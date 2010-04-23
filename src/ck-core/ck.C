@@ -516,11 +516,11 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("CkDeliverMessageFree: name of entry fn: %s\n", _entryTable[epIdx]->name);
   //fflush(stdout);
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif
   _entryTable[epIdx]->call(msg, obj);
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
   if (_entryTable[epIdx]->noKeep)
@@ -550,11 +550,11 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
       CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
   }
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
   _entryTable[epIdx]->call(deliverMsg, obj);
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
 }
@@ -569,7 +569,7 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
 
-#ifndef CMK_OPTIMIZE /* Consider tracing: */
+#if !CMK_TRACE_DISABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
     _invokeEntryNoTrace(epIdx,env,obj);
@@ -1447,7 +1447,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
   criticalPath_send(env);
   automaticallySetMessagePriority(env);
 #endif
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1536,7 +1536,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
     if(!CmiNodeAlive(CkMyPe())){
 	return;
     }
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
     _prepareMsg(entryIndex,msg,pCid);
 #endif
@@ -1573,7 +1573,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   criticalPath_send(env);
   automaticallySetMessagePriority(env);
 #endif
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
   CmiSetHandler(env, _charmHandlerIdx);
@@ -1902,7 +1902,7 @@ static void _prepareOutgoingArrayMsg(envelope *env,int type)
   _CHECK_USED(env);
   _SET_USED(env, 1);
   env->setMsgtype(type);
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
   setMemoryOwnedBy(((char*)env)-sizeof(CmiChunkHeader), 0);
 #endif
   CmiSetHandler(env, _charmHandlerIdx);
@@ -2331,7 +2331,7 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
     free(token);
     return;
   }
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
