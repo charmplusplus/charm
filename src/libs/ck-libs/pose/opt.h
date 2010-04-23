@@ -46,7 +46,7 @@ public:
       avgRBoffset = POSE_TimeMax/2;
     }
   /// Initialize the synchronization strategy type of the poser
-  void initSync() { parent->sync = OPTIMISTIC; }
+  inline void initSync() { parent->sync = OPTIMISTIC; }
   /// Perform a single forward execution step
   /** Prior to the forward execution, cancellation and rollback are done if
       necessary.  Derived strategies typically just reimplement this method */
@@ -86,7 +86,7 @@ public:
     return theTime;
   }
   /// Add spawned event to current event's spawned event list
-  void AddSpawnedEvent(int AnObjIdx, eventID evID, POSE_TimeType ts) { 
+  inline void AddSpawnedEvent(int AnObjIdx, eventID evID, POSE_TimeType ts) { 
     eq->AddSpawnToCurrent(AnObjIdx, evID, ts);
   }
   /// Send cancellation messages to all of event e's spawned events

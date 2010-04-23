@@ -72,7 +72,7 @@ class SRentry {
     }
   }
   /// Assignment operator
-  SRentry& operator=(const SRentry& e) {
+  inline SRentry& operator=(const SRentry& e) {
     timestamp = e.timestamp;
     sends = e.sends;
     recvs = e.recvs;

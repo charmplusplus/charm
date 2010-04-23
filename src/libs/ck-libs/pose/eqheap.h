@@ -82,7 +82,7 @@ class EqHeap {
       found in the heap */
   int DeleteEvent(eventID evID, POSE_TimeType timestamp);  
   /// Find maximum element
-  POSE_TimeType FindMax() {
+  inline POSE_TimeType FindMax() {
     if (top) return top->findMax();
     return POSE_UnsetTS;
   }
