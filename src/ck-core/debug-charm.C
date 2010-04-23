@@ -756,7 +756,7 @@ extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
          env->getMsgtype() == ForVidMsg || env->getMsgtype() == FillVidMsg || 
          _entryTable[env->getEpIdx()]->inCharm;
   }
-  return 0;
+  return 1;
 }
 #endif
 
