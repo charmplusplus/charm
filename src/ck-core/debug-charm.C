@@ -853,7 +853,7 @@ CkpvExtern(int, freezeModeFlag);
 #include "blue_impl.h"
 extern void BgProcessMessageFreezeMode(threadInfo *, char *);
 
-void CpdBlueGeneInit()
+void CpdBgInit()
 {
         // Register the BG handler for CCS. Notice that this is put into a variable shared by
         // the whole real processor. This because converse needs to find it. We check that all
@@ -879,7 +879,7 @@ void CpdBlueGeneInit()
 void CpdBreakPointInit() {}
 void CpdCharmInit() {}
 #if CMK_BLUEGENE_CHARM
-void CpdBlueGeneInit() {}
+void CpdBgInit() {}
 #endif
 
 void CpdFinishInitialization() {}

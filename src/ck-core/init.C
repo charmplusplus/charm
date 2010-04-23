@@ -854,7 +854,7 @@ extern "C" void initQd(char **argv)
 }
 
 #if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
-void CpdBlueGeneInit();
+void CpdBgInit();
 #endif
 void CpdBreakPointInit();
 
@@ -1141,7 +1141,7 @@ void _initCharm(int unused_argc, char **argv)
       // Register the BG handler for CCS. Notice that this is put into a variable shared by
       // the whole real processor. This because converse needs to find it. We check that all
       // virtual processors register the same index for this handler.
-    CpdBlueGeneInit();
+    CpdBgInit();
 #endif
 
 	if (faultFunc) {
