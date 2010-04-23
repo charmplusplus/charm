@@ -66,14 +66,12 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     if (fn->mergeFn == NULL) CmiAbort("Called CCS broadcast with NULL merge function!\n");
     if (repPE == -1) {
       /* CCS Broadcast */
-      CmiPrintf("calling CkReduce\n");
       CkReduce(msg, len, fn->mergeFn);
     } else {
       /* CCS Multicast */
       CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
     }
   } else {
-    CmiPrintf("Ccs replying\n");
     CcsImpl_reply(rep, repLen, repData);
   }
   return 0;
