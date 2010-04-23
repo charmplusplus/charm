@@ -849,6 +849,7 @@ void CpdCharmInit()
 
 #else
 
+void CpdBreakPointInit() {}
 void CpdCharmInit() {}
 
 void CpdFinishInitialization() {}

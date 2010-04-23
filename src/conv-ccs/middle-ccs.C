@@ -6,6 +6,7 @@
 #include "ccs-server.h"
 #include "conv-ccs.h"
 
+#if CMK_CCS_AVAILABLE
 extern "C" void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
 extern "C" void req_fw_handler(char *msg)
@@ -42,7 +43,6 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
-extern "C" void CcsSendReply(int replyLen, const void *replyData);
 extern int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
@@ -75,6 +75,7 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
     CcsImpl_reply(rep, repLen, repData);
   }
 }
+#endif
 
 /**********************************************
   "ccs_getinfo"-- takes no data
