@@ -15,8 +15,6 @@
 #include "blue_defs.h"
 #include "cklists.h"
 
-#define BG_CURRENT_VERSION      5
-
 extern int bglog_version;
 
 extern int bgcorroff;
@@ -80,13 +78,7 @@ public:
 #if DELAY_SEND
 //  void send();
 #endif
-  void pup(PUP::er &p) {
-    p|msgID; p|dstNode; p|sendTime; p|recvTime; p|tID; p|msgsize; 
-    CmiAssert(recvTime>=sendTime);
-    CmiAssert(msgsize >= 0);
-    if (p.isUnpacking()) group = 1;    // default value
-    if (bglog_version>0) p|group;
-  }
+  void pup(PUP::er &p);
 };
 
 /**
@@ -118,6 +110,9 @@ public:
 extern void BgDelaySend(BgMsgEntry *msgEntry);
 
 class BgTimeLineRec;
+
+enum BgMPIOp { MPI_NONE = 0, MPI_BARRIER = 1, MPI_ALLREDUCE = 2 };
+
 /**
   one time log for an handler function;
   it records a list of message sent events in an execution of handler
@@ -138,7 +133,8 @@ public:
 
   int ep;
   int seqno;
-  int size;
+  unsigned int mpiSize;
+  unsigned short mpiOp;
   short charm_ep;
 
   char name[20];
@@ -150,11 +146,7 @@ public:
   BgTimeLog(BgTimeLog *);
   BgTimeLog(const BgMsgID &msgID);
   BgTimeLog(char *msg, char *str=NULL);
-  BgTimeLog()
-    : ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0),
-      execTime(.0), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1), 
-      flag(0), size(0)
-    {strcpy(name,"dummyname");}
+  BgTimeLog();
   BgTimeLog(int epc, const char* name, double sTime, double eTime);
   BgTimeLog(int epc, const char* name, double sTime);
   ~BgTimeLog();
@@ -228,8 +220,6 @@ public:
   void pupCommon(PUP::er &p);
   void pup(PUP::er &p);
   void winPup(PUP::er &p, int& firstLogToRead, int& numLogsToRead);
-  void setSize(int s) { size = s; }
-
 #if DELAY_SEND
   void send() {
     for (int i=0; i<msgs.length(); i++)

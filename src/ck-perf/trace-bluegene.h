@@ -15,8 +15,7 @@
 
 #include "trace.h"
 
-// TraceBluegene is subclass of Trace, 
-// it defines Blue Gene specific tracing subroutines.
+// Bigsim emulator specific tracing subroutines.
 class TraceBluegene : public Trace {
 
  private:
@@ -33,7 +32,7 @@ class TraceBluegene : public Trace {
     void bgDummyBeginExec(const char* name,void** parentLogPtr, int split);
     void bgBeginExec(char* msg, char *str);
     void bgAmpiBeginExec(char *msg, char *str, void **logs, int count);
-    void bgAmpiSetSize(int size);
+    void bgAmpiLog(unsigned short op, unsigned int size);
     void bgSetInfo(char *msg, const char *str, void **logs, int count);
     void bgEndExec(int);
     virtual void beginExecute(envelope *);
@@ -77,8 +76,8 @@ extern int traceBluegeneLinked;
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList) _TRACE_BG_ONLY(CkpvAccess(_tracebg)->userBracketEvent(x,bt,et,pLogPtr,bgLogList))
 #define TRACE_BG_ADD_TAG(str)	_TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAddTag(str))
 
-# define TRACE_BG_AMPI_SET_SIZE(size) \
-    _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiSetSize(size))
+# define TRACE_BG_AMPI_LOG(op,size)					\
+    _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgAmpiLog(op,size))
 
 # define TRACE_BG_AMPI_SUSPEND()     \
 	_TRACE_BG_END_EXECUTE(1); \
@@ -134,6 +133,7 @@ extern "C" void BgSetStartEvent();
 #define _TRACE_BGLIST_USER_EVENT_BRACKET(x,bt,et,pLogPtr,bgLogList)
 #define _TRACE_BG_ADD_TAG(str)
 	
+# define TRACE_BG_AMPI_LOG(op, size)
 # define TRACE_BG_AMPI_SUSPEND()
 # define TRACE_BG_AMPI_RESUME(t, msg, str, log)
 # define TRACE_BG_AMPI_START(t, str)

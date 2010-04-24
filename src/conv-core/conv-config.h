@@ -88,6 +88,7 @@
 #endif
 
 #if ! CMK_CCS_AVAILABLE
+#undef CMK_CHARMDEBUG
 #define  CMK_CHARMDEBUG             0
 #endif
 
