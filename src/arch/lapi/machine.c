@@ -2097,7 +2097,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (CmiGetArgFlag(argv,"++debug")) {  /*Pause so user has a chance to start and attach debugger*/
         printf("CHARMDEBUG> Processor %d has PID %d\n",CmiMyNode(),getpid());
         if (!CmiGetArgFlag(argv,"++debug-no-pause"))
-            sleep(120);
+            sleep(30);
     }
 
 #if CMK_NODE_QUEUE_AVAILABLE
