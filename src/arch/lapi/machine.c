@@ -418,9 +418,7 @@ char *CopyMsg(char *msg, int len) {
     return copy;
 }
  
-#if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(CmiNodeState, NodeState);
-#endif
 
 #if CMK_IMMEDIATE_MSG
 #include "immediate.c"
@@ -2100,10 +2098,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
             sleep(30);
     }
 
-#if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 
+#if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(PCQueue, nodeBcastQ);
     CsvAccess(nodeBcastQ) = PCQueueCreate();
 #endif
