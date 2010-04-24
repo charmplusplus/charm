@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "middle.h"
 
 #if CMK_BLUEGENE_CHARM
