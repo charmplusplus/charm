@@ -829,7 +829,7 @@ static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
     /* Only check proc-level msgs */
     if (broot>=0
 #if CMK_NODE_QUEUE_AVAILABLE
-        && destrank != DGRAM_NODEMESSAGE)
+        && destrank != DGRAM_NODEMESSAGE
 #endif
     )
     {
