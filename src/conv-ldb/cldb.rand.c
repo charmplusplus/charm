@@ -76,7 +76,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   if (pe == CLD_ANYWHERE) {
     pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
       /* optimizationfor SMP */
-#if CMK_SMP
+#if CMK_NODE_QUEUE_AVAILABLE
     if (CmiNodeOf(pe) == CmiMyNode()) {
       CldNodeEnqueue(CmiMyNode(), msg, infofn);
       return;
