@@ -470,6 +470,7 @@ public:
   double  currTime;		/* thread timer */
 
   BgMessageWatcher *watcher;
+  int     cth_serialNo;         /* for record/replay */
 
   /*
    * It is needed for out-of-core scheduling
@@ -501,7 +502,8 @@ public:
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
   	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0), 
-        watcher(NULL), isCoreOnDisk(0), memUsed(0.0),
+        watcher(NULL), cth_serialNo(2),
+        isCoreOnDisk(0), memUsed(0.0),
 	startOutOfCore(1), startOOCChanged(0){}
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
@@ -519,8 +521,10 @@ class workThreadInfo : public threadInfo {
 private:
   int CsdStopFlag;
 public:
+  void* reduceMsg;
+  
   workThreadInfo(int _id, nodeInfo *_node): 
-        threadInfo(_id, WORK_THREAD, _node) { 
+        threadInfo(_id, WORK_THREAD, _node), reduceMsg(NULL) { 
     CsdStopFlag=0; 
     watcher = NULL;
     if (_id != -1) {
@@ -555,7 +559,8 @@ void    resetVTime();
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);
 void   addBgThreadMessage(char *msgPtr, int threadID);
-void   BgProcessMessage(threadInfo *t, char *msg);
+void   BgProcessMessageDefault(threadInfo *t, char *msg);
+extern void (*BgProcessMessage)(threadInfo *t, char *msg);
 
 
 /* blue gene debug */

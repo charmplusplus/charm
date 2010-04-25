@@ -172,6 +172,7 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID,
 
 void BgStartStreaming();
 void BgEndStreaming();
+void BgEnqueue(char *msg);         /* enqueue a msg to local queue */
 
 /************************ collective functions ************************/
 
@@ -278,6 +279,7 @@ void BgUnsetStartOutOfCore();
 /*********************** Record / Replay *************************/
 int BgIsRecord();
 int BgIsReplay();
+void BgRewindRecord();
 
 #if defined(__cplusplus)
 }

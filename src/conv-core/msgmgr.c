@@ -1,12 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 #include <stdlib.h>
 #include <converse.h>
+
+#define CmiAlloc  malloc
+#define CmiFree   free
 
 typedef struct CmmEntryStruct *CmmEntry;
 

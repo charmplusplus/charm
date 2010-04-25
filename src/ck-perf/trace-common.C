@@ -10,21 +10,6 @@
 */
 /*@{*/
 
-#include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
-#include <direct.h>
-#define CHDIR _chdir
-#define GETCWD _getcwd
-#define PATHSEP '\\'
-#define PATHSEPSTR "\\"
-#else
-#include <unistd.h>
-#define CHDIR chdir
-#define GETCWD getcwd
-#define PATHSEP '/'
-#define PATHSEPSTR "/"
-#endif
-
 // cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
 #include "middle.h"
@@ -195,19 +180,19 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif	
-  fprintf(stsfp, "TOTAL_CHARES %d\n", _chareTable.size());
-  fprintf(stsfp, "TOTAL_EPS %d\n", _entryTable.size());
-  fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
-  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
+  fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
+  fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
+  fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());
+  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", (int)0);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", (int)nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s\n", (int)i, _chareTable[i]->name);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
-                 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", (int)i, _entryTable[i]->name,
+                 (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
-    fprintf(stsfp, "MESSAGE %d %u\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
 extern "C"

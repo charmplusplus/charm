@@ -12,6 +12,9 @@
 /* build MPI. */
 #undef CMK_BUILD_ON_MPI
 
+/* enable charmdebug */
+#undef CMK_CHARMDEBUG
+
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 

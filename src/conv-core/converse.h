@@ -1228,6 +1228,7 @@ typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
+void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
 int        CthMigratable();

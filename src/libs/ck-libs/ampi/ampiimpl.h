@@ -81,7 +81,11 @@ class fromzDisk : public zdisk {
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
+#if CMK_CONVERSE_LAPI ||  CMK_BLUEGENE_CHARM
+#define AMPI_ALLTOALL_MEDIUM_MSG   4194304
+#else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
+#endif
 
 #if AMPI_COUNTER
 class AmpiCounters{

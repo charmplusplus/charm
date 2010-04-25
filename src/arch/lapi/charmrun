@@ -62,6 +62,7 @@ if [ -z "$args" -o "$args1" == "-" -o "$args1" == "+" ]
 fi
 
 executable=`echo $args | awk '{print $1}'`
+args=`echo ${args#*$executable}`
 
 # check if the node size has been set, or a file called .nodesize is present
 #if [ -z "$nodesize" ]
@@ -109,6 +110,8 @@ if [ -z "$llfile" ]
     exit
 fi
 
+if [ -n "$ppnused" ]
+then
 if [ $ppnused -gt 0 ]
     then
 #The MALLOCMULTIHEAP env var helps to improve the memory allocation performance
@@ -121,6 +124,7 @@ if [ $ppnused -gt 0 ]
         heaps=32
     fi
     export MALLOCMULTIHEAP=heaps:$heaps
+fi
 fi
 
 filename="charmrun_script.$$.ll"
@@ -292,6 +296,10 @@ grep -E -v "#@" $llfile | grep "export" >> $filename
 
 if [ ! -x "$executable" ]
     then
+    executable = "$PWD/$executable"
+fi
+if [ ! -x "$executable" ]
+    then
     echo "Executable not found: $executable"
     exit
 fi
@@ -299,8 +307,8 @@ fi
 if [ $interactive -eq 0 ]
     then
     # submit the job as poe, iterating 
-    echo "Running interactively> poe $args -llfile $filename"
-    poe $args -llfile $filename
+    echo "Running interactively> poe $executable $args -llfile $filename"
+    poe $executable $args -llfile $filename
     status=$?
     if [ $status -eq 255 ];
       then
@@ -312,7 +320,7 @@ if [ $interactive -eq 0 ]
       do
       echo "Retrying in two minutes..."
       sleep 120
-      poe $args -llfile $filename;
+      poe $executable $args -llfile $filename;
       status=$?
       if [ $status -eq 255 ];
         then
@@ -325,10 +333,10 @@ if [ $interactive -eq 0 ]
     
 else
     # append the command at the end of the file and llsubmit it
-    echo "Submitting batch> poe $args"
+    echo "Submitting batch> poe $executable $args"
     cat >> $filename <<EOF
 
-poe $args
+poe $executable $args
 EOF
     llsubmit $filename
 fi

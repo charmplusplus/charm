@@ -1,4 +1,6 @@
 
+#define CMK_CONVERSE_LAPI                                  1
+
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         0

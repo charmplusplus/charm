@@ -11,17 +11,20 @@ public:
          */
         virtual CmiBool record(char *msg) { return CmiFalse; }
         virtual int replay() { return 0; }
+	virtual void rewind() {}
 };
 
 class BgMessageRecorder : public BgMessageWatcher {
         FILE *f;
+	long pos;
 public:
         BgMessageRecorder(FILE * f_);
         ~BgMessageRecorder() { fclose(f); }
 
         virtual CmiBool record(char *msg) {
-                //if (BgGetGlobalWorkerThreadID()==1) printf("srcpe: %d size: %d handle: %d\n",CmiBgMsgSrcPe(msg),CmiBgMsgLength(msg),CmiBgMsgHandle(msg));
+//                if (BgGetGlobalWorkerThreadID()==0) printf("srcpe: %d size: %d handle: %d\n",CmiBgMsgSrcPe(msg),CmiBgMsgLength(msg),CmiBgMsgHandle(msg));
                 int d = CmiBgMsgSrcPe(msg);
+		pos = ftell(f);
                 fwrite(&d, sizeof(int), 1, f);
                 if (d == BgGetGlobalWorkerThreadID()) return CmiTrue; // don't record local msg
                 d = CmiBgMsgLength(msg);
@@ -36,6 +39,10 @@ printf("replay: %d %d\n", m[0], m[1]);
                 return CmiTrue;
         }
         virtual int replay() { return 0; }
+	virtual void rewind() {
+//if (BgGetGlobalWorkerThreadID()==0) printf("rewind to %ld\n", pos);
+		fseek(f, pos, SEEK_SET);
+	}
 };
 
 class BgMessageReplay : public BgMessageWatcher {
@@ -50,8 +57,8 @@ public:
                 int nextPE;
                 int ret =  fread(&nextPE, sizeof(int), 1, f);
                 if (-1 == ret || ret == 0) {
-                        printf("BgMessageReplay> Emulation replay finished due to end of log.\n");
-                        printf("BgMessageReplay> Replayed %d local records and %d remote records, total of %d bytes.\n", lcount, rcount, ftell(f));
+                        printf("BgMessageReplay> Emulation replay finished at %f seconds due to end of log.\n", CmiWallTimer());
+                        printf("BgMessageReplay> Replayed %d local records and %d remote records, total of %d bytes of data replayed.\n", lcount, rcount, ftell(f));
                         ConverseExit();
                         return 0;
                 }

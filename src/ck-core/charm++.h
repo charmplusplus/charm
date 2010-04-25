@@ -1181,6 +1181,8 @@ inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)
 
 /************************** Debugging Utilities **************/
 
+CkpvExtern(DebugEntryTable, _debugEntryTable);
+
 //For debugging: convert given index to a string (NOT threadsafe)
 static const char *idx2str(const CkArrayIndex &ind) {
   static char retBuf[80];
@@ -1217,7 +1219,7 @@ public:
   }
     */
   void deallocate() {
-    CkPrintf("CkConditional::delete %d\n",refcount);
+    //CkPrintf("CkConditional::delete %d\n",refcount);
     if (--refcount == 0) {
       //((CkConditional*)p)->~CkConditional();
       delete this;
