@@ -215,9 +215,15 @@ embed_cc(str, blk) ::=
 >>
 
 
-class_var_decl(modl, type, declList) ::=
+class_var_decl(modl, type, declList, domainExps) ::=
 <<
-<if(modl)><modl>:<else>public:<endif> <type> <declList>;
+<if(modl)>
+<modl>:
+<else>
+public:
+<endif>
+<domainExps; separator="; ">
+<type> <declList>;
 >>
 
 
@@ -233,9 +239,9 @@ var_decl(id, initializer) ::=
 >>
 
 
-var_decl_id(id, array_decl_list) ::=
+var_decl_id(id, domainExp) ::=
 <<
-<id><if(array_decl_list)> <array_decl_list><endif>
+<id><if(domainExp)> <domainExp><endif>
 >>
 
 
@@ -257,10 +263,11 @@ local_mod_list(mods) ::=
 >>
  
 
-local_var_decl(modList, type, declList) ::=
+local_var_decl(modList, type, declList, domainExps) ::=
 <<
+<domainExps>
 <if(modList)>
-<modList> <type> <declList>;
+<modList> <type> <declList>
 <else>
 <type> <declList>;
 <endif>
@@ -402,4 +409,10 @@ arguments(exprs) ::=
 <exprs; separator=", ">
 >>
 
-
+range_constructor(range, others) ::=
+<<
+<if(range)>
+(new Domain(<range>)<if(others)>, <others; separator=", "><endif>)
+<else>
+<endif>
+>>

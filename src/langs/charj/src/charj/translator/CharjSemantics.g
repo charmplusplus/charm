@@ -119,14 +119,14 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^('template'? i1=IDENT* ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*))
+    :   ^('template' i1=IDENT* typeDeclaration[$imports])
         {
             // JL: Need to fill the templateArgs in ClassSymbol, and push this down
             // to the class subtree
         }
     |   ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            Scope outerScope = $ScopeStack[-1]::current;
+            /*Scope outerScope = $ScopeStack[-1]::current;
             $sym = new ClassSymbol(symtab, $i2.text, null, outerScope);
             outerScope.define($sym.name, $sym);
             currentClass = $sym;
@@ -134,7 +134,7 @@ scope ScopeStack; // top-level type scope
             $sym.definitionTokenStream = input.getTokenStream();
             $i2.symbol = $sym;
             $ScopeStack::current = $sym;
-            importPackages($sym, $imports);
+            importPackages($sym, $imports);*/
         }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
@@ -183,13 +183,32 @@ variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
     
-variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+variableDeclaratorId returns [CharjAST domainExp]
+    :   ^(IDENT domainExpression? { domainExp = $domainExpression.start; }  )
+    ;
+
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
     ;
 
 variableInitializer
     :   arrayInitializer
-    |   expression
+    |   newExpression
     ;
 
 arrayDeclaratorList
@@ -242,11 +261,11 @@ type
     ;
 
 simpleType
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
+    :   ^(TYPE primitiveType domainExpression?)
     ;
     
 objectType
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 qualifiedTypeIdent
@@ -254,7 +273,7 @@ qualifiedTypeIdent
     ;
 
 typeIdent
-    :   ^(IDENT genericTypeArgumentList?)
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
@@ -270,6 +289,15 @@ primitiveType
 
 genericTypeArgumentList
     :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
+    ;
+
+templateArgList
+    :   genericTypeArgument+
+    ;
+
+templateInstantiation
+    :   ^(TEMPLATE_INST templateArgList)
+    |   ^(TEMPLATE_INST templateInstantiation)
     ;
     
 genericTypeArgument
@@ -352,7 +380,7 @@ forInit
 parenthesizedExpression
     :   ^(PAREN_EXPR expression)
     ;
-    
+
 expression
     :   ^(EXPR expr)
     ;
@@ -432,12 +460,16 @@ arrayTypeDeclarator
     ;
 
 newExpression
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
+    ;
+
+/*newExpression
     :   ^(  STATIC_ARRAY_CREATOR
             (   primitiveType newArrayConstruction
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
-    ;
+    ;*/
 
 newArrayConstruction
     :   arrayDeclaratorList arrayInitializer
