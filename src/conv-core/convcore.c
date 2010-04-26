@@ -3462,4 +3462,11 @@ unsigned int CmiLog2(unsigned int val) {
 }
 #endif
 
+#if CMK_BLUEGENE_CHARM
+int CmiMyRank_()
+{
+  return CmiMyRank();
+}
+#endif
+
 /*@}*/
