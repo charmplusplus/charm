@@ -20,11 +20,11 @@ Modified from the original: changed output format, and converted main to a param
 
 /* comment this out to test and change CmiPrintf to printf */
 #include "converse.h"
-#include "typedefs.h"
+#include "graphdefs.h"
 
-int addEdge(EdgeListType *l,int fm,int to);
-void addspEdge(EdgeListType *, int, int);
-int edgeExists(int fm, int to);
+int addEdge(VerticesListType *graph, EdgeListType *l,int fm,int to);
+void addspEdge(VerticesListType *graph, EdgeListType *, int, int);
+int edgeExists(VerticesListType *graph, int fm, int to);
 static Q * makeQueue();
 static int isEmpty(Q*);
 static int dequeue(Q*);
@@ -33,9 +33,6 @@ static int dequeue(Q*);
 int V; /* no. of vertices */
 int E; /* no. of edges */
 int C; /* no. of connections per vertex */
-int seed;
-
-VerticesListType graph;
 
 VerticesListType * InitVertices();
 
@@ -49,12 +46,14 @@ main(int argc, char **argv)
 
 static void printOut(VerticesListType *vertices);
 static void copyOut(VerticesListType *vertices, int *npe, int *pes);
-static void initGraph(void);
-static void diameter(void);
-static void AddEdges(EdgeListType *EdgeList, int V, int n);
+static void initGraph(VerticesListType *graph);
+static void diameter(VerticesListType *graph);
+static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n);
 
 void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
 { int i;
+  VerticesListType graph;
+  int seed;
   EdgeListType * EdgeList;
   /* VerticesListType * vertices; */
   extern EdgeListType * InitEdgeList();
@@ -78,9 +77,9 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   for (i=0; i<seed; i++) CrnRand();
   if ((V*C %2) != 0) printf("V*C must be even\n");
   E = V*C/2;
-  initGraph();
+  initGraph(&graph);
   EdgeList = InitEdgeList(E);
-  AddEdges(EdgeList, V, E); 
+  AddEdges(&graph, EdgeList, V, E); 
   /*  vertices = (VerticesListType *) InitVertices(EdgeList, V,E); */
 
   if (tofile) {
@@ -88,7 +87,7 @@ void gengraph(int pV, int pC, int pseed, int *pes, int *npe, int tofile)
   }
   else copyOut(&graph, npe, pes);
 
-  if (CmiMyPe()==0) diameter();
+  if (CmiMyPe()==0) diameter(&graph);
 }
 
 #if 0
@@ -126,7 +125,7 @@ n -= (V-1);
 }
 #endif
 
-static void AddEdges(EdgeListType *EdgeList, int V, int n)
+static void AddEdges(VerticesListType *graph, EdgeListType *EdgeList, int V, int n)
 	/* Add more edges to make up a total of E edges */
   {	int i,j,w,x,y,k;
 	int c1,max,maxi;
@@ -145,7 +144,7 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	  for (j=0; j<c1; j++) {
 	      w = c1*i + j +1; 
 	      if (w < V) {
-		addEdge(EdgeList,i,w);
+		addEdge(graph, EdgeList,i,w);
 		count++;
 			      }
 	     	  }
@@ -153,13 +152,14 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 	/*varr is array of vertices and free connection for each vertex*/
 	j=0;
 	for (i=0;i<V;i++)
-		if(connections(i)<C)
+		if(connections(graph, i)<C)
 		{
 		 varr[j][0]=i;
-		 varr[j][1]=C-connections(i);
+		 varr[j][1]=C-connections(graph,i);
 		 j++;
 		}
 	varrlen=j;
+	CmiAssert(varrlen>0);
 	
 	/*for all edges except last 10 , edge is formed by randomly selecting vertices from varr*/
 
@@ -237,13 +237,13 @@ static void AddEdges(EdgeListType *EdgeList, int V, int n)
 				         	 } while (y == x);
 				else addEdge(EdgeList,varr[x][0],varr[y][0]); */
 
-				if (edgeExists(varr[x][0],varr[y][0])&&(j==k-1))
-					addspEdge(EdgeList,varr[x][0],varr[y][0]);
+				if (edgeExists(graph, varr[x][0],varr[y][0])&&(j==k-1))
+					addspEdge(graph, EdgeList,varr[x][0],varr[y][0]);
 				else	
 				{
-					while((y==x)||(edgeExists(varr[x][0],varr[y][0])))
+					while((y==x)||(edgeExists(graph,varr[x][0],varr[y][0])))
 				     		y = rand() % varrlen;
-					addEdge(EdgeList,varr[x][0],varr[y][0]); 
+					addEdge(graph,EdgeList,varr[x][0],varr[y][0]); 
 				}
 
 				varr[x][1]=varr[x][1]-1;
@@ -454,24 +454,24 @@ static void printOut(VerticesListType *vertices)
    }
 }
 
-static void initGraph(void)
+static void initGraph(VerticesListType *graph)
 { int i;
-  graph.numVertices = V;
-  graph.vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
-  _MEMCHECK(graph.vertexArray);
-  graph.adjArray = (int *) malloc(2*E*sizeof(int));
-  _MEMCHECK(graph.adjArray);
+  graph->numVertices = V;
+  graph->vertexArray = (Vertex *) malloc(V*sizeof(Vertex));
+  _MEMCHECK(graph->vertexArray);
+  graph->adjArray = (int *) malloc(2*E*sizeof(int));
+  _MEMCHECK(graph->adjArray);
 
   for (i=0; i< V; i++) {
-    graph.vertexArray[i].degree = 0;
-    graph.vertexArray[i].next = i*C;
-    graph.vertexArray[i].adjListInd = i*C;
+    graph->vertexArray[i].degree = 0;
+    graph->vertexArray[i].next = i*C;
+    graph->vertexArray[i].adjListInd = i*C;
   }
 }
 
 static void enqueue(Q *q, int i);
 
-static void diameter(void)
+static void diameter(VerticesListType *graph)
 {
   Q * makeQueue();
   int i,j, k, v, w, start;
@@ -499,9 +499,9 @@ static void diameter(void)
     while (! (isEmpty(q))) {
       v = dequeue(q);
       
-      start=graph.vertexArray[v].adjListInd;
-      for (k=0; k< graph.vertexArray[i].degree; k++) {
-	w = graph.adjArray[k+start];
+      start=graph->vertexArray[v].adjListInd;
+      for (k=0; k< graph->vertexArray[i].degree; k++) {
+	w = graph->adjArray[k+start];
 	if (distance[w] == -1) {
 	  distance[w] = distance[v] + 1;
 	  enqueue(q, w);
