@@ -85,7 +85,7 @@ extern "C" {
 
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern int memory_status_info;
 extern int memory_chare_id;
 #define setMemoryStatus(p) { \
@@ -835,7 +835,7 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 #define CmiAssert(expr) ((void) 0)
 #else
 #if defined(__STDC__) || defined(__cplusplus)
@@ -1792,7 +1792,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else
