@@ -1947,6 +1947,20 @@ void CkDeleteChares() {
   int i;
   int numGroups = CkpvAccess(_groupIDTable)->size();
 
+  // delete all plain chares
+#ifndef CMK_CHARE_USE_PTR
+  for (i=0; i<CpvAccess(chare_objs).size(); i++) {
+	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
+	delete obj;
+	CpvAccess(chare_objs)[i] = NULL;
+  }
+  for (i=0; i<CpvAccess(vidblocks).size(); i++) {
+	VidBlock *obj = CpvAccess(vidblocks)[i];
+	delete obj;
+	CpvAccess(vidblocks)[i] = NULL;
+  }
+#endif
+
   // delete all array elements
   for(i=0;i<numGroups;i++) {
     IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
@@ -1954,7 +1968,6 @@ void CkDeleteChares() {
       CkLocMgr *mgr = (CkLocMgr*)obj;
       ElementDestroyer destroyer(mgr);
       mgr->iterate(destroyer);
-printf("[%d] DELETE!\n", CkMyPe());
     }
   }
 
