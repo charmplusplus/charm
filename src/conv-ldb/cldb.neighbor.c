@@ -349,7 +349,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     /* always pack the message because the message may be move away
        to a different processor later by CldGetToken() */
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    if (pfn) {
+    if (pfn && CmiNumNodes()>1) {
        pfn(&msg);
        ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
