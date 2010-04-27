@@ -7,7 +7,7 @@ CpvCExtern(int,_traceCoreOn);
 extern "C" {
 #endif
 /* Tracing API */
-#if CMK_TRACE_IN_CHARM || CMK_TRACE_DISABLED
+#if CMK_TRACE_IN_CHARM || ! CMK_TRACE_ENABLED
 #define LOGCONDITIONAL(x) 
 #else 
 #define LOGCONDITIONAL(x) do { if(CpvAccess(_traceCoreOn)!=0){ \

@@ -1190,6 +1190,7 @@ if test -n "$ac_init_help"; then
 Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-error-checking enable error checking
   --enable-tracing        enable tracing modules
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
@@ -1637,10 +1638,35 @@ Echo() {
 	echo $* >> $charmout
 }
 
+# enable/disable error checking
+# Check whether --enable-error-checking was given.
+if test "${enable_error_checking+set}" = set; then
+  enableval=$enable_error_checking;
+else
+  enable_error_checking=yes
+fi
+
+
+if test "$enable_error_checking" = "no"
+then
+  Echo "Error checking is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_ERROR_CHECKING 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_ERROR_CHECKING 1
+_ACEOF
+
+fi
+
 # check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
-  enableval=$enable_tracing; enable_tracing=$enableval
+  enableval=$enable_tracing;
 else
   enable_tracing=yes
 fi
@@ -1651,14 +1677,20 @@ then
   Echo "Charm tracing is disabled"
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_TRACE_DISABLED 1
+#define CMK_TRACE_ENABLED 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TRACE_ENABLED 1
 _ACEOF
 
 fi
 
 # Check whether --enable-charmdebug was given.
 if test "${enable_charmdebug+set}" = set; then
-  enableval=$enable_charmdebug; enable_charmdebug=$enableval
+  enableval=$enable_charmdebug;
 else
   enable_charmdebug=yes
 fi

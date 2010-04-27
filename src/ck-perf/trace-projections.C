@@ -82,14 +82,14 @@ void flushTraceLog()
   CkpvAccess(_trace)->traceFlushLog();
 }
 
-#if CMK_TRACE_DISABLED
+#if ! CMK_TRACE_ENABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not available in optimized version!!!!\n\n\n"); }
 #else
 #define OPTIMIZED_VERSION /*empty*/
-#endif // CMK_TRACE_DISABLED
+#endif // CMK_TRACE_ENABLED
 
 /*
 On T3E, we need to have file number control by open/close files only when needed.
@@ -171,7 +171,7 @@ void traceThreadListener_free(struct CthThreadListener *l)
 
 void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   /* strip essential information from the envelope */
   TraceThreadListener *a= new TraceThreadListener;
   
@@ -1690,7 +1690,7 @@ void registerOutlierReduction() {
 // FIXME: WHY extern "C"???
 extern "C" void TraceProjectionsExitHandler()
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());
