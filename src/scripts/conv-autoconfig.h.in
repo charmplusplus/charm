@@ -42,6 +42,9 @@
 /* whether getProcAddress works */
 #undef CMK_DLL_USE_WIN32
 
+/* enable error checking */
+#undef CMK_ERROR_CHECKING
+
 /* whether C++ class explicit keyword works */
 #undef CMK_EXPLICIT
 

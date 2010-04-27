@@ -19,6 +19,21 @@ Echo() {
 	echo $* >> $charmout
 }
 
+# enable/disable error checking
+AC_ARG_ENABLE([error-checking],
+            [AS_HELP_STRING([--enable-error-checking],
+              [enable error checking])],
+            [enable_errorchecking=$enableval],
+            [enable_errorchecking=yes])
+
+if test "$enable_errorchecking" = "no"
+then
+  Echo "Error checking is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 0, [disable error checking])
+else
+  AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
+fi
+
 # check enable/disable
 AC_ARG_ENABLE([tracing],
             [AS_HELP_STRING([--enable-tracing],
