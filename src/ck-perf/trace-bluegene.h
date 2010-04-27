@@ -52,14 +52,14 @@ class TraceBluegene : public Trace {
 CkpvExtern(TraceBluegene*, _tracebg);
 extern int traceBluegeneLinked;
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #  define _TRACE_BG_ONLY(code) do{ BgGetTime(); if(traceBluegeneLinked && CpvAccess(traceOn)){ code; } resetVTime(); } while(0)
 #else
 #  define _TRACE_BG_ONLY(code) /*empty*/
 #endif
 
 /* tracing for Blue Gene - before trace projector era */
-#if !CMK_TRACE_DISABLED && CMK_TRACE_IN_CHARM
+#if CMK_TRACE_ENABLED && CMK_TRACE_IN_CHARM
 // for Sdag only
 // fixme - think of better api for tracing sdag code
 #define BgPrint(x)  _TRACE_BG_ONLY(CkpvAccess(_tracebg)->bgPrint(x))

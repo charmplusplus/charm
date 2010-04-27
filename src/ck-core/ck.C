@@ -569,7 +569,7 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
 
-#if !CMK_TRACE_DISABLED 
+#if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
     _invokeEntryNoTrace(epIdx,env,obj);
@@ -2331,7 +2331,7 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
     free(token);
     return;
   }
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);

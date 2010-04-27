@@ -1166,7 +1166,7 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());

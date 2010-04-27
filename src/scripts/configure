@@ -1641,13 +1641,13 @@ Echo() {
 # enable/disable error checking
 # Check whether --enable-error-checking was given.
 if test "${enable_error_checking+set}" = set; then
-  enableval=$enable_error_checking; enable_errorchecking=$enableval
+  enableval=$enable_error_checking;
 else
-  enable_errorchecking=yes
+  enable_error_checking=yes
 fi
 
 
-if test "$enable_errorchecking" = "no"
+if test "$enable_error_checking" = "no"
 then
   Echo "Error checking is disabled"
 
@@ -1666,7 +1666,7 @@ fi
 # check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
-  enableval=$enable_tracing; enable_tracing=$enableval
+  enableval=$enable_tracing;
 else
   enable_tracing=yes
 fi
@@ -1677,14 +1677,20 @@ then
   Echo "Charm tracing is disabled"
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_TRACE_DISABLED 1
+#define CMK_TRACE_ENABLED 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TRACE_ENABLED 1
 _ACEOF
 
 fi
 
 # Check whether --enable-charmdebug was given.
 if test "${enable_charmdebug+set}" = set; then
-  enableval=$enable_charmdebug; enable_charmdebug=$enableval
+  enableval=$enable_charmdebug;
 else
   enable_charmdebug=yes
 fi

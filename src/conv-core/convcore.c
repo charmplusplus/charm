@@ -1405,7 +1405,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
@@ -1422,7 +1422,7 @@ void CmiHandleMessage(void *msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
 	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
@@ -1745,7 +1745,7 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -1773,7 +1773,7 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -3231,7 +3231,7 @@ void ConverseCommonInit(char **argv)
    }
 #endif
 	
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
@@ -3280,7 +3280,7 @@ void ConverseCommonExit(void)
 {
   CcsImpl_kill();
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceClose();
 /*closeTraceCore();*/ /* projector */
 #endif
