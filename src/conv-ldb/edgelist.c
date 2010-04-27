@@ -8,7 +8,7 @@
 /* The data structure/ ADT for the edge-list */
 #include <stdio.h>
 #include <stdlib.h>
-#include "typedefs.h"
+#include "graphdefs.h"
 
 extern VerticesListType graph;
 

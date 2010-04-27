@@ -20,7 +20,7 @@ Modified from the original: changed output format, and converted main to a param
 
 /* comment this out to test and change CmiPrintf to printf */
 #include "converse.h"
-#include "typedefs.h"
+#include "graphdefs.h"
 
 int addEdge(EdgeListType *l,int fm,int to);
 void addspEdge(EdgeListType *, int, int);
