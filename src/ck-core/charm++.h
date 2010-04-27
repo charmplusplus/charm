@@ -724,11 +724,11 @@ class CProxy_Chare : public CProxy {
     CkChareID _ck_cid;
   public:
     CProxy_Chare() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_cid.onPE=0; _ck_cid.objPtr=0;
 #endif
     }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const  {   //Make sure this proxy has a value
 #ifdef CMK_CHARE_USE_PTR
 	if (_ck_cid.objPtr==0)
@@ -808,7 +808,7 @@ class CProxy_Group : public CProxy {
 
   public:
     CProxy_Group() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_gid.setZero();
 #endif
 	//CkPrintf(" In CProxy_Group Constructor\n");
@@ -828,7 +828,7 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
 		CkAbort("Error! This group proxy has not been initialized!");
@@ -1017,7 +1017,7 @@ class CProxy_NodeGroup : public CProxy{
     CkGroupID _ck_gid;
   public:
     CProxy_NodeGroup() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_gid.setZero();
 #endif
 	//CkPrintf("In CProxy_NodeGroup0 Constructor %d\n",CkLocalNodeBranch(_ck_gid));
@@ -1031,7 +1031,7 @@ class CProxy_NodeGroup : public CProxy{
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
 		CkAbort("Error! This group proxy has not been initialized!");
