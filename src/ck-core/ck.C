@@ -545,7 +545,7 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   { /* Method needs a copy of the message to keep/delete */
     void *oldMsg=(void *)msg;
     deliverMsg=CkCopyMsg(&oldMsg);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (oldMsg!=msg)
       CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
@@ -1506,7 +1506,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     CkSendMsgInline(entryIdx, msg, pCid, opts);
     return;
   }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (opts & CK_MSG_IMMEDIATE) {
     CmiAbort("Immediate message is not allowed in Chare!");
   }
@@ -1565,7 +1565,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
@@ -1654,7 +1654,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
 #else
       envelope *env=UsrToEnv(msg);
@@ -1808,7 +1808,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     if (obj!=NULL)
     { //Just directly call the group:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
 #else
       envelope *env=UsrToEnv(msg);
