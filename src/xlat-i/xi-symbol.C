@@ -986,28 +986,29 @@ Chare::genDecls(XStr& str)
     }
   }
 
-  if (!templat)
-  { //Generate a CBase typedef:
-    TypeList *b=bases_CBase;
-    if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
-    if (isPython()) { //Generate a python base: typedef CBaseT<Python_me,CProxy_me> CBase_me;
-      str << "typedef CBaseT<"<<Prefix::Python<<type<<",CProxy_"<<type<<"> "
-	  <<" CBase_"<<type<<";\n";
-    } else { //Generate normal CBase_me definition
-      switch(b->length()) {
-      case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
-	str << "typedef CBaseT<";
-        str <<b->getFirst()<<",CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
-	break;
-      case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
-	str << "typedef CBaseT2<";
-        str << b->getFirst() << ",";
-        str << b->getSecond() << "," <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
-	break;
-      default: //No base class, or several: give up, don't generate a CBase_me.
-	break;
-      };
-    }
+  // Create CBase_Whatever convenience type so that chare implementations can
+  // avoid inheriting from a complex CBaseT templated type.
+  TypeList *b=bases_CBase;
+  if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+  if (templat) {
+    templat->genSpec(str);
+    str << "\nclass CBase_" << type << " : public ";
+  } else {
+    str << "typedef ";
+  }
+  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT<");
+  if (isPython()) {
+    str << Prefix::Python << type;
+  } else {
+    str << b->getFirst();
+    if (b->length() >= 2) str << "," << b->getSecond();
+  }
+  str << ", CProxy_" << type;
+  if (templat) {
+    templat->genVars(str);
+    str << " > { };\n";
+  } else {
+    str << "> CBase_" << type << ";\n";
   }
 }
 
