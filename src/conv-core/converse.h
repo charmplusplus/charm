@@ -122,9 +122,7 @@ void setMemoryOwnedBy(void *p, int id);
 # define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
 #endif
 
-#if CMK_BLUEGENE_CHARM
 extern int CmiMyRank_();
-#endif
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
