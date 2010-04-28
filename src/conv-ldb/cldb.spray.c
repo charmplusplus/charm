@@ -126,15 +126,15 @@ void CldHopHandler(char *msg)
   CldInfoFn ifn; CldPackFn pfn; int pe;
 
   if (pinf->rebalance) {
-    ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
-    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    if (pfn) {
-      pfn(&msg);
-      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    }
     /* do pe = ((lrand48()&0x7FFFFFFF)%CmiNumPes()); */
     do pe = ((CrnRand()&0x7FFFFFFF)%CmiNumPes());
     while (pe == pinf->mype);
+    ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    if (pfn && CmiNodeOf(pe) != CmiMyNode()) {
+      pfn(&msg);
+      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    }
     CmiSyncSendAndFree(pe, len, msg);
     pinf->rebalance--;
   } else {
@@ -193,7 +193,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
   if (pe != CLD_ANYWHERE) {
-    if (pfn && (pe != CmiMyPe())) {
+    if (pfn && (CmiNodeOf(pe) != CmiMyNode())) {
       pfn(&msg);
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }

@@ -15,7 +15,7 @@
 #define CkIntbits (sizeof(int)*8)
 #endif
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _SET_USED(env, x) (env)->setUsed((x))
 #define _CHECK_USED(env) do { if(env->isUsed()) \
                            CmiAbort("Message being re-sent. Aborting...\n"); \
@@ -214,10 +214,10 @@ private:
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
     void   setMsgtype(const UChar m) { attribs.mtype = m; }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
-#else /* CMK_OPTIMIZE */
+#else /* CMK_ERROR_CHECKING */
     inline void setUsed(const UChar u) {}
 #endif
     UChar  getMsgIdx(void) const { return attribs.msgIdx; }
