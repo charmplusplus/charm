@@ -2,7 +2,7 @@
 %{
 #include <iostream>
 #include <string>
-#include <strings.h>
+#include <string.h>
 #include "xi-symbol.h"
 #include "EToken.h"
 using namespace xi;
