@@ -439,8 +439,8 @@ for each processor in the node.
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
        } else { \
-               if(CMK_MAX_PTHREADS < CmiMyNodeSize()){ \
-		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()); \
+               if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
+		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
 		 CmiAbort("Error in TLS-based Converse Private Variables"); \
 	       } \
 	       CMK_TAG(Cpv_inited_,v)=1; \
