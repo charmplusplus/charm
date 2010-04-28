@@ -235,6 +235,13 @@ TParamList::print(XStr& str)
   }
 }
 
+std::string TParamList::to_string()
+{
+    XStr s;
+    print(s);
+    return s.get_string();
+}
+
 
 void
 Type::genProxyName(XStr &str,forWhom forElement)
