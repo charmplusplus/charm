@@ -419,7 +419,7 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
-#define CMK_MAX_PTHREADS     64
+#define CMK_MAX_PTHREADS     128
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
@@ -441,7 +441,10 @@ for each processor in the node.
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
        } else { \
-               CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()); \
+               if(CMK_MAX_PTHREADS < CmiMyNodeSize()){ \
+		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()); \
+		 CmiAbort("Error in TLS-based Converse Private Variables"); \
+	       } \
 	       CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0); \
