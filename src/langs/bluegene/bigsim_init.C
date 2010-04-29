@@ -43,6 +43,8 @@ extern "C" void BgAttach(CthThread t)
   CtvAccessOther(t, threadinfo)= cta(threadinfo);
     // special thread scheduling
   BgSetStrategyBigSimDefault(t);
+    // set serial number
+  CthSetSerialNo(t, CtvAccessOther(t, threadinfo)->cth_serialNo++);
 }
 
 extern "C" void BgSetStartOutOfCore(){

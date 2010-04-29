@@ -15,7 +15,7 @@
 #define CkIntbits (sizeof(int)*8)
 #endif
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _SET_USED(env, x) (env)->setUsed((x))
 #define _CHECK_USED(env) do { if(env->isUsed()) \
                            CmiAbort("Message being re-sent. Aborting...\n"); \
@@ -214,10 +214,10 @@ private:
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
     void   setMsgtype(const UChar m) { attribs.mtype = m; }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
-#else /* CMK_OPTIMIZE */
+#else /* CMK_ERROR_CHECKING */
     inline void setUsed(const UChar u) {}
 #endif
     UChar  getMsgIdx(void) const { return attribs.msgIdx; }
@@ -241,8 +241,10 @@ private:
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
+      //for record-replay
       memset(env, 0, sizeof(envelope));
+      env->setEvent(++CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
@@ -250,8 +252,6 @@ private:
       env->setPacked(0);
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
-      //for record-replay
-      env->setEvent(++CkpvAccess(envelopeEventID));
       env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
@@ -377,6 +377,10 @@ inline void *_allocMsg(const int msgtype, const int size, const int prio=0) {
 
 inline void _resetEnv(envelope *env) {
   env->reset();
+}
+
+inline void setEventID(envelope *env){
+  env->setEvent(++CkpvAccess(envelopeEventID));
 }
 
 /** @} */

@@ -10,21 +10,6 @@
 */
 /*@{*/
 
-#include <stdlib.h>
-#if defined(_WIN32) && !defined(__CYGWIN__)
-#include <direct.h>
-#define CHDIR _chdir
-#define GETCWD _getcwd
-#define PATHSEP '\\'
-#define PATHSEPSTR "\\"
-#else
-#include <unistd.h>
-#define CHDIR chdir
-#define GETCWD getcwd
-#define PATHSEP '/'
-#define PATHSEPSTR "/"
-#endif
-
 // cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
 #include "middle.h"
@@ -38,9 +23,9 @@
 
 CpvCExtern(int, _traceCoreOn);   // projector
 
-#if CMK_TRACE_DISABLED
+#if ! CMK_TRACE_ENABLED
 static int warned = 0;
-#define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available with CMK_TRACE_DISABLED!\n");  return;  }
+#define OPTIMIZE_WARNING if (!warned) { warned=1;  CmiPrintf("\n\n!!!! Warning: tracing not available without CMK_TRACE_ENABLED!\n");  return;  }
 #else
 #define OPTIMIZE_WARNING /*empty*/
 #endif
@@ -195,19 +180,19 @@ extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif	
-  fprintf(stsfp, "TOTAL_CHARES %d\n", _chareTable.size());
-  fprintf(stsfp, "TOTAL_EPS %d\n", _entryTable.size());
-  fprintf(stsfp, "TOTAL_MSGS %d\n", _msgTable.size());
-  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", 0);
-  fprintf(stsfp, "TOTAL_EVENTS %d\n", nUserEvents);
+  fprintf(stsfp, "TOTAL_CHARES %d\n", (int)_chareTable.size());
+  fprintf(stsfp, "TOTAL_EPS %d\n", (int)_entryTable.size());
+  fprintf(stsfp, "TOTAL_MSGS %d\n", (int)_msgTable.size());
+  fprintf(stsfp, "TOTAL_PSEUDOS %d\n", (int)0);
+  fprintf(stsfp, "TOTAL_EVENTS %d\n", (int)nUserEvents);
   size_t i;
   for(i=0;i<_chareTable.size();i++)
-    fprintf(stsfp, "CHARE %d %s\n", i, _chareTable[i]->name);
+    fprintf(stsfp, "CHARE %d %s\n", (int)i, _chareTable[i]->name);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", i, _entryTable[i]->name,
-                 _entryTable[i]->chareIdx, _entryTable[i]->msgIdx);
+    fprintf(stsfp, "ENTRY CHARE %d %s %d %d\n", (int)i, _entryTable[i]->name,
+                 (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
-    fprintf(stsfp, "MESSAGE %d %u\n", i, _msgTable[i]->size);
+    fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
 
 extern "C"
@@ -265,7 +250,7 @@ void TraceArray::traceEndOnCommThread() {
 
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   DEBUGF(("[%d] traceBegin called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
   
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -285,7 +270,7 @@ extern "C" void traceBegin(void) {
 
 /*Cancel the beginIdle/endIdle condition handlers.*/
 extern "C" void traceEnd(void) {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   DEBUGF(("[%d] traceEnd called with %d at %f\n", CkMyPe(), CpvAccess(traceOn), TraceTimer()));
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -301,7 +286,7 @@ if(CmiMyRank()==0){
 	
   if (CpvAccess(traceOn)==0) return;
   if (CkpvAccess(_traces) == NULL) {
-    CmiPrintf("Warning: did you mix compilation with and without -DCMK_TRACE_DISABLED? \n");
+    CmiPrintf("Warning: did you mix compilation with and without -DCMK_TRACE_ENABLED? \n");
   }
   CkpvAccess(_traces)->traceEnd();
   CpvAccess(traceOn) = 0;
@@ -392,7 +377,7 @@ extern "C" void traceCharmInit(char **argv)
 #endif
 }
 
-// CMK_TRACE_DISABLED is already guarded in convcore.c
+// CMK_TRACE_ENABLED is already guarded in convcore.c
 extern "C"
 void traceMessageRecv(char *msg, int pe)
 {
@@ -401,7 +386,7 @@ void traceMessageRecv(char *msg, int pe)
 #endif
 }
 
-// CMK_TRACE_DISABLED is already guarded in convcore.c
+// CMK_TRACE_ENABLED is already guarded in convcore.c
 // converse thread tracing is not supported in blue gene simulator
 // in BigSim, threads need to be traced manually (because virtual processors
 // themselves are implemented as threads and we don't want them to be traced
@@ -429,7 +414,7 @@ void traceAwaken(CthThread t)
 extern "C"
 void traceUserEvent(int e)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn))
     CkpvAccess(_traces)->userEvent(e);
 #endif
@@ -438,7 +423,7 @@ void traceUserEvent(int e)
 extern "C"
 void traceUserBracketEvent(int e, double beginT, double endT)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userBracketEvent(e, beginT, endT);
 #endif
@@ -447,7 +432,7 @@ void traceUserBracketEvent(int e, double beginT, double endT)
 extern "C"
 void traceUserSuppliedData(int d)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedData(d);
 #endif
@@ -456,7 +441,7 @@ void traceUserSuppliedData(int d)
 extern "C"
 void traceUserSuppliedNote(char * note)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedNote(note);
 #endif
@@ -467,7 +452,7 @@ extern "C"
 void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)
 {
   //CkPrintf("traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double et)\n");
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
     CkpvAccess(_traces)->userSuppliedBracketedNote(note, eventID, bt, et);
 #endif
@@ -477,7 +462,7 @@ void traceUserSuppliedBracketedNote(char *note, int eventID, double bt, double e
 extern "C"
 void traceMemoryUsage()
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   double d = CmiMemoryUsage()*1.0;
 
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
@@ -510,7 +495,7 @@ void (*registerMachineUserEvents())() {
 extern "C"
 int traceRegisterUserEvent(const char*x, int e)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   return CkpvAccess(_traces)->traceRegisterUserEvent(x, e);
 #else
   return 0;
@@ -594,7 +579,7 @@ int CkIsCharmMessage(char *msg)
 // return 1 if any one of tracing modules is linked.
 int  traceAvailable()
 {
-#if CMK_TRACE_DISABLED
+#if ! CMK_TRACE_ENABLED
   return 0;
 #else
   return CkpvAccess(_traces)->length()>0;
@@ -628,7 +613,7 @@ void registerFunction(char *name){
 
 extern "C"
 int traceRegisterFunction(const char* name, int idx) {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   if(idx==-999){
     CkpvAccess(_traces)->regFunc(name, idx);
   } else {

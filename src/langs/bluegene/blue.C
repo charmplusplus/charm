@@ -506,6 +506,7 @@ char * getFullBuffer()
  * called by a Converse handler or sendPacket()
  * add message msgPtr to a bluegene node's inbuffer queue 
  */
+extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
 #ifndef CMK_OPTIMIZE
@@ -537,6 +538,18 @@ void addBgThreadMessage(char *msgPtr, int threadID)
 void addBgNodeMessage(char *msgPtr)
 {
   tMYNODE->addBgNodeMessage(msgPtr);
+}
+
+void BgEnqueue(char *msg)
+{
+#if 0
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  workThreadInfo *tinfo = (workThreadInfo *)cta(threadinfo);
+  tinfo->addAffMessage(msg);
+#else
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  addBgNodeInbuffer(msg, myNode->id);
+#endif
 }
 
 /** BG API Func 
@@ -1181,11 +1194,12 @@ void BgSetWorkerThreadStart(BgStartHandler f)
 extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 // kernel function for processing a bluegene message
-void BgProcessMessage(threadInfo *tinfo, char *msg)
+void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
 {
   DEBUGM(5, ("=====Begin of BgProcessing a msg on node[%d]=====\n", BgMyNode()));
   int handler = CmiBgMsgHandle(msg);
-  DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
+  //CmiPrintf("[%d] call handler %d\n", BgMyNode(), handler);
+  CmiAssert(handler < 1000);
 
   BgHandlerInfo *handInfo;
 #if  CMK_BLUEGENE_NODE
@@ -1225,6 +1239,7 @@ void BgProcessMessage(threadInfo *tinfo, char *msg)
   DEBUGM(5, ("=====End of BgProcessing a msg on node[%d]=====\n\n", BgMyNode()));
 }
 
+void  (*BgProcessMessage)(threadInfo *t, char *msg) = BgProcessMessageDefault;
 
 void scheduleWorkerThread(char *msg)
 {
@@ -1322,6 +1337,7 @@ static CmiHandler exitHandlerFunc(char *msg)
       traceCharmClose();
 //      CmiSwitchToPE(oldPe);
       delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
+      cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
     }
     if (origPe!=-2) CmiSwitchToPE(origPe);
   }
@@ -1394,6 +1410,7 @@ CmiStartFn bgMain(int argc, char **argv)
   int i;
   char *configFile = NULL;
 
+  BgProcessMessage = BgProcessMessageDefault;
 #if CMK_CONDS_USE_SPECIAL_CODE
   // overwrite possible implementation in machine.c
   CmiSwitchToPE = CmiSwitchToPEFn;
@@ -2093,6 +2110,10 @@ void BgSetStrategyBigSimDefault(CthThread t)
   CthAddListener(t, a);
 }
 
+int BgIsMainthread()
+{
+    return tMYNODE == NULL;
+}
 
 int BgIsRecord()
 {
@@ -2104,7 +2125,38 @@ int BgIsReplay()
     return cva(bgMach).replay != -1;
 }
 
-int BgIsMainthread()
-{
-    return tMYNODE == NULL;
+extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
+  ((workThreadInfo*)cta(threadinfo))->reduceMsg = msg;
+  //CmiPrintf("Called CkReduce from %d %hd\n",CmiMyPe(),cta(threadinfo)->globalId);
+  int numLocal = 0, count = 0;
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t->reduceMsg == NULL) return; /* we are not yet ready to reduce */
+      numLocal ++;
+    }
+  }
+  void **msgLocal = (void**)malloc(sizeof(void*)*(numLocal-1));
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t == cta(threadinfo)) break;
+      msgLocal[count++] = t->reduceMsg;
+      t->reduceMsg = NULL;
+    }
+  }
+  CmiAssert(count==numLocal-1);
+  msg = mergeFn(&size, msg, msgLocal, numLocal-1);
+  CmiReduce(msg, size, mergeFn);
+  CmiPrintf("Called CmiReduce %d\n",CmiMyPe());
+  for (int i=0; i<numLocal-1; ++i) CmiFree(msgLocal[i]);
+  free(msgLocal);
 }
+
+// for record/replay, to fseek back
+void BgRewindRecord()
+{
+  threadInfo *tinfo = cta(threadinfo);
+  if (tinfo->watcher) tinfo->watcher->rewind();
+}
+

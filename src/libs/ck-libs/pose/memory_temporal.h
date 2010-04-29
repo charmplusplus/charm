@@ -46,21 +46,21 @@ class SuperBlock {
  SuperBlock() : refCount(0), blk(NULL), pos(NULL) {};
   ~SuperBlock() { free(blk); }
   /// Allocate and set initial values
-  void initBlock() {
+  inline void initBlock() {
     refCount = 0; 
     blk = (char *)malloc(BLOCK_SIZE);
     pos = blk;
     nextBlock = NULL;
     percent_full = 0;
   }
-  void resetBlock() {
+  inline void resetBlock() {
     // assumes this is a recycled SuperBlock, thus blk was already allocated
     refCount = 0; 
     pos = blk;
     nextBlock = NULL;
     percent_full = 0;
   }
-  bool noLongerReferenced() { return(refCount == 0); }
+  inline bool noLongerReferenced() { return(refCount == 0); }
   /// return pos, and advance pos by sz, aligned to 16 bytes, inc refCount
   char *sb_alloc(int sz) {
 #ifdef VERBOSE_DEBUG
@@ -103,9 +103,9 @@ class SuperBlock {
       return false;
     }
   }
-  SuperBlock *getNextBlock() { return nextBlock; }
-  void setNextBlock(SuperBlock *loc) { nextBlock = loc; }
-  int getPercentFull() { return percent_full; }
+  inline SuperBlock *getNextBlock() { return nextBlock; }
+  inline void setNextBlock(SuperBlock *loc) { nextBlock = loc; }
+  inline int getPercentFull() { return percent_full; }
   void sanity_check();
 };
 
@@ -142,22 +142,22 @@ class TimeBucket {
     }
     numSuperBlocks = 1;
   }
-  int getNumSuperBlocks() { return numSuperBlocks; }
-  int getStart() { return start; }
-  int getRange() { return range; }
-  void setStart(int s) { start = s; }
-  void setRange(int r) { range = r; }
-  bool isVeryFull() {
+  inline int getNumSuperBlocks() { return numSuperBlocks; }
+  inline int getStart() { return start; }
+  inline int getRange() { return range; }
+  inline void setStart(int s) { start = s; }
+  inline void setRange(int r) { range = r; }
+  inline bool isVeryFull() {
     if (numSuperBlocks > 1) return true;
     else if (sBlocks->getPercentFull() > 90) return true;
     else return false;
   }
-  SuperBlock *getFirstSuperBlock() { return sBlocks; }
-  void setFirstSuperBlock(SuperBlock *sb) { sBlocks = sb; }
-  void setPrevBucket(TimeBucket *p) { prevBucket = p; }
-  void setNextBucket(TimeBucket *n) { nextBucket = n; }
-  TimeBucket *getPrevBucket() { return prevBucket; }
-  TimeBucket *getNextBucket() { return nextBucket; }
+  inline SuperBlock *getFirstSuperBlock() { return sBlocks; }
+  inline void setFirstSuperBlock(SuperBlock *sb) { sBlocks = sb; }
+  inline void setPrevBucket(TimeBucket *p) { prevBucket = p; }
+  inline void setNextBucket(TimeBucket *n) { nextBucket = n; }
+  inline TimeBucket *getPrevBucket() { return prevBucket; }
+  inline TimeBucket *getNextBucket() { return nextBucket; }
   // Get some memory in this time range
   char *tb_alloc(int sz) {
 #ifdef VERBOSE_DEBUG
@@ -239,7 +239,7 @@ class TimePool : public Group {
   // "Free" up memory from a time range
   void tmp_free(POSE_TimeType timestamp, void *mem);
   // Update the minimum time before which SuperBlocks can be recycled
-  void set_min_time(POSE_TimeType min_t) { min_time = min_t; clean_up(); }
+  inline void set_min_time(POSE_TimeType min_t) { min_time = min_t; clean_up(); }
   void empty_recycle_bin() {
     SuperBlock *b = not_in_use;
     while (not_in_use) {

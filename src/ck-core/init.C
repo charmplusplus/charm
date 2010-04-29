@@ -682,7 +682,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
   register envelope *env = (envelope *) msg;
   
   if (ck->watcher!=NULL) {
-    if (!ck->watcher->processMessage(env,ck)) return;
+    if (!ck->watcher->processMessage(&env,ck)) return;
   }
   
   switch (env->getMsgtype()) {
@@ -784,7 +784,10 @@ extern "C"
 void EmergencyExit(void) {
 #ifndef __BLUEGENE__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
-  delete CkpvAccess(_coreState);
+  if (CkpvAccess(_coreState) != NULL) {
+    delete CkpvAccess(_coreState);
+    CkpvAccess(_coreState) = NULL;
+  }
 #endif
 }
 
@@ -849,6 +852,11 @@ extern "C" void initQd(char **argv)
             CmiPrintf("Charm++> Fake QD using %d seconds.\n", _dummy_dq);
         }
 }
+
+#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+void CpdBgInit();
+#endif
+void CpdBreakPointInit();
 
 /**
   This is the main charm setup routine.  It's called
@@ -1044,18 +1052,17 @@ void _initCharm(int unused_argc, char **argv)
 		CkRegisterMainModule();
 		_registerDone();
 	}
+	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */
+	if (CkMyRank() == 0) {
+	  CpdBreakPointInit();
+	}
 	CmiNodeAllBarrier();
 
     // Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
 #ifndef CMK_OPTIMIZE
-#ifdef __BLUEGENE__
-        if(BgNodeRank()==0)
-#else
-        if(CkMyRank()==0)
-#endif
-          CpdFinishInitialization();
+	CpdFinishInitialization();
 #endif
 
 	//CmiNodeAllBarrier();
@@ -1129,6 +1136,13 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
+
+#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+      // Register the BG handler for CCS. Notice that this is put into a variable shared by
+      // the whole real processor. This because converse needs to find it. We check that all
+      // virtual processors register the same index for this handler.
+    CpdBgInit();
+#endif
 
 	if (faultFunc) {
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
@@ -1215,7 +1229,8 @@ void _initCharm(int unused_argc, char **argv)
                                         CkpvAccess(_coreState));
         }
 
-#if CMK_CCS_AVAILABLE
+#if CMK_CHARMDEBUG
+        // Should not use CpdFreeze inside a thread (since this processor is really a user-level thread)
        if (CpvAccess(cpdSuspendStartup))
        { 
           //CmiPrintf("In Parallel Debugging mode .....\n");

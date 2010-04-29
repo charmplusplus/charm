@@ -1402,13 +1402,17 @@ void req_ccs_connect(void)
 
   if (pe<=-nodetab_size || pe>=nodetab_size) {
     /*Treat out of bound values as errors. Helps detecting bugs*/
+    /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
+    /* TODO: We should somehow check boundaries also for bigemulator... */
+#if ! CMK_BLUEGENE_CHARM
     if (pe==-nodetab_size) fprintf(stderr,"Invalid processor index in CCS request: are you trying to do a broadcast instead?");
     else fprintf(stderr,"Invalid processor index in CCS request.");
     CcsServer_sendReply(&h.hdr,0,0);
     free(reqData);
     return;
+#endif
   }
-  else if (pe == -1) {
+  if (pe == -1) {
     /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
     pe = 0;
   }
@@ -1425,12 +1429,16 @@ void req_ccs_connect(void)
 #if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
     CcsServer_sendReply(&h.hdr,0,0);
 #else
+    int destpe = pe;
+#if CMK_BLUEGENE_CHARM
+    destpe = destpe % nodetab_size;
+#endif
     /*Fill out the charmrun header & forward the CCS request*/
     ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
 
     bufs[0]=&h; lens[0]=sizeof(h);
     bufs[1]=reqData; lens[1]=reqBytes;
-    skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
+    skt_sendV(nodetab_ctrlfd(destpe),2,bufs,lens);
 
 #endif
   }

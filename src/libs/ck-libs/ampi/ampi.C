@@ -1876,7 +1876,7 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 
 #if 0
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   int size=0;
   MPI_Type_size(type,&size);
   _LOG_E_AMPI_MSG_SEND(t,destIdx,count,size)
@@ -2677,22 +2677,14 @@ int AMPI_Barrier(MPI_Comm comm)
   AMPIAPI("AMPI_Barrier");
 
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
-#if CMK_BLUEGENE_CHARM
-  void *barrierLog;		// store current log in timeline
-  //TRACE_BG_AMPI_BARRIER_START(barrierLog);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier", NULL, 0, 1);
-  _TRACE_BG_TLINE_END(&barrierLog); 
-#endif
+
+  TRACE_BG_AMPI_LOG(1, 0);
+
   //HACK: Use collective operation as a barrier.
   AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
 
   //BIGSIM_OOC DEBUGGING
   //CkPrintf("%d: in AMPI_Barrier, after AMPI_Allreduce\n", getAmpiParent()->thisIndex);
-#if CMK_BLUEGENE_CHARM
-  //TRACE_BG_AMPI_BARRIER_END(barrierLog);
-  //_TRACE_BG_SET_INFO(NULL, "AMPI_Barrier_END",  &barrierLog, 1);
-  TRACE_BG_AMPI_BREAK(NULL, "AMPI_Barrier_END", &barrierLog, 1, 1);
-#endif
 #if AMPI_COUNTER
   getAmpiParent()->counters.barrier++;
 #endif
@@ -2843,7 +2835,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
   
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
-  TRACE_BG_AMPI_SET_SIZE(count * ddt_type->getSize());
+
+  TRACE_BG_AMPI_LOG(2, count * ddt_type->getSize());
+
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
 #ifdef AMPIMSGLOG
@@ -3669,7 +3663,7 @@ int AMPI_Request_free(MPI_Request *request){
 
 CDECL
 int AMPI_Cancel(MPI_Request *request){
-  AMPIAPI("AMPI_Request_free");
+  AMPIAPI("AMPI_Cancel");
   return AMPI_Request_free(request);
 }
 
@@ -3706,7 +3700,7 @@ CDECL
 int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
                    MPI_Comm comm, MPI_Request *req)
 {
-  AMPIAPI("AMPI_Send_init");
+  AMPIAPI("AMPI_Ssend_init");
   AmpiRequestList* reqs = getReqs();
   PersReq *newreq = new PersReq(buf,count,type,dest,tag,comm,3);
   *req = reqs->insert(newreq);
@@ -4456,7 +4450,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
     
     free((char *)tmp_buf); 
     
-  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ){
+  }else if ( itemsize <= AMPI_ALLTOALL_MEDIUM_MSG ) {
 #if AMPI_COMLIB
 	  if(comm == MPI_COMM_WORLD) {
 		  // commlib support
@@ -4469,13 +4463,13 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 		  ptr->getAlltoallStrategy()->doneInserting();
 	  } else
 #endif 
-      {
+    { // Note that this block hangs off the conditional above
 	for(i=0;i<size;i++) {
           int dst = (rank+i) % size;
           ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
                     sendtype, dst, comm);
 	}
-      }
+    }
     dttype = ptr->getDDT()->getType(recvtype) ;
     itemsize = dttype->getSize(recvcount) ;
     MPI_Status status;

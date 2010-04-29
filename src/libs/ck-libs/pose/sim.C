@@ -242,6 +242,48 @@ void sim::Commit()
 #endif
 }
 
+/// Commit all possible events before a checkpoint to disk
+/*  This is necessary to ensure a minimal state at checkpoint time.
+    sim::Commit() requires a minimum advancement in GVT (currently 100
+    ticks) before the event queue commits its events.  As a result,
+    some events could be left in the queue.  This function takes care
+    of that.
+*/
+void sim::CheckpointCommit() {
+  if (active < 0)  return; // object is migrating
+#ifndef CMK_OPTIMIZE
+  double critStart;
+  if(pose_config.trace)
+    critStart= CmiWallTimer();  // trace timing
+  int tstat;
+  if(pose_config.stats) {
+    tstat = localStats->TimerRunning();
+    if (!tstat)  localStats->TimerStart(SIM_TIMER);
+    else localStats->SwitchTimer(SIM_TIMER);
+  }
+  if(pose_config.stats)
+    localStats->SwitchTimer(FC_TIMER);
+#endif
+  int curGVT = localPVT->getGVT();
+  lastGVT = curGVT;
+  eq->CommitEvents(this, lastGVT); // commit everything up to the current GVT
+#ifndef CMK_OPTIMIZE
+  if(pose_config.trace) {
+    traceUserBracketEvent(50, critStart, CmiWallTimer());
+    critStart = CmiWallTimer();
+  }
+  if(pose_config.stats)
+    localStats->SwitchTimer(SIM_TIMER);
+#endif
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    if (!tstat)  localStats->TimerStop();
+    else localStats->SwitchTimer(tstat);
+  if(pose_config.trace)
+    traceUserBracketEvent(60, critStart, CmiWallTimer());
+#endif
+}
+
 /// Report load information to local load balancer
 void sim::ReportLBdata()
 {

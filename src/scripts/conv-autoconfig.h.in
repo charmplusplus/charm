@@ -12,6 +12,9 @@
 /* build MPI. */
 #undef CMK_BUILD_ON_MPI
 
+/* enable charmdebug */
+#undef CMK_CHARMDEBUG
+
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 
@@ -38,6 +41,9 @@
 
 /* whether getProcAddress works */
 #undef CMK_DLL_USE_WIN32
+
+/* enable error checking */
+#undef CMK_ERROR_CHECKING
 
 /* whether C++ class explicit keyword works */
 #undef CMK_EXPLICIT
@@ -229,7 +235,7 @@
 #undef CMK_TLS_THREAD
 
 /* disable tracing */
-#undef CMK_TRACE_DISABLED
+#undef CMK_TRACE_ENABLED
 
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE

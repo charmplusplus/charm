@@ -113,7 +113,7 @@ class Skipped_Event {
 
   Skipped_Event() {}
   Skipped_Event(int sIndex, POSE_TimeType ts) : simIndex(sIndex), timestamp(ts) {}
-  void pup(PUP::er &p) {
+  inline void pup(PUP::er &p) {
     p|simIndex; p|timestamp;
   }
   inline Skipped_Event& operator=(const Skipped_Event &obj) {

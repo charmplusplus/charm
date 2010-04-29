@@ -533,29 +533,34 @@ int check_stdio_header(CcsImplHeader *hdr) {
 }
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
+#if CMK_BLUEGENE_CHARM
+#define MAX_PRINT_BUF_SIZE 1024
+#else
+#define MAX_PRINT_BUF_SIZE 8192
+#endif
 int print_fw_handler_idx;
 
 /* Receives messages passed to processor 0 by all other processors as a
  * consequence of prints in debug mode.
  */
 void print_fw_handler(char *msg) {
-  write_stdio_duplicate(msg+CmiMsgHeaderSizeBytes);
+  write_stdio_duplicate(msg+CmiReservedHeaderSize);
 }
 
 /* Forward prints to node0 to be buffered and delivered through CCS */
 void print_node0(const char *format, va_list args) {
-  char buffer[16384];
+  char buffer[MAX_PRINT_BUF_SIZE];
   int len;
-  if ((len=vsnprintf(buffer, 16384, format, args)) >= 16384) CmiAbort("CmiPrintf: printing buffer too long\n");
+  if ((len=vsnprintf(buffer, MAX_PRINT_BUF_SIZE, format, args)) >= MAX_PRINT_BUF_SIZE) CmiAbort("CmiPrintf: printing buffer too long\n");
   if (CmiMyPe() == 0) {
     /* We are the print server, just concatenate the printed string */
     write_stdio_duplicate(buffer);
   } else {
     /* Need to forward the string to processor 0 */
-    char* msg = CmiAlloc(CmiMsgHeaderSizeBytes+len+1);
-    memcpy(msg+CmiMsgHeaderSizeBytes, buffer, len+1);
+    char* msg = CmiAlloc(CmiReservedHeaderSize+len+1);
+    memcpy(msg+CmiReservedHeaderSize, buffer, len+1);
     CmiSetHandler(msg,print_fw_handler_idx);
-    CmiSyncSendAndFree(0,CmiMsgHeaderSizeBytes+len+1,msg);
+    CmiSyncSendAndFree(0,CmiReservedHeaderSize+len+1,msg);
   }
 }
 #endif

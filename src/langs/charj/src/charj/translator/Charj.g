@@ -117,7 +117,7 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource
-    :   compilationUnit
+    :   compilationUnit EOF
         ->  ^(CHARJ_SOURCE compilationUnit)
     ;
 

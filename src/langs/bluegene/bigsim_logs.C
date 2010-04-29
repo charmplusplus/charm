@@ -9,9 +9,15 @@
      * add objId
  version 3
      * objId changed to 4 ints 
+
+ versions 4, 5
+ - ???
+
+ version 6
+ - MPI Record added
 */
 
-int bglog_version = BG_CURRENT_VERSION;
+int bglog_version = 6;
 
 int genTimeLog = 0;			// was 1 for guna 's seq correction
 int correctTimeLog = 0;
@@ -79,6 +85,15 @@ void BgMsgEntry::send() {
 #endif
 */
 
+void BgMsgEntry::pup(PUP::er &p)
+{
+    p|msgID; p|dstNode; p|sendTime; p|recvTime; p|tID; p|msgsize;
+    CmiAssert(recvTime>=sendTime);
+    CmiAssert(msgsize >= 0);
+    if (p.isUnpacking()) group = 1;    // default value
+    if (bglog_version>0) p|group;
+}
+
 void bgEvents::print()
 {
   switch (eType) {
@@ -132,6 +147,15 @@ void bgEvents::pup(PUP::er &p)
   }
 }
 
+BgTimeLog::BgTimeLog()
+    : ep(-1), charm_ep(-1), recvTime(.0), startTime(.0), endTime(.0),
+      execTime(.0), effRecvTime(INVALIDTIME), seqno(0), doCorrect(1),
+      flag(0), mpiOp(MPI_NONE)
+{
+    strcpy(name,"dummyname");
+}
+
+
 BgTimeLog::BgTimeLog(BgTimeLog *log)
 {
   strncpy(name,log->name,20);
@@ -144,10 +168,11 @@ BgTimeLog::BgTimeLog(BgTimeLog *log)
   msgId = log->msgId;
 
   seqno = 0;
-  size = 0;
   effRecvTime = recvTime;
   doCorrect = 1;
   flag = 0;
+  mpiOp = log->mpiOp;
+  mpiSize = log->mpiSize;
 }
 
 BgTimeLog::BgTimeLog(const BgMsgID &msgID)
@@ -163,28 +188,10 @@ BgTimeLog::BgTimeLog(const BgMsgID &msgID)
   oldStartTime= startTime;
   effRecvTime = -1.0;
   seqno = 0;
-  size = 0;
   doCorrect = 1;
   flag = 0;
+  mpiOp = MPI_NONE;
 }
-
-/*
-BgTimeLog::BgTimeLog(int _ep, int srcpe, int msgid, double _startTime, double _endTime, double _recvTime, char *str)
-{
-  if (str)
-    strcpy(name,str);
-  else
-    strcpy(name,"msgep");
-  startTime = _startTime;
-  endTime = _endTime;
-  execTime = endTime - startTime;
-  ep = _ep;
-  recvTime = _recvTime;
-  msgId = BgMsgID(srcpe, msgid);
-
-  recvTime = effRecvTime = startTime;
-}
-*/
 
 BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
 { 
@@ -200,9 +207,9 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
   oldStartTime= startTime;
   effRecvTime = -1.0;
   seqno = 0;
-  size = 0;
   doCorrect = 1;
   flag = 0;
+  mpiOp = MPI_NONE;
 }
 
 // for SDAG, somewhere else will set the effective recv time.
@@ -221,9 +228,9 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr, double sTime, double eTime)
   oldStartTime = startTime;
   effRecvTime = -1.0;
   seqno = 0;
-  size = 0;
   doCorrect = 1;
   flag = 0;
+  mpiOp = MPI_NONE;
 }
 
 // create a new log from a message
@@ -248,7 +255,6 @@ BgTimeLog::BgTimeLog(char *msg, char *str)
   oldStartTime=startTime;
   effRecvTime = recvTime;
   seqno = 0;
-  size = 0;
 //  doCorrect = msg?CkMsgDoCorrect(msg):1;
   doCorrect = 1;
   flag = 0;
@@ -256,6 +262,7 @@ BgTimeLog::BgTimeLog(char *msg, char *str)
   if (genTimeLog && !doCorrect) {
       recvTime = effRecvTime = startTime;
   }
+  mpiOp = MPI_NONE;
 }
 
 BgTimeLog::~BgTimeLog()
@@ -390,6 +397,14 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   p|ep; 
   p|seqno; p|msgId;
+
+  if (bglog_version >= 6)
+  {
+      p|mpiOp;
+      //if (MPI_NONE != mpiOp)
+	  p|mpiSize;
+  }
+
   if (bglog_version >= 4) p(charm_ep);
   p|recvTime; p|effRecvTime; p|startTime; p|execTime; p|endTime; 
   p|flag; p(name,20);

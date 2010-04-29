@@ -256,7 +256,7 @@ headers: dirs+sources
 	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-conv-autoconfig.h: configure
+conv-autoconfig.h: configure config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS
 
@@ -361,7 +361,7 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
-	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
+	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o tracec.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
@@ -808,7 +808,7 @@ $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
  
 LIBTRACE_UTIL=trace-utilization.o
 $(L)/libtrace-utilization.a: $(LIBTRACE_UTIL)
-	$(CHARMC) -o $@ $(LIBTRACE_UTIL)           
+	$(CHARMC) -o $@ $(LIBTRACE_UTIL)
 
 LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)

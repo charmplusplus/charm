@@ -276,7 +276,8 @@ class NodeGroup : public CkNodeReductionMgr {
   public:
     CmiNodeLock __nodelock;
     NodeGroup();
-    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { }
+    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { __nodelock=CmiCreateLock(); }
+    
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}

@@ -144,15 +144,15 @@ class PVT : public Group {
   void doneLB();
 
   /// Returns GVT estimate
-  POSE_TimeType getGVT() { return estGVT; }    
+  inline POSE_TimeType getGVT() { return estGVT; }    
 
-  int getSpecEventCount() { return specEventCount; }    
-  int getEventCount() { return eventCount; }    
-  void incSpecEventCount() { specEventCount++; }    
-  void incEventCount() { eventCount++; }
-  void decEventCount() { eventCount--; }
+  inline int getSpecEventCount() { return specEventCount; }    
+  inline int getEventCount() { return eventCount; }    
+  inline void incSpecEventCount() { specEventCount++; }    
+  inline void incEventCount() { eventCount++; }
+  inline void decEventCount() { eventCount--; }
   /// Returns termination flag
-  int done() { return simdone; }
+  inline int done() { return simdone; }
   /// Register poser with PVT
   int objRegister(int arrIdx, POSE_TimeType safeTime, int sync, sim *myPtr);
   /// Unregister poser from PVT
@@ -165,7 +165,7 @@ class PVT : public Group {
   void reportReduce(UpdateMsg *);
   /// Adds incoming send/recv information to a list
   void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
-  int getNumObjs() { return objs.getNumObjs(); }
+  inline int getNumObjs() { return objs.getNumObjs(); }
 };
 
 /// GVT chare group for estimating GVT

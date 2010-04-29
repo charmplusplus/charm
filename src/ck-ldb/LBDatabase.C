@@ -493,7 +493,7 @@ void TurnManualLBOff()
 #endif
 }
 
-void LBTurnInstrumentOn() { 
+extern "C" void LBTurnInstrumentOn() { 
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
     LBDatabase::Object()->CollectStatsOn(); 
@@ -502,7 +502,7 @@ void LBTurnInstrumentOn() {
 #endif
 }
 
-void LBTurnInstrumentOff() { 
+extern "C" void LBTurnInstrumentOff() { 
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
     LBDatabase::Object()->CollectStatsOff(); 

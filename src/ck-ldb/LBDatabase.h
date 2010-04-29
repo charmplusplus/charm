@@ -383,8 +383,8 @@ void LBChangePredictor(LBPredictorFunction *model);
 
 void LBSetPeriod(double second);
 
-void LBTurnInstrumentOn();
-void LBTurnInstrumentOff();
+extern "C" void LBTurnInstrumentOn();
+extern "C" void LBTurnInstrumentOff();
 void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }

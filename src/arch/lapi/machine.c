@@ -90,11 +90,11 @@ Chao Mei 01/28/2010
 
 /* Redefine CmiNodeLocks only for PCQueue data structure */
 #define CmiNodeLock CmiNodeLock_nonsmp
-#undef CmiCreateLock()
-#undef CmiLock(lock)
-#undef CmiUnlock(lock)
-#undef CmiTryLock(lock)
-#undef CmiDestroyLock(lock)
+#undef CmiCreateLock
+#undef CmiLock
+#undef CmiUnlock
+#undef CmiTryLock
+#undef CmiDestroyLock
 typedef pthread_mutex_t *CmiNodeLock_nonsmp;
 CmiNodeLock CmiCreateLock(){
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));  
@@ -418,9 +418,7 @@ char *CopyMsg(char *msg, int len) {
     return copy;
 }
  
-#if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(CmiNodeState, NodeState);
-#endif
 
 #if CMK_IMMEDIATE_MSG
 #include "immediate.c"
@@ -829,7 +827,12 @@ static void PumpMsgsComplete(lapi_handle_t *myLapiContext, void *am_info) {
     broot = CMI_BROADCAST_ROOT(msg);
     destrank = CMI_DEST_RANK(msg);
     /* Only check proc-level msgs */
-    if (broot>=0 && destrank != DGRAM_NODEMESSAGE){
+    if (broot>=0
+#if CMK_NODE_QUEUE_AVAILABLE
+        && destrank != DGRAM_NODEMESSAGE
+#endif
+    )
+    {
         MsgOrderInfo *info;        
         if(broot>0){
             info = &CpvAccessOther(bcastMsgSeqInfo, destrank);
@@ -2092,13 +2095,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     if (CmiGetArgFlag(argv,"++debug")) {  /*Pause so user has a chance to start and attach debugger*/
         printf("CHARMDEBUG> Processor %d has PID %d\n",CmiMyNode(),getpid());
         if (!CmiGetArgFlag(argv,"++debug-no-pause"))
-            sleep(10);
+            sleep(30);
     }
 
-#if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(CmiNodeState, NodeState);
     CmiNodeStateInit(&CsvAccess(NodeState));
 
+#if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(PCQueue, nodeBcastQ);
     CsvAccess(nodeBcastQ) = PCQueueCreate();
 #endif

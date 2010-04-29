@@ -59,7 +59,7 @@ double map_linearly_to_interval(double val, double old_lower, double old_upper, 
   if(val == old_lower)
 	new_val = new_lower;
   else if(val == old_upper)
-	new_val = old_lower;
+	new_val = new_upper;
   else
 	new_val = new_lower + ((val-old_lower)*(new_upper-new_lower))/(old_upper-old_lower);
 

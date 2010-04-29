@@ -43,6 +43,7 @@
     <property name="profile" value="false" />
     <property name="report" value="false" />
     <property name="multithreaded" value="true" />
+    <property name="debug" value="false" />
 
     <target name="init">
         <tstamp />
@@ -67,6 +68,7 @@
                 libdirectory="@{grammar.path}"
                 multithreaded="${multithreaded}"
                 report="${report}"
+                debug="${debug}"
                 profile="${profile}">
                 <jvmarg value="-Xmx512M"/>
                 <classpath refid="${classpath}"/>

@@ -53,7 +53,7 @@ void traceEnd(void);
 void traceWriteSts(void);
 void traceFlushLog(void);
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 CpvExtern(int, traceOn);
 #define traceIsOn()  (CpvAccess(traceOn))
 #else 

@@ -26,7 +26,7 @@ typedef struct {
 		     vertex are stored contiguosly */
 } VerticesListType;
 
-#define connections(i) (graph.vertexArray[i].degree)
+#define connections(graph, i) (graph->vertexArray[i].degree)
 
 /* -----*/
 typedef struct {

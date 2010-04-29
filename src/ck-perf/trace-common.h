@@ -13,6 +13,23 @@
 #ifndef __TRACE_COMMON_H__
 #define __TRACE_COMMON_H__
 
+
+#include <stdlib.h>
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#include <direct.h>
+#define CHDIR _chdir
+#define GETCWD _getcwd
+#define PATHSEP '\\'
+#define PATHSEPSTR "\\"
+#else
+#include <unistd.h>
+#define CHDIR chdir
+#define GETCWD getcwd
+#define PATHSEP '/'
+#define PATHSEPSTR "/"
+#endif
+
+
 #define  CREATION           1
 #define  BEGIN_PROCESSING   2
 #define  END_PROCESSING     3

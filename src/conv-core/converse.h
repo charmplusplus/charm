@@ -85,7 +85,7 @@ extern "C" {
 
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern int memory_status_info;
 extern int memory_chare_id;
 #define setMemoryStatus(p) { \
@@ -121,6 +121,8 @@ void setMemoryOwnedBy(void *p, int id);
 # define CpvInit_Alloc(t,n) (t *)calloc(n,sizeof(t))
 # define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
 #endif
+
+extern int CmiMyRank_();
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
@@ -415,7 +417,7 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
-#define CMK_MAX_PTHREADS     64
+#define CMK_MAX_PTHREADS     128
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
@@ -437,7 +439,11 @@ for each processor in the node.
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
        } else { \
-               CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()); \
+               if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
+		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
+		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
+		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
+	       } \
 	       CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0); \
@@ -831,7 +837,7 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 #define CmiAssert(expr) ((void) 0)
 #else
 #if defined(__STDC__) || defined(__cplusplus)
@@ -1228,6 +1234,7 @@ typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
+void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
 int        CthMigratable();
@@ -1787,7 +1794,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else
