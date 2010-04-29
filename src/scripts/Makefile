@@ -808,7 +808,7 @@ $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
  
 LIBTRACE_UTIL=trace-utilization.o
 $(L)/libtrace-utilization.a: $(LIBTRACE_UTIL)
-	$(CHARMC) -o $@ $(LIBTRACE_UTIL)           
+	$(CHARMC) -o $@ $(LIBTRACE_UTIL)
 
 LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
