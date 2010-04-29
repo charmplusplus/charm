@@ -441,7 +441,8 @@ for each processor in the node.
        } else { \
                if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
 		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
-		 CmiAbort("Error in TLS-based Converse Private Variables"); \
+		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
+		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
 	       } \
 	       CMK_TAG(Cpv_inited_,v)=1; \
        } \
