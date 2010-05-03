@@ -366,6 +366,12 @@ controlPointManager::controlPointManager() {
     haveControlPointChangeCallback = true;
   }
 
+
+/// A user can specify that the framework should advance the phases automatically. Useful for gather performance measurements without modifying a program.
+void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase){
+  frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
+}
+
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
   void controlPointManager::processControlPoints(){
@@ -744,7 +750,7 @@ controlPointManager::controlPointManager() {
       prevPhase->idleTime.avg = r[1]/CkNumPes();
       prevPhase->idleTime.max = r[2];
       prevPhase->idleTime.print();
-      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, prevPhase);
     } else {
       CkPrintf("There is no previous phase to store the idle time measurements\n");
     }
@@ -831,7 +837,7 @@ controlPointManager::controlPointManager() {
       
       prevPhase->memoryUsageMB = mem[0];
       
-      CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf  mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, (double)prevPhase->memoryUsageMB, prevPhase);
 
       double bytesPerInvoke2 = msgBytes[2] / msgBytes[0];
       double bytesPerInvoke3 = msgBytes[3] / msgBytes[1];
@@ -1128,6 +1134,14 @@ void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
   CkAssert(CkMyPe() == 0);
   CkPrintf("Application has registered a control point change callback\n");
   controlPointManagerProxy.ckLocalBranch()->setCPCallback(cb, frameworkShouldAdvancePhase);
+}
+
+/// An interface callable by the application.
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase){
+  if(CkMyPe() == 0){
+    CkPrintf("Application has specified that framework should %sadvance phase\n", frameworkShouldAdvancePhase?"":"not ");
+    controlPointManagerProxy.ckLocalBranch()->setFrameworkAdvancePhase(frameworkShouldAdvancePhase);
+  }
 }
 
 /// An interface callable by the application.

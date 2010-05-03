@@ -62,6 +62,7 @@
 
 
 void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase);
 
 
 void registerControlPointTiming(double time);
@@ -752,6 +753,8 @@ public:
 
   /// User can register a callback that is called when application should advance to next phase
   void setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
+
+  void setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase);
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
