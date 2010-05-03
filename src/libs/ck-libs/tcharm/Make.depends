@@ -3,12 +3,11 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/converse.h ../../../../include/conv-config.h \
   ../../../../include/conv-autoconfig.h ../../../../include/conv-common.h \
   ../../../../include/conv-mach.h ../../../../include/conv-mach-opt.h \
-  ../../../../include/conv-mach-smp.h ../../../../include/pup_c.h \
-  ../../../../include/queueing.h ../../../../include/conv-cpm.h \
-  ../../../../include/conv-cpath.h ../../../../include/conv-qd.h \
-  ../../../../include/conv-random.h ../../../../include/conv-lists.h \
-  ../../../../include/conv-trace.h ../../../../include/persistent.h \
-  ../../../../include/conv-onesided.h ../../../../include/debug-conv.h \
+  ../../../../include/pup_c.h ../../../../include/queueing.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
   ../../../../include/pup_c.h ../../../../include/charm-api.h tcharmc.h \
   ../../../../include/cklists.h ../../../../include/pup.h \
   ../../../../include/memory-isomalloc.h tcharm.decl.h \
@@ -51,12 +50,11 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
   ../../../../include/converse.h ../../../../include/conv-config.h \
   ../../../../include/conv-autoconfig.h ../../../../include/conv-common.h \
   ../../../../include/conv-mach.h ../../../../include/conv-mach-opt.h \
-  ../../../../include/conv-mach-smp.h ../../../../include/pup_c.h \
-  ../../../../include/queueing.h ../../../../include/conv-cpm.h \
-  ../../../../include/conv-cpath.h ../../../../include/conv-qd.h \
-  ../../../../include/conv-random.h ../../../../include/conv-lists.h \
-  ../../../../include/conv-trace.h ../../../../include/persistent.h \
-  ../../../../include/conv-onesided.h ../../../../include/debug-conv.h \
+  ../../../../include/pup_c.h ../../../../include/queueing.h \
+  ../../../../include/conv-cpm.h ../../../../include/conv-cpath.h \
+  ../../../../include/conv-qd.h ../../../../include/conv-random.h \
+  ../../../../include/conv-lists.h ../../../../include/conv-trace.h \
+  ../../../../include/persistent.h ../../../../include/debug-conv.h \
   ../../../../include/pup_c.h ../../../../include/charm-api.h tcharmc.h \
   ../../../../include/cklists.h ../../../../include/pup.h \
   ../../../../include/memory-isomalloc.h tcharm.decl.h \
@@ -98,29 +96,29 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
 compat_uns.o: compat_uns.c ../../../../include/charm-api.h \
   ../../../../include/conv-config.h ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/conv-mach-smp.h \
-  tcharmc.h ../../../../include/pup_c.h
+  ../../../../include/conv-mach-opt.h tcharmc.h \
+  ../../../../include/pup_c.h
 	$(CHARMC) -o compat_uns.o compat_uns.c
 compat_us.o: compat_us.c ../../../../include/charm-api.h \
   ../../../../include/conv-config.h ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/conv-mach-smp.h \
-  tcharmc.h ../../../../include/pup_c.h
+  ../../../../include/conv-mach-opt.h tcharmc.h \
+  ../../../../include/pup_c.h
 	$(CHARMC) -o compat_us.o compat_us.c
 compat_funs.o: compat_funs.c ../../../../include/charm-api.h \
   ../../../../include/conv-config.h ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/conv-mach-smp.h \
-  tcharmc.h ../../../../include/pup_c.h
+  ../../../../include/conv-mach-opt.h tcharmc.h \
+  ../../../../include/pup_c.h
 	$(CHARMC) -o compat_funs.o compat_funs.c
 compat_fus.o: compat_fus.c ../../../../include/charm-api.h \
   ../../../../include/conv-config.h ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/conv-mach-smp.h \
-  tcharmc.h ../../../../include/pup_c.h
+  ../../../../include/conv-mach-opt.h tcharmc.h \
+  ../../../../include/pup_c.h
 	$(CHARMC) -o compat_fus.o compat_fus.c
 compat_regmm.o: compat_regmm.c ../../../../include/charm-api.h \
   ../../../../include/conv-config.h ../../../../include/conv-autoconfig.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
-  ../../../../include/conv-mach-opt.h ../../../../include/conv-mach-smp.h
+  ../../../../include/conv-mach-opt.h
 	$(CHARMC) -o compat_regmm.o compat_regmm.c

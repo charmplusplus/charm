@@ -184,7 +184,7 @@ void *CkWaitFuture(CkFutureID handle)
   if (!(fut->ready)) {
     CthSetNext(self, fut->waiters);
     fut->waiters = self;
-    CthSuspend();
+    while (!(fut->ready)) CthSuspend();
   }
   fut = (fs->array)+handle;
   value = fut->value;
