@@ -9,8 +9,8 @@ subroutine gotoNextPhase()
 end subroutine
 
 integer function controlPoint(lb, ub)
-     integer :: lb
-integer :: ub
+     integer*4 :: lb
+integer*4 :: ub
 end function
 
 end interface

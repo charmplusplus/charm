@@ -11,6 +11,7 @@
 #include "trace-projections.h"
 #include <pathHistory.h>
 #include "cp_effects.h"
+#include <iostream>
 
 #include <climits>
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
@@ -1818,6 +1819,11 @@ int controlPoint(const char *name, int lb, int ub){
     
   }
 
+  if(!isInRange(result,ub,lb)){
+    std::cerr << "control point out of range: " << result << " " << lb << " " << ub << std::endl;
+    fflush(stdout);
+    fflush(stderr);
+  }
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData->controlPoints[std::string(name)] = result; // was insert() 
 
@@ -1830,8 +1836,10 @@ int controlPoint(const char *name, int lb, int ub){
 }
 
 
-FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(int lb, int ub){
-  return controlPoint("Fortran CP", lb, ub);
+FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
+  CkAssert(sizeof(lb) == 4);
+  CkAssert(CkMyPe() == 0);
+  return controlPoint("FortranCP", *lb, *ub);
 }
 
 

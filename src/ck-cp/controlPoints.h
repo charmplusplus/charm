@@ -89,7 +89,7 @@ int controlPoint(const char *name, int lb, int ub);
 
 /// A fortran callable one. I couldn't figure out how to pass a string from fortran to C++ yet
 /// So far fortran can only have one control point
-FDECL int FTN_NAME(controlpoint,CONTROLPOINT)(int lb, int ub);
+FDECL int FTN_NAME(controlpoint,CONTROLPOINT)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
 
 
 /// Return an integer from the provided vector of values
