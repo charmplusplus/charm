@@ -35,10 +35,10 @@ $(COMPATLIB): $(COMPAT)
 
 headers: $(HEADERS)
 
-tcharm.decl.h: tcharm.ci
+tcharm.decl.h tcharm.def.h: tcharm.ci
 	$(CHARMC) tcharm.ci
 
-tcharmmain.decl.h: tcharmmain.ci
+tcharmmain.decl.h tcharmmain.def.h: tcharmmain.ci
 	$(CHARMC) tcharmmain.ci
 
 clean: 
