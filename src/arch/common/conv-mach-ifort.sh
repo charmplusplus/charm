@@ -10,7 +10,15 @@ then
 fi
 if test -x "$F90DIR" 
 then
-  F90LIBDIR="`dirname $F90DIR`/../lib"
+  F90DIR=`dirname $F90DIR`
+  Minor=`basename $F90DIR`
+  if test "$Minor" = "intel64"
+  then
+    F90DIR=`dirname $F90DIR`
+    F90LIBDIR="$F90DIR/../lib/$Minor"
+  else
+    F90LIBDIR="$F90DIR/../lib"
+  fi
   F90MAIN="$F90LIBDIR/for_main.o"
 fi
 # for_main.o is important for main() in f90 code

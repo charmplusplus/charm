@@ -17,12 +17,12 @@ then
 fi
 
 BGL_BIN=$BGL_FLOOR/blrts-gnu/bin
-BGL_INC="-I$BGL_INSTALL/bglsys/include"
+BGL_INC="-I$BGL_INSTALL/bglsys/include -I/gsa/yktgsa/home/g/m/gmartyna/dev/myincs"
 #-I$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/sys-include/" 
 
 #BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L/gsa/watgsa/home/s/a/sameer77/bgx/new2/bglsw-install/blrts-gnu/powerpc-bgl-blrts-gnu/lib -lc"
 
-BGL_LIB="-L$BGL_INSTALL/bglsys/lib"        #" -L$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/lib"
+BGL_LIB="-L$BGL_INSTALL/bglsys/lib -L/gsa/yktgsa/home/g/m/gmartyna/dev/mylibs"        #" -L$BGL_INSTALL/blrts-gnu/powerpc-bgl-blrts-gnu/lib"
 
 # test if compiler binary present
 if test ! -x $BGL_BIN/powerpc-bgl-blrts-gnu-g++
