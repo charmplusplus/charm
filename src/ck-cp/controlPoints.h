@@ -70,14 +70,14 @@ void registerControlPointTiming(double time);
 
 /// Called once each application step. Can be used instead of registerControlPointTiming()
 void controlPointTimingStamp();
-FDECL void FTN_NAME(controlpointtimingstamp,CONTROLPOINTTIMINGSTAMP)();
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)();
 
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
 /// This should be called before calling controlPoint()
 void gotoNextPhase();
-FDECL void FTN_NAME(gotonextphase,GOTONEXTPHASE)();
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)();
 
 /// Return an integral power of 2 between c1 and c2
 /// The value returned will likely change between subsequent invocations
@@ -89,7 +89,7 @@ int controlPoint(const char *name, int lb, int ub);
 
 /// A fortran callable one. I couldn't figure out how to pass a string from fortran to C++ yet
 /// So far fortran can only have one control point
-FDECL int FTN_NAME(controlpoint,CONTROLPOINT)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
+FDECL int FTN_NAME(CONTROLPOINT,controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
 
 
 /// Return an integer from the provided vector of values

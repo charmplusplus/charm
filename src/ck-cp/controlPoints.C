@@ -1029,7 +1029,7 @@ public:
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
-      CkPrintf("controlPointSamplePeriod = %ld sec\n", period);
+      CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
       controlPointSamplePeriod =  period * 1000; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
