@@ -77,7 +77,7 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
   }
   return 0;
 }
-#endif
+
 
 /**********************************************
   "ccs_getinfo"-- takes no data
@@ -101,7 +101,7 @@ void ccs_getinfo(char *msg)
 }
 
 ///////////////////////////////// middle-debug.C
-
+#endif
 #if ! CMK_HAS_GETPID
 typedef int pid_t;
 #endif

@@ -193,7 +193,6 @@ int skt_sendV(SOCKET fd,int nBuffers,const void **buffers,int *lengths);
 }
 #endif
 
-#endif /*!CMK_NO_SOCKETS*/
 
 /***********************************
 Conv-host messages: these are a simple
@@ -303,6 +302,7 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif
+#endif /*!CMK_NO_SOCKETS*/
 
 #endif /*SOCK_ROUTINES_H*/
 

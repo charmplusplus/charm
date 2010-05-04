@@ -183,7 +183,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
       comlib.h cmidirect.h cmidirectmanytomany.h \
-      controlPoints.h arrayRedistributor.h cp_effects.h register.h stats.h
+      controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.

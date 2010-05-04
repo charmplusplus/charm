@@ -137,6 +137,7 @@ then
         kraken*)
                 ncores=`expr \( $pes + 11 \) / 12 \* 12`
 		ncpus="#PBS -l size=$ncores"
+		ppn=''
 		;;
 	*)
 		ncpus="#PBS -l ncpus=$pes"
@@ -144,12 +145,12 @@ then
 	esac
 	if test $USE_LSF -eq 0
 	then
-	  mpirun=`which mpirun 2>/dev/null`
-          npcmd="-np "
+          mpirun=`which aprun 2>/dev/null`
+          npcmd="-n "
           if test -z "$mpirun"
           then
-            mpirun=`which aprun 2>/dev/null`
-            npcmd="-n "
+	    mpirun=`which mpirun 2>/dev/null`
+            npcmd="-np "
           fi
           cat > $script << EOF
 #!/bin/sh

@@ -1003,6 +1003,11 @@ void gotoNextPhase(){
   controlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
+{
+  gotoNextPhase();
+}
+
 
 /// A mainchare that is used just to create our controlPointManager group at startup
 class controlPointMain : public CBase_controlPointMain {
@@ -1167,6 +1172,15 @@ void controlPointTimingStamp() {
     
   controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
 }
+
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
+{
+  controlPointTimingStamp();
+}
+
+
+
+
 
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
@@ -1813,6 +1827,11 @@ int controlPoint(const char *name, int lb, int ub){
   //  thisPhaseData->print();
   
   return result;
+}
+
+
+FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(int lb, int ub){
+  return controlPoint("Fortran CP", lb, ub);
 }
 
 
