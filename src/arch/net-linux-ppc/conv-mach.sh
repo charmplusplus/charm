@@ -1,3 +1,5 @@
+isLinux=true
+
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E"
 CMK_CC="gcc -fPIC -m32"
