@@ -3237,14 +3237,14 @@ void ConverseCommonInit(char **argv)
 #endif
   CmiProcessPriority(argv);
 
+  CmiPersistentInit();
+  CmiIsomallocInit(argv);
+  CmiDeliversInit();
+  CsdInit(argv);
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
 #endif
-  CmiPersistentInit();
-  CmiIsomallocInit(argv);
   CpdInit();
-  CmiDeliversInit();
-  CsdInit(argv);
   CthSchedInit();
   CmiGroupInit();
   CmiMulticastInit();
