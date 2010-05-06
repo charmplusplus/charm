@@ -1409,7 +1409,7 @@ void req_ccs_connect(void)
   pe=ChMessageInt(h.hdr.pe);
   reqBytes=ChMessageInt(h.hdr.len);
 
-  if (pe<=-nodetab_size || pe>=nodetab_size) {
+  if ((pe<=-nodetab_size || pe>=nodetab_size) && 0==replay_single) {
     /*Treat out of bound values as errors. Helps detecting bugs*/
     /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
     /* TODO: We should somehow check boundaries also for bigemulator... */
