@@ -92,8 +92,8 @@
 #define  CMK_CHARMDEBUG             0
 #endif
 
-#ifndef CMK_TRACE_DISABLED
-#define CMK_TRACE_DISABLED          0
+#ifndef CMK_TRACE_ENABLED
+#define CMK_TRACE_ENABLED          1
 #endif
 
 #endif

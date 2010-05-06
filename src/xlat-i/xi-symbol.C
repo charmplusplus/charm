@@ -235,6 +235,13 @@ TParamList::print(XStr& str)
   }
 }
 
+std::string TParamList::to_string()
+{
+    XStr s;
+    print(s);
+    return s.get_string();
+}
+
 
 void
 Type::genProxyName(XStr &str,forWhom forElement)
@@ -979,28 +986,29 @@ Chare::genDecls(XStr& str)
     }
   }
 
-  if (!templat)
-  { //Generate a CBase typedef:
-    TypeList *b=bases_CBase;
-    if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
-    if (isPython()) { //Generate a python base: typedef CBaseT<Python_me,CProxy_me> CBase_me;
-      str << "typedef CBaseT<"<<Prefix::Python<<type<<",CProxy_"<<type<<"> "
-	  <<" CBase_"<<type<<";\n";
-    } else { //Generate normal CBase_me definition
-      switch(b->length()) {
-      case 1: //Just one base class: typedef CBaseT<parent,CProxy_me> CBase_me;
-	str << "typedef CBaseT<";
-        str <<b->getFirst()<<",CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
-	break;
-      case 2: //Two base classes: typedef CBaseT2<parent1,parent2,CProxy_me> CBase_me;
-	str << "typedef CBaseT2<";
-        str << b->getFirst() << ",";
-        str << b->getSecond() << "," <<"CProxy_"<<type<<"> "<<" CBase_"<<type<<";\n";
-	break;
-      default: //No base class, or several: give up, don't generate a CBase_me.
-	break;
-      };
-    }
+  // Create CBase_Whatever convenience type so that chare implementations can
+  // avoid inheriting from a complex CBaseT templated type.
+  TypeList *b=bases_CBase;
+  if (b==NULL) b=bases; //Fall back to normal bases list if no CBase available
+  if (templat) {
+    templat->genSpec(str);
+    str << "\nclass CBase_" << type << " : public ";
+  } else {
+    str << "typedef ";
+  }
+  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT<");
+  if (isPython()) {
+    str << Prefix::Python << type;
+  } else {
+    str << b->getFirst();
+    if (b->length() >= 2) str << "," << b->getSecond();
+  }
+  str << ", CProxy_" << type;
+  if (templat) {
+    templat->genVars(str);
+    str << " > { };\n";
+  } else {
+    str << "> CBase_" << type << ";\n";
   }
 }
 
@@ -1008,6 +1016,25 @@ void
 Chare::preprocess()
 {
   if(list) list->preprocess();
+}
+
+/*This disambiguation code is needed to support
+  multiple inheritance in Chares (Groups, Arrays).
+  They resolve ambiguous accessor calls to the parent "super".
+  Because mutator routines need to change *all* the base
+  classes, mutators are generated in xi-symbol.C.
+*/
+static void
+disambig_proxy(XStr &str, const XStr &super)
+{
+  str << "int ckIsDelegated(void) const "
+      << "{return " << super << "::ckIsDelegated();}\n"
+      << "inline CkDelegateMgr *ckDelegatedTo(void) const "
+      << "{return " << super << "::ckDelegatedTo();}\n"
+      << "inline CkDelegateData *ckDelegatedPtr(void) const "
+      << "{return " << super << "::ckDelegatedPtr();}\n"
+      << "CkGroupID ckDelegatedIdx(void) const "
+      << "{return " << super << "::ckDelegatedIdx();}\n";
 }
 
 void
@@ -1042,7 +1069,12 @@ Chare::genSubDecls(XStr& str)
   //Multiple inheritance-- resolve inheritance ambiguity
     XStr super;
     bases->getFirst()->genProxyName(super,forElement);
-    str<<"    CK_DISAMBIG_CHARE("<<super<<")\n";
+    disambig_proxy(str, super);
+    str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n"
+	<< "const CkChareID &ckGetChareID(void) const\n"
+	<< "{ return " << super << "::ckGetChareID(); }\n"
+	<< "operator const CkChareID &(void) const {return ckGetChareID();}\n";
+
     sharedDisambiguation(str,super);
     str<<"    void ckSetChareID(const CkChareID &c) {\n";
     genProxyNames(str,"      ",NULL,"::ckSetChareID(c);\n","");
@@ -1149,6 +1181,30 @@ void Group::genSubRegisterMethodDef(XStr& str) {
         }
 }
 
+static void
+disambig_reduction_client(XStr &str, const XStr &super)
+{
+  str << "inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
+      << "{ " << super << "::setReductionClient(fn,param); }\n"
+      << "inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
+      << "{ " << super << "::ckSetReductionClient(fn,param); }\n"
+      << "inline void ckSetReductionClient(CkCallback *cb) const\n"
+      << "{ " << super << "::ckSetReductionClient(cb); }\n";
+}
+
+static void
+disambig_group(XStr &str, const XStr &super)
+{
+  disambig_proxy(str, super);
+  str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n"
+      << "CkChareID ckGetChareID(void) const\n"
+      << "   {return " << super << "::ckGetChareID();}\n"
+      << "CkGroupID ckGetGroupID(void) const\n"
+      << "   {return " << super << "::ckGetGroupID();}\n"
+      << "operator CkGroupID () const { return ckGetGroupID(); }\n";
+  disambig_reduction_client(str, super);
+}
+
 void
 Group::genSubDecls(XStr& str)
 {
@@ -1184,7 +1240,10 @@ Group::genSubDecls(XStr& str)
     genProxyNames(str, "", NULL,"(_gid,_onPE)", ", ");
     str << "{  }\n";
 
-    str<<"   CK_DISAMBIG_GROUP_ELEMENT("<<super<<")\n";
+    disambig_group(str, super);
+    str << "int ckGetGroupPe(void) const\n"
+	<< "{return " << super << "::ckGetGroupPe();}\n";
+
   }
   else if (forElement==forSection)
   {//For a section of the group
@@ -1201,7 +1260,27 @@ Group::genSubDecls(XStr& str)
     genProxyNames(str, "", NULL,"(n,_gid,_pelist,_npes,CK_DELCTOR_ARGS)", ", ");
     str << "{  }\n";
     
-    str << "   CK_DISAMBIG_GROUP_SECTION("<<super<<")\n";
+    disambig_group(str, super);
+    str << "inline int ckGetNumSections() const\n" <<
+      "{ return " << super << "::ckGetNumSections(); }\n" <<
+      "inline CkSectionInfo &ckGetSectionInfo()\n" <<
+      "{ return " << super << "::ckGetSectionInfo(); }\n" <<
+      "inline CkSectionID *ckGetSectionIDs()\n" <<
+      "{ return " << super << "::ckGetSectionIDs(); }\n" <<
+      "inline CkSectionID &ckGetSectionID()\n" <<
+      "{ return " << super << "::ckGetSectionID(); }\n" <<
+      "inline CkSectionID &ckGetSectionID(int i)\n" <<
+      "{ return " << super << "::ckGetSectionID(i); }\n" <<
+      "inline CkGroupID ckGetGroupIDn(int i) const\n" <<
+      "{ return " << super << "::ckGetGroupIDn(i); }\n" <<
+      "inline int *ckGetElements() const\n" <<
+      "{ return " << super << "::ckGetElements(); }\n" <<
+      "inline int *ckGetElements(int i) const\n" <<
+      "{ return " << super << "::ckGetElements(i); }\n" <<
+      "inline int ckGetNumElements() const\n" <<
+      "{ return " << super << "::ckGetNumElements(); } \n" <<
+      "inline int ckGetNumElements(int i) const\n" <<
+      "{ return " << super << "::ckGetNumElements(i); }\n";
   }
   else if (forElement==forAll)
   {//For whole group
@@ -1218,7 +1297,7 @@ Group::genSubDecls(XStr& str)
     str << "      {return "<<proxyName(1)<<"(ckGetGroupID(),onPE,CK_DELCTOR_CALL);}\n";
     forElement=forAll;
 
-    str<<"   CK_DISAMBIG_GROUP("<<super<<")\n";
+    disambig_group(str, super);
   }
 
   //Multiple inheritance-- resolve inheritance ambiguity
@@ -1284,6 +1363,30 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 	}
 }
 
+static void
+disambig_array(XStr &str, const XStr &super)
+{
+  disambig_proxy(str, super);
+  str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n" <<
+    "inline operator CkArrayID () const {return ckGetArrayID();}\n" <<
+    "inline static CkArrayID ckCreateEmptyArray(void)" <<
+    "{ return " << super << "::ckCreateEmptyArray(); }\n" <<
+    "inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)" <<
+    "{ return " << super << "::ckCreateArray(m,ctor,opts); }\n" <<
+    "inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)" <<
+    "{ " << super << "::ckInsertIdx(m,ctor,onPe,idx); }\n" <<
+    "inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const" <<
+    "{ " << super << "::ckBroadcast(m,ep,opts); }\n" <<
+    "inline CkArrayID ckGetArrayID(void) const" <<
+    "{ return " << super << "::ckGetArrayID();}\n" <<
+    "inline CkArray *ckLocalBranch(void) const" <<
+    "{ return " << super << "::ckLocalBranch(); }\n" <<
+    "inline CkLocMgr *ckLocMgr(void) const" <<
+    "{ return " << super << "::ckLocMgr(); }\n" <<
+    "inline void doneInserting(void) { " << super << "::doneInserting(); }\n";
+  disambig_reduction_client(str, super);
+}
+
 void
 Array::genSubDecls(XStr& str)
 {
@@ -1316,7 +1419,16 @@ Array::genSubDecls(XStr& str)
 
   if (forElement==forIndividual)
   {/*For an individual element (no indexing)*/
-    str << "    CK_DISAMBIG_ARRAY_ELEMENT("<<super<<")\n";
+    disambig_array(str, super);
+    str << "inline void ckInsert(CkArrayMessage *m,int ctor,int onPe)\n"
+	<< "  { " << super << "::ckInsert(m,ctor,onPe); }\n"
+	<< "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const\n"
+	<< "  { " << super << "::ckSend(m,ep,opts); }\n"
+	<< "inline void *ckSendSync(CkArrayMessage *m, int ep) const\n"
+	<< "  { return " << super << "::ckSendSync(m,ep); }\n"
+	<< "inline const CkArrayIndex &ckGetIndex() const\n"
+	<< "  { return " << super << "::ckGetIndex(); }\n";
+
     str << "    "<<type<<tvars()<<" *ckLocal(void) const\n";
     str << "      { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }\n";
     //This constructor is used for array indexing
@@ -1329,7 +1441,7 @@ Array::genSubDecls(XStr& str)
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
-    str << "    CK_DISAMBIG_ARRAY("<<super<<")\n";
+    disambig_array(str, super);
 
     str<< //Build a simple, empty array
     "    static CkArrayID ckNew(void) {return ckCreateEmptyArray();}\n";
@@ -1381,7 +1493,27 @@ Array::genSubDecls(XStr& str)
   }
   else if (forElement==forSection)
   { /* for Section, indexible version*/
-    str << "    CK_DISAMBIG_ARRAY_SECTION("<<super<<")\n";
+    disambig_array(str, super);
+    str << "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0)\n"
+	<< " { " << super << "::ckSend(m,ep,opts); }\n"
+	<< "inline CkSectionInfo &ckGetSectionInfo()\n"
+	<< "  { return " << super << "::ckGetSectionInfo(); }\n"
+	<< "inline CkSectionID *ckGetSectionIDs()\n"
+	<< "  { return " << super << "::ckGetSectionIDs(); }\n"
+	<< "inline CkSectionID &ckGetSectionID()\n"
+	<< "  { return " << super << "::ckGetSectionID(); }\n"
+	<< "inline CkSectionID &ckGetSectionID(int i)\n"
+	<< "  { return " << super << "::ckGetSectionID(i); }\n"
+	<< "inline CkArrayID ckGetArrayIDn(int i) const\n"
+	<< "{return " << super << "::ckGetArrayIDn(i); } \n"
+	<< "inline CkArrayIndexMax *ckGetArrayElements() const\n"
+	<< "  { return " << super << "::ckGetArrayElements(); }\n"
+	<< "inline CkArrayIndexMax *ckGetArrayElements(int i) const\n"
+	<< "{return " << super << "::ckGetArrayElements(i); }\n"
+	<< "inline int ckGetNumElements() const\n"
+	<< "  { return " << super << "::ckGetNumElements(); } \n"
+	<< "inline int ckGetNumElements(int i) const\n"
+	<< "{return " << super << "::ckGetNumElements(i); } \n";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")

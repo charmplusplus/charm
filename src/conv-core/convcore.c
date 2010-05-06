@@ -889,7 +889,7 @@ double CmiWallTimer()
 
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (lastT > 0.0 && currenttime < lastT) {
     currenttime = lastT;
   }
@@ -1405,7 +1405,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
@@ -1422,7 +1422,7 @@ void CmiHandleMessage(void *msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
 	_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
@@ -1745,7 +1745,7 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -1773,7 +1773,7 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -2609,7 +2609,7 @@ void CmiFree(void *blk)
 {
   void *parentBlk=CmiAllocFindEnclosing(blk);
   int refCount=REFFIELD(parentBlk);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
     CmiAbort("CmiFree reference count was zero-- is this a duplicate free?");
 #endif
@@ -2701,7 +2701,7 @@ void CmiTmpFree(void *t) {
     CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
     /* t should point into our temporary buffer: figure out where */
     int cur=((const char *)t)-b->buf;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (cur<0 || cur>b->max)
       CmiAbort("CmiTmpFree: called with an invalid pointer");
 #endif
@@ -3231,7 +3231,7 @@ void ConverseCommonInit(char **argv)
    }
 #endif
 	
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
@@ -3280,7 +3280,7 @@ void ConverseCommonExit(void)
 {
   CcsImpl_kill();
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceClose();
 /*closeTraceCore();*/ /* projector */
 #endif
@@ -3462,11 +3462,10 @@ unsigned int CmiLog2(unsigned int val) {
 }
 #endif
 
-#if CMK_BLUEGENE_CHARM
+/* for bigsim */
 int CmiMyRank_()
 {
   return CmiMyRank();
 }
-#endif
 
 /*@}*/

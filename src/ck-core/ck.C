@@ -545,7 +545,7 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   { /* Method needs a copy of the message to keep/delete */
     void *oldMsg=(void *)msg;
     deliverMsg=CkCopyMsg(&oldMsg);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (oldMsg!=msg)
       CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
@@ -569,7 +569,7 @@ static inline void _invokeEntryNoTrace(int epIdx,envelope *env,void *obj)
 static inline void _invokeEntry(int epIdx,envelope *env,void *obj)
 {
 
-#if !CMK_TRACE_DISABLED 
+#if CMK_TRACE_ENABLED 
   if (_entryTable[epIdx]->traceEnabled) {
     _TRACE_BEGIN_EXECUTE(env);
     _invokeEntryNoTrace(epIdx,env,obj);
@@ -1506,7 +1506,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     CkSendMsgInline(entryIdx, msg, pCid, opts);
     return;
   }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (opts & CK_MSG_IMMEDIATE) {
     CmiAbort("Immediate message is not allowed in Chare!");
   }
@@ -1565,7 +1565,7 @@ static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int t
   env->setEpIdx(eIdx);
   env->setGroupNum(gID);
   env->setSrcPe(CkMyPe());
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   nodeRedMgr.setZero();
   env->setRednMgr(nodeRedMgr);
 #endif
@@ -1654,7 +1654,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
     { //Just directly call the group:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
 #else
       envelope *env=UsrToEnv(msg);
@@ -1808,7 +1808,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     if (obj!=NULL)
     { //Just directly call the group:
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
 #else
       envelope *env=UsrToEnv(msg);
@@ -1947,6 +1947,20 @@ void CkDeleteChares() {
   int i;
   int numGroups = CkpvAccess(_groupIDTable)->size();
 
+  // delete all plain chares
+#ifndef CMK_CHARE_USE_PTR
+  for (i=0; i<CpvAccess(chare_objs).size(); i++) {
+	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
+	delete obj;
+	CpvAccess(chare_objs)[i] = NULL;
+  }
+  for (i=0; i<CpvAccess(vidblocks).size(); i++) {
+	VidBlock *obj = CpvAccess(vidblocks)[i];
+	delete obj;
+	CpvAccess(vidblocks)[i] = NULL;
+  }
+#endif
+
   // delete all array elements
   for(i=0;i<numGroups;i++) {
     IrrGroup *obj = CkpvAccess(_groupTable)->find((*CkpvAccess(_groupIDTable))[i]).getObj();
@@ -1954,7 +1968,6 @@ void CkDeleteChares() {
       CkLocMgr *mgr = (CkLocMgr*)obj;
       ElementDestroyer destroyer(mgr);
       mgr->iterate(destroyer);
-printf("[%d] DELETE!\n", CkMyPe());
     }
   }
 
@@ -2331,7 +2344,7 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
     free(token);
     return;
   }
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);

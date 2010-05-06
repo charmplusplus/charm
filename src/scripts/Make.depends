@@ -3,7 +3,7 @@ convcore.o: convcore.c converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
   persistent.h debug-conv.h sockRoutines.h conv-ccs.h ccs-server.h \
-  memory-isomalloc.h converseEvents.h traceCoreAPI.h \
+  ckhashtable.h pup.h memory-isomalloc.h converseEvents.h traceCoreAPI.h \
   converseProjections.h traceCoreCommon.h machineEvents.h \
   machineProjections.h quiescence.h cmibacktrace.c
 	$(CHARMC) -c -I. convcore.c
@@ -65,16 +65,17 @@ random.o: random.c converse.h conv-config.h conv-autoconfig.h \
 debug-conv.o: debug-conv.c converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h conv-ccs.h sockRoutines.h ccs-server.h
+  persistent.h debug-conv.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckhashtable.h pup.h
 	$(CHARMC) -c -I. debug-conv.c
 
 generate.o: generate.c converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h typedefs.h
+  persistent.h debug-conv.h graphdefs.h
 	$(CHARMC) -c -I. generate.c
 
-edgelist.o: edgelist.c typedefs.h converse.h conv-config.h \
+edgelist.o: edgelist.c graphdefs.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
   queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
   conv-trace.h persistent.h debug-conv.h
@@ -87,9 +88,6 @@ conv-ccs.o: conv-ccs.c converse.h conv-config.h conv-autoconfig.h \
   ckhashtable.h pup.h
 	$(CHARMC) -c -I. conv-ccs.c
 
-middle-ccs.o: middle-ccs.C converse.h bgconverse.h
-	$(CHARMC) -c -I. middle-ccs.C
-
 ccs-builtins.o: ccs-builtins.C converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
@@ -97,6 +95,13 @@ ccs-builtins.o: ccs-builtins.C converse.h conv-config.h conv-autoconfig.h \
   debug-charm.h cklists.h conv-ccs.h sockRoutines.h ccs-server.h \
   ccs-builtins.h
 	$(CHARMC) -c -I. ccs-builtins.C
+
+middle-ccs.o: middle-ccs.C middle.h middle-conv.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h \
+  ccs-server.h sockRoutines.h conv-ccs.h ckhashtable.h pup.h
+	$(CHARMC) -c -I. middle-ccs.C
 
 traceCore.o: traceCore.C converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
@@ -2695,11 +2700,11 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
   CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
   waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h ControlPoints.decl.h charm++.h trace-controlPoints.h trace.h \
-  envelope.h register.h trace-common.h LBDatabase.h controlPoints.h \
-  pup_stl.h arrayRedistributor.h pathHistory.h PathHistory.decl.h \
-  cp_effects.h ck.h qd.h register.h stats.h ckfutures.h ckIgetControl.h \
-  ckarray.h
+  envelope.h trace-controlPoints.h trace.h envelope.h register.h \
+  trace-common.h LBDatabase.h controlPoints.h ControlPoints.decl.h \
+  charm++.h pup_stl.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h cp_effects.h ck.h qd.h register.h stats.h \
+  ckfutures.h ckIgetControl.h ckarray.h
 	$(CHARMC) -c -I. arrayRedistributor.C
 
 cp_effects.o: cp_effects.C cp_effects.h charm++.h charm.h converse.h \

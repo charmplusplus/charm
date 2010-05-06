@@ -436,6 +436,7 @@ class TParamList : public Printable {
     TParamList(TParam *t, TParamList *n=0) : tparam(t), next(n) {}
     void print(XStr& str);
     void genSpec(XStr& str);
+    std::string to_string();
 };
 
 /* A type instantiation parameter */

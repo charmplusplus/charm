@@ -11,6 +11,7 @@
 #include "trace-projections.h"
 #include <pathHistory.h>
 #include "cp_effects.h"
+#include <iostream>
 
 #include <climits>
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
@@ -365,6 +366,12 @@ controlPointManager::controlPointManager() {
     controlPointChangeCallback = cb;
     haveControlPointChangeCallback = true;
   }
+
+
+/// A user can specify that the framework should advance the phases automatically. Useful for gather performance measurements without modifying a program.
+void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase){
+  frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
+}
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
@@ -744,7 +751,7 @@ controlPointManager::controlPointManager() {
       prevPhase->idleTime.avg = r[1]/CkNumPes();
       prevPhase->idleTime.max = r[2];
       prevPhase->idleTime.print();
-      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, prevPhase);
     } else {
       CkPrintf("There is no previous phase to store the idle time measurements\n");
     }
@@ -831,7 +838,7 @@ controlPointManager::controlPointManager() {
       
       prevPhase->memoryUsageMB = mem[0];
       
-      CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf  mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, (double)prevPhase->memoryUsageMB, prevPhase);
 
       double bytesPerInvoke2 = msgBytes[2] / msgBytes[0];
       double bytesPerInvoke3 = msgBytes[3] / msgBytes[1];
@@ -997,6 +1004,11 @@ void gotoNextPhase(){
   controlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
+{
+  gotoNextPhase();
+}
+
 
 /// A mainchare that is used just to create our controlPointManager group at startup
 class controlPointMain : public CBase_controlPointMain {
@@ -1017,7 +1029,7 @@ public:
     double period;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
-      CkPrintf("controlPointSamplePeriod = %ld sec\n", period);
+      CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
       controlPointSamplePeriod =  period * 1000; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
@@ -1131,6 +1143,14 @@ void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
 }
 
 /// An interface callable by the application.
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase){
+  if(CkMyPe() == 0){
+    CkPrintf("Application has specified that framework should %sadvance phase\n", frameworkShouldAdvancePhase?"":"not ");
+    controlPointManagerProxy.ckLocalBranch()->setFrameworkAdvancePhase(frameworkShouldAdvancePhase);
+  }
+}
+
+/// An interface callable by the application.
 void registerControlPointTiming(double time){
   CkAssert(CkMyPe() == 0);
 #if DEBUGPRINT>0
@@ -1153,6 +1173,15 @@ void controlPointTimingStamp() {
     
   controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
 }
+
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
+{
+  controlPointTimingStamp();
+}
+
+
+
+
 
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
@@ -1790,6 +1819,11 @@ int controlPoint(const char *name, int lb, int ub){
     
   }
 
+  if(!isInRange(result,ub,lb)){
+    std::cerr << "control point out of range: " << result << " " << lb << " " << ub << std::endl;
+    fflush(stdout);
+    fflush(stderr);
+  }
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData->controlPoints[std::string(name)] = result; // was insert() 
 
@@ -1799,6 +1833,13 @@ int controlPoint(const char *name, int lb, int ub){
   //  thisPhaseData->print();
   
   return result;
+}
+
+
+FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
+  CkAssert(sizeof(lb) == 4);
+  CkAssert(CkMyPe() == 0);
+  return controlPoint("FortranCP", *lb, *ub);
 }
 
 

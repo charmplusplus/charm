@@ -1,3 +1,5 @@
+isAIX=true
+
 CMK_CPP_CHARM='/usr/lib/cpp'
 CMK_CPP_C='xlc -E'
 CMK_CC='xlc_r -qcpluscmt '

@@ -88,7 +88,7 @@ static void CldStillIdle(void *dummy, double curT)
 #endif
   cldData->sent = 1;
 
-#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
 #endif
 }
@@ -124,7 +124,7 @@ static void CldAskLoadHandler(requestmsg *msg)
     CpvAccess(neighbors)[i].load += sendLoad;
     CldMultipleSend(receiver, sendLoad, rank, 0);
 #if 0
-#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
     /* this is dangerous since projections logging is not thread safe */
     {
     CldProcInfo  cldData = CpvAccessOther(CldData, rank);
@@ -210,7 +210,7 @@ void CldBalance(void *dummy, double curT)
   int i, j, overload, numToMove=0, avgLoad;
   int totalUnderAvg=0, numUnderAvg=0, maxUnderAvg=0;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   double startT = curT;
 #endif
 
@@ -254,7 +254,7 @@ void CldBalance(void *dummy, double curT)
       }
   }
   CldSendLoad();
-#if !defined(CMK_OPTIMIZE) && TRACE_USEREVENTS
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
   CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
@@ -349,7 +349,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     /* always pack the message because the message may be move away
        to a different processor later by CldGetToken() */
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    if (pfn) {
+    if (pfn && CmiNumNodes()>1) {
        pfn(&msg);
        ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     }
@@ -530,7 +530,7 @@ void CldGraphModuleInit(char **argv)
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
   CpvAccess(CldData)->lastCheck = -1;
   CpvAccess(CldData)->sent = 0;
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
   CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
