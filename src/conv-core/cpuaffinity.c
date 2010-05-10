@@ -287,7 +287,7 @@ static void cpuAffinityHandler(void *m)
   }
 }
 
-int CmiSetAffinitity(int mycore)
+int CmiSetCPUAffinity(int mycore)
 {
   int core = mycore;
   if (core < 0) {
@@ -295,7 +295,7 @@ int CmiSetAffinitity(int mycore)
   }
   if (core < 0) {
     CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
-    CmiAbort("CmiSetAffinitity failed");
+    CmiAbort("CmiSetCPUAffinity failed");
   }
   /* set cpu affinity */
 #if CMK_SMP
@@ -318,7 +318,7 @@ static void cpuAffinityRecvHandler(void *msg)
 
   /*CmiPrintf("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank);*/
 
-  if (-1 != CmiSetAffinitity(myrank)) {
+  if (-1 != CmiSetCPUAffinity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
   else
@@ -445,11 +445,11 @@ void CmiInitCPUAffinity(char **argv)
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPe()-CmiNumPes());
       printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
-      if (-1 == CmiSetAffinitity(mycore))
+      if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
     }
     else {
-    /* if (CmiSetAffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
+    /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
     if (coremap == NULL && pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
@@ -472,7 +472,7 @@ void CmiInitCPUAffinity(char **argv)
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
     }
-    if (CmiSetAffinitity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
+    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
@@ -496,7 +496,7 @@ void CmiInitCPUAffinity(char **argv)
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
     }
-    if (CmiSetAffinitity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
+    if (CmiSetCPUAffinity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     return;
