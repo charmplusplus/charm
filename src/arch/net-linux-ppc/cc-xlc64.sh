@@ -1,6 +1,7 @@
 COMMENT="Enable 64-bit mode (-q64)"
 CMK_CC='xlc_r -q64 '
-CMK_CXX='xlC_r -q64 -qstaticinline '
+#CMK_CXX='xlC_r -q64 -qstaticinline '
+CMK_CXX='xlC_r -q64 '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q!  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q! '
 CMK_LD="$CMK_CC "
@@ -10,7 +11,7 @@ CMK_QT="aix"
 
 CMK_NATIVE_CC='xlc_r -q64'
 CMK_NATIVE_LD='xlc_r -q64'
-CMK_NATIVE_CXX='xlC_r -qstaticinline -q64'
+CMK_NATIVE_CXX='xlC_r -q64'
 CMK_NATIVE_LDXX='xlC_r -q64'
 
 CMK_CF77='xlf_r -q64 '
