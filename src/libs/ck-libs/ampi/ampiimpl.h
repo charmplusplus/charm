@@ -588,7 +588,8 @@ public:
 	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
-	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
+	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
+	/// 4-SReq, 5-GPUReq
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -743,6 +744,19 @@ public:
 	}
 	//added due to BIGSIM_OOC DEBUGGING
 	virtual void print();
+};
+
+class GPUReq : public AmpiRequest {
+    bool isComplete;
+
+public:
+    GPUReq(int comm_);
+    int getType() { return 5; }
+    CmiBool test(MPI_Status *sts);
+    void complete(MPI_Status *sts);
+    int wait(MPI_Status *sts);
+    void receive(ampi *ptr, AmpiMsg *msg);
+    void setComplete();
 };
 
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
@@ -1396,6 +1410,7 @@ one MPI communicator.
 class ampi : public CBase_ampi {
 friend class IReq;
 friend class SReq;
+friend class GPUReq;
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;

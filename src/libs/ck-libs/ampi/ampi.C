@@ -5697,6 +5697,7 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
 
 /******** AMPI-specific (not standard MPI) calls *********/
 
+
 CDECL
 int AMPI_Suspend(int comm) {
 	AMPIAPI("AMPI_Suspend");
@@ -5723,6 +5724,75 @@ int AMPI_System(const char *cmd) {
 	return TCHARM_System(cmd);
 }
 
+#if CMK_CUDA
+GPUReq::GPUReq(int comm_)
+{
+    MPI_Comm_rank(comm_, &src);
+    comm = comm_;
+    isvalid = true;
+    buf = getAmpiInstance(comm);
+    isComplete = false;
+}
+
+bool GPUReq::test(MPI_Status *sts)
+{
+    return isComplete;
+}
+
+void GPUReq::complete(MPI_Status *sts)
+{
+    wait(sts);
+}
+
+int GPUReq::wait(MPI_Status *sts)
+{
+    (void)sts;
+    while (!isComplete) {
+	AMPI_Suspend(comm);
+    }
+    return 0;
+}
+
+void GPUReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+    CkAbort("GPUReq::receive should never be called");
+}
+
+void GPUReq::setComplete()
+{
+    isComplete = true;
+}
+
+class workRequestQueue;
+extern workRequestQueue *wrQueue;
+void enqueue(workRequestQueue *q, workRequest *wr);
+extern "C++" void setWRCallback(workRequest *wr, void *cb);
+
+void AMPI_GPU_complete(void *request, void* dummy)
+{
+    GPUReq *req = static_cast<GPUReq *>(request);
+    req->setComplete();
+    ampi *ptr = static_cast<ampi *>(req->buf);
+    ptr->unblock();
+}
+
+CDECL
+int AMPI_GPU_invoke(workRequest *to_call, MPI_Request *request, MPI_Comm comm)
+{
+    AMPIAPI(__func__);
+
+    AmpiRequestList* reqs = getReqs();
+    GPUReq *newreq = new GPUReq(comm);
+    *request = reqs->insert(newreq);
+
+    // Create a callback that completes the corresponding request
+    CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+    setWRCallback(to_call, cb);
+
+    // Call the CUDA manager with to_call and cb
+    enqueue(wrQueue, to_call);
+}
+#endif
 
 #include "ampi.def.h"
 
