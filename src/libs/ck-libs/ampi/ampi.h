@@ -654,7 +654,7 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
 typedef struct workRequest workRequest;
 
 /* AMPI GPU Request interface */
-int AMPI_GPU_invoke(workRequest *to_call, MPI_Request *request, MPI_Comm comm);
+int AMPI_GPU_invoke(workRequest *to_call, MPI_Comm comm, MPI_Request *request);
 #endif
 
 /*********************One sided communication routines *****************/ 

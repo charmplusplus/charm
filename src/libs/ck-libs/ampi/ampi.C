@@ -5748,7 +5748,7 @@ int GPUReq::wait(MPI_Status *sts)
 {
     (void)sts;
     while (!isComplete) {
-	AMPI_Suspend(comm);
+	getAmpiInstance(comm)->block();
     }
     return 0;
 }
@@ -5777,7 +5777,7 @@ void AMPI_GPU_complete(void *request, void* dummy)
 }
 
 CDECL
-int AMPI_GPU_invoke(workRequest *to_call, MPI_Request *request, MPI_Comm comm)
+int AMPI_GPU_invoke(workRequest *to_call, MPI_Comm comm, MPI_Request *request)
 {
     AMPIAPI(__func__);
 
