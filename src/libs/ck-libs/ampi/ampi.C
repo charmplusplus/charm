@@ -3162,60 +3162,61 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
-  if (CpvAccess(CmiPICMethod) != 2) 
-  {
-	//Copy "this" to a local variable in the case that "this" pointer
-	//is updated during the out-of-core emulation.
-
-          // optimization for Irecv
-          // generic() writes directly to the buffer, so the only thing we
-          // do here is to wait
-  	ampi *ptr = getAmpiInstance(comm);
-
-	//BIGSIM_OOC DEBUGGING
-	//int ooccnt=0;
-	//int ampiIndex = ptr->thisIndex;
-	//CmiPrintf("%d: IReq's status=%d\n", ampiIndex, statusIreq);
-	
-	while (statusIreq == false) {
-		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("Before blocking: %dth time: %d: in Ireq::wait\n", ++ooccnt, ptr->thisIndex);
-		//print();
-
-  		ptr->resumeOnRecv=true;
-		ptr->block();
-			
-		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
-		//CmiPrintf("IReq's this pointer: %p\n", this);
-		//print();
-
-	    #if CMK_BLUEGENE_CHARM
-		//Because of the out-of-core emulation, this pointer is changed after in-out
-		//memory operation. So we need to return from this function and do the while loop
-		//in the outer function call.	
-		if(_BgInOutOfCoreMode)
-		    return -1;
-	    #endif	
-	}   // end of while
-	ptr->resumeOnRecv=false;
-
-	AMPI_DEBUG("IReq::wait has resumed\n");
-
-        if(sts) {
-	  AMPI_DEBUG("Setting sts->MPI_TAG to this->tag=%d in IReq::wait  this=%p\n", (int)this->tag, this);
-          sts->MPI_TAG = tag;
-          sts->MPI_SOURCE = src;
-          sts->MPI_COMM = comm;
-          sts->MPI_LENGTH = length;
-        }
-  }
-  else {
-    AMPI_DEBUG("In else clause of IReq::wait\n");
+    if(CpvAccess(CmiPICMethod) == 2) {
+	AMPI_DEBUG("In weird clause of IReq::wait\n");
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
-		CkAbort("AMPI> Error in non-blocking request wait");
-  }
+	    CkAbort("AMPI> Error in non-blocking request wait");
+
 	return 0;
+    }
+
+    //Copy "this" to a local variable in the case that "this" pointer
+    //is updated during the out-of-core emulation.
+
+    // optimization for Irecv
+    // generic() writes directly to the buffer, so the only thing we
+    // do here is to wait
+    ampi *ptr = getAmpiInstance(comm);
+
+    //BIGSIM_OOC DEBUGGING
+    //int ooccnt=0;
+    //int ampiIndex = ptr->thisIndex;
+    //CmiPrintf("%d: IReq's status=%d\n", ampiIndex, statusIreq);
+	
+    while (statusIreq == false) {
+	//BIGSIM_OOC DEBUGGING
+	//CmiPrintf("Before blocking: %dth time: %d: in Ireq::wait\n", ++ooccnt, ptr->thisIndex);
+	//print();
+
+	ptr->resumeOnRecv=true;
+	ptr->block();
+			
+	//BIGSIM_OOC DEBUGGING
+	//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
+	//CmiPrintf("IReq's this pointer: %p\n", this);
+	//print();
+
+#if CMK_BLUEGENE_CHARM
+	//Because of the out-of-core emulation, this pointer is changed after in-out
+	//memory operation. So we need to return from this function and do the while loop
+	//in the outer function call.	
+	if(_BgInOutOfCoreMode)
+	    return -1;
+#endif	
+    }   // end of while
+    ptr->resumeOnRecv=false;
+
+    AMPI_DEBUG("IReq::wait has resumed\n");
+
+    if(sts) {
+	AMPI_DEBUG("Setting sts->MPI_TAG to this->tag=%d in IReq::wait  this=%p\n", (int)this->tag, this);
+	sts->MPI_TAG = tag;
+	sts->MPI_SOURCE = src;
+	sts->MPI_COMM = comm;
+	sts->MPI_LENGTH = length;
+    }
+
+    return 0;
 }
 
 int ATAReq::wait(MPI_Status *sts){
