@@ -52,7 +52,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults, LDBPeriod}  tuningScheme;
 
 
 
@@ -87,6 +87,9 @@ void printTuningScheme(){
     break;
   case DivideAndConquer:
     CkPrintf("Tuning Scheme: Divide & Conquer Algorithm\n");
+    break;
+  case LDBPeriod:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering\n");
     break;
   default:
     CkPrintf("Unknown tuning scheme\n");
@@ -1060,6 +1063,8 @@ public:
       whichTuningScheme = Simplex;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPDivideConquer", "A divide and conquer program specific steering scheme") ){
       whichTuningScheme = DivideAndConquer;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriod", "Adjust the load balancing period") ){
+      whichTuningScheme = LDBPeriod;
     }
 
     char *defValStr = NULL;
@@ -1343,7 +1348,76 @@ void controlPointManager::generatePlan() {
 	newControlPoints[name] =  best->controlPoints[name];
       }
     }
+  } else if( whichTuningScheme == LDBPeriod) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
 
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+    
+
+    // Build model of execution time based on two phases ago
+    // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+    const std::vector<double> &times = twoAgoPhase->times;
+    const int oldNumTimings = times.size();
+    const int b1 = 2 + (oldNumTimings-2)/3;
+    const int b2 = 2 + (2*(oldNumTimings-2))/3;
+    double s1 = 0;
+    double s2 = 0;
+    double s3 = 0;
+
+    const double ldbStepsTime = times[0] + times[1];
+    
+    for(int i=2; i<=b1; i++){
+      s1 += times[i];
+    }
+    for(int i=b1+1; i<=b2; i++){
+      s2 += times[i];
+    }
+    for(int i=b2+1; i<=oldNumTimings; i++){
+      s3 += times[i];
+    }
+
+    
+    // Compute the estimated time for the last phase's data
+    const std::vector<double> &timesNew = prevPhase->times;
+    const int newNumTimings = timesNew.size();
+    
+    const double a1 = s1 / ((newNumTimings-2)/3);
+    const double a2 = s2 / ((newNumTimings-2)/3);
+    const double a3 = s3 / ((newNumTimings-2)/3);
+    
+    const double a = (a1-2.0*a2+a3)/2.0;
+    const double b = (a1-4.0*a2+3.0*a3)/2.0;
+    const double c = a3;
+    
+    // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
+    const double x1 = (double)newNumTimings / (double)oldNumTimings + 0.5;
+    const double x2 = 0.5;
+    const double expectedTotalTime = a*x1*x1*x1/3.0 + b*x1*x1/2.0 + c*x1 - (a*x2*x2*x2/3.0 + b*x2*x2/2.0 + c*x2);
+    
+    
+    // Measure actual time
+    double sum = 0.0;
+    for(int i=2; i<newNumTimings; ++i){
+      sum += timesNew[i];
+    }
+
+    const double avg = sum / ((double)(newNumTimings-2));
+    const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+
+    // Determine load balance cost
+    const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
+    
+    // Determine whether LB cost outweights the estimated benefit
+    CkPrintf("Quadratic Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, actualTotalTime);
+    
+    
+    
   } else if ( whichTuningScheme == UseSteering ) {
 	  // -----------------------------------------------------------
 	  //  STEERING BASED ON KNOWLEDGE
@@ -2247,8 +2321,8 @@ void simplexScheme::doContraction(std::map<std::string, std::pair<int,int> > & c
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Contracting %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
-
-
+	
+	
 	// Transition to "contracting" state
 	simplexState = contracting;
 	CkPrintf("Simplex Tuning: Switched to state: contracting\n");
