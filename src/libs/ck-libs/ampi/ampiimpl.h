@@ -816,7 +816,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
 
     inline void checkRequest(MPI_Request idx){
       if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
-        CkAbort("Invalide MPI_Request\n");
+        CkAbort("Invalid MPI_Request\n");
     }
 
     //find an AmpiRequest by its pointer value
