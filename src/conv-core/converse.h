@@ -838,14 +838,15 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-#if ! CMK_ERROR_CHECKING
-#define CmiAssert(expr) ((void) 0)
-#else
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x
 #else
 #define __CMK_STRING(x) "x"
 #endif
+
+#if ! CMK_ERROR_CHECKING
+#define CmiAssert(expr) ((void) 0)
+#else
 extern void __cmi_assert(const char *, const char *, int);
 #define CmiAssert(expr) \
   ((void) ((expr) ? 0 :                   \
@@ -1696,9 +1697,6 @@ extern int _immRunning;
 #elif CMK_PPC_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define AT TOSTRING(__LINE__)
 #define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
      __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \
