@@ -1410,7 +1410,6 @@ one MPI communicator.
 class ampi : public CBase_ampi {
 friend class IReq;
 friend class SReq;
-friend class GPUReq;
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;
