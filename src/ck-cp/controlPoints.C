@@ -1370,72 +1370,78 @@ void controlPointManager::generatePlan() {
     instrumentedPhase *prevPhase = previousPhaseData();
     
     
-    // Build model of execution time based on two phases ago
-    // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
     const std::vector<double> &times = twoAgoPhase->times;
     const int oldNumTimings = times.size();
-    double oldSum = 0;
-        
-    for(int i=2; i<oldNumTimings; i++){
-      oldSum += times[i];
-    }
-    
-    const double oldAvg = oldSum / (oldNumTimings-2);
-    
-    
-    // Compute the estimated time for the last phase's data
+
+
     const std::vector<double> &timesNew = prevPhase->times;
     const int newNumTimings = timesNew.size();
-    
-    
-    // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
-    const double expectedTotalTime = oldAvg * newNumTimings;
-    
-    
-    // Measure actual time
-    double newSum = 0.0;
-    for(int i=2; i<newNumTimings; ++i){
-      newSum += timesNew[i];
-    }
-    
-    const double newAvg = newSum / (newNumTimings-2);
-    const double newTotalTimeExcludingLBSteps = newAvg * ((double)newNumTimings); // excluding the load balancing abnormal steps
-    
-    const double benefit = expectedTotalTime - newTotalTimeExcludingLBSteps;
-    
-    // Determine load balance cost
-    const double lbcost = timesNew[0] + timesNew[1] - 2.0*newAvg;
-    
-    const double benefitAfterLB = benefit - lbcost;
-    
-    
-    // Determine whether LB cost outweights the estimated benefit
-    CkPrintf("Constant Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, newTotalTimeExcludingLBSteps);
-    
-    
-    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-      const std::string &name = cpsIter->first;
-      const std::pair<int,int> &bounds = cpsIter->second;
-      const int lb = bounds.first;
-      const int ub = bounds.second;
+
+
+    if(oldNumTimings > 4 && newNumTimings > 4){
       
-      if(benefitAfterLB > 0){
-	CkPrintf("Constant Model: Beneficial LB\n");
-	int newval = newControlPoints[name] / 2;
-	if(newval > lb)
-	  newControlPoints[name] = newval;
-	else 
-	  newControlPoints[name] = lb;
-      } else {
-	CkPrintf("Constant Model: Detrimental LB\n");
-	int newval = newControlPoints[name] * 2;
-	if(newval < ub)
-	  newControlPoints[name] = newval;
-	else
-	  newControlPoints[name] = ub;
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      
+      double oldSum = 0;
+      
+      for(int i=2; i<oldNumTimings; i++){
+	oldSum += times[i];
       }
       
+      const double oldAvg = oldSum / (oldNumTimings-2);
+      
+      
+      
+      
+      // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
+      const double expectedTotalTime = oldAvg * newNumTimings;
+      
+      
+      // Measure actual time
+      double newSum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	newSum += timesNew[i];
+      }
+      
+      const double newAvg = newSum / (newNumTimings-2);
+      const double newTotalTimeExcludingLBSteps = newAvg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+      
+      const double benefit = expectedTotalTime - newTotalTimeExcludingLBSteps;
+      
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*newAvg;
+      
+      const double benefitAfterLB = benefit - lbcost;
+    
+    
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Constant Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, newTotalTimeExcludingLBSteps);
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+      
+	if(benefitAfterLB > 0){
+	  CkPrintf("Constant Model: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("Constant Model: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else
+	    newControlPoints[name] = ub;
+	}
+      }
     }
     
     
@@ -1450,80 +1456,84 @@ void controlPointManager::generatePlan() {
     instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
     instrumentedPhase *prevPhase = previousPhaseData();
     
-
-    // Build model of execution time based on two phases ago
-    // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
     const std::vector<double> &times = twoAgoPhase->times;
     const int oldNumTimings = times.size();
-    const int b1 = 2 + (oldNumTimings-2)/2;
-    double s1 = 0;
-    double s2 = 0;
-    
-    const double ldbStepsTime = times[0] + times[1];
-    
-    for(int i=2; i<b1; i++){
-      s1 += times[i];
-    }
-    for(int i=b1; i<oldNumTimings; i++){
-      s2 += times[i];
-    }
-    
-    
-    // Compute the estimated time for the last phase's data
+
     const std::vector<double> &timesNew = prevPhase->times;
     const int newNumTimings = timesNew.size();
     
-    const double a1 = s1 / ((newNumTimings-2)/2);
-    const double a2 = s2 / ((newNumTimings-2)/2);
+
+    if(oldNumTimings > 4 && newNumTimings > 4){
+
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      const int b1 = 2 + (oldNumTimings-2)/2;
+      double s1 = 0;
+      double s2 = 0;
     
-    const double expectedTotalTime = ((5.0*a2-3.0*a1)/2.0 ) * newNumTimings;
+      const double ldbStepsTime = times[0] + times[1];
+    
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<oldNumTimings; i++){
+	s2 += times[i];
+      }
+    
+    
+      // Compute the estimated time for the last phase's data
+    
+      const double a1 = s1 / ((newNumTimings-2)/2);
+      const double a2 = s2 / ((newNumTimings-2)/2);
+    
+      const double expectedTotalTime = ((5.0*a2-3.0*a1)/2.0 ) * newNumTimings;
         
     
-    // Measure actual time
-    double sum = 0.0;
-    for(int i=2; i<newNumTimings; ++i){
-      sum += timesNew[i];
-    }
-
-    const double avg = sum / ((double)(newNumTimings-2));
-    const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
-
-    const double benefit = expectedTotalTime - actualTotalTime;
-
-    // Determine load balance cost
-    const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
-
-    const double benefitAfterLB = benefit - lbcost;
-
-    
-    // Determine whether LB cost outweights the estimated benefit
-    CkPrintf("Linear Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, actualTotalTime);
-    
-    
-    
-    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-      const std::string &name = cpsIter->first;
-      const std::pair<int,int> &bounds = cpsIter->second;
-      const int lb = bounds.first;
-      const int ub = bounds.second;
-      
-      if(benefitAfterLB > 0){
-	CkPrintf("Linear Model: Beneficial LB\n");
-	int newval = newControlPoints[name] / 2;
-	if(newval > lb)
-	  newControlPoints[name] = newval;
-	else 
-	  newControlPoints[name] = lb;
-      } else {
-	CkPrintf("Linear Model: Detrimental LB\n");
-	int newval = newControlPoints[name] * 2;
-	if(newval < ub)
-	  newControlPoints[name] = newval;
-	else 
-	  newControlPoints[name] = ub;
+      // Measure actual time
+      double sum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	sum += timesNew[i];
       }
+
+      const double avg = sum / ((double)(newNumTimings-2));
+      const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+
+      const double benefit = expectedTotalTime - actualTotalTime;
+
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
+
+      const double benefitAfterLB = benefit - lbcost;
+
+    
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Linear Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, actualTotalTime);
+    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
       
+	if(benefitAfterLB > 0){
+	  CkPrintf("Linear Model: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("Linear Model: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = ub;
+	}
+      }
     }
 
   }
@@ -1538,96 +1548,101 @@ void controlPointManager::generatePlan() {
 
     instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
     instrumentedPhase *prevPhase = previousPhaseData();
-    
-
-    // Build model of execution time based on two phases ago
-    // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+        
     const std::vector<double> &times = twoAgoPhase->times;
     const int oldNumTimings = times.size();
-    const int b1 = 2 + (oldNumTimings-2)/3;
-    const int b2 = 2 + (2*(oldNumTimings-2))/3;
-    double s1 = 0;
-    double s2 = 0;
-    double s3 = 0;
 
-    const double ldbStepsTime = times[0] + times[1];
-    
-    for(int i=2; i<b1; i++){
-      s1 += times[i];
-    }
-    for(int i=b1; i<b2; i++){
-      s2 += times[i];
-    }
-    for(int i=b2; i<oldNumTimings; i++){
-      s3 += times[i];
-    }
-
-    
-    // Compute the estimated time for the last phase's data
     const std::vector<double> &timesNew = prevPhase->times;
     const int newNumTimings = timesNew.size();
+
     
-    const double a1 = s1 / ((newNumTimings-2)/3);
-    const double a2 = s2 / ((newNumTimings-2)/3);
-    const double a3 = s3 / ((newNumTimings-2)/3);
+    if(oldNumTimings > 4 && newNumTimings > 4){
+
+
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      const int b1 = 2 + (oldNumTimings-2)/3;
+      const int b2 = 2 + (2*(oldNumTimings-2))/3;
+      double s1 = 0;
+      double s2 = 0;
+      double s3 = 0;
+
+      const double ldbStepsTime = times[0] + times[1];
     
-    const double a = (a1-2.0*a2+a3)/2.0;
-    const double b = (a1-4.0*a2+3.0*a3)/2.0;
-    const double c = a3;
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<b2; i++){
+	s2 += times[i];
+      }
+      for(int i=b2; i<oldNumTimings; i++){
+	s3 += times[i];
+      }
+
     
-    // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
-    const double x1 = (double)newNumTimings / (double)oldNumTimings * 3.0 + 0.5;  // should be 3.5 if ratio is same
-    const double x2 = 0.5;
-    const double expectedTotalTime = a*x1*x1*x1/3.0 + b*x1*x1/2.0 + c*x1 - (a*x2*x2*x2/3.0 + b*x2*x2/2.0 + c*x2);
+      // Compute the estimated time for the last phase's data
+    
+      const double a1 = s1 / ((newNumTimings-2)/3);
+      const double a2 = s2 / ((newNumTimings-2)/3);
+      const double a3 = s3 / ((newNumTimings-2)/3);
+    
+      const double a = (a1-2.0*a2+a3)/2.0;
+      const double b = (a1-4.0*a2+3.0*a3)/2.0;
+      const double c = a3;
+    
+      // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
+      const double x1 = (double)newNumTimings / (double)oldNumTimings * 3.0 + 0.5;  // should be 3.5 if ratio is same
+      const double x2 = 0.5;
+      const double expectedTotalTime = a*x1*x1*x1/3.0 + b*x1*x1/2.0 + c*x1 - (a*x2*x2*x2/3.0 + b*x2*x2/2.0 + c*x2);
    
     
-    // Measure actual time
-    double sum = 0.0;
-    for(int i=2; i<newNumTimings; ++i){
-      sum += timesNew[i];
-    }
-
-    const double avg = sum / ((double)(newNumTimings-2));
-    const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
-
-    const double benefit = expectedTotalTime - actualTotalTime;
-
-    // Determine load balance cost
-    const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
-
-    const double benefitAfterLB = benefit - lbcost;
-
-    
-    // Determine whether LB cost outweights the estimated benefit
-    CkPrintf("Quadratic Model: lbcost = %f, expected = %f, actual = %f, x1=%f, a1=%f, a2=%f, a3=%f, b1=%d, b2=%d, a=%f, b=%f, c=%f\n", lbcost, expectedTotalTime, actualTotalTime, x1, a1, a2, a3, b1, b2, a, b, c);
-    
-    
-    
-    std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
-    for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
-      const std::string &name = cpsIter->first;
-      const std::pair<int,int> &bounds = cpsIter->second;
-      const int lb = bounds.first;
-      const int ub = bounds.second;
-      
-      if(benefitAfterLB > 0){
-	CkPrintf("QuadraticModel: Beneficial LB\n");
-	int newval = newControlPoints[name] / 2;
-	if(newval > lb)
-	  newControlPoints[name] = newval;
-	else 
-	  newControlPoints[name] = lb;
-      } else {
-	CkPrintf("QuadraticModel: Detrimental LB\n");
-	int newval = newControlPoints[name] * 2;
-	if(newval < ub)
-	  newControlPoints[name] = newval;
-	else 
-	  newControlPoints[name] = ub;
+      // Measure actual time
+      double sum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	sum += timesNew[i];
       }
-      
-    }
+
+      const double avg = sum / ((double)(newNumTimings-2));
+      const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+
+      const double benefit = expectedTotalTime - actualTotalTime;
+
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
+
+      const double benefitAfterLB = benefit - lbcost;
+
     
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Quadratic Model: lbcost = %f, expected = %f, actual = %f, x1=%f, a1=%f, a2=%f, a3=%f, b1=%d, b2=%d, a=%f, b=%f, c=%f\n", lbcost, expectedTotalTime, actualTotalTime, x1, a1, a2, a3, b1, b2, a, b, c);
+    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+      
+	if(benefitAfterLB > 0){
+	  CkPrintf("QuadraticModel: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("QuadraticModel: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = ub;
+	}
+      
+      }
+    }
     
   } else if ( whichTuningScheme == UseSteering ) {
 	  // -----------------------------------------------------------
