@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 #include "tcharm.h"
@@ -3169,60 +3162,61 @@ int PersReq::wait(MPI_Status *sts){
 }
 
 int IReq::wait(MPI_Status *sts){
-  if (CpvAccess(CmiPICMethod) != 2) 
-  {
-	//Copy "this" to a local variable in the case that "this" pointer
-	//is updated during the out-of-core emulation.
-
-          // optimization for Irecv
-          // generic() writes directly to the buffer, so the only thing we
-          // do here is to wait
-  	ampi *ptr = getAmpiInstance(comm);
-
-	//BIGSIM_OOC DEBUGGING
-	//int ooccnt=0;
-	//int ampiIndex = ptr->thisIndex;
-	//CmiPrintf("%d: IReq's status=%d\n", ampiIndex, statusIreq);
-	
-	while (statusIreq == false) {
-		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("Before blocking: %dth time: %d: in Ireq::wait\n", ++ooccnt, ptr->thisIndex);
-		//print();
-
-  		ptr->resumeOnRecv=true;
-		ptr->block();
-			
-		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
-		//CmiPrintf("IReq's this pointer: %p\n", this);
-		//print();
-
-	    #if CMK_BLUEGENE_CHARM
-		//Because of the out-of-core emulation, this pointer is changed after in-out
-		//memory operation. So we need to return from this function and do the while loop
-		//in the outer function call.	
-		if(_BgInOutOfCoreMode)
-		    return -1;
-	    #endif	
-	}   // end of while
-	ptr->resumeOnRecv=false;
-
-	AMPI_DEBUG("IReq::wait has resumed\n");
-
-        if(sts) {
-	  AMPI_DEBUG("Setting sts->MPI_TAG to this->tag=%d in IReq::wait  this=%p\n", (int)this->tag, this);
-          sts->MPI_TAG = tag;
-          sts->MPI_SOURCE = src;
-          sts->MPI_COMM = comm;
-          sts->MPI_LENGTH = length;
-        }
-  }
-  else {
-    AMPI_DEBUG("In else clause of IReq::wait\n");
+    if(CpvAccess(CmiPICMethod) == 2) {
+	AMPI_DEBUG("In weird clause of IReq::wait\n");
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
-		CkAbort("AMPI> Error in non-blocking request wait");
-  }
+	    CkAbort("AMPI> Error in non-blocking request wait");
+
 	return 0;
+    }
+
+    //Copy "this" to a local variable in the case that "this" pointer
+    //is updated during the out-of-core emulation.
+
+    // optimization for Irecv
+    // generic() writes directly to the buffer, so the only thing we
+    // do here is to wait
+    ampi *ptr = getAmpiInstance(comm);
+
+    //BIGSIM_OOC DEBUGGING
+    //int ooccnt=0;
+    //int ampiIndex = ptr->thisIndex;
+    //CmiPrintf("%d: IReq's status=%d\n", ampiIndex, statusIreq);
+	
+    while (statusIreq == false) {
+	//BIGSIM_OOC DEBUGGING
+	//CmiPrintf("Before blocking: %dth time: %d: in Ireq::wait\n", ++ooccnt, ptr->thisIndex);
+	//print();
+
+	ptr->resumeOnRecv=true;
+	ptr->block();
+			
+	//BIGSIM_OOC DEBUGGING
+	//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
+	//CmiPrintf("IReq's this pointer: %p\n", this);
+	//print();
+
+#if CMK_BLUEGENE_CHARM
+	//Because of the out-of-core emulation, this pointer is changed after in-out
+	//memory operation. So we need to return from this function and do the while loop
+	//in the outer function call.	
+	if(_BgInOutOfCoreMode)
+	    return -1;
+#endif	
+    }   // end of while
+    ptr->resumeOnRecv=false;
+
+    AMPI_DEBUG("IReq::wait has resumed\n");
+
+    if(sts) {
+	AMPI_DEBUG("Setting sts->MPI_TAG to this->tag=%d in IReq::wait  this=%p\n", (int)this->tag, this);
+	sts->MPI_TAG = tag;
+	sts->MPI_SOURCE = src;
+	sts->MPI_COMM = comm;
+	sts->MPI_LENGTH = length;
+    }
+
+    return 0;
 }
 
 int ATAReq::wait(MPI_Status *sts){
@@ -5703,6 +5697,7 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int ni, int na, int nd, int i[
 
 /******** AMPI-specific (not standard MPI) calls *********/
 
+
 CDECL
 int AMPI_Suspend(int comm) {
 	AMPIAPI("AMPI_Suspend");
@@ -5729,6 +5724,75 @@ int AMPI_System(const char *cmd) {
 	return TCHARM_System(cmd);
 }
 
+#if CMK_CUDA
+GPUReq::GPUReq(int comm_)
+{
+    MPI_Comm_rank(comm_, &src);
+    comm = comm_;
+    isvalid = true;
+    buf = getAmpiInstance(comm);
+    isComplete = false;
+}
+
+bool GPUReq::test(MPI_Status *sts)
+{
+    return isComplete;
+}
+
+void GPUReq::complete(MPI_Status *sts)
+{
+    wait(sts);
+}
+
+int GPUReq::wait(MPI_Status *sts)
+{
+    (void)sts;
+    while (!isComplete) {
+	getAmpiInstance(comm)->block();
+    }
+    return 0;
+}
+
+void GPUReq::receive(ampi *ptr, AmpiMsg *msg)
+{
+    CkAbort("GPUReq::receive should never be called");
+}
+
+void GPUReq::setComplete()
+{
+    isComplete = true;
+}
+
+class workRequestQueue;
+extern workRequestQueue *wrQueue;
+void enqueue(workRequestQueue *q, workRequest *wr);
+extern "C++" void setWRCallback(workRequest *wr, void *cb);
+
+void AMPI_GPU_complete(void *request, void* dummy)
+{
+    GPUReq *req = static_cast<GPUReq *>(request);
+    req->setComplete();
+    ampi *ptr = static_cast<ampi *>(req->buf);
+    ptr->unblock();
+}
+
+CDECL
+int AMPI_GPU_invoke(workRequest *to_call, MPI_Comm comm, MPI_Request *request)
+{
+    AMPIAPI(__func__);
+
+    AmpiRequestList* reqs = getReqs();
+    GPUReq *newreq = new GPUReq(comm);
+    *request = reqs->insert(newreq);
+
+    // Create a callback that completes the corresponding request
+    CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
+    setWRCallback(to_call, cb);
+
+    // Call the CUDA manager with to_call and cb
+    enqueue(wrQueue, to_call);
+}
+#endif
 
 #include "ampi.def.h"
 

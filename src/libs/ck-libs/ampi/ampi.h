@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 #ifndef _MPI_H
 #define _MPI_H
 
@@ -656,6 +650,12 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
                           int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                           MPI_Datatype array_of_datatypes[]);
 
+#if CMK_CUDA
+typedef struct workRequest workRequest;
+
+/* AMPI GPU Request interface */
+int AMPI_GPU_invoke(workRequest *to_call, MPI_Comm comm, MPI_Request *request);
+#endif
 
 /*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */

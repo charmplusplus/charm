@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
@@ -595,7 +588,8 @@ public:
 	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
-	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
+	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
+	/// 4-SReq, 5-GPUReq
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -752,6 +746,19 @@ public:
 	virtual void print();
 };
 
+class GPUReq : public AmpiRequest {
+    bool isComplete;
+
+public:
+    GPUReq(int comm_);
+    int getType() { return 5; }
+    CmiBool test(MPI_Status *sts);
+    void complete(MPI_Status *sts);
+    int wait(MPI_Status *sts);
+    void receive(ampi *ptr, AmpiMsg *msg);
+    void setComplete();
+};
+
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
 class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     AmpiRequest** block; //Elements of vector
@@ -823,7 +830,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
 
     inline void checkRequest(MPI_Request idx){
       if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
-        CkAbort("Invalide MPI_Request\n");
+        CkAbort("Invalid MPI_Request\n");
     }
 
     //find an AmpiRequest by its pointer value
