@@ -1510,14 +1510,14 @@ void controlPointManager::generatePlan() {
       
       if(benefitAfterLB > 0){
 	CkPrintf("Linear Model: Beneficial LB\n");
-	int newval = newControlPoints[name] /= 2;
+	int newval = newControlPoints[name] / 2;
 	if(newval > lb)
 	  newControlPoints[name] = newval;
 	else 
 	  newControlPoints[name] = lb;
       } else {
 	CkPrintf("Linear Model: Detrimental LB\n");
-	int newval = newControlPoints[name] *= 2;
+	int newval = newControlPoints[name] * 2;
 	if(newval < ub)
 	  newControlPoints[name] = newval;
 	else 
@@ -1612,14 +1612,14 @@ void controlPointManager::generatePlan() {
       
       if(benefitAfterLB > 0){
 	CkPrintf("QuadraticModel: Beneficial LB\n");
-	int newval = newControlPoints[name] /= 2;
+	int newval = newControlPoints[name] / 2;
 	if(newval > lb)
 	  newControlPoints[name] = newval;
 	else 
 	  newControlPoints[name] = lb;
       } else {
 	CkPrintf("QuadraticModel: Detrimental LB\n");
-	int newval = newControlPoints[name] *= 2;
+	int newval = newControlPoints[name] * 2;
 	if(newval < ub)
 	  newControlPoints[name] = newval;
 	else 
@@ -2105,7 +2105,7 @@ int controlPoint(const char *name, int lb, int ub){
   }
 
   if(!isInRange(result,ub,lb)){
-    std::cerr << "control point out of range: " << result << " " << lb << " " << ub << std::endl;
+    std::cerr << "control point = " << result << " is out of range: " << lb << " " << ub << std::endl;
     fflush(stdout);
     fflush(stderr);
   }
