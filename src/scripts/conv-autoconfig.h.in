@@ -204,6 +204,9 @@
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
 
+/* whether is power7 */
+#undef CMK_POWER7
+
 /* Allows PPC assembly. */
 #undef CMK_PPC_ASM
 

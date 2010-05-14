@@ -656,6 +656,7 @@ char *arg_currdir_r;
 int   arg_server;
 int   arg_server_port=0;
 char *arg_server_auth=NULL;
+int   replay_single=0;
 
 #if CMK_BPROC
 int   arg_startpe;
@@ -771,6 +772,14 @@ void arg_init(int argc, char **argv)
 	arg_argv[arg_argc++]="++debug";
   }
 
+  /* Check for +replay-detail to know we have to load only one single processor */
+  for (i=0;argv[i];i++) {
+    if (0==strcmp(argv[i],"+replay-detail")) {
+      replay_single = 1;
+      arg_requested_pes = 1;
+    }
+  }
+  
 #ifdef CMK_BPROC
   if (arg_local) {
     fprintf(stderr,"Warning> ++local cannot be used in bproc version, ignored!\n");
@@ -1400,7 +1409,7 @@ void req_ccs_connect(void)
   pe=ChMessageInt(h.hdr.pe);
   reqBytes=ChMessageInt(h.hdr.len);
 
-  if (pe<=-nodetab_size || pe>=nodetab_size) {
+  if ((pe<=-nodetab_size || pe>=nodetab_size) && 0==replay_single) {
     /*Treat out of bound values as errors. Helps detecting bugs*/
     /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
     /* TODO: We should somehow check boundaries also for bigemulator... */
@@ -1433,6 +1442,7 @@ void req_ccs_connect(void)
 #if CMK_BLUEGENE_CHARM
     destpe = destpe % nodetab_size;
 #endif
+    if (replay_single) destpe = 0;
     /*Fill out the charmrun header & forward the CCS request*/
     ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
 
