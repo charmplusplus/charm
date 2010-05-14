@@ -23,6 +23,7 @@ public:
     int nID;
 
 public:
+    toNeighborMsg() {};
     toNeighborMsg(int s): size(s) {  init(); }
     void setMsgSrc(int X, int id) {
         fromX = X;
@@ -388,7 +389,7 @@ public:
 #if REUSE_ITER_MSG
 	if(iterMsg[0]==NULL){ //indicating the messages have not been created
 	    for(int i=0; i<numNeighbors; i++)
-		iterMsg[i] = new(curIterMsgSize, 0) toNeighborMsg;
+		iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
 	}
 #endif
 	
