@@ -349,7 +349,7 @@ public:
 #if REUSE_ITER_MSG
 	    toNeighborMsg *msg = iterMsg[i];
 #else
-            toNeighborMsg *msg = new(msgSize, 0) toNeighborMsg(msgSize/4);
+            toNeighborMsg *msg = new(msgSize/4, 0) toNeighborMsg(msgSize/4);
 #endif
 
 #if DEBUG
