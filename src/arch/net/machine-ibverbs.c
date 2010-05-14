@@ -526,6 +526,7 @@ static void CmiMachineInit(char **argv){
 	maxTokens = maxRecvBuffers;
 //	maxTokens = 80;
 	context->tokensLeft=maxTokens;
+	context->qp=NULL;
 	//tokensPerProcessor=4;
 	if(_Cmi_numnodes > 1){
 #if !CMK_IBVERBS_FAST_START
@@ -845,8 +846,10 @@ void 	infiPostInitialRecvs(){
 	}
 
 
-	free(context->qp);
-	context->qp = NULL;
+	if (context->qp) {
+          free(context->qp);
+	  context->qp = NULL;
+	}
 	free(context->localAddr);
 	context->localAddr= NULL;
 }
