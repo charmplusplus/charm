@@ -12,6 +12,7 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "register.h"
 #include "ck.h"
 #include "trace.h"
+#include "TopoManager.h"
 
 #include<sstream>
 
@@ -268,7 +269,7 @@ public:
  */
 class DefaultArrayMap : public RRMap
 {
-private:
+public:
   CkPupPtrVec<dimInfo> arrs;
 
 public:
@@ -280,14 +281,14 @@ public:
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
-    int numPes=CkNumPes();
+    int numPes = CkNumPes();
     int binSize;
     if (numElements.nInts == 1) {
       binSize = (int)ceil((double)(numElements.data()[0])/(double)numPes);
     } else if (numElements.nInts == 2) {
-      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
+      binSize = (int)ceil((double)(numElements.data()[0] * numElements.data()[1])/(double)numPes);
     } else if (numElements.nInts == 3) {
-      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
+      binSize = (int)ceil((double)(numElements.data()[0] * numElements.data()[1] * numElements.data()[2])/(double)numPes);
     }
 
     int idx = arrs.size();
@@ -318,6 +319,80 @@ public:
   void pup(PUP::er& p){
     RRMap::pup(p);
     p|arrs;
+  }
+};
+
+/**
+ * This map can be used for topology aware mapping when the mapping is provided
+ * through a file -- ASB
+ */
+class ReadFileMap : public DefaultArrayMap
+{
+private:
+  CkVec<int> mapping;
+
+public:
+  ReadFileMap(void) {
+    DEBC((AA"Creating ReadFileMap\n"AB));
+  }
+
+  ReadFileMap(CkMigrateMessage *m):DefaultArrayMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    if(mapping.size() == 0) {
+      int numChares;
+
+      if (arrs[idx]->_nelems.nInts == 1) {
+	numChares = arrs[idx]->_nelems.data()[0];
+      } else if (arrs[idx]->_nelems.nInts == 2) {
+	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1];
+      } else if (arrs[idx]->_nelems.nInts == 3) {
+	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1] * arrs[idx]->_nelems.data()[2];
+      } else {
+	CkAbort("CkArrayIndex has more than 3 integers!");
+      }
+
+      mapping.resize(numChares);
+      FILE *mapf = fopen("mapfile", "r");
+      TopoManager tmgr;
+      int x, y, z, t, rv;
+
+      for(int i=0; i<numChares; i++) {
+	rv = fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+	mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
+	fflush(NULL);
+      }
+      fclose(mapf);
+    }
+    printf("File reading done.\n");
+    fflush(NULL);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    } else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+
+    return mapping[flati];
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+    p|mapping;
   }
 };
 
@@ -541,12 +616,6 @@ public:
     CkFreeMsg(ctorMsg);
   }
 };
-
-
-
-
-
-
 
 
 CkpvStaticDeclare(double*, rem);

@@ -746,14 +746,17 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID=CkCreatePropMap();
 #endif
 #endif
-  }else if(0==strcmp(mapping,"BLOCK_MAP")){
+  } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("USING BLOCK_MAP\n");
-    mapID=CProxy_BlockMap::ckNew();
-  }else if(0==strcmp(mapping,"RR_MAP")){
+    mapID = CProxy_BlockMap::ckNew();
+  } else if(0 == strcmp(mapping,"RR_MAP")) {
     CkPrintf("USING RR_MAP\n");
-    mapID=CProxy_RRMap::ckNew();
-  }else{  // "PROP_MAP" or anything else
-    mapID=CkCreatePropMap();
+    mapID = CProxy_RRMap::ckNew();
+  } else if(0 == strcmp(mapping,"MAPFILE")) {
+    CkPrintf("Reading map from file\n");
+    mapID = CProxy_ReadFileMap::ckNew();
+  } else {  // "PROP_MAP" or anything else
+    mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
   int nElem=msg->numElements; //<- save it because msg will be deleted.
