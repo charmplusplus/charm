@@ -87,8 +87,20 @@ processArgs() {
 }
 
 processArgs "$@"
-if $VERBOSE; then
-    echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
-    --stdlib $STDLIB $ARGS $FILES"
-fi
-java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS $FILES
+for file in $FILES; do
+    if $VERBOSE; then
+        echo "cpp $ARGS $file $file.tmp"
+    fi
+    cpp $ARGS $file $file.tmp
+    if $VERBOSE; then
+        echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
+        --stdlib $STDLIB $ARGS $file.tmp"
+    fi
+    java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
+        $ARGS $file.tmp
+    if $VERBOSE; then
+        echo "rm $file.tmp"
+    fi
+    rm $file.tmp
+done
+#java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS $FILES
