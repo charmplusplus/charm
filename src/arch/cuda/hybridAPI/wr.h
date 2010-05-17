@@ -108,8 +108,8 @@ typedef struct workRequest {
   int id; 
 
   /* The following flag is used for control by the system */
-
   int state; 
+
   /* user data, may be used to pass scalar values to kernel calls */
   void *userData; 
 
