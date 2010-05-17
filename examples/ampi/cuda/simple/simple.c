@@ -8,7 +8,7 @@ int main(int argc, char **argv)
     MPI_Request req;
     MPI_Status sts;
     void *wr = kernelSetup();
-    AMPI_GPU_invoke(wr, MPI_COMM_WORLD, &req);
+    AMPI_GPU_Iinvoke(wr, &req);
     MPI_Wait(&req, &sts);
 
     MPI_Finalize();
