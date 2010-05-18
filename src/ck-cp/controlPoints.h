@@ -63,6 +63,7 @@
 
 
 void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
+
 void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase);
 
 

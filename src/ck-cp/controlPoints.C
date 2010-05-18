@@ -181,7 +181,6 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 /// If different seed, name, and random_seed values are provided, the returned values are pseudo-random
 unsigned int randInt(unsigned int num, const char* name, int seed=0){
   CkAssert(num > 0);
-  CkAssert(num < 1000);
 
   unsigned long hash = 0;
   unsigned int c;
@@ -1194,6 +1193,11 @@ FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
   controlPointTimingStamp();
 }
 
+
+FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+{
+  setFrameworkAdvancePhase(*value);
+}
 
 
 
