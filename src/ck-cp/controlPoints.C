@@ -1487,7 +1487,7 @@ void controlPointManager::generatePlan() {
       const double a2 = s2 / (double)(oldNumTimings-b1);
       const double aold = (a1+a2)/2.0;
 
-      const double expectedTotalTime = numNewTimings*(aold+(numOldTimings+numNewTimings)*(a2-a1)/numOldTimings);
+      const double expectedTotalTime = newNumTimings*(aold+(oldNumTimings+newNumTimings)*(a2-a1)/oldNumTimings);
         
     
       // Measure actual time
