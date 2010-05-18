@@ -1479,14 +1479,15 @@ void controlPointManager::generatePlan() {
       for(int i=b1; i<oldNumTimings; i++){
 	s2 += times[i];
       }
-    
-    
+      
+      
       // Compute the estimated time for the last phase's data
     
-      const double a1 = s1 / ((newNumTimings-2)/2);
-      const double a2 = s2 / ((newNumTimings-2)/2);
-    
-      const double expectedTotalTime = ((5.0*a2-3.0*a1)/2.0 ) * newNumTimings;
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(oldNumTimings-b1);
+      const double aold = (a1+a2)/2.0;
+
+      const double expectedTotalTime = numNewTimings*(aold+(numOldTimings+numNewTimings)*(a2-a1)/numOldTimings);
         
     
       // Measure actual time
@@ -1582,9 +1583,9 @@ void controlPointManager::generatePlan() {
     
       // Compute the estimated time for the last phase's data
     
-      const double a1 = s1 / ((newNumTimings-2)/3);
-      const double a2 = s2 / ((newNumTimings-2)/3);
-      const double a3 = s3 / ((newNumTimings-2)/3);
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(b2-b1);
+      const double a3 = s3 / (double)(oldNumTimings-b2);
     
       const double a = (a1-2.0*a2+a3)/2.0;
       const double b = (a1-4.0*a2+3.0*a3)/2.0;
