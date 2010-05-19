@@ -21,18 +21,14 @@ cpu affinity.
 #include <stdio.h>
 #include <unistd.h>
 
-
-#include <stdlib.h>
-#include <stdio.h>
-
 #ifdef _WIN32
 #include <windows.h>
 #include <winbase.h>
 #else
 #define _GNU_SOURCE
 #include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 #endif
 
 #if defined(__APPLE__) 
@@ -42,6 +38,7 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #if defined(ARCH_HPUX11) ||  defined(ARCH_HPUX10)
 #include <sys/mpctl.h>
 #endif
+
 
 #define MAX_EXCLUDE      16
 static int excludecore[MAX_EXCLUDE] = {-1};
@@ -128,12 +125,7 @@ int set_thread_affinity(int cpuid) {
     return -1;
   }
 #elif  CMK_HAS_PTHREAD_SETAFFINITY
-  SET_MASK(cpuid)
-  /* PID 0 refers to the current process */
-  if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
-    perror("pthread_setaffinity");
-    return -1;
-  }
+  return set_pthread_affinity(cpuid);
 #elif CMK_HAS_BINDPROCESSOR
   if (bindprocessor(BINDTHREAD, thread_self(), cpuid) != 0)
     return -1;
@@ -184,11 +176,7 @@ int print_thread_affinity() {
   size_t len = sizeof(mask);
 
 #if  CMK_HAS_PTHREAD_SETAFFINITY
-  if (pthread_getaffinity_np(pthread_self(), len, &mask) < 0) {
-    perror("pthread_setaffinity");
-    return -1;
-  }
-  CmiPrintf("[%d] %s affinity mask is: 0x%08lx\n", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread", mask);
+  return print_pthread_affinity();
 #endif
 #endif
   return 0;
@@ -201,6 +189,24 @@ int CmiPrintCPUAffinity()
 #else
   return print_cpu_affinity();
 #endif
+}
+
+  /* returns which core is running on, only works on Linux */
+int CmiOnCore(void) {
+  FILE *fp;
+  int core=-1;
+  char str[128];
+  int n;
+
+  fp = fopen("/proc/self/stat", "r");
+  if (fp == NULL) return -1;
+  for (n=0; n<39; n++)  {
+    fscanf(fp, "%s", str);
+  }
+  fclose(fp);
+  core = atoi(str);
+
+  return core;
 }
 
 static int cpuAffinityHandlerIdx;
