@@ -191,12 +191,6 @@ cpuaffinity.o: cpuaffinity.c converse.h conv-config.h conv-autoconfig.h \
   persistent.h debug-conv.h sockRoutines.h
 	$(CHARMC) -c -I. cpuaffinity.c
 
-affinity.o: affinity.c converse.h conv-config.h conv-autoconfig.h \
-  conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
-  conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
-  persistent.h debug-conv.h
-	$(CHARMC) -c -I. affinity.c
-
 cputopology.o: cputopology.C converse.h conv-config.h conv-autoconfig.h \
   conv-common.h conv-mach.h conv-mach-opt.h pup_c.h queueing.h conv-cpm.h \
   conv-cpath.h conv-qd.h conv-random.h conv-lists.h conv-trace.h \
