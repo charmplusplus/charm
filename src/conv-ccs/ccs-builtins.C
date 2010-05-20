@@ -239,37 +239,39 @@ static void CpdList_ccs_list_items_set(char *msg)
 
 /** gather information about the machine we're currently running on */
 void CpdMachineArchitecture(char *msg) {
-  char reply[6]; // where we store our reply
+  char reply[8]; // where we store our reply
+  reply[0]=CHARMDEBUG_MAJOR;
+  reply[1]=CHARMDEBUG_MINOR;
   // decide if we are 32 bit (1) or 64 bit (2)
-  reply[0] = 0;
-  if (sizeof(char*) == 4) reply[0] = 1;
-  else if (sizeof(char*) == 8) reply[0] = 2;
+  reply[2] = 0;
+  if (sizeof(char*) == 4) reply[2] = 1;
+  else if (sizeof(char*) == 8) reply[2] = 2;
   // decide if we are little endian (1) or big endian (2)
-  reply[1] = 0;
+  reply[3] = 0;
   int value = 1;
   char firstByte = *((char*)&value);
-  if (firstByte == 1) reply[1] = 1;
-  else reply[1] = 2;
+  if (firstByte == 1) reply[3] = 1;
+  else reply[3] = 2;
   // add the third bit if we are in bigsim
 #if CMK_BLUEGENE_CHARM
-  reply[1] |= 4;
+  reply[3] |= 4;
 #endif
   // get the size of an "int"
-  reply[2] = sizeof(int);
+  reply[4] = sizeof(int);
   // get the size of an "long"
-  reply[3] = sizeof(long);
+  reply[5] = sizeof(long);
 #if CMK_LONG_LONG_DEFINED
   // get the size of an "long long"
-  reply[4] = sizeof(long long);
+  reply[6] = sizeof(long long);
 #else
   // Per Filippo, the debugger will be fine with this. It should never
   // come up, since configure didn't detect support for `long long` on
   // the machine.
-  reply[4] = 0;
+  reply[6] = 0;
 #endif
   // get the size of an "bool"
-  reply[5] = sizeof(bool);
-  CcsSendReply(6, (void*)reply);
+  reply[7] = sizeof(bool);
+  CcsSendReply(8, (void*)reply);
   CmiFree(msg);
 }
 
