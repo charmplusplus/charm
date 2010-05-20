@@ -294,10 +294,16 @@ public class Translator {
 
         // Move decl.h and def.h into temp directory.
         // charmxi/charmc doesn't offer control over where to generate these
+        cmd = "touch " + moduleName + ".decl.h " + moduleName + ".def.h";
+        retVal = exec(cmd, currentDir);
+        if (retVal != 0) {
+            error("Could not touch .decl.h and .def.h files ");
+            return;
+        }
         cmd = "mv " + moduleName + ".decl.h " + moduleName + ".def.h " +
             tempDirectory;
         retVal = exec(cmd, currentDir);
-         if (retVal != 0) {
+        if (retVal != 0) {
             error("Could not move .decl.h and .def.h files " +
                     "into temp directory");
             return;

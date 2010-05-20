@@ -151,23 +151,23 @@ typeDeclaration
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-        -> {emitCC()}? classDeclaration_cc(
+        -> {emitCC()}? chareDeclaration_cc(
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitCI()}? charedeclaration_ci(
+        -> {emitCI()}? chareDeclaration_ci(
                 chareType={$chareType.st},
                 arrayDim={null},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitH()}? classDeclaration_h(
+        -> {emitH()}? chareDeclaration_h(
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         ->
     |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-        -> {emitCI()}? charedeclaration_ci(
+        -> {emitCI()}? chareDeclaration_ci(
                 chareType={"array"},
                 arrayDim={$ARRAY_DIMENSION.text.toUpperCase()},
                 ident={$IDENT.text}, 

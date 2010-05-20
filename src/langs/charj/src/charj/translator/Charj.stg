@@ -84,12 +84,15 @@ interfaceExtends(ts) ::=
 classDeclaration_h(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
+<if(ext)>
+class <ident>: public <ext> {
+<else>
+class <ident> {
+<endif>
 
-#include "<ident>.decl.h"
-/* superclass: <ext> */
-class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
+
 <if(debug)>/* \</typeDeclaration> */<endif>
 
 >>
@@ -97,7 +100,20 @@ class <ident>: public CBase_<ident> {
 classDeclaration_cc(ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
+<if(ext)>
+class <ident>: public <ext> {
+<else>
+class <ident> {
+<endif>
 
+    <csds; separator="\n">
+};
+<if(debug)>/* \</typeDeclaration> */<endif>
+
+>>
+
+chareDeclaration_cc(ident, ext, csds) ::=
+<<
 
 #include "<ident>.decl.h"
 /* superclass: <ext> */
@@ -105,12 +121,18 @@ class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
 #include "<ident>.def.h"
-<if(debug)>/* \</typeDeclaration> */<endif>
-
 >>
 
+chareDeclaration_h(ident, ext, csds) ::=
+<<
+#include "<ident>.decl.h"
+/* superclass: <ext> */
+class <ident>: public CBase_<ident> {
+    <csds; separator="\n">
+};
+>>
 
-charedeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
