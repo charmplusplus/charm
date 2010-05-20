@@ -170,6 +170,7 @@ typedef struct {
  *
  */
 void enqueue(workRequestQueue *q, workRequest *wr); 
+void setWRCallback(workRequest *wr, void *cb);
 
 #ifdef GPU_MEMPOOL
 void hapi_poolFree(void *);

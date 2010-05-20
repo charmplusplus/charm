@@ -24,6 +24,7 @@ test: all
 	-sync
 	./charmrun ./hello +p3 +restart log $(TESTOPTS)
 	./charmrun ./hello +p4 +restart log $(TESTOPTS)
+	./charmrun ./hello +p2 +restart log $(TESTOPTS)
 
 bgtest: all
 	-rm -fr log
