@@ -640,7 +640,7 @@ cklocation.o: cklocation.C charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h register.h ck.h qd.h stats.h ckfutures.h \
-  ckIgetControl.h CkLocation.def.h
+  ckIgetControl.h TopoManager.h CkLocation.def.h
 	$(CHARMC) -c -I. cklocation.C
 
 ckarray.o: ckarray.C charm++.h charm.h converse.h conv-config.h \
@@ -2678,11 +2678,11 @@ controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
   waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
   ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h controlPoints.h ControlPoints.decl.h charm++.h pup_stl.h \
-  LBDatabase.h arrayRedistributor.h pathHistory.h PathHistory.decl.h \
-  envelope.h cp_effects.h ck.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h ckarray.h trace-controlPoints.h trace.h register.h \
-  trace-common.h trace-projections.h ckhashtable.h pup.h pathHistory.h \
-  cp_effects.h ControlPoints.def.h
+  charm-api.h LBDatabase.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h envelope.h cp_effects.h ck.h qd.h register.h stats.h \
+  ckfutures.h ckIgetControl.h ckarray.h trace-controlPoints.h trace.h \
+  register.h trace-common.h trace-projections.h ckhashtable.h pup.h \
+  pathHistory.h cp_effects.h ControlPoints.def.h
 	$(CHARMC) -c -I. controlPoints.C
 
 arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
@@ -2702,7 +2702,7 @@ arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
   ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
   envelope.h trace-controlPoints.h trace.h envelope.h register.h \
   trace-common.h LBDatabase.h controlPoints.h ControlPoints.decl.h \
-  charm++.h pup_stl.h arrayRedistributor.h pathHistory.h \
+  charm++.h pup_stl.h charm-api.h arrayRedistributor.h pathHistory.h \
   PathHistory.decl.h cp_effects.h ck.h qd.h register.h stats.h \
   ckfutures.h ckIgetControl.h ckarray.h
 	$(CHARMC) -c -I. arrayRedistributor.C

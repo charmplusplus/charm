@@ -505,6 +505,7 @@ extern int CmiPhysicalRank(int pe);
 
 extern int CmiPrintCPUAffinity();
 extern int CmiSetCPUAffinity(int core);
+extern int CmiOnCore();
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */

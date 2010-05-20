@@ -10,6 +10,8 @@ cpu affinity.
  * new options +pemap +commmap takes complex pattern of a list of cores
 */
 
+#define _GNU_SOURCE
+
 #include "converse.h"
 #include "sockRoutines.h"
 
@@ -21,18 +23,14 @@ cpu affinity.
 #include <stdio.h>
 #include <unistd.h>
 
-
-#include <stdlib.h>
-#include <stdio.h>
-
 #ifdef _WIN32
 #include <windows.h>
 #include <winbase.h>
 #else
 #define _GNU_SOURCE
 #include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 #endif
 
 #if defined(__APPLE__) 
@@ -42,6 +40,7 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #if defined(ARCH_HPUX11) ||  defined(ARCH_HPUX10)
 #include <sys/mpctl.h>
 #endif
+
 
 #define MAX_EXCLUDE      16
 static int excludecore[MAX_EXCLUDE] = {-1};
@@ -112,8 +111,8 @@ int set_cpu_affinity(unsigned int cpuid) {
   return 0;
 }
 
-int set_thread_affinity(int cpuid) {
 #if CMK_SMP
+int set_thread_affinity(int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
 
@@ -128,9 +127,17 @@ int set_thread_affinity(int cpuid) {
     return -1;
   }
 #elif  CMK_HAS_PTHREAD_SETAFFINITY
-  SET_MASK(cpuid)
-  /* PID 0 refers to the current process */
-  if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
+  int s, j;
+  cpu_set_t cpuset;
+  pthread_t thread;
+
+  thread = pthread_self();
+
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpuid, &cpuset);
+
+  s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  if (s != 0) {
     perror("pthread_setaffinity");
     return -1;
   }
@@ -142,8 +149,25 @@ int set_thread_affinity(int cpuid) {
 #endif
 
   return 0;
+}
+#endif
+
+int CmiSetCPUAffinity(int mycore)
+{
+  int core = mycore;
+  if (core < 0) {
+    core = CmiNumCores() + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinity failed");
+  }
+  /* set cpu affinity */
+#if CMK_SMP
+  return set_thread_affinity(core);
 #else
-  return -1;
+  return set_cpu_affinity(core);
+  /* print_cpu_affinity(); */
 #endif
 }
 
@@ -178,21 +202,35 @@ int print_cpu_affinity() {
   return 0;
 }
 
-int print_thread_affinity() {
 #if CMK_SMP
+int print_thread_affinity() {
   unsigned long mask;
   size_t len = sizeof(mask);
 
 #if  CMK_HAS_PTHREAD_SETAFFINITY
-  if (pthread_getaffinity_np(pthread_self(), len, &mask) < 0) {
-    perror("pthread_setaffinity");
+  int s, j;
+  cpu_set_t cpuset;
+  pthread_t thread;
+  char str[256], pe[16];
+
+  thread = pthread_self();
+  s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  if (s != 0) {
+    perror("pthread_getaffinity");
     return -1;
   }
-  CmiPrintf("[%d] %s affinity mask is: 0x%08lx\n", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread", mask);
-#endif
+
+  sprintf(str, "[%d] %s affinity is: ", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread");
+  for (j = 0; j < CPU_SETSIZE; j++)
+        if (CPU_ISSET(j, &cpuset)) {
+            sprintf(pe, " %d", j);
+            strcat(str, pe);
+        }
+  CmiPrintf("%s\n", str);
 #endif
   return 0;
 }
+#endif
 
 int CmiPrintCPUAffinity()
 {
@@ -201,6 +239,24 @@ int CmiPrintCPUAffinity()
 #else
   return print_cpu_affinity();
 #endif
+}
+
+  /* returns which core is running on, only works on Linux */
+int CmiOnCore(void) {
+  FILE *fp;
+  int core=-1;
+  char str[128];
+  int n;
+
+  fp = fopen("/proc/self/stat", "r");
+  if (fp == NULL) return -1;
+  for (n=0; n<39; n++)  {
+    fscanf(fp, "%s", str);
+  }
+  fclose(fp);
+  core = atoi(str);
+
+  return core;
 }
 
 static int cpuAffinityHandlerIdx;
@@ -285,25 +341,6 @@ static void cpuAffinityHandler(void *m)
 #endif
     CmiSyncBroadcastAllAndFree(sizeof(rankMsg)+CmiNumPes()*sizeof(int)*2, (void *)rankmsg);
   }
-}
-
-int CmiSetCPUAffinity(int mycore)
-{
-  int core = mycore;
-  if (core < 0) {
-    core = CmiNumCores() + core;
-  }
-  if (core < 0) {
-    CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
-    CmiAbort("CmiSetCPUAffinity failed");
-  }
-  /* set cpu affinity */
-#if CMK_SMP
-  return set_thread_affinity(core);
-#else
-  return set_cpu_affinity(core);
-  /* print_cpu_affinity(); */
-#endif
 }
 
 /* called on each processor */
