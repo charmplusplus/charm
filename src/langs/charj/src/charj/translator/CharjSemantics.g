@@ -309,7 +309,7 @@ statement
     :   block
     |   ^('assert' expression expression?)
     |   ^('if' parenthesizedExpression statement statement?)
-    |   ^('for' forInit expression? expression* statement)
+    |   ^('for' forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
     |   ^('while' parenthesizedExpression statement)
     |   ^('do' statement parenthesizedExpression)

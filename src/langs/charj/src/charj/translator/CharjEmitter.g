@@ -505,7 +505,7 @@ statement
         -> assert(cond={$cond.st}, msg={$msg.st})
     |   ^('if' parenthesizedExpression then=statement else_=statement?)
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
-    |   ^('for' forInit cond=expression? (update+=expression)* s=statement)
+    |   ^('for' forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
         -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"

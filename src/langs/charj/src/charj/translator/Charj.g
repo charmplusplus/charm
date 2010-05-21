@@ -69,6 +69,8 @@ tokens {
     EXTENDS_BOUND_LIST;
     EXTENDS_CLAUSE;
     FOR_EACH;
+    FOR_EXPR;
+    FOR_UPDATE;
     FORMAL_PARAM_LIST;
     FORMAL_PARAM_STD_DECL;
     FORMAL_PARAM_VARARG_DECL;
@@ -441,7 +443,7 @@ statement
         )   
     |   f='for' '('
         (   forInit? ';' expression? ';' expressionList? ')' statement
-            -> ^($f forInit expression? expressionList statement)
+            -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? statement)
         |   localModifierList? type IDENT ':' expression ')' statement
             -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
         )
