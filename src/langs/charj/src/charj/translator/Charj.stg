@@ -23,7 +23,7 @@ charjSource_ci(pd, ids, tds, debug) ::=
 >>
 
 
-charjSource_h(pd, ids, tds, cb, debug) ::= 
+charjSource_h(pd, ids, tds, debug) ::=
 <<
 <if(debug)>/* \<CHARJ_SOURCE> */<endif>
 /**************************************************************************
@@ -36,29 +36,20 @@ charjSource_h(pd, ids, tds, cb, debug) ::=
 <pd>
 <ids>
 <tds>
-<cb>
 
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
 >>
 
 
-charjSource_cc(pd, ids, tds, cb, debug) ::= 
+charjSource_cc(pd, ids, tds, debug) ::=
 <<
 <if(debug)>/* \<CHARJ_SOURCE> */<endif>
 <ids>
 <pd>
 <tds>
-<cb>
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
->>
-
-packageDeclaration_cc_h(ids) ::= 
-<<
-<if(debug)>/* \<packageDeclaration> */<endif>
-namespace <ids; separator=" { namespace "> {
-<if(debug)>/* \</packageDeclaration> */<endif>
 >>
 
 importDeclaration_cc_h(inc_id, use_id) ::= 
@@ -80,10 +71,24 @@ interfaceExtends(ts) ::=
 : public <ts; separator=", public ">
 >>
 
-
-classDeclaration_h(ident, ext, csds) ::=
+classDeclaration_h(sym, ident, ext, csds) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
+<sym.NamespaceOpeningString>
+<if(ext)>
+class <ident> : public <ext> {
+<else>
+class <ident> {
+<endif>
+
+    <csds; separator="\n">
+};
+<sym.NamespaceClosingString>
+
+>>
+
+classDeclaration_cc(sym, ident, ext, csds) ::=
+<<
+<sym.NamespaceOpeningString>
 <if(ext)>
 class <ident>: public <ext> {
 <else>
@@ -92,58 +97,46 @@ class <ident> {
 
     <csds; separator="\n">
 };
-
-<if(debug)>/* \</typeDeclaration> */<endif>
-
->>
-
-classDeclaration_cc(ident, ext, csds) ::=
-<<
-<if(debug)>/* \<typeDeclaration> */<endif>
-<if(ext)>
-class <ident>: public <ext> {
-<else>
-class <ident> {
-<endif>
-
-    <csds; separator="\n">
-};
-<if(debug)>/* \</typeDeclaration> */<endif>
+<sym.NamespaceClosingString>
 
 >>
 
-chareDeclaration_cc(ident, ext, csds) ::=
+chareDeclaration_cc(sym, ident, ext, csds) ::=
 <<
 
 #include "<ident>.decl.h"
+<sym.NamespaceOpeningString>
 /* superclass: <ext> */
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
+<sym.NamespaceClosingString>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_h(ident, ext, csds) ::=
+chareDeclaration_h(sym, ident, ext, csds) ::=
 <<
 #include "<ident>.decl.h"
+<sym.NamespaceOpeningString>
 /* superclass: <ext> */
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
+<sym.NamespaceClosingString>
 >>
 
-chareDeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
 <if(ext)>
     extern module <ext>;
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident>: <ext> {
-<else>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident> {
 <endif>
+    <sym.NamespaceOpeningString>
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
         <csds; separator="\n">
     }
+    <sym.NamespaceClosingString>
 }
 
 <if(debug)>/* \</typeDeclaration> */<endif>

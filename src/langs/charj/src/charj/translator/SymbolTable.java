@@ -114,7 +114,7 @@ public class SymbolTable {
         return defaultPkg;
     }
 
-    /** Find package starting with it's outermost package name.  If
+    /** Find package starting with its outermost package name.  If
      *  not in sym tab, return null.
      */
     public PackageScope resolvePackage(String packageName) {

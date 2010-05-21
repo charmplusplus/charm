@@ -119,10 +119,11 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^('class' IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    :   ^((('class')|(chareType)|('chare_array' ARRAY_DIMENSION)) IDENT
+            (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             Scope outerScope = $ScopeStack[-1]::current;
-            $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
+            $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
             outerScope.define($sym.name, $sym);
             currentClass = $sym;
             $sym.definition = $typeDeclaration.start;
@@ -133,8 +134,6 @@ scope ScopeStack; // top-level type scope
         }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
-    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
     ;
 
 chareType

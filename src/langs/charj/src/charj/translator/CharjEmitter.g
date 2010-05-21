@@ -19,12 +19,12 @@ package charj.translator;
 
 
 @members {
-    SymbolTable symtab_ = null;
+    SymbolTable symtab = null;
 
-    PackageScope currentPackage_ = null;
-    ClassSymbol currentClass_ = null;
-    MethodSymbol currentMethod_ = null;
-    LocalScope currentLocalScope_ = null;
+    PackageScope currentPackage = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
+    LocalScope currentLocalScope = null;
 
     Translator translator_;
     OutputMode mode_;
@@ -78,30 +78,18 @@ package charj.translator;
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable symtab, OutputMode m]
 @init {
-    this.symtab_ = symtab;
+    this.symtab = symtab;
     this.translator_ = symtab.translator;
     this.mode_ = m;
-    String closingBraces = "";
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t=typeDeclaration))
-        {
-            // construct string of }'s to close namespace 
-            if ($p.st != null) {
-                String temp_p = $p.st.toString();
-                for (int idx=0; idx<temp_p.length(); ++idx) {
-                    if (temp_p.charAt(idx) == '{') {
-                        closingBraces += "} ";
-                    }
-                }
-            }
-        }
         -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
+            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
         -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
         -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
+            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
         ->
     ;
 
@@ -109,12 +97,7 @@ packageDeclaration
 @init { 
     List<String> names = null; 
 }
-    :   ^('package' qualifiedIdentifier)  {
-            names =  java.util.Arrays.asList(
-                    $qualifiedIdentifier.text.split("[.]"));
-        }
-        -> {(emitCC() || emitH())}? packageDeclaration_cc_h(
-            ids={names})
+    :   ^('package' qualifiedIdentifier)
         ->
     ;
     
@@ -137,11 +120,16 @@ importDeclaration
     
 typeDeclaration
     :   ^('class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+        {
+            currentClass = (ClassSymbol)$IDENT.symbol;
+        }
         -> {emitCC()}? classDeclaration_cc(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitH()}? classDeclaration_h(
+        -> {emitH()}?  classDeclaration_h(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
@@ -151,25 +139,42 @@ typeDeclaration
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+        {
+            currentClass = (ClassSymbol)$IDENT.symbol;
+        }
         -> {emitCC()}? chareDeclaration_cc(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         -> {emitCI()}? chareDeclaration_ci(
+                sym={currentClass},
                 chareType={$chareType.st},
                 arrayDim={null},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         -> {emitH()}? chareDeclaration_h(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
         ->
     |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+        -> {emitCC()}? chareDeclaration_cc(
+                sym={currentClass},
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
         -> {emitCI()}? chareDeclaration_ci(
+                sym={currentClass},
                 chareType={"array"},
                 arrayDim={$ARRAY_DIMENSION.text.toUpperCase()},
+                ident={$IDENT.text}, 
+                ext={$su.st}, 
+                csds={$csds})
+        -> {emitH()}? chareDeclaration_h(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})

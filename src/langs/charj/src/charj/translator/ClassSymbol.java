@@ -243,4 +243,23 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return name;
     }
 
+    public String getNamespaceOpeningString() {
+        Scope currentScope = scope;
+        String namespace = "";
+        while (currentScope.getEnclosingScope() != null) {
+            namespace = "namespace " + currentScope.getScopeName() + " { " + namespace;
+            currentScope = currentScope.getEnclosingScope();
+        }
+        return namespace;
+    }
+
+    public String getNamespaceClosingString() {
+        Scope currentScope = scope;
+        String namespace = "";
+        while (currentScope.getEnclosingScope() != null) {
+            namespace += "} ";
+            currentScope = currentScope.getEnclosingScope();
+        }
+        return namespace;
+    }
 }
