@@ -249,24 +249,17 @@ public class Translator {
             String output) throws
         IOException
     {
-        int lastDot = filename.lastIndexOf(".");
-        int lastSlash = filename.lastIndexOf(java.io.File.separator);
-        String tempFile = filename.substring(0, lastSlash + 1) +
-            ".charj" + java.io.File.separator;
-        new File(tempFile).mkdir();
-        tempFile += filename.substring(lastSlash + 1, filename.length());
-        if (m_verbose) System.out.println(" [charjc] create: " + tempFile);
-        FileWriter fw = new FileWriter(tempFile);
+        if (m_verbose) System.out.println(" [charjc] create: " + filename);
+        FileWriter fw = new FileWriter(filename);
         fw.write(output);
         fw.close();
         return;
     }
 
     /**
-     * Enters the .charj directory and compiles the .cc and .ci files 
-     * generated from the given filename. The given charmc string 
-     * includes all options to be passed to charmc. Any generated .o 
-     * file is moved back to the initial directory.
+     * Compiles the .cc and .ci files generated from the given filename.
+     * The given charmc string includes all options to be passed to charmc.
+     * Any generated .o file is moved back to the initial directory.
      */
     private void compileTempFiles(
             String filename,
@@ -279,35 +272,27 @@ public class Translator {
         if (baseDirectory.equals("")) {
             baseDirectory = "./";
         }
-        String tempDirectory = baseDirectory + ".charj/";
         String moduleName = filename.substring(lastSlash + 1, lastDot);
-        String baseTempFilename = tempDirectory + moduleName;
+        String baseTempFilename = moduleName;
 
         // Compile interface file
         String cmd = charmc + " " + baseTempFilename + ".ci";
         File currentDir = new File(".");
         int retVal = exec(cmd, currentDir);
         if (retVal != 0) {
-            error("Could not compile generated interface file");
+            error("Could not compile generated interface file.");
             return;
         }
 
         // Move decl.h and def.h into temp directory.
         // charmxi/charmc doesn't offer control over where to generate these
-        cmd = "touch " + moduleName + ".decl.h " + moduleName + ".def.h";
+        cmd = "touch " + baseTempFilename + ".decl.h " +
+            baseTempFilename + ".def.h";
         retVal = exec(cmd, currentDir);
         if (retVal != 0) {
-            error("Could not touch .decl.h and .def.h files ");
+            error("Could not touch .decl.h and .def.h files.");
             return;
         }
-        cmd = "mv " + moduleName + ".decl.h " + moduleName + ".def.h " +
-            tempDirectory;
-        retVal = exec(cmd, currentDir);
-        if (retVal != 0) {
-            error("Could not move .decl.h and .def.h files " +
-                    "into temp directory");
-            return;
-        }       
 
         // Compile c++ output
         cmd = charmc + " -c " + baseTempFilename + ".cc" + 
@@ -317,12 +302,6 @@ public class Translator {
             error("Could not compile generated C++ file");
             return;
         }
-
-        // move generated .o and .h file into .cj directory
-        cmd = "mv -f " + baseTempFilename + ".o " + baseDirectory;
-        exec(cmd, currentDir);
-        cmd = "cp -f " + baseTempFilename + ".h " + baseDirectory;
-        exec(cmd, currentDir);
     }
 
     /**
