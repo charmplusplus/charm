@@ -1,6 +1,8 @@
 #!/bin/bash
 
-CHARJCHOME=${0%${0##*/}}            # location of charjc
+cd ${0%${0##*/}}
+CHARJCHOME=`pwd`                    # location of charjc
+cd -
 ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
 ANTLR_VERSION="3.1"
 ANTLR_CLASSPATH=""
@@ -31,8 +33,8 @@ CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
 # We need to aggregate all charmc options into one quoted string, while leaving
 # the charjc options alone.
 VERBOSE=false
-CHARMC=$CHARJCHOME../../../../bin/charmc
-STDLIB=$CHARJCHOME../src
+CHARMC=$CHARJCHOME/../../../../bin/charmc
+STDLIB=$CHARJCHOME/../src
 CHARMC_ARGS=
 FILES=
 ARGS=
@@ -88,19 +90,19 @@ processArgs() {
 
 processArgs "$@"
 for file in $FILES; do
+    tmpdir=`dirname $file`/`basename $file`.gen
+    mkdir -p $tmpdir
     if $VERBOSE; then
-        echo "cpp $ARGS $file $file.tmp"
+        echo "cpp $ARGS $file $tmpdir/$file"
+        echo "cd $tmpdir"
     fi
-    cpp $ARGS $file $file.tmp
+    cpp $ARGS $file $tmpdir/$file
+    cd $tmpdir
     if $VERBOSE; then
         echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
-        --stdlib $STDLIB $ARGS $file.tmp"
+        --stdlib $STDLIB $ARGS $file"
     fi
     java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
-        $ARGS $file.tmp
-    if $VERBOSE; then
-        echo "rm $file.tmp"
-    fi
-    rm $file.tmp
+        $ARGS $file
 done
 #java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS $FILES
