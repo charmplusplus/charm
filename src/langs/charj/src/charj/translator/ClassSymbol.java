@@ -10,6 +10,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     Map<String, PackageScope> imports = 
         new LinkedHashMap<String, PackageScope>();
+    List<String> includes = new ArrayList<String>();
 
     /** List of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
@@ -241,6 +242,18 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             return "m"+name;
         }
         return name;
+    }
+
+    public void addInclude(String includeName) {
+        includes.add(includeName);
+    }
+
+    public String getIncludeString() {
+        String includeString = "";
+        for (String include : includes) {
+            includeString += "#include<" + include + ">\n";
+        }
+        return includeString;
     }
 
     public String getNamespaceOpeningString() {

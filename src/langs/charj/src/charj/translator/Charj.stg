@@ -73,6 +73,7 @@ interfaceExtends(ts) ::=
 
 classDeclaration_h(sym, ident, ext, csds) ::=
 <<
+<sym.IncludeString>
 <sym.NamespaceOpeningString>
 <if(ext)>
 class <ident> : public <ext> {
