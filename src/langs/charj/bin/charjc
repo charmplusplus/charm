@@ -2,7 +2,7 @@
 
 cd ${0%${0##*/}}
 CHARJCHOME=`pwd`                    # location of charjc
-cd -
+cd - >& /dev/null
 ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
 ANTLR_VERSION="3.2"
 
