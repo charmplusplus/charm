@@ -261,7 +261,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         Scope currentScope = scope;
         String namespace = "";
         while (currentScope.getEnclosingScope() != null) {
-            namespace = "namespace " + currentScope.getScopeName() + " { " + namespace;
+            namespace = "namespace " + currentScope.getScopeName() + " {\n" + namespace;
             currentScope = currentScope.getEnclosingScope();
         }
         return namespace;
@@ -271,7 +271,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         Scope currentScope = scope;
         String namespace = "";
         while (currentScope.getEnclosingScope() != null) {
-            namespace += "} ";
+            namespace += "\n} // namespace " + currentScope.getScopeName();
             currentScope = currentScope.getEnclosingScope();
         }
         return namespace;

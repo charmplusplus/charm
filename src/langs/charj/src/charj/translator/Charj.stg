@@ -108,7 +108,7 @@ chareDeclaration_cc(sym, ident, ext, csds) ::=
 
 #include "<ident>.decl.h"
 <sym.NamespaceOpeningString>
-/* superclass: <ext> */
+<if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
@@ -120,7 +120,7 @@ chareDeclaration_h(sym, ident, ext, csds) ::=
 <<
 #include "<ident>.decl.h"
 <sym.NamespaceOpeningString>
-/* superclass: <ext> */
+<if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
