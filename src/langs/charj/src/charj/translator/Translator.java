@@ -329,7 +329,7 @@ public class Translator {
      * Print a representation of the Charj AST. If message is not null,
      * it is printed, along with an ASCII representation of the tree,
      * to stdout. If filename is not null, an html temp file containin
-     * the representation is printed to .charj/filename.
+     * the representation is printed to filename.
      */
     public void printAST(String message, String filename) throws IOException
     {
