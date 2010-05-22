@@ -89,6 +89,7 @@ class <ident> {
 
 classDeclaration_cc(sym, ident, ext, csds) ::=
 <<
+<sym.IncludeString>
 <sym.NamespaceOpeningString>
 <if(ext)>
 class <ident>: public <ext> {

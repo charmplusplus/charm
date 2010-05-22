@@ -49,6 +49,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         this.scope = scope;
 
         // manually add automatic class methods and symbols here
+        this.includes.add("charm++.h");
     }
 
     public Scope getEnclosingScope() {
@@ -251,7 +252,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public String getIncludeString() {
         String includeString = "";
         for (String include : includes) {
-            includeString += "#include<" + include + ">\n";
+            includeString += "#include <" + include + ">\n";
         }
         return includeString;
     }
