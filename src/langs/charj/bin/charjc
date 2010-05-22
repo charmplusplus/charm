@@ -4,30 +4,12 @@ cd ${0%${0##*/}}
 CHARJCHOME=`pwd`                    # location of charjc
 cd -
 ANTLRHOME=$CHARJCHOME/../lib        # location of antlr jars
-ANTLR_VERSION="3.1"
-ANTLR_CLASSPATH=""
+ANTLR_VERSION="3.2"
 
-if test "$ANTLR_VERSION" = "3.0"
-then
-    ANTLRJAR=$ANTLRHOME/antlr-3.0.1.jar
-    ANTLR27JAR=$ANTLRHOME/antlr-2.7.7.jar
-    ANTLR_RTJAR=$ANTLRHOME/antlr-runtime-3.0.1.jar
-    STJAR=$ANTLRHOME/stringtemplate-3.1b1.jar
-    ANTLR_CLASSPATH=$ANTLRJAR:$STJAR:$ANTLR_RTJAR:$ANTLR27JAR
-fi
-
-if test "$ANTLR_VERSION" = "3.1"
-then
-    ANTLRJAR=$ANTLRHOME/antlr-3.1b1.jar
-    ANTLR27JAR=$ANTLRHOME/antlr-2.7.7.jar
-    ANTLR_RTJAR=$ANTLRHOME/antlr-runtime-3.1b1.jar
-    STJAR=$ANTLRHOME/stringtemplate-3.1.jar
-    ANTLR_CLASSPATH=$ANTLRJAR:$STJAR:$ANTLR_RTJAR:$ANTLR27JAR
-fi
-
+ANTLR_JAR=$ANTLRHOME/antlr-3.2.jar
 JSAP_JAR=$CHARJCHOME/../lib/JSAP-2.1.jar
 CHARJ_JAR=$CHARJCHOME/../build/lib/charj.jar
-CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_CLASSPATH:$JSAP_JAR:$CHARJ_JAR"
+CHARJ_JFLAGS="-classpath $CLASSPATH:$ANTLR_JAR:$JSAP_JAR:$CHARJ_JAR"
 
 # flag processing
 # We need to aggregate all charmc options into one quoted string, while leaving
@@ -105,4 +87,4 @@ for file in $FILES; do
     java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
         $ARGS $file
 done
-#java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB $ARGS $FILES
+
