@@ -142,34 +142,27 @@ typeDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
-    |   chareArrayDefinition
     ;
 
 classDefinition
     :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE 'class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   'chare_array' '[' ARRAY_DIMENSION ']' -> ^('chare_array' ARRAY_DIMENSION)
     ;
 
 chareDefinition
     :   'public'? chareType IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^(chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
-    ;
-
-chareArrayDefinition
-    :   'public'? 'chare_array' '[' ARRAY_DIMENSION ']' IDENT ('extends' type)? ('implements' typeList)? '{'
-            classScopeDeclaration*
-        '}' ';'?
-        -> ^('chare_array' ARRAY_DIMENSION IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 interfaceDefinition
@@ -750,8 +743,7 @@ DECIMAL_LITERAL : ('0' | '1'..'9' '0'..'9'*) INTEGER_TYPE_SUFFIX? ;
 
 OCTAL_LITERAL : '0' ('0'..'7')+ INTEGER_TYPE_SUFFIX? ;
 
-//fragment
-ARRAY_DIMENSION :  '1'..'6' ('d'|'D') ;
+ARRAY_DIMENSION :  ('1'..'6')('d'|'D') ;
 
 fragment
 HEX_DIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;

@@ -119,7 +119,7 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^((('class')|(chareType)|('chare_array' ARRAY_DIMENSION)) IDENT
+    :   ^(TYPE ('class' | chareType) IDENT
             (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             Scope outerScope = $ScopeStack[-1]::current;
@@ -140,6 +140,7 @@ chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   ^('chare_array' ARRAY_DIMENSION)
     ;
 
 enumConstant
