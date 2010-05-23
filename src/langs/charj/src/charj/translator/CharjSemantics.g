@@ -153,6 +153,7 @@ scope ScopeStack;
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
+            /*
             ClassSymbol returnType = currentClass.resolveType($ty.text);
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
             currentMethod = sym;
@@ -160,6 +161,7 @@ scope ScopeStack;
             sym.definitionTokenStream = input.getTokenStream();
             currentClass.members.put($IDENT.text, sym);
             $FUNCTION_METHOD_DECL.symbol = sym;
+            */
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
@@ -241,6 +243,7 @@ localModifier
 type
     :   simpleType
     |   objectType 
+    |   'void'
     ;
 
 simpleType

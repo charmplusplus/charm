@@ -354,6 +354,7 @@ type
         -> {$simpleType.st}
     |   objectType 
         -> {$objectType.st}
+    |   'void'
     ;
 
 simpleType
