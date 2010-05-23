@@ -57,6 +57,8 @@ int main()
         BgMsgEntry *msg = bglog->msgs[midx];
         if (msg->sendTime < bglog->startTime || msg->sendTime > bglog->endTime)
           printf("[%d] Invalid MsgEntry [%d]: sendTime: %f in log startT: %f endT: %f execT: %f\n", i, idx, msg->sendTime, bglog->startTime, bglog->endTime, bglog->execTime);
+        if (msg->sendTime > msg->recvTime)
+          printf("[%d] Invalid recvTime in MsgEntry [%d]: sendTime: %f recvTime: %f\n", i, idx, msg->sendTime, msg->recvTime);
       }
     }
 
