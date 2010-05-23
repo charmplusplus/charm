@@ -49,6 +49,7 @@ void check_test(int argc, char** argv) {
     exit(1);
   }
 
+#if ! CMK_SMP
   const int s = 1*1024*1024;
   void *buf1 = CmiAlloc(s);
   CmiUInt8 mem_before = CmiMemoryUsage();
@@ -61,6 +62,7 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: CmiMemoryUsage() does not work %lld %lld!\n", mem_before, mem_after);
     CmiAbort("CmiMemoryUsage failed");
   }
+#endif
 
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
   CmiPrintf("All tests passed\n");
