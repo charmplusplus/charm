@@ -164,26 +164,13 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-    <sym.NamespaceOpeningString>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
-    <csds; separator="\n">
-    }
-    <sym.NamespaceClosingString>
-}
-
-
-chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
-<<
-<if(debug)>/* \<typeDeclaration> */<endif>
-module <ident> {
-<if(ext)>
-    extern module <ext>;
-<endif>
-}
+};
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
 
 <if(debug)>/* \</typeDeclaration> */<endif>
 
 >>
+
 
 chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
@@ -192,10 +179,10 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
     <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
 };
 <else>
-<chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
         <csds; separator="\n">
-};
-<endif>
+    };
+}<endif>
 >>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
