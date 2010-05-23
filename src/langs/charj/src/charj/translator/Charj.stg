@@ -7,7 +7,6 @@ charjSource_ci(pd, ids, tds, debug) ::=
 <if(debug)>/* \<charjSource_ci> */<endif>
 /*
  * packageDeclaration disabled...
-<pd>
  * end packageDeclaration
  */
 
@@ -33,7 +32,6 @@ charjSource_h(pd, ids, tds, debug) ::=
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
-<pd>
 <ids>
 <tds>
 
@@ -46,7 +44,6 @@ charjSource_cc(pd, ids, tds, debug) ::=
 <<
 <if(debug)>/* \<CHARJ_SOURCE> */<endif>
 <ids>
-<pd>
 <tds>
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
 >>
@@ -159,6 +156,21 @@ class <ident>: public CBase_<ident> {
 };
 <endif>
 >>
+
+chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(debug)>/* \<typeDeclaration> */<endif>
+module <ident> {
+<if(ext)>
+    extern module <ext>;
+<endif>
+    <sym.NamespaceOpeningString>
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+    <csds; separator="\n">
+    }
+    <sym.NamespaceClosingString>
+}
+
 
 chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
