@@ -59,7 +59,9 @@ public class SymbolTable {
         objectRoot.define("EOF", new VariableSymbol(this,"EOF",null));
         lang.define("Object", objectRoot);
 
+        primitiveTypes.put("void",   new ClassSymbol(this, "void",   null, lang));
         primitiveTypes.put("int",    new ClassSymbol(this, "int",    null, lang));
+        primitiveTypes.put("long",   new ClassSymbol(this, "long",   null, lang));
         primitiveTypes.put("float",  new ClassSymbol(this, "float",  null, lang));
         primitiveTypes.put("double", new ClassSymbol(this, "double", null, lang));
         primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang)); 
@@ -114,7 +116,7 @@ public class SymbolTable {
         return defaultPkg;
     }
 
-    /** Find package starting with it's outermost package name.  If
+    /** Find package starting with its outermost package name.  If
      *  not in sym tab, return null.
      */
     public PackageScope resolvePackage(String packageName) {

@@ -6,7 +6,7 @@ public class Conditional {
         if (true) return;
         if (true)
             return;
-        if (a) c=true else c=false;
+        if (a) c=true; else c=false;
 
         if (b)
             c = true;
