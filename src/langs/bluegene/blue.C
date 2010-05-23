@@ -606,7 +606,7 @@ void nodeBCastMsgHandlerFunc(char *msg)
   if (gnodeID < -1) {
     gnodeID = - (gnodeID+100);
     if (cva(bgMach).replaynode != -1) {
-      if (gnodeID == cva(bgMach).replaynode/cva(bgMach).numWth)
+      if (gnodeID == cva(bgMach).replaynode)
           lnodeID = 0;
       else
           lnodeID = -1;
@@ -672,7 +672,7 @@ void threadBCastMsgHandlerFunc(char *msg)
   if (cva(bgMach).replay != -1) {
     if (gnodeID < -1) {
       gnodeID = - (gnodeID+100);
-      if (gnodeID == cva(bgMach).replaynode/cva(bgMach).numWth && threadID == cva(bgMach).replaynode%cva(bgMach).numWth)
+      if (gnodeID == cva(bgMach).replay/cva(bgMach).numWth && threadID == cva(bgMach).replay%cva(bgMach).numWth)
         return;
     }
     CmiBgMsgThreadID(msg) = 0;
@@ -684,7 +684,7 @@ void threadBCastMsgHandlerFunc(char *msg)
   if (gnodeID < -1) {
       gnodeID = - (gnodeID+100);
       if (cva(bgMach).replaynode != -1) {
-        if (gnodeID == cva(bgMach).replaynode/cva(bgMach).numWth)
+        if (gnodeID == cva(bgMach).replaynode)
           lnodeID = 0;
         else
           lnodeID = -1;
@@ -978,7 +978,7 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type,
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
 
-  if (cva(bgMach).inReplayMode()) {     // replay mode
+  if (cva(bgMach).replay!=-1) {     // replay mode
     threadID = 0;
     CmiAssert(threadID != -1);
   }
@@ -1617,6 +1617,12 @@ CmiStartFn bgMain(int argc, char **argv)
     cva(bgMach).replaynode = 0;    // default to 0
   }
   if (cva(bgMach).replaynode >= 0) {
+    int startpe, endpe;
+    BgRead_nodeinfo(replaynode, startpe, endpe);
+    if (cva(bgMach).numWth != endpe-startpe+1) {
+      cva(bgMach).numWth = endpe-startpe+1;     // update wth
+      CmiPrintf("BG info> numWth is changed to %d.\n", cva(bgMach).numWth);
+    }
     if (CmiNumPes()>1)
       CmiAbort("BG> bgreplay mode must run on one physical processor.");
     if (cva(bgMach).x!=1 || cva(bgMach).y!=1 || cva(bgMach).z!=1)

@@ -106,7 +106,10 @@ void BgRead_nodeinfo(int node, int &startpe, int &endpe)
     char fName[128];
     sprintf(fName,"bgnode_%06d.log",node);
     FILE *fp = fopen(fName, "r");
-    CmiAssert(fp!=NULL);
+    if (fp==NULL) {
+      CmiPrintf("BgReplayNode> metadata file for node %d does not exist!\n", node);
+      CmiAbort("BgRead_nodeinfo");
+    }
     fscanf(fp, "%d %d\n", &startpe, &endpe);
     fclose(fp);
 }
