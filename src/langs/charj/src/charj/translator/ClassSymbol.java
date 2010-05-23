@@ -262,7 +262,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         List<String> list = new ArrayList<String>();
         String namespace = "";
         for(Scope currentScope = scope; currentScope != null; currentScope = currentScope.getEnclosingScope())
-            list.add(currentScope.getScopeName());
+            list.add(0, currentScope.getScopeName());
+        list.remove(0);
         return list;
     }
 

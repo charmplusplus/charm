@@ -164,11 +164,9 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-};
     <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
-
 <if(debug)>/* \</typeDeclaration> */<endif>
-
+};
 >>
 
 
