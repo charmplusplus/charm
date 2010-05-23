@@ -59,6 +59,7 @@ public class SymbolTable {
         objectRoot.define("EOF", new VariableSymbol(this,"EOF",null));
         lang.define("Object", objectRoot);
 
+        primitiveTypes.put("void",   new ClassSymbol(this, "void",   null, lang));
         primitiveTypes.put("int",    new ClassSymbol(this, "int",    null, lang));
         primitiveTypes.put("long",   new ClassSymbol(this, "long",   null, lang));
         primitiveTypes.put("float",  new ClassSymbol(this, "float",  null, lang));

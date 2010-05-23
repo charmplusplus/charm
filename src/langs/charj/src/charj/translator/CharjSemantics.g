@@ -148,11 +148,19 @@ enumConstant
     ;
     
 classScopeDeclaration
+scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
-            f=formalParameterList b=block?)
+        {
+            ClassSymbol returnType = currentClass.resolveType($ty.text);
+            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
+            currentMethod = sym;
+            sym.definition = $classScopeDeclaration.start;
+            sym.definitionTokenStream = input.getTokenStream();
+            currentClass.members.put($IDENT.text, sym);
+            $FUNCTION_METHOD_DECL.symbol = sym;
+        }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
@@ -162,7 +170,6 @@ classScopeDeclaration
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList arrayDeclaratorList?)
-    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.

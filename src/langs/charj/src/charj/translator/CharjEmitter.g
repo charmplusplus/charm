@@ -214,33 +214,6 @@ classScopeDeclaration
                 adl={$a.st},
                 block={$b.st})
         ->
-    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
-            f=formalParameterList b=block?)
-        { 
-            // determine whether this is an entry method
-            if ($m.st != null) {
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-            }
-        }
-        -> {emitCC()}? voidMethodDecl_cc(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
-        -> {emitCI() && entry}? voidMethodDecl_ci(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
-        -> {emitH()}? voidMethodDecl_h(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
-        ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> {emitCC() || emitH()}? class_var_decl(
             modl={$modifierList.st},
@@ -283,8 +256,6 @@ classScopeDeclaration
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList?)
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"

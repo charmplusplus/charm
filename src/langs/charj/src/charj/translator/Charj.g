@@ -100,7 +100,6 @@ tokens {
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
-    VOID_METHOD_DECL;
 }
 
 @header {
@@ -197,8 +196,6 @@ classScopeDeclaration
             (   type IDENT formalParameterList arrayDeclaratorList? (block | ';')
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList arrayDeclaratorList? block?)
-            |   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -216,8 +213,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList arrayDeclaratorList? ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList arrayDeclaratorList?)
-            |   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -324,6 +319,7 @@ localModifier
 type
     :   simpleType
     |   objectType
+    |   'void'
     ;
 
 simpleType

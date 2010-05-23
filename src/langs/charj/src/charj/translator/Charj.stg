@@ -166,26 +166,6 @@ funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
-voidMethodDecl_ci(modl, gtpl, id, fpl, block) ::=
-<<
-entry void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_h(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_cc(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl> {
-    <block>
-}
->>
-
-
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
 entry void<gtpl> <id><fpl>;
