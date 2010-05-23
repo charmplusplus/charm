@@ -49,7 +49,6 @@ charjSource_cc(pd, ids, tds, debug) ::=
 <pd>
 <tds>
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
-
 >>
 
 importDeclaration_cc_h(inc_id, use_id) ::= 
@@ -74,7 +73,16 @@ interfaceExtends(ts) ::=
 classDeclaration_h(sym, ident, ext, csds) ::=
 <<
 <sym.IncludeString>
-<sym.NamespaceOpeningString>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+>>
+
+classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+};
+<else>
 <if(ext)>
 class <ident> : public <ext> {
 <else>
@@ -83,14 +91,23 @@ class <ident> {
 
     <csds; separator="\n">
 };
-<sym.NamespaceClosingString>
-
+<endif>
 >>
+
 
 classDeclaration_cc(sym, ident, ext, csds) ::=
 <<
 <sym.IncludeString>
-<sym.NamespaceOpeningString>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+>>
+
+classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+};
+<else>
 <if(ext)>
 class <ident>: public <ext> {
 <else>
@@ -99,32 +116,48 @@ class <ident> {
 
     <csds; separator="\n">
 };
-<sym.NamespaceClosingString>
-
+<endif>
 >>
+
 
 chareDeclaration_cc(sym, ident, ext, csds) ::=
 <<
-
 #include "<ident>.decl.h"
-<sym.NamespaceOpeningString>
-<if(ext)>/* superclass: <ext> */<endif>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+#include "<ident>.def.h"
+>>
+
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+};
+<else><if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
-<sym.NamespaceClosingString>
-#include "<ident>.def.h"
+<endif>
 >>
 
 chareDeclaration_h(sym, ident, ext, csds) ::=
 <<
 #include "<ident>.decl.h"
-<sym.NamespaceOpeningString>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+>>
+
+chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+};
+<else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
-<sym.NamespaceClosingString>
+<endif>
 >>
 
 chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
@@ -134,17 +167,24 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-    <sym.NamespaceOpeningString>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
-        <csds; separator="\n">
-    }
-    <sym.NamespaceClosingString>
 }
 
 <if(debug)>/* \</typeDeclaration> */<endif>
 
 >>
 
+chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+};
+<else>
+<chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+        <csds; separator="\n">
+};
+<endif>
+>>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<

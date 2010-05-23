@@ -85,19 +85,18 @@ charjSource[SymbolTable symtab, OutputMode m]
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCC()}? charjSource_cc(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitH()}? charjSource_h(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
         ->
     ;
 
 packageDeclaration
-@init { 
-    List<String> names = null; 
-}
-    :   ^('package' qualifiedIdentifier)
+returns [List names]
+    :   ^('package' (ids+=IDENT)+)
+        {
+            $names = $ids;
+        }
         ->
     ;
     
