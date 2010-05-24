@@ -180,7 +180,7 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
     <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
         <csds; separator="\n">
     };
-}<endif>
+<endif>
 >>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
