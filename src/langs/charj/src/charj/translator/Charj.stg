@@ -164,7 +164,9 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+        <csds; separator="\n">
+    };
 <if(debug)>/* \</typeDeclaration> */<endif>
 };
 >>
