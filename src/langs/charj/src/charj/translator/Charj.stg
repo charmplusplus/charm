@@ -78,7 +78,7 @@ classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-};
+}
 <else>
 <if(ext)>
 class <ident> : public <ext> {
@@ -103,7 +103,7 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-};
+}
 <else>
 <if(ext)>
 class <ident>: public <ext> {
@@ -129,7 +129,7 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-};
+}
 <else><if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
@@ -148,7 +148,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-};
+}
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
@@ -164,11 +164,9 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
-        <csds; separator="\n">
-    };
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
 <if(debug)>/* \</typeDeclaration> */<endif>
-};
+}
 >>
 
 
@@ -177,29 +175,29 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
-};
+}
 <else>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
-        <csds; separator="\n">
-    };
+<chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+    <csds; separator="\n">
+};
 <endif>
 >>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(first(modl))><modl; separator=" ">: <endif><ty> <gtpl> <id><fpl> <adl>;
+<if(first(modl))><modl; separator=" ">: <endif><ty><gtpl> <id><fpl><adl>;
 >>
 
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty> <gtpl> <id><fpl> <adl>;
+entry <ty><gtpl> <id><fpl> <adl>;
 >>
 
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(first(modl))><modl; separator = " ">: <endif><ty> <gtpl> <id><fpl> <adl> {
+<if(first(modl))><modl; separator = " ">: <endif><ty><gtpl> <id><fpl><adl> {
     <block>
 }
 >>
