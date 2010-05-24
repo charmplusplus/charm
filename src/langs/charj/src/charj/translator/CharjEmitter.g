@@ -178,7 +178,11 @@ enumConstant
     ;
 
 classScopeDeclaration
-@init { boolean entry = false; }
+@init {
+  boolean entry = false;
+  List<String> modList = new ArrayList<String>();
+
+}
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
@@ -186,11 +190,13 @@ classScopeDeclaration
             if ($m.st != null) {
                 // determine whether this is an entry method
                 entry = listContainsToken($m.start.getChildren(), ENTRY);
-                System.out.println("entry is " + entry + " for method " + $IDENT.getText());
+                for(Object o : $m.names)
+                  if(o.equals("entry")) continue;
+                  else modList.add(o.toString());
             }
         }
         -> {emitCC()}? funcMethodDecl_cc(
-                modl={$m.st}, 
+                modl={modList}, 
                 gtpl={$g.st}, 
                 ty={$ty.text},
                 id={$IDENT.text}, 
@@ -198,7 +204,7 @@ classScopeDeclaration
                 adl={$a.st},
                 block={$b.st})
         -> {emitH()}? funcMethodDecl_h(
-                modl={$m.st}, 
+                modl={modList}, 
                 gtpl={$g.st}, 
                 ty={$ty.text},
                 id={$IDENT.text}, 
@@ -316,7 +322,12 @@ throwsClause
     ;
 
 modifierList
+returns [List<String> names]
     :   ^(MODIFIER_LIST (m+=modifier)+)
+        {
+          $names = new ArrayList<String>();
+          for(Object o : $m) $names.add(o.toString());
+        }
         -> mod_list(mods={$m})
     ;
 

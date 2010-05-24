@@ -185,7 +185,7 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl>;
+<if(first(modl))><modl; separator=" ">: <endif><ty> <gtpl> <id><fpl> <adl>;
 >>
 
 
@@ -197,7 +197,7 @@ entry <ty> <gtpl> <id><fpl> <adl>;
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl> {
+<if(first(modl))><modl; separator = " ">: <endif><ty> <gtpl> <id><fpl> <adl> {
     <block>
 }
 >>
