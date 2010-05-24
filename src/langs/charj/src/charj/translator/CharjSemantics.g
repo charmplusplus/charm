@@ -115,7 +115,7 @@ importDeclarations returns [List<CharjAST> packageNames]
 @init {
     packageNames = new ArrayList<CharjAST>();
 }
-    :   (^('import' qualifiedIdentifier './*'?)
+    :   (^('import' qualifiedIdentifier '.*'?)
 		{ packageNames.add($qualifiedIdentifier.start); })*
     ;
 
