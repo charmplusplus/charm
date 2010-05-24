@@ -85,19 +85,18 @@ charjSource[SymbolTable symtab, OutputMode m]
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCC()}? charjSource_cc(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitH()}? charjSource_h(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
         ->
     ;
 
 packageDeclaration
-@init { 
-    List<String> names = null; 
-}
-    :   ^('package' qualifiedIdentifier)
+returns [List names]
+    :   ^('package' (ids+=IDENT)+)
+        {
+            $names = $ids;
+        }
         ->
     ;
     
@@ -138,7 +137,7 @@ typeDeclaration
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
-    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
@@ -187,6 +186,7 @@ classScopeDeclaration
             if ($m.st != null) {
                 // determine whether this is an entry method
                 entry = listContainsToken($m.start.getChildren(), ENTRY);
+                System.out.println("entry is " + entry + " for method " + $IDENT.getText());
             }
         }
         -> {emitCC()}? funcMethodDecl_cc(
