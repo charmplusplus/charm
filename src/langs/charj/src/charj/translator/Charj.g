@@ -129,7 +129,8 @@ compilationUnit
     ;
 
 packageDeclaration
-    :   'package'^ qualifiedIdentifier ';'!  
+    :   'package' IDENT ('.' IDENT)+ ';'  
+        ->  ^('package' IDENT+)
     ;
 
 importDeclaration

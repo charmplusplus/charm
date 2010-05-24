@@ -257,6 +257,16 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return includeString;
     }
 
+    public List<String> getPackageNames()
+    {
+        List<String> list = new ArrayList<String>();
+        String namespace = "";
+        for(Scope currentScope = scope; currentScope != null; currentScope = currentScope.getEnclosingScope())
+            list.add(0, currentScope.getScopeName());
+        list.remove(0);
+        return list;
+    }
+
     public String getNamespaceOpeningString() {
         Scope currentScope = scope;
         String namespace = "";
