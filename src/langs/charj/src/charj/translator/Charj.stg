@@ -164,7 +164,9 @@ module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
-    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+        <csds; separator="\n">
+    };
 <if(debug)>/* \</typeDeclaration> */<endif>
 };
 >>
@@ -180,12 +182,12 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
     <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
         <csds; separator="\n">
     };
-}<endif>
+<endif>
 >>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl>;
+<if(first(modl))><modl; separator=" ">: <endif><ty> <gtpl> <id><fpl> <adl>;
 >>
 
 
@@ -197,7 +199,7 @@ entry <ty> <gtpl> <id><fpl> <adl>;
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl> {
+<if(first(modl))><modl; separator = " ">: <endif><ty> <gtpl> <id><fpl> <adl> {
     <block>
 }
 >>
