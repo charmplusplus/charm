@@ -69,12 +69,17 @@
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
+    <target name="CharjASTModifier" depends="Charj">
+        <antlr3 grammar.name="CharjASTModifier.g"
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+
     <target name="CharjSemantics" depends="Charj">
         <antlr3 grammar.name="CharjSemantics.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
-    <target name="CharjEmitter" depends="CharjSemantics">
+    <target name="CharjEmitter" depends="CharjSemantics,CharjASTModifier">
         <antlr3 grammar.name="CharjEmitter.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>

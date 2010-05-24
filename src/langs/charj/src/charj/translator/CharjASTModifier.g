@@ -17,6 +17,15 @@ options {
 package charj.translator;
 }
 
+@members {
+    SymbolTable symtab = null;
+    PackageScope currentPackage = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
+    LocalScope currentLocalScope = null;
+    Translator translator;
+}
+
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
 @rulecatch {
     catch (RecognitionException re) {
@@ -28,6 +37,9 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
+@init {
+    symtab = _symtab;
+}
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
