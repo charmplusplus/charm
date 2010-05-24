@@ -157,6 +157,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
         // look for type in classes already defined in imported packages
         for (String packageName : imports.keySet()) {
+            if ( debug() ) System.out.println( "Looking for type " +
+                    type + " in package " + packageName);
             PackageScope pkg = resolvePackage(packageName);
             ClassSymbol cs = pkg.resolveType(type);
             if ( cs != null) { // stop looking, found it

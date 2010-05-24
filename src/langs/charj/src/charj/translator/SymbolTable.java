@@ -67,6 +67,14 @@ public class SymbolTable {
         primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang)); 
         primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang)); 
         primitiveTypes.put("bool",   new ClassSymbol(this, "bool",   null, lang)); 
+        lang.define("void", primitiveTypes.get("void"));
+        lang.define("int", primitiveTypes.get("int"));
+        lang.define("long", primitiveTypes.get("long"));
+        lang.define("float", primitiveTypes.get("float"));
+        lang.define("double", primitiveTypes.get("double"));
+        lang.define("char", primitiveTypes.get("char"));
+        lang.define("short", primitiveTypes.get("short"));
+        lang.define("bool", primitiveTypes.get("bool"));
     }
 
     public ClassSymbol resolveBuiltinType(String type) {

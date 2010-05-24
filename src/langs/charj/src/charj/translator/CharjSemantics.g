@@ -113,7 +113,7 @@ packageDeclaration
     
 importDeclarations returns [List<CharjAST> packageNames]
 @init {
-	packageNames = new ArrayList<CharjAST>();
+    packageNames = new ArrayList<CharjAST>();
 }
     :   (^('import' qualifiedIdentifier './*'?)
 		{ packageNames.add($qualifiedIdentifier.start); })*
@@ -123,18 +123,19 @@ importDeclarations returns [List<CharjAST> packageNames]
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
     :   ^(TYPE ('class' | chareType) IDENT
-            (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
-        {
-            Scope outerScope = $ScopeStack[-1]::current;
-            $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
-            outerScope.define($sym.name, $sym);
-            currentClass = $sym;
-            $sym.definition = $typeDeclaration.start;
-            $sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.symbol = $sym;
-            $ScopeStack::current = $sym;
-            importPackages($sym, $imports);
-        }
+            (^('extends' parent=type))? (^('implements' type+))?
+            {
+                Scope outerScope = $ScopeStack[-1]::current;
+                $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
+                outerScope.define($sym.name, $sym);
+                currentClass = $sym;
+                $sym.definition = $typeDeclaration.start;
+                $sym.definitionTokenStream = input.getTokenStream();
+                $IDENT.symbol = $sym;
+                $ScopeStack::current = $sym;
+                importPackages($sym, $imports);
+            }
+            classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -156,7 +157,6 @@ scope ScopeStack;
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
-            /*
             ClassSymbol returnType = currentClass.resolveType($ty.text);
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
             currentMethod = sym;
@@ -164,7 +164,6 @@ scope ScopeStack;
             sym.definitionTokenStream = input.getTokenStream();
             currentClass.members.put($IDENT.text, sym);
             $FUNCTION_METHOD_DECL.symbol = sym;
-            */
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
