@@ -24,6 +24,8 @@ package charj.translator;
     MethodSymbol currentMethod = null;
     LocalScope currentLocalScope = null;
     Translator translator;
+
+    PupRoutineCreator puper = new PupRoutineCreator();
 }
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
@@ -50,7 +52,7 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     ;
 
 packageDeclaration
-    :   ^('package' (ids+=IDENT)+)  
+    :   ^(PACKAGE (ids+=IDENT)+)  
     ;
     
 importDeclarations returns [List<CharjAST> packageNames]
@@ -58,16 +60,16 @@ importDeclarations returns [List<CharjAST> packageNames]
     ;
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
-    :   ^(TYPE ('class' | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
-    |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
-    |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
+    |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
+    |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
 
 chareType
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
-    |   ^('chare_array' ARRAY_DIMENSION)
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 enumConstant
@@ -80,7 +82,13 @@ classScopeDeclaration
             b=block?)
 
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        {
+            puper.primitiveVarPup($PRIMITIVE_VAR_DECLARATION); // TODO: arrays
+        }
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        {
+            puper.objectVarPup($OBJECT_VAR_DECLARATION);
+        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
     ;
@@ -137,12 +145,12 @@ modifierList
     ;
 
 modifier
-    :   'public'
-    |   'protected'
-    |   'private'
-    |   'entry'
-    |   'abstract'
-    |   'native'
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    |   ENTRY
+    |   ABSTRACT
+    |   NATIVE
     |   localModifier
     ;
 
@@ -151,15 +159,15 @@ localModifierList
     ;
 
 localModifier
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
 type
     :   simpleType
     |   objectType 
-    |   'void'
+    |   VOID
     ;
 
 simpleType
@@ -179,14 +187,14 @@ typeIdent
     ;
 
 primitiveType
-    :   'boolean'     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   'char'        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   'byte'        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   'short'       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   'int'         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   'long'        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   'float'       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   'double'      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
+    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
+    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
+    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
+    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
+    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
+    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
+    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
     ;
 
 genericTypeArgumentList
@@ -233,34 +241,34 @@ localVariableDeclaration
 
 statement
     :   block
-    |   ^('assert' expression expression?)
-    |   ^('if' parenthesizedExpression statement statement?)
-    |   ^('for' forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
+    |   ^(ASSERT expression expression?)
+    |   ^(IF parenthesizedExpression statement statement?)
+    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
-    |   ^('while' parenthesizedExpression statement)
-    |   ^('do' statement parenthesizedExpression)
-    |   ^('switch' parenthesizedExpression switchCaseLabel*)
-    |   ^('return' expression?)
-    |   ^('throw' expression)
-    |   ^('break' IDENT?) {
+    |   ^(WHILE parenthesizedExpression statement)
+    |   ^(DO statement parenthesizedExpression)
+    |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
+    |   ^(RETURN expression?)
+    |   ^(THROW expression)
+    |   ^(BREAK IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
             }
         }
-    |   ^('continue' IDENT?) {
+    |   ^(CONTINUE IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
             }
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^('embed' STRING_LITERAL EMBED_BLOCK)
+    |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     ;
         
 switchCaseLabel
-    :   ^('case' expression blockStatement*)
-    |   ^('default' blockStatement*)
+    :   ^(CASE expression blockStatement*)
+    |   ^(DEFAULT blockStatement*)
     ;
     
 forInit
@@ -327,8 +335,8 @@ expr
 primaryExpression
     :   ^(  '.' primaryExpression
                 (   IDENT
-                |   'this'
-                |   'super'
+                |   THIS
+                |   SUPER
                 )
         )
     |   parenthesizedExpression
@@ -338,9 +346,9 @@ primaryExpression
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
     |   newExpression
-    |   'this'
+    |   THIS
     |   arrayTypeDeclarator
-    |   'super'
+    |   SUPER
     ;
     
 explicitConstructorCall
@@ -376,8 +384,8 @@ literal
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL          
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 
