@@ -225,4 +225,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
         return list;
     }
+
+    public String getName()
+    {
+        return name;
+    }
 }

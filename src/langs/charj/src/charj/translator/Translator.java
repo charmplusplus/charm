@@ -31,6 +31,7 @@ public class Translator {
     private String m_stdlib;
     private List<String> m_usrlibs;
 
+    private String m_basename;
     private SymbolTable m_symtab;
     private CommonTree m_ast;
     private CommonTreeNodeStream m_nodes;
@@ -57,6 +58,7 @@ public class Translator {
 
     public boolean debug()      { return m_debug; }
     public boolean verbose()    { return m_verbose; }
+    public String basename()    { return m_basename; }
 
     public static TreeAdaptor m_adaptor = new CommonTreeAdaptor() {
         public Object create(Token token) {
@@ -72,6 +74,8 @@ public class Translator {
     };
 
     public String translate(String filename) throws Exception {
+        m_basename = filename.substring(0, filename.lastIndexOf("."));
+
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);

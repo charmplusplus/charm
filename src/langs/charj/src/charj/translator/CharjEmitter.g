@@ -33,6 +33,7 @@ package charj.translator;
     private boolean emitCI() { return mode_ == OutputMode.ci; }
     private boolean emitH() { return mode_ == OutputMode.h; }
     private boolean debug() { return translator_.debug(); }
+    private String basename() { return translator_.basename(); }
 
     /**
      *  Override ANTLR's token mismatch behavior so we throw exceptions early.
@@ -85,9 +86,9 @@ charjSource[SymbolTable symtab, OutputMode m]
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
         ->
     ;
 
@@ -118,10 +119,11 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^(TYPE 'class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    :   ^(TYPE 'class' IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
+        (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
@@ -137,10 +139,11 @@ typeDeclaration
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
-    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
+        (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
@@ -197,6 +200,7 @@ classScopeDeclaration
             }
         }
         -> {emitCC()}? funcMethodDecl_cc(
+                sym={currentClass},
                 modl={modList}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -222,13 +226,13 @@ classScopeDeclaration
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
         ->
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
