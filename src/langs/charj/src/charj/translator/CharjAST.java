@@ -56,4 +56,9 @@ public class CharjAST extends CommonTree
         return s;
     }
 
+    public CharjAST dupNode()
+    {
+        return new CharjAST(getType(), getText());
+    }
+
 }

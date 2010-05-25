@@ -224,7 +224,7 @@ ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 block_cc(bsl) ::=
 <<
 {
-<bsl; separator="\n">
+    <bsl; separator="\n">
 }
 >>
 

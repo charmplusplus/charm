@@ -52,9 +52,6 @@ tokens {
     NODEGROUP               = 'nodegroup'       ;
     ENUM                    = 'enum'            ;
 
-    BITWISE_OR              = '|'               ;
-    BITWISE_AND             = '&'               ;
-
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
     IF                      = 'if'              ;
@@ -68,6 +65,34 @@ tokens {
     WHILE                   = 'while'           ;
     THROW                   = 'throw'           ;
     BREAK                   = 'break'           ;
+
+    BITWISE_OR              = '|'               ;
+    BITWISE_AND             = '&'               ;
+    ASSIGNMENT              = '='               ;
+    PLUS_EQUALS             = '+='              ;
+    MINUS_EQUALS            = '-='              ;
+    TIMES_EQUALS            = '*='              ;
+    DIVIDE_EQUALS           = '/='              ;
+    AND_EQUALS              = '&='              ;
+    OR_EQUALS               = '|='              ;
+    POWER_EQUALS            = '^='              ;
+    MOD_EQUALS              = '%='              ;
+    OR                      = '||'              ;
+    AND                     = '&&'              ;
+    POWER                   = '^'               ;
+    GT                      = '>'               ;
+    LT                      = '<'               ;
+    PLUS                    = '+'               ;
+    MINUS                   = '-'               ;
+    TIMES                   = '*'               ;
+    DIVIDE                  = '/'               ;
+    MOD                     = '%'               ;
+    UNARY_PLUS              = '++'              ;
+    UNARY_MINUS             = '--'              ;
+    NOT                     = '!'               ;
+    TILDA                   = '~'               ;
+    INSTANCEOF              = 'instanceof'      ;
+
 
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
@@ -145,8 +170,6 @@ tokens {
     SUPER_CONSTRUCTOR_CALL;
     THIS_CONSTRUCTOR_CALL;
     TYPE;
-    UNARY_MINUS;
-    UNARY_PLUS;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;

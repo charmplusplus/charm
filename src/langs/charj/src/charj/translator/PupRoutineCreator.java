@@ -60,13 +60,15 @@ class PupRoutineCreator
         for(CharjAST p = idNode.getParent(); p != null; p = p.getParent())
             if(p.getType() == CharjParser.PRIMITIVE_VAR_DECLARATION)
                 primitive = true;
+            else if(p.getType() == CharjParser.FUNCTION_METHOD_DECL)
+                break;
             else if(p.getType() == CharjParser.TYPE)
             {
                 if(primitive)
                     primitiveVarPup(idNode);
                 else
                     objectVarPup(idNode);
-                return;
+                break;
             }
     }
 
