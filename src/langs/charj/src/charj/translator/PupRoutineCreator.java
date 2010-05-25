@@ -28,31 +28,21 @@ class PupRoutineCreator
     private void createPupNode()
     {
         pupNode = createNode(CharjParser.FUNCTION_METHOD_DECL, "FUNCTION_METHOD_DECL");
-        
-        CharjAST modlist = createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST");
-        modlist.addChild(createNode(CharjParser.PUBLIC, "public"));
-        pupNode.addChild(modlist);
 
+    	pupNode.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
         pupNode.addChild(createNode(CharjParser.VOID, "void"));
-
         pupNode.addChild(createNode(CharjParser.IDENT, "pup"));
-
-        CharjAST paramlist = createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST");
-
-        CharjAST param = createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL");
-
-        CharjAST type = createNode(CharjParser.TYPE, "TYPE");
-        
-        CharjAST qualifiedtypeid = createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT");
-        qualifiedtypeid.addChild(createNode(CharjParser.IDENT, "PUP::er&"));
-
-        type.addChild(qualifiedtypeid);
-        param.addChild(type);
-        param.addChild(createNode(CharjParser.IDENT, "p"));
-        paramlist.addChild(param);
-        pupNode.addChild(paramlist);
-        
+        pupNode.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
         pupNode.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+
+        pupNode.getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+
+        pupNode.getChild(3).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
+        pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.TYPE, "TYPE"));
+        pupNode.getChild(3).getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
+        pupNode.getChild(3).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "PUP::er&"));
+
+        pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
     }
 
     protected CharjAST getEnclosingType(CharjAST varDeclNode)
@@ -82,14 +72,10 @@ class PupRoutineCreator
 
     protected void primitiveVarPup(CharjAST idNode)
     {
-        CharjAST expr = createNode(CharjParser.EXPR, "EXPR");
-        CharjAST bor = createNode(CharjParser.BITWISE_OR, "|");
-        expr.addChild(bor);
-
-        bor.addChild(createNode(CharjParser.IDENT, "p"));
-        bor.addChild(idNode.dupNode());
-
-        block.addChild(expr);
+        pupNode.getChild(4).addChild(createNode(CharjParser.EXPR, "EXPR"));
+        pupNode.getChild(4).getChild(0).addChild(createNode(CharjParser.BITWISE_OR, "|"));
+        pupNode.getChild(4).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
+        pupNode.getChild(4).getChild(0).getChild(0).addChild(idNode.dupNode());
     }
     
     protected void objectVarPup(CharjAST varDeclNode){}

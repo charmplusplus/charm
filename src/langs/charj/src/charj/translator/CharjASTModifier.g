@@ -61,10 +61,10 @@ importDeclarations returns [List<CharjAST> packageNames]
     ;
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
-    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*
+    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             $TYPE.tree.addChild(puper.getPupRoutineNode());
-        })
+        }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;

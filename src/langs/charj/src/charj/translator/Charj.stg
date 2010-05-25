@@ -197,9 +197,8 @@ entry <ty><gtpl> <id><fpl> <adl>;
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(first(modl))><modl; separator = " ">: <endif><ty><gtpl> <id><fpl><adl> {
-    <block>
-}
+<if(first(modl))><modl; separator = " ">: <endif><ty><gtpl> <id><fpl><adl>
+<block>
 >>
 
 
@@ -217,15 +216,16 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl>:<endif><gtpl> <id><fpl> {
-    <block>
-}
+<if(modl)><modl>:<endif><gtpl> <id><fpl>
+<block>
 >>
 
 
 block_cc(bsl) ::=
 <<
-<bsl:{s| <s><\n>}>
+{
+<bsl; separator="\n">
+}
 >>
 
 
