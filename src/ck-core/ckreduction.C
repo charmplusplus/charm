@@ -54,10 +54,9 @@ waits for the migrant contributions to straggle in.
 #include "pathHistory.h"
 #endif
 
-#if 0
+#if CMK_DEBUG_REDUCTIONS
 //Debugging messages:
 // Reduction mananger internal information:
-#define DEBUGRED 1
 #define DEBR(x) CkPrintf x
 #define AA "Red PE%d Node%d #%d (%d,%d) Group %d> "
 #define AB ,CkMyPe(),CkMyNode(),redNo,nRemote,nContrib,thisgroup.idx
@@ -71,7 +70,6 @@ waits for the migrant contributions to straggle in.
 #define DEBREVAC(x) CkPrintf x
 #else
 //No debugging info-- empty defines
-#define DEBUGRED 0
 #define DEBR(x) // CkPrintf x
 #define DEBRMLOG(x) CkPrintf x
 #define AA
