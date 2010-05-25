@@ -198,7 +198,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             parent = scope.getFullyQualifiedName();
         }
         if ( parent!=null ) {
-            return parent+"."+name;
+            return parent+"::"+name;
         }
         return name;
     }
@@ -224,6 +224,27 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             list.add(currentScope.getScopeName());
         }
         return list;
+    }
+
+    private Set<ClassSymbol> getMemberTypes()
+    {
+        Set<ClassSymbol> types = new HashSet<ClassSymbol>();
+        for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
+            types.add(((VariableSymbol)entry.getValue()).type);
+        }
+        return types;
+    }
+
+    public List<String> getMemberTypeNames()
+    {
+        System.out.println("Looking for type names...");
+        System.out.println("Found " + fields.size() + " fields...");
+        List<String> names = new ArrayList<String>();
+        for (ClassSymbol c : getMemberTypes()) {
+            names.add(c.getFullyQualifiedName());
+            System.out.println("Found type " + c.getFullyQualifiedName());
+        }
+        return names;
     }
 
     public String getName()

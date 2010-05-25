@@ -58,6 +58,7 @@ interfaceExtends(ts) ::=
 classDeclaration_h(sym, ident, ext, csds) ::=
 <<
 <sym.IncludeString>
+<sym.MemberTypeNames:{name| class <name>; separator = "\n"}>
 <classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
 
