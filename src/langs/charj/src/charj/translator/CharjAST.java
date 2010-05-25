@@ -1,6 +1,7 @@
 package charj.translator;
 
 import org.antlr.runtime.tree.CommonTree;
+import org.antlr.runtime.tree.Tree;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
 import java.util.*;
@@ -35,7 +36,16 @@ public class CharjAST extends CommonTree
 
     public CharjAST getChild(int index)
     {
-        return (CharjAST) super.getChild(index);
+        try
+        {
+            return (CharjAST) super.getChild(index);
+        }
+        catch(ClassCastException e)
+        {
+            Tree child = super.getChild(index);
+            System.out.println("possible error node: " + child);
+            return new CharjAST(child.getType(), child.getText());
+        }
     }
 
     public String toString() {

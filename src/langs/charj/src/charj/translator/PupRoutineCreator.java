@@ -15,6 +15,11 @@ class PupRoutineCreator
         block = pupNode.getChild(4);
     }
 
+    protected CharjAST getPupRoutineNode()
+    {
+        return pupNode;
+    }
+
     private CharjAST createNode(int type, String text)
     {
         return new CharjAST(new CommonToken(type, text));
@@ -43,7 +48,9 @@ class PupRoutineCreator
 
         type.addChild(qualifiedtypeid);
         param.addChild(type);
+        param.addChild(createNode(CharjParser.IDENT, "p"));
         paramlist.addChild(param);
+        pupNode.addChild(paramlist);
         
         pupNode.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
     }
@@ -56,9 +63,33 @@ class PupRoutineCreator
         return null;
     }         
 
-    protected void primitiveVarPup(CharjAST varDeclNode)
+    protected void varPup(CharjAST idNode)
     {
-        CharjAST enclTypeNode = getEnclosingType(varDeclNode);
+        boolean primitive = false;
+
+        for(CharjAST p = idNode.getParent(); p != null; p = p.getParent())
+            if(p.getType() == CharjParser.PRIMITIVE_VAR_DECLARATION)
+                primitive = true;
+            else if(p.getType() == CharjParser.TYPE)
+            {
+                if(primitive)
+                    primitiveVarPup(idNode);
+                else
+                    objectVarPup(idNode);
+                return;
+            }
+    }
+
+    protected void primitiveVarPup(CharjAST idNode)
+    {
+        CharjAST expr = createNode(CharjParser.EXPR, "EXPR");
+        CharjAST bor = createNode(CharjParser.BITWISE_OR, "|");
+        expr.addChild(bor);
+
+        bor.addChild(createNode(CharjParser.IDENT, "p"));
+        bor.addChild(idNode.dupNode());
+
+        block.addChild(expr);
     }
     
     protected void objectVarPup(CharjAST varDeclNode){}

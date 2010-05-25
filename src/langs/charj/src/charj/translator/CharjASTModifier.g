@@ -11,6 +11,7 @@ options {
     memoize = true;
     tokenVocab = Charj;
     ASTLabelType = CharjAST;
+    output = AST;
 }
 
 @header {
@@ -60,7 +61,10 @@ importDeclarations returns [List<CharjAST> packageNames]
     ;
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
-    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
+    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*
+        {
+            $TYPE.tree.addChild(puper.getPupRoutineNode());
+        })
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -82,13 +86,7 @@ classScopeDeclaration
             b=block?)
 
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-        {
-            puper.primitiveVarPup($PRIMITIVE_VAR_DECLARATION); // TODO: arrays
-        }
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-        {
-            puper.objectVarPup($OBJECT_VAR_DECLARATION);
-        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
     ;
@@ -113,6 +111,9 @@ variableDeclarator
     
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
+        {
+            puper.varPup($IDENT);
+        }
     ;
 
 variableInitializer
@@ -302,9 +303,9 @@ expr
     |   ^('?' expr expr expr)
     |   ^('||' expr expr)
     |   ^('&&' expr expr)
-    |   ^('|' expr expr)
+    |   ^(BITWISE_OR expr expr)
     |   ^('^' expr expr)
-    |   ^('&' expr expr)
+    |   ^(BITWISE_AND expr expr)
     |   ^('==' expr expr)
     |   ^('!=' expr expr)
     |   ^('instanceof' expr type)

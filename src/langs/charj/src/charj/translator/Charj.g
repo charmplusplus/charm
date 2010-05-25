@@ -52,6 +52,9 @@ tokens {
     NODEGROUP               = 'nodegroup'       ;
     ENUM                    = 'enum'            ;
 
+    BITWISE_OR              = '|'               ;
+    BITWISE_AND             = '&'               ;
+
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
     IF                      = 'if'              ;
