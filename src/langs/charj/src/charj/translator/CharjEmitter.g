@@ -199,7 +199,7 @@ classScopeDeclaration
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={modList}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -207,7 +207,7 @@ classScopeDeclaration
         -> {emitH()}? funcMethodDecl_h(
                 modl={modList}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -215,7 +215,7 @@ classScopeDeclaration
         -> {(emitCI() && entry)}? funcMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -367,6 +367,7 @@ type
     |   objectType 
         -> {$objectType.st}
     |   'void'
+        -> {$st = %{$start.getText()};}
     ;
 
 simpleType
@@ -376,12 +377,12 @@ simpleType
 
 objectType
     :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        -> type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 qualifiedTypeIdent
     :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+) 
-        -> template(types={$t}) "<types; separator=\".\">"
+        -> template(types={$t}) "<types; separator=\"::\">"
     ;
 
 typeIdent
@@ -499,6 +500,8 @@ statement
         -> label(text={$i.text}, stmt={$s.st})
     |   expression
         -> template(expr={$expression.st}) "<expr>;"
+    |   ^('delete' qualifiedIdentifier)
+        -> template(t={$qualifiedIdentifier.st}) "delete <t>;"
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
@@ -619,14 +622,14 @@ expr
     |   primaryExpression
         -> {$primaryExpression.st}
     ;
-    
+
 primaryExpression
-    :   ^('.' prim=primaryExpression IDENT)
-        -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
-    |   ^('.' prim=primaryExpression 'this')
-        -> template(prim={$prim.st}) "<prim>.this"
-    |   ^('.' prim=primaryExpression 'super')
-        -> template(prim={$prim.st}) "<prim>.super"
+    :   ^('.' prim=primaryExpression
+            ( IDENT     -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+            | 'this'    -> template(prim={$prim.st}) "<prim>->this"
+            | 'super'   -> template(prim={$prim.st}) "<prim>->super"
+            )
+        )
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
@@ -668,6 +671,8 @@ newExpression
             )
         )
         -> template(t={$text}) "<t>"
+    |   ^('new' qualifiedTypeIdent arguments)
+        -> template(q={$qualifiedTypeIdent.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
 
 newArrayConstruction

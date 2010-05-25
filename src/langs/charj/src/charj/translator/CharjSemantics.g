@@ -347,6 +347,7 @@ statement
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
+    |   ^('delete' qualifiedIdentifier)
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     ;
@@ -451,6 +452,7 @@ newExpression
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
+    |   ^('new' qualifiedTypeIdent arguments)
     ;
 
 newArrayConstruction

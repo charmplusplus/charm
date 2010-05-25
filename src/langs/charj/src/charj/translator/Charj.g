@@ -454,6 +454,8 @@ statement
         ->  ^('continue' IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
+    |   'delete' qualifiedIdentifier ';'
+        -> ^('delete' qualifiedIdentifier)
     |   'embed' STRING_LITERAL EMBED_BLOCK
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
@@ -708,6 +710,8 @@ newExpression
         |   genericTypeArgumentList? qualifiedTypeIdent
                 newArrayConstruction                // new static array of object type reference elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
+        |   qualifiedTypeIdent arguments
+            -> ^('new' qualifiedTypeIdent arguments)
         )
     ;
     

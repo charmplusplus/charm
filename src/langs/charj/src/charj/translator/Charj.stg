@@ -295,6 +295,12 @@ type(typeID, arrDeclList) ::=
 >>
 
 
+obj_type(typeID, arrDeclList) ::=
+<<
+<typeID>*<arrDeclList>
+>>
+
+
 typeIdent(typeID, generics) ::=
 <<
 <typeID><generics>
