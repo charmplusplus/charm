@@ -91,6 +91,9 @@ public class Translator {
         // do AST rewriting and semantic checking
         if (m_printAST) printAST("Before Modifier Pass", "before_mod.html");
         modifierPass();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
         semanticPass();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
@@ -116,12 +119,13 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private ClassSymbol modifierPass() throws
+    private void modifierPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
-        return mod.charjSource(m_symtab);
+        mod.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
     }
 
     private ClassSymbol semanticPass() throws
