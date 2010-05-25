@@ -2135,11 +2135,7 @@ CmiBool CkNodeReductionMgr::hasParent(void) //Root Node
 }
 int CkNodeReductionMgr::treeParent(void) //My parent Node
 {
-#ifdef BINOMIAL_TREE
-	return parent;
-#else
   return parent;
-#endif
 }
 
 int CkNodeReductionMgr::firstKid(void) //My first child Node
