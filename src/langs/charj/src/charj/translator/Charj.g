@@ -155,6 +155,7 @@ chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   'mainchare'
     |   'chare_array' '[' ARRAY_DIMENSION ']' -> ^('chare_array' ARRAY_DIMENSION)
     ;
 

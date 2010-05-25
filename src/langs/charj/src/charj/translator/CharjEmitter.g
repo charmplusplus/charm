@@ -168,6 +168,7 @@ $st = %{$start.getText()};
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   'mainchare'
     |   ^('chare_array' ARRAY_DIMENSION)
         -> template(t={$ARRAY_DIMENSION.text}) "array [<t>]"
     ;

@@ -12,20 +12,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
 
-    /** List of all fields and methods */
+    /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
-    public Map<String, String> aliases = new LinkedHashMap<String, String>();
-
-    /** The set of method names (without signatures) for this class.  Maps
-     *  to a list of methods with same name but different args
-     protected Map<String, List<MethodSymbol>> methods =
-     new HashMap<String, List<MethodSymbol>>();
-     */
-
-    /** List of unmangled methods for this class. Used to distinguish
-     *  var from method name in expressions.  x = f; // what is f?
-     */
-    protected Set<String> methodNames = new HashSet<String>();
+    public Map<String, VariableSymbol> fields = new LinkedHashMap<String, VariableSymbol>();
+    public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
 
     public boolean hasCopyCtor = false;
 
@@ -94,31 +84,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
                 "ClassSymbol.importPackage(" + packageName + 
                 "): dir not found");
         return p;
-    }
-
-    public void alias(
-            CharjAST aliasAST, 
-            CharjAST methodNameAST) {
-        String op = aliasAST.getToken().getText();
-        op = op.substring(1,op.length()-1);
-        String method = methodNameAST.getToken().getText();
-        method = method.substring(1,method.length()-1);
-        alias(op, method);
-    }
-
-    public void alias(
-            String alias, 
-            String methodName) {
-        aliases.put(alias, methodName);
-    }
-
-    public String getMethodNameForOperator(String op) {
-        String name = aliases.get(op);
-        if ( name==null ) {
-            symtab.translator.error(
-                    "no such operator for " + this.name + ": " + op);
-        }
-        return name;
     }
 
     /** Using the list of imports, resolve a package name like charj.lang.
@@ -194,20 +159,15 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public MethodSymbol resolveMethodLocally(
             String name, 
             int numargs) {
-        if ( numargs>0 ) {
+        if (numargs > 0) {
             name += numargs;
         }
      
-        Symbol s = members.get(name);
-        if ( s!=null && s.getClass() == MethodSymbol.class ) {
-            return (MethodSymbol)s;
-        }
-
-        return null;
+        return methods.get(name);
     }
 
     public boolean isMethod(String name) {
-        if ( methodNames.contains(name) ) {
+        if ( methods.containsKey(name) ) {
             return true;
         }
         if ( getEnclosingScope()!=null ) {
@@ -219,8 +179,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public Symbol define(
             String name, 
             Symbol sym) {
-        if ( sym instanceof MethodSymbol ) {
-            methodNames.add(sym.name);
+        members.put(name, sym);
+        if (sym instanceof MethodSymbol) {
+            methods.put(name, (MethodSymbol)sym);
+        } else if (sym instanceof VariableSymbol) {
+            fields.put(name, (VariableSymbol)sym);
         }
         return super.define(name, sym);
     }
@@ -236,13 +199,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
         if ( parent!=null ) {
             return parent+"."+name;
-        }
-        return name;
-    }
-
-    public String getMangledName() {
-        if ( SymbolTable.TYPE_NAMES_TO_MANGLE.contains(name) ) {
-            return "m"+name;
         }
         return name;
     }

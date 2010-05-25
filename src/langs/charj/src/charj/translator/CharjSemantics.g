@@ -136,6 +136,12 @@ scope ScopeStack; // top-level type scope
                 importPackages($sym, $imports);
             }
             classScopeDeclaration*)
+            {
+                //System.out.println("Members for type " + $sym.name + ":");
+                //for (Map.Entry<String, Symbol> entry : $sym.members.entrySet()) {
+                //    System.out.println(entry.getKey());
+                //}
+            }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -144,6 +150,7 @@ chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   'mainchare'
     |   ^('chare_array' ARRAY_DIMENSION)
     ;
 
@@ -162,7 +169,7 @@ scope ScopeStack;
             currentMethod = sym;
             sym.definition = $classScopeDeclaration.start;
             sym.definitionTokenStream = input.getTokenStream();
-            currentClass.members.put($IDENT.text, sym);
+            currentClass.define($IDENT.text, sym);
             $FUNCTION_METHOD_DECL.symbol = sym;
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
