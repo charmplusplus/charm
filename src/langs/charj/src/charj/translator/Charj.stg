@@ -7,7 +7,6 @@ charjSource_ci(pd, ids, tds, debug) ::=
 <if(debug)>/* \<charjSource_ci> */<endif>
 /*
  * packageDeclaration disabled...
-<pd>
  * end packageDeclaration
  */
 
@@ -23,7 +22,7 @@ charjSource_ci(pd, ids, tds, debug) ::=
 >>
 
 
-charjSource_h(pd, ids, tds, cb, debug) ::= 
+charjSource_h(pd, ids, tds, debug) ::=
 <<
 <if(debug)>/* \<CHARJ_SOURCE> */<endif>
 /**************************************************************************
@@ -33,32 +32,20 @@ charjSource_h(pd, ids, tds, cb, debug) ::=
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
-<pd>
 <ids>
 <tds>
-<cb>
 
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
 >>
 
 
-charjSource_cc(pd, ids, tds, cb, debug) ::= 
+charjSource_cc(pd, ids, tds, debug) ::=
 <<
 <if(debug)>/* \<CHARJ_SOURCE> */<endif>
 <ids>
-<pd>
 <tds>
-<cb>
 <if(debug)>/* \</CHARJ_SOURCE> */<endif>
-
->>
-
-packageDeclaration_cc_h(ids) ::= 
-<<
-<if(debug)>/* \<packageDeclaration> */<endif>
-namespace <ids; separator=" { namespace "> {
-<if(debug)>/* \</packageDeclaration> */<endif>
 >>
 
 importDeclaration_cc_h(inc_id, use_id) ::= 
@@ -80,90 +67,137 @@ interfaceExtends(ts) ::=
 : public <ts; separator=", public ">
 >>
 
-
-classDeclaration_h(ident, ext, csds) ::=
+classDeclaration_h(sym, ident, ext, csds) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
-
-#include "<ident>.decl.h"
-/* superclass: <ext> */
-class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
-};
-<if(debug)>/* \</typeDeclaration> */<endif>
-
+<sym.IncludeString>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
 
-classDeclaration_cc(ident, ext, csds) ::=
+classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+}
+<else>
+<if(ext)>
+class <ident> : public <ext> {
+<else>
+class <ident> {
+<endif>
 
-
-#include "<ident>.decl.h"
-/* superclass: <ext> */
-class <ident>: public CBase_<ident> {
     <csds; separator="\n">
 };
+<endif>
+>>
+
+
+classDeclaration_cc(sym, ident, ext, csds) ::=
+<<
+<sym.IncludeString>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+>>
+
+classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+}
+<else>
+<if(ext)>
+class <ident>: public <ext> {
+<else>
+class <ident> {
+<endif>
+
+    <csds; separator="\n">
+};
+<endif>
+>>
+
+
+chareDeclaration_cc(sym, ident, ext, csds) ::=
+<<
+#include "<ident>.decl.h"
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 #include "<ident>.def.h"
-<if(debug)>/* \</typeDeclaration> */<endif>
-
 >>
 
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+}
+<else><if(ext)>/* superclass: <ext> */<endif>
+class <ident>: public CBase_<ident> {
+    <csds; separator="\n">
+};
+<endif>
+>>
 
-charedeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_h(sym, ident, ext, csds) ::=
+<<
+#include "<ident>.decl.h"
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+>>
+
+chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+}
+<else>
+<if(ext)>/* superclass: <ext> */<endif>
+class <ident>: public CBase_<ident> {
+    <csds; separator="\n">
+};
+<endif>
+>>
+
+chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
 <if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
 <if(ext)>
     extern module <ext>;
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident>: <ext> {
-<else>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident> {
 <endif>
-        <csds; separator="\n">
-    }
-}
-
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
 <if(debug)>/* \</typeDeclaration> */<endif>
-
+}
 >>
 
 
+chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+}
+<else>
+<chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+    <csds; separator="\n">
+};
+<endif>
+>>
+
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl>;
+<if(first(modl))><modl; separator=" ">: <endif><ty><gtpl> <id><fpl><adl>;
 >>
 
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty> <gtpl> <id><fpl> <adl>;
+entry <ty><gtpl> <id><fpl> <adl>;
 >>
 
 
 funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl> {
-    <block>
-}
->>
-
-
-voidMethodDecl_ci(modl, gtpl, id, fpl, block) ::=
-<<
-entry void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_h(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_cc(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl> {
+<if(first(modl))><modl; separator = " ">: <endif><ty><gtpl> <id><fpl><adl> {
     <block>
 }
 >>
@@ -311,7 +345,7 @@ if <cond> {
 
 for(initializer, cond, update, body) ::=
 <<
-for (<initializer> <cond> <update>) {
+for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) {
     <body>
 }
 >>
@@ -351,16 +385,6 @@ label(text, stmt) ::=
 case(expr, block) ::=
 <<
 case <expr>: <block>
->>
-
-for_cond(expr) ::=
-<<
-<expr>
->>
-
-for_update(exprs) ::=
-<<
-<exprs; separator=", ">
 >>
 
 method_call(primary, generic_types, args) ::=

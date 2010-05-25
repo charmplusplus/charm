@@ -5725,13 +5725,13 @@ int AMPI_System(const char *cmd) {
 }
 
 #if CMK_CUDA
-GPUReq::GPUReq(int comm_)
+GPUReq::GPUReq()
 {
-    MPI_Comm_rank(comm_, &src);
-    comm = comm_;
-    isvalid = true;
-    buf = getAmpiInstance(comm);
+    comm = MPI_COMM_SELF;
     isComplete = false;
+    isvalid = true;
+    MPI_Comm_rank(comm, &src);
+    buf = getAmpiInstance(comm);
 }
 
 bool GPUReq::test(MPI_Status *sts)
@@ -5777,21 +5777,33 @@ void AMPI_GPU_complete(void *request, void* dummy)
 }
 
 CDECL
-int AMPI_GPU_invoke(workRequest *to_call, MPI_Comm comm, MPI_Request *request)
+int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request)
 {
     AMPIAPI(__func__);
 
     AmpiRequestList* reqs = getReqs();
-    GPUReq *newreq = new GPUReq(comm);
+    GPUReq *newreq = new GPUReq();
     *request = reqs->insert(newreq);
 
-    // Create a callback that completes the corresponding request
+    // A callback that completes the corresponding request
     CkCallback *cb = new CkCallback(&AMPI_GPU_complete, newreq);
     setWRCallback(to_call, cb);
 
-    // Call the CUDA manager with to_call and cb
     enqueue(wrQueue, to_call);
 }
+
+CDECL
+int AMPI_GPU_Invoke(workRequest *to_call)
+{
+    AMPIAPI(__func__);
+
+    MPI_Request req;
+    AMPI_GPU_Iinvoke(to_call, &req);
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+
+    return 0;
+}
+
 #endif
 
 #include "ampi.def.h"

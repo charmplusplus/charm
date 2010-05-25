@@ -19,12 +19,12 @@ package charj.translator;
 
 
 @members {
-    SymbolTable symtab_ = null;
+    SymbolTable symtab = null;
 
-    PackageScope currentPackage_ = null;
-    ClassSymbol currentClass_ = null;
-    MethodSymbol currentMethod_ = null;
-    LocalScope currentLocalScope_ = null;
+    PackageScope currentPackage = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
+    LocalScope currentLocalScope = null;
 
     Translator translator_;
     OutputMode mode_;
@@ -78,43 +78,25 @@ package charj.translator;
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable symtab, OutputMode m]
 @init {
-    this.symtab_ = symtab;
+    this.symtab = symtab;
     this.translator_ = symtab.translator;
     this.mode_ = m;
-    String closingBraces = "";
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
         (t=typeDeclaration))
-        {
-            // construct string of }'s to close namespace 
-            if ($p.st != null) {
-                String temp_p = $p.st.toString();
-                for (int idx=0; idx<temp_p.length(); ++idx) {
-                    if (temp_p.charAt(idx) == '{') {
-                        closingBraces += "} ";
-                    }
-                }
-            }
-        }
-        -> {emitCC()}? charjSource_cc(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(pd={$p.st}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(
-            pd={$p.st}, ids={$i}, tds={$t.st}, cb={closingBraces}, debug={debug()})
+        -> {emitCC()}? charjSource_cc(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        -> {emitH()}? charjSource_h(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
         ->
     ;
 
 packageDeclaration
-@init { 
-    List<String> names = null; 
-}
-    :   ^('package' qualifiedIdentifier)  {
-            names =  java.util.Arrays.asList(
-                    $qualifiedIdentifier.text.split("[.]"));
+returns [List names]
+    :   ^('package' (ids+=IDENT)+)
+        {
+            $names = $ids;
         }
-        -> {(emitCC() || emitH())}? packageDeclaration_cc_h(
-            ids={names})
         ->
     ;
     
@@ -136,12 +118,17 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^('class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    :   ^(TYPE 'class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+        {
+            currentClass = (ClassSymbol)$IDENT.symbol;
+        }
         -> {emitCC()}? classDeclaration_cc(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitH()}? classDeclaration_h(
+        -> {emitH()}?  classDeclaration_h(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
@@ -150,26 +137,24 @@ typeDeclaration
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
-    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-        -> {emitCC()}? classDeclaration_cc(
+    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+        {
+            currentClass = (ClassSymbol)$IDENT.symbol;
+        }
+        -> {emitCC()}? chareDeclaration_cc(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitCI()}? charedeclaration_ci(
+        -> {emitCI()}? chareDeclaration_ci(
+                sym={currentClass},
                 chareType={$chareType.st},
                 arrayDim={null},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
-        -> {emitH()}? classDeclaration_h(
-                ident={$IDENT.text}, 
-                ext={$su.st}, 
-                csds={$csds})
-        ->
-    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-        -> {emitCI()}? charedeclaration_ci(
-                chareType={"array"},
-                arrayDim={$ARRAY_DIMENSION.text.toUpperCase()},
+        -> {emitH()}? chareDeclaration_h(
+                sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds})
@@ -183,6 +168,8 @@ $st = %{$start.getText()};
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   ^('chare_array' ARRAY_DIMENSION)
+        -> template(t={$ARRAY_DIMENSION.text}) "array [<t>]"
     ;
 
 enumConstant
@@ -191,7 +178,11 @@ enumConstant
     ;
 
 classScopeDeclaration
-@init { boolean entry = false; }
+@init {
+  boolean entry = false;
+  List<String> modList = new ArrayList<String>();
+
+}
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
@@ -199,10 +190,13 @@ classScopeDeclaration
             if ($m.st != null) {
                 // determine whether this is an entry method
                 entry = listContainsToken($m.start.getChildren(), ENTRY);
+                for(Object o : $m.names)
+                  if(o.equals("entry")) continue;
+                  else modList.add(o.toString());
             }
         }
         -> {emitCC()}? funcMethodDecl_cc(
-                modl={$m.st}, 
+                modl={modList}, 
                 gtpl={$g.st}, 
                 ty={$ty.text},
                 id={$IDENT.text}, 
@@ -210,7 +204,7 @@ classScopeDeclaration
                 adl={$a.st},
                 block={$b.st})
         -> {emitH()}? funcMethodDecl_h(
-                modl={$m.st}, 
+                modl={modList}, 
                 gtpl={$g.st}, 
                 ty={$ty.text},
                 id={$IDENT.text}, 
@@ -224,33 +218,6 @@ classScopeDeclaration
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
-                block={$b.st})
-        ->
-    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
-            f=formalParameterList b=block?)
-        { 
-            // determine whether this is an entry method
-            if ($m.st != null) {
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-            }
-        }
-        -> {emitCC()}? voidMethodDecl_cc(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
-        -> {emitCI() && entry}? voidMethodDecl_ci(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
-        -> {emitH()}? voidMethodDecl_h(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
@@ -295,8 +262,6 @@ classScopeDeclaration
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList arrayDeclaratorList?)
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
@@ -357,7 +322,12 @@ throwsClause
     ;
 
 modifierList
+returns [List<String> names]
     :   ^(MODIFIER_LIST (m+=modifier)+)
+        {
+          $names = new ArrayList<String>();
+          for(Object o : $m) $names.add(o.toString());
+        }
         -> mod_list(mods={$m})
     ;
 
@@ -395,6 +365,7 @@ type
         -> {$simpleType.st}
     |   objectType 
         -> {$objectType.st}
+    |   'void'
     ;
 
 simpleType
@@ -505,7 +476,7 @@ statement
         -> assert(cond={$cond.st}, msg={$msg.st})
     |   ^('if' parenthesizedExpression then=statement else_=statement?)
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
-    |   ^('for' forInit cond=expression? (update+=expression)* s=statement)
+    |   ^('for' forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
         -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"

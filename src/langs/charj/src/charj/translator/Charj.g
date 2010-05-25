@@ -69,6 +69,8 @@ tokens {
     EXTENDS_BOUND_LIST;
     EXTENDS_CLAUSE;
     FOR_EACH;
+    FOR_EXPR;
+    FOR_UPDATE;
     FORMAL_PARAM_LIST;
     FORMAL_PARAM_STD_DECL;
     FORMAL_PARAM_VARARG_DECL;
@@ -98,7 +100,6 @@ tokens {
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
-    VOID_METHOD_DECL;
 }
 
 @header {
@@ -128,7 +129,8 @@ compilationUnit
     ;
 
 packageDeclaration
-    :   'package'^ qualifiedIdentifier ';'!  
+    :   'package' IDENT ('.' IDENT)+ ';'  
+        ->  ^('package' IDENT+)
     ;
 
 importDeclaration
@@ -140,34 +142,27 @@ typeDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
-    |   chareArrayDefinition
     ;
 
 classDefinition
     :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE 'class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   'chare_array' '[' ARRAY_DIMENSION ']' -> ^('chare_array' ARRAY_DIMENSION)
     ;
 
 chareDefinition
     :   'public'? chareType IDENT ('extends' type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^(chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
-    ;
-
-chareArrayDefinition
-    :   'public'? 'chare_array' '[' ARRAY_DIMENSION ']' IDENT ('extends' type)? ('implements' typeList)? '{'
-            classScopeDeclaration*
-        '}' ';'?
-        -> ^('chare_array' ARRAY_DIMENSION IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 interfaceDefinition
@@ -202,8 +197,6 @@ classScopeDeclaration
             (   type IDENT formalParameterList arrayDeclaratorList? (block | ';')
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList arrayDeclaratorList? block?)
-            |   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -221,8 +214,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList arrayDeclaratorList? ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList arrayDeclaratorList?)
-            |   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -329,6 +320,7 @@ localModifier
 type
     :   simpleType
     |   objectType
+    |   'void'
     ;
 
 simpleType
@@ -441,7 +433,7 @@ statement
         )   
     |   f='for' '('
         (   forInit? ';' expression? ';' expressionList? ')' statement
-            -> ^($f forInit expression? expressionList statement)
+            -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? statement)
         |   localModifierList? type IDENT ':' expression ')' statement
             -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
         )
@@ -748,8 +740,7 @@ DECIMAL_LITERAL : ('0' | '1'..'9' '0'..'9'*) INTEGER_TYPE_SUFFIX? ;
 
 OCTAL_LITERAL : '0' ('0'..'7')+ INTEGER_TYPE_SUFFIX? ;
 
-//fragment
-ARRAY_DIMENSION :  '1'..'6' ('d'|'D') ;
+ARRAY_DIMENSION :  ('1'..'6')('d'|'D') ;
 
 fragment
 HEX_DIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;
@@ -846,8 +837,9 @@ COMMENT
     ;
 
 LINE_COMMENT
-    : '//' ~('\n'|'\r')* '\r'? '\n'
+    : ('//'|'#') ~('\n'|'\r')* '\r'? '\n'
     {   
         $channel = HIDDEN;
     }
     ;
+

@@ -21,23 +21,11 @@
     <property name="token.lib" location="${buildsrc}/${package}" />
 
     <!-- Define path used for classpath later -->
-    <path id="project.class.path.3.0">
-        <pathelement location="lib/antlr-2.7.7.jar"/>
-        <pathelement location="lib/antlr-3.0.1.jar"/>
-        <pathelement location="lib/antlr-runtime-3.0.1.jar"/>
-        <pathelement location="lib/stringtemplate-3.1b1.jar"/>
-        <pathelement location="lib/gunit-1.0.2.jar"/>
+    <path id="project.class.path.3.2">
+        <pathelement location="lib/antlr-3.2.jar"/>
         <pathelement location="lib/JSAP-2.1.jar"/>
     </path>
-    <path id="project.class.path.3.1">
-        <pathelement location="lib/antlr-2.7.7.jar"/>
-        <pathelement location="lib/antlr-3.1b1.jar"/>
-        <pathelement location="lib/antlr-runtime-3.1b1.jar"/>
-        <pathelement location="lib/stringtemplate-3.1.jar"/>
-        <pathelement location="lib/gunit-1.0.2.jar"/>
-        <pathelement location="lib/JSAP-2.1.jar"/>
-    </path>
-    <property name="classpath" value="project.class.path.3.1"/>
+    <property name="classpath" value="project.class.path.3.2"/>
 
     <!-- antlr options -->
     <property name="profile" value="false" />

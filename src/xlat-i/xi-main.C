@@ -117,6 +117,7 @@ ModuleList *Parse(char *interfacefile)
 
 ModuleList *Parse(FILE *fp)
 {
+  modlist = NULL;
   yyin = fp ;
   if(yyparse())
       exit(1);
@@ -155,6 +156,7 @@ int main(int argc, char *argv[])
   //if (fname==NULL) abortxi(argv[0]);
 
   ModuleList *m = Parse(openFile(fname)) ;
+  if (!m) return 0;
   m->preprocess();
   m->generate();
   return 0 ;

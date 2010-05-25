@@ -95,8 +95,11 @@ packageDeclaration
 @init { 
     List<String> names = null; 
 }
-    :   ^('package' qualifiedIdentifier)  {
-            String packageName = $qualifiedIdentifier.text;
+    :   ^('package' (ids+=IDENT)+)  
+        {
+            String packageName = "";
+            for(Object o : $ids) packageName += '.' + ((CharjAST)o).getText();
+            packageName = packageName.substring(1);
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
                 ps = symtab.definePackage(packageName);
@@ -104,7 +107,7 @@ packageDeclaration
             }
             currentPackage = ps;
             $ScopeStack::current = ps;
-            $qualifiedIdentifier.start.symbol = ps;
+//            $qualifiedIdentifier.start.symbol = ps; ----- commented out while dealing with the namespaces issue (Minas)
         }
     ;
     
@@ -119,10 +122,11 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^('class' IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    :   ^(TYPE ('class' | chareType) IDENT
+            (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             Scope outerScope = $ScopeStack[-1]::current;
-            $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
+            $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
             outerScope.define($sym.name, $sym);
             currentClass = $sym;
             $sym.definition = $typeDeclaration.start;
@@ -133,14 +137,13 @@ scope ScopeStack; // top-level type scope
         }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
-    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
     ;
 
 chareType
     :   'chare'
     |   'group'
     |   'nodegroup'
+    |   ^('chare_array' ARRAY_DIMENSION)
     ;
 
 enumConstant
@@ -148,11 +151,21 @@ enumConstant
     ;
     
 classScopeDeclaration
+scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
-            f=formalParameterList b=block?)
+        {
+            /*
+            ClassSymbol returnType = currentClass.resolveType($ty.text);
+            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
+            currentMethod = sym;
+            sym.definition = $classScopeDeclaration.start;
+            sym.definitionTokenStream = input.getTokenStream();
+            currentClass.members.put($IDENT.text, sym);
+            $FUNCTION_METHOD_DECL.symbol = sym;
+            */
+        }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
@@ -162,7 +175,6 @@ classScopeDeclaration
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList arrayDeclaratorList?)
-    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
@@ -234,6 +246,7 @@ localModifier
 type
     :   simpleType
     |   objectType 
+    |   'void'
     ;
 
 simpleType
@@ -309,7 +322,7 @@ statement
     :   block
     |   ^('assert' expression expression?)
     |   ^('if' parenthesizedExpression statement statement?)
-    |   ^('for' forInit expression? expression* statement)
+    |   ^('for' forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
     |   ^('while' parenthesizedExpression statement)
     |   ^('do' statement parenthesizedExpression)

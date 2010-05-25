@@ -1581,7 +1581,7 @@ CthThread t;
 #if CMK_THREADS_USE_CONTEXT && CMK_64BIT /* makecontext only pass integer arguments */
 void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
 {
-  CmiUInt8 fn0 = (((CmiUInt8)fn1) << 32) | fn2;
+  CmiUInt8 fn0 =  (((CmiUInt8)fn1) << 32) | fn2;
   CmiUInt8 arg0 = (((CmiUInt8)arg1) << 32) | arg2;
   void *arg = (void *)arg0;
   qt_userf_t *fn = (qt_userf_t*)fn0;
@@ -1651,10 +1651,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   errno = 0;
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
-    int fn1 = ((CmiUInt8)fn) >> 32;
-    int fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
-    int arg1 = ((CmiUInt8)arg) >> 32;
-    int arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
+    CmiUInt4 fn1 = ((CmiUInt8)fn) >> 32;
+    CmiUInt4 fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
+    CmiUInt4 arg1 = ((CmiUInt8)arg) >> 32;
+    CmiUInt4 arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
   }
   else

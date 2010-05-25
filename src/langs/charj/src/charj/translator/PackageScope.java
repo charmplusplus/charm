@@ -29,6 +29,7 @@ public class PackageScope extends SymbolWithScope {
      *  be found.
      */
     public ClassSymbol resolveType(String type) {
+        if (type == null) return null;
         if (debug()) System.out.println(
                 " PackageScope.resolveType(" + type + 
                 "): examine " + toString());

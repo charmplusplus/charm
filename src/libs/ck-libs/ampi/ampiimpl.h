@@ -750,7 +750,7 @@ class GPUReq : public AmpiRequest {
     bool isComplete;
 
 public:
-    GPUReq(int comm_);
+    GPUReq();
     int getType() { return 5; }
     CmiBool test(MPI_Status *sts);
     void complete(MPI_Status *sts);
