@@ -116,12 +116,13 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private ClassSymbol modifierPass() throws
+    private void modifierPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
-        return mod.charjSource(m_symtab);
+        mod.setTreeAdaptor(m_adaptor);
+        mod.charjSource(m_symtab);
     }
 
     private ClassSymbol semanticPass() throws
