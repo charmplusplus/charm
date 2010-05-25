@@ -78,7 +78,7 @@ classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <if(ext)>
 class <ident> : public <ext> {
@@ -86,7 +86,7 @@ class <ident> : public <ext> {
 class <ident> {
 <endif>
 
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -103,7 +103,7 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <if(ext)>
 class <ident>: public <ext> {
@@ -111,7 +111,7 @@ class <ident>: public <ext> {
 class <ident> {
 <endif>
 
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -129,10 +129,10 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else><if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -148,11 +148,11 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -175,10 +175,10 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -225,7 +225,7 @@ ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 
 block_cc(bsl) ::=
 <<
-<bsl:{s| <s><\n>}>
+<bsl; separator = "\n">
 >>
 
 
