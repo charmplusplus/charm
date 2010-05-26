@@ -220,7 +220,7 @@ public class Translator {
             String fullName = packageDir + "/" + typeName + ".cj";
 		
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            boolean fileExists = (cl.getResource(fullName) == null);
+            boolean fileExists = (cl.getResource(fullName) != null);
             if (!fileExists) {
                 if (debug()) System.out.println(
                         " \tloadType(" + typeName + "): not found");

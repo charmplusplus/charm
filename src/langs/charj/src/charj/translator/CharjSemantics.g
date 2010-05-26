@@ -183,12 +183,12 @@ scope ScopeStack;
 field [ClassSymbol type]
     :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
     {
-            //System.out.println("Found variable: " + $type + " " + $IDENT.text);
-            //VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
-            //sym.definition = $field.start;
-            //sym.definitionTokenStream = input.getTokenStream();
-            //$VAR_DECLARATOR.symbol = sym;
-            //currentClass.define($IDENT.text, sym);
+            System.out.println("Found variable: " + $type + " " + $IDENT.text);
+            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
+            sym.definition = $field.start;
+            sym.definitionTokenStream = input.getTokenStream();
+            $VAR_DECLARATOR.symbol = sym;
+            currentClass.define($IDENT.text, sym);
     }
     ;
     
@@ -282,11 +282,8 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
-            /*
-            System.out.println("Resolving type: " + $qualifiedTypeIdent.name);
             $type = currentClass.resolveType($qualifiedTypeIdent.name);
             if ($type == null) $type = symtab.resolveBuiltinType($qualifiedTypeIdent.name);
-            */
         }
     ;
 

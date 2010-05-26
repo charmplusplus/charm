@@ -18,6 +18,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
 
     public boolean hasCopyCtor = false;
+    public boolean isPrimitive = false;
 
     public ClassSymbol(
             SymbolTable symtab, 
@@ -241,7 +242,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         if (debug()) System.out.println("Found " + fields.size() + " fields...");
         List<String> names = new ArrayList<String>();
         for (ClassSymbol c : getMemberTypes()) {
-            names.add(c.getFullyQualifiedName());
+            if (c.isPrimitive) continue;
+            names.add(c.getName());
             if (debug()) System.out.println("Found type " + c.getFullyQualifiedName());
         }
         return names;
