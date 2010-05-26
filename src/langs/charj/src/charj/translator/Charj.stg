@@ -38,7 +38,7 @@ charjSource_cc(basename, pd, ids, tds, debug) ::=
 
 >>
 
-importDeclaration_cc_h(inc_id, use_id) ::= 
+importDeclaration_cc_h(inc_id, use_id) ::=
 <<
 #include \<<inc_id>\>
 using <use_id>;
@@ -195,7 +195,7 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl; separator=" ">: <endif><id>::<id><fpl>
+<id>::<id><fpl>
 <block>
 >>
 
@@ -256,7 +256,7 @@ local_mod_list(mods) ::=
 <<
 <if(mods)><mods; separator=" "><endif>
 >>
- 
+
 
 local_var_decl(modList, type, declList) ::=
 <<
@@ -396,7 +396,7 @@ array_construction_with_init(array_decls, initializer) ::=
 array_construction(exprs, array_decls) ::=
 <<
 [<exprs; separator="][">]<array_decls>
->> 
+>>
 
 
 arguments(exprs) ::=
