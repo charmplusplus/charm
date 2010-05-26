@@ -69,7 +69,8 @@ tokens {
 
     BITWISE_OR              = '|'               ;
     BITWISE_AND             = '&'               ;
-    ASSIGNMENT              = '='               ;
+    EQUALS                  = '='               ;
+    NOT_EQUALS              = '!='              ;
     PLUS_EQUALS             = '+='              ;
     MINUS_EQUALS            = '-='              ;
     TIMES_EQUALS            = '*='              ;
@@ -479,6 +480,8 @@ qualifiedIdentifier
 block
     :   lc='{' blockStatement* '}'
         ->  ^(BLOCK[$lc, "BLOCK"] blockStatement*)
+    |   nonBlockStatement
+        -> ^(BLOCK nonBlockStatement)
     ;
 
 blockStatement
@@ -492,31 +495,35 @@ localVariableDeclaration
     |   localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
     ;
-        
+
 statement
-    :   block
-    |   'assert' expr1=expression 
+    :   nonBlockStatement
+    |   block
+    ;
+        
+nonBlockStatement
+    :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
             ->  ^('assert' $expr1 $expr2)
         |   ';'
             ->  ^('assert' $expr1)
         )
-    |   IF parenthesizedExpression ifStat=statement 
-        (   ELSE elseStat=statement
+    |   IF parenthesizedExpression ifStat=block
+        (   ELSE elseStat=block
             ->  ^(IF parenthesizedExpression $ifStat $elseStat)
         |
             ->  ^(IF parenthesizedExpression $ifStat)
         )   
     |   f=FOR '('
-        (   forInit? ';' expression? ';' expressionList? ')' statement
-            -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? statement)
-        |   localModifierList? type IDENT ':' expression ')' statement
-            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
+        (   forInit? ';' expression? ';' expressionList? ')' block
+            -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? block)
+        |   localModifierList? type IDENT ':' expression ')' block
+            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression block)
         )
-    |   WHILE parenthesizedExpression statement
-        ->  ^(WHILE parenthesizedExpression statement)
-    |   DO statement WHILE parenthesizedExpression ';'
-        ->  ^(DO statement parenthesizedExpression)
+    |   WHILE parenthesizedExpression block
+        ->  ^(WHILE parenthesizedExpression block)
+    |   DO block WHILE parenthesizedExpression ';'
+        ->  ^(DO block parenthesizedExpression)
     |   SWITCH parenthesizedExpression '{' switchCaseLabel* '}'
         ->  ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   RETURN expression? ';'

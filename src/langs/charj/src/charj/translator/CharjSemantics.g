@@ -95,7 +95,7 @@ packageDeclaration
 @init { 
     List<String> names = null; 
 }
-    :   ^('package' (ids+=IDENT)+)  
+    :   ^(PACKAGE (ids+=IDENT)+)  
         {
             String packageName = "";
             for(Object o : $ids) packageName += '.' + ((CharjAST)o).getText();
@@ -325,13 +325,17 @@ localVariableDeclaration
     ;
 
 statement
-    :   block
-    |   ^(ASSERT expression expression?)
-    |   ^(IF parenthesizedExpression statement statement?)
-    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
-    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
-    |   ^(WHILE parenthesizedExpression statement)
-    |   ^(DO statement parenthesizedExpression)
+    : nonBlockStatement
+    | block
+    ;
+
+nonBlockStatement
+    :   ^(ASSERT expression expression?)
+    |   ^(IF parenthesizedExpression block block?)
+    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
+    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
+    |   ^(WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression)
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)

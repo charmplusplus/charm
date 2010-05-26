@@ -478,20 +478,25 @@ localVariableDeclaration
 
 
 statement
-    :   block
+    :   nonBlockStatement
+        -> {$nonBlockStatement.st}
+    |   block
         -> {$block.st}
-    |   ^(ASSERT cond=expression msg=expression?)
+    ;
+
+nonBlockStatement
+    :   ^(ASSERT cond=expression msg=expression?)
         -> assert(cond={$cond.st}, msg={$msg.st})
-    |   ^(IF parenthesizedExpression then=statement else_=statement?)
+    |   ^(IF parenthesizedExpression then=block else_=block?)
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
-    |   ^(FOR forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
-        -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
-    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
+    |   ^(FOR forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* b=block)
+        -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$block.st})
+    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"
-    |   ^(WHILE pe=parenthesizedExpression s=statement)
-        -> while(cond={$pe.st}, body={$s.st})
-    |   ^(DO s=statement pe=parenthesizedExpression)
-        -> dowhile(cond={$pe.st}, block={$s.st})
+    |   ^(WHILE pe=parenthesizedExpression b=block)
+        -> while(cond={$pe.st}, body={$b.st})
+    |   ^(DO b=block pe=parenthesizedExpression)
+        -> dowhile(cond={$pe.st}, block={$b.st})
     |   ^(SWITCH pe=parenthesizedExpression (scls+=switchCaseLabel)*)
         -> switch(expr={$pe.st}, labels={$scls})
     |   ^(RETURN e=expression?)

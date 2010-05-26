@@ -319,33 +319,23 @@ CkAssert(<cond>);
 
 if(cond, then, else_) ::=
 <<
-if <cond> {
-    <then>
-}<if(else_)> else {
-    <else_>
-}<endif>
+if <cond> <then><if(else_)> else <else_><endif>
 >>
 
 
 for(initializer, cond, update, body) ::=
 <<
-for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) {
-    <body>
-}
+for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) <body>
 >>
 
 while(cond, body) ::=
 <<
-while <cond> {
-    <body>
-} 
+while <cond> <body>
 >>
 
 dowhile(cond, body) ::=
 <<
-do {
-    <body>
-} while <cond>;
+do <body> while <cond>;
 >>
 
 

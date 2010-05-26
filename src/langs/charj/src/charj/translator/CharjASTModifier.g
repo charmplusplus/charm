@@ -57,7 +57,7 @@ packageDeclaration
     ;
     
 importDeclarations returns [List<CharjAST> packageNames]
-    :   (^('import' qualifiedIdentifier '.*'?))*
+    :   (^(IMPORT qualifiedIdentifier '.*'?))*
     ;
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
@@ -84,7 +84,6 @@ classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
@@ -241,13 +240,17 @@ localVariableDeclaration
     ;
 
 statement
-    :   block
-    |   ^(ASSERT expression expression?)
-    |   ^(IF parenthesizedExpression statement statement?)
-    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* statement)
-    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
-    |   ^(WHILE parenthesizedExpression statement)
-    |   ^(DO statement parenthesizedExpression)
+    :   nonBlockStatement
+    |   block
+    ;
+
+nonBlockStatement
+    :   ^(ASSERT expression expression?)
+    |   ^(IF parenthesizedExpression block block?)
+    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
+    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
+    |   ^(WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression)
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
@@ -263,6 +266,7 @@ statement
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
+    |   ^('delete' qualifiedIdentifier)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     ;
@@ -367,6 +371,7 @@ newExpression
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
+    |   ^('new' qualifiedTypeIdent arguments)
     ;
 
 newArrayConstruction
