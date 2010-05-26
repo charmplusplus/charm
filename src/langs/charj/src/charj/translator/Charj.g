@@ -172,6 +172,10 @@ tokens {
     SUPER_CONSTRUCTOR_CALL;
     THIS_CONSTRUCTOR_CALL;
     TYPE;
+    SIMPLE_TYPE;
+    OBJECT_TYPE;
+    REFERENCE_TYPE;
+    POINTER_TYPE;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -402,12 +406,12 @@ type
 
 simpleType
     :   primitiveType arrayDeclaratorList?
-        ->  ^(TYPE primitiveType arrayDeclaratorList?)  
+        ->  ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)  
     ;
 
 objectType
     :   qualifiedTypeIdent arrayDeclaratorList?
-        ->  ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        ->  ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent

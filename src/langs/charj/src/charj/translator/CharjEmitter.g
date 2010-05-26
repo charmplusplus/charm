@@ -377,13 +377,17 @@ type
     ;
 
 simpleType
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
-        -> type(typeID={$primitiveType.st}, arrDeclList={$arrayDeclaratorList.st})
+    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+        -> simple_type(typeID={$primitiveType.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 objectType
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT qualifiedTypeIdent arrayDeclaratorList?)
         -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    |   ^(OBJECT_POINTER qualifiedTypeIdent arrayDeclaratorList?)
+        -> pointer_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    |   ^(OBJECT_REFERENCE qualifiedTypeIdent arrayDeclaratorList?)
+        -> reference_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 qualifiedTypeIdent
@@ -576,7 +580,7 @@ expr
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> || <e2>"
     |   ^('&&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> && <e2>"
-    |   ^('|' e1=expr e2=expr)
+    |   ^(BITWISE_OR e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> | <e2>"
     |   ^('^' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
@@ -624,9 +628,9 @@ expr
         -> template(e1={$e1.st}) "<e1>++"
     |   ^(POST_DEC e1=expr)
         -> template(e1={$e1.st}) "<e1>--"
-    |   ^('~' e1=expr)
+    |   ^(TILDA e1=expr)
         -> template(e1={$e1.st}) "~<e1>"
-    |   ^('!' e1=expr)
+    |   ^(NOT e1=expr)
         -> template(e1={$e1.st}) "!<e1>"
     |   ^(CAST_EXPR ty=type e1=expr)
         -> template(ty={$ty.st}, e1={$e1.st}) "(<ty>)<e1>"

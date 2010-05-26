@@ -171,11 +171,13 @@ type
     ;
 
 simpleType
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
+    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
     ;
     
 objectType
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent

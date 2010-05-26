@@ -271,14 +271,16 @@ type
     ;
 
 simpleType returns [ClassSymbol type]
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
+    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
         {
             $type = symtab.resolveBuiltinType($primitiveType.text);
         }
     ;
     
 objectType returns [ClassSymbol type]
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
             /*
             System.out.println("Resolving type: " + $qualifiedTypeIdent.name);
