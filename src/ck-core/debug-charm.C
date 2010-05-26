@@ -19,6 +19,10 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+#if CMK_BLUEGENE_CHARM
+#include "blue_impl.h"
+#endif
+
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
@@ -516,7 +520,7 @@ void CpdDeliverMessage(char * msg) {
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
   //CmiPrintf("received deliver request %d\n",msgNum);
 
-  void *debugQ=CpvAccess(debugQueue);
+  void *debugQ=CkpvAccess(debugQueue);
   CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
   for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
   CkpvAccess(skipBreakpoint) = 1;
@@ -583,10 +587,6 @@ void CpdBreakPointInit()
   CkRegisterChareInCharm(CpvAccess(_debugChare));
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
 }
-
-#if CMK_BLUEGENE_CHARM
-#include "blue_impl.h"
-#endif
 
 static void _call_freeze_on_break_point(void * msg, void * object)
 {
