@@ -267,7 +267,7 @@ local_var_decl(modList, type, declList) ::=
 >>
 
 
-type(typeID, arrDeclList) ::=
+simple_type(typeID, arrDeclList) ::=
 <<
 <typeID><arrDeclList>
 >>
@@ -275,7 +275,17 @@ type(typeID, arrDeclList) ::=
 
 obj_type(typeID, arrDeclList) ::=
 <<
+<typeID><arrDeclList>
+>>
+
+pointer_type(typeID, arrDeclList) ::=
+<<
 <typeID>*<arrDeclList>
+>>
+
+reference_type(typeID, arrDeclList) ::=
+<<
+<typeID>&<arrDeclList>
 >>
 
 
