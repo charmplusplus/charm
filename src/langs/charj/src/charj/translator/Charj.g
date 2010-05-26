@@ -67,6 +67,7 @@ tokens {
     THROW                   = 'throw'           ;
     BREAK                   = 'break'           ;
 
+    NEW                     = 'new'             ;
     BITWISE_OR              = '|'               ;
     BITWISE_AND             = '&'               ;
     EQUALS                  = '='               ;
@@ -411,7 +412,7 @@ simpleType
 
 objectType
     :   qualifiedTypeIdent arrayDeclaratorList?
-        ->  ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        ->  ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent
@@ -709,8 +710,8 @@ postfixedExpression
                 (   arguments
                     ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentList? arguments)
                 )?
-            |   'this'
-                ->  ^($outerDot $postfixedExpression 'this')
+            |   THIS
+                ->  ^($outerDot $postfixedExpression THIS)
             |   s='super' arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] $postfixedExpression arguments)
             |   (   'super' innerDot='.' IDENT
@@ -743,11 +744,11 @@ primaryExpression
             )
         |   IDENT arguments
             ->  ^(METHOD_CALL IDENT genericTypeArgumentList arguments)
-        |   t='this' arguments
+        |   t=THIS arguments
             ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
         )
-    |   (   'this'
-            ->  'this'
+    |   (   THIS
+            ->  THIS
         )
         (   arguments
             ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] arguments)
@@ -781,8 +782,8 @@ qualifiedIdentExpression
                 |   IDENT arguments
                     ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) genericTypeArgumentList arguments)
                 )
-            |   'this'
-                ->  ^($outerDot qualifiedIdentifier 'this')
+            |   THIS
+                ->  ^($outerDot qualifiedIdentifier THIS)
             |   s='super' arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier arguments)
             )
@@ -790,14 +791,14 @@ qualifiedIdentExpression
     ;
 
 newExpression
-    :   n='new'
+    :   n=NEW
         (   primitiveType newArrayConstruction          // new static array of primitive type elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction)
         |   genericTypeArgumentList? qualifiedTypeIdent
                 newArrayConstruction                // new static array of object type reference elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
         |   qualifiedTypeIdent arguments
-            -> ^('new' qualifiedTypeIdent arguments)
+            -> ^(NEW qualifiedTypeIdent arguments)
         )
     ;
     
