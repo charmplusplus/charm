@@ -177,6 +177,7 @@ tokens {
     OBJECT_TYPE;
     REFERENCE_TYPE;
     POINTER_TYPE;
+    PROXY_TYPE;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -402,7 +403,13 @@ localModifier
 type
     :   simpleType
     |   objectType
+    |   proxyType
     |   VOID
+    ;
+
+proxyType
+    :   qualifiedTypeIdent '@' arrayDeclaratorList?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 simpleType

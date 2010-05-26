@@ -56,7 +56,6 @@ public class SymbolTable {
     {
         PackageScope lang = resolvePackage("charj.lang");
         objectRoot = new ClassSymbol(this, "Object", null, lang);
-        objectRoot.define("EOF", new VariableSymbol(this,"EOF",null));
         lang.define("Object", objectRoot);
 
         primitiveTypes.put("void",   new ClassSymbol(this, "void",   null, lang));
