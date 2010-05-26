@@ -237,12 +237,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public List<String> getMemberTypeNames()
     {
-        System.out.println("Looking for type names...");
-        System.out.println("Found " + fields.size() + " fields...");
+        if (debug()) System.out.println("Looking for type names...");
+        if (debug()) System.out.println("Found " + fields.size() + " fields...");
         List<String> names = new ArrayList<String>();
         for (ClassSymbol c : getMemberTypes()) {
             names.add(c.getFullyQualifiedName());
-            System.out.println("Found type " + c.getFullyQualifiedName());
+            if (debug()) System.out.println("Found type " + c.getFullyQualifiedName());
         }
         return names;
     }

@@ -172,10 +172,24 @@ scope ScopeStack;
             currentClass.define($IDENT.text, sym);
             $FUNCTION_METHOD_DECL.symbol = sym;
         }
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
+            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
+            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
+    ;
+
+field [ClassSymbol type]
+    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+    {
+            //System.out.println("Found variable: " + $type + " " + $IDENT.text);
+            //VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
+            //sym.definition = $field.start;
+            //sym.definitionTokenStream = input.getTokenStream();
+            //$VAR_DECLARATOR.symbol = sym;
+            //currentClass.define($IDENT.text, sym);
+    }
     ;
     
 interfaceScopeDeclaration
@@ -193,7 +207,8 @@ variableDeclaratorList
     ;
 
 variableDeclarator
-    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
+    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+
     ;
     
 variableDeclaratorId
@@ -255,20 +270,34 @@ type
     |   VOID
     ;
 
-simpleType
+simpleType returns [ClassSymbol type]
     :   ^(TYPE primitiveType arrayDeclaratorList?)
+        {
+            $type = symtab.resolveBuiltinType($primitiveType.text);
+        }
     ;
     
-objectType
+objectType returns [ClassSymbol type]
     :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        {
+            /*
+            System.out.println("Resolving type: " + $qualifiedTypeIdent.name);
+            $type = currentClass.resolveType($qualifiedTypeIdent.name);
+            if ($type == null) $type = symtab.resolveBuiltinType($qualifiedTypeIdent.name);
+            */
+        }
     ;
 
-qualifiedTypeIdent
-    :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
+qualifiedTypeIdent returns [String name]
+@init {
+$name = "";
+}
+    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {$name += $typeIdent.name;})+) 
     ;
 
-typeIdent
+typeIdent returns [String name]
     :   ^(IDENT genericTypeArgumentList?)
+        { $name = $IDENT.text; }
     ;
 
 primitiveType
