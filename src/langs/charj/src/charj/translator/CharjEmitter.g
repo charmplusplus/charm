@@ -382,11 +382,11 @@ simpleType
     ;
 
 objectType
-    :   ^(OBJECT qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
-    |   ^(OBJECT_POINTER qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> pointer_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
-    |   ^(OBJECT_REFERENCE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> reference_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
@@ -686,7 +686,7 @@ newExpression
             )
         )
         -> template(t={$text}) "<t>"
-    |   ^('new' qualifiedTypeIdent arguments)
+    |   ^(NEW qualifiedTypeIdent arguments)
         -> template(q={$qualifiedTypeIdent.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
 

@@ -38,9 +38,9 @@ class PupRoutineCreator
         pupNode.getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
 
         pupNode.getChild(3).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
-        pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.TYPE, "TYPE"));
+        pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.REFERENCE_TYPE, "REFERENCE_TYPE"));
         pupNode.getChild(3).getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
-        pupNode.getChild(3).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "PUP::er&"));
+        pupNode.getChild(3).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "PUP::er"));
 
         pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
     }
