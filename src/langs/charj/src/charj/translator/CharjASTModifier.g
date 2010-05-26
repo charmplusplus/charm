@@ -177,6 +177,7 @@ simpleType
     
 objectType
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;

@@ -384,6 +384,8 @@ simpleType
 objectType
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> pointer_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)

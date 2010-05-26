@@ -107,7 +107,6 @@ packageDeclaration
             }
             currentPackage = ps;
             $ScopeStack::current = ps;
-//            $qualifiedIdentifier.start.symbol = ps; ----- commented out while dealing with the namespaces issue (Minas)
         }
     ;
     
@@ -280,6 +279,7 @@ simpleType returns [ClassSymbol type]
 objectType returns [ClassSymbol type]
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
             $type = currentClass.resolveType($qualifiedTypeIdent.name);
