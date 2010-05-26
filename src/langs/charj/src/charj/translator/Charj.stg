@@ -1,30 +1,19 @@
 group Charj;
 
-charjSource_ci(pd, ids, tds, debug) ::= 
-//<pd>
-//<ids>
+charjSource_ci(basename, pd, ids, tds, debug) ::=
 <<
-<if(debug)>/* \<charjSource_ci> */<endif>
-/*
- * packageDeclaration disabled...
- * end packageDeclaration
- */
 
-/*
- * importDeclarations disabled...
-<ids>
- * end importDeclarations
- */
-
+// interface for <basename>
 <tds>
-<if(debug)>/* \</charjSource_ci> */<endif>
 
 >>
 
 
-charjSource_h(pd, ids, tds, debug) ::=
+charjSource_h(basename, pd, ids, tds, debug) ::=
 <<
-<if(debug)>/* \<CHARJ_SOURCE> */<endif>
+#ifndef __<basename>__
+#define __<basename>__
+
 /**************************************************************************
  * WARNING                                                                *
  **************************************************************************
@@ -35,25 +24,24 @@ charjSource_h(pd, ids, tds, debug) ::=
 <ids>
 <tds>
 
-<if(debug)>/* \</CHARJ_SOURCE> */<endif>
+#endif // __<basename>__
 
 >>
 
 
-charjSource_cc(pd, ids, tds, debug) ::=
+charjSource_cc(basename, pd, ids, tds, debug) ::=
 <<
-<if(debug)>/* \<CHARJ_SOURCE> */<endif>
+#include "<basename>.h"
+
 <ids>
 <tds>
-<if(debug)>/* \</CHARJ_SOURCE> */<endif>
+
 >>
 
 importDeclaration_cc_h(inc_id, use_id) ::= 
 <<
-<if(debug)>/* \<importDeclaration> */<endif>
 #include \<<inc_id>\>
 using <use_id>;
-<if(debug)>/* \</importDeclaration> */<endif>
 >>
 
 classExtends_ci(type) ::= "<type>"
@@ -70,6 +58,8 @@ interfaceExtends(ts) ::=
 classDeclaration_h(sym, ident, ext, csds) ::=
 <<
 <sym.IncludeString>
+<sym.MemberTypeNames:{name| class <name>;
+}>
 <classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
 
@@ -78,7 +68,7 @@ classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <if(ext)>
 class <ident> : public <ext> {
@@ -86,7 +76,7 @@ class <ident> : public <ext> {
 class <ident> {
 <endif>
 
-    <csds; separator="\n">
+    <csds; separator="\n\n">
 };
 <endif>
 >>
@@ -103,16 +93,9 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
-<if(ext)>
-class <ident>: public <ext> {
-<else>
-class <ident> {
-<endif>
-
-    <csds; separator="\n">
-};
+<csds; separator="\n\n">
 <endif>
 >>
 
@@ -129,11 +112,9 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
-<else><if(ext)>/* superclass: <ext> */<endif>
-class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
-};
+} // namespace <first(pds)>
+<else>
+<csds; separator="\n\n">
 <endif>
 >>
 
@@ -148,7 +129,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
@@ -159,13 +140,11 @@ class <ident>: public CBase_<ident> {
 
 chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
 module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
     <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
-<if(debug)>/* \</typeDeclaration> */<endif>
 }
 >>
 
@@ -175,7 +154,7 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 <if(first(pds))>namespace <first(pds)>
 {
     <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
-}
+} // namespace <first(pds)>
 <else>
 <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
     <csds; separator="\n">
@@ -191,15 +170,14 @@ funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty><gtpl> <id><fpl> <adl>;
+entry <ty><gtpl> <id><fpl><adl>;
 >>
 
 
-funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
+funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(first(modl))><modl; separator = " ">: <endif><ty><gtpl> <id><fpl><adl> {
-    <block>
-}
+<ty><gtpl> <sym.Name>::<id><fpl><adl>
+<block>
 >>
 
 
@@ -217,15 +195,16 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl>:<endif><gtpl> <id><fpl> {
-    <block>
-}
+<gtpl> <id>::<id><fpl>
+<block>
 >>
 
 
 block_cc(bsl) ::=
 <<
-<bsl:{s| <s><\n>}>
+{
+    <bsl; separator="\n">
+}
 >>
 
 
@@ -289,9 +268,25 @@ local_var_decl(modList, type, declList) ::=
 >>
 
 
-type(typeID, arrDeclList) ::=
+simple_type(typeID, arrDeclList) ::=
 <<
 <typeID><arrDeclList>
+>>
+
+
+obj_type(typeID, arrDeclList) ::=
+<<
+<typeID><arrDeclList>
+>>
+
+pointer_type(typeID, arrDeclList) ::=
+<<
+<typeID>*<arrDeclList>
+>>
+
+reference_type(typeID, arrDeclList) ::=
+<<
+<typeID>&<arrDeclList>
 >>
 
 
@@ -335,33 +330,23 @@ CkAssert(<cond>);
 
 if(cond, then, else_) ::=
 <<
-if <cond> {
-    <then>
-}<if(else_)> else {
-    <else_>
-}<endif>
+if <cond> <then><if(else_)> else <else_><endif>
 >>
 
 
 for(initializer, cond, update, body) ::=
 <<
-for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) {
-    <body>
-}
+for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) <body>
 >>
 
 while(cond, body) ::=
 <<
-while <cond> {
-    <body>
-} 
+while <cond> <body>
 >>
 
 dowhile(cond, body) ::=
 <<
-do {
-    <body>
-} while <cond>;
+do <body> while <cond>;
 >>
 
 

@@ -19,6 +19,10 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+#if CMK_BLUEGENE_CHARM
+#include "blue_impl.h"
+#endif
+
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
@@ -510,6 +514,28 @@ class CpdList_message : public CpdListAccessor {
   }
 };
 
+void CpdDeliverMessage(char * msg) {
+  int msgNum;
+  void *m;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
+  //CmiPrintf("received deliver request %d\n",msgNum);
+
+  void *debugQ=CkpvAccess(debugQueue);
+  CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
+  for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
+  CkpvAccess(skipBreakpoint) = 1;
+  char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
+#if CMK_BLUEGENE_CHARM
+  stopVTimer();
+  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
+  startVTimer();
+#else
+  CmiHandleMessage(queuedMsg);
+#endif
+  CkpvAccess(skipBreakpoint) = 0;
+  while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
+}
+
 class CpdList_msgStack : public CpdListAccessor {
   virtual const char * getPath(void) const {return "charm/messageStack";}
   virtual size_t getLength(void) const {
@@ -561,10 +587,6 @@ void CpdBreakPointInit()
   CkRegisterChareInCharm(CpvAccess(_debugChare));
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
 }
-
-#if CMK_BLUEGENE_CHARM
-#include "blue_impl.h"
-#endif
 
 static void _call_freeze_on_break_point(void * msg, void * object)
 {
@@ -832,6 +854,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
+  CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());

@@ -1962,6 +1962,7 @@ EOT
 test_finish() {
 	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
+	test $1 -eq 1 && echo "*** Please find detailed output in charmconfig.out ***"
 	exit $1
 }
 
@@ -2563,7 +2564,7 @@ BUILD_MPI=$strictpass
 if test $BUILD_MPI -eq 0
 then
   echo "Error: Can not compile a MPI program"
-  exit 1
+  test_finish 1
 fi
 
 if test $BUILD_MPI -eq 1
@@ -2584,7 +2585,7 @@ then
                 add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
         else
                 echo "Error: can not find mpi library"
-                exit 1
+                test_finish 1
         fi
       fi
     else
@@ -3635,7 +3636,7 @@ echo "${ECHO_T}$GLIBCVERSION" >&6; }
     then
        echo "Your version of GLIBC is ancient, and does not have sufficient "
        echo "support for pthreads."
-       exit 1
+       test_finish 1
     fi
 esac
 fi

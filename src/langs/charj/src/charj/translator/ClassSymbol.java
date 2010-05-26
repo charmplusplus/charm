@@ -12,22 +12,13 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
 
-    /** List of all fields and methods */
+    /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
-    public Map<String, String> aliases = new LinkedHashMap<String, String>();
-
-    /** The set of method names (without signatures) for this class.  Maps
-     *  to a list of methods with same name but different args
-     protected Map<String, List<MethodSymbol>> methods =
-     new HashMap<String, List<MethodSymbol>>();
-     */
-
-    /** List of unmangled methods for this class. Used to distinguish
-     *  var from method name in expressions.  x = f; // what is f?
-     */
-    protected Set<String> methodNames = new HashSet<String>();
+    public Map<String, VariableSymbol> fields = new LinkedHashMap<String, VariableSymbol>();
+    public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
 
     public boolean hasCopyCtor = false;
+    public boolean isPrimitive = false;
 
     public ClassSymbol(
             SymbolTable symtab, 
@@ -96,31 +87,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return p;
     }
 
-    public void alias(
-            CharjAST aliasAST, 
-            CharjAST methodNameAST) {
-        String op = aliasAST.getToken().getText();
-        op = op.substring(1,op.length()-1);
-        String method = methodNameAST.getToken().getText();
-        method = method.substring(1,method.length()-1);
-        alias(op, method);
-    }
-
-    public void alias(
-            String alias, 
-            String methodName) {
-        aliases.put(alias, methodName);
-    }
-
-    public String getMethodNameForOperator(String op) {
-        String name = aliases.get(op);
-        if ( name==null ) {
-            symtab.translator.error(
-                    "no such operator for " + this.name + ": " + op);
-        }
-        return name;
-    }
-
     /** Using the list of imports, resolve a package name like charj.lang.
      *  There may be many packages defined and visible to the symbol table
      *  but this class can only see those packages in the implicit or explicit
@@ -157,6 +123,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
         // look for type in classes already defined in imported packages
         for (String packageName : imports.keySet()) {
+            if ( debug() ) System.out.println( "Looking for type " +
+                    type + " in package " + packageName);
             PackageScope pkg = resolvePackage(packageName);
             ClassSymbol cs = pkg.resolveType(type);
             if ( cs != null) { // stop looking, found it
@@ -192,20 +160,15 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public MethodSymbol resolveMethodLocally(
             String name, 
             int numargs) {
-        if ( numargs>0 ) {
+        if (numargs > 0) {
             name += numargs;
         }
      
-        Symbol s = members.get(name);
-        if ( s!=null && s.getClass() == MethodSymbol.class ) {
-            return (MethodSymbol)s;
-        }
-
-        return null;
+        return methods.get(name);
     }
 
     public boolean isMethod(String name) {
-        if ( methodNames.contains(name) ) {
+        if ( methods.containsKey(name) ) {
             return true;
         }
         if ( getEnclosingScope()!=null ) {
@@ -217,8 +180,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public Symbol define(
             String name, 
             Symbol sym) {
-        if ( sym instanceof MethodSymbol ) {
-            methodNames.add(sym.name);
+        members.put(name, sym);
+        if (sym instanceof MethodSymbol) {
+            methods.put(name, (MethodSymbol)sym);
+        } else if (sym instanceof VariableSymbol) {
+            fields.put(name, (VariableSymbol)sym);
         }
         return super.define(name, sym);
     }
@@ -233,14 +199,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             parent = scope.getFullyQualifiedName();
         }
         if ( parent!=null ) {
-            return parent+"."+name;
-        }
-        return name;
-    }
-
-    public String getMangledName() {
-        if ( SymbolTable.TYPE_NAMES_TO_MANGLE.contains(name) ) {
-            return "m"+name;
+            return parent+"::"+name;
         }
         return name;
     }
@@ -260,30 +219,38 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public List<String> getPackageNames()
     {
         List<String> list = new ArrayList<String>();
-        String namespace = "";
-        for(Scope currentScope = scope; currentScope != null; currentScope = currentScope.getEnclosingScope())
-            list.add(0, currentScope.getScopeName());
-        list.remove(0);
+        for(Scope currentScope = scope;
+                currentScope.getEnclosingScope() != null;
+                currentScope = currentScope.getEnclosingScope()) {
+            list.add(currentScope.getScopeName());
+        }
         return list;
     }
 
-    public String getNamespaceOpeningString() {
-        Scope currentScope = scope;
-        String namespace = "";
-        while (currentScope.getEnclosingScope() != null) {
-            namespace = "namespace " + currentScope.getScopeName() + " {\n" + namespace;
-            currentScope = currentScope.getEnclosingScope();
+    private Set<ClassSymbol> getMemberTypes()
+    {
+        Set<ClassSymbol> types = new HashSet<ClassSymbol>();
+        for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
+            types.add(((VariableSymbol)entry.getValue()).type);
         }
-        return namespace;
+        return types;
     }
 
-    public String getNamespaceClosingString() {
-        Scope currentScope = scope;
-        String namespace = "";
-        while (currentScope.getEnclosingScope() != null) {
-            namespace += "\n} // namespace " + currentScope.getScopeName();
-            currentScope = currentScope.getEnclosingScope();
+    public List<String> getMemberTypeNames()
+    {
+        if (debug()) System.out.println("Looking for type names...");
+        if (debug()) System.out.println("Found " + fields.size() + " fields...");
+        List<String> names = new ArrayList<String>();
+        for (ClassSymbol c : getMemberTypes()) {
+            if (c.isPrimitive) continue;
+            names.add(c.getName());
+            if (debug()) System.out.println("Found type " + c.getFullyQualifiedName());
         }
-        return namespace;
+        return names;
+    }
+
+    public String getName()
+    {
+        return name;
     }
 }
