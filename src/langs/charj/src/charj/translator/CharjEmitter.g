@@ -119,7 +119,7 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^(TYPE 'class' IDENT (^('extends' su=type))? (^('implements' type+))?
+    :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
@@ -135,9 +135,9 @@ typeDeclaration
                 ext={$su.st}, 
                 csds={$csds})
         ->
-    |   ^('interface' IDENT (^('extends' type+))? interfaceScopeDeclaration*)
+    |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
-    |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
+    |   ^(ENUM IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
@@ -168,11 +168,11 @@ chareType
 @init {
 $st = %{$start.getText()};
 }
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
-    |   'mainchare'
-    |   ^('chare_array' ARRAY_DIMENSION)
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   MAINCHARE
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
         -> template(t={$ARRAY_DIMENSION.text}) "array [<t>]"
     ;
 
@@ -340,12 +340,12 @@ modifier
 @init {
 $st = %{$start.getText()};
 }
-    :   'public'
-    |   'protected'
-    |   'private'
-    |   'entry'
-    |   'abstract'
-    |   'native'
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    |   ENTRY
+    |   ABSTRACT
+    |   NATIVE
     |   localModifier
         -> {$localModifier.st}
     ;
@@ -359,9 +359,9 @@ localModifier
 @init {
 $st = %{$start.getText()};
 }
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
     
@@ -370,8 +370,10 @@ type
         -> {$simpleType.st}
     |   objectType 
         -> {$objectType.st}
-    |   'void'
-        -> {$st = %{$start.getText()};}
+    |   VOID
+        {
+            $st = %{$start.getText()};
+        }
     ;
 
 simpleType
@@ -398,16 +400,16 @@ primitiveType
 @init {
 $st = %{$start.getText()};
 }
-    :   'boolean'
+    :   BOOLEAN
         -> template() "bool"
-    |   'char'
-    |   'byte'
+    |   CHAR
+    |   BYTE
         -> template() "char"
-    |   'short'
-    |   'int'
-    |   'long'
-    |   'float'
-    |   'double'
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -478,27 +480,27 @@ localVariableDeclaration
 statement
     :   block
         -> {$block.st}
-    |   ^('assert' cond=expression msg=expression?)
+    |   ^(ASSERT cond=expression msg=expression?)
         -> assert(cond={$cond.st}, msg={$msg.st})
-    |   ^('if' parenthesizedExpression then=statement else_=statement?)
+    |   ^(IF parenthesizedExpression then=statement else_=statement?)
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
-    |   ^('for' forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
+    |   ^(FOR forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
         -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
     |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"
-    |   ^('while' pe=parenthesizedExpression s=statement)
+    |   ^(WHILE pe=parenthesizedExpression s=statement)
         -> while(cond={$pe.st}, body={$s.st})
-    |   ^('do' s=statement pe=parenthesizedExpression)
+    |   ^(DO s=statement pe=parenthesizedExpression)
         -> dowhile(cond={$pe.st}, block={$s.st})
-    |   ^('switch' pe=parenthesizedExpression (scls+=switchCaseLabel)*)
+    |   ^(SWITCH pe=parenthesizedExpression (scls+=switchCaseLabel)*)
         -> switch(expr={$pe.st}, labels={$scls})
-    |   ^('return' e=expression?)
+    |   ^(RETURN e=expression?)
         -> return(val={$e.st})
-    |   ^('throw' expression)
+    |   ^(THROW expression)
         -> template(t={$text}) "/* throw not implemented */ <t>"
-    |   ^('break' IDENT?)
+    |   ^(BREAK IDENT?)
         -> template() "break;" // TODO: support labeling
-    |   ^('continue' IDENT?)
+    |   ^(CONTINUE IDENT?)
         -> template() "continue;" // TODO: support labeling
     |   ^(LABELED_STATEMENT i=IDENT s=statement)
         -> label(text={$i.text}, stmt={$s.st})
@@ -513,9 +515,9 @@ statement
     ;
         
 switchCaseLabel
-    :   ^('case' expression (b+=blockStatement)*)
+    :   ^(CASE expression (b+=blockStatement)*)
         -> case(expr={$expression.st}, block={$b})
-    |   ^('default' (b+=blockStatement)*)
+    |   ^(DEFAULT (b+=blockStatement)*)
         -> template(block={$b}) "default: <block>"
     ;
     
@@ -630,8 +632,8 @@ expr
 primaryExpression
     :   ^('.' prim=primaryExpression
             ( IDENT     -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
-            | 'this'    -> template(prim={$prim.st}) "<prim>->this"
-            | 'super'   -> template(prim={$prim.st}) "<prim>->super"
+            | THIS    -> template(prim={$prim.st}) "<prim>->this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>->super"
             )
         )
     |   parenthesizedExpression
@@ -648,11 +650,11 @@ primaryExpression
         -> {$literal.st}
     |   newExpression
         -> {$newExpression.st}
-    |   'this'
+    |   THIS
         -> {%{$start.getText()}}
     |   arrayTypeDeclarator
         -> {$arrayTypeDeclarator.st}
-    |   'super'
+    |   SUPER
         -> {%{$start.getText()}}
     ;
     
@@ -703,8 +705,8 @@ $st = %{$start.getText()};
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 

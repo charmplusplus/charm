@@ -176,9 +176,7 @@ entry <ty><gtpl> <id><fpl><adl>;
 funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <ty><gtpl> <sym.Name>::<id><fpl><adl>
-{
-    <block>
-}
+<block>
 >>
 
 
@@ -196,15 +194,16 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<gtpl> <id>::<id><fpl> {
-    <block>
-}
+<gtpl> <id>::<id><fpl>
+<block>
 >>
 
 
 block_cc(bsl) ::=
 <<
-<bsl; separator = "\n">
+{
+    <bsl; separator="\n">
+}
 >>
 
 

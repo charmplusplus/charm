@@ -146,8 +146,6 @@ public:
 	 */
 	void ckSetReductionClient(CkCallback *cb);
 
-	void contributorDied(contributorInfo *ci);//Don't expect more contributions
-
 //Contribute-- the given msg can contain any data.  The reducerType
 // field of the message must be valid.
 // Each contributor must contribute exactly once to each reduction.
