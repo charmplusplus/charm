@@ -639,8 +639,8 @@ expr
     ;
 
 primaryExpression
-    :   ^('.' prim=primaryExpression
-            ( IDENT     -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+    :   ^(DOT prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
             | THIS    -> template(prim={$prim.st}) "<prim>->this"
             | SUPER   -> template(prim={$prim.st}) "<prim>->super"
             )

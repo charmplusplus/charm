@@ -425,7 +425,7 @@ expr
     ;
     
 primaryExpression
-    :   ^(  '.' primaryExpression
+    :   ^(  DOT primaryExpression
                 (   IDENT
                 |   THIS
                 |   SUPER
