@@ -1320,7 +1320,8 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
   } else {
-    CkPackMessage(&env);
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+      CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
