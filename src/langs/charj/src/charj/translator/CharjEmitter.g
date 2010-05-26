@@ -198,7 +198,7 @@ classScopeDeclaration
         -> {emitCC()}? funcMethodDecl_cc(
                 modl={modList}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -206,7 +206,7 @@ classScopeDeclaration
         -> {emitH()}? funcMethodDecl_h(
                 modl={modList}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -214,7 +214,7 @@ classScopeDeclaration
         -> {(emitCI() && entry)}? funcMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -366,6 +366,9 @@ type
     |   objectType 
         -> {$objectType.st}
     |   VOID
+        {
+            $st = %{$start.getText()};
+        }
     ;
 
 simpleType
