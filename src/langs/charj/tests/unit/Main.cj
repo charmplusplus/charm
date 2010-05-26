@@ -2,12 +2,12 @@
 package tests.unit;
 
 mainchare Main {
-    entry Main() {
+    public entry Main() {
     }
 
-    entry void run_tests() {
+    public entry void run_tests() {
     }
 
-    entry void confirm_result(boolean result) {
+    public entry void confirm_result(boolean result) {
     }
 }
