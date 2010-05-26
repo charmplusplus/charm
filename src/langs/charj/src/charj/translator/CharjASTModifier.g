@@ -73,6 +73,7 @@ chareType
     :   CHARE
     |   GROUP
     |   NODEGROUP
+    |   MAINCHARE
     |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
