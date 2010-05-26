@@ -808,6 +808,7 @@ extern void init_memcheckpt(char **argv);
 extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
+extern "C" void CmiInitMemAffinity(char **argv);
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -1131,7 +1132,8 @@ void _initCharm(int unused_argc, char **argv)
         if (faultFunc == NULL) {         // this is not restart
             // these two are blocking calls for non-bigsim
 #if ! CMK_BLUEGENE_CHARM
-          CmiInitCPUAffinity(argv);
+	  CmiInitCPUAffinity(argv);
+          CmiInitMemAffinity(argv);
 #endif
         }
         CmiInitCPUTopology(argv);

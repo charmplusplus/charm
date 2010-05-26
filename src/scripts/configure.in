@@ -72,6 +72,20 @@ then
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
+AC_ARG_WITH([numa],
+            [AS_HELP_STRING([--with-numa],
+              [support memory affinity with NUMA])],
+            [],
+            [with_numa=no])
+
+WITH_NUMA=no
+if test "$with_numa" = "yes"
+then
+  Echo "Charm NUMA support is builtin"
+  WITH_NUMA=yes
+fi
+          
+
 #
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
@@ -987,6 +1001,31 @@ int main()
 EOT
 test_linkc "whether pthread_setaffinity_np call exists" "yes" "no" "-lpthread"
 AC_DEFINE_UNQUOTED(CMK_HAS_PTHREAD_SETAFFINITY, $pass, [whether the pthread_setaffinity_np() exists])
+
+
+### check libnuma on Linux ####
+if test "$WITH_NUMA" = "yes"
+then
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <linux/mempolicy.h>
+#include <numaif.h>
+#include <numa.h>
+
+int main()
+{
+  if (get_mempolicy(NULL, NULL, 0, 0, 0) == 0) return 0;
+  return -1;
+}
+EOT
+test_linkc "whether libnuma exists" "yes" "no" "-lnuma"
+AC_DEFINE_UNQUOTED(CMK_HAS_NUMACTRL, $pass, [whether NUMA control related functions exist])
+if test $pass -eq 1
+then
+        add_flag 'CMK_SYSLIBS="$CMK_SYSLIBS -lnuma"' "libnuma"
+fi
+fi
 
 #### check bindprocessors on AIX ####
 cat > $tc <<EOT

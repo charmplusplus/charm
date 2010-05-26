@@ -1195,6 +1195,11 @@ Optional Features:
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
 
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-numa             support memory affinity with NUMA
+
 _ACEOF
 ac_status=$?
 fi
@@ -1729,6 +1734,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 fi
+
+
+# Check whether --with-numa was given.
+if test "${with_numa+set}" = set; then
+  withval=$with_numa;
+else
+  with_numa=no
+fi
+
+
+WITH_NUMA=no
+if test "$with_numa" = "yes"
+then
+  Echo "Charm NUMA support is builtin"
+  WITH_NUMA=yes
+fi
+
 
 #
 { echo "$as_me:$LINENO: checking machine name" >&5
@@ -2874,6 +2896,35 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_PTHREAD_SETAFFINITY $pass
 _ACEOF
 
+
+
+### check libnuma on Linux ####
+if test "$WITH_NUMA" = "yes"
+then
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <linux/mempolicy.h>
+#include <numaif.h>
+#include <numa.h>
+
+int main()
+{
+  if (get_mempolicy(NULL, NULL, 0, 0, 0) == 0) return 0;
+  return -1;
+}
+EOT
+test_linkc "whether libnuma exists" "yes" "no" "-lnuma"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_NUMACTRL $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        add_flag 'CMK_SYSLIBS="$CMK_SYSLIBS -lnuma"' "libnuma"
+fi
+fi
 
 #### check bindprocessors on AIX ####
 cat > $tc <<EOT
