@@ -189,13 +189,13 @@ entry void<gtpl> <id><fpl>;
 
 ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl>:<endif><gtpl> <id><fpl>;
+<if(modl)><modl; separator=" ">: <endif><id><fpl>;
 >>
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<gtpl> <id>::<id><fpl>
+<if(modl)><modl; separator=" ">: <endif><id>::<id><fpl>
 <block>
 >>
 
@@ -277,6 +277,11 @@ simple_type(typeID, arrDeclList) ::=
 obj_type(typeID, arrDeclList) ::=
 <<
 <typeID><arrDeclList>
+>>
+
+proxy_type(typeID, arrDeclList) ::=
+<<
+CProxy_<typeID><arrDeclList>
 >>
 
 pointer_type(typeID, arrDeclList) ::=

@@ -194,9 +194,10 @@ classScopeDeclaration
             if ($m.st != null) {
                 // determine whether this is an entry method
                 entry = listContainsToken($m.start.getChildren(), ENTRY);
-                for(Object o : $m.names)
-                  if(o.equals("entry")) continue;
-                  else modList.add(o.toString());
+                for(Object o : $m.names) {
+                    if (o.equals("entry")) continue;
+                    else modList.add(o.toString());
+                }
             }
         }
         -> {emitCC()}? funcMethodDecl_cc(
@@ -242,22 +243,26 @@ classScopeDeclaration
             // determine whether this is an entry method
             if ($m.st != null) {
                 entry = listContainsToken($m.start.getChildren(), ENTRY);
+                for(Object o : $m.names) {
+                    if (o.equals("entry")) continue;
+                    else modList.add(o.toString());
+                }
             }
         }
         -> {emitCC()}? ctorDecl_cc(
-                modl={$m.st}, 
+                modl={modList},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitCI() && entry}? ctorDecl_ci(
-                modl={$m.st}, 
+                modl={modList},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitH()}? ctorDecl_h(
-                modl={$m.st}, 
+                modl={modList},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
