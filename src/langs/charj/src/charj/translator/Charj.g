@@ -16,7 +16,83 @@ options {
 }
 
 tokens {
+
     ENTRY                   = 'entry'           ;
+    PUBLIC                  = 'public'          ;
+    PROTECTED               = 'protected'       ;
+    ENTRY                   = 'entry'           ;
+    PRIVATE                 = 'private'         ;
+    ABSTRACT                = 'abstract'        ;
+    NATIVE                  = 'native'          ;
+    FINAL                   = 'final'           ;
+    STATIC                  = 'static'          ;
+    VOLATILE                = 'volatile'        ;
+    VOID                    = 'void'            ;
+    BOOLEAN                 = 'boolean'         ;
+    CHAR                    = 'char'            ;
+    BYTE                    = 'byte'            ;
+    SHORT                   = 'short'           ;
+    INT                     = 'int'             ;
+    LONG                    = 'long'            ;
+    FLOAT                   = 'float'           ;
+    DOUBLE                  = 'double'          ;
+    TRUE                    = 'true'            ;
+    FALSE                   = 'false'           ;
+    NULL                    = 'null'            ;
+    THIS                    = 'this'            ;
+    SUPER                   = 'super'           ;
+    CHARE                   = 'chare'           ;
+    CHARE_ARRAY             = 'chare_array'     ;
+    INTERFACE               = 'interface'       ;
+    PACKAGE                 = 'package'         ;
+    IMPORT                  = 'import'          ;
+    CLASS                   = 'class'           ;
+    EXTENDS                 = 'extends'         ;
+    GROUP                   = 'group'           ;
+    NODEGROUP               = 'nodegroup'       ;
+    ENUM                    = 'enum'            ;
+
+    FOR                     = 'for'             ;
+    WHILE                   = 'while'           ;
+    IF                      = 'if'              ;
+    CASE                    = 'case'            ;
+    SWITCH                  = 'switch'          ;
+    RETURN                  = 'return'          ;
+    ELSE                    = 'else'            ;
+    CONTINUE                = 'continue'        ;
+    DO                      = 'do'              ;
+    DEFAULT                 = 'default'         ;
+    WHILE                   = 'while'           ;
+    THROW                   = 'throw'           ;
+    BREAK                   = 'break'           ;
+
+    BITWISE_OR              = '|'               ;
+    BITWISE_AND             = '&'               ;
+    ASSIGNMENT              = '='               ;
+    PLUS_EQUALS             = '+='              ;
+    MINUS_EQUALS            = '-='              ;
+    TIMES_EQUALS            = '*='              ;
+    DIVIDE_EQUALS           = '/='              ;
+    AND_EQUALS              = '&='              ;
+    OR_EQUALS               = '|='              ;
+    POWER_EQUALS            = '^='              ;
+    MOD_EQUALS              = '%='              ;
+    OR                      = '||'              ;
+    AND                     = '&&'              ;
+    POWER                   = '^'               ;
+    GT                      = '>'               ;
+    LT                      = '<'               ;
+    PLUS                    = '+'               ;
+    MINUS                   = '-'               ;
+    TIMES                   = '*'               ;
+    DIVIDE                  = '/'               ;
+    MOD                     = '%'               ;
+    UNARY_PLUS              = '++'              ;
+    UNARY_MINUS             = '--'              ;
+    NOT                     = '!'               ;
+    TILDA                   = '~'               ;
+    INSTANCEOF              = 'instanceof'      ;
+
 
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
@@ -94,8 +170,6 @@ tokens {
     SUPER_CONSTRUCTOR_CALL;
     THIS_CONSTRUCTOR_CALL;
     TYPE;
-    UNARY_MINUS;
-    UNARY_PLUS;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -129,12 +203,12 @@ compilationUnit
     ;
 
 packageDeclaration
-    :   'package' IDENT ('.' IDENT)+ ';'  
-        ->  ^('package' IDENT+)
+    :   PACKAGE IDENT ('.' IDENT)+ ';'  
+        ->  ^(PACKAGE IDENT+)
     ;
 
 importDeclaration
-    :   'import'^ qualifiedIdentifier '.*'? ';'!
+    :   IMPORT^ qualifiedIdentifier '.*'? ';'!
     ;
 
 typeDeclaration
@@ -145,38 +219,38 @@ typeDeclaration
     ;
 
 classDefinition
-    :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
+    :   PUBLIC? CLASS IDENT (EXTENDS type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^(TYPE 'class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE CLASS IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 chareType
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
-    |   'chare_array' '[' ARRAY_DIMENSION ']' -> ^('chare_array' ARRAY_DIMENSION)
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   CHARE_ARRAY '[' ARRAY_DIMENSION ']' -> ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 chareDefinition
-    :   'public'? chareType IDENT ('extends' type)? ('implements' typeList)? '{'
+    :   PUBLIC? chareType IDENT (EXTENDS type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^(TYPE chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE chareType IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 interfaceDefinition
-    :   'interface' IDENT ('extends' typeList)?  '{'
+    :   'interface' IDENT (EXTENDS typeList)?  '{'
             interfaceScopeDeclaration*
         '}' ';'?
-        -> ^('interface' IDENT ^('extends' typeList)? interfaceScopeDeclaration*)
+        -> ^('interface' IDENT ^(EXTENDS typeList)? interfaceScopeDeclaration*)
     ;
 
 enumDefinition
-    :   'enum' IDENT ('implements' typeList)? '{'
+    :   ENUM IDENT ('implements' typeList)? '{'
             enumConstants ','? ';' classScopeDeclaration*
         '}' ';'?
-        -> ^('enum' IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
+        -> ^(ENUM IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
     ;
 
 enumConstants
@@ -287,7 +361,7 @@ genericTypeParameter
     ;
 
 bound
-    :   e='extends' type ('&' type)*
+    :   e=EXTENDS type ('&' type)*
         ->  ^(EXTENDS_BOUND_LIST[$e, "EXTENDS_BOUND_LIST"] type+)
     ;
 
@@ -297,12 +371,12 @@ modifierList
     ;
 
 modifier
-    :   'public'
-    |   'protected'
-    |   'entry'
-    |   'private'
-    |   'abstract'
-    |   'native'
+    :   PUBLIC
+    |   PROTECTED
+    |   ENTRY
+    |   PRIVATE
+    |   ABSTRACT
+    |   NATIVE
     |   localModifier
     ;
 
@@ -312,15 +386,15 @@ localModifierList
     ;
 
 localModifier
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
 type
     :   simpleType
     |   objectType
-    |   'void'
+    |   VOID
     ;
 
 simpleType
@@ -343,14 +417,14 @@ typeIdent
     ;
 
 primitiveType
-    :   'boolean'
-    |   'char'
-    |   'byte'
-    |   'short'
-    |   'int'
-    |   'long'
-    |   'float'
-    |   'double'
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -425,32 +499,32 @@ statement
         |   ';'
             ->  ^('assert' $expr1)
         )
-    |   'if' parenthesizedExpression ifStat=statement 
-        (   'else' elseStat=statement
-            ->  ^('if' parenthesizedExpression $ifStat $elseStat)
+    |   IF parenthesizedExpression ifStat=statement 
+        (   ELSE elseStat=statement
+            ->  ^(IF parenthesizedExpression $ifStat $elseStat)
         |
-            ->  ^('if' parenthesizedExpression $ifStat)
+            ->  ^(IF parenthesizedExpression $ifStat)
         )   
-    |   f='for' '('
+    |   f=FOR '('
         (   forInit? ';' expression? ';' expressionList? ')' statement
             -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? statement)
         |   localModifierList? type IDENT ':' expression ')' statement
             -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
         )
-    |   'while' parenthesizedExpression statement
-        ->  ^('while' parenthesizedExpression statement)
-    |   'do' statement 'while' parenthesizedExpression ';'
-        ->  ^('do' statement parenthesizedExpression)
-    |   'switch' parenthesizedExpression '{' switchCaseLabel* '}'
-        ->  ^('switch' parenthesizedExpression switchCaseLabel*)
-    |   'return' expression? ';'
-        ->  ^('return' expression?)
-    |   'throw' expression ';'
-        ->  ^('throw' expression)
-    |   'break' IDENT? ';'
-        ->  ^('break' IDENT?)
-    |   'continue' IDENT? ';'
-        ->  ^('continue' IDENT?)
+    |   WHILE parenthesizedExpression statement
+        ->  ^(WHILE parenthesizedExpression statement)
+    |   DO statement WHILE parenthesizedExpression ';'
+        ->  ^(DO statement parenthesizedExpression)
+    |   SWITCH parenthesizedExpression '{' switchCaseLabel* '}'
+        ->  ^(SWITCH parenthesizedExpression switchCaseLabel*)
+    |   RETURN expression? ';'
+        ->  ^(RETURN expression?)
+    |   THROW expression ';'
+        ->  ^(THROW expression)
+    |   BREAK IDENT? ';'
+        ->  ^(BREAK IDENT?)
+    |   CONTINUE IDENT? ';'
+        ->  ^(CONTINUE IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
     |   'embed' STRING_LITERAL EMBED_BLOCK
@@ -461,8 +535,8 @@ statement
         
 
 switchCaseLabel
-    :   'case'^ expression ':'! blockStatement*
-    |   'default'^ ':'! blockStatement*
+    :   CASE^ expression ':'! blockStatement*
+    |   DEFAULT^ ':'! blockStatement*
     ;
     
 forInit
@@ -727,9 +801,9 @@ literal
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 
 // LEXER

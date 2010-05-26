@@ -1,8 +1,10 @@
 package charj.translator;
 
 import org.antlr.runtime.tree.CommonTree;
+import org.antlr.runtime.tree.Tree;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
+import java.util.*;
 
 /**
  * Custom subclass of Antlr's tree node. Doesn't do anything special yet,
@@ -22,12 +24,41 @@ public class CharjAST extends CommonTree
         super(new CommonToken(type, text));
     }
 
+    public CharjAST getParent()
+    {
+        return (CharjAST) super.getParent();
+    }
+
+    public List<CharjAST> getChildren()
+    {
+        return (List<CharjAST>) super.getChildren();
+    }
+
+    public CharjAST getChild(int index)
+    {
+        try
+        {
+            return (CharjAST) super.getChild(index);
+        }
+        catch(ClassCastException e)
+        {
+            Tree child = super.getChild(index);
+            System.out.println("possible error node: " + child);
+            return new CharjAST(child.getType(), child.getText());
+        }
+    }
+
     public String toString() {
         String s = super.toString();
         if (symbol != null) {
             s += "(" + symbol + ")" ;
         }
         return s;
+    }
+
+    public CharjAST dupNode()
+    {
+        return new CharjAST(getType(), getText());
     }
 
 }

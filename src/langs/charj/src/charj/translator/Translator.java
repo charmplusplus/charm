@@ -88,21 +88,23 @@ public class Translator {
         m_nodes.setTokenStream(tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
-        // do AST rewriting in semantic phase
-        if (m_printAST) printAST("Before Semantic Pass", "before.html");
+        // do AST rewriting and semantic checking
+        if (m_printAST) printAST("Before Modifier Pass", "before_mod.html");
+        modifierPass();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+        if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
         semanticPass();
-        if (m_printAST) printAST("After Semantic Pass", "after.html");
+        if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
 
         // emit code for .ci, .h, and .cc based on rewritten AST
-        m_nodes.reset();
         String ciOutput = translationPass(OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
 
-        m_nodes.reset();
         String hOutput = translationPass(OutputMode.h);
         writeTempFile(filename, hOutput, OutputMode.h);
         
-        m_nodes.reset();
         String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
         if (!m_translate_only) compileTempFiles(filename, m_charmc);
@@ -117,9 +119,19 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
+    private void modifierPass() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        CharjASTModifier mod = new CharjASTModifier(m_nodes);
+        mod.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+    }
+
     private ClassSymbol semanticPass() throws
         RecognitionException, IOException, InterruptedException
     {
+        m_nodes.reset();
         CharjSemantics sem = new CharjSemantics(m_nodes);
         return sem.charjSource(m_symtab);
     }
@@ -127,6 +139,7 @@ public class Translator {
     private String translationPass(OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
+        m_nodes.reset();
         CharjEmitter emitter = new CharjEmitter(m_nodes);
         StringTemplateGroup templates = getTemplates(templateFile);
         emitter.setTemplateLib(templates);
