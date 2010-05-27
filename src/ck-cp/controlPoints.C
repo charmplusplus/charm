@@ -2142,7 +2142,6 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
-  CkAssert(sizeof(lb) == 4);
   CkAssert(CkMyPe() == 0);
   return controlPoint("FortranCP", *lb, *ub);
 }
