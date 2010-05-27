@@ -16,6 +16,7 @@ cpu affinity.
 #include "sockRoutines.h"
 
 #define DEBUGP(x)   /* CmiPrintf x;  */
+CpvDeclare(int, myCPUAffToCore);
 
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
@@ -156,7 +157,6 @@ int set_thread_affinity(int cpuid) {
 }
 #endif
 
-CpvDeclare(int, myCPUAffToCore);
 
 int CmiSetCPUAffinity(int mycore)
 {
@@ -641,7 +641,7 @@ void CmiInitCPUAffinity(char **argv)
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
 
-  CpvInitialize(myCPUAffToCore);
+  CpvInitialize(int, myCPUAffToCore);
   CpvAccess(myCPUAffToCore) = -1;
 }
 
