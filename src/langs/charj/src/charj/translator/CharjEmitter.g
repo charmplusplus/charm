@@ -550,7 +550,7 @@ expression
     ;
 
 expr
-    :   ^('=' e1=expr e2=expr)
+    :   ^(ASSIGNMENT e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> = <e2>"
     |   ^('+=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> += <e2>"
@@ -586,7 +586,7 @@ expr
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
     |   ^('&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> & <e2>"
-    |   ^('==' e1=expr e2=expr)
+    |   ^(EQUALS e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> == <e2>"
     |   ^('!=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> != <e2>"

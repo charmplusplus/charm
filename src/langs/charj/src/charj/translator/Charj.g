@@ -71,7 +71,7 @@ tokens {
     NEW                     = 'new'             ;
     BITWISE_OR              = '|'               ;
     BITWISE_AND             = '&'               ;
-    EQUALS                  = '='               ;
+    ASSIGNMENT              = '='               ;
     NOT_EQUALS              = '!='              ;
     PLUS_EQUALS             = '+='              ;
     MINUS_EQUALS            = '-='              ;
@@ -312,7 +312,7 @@ classFieldDeclaratorList
     ;
 
 classFieldDeclarator
-    :   variableDeclaratorId ('=' variableInitializer)?
+    :   variableDeclaratorId (ASSIGNMENT variableInitializer)?
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
 
@@ -322,7 +322,7 @@ interfaceFieldDeclaratorList
     ;
 
 interfaceFieldDeclarator
-    :   variableDeclaratorId '=' variableInitializer
+    :   variableDeclaratorId ASSIGNMENT variableInitializer
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
@@ -580,7 +580,7 @@ expression
 
 assignmentExpression
     :   conditionalExpression 
-        (   (   '='^
+        (   (   ASSIGNMENT^
             |   '+='^
             |   '-='^
             |   '*='^
@@ -622,7 +622,7 @@ andExpression
 
 equalityExpression
     :   instanceOfExpression 
-        (   (   '=='^
+        (   (   EQUALS^
             |   '!='^
             ) 
             instanceOfExpression
