@@ -27,12 +27,12 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
-CpvDeclare(CkVec<void *>, chare_objs);
-CpvDeclare(CkVec<int>, chare_types);
-CpvDeclare(CkVec<VidBlock *>, vidblocks);
+CkpvDeclare(CkVec<void *>, chare_objs);
+CkpvDeclare(CkVec<int>, chare_types);
+CkpvDeclare(CkVec<VidBlock *>, vidblocks);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
-CpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
+CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 #endif
 
 
@@ -52,10 +52,10 @@ void _initChareTables()
 {
 #ifndef CMK_CHARE_USE_PTR
           /* chare and vidblock table */
-  CpvInitialize(CkVec<void *>, chare_objs);
-  CpvInitialize(CkVec<int>, chare_types);
-  CpvInitialize(CkVec<VidBlock *>, vidblocks);
-  CpvInitialize(Vidblockmap, vmap);
+  CkpvInitialize(CkVec<void *>, chare_objs);
+  CkpvInitialize(CkVec<int>, chare_types);
+  CkpvInitialize(CkVec<VidBlock *>, vidblocks);
+  CkpvInitialize(Vidblockmap, vmap);
 #endif
 }
 
@@ -104,10 +104,10 @@ Chare::~Chare() {
 */
   if (chareIdx != -1)
   {
-    CmiAssert(CpvAccess(chare_objs)[chareIdx] == this);
-    CpvAccess(chare_objs)[chareIdx] = NULL;
-    Vidblockmap::iterator iter = CpvAccess(vmap).find(chareIdx);
-    if (iter != CpvAccess(vmap).end()) {
+    CmiAssert(CkpvAccess(chare_objs)[chareIdx] == this);
+    CkpvAccess(chare_objs)[chareIdx] = NULL;
+    Vidblockmap::iterator iter = CkpvAccess(vmap).find(chareIdx);
+    if (iter != CkpvAccess(vmap).end()) {
       register CkChareID *pCid = (CkChareID *)
         _allocMsg(DeleteVidMsg, sizeof(CkChareID));
       int srcPe = iter->second.onPE;
@@ -118,7 +118,7 @@ Chare::~Chare() {
       CmiSetHandler(ret, _charmHandlerIdx);
       CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
       CpvAccess(_qd)->create();
-      CpvAccess(vmap).erase(iter);
+      CkpvAccess(vmap).erase(iter);
     }
   }
 #endif
@@ -599,8 +599,8 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     env->setMsgtype(NewVChareMsg);
     env->setVidPtr(pCid->objPtr);
 #ifndef CMK_CHARE_USE_PTR
-    CpvAccess(vidblocks).push_back((VidBlock*)pCid->objPtr);
-    int idx = CpvAccess(vidblocks).size()-1;
+    CkpvAccess(vidblocks).push_back((VidBlock*)pCid->objPtr);
+    int idx = CkpvAccess(vidblocks).size()-1;
     pCid->objPtr = (void *)idx;
     env->setVidPtr((void *)idx);
 #endif
@@ -823,9 +823,9 @@ static inline void *_allocNewChare(envelope *env, int &idx)
   void *tmp=malloc(_chareTable[chareIdx]->size);
   _MEMCHECK(tmp);
 #ifndef CMK_CHARE_USE_PTR
-  CpvAccess(chare_objs).push_back(tmp);
-  CpvAccess(chare_types).push_back(chareIdx);
-  idx = CpvAccess(chare_objs).size()-1;
+  CkpvAccess(chare_objs).push_back(tmp);
+  CkpvAccess(chare_types).push_back(chareIdx);
+  idx = CkpvAccess(chare_objs).size()-1;
 #endif
   setMemoryTypeChare(tmp);
   return tmp;
@@ -871,7 +871,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   CkChareID vid;
   vid.onPE = srcPe;
   vid.objPtr = env->getVidPtr();
-  CpvAccess(vmap)[idx] = vid;    
+  CkpvAccess(vmap)[idx] = vid;    
 #endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
@@ -894,7 +894,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
   else {
 #ifndef CMK_CHARE_USE_PTR
     if (_chareTable[_entryTable[epIdx]->chareIdx]->chareType == TypeChare)
-      obj = CpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
+      obj = CkpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
     else
       obj = env->getObjPtr();
 #else
@@ -914,7 +914,7 @@ static inline void _processForChareMsg(CkCoreState *ck,envelope *env)
 static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   register VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "FillVidMsg: Not a valid VIdPtr\n");
@@ -928,7 +928,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
 #else
   VidBlock *vptr = (VidBlock *) env->getVidPtr();
   _CHECK_VALID(vptr, "ForVidMsg: Not a valid VIdPtr\n");
@@ -940,9 +940,9 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
 static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
 {
 #ifndef CMK_CHARE_USE_PTR
-  register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  register VidBlock *vptr = CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
   delete vptr;
-  CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()] = NULL;
+  CkpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()] = NULL;
 #endif
   CmiFree(env);
 }
@@ -1317,7 +1317,8 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
   } else {
-    CkPackMessage(&env);
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+      CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -1459,7 +1460,7 @@ static inline int _prepareMsg(int eIdx,void *msg,const CkChareID *pCid)
     register int pe = -(pCid->onPE+1);
     if(pe==CkMyPe()) {
 #ifndef CMK_CHARE_USE_PTR
-      VidBlock *vblk = CpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
+      VidBlock *vblk = CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
 #else
       VidBlock *vblk = (VidBlock *) pCid->objPtr;
 #endif
@@ -1949,15 +1950,15 @@ void CkDeleteChares() {
 
   // delete all plain chares
 #ifndef CMK_CHARE_USE_PTR
-  for (i=0; i<CpvAccess(chare_objs).size(); i++) {
-	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
+  for (i=0; i<CkpvAccess(chare_objs).size(); i++) {
+	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
 	delete obj;
-	CpvAccess(chare_objs)[i] = NULL;
+	CkpvAccess(chare_objs)[i] = NULL;
   }
-  for (i=0; i<CpvAccess(vidblocks).size(); i++) {
-	VidBlock *obj = CpvAccess(vidblocks)[i];
+  for (i=0; i<CkpvAccess(vidblocks).size(); i++) {
+	VidBlock *obj = CkpvAccess(vidblocks)[i];
 	delete obj;
-	CpvAccess(vidblocks)[i] = NULL;
+	CkpvAccess(vidblocks)[i] = NULL;
   }
 #endif
 

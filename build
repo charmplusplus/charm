@@ -300,6 +300,14 @@ do
 		WITH_PRODUCTION="true" 
 		shift
 		;;
+    --with-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
+    --without-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     --build-shared|-bs)
 		# obsolete, do nothing
 		shift

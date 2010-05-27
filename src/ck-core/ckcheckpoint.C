@@ -218,20 +218,20 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 
 #ifndef CMK_CHARE_USE_PTR
 
-CpvExtern(CkVec<void *>, chare_objs);
-CpvExtern(CkVec<int>, chare_types);
-CpvExtern(CkVec<VidBlock *>, vidblocks);
+CkpvExtern(CkVec<void *>, chare_objs);
+CkpvExtern(CkVec<int>, chare_types);
+CkpvExtern(CkVec<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)
 {
   int i, n;
-  if (!p.isUnpacking()) n = CpvAccess(chare_objs).size();
+  if (!p.isUnpacking()) n = CkpvAccess(chare_objs).size();
   p|n;
   for (i=0; i<n; i++) {
         int chare_type;
 	if (!p.isUnpacking()) {
-		chare_type = CpvAccess(chare_types)[i];
+		chare_type = CkpvAccess(chare_types)[i];
 	}
 	p | chare_type;
 	if (p.isUnpacking()) {
@@ -246,20 +246,20 @@ void CkPupChareData(PUP::er &p)
 		CkCreateLocalChare(migCtor, env);
 		CkFreeSysMsg(m);
 	}
-	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
+	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
 	obj->pup(p);
   }
 
-  if (!p.isUnpacking()) n = CpvAccess(vidblocks).size();
+  if (!p.isUnpacking()) n = CkpvAccess(vidblocks).size();
   p|n;
   for (i=0; i<n; i++) {
 	VidBlock *v;
 	if (p.isUnpacking()) {
 		v = new VidBlock();
-		CpvAccess(vidblocks).push_back(v);
+		CkpvAccess(vidblocks).push_back(v);
 	}
 	else
-		v = CpvAccess(vidblocks)[i];
+		v = CkpvAccess(vidblocks)[i];
 	v->pup(p);
   }
 }

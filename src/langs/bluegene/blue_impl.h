@@ -31,8 +31,9 @@ public:
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
   double fpfactor;         /* fp time factor */
   double timercost;        /* cost of timer */
-  int    record, replay;   /* record/replay */
+  int    record, recordnode, replay, replaynode;   /* record/replay */
   CkListString recordprocs;
+  CkListString recordnodes;
   char *traceroot;	   /* bgTraceFile prefix */
   BigSimNetwork *network;  /* network setup */
   CkListString procList;   /* a list of processor numbers with projections */
@@ -42,7 +43,7 @@ public:
   void nullify() { 
 	x=y=z=0; 
 	numCth=numWth=1; stacksize=0; 
-        record=replay=-1;
+        record=recordnode=replay=replaynode=-1;
 	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
@@ -63,7 +64,7 @@ public:
        }
   int traceProejctions(int pe);
   void setNetworkModel(char *model);
-  int inReplayMode() { return replay != -1; }
+  int inReplayMode() { return replay != -1 || replaynode != -1; }
 };
 
 // simulation state

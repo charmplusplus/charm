@@ -117,7 +117,7 @@ int  BgNumNodes();	/**<  total number of Blue Gene nodes */
 void BgSetSize(int sx, int sy, int sz);
 int  BgNodeSize();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
-int  BgMyNode();
+int  BgMyNode();        /* global node serial number */
 
 int BgNodeToRealPE(int node);         /* return a real processor number from a bg node */
 int BgTraceProjectionOn(int pe);    /* true if pe is on for trace projections */
