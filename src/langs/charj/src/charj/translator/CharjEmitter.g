@@ -446,7 +446,7 @@ formalParameterVarargDecl
 qualifiedIdentifier
     :   IDENT
         -> template(t={$text}) "<t>"
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
     ;
     
@@ -640,6 +640,12 @@ expr
 
 primaryExpression
     :   ^(DOT prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+            | THIS    -> template(prim={$prim.st}) "<prim>.this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>.super"
+            )
+        )
+    |   ^(ARROW prim=primaryExpression
             ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
             | THIS    -> template(prim={$prim.st}) "<prim>->this"
             | SUPER   -> template(prim={$prim.st}) "<prim>->super"

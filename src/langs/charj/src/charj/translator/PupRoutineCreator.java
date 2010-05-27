@@ -71,6 +71,8 @@ class PupRoutineCreator
                     type = p.getChild(0).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
+                case CharjParser.BLOCK:
+                case CharjParser.FORMAL_PARAM_LIST:
                     System.out.println("local var, not puping...");
                     return;
                 case CharjParser.TYPE:
@@ -84,11 +86,14 @@ class PupRoutineCreator
                         case CharjParser.POINTER_TYPE: System.out.println("found pointer");
                             pointerVarPup(idNode);
                             break;
+                        default:
+                            System.out.println("unknown type -- THIS IS AN ERROR in method varPup, in PupRoutineCreator.java");
+                            break;
                     }
                     return;
             }
         }
-        System.out.println("after for");
+        System.out.println("THIS IS AN ERROR in method varPup, in PupRoutineCreator.java");
     }
 
     protected void primitiveVarPup(CharjAST idNode)
@@ -109,7 +114,7 @@ class PupRoutineCreator
         int index = pupNode.getChild(4).getChildren().size() - 1;
 
         pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
-        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.DOT, "."));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.ARROW, "ARROW"));
         pupNode.getChild(4).getChild(index).getChild(0).getChild(0).addChild(idNode.dupNode());
         pupNode.getChild(4).getChild(index).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "pup"));
         pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));

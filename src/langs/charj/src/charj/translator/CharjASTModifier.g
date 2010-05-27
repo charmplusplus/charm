@@ -221,10 +221,10 @@ formalParameterVarargDecl
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
-// IDENT (^('.' qualifiedIdentifier IDENT))*
+// IDENT (^(DOT qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
 block
@@ -346,6 +346,11 @@ primaryExpression
                 |   SUPER
                 )
         )
+        ->   ^(ARROW primaryExpression
+                   IDENT?
+                   THIS?
+                   SUPER?
+             )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)

@@ -182,6 +182,7 @@ tokens {
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
+    ARROW;
 }
 
 @header {
@@ -211,7 +212,7 @@ compilationUnit
     ;
 
 packageDeclaration
-    :   PACKAGE IDENT ('.' IDENT)+ ';'  
+    :   PACKAGE IDENT (DOT IDENT)+ ';'  
         ->  ^(PACKAGE IDENT+)
     ;
 
@@ -417,7 +418,7 @@ objectType
     ;
 
 qualifiedTypeIdent
-    :   typeIdent ('.' typeIdent)*
+    :   typeIdent (DOT typeIdent)*
         ->  ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
@@ -478,8 +479,8 @@ qualifiedIdentifier
     :   (   IDENT
             ->  IDENT
         )
-        (   '.' ident=IDENT
-            ->  ^('.' $qualifiedIdentifier $ident)
+        (   DOT ident=IDENT
+            ->  ^(DOT $qualifiedIdentifier $ident)
         )*
     ;
 
@@ -772,12 +773,12 @@ qualifiedIdentExpression
         // And now comes the stuff that may follow the qualified identifier.
         (   arguments
             ->  ^(METHOD_CALL qualifiedIdentifier arguments)
-        |   outerDot='.'
+        |   outerDot=DOT
             (   genericTypeArgumentList 
                 (   s=SUPER arguments
                     ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"]
                             qualifiedIdentifier genericTypeArgumentList arguments)
-                |   SUPER innerDot='.' IDENT arguments
+                |   SUPER innerDot=DOT IDENT arguments
                     ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
                             genericTypeArgumentList arguments)
                 |   IDENT arguments
@@ -844,11 +845,11 @@ INTEGER_TYPE_SUFFIX : ('l'|'L') ;
 FLOATING_POINT_LITERAL
     :   ('0'..'9')+ 
         (
-            '.' ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
+            DOT ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
         |   EXPONENT FLOAT_TYPE_SUFFIX?
         |   FLOAT_TYPE_SUFFIX
         )
-    |   '.' ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
+    |   DOT ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
     ;
 
 fragment

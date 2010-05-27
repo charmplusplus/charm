@@ -98,7 +98,7 @@ packageDeclaration
     :   ^(PACKAGE (ids+=IDENT)+)  
         {
             String packageName = "";
-            for(Object o : $ids) packageName += '.' + ((CharjAST)o).getText();
+            for(Object o : $ids) packageName += DOT + ((CharjAST)o).getText();
             packageName = packageName.substring(1);
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
@@ -306,10 +306,10 @@ formalParameterVarargDecl
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
-// IDENT (^('.' qualifiedIdentifier IDENT))*
+// IDENT (^(DOT qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
 block
@@ -425,7 +425,13 @@ expr
     ;
     
 primaryExpression
-    :   ^(  DOT primaryExpression
+    :   ^(DOT primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   ^(ARROW primaryExpression
                 (   IDENT
                 |   THIS
                 |   SUPER
