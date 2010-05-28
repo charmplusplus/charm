@@ -1,5 +1,5 @@
 /*****************************************************************************
- * $Source$
+* $Source$
  * $Author$
  * $Date$
  * $Revision$
@@ -611,6 +611,20 @@ Module::preprocess()
 }
 
 void
+Module::genDepend(const char *cifile)
+{
+  cout << name << ".decl.h: " << cifile;
+  if (internalMode)
+    cout << " charmxi";
+  cout << endl;
+  cout << '\t' << "$(CHARMC) ";
+  if (internalMode)
+	  cout << "-intrinsic ";
+  cout << cifile << endl;
+  cout << name << ".def.h: " << name << ".decl.h" << endl;
+}
+
+void
 ModuleList::print(XStr& str)
 {
     perElemGen(modules, str, &Module::print);
@@ -628,6 +642,12 @@ ModuleList::preprocess()
 {
     for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
 	(*i)->preprocess();
+}
+
+void
+ModuleList::genDepends()
+{
+    perElemGen(modules, cur_file, &Module::genDepend);
 }
 
 void
