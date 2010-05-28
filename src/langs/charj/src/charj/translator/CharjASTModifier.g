@@ -357,6 +357,8 @@ primaryExpression
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal

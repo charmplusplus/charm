@@ -464,6 +464,7 @@ primaryExpression
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal

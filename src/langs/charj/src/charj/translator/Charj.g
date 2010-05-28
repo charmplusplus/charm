@@ -98,6 +98,7 @@ tokens {
     UNARY_MINUS             = '--'              ;
     NOT                     = '!'               ;
     TILDE                   = '~'               ;
+    AT                      = '@'               ;
     INSTANCEOF              = 'instanceof'      ;
 
 
@@ -166,6 +167,7 @@ tokens {
     LOCAL_MODIFIER_LIST;
     CHARJ_SOURCE;
     METHOD_CALL;
+    ENTRY_METHOD_CALL;
     MODIFIER_LIST;
     PAREN_EXPR;
     POST_DEC;
@@ -408,13 +410,7 @@ localModifier
 type
     :   simpleType
     |   objectType
-    |   proxyType
     |   VOID
-    ;
-
-proxyType
-    :   qualifiedTypeIdent '@' arrayDeclaratorList?
-        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 simpleType
@@ -423,7 +419,9 @@ simpleType
     ;
 
 objectType
-    :   qualifiedTypeIdent arrayDeclaratorList?
+    :   qualifiedTypeIdent AT arrayDeclaratorList?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   qualifiedTypeIdent arrayDeclaratorList?
         ->  ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
@@ -733,6 +731,8 @@ postfixedExpression
                     ->  ^(METHOD_CALL $postfixedExpression arguments)
                 )?
             )
+        |   (AT genericTypeArgumentList? IDENT arguments)
+            ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) genericTypeArgumentList? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         )*
