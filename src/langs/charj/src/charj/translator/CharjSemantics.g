@@ -182,7 +182,6 @@ scope ScopeStack;
 field [ClassSymbol type]
     :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
     {
-            System.out.println("Found variable: " + $type + " " + $IDENT.text);
             VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
             sym.definition = $field.start;
             sym.definitionTokenStream = input.getTokenStream();
