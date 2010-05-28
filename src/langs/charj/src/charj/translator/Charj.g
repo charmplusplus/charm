@@ -84,7 +84,9 @@ tokens {
     AND                     = '&&'              ;
     POWER                   = '^'               ;
     GT                      = '>'               ;
+    GTE                     = '>='              ;
     LT                      = '<'               ;
+    LTE                     = '<='              ;
     PLUS                    = '+'               ;
     MINUS                   = '-'               ;
     TIMES                   = '*'               ;
