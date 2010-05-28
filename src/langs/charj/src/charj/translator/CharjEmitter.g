@@ -453,7 +453,7 @@ formalParameterVarargDecl
 qualifiedIdentifier
     :   IDENT
         -> template(t={$text}) "<t>"
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
     ;
     
@@ -557,7 +557,7 @@ expression
     ;
 
 expr
-    :   ^('=' e1=expr e2=expr)
+    :   ^(ASSIGNMENT e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> = <e2>"
     |   ^('+=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> += <e2>"
@@ -593,7 +593,7 @@ expr
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
     |   ^('&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> & <e2>"
-    |   ^('==' e1=expr e2=expr)
+    |   ^(EQUALS e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> == <e2>"
     |   ^('!=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> != <e2>"
@@ -635,7 +635,7 @@ expr
         -> template(e1={$e1.st}) "<e1>++"
     |   ^(POST_DEC e1=expr)
         -> template(e1={$e1.st}) "<e1>--"
-    |   ^(TILDA e1=expr)
+    |   ^(TILDE e1=expr)
         -> template(e1={$e1.st}) "~<e1>"
     |   ^(NOT e1=expr)
         -> template(e1={$e1.st}) "!<e1>"
@@ -646,8 +646,14 @@ expr
     ;
 
 primaryExpression
-    :   ^('.' prim=primaryExpression
-            ( IDENT     -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+    :   ^(DOT prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+            | THIS    -> template(prim={$prim.st}) "<prim>.this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>.super"
+            )
+        )
+    |   ^(ARROW prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
             | THIS    -> template(prim={$prim.st}) "<prim>->this"
             | SUPER   -> template(prim={$prim.st}) "<prim>->super"
             )

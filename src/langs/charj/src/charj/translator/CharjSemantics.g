@@ -94,11 +94,10 @@ scope ScopeStack; // default scope
 packageDeclaration
 @init { 
     List<String> names = null; 
+    String packageName = "";
 }
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
         {
-            String packageName = "";
-            for(Object o : $ids) packageName += '.' + ((CharjAST)o).getText();
             packageName = packageName.substring(1);
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
@@ -331,10 +330,10 @@ formalParameterVarargDecl
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
-// IDENT (^('.' qualifiedIdentifier IDENT))*
+// IDENT (^(DOT qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
 block
@@ -443,14 +442,20 @@ expr
     |   ^(PRE_DEC expr)
     |   ^(POST_INC expr)
     |   ^(POST_DEC expr)
-    |   ^(TILDA expr)
+    |   ^(TILDE expr)
     |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
     |   primaryExpression
     ;
     
 primaryExpression
-    :   ^(  '.' primaryExpression
+    :   ^(DOT primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   ^(ARROW primaryExpression
                 (   IDENT
                 |   THIS
                 |   SUPER
