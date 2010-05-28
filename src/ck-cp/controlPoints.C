@@ -1691,6 +1691,9 @@ void controlPointManager::generatePlan() {
       const double ldbStepsTime = times[0] + times[1];
       const double lbcost = ldbStepsTime - 2.0*avg; // An approximation of the 
       
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#define lround(x)        ((long)(x+0.5))
+#endif
       int newval = lround(sqrt(2.0*lbcost/m));
       
 
