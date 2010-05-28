@@ -23,9 +23,8 @@ public chare Fib {
         partialResult_ = 0;
         pendingChildren_ = 2;
         int x = 1;
-        Fib child1 = new Fib;//();
-        //= new Fib(false, n-1, thisHandle); // replace with "@this"?
-        //Fib child2 = new Fib(false, n-2, thisHandle); // can we get away with just "this"?
+        Fib child1 = new Fib(false, n-1, thisHandle); // replace with "@this"?
+        Fib child2 = new Fib(false, n-2, thisHandle); // can we get away with just "this"?
     }
 
     entry void passUp(int subTreeValue) {
