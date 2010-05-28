@@ -628,7 +628,7 @@ expr
         -> template(e1={$e1.st}) "<e1>++"
     |   ^(POST_DEC e1=expr)
         -> template(e1={$e1.st}) "<e1>--"
-    |   ^(TILDA e1=expr)
+    |   ^(TILDE e1=expr)
         -> template(e1={$e1.st}) "~<e1>"
     |   ^(NOT e1=expr)
         -> template(e1={$e1.st}) "!<e1>"

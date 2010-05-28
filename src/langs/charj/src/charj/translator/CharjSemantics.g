@@ -416,7 +416,7 @@ expr
     |   ^(PRE_DEC expr)
     |   ^(POST_INC expr)
     |   ^(POST_DEC expr)
-    |   ^(TILDA expr)
+    |   ^(TILDE expr)
     |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
     |   primaryExpression

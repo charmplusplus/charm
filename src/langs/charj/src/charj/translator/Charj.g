@@ -72,6 +72,7 @@ tokens {
     BITWISE_OR              = '|'               ;
     BITWISE_AND             = '&'               ;
     ASSIGNMENT              = '='               ;
+    EQUALS                  = '=='              ;
     NOT_EQUALS              = '!='              ;
     PLUS_EQUALS             = '+='              ;
     MINUS_EQUALS            = '-='              ;
@@ -85,7 +86,9 @@ tokens {
     AND                     = '&&'              ;
     POWER                   = '^'               ;
     GT                      = '>'               ;
+    GTE                     = '>='              ;
     LT                      = '<'               ;
+    LTE                     = '<='              ;
     PLUS                    = '+'               ;
     MINUS                   = '-'               ;
     TIMES                   = '*'               ;
@@ -94,7 +97,7 @@ tokens {
     UNARY_PLUS              = '++'              ;
     UNARY_MINUS             = '--'              ;
     NOT                     = '!'               ;
-    TILDA                   = '~'               ;
+    TILDE                   = '~'               ;
     INSTANCEOF              = 'instanceof'      ;
 
 
