@@ -532,6 +532,56 @@ void CpdDeliverMessage(char * msg) {
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
 
+void CpdConditionalDeliveryScheduler() {
+  CsdSchedulerState_t state;
+  CsdSchedulerState_new(&state);
+  while (CpvAccess(conditionalDelivery)) {
+#if NODE_0_IS_CONVHOST
+    if (CmiMyPe()==0) CcsServerCheck(); /*Make sure we can get CCS messages*/
+#endif
+    msg = CsdNextMessage(&state);
+    
+  }
+}
+
+#include <sys/wait.h>
+void CpdDeliverMessageConditionally(char * msg) {
+  int msgNum;
+  void *m;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
+  //CmiPrintf("received deliver request %d\n",msgNum);
+
+  pid_t pid = fork();
+  if (pid > 0) {
+    CmiPrintf("parent %d\n",pid);
+    CpdConditionalDeliveryScheduler();
+    wait(NULL);
+    return;
+  }
+  
+  //while (true);
+  printf("child\n");
+  //while (1);
+  //_exit(0);
+  _replaySystem = 1;
+
+  void *debugQ=CpvAccess(debugQueue);
+  CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
+  for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
+  CkpvAccess(skipBreakpoint) = 1;
+  char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
+#if CMK_BLUEGENE_CHARM
+  stopVTimer();
+  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
+  startVTimer();
+#else
+  CmiHandleMessage(queuedMsg);
+#endif
+  CkpvAccess(skipBreakpoint) = 0;
+  _exit(0);
+  while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
+}
+
 class CpdList_msgStack : public CpdListAccessor {
   virtual const char * getPath(void) const {return "charm/messageStack";}
   virtual size_t getLength(void) const {
@@ -855,6 +905,7 @@ void CpdCharmInit()
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
   CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
+  CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
