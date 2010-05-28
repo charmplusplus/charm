@@ -77,6 +77,7 @@ OPTIMIZE_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
+GENDEPENDS="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -618,10 +619,15 @@ do
 # Run preprocessor as an extra step, continue after preprocessing
 		PREPROCESS="yes"
                 ;;
-	"-M"|"-P"|"-S")
+	"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
+		;;
+	"-M")
+		SKIPLINK="yes"
+		OPTS="$OPTS $arg"
+		GENDEPENDS="yes"
 		;;
 	"-default-to-aout")
 		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
@@ -973,6 +979,11 @@ fi
 if [ -n "$XI_INTERNAL" ]
 then
     CMK_XIOPTS="$CMK_XIOPTS -intrinsic"
+fi
+
+if [ "$GENDEPENDS" = "yes" ]
+then
+    CMK_XIOPTS="$CMK_XIOPTS -M"
 fi
 
 if test "$CMK_WITH_TAU" = "true"
