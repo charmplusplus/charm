@@ -66,7 +66,7 @@ public class SymbolTable {
         primitiveTypes.put("double", new ClassSymbol(this, "double", null, lang));
         primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang));
         primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang));
-        primitiveTypes.put("bool",   new ClassSymbol(this, "bool",   null, lang));
+        primitiveTypes.put("boolean",new ClassSymbol(this, "bool",   null, lang));
         for (Map.Entry<String, ClassSymbol> entry : primitiveTypes.entrySet()) {
             ClassSymbol c = entry.getValue();
             lang.define(entry.getKey(), c);
