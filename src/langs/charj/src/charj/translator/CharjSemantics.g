@@ -94,11 +94,10 @@ scope ScopeStack; // default scope
 packageDeclaration
 @init { 
     List<String> names = null; 
+    String packageName = "";
 }
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
         {
-            String packageName = "";
-            for(Object o : $ids) packageName += DOT + ((CharjAST)o).getText();
             packageName = packageName.substring(1);
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
@@ -107,7 +106,6 @@ packageDeclaration
             }
             currentPackage = ps;
             $ScopeStack::current = ps;
-//            $qualifiedIdentifier.start.symbol = ps; ----- commented out while dealing with the namespaces issue (Minas)
         }
     ;
     
