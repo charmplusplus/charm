@@ -12,17 +12,16 @@ using std::for_each;
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
+#include <iostream>
+using std::cerr;
+using std::cout;
+using std::endl;
 
 #if ! CMK_BOOL_DEFINED
 typedef enum {false = 0, true = 1} bool;
 #endif
 
-#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
-#  include <fstream.h>
-#else /* ISO C++ */
-#  include <fstream>
-   using namespace std;
-#endif
+#include <fstream>
 
 namespace xi {
    
@@ -459,6 +458,7 @@ Module::print(XStr& str)
 void
 Module::generate()
 {
+  using std::ofstream;
   XStr declstr, defstr;
   XStr pubDeclStr, pubDefStr, pubDefConstr;
 
