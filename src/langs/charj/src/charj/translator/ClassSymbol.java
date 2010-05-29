@@ -236,11 +236,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public List<String> getPackageNames()
     {
-        List<String> list = new ArrayList<String>();
+        List<String> list = new LinkedList<String>();
         for(Scope currentScope = scope;
                 currentScope.getEnclosingScope() != null;
                 currentScope = currentScope.getEnclosingScope()) {
-            list.add(currentScope.getScopeName());
+            list.add(0, currentScope.getScopeName());
         }
         return list;
     }
