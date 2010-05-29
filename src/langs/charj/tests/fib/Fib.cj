@@ -1,5 +1,12 @@
-// Fib.cj
-package tests.Fib;
+
+package tests;
+
+public mainchare Main {
+    public entry Main(CkArgMsg m) {
+        int n = atoi(m.argv[1]);
+        Fib@ fib = new Fib(true, n, thishandle);
+    }
+}
 
 public chare Fib {
     Fib@ parent;
@@ -7,7 +14,6 @@ public chare Fib {
     int n;
     int partialResult;
     int pendingChildren;
-    map<int,int> intMap;
 
     entry Fib(boolean root_, int n_, Fib@ parent_) {
         CkPrintf("in fib::fib. n=%d\n", n_);
