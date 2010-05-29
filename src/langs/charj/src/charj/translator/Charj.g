@@ -218,7 +218,7 @@ compilationUnit
     ;
 
 packageDeclaration
-    :   PACKAGE IDENT (DOT IDENT)+ ';'  
+    :   PACKAGE IDENT (DOT IDENT)* ';'
         ->  ^(PACKAGE IDENT+)
     ;
 
