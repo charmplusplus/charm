@@ -73,7 +73,6 @@ class PupRoutineCreator
 
     protected void varPup(CharjAST idNode)
     {
-        System.out.println("in var pup: " + idNode.getText());
         int type = -1;
 
         for(CharjAST p = idNode.getParent(); p != null; p = p.getParent())
@@ -81,37 +80,37 @@ class PupRoutineCreator
             switch(p.getType())
             {
                 case CharjParser.PRIMITIVE_VAR_DECLARATION:
-                    System.out.println("got the type, it's primitive");
                     type = p.getType();
                     break;
                 case CharjParser.OBJECT_VAR_DECLARATION:
-                    System.out.println("got the type, it's an object!");
                     type = p.getChild(0).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
                 case CharjParser.BLOCK:
                 case CharjParser.FORMAL_PARAM_LIST:
-                    System.out.println("local var, not puping...");
                     return;
                 case CharjParser.TYPE:
-                    System.out.println("class member var, puping... type " + type);
                     switch(type)
                     {
-                        case CharjParser.REFERENCE_TYPE: System.out.println("found ref");
-                        case CharjParser.PRIMITIVE_VAR_DECLARATION: System.out.println("found simple or ref");
+                        case CharjParser.REFERENCE_TYPE:
+                            break;
+                        case CharjParser.PRIMITIVE_VAR_DECLARATION:
                             primitiveVarPup(idNode);
                             break;
-                        case CharjParser.POINTER_TYPE: System.out.println("found pointer");
+                        case CharjParser.POINTER_TYPE:
                             pointerVarPup(idNode);
                             break;
+                        case CharjParser.PROXY_TYPE:
+                            proxyVarPup(idNode);
+                            break;
                         default:
-                            System.out.println("unknown type -- THIS IS AN ERROR in method varPup, in PupRoutineCreator.java");
+                            System.out.println("PupRoutineCreator.varPup: unknown type " + idNode);
                             break;
                     }
                     return;
             }
         }
-        System.out.println("THIS IS AN ERROR in method varPup, in PupRoutineCreator.java");
+        System.out.println("PupRoutineCreator.varPup: could not pup variable " + idNode);
     }
 
     protected void primitiveVarPup(CharjAST idNode)
@@ -123,6 +122,12 @@ class PupRoutineCreator
         pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.BITWISE_OR, "|"));
         pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
         pupNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
+    }
+
+    protected void proxyVarPup(CharjAST idNode)
+    {
+        // For now, just do a basic PUP. More complex handling may be needed later.
+        primitiveVarPup(idNode);
     }
     
     private boolean generatedIf = false;

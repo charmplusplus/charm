@@ -189,6 +189,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public Symbol define(
             String name,
             Symbol sym) {
+        if (sym == null) {
+            System.out.println("ClassSymbol.define: Uh oh, defining null symbol");
+        }
         members.put(name, sym);
         if (sym instanceof MethodSymbol) {
             methods.put(name, (MethodSymbol)sym);
@@ -246,20 +249,20 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     {
         Set<ClassSymbol> types = new HashSet<ClassSymbol>();
         for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
-            types.add(((VariableSymbol)entry.getValue()).type);
+            // note: type info may be null for unknown types, but this might
+            // need to be changed at some point.
+            ClassSymbol type = ((VariableSymbol)entry.getValue()).type;
+            if (type != null) types.add(type);
         }
         return types;
     }
 
     public List<String> getMemberTypeNames()
     {
-        if (debug()) System.out.println("Looking for type names...");
-        if (debug()) System.out.println("Found " + fields.size() + " fields...");
         List<String> names = new ArrayList<String>();
         for (ClassSymbol c : getMemberTypes()) {
             if (c.isPrimitive) continue;
             names.add(c.getName());
-            if (debug()) System.out.println("Found type " + c.getFullyQualifiedName());
         }
         return names;
     }
