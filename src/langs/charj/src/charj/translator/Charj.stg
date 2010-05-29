@@ -4,7 +4,7 @@ charjSource_ci(basename, pd, ids, tds, debug) ::=
 <<
 
 // interface for <basename>
-<tds>
+<tds; separator="\n\n">
 
 >>
 
@@ -22,7 +22,7 @@ charjSource_h(basename, pd, ids, tds, debug) ::=
  **************************************************************************/
 
 <ids>
-<tds>
+<tds; separator="\n\n">
 
 #endif // __<basename>__
 
@@ -34,7 +34,7 @@ charjSource_cc(basename, pd, ids, tds, debug) ::=
 #include "<basename>.h"
 
 <ids>
-<tds>
+<tds; separator="\n\n">
 
 >>
 

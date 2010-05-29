@@ -85,10 +85,10 @@ charjSource[SymbolTable symtab, OutputMode m]
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
-        (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        (t+=typeDeclaration)*)
+        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
+        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
         ->
     ;
 
@@ -185,7 +185,6 @@ classScopeDeclaration
 @init {
   boolean entry = false;
   List<String> modList = new ArrayList<String>();
-
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 

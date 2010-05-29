@@ -214,7 +214,7 @@ charjSource
 compilationUnit
     :   packageDeclaration? 
         importDeclaration* 
-        typeDeclaration
+        typeDeclaration*
     ;
 
 packageDeclaration

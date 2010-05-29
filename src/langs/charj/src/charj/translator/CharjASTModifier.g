@@ -48,7 +48,7 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
         (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames]))
+        (typeDeclaration[$importDeclarations.packageNames])*)
         { $cs = $typeDeclaration.sym; }
     ;
 
@@ -65,6 +65,7 @@ typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
         {
             $TYPE.tree.addChild(puper.getPupRoutineNode());
             $TYPE.tree.addChild(puper.getInitRoutineNode());
+            puper = new PupRoutineCreator();
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)

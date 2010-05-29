@@ -86,7 +86,7 @@ scope ScopeStack; // default scope
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
         (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames]))
+        (typeDeclaration[$importDeclarations.packageNames])*)
         { $cs = $typeDeclaration.sym; }
     ;
 
