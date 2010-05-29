@@ -67,10 +67,12 @@ tokens {
     THROW                   = 'throw'           ;
     BREAK                   = 'break'           ;
 
+    DOT                     = '.'               ;
     NEW                     = 'new'             ;
     BITWISE_OR              = '|'               ;
     BITWISE_AND             = '&'               ;
-    EQUALS                  = '='               ;
+    ASSIGNMENT              = '='               ;
+    EQUALS                  = '=='              ;
     NOT_EQUALS              = '!='              ;
     PLUS_EQUALS             = '+='              ;
     MINUS_EQUALS            = '-='              ;
@@ -84,7 +86,9 @@ tokens {
     AND                     = '&&'              ;
     POWER                   = '^'               ;
     GT                      = '>'               ;
+    GTE                     = '>='              ;
     LT                      = '<'               ;
+    LTE                     = '<='              ;
     PLUS                    = '+'               ;
     MINUS                   = '-'               ;
     TIMES                   = '*'               ;
@@ -93,7 +97,8 @@ tokens {
     UNARY_PLUS              = '++'              ;
     UNARY_MINUS             = '--'              ;
     NOT                     = '!'               ;
-    TILDA                   = '~'               ;
+    TILDE                   = '~'               ;
+    AT                      = '@'               ;
     INSTANCEOF              = 'instanceof'      ;
 
 
@@ -162,6 +167,7 @@ tokens {
     LOCAL_MODIFIER_LIST;
     CHARJ_SOURCE;
     METHOD_CALL;
+    ENTRY_METHOD_CALL;
     MODIFIER_LIST;
     PAREN_EXPR;
     POST_DEC;
@@ -182,6 +188,7 @@ tokens {
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
+    ARROW;
 }
 
 @header {
@@ -207,11 +214,11 @@ charjSource
 compilationUnit
     :   packageDeclaration? 
         importDeclaration* 
-        typeDeclaration
+        typeDeclaration*
     ;
 
 packageDeclaration
-    :   PACKAGE IDENT ('.' IDENT)+ ';'  
+    :   PACKAGE IDENT (DOT IDENT)* ';'
         ->  ^(PACKAGE IDENT+)
     ;
 
@@ -311,7 +318,7 @@ classFieldDeclaratorList
     ;
 
 classFieldDeclarator
-    :   variableDeclaratorId ('=' variableInitializer)?
+    :   variableDeclaratorId (ASSIGNMENT variableInitializer)?
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
 
@@ -321,7 +328,7 @@ interfaceFieldDeclaratorList
     ;
 
 interfaceFieldDeclarator
-    :   variableDeclaratorId '=' variableInitializer
+    :   variableDeclaratorId ASSIGNMENT variableInitializer
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
@@ -403,13 +410,7 @@ localModifier
 type
     :   simpleType
     |   objectType
-    |   proxyType
     |   VOID
-    ;
-
-proxyType
-    :   qualifiedTypeIdent '@' arrayDeclaratorList?
-        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 simpleType
@@ -418,12 +419,14 @@ simpleType
     ;
 
 objectType
-    :   qualifiedTypeIdent arrayDeclaratorList?
+    :   qualifiedTypeIdent AT arrayDeclaratorList?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   qualifiedTypeIdent arrayDeclaratorList?
         ->  ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     ;
 
 qualifiedTypeIdent
-    :   typeIdent ('.' typeIdent)*
+    :   typeIdent (DOT typeIdent)*
         ->  ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
@@ -484,8 +487,8 @@ qualifiedIdentifier
     :   (   IDENT
             ->  IDENT
         )
-        (   '.' ident=IDENT
-            ->  ^('.' $qualifiedIdentifier $ident)
+        (   DOT ident=IDENT
+            ->  ^(DOT $qualifiedIdentifier $ident)
         )*
     ;
 
@@ -585,7 +588,7 @@ expression
 
 assignmentExpression
     :   conditionalExpression 
-        (   (   '='^
+        (   (   ASSIGNMENT^
             |   '+='^
             |   '-='^
             |   '*='^
@@ -627,7 +630,7 @@ andExpression
 
 equalityExpression
     :   instanceOfExpression 
-        (   (   '=='^
+        (   (   EQUALS^
             |   '!='^
             ) 
             instanceOfExpression
@@ -707,7 +710,7 @@ postfixedExpression
         )
         // ... and than the optional things that may follow a primary
         // expression 0 or more times.
-        (   outerDot='.'                 
+        (   outerDot=DOT                 
             // Note: generic type arguments are only valid for method calls,
             // i.e. if there is an argument list
             (   (   genericTypeArgumentList?  
@@ -719,15 +722,17 @@ postfixedExpression
                 )?
             |   THIS
                 ->  ^($outerDot $postfixedExpression THIS)
-            |   s='super' arguments
+            |   s=SUPER arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] $postfixedExpression arguments)
-            |   (   'super' innerDot='.' IDENT
-                    ->  ^($innerDot ^($outerDot $postfixedExpression 'super') IDENT)
+            |   (   SUPER innerDot=DOT IDENT
+                    ->  ^($innerDot ^($outerDot $postfixedExpression SUPER) IDENT)
                 )
                 (   arguments
                     ->  ^(METHOD_CALL $postfixedExpression arguments)
                 )?
             )
+        |   (AT genericTypeArgumentList? IDENT arguments)
+            ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) genericTypeArgumentList? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         )*
@@ -743,11 +748,11 @@ primaryExpression
     |   newExpression
     |   qualifiedIdentExpression
     |   genericTypeArgumentList 
-        (   s='super'
+        (   s=SUPER
             (   arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
             |   IDENT arguments
-                ->  ^(METHOD_CALL ^('.' 'super' IDENT) genericTypeArgumentList arguments)
+                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentList arguments)
             )
         |   IDENT arguments
             ->  ^(METHOD_CALL IDENT genericTypeArgumentList arguments)
@@ -760,13 +765,13 @@ primaryExpression
         (   arguments
             ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] arguments)
         )?
-    |   s='super' arguments
+    |   s=SUPER arguments
         ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] arguments)
-    |   (   'super' '.' IDENT
+    |   (   SUPER DOT IDENT
         )
         (   arguments
-            ->  ^(METHOD_CALL ^('.' 'super' IDENT) arguments)
-        |   ->  ^('.' 'super' IDENT)
+            ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
+        |   ->  ^(DOT SUPER IDENT)
         )
     ;
     
@@ -778,20 +783,20 @@ qualifiedIdentExpression
         // And now comes the stuff that may follow the qualified identifier.
         (   arguments
             ->  ^(METHOD_CALL qualifiedIdentifier arguments)
-        |   outerDot='.'
+        |   outerDot=DOT
             (   genericTypeArgumentList 
-                (   s='super' arguments
+                (   s=SUPER arguments
                     ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"]
                             qualifiedIdentifier genericTypeArgumentList arguments)
-                |   'super' innerDot='.' IDENT arguments
-                    ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier 'super') IDENT)
+                |   SUPER innerDot=DOT IDENT arguments
+                    ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
                             genericTypeArgumentList arguments)
                 |   IDENT arguments
                     ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) genericTypeArgumentList arguments)
                 )
             |   THIS
                 ->  ^($outerDot qualifiedIdentifier THIS)
-            |   s='super' arguments
+            |   s=SUPER arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier arguments)
             )
         )?
@@ -850,11 +855,11 @@ INTEGER_TYPE_SUFFIX : ('l'|'L') ;
 FLOATING_POINT_LITERAL
     :   ('0'..'9')+ 
         (
-            '.' ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
+            DOT ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
         |   EXPONENT FLOAT_TYPE_SUFFIX?
         |   FLOAT_TYPE_SUFFIX
         )
-    |   '.' ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
+    |   DOT ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
     ;
 
 fragment

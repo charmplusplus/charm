@@ -7,12 +7,12 @@ import org.antlr.runtime.CommonToken;
 class PupRoutineCreator
 {
     private CharjAST pupNode;
-    private CharjAST block;
+    private CharjAST initNode;
 
     PupRoutineCreator()
     {
         createPupNode();
-        block = pupNode.getChild(4);
+        createInitNode();
     }
 
     protected CharjAST getPupRoutineNode()
@@ -20,10 +20,28 @@ class PupRoutineCreator
         return pupNode;
     }
 
+    protected CharjAST getInitRoutineNode()
+    {
+        return initNode;
+    }
+
     private CharjAST createNode(int type, String text)
     {
         return new CharjAST(new CommonToken(type, text));
     }    
+    
+    private void createInitNode()
+    {
+        initNode = createNode(CharjParser.FUNCTION_METHOD_DECL, "FUNCTION_METHOD_DECL");
+
+    	initNode.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+        initNode.addChild(createNode(CharjParser.VOID, "void"));
+        initNode.addChild(createNode(CharjParser.IDENT, "initMethod"));
+        initNode.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
+        initNode.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+
+        initNode.getChild(0).addChild(createNode(CharjParser.PRIVATE, "private"));
+    }
 
     private void createPupNode()
     {
@@ -55,30 +73,117 @@ class PupRoutineCreator
 
     protected void varPup(CharjAST idNode)
     {
-        boolean primitive = false;
+        int type = -1;
 
         for(CharjAST p = idNode.getParent(); p != null; p = p.getParent())
-            if(p.getType() == CharjParser.PRIMITIVE_VAR_DECLARATION)
-                primitive = true;
-            else if(p.getType() == CharjParser.FUNCTION_METHOD_DECL)
-                break;
-            else if(p.getType() == CharjParser.TYPE)
+        {
+            switch(p.getType())
             {
-                if(primitive)
-                    primitiveVarPup(idNode);
-                else
-                    objectVarPup(idNode);
-                break;
+                case CharjParser.PRIMITIVE_VAR_DECLARATION:
+                    type = p.getType();
+                    break;
+                case CharjParser.OBJECT_VAR_DECLARATION:
+                    type = p.getChild(0).getType();
+                    break;
+                case CharjParser.FUNCTION_METHOD_DECL:
+                case CharjParser.BLOCK:
+                case CharjParser.FORMAL_PARAM_LIST:
+                    return;
+                case CharjParser.TYPE:
+                    switch(type)
+                    {
+                        case CharjParser.REFERENCE_TYPE:
+                            break;
+                        case CharjParser.PRIMITIVE_VAR_DECLARATION:
+                            primitiveVarPup(idNode);
+                            break;
+                        case CharjParser.POINTER_TYPE:
+                            pointerVarPup(idNode);
+                            break;
+                        case CharjParser.PROXY_TYPE:
+                            proxyVarPup(idNode);
+                            break;
+                        default:
+                            System.out.println("PupRoutineCreator.varPup: unknown type " + idNode);
+                            break;
+                    }
+                    return;
             }
+        }
+        System.out.println("PupRoutineCreator.varPup: could not pup variable " + idNode);
     }
 
     protected void primitiveVarPup(CharjAST idNode)
     {
         pupNode.getChild(4).addChild(createNode(CharjParser.EXPR, "EXPR"));
-        pupNode.getChild(4).getChild(0).addChild(createNode(CharjParser.BITWISE_OR, "|"));
-        pupNode.getChild(4).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
-        pupNode.getChild(4).getChild(0).getChild(0).addChild(idNode.dupNode());
+        
+        int index = pupNode.getChild(4).getChildren().size() - 1;
+
+        pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.BITWISE_OR, "|"));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
+    }
+
+    protected void proxyVarPup(CharjAST idNode)
+    {
+        // For now, just do a basic PUP. More complex handling may be needed later.
+        primitiveVarPup(idNode);
     }
     
-    protected void objectVarPup(CharjAST varDeclNode){}
+    private boolean generatedIf = false;
+
+    protected void pointerVarPup(CharjAST idNode)
+    {
+        if(!generatedIf)
+        {
+            generateIf();
+            generatedIf = true;
+        }
+
+        // add stuff to the initMethod routine
+        initNode.getChild(4).addChild(createNode(CharjParser.EXPR, "EXPR"));
+
+        int index = initNode.getChild(4).getChildren().size() - 1;
+
+        initNode.getChild(4).getChild(index).addChild(createNode(CharjParser.ASSIGNMENT, "="));
+        initNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
+        initNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.NEW, "new"));
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(0).getChild(0).getChild(0).dupNode());
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+
+        // add stuff to the pup routine
+        pupNode.getChild(4).addChild(createNode(CharjParser.EXPR, "EXPR"));
+
+        index = pupNode.getChild(4).getChildren().size() - 1;
+
+        pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.ARROW, "ARROW"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).addChild(idNode.dupNode());
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "pup"));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.EXPR, "EXPR"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
+    }
+
+    protected void generateIf()
+    {
+        pupNode.getChild(4).addChild(createNode(CharjParser.IF, "if"));
+        
+        int index = pupNode.getChild(4).getChildren().size() - 1;
+       
+        pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.PAREN_EXPR, "PAREN_EXPR"));
+        pupNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.EXPR, "EXPR"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.DOT, "."));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "p"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "isUnpacking"));
+        pupNode.getChild(4).getChild(index).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+        pupNode.getChild(4).getChild(index).addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+        pupNode.getChild(4).getChild(index).getChild(1).addChild(createNode(CharjParser.EXPR, "EXPR"));
+        pupNode.getChild(4).getChild(index).getChild(1).getChild(0).addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
+        pupNode.getChild(4).getChild(index).getChild(1).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "initMethod"));
+        pupNode.getChild(4).getChild(index).getChild(1).getChild(0).getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+    }
+
 }

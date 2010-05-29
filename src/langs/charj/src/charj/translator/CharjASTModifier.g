@@ -48,7 +48,7 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
         (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames]))
+        (typeDeclaration[$importDeclarations.packageNames])*)
         { $cs = $typeDeclaration.sym; }
     ;
 
@@ -64,6 +64,8 @@ typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
     :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             $TYPE.tree.addChild(puper.getPupRoutineNode());
+            $TYPE.tree.addChild(puper.getInitRoutineNode());
+            puper = new PupRoutineCreator();
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
@@ -223,10 +225,10 @@ formalParameterVarargDecl
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
-// IDENT (^('.' qualifiedIdentifier IDENT))*
+// IDENT (^(DOT qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
 block
@@ -335,22 +337,29 @@ expr
     |   ^(PRE_DEC expr)
     |   ^(POST_INC expr)
     |   ^(POST_DEC expr)
-    |   ^(TILDA expr)
+    |   ^(TILDE expr)
     |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
     |   primaryExpression
     ;
     
 primaryExpression
-    :   ^(  '.' primaryExpression
+    :   ^(DOT primaryExpression
                 (   IDENT
                 |   THIS
                 |   SUPER
                 )
         )
+        ->   ^(ARROW primaryExpression
+                   IDENT?
+                   THIS?
+                   SUPER?
+             )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal

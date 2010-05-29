@@ -6,7 +6,7 @@ import java.util.*;
 
 public class SymbolTable {
     public static final String DEFAULT_PACKAGE_NAME = "default";
-    public static final List<String> AUTO_IMPORTS = 
+    public static final List<String> AUTO_IMPORTS =
         new ArrayList<String>() {
             {
                 add("charj.lang");
@@ -14,10 +14,10 @@ public class SymbolTable {
             }
         };
 
-    public static final Set<String> TYPE_NAMES_TO_MANGLE = 
+    public static final Set<String> TYPE_NAMES_TO_MANGLE =
         new HashSet<String>() { {} };
 
-    public static final Set<String> METHOD_NAMES_TO_MANGLE = 
+    public static final Set<String> METHOD_NAMES_TO_MANGLE =
         new HashSet<String>() { {} };
 
     public static Map<String, ClassSymbol> primitiveTypes =
@@ -37,13 +37,14 @@ public class SymbolTable {
     /** Root of the object hierarchy, Charj.lang.Object */
     ClassSymbol objectRoot;
 
-    public SymbolTable(Translator _translator) 
+    public SymbolTable(Translator _translator)
     {
         translator = _translator;
         // define default package
         defaultPkg = new PackageScope(this, DEFAULT_PACKAGE_NAME, null);
         topLevelPackageScopes.put(DEFAULT_PACKAGE_NAME, defaultPkg);
         PackageScope lang = definePackage("charj.lang");
+        PackageScope externals = definePackage("externals");
         addScope(defaultPkg);
         initObjectHierarchy();
     }
@@ -52,7 +53,7 @@ public class SymbolTable {
         return translator.debug();
     }
 
-    protected void initObjectHierarchy() 
+    protected void initObjectHierarchy()
     {
         PackageScope lang = resolvePackage("charj.lang");
         objectRoot = new ClassSymbol(this, "Object", null, lang);
@@ -63,9 +64,9 @@ public class SymbolTable {
         primitiveTypes.put("long",   new ClassSymbol(this, "long",   null, lang));
         primitiveTypes.put("float",  new ClassSymbol(this, "float",  null, lang));
         primitiveTypes.put("double", new ClassSymbol(this, "double", null, lang));
-        primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang)); 
-        primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang)); 
-        primitiveTypes.put("bool",   new ClassSymbol(this, "bool",   null, lang)); 
+        primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang));
+        primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang));
+        primitiveTypes.put("boolean",new ClassSymbol(this, "bool",   null, lang));
         for (Map.Entry<String, ClassSymbol> entry : primitiveTypes.entrySet()) {
             ClassSymbol c = entry.getValue();
             lang.define(entry.getKey(), c);
@@ -80,7 +81,7 @@ public class SymbolTable {
     }
 
     /** Given a package like foo or charj.io, define it by breaking it up and
-     *  looking up the packages to left of last id.  Add last id to that 
+     *  looking up the packages to left of last id.  Add last id to that
      *  package.
      */
     public PackageScope definePackage(String packageName) {
@@ -91,7 +92,7 @@ public class SymbolTable {
         if (outerPackage == null) {
             if (debug()) {
                 System.out.println(
-                        " SymbolTable.definePackage(" + packageName + 
+                        " SymbolTable.definePackage(" + packageName +
                         "): defining outer pkg: " + outerPackageName);
             }
             outerPackage = new PackageScope(this,outerPackageName,defaultPkg);
@@ -104,10 +105,10 @@ public class SymbolTable {
             PackageScope p = (PackageScope)enclosingPackage.resolve(pname);
             if (p==null) {
                 if (debug()) System.out.println(
-                        " SymbolTable.definePackage(" + packageName + 
+                        " SymbolTable.definePackage(" + packageName +
                         "): defining inner pkg: " + pname +
                         " in "+enclosingPackage.toString());
-                
+
                 p = new PackageScope(this,pname,enclosingPackage);
                 enclosingPackage.define(pname, p);
             }
@@ -125,7 +126,7 @@ public class SymbolTable {
      */
     public PackageScope resolvePackage(String packageName) {
         if (debug()) System.out.println(
-                " SymbolTable.resolvePackage(" + packageName + 
+                " SymbolTable.resolvePackage(" + packageName +
                 "): examine: " + topLevelPackageScopes.keySet());
         String[] packageNames = packageName.split("[.]");
         String outerPackageName = packageNames[0];
@@ -134,7 +135,7 @@ public class SymbolTable {
 
         if (enclosingPackage == null) {
             if (debug()) System.out.println(
-                    " SymbolTable.resolvePackage(" + packageName + 
+                    " SymbolTable.resolvePackage(" + packageName +
                     "): outer package " +
                     outerPackageName + " not found in top level " +
                     topLevelPackageScopes.keySet());
@@ -170,31 +171,6 @@ public class SymbolTable {
 
     public void addScope(Scope s) {
         scopes.add(s);
-    }
-
-    // TODO:  shouldn't we include the arguments and do all mangling here?
-    public static String mangle(String methodName) {
-        if (METHOD_NAMES_TO_MANGLE.contains(methodName)) {
-            return "cj" + methodName;
-        }
-        return methodName;
-    }
-
-    public static String unmangle(String methodName) {
-        // this is not perfect because perhaps someone makes a method called
-        // mtoString() etc.
-        String unmangled = methodName.substring(2, methodName.length());
-        if (METHOD_NAMES_TO_MANGLE.contains(unmangled)) {
-            return unmangled;
-        }
-        return methodName;
-    }
-
-    public static String getCharjTypeName(String className) {
-        if (SymbolTable.TYPE_NAMES_TO_MANGLE.contains(className)) {
-            return "cj"+className;
-        }
-        return className;
     }
 
     public String toString() {

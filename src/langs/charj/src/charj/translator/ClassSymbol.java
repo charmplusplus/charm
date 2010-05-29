@@ -8,9 +8,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
 
-    Map<String, PackageScope> imports = 
+    Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
+    List<String> usings = new ArrayList<String>();
 
     /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
@@ -21,7 +22,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public boolean isPrimitive = false;
 
     public ClassSymbol(
-            SymbolTable symtab, 
+            SymbolTable symtab,
             String name) {
         super(symtab, name);
         type = this;
@@ -31,7 +32,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     }
 
     public ClassSymbol(
-            SymbolTable symtab, 
+            SymbolTable symtab,
             String name,
             ClassSymbol superClass,
             Scope scope) {
@@ -41,11 +42,19 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
+        this.includes.add("list");
+        this.usings.add("std::list");
+        this.includes.add("string");
+        this.usings.add("std::string");
+        this.includes.add("vector");
+        this.usings.add("std::vector");
+        this.includes.add("map");
+        this.usings.add("std::map");
     }
 
     public Scope getEnclosingScope() {
         // at root?  Then use enclosing scope
-        if ( superClass==null ) { 
+        if ( superClass==null ) {
             return scope;
         }
         return superClass;
@@ -58,7 +67,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     /** Importing a package means adding the package to list of "filters"
      *  used by resolvePackage.  The resolve operation can only see classes
      *  defined in the imported packages.  This method asks the sym tab if
-     *  it is known before looking at corresponding dir on disk to see if it 
+     *  it is known before looking at corresponding dir on disk to see if it
      *  exists.
      *
      *  Return null if this class is not in sym tab and was not found in path.
@@ -67,7 +76,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         if (debug()) System.out.println(
                 "ClassSymbol.importPackage(" + packageName +
                 "): add to " + toString());
-        
+
         PackageScope p = symtab.resolvePackage(packageName);
         if ( p!=null ) {
             imports.put(packageName, p);
@@ -82,7 +91,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
 
         if ( p==null && debug() ) System.out.println(
-                "ClassSymbol.importPackage(" + packageName + 
+                "ClassSymbol.importPackage(" + packageName +
                 "): dir not found");
         return p;
     }
@@ -96,13 +105,13 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return imports.get(packageName);
     }
 
-    /** To resolve a type in a class, look it up in each imported package 
-     *  including the current package. Classes cannot be defined in the 
+    /** To resolve a type in a class, look it up in each imported package
+     *  including the current package. Classes cannot be defined in the
      *  superclass so don't look upwards for types.
      *
      *  First check to see if we are resolving enclosing class then
      *  look for type in each imported package.  If not found in existing
-     *  packges, walk through imported packages again, trying to load from 
+     *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
     public ClassSymbol resolveType(String type) {
@@ -116,7 +125,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
         if ( name.equals(type) ) {
             if ( debug() ) System.out.println(
-                    "ClassSymbol.resolveType(" + type + 
+                    "ClassSymbol.resolveType(" + type +
                     "): surrounding class " + name + ":" + members.keySet());
             return this;
         }
@@ -129,8 +138,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
             ClassSymbol cs = pkg.resolveType(type);
             if ( cs != null) { // stop looking, found it
                 if ( debug() ) System.out.println(
-                        "ClassSymbol.resolveType(" + type + 
-                        "): found in context " + name + ":" + 
+                        "ClassSymbol.resolveType(" + type +
+                        "): found in context " + name + ":" +
                         members.keySet());
                 return cs;
             }
@@ -152,18 +161,18 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
 
         if ( debug() ) System.out.println(
-                "ClassSymbol.resolveType(" + type + 
+                "ClassSymbol.resolveType(" + type +
                 "): not in context " + name + ":" + members.keySet());
         return null;
     }
 
     public MethodSymbol resolveMethodLocally(
-            String name, 
+            String name,
             int numargs) {
         if (numargs > 0) {
             name += numargs;
         }
-     
+
         return methods.get(name);
     }
 
@@ -178,8 +187,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     }
 
     public Symbol define(
-            String name, 
+            String name,
             Symbol sym) {
+        if (sym == null) {
+            System.out.println("ClassSymbol.define: Uh oh, defining null symbol");
+        }
         members.put(name, sym);
         if (sym instanceof MethodSymbol) {
             methods.put(name, (MethodSymbol)sym);
@@ -208,21 +220,27 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         includes.add(includeName);
     }
 
-    public String getIncludeString() {
-        String includeString = "";
-        for (String include : includes) {
-            includeString += "#include <" + include + ">\n";
-        }
-        return includeString;
+    public void getUsings(String usingName) {
+        usings.add(usingName);
+    }
+
+    public List<String> getIncludes()
+    {
+        return includes;
+    }
+
+    public List<String> getUsings()
+    {
+        return usings;
     }
 
     public List<String> getPackageNames()
     {
-        List<String> list = new ArrayList<String>();
+        List<String> list = new LinkedList<String>();
         for(Scope currentScope = scope;
                 currentScope.getEnclosingScope() != null;
                 currentScope = currentScope.getEnclosingScope()) {
-            list.add(currentScope.getScopeName());
+            list.add(0, currentScope.getScopeName());
         }
         return list;
     }
@@ -231,20 +249,20 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     {
         Set<ClassSymbol> types = new HashSet<ClassSymbol>();
         for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
-            types.add(((VariableSymbol)entry.getValue()).type);
+            // note: type info may be null for unknown types, but this might
+            // need to be changed at some point.
+            ClassSymbol type = ((VariableSymbol)entry.getValue()).type;
+            if (type != null) types.add(type);
         }
         return types;
     }
 
     public List<String> getMemberTypeNames()
     {
-        if (debug()) System.out.println("Looking for type names...");
-        if (debug()) System.out.println("Found " + fields.size() + " fields...");
         List<String> names = new ArrayList<String>();
         for (ClassSymbol c : getMemberTypes()) {
             if (c.isPrimitive) continue;
             names.add(c.getName());
-            if (debug()) System.out.println("Found type " + c.getFullyQualifiedName());
         }
         return names;
     }

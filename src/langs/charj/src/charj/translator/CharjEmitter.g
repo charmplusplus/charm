@@ -85,10 +85,10 @@ charjSource[SymbolTable symtab, OutputMode m]
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
         (i+=importDeclaration)* 
-        (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        (t+=typeDeclaration)*)
+        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
+        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
         ->
     ;
 
@@ -185,7 +185,6 @@ classScopeDeclaration
 @init {
   boolean entry = false;
   List<String> modList = new ArrayList<String>();
-
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
@@ -453,7 +452,7 @@ formalParameterVarargDecl
 qualifiedIdentifier
     :   IDENT
         -> template(t={$text}) "<t>"
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
     ;
     
@@ -557,7 +556,7 @@ expression
     ;
 
 expr
-    :   ^('=' e1=expr e2=expr)
+    :   ^(ASSIGNMENT e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> = <e2>"
     |   ^('+=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> += <e2>"
@@ -593,7 +592,7 @@ expr
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
     |   ^('&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> & <e2>"
-    |   ^('==' e1=expr e2=expr)
+    |   ^(EQUALS e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> == <e2>"
     |   ^('!=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> != <e2>"
@@ -635,7 +634,7 @@ expr
         -> template(e1={$e1.st}) "<e1>++"
     |   ^(POST_DEC e1=expr)
         -> template(e1={$e1.st}) "<e1>--"
-    |   ^(TILDA e1=expr)
+    |   ^(TILDE e1=expr)
         -> template(e1={$e1.st}) "~<e1>"
     |   ^(NOT e1=expr)
         -> template(e1={$e1.st}) "!<e1>"
@@ -646,8 +645,14 @@ expr
     ;
 
 primaryExpression
-    :   ^('.' prim=primaryExpression
-            ( IDENT     -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+    :   ^(DOT prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+            | THIS    -> template(prim={$prim.st}) "<prim>.this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>.super"
+            )
+        )
+    |   ^(ARROW prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
             | THIS    -> template(prim={$prim.st}) "<prim>->this"
             | SUPER   -> template(prim={$prim.st}) "<prim>->super"
             )
@@ -657,6 +662,8 @@ primaryExpression
     |   IDENT
         -> {%{$start.getText()}}
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
+        -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
+    |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}

@@ -1043,7 +1043,7 @@ public:
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
       CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
-      controlPointSamplePeriod =  period * 1000; /**< A readonly */
+      controlPointSamplePeriod =  (int)(period * 1000); /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
@@ -1695,6 +1695,9 @@ void controlPointManager::generatePlan() {
       const double ldbStepsTime = times[0] + times[1];
       const double lbcost = ldbStepsTime - 2.0*avg; // An approximation of the 
       
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+#define lround(x)        ((long)(x+0.5))
+#endif
       int newval = lround(sqrt(2.0*lbcost/m));
       
 
@@ -1933,7 +1936,7 @@ void controlPointManager::generatePlan() {
       
       const int before = bestPhase->controlPoints[name];   
   
-      const int range = (maxValue-minValue+1)*(1.0-progress);
+      const int range = (int)((maxValue-minValue+1)*(1.0-progress));
 
       int high = min(before+range, maxValue);
       int low = max(before-range, minValue);
@@ -2422,7 +2425,7 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 				double val = (cPhaseConfig[v] + best[v])/2.0;
 
-				newControlPoints[name] = keepInRange(val,lb,ub);
+				newControlPoints[name] = keepInRange((int)val,lb,ub);
 				CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 				v++;
 			}
@@ -2537,7 +2540,7 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2581,7 +2584,7 @@ void simplexScheme::doExpansion(std::map<std::string, std::pair<int,int> > & con
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Expanding %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2622,7 +2625,7 @@ void simplexScheme::doContraction(std::map<std::string, std::pair<int,int> > & c
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Contracting %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}

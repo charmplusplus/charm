@@ -4,7 +4,7 @@ charjSource_ci(basename, pd, ids, tds, debug) ::=
 <<
 
 // interface for <basename>
-<tds>
+<tds; separator="\n\n">
 
 >>
 
@@ -22,7 +22,7 @@ charjSource_h(basename, pd, ids, tds, debug) ::=
  **************************************************************************/
 
 <ids>
-<tds>
+<tds; separator="\n\n">
 
 #endif // __<basename>__
 
@@ -34,7 +34,7 @@ charjSource_cc(basename, pd, ids, tds, debug) ::=
 #include "<basename>.h"
 
 <ids>
-<tds>
+<tds; separator="\n\n">
 
 >>
 
@@ -55,11 +55,19 @@ interfaceExtends(ts) ::=
 : public <ts; separator=", public ">
 >>
 
-classDeclaration_h(sym, ident, ext, csds) ::=
+type_preamble_h(sym) ::=
 <<
-<sym.IncludeString>
+<sym.Includes:{include| #include\<<include>\>
+}>
+<sym.Usings:{using| using <using>;
+}>
 <sym.MemberTypeNames:{name| class <name>;
 }>
+>>
+
+classDeclaration_h(sym, ident, ext, csds) ::=
+<<
+<type_preamble_h(sym)>
 <classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
 
@@ -84,7 +92,6 @@ class <ident> {
 
 classDeclaration_cc(sym, ident, ext, csds) ::=
 <<
-<sym.IncludeString>
 <classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
 
@@ -120,6 +127,7 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 
 chareDeclaration_h(sym, ident, ext, csds) ::=
 <<
+<type_preamble_h(sym)>
 #include "<ident>.decl.h"
 <chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 >>
