@@ -149,7 +149,7 @@ class PupRoutineCreator
         initNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
         initNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.NEW, "new"));
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
-        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(0).getChild(0).getChild(0).dupNode());
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(0).getChild(0).getChild(0).dupTree());
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
 
         // add stuff to the pup routine
