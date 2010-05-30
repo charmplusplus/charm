@@ -120,7 +120,7 @@ importDeclarations returns [List<CharjAST> packageNames]
 
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^(TYPE (CLASS | chareType) IDENT
+    :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
             {
                 Scope outerScope = $ScopeStack[-1]::current;
@@ -131,6 +131,20 @@ scope ScopeStack; // top-level type scope
                 $sym.definitionTokenStream = input.getTokenStream();
                 $IDENT.symbol = $sym;
                 $ScopeStack::current = $sym;
+                String classTypeName = $classType.text;
+                if (classTypeName.equals("class")) {
+                } else if (classTypeName.equals("chare")) {
+                    currentClass.isChare = true;
+                } else if (classTypeName.equals("group")) {
+                    currentClass.isChare = true;
+                } else if (classTypeName.equals("nodegroup")) {
+                    currentClass.isChare = true;
+                } else if (classTypeName.equals("chare_array")) {
+                    currentClass.isChare = true;
+                } else if (classTypeName.equals("mainchare")) {
+                    currentClass.isChare = true;
+                    currentClass.isMainChare = true;
+                } else System.out.println("Error: type " + classTypeName + " not recognized.");
                 importPackages($sym, $imports);
             }
             classScopeDeclaration*)
@@ -142,6 +156,11 @@ scope ScopeStack; // top-level type scope
             }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    ;
+
+classType
+    :   CLASS
+    |   chareType
     ;
 
 chareType

@@ -20,6 +20,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
 
     public boolean hasCopyCtor = false;
     public boolean isPrimitive = false;
+    public boolean isChare = false;
+    public boolean isMainChare = false;
 
     public ClassSymbol(
             SymbolTable symtab,

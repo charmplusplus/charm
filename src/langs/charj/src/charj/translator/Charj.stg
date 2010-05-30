@@ -148,7 +148,7 @@ class <ident>: public CBase_<ident> {
 
 chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
-module <ident> {
+<if(sym.isMainChare)>main<endif>module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
