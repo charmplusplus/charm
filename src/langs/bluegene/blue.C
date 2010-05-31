@@ -477,6 +477,10 @@ extern "C"
 void BgElapse(double t)
 {
 //  ASSERT(tTHREADTYPE == WORK_THREAD);
+#if CMK_ERROR_CHECKING
+  if (tTHREADTYPE == WORK_THREAD)
+  CthCheckMagic(CthSelf());
+#endif
   if (cva(bgMach).timingMethod == BG_ELAPSE)
     tCURRTIME += t;
 }
@@ -1285,6 +1289,10 @@ void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
 
   entryFunc(msg, handInfo->userPtr);
 
+#if CMK_ERROR_CHECKING
+  CthCheckMagic(CthSelf());
+#endif
+
   stopVTimer();
 
   DEBUGM(5, ("=====End of BgProcessing a msg on node[%d]=====\n\n", BgMyNode()));
@@ -1324,6 +1332,9 @@ void BgNodeInitialize(nodeInfo *ninfo)
     threadInfo *tinfo = ninfo->threadinfo[i];
     t = CthCreate((CthVoidFn)run_thread, tinfo, cva(bgMach).stacksize);
     if (t == NULL) CmiAbort("BG> Failed to create worker thread. \n");
+#if CMK_ERROR_CHECKING
+    CthSetMagic(t);
+#endif
     tinfo->setThread(t);
     /* put to thread table */
     tTHREADTABLE[tinfo->id] = t;

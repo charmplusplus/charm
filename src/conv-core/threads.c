@@ -605,6 +605,17 @@ static void CthThreadFinished(CthThread t)
 	CthSuspend();
 }
 
+void CthSetMagic(CthThread t)
+{
+	*((int*)(B(t)->stack + B(t)->stacksize) -1) = THD_MAGIC_NUM;
+}
+
+void CthCheckMagic(CthThread t)
+{
+printf("CthCheckMagic\n");
+	if (*((int*)(B(t)->stack + B(t)->stacksize) -1) != THD_MAGIC_NUM)
+		CmiAbort("Charm++: CthThread stack overflow detected.");
+}
 
 /************ Scheduler Interface **********/
 
