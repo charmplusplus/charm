@@ -61,4 +61,16 @@ public class CharjAST extends CommonTree
         return new CharjAST(getType(), getText());
     }
 
+    public CharjAST dupTree()
+    {
+        CharjAST root = dupNode();
+
+        List<CharjAST> children = getChildren();
+        if(children == null) return root;
+
+        for(CharjAST child : getChildren())
+            root.addChild(child.dupTree());
+        return root;
+    }
+
 }
