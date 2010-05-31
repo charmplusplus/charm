@@ -238,27 +238,51 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST modifier+)
+    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
     ;
 
 modifier
-    :   PUBLIC
-    |   PROTECTED
-    |   ENTRY
-    |   PRIVATE
-    |   ABSTRACT
-    |   NATIVE
+    :   accessModifier
     |   localModifier
+    |   charjModifier
+    |   otherModifier
     ;
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
+accessModifierList
+    :   ^(ACCESS_MODIFIER_LIST accessModifier+)
+    ;
+
+charjModifierList
+    :   ^(CHARJ_MODIFIER_LIST charjModifier+)
+    ;
+
+otherModifierList
+    :   ^(OTHER_MODIFIER_LIST otherModifier+)
+    ;
+    
 localModifier
     :   FINAL
     |   STATIC
     |   VOLATILE
+    ;
+
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+    :   ENTRY
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
     ;
 
 type
