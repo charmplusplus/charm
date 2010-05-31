@@ -348,6 +348,7 @@ returns [List names]
         {
             $names = $m;
         }
+        ->  local_mod_list(mods = {$names})
     ;
 
 charjModifierList
@@ -510,12 +511,12 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
     ;

@@ -271,11 +271,11 @@ mod_list_ci(accmods, localmods, charjmods, othermods) ::=
 
 local_var_decl(modList, type, declList) ::=
 <<
-<if(modList)>
-<modList> <type> <declList>;
-<else>
-<type> <declList>;
-<endif>
+<if(modList)><modList> <endif><type> <declList>;
+>>
+
+local_mod_list(mods) ::= <<
+<mods; separator=" ">
 >>
 
 
