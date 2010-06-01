@@ -8,7 +8,7 @@ charjSource_ci(basename, pd, imports, types, ros, debug) ::=
 <types; separator="\n\n">
 <if(ros)>
 
-module readonly_<basename> {
+module <basename>_readonly {
     <ros; separator="\n">
 }
 <endif>
