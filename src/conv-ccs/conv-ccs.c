@@ -236,6 +236,7 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 
 /* Call the handler */
   CpvAccess(ccsReq)=hdr;
+#if CMK_CHARMDEBUG
   if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
     /* We are conditionally delivering, send the message to the child and wait for its response */
     int bytes = reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
@@ -251,7 +252,9 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
       CpdEndConditionalDeliver_master();
    }
   }
-  else {
+  else
+#endif
+  {
     callHandlerRec(fn,reqLen,reqData);
   
 /*Check if a reply was sent*/
