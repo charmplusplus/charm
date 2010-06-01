@@ -30,6 +30,7 @@ Chunk::Chunk(int t, int x, int y){
   iterations =0;
   myMax = 99999.999;
 
+
   // CkPrintf("[%d] x is %d, y is %d, t is %d %f\n",CkMyPe(),x,y,t,BgGetTime());  
   myxdim = int(xdim/total);
   counter=0;
@@ -84,7 +85,6 @@ void Chunk::resetBoundary() {
 	A[indexof(0,i,myydim)] = 1.0;
   
 }
-
 }
 
 
@@ -188,8 +188,6 @@ void Chunk::startWork(){
     CkPrintf("\n\nA in end of startWork is \n");
   print();
 #endif
-int xx[1024*4+100];
-for (int i=0;i<1024*4+100;i++) xx[i]=i;
 }
 
 

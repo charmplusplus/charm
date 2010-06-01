@@ -67,7 +67,7 @@ void CpdSearchLeaks(char * msg) {
       info->begin_data = ntohl((int)info->begin_data);
       info->end_data = ntohl((int)info->end_data);
       info->begin_bss = ntohl((int)info->begin_bss);
-      info->end_bss = (char*)(size_t)ntohl((size_t)info->end_bss);
+      info->end_bss = ntohl((int)info->end_bss);
     }
     info->quick = ntohl(info->quick);
     info->pe = ntohl(info->pe);
