@@ -44,21 +44,25 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
-        (packageDeclaration)? 
-        (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames])*)
-        { $cs = $typeDeclaration.sym; }
+        packageDeclaration?
+        importDeclaration*
+        readonlyDeclaration*
+        (typeDeclaration { $cs = $typeDeclaration.sym; })*)
     ;
 
 packageDeclaration
     :   ^(PACKAGE (ids+=IDENT)+)  
     ;
     
-importDeclarations returns [List<CharjAST> packageNames]
-    :   (^(IMPORT qualifiedIdentifier '.*'?))*
+importDeclaration
+    :   ^(IMPORT qualifiedIdentifier '.*'?)
     ;
 
-typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
+readonlyDeclaration
+    :   ^(READONLY localVariableDeclaration)
+    ;
+
+typeDeclaration returns [ClassSymbol sym]
     :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             $TYPE.tree.addChild(astmod.getPupRoutineNode());
@@ -130,7 +134,7 @@ variableDeclarator
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
         {
-            astmod.varPup($IDENT);
+            if (currentClass != null) astmod.varPup($IDENT);
         }
     ;
 

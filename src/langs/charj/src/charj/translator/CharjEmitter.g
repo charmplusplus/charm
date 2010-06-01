@@ -84,12 +84,18 @@ charjSource[SymbolTable symtab, OutputMode m]
     this.mode_ = m;
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
-        (i+=importDeclaration)* 
+        (i+=importDeclaration)*
+        (r+=readonlyDeclaration)*
         (t+=typeDeclaration)*)
-        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
-        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, ids={$i}, tds={$t}, debug={debug()})
+        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
+        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         ->
+    ;
+
+topLevelDeclaration
+    :   importDeclaration -> {$importDeclaration.st;}
+    |   typeDeclaration -> {$typeDeclaration.st;}
     ;
 
 packageDeclaration returns [List names]
@@ -97,6 +103,13 @@ packageDeclaration returns [List names]
         {
             $names = $ids;
         }
+        ->
+    ;
+
+readonlyDeclaration
+    :   ^(READONLY lvd=localVariableDeclaration)
+        -> {emitCI()}? template(bn={basename()}, v={$lvd.st}) "readonly <v>"
+        -> {emitH()}? template(v={$lvd.st}) "extern <v>"
         ->
     ;
     

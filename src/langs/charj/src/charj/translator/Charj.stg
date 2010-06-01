@@ -1,15 +1,21 @@
 group Charj;
 
-charjSource_ci(basename, pd, ids, tds, debug) ::=
+charjSource_ci(basename, pd, imports, types, ros, debug) ::=
 <<
 
 // interface for <basename>
-<tds; separator="\n\n">
+<imports; separator="\n">
+<types; separator="\n\n">
+<if(ros)>
 
+module readonly_<basename> {
+    <ros; separator="\n">
+}
+<endif>
 >>
 
 
-charjSource_h(basename, pd, ids, tds, debug) ::=
+charjSource_h(basename, pd, imports, types, ros, debug) ::=
 <<
 #ifndef __<basename>__
 #define __<basename>__
@@ -21,20 +27,55 @@ charjSource_h(basename, pd, ids, tds, debug) ::=
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
-<ids>
-<tds; separator="\n\n">
+<imports; separator="\n">
+<types; separator="\n\n">
+<if(ros)>
+/* Readonly variables */
+<readonlys_h(pds = pd, ros = ros)>
+#include "<basename>_readonly.decl.h"
+<endif>
+
 
 #endif // __<basename>__
 
+
 >>
 
-
-charjSource_cc(basename, pd, ids, tds, debug) ::=
+charjSource_cc(basename, pd, imports, types, ros, debug) ::=
 <<
 #include "<basename>.h"
 
-<ids>
-<tds; separator="\n\n">
+<imports; separator="\n">
+<types; separator="\n\n">
+<if(ros)>
+
+/* Readonly variable support */
+<readonlys_cc(pds = pd, basename = basename)>
+<endif>
+
+
+>>
+
+readonlys_h(pds, ros) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <readonlys_h(pds = rest(pds), ros = ros)>
+} // namespace <first(pds)>
+<else>
+<ros; separator="\n">
+<endif>
+>>
+
+readonlys_cc(pds, basename) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <readonlys_cc(pds = rest(pds), basename = basename)>
+} // namespace <first(pds)>
+<else>
+#include "<basename>_readonly.def.h"
+<endif>
 
 >>
 
@@ -65,10 +106,25 @@ type_preamble_h(sym) ::=
 }>
 >>
 
+chare_preamble_h(sym) ::=
+<<
+<type_preamble_h(sym)>
+>>
+
+type_epilogue_h(sym) ::=
+<<
+>>
+
+chare_epilogue_h(sym) ::=
+<<
+<type_epilogue_h(sym)>
+>>
+
 classDeclaration_h(sym, ident, ext, csds) ::=
 <<
 <type_preamble_h(sym)>
 <classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<type_epilogue_h(sym)>
 >>
 
 classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
@@ -127,9 +183,10 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 
 chareDeclaration_h(sym, ident, ext, csds) ::=
 <<
-<type_preamble_h(sym)>
+<chare_preamble_h(sym)>
 #include "<ident>.decl.h"
 <chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<chare_epilogue_h(sym)>
 >>
 
 chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=

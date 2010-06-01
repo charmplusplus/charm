@@ -28,6 +28,7 @@ package charj.translator;
     MethodSymbol currentMethod = null;
     LocalScope currentLocalScope = null;
     Translator translator;
+    List<CharjAST> imports = new ArrayList<CharjAST>();
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
@@ -62,6 +63,10 @@ package charj.translator;
             }
         }
     }
+
+    public void addImport(CharjAST importNode) {
+        imports.add(importNode);
+    }
 }
 
 
@@ -81,13 +86,11 @@ scope ScopeStack; // default scope
     symtab = _symtab;
     $ScopeStack::current = symtab.getDefaultPkg();
 }
-    // TODO: go back to allowing multiple type definitions per file, check that
-    // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
-        (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames])*)
-        { $cs = $typeDeclaration.sym; }
+        (importDeclaration
+        | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | readonlyDeclaration)*)
     ;
 
 // note: no new scope here--this replaces the default scope
@@ -109,16 +112,16 @@ packageDeclaration
         }
     ;
     
-importDeclarations returns [List<CharjAST> packageNames]
-@init {
-    packageNames = new ArrayList<CharjAST>();
-}
-    :   (^(IMPORT qualifiedIdentifier '.*'?)
-		{ packageNames.add($qualifiedIdentifier.start); })*
+importDeclaration
+    :   ^(IMPORT qualifiedIdentifier '.*'?)
+        { addImport($qualifiedIdentifier.start); }
     ;
 
+readonlyDeclaration
+    :   ^(READONLY localVariableDeclaration)
+    ;
 
-typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
+typeDeclaration returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
@@ -145,7 +148,7 @@ scope ScopeStack; // top-level type scope
                     currentClass.isChare = true;
                     currentClass.isMainChare = true;
                 } else System.out.println("Error: type " + classTypeName + " not recognized.");
-                importPackages($sym, $imports);
+                importPackages($sym, imports);
             }
             classScopeDeclaration*)
             {
@@ -335,7 +338,7 @@ String name = "";
         {
             $type = null;
             //System.out.println("trying to resolve type " + name + " in type " + currentClass);
-            $type = currentClass.resolveType(name);
+            if (currentClass != null) $type = currentClass.resolveType(name);
             //System.out.println("got " + $type);
             //if ($type == null) $type = symtab.resolveBuiltinType(name);
             $QUALIFIED_TYPE_IDENT.symbol = $type;

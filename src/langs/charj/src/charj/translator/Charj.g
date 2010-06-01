@@ -52,6 +52,7 @@ tokens {
     GROUP                   = 'group'           ;
     NODEGROUP               = 'nodegroup'       ;
     ENUM                    = 'enum'            ;
+    READONLY                = 'readonly'        ;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -216,8 +217,13 @@ charjSource
 
 compilationUnit
     :   packageDeclaration? 
-        importDeclaration* 
-        typeDeclaration*
+        topLevelDeclaration+ 
+    ;
+
+topLevelDeclaration
+    :   importDeclaration
+    |   readonlyDeclaration
+    |   typeDeclaration
     ;
 
 packageDeclaration
@@ -227,6 +233,10 @@ packageDeclaration
 
 importDeclaration
     :   IMPORT^ qualifiedIdentifier '.*'? ';'!
+    ;
+
+readonlyDeclaration
+    :   READONLY^ localVariableDeclaration ';'!
     ;
 
 typeDeclaration
