@@ -158,7 +158,7 @@ public abstract class SymbolWithScope
             parent = getEnclosingScope().getFullyQualifiedName();
         }
         if ( parent!=null ) {
-            return parent + "." + name;
+            return parent + "::" + name;
         }
         return name;
     }

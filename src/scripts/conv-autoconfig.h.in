@@ -132,6 +132,9 @@
 /* whether ntohl is available */
 #undef CMK_HAS_NTOHL
 
+/* whether NUMA control related functions exist */
+#undef CMK_HAS_NUMACTRL
+
 /* whether has popen */
 #undef CMK_HAS_POPEN
 

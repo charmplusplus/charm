@@ -19,6 +19,10 @@
 //#include "queueing.h"
 #include <unistd.h>
 
+#if CMK_BLUEGENE_CHARM
+#include "blue_impl.h"
+#endif
+
 
 #if CMK_CHARMDEBUG && CMK_CCS_AVAILABLE && !defined(_WIN32)
 
@@ -720,10 +724,6 @@ void CpdBreakPointInit()
   CkRegisterChareInCharm(CpvAccess(_debugChare));
   CpvAccess(breakPointEntryTable) = new CpdBpFuncTable_t(10,0.5,CkHashFunction_int,CkHashCompare_int );
 }
-
-#if CMK_BLUEGENE_CHARM
-#include "blue_impl.h"
-#endif
 
 static void _call_freeze_on_break_point(void * msg, void * object)
 {

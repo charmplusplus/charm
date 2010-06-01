@@ -33,6 +33,7 @@ CkpvDeclare(CkVec<VidBlock *>, vidblocks);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
+CkpvDeclare(int, currentChareIdx);
 #endif
 
 
@@ -56,6 +57,8 @@ void _initChareTables()
   CkpvInitialize(CkVec<int>, chare_types);
   CkpvInitialize(CkVec<VidBlock *>, vidblocks);
   CkpvInitialize(Vidblockmap, vmap);
+  CkpvInitialize(int, currentChareIdx);
+  CkpvAccess(currentChareIdx) = -1;
 #endif
 }
 
@@ -65,7 +68,10 @@ Chare::Chare(void) {
   thishandle.objPtr=this;
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
-  if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
+  if (CkpvAccess(currentChareIdx) >= 0) {
+    thishandle.objPtr=(void*)CkpvAccess(currentChareIdx);
+  }
+  chareIdx = CkpvAccess(currentChareIdx);
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   mlogData = new ChareMlogData();
@@ -643,7 +649,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = -1;
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
   _STATS_RECORD_PROCESS_GROUP_1();
@@ -666,7 +673,8 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = -1;
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj);
   CkpvAccess(_currentNodeGroupObj) = NULL;
@@ -836,7 +844,8 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   int idx;
   register void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = idx;
+  //((Chare *)obj)->chareIdx = idx;
+  CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
 }
@@ -875,7 +884,8 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 #endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = idx;
+  //((Chare *)obj)->chareIdx = idx;
+  CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
 }
@@ -1317,7 +1327,8 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
   } else {
-    CkPackMessage(&env);
+    if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
+      CkPackMessage(&env);
     int len=env->getTotalsize();
     CmiSetXHandler(env,CmiGetHandler(env));
 #if CMK_OBJECT_QUEUE_AVAILABLE

@@ -33,6 +33,7 @@ package charj.translator;
     private boolean emitCI() { return mode_ == OutputMode.ci; }
     private boolean emitH() { return mode_ == OutputMode.h; }
     private boolean debug() { return translator_.debug(); }
+    private String basename() { return translator_.basename(); }
 
     /**
      *  Override ANTLR's token mismatch behavior so we throw exceptions early.
@@ -83,20 +84,32 @@ charjSource[SymbolTable symtab, OutputMode m]
     this.mode_ = m;
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
-        (i+=importDeclaration)* 
-        (t=typeDeclaration))
-        -> {emitCC()}? charjSource_cc(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitCI()}? charjSource_ci(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
-        -> {emitH()}? charjSource_h(pd={$p.names}, ids={$i}, tds={$t.st}, debug={debug()})
+        (i+=importDeclaration)*
+        (r+=readonlyDeclaration)*
+        (t+=typeDeclaration)*)
+        -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
+        -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
+        -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         ->
     ;
 
-packageDeclaration
-returns [List names]
+topLevelDeclaration
+    :   importDeclaration -> {$importDeclaration.st;}
+    |   typeDeclaration -> {$typeDeclaration.st;}
+    ;
+
+packageDeclaration returns [List names]
     :   ^('package' (ids+=IDENT)+)
         {
             $names = $ids;
         }
+        ->
+    ;
+
+readonlyDeclaration
+    :   ^(READONLY lvd=localVariableDeclaration)
+        -> {emitCI()}? template(bn={basename()}, v={$lvd.st}) "readonly <v>"
+        -> {emitH()}? template(v={$lvd.st}) "extern <v>"
         ->
     ;
     
@@ -118,10 +131,11 @@ importDeclaration
     ;
     
 typeDeclaration
-    :   ^(TYPE 'class' IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
+        (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
@@ -133,14 +147,15 @@ typeDeclaration
                 ext={$su.st}, 
                 csds={$csds})
         ->
-    |   ^('interface' IDENT (^('extends' type+))? interfaceScopeDeclaration*)
+    |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
-    |   ^('enum' IDENT (^('implements' type+))? classScopeDeclaration*)
+    |   ^(ENUM IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
-    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))? (csds+=classScopeDeclaration)*)
+    |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.symbol;
         }
+        (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
@@ -165,10 +180,11 @@ chareType
 @init {
 $st = %{$start.getText()};
 }
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
-    |   ^('chare_array' ARRAY_DIMENSION)
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   MAINCHARE
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
         -> template(t={$ARRAY_DIMENSION.text}) "array [<t>]"
     ;
 
@@ -178,35 +194,31 @@ enumConstant
     ;
 
 classScopeDeclaration
-@init {
-  boolean entry = false;
-  List<String> modList = new ArrayList<String>();
-
+@init
+{
+    boolean entry = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-        { 
-            if ($m.st != null) {
-                // determine whether this is an entry method
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-                for(Object o : $m.names)
-                  if(o.equals("entry")) continue;
-                  else modList.add(o.toString());
-            }
+        {
+            // determine whether it's an entry method
+            if($m.start != null)
+                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
         }
         -> {emitCC()}? funcMethodDecl_cc(
-                modl={modList}, 
+                sym={currentClass},
+                modl={$m.st}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
         -> {emitH()}? funcMethodDecl_h(
-                modl={modList}, 
+                modl={$m.st}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
@@ -214,45 +226,44 @@ classScopeDeclaration
         -> {(emitCI() && entry)}? funcMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
-                ty={$ty.text},
+                ty={$ty.st},
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
         ->
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
         ->
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        { 
-            // determine whether this is an entry method
-            if ($m.st != null) {
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-            }
+        {
+            // determine whether it's an entry method
+            if($m.start != null)
+                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
         }
         -> {emitCC()}? ctorDecl_cc(
-                modl={$m.st}, 
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitCI() && entry}? ctorDecl_ci(
-                modl={$m.st}, 
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitH()}? ctorDecl_h(
-                modl={$m.st}, 
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
@@ -322,65 +333,128 @@ throwsClause
     ;
 
 modifierList
-returns [List<String> names]
-    :   ^(MODIFIER_LIST (m+=modifier)+)
-        {
-          $names = new ArrayList<String>();
-          for(Object o : $m) $names.add(o.toString());
-        }
-        -> mod_list(mods={$m})
+    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+        ->  {emitCC()}? mod_list_cc(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->  {emitH()}? mod_list_h(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->  {emitCI()}? mod_list_ci(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->
     ;
 
 modifier
-@init {
-$st = %{$start.getText()};
-}
-    :   'public'
-    |   'protected'
-    |   'private'
-    |   'entry'
-    |   'abstract'
-    |   'native'
+    :   accessModifier
     |   localModifier
-        -> {$localModifier.st}
+    |   charjModifier
+    |   otherModifier
     ;
 
+accessModifierList
+returns [List names]
+    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)+)
+        {
+            $names = $m;
+        }
+    ;
 localModifierList
+returns [List names]
     :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)+)
-        -> local_mod_list(mods={$m})
+        {
+            $names = $m;
+        }
+        ->  local_mod_list(mods = {$names})
     ;
 
+charjModifierList
+returns [List names]
+    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)+)
+        {
+            $names = $m;
+        }
+    ;
+
+otherModifierList
+returns [List names]
+    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)+)
+        {
+            $names = $m;
+        }
+    ;
+    
 localModifier
-@init {
-$st = %{$start.getText()};
+@init
+{
+    $st = %{$start.getText()};
 }
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
+accessModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   ENTRY
+    ;
+
+otherModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   ABSTRACT
+    |   NATIVE
+    ;
     
 type
     :   simpleType
         -> {$simpleType.st}
     |   objectType 
         -> {$objectType.st}
-    |   'void'
+    |   VOID
+        {
+            $st = %{$start.getText()};
+        }
     ;
 
 simpleType
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
-        -> type(typeID={$primitiveType.st}, arrDeclList={$arrayDeclaratorList.st})
+    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+        -> simple_type(typeID={$primitiveType.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
 objectType
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        -> type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    : proxyType -> {$proxyType.st;}
+    | nonProxyType -> {$nonProxyType.st}
     ;
 
-qualifiedTypeIdent
-    :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+) 
-        -> template(types={$t}) "<types; separator=\".\">"
+nonProxyType
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> pointer_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> reference_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    ;
+
+proxyType
+    :   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    ;
+
+qualifiedTypeIdent returns [ClassSymbol type]
+    :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+)
+        {$type = (ClassSymbol)$QUALIFIED_TYPE_IDENT.symbol;}
+        -> template(types={$t}) "<types; separator=\"::\">"
     ;
 
 typeIdent
@@ -392,16 +466,16 @@ primitiveType
 @init {
 $st = %{$start.getText()};
 }
-    :   'boolean'
+    :   BOOLEAN
         -> template() "bool"
-    |   'char'
-    |   'byte'
+    |   CHAR
+    |   BYTE
         -> template() "char"
-    |   'short'
-    |   'int'
-    |   'long'
-    |   'float'
-    |   'double'
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -434,7 +508,7 @@ formalParameterVarargDecl
 qualifiedIdentifier
     :   IDENT
         -> template(t={$text}) "<t>"
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
     ;
     
@@ -458,46 +532,53 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
     ;
 
 
 statement
-    :   block
+    :   nonBlockStatement
+        -> {$nonBlockStatement.st}
+    |   block
         -> {$block.st}
-    |   ^('assert' cond=expression msg=expression?)
+    ;
+
+nonBlockStatement
+    :   ^(ASSERT cond=expression msg=expression?)
         -> assert(cond={$cond.st}, msg={$msg.st})
-    |   ^('if' parenthesizedExpression then=statement else_=statement?)
+    |   ^(IF parenthesizedExpression then=block else_=block?)
         -> if(cond={$parenthesizedExpression.st}, then={$then.st}, else_={$else_.st})
-    |   ^('for' forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* s=statement)
-        -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$s.st})
-    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
+    |   ^(FOR forInit? FOR_EXPR cond=expression? FOR_UPDATE (update+=expression)* b=block)
+        -> for(initializer={$forInit.st}, cond={$cond.st}, update={$update}, body={$block.st})
+    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
         -> template(t={$text}) "/* foreach not implemented */ <t>"
-    |   ^('while' pe=parenthesizedExpression s=statement)
-        -> while(cond={$pe.st}, body={$s.st})
-    |   ^('do' s=statement pe=parenthesizedExpression)
-        -> dowhile(cond={$pe.st}, block={$s.st})
-    |   ^('switch' pe=parenthesizedExpression (scls+=switchCaseLabel)*)
+    |   ^(WHILE pe=parenthesizedExpression b=block)
+        -> while(cond={$pe.st}, body={$b.st})
+    |   ^(DO b=block pe=parenthesizedExpression)
+        -> dowhile(cond={$pe.st}, block={$b.st})
+    |   ^(SWITCH pe=parenthesizedExpression (scls+=switchCaseLabel)*)
         -> switch(expr={$pe.st}, labels={$scls})
-    |   ^('return' e=expression?)
+    |   ^(RETURN e=expression?)
         -> return(val={$e.st})
-    |   ^('throw' expression)
+    |   ^(THROW expression)
         -> template(t={$text}) "/* throw not implemented */ <t>"
-    |   ^('break' IDENT?)
+    |   ^(BREAK IDENT?)
         -> template() "break;" // TODO: support labeling
-    |   ^('continue' IDENT?)
+    |   ^(CONTINUE IDENT?)
         -> template() "continue;" // TODO: support labeling
     |   ^(LABELED_STATEMENT i=IDENT s=statement)
         -> label(text={$i.text}, stmt={$s.st})
     |   expression
         -> template(expr={$expression.st}) "<expr>;"
+    |   ^('delete' qualifiedIdentifier)
+        -> template(t={$qualifiedIdentifier.st}) "delete <t>;"
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
@@ -505,9 +586,9 @@ statement
     ;
         
 switchCaseLabel
-    :   ^('case' expression (b+=blockStatement)*)
+    :   ^(CASE expression (b+=blockStatement)*)
         -> case(expr={$expression.st}, block={$b})
-    |   ^('default' (b+=blockStatement)*)
+    |   ^(DEFAULT (b+=blockStatement)*)
         -> template(block={$b}) "default: <block>"
     ;
     
@@ -531,7 +612,7 @@ expression
     ;
 
 expr
-    :   ^('=' e1=expr e2=expr)
+    :   ^(ASSIGNMENT e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> = <e2>"
     |   ^('+=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> += <e2>"
@@ -561,13 +642,13 @@ expr
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> || <e2>"
     |   ^('&&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> && <e2>"
-    |   ^('|' e1=expr e2=expr)
+    |   ^(BITWISE_OR e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> | <e2>"
     |   ^('^' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> ^ <e2>"
     |   ^('&' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> & <e2>"
-    |   ^('==' e1=expr e2=expr)
+    |   ^(EQUALS e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> == <e2>"
     |   ^('!=' e1=expr e2=expr)
         -> template(e1={$e1.st}, e2={$e2.st}) "<e1> != <e2>"
@@ -609,28 +690,36 @@ expr
         -> template(e1={$e1.st}) "<e1>++"
     |   ^(POST_DEC e1=expr)
         -> template(e1={$e1.st}) "<e1>--"
-    |   ^('~' e1=expr)
+    |   ^(TILDE e1=expr)
         -> template(e1={$e1.st}) "~<e1>"
-    |   ^('!' e1=expr)
+    |   ^(NOT e1=expr)
         -> template(e1={$e1.st}) "!<e1>"
     |   ^(CAST_EXPR ty=type e1=expr)
         -> template(ty={$ty.st}, e1={$e1.st}) "(<ty>)<e1>"
     |   primaryExpression
         -> {$primaryExpression.st}
     ;
-    
+
 primaryExpression
-    :   ^('.' prim=primaryExpression IDENT)
-        -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
-    |   ^('.' prim=primaryExpression 'this')
-        -> template(prim={$prim.st}) "<prim>.this"
-    |   ^('.' prim=primaryExpression 'super')
-        -> template(prim={$prim.st}) "<prim>.super"
+    :   ^(DOT prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+            | THIS    -> template(prim={$prim.st}) "<prim>.this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>.super"
+            )
+        )
+    |   ^(ARROW prim=primaryExpression
+            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+            | THIS    -> template(prim={$prim.st}) "<prim>->this"
+            | SUPER   -> template(prim={$prim.st}) "<prim>->super"
+            )
+        )
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
         -> {%{$start.getText()}}
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
+        -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
+    |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
@@ -640,11 +729,11 @@ primaryExpression
         -> {$literal.st}
     |   newExpression
         -> {$newExpression.st}
-    |   'this'
+    |   THIS
         -> {%{$start.getText()}}
     |   arrayTypeDeclarator
         -> {$arrayTypeDeclarator.st}
-    |   'super'
+    |   SUPER
         -> {%{$start.getText()}}
     ;
     
@@ -667,6 +756,10 @@ newExpression
             )
         )
         -> template(t={$text}) "<t>"
+    |   ^(NEW proxyType arguments)
+        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
+    |   ^(NEW nonProxyType arguments)
+        -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
 
 newArrayConstruction
@@ -693,8 +786,8 @@ $st = %{$start.getText()};
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 

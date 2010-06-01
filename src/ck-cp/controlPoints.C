@@ -12,8 +12,12 @@
 #include <pathHistory.h>
 #include "cp_effects.h"
 #include <iostream>
-
+#include <math.h>
 #include <climits>
+
+#define roundDouble(x)        ((long)(x+0.5))
+
+
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
  
 
@@ -52,7 +56,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults, LDBPeriod, LDBPeriodLinear, LDBPeriodQuadratic}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults, LDBPeriod, LDBPeriodLinear, LDBPeriodQuadratic, LDBPeriodOptimal}  tuningScheme;
 
 
 
@@ -96,6 +100,9 @@ void printTuningScheme(){
     break;
   case LDBPeriodQuadratic:
     CkPrintf("Tuning Scheme: Load Balancing Period Steering (Quadratic Prediction)\n");
+    break;
+  case LDBPeriodOptimal:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering (Optimal Prediction)\n");
     break;
   default:
     CkPrintf("Unknown tuning scheme\n");
@@ -181,7 +188,6 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 /// If different seed, name, and random_seed values are provided, the returned values are pseudo-random
 unsigned int randInt(unsigned int num, const char* name, int seed=0){
   CkAssert(num > 0);
-  CkAssert(num < 1000);
 
   unsigned long hash = 0;
   unsigned int c;
@@ -1039,7 +1045,7 @@ public:
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
     if(haveSamplePeriod){
       CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
-      controlPointSamplePeriod =  period * 1000; /**< A readonly */
+      controlPointSamplePeriod =  (int)(period * 1000); /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
@@ -1069,12 +1075,14 @@ public:
       whichTuningScheme = Simplex;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPDivideConquer", "A divide and conquer program specific steering scheme") ){
       whichTuningScheme = DivideAndConquer;
-    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriod", "Adjust the load balancing period") ){
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriod", "Adjust the load balancing period (Constant Predictor)") ){
       whichTuningScheme = LDBPeriod;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodLinear", "Adjust the load balancing period (Linear Predictor)") ){
       whichTuningScheme = LDBPeriodLinear;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodQuadratic", "Adjust the load balancing period (Quadratic Predictor)") ){
       whichTuningScheme = LDBPeriodQuadratic;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodOptimal", "Adjust the load balancing period (Optimal Predictor)") ){
+      whichTuningScheme = LDBPeriodOptimal;
     }
 
     char *defValStr = NULL;
@@ -1194,6 +1202,11 @@ FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
   controlPointTimingStamp();
 }
 
+
+FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+{
+  setFrameworkAdvancePhase(*value);
+}
 
 
 
@@ -1645,6 +1658,78 @@ void controlPointManager::generatePlan() {
       }
     }
     
+
+  }  else if( whichTuningScheme == LDBPeriodOptimal) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
+
+
+
+    instrumentedPhase *prevPhase = previousPhaseData();
+    
+    const std::vector<double> &times = prevPhase->times;
+    const int numTimings = times.size();
+    
+    if( numTimings > 4){
+
+      const int b1 = 2 + (numTimings-2)/2;
+      double s1 = 0;
+      double s2 = 0;
+    
+    
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<numTimings; i++){
+	s2 += times[i];
+      }
+      
+    
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(numTimings-b1);
+      const double avg = (a1+a1) / 2.0;
+
+      const double m = (a2-a1)/((double)(numTimings-2)/2.0); // An approximation of the slope of the execution times    
+
+      const double ldbStepsTime = times[0] + times[1];
+      const double lbcost = ldbStepsTime - 2.0*avg; // An approximation of the 
+      
+
+      int newval = roundDouble(sqrt(2.0*lbcost/m));
+      
+      // We don't really know what to do if m<=0, so we'll just double the period
+      if(m<=0)
+	newval = 2*numTimings;     
+      
+      CkPrintf("Optimal Model (double when negative): lbcost = %f, m = %f, new ldbperiod should be %d\n", lbcost, m, newval);    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	// TODO: lookup only control points that are relevant instead of all of them
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+	
+	if(newval < lb){
+	  newControlPoints[name] = lb;
+	} else if(newval > ub){
+	  newControlPoints[name] = ub;
+	} else {
+	  newControlPoints[name] = newval;
+	} 
+	
+      }
+      
+      
+    }
+    
+ 
+
   } else if ( whichTuningScheme == UseSteering ) {
 	  // -----------------------------------------------------------
 	  //  STEERING BASED ON KNOWLEDGE
@@ -1854,7 +1939,7 @@ void controlPointManager::generatePlan() {
       
       const int before = bestPhase->controlPoints[name];   
   
-      const int range = (maxValue-minValue+1)*(1.0-progress);
+      const int range = (int)((maxValue-minValue+1)*(1.0-progress));
 
       int high = min(before+range, maxValue);
       int low = max(before-range, minValue);
@@ -2138,7 +2223,6 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
-  CkAssert(sizeof(lb) == 4);
   CkAssert(CkMyPe() == 0);
   return controlPoint("FortranCP", *lb, *ub);
 }
@@ -2344,7 +2428,7 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 				double val = (cPhaseConfig[v] + best[v])/2.0;
 
-				newControlPoints[name] = keepInRange(val,lb,ub);
+				newControlPoints[name] = keepInRange((int)val,lb,ub);
 				CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 				v++;
 			}
@@ -2459,7 +2543,7 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2503,7 +2587,7 @@ void simplexScheme::doExpansion(std::map<std::string, std::pair<int,int> > & con
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Expanding %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2544,7 +2628,7 @@ void simplexScheme::doContraction(std::map<std::string, std::pair<int,int> > & c
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Contracting %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}

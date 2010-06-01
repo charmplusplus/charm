@@ -1,20 +1,15 @@
 /**
- * The semantic phase walks the tree and builds the symbol table, handles
- * all the imports, and does the semantic checks. The resulting tree and
- * symbol table are used by the emitter to generate the output. 
+ *  fill a description in
  */
 
-tree grammar CharjSemantics;
+tree grammar CharjASTModifier;
 
 options {
     backtrack = true; 
     memoize = true;
     tokenVocab = Charj;
     ASTLabelType = CharjAST;
-}
-
-scope ScopeStack {
-    Scope current;
+    output = AST;
 }
 
 @header {
@@ -28,47 +23,9 @@ package charj.translator;
     MethodSymbol currentMethod = null;
     LocalScope currentLocalScope = null;
     Translator translator;
-    List<CharjAST> imports = new ArrayList<CharjAST>();
 
-    /**
-     *  Test a list of CharjAST nodes to see if any of them has the given token
-     *  type.
-     */
-    public boolean listContainsToken(List<CharjAST> list, int tokenType) {
-        if (list == null) return false;
-        for (CharjAST node : list) {
-            if (node.token.getType() == tokenType) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public void importPackages(ClassSymbol cs, List<CharjAST> imports) {
-        if (imports == null) {
-            return;
-        }
-
-        for (CharjAST pkg : imports) {
-            String pkgName = input.getTokenStream().toString(
-                    pkg.getTokenStartIndex(),
-                    pkg.getTokenStopIndex());
-            // find imported class and add to cs.imports
-            PackageScope p = cs.importPackage(pkgName);
-            if (p == null) {
-                translator.error(
-                    this, 
-                    "package " + pkgName + " not found.",
-                    pkg);
-            }
-        }
-    }
-
-    public void addImport(CharjAST importNode) {
-        imports.add(importNode);
-    }
+    AstModifier astmod = new AstModifier();
 }
-
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
 @rulecatch {
@@ -81,40 +38,24 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-scope ScopeStack; // default scope
 @init {
     symtab = _symtab;
-    $ScopeStack::current = symtab.getDefaultPkg();
 }
+    // TODO: go back to allowing multiple type definitions per file, check that
+    // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
-        (packageDeclaration)? 
-        (importDeclaration
-        | typeDeclaration { $cs = $typeDeclaration.sym; }
-        | readonlyDeclaration)*)
+        packageDeclaration?
+        importDeclaration*
+        readonlyDeclaration*
+        (typeDeclaration { $cs = $typeDeclaration.sym; })*)
     ;
 
-// note: no new scope here--this replaces the default scope
 packageDeclaration
-@init { 
-    List<String> names = null; 
-    String packageName = "";
-}
-    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
-        {
-            packageName = packageName.substring(1);
-            PackageScope ps = symtab.resolvePackage(packageName);
-            if (ps == null) {
-                ps = symtab.definePackage(packageName);
-                symtab.addScope(ps);
-            }
-            currentPackage = ps;
-            $ScopeStack::current = ps;
-        }
+    :   ^(PACKAGE (ids+=IDENT)+)  
     ;
     
 importDeclaration
     :   ^(IMPORT qualifiedIdentifier '.*'?)
-        { addImport($qualifiedIdentifier.start); }
     ;
 
 readonlyDeclaration
@@ -122,48 +63,15 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-scope ScopeStack; // top-level type scope
-    :   ^(TYPE classType IDENT
-            (^('extends' parent=type))? (^('implements' type+))?
-            {
-                Scope outerScope = $ScopeStack[-1]::current;
-                $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
-                outerScope.define($sym.name, $sym);
-                currentClass = $sym;
-                $sym.definition = $typeDeclaration.start;
-                $sym.definitionTokenStream = input.getTokenStream();
-                $IDENT.symbol = $sym;
-                $ScopeStack::current = $sym;
-                String classTypeName = $classType.text;
-                if (classTypeName.equals("class")) {
-                } else if (classTypeName.equals("chare")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("group")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("nodegroup")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("chare_array")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("mainchare")) {
-                    currentClass.isChare = true;
-                    currentClass.isMainChare = true;
-                } else System.out.println("Error: type " + classTypeName + " not recognized.");
-                importPackages($sym, imports);
-            }
-            classScopeDeclaration*)
-            {
-                //System.out.println("Members for type " + $sym.name + ":");
-                //for (Map.Entry<String, Symbol> entry : $sym.members.entrySet()) {
-                //    System.out.println(entry.getKey());
-                //}
-            }
-    |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
-    |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
-    ;
-
-classType
-    :   CLASS
-    |   chareType
+    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
+        {
+            $TYPE.tree.addChild(astmod.getPupRoutineNode());
+            $TYPE.tree.addChild(astmod.getInitRoutineNode());
+            astmod.ensureDefaultCtor($TYPE.tree);
+            astmod = new AstModifier();
+        }
+    |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
+    |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
 
 chareType
@@ -179,36 +87,30 @@ enumConstant
     ;
     
 classScopeDeclaration
-scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
-            ClassSymbol returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $FUNCTION_METHOD_DECL.symbol = sym;
+            if($m.tree == null)
+                astmod.fillPrivateModifier($FUNCTION_METHOD_DECL.tree);
         }
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
-            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
-            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+    |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
+        {
+            if($m.tree == null)
+                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
+        }
+    |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
+        {
+            if($m.tree == null)
+                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
+        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
-    ;
-
-field [ClassSymbol type]
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-    {
-            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
-            sym.definition = $field.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            $VAR_DECLARATOR.symbol = sym;
-            currentClass.define($IDENT.text, sym);
-    }
+        {
+            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
+            if($m.tree == null)
+                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
+        }
     ;
     
 interfaceScopeDeclaration
@@ -226,12 +128,14 @@ variableDeclaratorList
     ;
 
 variableDeclarator
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-
+    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
     
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
+        {
+            if (currentClass != null) astmod.varPup($IDENT);
+        }
     ;
 
 variableInitializer
@@ -260,94 +164,55 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+    :   ^(MODIFIER_LIST modifier+)
+        {
+            astmod.arrangeModifiers($MODIFIER_LIST.tree);
+        }
     ;
 
 modifier
-    :   accessModifier
+    :   PUBLIC
+    |   PRIVATE
+    |   PROTECTED
+    |   ENTRY
+    |   ABSTRACT
+    |   NATIVE
     |   localModifier
-    |   charjModifier
-    |   otherModifier
     ;
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
-accessModifierList
-    :   ^(ACCESS_MODIFIER_LIST accessModifier+)
-    ;
-
-charjModifierList
-    :   ^(CHARJ_MODIFIER_LIST charjModifier+)
-    ;
-
-otherModifierList
-    :   ^(OTHER_MODIFIER_LIST otherModifier+)
-    ;
-    
 localModifier
     :   FINAL
     |   STATIC
     |   VOLATILE
     ;
 
-accessModifier
-    :   PUBLIC
-    |   PROTECTED
-    |   PRIVATE
-    ;
-
-charjModifier
-    :   ENTRY
-    ;
-
-otherModifier
-    :   ABSTRACT
-    |   NATIVE
-    ;
-
 type
     :   simpleType
-    |   objectType
+    |   objectType 
     |   VOID
     ;
 
-simpleType returns [ClassSymbol type]
+simpleType
     :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
-        {
-            $type = symtab.resolveBuiltinType($primitiveType.text);
-        }
     ;
     
-objectType returns [ClassSymbol type]
+objectType
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        {
-            $type = $qualifiedTypeIdent.type;
-        }
     ;
 
-qualifiedTypeIdent returns [ClassSymbol type]
-@init {
-String name = "";
-}
-    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
-        {
-            $type = null;
-            //System.out.println("trying to resolve type " + name + " in type " + currentClass);
-            if (currentClass != null) $type = currentClass.resolveType(name);
-            //System.out.println("got " + $type);
-            //if ($type == null) $type = symtab.resolveBuiltinType(name);
-            $QUALIFIED_TYPE_IDENT.symbol = $type;
-        }
+qualifiedTypeIdent
+    :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
-typeIdent returns [String name]
+typeIdent
     :   ^(IDENT genericTypeArgumentList?)
-        { $name = $IDENT.text; }
     ;
 
 primitiveType
@@ -404,8 +269,8 @@ localVariableDeclaration
     ;
 
 statement
-    : nonBlockStatement
-    | block
+    :   nonBlockStatement
+    |   block
     ;
 
 nonBlockStatement
@@ -508,16 +373,16 @@ primaryExpression
                 |   SUPER
                 )
         )
-    |   ^(ARROW primaryExpression
-                (   IDENT
-                |   THIS
-                |   SUPER
-                )
-        )
+        ->   ^(ARROW primaryExpression
+                   IDENT?
+                   THIS?
+                   SUPER?
+             )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
@@ -563,6 +428,6 @@ literal
     |   STRING_LITERAL          
     |   TRUE
     |   FALSE
-    |   NULL 
+    |   NULL
     ;
 

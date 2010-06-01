@@ -1451,7 +1451,7 @@ static void sanityCheck()
 #endif
   }
   if (cva(bgMach).getNodeSize()<CmiNumPes()) {
-    CmiAbort("\nToo few BlueGene nodes!\n");
+    CmiAbort("\nToo few BigSim nodes!\n");
   }
 }
 
