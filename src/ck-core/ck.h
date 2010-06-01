@@ -29,6 +29,7 @@
 extern "C" int _replaySystem;
 
 #if CMK_CHARMDEBUG
+extern "C" int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
   if (!ConverseDeliver(pe)) {
     CmiFree(msg);
