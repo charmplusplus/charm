@@ -252,4 +252,38 @@ class AstModifier
             declNode.addChild(c);
     }
 
+    private boolean hasDefaultCtor = false;
+
+    protected void checkForDefaultCtor(CharjAST ctordecl)
+    {
+        if(hasDefaultCtor)
+            return;
+
+        CharjAST params = null;
+        for(CharjAST node : ctordecl.getChildren())
+            if(node.getType() == CharjParser.FORMAL_PARAM_LIST)
+            {
+                params = node;
+                break;
+            }
+        if(params.getChildren() == null)
+            hasDefaultCtor = true;
+    }
+
+    protected void ensureDefaultCtor(CharjAST typenode)
+    {
+        if(hasDefaultCtor)
+            return;
+        
+        CharjAST ctor = createNode(CharjParser.CONSTRUCTOR_DECL, "CONSTRUCTOR_DECL");
+        ctor.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+        ctor.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        ctor.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+        ctor.addChild(typenode.getChild(1).dupNode());
+        ctor.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
+        ctor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+
+        typenode.addChild(ctor);
+    }
+
 }

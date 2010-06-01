@@ -1,7 +1,5 @@
 /**
- * The semantic phase walks the tree and builds the symbol table, handles
- * all the imports, and does the semantic checks. The resulting tree and
- * symbol table are used by the emitter to generate the output. 
+ *  fill a description in
  */
 
 tree grammar CharjASTModifier;
@@ -65,7 +63,8 @@ typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
         {
             $TYPE.tree.addChild(astmod.getPupRoutineNode());
             $TYPE.tree.addChild(astmod.getInitRoutineNode());
-            astmod = new AstModifier();
+            
+            astmod.ensureDefaultCtor($TYPE.tree);
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
@@ -104,6 +103,7 @@ classScopeDeclaration
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
+            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
             if($m.tree == null)
                 astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
         }
