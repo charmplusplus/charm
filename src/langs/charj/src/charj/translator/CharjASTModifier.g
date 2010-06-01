@@ -1,7 +1,5 @@
 /**
- * The semantic phase walks the tree and builds the symbol table, handles
- * all the imports, and does the semantic checks. The resulting tree and
- * symbol table are used by the emitter to generate the output. 
+ *  fill a description in
  */
 
 tree grammar CharjASTModifier;
@@ -26,7 +24,7 @@ package charj.translator;
     LocalScope currentLocalScope = null;
     Translator translator;
 
-    PupRoutineCreator puper = new PupRoutineCreator();
+    AstModifier astmod = new AstModifier();
 }
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
@@ -63,9 +61,10 @@ importDeclarations returns [List<CharjAST> packageNames]
 typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
     :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            $TYPE.tree.addChild(puper.getPupRoutineNode());
-            $TYPE.tree.addChild(puper.getInitRoutineNode());
-            puper = new PupRoutineCreator();
+            $TYPE.tree.addChild(astmod.getPupRoutineNode());
+            $TYPE.tree.addChild(astmod.getInitRoutineNode());
+            astmod.ensureDefaultCtor($TYPE.tree);
+            astmod = new AstModifier();
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
@@ -87,10 +86,27 @@ classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        {
+            if($m.tree == null)
+                astmod.fillPrivateModifier($FUNCTION_METHOD_DECL.tree);
+        }
+    |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
+        {
+            if($m.tree == null)
+                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
+        }
+    |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
+        {
+            if($m.tree == null)
+                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
+        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
+        {
+            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
+            if($m.tree == null)
+                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
+        }
     ;
     
 interfaceScopeDeclaration
@@ -114,7 +130,7 @@ variableDeclarator
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
         {
-            puper.varPup($IDENT);
+            astmod.varPup($IDENT);
         }
     ;
 
@@ -145,12 +161,15 @@ bound
 
 modifierList
     :   ^(MODIFIER_LIST modifier+)
+        {
+            astmod.arrangeModifiers($MODIFIER_LIST.tree);
+        }
     ;
 
 modifier
     :   PUBLIC
-    |   PROTECTED
     |   PRIVATE
+    |   PROTECTED
     |   ENTRY
     |   ABSTRACT
     |   NATIVE

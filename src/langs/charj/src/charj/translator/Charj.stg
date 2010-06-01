@@ -172,38 +172,38 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(first(modl))><modl; separator=" ">: <endif><ty><gtpl> <id><fpl><adl>;
+<modl><ty><gtpl> <id><fpl><adl>;
 >>
 
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty><gtpl> <id><fpl><adl>;
+<modl><ty><gtpl> <id><fpl><adl>;
 >>
 
 
 funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<ty><gtpl> <sym.Name>::<id><fpl><adl>
+<modl><ty><gtpl> <sym.Name>::<id><fpl><adl>
 <block>
 >>
 
 
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-entry void<gtpl> <id><fpl>;
+<modl>void<gtpl> <id><fpl>;
 >>
 
 
 ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl; separator=" ">: <endif><id><fpl>;
+<modl><id><fpl>;
 >>
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<id>::<id><fpl>
+<modl><id>::<id><fpl>
 <block>
 >>
 
@@ -226,7 +226,7 @@ embed_cc(str, blk) ::=
 
 class_var_decl(modl, type, declList) ::=
 <<
-<if(modl)><modl>:<else>public:<endif> <type> <declList>;
+<modl><type> <declList>;
 >>
 
 
@@ -254,25 +254,28 @@ var_id_decl(id, adl) ::=
 >>
 
 
-mod_list(mods) ::=
+mod_list_cc(accmods, localmods, charjmods, othermods) ::=
 <<
-<if(mods)><mods; separator=" "><endif>
+<if(localmods)><localmods; separator=" "> <endif><if(othermods)><othermods; separator=" "> <endif>
 >>
 
-
-local_mod_list(mods) ::=
+mod_list_h(accmods, localmods, charjmods, othermods) ::=
 <<
-<if(mods)><mods; separator=" "><endif>
+<if(accmods)><accmods; separator=" ">: <endif><if(othermods)><othermods; separator=" "> <endif>
 >>
 
+mod_list_ci(accmods, localmods, charjmods, othermods) ::=
+<<
+<if(charjmods)><charjmods; separator=" "> <endif>
+>>
 
 local_var_decl(modList, type, declList) ::=
 <<
-<if(modList)>
-<modList> <type> <declList>;
-<else>
-<type> <declList>;
-<endif>
+<if(modList)><modList> <endif><type> <declList>;
+>>
+
+local_mod_list(mods) ::= <<
+<mods; separator=" ">
 >>
 
 

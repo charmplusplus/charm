@@ -13,9 +13,11 @@
 #include "cp_effects.h"
 #include <iostream>
 #include <math.h>
-
-
 #include <climits>
+
+#define roundDouble(x)        ((long)(x+0.5))
+
+
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
  
 
@@ -186,7 +188,6 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 /// If different seed, name, and random_seed values are provided, the returned values are pseudo-random
 unsigned int randInt(unsigned int num, const char* name, int seed=0){
   CkAssert(num > 0);
-  CkAssert(num < 1000);
 
   unsigned long hash = 0;
   unsigned int c;
@@ -1202,6 +1203,11 @@ FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
 }
 
 
+FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+{
+  setFrameworkAdvancePhase(*value);
+}
+
 
 
 
@@ -1691,13 +1697,14 @@ void controlPointManager::generatePlan() {
       const double ldbStepsTime = times[0] + times[1];
       const double lbcost = ldbStepsTime - 2.0*avg; // An approximation of the 
       
-#if defined(_WIN32) && ! defined(__CYGWIN__)
-#define lround(x)        ((long)(x+0.5))
-#endif
-      int newval = lround(sqrt(2.0*lbcost/m));
-      
 
-      CkPrintf("Optimal Model: lbcost = %f, m = %f, new ldbperiod should be %d\n", lbcost, m, newval);    
+      int newval = roundDouble(sqrt(2.0*lbcost/m));
+      
+      // We don't really know what to do if m<=0, so we'll just double the period
+      if(m<=0)
+	newval = 2*numTimings;     
+      
+      CkPrintf("Optimal Model (double when negative): lbcost = %f, m = %f, new ldbperiod should be %d\n", lbcost, m, newval);    
     
     
       std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
@@ -2216,7 +2223,6 @@ int controlPoint(const char *name, int lb, int ub){
 
 
 FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
-  CkAssert(sizeof(lb) == 4);
   CkAssert(CkMyPe() == 0);
   return controlPoint("FortranCP", *lb, *ub);
 }

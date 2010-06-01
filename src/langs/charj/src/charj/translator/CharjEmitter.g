@@ -181,26 +181,21 @@ enumConstant
     ;
 
 classScopeDeclaration
-@init {
-  boolean entry = false;
-  List<String> modList = new ArrayList<String>();
+@init
+{
+    boolean entry = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-        { 
-            if ($m.st != null) {
-                // determine whether this is an entry method
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-                for(Object o : $m.names) {
-                    if (o.equals("entry")) continue;
-                    else modList.add(o.toString());
-                }
-            }
+        {
+            // determine whether it's an entry method
+            if($m.start != null)
+                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
         }
         -> {emitCC()}? funcMethodDecl_cc(
                 sym={currentClass},
-                modl={modList}, 
+                modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
@@ -208,7 +203,7 @@ classScopeDeclaration
                 adl={$a.st},
                 block={$b.st})
         -> {emitH()}? funcMethodDecl_h(
-                modl={modList}, 
+                modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
@@ -237,30 +232,25 @@ classScopeDeclaration
             declList={$variableDeclaratorList.st})
         ->
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        { 
-            // determine whether this is an entry method
-            if ($m.st != null) {
-                entry = listContainsToken($m.start.getChildren(), ENTRY);
-                for(Object o : $m.names) {
-                    if (o.equals("entry")) continue;
-                    else modList.add(o.toString());
-                }
-            }
+        {
+            // determine whether it's an entry method
+            if($m.start != null)
+                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
         }
         -> {emitCC()}? ctorDecl_cc(
-                modl={modList},
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitCI() && entry}? ctorDecl_ci(
-                modl={modList},
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
         -> {emitH()}? ctorDecl_h(
-                modl={modList},
+                modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
@@ -329,43 +319,89 @@ throwsClause
         -> template(t={$text}) "/* throwsClause-not implemented */ <t>"
     ;
 
-modifierList returns [List<String> names]
-    :   ^(MODIFIER_LIST (m+=modifier)+)
-        {
-          $names = new ArrayList<String>();
-          for(Object o : $m) $names.add(o.toString());
-        }
-        -> mod_list(mods={$m})
+modifierList
+    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+        ->  {emitCC()}? mod_list_cc(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->  {emitH()}? mod_list_h(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->  {emitCI()}? mod_list_ci(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
+        ->
     ;
 
 modifier
-@init {
-$st = %{$start.getText()};
-}
-    :   PUBLIC
-    |   PROTECTED
-    |   PRIVATE
-    |   ENTRY
-    |   ABSTRACT
-    |   NATIVE
+    :   accessModifier
     |   localModifier
-        -> {$localModifier.st}
+    |   charjModifier
+    |   otherModifier
     ;
 
+accessModifierList
+returns [List names]
+    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)+)
+        {
+            $names = $m;
+        }
+    ;
 localModifierList
+returns [List names]
     :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)+)
-        -> local_mod_list(mods={$m})
+        {
+            $names = $m;
+        }
+        ->  local_mod_list(mods = {$names})
     ;
 
+charjModifierList
+returns [List names]
+    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)+)
+        {
+            $names = $m;
+        }
+    ;
+
+otherModifierList
+returns [List names]
+    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)+)
+        {
+            $names = $m;
+        }
+    ;
+    
 localModifier
-@init {
-$st = %{$start.getText()};
+@init
+{
+    $st = %{$start.getText()};
 }
     :   FINAL
     |   STATIC
     |   VOLATILE
     ;
 
+accessModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   ENTRY
+    ;
+
+otherModifier
+@init
+{
+    $st = %{$start.getText()};
+}
+    :   ABSTRACT
+    |   NATIVE
+    ;
     
 type
     :   simpleType
@@ -483,12 +519,12 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
         -> local_var_decl(
-            modList={null},
+            modList={$localModifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
     ;

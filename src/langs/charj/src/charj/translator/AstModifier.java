@@ -3,13 +3,14 @@ package charj.translator;
 import org.antlr.runtime.tree.CommonTree;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
+import java.util.*;
 
-class PupRoutineCreator
+class AstModifier
 {
     private CharjAST pupNode;
     private CharjAST initNode;
 
-    PupRoutineCreator()
+    AstModifier()
     {
         createPupNode();
         createInitNode();
@@ -40,7 +41,8 @@ class PupRoutineCreator
         initNode.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
         initNode.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
 
-        initNode.getChild(0).addChild(createNode(CharjParser.PRIVATE, "private"));
+        initNode.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        initNode.getChild(0).getChild(0).addChild(createNode(CharjParser.PRIVATE, "private"));
     }
 
     private void createPupNode()
@@ -53,7 +55,8 @@ class PupRoutineCreator
         pupNode.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
         pupNode.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
 
-        pupNode.getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+        pupNode.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        pupNode.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
 
         pupNode.getChild(3).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
         pupNode.getChild(3).getChild(0).addChild(createNode(CharjParser.REFERENCE_TYPE, "REFERENCE_TYPE"));
@@ -83,7 +86,7 @@ class PupRoutineCreator
                     type = p.getType();
                     break;
                 case CharjParser.OBJECT_VAR_DECLARATION:
-                    type = p.getChild(0).getType();
+                    type = p.getChild(1).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
                 case CharjParser.BLOCK:
@@ -104,13 +107,13 @@ class PupRoutineCreator
                             proxyVarPup(idNode);
                             break;
                         default:
-                            System.out.println("PupRoutineCreator.varPup: unknown type " + idNode);
+                            System.out.println("AstModifier.varPup: unknown type " + idNode);
                             break;
                     }
                     return;
             }
         }
-        System.out.println("PupRoutineCreator.varPup: could not pup variable " + idNode);
+        System.out.println("AstModifier.varPup: could not pup variable " + idNode);
     }
 
     protected void primitiveVarPup(CharjAST idNode)
@@ -149,7 +152,7 @@ class PupRoutineCreator
         initNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
         initNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.NEW, "new"));
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
-        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(0).getChild(0).getChild(0).dupNode());
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(1).getChild(0).getChild(0).dupTree());
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
 
         // add stuff to the pup routine
@@ -184,6 +187,103 @@ class PupRoutineCreator
         pupNode.getChild(4).getChild(index).getChild(1).getChild(0).addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
         pupNode.getChild(4).getChild(index).getChild(1).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "initMethod"));
         pupNode.getChild(4).getChild(index).getChild(1).getChild(0).getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+    }
+
+    protected void arrangeModifiers(CharjAST modlistNode)
+    {
+        CharjAST accessList = createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST");
+        CharjAST localList = createNode(CharjParser.LOCAL_MODIFIER_LIST, "LOCAL_MODIFIER_LIST");
+        CharjAST charjList = createNode(CharjParser.CHARJ_MODIFIER_LIST, "CHARJ_MODIFIER_LIST");
+        CharjAST otherList = createNode(CharjParser.CHARJ_MODIFIER_LIST, "OTHER_MODIFIER_LIST");
+
+
+        Iterator<CharjAST> iter = modlistNode.getChildren().iterator();
+        
+        while(iter.hasNext())
+        {
+            CharjAST mod = iter.next();
+            iter.remove();
+
+            switch(mod.getType())
+            {
+                case CharjParser.PUBLIC:
+                case CharjParser.PRIVATE:
+                case CharjParser.PROTECTED:
+                    accessList.addChild(mod.dupNode());
+                    break;
+                case CharjParser.ENTRY:
+                    charjList.addChild(mod.dupNode());
+                    break;
+                case CharjParser.FINAL:
+                case CharjParser.STATIC:
+                case CharjParser.VOLATILE:
+                    localList.addChild(mod.dupNode());
+                    break;
+                case CharjParser.ABSTRACT:
+                case CharjParser.NATIVE:
+                    otherList.addChild(mod.dupNode());
+                    break;
+            }
+        }
+
+       if(accessList.getChildren() == null)
+           accessList.addChild(createNode(CharjParser.PRIVATE, "private"));
+
+       modlistNode.addChild(accessList);
+       if(localList.getChildren() != null) modlistNode.addChild(localList);
+       if(charjList.getChildren() != null) modlistNode.addChild(charjList);
+       if(otherList.getChildren() != null) modlistNode.addChild(otherList);
+    }
+
+    protected void fillPrivateModifier(CharjAST declNode)
+    {
+        CharjAST modlist = createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST");
+        modlist.addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        modlist.getChild(0).addChild(createNode(CharjParser.PRIVATE, "private"));
+        
+        ArrayList<CharjAST> list = new ArrayList<CharjAST>();
+        list.addAll(declNode.getChildren());
+
+        declNode.getChildren().clear();
+
+        declNode.addChild(modlist);
+
+        for(CharjAST c : list)
+            declNode.addChild(c);
+    }
+
+    private boolean hasDefaultCtor = false;
+
+    protected void checkForDefaultCtor(CharjAST ctordecl)
+    {
+        if(hasDefaultCtor)
+            return;
+
+        CharjAST params = null;
+        for(CharjAST node : ctordecl.getChildren())
+            if(node.getType() == CharjParser.FORMAL_PARAM_LIST)
+            {
+                params = node;
+                break;
+            }
+        if(params.getChildren() == null)
+            hasDefaultCtor = true;
+    }
+
+    protected void ensureDefaultCtor(CharjAST typenode)
+    {
+        if(hasDefaultCtor)
+            return;
+        
+        CharjAST ctor = createNode(CharjParser.CONSTRUCTOR_DECL, "CONSTRUCTOR_DECL");
+        ctor.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+        ctor.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        ctor.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+        ctor.addChild(typenode.getChild(1).dupNode());
+        ctor.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
+        ctor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+
+        typenode.addChild(ctor);
     }
 
 }

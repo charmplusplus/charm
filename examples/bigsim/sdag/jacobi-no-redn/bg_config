@@ -1,11 +1,11 @@
-x 4
-y 2
-z 2
+x 2
+y 1
+z 1
 cth 1
 wth 1
-#stacksize  4000
+stacksize  14000
 #timing  walltime
-timing  bgelapse
+timing  elapse
 #timing  counter
 cpufactor   1.0
 fpfactor    5e-7
