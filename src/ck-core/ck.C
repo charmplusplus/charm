@@ -68,8 +68,8 @@ Chare::Chare(void) {
   thishandle.objPtr=this;
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
-  if (CpvAccess(currentChareIdx) >= 0) {
-    thishandle.objPtr=(void*)CpvAccess(currentChareIdx);
+  if (CkpvAccess(currentChareIdx) >= 0) {
+    thishandle.objPtr=(void*)CkpvAccess(currentChareIdx);
   }
   chareIdx = CkpvAccess(currentChareIdx);
 #endif
