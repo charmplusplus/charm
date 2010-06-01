@@ -110,6 +110,7 @@ readonlyDeclaration
     :   ^(READONLY lvd=localVariableDeclaration)
         -> {emitCI()}? template(bn={basename()}, v={$lvd.st}) "readonly <v>"
         -> {emitH()}? template(v={$lvd.st}) "extern <v>"
+        -> {emitCC()}? {$lvd.st;}
         ->
     ;
     
