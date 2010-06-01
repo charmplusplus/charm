@@ -248,13 +248,8 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
       free(buf);
     } else {
       /* the pipe has been closed */
-      close(conditionalPipe[0]);
-      conditionalPipe[0] = 0;
-      close(conditionalPipe[1]);
-      conditionalPipe[1] = 0;
-      wait(NULL);
-      CcsSendReply(0,NULL);
-    }
+      CpdEndConditionalDeliver_master();
+   }
   }
   else {
     callHandlerRec(fn,reqLen,reqData);
