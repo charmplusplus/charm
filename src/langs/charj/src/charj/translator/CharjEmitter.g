@@ -197,6 +197,7 @@ classScopeDeclaration
 @init
 {
     boolean entry = false;
+    boolean migrationCtor = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
@@ -247,8 +248,10 @@ classScopeDeclaration
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
         {
             // determine whether it's an entry method
-            if($m.start != null)
+            if ($m.start != null) {
                 entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
+            }
+            migrationCtor = currentClass.migrationCtor == $CONSTRUCTOR_DECL;
         }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
@@ -256,7 +259,7 @@ classScopeDeclaration
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
-        -> {emitCI() && entry}? ctorDecl_ci(
+        -> {emitCI() && entry && !migrationCtor}? ctorDecl_ci(
                 modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 

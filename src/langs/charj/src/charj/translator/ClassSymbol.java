@@ -23,6 +23,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public boolean isChare = false;
     public boolean isMainChare = false;
 
+    public CharjAST migrationCtor = null;
+
     public ClassSymbol(
             SymbolTable symtab,
             String name) {

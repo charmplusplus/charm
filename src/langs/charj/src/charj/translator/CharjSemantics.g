@@ -29,6 +29,7 @@ package charj.translator;
     LocalScope currentLocalScope = null;
     Translator translator;
     List<CharjAST> imports = new ArrayList<CharjAST>();
+    AstModifier astmod = new AstModifier();
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
@@ -198,6 +199,9 @@ scope ScopeStack;
             ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
+        {
+            if (astmod.isMigrationCtor($CONSTRUCTOR_DECL)) currentClass.migrationCtor = $CONSTRUCTOR_DECL;
+        }
     ;
 
 field [ClassSymbol type]

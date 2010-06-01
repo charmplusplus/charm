@@ -9,6 +9,7 @@ class AstModifier
 {
     private CharjAST pupNode;
     private CharjAST initNode;
+    private CharjAST migrationCtor;
 
     AstModifier()
     {
@@ -253,6 +254,7 @@ class AstModifier
     }
 
     private boolean hasDefaultCtor = false;
+    private boolean hasMigrationCtor = false;
 
     protected void checkForDefaultCtor(CharjAST ctordecl)
     {
@@ -260,14 +262,49 @@ class AstModifier
             return;
 
         CharjAST params = null;
-        for(CharjAST node : ctordecl.getChildren())
+        for(CharjAST node : ctordecl.getChildren()) {
             if(node.getType() == CharjParser.FORMAL_PARAM_LIST)
             {
                 params = node;
                 break;
             }
+        }
         if(params.getChildren() == null)
             hasDefaultCtor = true;
+    }
+
+    protected boolean isMigrationCtor(CharjAST ctordecl)
+    {
+        CharjAST params = null;
+        for(CharjAST node : ctordecl.getChildren()) {
+            if(node.getType() == CharjParser.FORMAL_PARAM_LIST)
+            {
+                params = node;
+                break;
+            }
+        }
+        
+        if (params == null || params.getChildren() == null) return false;
+        if (params.getChildren().size() != 1) return false;
+        params = params.getChild(0);
+        if (params == null || params.getType() != CharjParser.FORMAL_PARAM_STD_DECL) return false;
+        params = params.getChild(0);
+        if (params == null || params.getType() != CharjParser.POINTER_TYPE) return false ;
+        params = params.getChild(0);
+        if (params == null || params.getType() != CharjParser.QUALIFIED_TYPE_IDENT) return false;
+        params = params.getChild(0);
+        if (params.toString().equals("CkMigrateMessage")) return true;
+        return false;
+
+    }
+
+    protected void checkForMigrationCtor(CharjAST ctordecl)
+    {
+        if(hasMigrationCtor) return;
+        if (isMigrationCtor(ctordecl)) {
+            hasMigrationCtor = true;
+            migrationCtor = ctordecl;
+        }
     }
 
     protected void ensureDefaultCtor(CharjAST typenode)
@@ -286,4 +323,28 @@ class AstModifier
         typenode.addChild(ctor);
     }
 
+    protected CharjAST ensureMigrationCtor(CharjAST typenode)
+    {
+        if(hasMigrationCtor)
+            return migrationCtor;
+        
+        CharjAST ctor = createNode(CharjParser.CONSTRUCTOR_DECL, "CONSTRUCTOR_DECL");
+        ctor.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+        ctor.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        ctor.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+        ctor.getChild(0).addChild(createNode(CharjParser.CHARJ_MODIFIER_LIST, "CHARJ_MODIFIER_LIST"));
+        ctor.getChild(0).getChild(1).addChild(createNode(CharjParser.ENTRY, "entry"));
+        ctor.addChild(typenode.getChild(1).dupNode());
+        CharjAST args = createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST");
+        args.addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
+        args.getChild(0).addChild(createNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
+        args.getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
+        args.getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "CkMigrateMessage"));
+        args.getChild(0).addChild(createNode(CharjParser.IDENT, "m"));
+        ctor.addChild(args);
+        ctor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+        typenode.addChild(ctor);
+        migrationCtor = ctor;
+        return migrationCtor;
+    }
 }

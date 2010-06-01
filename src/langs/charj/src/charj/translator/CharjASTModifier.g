@@ -63,15 +63,24 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-    :   ^(TYPE (CLASS | chareType) IDENT (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
+@init {
+    boolean array_type = false;
+}
+    :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
+        (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
             $TYPE.tree.addChild(astmod.getPupRoutineNode());
             $TYPE.tree.addChild(astmod.getInitRoutineNode());
             astmod.ensureDefaultCtor($TYPE.tree);
+            if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
             astmod = new AstModifier();
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    ;
+
+chareArrayType
+    :   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 chareType
@@ -79,7 +88,6 @@ chareType
     |   GROUP
     |   NODEGROUP
     |   MAINCHARE
-    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 enumConstant
@@ -108,6 +116,7 @@ classScopeDeclaration
             b=block)
         {
             astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
+            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
             if($m.tree == null)
                 astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
         }
