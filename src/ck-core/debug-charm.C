@@ -423,6 +423,9 @@ void CpdPupMessage(PUP::er &p, void *msg)
 }
 
 CkpvStaticDeclare(void *, lastBreakPointMsg);
+int conditionalPipe[2] = {0, 0};
+CkpvDeclare(void*, conditionalQueue);
+
 
 //Cpd Lists for local and scheduler queues
 class CpdList_localQ : public CpdListAccessor {
@@ -438,10 +441,23 @@ public:
     return x;
   }
   virtual void pup(PUP::er &p, CpdListItemsRequest &req) {
-    int length = CdsFifo_Length((CdsFifo)(CkpvAccess(debugQueue)));
-    void ** messages = CdsFifo_Enumerate(CkpvAccess(debugQueue));
+    int length;
+    void ** messages;
     int curObj=0;
+    void *msg;
 
+    length = CdsFifo_Length((CdsFifo)(CkpvAccess(conditionalQueue)));
+    messages = CdsFifo_Enumerate(CkpvAccess(conditionalQueue));
+    for (curObj=-length; curObj<0; curObj++) {
+      void *msg = messages[length+curObj];
+      pupSingleMessage(p, curObj-1, msg);
+    }
+    delete[] messages;
+    
+    curObj = 0;
+    length = CdsFifo_Length((CdsFifo)(CkpvAccess(debugQueue)));
+    messages = CdsFifo_Enumerate(CkpvAccess(debugQueue));
+    
     if (CkpvAccess(lastBreakPointMsg) != NULL) {
       beginItem(p, -1);
       envelope *env=(envelope *)UsrToEnv(CkpvAccess(lastBreakPointMsg));
@@ -458,35 +474,40 @@ public:
     for(curObj=req.lo; curObj<req.hi; curObj++)
       if ((curObj>=0) && (curObj<length))
       {
-        beginItem(p,curObj);
         void *msg=messages[curObj]; /* converse message */
-        int isCharm=0;
-        const char *type="Converse";
-        p.comment("name");
-        char name[128];
-#if ! CMK_BLUEGENE_CHARM
-        if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
-        if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
-#else
-        isCharm=1; type="BG";
-#endif
-        sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
-        p(name, strlen(name));
-
-        if (isCharm)
-        { /* charm message */
-          p.comment("charmMsg");
-          p.synchronize(PUP::sync_begin_object);
-          envelope *env=(envelope *)msg;
-          CkUnpackMessage(&env);
-          messages[curObj]=env;
-          CpdPupMessage(p, EnvToUsr(env));
-          //CkPupMessage(p, &messages[curObj], 0);
-          p.synchronize(PUP::sync_end_object);
-        }
+        pupSingleMessage(p, curObj, msg);
       }
     delete[] messages;
 
+  }
+
+  void pupSingleMessage(PUP::er &p, int curObj, void *msg) {
+    beginItem(p,curObj);
+    int isCharm=0;
+    const char *type="Converse";
+    p.comment("name");
+    char name[128];
+#if ! CMK_BLUEGENE_CHARM
+    if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
+    if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
+#else
+    isCharm=1; type="BG";
+#endif
+    if (curObj < 0) type="Conditional";
+    sprintf(name,"%s %d: %s (%d)","Message",curObj,type,CmiGetHandler(msg));
+    p(name, strlen(name));
+
+    if (isCharm)
+    { /* charm message */
+      p.comment("charmMsg");
+      p.synchronize(PUP::sync_begin_object);
+      envelope *env=(envelope *)msg;
+      CkUnpackMessage(&env);
+      //messages[curObj]=env;
+      CpdPupMessage(p, EnvToUsr(env));
+      //CkPupMessage(p, &messages[curObj], 0);
+      p.synchronize(PUP::sync_end_object);
+    }
   }
 };
 
@@ -516,11 +537,15 @@ void CpdDeliverMessage(char * msg) {
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
   //CmiPrintf("received deliver request %d\n",msgNum);
 
-  void *debugQ=CpvAccess(debugQueue);
+  void *debugQ=CkpvAccess(debugQueue);
   CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
   for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
   CkpvAccess(skipBreakpoint) = 1;
   char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
+  if (_conditionalDelivery) {
+    CmiReference(queuedMsg);
+    CdsFifo_Enqueue(CkpvAccess(conditionalQueue), queuedMsg);
+  }  
 #if CMK_BLUEGENE_CHARM
   stopVTimer();
   BgProcessMessageDefault(cta(threadinfo), queuedMsg);
@@ -532,16 +557,16 @@ void CpdDeliverMessage(char * msg) {
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
 
-void CpdConditionalDeliveryScheduler() {
-  CsdSchedulerState_t state;
-  CsdSchedulerState_new(&state);
-  while (CpvAccess(conditionalDelivery)) {
-#if NODE_0_IS_CONVHOST
-    if (CmiMyPe()==0) CcsServerCheck(); /*Make sure we can get CCS messages*/
-#endif
-    msg = CsdNextMessage(&state);
-    
-  }
+void *CpdGetNextMessageConditional(CsdSchedulerState_t*) {
+  int len;
+  read(conditionalPipe[0], &len, 4);
+  void *msg = CmiAlloc(len);
+  read(conditionalPipe[0], msg, len);
+  return msg;
+}
+
+void CpdEndConditionalDelivery(char *msg) {
+  _exit(0);
 }
 
 #include <sys/wait.h>
@@ -551,25 +576,46 @@ void CpdDeliverMessageConditionally(char * msg) {
   sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);
   //CmiPrintf("received deliver request %d\n",msgNum);
 
+  int pipefd[2][2];
+  pipe(pipefd[0]); // parent to child
+  pipe(pipefd[1]); // child to parent
+  
   pid_t pid = fork();
   if (pid > 0) {
+    int bytes;
     CmiPrintf("parent %d\n",pid);
-    CpdConditionalDeliveryScheduler();
-    wait(NULL);
+    close(pipefd[0][0]);
+    close(pipefd[1][1]);
+    conditionalPipe[0] = pipefd[1][0];
+    conditionalPipe[1] = pipefd[0][1];
+    //CpdConditionalDeliveryScheduler(pipefd[1][0], pipefd[0][1]);
+    read(conditionalPipe[0], &bytes, 4);
+    char *buf = (char*)malloc(bytes);
+    read(conditionalPipe[0], buf, bytes);
+    CcsSendReply(bytes,buf);
+    free(buf);
     return;
   }
   
   //while (true);
   printf("child\n");
-  //while (1);
+  int volatile tmp=1;
+  //while (tmp);
   //_exit(0);
-  _replaySystem = 1;
+  _conditionalDelivery = 1;
+  close(pipefd[0][1]);
+  close(pipefd[1][0]);
+  conditionalPipe[0] = pipefd[0][0];
+  conditionalPipe[1] = pipefd[1][1];
+  CpdGetNextMessage = CpdGetNextMessageConditional;
 
-  void *debugQ=CpvAccess(debugQueue);
+  void *debugQ=CkpvAccess(debugQueue);
   CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
   for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
   CkpvAccess(skipBreakpoint) = 1;
   char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
+  CmiReference(queuedMsg);
+  CdsFifo_Enqueue(CkpvAccess(conditionalQueue), queuedMsg);
 #if CMK_BLUEGENE_CHARM
   stopVTimer();
   BgProcessMessageDefault(cta(threadinfo), queuedMsg);
@@ -578,7 +624,7 @@ void CpdDeliverMessageConditionally(char * msg) {
   CmiHandleMessage(queuedMsg);
 #endif
   CkpvAccess(skipBreakpoint) = 0;
-  _exit(0);
+  //_exit(0);
   while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
 }
 
@@ -670,6 +716,10 @@ void CpdDeliverSingleMessage () {
   if ( (CkpvAccess(lastBreakPointMsg) != NULL) && (CkpvAccess(lastBreakPointObject) != NULL) ) {
     EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
     if (breakPointEntryInfo != NULL) {
+      if (_conditionalDelivery) {
+        CmiReference(CkpvAccess(lastBreakPointMsg));
+        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),CkpvAccess(lastBreakPointMsg));
+      }
       breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
     }
     CkpvAccess(lastBreakPointMsg) = NULL;
@@ -683,6 +733,10 @@ void CpdDeliverSingleMessage () {
     if (!CdsFifo_Empty(CkpvAccess(debugQueue))) {
       CkpvAccess(skipBreakpoint) = 1;
       char *queuedMsg = (char *)CdsFifo_Dequeue(CkpvAccess(debugQueue));
+      if (_conditionalDelivery) {
+        CmiReference(queuedMsg);
+        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),queuedMsg);
+      }
 #if CMK_BLUEGENE_CHARM
       stopVTimer();
       BgProcessMessageDefault(cta(threadinfo), queuedMsg);
@@ -906,12 +960,14 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_localQ());
   CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
   CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
+  CcsRegisterHandler("endConditional",(CmiHandler)CpdEndConditionalDelivery);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
   CpdListRegister(new CpdList_object());
   CpdListRegister(new CpdList_message());
   CpdListRegister(new CpdList_msgStack());
+  CpdGetNextMessage = CsdNextMessage;
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
 #if CMK_BLUEGENE_CHARM
   CpdIsDebugMessage = CpdIsBgCharmDebugMessage;

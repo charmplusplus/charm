@@ -16,12 +16,14 @@ CpvExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
 CpvExtern(void *, debugQueue);
+CpvExtern(void *, conditionalQueue);
 int _debugHandlerIdx;
 
 char ** memoryBackup;
 
 /** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
 int _replaySystem = 0;
+int _conditionalDelivery = 0;
 
 #undef ConverseDeliver
 int ConverseDeliver(int pe) {
@@ -251,6 +253,7 @@ freeze mode-- only executes CCS requests.
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
 int (*CpdIsDebugMessage)(void *);
+void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 
 void CpdFreezeModeScheduler(void)
 {
@@ -268,7 +271,7 @@ void CpdFreezeModeScheduler(void)
 #if NODE_0_IS_CONVHOST
       if (CmiMyPe()==0) CcsServerCheck(); /*Make sure we can get CCS messages*/
 #endif
-      msg = CsdNextMessage(&state);
+      msg = CpdGetNextMessage(&state);
 
       if (msg!=NULL) {
         /*int hIdx=CmiGetHandler(msg);*/
@@ -283,8 +286,9 @@ void CpdFreezeModeScheduler(void)
 	    / * Debug messages should be handled immediately * /
 	    CmiHandleMessage(msg);
 	  } else */
-	  if (CpdIsDebugMessage(msg)) {
-	    CmiHandleMessage(msg);
+        
+      if (CpdIsDebugMessage(msg)) {
+        CmiHandleMessage(msg);
 	  }
 	  else
 	  /*An ordinary charm++ message-- queue it up*/
@@ -312,6 +316,9 @@ void CpdInit(void)
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
+
+  CpvInitialize(void *, conditionalQueue);
+  CpvAccess(conditionalQueue) = CdsFifo_Create();
 #endif
   
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);

@@ -73,7 +73,12 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
       CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
     }
   } else {
-    CcsImpl_reply(rep, repLen, repData);
+    if (_conditionalDelivery == 0) CcsImpl_reply(rep, repLen, repData);
+    else {
+      /* We are the child of a conditional delivery, write to the parent the reply */
+      write(conditionalPipe[1], &repLen, 4);
+      write(conditionalPipe[1], repData, repLen);
+    }
   }
   return 0;
 }
