@@ -24,8 +24,8 @@ char ** memoryBackup;
 int _replaySystem = 0;
 
 #undef ConverseDeliver
-int ConverseDeliver() {
-  return !_replaySystem;
+int ConverseDeliver(int pe) {
+  return !_replaySystem && (!_conditionalDelivery || pe==CmiMyPe());
 }
 
 #if ! CMK_HAS_NTOHL
