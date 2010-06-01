@@ -1,10 +1,20 @@
 
 package tests;
 
+readonly Main@ main;
+
 public mainchare Main {
+    int n;
+
     public entry Main(CkArgMsg m) {
-        int n = atoi(m.argv[1]);
-        Fib@ fib = new Fib@(true, n, thishandle);
+        n = atoi(m.argv[1]);
+        main = thishandle;
+        Fib@ fib = new Fib@(true, n, NULL);
+    }
+
+    public entry void done(int value) {
+        CkPrintf("Fib(%d) = %d", n, value);
+        CkExit();
     }
 }
 
@@ -15,8 +25,7 @@ public chare Fib {
     int partialResult;
     int pendingChildren;
 
-    entry Fib(boolean root_, int n_, Fib@ parent_) {
-        CkPrintf("in fib::fib. n=%d\n", n_);
+    public entry Fib(boolean root_, int n_, Fib@ parent_) {
         n = n_;
         root = root_;
         parent = parent_;
@@ -29,16 +38,13 @@ public chare Fib {
         pendingChildren = 2;
         int x = 1;
         Fib@ child1 = new Fib@(false, n-1, thishandle); // replace with "@this"?
-        Fib@ child2 = new Fib@(false, n-2, thishandle); // can we get away with just "this"?
+        Fib@ child2 = new Fib@(false, n-2, thishandle);
     }
 
-    entry void passUp(int subTreeValue) {
+    public entry void passUp(int subTreeValue) {
         partialResult += subTreeValue;
         if (pendingChildren) return;
-        if (root) {
-            CkPrintf("Fib(%d) = %d", n, partialResult);
-            CkExit();
-        }
-        parent@passUp(partialResult); // replace with parent@passUp(partialResult_); ?
+        if (root) main@done(partialResult);
+        else parent@passUp(partialResult);
     }
 }
