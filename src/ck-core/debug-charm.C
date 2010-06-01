@@ -569,6 +569,8 @@ void CpdEndConditionalDelivery(char *msg) {
   _exit(0);
 }
 
+extern "C" void CpdDeliverSingleMessage ();
+
 #include <sys/wait.h>
 void CpdDeliverMessageConditionally(char * msg) {
   int msgNum;
@@ -609,23 +611,26 @@ void CpdDeliverMessageConditionally(char * msg) {
   conditionalPipe[1] = pipefd[1][1];
   CpdGetNextMessage = CpdGetNextMessageConditional;
 
-  void *debugQ=CkpvAccess(debugQueue);
-  CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
-  for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
-  CkpvAccess(skipBreakpoint) = 1;
-  char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
-  CmiReference(queuedMsg);
-  CdsFifo_Enqueue(CkpvAccess(conditionalQueue), queuedMsg);
+  if (msgNum == -1) CpdDeliverSingleMessage();
+  else {
+    void *debugQ=CkpvAccess(debugQueue);
+    CdsFifo_Enqueue(debugQ, (void*)(-1)); // Enqueue a guard
+    for (int i=0; i<msgNum; ++i) CdsFifo_Enqueue(debugQ, CdsFifo_Dequeue(debugQ));
+    CkpvAccess(skipBreakpoint) = 1;
+    char *queuedMsg = (char *)CdsFifo_Dequeue(debugQ);
+    CmiReference(queuedMsg);
+    CdsFifo_Enqueue(CkpvAccess(conditionalQueue), queuedMsg);
 #if CMK_BLUEGENE_CHARM
-  stopVTimer();
-  BgProcessMessageDefault(cta(threadinfo), queuedMsg);
-  startVTimer();
+    stopVTimer();
+    BgProcessMessageDefault(cta(threadinfo), queuedMsg);
+    startVTimer();
 #else
-  CmiHandleMessage(queuedMsg);
+    CmiHandleMessage(queuedMsg);
 #endif
-  CkpvAccess(skipBreakpoint) = 0;
-  //_exit(0);
-  while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);  
+    CkpvAccess(skipBreakpoint) = 0;
+    //_exit(0);
+    while ((m=CdsFifo_Dequeue(debugQ)) != (void*)(-1)) CdsFifo_Enqueue(debugQ, m);
+  }
 }
 
 class CpdList_msgStack : public CpdListAccessor {
@@ -717,8 +722,9 @@ void CpdDeliverSingleMessage () {
     EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
     if (breakPointEntryInfo != NULL) {
       if (_conditionalDelivery) {
-        CmiReference(CkpvAccess(lastBreakPointMsg));
-        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),CkpvAccess(lastBreakPointMsg));
+        void *env = UsrToEnv(CkpvAccess(lastBreakPointMsg));
+        CmiReference(env);
+        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),env);
       }
       breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
     }
