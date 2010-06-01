@@ -197,6 +197,10 @@ scope ScopeStack;
             ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
             ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+        {
+            ClassSymbol type = $objectType.type;
+            if (type.isChare) currentClass.addExtern(type.getName());
+        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
@@ -341,10 +345,10 @@ String name = "";
     :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
         {
             $type = null;
-            //System.out.println("trying to resolve type " + name + " in type " + currentClass);
+            System.out.println("trying to resolve type " + name + " in type " + currentClass);
             if (currentClass != null) $type = currentClass.resolveType(name);
-            //System.out.println("got " + $type);
-            //if ($type == null) $type = symtab.resolveBuiltinType(name);
+            System.out.println("got " + $type);
+            if ($type == null) $type = symtab.resolveBuiltinType(name);
             $QUALIFIED_TYPE_IDENT.symbol = $type;
         }
     ;
@@ -405,6 +409,11 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+        {
+            ClassSymbol type = $objectType.type;
+            System.out.println("looked up type " + type + " for declaration " + $objectType.text);
+            if (type != null && type.isChare && currentClass != null) currentClass.addExtern(type.getName());
+        }
     ;
 
 statement

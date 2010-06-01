@@ -12,6 +12,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
     List<String> usings = new ArrayList<String>();
+    List<String> externs = new ArrayList<String>();
 
     /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
@@ -224,6 +225,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         includes.add(includeName);
     }
 
+    public void addExtern(String externName) {
+        externs.add(externName);
+    }
+
     public void getUsings(String usingName) {
         usings.add(usingName);
     }
@@ -236,6 +241,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public List<String> getUsings()
     {
         return usings;
+    }
+
+    public List<String> getExterns()
+    {
+        return externs;
     }
 
     public List<String> getPackageNames()
