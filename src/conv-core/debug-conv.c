@@ -16,7 +16,8 @@ CpvExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
 CpvExtern(void *, debugQueue);
-CpvExtern(void *, conditionalQueue);
+CpvDeclare(void*, conditionalQueue);
+int conditionalPipe[2] = {0, 0};
 int _debugHandlerIdx;
 
 char ** memoryBackup;

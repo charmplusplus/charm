@@ -431,8 +431,7 @@ struct ConditionalList {
   int msgs[1];
 };
 CkpvStaticDeclare(void *, lastBreakPointMsg);
-int conditionalPipe[2] = {0, 0};
-CkpvDeclare(void*, conditionalQueue);
+CpvExtern(void*, conditionalQueue);
 ConditionalList * conditionalShm = NULL;
 
 //Cpd Lists for local and scheduler queues
@@ -454,8 +453,8 @@ public:
     int curObj=0;
     void *msg;
 
-    length = CdsFifo_Length((CdsFifo)(CkpvAccess(conditionalQueue)));
-    messages = CdsFifo_Enumerate(CkpvAccess(conditionalQueue));
+    length = CdsFifo_Length((CdsFifo)(CpvAccess(conditionalQueue)));
+    messages = CdsFifo_Enumerate(CpvAccess(conditionalQueue));
     for (curObj=-length; curObj<0; curObj++) {
       void *msg = messages[length+curObj];
       pupSingleMessage(p, curObj-1, msg);
@@ -549,7 +548,7 @@ static void CpdDeliverMessageInt(int msgNum) {
   if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = msgNum;
   if (_conditionalDelivery) {
     CmiReference(queuedMsg);
-    CdsFifo_Enqueue(CkpvAccess(conditionalQueue), queuedMsg);
+    CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
   }  
 #if CMK_BLUEGENE_CHARM
   stopVTimer();
@@ -761,7 +760,7 @@ void CpdDeliverSingleMessage () {
         if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = -1;
         void *env = UsrToEnv(CkpvAccess(lastBreakPointMsg));
         CmiReference(env);
-        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),env);
+        CdsFifo_Enqueue(CpvAccess(conditionalQueue),env);
       }
       breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
     }
@@ -779,7 +778,7 @@ void CpdDeliverSingleMessage () {
       if (_conditionalDelivery) {
         if (_conditionalDelivery==1) conditionalShm->msgs[conditionalShm->count++] = 0;
         CmiReference(queuedMsg);
-        CdsFifo_Enqueue(CkpvAccess(conditionalQueue),queuedMsg);
+        CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
       }
 #if CMK_BLUEGENE_CHARM
       stopVTimer();
