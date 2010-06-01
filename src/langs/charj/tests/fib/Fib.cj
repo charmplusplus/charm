@@ -4,7 +4,7 @@ package tests;
 public mainchare Main {
     public entry Main(CkArgMsg m) {
         int n = atoi(m.argv[1]);
-        Fib@ fib = new Fib(true, n, thishandle);
+        Fib@ fib = new Fib@(true, n, thishandle);
     }
 }
 
@@ -28,8 +28,8 @@ public chare Fib {
         partialResult = 0;
         pendingChildren = 2;
         int x = 1;
-        Fib child1 = new Fib(false, n-1, thishandle); // replace with "@this"?
-        Fib child2 = new Fib(false, n-2, thishandle); // can we get away with just "this"?
+        Fib@ child1 = new Fib@(false, n-1, thishandle); // replace with "@this"?
+        Fib@ child2 = new Fib@(false, n-2, thishandle); // can we get away with just "this"?
     }
 
     entry void passUp(int subTreeValue) {
