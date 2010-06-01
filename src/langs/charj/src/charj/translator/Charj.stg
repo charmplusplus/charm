@@ -197,7 +197,7 @@ ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 
 ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<modl><endif><id><fpl>;
+<modl><id><fpl>;
 >>
 
 
