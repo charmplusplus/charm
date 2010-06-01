@@ -92,8 +92,7 @@ charjSource[SymbolTable symtab, OutputMode m]
         ->
     ;
 
-packageDeclaration
-returns [List names]
+packageDeclaration returns [List names]
     :   ^('package' (ids+=IDENT)+)
         {
             $names = $ids;
@@ -330,8 +329,7 @@ throwsClause
         -> template(t={$text}) "/* throwsClause-not implemented */ <t>"
     ;
 
-modifierList
-returns [List<String> names]
+modifierList returns [List<String> names]
     :   ^(MODIFIER_LIST (m+=modifier)+)
         {
           $names = new ArrayList<String>();
@@ -386,18 +384,27 @@ simpleType
     ;
 
 objectType
+    : proxyType -> {$proxyType.st;}
+    | nonProxyType -> {$nonProxyType.st}
+    ;
+
+nonProxyType
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> pointer_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         -> reference_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
     ;
 
-qualifiedTypeIdent
-    :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+) 
+proxyType
+    :   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$arrayDeclaratorList.st})
+    ;
+
+qualifiedTypeIdent returns [ClassSymbol type]
+    :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+)
+        {$type = (ClassSymbol)$QUALIFIED_TYPE_IDENT.symbol;}
         -> template(types={$t}) "<types; separator=\"::\">"
     ;
 
@@ -700,8 +707,10 @@ newExpression
             )
         )
         -> template(t={$text}) "<t>"
-    |   ^(NEW qualifiedTypeIdent arguments)
-        -> template(q={$qualifiedTypeIdent.st}, a={$arguments.st}) "new <q>(<a>)"
+    |   ^(NEW proxyType arguments)
+        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
+    |   ^(NEW nonProxyType arguments)
+        -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
 
 newArrayConstruction

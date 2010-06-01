@@ -384,7 +384,7 @@ newExpression
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
-    |   ^(NEW qualifiedTypeIdent arguments)
+    |   ^(NEW type arguments)
     ;
 
 newArrayConstruction

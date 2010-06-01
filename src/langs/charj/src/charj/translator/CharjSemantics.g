@@ -299,16 +299,23 @@ objectType returns [ClassSymbol type]
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
-            $type = currentClass.resolveType($qualifiedTypeIdent.name);
-            if ($type == null) $type = symtab.resolveBuiltinType($qualifiedTypeIdent.name);
+            $type = $qualifiedTypeIdent.type;
         }
     ;
 
-qualifiedTypeIdent returns [String name]
+qualifiedTypeIdent returns [ClassSymbol type]
 @init {
-$name = "";
+String name = "";
 }
-    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {$name += $typeIdent.name;})+) 
+    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
+        {
+            $type = null;
+            //System.out.println("trying to resolve type " + name + " in type " + currentClass);
+            $type = currentClass.resolveType(name);
+            //System.out.println("got " + $type);
+            //if ($type == null) $type = symtab.resolveBuiltinType(name);
+            $QUALIFIED_TYPE_IDENT.symbol = $type;
+        }
     ;
 
 typeIdent returns [String name]
@@ -508,7 +515,7 @@ newExpression
             |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
             )
         )
-    |   ^(NEW qualifiedTypeIdent arguments)
+    |   ^(NEW type arguments)
     ;
 
 newArrayConstruction

@@ -809,8 +809,8 @@ newExpression
         |   genericTypeArgumentList? qualifiedTypeIdent
                 newArrayConstruction                // new static array of object type reference elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
-        |   qualifiedTypeIdent arguments
-            -> ^(NEW qualifiedTypeIdent arguments)
+        |   type arguments
+            -> ^(NEW type arguments)
         )
     ;
     

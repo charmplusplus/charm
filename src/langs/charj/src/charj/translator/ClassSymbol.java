@@ -148,19 +148,19 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         }
 
         // not already seen in one of the imported packages, look on disk
-        for (String packageName : imports.keySet()) {
-            PackageScope pkg = resolvePackage(packageName);
-            ClassSymbol cs = symtab.translator.loadType(
-                    pkg.getFullyQualifiedName(), type);
-            if ( cs!=null ) {
-                pkg.define(type, cs); // add to symbol table
-                if ( debug() ) System.out.println(
-                        "ClassSymbol.resolveType(" + type +
-                        "): found after loading in context " + name +
-                        ":" + members.keySet());
-                return cs;
-            }
-        }
+        //for (String packageName : imports.keySet()) {
+        //    PackageScope pkg = resolvePackage(packageName);
+        //    ClassSymbol cs = symtab.translator.loadType(
+        //            pkg.getFullyQualifiedName(), type);
+        //    if ( cs!=null ) {
+        //        pkg.define(type, cs); // add to symbol table
+        //        if ( debug() ) System.out.println(
+        //                "ClassSymbol.resolveType(" + type +
+        //                "): found after loading in context " + name +
+        //                ":" + members.keySet());
+        //        return cs;
+        //    }
+        //}
 
         if ( debug() ) System.out.println(
                 "ClassSymbol.resolveType(" + type +
