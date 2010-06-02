@@ -24,7 +24,7 @@ package charj.translator;
     LocalScope currentLocalScope = null;
     Translator translator;
 
-    AstModifier astmod = new AstModifier();
+    AstModifier astmod;
 }
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
@@ -65,6 +65,7 @@ readonlyDeclaration
 typeDeclaration returns [ClassSymbol sym]
 @init {
     boolean array_type = false;
+    astmod = new AstModifier();
 }
     :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
         (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
@@ -73,7 +74,6 @@ typeDeclaration returns [ClassSymbol sym]
             $TYPE.tree.addChild(astmod.getInitRoutineNode());
             astmod.ensureDefaultCtor($TYPE.tree);
             if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
-            astmod = new AstModifier();
         }
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
@@ -143,7 +143,8 @@ variableDeclarator
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
         {
-            if (currentClass != null) astmod.varPup($IDENT);
+            //if (currentClass != null)
+                astmod.varPup($IDENT);
         }
     ;
 

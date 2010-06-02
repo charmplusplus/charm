@@ -84,10 +84,12 @@ class AstModifier
             switch(p.getType())
             {
                 case CharjParser.PRIMITIVE_VAR_DECLARATION:
+                    System.out.println("found primitive var: " + idNode.getText());
                     type = p.getType();
                     break;
                 case CharjParser.OBJECT_VAR_DECLARATION:
-                    type = p.getChild(1).getType();
+                    System.out.println("found object var: " + idNode.getText());
+                    type = p.getChild(0).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
                 case CharjParser.BLOCK:
@@ -97,14 +99,18 @@ class AstModifier
                     switch(type)
                     {
                         case CharjParser.REFERENCE_TYPE:
+                            System.out.println("puping a reference type");
                             break;
                         case CharjParser.PRIMITIVE_VAR_DECLARATION:
+                            System.out.println("puping a primitive type");
                             primitiveVarPup(idNode);
                             break;
                         case CharjParser.POINTER_TYPE:
+                            System.out.println("puping a pointer type");
                             pointerVarPup(idNode);
                             break;
                         case CharjParser.PROXY_TYPE:
+                            System.out.println("puping a proxy type");
                             proxyVarPup(idNode);
                             break;
                         default:
@@ -152,8 +158,9 @@ class AstModifier
         initNode.getChild(4).getChild(index).addChild(createNode(CharjParser.ASSIGNMENT, "="));
         initNode.getChild(4).getChild(index).getChild(0).addChild(idNode.dupNode());
         initNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.NEW, "new"));
-        initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
-        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(1).getChild(0).getChild(0).dupTree());
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.OBJECT_TYPE, "OBJECT_TYPE"));
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(1).getChild(0).getChild(0).dupTree());
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
 
         // add stuff to the pup routine
