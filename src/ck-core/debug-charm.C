@@ -630,7 +630,7 @@ void CpdEndConditionalDelivery(char *msg) {
   for (int i=0; i<conditionalShm->count; ++i)
     printf("message delivered %d\n",conditionalShm->msgs[i]);
   conditionalShm->count = msgNum;
-  shmdt(conditionalShm);
+  shmdt((char*)conditionalShm);
   _exit(0);
 }
 
@@ -642,7 +642,7 @@ extern "C" void CpdEndConditionalDeliver_master() {
   wait(NULL);
   if (conditionalShm->count == 0) {
     CcsSendReply(0,NULL);
-    shmdt(conditionalShm);
+    shmdt((char*)conditionalShm);
     conditionalShm = NULL;
   } else {
     if (CpdConditional_SetupComm()==0) {
