@@ -426,6 +426,14 @@ type
     |   VOID
     ;
 
+constructorType
+    :   qualifiedTypeIdent AT arrayDeclaratorList?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   qualifiedTypeIdent arrayDeclaratorList?
+        ->  ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    ;
+
+
 simpleType
     :   primitiveType arrayDeclaratorList?
         ->  ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)  
@@ -822,8 +830,8 @@ newExpression
         |   genericTypeArgumentList? qualifiedTypeIdent
                 newArrayConstruction                // new static array of object type reference elements
             ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
-        |   type arguments
-            -> ^(NEW type arguments)
+        |   constructorType arguments
+            -> ^(NEW constructorType arguments)
         )
     ;
     
