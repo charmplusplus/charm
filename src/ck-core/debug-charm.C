@@ -1059,6 +1059,7 @@ void CpdFinishInitialization() {}
 
 void *CpdGetCurrentObject() {return NULL;}
 void *CpdGetCurrentMsg() {return NULL;}
+extern "C" void CpdEndConditionalDeliver_master() {}
 
 void CpdBeforeEp(int ep, void *obj, void *msg) {}
 void CpdAfterEp(int ep) {}
