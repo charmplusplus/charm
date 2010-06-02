@@ -55,6 +55,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         this.usings.add("std::vector");
         this.includes.add("map");
         this.usings.add("std::map");
+        this.includes.add("iostream");
+        this.usings.add("std::cout");
     }
 
     public Scope getEnclosingScope() {
