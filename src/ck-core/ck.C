@@ -1303,8 +1303,8 @@ void _skipCldHandler(void *converseMsg)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(pe)) {
     CmiFree(env);
     return;
   }
@@ -1371,8 +1371,8 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(-1)) {
     CmiFree(env);
     return;
   }
@@ -1389,8 +1389,8 @@ static void _noCldEnqueue(int pe, envelope *env)
     CmiHandleMessage(env);
   } else
 */
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(pe)) {
     CmiFree(env);
     return;
   }
@@ -1411,8 +1411,8 @@ void _noCldNodeEnqueue(int node, envelope *env)
     CmiHandleMessage(env);
   } else {
 */
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(node)) {
     CmiFree(env);
     return;
   }

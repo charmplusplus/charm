@@ -236,11 +236,31 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
 
 /* Call the handler */
   CpvAccess(ccsReq)=hdr;
-  callHandlerRec(fn,reqLen,reqData);
+#if CMK_CHARMDEBUG
+  if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
+    /* We are conditionally delivering, send the message to the child and wait for its response */
+    int bytes = reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
+    write(conditionalPipe[1], &bytes, 4);
+    write(conditionalPipe[1], ((char*)hdr)-CmiReservedHeaderSize, bytes);
+    if (4==read(conditionalPipe[0], &bytes, 4)) {
+      char *buf = malloc(bytes);
+      read(conditionalPipe[0], buf, bytes);
+      CcsSendReply(bytes,buf);
+      free(buf);
+    } else {
+      /* the pipe has been closed */
+      CpdEndConditionalDeliver_master();
+   }
+  }
+  else
+#endif
+  {
+    callHandlerRec(fn,reqLen,reqData);
   
 /*Check if a reply was sent*/
-  if (CpvAccess(ccsReq)!=NULL)
-    CcsSendReply(0,NULL);/*Send an empty reply if not*/
+    if (CpvAccess(ccsReq)!=NULL)
+      CcsSendReply(0,NULL);/*Send an empty reply if not*/
+  }
 }
 
 #if ! NODE_0_IS_CONVHOST || CMK_BLUEGENE_CHARM
