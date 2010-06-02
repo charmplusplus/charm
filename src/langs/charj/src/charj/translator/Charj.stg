@@ -99,7 +99,7 @@ interfaceExtends(ts) ::=
 
 type_preamble_h(sym) ::=
 <<
-<sym.Includes:{include| #include\<<include>\>
+<sym.Includes:{include| #include \<<include>\>
 }>
 <sym.Usings:{using| using <using>;
 }>
