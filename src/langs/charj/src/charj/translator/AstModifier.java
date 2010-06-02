@@ -84,11 +84,11 @@ class AstModifier
             switch(p.getType())
             {
                 case CharjParser.PRIMITIVE_VAR_DECLARATION:
-                    System.out.println("found primitive var: " + idNode.getText());
+                    //System.out.println("found primitive var: " + idNode.getText());
                     type = p.getType();
                     break;
                 case CharjParser.OBJECT_VAR_DECLARATION:
-                    System.out.println("found object var: " + idNode.getText());
+                    //System.out.println("found object var: " + idNode.getText());
                     type = p.getChild(0).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
@@ -99,18 +99,18 @@ class AstModifier
                     switch(type)
                     {
                         case CharjParser.REFERENCE_TYPE:
-                            System.out.println("puping a reference type");
+                            //System.out.println("puping a reference type");
                             break;
                         case CharjParser.PRIMITIVE_VAR_DECLARATION:
-                            System.out.println("puping a primitive type");
+                            //System.out.println("puping a primitive type");
                             primitiveVarPup(idNode);
                             break;
                         case CharjParser.POINTER_TYPE:
-                            System.out.println("puping a pointer type");
+                            //System.out.println("puping a pointer type");
                             pointerVarPup(idNode);
                             break;
                         case CharjParser.PROXY_TYPE:
-                            System.out.println("puping a proxy type");
+                            //System.out.println("puping a proxy type");
                             proxyVarPup(idNode);
                             break;
                         default:

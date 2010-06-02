@@ -24,7 +24,7 @@ package charj.translator;
     LocalScope currentLocalScope = null;
     Translator translator;
 
-    AstModifier astmod;
+    AstModifier astmod = new AstModifier();
 }
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
@@ -143,8 +143,7 @@ variableDeclarator
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
         {
-            //if (currentClass != null)
-                astmod.varPup($IDENT);
+            astmod.varPup($IDENT);
         }
     ;
 
