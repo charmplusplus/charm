@@ -54,6 +54,9 @@ tokens {
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
 
+    PRINT                   = 'print'           ;
+    PRINTLN                 = 'println'         ;
+
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
     IF                      = 'if'              ;
@@ -578,6 +581,10 @@ nonBlockStatement
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
     |   ';' // Preserve empty statements.
+    |   PRINT '(' (expression (',' expression)*)* ')' ';'
+        ->  ^(PRINT expression*)
+    |   PRINTLN '(' (expression (',' expression)*)* ')' ';'
+        ->  ^(PRINTLN expression*)
     ;           
         
 

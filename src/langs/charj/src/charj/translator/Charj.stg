@@ -475,4 +475,14 @@ arguments(exprs) ::=
 <exprs; separator=", ">
 >>
 
+print(exprs) ::=
+<<
+<if(first(exprs))>cout <exprs : { n | \<\< <n> }>;<endif>
+>>
+
+println(exprs) ::=
+<<
+cout<if(first(exprs))> <exprs : { n | \<\< <n> }><else> <endif>\<\< endl;
+>>
+
 

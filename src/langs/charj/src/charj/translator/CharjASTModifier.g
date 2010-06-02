@@ -307,6 +307,8 @@ nonBlockStatement
     |   ^('delete' qualifiedIdentifier)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
+    |   ^(PRINT expression*)
+    |   ^(PRINTLN expression*)
     ;
         
 switchCaseLabel

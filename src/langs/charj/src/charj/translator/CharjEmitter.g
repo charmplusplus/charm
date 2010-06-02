@@ -587,6 +587,10 @@ nonBlockStatement
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
+    |   ^(PRINT (exprs += expression)*)
+        ->  print(exprs = {$exprs})
+    |   ^(PRINTLN (exprs += expression)*)
+        ->  println(exprs = {$exprs})
     ;
         
 switchCaseLabel
