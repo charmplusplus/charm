@@ -309,6 +309,8 @@ nonBlockStatement
     |   ';' // Empty statement.
     |   ^(PRINT expression*)
     |   ^(PRINTLN expression*)
+    |   ^(EXIT expression?)
+    |   EXITALL
     ;
         
 switchCaseLabel
