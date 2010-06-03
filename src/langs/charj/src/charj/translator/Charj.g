@@ -107,6 +107,12 @@ tokens {
     AT                      = '@'               ;
     INSTANCEOF              = 'instanceof'      ;
 
+    // Charj keywords for things that are automatically generated
+    // and we don't want the user to use them as identifiers
+
+    PUP                     = 'pup'             ;
+    INITMETHOD              = 'initMethod'      ;
+
 
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved

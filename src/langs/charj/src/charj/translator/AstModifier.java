@@ -89,7 +89,7 @@ class AstModifier
                     break;
                 case CharjParser.OBJECT_VAR_DECLARATION:
                     //System.out.println("found object var: " + idNode.getText());
-                    type = p.getChild(0).getType();
+                    type = p.getChildAfterType(CharjParser.MODIFIER_LIST).getType();
                     break;
                 case CharjParser.FUNCTION_METHOD_DECL:
                 case CharjParser.BLOCK:
@@ -160,7 +160,7 @@ class AstModifier
         initNode.getChild(4).getChild(index).getChild(0).addChild(createNode(CharjParser.NEW, "new"));
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.OBJECT_TYPE, "OBJECT_TYPE"));
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
-        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).getChild(0).addChild(idNode.getParent().getParent().getParent().getChild(0).getChild(0).getChild(0).dupTree());
+        initNode.getChild(4).getChild(index).getChild(0).getChild(1).getChild(0).getChild(0).addChild(idNode.getParent().getParent().getParent().getChildOfType(CharjParser.POINTER_TYPE).getChild(0).getChild(0).dupTree());
         initNode.getChild(4).getChild(index).getChild(0).getChild(1).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
 
         // add stuff to the pup routine
