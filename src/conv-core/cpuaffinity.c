@@ -468,7 +468,7 @@ void CmiInitCPUAffinity(char **argv)
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   if (pemap!=NULL && (coremap != NULL || excludecount>0))
-    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.");
+    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.\n");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
@@ -532,7 +532,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL) {
     int mycore = search_pemap(pemap, CmiMyPe());
-    printf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
     if (mycore >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
