@@ -11,6 +11,7 @@
 
 #define DEBUG 0
 #define REUSE_ITER_MSG 0
+#define TOUCH_MSGDATA 0
 
 CProxy_Main mainProxy;
 int gMsgSize;
@@ -24,7 +25,12 @@ public:
 
 public:
     toNeighborMsg() {};
-    toNeighborMsg(int s): size(s) {  init(); }
+    toNeighborMsg(int s): size(s) {  
+#if TOUCH_MSGDATA
+	init(); 
+#endif
+    }
+
     void setMsgSrc(int X, int id) {
         fromX = X;
         nID = id;
@@ -34,7 +40,7 @@ public:
           data[i] = i;
     }
     int sum() {
-        int s;
+        int s=0;
         for (int i=0; i<size; i++)
           s += data[i];
         return s;
@@ -80,6 +86,10 @@ public:
         }
 
         int numElems = atoi(m->argv[1]);
+	if(numElems < CkNumPes()){
+		printf("Warning: #elements is forced to be euqal to #pes\n");
+		numElems = CkNumPes();
+	}
 
         numSteps = atoi(m->argv[2]);
 
@@ -437,7 +447,10 @@ public:
 #if DEBUG
 	CkPrintf("[%d]: recv msg from %d as its %dth neighbor\n", thisIndex, m->fromX, m->nID);
 #endif
+
+#if TOUCH_MSGDATA
         sum = m->sum();
+#endif
         thisProxy(m->fromX).recvReplies(m);
     }
 
