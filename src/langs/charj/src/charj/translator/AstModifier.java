@@ -271,12 +271,12 @@ class AstModifier
             declNode.addChild(c);
     }
 
-    private boolean hasDefaultCtor = false;
     private boolean hasMigrationCtor = false;
+    private CharjAST defaultCtor;
 
-    protected void checkForDefaultCtor(CharjAST ctordecl)
+    protected void checkForDefaultCtor(CharjAST ctordecl, CharjAST ctordecltree)
     {
-        if(hasDefaultCtor)
+        if(defaultCtor != null)
             return;
 
         CharjAST params = null;
@@ -288,7 +288,7 @@ class AstModifier
             }
         }
         if(params.getChildren() == null)
-            hasDefaultCtor = true;
+            defaultCtor = ctordecltree;
     }
 
     protected boolean isMigrationCtor(CharjAST ctordecl)
@@ -327,18 +327,27 @@ class AstModifier
 
     protected void ensureDefaultCtor(CharjAST typenode)
     {
-        if(hasDefaultCtor)
-            return;
-        
-        CharjAST ctor = createNode(CharjParser.CONSTRUCTOR_DECL, "CONSTRUCTOR_DECL");
-        ctor.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
-        ctor.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
-        ctor.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
-        ctor.addChild(typenode.getChild(1).dupNode());
-        ctor.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
-        ctor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+        if(defaultCtor != null && typenode.getChild(0).getType() == CharjParser.MAINCHARE && defaultCtor.getChild(1).getChildren() == null)
+        {
+            // fill CkMsgArg* argument
+            defaultCtor.getChild(2).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
+            defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
+            defaultCtor.getChild(2).getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
+            defaultCtor.getChild(2).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "CkArgMsg"));
+            defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.IDENT, "m"));
+        }
+        else if(defaultCtor == null)
+        {
+            CharjAST ctor = createNode(CharjParser.CONSTRUCTOR_DECL, "CONSTRUCTOR_DECL");
+            ctor.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+            ctor.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+            ctor.getChild(0).getChild(0).addChild(createNode(CharjParser.PUBLIC, "public"));
+            ctor.addChild(typenode.getChild(1).dupNode());
+            ctor.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
+            ctor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
 
-        typenode.addChild(ctor);
+            typenode.addChild(ctor);
+        }
     }
 
     protected CharjAST ensureMigrationCtor(CharjAST typenode)

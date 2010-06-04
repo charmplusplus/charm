@@ -115,7 +115,7 @@ classScopeDeclaration
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
+            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
             astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
             if($m.tree == null)
                 astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
