@@ -485,4 +485,13 @@ println(exprs) ::=
 cout<if(first(exprs))> <exprs : { n | \<\< <n> }><else> <endif>\<\< endl;
 >>
 
+exit(expr) ::=
+<<
+<if(expr)>exit(<expr>)<else>exit(0)<endif>;
+>>
+
+exitall() ::=
+<<
+CkExit();
+>>
 

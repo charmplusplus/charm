@@ -56,6 +56,8 @@ tokens {
 
     PRINT                   = 'print'           ;
     PRINTLN                 = 'println'         ;
+    EXIT                    = 'exit'            ;
+    EXITALL                 = 'exitAll'         ;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -104,6 +106,12 @@ tokens {
     TILDE                   = '~'               ;
     AT                      = '@'               ;
     INSTANCEOF              = 'instanceof'      ;
+
+    // Charj keywords for things that are automatically generated
+    // and we don't want the user to use them as identifiers
+
+    PUP                     = 'pup'             ;
+    INITMETHOD              = 'initMethod'      ;
 
 
     // C++ keywords that aren't used in charj. 
@@ -585,6 +593,10 @@ nonBlockStatement
         ->  ^(PRINT expression*)
     |   PRINTLN '(' (expression (',' expression)*)* ')' ';'
         ->  ^(PRINTLN expression*)
+    |   EXIT '(' expression? ')' ';'
+        ->  ^(EXIT expression?)
+    |   EXITALL '(' ')' ';'
+        ->  EXITALL
     ;           
         
 

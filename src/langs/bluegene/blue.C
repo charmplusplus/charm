@@ -79,6 +79,7 @@ char **papi_counters_desc = NULL;
 #define MAX_TOTAL_EVENTS 10
 #endif
 
+BgTracingFn userTracingFn = NULL;
 
 /****************************************************************************
      little utility functions
@@ -561,7 +562,6 @@ int checkReady()
     CmiAbort("checkReady called by a non-communication thread!\n");
   return !tINBUFFER.isEmpty();
 }
-
 
 /* handler to process the msg */
 void msgHandlerFunc(char *msg)
@@ -1352,6 +1352,26 @@ static void beginExitHandlerFunc(void *msg);
 static void writeToDisk();
 static void sendCorrectionStats();
 
+void callAllUserTracingFunction()
+{
+  if (userTracingFn == NULL) return;
+  int origPe = -2;
+  // close all tracing modules
+  for (int j=0; j<cva(numNodes); j++)
+    for (int i=0; i<cva(bgMach).numWth; i++) {
+      int pe = nodeInfo::Local2Global(j)*cva(bgMach).numWth+i;
+      int oldPe = CmiSwitchToPE(pe);
+      if (cva(bgMach).replay != -1)
+        if ( pe != cva(bgMach).replay ) continue;
+      if (origPe == -2) origPe = oldPe;
+      traceCharmClose();
+      delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
+      cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
+      if (userTracingFn) userTracingFn();
+    }
+    if (origPe!=-2) CmiSwitchToPE(origPe);
+}
+
 static CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
@@ -1392,6 +1412,7 @@ static CmiHandler exitHandlerFunc(char *msg)
 //      CmiSwitchToPE(oldPe);
       delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
       cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
+      if (userTracingFn) userTracingFn();
     }
     if (origPe!=-2) CmiSwitchToPE(origPe);
   }
@@ -1762,8 +1783,10 @@ if(bgUseOutOfCore){
     /* initialize a BG node and fire all threads */
     BgNodeInitialize(ninfo);
   }
+
   // clear main thread.
   cta(threadinfo)->myNode = NULL;
+
   CpvInitialize(CthThread, mainThread);
   cva(mainThread) = CthSelf();
 
@@ -1793,7 +1816,7 @@ extern "C" int CmiSwitchToPEFn(int pe)
   else if (pe < 0) {
   }
   else {
-    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
+//    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
     int t = pe%cva(bgMach).numWth;
     int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;
@@ -2246,4 +2269,11 @@ void BgRewindRecord()
   threadInfo *tinfo = cta(threadinfo);
   if (tinfo->watcher) tinfo->watcher->rewind();
 }
+
+
+void BgRegisterUserTracingFunction(BgTracingFn fn)
+{
+  userTracingFn = fn;
+}
+
 

@@ -73,4 +73,27 @@ public class CharjAST extends CommonTree
         return root;
     }
 
+    public CharjAST getChildOfType(int type)
+    {
+        try
+        {
+            for(CharjAST c : getChildren())
+                if(c.getType() == type)
+                    return c;
+        }
+        catch(NullPointerException npe)
+        {
+            npe.printStackTrace();
+        }
+        return null;
+    }
+
+    public CharjAST getChildAfterType(int type)
+    {
+        for(int i = 0; i < getChildCount(); i++)
+            if(getChild(i).getType() == type)
+                return getChild(i+1);
+        return getChild(0);
+    }
+
 }

@@ -591,6 +591,10 @@ nonBlockStatement
         ->  print(exprs = {$exprs})
     |   ^(PRINTLN (exprs += expression)*)
         ->  println(exprs = {$exprs})
+    |   ^(EXIT expression?)
+        ->  exit(expr = {$expression.st})
+    |   EXITALL
+        ->  exitall()
     ;
         
 switchCaseLabel

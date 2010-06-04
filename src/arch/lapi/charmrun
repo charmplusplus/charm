@@ -15,13 +15,17 @@ while [ $# -gt 0 ]
 	  shift
 	  ;;
       +ppn)
-	  args=$args"$1 $2"
+	  args=$args"$1 $2 "
 	  ppnused="$2"
 	  shift
 	  ;;
       +p[0-9]*)
           pes=`expr substr $1 3 10`
           ;;
+      +ppn[0-9]*)
+	  ppnused=`expr substr $1 5 12`
+	  args=$args"+ppn $ppnused "
+	  ;;
       +n)
 	  nodes=$2
           shift
