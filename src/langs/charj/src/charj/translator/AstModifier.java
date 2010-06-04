@@ -235,7 +235,18 @@ class AstModifier
         }
 
        if(accessList.getChildren() == null)
-           accessList.addChild(createNode(CharjParser.PRIVATE, "private"));
+           try
+           {
+               if(charjList.getChildren().contains(createNode(CharjParser.ENTRY, "entry")))
+                   accessList.addChild(createNode(CharjParser.PUBLIC, "public"));
+               else
+                   accessList.addChild(createNode(CharjParser.PRIVATE, "private"));
+           }
+           catch(NullPointerException npe)
+           {
+               // charjList == null && accessList is empty
+               accessList.addChild(createNode(CharjParser.PRIVATE, "private"));
+           }
 
        modlistNode.addChild(accessList);
        if(localList.getChildren() != null) modlistNode.addChild(localList);
