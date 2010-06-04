@@ -21,6 +21,8 @@ int main()
                                                                                 
   int* allNodeOffsets = BgLoadOffsets(totalProcs,numPes);
 
+  int numNodes = totalProcs / numWth;
+
   // load timelines from each emulating processor
   for (int i=0; i<numPes; i++) 
   {
@@ -28,7 +30,9 @@ int main()
     int rec_count = 0;
 
       // procNum is the target PE on this emulating processor
-    for(int procNum=i;procNum<totalProcs;procNum+=numPes){
+    for (int nodeNum=i;nodeNum<numNodes;nodeNum+=numPes) {
+     for (int procNum=nodeNum*numWth; procNum<(nodeNum+1)*numWth; procNum++) {
+       //for(int procNum=i;procNum<totalProcs;procNum+=numPes){
 
       BgTimeLineRec &tlinerec = tlinerecs[rec_count];
       rec_count++;
@@ -53,6 +57,7 @@ int main()
         }  
       }
 
+    }
     }
     BgWriteTimelines(i,tlinerecs,rec_count,OUTPUTDIR);
     delete[] tlinerecs;
