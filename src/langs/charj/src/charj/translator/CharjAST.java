@@ -99,6 +99,8 @@ public class CharjAST extends CommonTree
     @Override
     public boolean equals(Object o)
     {
+        if(o == null)
+            return false;
         if(!(o instanceof CharjAST))
             return false;
         CharjAST other = (CharjAST)o;
