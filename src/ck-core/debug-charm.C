@@ -588,9 +588,11 @@ static pid_t CpdConditional_SetupComm() {
   pipe(pipefd[1]); // child to parent
   
   if (conditionalShm == NULL) {
+    struct shmid_ds dummy;
     int shmemid = shmget(IPC_PRIVATE, 1024*1024, IPC_CREAT | 0666);
     conditionalShm = (ConditionalList*)shmat(shmemid, NULL, 0);
     conditionalShm->count = 0;
+    shmctl(shmemid, IPC_RMID, &dummy);
   }
   
   pid_t pid = fork();
