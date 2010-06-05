@@ -11,18 +11,4 @@ chare fib
   entry void response(int value);
 };
 
-chare SimpleInterface {
-  entry SimpleInterface();
-};
-
-chare SetSimpleInterface {
-  entry SetSimpleInterface();
-  entry void set_si(CProxy_SimpleInterface& pssi, int n, char name[n]);
-};
-
-chare SingleProvider : SimpleInterface {
-       entry SingleProvider();
-       entry void provider_set_s(CProxy_SetSimpleInterface& pssi, CProxy_SimpleInterface& psi, int n, char name[n]);
-};
-
 };

@@ -1420,11 +1420,6 @@ void CmiHandleMessage(void *msg)
 	
         MESSAGE_PHASE_CHECK(msg)
 
-#if CMK_BLUEGENE_CHARM
-if (BgIsReplay() && CmiMyPe()!=0) return;
-#endif
-
-
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
 #if CMK_TRACE_ENABLED

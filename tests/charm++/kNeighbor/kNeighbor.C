@@ -1,9 +1,8 @@
 #include "kNeighbor.decl.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "bigsim_param.h"
 
-#define STRIDEK 1
+#define STRIDEK 3
 #define CALCPERSTEP 100
 #define WRAPROUND 1
 #define ALLCROSSNODE 0
@@ -14,15 +13,8 @@
 #define REUSE_ITER_MSG 0
 #define TOUCH_MSGDATA 0
 
-#define DOCOMP 1
-
-
 CProxy_Main mainProxy;
 int gMsgSize;
-
-void initTrace() {
-  initBigSimTrace(1);
-}
 
 class toNeighborMsg: public CMessage_toNeighborMsg {
 public:
@@ -352,15 +344,11 @@ public:
 #ifdef DOCOMP
         //1: pick a work size and do some computation
         int sum=0;
-        //int N=curIterWorkSize;
-        int N = rand() % 100;
-	startTraceBigSim();
+        int N=curIterWorkSize;
         for (int i=0; i<N; i++)
             for (int j=0; j<N; j++)
                 for (int k=0; k<N; k++)
-                    //sum += (thisIndex*i+thisIndex*j+k)%WORKSIZECNT;
-                    sum += (thisIndex*i+thisIndex*j+k)%5000;
-        endTraceBigSim("startInternalIteration", internalStepCnt, N);
+                    sum += (thisIndex*i+thisIndex*j+k)%WORKSIZECNT;
 #endif
         //2. send msg to K neighbors
         int msgSize = curIterMsgSize;
@@ -449,7 +437,6 @@ public:
                 		CkPrintf("RTT time from neighbor %d (actual elem id %d): %lf\n", i, neighbors[i], recvTimes[i]);
                 	}
                 }*/
-		finalizeBigSimTrace();
             } else {
                 startInternalIteration();
             }

@@ -3,7 +3,6 @@
 #include "tcharm.h"
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
-#include "cktiming.h"
 
 #define CART_TOPOL 1
 #define AMPI_PRINT_IDLE 0
@@ -493,9 +492,6 @@ static void ampiProcInit(void){
 
   CkpvInitialize(int, argvExtracted);
   CkpvAccess(argvExtracted) = 0;
-
-  initBigSimTrace(1);
-
   REGISTER_AMPI
   initAmpiProjections();
   char **argv=CkGetArgv();
@@ -2469,7 +2465,6 @@ int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 CDECL void AMPI_Exit(int /*exitCode*/)
 {
   AMPIAPI("AMPI_Exit");
-  finalizeBigSimTrace();
   TCHARM_Done();
 }
 FDECL void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
