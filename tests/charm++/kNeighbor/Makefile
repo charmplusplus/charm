@@ -1,7 +1,7 @@
 LINKOPTS=-memory os
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS = kNeighbor.o
+OBJS = kNeighbor.o 
 COMPOBJS = kNeighbor.comp.o
 
 all: kNeighbor 
@@ -9,8 +9,10 @@ all: kNeighbor
 projections: kNeighbor.proj kNeighbor.comp.proj
 
 kNeighbor: $(OBJS)
-	$(CHARMC) -language charm++ -o kNeighbor $(OBJS) 
-	$(CHARMC) -language charm++ -o kNeighbor.memos $(OBJS) $(LINKOPTS)
+	$(CHARMC) -language charm++ -o kNeighbor $(OBJS)  -lbigsim-param
+
+traceBigSim.o:  traceBigSim.C
+	$(CHARMC) -c traceBigSim.C
 
 kNeighbor.comp: $(COMPOBJS)
 	$(CHARMC) -language charm++ -o kNeighbor.comp.memos $(COMPOBJS) 
@@ -29,7 +31,7 @@ kNeighbor.decl.h: kNeighbor.ci
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o charmrun *~ kNeighbor kNeighbor.memos kNeighbor.comp kNeighbor.comp.memos kNeighbor.proj kNeighbor.comp.proj
 
-kNeighbor.o: kNeighbor.C kNeighbor.decl.h
+kNeighbor.o: kNeighbor.C kNeighbor.decl.h 
 	$(CHARMC) -c kNeighbor.C
 
 kNeighbor.comp.o: kNeighbor.C kNeighbor.decl.h
@@ -47,3 +49,9 @@ test-pxshm: all
 	./charmrun +p7 ./kNeighbor +setcpuaffinity 7 10000 256 +nodesize 7
 	./charmrun +p7 ./kNeighbor +setcpuaffinity 7 10000 1024 +nodesize 7
 	./charmrun +p7 ./kNeighbor +setcpuaffinity 7 10000 16384 +nodesize 7
+
+
+interpolate:
+	./charmrun +p3 ./kNeighbor 3 1 64 +x3 +y1 +z1 +bglog
+	./charmrun +p3 ./kNeighbor 3 1 64
+

@@ -25,4 +25,6 @@ mainmodule kNeighbor {
 	group MyMap : CkArrayMap{
 		entry MyMap(int);
 	};
+
+   initproc void initTrace();
 }
