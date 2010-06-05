@@ -259,17 +259,11 @@ class AstModifier
         CharjAST modlist = createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST");
         modlist.addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
         modlist.getChild(0).addChild(createNode(CharjParser.PRIVATE, "private"));
-        
-        ArrayList<CharjAST> list = new ArrayList<CharjAST>();
-        list.addAll(declNode.getChildren());
 
-        declNode.getChildren().clear();
-
-        declNode.addChild(modlist);
-
-        for(CharjAST c : list)
-            declNode.addChild(c);
+        declNode.insertChild(0, modlist);
     }
+
+    protected void dealWithInit(CharjAST vardecl) {} // TODO
 
     private boolean hasMigrationCtor = false;
     private CharjAST defaultCtor;

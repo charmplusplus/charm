@@ -138,6 +138,9 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
+        {
+            astmod.dealWithInit($VAR_DECLARATOR.tree);
+        }
     ;
     
 variableDeclaratorId
