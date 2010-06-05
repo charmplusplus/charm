@@ -96,4 +96,14 @@ public class CharjAST extends CommonTree
         return getChild(0);
     }
 
+    @Override
+    public boolean equals(Object o)
+    {
+        if(o == null)
+            return false;
+        if(!(o instanceof CharjAST))
+            return false;
+        CharjAST other = (CharjAST)o;
+        return other.getType() == this.getType() && other.getText().equals(this.getText());
+    }
 }

@@ -25,6 +25,7 @@ POSE_TimeType seqLastCheckpointGVT;
 double seqLastCheckpointTime;
 double seqStartTime;
 CkQ<Skipped_Event> POSE_Skipped_Events;
+int poseIndexOfStopEvent;
 
 const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
@@ -133,6 +134,7 @@ void POSE_init(int IDflag, int ET) // can specify both
   seqCheckpointInProgress = 0;
   seqLastCheckpointGVT = 0;
   seqLastCheckpointTime = seqStartTime = 0.0;
+  poseIndexOfStopEvent = -1;
 #else
   /*  CkPrintf("WARNING: Charm Quiescence termination enabled!\n");
   int fnIdx = CkIndex_pose::stop();
@@ -190,6 +192,11 @@ void POSE_exit()
   POSE_Coordinator.exit();
 }
 
+/// Set the poser index for an event to be executed when POSE detects quiescence
+void setPoseIndexOfStopEvent(int index) {
+  poseIndexOfStopEvent = index;
+}
+
 /// Exit simulation program after terminus reduction
 void POSE_prepExit(void *param, void *msg)
 {
@@ -227,8 +234,12 @@ void pose::registerCallBack(callBack *cbm)
 void pose::stop(void) 
 { 
 #ifdef SEQUENTIAL_POSE
+  // invoke any registered stop events and restart quiescence detection
+  if (poseIndexOfStopEvent >= 0) {
+    POSE_Objects[poseIndexOfStopEvent].invokeStopEvent();
+    CkStartQD(CkIndex_pose::stop(), &POSE_Coordinator_ID);
   // don't stop if quiescence was reached for a checkpoint operation
-  if (seqCheckpointInProgress) {
+  } else if (seqCheckpointInProgress) {
     POSE_Objects[0].SeqBeginCheckpoint();
   } else {
 #if USE_LONG_TIMESTAMPS
