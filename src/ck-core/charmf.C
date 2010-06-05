@@ -5,6 +5,7 @@
 #include "charm++.h"
 #include <stdarg.h>
 #include "charmf.h"
+#include "cktiming.h"
 
 extern "C" int typesize(int type, int count)
 {
@@ -172,5 +173,41 @@ FDECL void FTN_NAME(CMIMEMORYCHECK, cmimemorycheck) ()
 {
   CmiMemoryCheck();
 }
+
+// cktiming utility
+
+FDECL void FTN_NAME(INITBIGSIMTRACE, initbigsimtrace)(int *outputParams)
+{
+  initBigSimTrace(*outputParams);
+}
+
+FDECL void FTN_NAME(FINALIZEBIGSIMTRACE, finalizebigsimtrace)()
+{
+  finalizeBigSimTrace();
+}
+
+FDECL void FTN_NAME(STARTTRACEBIGSIM, starttracebigsim)()
+{
+  startTraceBigSim();
+}
+
+FDECL void FTN_NAME(ENDTRACEBIGSIM1, endtracebigsim1)(char *eventName, int *stepno, double *p1)
+{
+  endTraceBigSim(eventName, *stepno, *p1);
+}
+
+
+FDECL void FTN_NAME(ENDTRACEBIGSIM2, endtracebigsim2)(char *eventName, int *stepno, double *p1, double *p2)
+{
+  endTraceBigSim(eventName, *stepno, *p1, *p2);
+}
+
+FDECL void FTN_NAME(ENDTRACEBIGSIM3, endtracebigsim3)(char *eventName, int *stepno, double *p1, double *p2, double *p3)
+{
+  // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3);
+  endTraceBigSim(eventName, *stepno, *p1, *p2, *p3);
+}
+
+
 
 
