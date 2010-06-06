@@ -27,5 +27,6 @@ module sim {
     entry void Cancel(cancelMsg *);
     entry void SeqBeginCheckpoint();
     entry void SeqResumeAfterCheckpoint();
+    entry void invokeStopEvent();
   };
 };

@@ -96,4 +96,43 @@ public class CharjAST extends CommonTree
         return getChild(0);
     }
 
+    @Override
+    public boolean equals(Object o)
+    {
+        if(o == null)
+            return false;
+        if(!(o instanceof CharjAST))
+            return false;
+        CharjAST other = (CharjAST)o;
+        return other.getType() == this.getType() && other.getText().equals(this.getText());
+    }
+
+    public void insertChild(int index, CharjAST node)
+    {
+        try
+        {
+            List<CharjAST> children = new ArrayList<CharjAST>();
+
+            for(int i=0; i<index; i++)
+                children.add(getChild(i));
+                
+            children.add(node);
+
+            for(int i=index; i < getChildCount(); i++)
+                children.add(getChild(i));
+
+            getChildren().clear();
+
+            for(CharjAST c : children)
+               addChild(c);
+        }
+        catch(NullPointerException npe)
+        {
+            npe.printStackTrace();
+            if(index == 0)
+                addChild(node);
+            else
+                throw new ArrayIndexOutOfBoundsException(index);
+        }
+    }
 }

@@ -72,6 +72,7 @@ typeDeclaration returns [ClassSymbol sym]
         {
             $TYPE.tree.addChild(astmod.getPupRoutineNode());
             $TYPE.tree.addChild(astmod.getInitRoutineNode());
+            $TYPE.tree.addChild(astmod.getCtorHelperNode());
             astmod.ensureDefaultCtor($TYPE.tree);
             if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
         }
@@ -115,10 +116,12 @@ classScopeDeclaration
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL);
-            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
             if($m.tree == null)
                 astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
+
+            astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
+            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
+            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
         }
     ;
     
@@ -138,6 +141,9 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
+        {
+            astmod.dealWithInit($VAR_DECLARATOR);
+        }
     ;
     
 variableDeclaratorId

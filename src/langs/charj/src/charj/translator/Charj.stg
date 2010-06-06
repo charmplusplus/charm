@@ -296,11 +296,20 @@ var_decl_list(var_decls) ::=
 >>
 
 
-var_decl(id, initializer) ::=
+var_decl_cc(id, initializer) ::=
 <<
 <id><if(initializer)> = <initializer><endif>
 >>
 
+var_decl_h(id, initializer) ::=
+<<
+<id>
+>>
+
+var_decl_ci(id, initializer) ::=
+<<
+<id><if(initializer)> = <initializer><endif>
+>>
 
 var_decl_id(id, array_decl_list) ::=
 <<
