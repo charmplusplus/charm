@@ -10,11 +10,13 @@ class AstModifier
     private CharjAST pupNode;
     private CharjAST initNode;
     private CharjAST migrationCtor;
+    private CharjAST constructorHelper;
 
     AstModifier()
     {
         createPupNode();
         createInitNode();
+        createCtorHelperNode();
     }
 
     protected CharjAST getPupRoutineNode()
@@ -27,10 +29,27 @@ class AstModifier
         return initNode;
     }
 
+    protected CharjAST getCtorHelperNode()
+    {
+        return constructorHelper;
+    }
+
     private CharjAST createNode(int type, String text)
     {
         return new CharjAST(new CommonToken(type, text));
-    }    
+    }   
+
+    private void createCtorHelperNode()
+    {
+        constructorHelper = createNode(CharjParser.FUNCTION_METHOD_DECL, "FUNCTION_METHOD_DECL");
+        constructorHelper.addChild(createNode(CharjParser.MODIFIER_LIST, "MODIFIER_LIST"));
+        constructorHelper.getChild(0).addChild(createNode(CharjParser.ACCESS_MODIFIER_LIST, "ACCESS_MODIFIER_LIST"));
+        constructorHelper.getChild(0).getChild(0).addChild(createNode(CharjParser.PROTECTED, "protected"));
+        constructorHelper.addChild(createNode(CharjParser.VOID, "void"));
+        constructorHelper.addChild(createNode(CharjParser.IDENT, "constructorHelper"));
+        constructorHelper.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
+        constructorHelper.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+    }
     
     private void createInitNode()
     {
@@ -263,7 +282,38 @@ class AstModifier
         declNode.insertChild(0, modlist);
     }
 
-    protected void dealWithInit(CharjAST vardecl) {} // TODO
+    protected void insertHelperRoutineCall(CharjAST ctordecl)
+    {
+        CharjAST expr = createNode(CharjParser.EXPR, "EXPR");
+        expr.addChild(createNode(CharjParser.METHOD_CALL, "METHOD_CALL"));
+        expr.getChild(0).addChild(createNode(CharjParser.IDENT, "constructorHelper"));
+        expr.getChild(0).addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+
+        ctordecl.getChild(3).insertChild(0, expr);   
+    }
+
+    protected void dealWithInit(CharjAST vardecl)
+    {
+        if(vardecl.getChildCount() > 1) // has an initialization expression
+        {
+            boolean localScope = false;
+            for(CharjAST temp = vardecl; temp != null; temp = temp.getParent())
+                if(temp.getType() == CharjParser.FUNCTION_METHOD_DECL || temp.getType() == CharjParser.CONSTRUCTOR_DECL)
+                {
+                    localScope = true;
+                    break;
+                }
+            if(!localScope)
+            {
+                // add current variable initialization to constructorHelper
+                CharjAST expr = createNode(CharjParser.EXPR, "EXPR");
+                expr.addChild(createNode(CharjParser.ASSIGNMENT, "="));
+                expr.getChild(0).addChild(vardecl.getChild(0).dupNode());
+                expr.getChild(0).addChild(vardecl.getChild(1).getChild(0).dupTree());
+                constructorHelper.getChild(4).addChild(expr);
+            }
+        }
+    }
 
     private boolean hasMigrationCtor = false;
     private CharjAST defaultCtor;
@@ -346,6 +396,8 @@ class AstModifier
             defaultCtor.addChild(typenode.getChild(1).dupNode());
             defaultCtor.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
             defaultCtor.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+
+            insertHelperRoutineCall(defaultCtor);
 
             if(typenode.getChild(0).getType() == CharjParser.MAINCHARE)
             {

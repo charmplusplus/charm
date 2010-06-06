@@ -291,8 +291,11 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer?)
-        -> var_decl(id={$id.st}, initializer={$initializer.st})
-    ;
+        -> {emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
+        -> {emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
+        -> {emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
+        ->
+    ; 
     
 variableDeclaratorId
     :   ^(IDENT adl=arrayDeclaratorList?)
