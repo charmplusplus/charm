@@ -750,6 +750,17 @@ primaryExpression
         -> {$arrayTypeDeclarator.st}
     |   SUPER
         -> {%{$start.getText()}}
+    |   GETNUMPES
+        ->  template() "CkNumPes()"
+    |   GETNUMNODES
+        ->  template() "CkNumNodes()"
+    |   GETMYPE
+        ->  template() "CkMyPe()"
+    |   GETMYNODE
+        ->  template() "CkMyNode()"
+    |   GETMYRANK
+        ->  template() "CkMyRank()"
+
     ;
     
 explicitConstructorCall

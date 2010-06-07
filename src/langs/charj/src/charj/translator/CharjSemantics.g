@@ -542,6 +542,11 @@ primaryExpression
     |   THIS
     |   arrayTypeDeclarator
     |   SUPER
+    |   GETNUMPES
+    |   GETNUMNODES
+    |   GETMYPE
+    |   GETMYNODE
+    |   GETMYRANK
     ;
     
 explicitConstructorCall

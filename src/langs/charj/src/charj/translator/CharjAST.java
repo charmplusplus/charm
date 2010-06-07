@@ -128,7 +128,7 @@ public class CharjAST extends CommonTree
         }
         catch(NullPointerException npe)
         {
-            npe.printStackTrace();
+            //npe.printStackTrace();
             if(index == 0)
                 addChild(node);
             else

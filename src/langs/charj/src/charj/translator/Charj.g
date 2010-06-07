@@ -58,6 +58,11 @@ tokens {
     PRINTLN                 = 'println'         ;
     EXIT                    = 'exit'            ;
     EXITALL                 = 'exitAll'         ;
+    GETMYPE                 = 'getMyPe'         ;
+    GETMYRANK               = 'getMyRank'       ;
+    GETMYNODE               = 'getMyNode'       ;
+    GETNUMPES               = 'getNumPes'       ;
+    GETNUMNODES             = 'getNumNodes'     ;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -597,6 +602,7 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
+
     ;           
         
 
@@ -813,6 +819,16 @@ primaryExpression
             ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
         |   ->  ^(DOT SUPER IDENT)
         )
+    |   GETMYPE '(' ')'
+        ->  GETMYPE
+    |   GETNUMPES '(' ')'
+        ->  GETNUMPES
+    |   GETMYRANK '(' ')'
+        ->  GETMYRANK
+    |   GETMYNODE '(' ')'
+        -> GETMYNODE
+    |   GETNUMNODES '(' ')'
+        -> GETNUMNODES
     ;
     
 qualifiedIdentExpression
