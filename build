@@ -604,7 +604,9 @@ echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
 Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
-$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"
+echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > config_opts.sh
+chmod +x config_opts.sh
+$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 

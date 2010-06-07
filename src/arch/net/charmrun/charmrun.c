@@ -2535,8 +2535,9 @@ void start_nodes_rsh() {start_nodes_daemon();}
 void finish_nodes(void) {}
 void start_one_node_rsh(int rank0no) {}
 void finish_one_node(int rank0no) {}
+void start_nodes_mpiexec() {}
 
-int start_set_node_rsh(int client) {}
+int start_set_node_rsh(int client) { return 0; }
 void finish_set_nodes(int start, int stop) {}
 
 void envCat(char *dest,LPTSTR oldEnv)
