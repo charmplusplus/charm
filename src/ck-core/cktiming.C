@@ -80,7 +80,6 @@ void initBigSimTrace(int outputParams)
   CkpvAccess(outputParameters) = outputParams;
   bgTraceCounter = 0;
 
-printf("initBigSimTrace: %d\n", outputParams);
   CkpvInitialize(bool, insideTraceBracket);
   CkpvAccess(insideTraceBracket) = false;
 
