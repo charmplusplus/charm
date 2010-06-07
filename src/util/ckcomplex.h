@@ -29,6 +29,11 @@ struct ckcomplex {
       return ckcomplex(re+a.re,im+a.im); 
     }
 
+    // note: not a member
+    inline friend ckcomplex operator-(ckcomplex lhs, ckcomplex rhs) {
+      return ckcomplex(lhs.re - rhs.re, lhs.im - rhs.im);
+    }
+
     inline ckcomplex conj(void) { 
         return ckcomplex(re, -im); 
     }
@@ -37,6 +42,11 @@ struct ckcomplex {
       re+=a.re; im+=a.im; 
     }
     
+    // note: not a member
+    inline friend ckcomplex operator*(RealType lhs, ckcomplex rhs) {
+      return ckcomplex(rhs.re*lhs, rhs.im*lhs);
+    }
+
     inline ckcomplex operator*(RealType a) { 
       return ckcomplex(re*a, im*a); 
     } 
