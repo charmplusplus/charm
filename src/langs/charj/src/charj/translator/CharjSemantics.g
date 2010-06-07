@@ -124,9 +124,9 @@ scope ScopeStack; // top-level type scope
             // JL: Need to fill the templateArgs in ClassSymbol, and push this down
             // to the class subtree
         }
-    |   ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    |   ^('class' i2=IDENT (^('extends' type))? (^('implements' type+))? 
         {
-            /*Scope outerScope = $ScopeStack[-1]::current;
+            Scope outerScope = $ScopeStack[-1]::current;
             $sym = new ClassSymbol(symtab, $i2.text, null, outerScope);
             outerScope.define($sym.name, $sym);
             currentClass = $sym;
@@ -134,8 +134,9 @@ scope ScopeStack; // top-level type scope
             $sym.definitionTokenStream = input.getTokenStream();
             $i2.symbol = $sym;
             $ScopeStack::current = $sym;
-            importPackages($sym, $imports);*/
+            importPackages($sym, $imports);
         }
+            classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
@@ -158,10 +159,15 @@ classScopeDeclaration
             b=block?)
     |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
             f=formalParameterList b=block?)
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[false])
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
+        {
+	        if (currentClass != null) {
+                currentClass.constructor = $classScopeDeclaration.start;
+            } 
+        }
     ;
     
 interfaceScopeDeclaration
@@ -171,20 +177,25 @@ interfaceScopeDeclaration
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[false])
     ;
 
-variableDeclaratorList
-    :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
+variableDeclaratorList[boolean localdef]
+    :   ^(VAR_DECLARATOR_LIST variableDeclarator[localdef]+)
     ;
 
-variableDeclarator
-    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
+variableDeclarator[boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     ;
     
-variableDeclaratorId returns [CharjAST domainExp]
-    :   ^(IDENT domainExpression? { domainExp = $domainExpression.start; }  )
+variableDeclaratorId[boolean localdef]
+    :   ^(IDENT domainExpression? 
+        { 
+            if (currentClass != null && !localdef) {
+                currentClass.initializers.add($variableDeclaratorId.start);
+            }
+        } )
     ;
 
 rangeItem
@@ -310,11 +321,11 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
@@ -334,8 +345,8 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList[true])
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
     ;
 
 statement
@@ -461,6 +472,11 @@ arrayTypeDeclarator
 
 newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
+        {
+            if (currentClass != null) {
+                currentClass.initializers.add($newExpression.start);
+            }
+        }
     ;
 
 /*newExpression

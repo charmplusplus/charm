@@ -257,29 +257,22 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType (^(vdl=VAR_DECLARATOR_LIST (^(VAR_DECLARATOR (^(IDENT de+=(domainExpression[null])?)) variableInitializer[null]?))+)))
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null, false])
         -> {emitCC() || emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$simpleType.st},
-            domainExps={$de},
-            declList={$vdl})
+            declList={$variableDeclaratorList.st})
         ->
-//(^(VAR_DECLARATOR_LIST variableDeclarator+))
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
-
-    	// {
-	    //     /*List<StringTemplate> stlist = new ArrayList<StringTemplate>();
-	    //     for (CharjAST domain : $variableDeclaratorList.domains) {
-	    //         //stlist.add(domain.st);
-        //         System.out.println(domain.toString());
-        //     }*/
-	    // }
-
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st, false])
+        /*{
+            if ($currentClass != null) {
+                $currentClass.members.put(
+            }
+        }*/
         -> {emitCC() || emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
-            //domainExps={$variableDeclaratorList.domains})
         ->
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
         { 
@@ -314,31 +307,35 @@ interfaceScopeDeclaration
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st])
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st, false])
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st, false])
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     ;
 
-variableDeclaratorList[StringTemplate obtype]
-    :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
+variableDeclaratorList[StringTemplate obtype, boolean output]
+    :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype, output])+ )
         -> var_decl_list(var_decls={$var_decls})
     ;
 
-variableDeclarator[StringTemplate obtype]
-    :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer[obtype]?)
-        -> var_decl(id={$id.st}, initializer={$initializer.st})
+variableDeclarator[StringTemplate obtype, boolean output]
+    :   ^(VAR_DECLARATOR id=variableDeclaratorId[output] initializer=variableInitializer[obtype, output]?)
+        -> {$output}? var_decl(id={$id.st}, initializer={$initializer.st})
+        -> {!$output}? var_decl(id={$id.st})
+        ->
     ;
     
-variableDeclaratorId
-    :   ^(IDENT domainExpression[null]?)
-        -> var_decl_id(id={$IDENT.text}, domainExp={$domainExpression.st})
+variableDeclaratorId[boolean output]
+    :   ^(IDENT de=domainExpression[null]?)
+        -> {$output}? var_decl_id(id={$IDENT.text}, domainExp={$de.st})
+        -> {!$output}? var_decl_id(id={$IDENT.text})
+        ->
     ;
 
-variableInitializer[StringTemplate obtype]
+variableInitializer[StringTemplate obtype, boolean output]
     :   arrayInitializer
         -> {$arrayInitializer.st}
-    |   newExpression[obtype]
+    |   newExpression[obtype, output]
         -> {$newExpression.st}
     ;
 
@@ -351,17 +348,19 @@ rangeItem
 
 rangeExpression
     :   ^(RANGE_EXPRESSION (ri+=rangeItem)*)
-        -> template(t={$ri}) "new Range(<t; separator=\",\">)"
+        -> template(t={$ri}) "Range(<t; separator=\",\">)"
     ;
 
-rangeList
+rangeList returns [int len]
     :   (r+=rangeExpression)*
+        { $len = $r.size(); }
         -> template(t={$r}) "<t; separator=\", \">"
+        
     ;
 
 domainExpression[List<StringTemplate> otherParams]
     :   ^(DOMAIN_EXPRESSION rl=rangeList)
-        -> range_constructor(range={$rl.st}, others={$otherParams}) 
+        -> range_constructor(range={$rl.st}, others={$otherParams}, len={$rl.len})
 
     ;
 
@@ -371,7 +370,7 @@ domainExpression[List<StringTemplate> otherParams]
     ;*/
     
 arrayInitializer
-    :   ^(ARRAY_INITIALIZER variableInitializer[null]*)
+    :   ^(ARRAY_INITIALIZER variableInitializer[null, false]*)
         -> template(t={$text}) "/* arrayInitializer-not implemented */ <t>"
     ;
 
@@ -509,12 +508,12 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId[true])
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[true])
         -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
@@ -543,18 +542,16 @@ blockStatement
 
 
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=(^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR (^(IDENT de+=domainExpression[null]?)) variableInitializer[null]?))+)))
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null, true])
         -> local_var_decl(
             modList={null},
             type={$simpleType.st},
-            domainExps={$de},
-            declList={$vdl})
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=(^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR (^(IDENT de+=domainExpression[null]?)) variableInitializer[null]?))+)))
+            declList={$vdl.st})
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st, true])
         -> local_var_decl(
             modList={null},
             type={$objectType.st},
-            domainExps={$de},
-            declList={$vdl})
+            declList={$vdl.st})
     ;
 
 
@@ -617,6 +614,8 @@ parenthesizedExpression
 expression
     :   ^(EXPR expr)
         -> {$expr.st}
+    |   domainExpression[null]
+        -> {$domainExpression.st}
     ;
 
 expr
@@ -727,7 +726,7 @@ primaryExpression
         -> template(pe={$pe.st}, ex={$ex.st}) "<pe>[<ex>]"
     |   literal
         -> {$literal.st}
-    |   newExpression[null]
+    |   newExpression[null, false]
         -> {$newExpression.st}
     |   'this'
         -> {%{$start.getText()}}
@@ -749,9 +748,11 @@ arrayTypeDeclarator
         -> template(t={$text}) "<t>"
     ;
 
-newExpression[StringTemplate obtype]
+newExpression[StringTemplate obtype, boolean output] returns [StringTemplate initArray]
     :   ^(NEW_EXPRESSION arguments? domainExpression[$arguments.args])
-        -> template(domain={$domainExpression.st},type={$obtype}) "new <type><domain>"
+        -> {$output}? template(domain={$domainExpression.st},type={$obtype}) "new <type>(<domain>)"
+        -> {!$output}? template() ""
+        ->
     ;
 
 /*newExpression
@@ -776,8 +777,8 @@ arguments returns [List<StringTemplate> args]
 @init {
     $args = new ArrayList<StringTemplate>();
 }
-    :   ^(ARGUMENT_LIST (ex+=(e=expression { $args.add($e.st); }))*)
-        -> arguments(exprs={$ex})
+    :   ^(ARGUMENT_LIST (e=expression { $args.add($e.st); } )*)        
+        ->  arguments(exprs={$args})
     ;
 
 literal
