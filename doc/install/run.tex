@@ -69,8 +69,10 @@ the network version:
 
 \item[{\tt ++mpiexec}]
 
-Use the cluster's mpiexec job launcher instead of the built in rsh/ssh
-method. This will pass {\tt -np \$P} to indicate how many processes to
+Use the cluster's {\tt mpiexec} job launcher instead of the built in rsh/ssh
+method.
+
+This will pass {\tt -np \$P} to indicate how many processes to
 launch. An executable named something other than {\tt mpiexec} can be
 used with the additional argument {\tt ++remote-shell} {\it runmpi},
 with `runmpi' replaced by the necessary name. At present, this depends
@@ -81,7 +83,7 @@ Use of this option can potentially provide a few benefits:
 
 \begin{itemize}
 \item Faster startup compared to the SSH/RSH approach charmrun would
-  otherwise use.
+  otherwise use
 \item No need to generate a nodelist file
 \item Multi-node job startup on clusters that do no allow connections
   from the head/login nodes to the compute nodes
