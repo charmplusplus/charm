@@ -95,6 +95,24 @@ the user to begin execution.
 \item[{\tt ++debug-no-pause}] Run each node under gdb in an xterm window
 immediately (i.e. without prompting the user to begin execution).
 
+If using one of the {\tt ++debug} or {\tt ++debug-no-pause} options,
+the user must ensure the following:
+\begin{enumerate}
+
+\item The {\tt DISPLAY} environment variable points to your terminal.
+SSH's X11 forwarding does not work properly with \charmpp{}.
+
+\item The nodes must be authorized to create windows on the host machine (see
+man pages for {\tt xhost} and {\tt xauth}).
+
+\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
+the user's path.
+
+\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
+file, because {\tt rsh} does not run the {\tt .login} file. 
+
+\end{enumerate}
+
 \item[{\tt ++maxrsh}] Maximum number of {\tt rsh}'s to run at a
 time.
 
@@ -136,25 +154,6 @@ time.
 \item[{\tt ++p}]                number of processes to create
 
 \end{description}
-
-If using the {\tt ++debug} option, the user must ensure the
-following:
-\begin{enumerate}
-
-\item The {\tt DISPLAY} environment variable points to your terminal.
-SSH's X11 forwarding does not work properly with \charmpp{}.
-
-\item The nodes must be authorized to create windows on the host machine (see
-man pages for {\tt xhost} and {\tt xauth}).
-
-\item {\tt xterm}, {\tt xdpyinfo},  and {\tt gdb} must be in
-the user's path.
-
-\item The path must be set in the {\tt .cshrc} file, not the {\tt .login}
-file, because {\tt rsh} does not run the {\tt .login} file. 
-
-\end{enumerate}
-
 
 \subsubsection{Multicore Options}
 
