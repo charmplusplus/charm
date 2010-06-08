@@ -10,6 +10,20 @@ To run a \charmpp{} program named ``pgm'' on four processors, type:
 charmrun pgm +p4
 \end{alltt}
 
+
+Programs built using the network version of \charmpp{} can be
+run alone, without charmrun.  This restricts you to using the 
+processors on the local
+machine, but it is convenient and often useful for debugging.
+For example, a \charmpp{} program can be run on one processor
+in the debugger using:
+
+\begin{alltt}
+gdb pgm
+\end{alltt}
+
+
+
 A complete list of {\tt charmrun} command line options is in 
 Section~\ref{command line options}.
 
@@ -49,18 +63,6 @@ entry point of the main chare.
 
 \subsubsection{Additional Network Options}
 \label{network command line options}
-
-Programs built using the network version of \charmpp{} can be
-run alone, without charmrun.  This restricts you to using the 
-processors on the local
-machine, but it is convenient and often useful for debugging.
-For example, a \charmpp{} program can be run on one processor
-in the debugger using:
-
-\begin{alltt}
-gdb pgm
-\end{alltt}
-
 
 The following {\tt ++} command line options are available in
 the network version:
