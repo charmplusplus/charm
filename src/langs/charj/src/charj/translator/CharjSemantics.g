@@ -515,7 +515,6 @@ expr
     |   ^(TILDE expr)
     |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
-    |   ^(POINTER_DEREFERENCE expr)
     |   primaryExpression
     ;
     

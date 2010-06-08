@@ -2,13 +2,14 @@
  *  TODO add a description
  */
 
-tree grammar CharjASTModifier2.g
+tree grammar CharjASTModifier2;
 
 options {
     backtrack = true; 
     memoize = true;
     tokenVocab = Charj;
     ASTLabelType = CharjAST;
+    output = AST;
 }
 
 @header {
@@ -35,7 +36,7 @@ charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
 
 // note: no new scope here--this replaces the default scope
 packageDeclaration
-    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
+    :   ^(PACKAGE IDENT+)
     ;
     
 importDeclaration
@@ -47,7 +48,6 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-scope ScopeStack; // top-level type scope
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
@@ -73,7 +73,6 @@ enumConstant
     ;
     
 classScopeDeclaration
-scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
@@ -202,7 +201,7 @@ objectType returns [ClassSymbol type]
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
-    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
+    :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
 typeIdent returns [String name]
@@ -353,7 +352,6 @@ expr
     |   ^(TILDE expr)
     |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
-    |   ^(POINTER_DEREFERENCE expr)
     |   primaryExpression
     ;
     

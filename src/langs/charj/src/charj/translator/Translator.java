@@ -95,11 +95,11 @@ public class Translator {
 
         // do AST rewriting and semantic checking
         if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
-        preSemanticsPass();
+        preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
         semanticPass();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
-        postSemanticsPass();
+        postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
         // emit code for .ci, .h, and .cc based on rewritten AST
