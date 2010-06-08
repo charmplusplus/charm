@@ -2,6 +2,51 @@ This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
 ================================================================================
+What's new in Charm++ 6.2.1 (since 6.2.0)
+================================================================================
+
+--------------------------------------------------------------------------------
+New Supported Platforms:
+--------------------------------------------------------------------------------
+
+POWER7 with LAPI on Linux
+
+Infiniband on PowerPC
+
+--------------------------------------------------------------------------------
+General Changes
+--------------------------------------------------------------------------------
+
+- Better support for multicasts on groups
+- Topology information gathering has been optimized
+- Converse (seed) load balancers have many new optimizations applied
+- CPU affinity can be set more easily using +pemap and +commap options
+  instead of the older +coremap
+- HybridLB (hierarchical balancing for very large core-count systems)
+  has been substantially improved
+- Load balancing infrastructure has further optimizations and bug fixes
+- Object mappings can be read from a file, to allow offline
+  topology-aware placement
+- Projections logs can be spread across multiple directories, speeding
+  up output when dealing with thousands of cores (+trace-subdirs N
+  will divide log files evenly among N subdirectories of the trace
+  root, named PROGNAME.projdir.K)
+- AMPI now implements MPI_Issend
+- AMPI's MPI_Alltoall uses a flooding algorithm more agressively,
+  versus pairwise exchange
+- Virtualized ARMCI support has been extended to cover the functions
+  needed by CAF
+
+--------------------------------------------------------------------------------
+Architecture-specific changes
+--------------------------------------------------------------------------------
+
+- LAPI SMP has many new optimizations applied
+
+- Net builds support the use of clusters' mpiexec systems for job
+  launch, via the ++mpiexec option to charmrun
+
+================================================================================
 What's new in Charm++ 6.2.0 (since 6.1)
 ================================================================================
 
