@@ -713,6 +713,8 @@ expr
         -> template(ty={$ty.st}, e1={$e1.st}) "(<ty>)<e1>"
     |   primaryExpression
         -> {$primaryExpression.st}
+    |   ^(POINTER_DEREFERENCE expr)
+        ->  template(e = {$expr.st}) "*(<e>)"
     ;
 
 primaryExpression

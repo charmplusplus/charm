@@ -1,10 +1,8 @@
 /**
- * The semantic phase walks the tree and builds the symbol table, handles
- * all the imports, and does the semantic checks. The resulting tree and
- * symbol table are used by the emitter to generate the output. 
+ *  TODO add a description
  */
 
-tree grammar CharjSemantics;
+tree grammar CharjASTModifier2.g
 
 options {
     backtrack = true; 
@@ -13,63 +11,9 @@ options {
     ASTLabelType = CharjAST;
 }
 
-scope ScopeStack {
-    Scope current;
-}
-
 @header {
 package charj.translator;
 }
-
-@members {
-    SymbolTable symtab = null;
-    PackageScope currentPackage = null;
-    ClassSymbol currentClass = null;
-    MethodSymbol currentMethod = null;
-    LocalScope currentLocalScope = null;
-    Translator translator;
-    List<CharjAST> imports = new ArrayList<CharjAST>();
-    AstModifier astmod = new AstModifier();
-
-    /**
-     *  Test a list of CharjAST nodes to see if any of them has the given token
-     *  type.
-     */
-    public boolean listContainsToken(List<CharjAST> list, int tokenType) {
-        if (list == null) return false;
-        for (CharjAST node : list) {
-            if (node.token.getType() == tokenType) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public void importPackages(ClassSymbol cs, List<CharjAST> imports) {
-        if (imports == null) {
-            return;
-        }
-
-        for (CharjAST pkg : imports) {
-            String pkgName = input.getTokenStream().toString(
-                    pkg.getTokenStartIndex(),
-                    pkg.getTokenStopIndex());
-            // find imported class and add to cs.imports
-            PackageScope p = cs.importPackage(pkgName);
-            if (p == null) {
-                translator.error(
-                    this, 
-                    "package " + pkgName + " not found.",
-                    pkg);
-            }
-        }
-    }
-
-    public void addImport(CharjAST importNode) {
-        imports.add(importNode);
-    }
-}
-
 
 // Replace default ANTLR generated catch clauses with this action, allowing early failure.
 @rulecatch {
@@ -82,11 +26,6 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-scope ScopeStack; // default scope
-@init {
-    symtab = _symtab;
-    $ScopeStack::current = symtab.getDefaultPkg();
-}
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
         (importDeclaration
@@ -96,26 +35,11 @@ scope ScopeStack; // default scope
 
 // note: no new scope here--this replaces the default scope
 packageDeclaration
-@init { 
-    List<String> names = null; 
-    String packageName = "";
-}
     :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
-        {
-            packageName = packageName.substring(1);
-            PackageScope ps = symtab.resolvePackage(packageName);
-            if (ps == null) {
-                ps = symtab.definePackage(packageName);
-                symtab.addScope(ps);
-            }
-            currentPackage = ps;
-            $ScopeStack::current = ps;
-        }
     ;
     
 importDeclaration
     :   ^(IMPORT qualifiedIdentifier '.*'?)
-        { addImport($qualifiedIdentifier.start); }
     ;
 
 readonlyDeclaration
@@ -126,38 +50,7 @@ typeDeclaration returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
-            {
-                Scope outerScope = $ScopeStack[-1]::current;
-                $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
-                outerScope.define($sym.name, $sym);
-                currentClass = $sym;
-                $sym.definition = $typeDeclaration.start;
-                $sym.definitionTokenStream = input.getTokenStream();
-                $IDENT.symbol = $sym;
-                $ScopeStack::current = $sym;
-                String classTypeName = $classType.text;
-                if (classTypeName.equals("class")) {
-                } else if (classTypeName.equals("chare")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("group")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("nodegroup")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("chare_array")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("mainchare")) {
-                    currentClass.isChare = true;
-                    currentClass.isMainChare = true;
-                } else System.out.println("Error: type " + classTypeName + " not recognized.");
-                importPackages($sym, imports);
-            }
-            classScopeDeclaration*)
-            {
-                //System.out.println("Members for type " + $sym.name + ":");
-                //for (Map.Entry<String, Symbol> entry : $sym.members.entrySet()) {
-                //    System.out.println(entry.getKey());
-                //}
-            }
+                classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -184,39 +77,16 @@ scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-        {
-            ClassSymbol returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $FUNCTION_METHOD_DECL.symbol = sym;
-        }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
             ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
             ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
-        {
-            ClassSymbol type = $objectType.type;
-            if (type != null && type.isChare) currentClass.addExtern(type.getName());
-        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
-        {
-            if (astmod.isMigrationCtor($CONSTRUCTOR_DECL)) currentClass.migrationCtor = $CONSTRUCTOR_DECL;
-        }
     ;
 
 field [ClassSymbol type]
     :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-    {
-            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
-            sym.definition = $field.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            $VAR_DECLARATOR.symbol = sym;
-            currentClass.define($IDENT.text, sym);
-    }
     ;
     
 interfaceScopeDeclaration
@@ -235,7 +105,6 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-
     ;
     
 variableDeclaratorId
@@ -323,9 +192,6 @@ type
 
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
-        {
-            $type = symtab.resolveBuiltinType($primitiveType.text);
-        }
     ;
     
 objectType returns [ClassSymbol type]
@@ -333,40 +199,25 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        {
-            $type = $qualifiedTypeIdent.type;
-        }
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
-@init {
-String name = "";
-}
     :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
-        {
-            $type = null;
-            /*System.out.println("trying to resolve type " + name + " in type " + currentClass);*/
-            if (currentClass != null) $type = currentClass.resolveType(name);
-            /*System.out.println("got " + $type);*/
-            if ($type == null) $type = symtab.resolveBuiltinType(name);
-            $QUALIFIED_TYPE_IDENT.symbol = $type;
-        }
     ;
 
 typeIdent returns [String name]
     :   ^(IDENT genericTypeArgumentList?)
-        { $name = $IDENT.text; }
     ;
 
 primitiveType
-    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -409,11 +260,6 @@ blockStatement
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
-        {
-            ClassSymbol type = $objectType.type;
-            /*System.out.println("looked up type " + type + " for declaration " + $objectType.text);*/
-            if (type != null && type.isChare && currentClass != null) currentClass.addExtern(type.getName());
-        }
     ;
 
 statement
@@ -431,16 +277,8 @@ nonBlockStatement
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
-    |   ^(BREAK IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
-            }
-        }
-    |   ^(CONTINUE IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
-            }
-        }
+    |   ^(BREAK IDENT?) 
+    |   ^(CONTINUE IDENT?) 
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
     |   ^('delete' qualifiedIdentifier)
