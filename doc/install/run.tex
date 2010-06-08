@@ -71,6 +71,27 @@ the network version:
  right on your local machine. This could be useful if you just want to 
  run small program on only one machine, for example, your laptop.
 
+
+\item[{\tt ++mpiexec}]
+
+Use the cluster's mpiexec job launcher instead of the built in rsh/ssh
+method. This will pass {\tt -np \$P} to indicate how many processes to
+launch. An executable named something other than {\tt mpiexec} can be
+used with the additional argument {\tt ++remote-shell} {\it runmpi},
+with `runmpi' replaced by the necessary name. At present, this depends
+on the environment variables {\tt OMPI\_COMM\_WORLD\_RANK} and {\tt
+  OMPI\_COMM\_WORLD\_SIZE} being set in each launched process.
+
+Use of this option can potentially provide a few benefits:
+
+\begin{itemize}
+\item Faster startup compared to the SSH/RSH approach charmrun would
+  otherwise use.
+\item No need to generate a nodelist file
+\item Multi-node job startup on clusters that do no allow connections
+  from the head/login nodes to the compute nodes
+\end{itemize}
+
 \item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.
 
