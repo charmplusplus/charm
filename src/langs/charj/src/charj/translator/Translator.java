@@ -141,7 +141,8 @@ public class Translator {
         m_nodes.reset();
         CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        //m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        mod.charjSource(m_symtab);
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);

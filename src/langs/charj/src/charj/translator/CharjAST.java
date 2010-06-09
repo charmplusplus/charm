@@ -47,7 +47,8 @@ public class CharjAST extends CommonTree
             return new CharjAST(child.getType(), child.getText());
         }
     }
-
+    
+    @Override
     public String toString() {
         String s = super.toString();
         if (symbol != null) {
@@ -55,10 +56,13 @@ public class CharjAST extends CommonTree
         }
         return s;
     }
-
+    
+    @Override
     public CharjAST dupNode()
     {
-        return new CharjAST(getType(), getText());
+        CharjAST node = new CharjAST(getType(), getText());
+        node.symbol = symbol;
+        return node;
     }
 
     public CharjAST dupTree()
@@ -66,7 +70,8 @@ public class CharjAST extends CommonTree
         CharjAST root = dupNode();
 
         List<CharjAST> children = getChildren();
-        if(children == null) return root;
+        if(children == null)
+            return root;
 
         for(CharjAST child : getChildren())
             root.addChild(child.dupTree());
