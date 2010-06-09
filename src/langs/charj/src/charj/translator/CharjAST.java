@@ -5,6 +5,7 @@ import org.antlr.runtime.tree.Tree;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
 import java.util.*;
+import java.lang.reflect.*;
 
 /**
  * Custom subclass of Antlr's tree node. Doesn't do anything special yet,
@@ -138,6 +139,20 @@ public class CharjAST extends CommonTree
                 addChild(node);
             else
                 throw new ArrayIndexOutOfBoundsException(index);
+        }
+    }
+
+    public void setType(int type, String name)
+    {
+        try
+        {
+            Field tokenField = getClass().getSuperclass().getDeclaredField("token");
+            tokenField.set(this, new CommonToken(type, name));
+        }
+        catch(Exception e)
+        {
+            System.err.println("debugging, this should never happen");
+            e.printStackTrace();
         }
     }
 }

@@ -203,11 +203,6 @@ classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-        {
-            // determine whether it's an entry method
-            if($m.start != null)
-                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
-        }
         -> {emitCC()}? funcMethodDecl_cc(
                 sym={currentClass},
                 modl={$m.st}, 
@@ -225,7 +220,29 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {(emitCI() && entry)}? funcMethodDecl_ci(
+        -> {emitCI()}? // do nothing, since it's not an entry method
+        ->
+    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
+            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
+            b=block?)
+        -> {emitCC()}? funcMethodDecl_cc(
+                sym={currentClass},
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                block={$b.st})
+        -> {emitH()}? funcMethodDecl_h(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                block={$b.st})
+        -> {emitCI()}? funcMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -247,12 +264,23 @@ classScopeDeclaration
             declList={$variableDeclaratorList.st})
         ->
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
+        -> {emitCC()}? ctorDecl_cc(
+                modl={$m.st},
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                block={$b.st})
+        -> {emitCI()}? // do nothing, it's not an entry constructor
+        -> {emitH()}? ctorDecl_h(
+                modl={$m.st},
+                gtpl={$g.st}, 
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                block={$b.st})
+        ->
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
         {
-            // determine whether it's an entry method
-            if ($m.start != null) {
-                entry = listContainsToken($m.start.getChildren(), CHARJ_MODIFIER_LIST);
-            }
-            migrationCtor = currentClass.migrationCtor == $CONSTRUCTOR_DECL;
+            migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
         }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
@@ -260,7 +288,7 @@ classScopeDeclaration
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 block={$b.st})
-        -> {emitCI() && entry && !migrationCtor}? ctorDecl_ci(
+        -> {emitCI() && !migrationCtor}? ctorDecl_ci(
                 modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 

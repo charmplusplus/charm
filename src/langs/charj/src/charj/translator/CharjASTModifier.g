@@ -96,12 +96,15 @@ enumConstant
     ;
     
 classScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
+    :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
             if($m.tree == null)
-                astmod.fillPrivateModifier($FUNCTION_METHOD_DECL.tree);
+                astmod.fillPrivateModifier($d.tree);
+
+            if(astmod.isEntry($d.tree))
+                $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
         }
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
         {
@@ -113,7 +116,7 @@ classScopeDeclaration
             if($m.tree == null)
                 astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
         }
-    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
+    |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
             if($m.tree == null)
@@ -122,6 +125,9 @@ classScopeDeclaration
             astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
             astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
             astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
+
+            if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
+                $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
         }
     ;
     

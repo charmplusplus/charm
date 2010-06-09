@@ -24,6 +24,28 @@ package charj.translator;
     }
 }
 
+@members {
+    SymbolTable symtab = null;
+    PackageScope currentPackage = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
+    LocalScope currentLocalScope = null;
+    Translator translator;
+
+    AstModifier astmod = new AstModifier();
+
+    protected boolean containsModifier(CharjAST modlist, int type)
+    {
+        if(modlist == null)
+            return false;
+        CharjAST charjModList = modlist.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+        if(charjModList == null)
+            return false;
+        if(charjModList.getChildOfType(CharjParser.ENTRY) == null)
+            return false;
+        return true;
+    }
+}
 
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
@@ -73,15 +95,18 @@ enumConstant
     ;
     
 classScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
-            b=block?)
+    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
+            type IDENT formalParameterList arrayDeclaratorList? b=block)
+    |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
+            type IDENT entryFormalParameterList arrayDeclaratorList? b=block)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
             ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
             ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
-    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
-            b=block)
+    |   ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            block)
+    |   ^(ENTRY_CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT entryFormalParameterList 
+            block)
     ;
 
 field [ClassSymbol type]
@@ -183,6 +208,12 @@ otherModifier
     |   NATIVE
     ;
 
+entryArgType
+    :   simpleType
+    |   entryArgObjectType
+    |   VOID
+    ;
+
 type
     :   simpleType
     |   objectType
@@ -198,6 +229,16 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    ;
+
+entryArgObjectType returns [ClassSymbol type]
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        {
+            $POINTER_TYPE.setType(CharjParser.OBJECT_TYPE, "OBJECT_TYPE");
+        }
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -231,9 +272,17 @@ genericTypeArgument
 formalParameterList
     :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
     ;
-    
+
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    ;
+
+entryFormalParameterList
+    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl* formalParameterVarargDecl?) 
+    ;
+
+entryFormalParameterStandardDecl
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? entryArgType variableDeclaratorId)
     ;
     
 formalParameterVarargDecl
@@ -371,7 +420,7 @@ primaryExpression
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
@@ -411,6 +460,96 @@ newArrayConstruction
 
 arguments
     :   ^(ARGUMENT_LIST expression*)
+    ;
+
+entryArguments
+    :   ^(ARGUMENT_LIST entryArgExpr*)
+    ;
+
+entryArgExpr
+    :   ^(EXPR entryExpr)
+    ;
+
+entryExpr
+    :   ^(ASSIGNMENT expr expr)
+    |   ^(PLUS_EQUALS expr expr)
+    |   ^(MINUS_EQUALS expr expr)
+    |   ^(TIMES_EQUALS expr expr)
+    |   ^(DIVIDE_EQUALS expr expr)
+    |   ^(AND_EQUALS expr expr)
+    |   ^(OR_EQUALS expr expr)
+    |   ^(POWER_EQUALS expr expr)
+    |   ^(MOD_EQUALS expr expr)
+    |   ^('>>>=' expr expr)
+    |   ^('>>=' expr expr)
+    |   ^('<<=' expr expr)
+    |   ^('?' expr expr expr)
+    |   ^(OR expr expr)
+    |   ^(AND expr expr)
+    |   ^(BITWISE_OR expr expr)
+    |   ^(POWER expr expr)
+    |   ^(BITWISE_AND expr expr)
+    |   ^(EQUALS expr expr)
+    |   ^(NOT_EQUALS expr expr)
+    |   ^(INSTANCEOF expr type)
+    |   ^(LTE expr expr)
+    |   ^(GTE expr expr)
+    |   ^('>>>' expr expr)
+    |   ^('>>' expr expr)
+    |   ^(GT expr expr)
+    |   ^('<<' expr expr)
+    |   ^(LT expr expr)
+    |   ^(PLUS expr expr)
+    |   ^(MINUS expr expr)
+    |   ^(TIMES expr expr)
+    |   ^(DIVIDE expr expr)
+    |   ^(MOD expr expr)
+    |   ^(UNARY_PLUS expr)
+    |   ^(UNARY_MINUS expr)
+    |   ^(PRE_INC expr)
+    |   ^(PRE_DEC expr)
+    |   ^(POST_INC expr)
+    |   ^(POST_DEC expr)
+    |   ^(TILDE expr)
+    |   ^(NOT expr)
+    |   ^(CAST_EXPR type expr)
+    |   entryPrimaryExpression
+    ;
+    
+entryPrimaryExpression
+    :   ^(DOT primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   ^(ARROW primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   parenthesizedExpression
+    |   IDENT
+        {
+            astmod.makePointerDereference($IDENT);
+        }
+    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
+    |   explicitConstructorCall
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   literal
+    |   newExpression
+        ->  ^(POINTER_DEREFERENCE newExpression)
+    |   THIS
+        ->  ^(POINTER_DEREFERENCE THIS)
+    |   arrayTypeDeclarator
+    |   SUPER
+    |   GETNUMPES
+    |   GETNUMNODES
+    |   GETMYPE
+    |   GETMYNODE
+    |   GETMYRANK
     ;
 
 literal 
