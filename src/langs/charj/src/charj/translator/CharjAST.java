@@ -16,6 +16,9 @@ public class CharjAST extends CommonTree
     /** Semantic information about this node. Includes type, scope, location
      * of definition, etc. */
     public Symbol symbol;
+    
+    // denotes whether the node's type should be changed in following translation steps (false by default)
+    public boolean immutable = false;
 
     public CharjAST(Token t) {
         super(t);
@@ -63,6 +66,7 @@ public class CharjAST extends CommonTree
     {
         CharjAST node = new CharjAST(getType(), getText());
         node.symbol = symbol;
+        node.immutable = immutable;
         return node;
     }
 
