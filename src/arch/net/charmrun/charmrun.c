@@ -2466,7 +2466,7 @@ char *create_netstart(int node)
   static char dest[1024];
   int port=0;
   if (arg_mpiexec)
-    sprintf(dest,"$OMPI_COMM_WORLD_RANK %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
+    sprintf(dest,"$CmiMyNode %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
   else
     sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
@@ -2900,6 +2900,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 
   if (arg_mpiexec)
         fprintf(f, "#!/bin/sh\n");
+
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
   	"  echo 'Charmrun remote shell(%s.%d)>' $*\n"
@@ -2940,21 +2941,32 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 */
   if (arg_display && !arg_ssh_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
-  netstart = create_netstart(rank0no);
-  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
-  if (arg_mpiexec)
-    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK; export CmiMyNode\n");
+  if (arg_mpiexec) {
+    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
+    fprintf(f,"test -z $CmiMyNode && CmiMyNode=$MPIRUN_RANK\n");
+    fprintf(f,"export CmiMyNode\n");
+  }
   else
     fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+
+  netstart = create_netstart(rank0no);
+  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
+
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
+
   if (restart || arg_mpiexec)    /* skip fork */
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",0);
   else
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
-  if (arg_mpiexec)
-    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE; export CmiNumNodes\n");
+
+  if (arg_mpiexec) {
+    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
+    fprintf(f,"test -z $CmiNumNodes && CmiNumNodes=$MPIRUN_NPROCS\n");
+    fprintf(f,"export CmiNumNodes\n");
+  }
   else
     fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
   fprintf (f, "VMI_PROCS='%d'; export VMI_PROCS\n", arg_requested_pes);
