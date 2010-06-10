@@ -226,6 +226,9 @@ objectType
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        {
+            astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
+        }
     ;
 
 qualifiedTypeIdent

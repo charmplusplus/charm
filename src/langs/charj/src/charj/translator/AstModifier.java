@@ -39,13 +39,6 @@ class AstModifier
         return new CharjAST(new CommonToken(type, text));
     }   
 
-    private CharjAST createImmutableNode(int type, String text)
-    {
-        CharjAST node = createNode(type, text);
-        node.immutable = true;
-        return node;
-    }
-
     private void createCtorHelperNode()
     {
         constructorHelper = createNode(CharjParser.FUNCTION_METHOD_DECL, "FUNCTION_METHOD_DECL");
@@ -389,7 +382,7 @@ class AstModifier
         {
             // fill CkMsgArg* argument
             defaultCtor.getChild(2).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
-            defaultCtor.getChild(2).getChild(0).addChild(createImmutableNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
+            defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
             defaultCtor.getChild(2).getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
             defaultCtor.getChild(2).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "CkArgMsg"));
             defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.IDENT, "m"));
@@ -412,7 +405,7 @@ class AstModifier
                 defaultCtor.getChild(0).addChild(createNode(CharjParser.CHARJ_MODIFIER_LIST, "CHARJ_MODIFIER_LIST"));
                 defaultCtor.getChild(0).getChild(1).addChild(createNode(CharjParser.ENTRY, "entry"));
                 defaultCtor.getChild(2).addChild(createNode(CharjParser.FORMAL_PARAM_STD_DECL, "FORMAL_PARAM_STD_DECL"));
-                defaultCtor.getChild(2).getChild(0).addChild(createImmutableNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
+                defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.POINTER_TYPE, "POINTER_TYPE"));
                 defaultCtor.getChild(2).getChild(0).getChild(0).addChild(createNode(CharjParser.QUALIFIED_TYPE_IDENT, "QUALIFIED_TYPE_IDENT"));
                 defaultCtor.getChild(2).getChild(0).getChild(0).getChild(0).addChild(createNode(CharjParser.IDENT, "CkArgMsg"));
                 defaultCtor.getChild(2).getChild(0).addChild(createNode(CharjParser.IDENT, "m"));
@@ -467,6 +460,20 @@ class AstModifier
         if(charjmods == null)
             return false;
         return charjmods.getChildOfType(CharjParser.ENTRY) != null;
+    }
+
+    protected void dealWithEntryMethodParam(CharjAST pointertype, CharjAST pointertypetree)
+    {
+        try
+        {
+            CharjAST funcdecl = pointertype.getParent().getParent().getParent();
+            if(funcdecl.getType() == CharjParser.FUNCTION_METHOD_DECL && isEntry(funcdecl))
+                pointertypetree.setType(CharjParser.OBJECT_TYPE, "OBJECT_TYPE");
+        }
+        catch(NullPointerException npe)
+        {
+            // do nothing, it's just not a method parameter
+        }
     }
 
 }

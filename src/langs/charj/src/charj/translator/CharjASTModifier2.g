@@ -236,10 +236,6 @@ entryArgObjectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        {
-            if(! $POINTER_TYPE.immutable)
-                $POINTER_TYPE.setType(CharjParser.OBJECT_TYPE, "OBJECT_TYPE");
-        }
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
