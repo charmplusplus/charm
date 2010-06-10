@@ -97,8 +97,12 @@ void TraceBluegene::bgDummyBeginExec(const char* name,void** parentLogPtr, int s
   // to avoid timestamp correction, set a fake recv time so that it stays here
   if (*parentLogPtr == NULL)
     newLog->recvTime = startTime;
-  else
-    if (split) newLog->objId = (*(BgTimeLog**)parentLogPtr)->objId;
+  else {
+    if (split) {
+      newLog->objId = (*(BgTimeLog**)parentLogPtr)->objId;
+      newLog->charm_ep = (*(BgTimeLog**)parentLogPtr)->charm_ep;
+    }
+  }
   *parentLogPtr = newLog;
   }
   startVTimer();
