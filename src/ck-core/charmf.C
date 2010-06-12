@@ -193,7 +193,7 @@ FDECL void FTN_NAME(STARTTRACEBIGSIM, starttracebigsim)()
 
 FDECL void FTN_NAME(ENDTRACEBIGSIM1, endtracebigsim1)(char *eventName, int *stepno, double *p1, int len)
 {
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1);
@@ -202,7 +202,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM1, endtracebigsim1)(char *eventName, int *step
 
 FDECL void FTN_NAME(ENDTRACEBIGSIM2, endtracebigsim2)(char *eventName, int *stepno, double *p1, double *p2, int len)
 {
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2);
@@ -211,7 +211,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM2, endtracebigsim2)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM3, endtracebigsim3)(char *eventName, int *stepno, double *p1, double *p2, double *p3, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3);
@@ -220,7 +220,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM3, endtracebigsim3)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM4, endtracebigsim4)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4);
@@ -229,7 +229,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM4, endtracebigsim4)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM5, endtracebigsim5)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5);
@@ -238,7 +238,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM5, endtracebigsim5)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM6, endtracebigsim6)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6);
@@ -247,7 +247,7 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM6, endtracebigsim6)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM7, endtracebigsim7)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, double *p7, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7);
@@ -256,21 +256,38 @@ FDECL void FTN_NAME(ENDTRACEBIGSIM7, endtracebigsim7)(char *eventName, int *step
 FDECL void FTN_NAME(ENDTRACEBIGSIM8, endtracebigsim8)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, double *p7, double *p8, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8);
 }
 
+FDECL void FTN_NAME(ENDTRACEBIGSIM9, endtracebigsim9)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, double *p7, double *p8, double *p9, int len)
+{
+  // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9);
+  char str[128];
+  strncpy(str,eventName, len);
+  str[len] = 0;
+  endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9);
+}
+
+FDECL void FTN_NAME(ENDTRACEBIGSIM10, endtracebigsim10)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, double *p7, double *p8, double *p9, double *p10, int len)
+{
+  // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9, *p10);
+  char str[128];
+  strncpy(str,eventName, len);
+  str[len] = 0;
+  endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9, *p10);
+}
+
 FDECL void FTN_NAME(ENDTRACEBIGSIM11, endtracebigsim11)(char *eventName, int *stepno, double *p1, double *p2, double *p3, double *p4, double *p5,  double *p6, double *p7, double *p8, double *p9, double *p10, double *p11, int len)
 {
   // printf("%d %f %f %f\n", *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7);
-  char str[512];
+  char str[128];
   strncpy(str,eventName, len);
   str[len] = 0;
   endTraceBigSim(str, *stepno, *p1, *p2, *p3, *p4, *p5, *p6, *p7, *p8, *p9, *p10, *p11);
 }
-
 
 
 

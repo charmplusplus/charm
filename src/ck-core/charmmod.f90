@@ -47,6 +47,16 @@ module charm
          INTEGER step
          DOUBLE PRECISION p1,p2,p3,p4,p5,p6,p7,p8
       END SUBROUTINE 
+      SUBROUTINE endtracebigsim9(e,step,p1,p2,p3,p4,p5,p6,p7,p8,p9)
+         CHARACTER* (*)  e
+         INTEGER step
+         DOUBLE PRECISION p1,p2,p3,p4,p5,p6,p7,p8,p9
+      END SUBROUTINE 
+      SUBROUTINE endtracebigsim10(e,step,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10)
+         CHARACTER* (*)  e
+         INTEGER step
+         DOUBLE PRECISION p1,p2,p3,p4,p5,p6,p7,p8,p9,p10
+      END SUBROUTINE 
       SUBROUTINE endtracebigsim11(e,step,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11)
          CHARACTER* (*)  e
          INTEGER step
