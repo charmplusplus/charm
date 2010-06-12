@@ -176,9 +176,9 @@ FDECL void FTN_NAME(CMIMEMORYCHECK, cmimemorycheck) ()
 
 // cktiming utility
 
-FDECL void FTN_NAME(INITBIGSIMTRACE, initbigsimtrace)(int *outputParams)
+FDECL void FTN_NAME(INITBIGSIMTRACE, initbigsimtrace)(int *outputParams, int *outputtiming)
 {
-  initBigSimTrace(*outputParams);
+  initBigSimTrace(*outputParams, *outputtiming);
 }
 
 FDECL void FTN_NAME(FINALIZEBIGSIMTRACE, finalizebigsimtrace)()

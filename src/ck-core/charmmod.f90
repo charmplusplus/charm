@@ -7,6 +7,9 @@ module charm
   real*8,    external :: CkCpuTimer
 
   INTERFACE
+      SUBROUTINE initbigsimtrace(outputParams, outputtiming)
+         INTEGER outputParams, outputtiming
+      END SUBROUTINE
       SUBROUTINE endtracebigsim1(e,step,p1) 
          CHARACTER* (*)  e
          INTEGER step
