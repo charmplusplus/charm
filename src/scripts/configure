@@ -3466,24 +3466,6 @@ echo "${ECHO_T}\"$ext\"" >&6; }
   /bin/rm -f conftest.f90
 fi
 
-### Check that Linux's C library is recent enough to provide working pthreads
-if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
-then
-case $version in *linux*smp*|*linux*vmi*)
-    { echo "$as_me:$LINENO: checking glibc version" >&5
-echo $ECHO_N "checking glibc version... $ECHO_C" >&6; }
-    get_glibc_version
-    { echo "$as_me:$LINENO: result: $GLIBCVERSION" >&5
-echo "${ECHO_T}$GLIBCVERSION" >&6; }
-    if test 0 = `expr $GLIBCVERSION \> 2.2.92`
-    then
-       echo "Your version of GLIBC is ancient, and does not have sufficient "
-       echo "support for pthreads."
-       test_finish 1
-    fi
-esac
-fi
-
 ac_config_files="$ac_config_files libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun"
 
 ac_config_commands="$ac_config_commands default"
