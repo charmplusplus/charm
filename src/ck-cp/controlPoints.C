@@ -2020,7 +2020,7 @@ void controlPointManager::generatePlan() {
 					  CkPrintf("Divide & Conquer Steering found knob to turn\n");
 					  fflush(stdout);
 
-					  int adjustByAmount = ((int)myAbs(idleTime-overheadTime)*5.0);
+					  int adjustByAmount = (int)(myAbs(idleTime-overheadTime)*5.0);
 					  
 					  if(info->first == ControlPoint::EFF_INC){
 					    const int minValue = controlPointSpace[cpName].first;
