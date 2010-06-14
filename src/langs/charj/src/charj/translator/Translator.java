@@ -99,8 +99,14 @@ public class Translator {
         m_nodes.setTokenStream(tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
-        semanticPass();
+	ClassSymbol sem = semanticPass();
+	modifyNodes(sem);
+        //semanticPass();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+
+	m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
 
         // emit code for .ci, .h, and .cc based on rewritten AST
         String ciOutput = translationPass(OutputMode.ci);
@@ -138,6 +144,60 @@ public class Translator {
         m_nodes.reset();
         CharjSemantics sem = new CharjSemantics(m_nodes);
         return sem.charjSource(m_symtab);
+    }
+
+
+    private CharjAST addConstructor(ClassSymbol sem) {
+	CharjAST ast1 = new CharjAST(CharjParser.CONSTRUCTOR_DECL, 
+				     "CONSTRUCTOR_DECL");
+	CharjAST ast2 = new CharjAST(CharjParser.IDENT, 
+				     sem.getScopeName());
+	CharjAST ast3 = new CharjAST(CharjParser.FORMAL_PARAM_LIST, 
+				     "FORMAL_PARAM_LIST");
+	CharjAST ast4 = new CharjAST(CharjParser.BLOCK, "BLOCK");
+	
+	ast1.addChild(ast2);
+	ast1.addChild(ast3);
+	ast1.addChild(ast4);
+	sem.definition.addChild(ast1);
+	return ast1;
+    }
+
+    private void modifyNodes(ClassSymbol sem) {
+	/* Add constructor */
+
+	if (sem.constructor == null) {
+	    sem.constructor = addConstructor(sem);
+	}
+
+	/* Insert array initializers into the constructor */
+
+	for (CharjAST init : sem.initializers) {
+	    System.out.println("processing init token = " + init.getType());
+
+	    if (init.getType() == CharjParser.IDENT) {
+		CharjAST ast1 = new CharjAST(CharjParser.EXPR, "EXPR");
+		CharjAST ast2 = new CharjAST(CharjParser.METHOD_CALL, "METHOD_CALL");
+		CharjAST ast2_1 = new CharjAST(CharjParser.DOT, ".");
+		CharjAST ast2_2 = new CharjAST(CharjParser.IDENT, init.getText());
+		CharjAST ast2_3 = new CharjAST(CharjParser.IDENT, "init");
+		CharjAST ast4 = new CharjAST(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST");
+
+		ast1.addChild(ast2);
+		ast2.addChild(ast2_1);
+		ast2_1.addChild(ast2_2);
+		ast2_1.addChild(ast2_3);
+		ast2.addChild(ast4);
+		ast4.addChildren(init.getChildren());
+
+		//System.out.println(sem.constructor.toStringTree());
+
+		sem.constructor.getChild(2).addChild(ast1);
+	    } else if (init.getType() == CharjParser.NEW_EXPRESSION) {
+		//(OBJECT_VAR_DECLARATION (TYPE (QUALIFIED_TYPE_IDENT (Array (TEMPLATE_INST (TYPE double(Symbol(double_primitive, ClassSymbol[double]: {}, ))))))) (VAR_DECLARATOR_LIST (VAR_DECLARATOR ccc (NEW_EXPRESSION (ARGUMENT_LIST (EXPR get)) (DOMAIN_EXPRESSION (RANGE_EXPRESSION 1))))))
+	    }
+	    
+	}
     }
 
     private String translationPass(OutputMode m) throws
