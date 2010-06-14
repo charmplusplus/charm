@@ -121,10 +121,14 @@ chare_epilogue_h(sym) ::=
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h(sym, ident, ext, csds) ::=
+classDeclaration_h(sym, ident, ext, csds, tident) ::=
 <<
 <type_preamble_h(sym)>
+<if(tident)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident)>
+<else>
 <classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<endif>
 <type_epilogue_h(sym)>
 >>
 
@@ -146,6 +150,11 @@ class <ident> {
 <endif>
 >>
 
+templateDeclaration_h(pds, sym, ident, ext, csds, tident) ::=
+<<
+template \<class <tident; separator=", class ">\>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds)>
+>>
 
 classDeclaration_cc(sym, ident, ext, csds) ::=
 <<
@@ -251,7 +260,7 @@ funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
 
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>void<gtpl> <id><fpl>;
+<modl><gtpl><id><fpl>;
 >>
 
 
@@ -311,9 +320,9 @@ var_decl_ci(id, initializer) ::=
 <id><if(initializer)> = <initializer><endif>
 >>
 
-var_decl_id(id, array_decl_list) ::=
+var_decl_id(id, domainExp) ::=
 <<
-<id><if(array_decl_list)> <array_decl_list><endif>
+<id><if(domainExp)>(<domainExp>)<endif>
 >>
 
 
@@ -338,12 +347,13 @@ mod_list_ci(accmods, localmods, charjmods, othermods) ::=
 <if(charjmods)><charjmods; separator=" "> <endif>
 >>
 
-local_var_decl(modList, type, declList) ::=
+local_var_decl(modList, type, declList, domainExps) ::=
 <<
 <if(modList)><modList> <endif><type> <declList>;
 >>
 
-local_mod_list(mods) ::= <<
+local_mod_list(mods) ::= 
+<<
 <mods; separator=" ">
 >>
 
@@ -504,3 +514,10 @@ exitall() ::=
 CkExit();
 >>
 
+range_constructor(range, others, len) ::=
+<<
+<if(range)>
+Domain\<<len>\>(<range>)<if(others)>, <others; separator=", "><endif>
+<else>
+<endif>
+>>

@@ -158,6 +158,11 @@ scope ScopeStack; // top-level type scope
                 //    System.out.println(entry.getKey());
                 //}
             }
+    |   ^('template' i1=IDENT* typeDeclaration)
+        {
+            // JL: Need to fill the templateArgs in ClassSymbol, and push this down
+            // to the class subtree
+        }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -205,9 +210,9 @@ scope ScopeStack;
             $ENTRY_FUNCTION_DECL.symbol = sym;
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
-            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
+            ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
-            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+            ^(VAR_DECLARATOR_LIST field[$objectType.type, false]+))
         {
             ClassSymbol type = $objectType.type;
             if (type != null && type.isChare) currentClass.addExtern(type.getName());
@@ -216,6 +221,9 @@ scope ScopeStack;
             b=block)
         {
             if (astmod.isMigrationCtor($CONSTRUCTOR_DECL)) currentClass.migrationCtor = $CONSTRUCTOR_DECL;
+            if (currentClass != null) {
+                currentClass.constructor = $classScopeDeclaration.start;
+            }
         }
     |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
@@ -224,14 +232,14 @@ scope ScopeStack;
         }
     ;
 
-field [ClassSymbol type]
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+field [ClassSymbol type, boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     {
-            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
+            VariableSymbol sym = new VariableSymbol(symtab, $variableDeclaratorId.ident, $type);
             sym.definition = $field.start;
             sym.definitionTokenStream = input.getTokenStream();
             $VAR_DECLARATOR.symbol = sym;
-            currentClass.define($IDENT.text, sym);
+            currentClass.define($variableDeclaratorId.ident, sym);
     }
     ;
     
@@ -241,21 +249,46 @@ interfaceScopeDeclaration
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[false])
     ;
 
-variableDeclaratorList
-    :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
+variableDeclaratorList[boolean localdef]
+    :   ^(VAR_DECLARATOR_LIST variableDeclarator[localdef]+)
     ;
 
-variableDeclarator
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-
+variableDeclarator[boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     ;
     
-variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+variableDeclaratorId[boolean localdef] returns [String ident]
+    :   ^(IDENT domainExpression?
+        { 
+            if (currentClass != null && !localdef) {
+                currentClass.initializers.add($variableDeclaratorId.start);
+            }
+
+            $ident = $IDENT.text;
+        } )
+    ;
+
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
     ;
 
 variableInitializer
@@ -370,7 +403,7 @@ String name = "";
     ;
 
 typeIdent returns [String name]
-    :   ^(IDENT genericTypeArgumentList?)
+    :   ^(IDENT templateInstantiation?)
         { $name = $IDENT.text; }
     ;
 
@@ -388,6 +421,15 @@ primitiveType
 genericTypeArgumentList
     :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
     ;
+
+templateArgList
+    :   genericTypeArgument+
+    ;
+
+templateInstantiation
+    :   ^(TEMPLATE_INST templateArgList)
+    |   ^(TEMPLATE_INST templateInstantiation)
+    ;
     
 genericTypeArgument
     :   type
@@ -399,11 +441,11 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
@@ -423,8 +465,8 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList[true])
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
         {
             ClassSymbol type = $objectType.type;
             /*System.out.println("looked up type " + type + " for declaration " + $objectType.text);*/
@@ -483,7 +525,7 @@ forInit
 parenthesizedExpression
     :   ^(PAREN_EXPR expression)
     ;
-    
+
 expression
     :   ^(EXPR expr)
     ;
@@ -575,11 +617,12 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
+        {
+            if (currentClass != null) {
+                currentClass.initializers.add($newExpression.start);
+            }
+        }
     |   ^(NEW type arguments)
     ;
 
