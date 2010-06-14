@@ -19,6 +19,7 @@ public class MethodSymbol
     /** The list of local variables defined anywhere in the method */
     LocalScope locals;
 
+    public boolean isEntry = false;
     public boolean isStatic = false;
     public boolean isCtor = false;
 

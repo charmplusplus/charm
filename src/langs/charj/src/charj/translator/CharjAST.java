@@ -5,6 +5,7 @@ import org.antlr.runtime.tree.Tree;
 import org.antlr.runtime.Token;
 import org.antlr.runtime.CommonToken;
 import java.util.*;
+import java.lang.reflect.*;
 
 /**
  * Custom subclass of Antlr's tree node. Doesn't do anything special yet,
@@ -15,7 +16,8 @@ public class CharjAST extends CommonTree
     /** Semantic information about this node. Includes type, scope, location
      * of definition, etc. */
     public Symbol symbol;
-
+    public Scope scope;
+    
     public CharjAST(Token t) {
         super(t);
     }
@@ -47,7 +49,8 @@ public class CharjAST extends CommonTree
             return new CharjAST(child.getType(), child.getText());
         }
     }
-
+    
+    @Override
     public String toString() {
         String s = super.toString();
         if (symbol != null) {
@@ -55,10 +58,13 @@ public class CharjAST extends CommonTree
         }
         return s;
     }
-
+    
+    @Override
     public CharjAST dupNode()
     {
-        return new CharjAST(getType(), getText());
+        CharjAST node = new CharjAST(getType(), getText());
+        node.symbol = symbol;
+        return node;
     }
 
     public CharjAST dupTree()
@@ -66,7 +72,8 @@ public class CharjAST extends CommonTree
         CharjAST root = dupNode();
 
         List<CharjAST> children = getChildren();
-        if(children == null) return root;
+        if(children == null)
+            return root;
 
         for(CharjAST child : getChildren())
             root.addChild(child.dupTree());
@@ -133,6 +140,20 @@ public class CharjAST extends CommonTree
                 addChild(node);
             else
                 throw new ArrayIndexOutOfBoundsException(index);
+        }
+    }
+
+    public void setType(int type, String name)
+    {
+        try
+        {
+            Field tokenField = getClass().getSuperclass().getDeclaredField("token");
+            tokenField.set(this, new CommonToken(type, name));
+        }
+        catch(Exception e)
+        {
+            System.err.println("debugging, this should never happen");
+            e.printStackTrace();
         }
     }
 }

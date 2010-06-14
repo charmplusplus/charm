@@ -198,6 +198,17 @@ scope ScopeStack;
             currentClass.define($IDENT.text, sym);
             $FUNCTION_METHOD_DECL.symbol = sym;
         }
+    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList?
+            ty=type IDENT formalParameterList a=arrayDeclaratorList? b=block)
+        {
+            ClassSymbol returnType = currentClass.resolveType($ty.text);
+            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
+            currentMethod = sym;
+            sym.definition = $classScopeDeclaration.start;
+            sym.definitionTokenStream = input.getTokenStream();
+            currentClass.define($IDENT.text, sym);
+            $ENTRY_FUNCTION_DECL.symbol = sym;
+        }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
             ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
@@ -213,6 +224,11 @@ scope ScopeStack;
             if (currentClass != null) {
                 currentClass.constructor = $classScopeDeclaration.start;
             }
+        }
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
+            b=block)
+        {
+            if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
         }
     ;
 

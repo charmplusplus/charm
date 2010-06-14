@@ -27,6 +27,9 @@ CkpvDeclare(FILE*, bgfp);     // for bigsim run
 
 CkpvDeclare(int, outputParameters);
 
+static int outputTiming = 0;
+
+
 //======================PAPI======================= 
 //#define BIG_SIM_PAPI
 #ifdef BIG_SIM_PAPI
@@ -74,11 +77,16 @@ CkpvStaticDeclare(StringPool, eventsPool);
 
 // called on all PEs once
 extern "C"
-void initBigSimTrace(int outputParams)
+void initBigSimTrace(int outputParams, int _outputTiming)
 {
   CkpvInitialize(int, outputParameters);
   CkpvAccess(outputParameters) = outputParams;
+
   bgTraceCounter = 0;
+#ifdef CMK_BLUEGENE_CHARM
+  if (!BgIsReplay()) outputTiming = 0;
+#endif
+  outputTiming = _outputTiming;
 
   CkpvInitialize(bool, insideTraceBracket);
   CkpvAccess(insideTraceBracket) = false;
@@ -91,7 +99,7 @@ void initBigSimTrace(int outputParams)
 #ifdef CMK_BLUEGENE_CHARM
   //   for bigsim emulation, write to files, one for each processor
   //   always write immediately, instead of store and dump at the end
-  if (!BgIsReplay()) {
+  if (!outputTiming) {
   char fname[128];
   const char *subdir = "params";
   CmiMkdir(subdir);

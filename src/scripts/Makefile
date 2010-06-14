@@ -308,7 +308,6 @@ dirs+sources:
 	./gathertree ../../examples ../examples
 	./gathertree ../../tests ../tests
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
-	rm -f ../bin/gendeps4ci; cp gendeps4ci ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
 #	-ln -s ../../java/bin charmjavabin
@@ -659,129 +658,6 @@ CHARMLIBS: charm++ CONVLIBS
 $(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
-CkFutures.def.h: CkFutures.decl.h
-
-CkFutures.decl.h: ckfutures.ci charmxi
-	$(CHARMXI) ckfutures.ci
-
-tempo.def.h: tempo.decl.h
-
-tempo.decl.h: tempo.ci charmxi
-	$(CHARMXI) tempo.ci
-
-waitqd.def.h: waitqd.decl.h
-
-waitqd.decl.h: waitqd.ci charmxi
-	$(CHARMXI) waitqd.ci
-
-LBDatabase.def.h: LBDatabase.decl.h
-
-LBDatabase.decl.h: LBDatabase.ci charmxi
-	$(CHARMXI) LBDatabase.ci
-
-NullLB.def.h: NullLB.decl.h
-
-NullLB.decl.h: NullLB.ci charmxi
-	$(CHARMXI) NullLB.ci
-
-BaseLB.def.h: BaseLB.decl.h
-
-BaseLB.decl.h: BaseLB.ci charmxi
-	$(CHARMXI) BaseLB.ci
-
-TraceProjections.def.h: TraceProjections.decl.h
-
-TraceProjections.decl.h: trace-projections.ci charmxi
-	$(CHARMXI) trace-projections.ci
-
-TraceSummary.def.h: TraceSummary.decl.h
-
-TraceSummary.decl.h: trace-summary.ci charmxi
-	$(CHARMXI) trace-summary.ci
-
- 
-TraceUtilization.def.h: TraceUtilization.decl.h
-
-TraceUtilization.decl.h: trace-utilization.ci charmxi
-	$(CHARMXI) trace-utilization.ci 
-
-TraceSimple.def.h: TraceSimple.decl.h
-
-TraceSimple.decl.h: trace-simple.ci charmxi
-	$(CHARMXI) trace-simple.ci
-
-TraceTau.def.h: TraceTau.decl.h
-
-TraceTau.decl.h: trace-Tau.ci charmxi
-	$(CHARMXI) trace-Tau.ci
-
-TraceControlPoints.def.h: TraceControlPoints.decl.h
-
-TraceControlPoints.decl.h: trace-controlPoints.ci charmxi
-	$(CHARMXI) trace-controlPoints.ci
-
-CkReduction.def.h: CkReduction.decl.h
-
-CkReduction.decl.h: ckreduction.ci charmxi
-	$(CHARMXI) ckreduction.ci
-
-CkCheckpoint.def.h: CkCheckpoint.decl.h
-
-CkCheckpoint.decl.h: ckcheckpoint.ci charmxi
-	$(CHARMXI) ckcheckpoint.ci
-
-CkMemCheckpoint.def.h: CkMemCheckpoint.decl.h
-
-CkMemCheckpoint.decl.h: ckmemcheckpoint.ci charmxi
-	$(CHARMXI) ckmemcheckpoint.ci
-
-CkMarshall.def.h: CkMarshall.decl.h
-
-CkMarshall.decl.h: ckmarshall.ci charmxi
-	$(CHARMXI) ckmarshall.ci
-
-CkArrayReductionMgr.def.h: CkArrayReductionMgr.decl.h
-
-CkArrayReductionMgr.decl.h: ckarrayreductionmgr.ci charmxi
-	$(CHARMXI) ckarrayreductionmgr.ci
-
-CkArray.def.h: CkArray.decl.h
-
-CkArray.decl.h : ckarray.ci charmxi
-	$(CHARMXI) ckarray.ci
-
-CkLocation.def.h: CkLocation.decl.h
-
-CkLocation.decl.h: cklocation.ci charmxi
-	$(CHARMXI) cklocation.ci
-
-CkCallback.def.h: CkCallback.decl.h
-
-CkCallback.decl.h: ckcallback.ci charmxi
-	$(CHARMXI) ckcallback.ci
-
-charisma.def.h: charisma.decl.h
-
-charisma.decl.h: charisma.ci charmxi
-	$(CHARMXI) charisma.ci
-
-## Charm++ Load balancer (Dynamic load balancer)
-
-CentralLB.def.h: CentralLB.decl.h
-
-CentralLB.decl.h: CentralLB.ci charmxi
-	$(CHARMXI) CentralLB.ci
-
-NborBaseLB.def.h: NborBaseLB.decl.h
-
-NborBaseLB.decl.h: NborBaseLB.ci charmxi
-	$(CHARMXI) NborBaseLB.ci
-
-HybridBaseLB.def.h: HybridBaseLB.decl.h
-
-HybridBaseLB.decl.h: HybridBaseLB.ci charmxi
-	$(CHARMXI) HybridBaseLB.ci
-
 ## Charm fortran AMPI
 
 CK_FOR_LIBS_CORE=$(L)/libckf.a
@@ -897,16 +773,6 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 
 CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o cp_effects.o
 
-ControlPoints.def.h: ControlPoints.decl.h
-
-ControlPoints.decl.h : controlPoints.ci charmxi
-	$(CHARMXI) controlPoints.ci
-
-ControlPointsNoTrace.def.h: ControlPointsNoTrace.decl.h
-
-ControlPointsNoTrace.decl.h : controlPointsNoTrace.ci charmxi
-	$(CHARMXI) controlPointsNoTrace.ci
-
 controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
@@ -917,18 +783,6 @@ $(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.
 
 controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
 	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
-
-######################################################################
-#
-# Critical Path Library
-#
-######################################################################
-
-
-PathHistory.def.h: PathHistory.decl.h
-
-PathHistory.decl.h : pathHistory.ci charmxi
-	$(CHARMXI) pathHistory.ci
 
 
 
@@ -964,12 +818,6 @@ CONVERSE_COM_OBJS = gridrouter.o hypercuberouter.o treerouter.o petable.o \
 		routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
 		pipelinestrategy.o prefixrouter.o
 
-
-comlib.def.h: comlib.decl.h
-
-comlib.decl.h : ComlibManager.ci charmxi
-	$(CHARMXI) ComlibManager.ci
-
 COMLIB_OBJS = $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
@@ -994,10 +842,6 @@ bigsim:  bigsim-target
 bigemulator: bigsim
 
 bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
-
-# old (Charm++) Blue Gene emulator
-BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
-	$(CHARMXI) BlueGene.ci
 
 $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
@@ -1194,7 +1038,11 @@ depends: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done; \
+	for cifile in $(wildcard *.ci); do \
+	      echo "checking generated modules for $$cifile" ; \
+	      $(CHARMXI) -M $$cifile >> $(DEPENDFILE) ; \
+	done
 
 
 dependsCaseSensitive: basics
@@ -1220,7 +1068,11 @@ dependsCaseSensitive: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done; \
+	for cifile in $(wildcard *.ci); do \
+	      echo "checking generated modules for $$cifile" ; \
+	      $(CHARMXI) -M $$cifile >> $(DEPENDFILE) ; \
+	done
 
 
 

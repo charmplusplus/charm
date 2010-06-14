@@ -1,8 +1,8 @@
 /**
- *  fill a description in
+ *  TODO add a description
  */
 
-tree grammar CharjASTModifier;
+tree grammar CharjASTModifier2;
 
 options {
     backtrack = true; 
@@ -16,6 +16,14 @@ options {
 package charj.translator;
 }
 
+// Replace default ANTLR generated catch clauses with this action, allowing early failure.
+@rulecatch {
+    catch (RecognitionException re) {
+        reportError(re);
+        throw re;
+    }
+}
+
 @members {
     SymbolTable symtab = null;
     PackageScope currentPackage = null;
@@ -25,33 +33,32 @@ package charj.translator;
     Translator translator;
 
     AstModifier astmod = new AstModifier();
-}
 
-// Replace default ANTLR generated catch clauses with this action, allowing early failure.
-@rulecatch {
-    catch (RecognitionException re) {
-        reportError(re);
-        throw re;
+    protected boolean containsModifier(CharjAST modlist, int type)
+    {
+        if(modlist == null)
+            return false;
+        CharjAST charjModList = modlist.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+        if(charjModList == null)
+            return false;
+        if(charjModList.getChildOfType(CharjParser.ENTRY) == null)
+            return false;
+        return true;
     }
 }
 
-
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-@init {
-    symtab = _symtab;
-}
-    // TODO: go back to allowing multiple type definitions per file, check that
-    // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
-        packageDeclaration?
-        importDeclaration*
-        readonlyDeclaration*
-        (typeDeclaration { $cs = $typeDeclaration.sym; })*)
+        (packageDeclaration)? 
+        (importDeclaration
+        | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | readonlyDeclaration)*)
     ;
 
+// note: no new scope here--this replaces the default scope
 packageDeclaration
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE IDENT+)
     ;
     
 importDeclaration
@@ -63,25 +70,16 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-@init {
-    boolean array_type = false;
-    astmod = new AstModifier();
-}
-    :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
-        (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
-        {
-            $TYPE.tree.addChild(astmod.getPupRoutineNode());
-            $TYPE.tree.addChild(astmod.getInitRoutineNode());
-            $TYPE.tree.addChild(astmod.getCtorHelperNode());
-            astmod.ensureDefaultCtor($TYPE.tree);
-            if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
-        }
-    |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
-    |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    :   ^(TYPE classType IDENT
+            (^('extends' parent=type))? (^('implements' type+))?
+                classScopeDeclaration*)
+    |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
+    |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
 
-chareArrayType
-    :   ^(CHARE_ARRAY ARRAY_DIMENSION)
+classType
+    :   CLASS
+    |   chareType
     ;
 
 chareType
@@ -89,6 +87,7 @@ chareType
     |   GROUP
     |   NODEGROUP
     |   MAINCHARE
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 enumConstant
@@ -96,39 +95,22 @@ enumConstant
     ;
     
 classScopeDeclaration
-    :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
-            b=block?)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($d.tree);
+    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
+            type IDENT formalParameterList arrayDeclaratorList? b=block)
+    |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
+            type IDENT entryFormalParameterList arrayDeclaratorList? b=block)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
+            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
+            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+    |   ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            block)
+    |   ^(ENTRY_CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT entryFormalParameterList 
+            block)
+    ;
 
-            if(astmod.isEntry($d.tree))
-                $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
-        }
-    |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
-        }
-    |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
-        }
-    |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
-            b=block)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
-
-            astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
-            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
-
-            if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
-                $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
-        }
+field [ClassSymbol type]
+    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
     ;
     
 interfaceScopeDeclaration
@@ -146,17 +128,11 @@ variableDeclaratorList
     ;
 
 variableDeclarator
-    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        {
-            astmod.dealWithInit($VAR_DECLARATOR);
-        }
+    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
     ;
     
 variableDeclaratorId
     :   ^(IDENT arrayDeclaratorList?)
-        {
-            astmod.varPup($IDENT);
-        }
     ;
 
 variableInitializer
@@ -185,69 +161,100 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST modifier+)
-        {
-            astmod.arrangeModifiers($MODIFIER_LIST.tree);
-        }
+    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
     ;
 
 modifier
-    :   PUBLIC
-    |   PRIVATE
-    |   PROTECTED
-    |   ENTRY
-    |   ABSTRACT
-    |   NATIVE
+    :   accessModifier
     |   localModifier
+    |   charjModifier
+    |   otherModifier
     ;
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
+accessModifierList
+    :   ^(ACCESS_MODIFIER_LIST accessModifier+)
+    ;
+
+charjModifierList
+    :   ^(CHARJ_MODIFIER_LIST charjModifier+)
+    ;
+
+otherModifierList
+    :   ^(OTHER_MODIFIER_LIST otherModifier+)
+    ;
+    
 localModifier
     :   FINAL
     |   STATIC
     |   VOLATILE
     ;
 
-type
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+    :   ENTRY
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
+    ;
+
+entryArgType
     :   simpleType
-    |   objectType 
+    |   entryArgObjectType
     |   VOID
     ;
 
-simpleType
+type
+    :   simpleType
+    |   objectType
+    |   VOID
+    ;
+
+simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
     ;
     
-objectType
+objectType returns [ClassSymbol type]
     :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-        {
-            astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
-        }
     ;
 
-qualifiedTypeIdent
+entryArgObjectType returns [ClassSymbol type]
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    ;
+
+qualifiedTypeIdent returns [ClassSymbol type]
     :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
-typeIdent
+typeIdent returns [String name]
     :   ^(IDENT genericTypeArgumentList?)
     ;
 
 primitiveType
-    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -262,9 +269,17 @@ genericTypeArgument
 formalParameterList
     :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
     ;
-    
+
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    ;
+
+entryFormalParameterList
+    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl* formalParameterVarargDecl?) 
+    ;
+
+entryFormalParameterStandardDecl
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? entryArgType variableDeclaratorId)
     ;
     
 formalParameterVarargDecl
@@ -293,8 +308,8 @@ localVariableDeclaration
     ;
 
 statement
-    :   nonBlockStatement
-    |   block
+    : nonBlockStatement
+    | block
     ;
 
 nonBlockStatement
@@ -307,16 +322,8 @@ nonBlockStatement
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
-    |   ^(BREAK IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
-            }
-        }
-    |   ^(CONTINUE IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
-            }
-        }
+    |   ^(BREAK IDENT?) 
+    |   ^(CONTINUE IDENT?) 
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
     |   ^('delete' qualifiedIdentifier)
@@ -401,16 +408,16 @@ primaryExpression
                 |   SUPER
                 )
         )
-        ->   ^(ARROW primaryExpression
-                   IDENT?
-                   THIS?
-                   SUPER?
-             )
+    |   ^(ARROW primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
-        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
@@ -452,6 +459,96 @@ arguments
     :   ^(ARGUMENT_LIST expression*)
     ;
 
+entryArguments
+    :   ^(ARGUMENT_LIST entryArgExpr*)
+    ;
+
+entryArgExpr
+    :   ^(EXPR entryExpr)
+    ;
+
+entryExpr
+    :   ^(ASSIGNMENT expr expr)
+    |   ^(PLUS_EQUALS expr expr)
+    |   ^(MINUS_EQUALS expr expr)
+    |   ^(TIMES_EQUALS expr expr)
+    |   ^(DIVIDE_EQUALS expr expr)
+    |   ^(AND_EQUALS expr expr)
+    |   ^(OR_EQUALS expr expr)
+    |   ^(POWER_EQUALS expr expr)
+    |   ^(MOD_EQUALS expr expr)
+    |   ^('>>>=' expr expr)
+    |   ^('>>=' expr expr)
+    |   ^('<<=' expr expr)
+    |   ^('?' expr expr expr)
+    |   ^(OR expr expr)
+    |   ^(AND expr expr)
+    |   ^(BITWISE_OR expr expr)
+    |   ^(POWER expr expr)
+    |   ^(BITWISE_AND expr expr)
+    |   ^(EQUALS expr expr)
+    |   ^(NOT_EQUALS expr expr)
+    |   ^(INSTANCEOF expr type)
+    |   ^(LTE expr expr)
+    |   ^(GTE expr expr)
+    |   ^('>>>' expr expr)
+    |   ^('>>' expr expr)
+    |   ^(GT expr expr)
+    |   ^('<<' expr expr)
+    |   ^(LT expr expr)
+    |   ^(PLUS expr expr)
+    |   ^(MINUS expr expr)
+    |   ^(TIMES expr expr)
+    |   ^(DIVIDE expr expr)
+    |   ^(MOD expr expr)
+    |   ^(UNARY_PLUS expr)
+    |   ^(UNARY_MINUS expr)
+    |   ^(PRE_INC expr)
+    |   ^(PRE_DEC expr)
+    |   ^(POST_INC expr)
+    |   ^(POST_DEC expr)
+    |   ^(TILDE expr)
+    |   ^(NOT expr)
+    |   ^(CAST_EXPR type expr)
+    |   entryPrimaryExpression
+    ;
+    
+entryPrimaryExpression
+    :   ^(DOT primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   ^(ARROW primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   parenthesizedExpression
+    |   IDENT
+        {
+            astmod.makePointerDereference($IDENT);
+        }
+    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
+    |   explicitConstructorCall
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   literal
+    |   newExpression
+        ->  ^(POINTER_DEREFERENCE newExpression)
+    |   THIS
+        ->  ^(POINTER_DEREFERENCE THIS)
+    |   arrayTypeDeclarator
+    |   SUPER
+    |   GETNUMPES
+    |   GETNUMNODES
+    |   GETMYPE
+    |   GETMYNODE
+    |   GETMYRANK
+    ;
+
 literal 
     :   HEX_LITERAL
     |   OCTAL_LITERAL
@@ -461,6 +558,6 @@ literal
     |   STRING_LITERAL          
     |   TRUE
     |   FALSE
-    |   NULL
+    |   NULL 
     ;
 

@@ -117,6 +117,7 @@ tokens {
 
     PUP                     = 'pup'             ;
     INITMETHOD              = 'initMethod'      ;
+    CTORHELPER              = 'ctorHelper'      ;
 
 
     // C++ keywords that aren't used in charj. 
@@ -213,6 +214,9 @@ tokens {
     ACCESS_MODIFIER_LIST;
     CHARJ_MODIFIER_LIST;
     OTHER_MODIFIER_LIST;
+    POINTER_DEREFERENCE;
+    ENTRY_FUNCTION_DECL;
+    ENTRY_CONSTRUCTOR_DECL;
 }
 
 @header {

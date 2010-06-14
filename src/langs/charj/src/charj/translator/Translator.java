@@ -35,6 +35,7 @@ public class Translator {
     private SymbolTable m_symtab;
     private CommonTree m_ast;
     private CommonTreeNodeStream m_nodes;
+    private CommonTokenStream m_tokens;
 
     public Translator(
             String _charmc,
@@ -79,30 +80,35 @@ public class Translator {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        m_tokens = new CommonTokenStream(lexer);
 
         // Use lexer tokens to feed tree parser
-        CharjParser parser = new CharjParser(tokens);
+        CharjParser parser = new CharjParser(m_tokens);
         parser.setTreeAdaptor(m_adaptor);
         CharjParser.charjSource_return r = parser.charjSource();
 
         // Create node stream for AST traversals
         m_ast = (CommonTree)r.getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
+        m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
         // do AST rewriting and semantic checking
-        if (m_printAST) printAST("Before Modifier Pass", "before_mod.html");
-        modifierPass();
-        m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
-        m_nodes.setTreeAdaptor(m_adaptor);
+        if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
+        preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
 	ClassSymbol sem = semanticPass();
 	modifyNodes(sem);
-        //semanticPass();
+        //m_symtab = new SymbolTable(this);
+        //m_nodes.reset();
+        //SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
+        //definer.downup(m_ast);
+        //m_nodes.reset();
+        //SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
+        //resolver.downup(m_ast);
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+        postSemanticPass();
+        if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
 	m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(tokens);
@@ -129,13 +135,29 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private void modifierPass() throws
+    private void preSemanticPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
         m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+    }
+
+    private void postSemanticPass() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
+        mod.setTreeAdaptor(m_adaptor);
+        //m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        mod.charjSource(m_symtab);
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
     }
 
     private ClassSymbol semanticPass() throws

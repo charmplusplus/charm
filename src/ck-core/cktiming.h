@@ -16,7 +16,7 @@ extern unsigned long bgTraceCounter;
 extern "C" {
 
 // Just some function declarations:
-void initBigSimTrace(int outputParams);
+void initBigSimTrace(int outputParams, int outtiming);
 void finalizeBigSimTrace();
 void startTraceBigSim();
 

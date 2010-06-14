@@ -119,7 +119,7 @@ void envelope::pup(PUP::er &p) {
 		p((char *)&(type.chare.ptr),sizeof(void *));
 		p(type.chare.forAnyPe);
 		break;
-	case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
+	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
 		p|type.group.g;
 		p|type.group.rednMgr;
 		p|type.group.epoch;
