@@ -16,6 +16,7 @@ public class CharjAST extends CommonTree
     /** Semantic information about this node. Includes type, scope, location
      * of definition, etc. */
     public Symbol symbol;
+    public Scope scope;
     
     public CharjAST(Token t) {
         super(t);

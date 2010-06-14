@@ -74,6 +74,16 @@
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
+    <target name="SymbolDefiner" depends="Charj">
+        <antlr3 grammar.name="SymbolDefiner.g"
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+    
+    <target name="SymbolResolver" depends="Charj">
+        <antlr3 grammar.name="SymbolResolver.g"
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
+
     <target name="CharjASTModifier2" depends="Charj">
         <antlr3 grammar.name="CharjASTModifier2.g"
             grammar.path="${buildsrc}/charj/translator"/>
@@ -84,7 +94,7 @@
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
 
-    <target name="CharjEmitter" depends="CharjSemantics,CharjASTModifier,CharjASTModifier2">
+    <target name="CharjEmitter" depends="CharjSemantics,CharjASTModifier,CharjASTModifier2,SymbolDefiner,SymbolResolver">
         <antlr3 grammar.name="CharjEmitter.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>

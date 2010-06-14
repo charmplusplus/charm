@@ -80,6 +80,14 @@ public class SymbolTable {
         return objectRoot.resolveType(type);
     }
 
+    public ClassSymbol getEnclosingClass(Scope scope) {
+        while (scope != null) {
+            if (scope instanceof ClassSymbol) return (ClassSymbol)scope;
+            scope = scope.getEnclosingScope();
+        }
+        return null;
+    }
+
     /** Given a package like foo or charj.io, define it by breaking it up and
      *  looking up the packages to left of last id.  Add last id to that
      *  package.
