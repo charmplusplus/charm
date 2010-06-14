@@ -108,10 +108,14 @@ exitMethod
         }
     ;
 
+
+
 enterClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
-            (^('implements' type+))? .*)
+            (^('implements' type+))?
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             //System.out.println("Entering class scope");
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
@@ -144,7 +148,9 @@ enterClass
 exitClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
-            (^('implements' type+))? .*)
+            (^('implements' type+))?
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             //System.out.println("class " + currentScope);
             currentScope = currentScope.getEnclosingScope();

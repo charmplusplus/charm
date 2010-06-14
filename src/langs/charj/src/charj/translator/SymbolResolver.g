@@ -54,7 +54,9 @@ boolean entry = false;
 enterClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
-            (^('implements' type+))? .*)
+            (^('implements' type+))?
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             $IDENT.symbol.type = (ClassSymbol)$IDENT.symbol;
         }
