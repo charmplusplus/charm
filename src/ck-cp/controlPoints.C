@@ -16,6 +16,12 @@
 #include <climits>
 
 #define roundDouble(x)        ((long)(x+0.5))
+#define myAbs(x)   (((x)>=0.0)?(x):(-1.0*(x)))
+#define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
+
+inline double closestInRange(double v, double a, double b){
+  return (v<a) ? a : ((v>b)?b:v);
+}
 
 
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
@@ -1041,14 +1047,19 @@ public:
 #endif
     
     
-    double period;
+    double period, periodms;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
+    bool haveSamplePeriodMs = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriodMs", &periodms,"The time between Control Point Framework samples (in milliseconds)");
     if(haveSamplePeriod){
       CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
       controlPointSamplePeriod =  (int)(period * 1000); /**< A readonly */
+    } else if(haveSamplePeriodMs){
+      CkPrintf("controlPointSamplePeriodMs = %lf ms\n", periodms);
+      controlPointSamplePeriod = periodms; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
+
     
     
     
@@ -2005,40 +2016,29 @@ void controlPointManager::generatePlan() {
 					  
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
-					  bool newPlanExists = false;
 
 					  CkPrintf("Divide & Conquer Steering found knob to turn\n");
 					  fflush(stdout);
 
-
-
+					  int adjustByAmount = ((int)myAbs(idleTime-overheadTime)*5.0);
+					  
 					  if(info->first == ControlPoint::EFF_INC){
-						  const int minValue = controlPointSpace[cpName].first;
-						  const int maxValue = controlPointSpace[cpName].second;
-						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  const int newVal = twoAgoValue+1*direction;
-						  if(newVal <= maxValue && newVal >= minValue){
-						    aNewPlan[cpName] = newVal;
-						    newPlanExists = true;
-						  } else {
-						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
-						  }
+					    const int minValue = controlPointSpace[cpName].first;
+					    const int maxValue = controlPointSpace[cpName].second;
+					    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+					    const int newVal = closestInRange(twoAgoValue+adjustByAmount*direction, minValue, maxValue);					  
+					    CkAssert(newVal <= maxValue && newVal >= minValue);
+					    aNewPlan[cpName] = newVal;
 					  } else {
-						  const int minValue = controlPointSpace[cpName].first;
-						  const int maxValue = controlPointSpace[cpName].second;
-						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  const int newVal = twoAgoValue-1*direction;
-						  if(newVal <= maxValue && newVal >= minValue){
-							  aNewPlan[cpName] = newVal;
-							  newPlanExists = true;
-						  } else {
-						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
-						  }
+					    const int minValue = controlPointSpace[cpName].first;
+					    const int maxValue = controlPointSpace[cpName].second;
+					    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+					    const int newVal = closestInRange(twoAgoValue-adjustByAmount*direction, minValue, maxValue);
+					    CkAssert(newVal <= maxValue && newVal >= minValue);
+					    aNewPlan[cpName] = newVal;
 					  }
-
-					  if(newPlanExists){
-					    possibleNextStepPlans.push_back(aNewPlan);
-					  }
+					  
+					  possibleNextStepPlans.push_back(aNewPlan);
 				  }
 			  }
 		  }
@@ -2163,8 +2163,6 @@ void controlPointManager::generatePlan() {
 
 
 
-
-#define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
 
 
 /// Get control point value from range of integers [lb,ub]
