@@ -228,7 +228,7 @@ classScopeDeclaration
         -> {emitCI()}? // do nothing, since it's not an entry method
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
+            ty=type IDENT f=formalParameterList a=domainExpression[null]? 
             b=block?)
         -> {emitCC()}? funcMethodDecl_cc(
                 sym={currentClass},

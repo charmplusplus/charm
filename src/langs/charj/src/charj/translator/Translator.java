@@ -111,7 +111,7 @@ public class Translator {
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
 	m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
+        m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
         // emit code for .ci, .h, and .cc based on rewritten AST
