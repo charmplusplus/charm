@@ -97,7 +97,7 @@ enumConstant
     
 classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
+            ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
         {
             if($m.tree == null)
@@ -133,7 +133,7 @@ classScopeDeclaration
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList arrayDeclaratorList?)
+            type IDENT formalParameterList domainExpression?)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
@@ -153,7 +153,7 @@ variableDeclarator
     ;
     
 variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+    :   ^(IDENT domainExpression?)
         {
             astmod.varPup($IDENT);
         }
@@ -164,12 +164,22 @@ variableInitializer
     |   expression
     ;
 
-arrayDeclaratorList
-    :   ^(ARRAY_DECLARATOR_LIST ARRAY_DECLARATOR*)  
-    ;
-    
 arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer*)
+    ;
+
+templateArg
+    : genericTypeArgument
+    | literal
+    ;
+
+templateArgList
+    :   templateArg (','! templateArg)*
+    ;
+
+templateInstantiation
+    :    ^(TEMPLATE_INST templateArgList)
+    |    ^(TEMPLATE_INST templateInstantiation)
     ;
 
 genericTypeParameterList
@@ -218,14 +228,14 @@ type
     ;
 
 simpleType
-    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+    :   ^(SIMPLE_TYPE primitiveType domainExpression?)
     ;
     
 objectType
-    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
         {
             astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
         }
@@ -236,7 +246,7 @@ qualifiedTypeIdent
     ;
 
 typeIdent
-    :   ^(IDENT genericTypeArgumentList?)
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
@@ -435,17 +445,8 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
     |   ^(NEW type arguments)
-    ;
-
-newArrayConstruction
-    :   arrayDeclaratorList arrayInitializer
-    |   expression+ arrayDeclaratorList?
     ;
 
 arguments
@@ -464,3 +465,21 @@ literal
     |   NULL
     ;
 
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression (','! rangeExpression)*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
+    ;
