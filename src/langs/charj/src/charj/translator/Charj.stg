@@ -260,7 +260,7 @@ funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
 
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-<modl>void<gtpl> <id><fpl>;
+<modl><gtpl><id><fpl>;
 >>
 
 
