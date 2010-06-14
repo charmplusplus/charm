@@ -2943,7 +2943,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
   if (arg_mpiexec) {
     fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
-    fprintf(f,"test -z $CmiMyNode && CmiMyNode=$MPIRUN_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f,"export CmiMyNode\n");
   }
   else
@@ -2961,7 +2961,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 
   if (arg_mpiexec) {
     fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
-    fprintf(f,"test -z $CmiNumNodes && CmiNumNodes=$MPIRUN_NPROCS\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$MPIRUN_NPROCS\n");
     fprintf(f,"export CmiNumNodes\n");
   }
   else
