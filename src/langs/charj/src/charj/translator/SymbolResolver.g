@@ -66,6 +66,7 @@ varDeclaration
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
                 $IDENT.symbol.type = $type.sym;
+                //System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.symbol.type + ", symbol is " + $IDENT.symbol);
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
@@ -75,40 +76,123 @@ varDeclaration
     ;
 
 expression returns [ClassSymbol type]
-    :   ^(EXPR expr) { $type = $expr.type; }
+    :   ^(EXPR expr) {
+            $type = $expr.type;
+            $EXPR.symbol = new Symbol(symtab, "EXPR", $type);
+        }
+    ;
+
+binary_op
+    : ASSIGNMENT
+    | PLUS_EQUALS
+    | MINUS_EQUALS
+    | TIMES_EQUALS
+    | DIVIDE_EQUALS
+    | AND_EQUALS
+    | OR_EQUALS
+    | POWER_EQUALS
+    | MOD_EQUALS
+    | '>>>='
+    | '>>='
+    | '<<='
+    | '?'
+    | OR
+    | AND
+    | BITWISE_OR
+    | POWER
+    | BITWISE_AND
+    | EQUALS
+    | NOT_EQUALS
+    | INSTANCEOF
+    | LTE
+    | GTE
+    | '>>>'
+    | '>>'
+    | GT
+    | '<<'
+    | LT
+    | PLUS
+    | MINUS
+    | TIMES
+    | DIVIDE
+    | MOD
+    ;
+
+unary_op
+    : UNARY_PLUS
+    | UNARY_MINUS
+    | PRE_INC
+    | PRE_DEC
+    | POST_INC
+    | POST_DEC
+    | TILDE
+    | NOT
+    | CAST_EXPR
+    ;
+
+
+expr returns [ClassSymbol type]
+    :   ^(binary_op e1=expr e2=expr) {
+            // TODO: proper type promotion rules
+            $type = $e1.type;
+            $binary_op.start.symbol = new Symbol(symtab, $binary_op.text, $type);
+        }
+    |   ^(unary_op e1=expr) {
+            $type = $e1.type;
+            $unary_op.start.symbol = new Symbol(symtab, $unary_op.text, $type);
+        }
+    |   primaryExpression {
+            $type = $primaryExpression.type;
+        }
     ;
 
 // TODO: fill out all the different cases here
-expr returns [ClassSymbol type]
+primaryExpression returns [ClassSymbol type]
+@init{
+    String memberText = "";
+    CharjAST memberNode = null;
+    CharjAST parentNode = null;
+}
     :   IDENT {
-            $IDENT.symbol = $IDENT.scope.resolveVariable($IDENT.text);
+            $IDENT.symbol = $IDENT.scope.resolve($IDENT.text);
             if ($IDENT.symbol != null) {
                 $type = $IDENT.symbol.type;
+                //System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.symbol);
             } else {
-                System.out.println("Couldn't resolve type: " + $IDENT.text);
+                System.out.println("Couldn't resolve IDENT type: " + $IDENT.text);
             }
         }
     |   THIS {
-            $THIS.symbol = symtab.getEnclosingClass($THIS.symbol.scope);
+            $THIS.symbol = symtab.getEnclosingClass($THIS.scope);
             $type = (ClassSymbol)$THIS.symbol;
         }
     |   SUPER {
-            $SUPER.symbol = symtab.getEnclosingClass($SUPER.symbol.scope).superClass;
+            $SUPER.symbol = symtab.getEnclosingClass($SUPER.scope).superClass;
             $type = (ClassSymbol)$SUPER.symbol;
         }
-    |   ^((DOT|ARROW) e=expr id=.) {
+    |   ^((DOT { parentNode = $DOT; } | ARROW { parentNode = $ARROW; } ) e=expr
+            (   IDENT { memberNode = $IDENT; memberText = $IDENT.text; }
+            |   THIS { memberNode = $THIS; memberText = "this"; }
+            |   SUPER { memberNode = $SUPER; memberText = "super"; }
+            ))
+        {
             ClassSymbol cxt = $e.type;
             Symbol s;
             if (cxt == null) {
                 s = null;
-                System.out.println("No expression context: " + $e.text);
+                /*System.out.println("No expression context: " + $e.text);*/
             } else {
-                s = cxt.resolveVariable($id.getText());
+                //System.out.println("Expression context is: " + cxt + " for symbol named " + memberText);
+                if (memberText.equals("this")) s = cxt;
+                else if (memberText.equals("super")) s = cxt.superClass;
+                else s = cxt.resolve(memberText);
             }
             if (s != null) {
                 $type = s.type;
+                memberNode.symbol = s;
+                parentNode.symbol = s;
             } else {
-                System.out.println("Couldn't resolve access " + $id.getText());
+                System.out.println("Couldn't resolve access " + memberText);
             }
         }
     |   ^(PAREN_EXPR expression) {
@@ -166,7 +250,8 @@ type returns [ClassSymbol sym]
 }
 @after {
     typeText = typeText.substring(1);
-    System.out.println("direct scope: " + scope);
+    //System.out.println("type string: " + typeText);
+    //System.out.println("direct scope: " + scope);
     $start.symbol = scope.resolveType(typeText);
     $sym = (ClassSymbol)$start.symbol;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);

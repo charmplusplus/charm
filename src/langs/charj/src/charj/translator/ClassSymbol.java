@@ -44,6 +44,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         this(symtab, name);
         this.superClass = superClass;
         this.scope = scope;
+        this.type = this;
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
@@ -210,7 +211,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     }
 
     public String toString() {
-        return "ClassSymbol[" + name + "]: " + members;
+        if (isPrimitive) return name;
+        else return getFullyQualifiedName() + members;
     }
 
     public String getFullyQualifiedName() {
