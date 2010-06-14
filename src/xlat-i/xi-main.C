@@ -128,7 +128,7 @@ ModuleList *Parse(FILE *fp)
 
 void abortxi(char *name)
 {
-  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic]  module.ci" << endl;
+  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic|-M]  module.ci" << endl;
   exit(1) ;
 }
 
@@ -141,6 +141,7 @@ int main(int argc, char *argv[])
   char *fname=NULL;
   fortranMode = 0;
   internalMode = 0;
+  bool dependsMode = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
@@ -148,6 +149,7 @@ int main(int argc, char *argv[])
       else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
       else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
+      else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else abortxi(argv[0]);
     }
     else
@@ -158,6 +160,9 @@ int main(int argc, char *argv[])
   ModuleList *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
-  m->generate();
+  if (dependsMode)
+      m->genDepends();
+  else
+      m->generate();
   return 0 ;
 }
