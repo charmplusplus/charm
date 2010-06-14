@@ -239,13 +239,13 @@ classScopeDeclaration
                 block={$b.st})
         ->
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null, false])
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
         ->
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st, false])
-        -> {emitCC() || emitH()}? class_var_decl(
+        -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
