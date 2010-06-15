@@ -530,7 +530,13 @@ entryPrimaryExpression
     |   parenthesizedExpression
     |   IDENT
         {
-            astmod.makePointerDereference($IDENT);
+            //System.out.println("Derefing ID with type " + $IDENT.symbolType.getClass().getName() +
+            //    ":\n" + $IDENT.symbolType + "\nand def info " + $IDENT.def.getClass().getName() + ":\n" + $IDENT.def);
+            if ($IDENT.symbolType instanceof ClassSymbol) {
+                if (!((ClassSymbol)$IDENT.symbolType).isPrimitive) {
+                    astmod.makePointerDereference($IDENT);
+                }
+            }
         }
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
