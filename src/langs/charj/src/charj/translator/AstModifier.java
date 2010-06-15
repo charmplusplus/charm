@@ -333,13 +333,21 @@ class AstModifier
         }
         if(params.getChildren() == null)
             defaultCtor = ctordecltree;
-        else if(params.getChildren().size() == 1 && params.getChild(0).getChild(0).getChild(0).getChild(0).getText().equals("CkArgMsg"))
-            for(CharjAST temp = ctordecl; temp != null; temp = temp.getParent())
-                if(temp.getType() == CharjParser.TYPE && temp.getChild(0).getType() == CharjParser.MAINCHARE)
-                {
-                    defaultCtor = ctordecltree;
-                    return;
-                }
+        else 
+            try
+            {
+                if(params.getChildren().size() == 1 && params.getChild(0).getChild(0).getChild(0).getChild(0).getText().equals("CkArgMsg"))
+                    for(CharjAST temp = ctordecl; temp != null; temp = temp.getParent())
+                        if(temp.getType() == CharjParser.TYPE && temp.getChild(0).getType() == CharjParser.MAINCHARE)
+                        {
+                            defaultCtor = ctordecltree;
+                            return;
+                        }
+            }
+            catch(NullPointerException npe)
+            {
+                // argument is a simple type, so one of the getChild(0) calls above returns null
+            }
     }
 
     protected boolean isMigrationCtor(CharjAST ctordecl)

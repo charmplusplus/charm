@@ -32,7 +32,7 @@ public class MethodSymbol
             SymbolTable symtab,
             String name,
             Scope enclosingScope,
-            ClassSymbol retType)
+            Type retType)
     {
         super(symtab, name);
         this.enclosingScope = enclosingScope;

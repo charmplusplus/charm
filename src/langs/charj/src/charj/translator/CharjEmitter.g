@@ -134,7 +134,7 @@ importDeclaration
 typeDeclaration
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
-            currentClass = (ClassSymbol)$IDENT.symbol;
+            currentClass = (ClassSymbol)$IDENT.def;
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -161,7 +161,7 @@ typeDeclaration
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
-            currentClass = (ClassSymbol)$IDENT.symbol;
+            currentClass = (ClassSymbol)$IDENT.def;
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -519,7 +519,7 @@ proxyType
 
 qualifiedTypeIdent returns [ClassSymbol type]
     :   ^(QUALIFIED_TYPE_IDENT (t+=typeIdent)+)
-        {$type = (ClassSymbol)$QUALIFIED_TYPE_IDENT.symbol;}
+        {$type = (ClassSymbol)$QUALIFIED_TYPE_IDENT.def;}
         -> template(types={$t}) "<types; separator=\"::\">"
     ;
 
@@ -805,7 +805,7 @@ primaryExpression
             )
         )
     |   ^(ARROW prim=primaryExpression
-            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>-><id>"
+            ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>-><id>"
             | THIS    -> template(prim={$prim.st}) "<prim>->this"
             | SUPER   -> template(prim={$prim.st}) "<prim>->super"
             )

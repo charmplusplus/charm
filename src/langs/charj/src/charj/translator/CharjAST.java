@@ -15,8 +15,9 @@ public class CharjAST extends CommonTree
 {
     /** Semantic information about this node. Includes type, scope, location
      * of definition, etc. */
-    public Symbol symbol;
     public Scope scope;
+    public Symbol def;
+    public Type symbolType;
     
     public CharjAST(Token t) {
         super(t);
@@ -53,8 +54,8 @@ public class CharjAST extends CommonTree
     @Override
     public String toString() {
         String s = super.toString();
-        if (symbol != null) {
-            s += "(" + symbol + ")" ;
+        if (symbolType != null) {
+            s += "(" + symbolType + ")" ;
         }
         return s;
     }
@@ -63,7 +64,9 @@ public class CharjAST extends CommonTree
     public CharjAST dupNode()
     {
         CharjAST node = new CharjAST(getType(), getText());
-        node.symbol = symbol;
+        node.def = def;
+        node.scope = scope;
+        node.symbolType = symbolType;
         return node;
     }
 

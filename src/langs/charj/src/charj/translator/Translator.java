@@ -97,15 +97,18 @@ public class Translator {
         if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
         preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
-	ClassSymbol sem = semanticPass();
-	modifyNodes(sem);
-        //m_symtab = new SymbolTable(this);
-        //m_nodes.reset();
-        //SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
-        //definer.downup(m_ast);
-        //m_nodes.reset();
-        //SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
-        //resolver.downup(m_ast);
+        // FIXME: no longer guaranteed one class per file, go through each type instead.
+	//ClassSymbol sem = semanticPass();
+	//modifyNodes(sem);
+        m_symtab = new SymbolTable(this);
+        m_nodes.reset();
+        System.out.println("\nDefiner Phase\n----------------");
+        SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
+        definer.downup(m_ast);
+        System.out.println("\nResolver Phase\n----------------");
+        m_nodes.reset();
+        SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
+        resolver.downup(m_ast);
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
         postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
@@ -141,7 +144,7 @@ public class Translator {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        m_ast = (CommonTree)mod.charjSource().getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
