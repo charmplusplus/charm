@@ -373,11 +373,6 @@ domainExpression[List<StringTemplate> otherParams]
 
     ;
 
-/*arrayDeclaratorList
-    :   ^(ARRAY_DECLARATOR_LIST ARRAY_DECLARATOR*)  
-        -> template(t={$text}) "<t>"
-    ;*/
-    
 arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer[null, false]*)
         -> template(t={$text}) "/* arrayInitializer-not implemented */ <t>"
@@ -873,28 +868,6 @@ newExpression[StringTemplate obtype, boolean output] returns [StringTemplate ini
         -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
 
-/*newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
-        -> template(t={$text}) "<t>"
-    |   ^(NEW proxyType arguments)
-        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
-    |   ^(NEW nonProxyType arguments)
-        -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
-    ;
-*/
-/*newArrayConstruction
-    :   arrayDeclaratorList arrayInitializer
-        -> array_construction_with_init(
-                array_decls={$arrayDeclaratorList.st},
-                initializer={$arrayInitializer.st})
-    |   (ex+=expression)+ adl=arrayDeclaratorList?
-        -> array_construction(exprs={$ex}, array_decls={$adl.st})
-    ;
-*/
 arguments returns [List<StringTemplate> args]
 @init {
     $args = new ArrayList<StringTemplate>();

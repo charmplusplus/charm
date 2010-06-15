@@ -384,7 +384,7 @@ interfaceFieldDeclarator
 
 
 variableDeclaratorId
-    :   ^(IDENT domainExpression?)
+    :   IDENT^ domainExpression?
     ;
 
 variableInitializer

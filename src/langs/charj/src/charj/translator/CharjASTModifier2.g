@@ -96,13 +96,13 @@ enumConstant
     
 classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
-            type IDENT formalParameterList arrayDeclaratorList? b=block)
+            type IDENT formalParameterList domainExpression? b=block)
     |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
-            type IDENT entryFormalParameterList arrayDeclaratorList? b=block)
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
-            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
-            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+            type IDENT entryFormalParameterList domainExpression? b=block)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+            //^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+            //^(VAR_DECLARATOR_LIST field[$objectType.type]+))
     |   ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
             block)
     |   ^(ENTRY_CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT entryFormalParameterList 
@@ -110,12 +110,12 @@ classScopeDeclaration
     ;
 
 field [ClassSymbol type]
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+    :   ^(VAR_DECLARATOR ^(IDENT domainExpression?) variableInitializer?)
     ;
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList arrayDeclaratorList?)
+            type IDENT formalParameterList domainExpression?)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
@@ -128,24 +128,34 @@ variableDeclaratorList
     ;
 
 variableDeclarator
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
     
 variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+    :   ^(IDENT domainExpression?)
     ;
 
 variableInitializer
     :   arrayInitializer
     |   expression
     ;
-
-arrayDeclaratorList
-    :   ^(ARRAY_DECLARATOR_LIST ARRAY_DECLARATOR*)  
-    ;
     
 arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer*)
+    ;
+
+templateArg
+    : genericTypeArgument
+    | literal
+    ;
+
+templateArgList
+    :   templateArg (','! templateArg)*
+    ;
+
+templateInstantiation
+    :    ^(TEMPLATE_INST templateArgList)
+    |    ^(TEMPLATE_INST templateInstantiation)
     ;
 
 genericTypeParameterList
@@ -221,21 +231,21 @@ type
     ;
 
 simpleType returns [ClassSymbol type]
-    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+    :   ^(SIMPLE_TYPE primitiveType domainExpression?)
     ;
     
 objectType returns [ClassSymbol type]
-    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 entryArgObjectType returns [ClassSymbol type]
-    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -243,7 +253,7 @@ qualifiedTypeIdent returns [ClassSymbol type]
     ;
 
 typeIdent returns [String name]
-    :   ^(IDENT genericTypeArgumentList?)
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
@@ -442,17 +452,8 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
     |   ^(NEW type arguments)
-    ;
-
-newArrayConstruction
-    :   arrayDeclaratorList arrayInitializer
-    |   expression+ arrayDeclaratorList?
     ;
 
 arguments
@@ -561,3 +562,21 @@ literal
     |   NULL 
     ;
 
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression (','! rangeExpression)*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
+    ;
