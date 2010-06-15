@@ -20,7 +20,6 @@ package charj.translator;
         this(input);
         this.symtab = symtab;
         this.currentScope = symtab.getDefaultPkg();
-        //System.out.println(currentScope);
     }
 }
 
@@ -42,9 +41,7 @@ bottomup
 
 enterBlock
     :   BLOCK {
-            //System.out.println("entering block scope");
             currentScope = new LocalScope(symtab, currentScope);
-            //System.out.println(currentScope);
         }
     ;
 
@@ -67,17 +64,17 @@ boolean entry = false;
             //System.out.println("entering method scope " + $IDENT.text);
             String typeName = $type.typeName;
             if (typeName == null) {
-                System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");
+                /*System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");*/
                 typeName = "void";
             }
-            ClassSymbol returnType = currentScope.resolveType(typeName);
+            Type returnType = currentScope.resolveType(typeName);
             //System.out.println("Resolving type " + typeName + " in scope " + currentScope + "->" + returnType);
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
             sym.isEntry = entry;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.symbol = sym;
+            $IDENT.def = sym;
             currentScope = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
@@ -94,7 +91,7 @@ boolean entry = false;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.symbol = sym;
+            $IDENT.def = sym;
             currentScope = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
@@ -119,14 +116,15 @@ enterClass
         {
             //System.out.println("Entering class scope");
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
-                    currentScope.resolveType($parent.text), currentScope);
+                    (ClassSymbol)currentScope.resolveType($parent.text), currentScope);
             currentScope.define(sym.name, sym);
             currentClass = sym;
             sym.definition = $IDENT;
             sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.symbol = sym;
+            $IDENT.def = sym;
             currentScope = sym;
             $IDENT.scope = currentScope;
+            $IDENT.symbolType = sym;
             String classTypeName = $classType.text;
             if (classTypeName.equals("class")) {
             } else if (classTypeName.equals("chare")) {
@@ -162,26 +160,28 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                ClassSymbol varType = currentScope.resolveType($type.typeName);
-                //System.out.println("Defining var " + $IDENT.text + " with type " + varType + " typename " + $type.typeName);
+                Type varType = currentScope.resolveType($type.typeName);
+                /*System.out.println("Defining var " + $IDENT.text + " with type " + varType + " typename " + $type.typeName);*/
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
-                $IDENT.symbol = sym;
+                $IDENT.def = sym;
                 $IDENT.scope = currentScope;
+                $IDENT.symbolType = varType;
                 currentScope.define($IDENT.text, sym);
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
         {
-            ClassSymbol varType = currentScope.resolveType($type.typeName);
-            //System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);
+            Type varType = currentScope.resolveType($type.typeName);
+            /*System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);*/
             VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text,
                     currentScope.resolveType($type.typeName));
             sym.definition = $IDENT;
             sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.symbol = sym;
+            $IDENT.def = sym;
             $IDENT.scope = currentScope;
+            $IDENT.symbolType = varType;
             currentScope.define($IDENT.text, sym);
         }
     ;

@@ -37,7 +37,7 @@ public abstract class SymbolWithScope
     /** Scopes other than package and class don't know how to resolve types
      *  (e.g., MethodSymbol).  Look to enclosing scope.
      */
-    public ClassSymbol resolveType(String type) {
+    public Type resolveType(String type) {
         if ( getEnclosingScope()!=null ) {
             return getEnclosingScope().resolveType(type);
         }

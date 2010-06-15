@@ -11,7 +11,7 @@ public class VariableSymbol extends Symbol {
     public VariableSymbol(
             SymbolTable symtab,
             String name,
-            ClassSymbol type) {
+            Type type) {
         super(symtab, name, type);
     }
 

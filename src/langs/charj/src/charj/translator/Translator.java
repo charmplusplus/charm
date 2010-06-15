@@ -102,8 +102,10 @@ public class Translator {
 	//modifyNodes(sem);
         m_symtab = new SymbolTable(this);
         m_nodes.reset();
+        System.out.println("\nDefiner Phase\n----------------");
         SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
         definer.downup(m_ast);
+        System.out.println("\nResolver Phase\n----------------");
         m_nodes.reset();
         SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
         resolver.downup(m_ast);
@@ -142,7 +144,7 @@ public class Translator {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        m_ast = (CommonTree)mod.charjSource().getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);

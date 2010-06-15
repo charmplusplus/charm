@@ -40,14 +40,16 @@ boolean entry = false;
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             type IDENT .*)
         {
-            $IDENT.symbol.type = $type.sym;
+            $IDENT.def.type = $type.sym;
+            $IDENT.symbolType = $IDENT.def.type;
         }
     |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             IDENT .*)
         {
-            $IDENT.symbol.type = (ClassSymbol)$IDENT.symbol.scope;
+            $IDENT.def.type = (ClassSymbol)$IDENT.def.scope;
+            $IDENT.symbolType = $IDENT.def.type;
         }
     ;
 
@@ -58,7 +60,8 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
-            $IDENT.symbol.type = (ClassSymbol)$IDENT.symbol;
+            $IDENT.def.type = (ClassSymbol)$IDENT.def;
+            $IDENT.symbolType = $IDENT.def.type;
         }
     ;
 
@@ -67,20 +70,23 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                $IDENT.symbol.type = $type.sym;
-                //System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.symbol.type + ", symbol is " + $IDENT.symbol);
+                $IDENT.def.type = $type.sym;
+                $IDENT.symbolType = $type.sym;
+                /*System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);*/
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
         {
-            $IDENT.symbol.type = $type.sym;
+            $IDENT.def.type = $type.sym;
+            $IDENT.symbolType = $type.sym;
         }
     ;
 
-expression returns [ClassSymbol type]
+expression returns [Type type]
     :   ^(EXPR expr) {
             $type = $expr.type;
-            $EXPR.symbol = new Symbol(symtab, "EXPR", $type);
+            $EXPR.def = new Symbol(symtab, "EXPR", $type);
+            $EXPR.symbolType = $type;
         }
     ;
 
@@ -133,15 +139,17 @@ unary_op
     ;
 
 
-expr returns [ClassSymbol type]
+expr returns [Type type]
     :   ^(binary_op e1=expr e2=expr) {
             // TODO: proper type promotion rules
             $type = $e1.type;
-            $binary_op.start.symbol = new Symbol(symtab, $binary_op.text, $type);
+            $binary_op.start.def = new Symbol(symtab, $binary_op.text, $type);
+            $binary_op.start.symbolType = $type;
         }
     |   ^(unary_op e1=expr) {
             $type = $e1.type;
-            $unary_op.start.symbol = new Symbol(symtab, $unary_op.text, $type);
+            $unary_op.start.def = new Symbol(symtab, $unary_op.text, $type);
+            $unary_op.start.symbolType = $type;
         }
     |   primaryExpression {
             $type = $primaryExpression.type;
@@ -149,28 +157,31 @@ expr returns [ClassSymbol type]
     ;
 
 // TODO: fill out all the different cases here
-primaryExpression returns [ClassSymbol type]
+primaryExpression returns [Type type]
 @init{
     String memberText = "";
     CharjAST memberNode = null;
     CharjAST parentNode = null;
 }
     :   IDENT {
-            $IDENT.symbol = $IDENT.scope.resolve($IDENT.text);
-            if ($IDENT.symbol != null) {
-                $type = $IDENT.symbol.type;
-                //System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.symbol);
+            $IDENT.def = $IDENT.scope.resolve($IDENT.text);
+            if ($IDENT.def != null) {
+                $type = $IDENT.def.type;
+                $IDENT.symbolType = $type;
+                /*System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.def);*/
             } else {
                 System.out.println("Couldn't resolve IDENT type: " + $IDENT.text);
             }
         }
     |   THIS {
-            $THIS.symbol = symtab.getEnclosingClass($THIS.scope);
-            $type = (ClassSymbol)$THIS.symbol;
+            $THIS.def = symtab.getEnclosingClass($THIS.scope);
+            $type = $THIS.def.type;
+            $THIS.symbolType = $type;
         }
     |   SUPER {
-            $SUPER.symbol = symtab.getEnclosingClass($SUPER.scope).superClass;
-            $type = (ClassSymbol)$SUPER.symbol;
+            $SUPER.def = symtab.getEnclosingClass($SUPER.scope).superClass;
+            $type = $SUPER.def.type;
+            $SUPER.symbolType = $type;
         }
     |   ^((DOT { parentNode = $DOT; } | ARROW { parentNode = $ARROW; } ) e=expr
             (   IDENT { memberNode = $IDENT; memberText = $IDENT.text; }
@@ -178,23 +189,27 @@ primaryExpression returns [ClassSymbol type]
             |   SUPER { memberNode = $SUPER; memberText = "super"; }
             ))
         {
-            ClassSymbol cxt = $e.type;
+            Type et = $e.type;
+            if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
+            ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {
                 s = null;
                 /*System.out.println("No expression context: " + $e.text);*/
             } else {
-                //System.out.println("Expression context is: " + cxt + " for symbol named " + memberText);
+                /*System.out.println("Expression context is: " + cxt + " for symbol named " + memberText);*/
                 if (memberText.equals("this")) s = cxt;
                 else if (memberText.equals("super")) s = cxt.superClass;
                 else s = cxt.resolve(memberText);
             }
             if (s != null) {
                 $type = s.type;
-                memberNode.symbol = s;
-                parentNode.symbol = s;
+                memberNode.def = s;
+                memberNode.symbolType = $type;
+                parentNode.def = s;
+                parentNode.symbolType = $type;
             } else {
-                System.out.println("Couldn't resolve access " + memberText);
+                //System.out.println("Couldn't resolve access " + memberText);
             }
         }
     |   ^(PAREN_EXPR expression) {
@@ -216,14 +231,25 @@ primaryExpression returns [ClassSymbol type]
     |   ^(NEW t=type .*) {
             $type = $t.sym;
         }
-    |   GETNUMPES
-    |   GETNUMNODES
-    |   GETMYPE
-    |   GETMYNODE
-    |   GETMYRANK
+    |   GETNUMPES {
+            $type = symtab.resolveBuiltinType("int");
+        }
+    |   GETNUMNODES {
+            $type = symtab.resolveBuiltinType("int");
+        }
+    |   GETMYPE {
+            $type = symtab.resolveBuiltinType("int");
+        }
+    |   GETMYNODE {
+            $type = symtab.resolveBuiltinType("int");
+        }
+    |   GETMYRANK {
+            $type = symtab.resolveBuiltinType("int");
+        }
     ;
 
-literal returns [ClassSymbol type]
+literal returns [Type type]
+@after { $start.symbolType = $type; }
     :   (HEX_LITERAL | OCTAL_LITERAL | DECIMAL_LITERAL) {
             $type = symtab.resolveBuiltinType("int");
         }
@@ -244,18 +270,20 @@ literal returns [ClassSymbol type]
         }
     ;
 
-type returns [ClassSymbol sym]
+type returns [Type sym]
 @init {
     String typeText = "";
     CharjAST head = null;
     Scope scope = null;
+    boolean proxy = false;
 }
 @after {
     typeText = typeText.substring(1);
-    //System.out.println("type string: " + typeText);
+    //System.out.println("\ntype string: " + typeText);
     //System.out.println("direct scope: " + scope);
-    $start.symbol = scope.resolveType(typeText);
-    $sym = (ClassSymbol)$start.symbol;
+    $start.symbolType = scope.resolveType(typeText);
+    if (proxy) $start.symbolType = new ProxyType(symtab, $start.symbolType);
+    $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
 }
     :   VOID {
@@ -270,7 +298,7 @@ type returns [ClassSymbol sym]
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText += "." + $IDENT.text;} .*))+) .*)
-    |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; }
+    |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)

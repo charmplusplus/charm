@@ -3,7 +3,7 @@ package charj.translator;
 
 import java.util.*;
 
-public class ClassSymbol extends SymbolWithScope implements Scope {
+public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
@@ -131,7 +131,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
      *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
-    public ClassSymbol resolveType(String type) {
+    public Type resolveType(String type) {
         if (debug()) System.out.println(
                 "ClassSymbol.resolveType(" + type + "): context is " + name +
                 ":" + members.keySet());
@@ -278,8 +278,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
             // note: type info may be null for unknown types, but this might
             // need to be changed at some point.
-            ClassSymbol type = ((VariableSymbol)entry.getValue()).type;
-            if (type != null) types.add(type);
+            Type type = ((VariableSymbol)entry.getValue()).type;
+            if (type != null && type instanceof ClassSymbol) types.add((ClassSymbol)type);
         }
         return types;
     }
@@ -295,6 +295,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     }
 
     public String getName()
+    {
+        return name;
+    }
+
+    public String getTypeName()
     {
         return name;
     }

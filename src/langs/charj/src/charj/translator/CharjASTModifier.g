@@ -17,7 +17,6 @@ package charj.translator;
 }
 
 @members {
-    SymbolTable symtab = null;
     PackageScope currentPackage = null;
     ClassSymbol currentClass = null;
     MethodSymbol currentMethod = null;
@@ -37,17 +36,14 @@ package charj.translator;
 
 
 // Starting point for parsing a Charj file.
-charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-@init {
-    symtab = _symtab;
-}
+charjSource
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         packageDeclaration?
         importDeclaration*
         readonlyDeclaration*
-        (typeDeclaration { $cs = $typeDeclaration.sym; })*)
+        typeDeclaration*)
     ;
 
 packageDeclaration
@@ -62,7 +58,7 @@ readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
     ;
 
-typeDeclaration returns [ClassSymbol sym]
+typeDeclaration
 @init {
     boolean array_type = false;
     astmod = new AstModifier();
