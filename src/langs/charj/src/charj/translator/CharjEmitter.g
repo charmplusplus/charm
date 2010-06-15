@@ -799,7 +799,7 @@ expr
 
 primaryExpression
     :   ^(DOT prim=primaryExpression
-            ( IDENT   -> template(id={$IDENT}, prim={$prim.st}) "<prim>.<id>"
+            ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
             | SUPER   -> template(prim={$prim.st}) "<prim>.super"
             )
@@ -813,7 +813,7 @@ primaryExpression
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
-        -> {%{$start.getText()}}
+        -> {%{$IDENT.text}}
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)

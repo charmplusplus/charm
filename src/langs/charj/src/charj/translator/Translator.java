@@ -98,14 +98,14 @@ public class Translator {
         preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
         // FIXME: no longer guaranteed one class per file, go through each type instead.
-	//ClassSymbol sem = semanticPass();
+	semanticPass();
 	//modifyNodes(sem);
         m_symtab = new SymbolTable(this);
         m_nodes.reset();
-        System.out.println("\nDefiner Phase\n----------------");
+        if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
         SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
         definer.downup(m_ast);
-        System.out.println("\nResolver Phase\n----------------");
+        if (m_verbose) System.out.println("\nResolver Phase\n----------------");
         m_nodes.reset();
         SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
         resolver.downup(m_ast);
