@@ -97,19 +97,14 @@ public class Translator {
         if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
         preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
+
         // FIXME: no longer guaranteed one class per file, go through each type instead.
-	semanticPass();
+	//semanticPass();
 	//modifyNodes(sem);
-        m_symtab = new SymbolTable(this);
-        m_nodes.reset();
-        if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
-        SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
-        definer.downup(m_ast);
-        if (m_verbose) System.out.println("\nResolver Phase\n----------------");
-        m_nodes.reset();
-        SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
-        resolver.downup(m_ast);
+
+        resolveTypes();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+
         postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
@@ -171,6 +166,18 @@ public class Translator {
         return sem.charjSource(m_symtab);
     }
 
+    private void resolveTypes() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
+        SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
+        definer.downup(m_ast);
+        if (m_verbose) System.out.println("\nResolver Phase\n----------------");
+        m_nodes.reset();
+        SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
+        resolver.downup(m_ast);
+    }
 
     private CharjAST addConstructor(ClassSymbol sem) {
 	CharjAST ast1 = new CharjAST(CharjParser.CONSTRUCTOR_DECL, 

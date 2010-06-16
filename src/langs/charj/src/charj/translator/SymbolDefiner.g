@@ -15,6 +15,7 @@ package charj.translator;
     SymbolTable symtab;
     Scope currentScope;
     ClassSymbol currentClass;
+    AstModifier astmod = new AstModifier();
 
     public SymbolDefiner(TreeNodeStream input, SymbolTable symtab) {
         this(input);
@@ -79,7 +80,13 @@ boolean entry = false;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
-    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
+    |   ^((CONSTRUCTOR_DECL
+          | ENTRY_CONSTRUCTOR_DECL {
+                entry = true;
+                if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) {
+                    currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
+                }
+            })
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             IDENT .*)
@@ -161,7 +168,8 @@ varDeclaration
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
                 Type varType = currentScope.resolveType($type.typeName);
-                /*System.out.println("Defining var " + $IDENT.text + " with type " + varType + " typename " + $type.typeName);*/
+                /*System.out.println("Defining var " + $IDENT.text + " with type " +
+                    varType + " typename " + $type.typeName);*/
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
@@ -169,6 +177,12 @@ varDeclaration
                 $IDENT.scope = currentScope;
                 $IDENT.symbolType = varType;
                 currentScope.define($IDENT.text, sym);
+
+                if (currentClass != null &&
+                        varType instanceof ClassSymbol &&
+                        ((ClassSymbol)varType).isChare) {
+                    currentClass.addExtern(varType.getTypeName());
+                }
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
