@@ -27,11 +27,11 @@ processArgs() {
         shift
 
         case "$arg" in
-        "-v"|"--verbose")
+        "-v"|"-V"|"--verbose")
             VERBOSE=true
             ARGS="$ARGS $arg"
             ;;
-        "--AST")
+        "--AST"|"--ast")
             ARGS="$ARGS $arg"
             ;;
         "--debug")
