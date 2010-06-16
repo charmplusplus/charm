@@ -127,29 +127,6 @@ scope ScopeStack; // top-level type scope
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
             {
-                Scope outerScope = $ScopeStack[-1]::current;
-                $sym = new ClassSymbol(symtab, $IDENT.text, (ClassSymbol)outerScope.resolveType($parent.text), outerScope);
-                outerScope.define($sym.name, $sym);
-                currentClass = $sym;
-                $sym.definition = $typeDeclaration.start;
-                $sym.definitionTokenStream = input.getTokenStream();
-                $IDENT.def = $sym;
-                $ScopeStack::current = $sym;
-                String classTypeName = $classType.text;
-                if (classTypeName.equals("class")) {
-                } else if (classTypeName.equals("chare")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("group")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("nodegroup")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("chare_array")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("mainchare")) {
-                    currentClass.isChare = true;
-                    currentClass.isMainChare = true;
-                } else System.out.println("Error: type " + classTypeName + " not recognized.");
-                importPackages($sym, imports);
             }
             classScopeDeclaration*)
             {
@@ -190,32 +167,16 @@ scope ScopeStack;
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
-            Type returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $FUNCTION_METHOD_DECL.def = sym;
         }
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList?
             ty=type IDENT formalParameterList a=arrayDeclaratorList? b=block)
         {
-            Type returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $ENTRY_FUNCTION_DECL.def = sym;
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
             ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
             ^(VAR_DECLARATOR_LIST field[$objectType.type, false]+))
         {
-            ClassSymbol type = (ClassSymbol)$objectType.type;
-            if (type != null && type.isChare) currentClass.addExtern(type.getTypeName());
         }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
@@ -235,11 +196,6 @@ scope ScopeStack;
 field [Type type, boolean localdef]
     :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     {
-            VariableSymbol sym = new VariableSymbol(symtab, $variableDeclaratorId.ident, $type);
-            sym.definition = $field.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            $VAR_DECLARATOR.def = sym;
-            currentClass.define($variableDeclaratorId.ident, sym);
     }
     ;
     
@@ -373,7 +329,6 @@ type
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
         {
-            $type = symtab.resolveBuiltinType($primitiveType.text);
         }
     ;
     
@@ -383,7 +338,6 @@ objectType returns [ClassSymbol type]
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
-            $type = $qualifiedTypeIdent.type;
         }
     ;
 
@@ -393,18 +347,11 @@ String name = "";
 }
     :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
         {
-            $type = null;
-            /*System.out.println("trying to restype " + name + " in type " + currentClass);*/
-            if (currentClass != null) $type = (ClassSymbol)currentClass.resolveType(name);
-            /*System.out.println("got " + $type);*/
-            if ($type == null) $type = (ClassSymbol)symtab.resolveBuiltinType(name);
-            $QUALIFIED_TYPE_IDENT.def = $type;
         }
     ;
 
 typeIdent returns [String name]
     :   ^(IDENT templateInstantiation?)
-        { $name = $IDENT.text; }
     ;
 
 primitiveType
@@ -468,9 +415,6 @@ localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList[true])
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
         {
-            ClassSymbol type = (ClassSymbol)$objectType.type;
-            /*System.out.println("looked up type " + type + " for declaration " + $objectType.text);*/
-            if (type != null && type.isChare && currentClass != null) currentClass.addExtern(type.getTypeName());
         }
     ;
 
