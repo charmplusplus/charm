@@ -29,6 +29,7 @@ topdown
     |   enterMethod
     |   varDeclaration
     |   expression
+    |   assignment
     ;
 
 bottomup
@@ -117,6 +118,20 @@ expression returns [Type type]
             $type = $expr.type;
             $EXPR.def = new Symbol(symtab, "EXPR", $type);
             $EXPR.symbolType = $type;
+        }
+    ;
+
+assignment
+    :   ^(ASSIGNMENT IDENT expr) {
+            //System.out.println("Found candidate assignment to " + $IDENT.text);
+            if ($IDENT.def instanceof VariableSymbol) {
+                VariableSymbol vs = (VariableSymbol)$IDENT.def;
+                if (vs.isReadOnly && !(currentClass.isMainChare &&
+                    $IDENT.hasParentOfType(CharjParser.ENTRY_CONSTRUCTOR_DECL))) {
+                    System.out.println("Warning: assignment to readonly variable " +
+                        $IDENT.text + " on line " + $IDENT.getLine());
+               }
+            }
         }
     ;
 

@@ -106,6 +106,21 @@ public class CharjAST extends CommonTree
         return getChild(0);
     }
 
+    public boolean hasParentOfType(int type)
+    {
+        //System.out.println("checking parent type = " + type);
+        CharjAST node = getParent();
+        while (node != null && node.getType() != type) {
+            //System.out.println("looking at parents, type = " + node.getType() + ": " + node.toString());
+            node = node.getParent();
+        }
+        boolean found = (node != null);
+        //if (found) System.out.println("looking at parents, type = " + node.getType() + ": " + node.toString());
+        //else System.out.println("null parent");
+        //System.out.println("Result: " + found);
+        return found;
+    }
+
     @Override
     public boolean equals(Object o)
     {
