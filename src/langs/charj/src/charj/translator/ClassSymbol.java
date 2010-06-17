@@ -16,7 +16,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
     List<String> usings = new ArrayList<String>();
-    List<String> externs = new ArrayList<String>();
+    Set<String> externs = new TreeSet<String>();
 
     /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
@@ -247,7 +247,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return usings;
     }
 
-    public List<String> getExterns()
+    public Set<String> getExterns()
     {
         return externs;
     }
