@@ -215,8 +215,13 @@ primaryExpression returns [Type type]
     |   ^(PAREN_EXPR expression) {
             $type = $expression.type;
         }
-    |   ^((METHOD_CALL|ENTRY_METHOD_CALL) e=expr .*) {
+    |   ^(METHOD_CALL e=expr .*) {
             $type = $e.type; // Type of a method is its return type.
+            $METHOD_CALL.symbolType = $type;
+        }
+    |   ^(ENTRY_METHOD_CALL e=expr .*) {
+            $type = $e.type; // Type of a method is its return type.
+            $ENTRY_METHOD_CALL.symbolType = $type;
         }
     |   ^(THIS_CONSTRUCTOR_CALL .*) {
             // TODO: fill in
@@ -282,6 +287,7 @@ type returns [Type sym]
     //System.out.println("\ntype string: " + typeText);
     //System.out.println("direct scope: " + scope);
     $start.symbolType = scope.resolveType(typeText);
+    //System.out.println("symbolType: " + $start.symbolType);
     if (proxy) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
