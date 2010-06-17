@@ -139,7 +139,6 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
-            System.out.println("Adding " + $IDENT.text + " to package " + currentScope);
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
                     (ClassSymbol)currentScope.resolveType($parent.text), currentScope);
             currentScope.define(sym.name, sym);
@@ -191,6 +190,10 @@ varDeclaration
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
+                if (currentScope instanceof PackageScope) {
+                    sym.isReadOnly = true;
+                    System.out.println("Marking " + $IDENT.text + " as readonly");
+                }
                 $IDENT.def = sym;
                 $IDENT.scope = currentScope;
                 $IDENT.symbolType = varType;

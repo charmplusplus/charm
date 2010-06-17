@@ -86,7 +86,7 @@ varDeclaration
             {
                 $IDENT.def.type = $type.sym;
                 $IDENT.symbolType = $type.sym;
-                System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);
+                //System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);
                 if (currentClass != null) {
                     ClassSymbol declType = null;
                     if ($type.sym instanceof ClassSymbol) {
@@ -94,11 +94,11 @@ varDeclaration
                     } else if ($type.sym instanceof ProxyType) {
                         declType = (ClassSymbol)((ProxyType)$type.sym).baseType;
                     }
-                    
+
                     if (declType != null) {
-                        System.out.println("Looking to extern " + $IDENT.text + " as " + declType);
+                        //System.out.println("Looking to extern " + $IDENT.text + " as " + declType);
                         if (declType.isChare && declType != currentClass) {
-                            System.out.println("extern added");
+                            //System.out.println("extern added");
                             currentClass.addExtern(declType.getTypeName());
                         }
                     }
@@ -187,6 +187,7 @@ expr returns [Type type]
     ;
 
 // TODO: fill out all the different cases here
+// TODO: warn on readonly assigment outside of ctor
 primaryExpression returns [Type type]
 @init{
     String memberText = "";
