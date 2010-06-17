@@ -75,10 +75,12 @@ for file in $FILES; do
     tmpdir=`dirname $file`/`basename $file`.gen
     mkdir -p $tmpdir
     if $VERBOSE; then
-        echo "cpp $ARGS $file $tmpdir/$file"
+        #echo "cpp $ARGS $file $tmpdir/$file"
+        echo "cp $file $tmpdir/$file"
         echo "cd $tmpdir"
     fi
-    cpp $CHARMC_ARGS $file $tmpdir/$file
+    #cpp $CHARMC_ARGS $file $tmpdir/$file
+    cp $file $tmpdir/$file
     cd $tmpdir
     if $VERBOSE; then
         echo "java $CHARJ_JFLAGS charj.Main --charmc \"$CHARMC\" \
