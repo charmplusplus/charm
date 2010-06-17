@@ -147,6 +147,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             return this;
         }
 
+        // Look in our enclosing package
+        if (scope != null) {
+            Type cs = scope.resolveType(type);
+            if (cs != null && cs instanceof ClassSymbol) return (ClassSymbol)cs;
+        }
+
         // look for type in classes already defined in imported packages
         for (String packageName : imports.keySet()) {
             if ( debug() ) System.out.println( "Looking for type " +
@@ -161,21 +167,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
                 return cs;
             }
         }
-
-        // not already seen in one of the imported packages, look on disk
-        //for (String packageName : imports.keySet()) {
-        //    PackageScope pkg = resolvePackage(packageName);
-        //    ClassSymbol cs = symtab.translator.loadType(
-        //            pkg.getFullyQualifiedName(), type);
-        //    if ( cs!=null ) {
-        //        pkg.define(type, cs); // add to symbol table
-        //        if ( debug() ) System.out.println(
-        //                "ClassSymbol.resolveType(" + type +
-        //                "): found after loading in context " + name +
-        //                ":" + members.keySet());
-        //        return cs;
-        //    }
-        //}
 
         if ( debug() ) System.out.println(
                 "ClassSymbol.resolveType(" + type +
