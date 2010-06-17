@@ -14,7 +14,7 @@ package charj.translator;
 @members {
     SymbolTable symtab;
     Scope currentScope;
-    ClassSymbol currentClass;
+    ClassSymbol currentClass = null;
 
     public SymbolResolver(TreeNodeStream input, SymbolTable symtab) {
         this(input);
@@ -29,6 +29,10 @@ topdown
     |   enterMethod
     |   varDeclaration
     |   expression
+    ;
+
+bottomup
+    :   exitClass
     ;
 
 enterMethod
@@ -62,7 +66,17 @@ enterClass
         {
             $IDENT.def.type = (ClassSymbol)$IDENT.def;
             $IDENT.symbolType = $IDENT.def.type;
+            currentClass = (ClassSymbol)$IDENT.def.type;
         }
+    ;
+
+exitClass
+    :   ^(TYPE classType IDENT
+            (^('extends' parent=type))?
+            (^('implements' type+))?
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
+        { currentClass = null; }
     ;
 
 varDeclaration
@@ -72,7 +86,23 @@ varDeclaration
             {
                 $IDENT.def.type = $type.sym;
                 $IDENT.symbolType = $type.sym;
-                /*System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);*/
+                System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);
+                if (currentClass != null) {
+                    ClassSymbol declType = null;
+                    if ($type.sym instanceof ClassSymbol) {
+                        declType = (ClassSymbol)$type.sym;
+                    } else if ($type.sym instanceof ProxyType) {
+                        declType = (ClassSymbol)((ProxyType)$type.sym).baseType;
+                    }
+                    
+                    if (declType != null) {
+                        System.out.println("Looking to extern " + $IDENT.text + " as " + declType);
+                        if (declType.isChare && declType != currentClass) {
+                            System.out.println("extern added");
+                            currentClass.addExtern(declType.getTypeName());
+                        }
+                    }
+                }
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))

@@ -139,6 +139,7 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
+            System.out.println("Adding " + $IDENT.text + " to package " + currentScope);
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
                     (ClassSymbol)currentScope.resolveType($parent.text), currentScope);
             currentScope.define(sym.name, sym);
@@ -195,11 +196,6 @@ varDeclaration
                 $IDENT.symbolType = varType;
                 currentScope.define($IDENT.text, sym);
 
-                if (currentClass != null &&
-                        varType instanceof ClassSymbol &&
-                        ((ClassSymbol)varType).isChare) {
-                    currentClass.addExtern(varType.getTypeName());
-                }
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
