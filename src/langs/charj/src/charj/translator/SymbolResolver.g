@@ -288,7 +288,7 @@ type returns [Type sym]
     //System.out.println("direct scope: " + scope);
     $start.symbolType = scope.resolveType(typeText);
     //System.out.println("symbolType: " + $start.symbolType);
-    if (proxy) $start.symbolType = new ProxyType(symtab, $start.symbolType);
+    if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
 }

@@ -26,7 +26,8 @@ package charj.translator;
 
 
 topdown
-    :   enterClass
+    :   enterPackage
+    |   enterClass
     |   enterMethod
     |   enterBlock
     |   varDeclaration
@@ -38,6 +39,23 @@ bottomup
     :   exitClass
     |   exitMethod
     |   exitBlock
+    ;
+
+enterPackage
+@init {
+    List<String> names = null;
+    String packageName = "";
+}
+    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
+        {
+            packageName = packageName.substring(1);
+            PackageScope ps = symtab.resolvePackage(packageName);
+            if (ps == null) {
+                ps = symtab.definePackage(packageName);
+                symtab.addScope(ps);
+            }
+            currentScope = ps;
+        }
     ;
 
 enterBlock
@@ -121,7 +139,6 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
-            //System.out.println("Entering class scope");
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
                     (ClassSymbol)currentScope.resolveType($parent.text), currentScope);
             currentScope.define(sym.name, sym);
