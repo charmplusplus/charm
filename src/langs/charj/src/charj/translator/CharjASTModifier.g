@@ -151,7 +151,7 @@ variableDeclarator
 variableDeclaratorId
     :   ^(IDENT domainExpression?)
         {
-            astmod.varPup($IDENT);
+            if (!($IDENT.hasParentOfType(CharjParser.READONLY))) astmod.varPup($IDENT);
         }
     ;
 
