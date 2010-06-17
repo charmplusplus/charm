@@ -625,8 +625,8 @@ nonBlockStatement
         ->  ^(CONTINUE IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
-    |   'delete' qualifiedIdentifier ';'
-        -> ^('delete' qualifiedIdentifier)
+    |   'delete' expression ';'
+        -> ^('delete' expression)
     |   'embed' STRING_LITERAL EMBED_BLOCK
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!

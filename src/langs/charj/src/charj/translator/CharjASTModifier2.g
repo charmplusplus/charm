@@ -336,7 +336,7 @@ nonBlockStatement
     |   ^(CONTINUE IDENT?) 
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^('delete' qualifiedIdentifier)
+    |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     |   ^(PRINT expression*)

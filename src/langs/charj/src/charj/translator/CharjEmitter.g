@@ -662,8 +662,8 @@ nonBlockStatement
         -> label(text={$i.text}, stmt={$s.st})
     |   expression
         -> template(expr={$expression.st}) "<expr>;"
-    |   ^('delete' qualifiedIdentifier)
-        -> template(t={$qualifiedIdentifier.st}) "delete <t>;"
+    |   ^('delete' expression)
+        -> template(t={$expression.st}) "delete <t>;"
     |   ^('embed' STRING_LITERAL EMBED_BLOCK)
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
