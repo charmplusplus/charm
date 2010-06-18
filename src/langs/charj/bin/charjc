@@ -18,7 +18,7 @@ VERBOSE=false
 CHARMC=$CHARJCHOME/../../../../bin/charmc
 STDLIB=$CHARJCHOME/../src
 CHARMC_ARGS=
-FILES=
+CJFILES=
 ARGS=
 processArgs() {
     while [ ! $# -eq 0 ]
@@ -56,7 +56,7 @@ processArgs() {
             shift
             ;;
         *.cj)
-            FILES="$FILES $arg"
+            CJFILES="$CJFILES $arg"
             ;;
         --*|-*)
             # unrecognized options are passed through to charmc
@@ -71,7 +71,7 @@ processArgs() {
 }
 
 processArgs "$@"
-for file in $FILES; do
+for file in $CJFILES; do
     tmpdir=`dirname $file`/`basename $file`.gen
     mkdir -p $tmpdir
     if $VERBOSE; then
@@ -88,5 +88,6 @@ for file in $FILES; do
     fi
     java $CHARJ_JFLAGS charj.Main --charmc "$CHARMC" --stdlib $STDLIB \
         $ARGS $file
+    cp *.o *.decl.h ..
 done
 
