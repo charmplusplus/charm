@@ -56,14 +56,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
-        this.includes.add("list");
-        this.usings.add("std::list");
         this.includes.add("string");
         this.usings.add("std::string");
         this.includes.add("vector");
         this.usings.add("std::vector");
-        this.includes.add("map");
-        this.usings.add("std::map");
         this.includes.add("iostream");
         this.usings.add("std::cout");
         this.usings.add("std::endl");

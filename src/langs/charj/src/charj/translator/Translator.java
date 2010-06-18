@@ -2,6 +2,9 @@
 package charj.translator;
 
 import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.nio.charset.*;
 import java.util.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
@@ -121,6 +124,7 @@ public class Translator {
         
         String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
+
         if (!m_translate_only) compileTempFiles(filename, m_charmc);
 
         // Build a string representing all emitted code. This will be printed
@@ -333,6 +337,21 @@ public class Translator {
             e.printStackTrace();
         }
         return cs;
+    }
+
+    /**
+     * Read the given file name in as a string.
+     */
+    public static String readFile(String path) throws IOException {
+      FileInputStream stream = new FileInputStream(new File(path));
+      try {
+        FileChannel fc = stream.getChannel();
+        MappedByteBuffer bb = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
+        return Charset.defaultCharset().decode(bb).toString();
+      }
+      finally {
+        stream.close();
+      }
     }
 
     /**
