@@ -46,12 +46,12 @@ public chare Fib {
         }
     }
 
-    public entry void gather(int value) {
+    public traced entry void gather(int value) {
         partialResult += value;
         if (--pendingChildren == 0) passUp();
     }
 
-    public void passUp() {
+    public traced void passUp() {
         if (root) main@done(partialResult);
         else parent@gather(partialResult);
         delete this;
