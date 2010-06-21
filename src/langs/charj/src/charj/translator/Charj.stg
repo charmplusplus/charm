@@ -146,6 +146,8 @@ class <ident> {
 <endif>
 
     <csds; separator="\n\n">
+    
+    static bool _trace_registered;
     void _initTrace();
 };
 <endif>
@@ -174,9 +176,12 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 #endif
 <csds; separator="\n\n">
 
+bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
     #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    if (_trace_registered) return;
     <sym.traceInitializers; separator="\n">
+    _trace_registered = true;
     #endif
 }
 <endif>
@@ -202,9 +207,12 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 #endif
 <csds; separator="\n\n">
 
+bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
     #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    if (_trace_registered) return;
     <sym.traceInitializers; separator="\n">
+    _trace_registered = true;
     #endif
 }
 <endif>
@@ -228,6 +236,8 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
+
+    static bool _trace_registered;
     void _initTrace();
 };
 <endif>
