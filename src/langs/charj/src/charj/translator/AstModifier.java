@@ -48,7 +48,16 @@ class AstModifier
         constructorHelper.addChild(createNode(CharjParser.VOID, "void"));
         constructorHelper.addChild(createNode(CharjParser.IDENT, "constructorHelper"));
         constructorHelper.addChild(createNode(CharjParser.FORMAL_PARAM_LIST, "FORMAL_PARAM_LIST"));
-        constructorHelper.addChild(createNode(CharjParser.BLOCK, "BLOCK"));
+        
+        // Add a default call to _initTrace
+        CharjAST block = createNode(CharjParser.BLOCK, "BLOCK");
+        CharjAST expr = createNode(CharjParser.EXPR, "EXPR");
+        CharjAST invoke = createNode(CharjParser.METHOD_CALL, "METHOD_CALL");
+        invoke.addChild(createNode(CharjParser.IDENT, "_initTrace"));
+        invoke.addChild(createNode(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST"));
+        expr.addChild(invoke);
+        block.addChild(expr);
+        constructorHelper.addChild(block);
     }
     
     private void createInitNode()
@@ -239,6 +248,7 @@ class AstModifier
                     accessList.addChild(mod.dupNode());
                     break;
                 case CharjParser.ENTRY:
+                case CharjParser.TRACED:
                     charjList.addChild(mod.dupNode());
                     break;
                 case CharjParser.FINAL:

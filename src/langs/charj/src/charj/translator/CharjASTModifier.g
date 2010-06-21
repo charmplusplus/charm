@@ -202,6 +202,7 @@ modifier
     |   PRIVATE
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   ABSTRACT
     |   NATIVE
     |   localModifier

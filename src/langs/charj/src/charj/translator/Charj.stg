@@ -146,6 +146,7 @@ class <ident> {
 <endif>
 
     <csds; separator="\n\n">
+    void _initTrace();
 };
 <endif>
 >>
@@ -168,7 +169,16 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
     <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
 } // namespace <first(pds)>
 <else>
+#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#include \<trace-projections.h\>
+#endif
 <csds; separator="\n\n">
+
+void <sym.name>::_initTrace() {
+    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    <sym.traceInitializers; separator="\n">
+    #endif
+}
 <endif>
 >>
 
@@ -187,7 +197,16 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
     <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
 } // namespace <first(pds)>
 <else>
+#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#include \<trace-projections.h\>
+#endif
 <csds; separator="\n\n">
+
+void <sym.name>::_initTrace() {
+    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    <sym.traceInitializers; separator="\n">
+    #endif
+}
 <endif>
 >>
 
@@ -209,6 +228,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
+    void _initTrace();
 };
 <endif>
 >>
@@ -251,10 +271,18 @@ funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
-funcMethodDecl_cc(sym, modl, gtpl, ty, id, fpl, adl, block) ::=
+funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<modl><ty><gtpl> <sym.Name>::<id><fpl><adl>
-<block>
+<modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
+{
+    #ifdef _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    <block>
+    #ifdef _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
+}
 >>
 
 

@@ -209,9 +209,12 @@ classScopeDeclaration
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList
-            b=block?)
+            b=block?) {
+            currentMethod = (MethodSymbol)$IDENT.def;
+        }
         -> {emitCC()}? funcMethodDecl_cc(
-                sym={currentClass},
+                classSym={currentClass},
+                methodSym={currentMethod},
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -229,9 +232,12 @@ classScopeDeclaration
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
-            b=block?)
+            b=block?) {
+            currentMethod = (MethodSymbol)$IDENT.def;
+        }
         -> {emitCC()}? funcMethodDecl_cc(
-                sym={currentClass},
+                classSym={currentClass},
+                methodSym={currentMethod},
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -268,6 +274,9 @@ classScopeDeclaration
             declList={$variableDeclaratorList.st})
         ->
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
+        {
+            currentMethod = (MethodSymbol)$IDENT.def;
+        }
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -284,6 +293,7 @@ classScopeDeclaration
         ->
     |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
         {
+            currentMethod = (MethodSymbol)$IDENT.def;
             migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
         }
         -> {emitCC()}? ctorDecl_cc(
@@ -466,11 +476,8 @@ accessModifier
     ;
 
 charjModifier
-@init
-{
-    $st = %{$start.getText()};
-}
-    :   ENTRY
+    :   ENTRY -> {%{$ENTRY.text}}
+    |   TRACED
     ;
 
 otherModifier

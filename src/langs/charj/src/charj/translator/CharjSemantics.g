@@ -313,6 +313,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   TRACED
     ;
 
 otherModifier
