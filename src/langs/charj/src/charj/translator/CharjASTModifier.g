@@ -96,28 +96,14 @@ classScopeDeclaration
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
         {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($d.tree);
-
             if(astmod.isEntry($d.tree))
                 $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
         }
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
-        }
     |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
-        }
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
-
             astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
             astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
             astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
@@ -191,10 +177,30 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST modifier+)
-        {
-            astmod.arrangeModifiers($MODIFIER_LIST.tree);
-        }
+    :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier | otherModifier)*)
+        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
+    ;
+
+localModifier
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
+    ;
+
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+    :   ENTRY
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
     ;
 
 modifier
@@ -209,12 +215,6 @@ modifier
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
-    ;
-
-localModifier
-    :   FINAL
-    |   STATIC
-    |   VOLATILE
     ;
 
 type

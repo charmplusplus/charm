@@ -399,7 +399,7 @@ throwsClause
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+    :   ^(MODIFIER_LIST accessModifierList localModifierList charjModifierList otherModifierList)
         ->  {emitCC()}? mod_list_cc(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
         ->  {emitH()}? mod_list_h(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
         ->  {emitCI()}? mod_list_ci(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
@@ -415,14 +415,14 @@ modifier
 
 accessModifierList
 returns [List names]
-    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)+)
+    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)*)
         {
             $names = $m;
         }
     ;
 localModifierList
 returns [List names]
-    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)+)
+    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)*)
         {
             $names = $m;
         }
@@ -431,7 +431,7 @@ returns [List names]
 
 charjModifierList
 returns [List names]
-    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)+)
+    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)*)
         {
             $names = $m;
         }
@@ -439,7 +439,7 @@ returns [List names]
 
 otherModifierList
 returns [List names]
-    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)+)
+    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)*)
         {
             $names = $m;
         }
