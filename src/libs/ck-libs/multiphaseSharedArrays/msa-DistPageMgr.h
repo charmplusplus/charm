@@ -511,6 +511,8 @@ protected:
 
     std::map<CthThread, MSA_Thread_Listener *> threadList;
 
+	bool clear;
+
     /// Return the state for this page, returning NULL if no state available.
     inline pageState_t *stateN(unsigned int pageNo) {
         return pageStateStorage[pageNo];
@@ -776,7 +778,8 @@ public:
 		  replacementPolicy(new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage)),
 		  outOfBufferInPrefetch(0), syncAckCount(0),syncThreadCount(0),
 		  resident_pages(0), numberLocalWorkerThreads(0), 
-		  numberLocalWorkerThreadsActive(0), enrollDoneq(0)
+		  numberLocalWorkerThreadsActive(0), enrollDoneq(0),
+		  clear(false)
 		{
 			MSADEBPRINT(printf("MSA_CacheGroup nEntries %d \n",nEntries););
 		}
@@ -877,8 +880,9 @@ public:
 
     // MSA_CacheGroup::
     // synchronize all the pages and also clear up the cache
-    inline void SyncReq(int single)
+    inline void SyncReq(int single, bool clear_)
 		{
+			clear = clear || clear_;
 			MSADEBPRINT(printf("SyncReq single %d\n",single););
 			if(single)
 			{
@@ -891,7 +895,7 @@ public:
 				getListener()->suspend();
 			}
 			else{
-				Sync();
+				Sync(clear_);
 			}
 		}
 
@@ -1034,11 +1038,11 @@ public:
 			// a reduction over a group)
 			if(CkMyPe() != 0)
 			{
-				thisProxy[0].SyncAck();
+				thisProxy[0].SyncAck(clear);
 			}
 			else /* I *am* PE 0 */
 			{
-				SyncAck();
+				SyncAck(clear);
 			}
 			MSADEBPRINT(printf("Sync all local threads done, going to addAndSuspend\n"););
 			/* Wait until sync is reflected from PE 0 */
@@ -1049,7 +1053,7 @@ public:
 		}
 
     // MSA_CacheGroup::
-    inline void Sync()
+    inline void Sync(bool clear_)
 		{
 			syncThreadCount++;
 			//ckout << "[" << CkMyPe() << "] syncThreadCount = " << syncThreadCount << " " << numberLocalWorkerThreads << endl;
@@ -1057,6 +1061,8 @@ public:
 			//  << ", number of suspended threads = " << getNumSuspendedThreads() << endl;
 
 			syncDebug();
+
+			clear |= clear_;
 
 			// First, all threads on this processor need to reach the sync
 			// call; only then can we proceed with merging the data.  Only
@@ -1079,18 +1085,19 @@ public:
 
     // TODO: Can this SyncAck and other simple Acks be made efficient?
 // Yes - Replace calls to this with contributes to a reduction that calls pageArray.Sync()
-    inline void SyncAck()
+    inline void SyncAck(bool clear_)
 		{
 			CkAssert(CkMyPe() == 0);  // SyncAck is only called on PE 0
 			syncAckCount++;
+			clear = clear || clear_;
 			// DONE @@ what if fewer worker threads than pe's ?
 			// @@ what if fewer worker threads than pe's and >1 threads on 1 pe?
 			//if(syncAckCount == min(numberOfWorkerThreads, CkNumPes())){
 			if (syncAckCount == enrolledPEs.size()) {
 				MSADEBPRINT(printf("SyncAck starting reduction on pageArray of size %d number of pages %d\n",
 								   nEntries, nPages););
-				pageArray.Sync();
-			}		
+				pageArray.Sync(clear);
+			}
 		}
 
     inline void SyncDone(CkReductionMsg *m)
@@ -1101,6 +1108,7 @@ public:
 			/* Reset for next sync */
 			syncThreadCount = 0;
 			syncAckCount = 0;
+			clear = false;
 			MSADEBPRINT(printf("SyncDone syncWaiters signal to be called\n"););
 			syncWaiters.signal(0);
 		}
@@ -1386,8 +1394,10 @@ public:
 		}
 
     // MSA_PageArray::
-    inline void Sync()
+    inline void Sync(bool clear)
 		{
+			if (clear && epage)
+				writeIdentity();
 			MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n"););
 			CkCallback cb(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cache);
 			contribute(0, NULL, CkReduction::concat, cb);

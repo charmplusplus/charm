@@ -457,9 +457,9 @@ protected:
     }
 
     /// Synchronize reads and writes across the entire array.
-    inline void sync(int single=0)
+    inline void sync(int single=0, bool clear = false)
     {
-        cache->SyncReq(single); 
+        cache->SyncReq(single, clear);
     }
 };
 
@@ -829,12 +829,26 @@ public:
                 return Write(msa);
             }
 
+        inline Write syncToReWrite()
+            {
+                checkInvalidate();
+                msa->sync(DEFAULT_SYNC_SINGLE, MSA_CLEAR_ALL);
+                return Write(msa);
+            }
+
         inline Accum syncToAccum()
             {
                 checkInvalidate();
                 msa->sync(DEFAULT_SYNC_SINGLE);
                 return Accum(msa);
             }
+
+        inline Accum syncToEAccum()
+        {
+            checkInvalidate();
+            msa->sync(DEFAULT_SYNC_SINGLE, MSA_CLEAR_ALL);
+            return Accum(msa);
+        }
 
         void pup(PUP::er &p)
             {
@@ -1181,6 +1195,7 @@ public:
     }
 
     static const int DEFAULT_SYNC_SINGLE = 0;
+    static const bool MSA_CLEAR_ALL = true;
 
     inline Write getInitialWrite()
     {
@@ -1262,9 +1277,9 @@ protected:
     }
 
     /// Synchronize reads and writes across the entire array.
-    inline void sync(int single=0)
+    inline void sync(int single=0, bool clear = false)
     {
-        cache->SyncReq(single); 
+        cache->SyncReq(single, clear);
     }
 };
 

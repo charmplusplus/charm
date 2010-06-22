@@ -14,7 +14,7 @@ module msa
         entry void enroll(unsigned int numberOfWorkerThreads);
         entry void enrollAck(int originator);  // internal method
         entry void enrollDone();  // internal method
-        entry void SyncAck();
+        entry void SyncAck(bool clear);
         entry void SyncDone(CkReductionMsg *);
 
         // Push data to its home and wait for notice that everyone else has caught up
@@ -35,7 +35,7 @@ module msa
         entry void PAReceivePage(ENTRY_TYPE page[ENTRIES_PER_PAGE], int pe, MSA_Page_Fault_t pageState);
         entry void PAReceiveRLEPage(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, ENTRY_TYPE entries[nEntries], unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
         entry void PAReceiveRLEPageWithPup(MSA_WriteSpan_t spans[nSpans], unsigned int nSpans, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> entries, unsigned int nEntries, int pe, MSA_Page_Fault_t pageState);
-        entry void Sync();
+        entry void Sync(bool clear);
 	
         // for debugging purposes only
         entry void emit(int ID, int offset);
