@@ -7,7 +7,8 @@ public mainchare Main {
     int n;
 
     public entry Main(CkArgMsg m) {
-        n = atoi(m.argv[1]);
+        if (m.argc < 2) n = 16;
+        else n = atoi(m.argv[1]);
         main = thishandle;
         Fib@ fib = new Fib@(true, n, thishandle);
     }
