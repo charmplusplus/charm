@@ -11,6 +11,7 @@ module msa
         entry void AckPage(unsigned int page);
         entry void ReceivePage(unsigned int page, ENTRY_TYPE pageData[size], int size);
         entry void ReceivePageWithPUP(unsigned int page, MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> pageData, int size);
+        entry void enroll();
         entry void enroll(unsigned int numberOfWorkerThreads);
         entry void enrollAck(int originator);  // internal method
         entry void enrollDone();  // internal method

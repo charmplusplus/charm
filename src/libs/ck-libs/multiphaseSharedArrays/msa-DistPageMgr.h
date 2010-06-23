@@ -945,6 +945,14 @@ public:
 			return;
 		}
 
+	// The check in the above function isn't all that useful, and
+	// breaks modularity for client code. We don't want to break
+	// backward compatibility, so just obviate that one assertion.
+	void enroll()
+		{
+			enroll(numberOfWorkerThreads);
+		}
+
     /// Enroll phase 2: called on PE 0 from everywhere
     inline void enrollAck(int originator)
 		{

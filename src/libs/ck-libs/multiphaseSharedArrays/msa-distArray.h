@@ -1142,6 +1142,11 @@ public:
         cache->enroll(num_workers);
     }
 
+    void enroll()
+    {
+        cache->enroll();
+    }
+
     // idx is the element to be read/written
     //
     // This function returns a reference to the first element on the
