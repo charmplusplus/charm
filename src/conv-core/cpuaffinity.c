@@ -43,7 +43,7 @@ CpvDeclare(int, myCPUAffToCore);
 #endif
 
 
-#define MAX_EXCLUDE      16
+#define MAX_EXCLUDE      32
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
