@@ -2370,6 +2370,13 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
   }
 }
 
+void CpdHandleLBMessage(LBMigrateMsg *msg) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  if (ck->watcher!=NULL) {
+    ck->watcher->processLBMessage(msg, ck);
+  }
+}
+
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
 
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {

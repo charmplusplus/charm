@@ -195,6 +195,7 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
+void CpdHandleLBMessage(LBMigrateMsg *msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);

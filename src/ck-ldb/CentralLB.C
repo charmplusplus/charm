@@ -11,6 +11,7 @@
 /*@{*/
 
 #include <charm++.h>
+#include "ck.h"
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBDBManager.h"
@@ -608,6 +609,10 @@ void CentralLB::LoadBalance()
         migrateMsg->expectedLoad[i] = info.peLoads[i];
   }
 
+#if CMK_REPLAYSYSTEM
+  CpdHandleLBMessage(migrateMsg);
+#endif
+  
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     lbDecisionCount++;
