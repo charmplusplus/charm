@@ -58,20 +58,33 @@ readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
     ;
 
+typeOfType returns [boolean array_type]
+    : CLASS 
+    | chareType 
+    | chareArrayType { $array_type = true; }
+    ;
+
 typeDeclaration
 @init {
     boolean array_type = false;
+    CharjAST chelperNode = new CharjAST(new CommonToken(CharjParser.IDENT, "constructorHelper"));
     astmod = new AstModifier();
 }
-    :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
+    :   ^(TYPE typeOfType IDENT
         (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            $TYPE.tree.addChild(astmod.getPupRoutineNode());
-            $TYPE.tree.addChild(astmod.getInitRoutineNode());
-            $TYPE.tree.addChild(astmod.getCtorHelperNode());
-            astmod.ensureDefaultCtor($TYPE.tree);
-            if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
+            array_type = $typeOfType.array_type;
+            //$TYPE.tree.addChild(astmod.getPupRoutineNode());
+            //$TYPE.tree.addChild(astmod.getInitRoutineNode());
+            //$TYPE.tree.addChild(astmod.getCtorHelperNode());
+            //astmod.ensureDefaultCtor($TYPE.tree);
+            //if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
         }
+        -> ^(TYPE typeOfType IDENT
+            (^('extends' type))? (^('implements' type+))? classScopeDeclaration* 
+        ^(FUNCTION_METHOD_DECL 
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PROTECTED) LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
+            VOID {chelperNode} FORMAL_PARAM_LIST BLOCK))
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;

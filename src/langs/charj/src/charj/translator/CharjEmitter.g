@@ -489,7 +489,7 @@ type
         -> {$objectType.st}
     |   VOID
         {
-            $st = %{$start.getText()};
+            $st = %{"void"};
         }
     ;
 
