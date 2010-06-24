@@ -640,9 +640,9 @@ ModuleList::preprocess()
 }
 
 void
-ModuleList::genDepends()
+ModuleList::genDepends(std::string ciFileBaseName)
 {
-    perElemGen(modules, cur_file, &Module::genDepend);
+    perElemGen(modules, ciFileBaseName.c_str(), &Module::genDepend);
 }
 
 void

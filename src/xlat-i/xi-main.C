@@ -163,12 +163,12 @@ int main(int argc, char *argv[])
   m->preprocess();
   if (dependsMode)
   {
-      m->genDepends();
-      std::string cifile = fname;
-      size_t loc = cifile.rfind('/');
+      std::string ciFileBaseName = fname;
+      size_t loc = ciFileBaseName.rfind('/');
       if(loc != std::string::npos)
-	cifile = cifile.substr(loc+1);
-      cout << cifile << ".stamp: " << cifile << endl;
+          ciFileBaseName = cifile.substr(loc+1);
+      m->genDepends(ciFileBaseName);
+      cout << ciFileBaseName << ".stamp: " << fname << endl;
   }
   else
       m->generate();
