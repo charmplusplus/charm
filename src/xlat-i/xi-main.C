@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
       std::string cifile = fname;
       size_t loc = cifile.rfind('/');
       if(loc != std::string::npos)
-	cifile = cifile.substr(loc);
+	cifile = cifile.substr(loc+1);
       cout << cifile << ".stamp: " << cifile << endl;
   }
   else
