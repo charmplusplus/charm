@@ -140,8 +140,8 @@ public:
 #endif
 	  return result;
 	}
-	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
-	   int result = 1;
+	inline CmiBool processThread(CthThreadToken *token, CkCoreState *ck) {
+	   int result = CmiTrue;
 	   if (next != NULL) result &= next->processThread(token, ck);
 	   result &= process(token, ck);
 #if CMK_BLUEGENE_CHARM
@@ -152,7 +152,7 @@ public:
 protected:
     /** These are used internally by this class to call the correct subclass method */
 	virtual CmiBool process(envelope **env,CkCoreState *ck) =0;
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {return CmiTrue;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };

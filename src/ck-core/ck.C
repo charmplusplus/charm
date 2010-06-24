@@ -2059,10 +2059,10 @@ private:
     }
     return CmiTrue;
   }
-  virtual int process(CthThreadToken *token,CkCoreState *ck) {
+  virtual CmiBool process(CthThreadToken *token,CkCoreState *ck) {
     curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
-    return 1;
+    return CmiTrue;
   }
 };
 
@@ -2268,18 +2268,18 @@ private:
 			return CmiFalse;
 		}
 	}
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {
       REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
 	  if (isNext(token)) {
         REPLAYDEBUG("Executing token: "<<token->serialNo)
 	    getNext();
 	    flush();
-	    return 1;
+	    return CmiTrue;
 	  } else {
         REPLAYDEBUG("Queueing token: "<<token->serialNo
             <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 	    delayedTokens.enq(token);
-	    return 0;
+	    return CmiFalse;
 	  }
 	}
 };
@@ -2338,12 +2338,12 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   ConverseExit();
 }
 
-static int CpdExecuteThreadResume(CthThreadToken *token) {
+static CmiBool CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     return ck->watcher->processThread(token,ck);
   }
-  return 1;
+  return CmiTrue;
 }
 
 CpvCExtern(int, CthResumeNormalThreadIdx);
