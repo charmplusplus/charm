@@ -10,6 +10,8 @@ typedef fftw_real  RealType;
 typedef double     RealType;
 #endif
 
+#include <cmath>
+
 struct ckcomplex {
     RealType  re;
     RealType  im;   
@@ -45,6 +47,10 @@ struct ckcomplex {
     // note: not a member
     inline friend ckcomplex operator*(RealType lhs, ckcomplex rhs) {
       return ckcomplex(rhs.re*lhs, rhs.im*lhs);
+    }
+
+    inline friend ckcomplex operator/(ckcomplex lhs, RealType rhs) {
+        return ckcomplex(lhs.re/rhs, lhs.im/rhs);
     }
 
     inline ckcomplex operator*(RealType a) { 
@@ -89,4 +95,14 @@ typedef ckcomplex complex;
 
 PUPbytes(ckcomplex)
 
+
+/// Overload std::isfinite for complex numbers. @note: Doesn't seem to be part of the standard
+inline int isfinite(complex aNum) { return ( std::isfinite(aNum.re) && std::isfinite(aNum.im) ); }
+
+/// Like std::norm, return the square of the distance from (0,0) in the complex number plane
+inline RealType norm(complex aNum) { return ( aNum.re*aNum.re + aNum.im*aNum.im ); }
+/// Return the distance from (0,0) in the complex plane
+inline RealType abs(complex aNum) { return ( sqrt(norm(aNum)) ); }
+
 #endif
+
