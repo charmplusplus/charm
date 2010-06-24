@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
       std::string ciFileBaseName = fname;
       size_t loc = ciFileBaseName.rfind('/');
       if(loc != std::string::npos)
-          ciFileBaseName = cifile.substr(loc+1);
+          ciFileBaseName = ciFileBaseName.substr(loc+1);
       m->genDepends(ciFileBaseName);
       cout << ciFileBaseName << ".stamp: " << fname << endl;
   }
