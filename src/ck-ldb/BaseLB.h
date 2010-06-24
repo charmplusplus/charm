@@ -136,6 +136,13 @@ struct MigrateInfo {
     int to_pe;
     int async_arrival;	    // if an object is available for immediate migrate
     MigrateInfo():  async_arrival(0) {}
+    void pup(PUP::er &p) {
+      p | index;
+      p | obj;
+      p | from_pe;
+      p | to_pe;
+      p | async_arrival;
+    }
 };
 
 /**
@@ -159,6 +166,17 @@ public:
 	int lbDecisionCount;
 #endif
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
+  void pup(PUP::er &p) {
+    p | level;
+    p | n_moves;
+    p | next_lb;
+    int numPes = CkNumPes();
+    p | numPes;
+    CkAssert(numPes == CkNumPes());
+    for (int i=0; i<n_moves; +i) p | moves[i];
+    p(avail_vector, numPes);
+    for (int i=0; i<numPes; ++i) p | expectedLoad[i];
+  }
 };
 
 struct VectorMigrateInfo {  
