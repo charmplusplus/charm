@@ -178,6 +178,18 @@ network and MPI versions, smp and non-smp versions.
 
 \item[{\tt +excludecore <core \#>}]       does not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
 
+\item[{\tt +pemap lb-ub[:s][,...]}] Bind the execution threads to the
+  sequence of cores described by the arguments using the operating
+  system's CPU affinity functions. A single number identifies a
+  particular core. Two numbers separated by a dash identify an
+  inclusive range. If they are followed by a colon and another number,
+  that range will be stepped through in increments of the additional
+  number. For example, the sequence {\tt 0-8:2,16,20-24} includes
+  cores 0, 2, 4, 6, 8, 16, 20, 21, 22, 23, 24.
+
+\item[{\tt +commap p[,q,...]}] Bind communication threads to the
+  listed cores, one per process.
+
 \end{description}
 
 \subsection{Nodelist file}
