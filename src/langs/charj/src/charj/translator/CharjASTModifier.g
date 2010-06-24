@@ -95,14 +95,14 @@ classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
-        {
-            if(astmod.isEntry($d.tree))
-                $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
-        }
+        -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList? 
+            type IDENT formalParameterList domainExpression? block?)
+        -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
+            type IDENT formalParameterList domainExpression? block?)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
-            b=block)
+            ^(BLOCK (blockStatement*)))
         {
             astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
             astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
@@ -111,6 +111,10 @@ classScopeDeclaration
             if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
                 $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
         }
+        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+        -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
     
 interfaceScopeDeclaration
@@ -176,8 +180,8 @@ bound
     :   ^(EXTENDS_BOUND_LIST type+)
     ;
 
-modifierList
-    :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier | otherModifier)*)
+modifierList returns [boolean isEntry]
+    :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier {if ($charjModifier.isEntry) {$isEntry = true;}} | otherModifier)*)
         -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
         -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
     ;
@@ -194,8 +198,8 @@ accessModifier
     |   PRIVATE
     ;
 
-charjModifier
-    :   ENTRY
+charjModifier returns [boolean isEntry] 
+    :   ENTRY { $isEntry = true; }
     ;
 
 otherModifier

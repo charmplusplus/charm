@@ -426,6 +426,7 @@ primaryExpression
         )
     |   parenthesizedExpression
     |   IDENT
+    |   CHELPER
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall

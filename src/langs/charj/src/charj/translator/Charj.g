@@ -118,6 +118,7 @@ tokens {
     PUP                     = 'pup'             ;
     INITMETHOD              = 'initMethod'      ;
     CTORHELPER              = 'ctorHelper'      ;
+    CHELPER                 = 'constructorHelper';
 
 
     // C++ keywords that aren't used in charj. 
