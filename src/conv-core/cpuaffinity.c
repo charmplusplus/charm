@@ -466,7 +466,6 @@ void CmiInitCPUAffinity(char **argv)
   hostnameMsg  *msg;
   char *pemap = NULL;
   char *commap = NULL;
-  char *coremap = NULL;
  
   int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
@@ -474,15 +473,10 @@ void CmiInitCPUAffinity(char **argv)
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
-  
-    /* obsolete */
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
-  if (coremap!=NULL && excludecount>0)
-    CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
-  if (pemap!=NULL && (coremap != NULL || excludecount>0))
-    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.\n");
+  if (pemap!=NULL && excludecount>0)
+    CmiAbort("Charm++> +pemap can not be used with +excludecore.\n");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
@@ -510,8 +504,6 @@ void CmiInitCPUAffinity(char **argv)
        for (i=1; i<excludecount; i++) CmiPrintf(" %d", excludecore[i]);
        CmiPrintf(".\n");
      }
-     if (coremap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity core map : %s\n", coremap);
      if (pemap!=NULL)
        CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
   }
@@ -530,7 +522,7 @@ void CmiInitCPUAffinity(char **argv)
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
-    if (coremap == NULL && pemap == NULL) {
+    if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
@@ -556,30 +548,6 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
-    return;
-  }
-
-  if (coremap!= NULL) {
-    /* each processor finds its mapping */
-    int i, ct=1, myrank;
-    for (i=0; i<strlen(coremap); i++) if (coremap[i]==',' && i<strlen(coremap)-1) ct++;
-#if CMK_SMP
-    ct = CmiMyRank()%ct;
-#else
-    ct = CmiMyPe()%ct;
-#endif
-    i=0;
-    while(ct>0) if (coremap[i++]==',') ct--;
-    myrank = atoi(coremap+i);
-    printf("Charm++> set PE%d on node #%d to core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
-    if (myrank >= CmiNumCores()) {
-      CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
-      CmiAbort("Invalid core number");
-    }
-    if (CmiSetCPUAffinity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
-    /*CpvAccess(myCPUAffToCore) = myrank;*/
-    CmiNodeAllBarrier();
-    CmiNodeAllBarrier();
     return;
   }
 
@@ -644,12 +612,10 @@ void CmiInitCPUAffinity(char **argv)
 {
   char *pemap = NULL;
   char *commap = NULL;
-  char *coremap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
