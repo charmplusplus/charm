@@ -401,7 +401,11 @@ void CmiInitCPUAffinity(char **argv)
     if (CmiMyRank() == 0) add_exclude(exclude);
   
     /* obsolete */
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
+  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping (deprecated in favor of +pemap)");
+  if (coremap!=NULL && CmiMyPe() == 0)
+    CmiPrintf("Charm++> DEPRECATION WARNING!!!\n"
+	      "Charm++> The +coremap option is deprecated, and will be removed in 6.3.x.\n"
+	      "Charm++> Please use +pemap instead.\n");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
 
