@@ -2896,7 +2896,6 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   char *host=nodetab_name(nodeno);
-#define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
 
   if (arg_mpiexec)
         fprintf(f, "#!/bin/sh\n");
@@ -3162,7 +3161,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
      to do this, we have to close stdin, stdout, stderr, and 
      run the subshell in the background. */
   fprintf(f,")");
-  fprintf(f,CLOSE_ALL "\n");
+  fprintf(f," < /dev/null 1> /dev/null 2> /dev/null");
+  if (!arg_mpiexec)
+      fprintf(f, " &");
+  fprintf(f, "\n");
   
   if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
   fprintf(f, /* Check for startup errors: */
