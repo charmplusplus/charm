@@ -235,8 +235,6 @@ controlPointManager::controlPointManager() {
     haveControlPointChangeCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
-    ControlPoint::initControlPointEffects();
-
     phase_id = 0;
 
     if(loadDataFileAtStartup){    
