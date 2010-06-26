@@ -1098,7 +1098,7 @@ void nodetab_init()
   int rightgroup, basicsize, i, remain;
   
   /* if arg_local is set, ignore the nodelist file */
-  if (arg_local) {
+  if (arg_local || arg_mpiexec) {
     nodetab_init_for_local();
     goto fin;
   }
