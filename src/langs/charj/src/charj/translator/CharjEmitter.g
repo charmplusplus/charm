@@ -141,19 +141,22 @@ typeDeclaration
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                hasDefaultCtor={currentClass.hasDefaultConstructor})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                hasDefaultCtor={currentClass.hasDefaultConstructor})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
             tident={$i0},
             ident={$i1.text},
             ext={$su.st},
-            csds={$csds})
+            csds={$csds},
+            hasDefaultCtor={currentClass.hasDefaultConstructor})
         -> 
     |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
@@ -170,7 +173,8 @@ typeDeclaration
                 ext={$su.st}, 
                 csds={$csds},
                 pupInits={currentClass.generateInits()},
-                pupers={currentClass.generatePUPers()})
+                pupers={currentClass.generatePUPers()},
+                hasDefaultCtor={currentClass.hasDefaultConstructor})
         -> {emitCI()}? chareDeclaration_ci(
                 sym={currentClass},
                 chareType={$chareType.st},
@@ -182,7 +186,8 @@ typeDeclaration
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                hasDefaultCtor={currentClass.hasDefaultConstructor})
         ->
     ;
 

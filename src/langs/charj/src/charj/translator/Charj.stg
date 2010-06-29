@@ -121,18 +121,18 @@ chare_epilogue_h(sym) ::=
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h(sym, ident, ext, csds, tident) ::=
+classDeclaration_h(sym, ident, ext, csds, tident, hasDefaultCtor) ::=
 <<
 <type_preamble_h(sym)>
 <if(tident)>
-<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident, hasDefaultCtor = hasDefaultCtor)>
 <else>
-<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 <endif>
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+classDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
@@ -146,45 +146,55 @@ class <ident> {
 <endif>
 
     <csds; separator="\n\n">
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
 };
 <endif>
 >>
 
-templateDeclaration_h(pds, sym, ident, ext, csds, tident) ::=
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor) ::=
 <<
 template \<class <tident; separator=", class ">\>
-<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds)>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor)>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds) ::=
+classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 >>
 
-classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <csds; separator="\n\n">
+
+<if(!hasDefaultCtor)>
+<ident>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
 <endif>
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <csds; separator="\n\n">
@@ -204,28 +214,38 @@ void <ident>::pup(PUP::er &p)
 <endif>
     <pupers; separator="\n">
 }
+
+<if(!hasDefaultCtor)>
+<ident>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
 <endif>
 >>
 
-chareDeclaration_h(sym, ident, ext, csds) ::=
+chareDeclaration_h(sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <chare_preamble_h(sym)>
 #include "<ident>.decl.h"
-<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 <chare_epilogue_h(sym)>
 >>
 
-chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
     public: void pup(PUP::er& p);
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
 };
 <endif>
 >>
