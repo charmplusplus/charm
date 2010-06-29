@@ -149,6 +149,7 @@ class <ident> {
     <if(!hasDefaultCtor)>
     public: <ident>();
     <endif>
+    protected: void constructorHelper();
 };
 <endif>
 >>
@@ -179,6 +180,11 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
     constructorHelper();
 }
 <endif>
+
+void <ident>::constructorHelper()
+{
+
+}
 <endif>
 >>
 
@@ -221,6 +227,11 @@ void <ident>::pup(PUP::er &p)
     constructorHelper();
 }
 <endif>
+
+void <ident>::constructorHelper()
+{
+
+}
 <endif>
 >>
 
@@ -246,6 +257,7 @@ class <ident>: public CBase_<ident> {
     <if(!hasDefaultCtor)>
     public: <ident>();
     <endif>
+    protected: void constructorHelper();
 };
 <endif>
 >>
