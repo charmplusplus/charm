@@ -39,7 +39,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
-	this.initializers = new ArrayList<CharjAST>();
+	initializers = new ArrayList<CharjAST>();
         varsToPup = new ArrayList<CharjAST>();
 	constructor = null;
     }
