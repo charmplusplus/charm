@@ -2370,7 +2370,7 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
   }
 }
 
-void CpdHandleLBMessage(LBMigrateMsg *msg) {
+void CpdHandleLBMessage(LBMigrateMsg **msg) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     ck->watcher->processLBMessage(msg, ck);

@@ -610,7 +610,7 @@ void CentralLB::LoadBalance()
   }
 
 #if CMK_REPLAYSYSTEM
-  CpdHandleLBMessage(migrateMsg);
+  CpdHandleLBMessage(&migrateMsg);
 #endif
   
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));

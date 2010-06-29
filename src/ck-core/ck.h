@@ -140,14 +140,14 @@ public:
 
     PROCESS_MACRO(Message,envelope*);
     PROCESS_MACRO(Thread,CthThreadToken);
-    PROCESS_MACRO(LBMessage,LBMigrateMsg);
+    PROCESS_MACRO(LBMessage,LBMigrateMsg*);
 
 #undef PROCESS_MACRO
 protected:
     /** These are used internally by this class to call the correct subclass method */
 	virtual CmiBool process(envelope **env,CkCoreState *ck) =0;
 	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {return CmiTrue;}
-	virtual CmiBool process(LBMigrateMsg *msg, CkCoreState *ck) {return CmiTrue;}
+	virtual CmiBool process(LBMigrateMsg **msg, CkCoreState *ck) {return CmiTrue;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };
@@ -195,7 +195,7 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
-void CpdHandleLBMessage(LBMigrateMsg *msg);
+void CpdHandleLBMessage(LBMigrateMsg **msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);
