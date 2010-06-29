@@ -463,6 +463,9 @@ accessModifier
     :   PUBLIC
     |   PROTECTED
     |   PRIVATE
+        {
+            $st = %{"private"};
+        }
     ;
 
 charjModifier

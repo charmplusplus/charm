@@ -108,12 +108,22 @@ classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
-        -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList domainExpression? block?)
+        -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
+            genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList domainExpression? block?)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
+        -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        -> ^(PRIMITIVE_VAR_DECLARATION 
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
+        -> {$modifierList.tree != null}? ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        -> ^(OBJECT_VAR_DECLARATION  
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             ^(BLOCK (blockStatement*)))
         {
@@ -124,7 +134,8 @@ classScopeDeclaration
             if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
                 $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
         }
-        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
+            genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
         -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
