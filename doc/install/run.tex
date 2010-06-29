@@ -75,9 +75,7 @@ method.
 This will pass {\tt -np \$P} to indicate how many processes to
 launch. An executable named something other than {\tt mpiexec} can be
 used with the additional argument {\tt ++remote-shell} {\it runmpi},
-with `runmpi' replaced by the necessary name. At present, this depends
-on the environment variables {\tt OMPI\_COMM\_WORLD\_RANK} and {\tt
-  OMPI\_COMM\_WORLD\_SIZE} being set in each launched process.
+with `runmpi' replaced by the necessary name.
 
 Use of this option can potentially provide a few benefits:
 
@@ -88,6 +86,11 @@ Use of this option can potentially provide a few benefits:
 \item Multi-node job startup on clusters that do not allow connections
   from the head/login nodes to the compute nodes
 \end{itemize}
+
+At present, this option depends on the environment variables for some
+common MPI implementations. It supports OpenMPI ({\tt OMPI\_COMM\_WORLD\_RANK} and
+{\tt OMPI\_COMM\_WORLD\_SIZE}) and M(VA)PICH ({\tt MPIRUN\_RANK} and {\tt
+  MPIRUN\_NPROCS} or {\tt PMI\_RANK} and {\tt PMI\_SIZE}).
 
 \item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.
