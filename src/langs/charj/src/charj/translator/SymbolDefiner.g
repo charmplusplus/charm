@@ -159,7 +159,9 @@ enterClass
                 currentClass.isChare = true;
             } else if (classTypeName.equals("chare_array")) {
                 // TODO: test this; might need to use startswith instead of equals
+                // TODO: should "isChare" be set to true?
                 currentClass.isChare = true;
+                currentClass.isChareArray = true;
             } else if (classTypeName.equals("mainchare")) {
                 currentClass.isChare = true;
                 currentClass.isMainChare = true;

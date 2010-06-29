@@ -28,7 +28,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public boolean isPrimitive = false;
     public boolean isChare = false;
     public boolean isMainChare = false;
+    public boolean isChareArray = false;
     public boolean hasDefaultConstructor = false;
+    public boolean hasMigrationConstructor = false;
 
     public CharjAST migrationCtor = null;
 

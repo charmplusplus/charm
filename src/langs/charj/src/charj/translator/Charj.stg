@@ -136,7 +136,7 @@ classDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>
@@ -189,18 +189,18 @@ void <ident>::constructorHelper()
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 } // namespace <first(pds)>
 <else>
 <csds; separator="\n\n">
@@ -232,22 +232,29 @@ void <ident>::constructorHelper()
 {
 
 }
+
+<if(needsMigration)>
+<ident>::<ident>(CkMigrateMessage *m)
+{
+    constructorHelper();
+}
+<endif>
 <endif>
 >>
 
-chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor) ::=
+chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
 <<
 <chare_preamble_h(sym)>
 #include "<ident>.decl.h"
-<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor)>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 <chare_epilogue_h(sym)>
 >>
 
-chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor) ::=
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor)>
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
@@ -261,6 +268,9 @@ class <ident>: public CBase_<ident> {
     public: <ident>();
     <endif>
     protected: void constructorHelper();
+    <if(needsMigration)>
+    public: <ident>(CkMigrateMessage*);
+    <endif>
 };
 <endif>
 >>

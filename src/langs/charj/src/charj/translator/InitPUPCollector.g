@@ -51,6 +51,19 @@ enterDefaultConstructor
         }
     ;
 
+enterMigrationConstructor
+    :    ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
+            (^(MODIFIER_LIST .*))? .
+                ^(FORMAL_PARAM_LIST ^(FORMAL_PARAM_STD_DECL
+                    ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
+                )) ^(BLOCK .*))
+        {
+            if (currentClass != null && $IDENT.text.equals("CkMigrateMessage")) {
+                currentClass.hasMigrationConstructor = true;
+            }
+        }
+    ;
+
 enterBlock 
     :   ^(BLOCK .*)
         {

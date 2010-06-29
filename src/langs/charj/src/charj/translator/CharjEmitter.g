@@ -132,6 +132,9 @@ importDeclaration
     ;
     
 typeDeclaration
+@init {
+    boolean needsMigration = false;
+}
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
@@ -165,6 +168,7 @@ typeDeclaration
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
+            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationConstructor;
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -174,7 +178,8 @@ typeDeclaration
                 csds={$csds},
                 pupInits={currentClass.generateInits()},
                 pupers={currentClass.generatePUPers()},
-                hasDefaultCtor={currentClass.hasDefaultConstructor})
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                needsMigration={needsMigration})
         -> {emitCI()}? chareDeclaration_ci(
                 sym={currentClass},
                 chareType={$chareType.st},
@@ -188,7 +193,8 @@ typeDeclaration
                 ext={$su.st}, 
                 csds={$csds},
                 needsPupInit={currentClass.generateInits() != null},
-                hasDefaultCtor={currentClass.hasDefaultConstructor})
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                needsMigration={needsMigration})
         ->
     ;
 
