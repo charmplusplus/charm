@@ -190,12 +190,12 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits) ::=
 <csds; separator="\n\n">
 
 <if(pupInits)>
-void pupInitMethod() {
+void <ident>::pupInitMethod() {
     <pupInits; separator="\n">
 }
 <endif>
 
-void pup(PUP::er &p) {
+void <ident>::pup(PUP::er &p) {
 <if(pupInits)>
     pupInitMethod();
 
