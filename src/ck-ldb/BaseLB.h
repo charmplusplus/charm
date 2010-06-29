@@ -167,15 +167,18 @@ public:
 #endif
   LBMigrateMsg(): level(0), n_moves(0), next_lb(0) {}
   void pup(PUP::er &p) {
+    int i;
     p | level;
     p | n_moves;
+    // Warning: it relies on the fact that the message has been allocated already
+    // with the correct number of moves!
     p | next_lb;
     int numPes = CkNumPes();
     p | numPes;
     CkAssert(numPes == CkNumPes());
-    for (int i=0; i<n_moves; +i) p | moves[i];
+    for (i=0; i<n_moves; ++i) p | moves[i];
     p(avail_vector, numPes);
-    for (int i=0; i<numPes; ++i) p | expectedLoad[i];
+    for (i=0; i<numPes; ++i) p | expectedLoad[i];
   }
 };
 

@@ -574,6 +574,14 @@ void CentralLB::LoadBalance()
 //      }
   }
 
+#if CMK_REPLAYSYSTEM
+  LDHandle *loadBalancer_pointers;
+  if (_replaySystem) {
+    loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
+    for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
+  }
+#endif
+  
   double strat_start_time = CkWallTimer();
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -588,6 +596,14 @@ void CentralLB::LoadBalance()
 
 //    CkPrintf("returned successfully\n");
 
+#if CMK_REPLAYSYSTEM
+  CpdHandleLBMessage(&migrateMsg);
+  if (_replaySystem) {
+    for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
+    free(loadBalancer_pointers);
+  }
+#endif
+  
   LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
   migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
 
@@ -609,10 +625,6 @@ void CentralLB::LoadBalance()
         migrateMsg->expectedLoad[i] = info.peLoads[i];
   }
 
-#if CMK_REPLAYSYSTEM
-  CpdHandleLBMessage(&migrateMsg);
-#endif
-  
   DEBUGF(("[%d]calling recv migration\n",CkMyPe()));
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     lbDecisionCount++;
