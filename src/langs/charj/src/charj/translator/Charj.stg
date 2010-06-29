@@ -173,21 +173,35 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits)>
 } // namespace <first(pds)>
 <else>
 <csds; separator="\n\n">
+
+<if(pupInits)>
+void pupInitMethod() {
+    <pupInits; separator="\n">
+}
+<endif>
+
+void pup(PUP::er &p) {
+<if(pupInits)>
+    pupInitMethod();
+
+<endif>
+    <pupers; separator="\n">
+}
 <endif>
 >>
 
@@ -209,6 +223,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
+    public: void pup(PUP::er& p);
 };
 <endif>
 >>

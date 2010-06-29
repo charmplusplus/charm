@@ -168,7 +168,9 @@ typeDeclaration
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                pupInits={currentClass.generateInits()},
+                pupers={currentClass.generatePUPers()})
         -> {emitCI()}? chareDeclaration_ci(
                 sym={currentClass},
                 chareType={$chareType.st},

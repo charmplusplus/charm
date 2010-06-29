@@ -9,6 +9,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<String> interfaceImpls;
     public List<String> templateArgs;
     public List<CharjAST> initializers;
+    public List<CharjAST> varsToPup;
 
     public CharjAST constructor;
 
@@ -39,6 +40,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             importPackage(pkg);
         }
 	this.initializers = new ArrayList<CharjAST>();
+        varsToPup = new ArrayList<CharjAST>();
 	constructor = null;
     }
 
@@ -289,5 +291,40 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public String getTypeName()
     {
         return name;
+    }
+
+    private boolean requiresInit() {
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<String> generateInits() {
+        List<String> inits = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                VariableSymbol vs = (VariableSymbol)varAst.def;
+                inits.add(vs.generateInit());
+            }
+        }
+        if (inits.size() == 0)
+            return null;
+        else
+            return inits;
+    }
+
+    public List<String> generatePUPers() {
+        List<String> PUPers = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol) {
+                PUPers.add(((VariableSymbol)varAst.def).generatePUP());
+            }
+        }
+        return PUPers;
     }
 }

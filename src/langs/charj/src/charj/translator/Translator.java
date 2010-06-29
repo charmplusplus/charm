@@ -108,6 +108,9 @@ public class Translator {
         resolveTypes();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
 
+        initPupCollect();
+        if (m_printAST) printAST("After Collector Pass", "after_collector.html");
+
         postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
@@ -181,6 +184,15 @@ public class Translator {
         m_nodes.reset();
         SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
         resolver.downup(m_ast);
+    }
+
+    private void initPupCollect() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nInitPupCollector Phase\n----------------");
+        InitPUPCollector collector = new InitPUPCollector(m_nodes);
+        collector.downup(m_ast);
     }
 
     private CharjAST addConstructor(ClassSymbol sem) {
