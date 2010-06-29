@@ -37,7 +37,6 @@ enterClass
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             currentClass = (ClassSymbol)$IDENT.def.type;
-            System.out.println("enterClassXXX: " + $IDENT.def.name);
         }
     ;
 
@@ -48,19 +47,6 @@ enterDefaultConstructor
         {
             if (currentClass != null) {
                 currentClass.hasDefaultConstructor = true;
-            }
-        }
-    ;
-
-enterMigrationConstructor
-    :    ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
-            (^(MODIFIER_LIST .*))? .
-                ^(FORMAL_PARAM_LIST ^(FORMAL_PARAM_STD_DECL 
-                    ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
-                )) ^(BLOCK .*))
-        {
-            if (currentClass != null && $IDENT.text == "CkMigrateMessage") {
-                currentClass.hasMigrationConstructor = true;
             }
         }
     ;
