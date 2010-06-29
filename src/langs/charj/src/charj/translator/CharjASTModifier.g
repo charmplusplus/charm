@@ -47,7 +47,7 @@ charjSource
     ;
 
 packageDeclaration
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE (ids+=IDENT)+)
     ;
     
 importDeclaration

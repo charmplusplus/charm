@@ -487,7 +487,6 @@ constructorType
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
-
 simpleType
     :   primitiveType domainExpression?
         ->  ^(SIMPLE_TYPE primitiveType domainExpression?)  
