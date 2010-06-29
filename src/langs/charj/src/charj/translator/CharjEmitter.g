@@ -187,6 +187,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
+                needsPupInit={currentClass.generateInits() != null},
                 hasDefaultCtor={currentClass.hasDefaultConstructor})
         ->
     ;
