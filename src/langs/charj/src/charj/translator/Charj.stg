@@ -235,24 +235,27 @@ void <ident>::constructorHelper()
 <endif>
 >>
 
-chareDeclaration_h(sym, ident, ext, csds, hasDefaultCtor) ::=
+chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor) ::=
 <<
 <chare_preamble_h(sym)>
 #include "<ident>.decl.h"
-<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor)>
 <chare_epilogue_h(sym)>
 >>
 
-chareDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
+    <if(needsPupInit)>
+    private: void pupInitMethod();
+    <endif>
     public: void pup(PUP::er& p);
     <if(!hasDefaultCtor)>
     public: <ident>();
