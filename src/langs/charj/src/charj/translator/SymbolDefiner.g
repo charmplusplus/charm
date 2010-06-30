@@ -87,11 +87,13 @@ boolean entry = false;
                 typeName = "void";
             }
             boolean isTraced = false;
-            CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
-            if (charj_mod != null) {
-                charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
-                isTraced = (charj_mod != null);
-                if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+            if ($MODIFIER_LIST != null) {
+                CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+                if (charj_mod != null) {
+                    charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
+                    isTraced = (charj_mod != null);
+                    if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+                }
             }
             Type returnType = currentScope.resolveType(typeName);
             //System.out.println("Resolving type " + typeName + " in scope " + currentScope + "->" + returnType);
