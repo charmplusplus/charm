@@ -1072,13 +1072,16 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     if (i!=0) CpvAccess(msgCounter) --;
     BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, now, local, i==0?npes:-1);
 
+#if 0
     BgSendPacket(x, y, z, t, handlerID, type, numbytes, sendmsg);
-/*
+#else
     if (myNode->x == x && myNode->y == y && myNode->z == z)
       addBgNodeInbuffer(sendmsg, myNode->id);
-    else
+    else {
+      if (cva(bgMach).inReplayMode()) continue;  // replay mode, no outgoing msg
       CmiSendPacket(x, y, z, numbytes, sendmsg);
-*/
+    }
+#endif
   }
 
   CmiFree(msg);
@@ -2227,7 +2230,7 @@ int BgIsMainthread()
 
 int BgIsRecord()
 {
-    return cva(bgMach).record == 1;
+    return cva(bgMach).record == 1 || cva(bgMach).recordnode == 1;
 }
 
 int BgIsReplay()

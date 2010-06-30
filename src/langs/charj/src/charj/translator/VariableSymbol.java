@@ -7,11 +7,12 @@ package charj.translator;
 public class VariableSymbol extends Symbol {
     public boolean isStatic = false;
     public boolean isConst = false;
+    public boolean isReadOnly = false;
 
     public VariableSymbol(
             SymbolTable symtab,
             String name,
-            ClassSymbol type) {
+            Type type) {
         super(symtab, name, type);
     }
 

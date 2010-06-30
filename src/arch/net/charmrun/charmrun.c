@@ -1255,6 +1255,8 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
+	if (arg_mpiexec)
+           nodetab_getinfo(nt)->ip = i.IP;   /* get IP */
 	i.IP=nodetab_ip(nt);
 #if CMK_USE_IBVERBS 
 	nodeinfo_arr[node] = i;

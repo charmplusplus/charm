@@ -86,6 +86,7 @@ void sim::pup(PUP::er &p) {
     p|seqLastCheckpointTime;
     p|seqStartTime;
     p|POSE_Skipped_Events;
+    p|poseIndexOfStopEvent;
     if (p.isUnpacking()) {
       seqStartTime = seqLastCheckpointTime;
     }

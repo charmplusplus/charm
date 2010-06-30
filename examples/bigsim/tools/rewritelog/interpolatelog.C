@@ -118,12 +118,15 @@ int main()
     // Create output directory
     mkdir(OUTPUTDIR, 0777);
 
+    int numNodes = totalProcs / numWth;
 
     for (int fileNum=0; fileNum<numPes; fileNum++){
         BgTimeLineRec *tlinerecs = new BgTimeLineRec[totalProcs/numPes+1];
         int rec_count = 0;
 
-        for(int procNum=fileNum;procNum<totalProcs;procNum+=numPes){
+        //for(int procNum=fileNum;procNum<totalProcs;procNum+=numPes){
+       for (int nodeNum=fileNum;nodeNum<numNodes;nodeNum+=numPes) {
+         for (int procNum=nodeNum*numWth; procNum<(nodeNum+1)*numWth; procNum++) {
 
             BgTimeLineRec &tlinerec = tlinerecs[rec_count];
             rec_count++;
@@ -298,8 +301,8 @@ int main()
 
             }
 
-
-        }
+        }         // end of procNum
+      }    // end of nodeNum
 
 #ifdef WRITE_OUTPUT_FILES
             // Write out the file

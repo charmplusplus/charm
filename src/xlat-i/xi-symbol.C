@@ -1,5 +1,5 @@
 /*****************************************************************************
- * $Source$
+* $Source$
  * $Author$
  * $Date$
  * $Revision$
@@ -12,17 +12,16 @@ using std::for_each;
 #include <stdlib.h>
 #include "xi-symbol.h"
 #include <ctype.h> // for tolower()
+#include <iostream>
+using std::cerr;
+using std::cout;
+using std::endl;
 
 #if ! CMK_BOOL_DEFINED
 typedef enum {false = 0, true = 1} bool;
 #endif
 
-#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
-#  include <fstream.h>
-#else /* ISO C++ */
-#  include <fstream>
-   using namespace std;
-#endif
+#include <fstream>
 
 namespace xi {
    
@@ -459,6 +458,7 @@ Module::print(XStr& str)
 void
 Module::generate()
 {
+  using std::ofstream;
   XStr declstr, defstr;
   XStr pubDeclStr, pubDefStr, pubDefConstr;
 
@@ -611,6 +611,15 @@ Module::preprocess()
 }
 
 void
+Module::genDepend(const char *cifile)
+{
+  cout << name << ".decl.h " << name << ".def.h: " << cifile << ".stamp";
+  if (internalMode)
+    cout << " charmxi";
+  cout << endl;
+}
+
+void
 ModuleList::print(XStr& str)
 {
     perElemGen(modules, str, &Module::print);
@@ -628,6 +637,12 @@ ModuleList::preprocess()
 {
     for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
 	(*i)->preprocess();
+}
+
+void
+ModuleList::genDepends(std::string ciFileBaseName)
+{
+    perElemGen(modules, ciFileBaseName.c_str(), &Module::genDepend);
 }
 
 void

@@ -263,6 +263,8 @@ class sim : public CBase_sim {
   void SeqBeginCheckpoint();
   /// In sequential mode, resume after checkpointing or restarting
   void SeqResumeAfterCheckpoint();
+  /// Implement this for posers that will need to execute events when POSE reaches quiescence
+  void invokeStopEvent() {}
   /// Return this poser's unique index on PVT branch
   inline int PVTindex() { return myPVTidx; }
   /// Test active flag

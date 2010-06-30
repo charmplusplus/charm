@@ -1132,6 +1132,7 @@ class Module : public Construct {
     void setModule();
     void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
     void preprocess();
+    void genDepend(const char *cifile);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -1162,6 +1163,7 @@ class ModuleList : public Printable {
     void print(XStr& str);
     void generate();
     void preprocess();
+    void genDepends(std::string ciFileBaseName);
 };
 
 class Readonly : public Member {

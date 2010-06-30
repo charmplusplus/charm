@@ -2,6 +2,9 @@
 package charj.translator;
 
 import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.nio.charset.*;
 import java.util.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
@@ -35,6 +38,7 @@ public class Translator {
     private SymbolTable m_symtab;
     private CommonTree m_ast;
     private CommonTreeNodeStream m_nodes;
+    private CommonTokenStream m_tokens;
 
     public Translator(
             String _charmc,
@@ -79,28 +83,37 @@ public class Translator {
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        m_tokens = new CommonTokenStream(lexer);
 
         // Use lexer tokens to feed tree parser
-        CharjParser parser = new CharjParser(tokens);
+        CharjParser parser = new CharjParser(m_tokens);
         parser.setTreeAdaptor(m_adaptor);
         CharjParser.charjSource_return r = parser.charjSource();
 
         // Create node stream for AST traversals
         m_ast = (CommonTree)r.getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
+        m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
         // do AST rewriting and semantic checking
-        if (m_printAST) printAST("Before Modifier Pass", "before_mod.html");
-        modifierPass();
-        m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
-        m_nodes.setTreeAdaptor(m_adaptor);
+        if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
+        preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
-        semanticPass();
+
+        // FIXME: no longer guaranteed one class per file, go through each type instead.
+	//semanticPass();
+	//modifyNodes(sem);
+
+        resolveTypes();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+
+        postSemanticPass();
+        if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
+
+	m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
 
         // emit code for .ci, .h, and .cc based on rewritten AST
         String ciOutput = translationPass(OutputMode.ci);
@@ -111,6 +124,7 @@ public class Translator {
         
         String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
+
         if (!m_translate_only) compileTempFiles(filename, m_charmc);
 
         // Build a string representing all emitted code. This will be printed
@@ -123,13 +137,29 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private void modifierPass() throws
+    private void preSemanticPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
         CharjASTModifier mod = new CharjASTModifier(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        m_ast = (CommonTree)mod.charjSource().getTree();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+    }
+
+    private void postSemanticPass() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
+        mod.setTreeAdaptor(m_adaptor);
+        //m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        mod.charjSource(m_symtab);
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
     }
 
     private ClassSymbol semanticPass() throws
@@ -138,6 +168,72 @@ public class Translator {
         m_nodes.reset();
         CharjSemantics sem = new CharjSemantics(m_nodes);
         return sem.charjSource(m_symtab);
+    }
+
+    private void resolveTypes() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
+        SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
+        definer.downup(m_ast);
+        if (m_verbose) System.out.println("\nResolver Phase\n----------------");
+        m_nodes.reset();
+        SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
+        resolver.downup(m_ast);
+    }
+
+    private CharjAST addConstructor(ClassSymbol sem) {
+	CharjAST ast1 = new CharjAST(CharjParser.CONSTRUCTOR_DECL, 
+				     "CONSTRUCTOR_DECL");
+	CharjAST ast2 = new CharjAST(CharjParser.IDENT, 
+				     sem.getScopeName());
+	CharjAST ast3 = new CharjAST(CharjParser.FORMAL_PARAM_LIST, 
+				     "FORMAL_PARAM_LIST");
+	CharjAST ast4 = new CharjAST(CharjParser.BLOCK, "BLOCK");
+	
+	ast1.addChild(ast2);
+	ast1.addChild(ast3);
+	ast1.addChild(ast4);
+	sem.definition.addChild(ast1);
+	return ast1;
+    }
+
+    private void modifyNodes(ClassSymbol sem) {
+	/* Add constructor */
+
+	if (sem.constructor == null) {
+	    sem.constructor = addConstructor(sem);
+	}
+
+	/* Insert array initializers into the constructor */
+
+	for (CharjAST init : sem.initializers) {
+	    System.out.println("processing init token = " + init.getType());
+
+	    if (init.getType() == CharjParser.IDENT) {
+		CharjAST ast1 = new CharjAST(CharjParser.EXPR, "EXPR");
+		CharjAST ast2 = new CharjAST(CharjParser.METHOD_CALL, "METHOD_CALL");
+		CharjAST ast2_1 = new CharjAST(CharjParser.DOT, ".");
+		CharjAST ast2_2 = new CharjAST(CharjParser.IDENT, init.getText());
+		CharjAST ast2_3 = new CharjAST(CharjParser.IDENT, "init");
+		CharjAST ast4 = new CharjAST(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST");
+
+		ast1.addChild(ast2);
+		ast2.addChild(ast2_1);
+		ast2_1.addChild(ast2_2);
+		ast2_1.addChild(ast2_3);
+		ast2.addChild(ast4);
+		ast4.addChildren(init.getChildren());
+
+		//System.out.println(sem.constructor.toStringTree());
+
+		sem.constructor.getChild(2).addChild(ast1);
+	    } else if (init.getType() == CharjParser.NEW_EXPRESSION) {
+		//(OBJECT_VAR_DECLARATION (TYPE (QUALIFIED_TYPE_IDENT (Array (TEMPLATE_INST (TYPE double(Symbol(double_primitive, ClassSymbol[double]: {}, ))))))) (VAR_DECLARATOR_LIST (VAR_DECLARATOR ccc (NEW_EXPRESSION (ARGUMENT_LIST (EXPR get)) (DOMAIN_EXPRESSION (RANGE_EXPRESSION 1))))))
+	    }
+	    
+	}
     }
 
     private String translationPass(OutputMode m) throws
@@ -241,6 +337,21 @@ public class Translator {
             e.printStackTrace();
         }
         return cs;
+    }
+
+    /**
+     * Read the given file name in as a string.
+     */
+    public static String readFile(String path) throws IOException {
+      FileInputStream stream = new FileInputStream(new File(path));
+      try {
+        FileChannel fc = stream.getChannel();
+        MappedByteBuffer bb = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
+        return Charset.defaultCharset().decode(bb).toString();
+      }
+      finally {
+        stream.close();
+      }
     }
 
     /**
