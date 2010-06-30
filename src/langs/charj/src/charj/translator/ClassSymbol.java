@@ -11,8 +11,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<VariableInitializer> initializers;
     public List<CharjAST> varsToPup;
 
-    public CharjAST constructor;
-
     Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
@@ -44,7 +42,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         }
 	initializers = new ArrayList<VariableInitializer>();
         varsToPup = new ArrayList<CharjAST>();
-	constructor = null;
     }
 
     public ClassSymbol(
@@ -56,7 +53,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.superClass = superClass;
         this.scope = scope;
         this.type = this;
-	constructor = null;
 	this.initializers = new ArrayList<VariableInitializer>();
 
         // manually add automatic class methods and symbols here
