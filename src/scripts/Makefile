@@ -993,6 +993,7 @@ clean:
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
+	rm -f *.stamp
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
 	-( cd doc && $(MAKE) clean )
 	( cd libs; $(MAKE) clean )
@@ -1041,8 +1042,10 @@ depends: basics
         done; \
 	for cifile in $(wildcard *.ci); do \
 	      echo "checking generated modules for $$cifile" ; \
-	      $(CHARMXI) -M $$cifile >> $(DEPENDFILE) ; \
+	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
 	done
+# Note: Compilation commands are now appended to the generated ci file dependency info using sed.
+# This should ideally be just an implicit rule for generating %.ci.stamp files from %.ci files
 
 
 dependsCaseSensitive: basics
@@ -1071,7 +1074,7 @@ dependsCaseSensitive: basics
         done; \
 	for cifile in $(wildcard *.ci); do \
 	      echo "checking generated modules for $$cifile" ; \
-	      $(CHARMXI) -M $$cifile >> $(DEPENDFILE) ; \
+	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
 	done
 
 

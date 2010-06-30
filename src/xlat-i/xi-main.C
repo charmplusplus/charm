@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xi-symbol.h"
+#include <string>
 
 using std::cout;
 using std::endl;
@@ -161,7 +162,14 @@ int main(int argc, char *argv[])
   if (!m) return 0;
   m->preprocess();
   if (dependsMode)
-      m->genDepends();
+  {
+      std::string ciFileBaseName = fname;
+      size_t loc = ciFileBaseName.rfind('/');
+      if(loc != std::string::npos)
+          ciFileBaseName = ciFileBaseName.substr(loc+1);
+      m->genDepends(ciFileBaseName);
+      cout << ciFileBaseName << ".stamp: " << fname << endl;
+  }
   else
       m->generate();
   return 0 ;

@@ -200,6 +200,7 @@ accessModifier
 
 charjModifier returns [boolean isEntry] 
     :   ENTRY { $isEntry = true; }
+    |   TRACED
     ;
 
 otherModifier
@@ -212,6 +213,7 @@ modifier
     |   PRIVATE
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   ABSTRACT
     |   NATIVE
     |   localModifier

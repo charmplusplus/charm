@@ -282,6 +282,15 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return names;
     }
 
+    public List<String> getTraceInitializers()
+    {
+        List<String> inits = new ArrayList<String>();
+        for (Map.Entry<String, MethodSymbol> e : methods.entrySet()) {
+            inits.add(e.getValue().getTraceInitializer());
+        }
+        return inits;
+    }
+
     public String getName()
     {
         return name;

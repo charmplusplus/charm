@@ -18,6 +18,7 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
     PRIVATE                 = 'private'         ;
@@ -456,6 +457,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   PRIVATE
     |   ABSTRACT
     |   NATIVE
