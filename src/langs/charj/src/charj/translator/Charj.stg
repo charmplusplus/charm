@@ -180,13 +180,13 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <csds; separator="\n\n">
 
 <if(!hasDefaultCtor)>
-<ident>::<ident>()
+<sym.name>::<ident>()
 {
     constructorHelper();
 }
 <endif>
 
-void <ident>::constructorHelper()
+void <sym.name>::constructorHelper()
 {
 
 }
@@ -223,13 +223,13 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaul
 <csds; separator="\n\n">
 
 <if(pupInits)>
-void <ident>::pupInitMethod() 
+void <sym.name>::pupInitMethod()
 {
     <pupInits; separator="\n">
 }
 <endif>
 
-void <ident>::pup(PUP::er &p) 
+void <sym.name>::pup(PUP::er &p)
 {
 <if(pupInits)>
     pupInitMethod();
@@ -239,19 +239,19 @@ void <ident>::pup(PUP::er &p)
 }
 
 <if(!hasDefaultCtor)>
-<ident>::<ident>()
+<sym.name>::<ident>()
 {
     constructorHelper();
 }
 <endif>
 
-void <ident>::constructorHelper()
+void <sym.name>::constructorHelper()
 {
     <inits; separator="\n">
 }
 
 <if(needsMigration)>
-<ident>::<ident>(CkMigrateMessage *m)
+<sym.name>::<ident>(CkMigrateMessage *m)
 {
     constructorHelper();
 }
