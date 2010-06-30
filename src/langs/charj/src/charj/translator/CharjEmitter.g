@@ -134,6 +134,7 @@ importDeclaration
 typeDeclaration
 @init {
     boolean needsMigration = false;
+    List<String> initializers = new ArrayList<String>();
 }
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
@@ -169,6 +170,10 @@ typeDeclaration
         {
             currentClass = (ClassSymbol)$IDENT.def;
             needsMigration = currentClass.isChareArray && !currentClass.hasMigrationConstructor;
+
+            for (VariableInitializer init : currentClass.initializers) {
+                initializers.add(init.emit());
+            }
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -179,7 +184,8 @@ typeDeclaration
                 pupInits={currentClass.generateInits()},
                 pupers={currentClass.generatePUPers()},
                 hasDefaultCtor={currentClass.hasDefaultConstructor},
-                needsMigration={needsMigration})
+                needsMigration={needsMigration},
+                inits={initializers})
         -> {emitCI()}? chareDeclaration_ci(
                 sym={currentClass},
                 chareType={$chareType.st},

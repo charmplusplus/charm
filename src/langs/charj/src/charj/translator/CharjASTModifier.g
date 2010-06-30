@@ -66,25 +66,15 @@ typeOfType returns [boolean array_type]
 
 typeDeclaration
 @init {
-    boolean array_type = false;
-    CharjAST chelperNode = new CharjAST(new CommonToken(CharjParser.IDENT, "constructorHelper"));
     astmod = new AstModifier();
 }
     :   ^(TYPE typeOfType IDENT
         (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            array_type = $typeOfType.array_type;
-            //$TYPE.tree.addChild(astmod.getPupRoutineNode());
-            //$TYPE.tree.addChild(astmod.getInitRoutineNode());
-            //$TYPE.tree.addChild(astmod.getCtorHelperNode());
-            //astmod.ensureDefaultCtor($TYPE.tree);
-            //if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
         }
         -> ^(TYPE typeOfType IDENT
             (^('extends' type))? (^('implements' type+))? classScopeDeclaration* 
-        ^(FUNCTION_METHOD_DECL 
-            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PROTECTED) LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
-            VOID {chelperNode} FORMAL_PARAM_LIST BLOCK))
+        )
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -126,14 +116,6 @@ classScopeDeclaration
             objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             ^(BLOCK (blockStatement*)))
-        {
-            astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
-            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
-
-            if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
-                $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
-        }
         -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
             genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
@@ -157,16 +139,10 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        {
-            astmod.dealWithInit($VAR_DECLARATOR);
-        }
     ;
     
 variableDeclaratorId
     :   ^(IDENT domainExpression?)
-        {
-            if (!($IDENT.hasParentOfType(CharjParser.READONLY))) astmod.varPup($IDENT);
-        }
     ;
 
 variableInitializer

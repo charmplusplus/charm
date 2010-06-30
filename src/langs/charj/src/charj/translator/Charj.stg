@@ -189,18 +189,18 @@ void <ident>::constructorHelper()
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
 } // namespace <first(pds)>
 <else>
 <csds; separator="\n\n">
@@ -230,7 +230,7 @@ void <ident>::pup(PUP::er &p)
 
 void <ident>::constructorHelper()
 {
-
+    <inits; separator="\n">
 }
 
 <if(needsMigration)>

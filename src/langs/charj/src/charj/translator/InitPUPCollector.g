@@ -79,18 +79,17 @@ exitBlock
     ;
 
 varDeclaration
-    :   ^((PRIMITIVE_VAR_DECLARATION | OBJECT_VAR_DECLARATION)
-            (^(MODIFIER_LIST .*))? .
-            ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
-            {
-                if (!inBlock && currentClass != null) {
-                    currentClass.varsToPup.add($IDENT);
-                }
-            }
-                )+))
-    |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .+))? . ^(IDENT .*))
+    :   ^(VAR_DECLARATOR ^(IDENT .*) (expr=.)? )
         {
-            
+
+            if (!inBlock && currentClass != null && $expr != null) {
+                System.out.println("FOUND EXPR");
+                currentClass.initializers.add(new VariableInitializer($expr, $IDENT));
+            }
+
+            if (!inBlock && currentClass != null) {
+                currentClass.varsToPup.add($IDENT);
+            }
         }
     ;
 

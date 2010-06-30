@@ -8,7 +8,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
     public List<String> templateArgs;
-    public List<CharjAST> initializers;
+    public List<VariableInitializer> initializers;
     public List<CharjAST> varsToPup;
 
     public CharjAST constructor;
@@ -42,7 +42,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
-	initializers = new ArrayList<CharjAST>();
+	initializers = new ArrayList<VariableInitializer>();
         varsToPup = new ArrayList<CharjAST>();
 	constructor = null;
     }
@@ -56,8 +56,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.superClass = superClass;
         this.scope = scope;
         this.type = this;
-	this.initializers = new ArrayList<CharjAST>();
 	constructor = null;
+	this.initializers = new ArrayList<VariableInitializer>();
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
