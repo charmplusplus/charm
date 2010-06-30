@@ -14,19 +14,19 @@ package charj.translator;
 @members {
     Scope currentScope;
     ClassSymbol currentClass = null;
-    boolean inBlock = false;
+    boolean inMethod = false;
 }
 
 topdown
     :   enterClass
-    |   enterBlock
+    |   enterMethod
     |   enterDefaultConstructor
     |   enterMigrationConstructor
     |   varDeclaration
     ;
 
 bottomup
-    :   exitBlock
+    :   exitMethod
     ;
 
 enterClass
@@ -41,40 +41,42 @@ enterClass
     ;
 
 enterDefaultConstructor
-    :    ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
-            (^(MODIFIER_LIST .*))? .
-            FORMAL_PARAM_LIST ^(BLOCK .*))
+    :    FORMAL_PARAM_LIST
         {
-            if (currentClass != null) {
+            if (($FORMAL_PARAM_LIST.hasParentOfType(CONSTRUCTOR_DECL) ||
+                 $FORMAL_PARAM_LIST.hasParentOfType(ENTRY_CONSTRUCTOR_DECL)) &&
+                currentClass != null) {
                 currentClass.hasDefaultConstructor = true;
             }
         }
     ;
 
 enterMigrationConstructor
-    :    ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
-            (^(MODIFIER_LIST .*))? .
-                ^(FORMAL_PARAM_LIST ^(FORMAL_PARAM_STD_DECL
-                    ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
-                )) ^(BLOCK .*))
+    :    ^(FORMAL_PARAM_LIST ^(FORMAL_PARAM_STD_DECL
+                ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT IDENT)) .
+            ))
         {
-            if (currentClass != null && $IDENT.text.equals("CkMigrateMessage")) {
+            if (($FORMAL_PARAM_LIST.hasParentOfType(CONSTRUCTOR_DECL) ||
+                 $FORMAL_PARAM_LIST.hasParentOfType(ENTRY_CONSTRUCTOR_DECL)) &&
+                currentClass != null && $IDENT.text.equals("CkMigrateMessage")) {
                 currentClass.hasMigrationConstructor = true;
             }
         }
     ;
 
-enterBlock 
-    :   ^(BLOCK .*)
+enterMethod
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL
+            | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*)
         {
-            inBlock = true;
+            inMethod = true;
         }
     ;
 
-exitBlock 
-    :   ^(BLOCK .*)
+exitMethod
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL
+            | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*)
         {
-            inBlock = false;
+            inMethod = false;
         }
     ;
 
@@ -82,12 +84,12 @@ varDeclaration
     :   ^(VAR_DECLARATOR ^(IDENT .*) (expr=.)? )
         {
 
-            if (!inBlock && currentClass != null && $expr != null) {
+            if (!inMethod && currentClass != null && $expr != null) {
                 System.out.println("FOUND EXPR");
                 currentClass.initializers.add(new VariableInitializer($expr, $IDENT));
             }
 
-            if (!inBlock && currentClass != null) {
+            if (!inMethod && currentClass != null) {
                 currentClass.varsToPup.add($IDENT);
             }
         }
