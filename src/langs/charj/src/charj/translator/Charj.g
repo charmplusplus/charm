@@ -20,7 +20,6 @@ tokens {
     ENTRY                   = 'entry'           ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
-    ENTRY                   = 'entry'           ;
     PRIVATE                 = 'private'         ;
     ABSTRACT                = 'abstract'        ;
     NATIVE                  = 'native'          ;
