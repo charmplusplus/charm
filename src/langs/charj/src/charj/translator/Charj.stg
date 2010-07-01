@@ -156,22 +156,22 @@ class <ident> {
 <endif>
 >>
 
-templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor) ::=
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor, inits) ::=
 <<
 template \<class <tident; separator=", class ">\>
-<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor)>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor, inits=inits)>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor) ::=
+classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor, inits) ::=
 <<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
 >>
 
-classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
@@ -188,7 +188,7 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 
 void <sym.name>::constructorHelper()
 {
-
+    <inits; separator="\n">
 }
 
 bool <sym.name>::_trace_registered = false;

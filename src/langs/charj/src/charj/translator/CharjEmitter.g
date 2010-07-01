@@ -139,6 +139,10 @@ typeDeclaration
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
+
+            for (VariableInitializer init : currentClass.initializers) {
+                initializers.add(init.emit());
+            }
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -146,7 +150,8 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                hasDefaultCtor={currentClass.hasDefaultConstructor})
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                inits={initializers})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
