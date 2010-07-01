@@ -85,7 +85,6 @@ varDeclaration
         {
 
             if (!inMethod && currentClass != null && $expr != null) {
-                System.out.println("FOUND EXPR");
                 currentClass.initializers.add(new VariableInitializer($expr, $IDENT));
             }
 
