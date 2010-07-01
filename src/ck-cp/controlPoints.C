@@ -1,7 +1,6 @@
 #include <charm++.h>
 
 // This file is compiled twice to make a version that is capable of not needing the tracing to be turned on. 
-// The Makefile will have -DCP_DISABLE_TRACING
 
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
@@ -54,7 +53,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherAll;
 /* readonly */ char CPDataFilename[512];
 
-
+extern bool enableCPTracing;
 
 /// The control point values to be used for the first few phases if the strategy doesn't choose to do something else.
 /// These probably come from the command line arguments, so are available only on PE 0
@@ -1058,8 +1057,7 @@ public:
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
 
-    
-    
+  
     
     whichTuningScheme = RandomSelection;
 
@@ -2723,8 +2721,4 @@ void ControlPointWriteOutputToDisk(){
 
 /*! @} */
 
-#ifdef CP_DISABLE_TRACING
-#include "ControlPointsNoTrace.def.h"
-#else
 #include "ControlPoints.def.h"
-#endif

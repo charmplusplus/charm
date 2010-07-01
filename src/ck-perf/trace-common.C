@@ -321,6 +321,12 @@ static int checkTraceOnPe(char **argv)
 /// defined in moduleInit.C
 void _createTraces(char **argv);
 
+
+bool enableCPTracing; // A global variable specifying whether or not the control point tracing module should be active in the run
+extern void _registerTraceControlPoints();
+extern void _createTracecontrolPoints(char **argv);
+
+
 /**
     traceInit: 		called at Converse level
     traceCharmInit:	called at Charm++ level
@@ -339,6 +345,18 @@ static inline void _traceInit(char **argv)
 
   // defined in moduleInit.C
   _createTraces(argv);
+
+  // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
+  // FIXME: make sure it is safe to use argv in SMP version 
+  // because CmiGetArgFlagDesc is destructive and this is called on all PEs.
+  if( CmiGetArgFlagDesc(argv,"+CPEnableMeasurements","Enable recording of measurements for Control Points") ){
+    enableCPTracing = true;
+    CmiPrintf("Calling _createTracecontrolPoints(argv);\n");
+    _createTracecontrolPoints(argv);   
+  } else {
+    enableCPTracing = false;
+  }
+  
 
   // set trace on/off
   CkpvAccess(_traces)->setTraceOnPE(CkpvAccess(traceOnPe));

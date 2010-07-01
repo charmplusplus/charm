@@ -20,6 +20,9 @@ CkGroupID traceControlPointsGID;
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
+
+  This module is special in that it is always included in charm, but sometimes it does nothing.
+  This is called on all processors in SMP version.
 */
 void _createTracecontrolPoints(char **argv)
 {
@@ -110,6 +113,7 @@ void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe,
 
 void TraceControlPoints::endExecute(void)
 {
+  //  CkPrintf("TraceControlPoints::endExecute\n");
   nesting_level--;
   if(nesting_level == 0){
     
