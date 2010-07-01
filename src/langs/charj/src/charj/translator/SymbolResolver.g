@@ -237,6 +237,7 @@ primaryExpression returns [Type type]
         {
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
+            if (et instanceof PointerType) et = ((PointerType)et).baseType;
             ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {
