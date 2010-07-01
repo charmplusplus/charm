@@ -327,7 +327,7 @@ dirs+sources:
 # Converse Libraries
 # 
 ###############################################################################
-CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
+CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-prioritycentralized.o     $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
 	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
@@ -507,6 +507,13 @@ $(L)/libldb-neighbor.o: cldb.neighbor.c cldb.neighbor.h graph.h $(CVHEADERS)
 
 $(L)/libldb-spray.o: cldb.spray.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.spray.c
+
+
+$(L)/libldb-prioritycentralized.o: cldb.prioritycentralized.c cldb.prioritycentralized.h  $(CVHEADERS)
+	$(CHARMC) -o $@ cldb.prioritycentralized.c 
+
+#//$(L)/libldb-prioritycentralizedopt.o: cldb.prioritycentralizedopt.c cldb.prioritycentralizedopt.h  $(CVHEADERS)
+#//	$(CHARMC) -o $@ cldb.prioritycentralizedopt.c 
 
 $(L)/libldb-test.o: cldb.test.c $(CVHEADERS)
 	$(CHARMC) -o $@ cldb.test.c

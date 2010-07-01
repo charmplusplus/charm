@@ -65,6 +65,7 @@ static void CldStillIdle(void *dummy, double curT)
 
   double now = curT;
   double lt = cldData->lastCheck;
+    
   /* only ask for work every 20ms */
   if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
   cldData->lastCheck = now;
@@ -333,6 +334,8 @@ void CldEnqueue(int pe, void *msg, int infofn)
   int len, queueing, priobits, avg; unsigned int *prioptr;
   CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(infofn);
   CldPackFn pfn;
+
+  //Yanhua Test
 
   if ((pe == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
     avg = CldMinAvg();

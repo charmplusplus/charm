@@ -100,7 +100,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
-    else CmiSyncSendAndFree(pe, len, msg);
+    else {
+        CmiPrintf(" on processor %d Send msg to pe:%d, length=%d Timer:%f \n", CmiMyPe(), pe, len, CmiWallTimer());
+        CmiSyncSendAndFree(pe, len, msg);
+    }
   }
 }
 

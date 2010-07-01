@@ -1424,7 +1424,7 @@ void CmiHandleMessage(void *msg)
 	(h->hdlr)(msg,h->userPtr);
 #if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
-	_LOG_E_HANDLER_END(handler); 	/* projector */
+	//_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
 
