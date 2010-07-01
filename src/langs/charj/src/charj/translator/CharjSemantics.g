@@ -181,15 +181,11 @@ scope ScopeStack;
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            if (astmod.isMigrationCtor($CONSTRUCTOR_DECL)) currentClass.migrationCtor = $CONSTRUCTOR_DECL;
-            if (currentClass != null) {
-                currentClass.constructor = $classScopeDeclaration.start;
-            }
+
         }
     |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
         }
     ;
 
@@ -220,11 +216,6 @@ variableDeclarator[boolean localdef]
 variableDeclaratorId[boolean localdef] returns [String ident]
     :   ^(IDENT domainExpression?
         { 
-            if (currentClass != null && !localdef) {
-                currentClass.initializers.add($variableDeclaratorId.start);
-            }
-
-            $ident = $IDENT.text;
         } )
     ;
 
@@ -564,9 +555,6 @@ arrayTypeDeclarator
 newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
         {
-            if (currentClass != null) {
-                currentClass.initializers.add($newExpression.start);
-            }
         }
     |   ^(NEW type arguments)
     ;

@@ -101,12 +101,11 @@ public class Translator {
         preSemanticPass();
         if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
 
-        // FIXME: no longer guaranteed one class per file, go through each type instead.
-	//semanticPass();
-	//modifyNodes(sem);
-
         resolveTypes();
         if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+
+        initPupCollect();
+        if (m_printAST) printAST("After Collector Pass", "after_collector.html");
 
         postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
@@ -183,57 +182,13 @@ public class Translator {
         resolver.downup(m_ast);
     }
 
-    private CharjAST addConstructor(ClassSymbol sem) {
-	CharjAST ast1 = new CharjAST(CharjParser.CONSTRUCTOR_DECL, 
-				     "CONSTRUCTOR_DECL");
-	CharjAST ast2 = new CharjAST(CharjParser.IDENT, 
-				     sem.getScopeName());
-	CharjAST ast3 = new CharjAST(CharjParser.FORMAL_PARAM_LIST, 
-				     "FORMAL_PARAM_LIST");
-	CharjAST ast4 = new CharjAST(CharjParser.BLOCK, "BLOCK");
-	
-	ast1.addChild(ast2);
-	ast1.addChild(ast3);
-	ast1.addChild(ast4);
-	sem.definition.addChild(ast1);
-	return ast1;
-    }
-
-    private void modifyNodes(ClassSymbol sem) {
-	/* Add constructor */
-
-	if (sem.constructor == null) {
-	    sem.constructor = addConstructor(sem);
-	}
-
-	/* Insert array initializers into the constructor */
-
-	for (CharjAST init : sem.initializers) {
-	    System.out.println("processing init token = " + init.getType());
-
-	    if (init.getType() == CharjParser.IDENT) {
-		CharjAST ast1 = new CharjAST(CharjParser.EXPR, "EXPR");
-		CharjAST ast2 = new CharjAST(CharjParser.METHOD_CALL, "METHOD_CALL");
-		CharjAST ast2_1 = new CharjAST(CharjParser.DOT, ".");
-		CharjAST ast2_2 = new CharjAST(CharjParser.IDENT, init.getText());
-		CharjAST ast2_3 = new CharjAST(CharjParser.IDENT, "init");
-		CharjAST ast4 = new CharjAST(CharjParser.ARGUMENT_LIST, "ARGUMENT_LIST");
-
-		ast1.addChild(ast2);
-		ast2.addChild(ast2_1);
-		ast2_1.addChild(ast2_2);
-		ast2_1.addChild(ast2_3);
-		ast2.addChild(ast4);
-		ast4.addChildren(init.getChildren());
-
-		//System.out.println(sem.constructor.toStringTree());
-
-		sem.constructor.getChild(2).addChild(ast1);
-	    } else if (init.getType() == CharjParser.NEW_EXPRESSION) {
-		//(OBJECT_VAR_DECLARATION (TYPE (QUALIFIED_TYPE_IDENT (Array (TEMPLATE_INST (TYPE double(Symbol(double_primitive, ClassSymbol[double]: {}, ))))))) (VAR_DECLARATOR_LIST (VAR_DECLARATOR ccc (NEW_EXPRESSION (ARGUMENT_LIST (EXPR get)) (DOMAIN_EXPRESSION (RANGE_EXPRESSION 1))))))
-	    }
-	    
-	}
+    private void initPupCollect() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nInitPupCollector Phase\n----------------");
+        InitPUPCollector collector = new InitPUPCollector(m_nodes);
+        collector.downup(m_ast);
     }
 
     private String translationPass(OutputMode m) throws
@@ -248,7 +203,7 @@ public class Translator {
         return st.toString();
     }
 
-    private StringTemplateGroup getTemplates(String templateFile) {
+    public static StringTemplateGroup getTemplates(String templateFile) {
         StringTemplateGroup templates = null;
         try {
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -258,7 +213,8 @@ public class Translator {
             templates = new StringTemplateGroup(reader);
             reader.close();
         } catch(IOException ex) {
-            error("Failed to load template file", ex); 
+            System.err.println(ex.getMessage());
+            ex.printStackTrace(System.err);
         }
         return templates;
     }

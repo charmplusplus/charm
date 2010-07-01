@@ -121,22 +121,22 @@ chare_epilogue_h(sym) ::=
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h(sym, ident, ext, csds, tident) ::=
+classDeclaration_h(sym, ident, ext, csds, tident, hasDefaultCtor) ::=
 <<
 <type_preamble_h(sym)>
 <if(tident)>
-<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident, hasDefaultCtor = hasDefaultCtor)>
 <else>
-<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 <endif>
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+classDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>
@@ -146,35 +146,50 @@ class <ident> {
 <endif>
 
     <csds; separator="\n\n">
-    
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
+    protected: void constructorHelper();
     static bool _trace_registered;
     void _initTrace();
 };
 <endif>
 >>
 
-templateDeclaration_h(pds, sym, ident, ext, csds, tident) ::=
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor, inits) ::=
 <<
 template \<class <tident; separator=", class ">\>
-<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds)>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor, inits=inits)>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds) ::=
+classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor, inits) ::=
 <<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
 >>
 
-classDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
+
+<if(!hasDefaultCtor)>
+<sym.name>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
+
+void <sym.name>::constructorHelper()
+{
+    <inits; separator="\n">
+}
 
 bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
@@ -188,24 +203,59 @@ void <sym.name>::_initTrace() {
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
+
+<if(pupInits)>
+void <sym.name>::pupInitMethod()
+{
+    <pupInits; separator="\n">
+}
+<endif>
+
+void <sym.name>::pup(PUP::er &p)
+{
+<if(pupInits)>
+    pupInitMethod();
+
+<endif>
+    <pupers; separator="\n">
+}
+
+<if(!hasDefaultCtor)>
+<sym.name>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
+
+void <sym.name>::constructorHelper()
+{
+    <inits; separator="\n">
+}
+
+<if(needsMigration)>
+<sym.name>::<ident>(CkMigrateMessage *m)
+{
+    constructorHelper();
+}
+<endif>
 
 bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
@@ -218,25 +268,35 @@ void <sym.name>::_initTrace() {
 <endif>
 >>
 
-chareDeclaration_h(sym, ident, ext, csds) ::=
+chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
 <<
 <chare_preamble_h(sym)>
 #include "<ident>.decl.h"
-<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 <chare_epilogue_h(sym)>
 >>
 
-chareDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
     <csds; separator="\n">
-
+    <if(needsPupInit)>
+    private: void pupInitMethod();
+    <endif>
+    public: void pup(PUP::er& p);
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
+    protected: void constructorHelper();
+    <if(needsMigration)>
+    public: <ident>(CkMigrateMessage*);
+    <endif>
     static bool _trace_registered;
     void _initTrace();
 };

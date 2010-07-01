@@ -237,6 +237,7 @@ primaryExpression returns [Type type]
         {
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
+            if (et instanceof PointerType) et = ((PointerType)et).baseType;
             ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {
@@ -327,6 +328,7 @@ type returns [Type sym]
     CharjAST head = null;
     Scope scope = null;
     boolean proxy = false;
+    boolean pointer = false;
 }
 @after {
     typeText = typeText.substring(1);
@@ -335,6 +337,7 @@ type returns [Type sym]
     $start.symbolType = scope.resolveType(typeText);
     //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
+    if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
     $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
 }
@@ -352,7 +355,7 @@ type returns [Type sym]
             ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText += "." + $IDENT.text;} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
-    |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; }
+    |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
     ;
 

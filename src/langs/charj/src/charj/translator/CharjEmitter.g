@@ -132,28 +132,40 @@ importDeclaration
     ;
     
 typeDeclaration
+@init {
+    boolean needsMigration = false;
+    List<String> initializers = new ArrayList<String>();
+}
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
+
+            for (VariableInitializer init : currentClass.initializers) {
+                initializers.add(init.emit());
+            }
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                inits={initializers})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                hasDefaultCtor={currentClass.hasDefaultConstructor})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
             tident={$i0},
             ident={$i1.text},
             ext={$su.st},
-            csds={$csds})
+            csds={$csds},
+            hasDefaultCtor={currentClass.hasDefaultConstructor})
         -> 
     |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
@@ -162,13 +174,23 @@ typeDeclaration
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
+            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationConstructor;
+
+            for (VariableInitializer init : currentClass.initializers) {
+                initializers.add(init.emit());
+            }
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                pupInits={currentClass.generateInits()},
+                pupers={currentClass.generatePUPers()},
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                needsMigration={needsMigration},
+                inits={initializers})
         -> {emitCI()}? chareDeclaration_ci(
                 sym={currentClass},
                 chareType={$chareType.st},
@@ -180,7 +202,10 @@ typeDeclaration
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                needsPupInit={currentClass.generateInits() != null},
+                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                needsMigration={needsMigration})
         ->
     ;
 
@@ -409,7 +434,7 @@ throwsClause
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+    :   ^(MODIFIER_LIST accessModifierList localModifierList charjModifierList otherModifierList)
         ->  {emitCC()}? mod_list_cc(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
         ->  {emitH()}? mod_list_h(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
         ->  {emitCI()}? mod_list_ci(accmods = {$accessModifierList.names}, localmods = {$localModifierList.names}, charjmods = {$charjModifierList.names}, othermods = {$otherModifierList.names})
@@ -425,14 +450,14 @@ modifier
 
 accessModifierList
 returns [List names]
-    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)+)
+    :   ^(ACCESS_MODIFIER_LIST (m+=accessModifier)*)
         {
             $names = $m;
         }
     ;
 localModifierList
 returns [List names]
-    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)+)
+    :   ^(LOCAL_MODIFIER_LIST (m+=localModifier)*)
         {
             $names = $m;
         }
@@ -441,7 +466,7 @@ returns [List names]
 
 charjModifierList
 returns [List names]
-    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)+)
+    :   ^(CHARJ_MODIFIER_LIST (m+=charjModifier)*)
         {
             $names = $m;
         }
@@ -449,7 +474,7 @@ returns [List names]
 
 otherModifierList
 returns [List names]
-    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)+)
+    :   ^(OTHER_MODIFIER_LIST (m+=otherModifier)*)
         {
             $names = $m;
         }
@@ -473,6 +498,9 @@ accessModifier
     :   PUBLIC
     |   PROTECTED
     |   PRIVATE
+        {
+            $st = %{"private"};
+        }
     ;
 
 charjModifier
@@ -496,7 +524,7 @@ type
         -> {$objectType.st}
     |   VOID
         {
-            $st = %{$start.getText()};
+            $st = %{"void"};
         }
     ;
 
@@ -821,6 +849,8 @@ primaryExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
         -> {%{$IDENT.text}}
+    |   CHELPER
+        -> {%{"constructorHelper"}}
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)

@@ -21,7 +21,6 @@ tokens {
     TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
-    ENTRY                   = 'entry'           ;
     PRIVATE                 = 'private'         ;
     ABSTRACT                = 'abstract'        ;
     NATIVE                  = 'native'          ;
@@ -119,6 +118,7 @@ tokens {
     PUP                     = 'pup'             ;
     INITMETHOD              = 'initMethod'      ;
     CTORHELPER              = 'ctorHelper'      ;
+    CHELPER                 = 'constructorHelper';
 
 
     // C++ keywords that aren't used in charj. 
@@ -487,7 +487,6 @@ constructorType
     |   qualifiedTypeIdent domainExpression?
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
     ;
-
 
 simpleType
     :   primitiveType domainExpression?

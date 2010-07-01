@@ -47,7 +47,7 @@ charjSource
     ;
 
 packageDeclaration
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE (ids+=IDENT)+)
     ;
     
 importDeclaration
@@ -58,20 +58,23 @@ readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
     ;
 
+typeOfType returns [boolean array_type]
+    : CLASS 
+    | chareType 
+    | chareArrayType { $array_type = true; }
+    ;
+
 typeDeclaration
 @init {
-    boolean array_type = false;
     astmod = new AstModifier();
 }
-    :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
+    :   ^(TYPE typeOfType IDENT
         (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            $TYPE.tree.addChild(astmod.getPupRoutineNode());
-            $TYPE.tree.addChild(astmod.getInitRoutineNode());
-            $TYPE.tree.addChild(astmod.getCtorHelperNode());
-            astmod.ensureDefaultCtor($TYPE.tree);
-            if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
         }
+        -> ^(TYPE typeOfType IDENT
+            (^('extends' type))? (^('implements' type+))? classScopeDeclaration* 
+        )
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -95,36 +98,29 @@ classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($d.tree);
-
-            if(astmod.isEntry($d.tree))
-                $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
-        }
+        -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
+            genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
+        -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
+            type IDENT formalParameterList domainExpression? block?)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
-        }
+        -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        -> ^(PRIMITIVE_VAR_DECLARATION 
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
-        }
+        -> {$modifierList.tree != null}? ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        -> ^(OBJECT_VAR_DECLARATION  
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
-            b=block)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
-
-            astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
-            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
-
-            if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
-                $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
-        }
+            ^(BLOCK (blockStatement*)))
+        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
+            genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+        -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
     
 interfaceScopeDeclaration
@@ -143,16 +139,10 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        {
-            astmod.dealWithInit($VAR_DECLARATOR);
-        }
     ;
     
 variableDeclaratorId
     :   ^(IDENT domainExpression?)
-        {
-            if (!($IDENT.hasParentOfType(CharjParser.READONLY))) astmod.varPup($IDENT);
-        }
     ;
 
 variableInitializer
@@ -190,11 +180,32 @@ bound
     :   ^(EXTENDS_BOUND_LIST type+)
     ;
 
-modifierList
-    :   ^(MODIFIER_LIST modifier+)
-        {
-            astmod.arrangeModifiers($MODIFIER_LIST.tree);
-        }
+modifierList returns [boolean isEntry]
+    :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier {if ($charjModifier.isEntry) {$isEntry = true;}} | otherModifier)*)
+        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
+    ;
+
+localModifier
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
+    ;
+
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier returns [boolean isEntry] 
+    :   ENTRY { $isEntry = true; }
+    |   TRACED
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
     ;
 
 modifier
@@ -210,12 +221,6 @@ modifier
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
-    ;
-
-localModifier
-    :   FINAL
-    |   STATIC
-    |   VOLATILE
     ;
 
 type

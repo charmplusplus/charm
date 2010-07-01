@@ -87,11 +87,13 @@ boolean entry = false;
                 typeName = "void";
             }
             boolean isTraced = false;
-            CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
-            if (charj_mod != null) {
-                charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
-                isTraced = (charj_mod != null);
-                if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+            if ($MODIFIER_LIST != null) {
+                CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+                if (charj_mod != null) {
+                    charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
+                    isTraced = (charj_mod != null);
+                    if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+                }
             }
             Type returnType = currentScope.resolveType(typeName);
             //System.out.println("Resolving type " + typeName + " in scope " + currentScope + "->" + returnType);
@@ -109,9 +111,6 @@ boolean entry = false;
     |   ^((CONSTRUCTOR_DECL
           | ENTRY_CONSTRUCTOR_DECL {
                 entry = true;
-                if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) {
-                    currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
-                }
             })
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
@@ -175,7 +174,9 @@ enterClass
                 currentClass.isChare = true;
             } else if (classTypeName.equals("chare_array")) {
                 // TODO: test this; might need to use startswith instead of equals
+                // TODO: should "isChare" be set to true?
                 currentClass.isChare = true;
+                currentClass.isChareArray = true;
             } else if (classTypeName.equals("mainchare")) {
                 currentClass.isChare = true;
                 currentClass.isMainChare = true;
