@@ -3352,7 +3352,7 @@ int rsh_fork_one(const char *startScript)
     s = skipblanks(e); e = skipstuff(s);
   }
 
-  rshargv[num++]="-np";
+  rshargv[num++]="-n";
   sprintf(npes, "%d", nodetab_rank0_size);
   rshargv[num++]=npes;
   rshargv[num++]=(char*)startScript;
