@@ -1000,6 +1000,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
+  CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
