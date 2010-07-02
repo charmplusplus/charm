@@ -895,10 +895,10 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   void controlPointManager::exitIfReady(){
      if( !alreadyRequestedMemoryUsage && !alreadyRequestedAll && !alreadyRequestedIdleTime && CkMyPe()==0){
-       CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
+       //  CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
        doExitNow();
      } else {
-       CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
+       // CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
        exitWhenReady = true;
      }
   }
@@ -907,7 +907,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   void controlPointManager::doExitNow(){
 	  writeOutputToDisk();
-	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
+	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
 	  CkExit();
   }
 

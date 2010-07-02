@@ -351,7 +351,6 @@ static inline void _traceInit(char **argv)
   // because CmiGetArgFlagDesc is destructive and this is called on all PEs.
   if( CmiGetArgFlagDesc(argv,"+CPEnableMeasurements","Enable recording of measurements for Control Points") ){
     enableCPTracing = true;
-    CmiPrintf("Calling _createTracecontrolPoints(argv);\n");
     _createTracecontrolPoints(argv);   
   } else {
     enableCPTracing = false;
