@@ -485,7 +485,7 @@ persist-comm.o: persist-comm.c persist_impl.h $(CVHEADERS)
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
-	
+
 crc32.o: crc32.c crc32.h
 	$(CHARMC) -o crc32.o crc32.c
 
@@ -1116,9 +1116,9 @@ install:
 	@test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib || true
 	@test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so || true
 	@test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin || true
-	cp -f ../include/*   $(DESTDIR)/include
-	cp -f ../lib/*       $(DESTDIR)/lib
-	cp -f ../lib_so/*    $(DESTDIR)/lib_so
+	cp -fL ../include/*   $(DESTDIR)/include
+	cp -fL ../lib/*       $(DESTDIR)/lib
+	cp -fL ../lib_so/*    $(DESTDIR)/lib_so
 #	cp -f ../bin/*       $(DESTDIR)/bin
 	for f in ../bin/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/bin; fi; done
 
