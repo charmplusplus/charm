@@ -379,8 +379,8 @@ public class Translator {
         }
 
         // Compile c++ output
-        cmd = charmc + " -c " + baseTempFilename + ".cc" + 
-            " -o " + baseTempFilename + ".o";
+        cmd = charmc + " -I" + m_stdlib + "/charj/libs -c " +
+            baseTempFilename + ".cc" + " -o " + baseTempFilename + ".o";
         retVal = exec(cmd, currentDir);
         if (retVal != 0) {
             error("Could not compile generated C++ file");
