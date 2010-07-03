@@ -829,6 +829,7 @@ void CpdSetBreakPoint (char *msg)
     // Replace entry in entry table with _call_freeze_on_break_point
     tableIdx = atoi(functionName);
     if (tableIdx >= 0 && tableIdx < tableSize) {
+      if (! CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint) {
            EntryInfo * breakPointEntryInfo = (EntryInfo *)CpvAccess(breakPointEntryTable)->get(tableIdx);
            if (breakPointEntryInfo == 0) {
              breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, 1, 0 );
@@ -837,6 +838,11 @@ void CpdSetBreakPoint (char *msg)
              _entryTable[tableIdx]->name = "debug_breakpoint_ep";
              _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
            } else {
+             if (breakPointEntryInfo->msgIdx == 0) {
+               // Reset the breakpoint info
+               _entryTable[tableIdx]->name = "debug_breakpoint_ep";
+               _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+             }
              breakPointEntryInfo->msgIdx ++;
              //CkAssert(breakPointEntryInfo->name == _entryTable[tableIdx]->name);
              //CkAssert(breakPointEntryInfo->call == _entryTable[tableIdx]->call);
@@ -845,6 +851,7 @@ void CpdSetBreakPoint (char *msg)
            }
            CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint = CmiTrue;
            reply = ~0;
+      }
     }
 
   }
@@ -866,17 +873,19 @@ void CpdRemoveBreakPoint (char *msg)
   if (strlen(functionName) > 0) {
     int idx = atoi(functionName);
     if (idx >= 0 && idx < _entryTable.size()) {
-      EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
-      if (breakPointEntryInfo != NULL) {
-        if (--breakPointEntryInfo->msgIdx == 0) {
-          // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-          _entryTable[idx]->name =  breakPointEntryInfo->name;
-          _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+      if (CkpvAccess(_debugEntryTable)[idx].isBreakpoint) {
+        EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
+        if (breakPointEntryInfo != NULL) {
+          if (--breakPointEntryInfo->msgIdx == 0) {
+            // If we are the last to delete the breakpoint, then restore the original name and call function pointer
+            _entryTable[idx]->name =  breakPointEntryInfo->name;
+            _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+          }
+          reply = ~0 ;
+          CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
+          //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
+          //CkpvAccess(breakPointEntryTable)->remove(idx);
         }
-        reply = ~0 ;
-        CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
-        //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-        //CkpvAccess(breakPointEntryTable)->remove(idx);
       }
     }
   }
