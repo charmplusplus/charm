@@ -584,7 +584,7 @@ rangeExpression
     ;
 
 rangeList
-    :   rangeExpression (','! rangeExpression)*
+    :   rangeExpression+
     ;
 
 domainExpression
