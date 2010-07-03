@@ -41,15 +41,15 @@ int main(void) {
   arr.init(domain);
 
   //arr[0] = 10;
-  arr[Point<1>(0)] = 10000;
-  arr[Point<1>(1)] = 20;
-  arr[Point<1>(8)] = 200;
+  arr[0] = 10000;
+  arr[1] = 20;
+  arr[8] = 200;
 
   //Array<int> aaa;
   //aaa(Domain<1>(Range(3));
 
   for (int i = 0; i < arr.size(); i++) {
-    cout << i << " -> " << arr[i] << endl;
+    cout << i << ": " << arr[i] << endl;
   }
 
   cout << endl;
@@ -58,7 +58,7 @@ int main(void) {
   at.test1();
 
   for (int i = 0; i < at.test.size(); i++) {
-    cout << i << " -> " << at.test[i] << endl;
+    cout << i << ": " << at.test[i] << endl;
   }
 
   return 0;

@@ -45,35 +45,38 @@ namespace CharjArray {
 
   enum ArrayType { RECT, JAGGED, ROW_MAJOR, COL_MAJOR };
  
-  template<class type, int dims = 1, int atype = RECT>
+  template<class type, int dims = 1, ArrayType atype = RECT>
   class Array {
   private:
     Domain<dims> domain;
     type *block;
-    bool initialized;
 
   public:
-    Array() : initialized(false) {}
+    Array(Domain<dims> domain_) {
+      init(domain_);
+    }
 
-    void init(Domain<dims> domain_) {
+    void init(Domain<dims> &domain_) {
       domain = domain_;
       if (atype == RECT)
 	block = new type[domain.size()];
-      initialized = true;
     }
 
     ~Array() {
       delete block;
     }
     
+    type* operator[] (const Domain<dims> &domain) {
+      return block[domain.ranges[0].size];
+    }
+
     type& operator[] (const Point<dims> &point) {
       return block[point.ranges[0].size];
-      //return block[index];
     }
-    
-    /*Array<type, dims, atype>& operator[] (const Domain<dims> &domain) {
-      
-      }*/
+
+    type& operator[] (const int index) {
+      return block[index];
+    }
 
     int size() {
       return domain.size();
