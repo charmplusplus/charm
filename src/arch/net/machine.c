@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /** @file
  * Basic NET implementation of Converse machine layer
@@ -1665,10 +1659,13 @@ static void node_addresses_obtain(char **argv)
 		free(me.info.qpList);
 	}
 #else
-	/*The nPE and IP fields are set by charmrun--
-	  these values don't matter. */
+	/*The nPE fields are set by charmrun--
+	  these values don't matter. 
+          Set IP in case it is mpiexec mode where charmrun does not have IP yet
+        */
 	me.info.nPE=ChMessageInt_new(0);
-	me.info.IP=_skt_invalid_ip;
+	/* me.info.IP=_skt_invalid_ip; */
+        me.info.IP=skt_innode_my_ip();
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #ifdef CMK_USE_MX
 	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);

@@ -336,7 +336,7 @@ static int search_pemap(char *pecoremap, int pe)
 {
   int *map = (int *)malloc(CmiNumPes()*sizeof(int));
   char *ptr = NULL;
-  int i, count;
+  int i, j, count;
   char *str;
 
   char *mapstr = (char*)malloc(strlen(pecoremap)+1);
@@ -346,16 +346,23 @@ static int search_pemap(char *pecoremap, int pe)
   count = 0;
   while (str)
   {
-      int hasdash=0, hascolon=0;
-      int start, end, stride=1;
+      int hasdash=0, hascolon=0, hasdot=0;
+      int start, end, stride=1, block=1;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-' && i!=0) hasdash=1;
           if (str[i] == ':') hascolon=1;
+	  if (str[i] == '.') hasdot=1;
       }
       if (hasdash) {
           if (hascolon) {
-            if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+            if (hasdot) {
+              if (sscanf(str, "%d-%d:%d.%d", &start, &end, &stride, &block) != 4)
                  printf("Warning: Check the format of \"%s\".\n", str);
+            }
+            else {
+              if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+            }
           }
           else {
             if (sscanf(str, "%d-%d", &start, &end) != 2)
@@ -366,9 +373,16 @@ static int search_pemap(char *pecoremap, int pe)
           sscanf(str, "%d", &start);
           end = start;
       }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", str);
+        block=1;
+      }
       for (i = start; i<=end; i+=stride) {
-        map[count++] = i;
-        if (count == CmiNumPes()) break;
+        for (j=0; j<block; j++) {
+          if (i+j>end) break;
+          map[count++] = i+j;
+          if (count == CmiNumPes()) break;
+        }
       }
       if (count == CmiNumPes()) break;
       str = strtok_r(NULL, ",", &ptr);
@@ -401,7 +415,11 @@ void CmiInitCPUAffinity(char **argv)
     if (CmiMyRank() == 0) add_exclude(exclude);
   
     /* obsolete */
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
+  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping (deprecated in favor of +pemap)");
+  if (coremap!=NULL && CmiMyPe() == 0)
+    CmiPrintf("Charm++> DEPRECATION WARNING!!!\n"
+	      "Charm++> The +coremap option is deprecated, and will be removed in 6.3.x.\n"
+	      "Charm++> Please use +pemap instead.\n");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
 
