@@ -239,7 +239,10 @@ objectType
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
         {
-            astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
+            // TODO: This breaks all pointer types inside chares not used for sending
+            // them in entry methods, converting them to object types, which breaks
+            // Arrays inside chares.
+            //astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
         }
     ;
 
