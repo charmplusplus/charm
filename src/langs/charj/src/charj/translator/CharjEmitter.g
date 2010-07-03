@@ -286,13 +286,13 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null, false])
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null])
         -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$simpleType.st},
             declList={$variableDeclaratorList.st})
         ->
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st, false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
         -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
             type={$objectType.st},
@@ -345,39 +345,34 @@ classScopeDeclaration
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList)
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st, false])
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st])
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st, false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
         -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
     ;
 
-variableDeclaratorList[StringTemplate obtype, boolean output]
-    :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype, output])+ )
+variableDeclaratorList[StringTemplate obtype]
+    :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
         -> var_decl_list(var_decls={$var_decls})
     ;
 
-variableDeclarator[StringTemplate obtype, boolean output]
-    :   ^(VAR_DECLARATOR id=variableDeclaratorId[output] initializer=variableInitializer[obtype, output]?)
-        -> {$output && emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
-        -> {$output && emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
-        -> {$output && emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
-        -> {!$output && emitCC()}? var_decl_cc(id={$id.st})
-        -> {!$output && emitH()}?  var_decl_h(id={$id.st})
-        -> {!$output && emitCI()}? var_decl_ci(id={$id.st})
+variableDeclarator[StringTemplate obtype]
+    :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer[obtype]?)
+        -> {emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
+        -> {emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
+        -> {emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
         ->
     ; 
     
-variableDeclaratorId[boolean output]
+variableDeclaratorId
     :   ^(IDENT de=domainExpression[null]?)
-        -> {$output}? var_decl_id(id={$IDENT.text}, domainExp={$de.st})
-        -> {!$output}? var_decl_id(id={$IDENT.text})
-        ->
+        -> var_decl_id(id={$IDENT.text}, domainExp={$de.st})
     ;
 
-variableInitializer[StringTemplate obtype, boolean output]
+variableInitializer[StringTemplate obtype]
     :   arrayInitializer
         -> {$arrayInitializer.st}
-    |   newExpression[obtype, output]
+    |   newExpression[obtype]
         -> {$newExpression.st}
     |   expression
         -> {$expression.st}
@@ -409,7 +404,7 @@ domainExpression[List<StringTemplate> otherParams]
     ;
 
 arrayInitializer
-    :   ^(ARRAY_INITIALIZER variableInitializer[null, false]*)
+    :   ^(ARRAY_INITIALIZER variableInitializer[null]*)
         -> template(t={$text}) "/* arrayInitializer-not implemented */ <t>"
     ;
 
@@ -533,7 +528,7 @@ simpleType
         -> simple_type(typeID={$primitiveType.st}, arrDeclList={$domainExpression.st})
     ;
 
-objectType
+objectType //[boolean forNewExpression]
     : proxyType -> {$proxyType.st;}
     | nonProxyType -> {$nonProxyType.st}
     ;
@@ -616,12 +611,12 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId[true])
+    :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[true])
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
         -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
@@ -650,12 +645,12 @@ blockStatement
 
 
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null, true])
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null])
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$vdl.st})
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st, true])
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st])
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$objectType.st},
@@ -861,7 +856,7 @@ primaryExpression
         -> template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
     |   literal
         -> {$literal.st}
-    |   newExpression[null, false]
+    |   newExpression[null]
         -> {$newExpression.st}
     |   THIS
         -> {%{$start.getText()}}
@@ -895,11 +890,9 @@ arrayTypeDeclarator
         -> template(t={$text}) "<t>"
     ;
 
-newExpression[StringTemplate obtype, boolean output] returns [StringTemplate initArray]
+newExpression[StringTemplate obtype]
     :   ^(NEW_EXPRESSION arguments? domainExpression[$arguments.args])
-        -> {$output}? template(domain={$domainExpression.st},type={$obtype}) "new <type>(<domain>)"
-        -> {!$output}? template() ""
-        ->
+        -> template(domain={$domainExpression.st},type={$obtype}) "new <type>(<domain>)"
     |   ^(NEW proxyType arguments)
         -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
     |   ^(NEW nonProxyType arguments)
