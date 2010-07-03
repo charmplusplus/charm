@@ -879,7 +879,8 @@ primaryExpression
         ->  template() "CkMyNode()"
     |   GETMYRANK
         ->  template() "CkMyRank()"
-
+    |   domainExpression[null]
+        ->  {$domainExpression.st}
     ;
     
 explicitConstructorCall

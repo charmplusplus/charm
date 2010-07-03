@@ -442,6 +442,7 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+    |   domainExpression
     ;
     
 explicitConstructorCall
@@ -556,6 +557,7 @@ entryPrimaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+    |   domainExpression
     ;
 
 literal 

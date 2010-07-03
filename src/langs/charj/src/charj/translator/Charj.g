@@ -853,6 +853,7 @@ primaryExpression
     |   literal
     |   newExpression
     |   qualifiedIdentExpression
+    |   domainExpression
     |   templateInstantiation
         (   s=SUPER
             (   arguments
