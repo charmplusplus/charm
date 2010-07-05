@@ -64,6 +64,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.includes.add("iostream");
         this.usings.add("std::cout");
         this.usings.add("std::endl");
+
+        // For now always include the array package
+        this.includes.add("Array.h");
+        this.usings.add("CharjArray::Array");
+        this.usings.add("CharjArray::Domain");
+        this.usings.add("CharjArray::Range");
     }
 
     public Scope getEnclosingScope() {
