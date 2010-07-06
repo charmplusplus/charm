@@ -1,6 +1,8 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
+#include <charm++.h>
+
 namespace CharjArray {
   class Range {
   public:
@@ -82,6 +84,7 @@ namespace CharjArray {
       return domain.size();
     }
 
+    void pup(PUP::er& p) { }
   };
 }
 
