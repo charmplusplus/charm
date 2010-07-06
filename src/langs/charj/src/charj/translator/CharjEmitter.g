@@ -854,7 +854,9 @@ primaryExpression
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expression)
-        -> template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
     |   literal
         -> {$literal.st}
     |   newExpression[null]

@@ -338,6 +338,14 @@ type returns [Type sym]
     //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
+
+    // TODO: Special case for Arrays, should be fixed
+    if (typeText.equals("Array") && $start.symbolType == null) {
+        System.out.println("found Array XXXX");
+        ClassSymbol cs = new ClassSymbol(symtab, "Array");
+        $start.symbolType = new PointerType(symtab, cs);
+    }
+
     $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
 }
