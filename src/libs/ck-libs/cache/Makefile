@@ -22,7 +22,7 @@ INTERFACE: $(CIFILES)
 	touch INTERFACE
 
 CkCache.o: CkCache.C $(HEADERS)
-	$(CHARMC) -c -o CkCache.o CkCache.C
+	$(CHARMC) -I../../.. -c -o CkCache.o CkCache.C
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB) INTERFACE

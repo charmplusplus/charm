@@ -58,8 +58,6 @@ typedef struct _bufferPool{
 #endif
 }BufferPool;
 
-// pre-allocated buffers will be at least this big
-#define GPU_MEMPOOL_MIN_BUFFER_SIZE 1024
 
 
 #endif
