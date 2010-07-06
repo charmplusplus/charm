@@ -287,7 +287,12 @@ void CpdFreezeModeScheduler(void)
 	    / * Debug messages should be handled immediately * /
 	    CmiHandleMessage(msg);
 	  } else */
-        
+      if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
+        // Since we are conditionally delivering, forward all messages to the child
+        int bytes = SIZEFIELD(msg); // reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
+        write(conditionalPipe[1], &bytes, 4);
+        write(conditionalPipe[1], msg, bytes);
+      }
       if (CpdIsDebugMessage(msg)) {
         CmiHandleMessage(msg);
 	  }

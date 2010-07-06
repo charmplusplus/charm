@@ -428,6 +428,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
 
 struct ConditionalList {
   int count;
+  int deliver;
   int msgs[1];
 };
 CkpvStaticDeclare(void *, lastBreakPointMsg);
@@ -592,6 +593,7 @@ static pid_t CpdConditional_SetupComm() {
     int shmemid = shmget(IPC_PRIVATE, 1024*1024, IPC_CREAT | 0666);
     conditionalShm = (ConditionalList*)shmat(shmemid, NULL, 0);
     conditionalShm->count = 0;
+    conditionalShm->deliver = 0;
     shmctl(shmemid, IPC_RMID, &dummy);
   }
   
@@ -642,10 +644,29 @@ extern "C" void CpdEndConditionalDeliver_master() {
   close(conditionalPipe[1]);
   conditionalPipe[1] = 0;
   wait(NULL);
+  int i;
+  // Check if we have to deliver unconditionally some messages
+  if (conditionalShm->deliver > 0) {
+    // Deliver the requested number of messages
+    for (i=0; i < conditionalShm->deliver; ++i) {
+      int msgNum = conditionalShm->msgs[i];
+      if (msgNum == -1) CpdDeliverSingleMessage();
+      else CpdDeliverMessageInt(msgNum);
+    }
+    // Move back the remaining messages accordingly
+    for (i=conditionalShm->deliver; i < conditionalShm->count; ++i) {
+      conditionalShm->msgs[i-conditionalShm->deliver] = conditionalShm->msgs[i];
+    }
+    conditionalShm->count -= conditionalShm->deliver;
+    conditionalShm->deliver = 0;
+    CmiMachineProgressImpl();
+  }
+  CkAssert(conditionalShm->count >= 0);
   if (conditionalShm->count == 0) {
     CcsSendReply(0,NULL);
     shmdt((char*)conditionalShm);
     conditionalShm = NULL;
+    CkPrintf("Conditional delivery on %d concluded; normal mode resumed\n",CkMyPe());
   } else {
     if (CpdConditional_SetupComm()==0) {
       // We are in the child, deliver again the messages
@@ -672,6 +693,14 @@ void CpdDeliverMessageConditionally(char * msg) {
     if (msgNum == -1) CpdDeliverSingleMessage();
     else CpdDeliverMessageInt(msgNum);
   }
+}
+
+void CpdCommitConditionalDelivery(char * msg) {
+  int msgNum;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);\
+  conditionalShm->deliver = msgNum;
+  shmdt((char*)conditionalShm);
+  _exit(0);
 }
 
 class CpdList_msgStack : public CpdListAccessor {
@@ -1017,6 +1046,7 @@ void CpdCharmInit()
   CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
   CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
   CcsRegisterHandler("endConditional",(CmiHandler)CpdEndConditionalDelivery);
+  CcsRegisterHandler("commitConditional",(CmiHandler)CpdCommitConditionalDelivery);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
