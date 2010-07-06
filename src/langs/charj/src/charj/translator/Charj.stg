@@ -6,14 +6,26 @@ charjSource_ci(basename, pd, imports, types, ros, debug) ::=
 // interface for <basename>
 <imports; separator="\n">
 <types; separator="\n\n">
-<if(ros)>
 
 module <basename>_readonly {
-    <ros; separator="\n">
-}
+<if(ros)>
+    <charjReadonly_ci(pds = pd, ros = ros)>
 <endif>
+
+}
+
 >>
 
+charjReadonly_ci(pds, ros) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <charjReadonly_ci(pds = rest(pds), ros = ros)>
+} // namespace <first(pds)>
+<else>
+<ros; separator="\n">
+<endif>
+>>
 
 charjSource_h(basename, pd, imports, types, ros, debug) ::=
 <<
@@ -73,9 +85,9 @@ readonlys_cc(pds, ros, basename) ::=
 {
     <readonlys_cc(pds = rest(pds), ros = ros, basename = basename)>
 } // namespace <first(pds)>
+#include "<basename>_readonly.def.h"
 <else>
 <ros; separator="\n">
-#include "<basename>_readonly.def.h"
 <endif>
 
 >>
@@ -303,13 +315,16 @@ class <ident>: public CBase_<ident> {
 <endif>
 >>
 
-chareDeclaration_ci(sym, chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
 <<
 <if(sym.isMainChare)>main<endif>module <ident> {
 <if(ext)>
     extern module <ext>;
 <endif>
     <sym.Externs:{ext| extern module <ext>;
+<if(sym.isMainChare)>
+extern module <basename>_readonly;
+<endif>
     }>
     <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
 }

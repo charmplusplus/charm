@@ -192,6 +192,7 @@ typeDeclaration
                 needsMigration={needsMigration},
                 inits={initializers})
         -> {emitCI()}? chareDeclaration_ci(
+                basename={basename()},
                 sym={currentClass},
                 chareType={$chareType.st},
                 arrayDim={null},
