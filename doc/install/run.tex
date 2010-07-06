@@ -75,9 +75,7 @@ method.
 This will pass {\tt -np \$P} to indicate how many processes to
 launch. An executable named something other than {\tt mpiexec} can be
 used with the additional argument {\tt ++remote-shell} {\it runmpi},
-with `runmpi' replaced by the necessary name. At present, this depends
-on the environment variables {\tt OMPI\_COMM\_WORLD\_RANK} and {\tt
-  OMPI\_COMM\_WORLD\_SIZE} being set in each launched process.
+with `runmpi' replaced by the necessary name.
 
 Use of this option can potentially provide a few benefits:
 
@@ -88,6 +86,11 @@ Use of this option can potentially provide a few benefits:
 \item Multi-node job startup on clusters that do not allow connections
   from the head/login nodes to the compute nodes
 \end{itemize}
+
+At present, this option depends on the environment variables for some
+common MPI implementations. It supports OpenMPI ({\tt OMPI\_COMM\_WORLD\_RANK} and
+{\tt OMPI\_COMM\_WORLD\_SIZE}) and M(VA)PICH ({\tt MPIRUN\_RANK} and {\tt
+  MPIRUN\_NPROCS} or {\tt PMI\_RANK} and {\tt PMI\_SIZE}).
 
 \item[{\tt ++debug}] Run each node under gdb in an xterm window, prompting
 the user to begin execution.
@@ -174,6 +177,26 @@ network and MPI versions, smp and non-smp versions.
 \item[{\tt +setcpuaffinity}]             set cpu affinity automatically for processes (when Charm++ is based on non-smp versions) or threads (when smp)
 
 \item[{\tt +excludecore <core \#>}]       does not set cpu affinity for the given core number. One can use this option multiple times to provide a list of core numbers to avoid.
+
+\item[{\tt +pemap L[-U[:S[.R]]][,...]}] Bind the execution threads to
+  the sequence of cores described by the arguments using the operating
+  system's CPU affinity functions.
+
+A single number identifies a particular core. Two numbers separated by
+a dash identify an inclusive range (\emph{lower bound} and \emph{upper
+  bound}). If they are followed by a colon and another number (a
+\emph{stride}), that range will be stepped through in increments of
+the additional number. Within each stride, a dot followed by a
+\emph{run} will indicate how many cores to use from that starting
+point.
+
+For example, the sequence {\tt 0-8:2,16,20-24} includes cores 0, 2, 4,
+6, 8, 16, 20, 21, 22, 23, 24. On a 4-way quad-core system, if one
+wanted to use 3 cores from each socket, one could write this as {\tt
+  0-15:4.3}.
+
+\item[{\tt +commap p[,q,...]}] Bind communication threads to the
+  listed cores, one per process.
 
 \end{description}
 
