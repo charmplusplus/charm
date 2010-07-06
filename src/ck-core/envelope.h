@@ -15,7 +15,7 @@
 #define CkIntbits (sizeof(int)*8)
 #endif
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _SET_USED(env, x) (env)->setUsed((x))
 #define _CHECK_USED(env) do { if(env->isUsed()) \
                            CmiAbort("Message being re-sent. Aborting...\n"); \
@@ -89,7 +89,7 @@ typedef unsigned short UShort;
 typedef unsigned char  UChar;
 
 #include "charm.h" // for CkGroupID, and CkEnvelopeType
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #include "ckobjid.h" //for the ckobjId
 #endif
 
@@ -180,7 +180,7 @@ public:
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CkObjID sender;
     CkObjID recver;
     MCount SN;
@@ -202,7 +202,7 @@ private:
     UInt   totalsize;  ///< Byte count from envelope start to end of priobits
     
   public:
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);
@@ -214,10 +214,10 @@ private:
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
     void   setMsgtype(const UChar m) { attribs.mtype = m; }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     UChar  isUsed(void) { return attribs.isUsed; }
     void   setUsed(const UChar u) { attribs.isUsed=u; }
-#else /* CMK_OPTIMIZE */
+#else /* CMK_ERROR_CHECKING */
     inline void setUsed(const UChar u) {}
 #endif
     UChar  getMsgIdx(void) const { return attribs.msgIdx; }
@@ -241,8 +241,10 @@ private:
             CkMsgAlignLength(size)+
 	    sizeof(int)*CkPriobitsToInts(prio);
       register envelope *env = (envelope *)CmiAlloc(tsize);
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
+      //for record-replay
       memset(env, 0, sizeof(envelope));
+      env->setEvent(++CkpvAccess(envelopeEventID));
 #endif
       env->setMsgtype(type);
       env->totalsize = tsize;
@@ -250,15 +252,13 @@ private:
       env->setPacked(0);
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
-      //for record-replay
-      env->setEvent(++CkpvAccess(envelopeEventID));
       env->setRef(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
@@ -379,6 +379,10 @@ inline void _resetEnv(envelope *env) {
   env->reset();
 }
 
+inline void setEventID(envelope *env){
+  env->setEvent(++CkpvAccess(envelopeEventID));
+}
+
 /** @} */
 
 extern UChar   _defaultQueueing;
@@ -401,7 +405,7 @@ private:
     }
 public:
     MsgPool():SafePool<void*>(_alloc, CkFreeMsg, _reset) {}
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         void *get(void){
             return allocfn();
         }

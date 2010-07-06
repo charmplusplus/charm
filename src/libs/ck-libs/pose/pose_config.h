@@ -19,7 +19,7 @@
 #define USE_LONG_TIMESTAMPS 1
 
 /// Uncomment to force determinism in event ordering
-//#define DETERMINISTIC_EVENTS 1
+#define DETERMINISTIC_EVENTS 1
 
 /// Uncomment this to turn on coarse memory management
 #define MEM_COARSE
@@ -37,9 +37,12 @@
 /// Uncomment to turn on POSE load balancer
 //#define LB_ON 1
 
+#ifdef POSE_COMM_ON
 #include <StreamingStrategy.h>
 #include <MeshStreamingStrategy.h>
 #include <PrioStreaming.h>
+#endif
+
 #define COMM_TIMEOUT 1
 #define COMM_MAXMSG 20
 
@@ -55,6 +58,9 @@
 #define LB_SKIP 51          // LB done 1/LB_SKIP times GVT iterations
 #define LB_THRESHOLD 4000   // 20 heavy objects
 #define LB_DIFF 2000       // min diff between min and max load PEs
+
+/// Checkpointing constants
+#define POSE_CHECKPOINT_DIRECTORY "__pose_chkpt_files" // directory where checkpoint files are stored
 
 // MISC
 #define MAX_POOL_SIZE 40    // maximum size of a memory pool
@@ -117,6 +123,9 @@ class POSE_Config
   int max_leash;
   int leash_flex;
   bool deterministic;
+  int checkpoint_gvt_interval;
+  int checkpoint_time_interval;
+  int lb_gvt_interval;
   /* one very long initializer line */
   POSE_Config() :
 #ifdef POSE_STATS_ON                   //w
@@ -167,10 +176,13 @@ class POSE_Config
     max_leash(MAX_LEASH),         //w
     leash_flex(LEASH_FLEX),       //w
 #ifdef DETERMINISTIC_EVENTS        //w
-    deterministic(true)
+    deterministic(true),
 #else
-    deterministic(false)
+    deterministic(false),
 #endif
+    checkpoint_gvt_interval(0),
+    checkpoint_time_interval(0),
+    lb_gvt_interval(0)
     {// all handled in initializer
     }
 };

@@ -1,14 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
-#include "converse.h"
-#include "sockRoutines.h"
-
-#define DEBUGP(x)   /* CmiPrintf x;  */
 
 /*
  This scheme relies on using IP address to identify nodes and assigning 
@@ -16,16 +5,24 @@ cpu affinity.
 
  when CMK_NO_SOCKETS, which is typically on cray xt3 and bluegene/L.
  There is no hostname for the compute nodes.
+ *
+ * last updated 3/20/2010   Gengbin Zheng
+ * new options +pemap +commmap takes complex pattern of a list of cores
 */
+
+#define _GNU_SOURCE
+
+#include "converse.h"
+#include "sockRoutines.h"
+
+#define DEBUGP(x)   /* CmiPrintf x;  */
+CpvDeclare(int, myCPUAffToCore);
+
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-
-
-#include <stdlib.h>
-#include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -33,8 +30,8 @@ cpu affinity.
 #else
 #define _GNU_SOURCE
 #include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+//long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 #endif
 
 #if defined(__APPLE__) 
@@ -45,7 +42,9 @@ long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr
 #include <sys/mpctl.h>
 #endif
 
-static int excludecore[8] = {-1};
+
+#define MAX_EXCLUDE      32
+static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
 static int affinity_doneflag = 0;
@@ -60,13 +59,23 @@ static int in_exclude(int core)
 static void add_exclude(int core)
 {
   if (in_exclude(core)) return;
-  CmiAssert(excludecount < 8);
+  CmiAssert(excludecount < MAX_EXCLUDE);
   excludecore[excludecount++] = core;
 }
 
 #if CMK_HAS_BINDPROCESSOR
 #include <sys/processor.h>
 #endif
+
+#define SET_MASK(cpuid)    \
+  /* set the affinity mask if possible */      \
+  if ((cpuid / 8) > len) {      \
+    printf("Mask size too small to handle requested CPU ID\n");   \
+    return -1;      \
+  } else {    \
+    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */ \
+  }
+
 
 /* This implementation assumes the default x86 CPU mask size used by Linux */
 /* For a large SMP machine, this code should be changed to use a variable sized   */
@@ -81,15 +90,8 @@ int set_cpu_affinity(unsigned int cpuid) {
    HANDLE hProcess;
  #endif
  
-  /* set the affinity mask if possible */
-  if ((cpuid / 8) > len) {
-    printf("Mask size too small to handle requested CPU ID\n");
-    return -1;
-  } else {
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
-  }
-
 #ifdef _WIN32
+  SET_MASK(cpuid)
   hProcess = GetCurrentProcess();
   if (SetProcessAffinityMask(hProcess, mask) == 0) {
     return -1;
@@ -98,8 +100,14 @@ int set_cpu_affinity(unsigned int cpuid) {
   pid = getpid();
   if (bindprocessor(BINDPROCESS, pid, cpuid) == -1) return -1;
 #else
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpuid, &cpuset);
+  /*SET_MASK(cpuid)*/
+
   /* PID 0 refers to the current process */
-  if (sched_setaffinity(0, len, &mask) < 0) {
+  /*if (sched_setaffinity(0, len, &mask) < 0) {*/
+  if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0) {
     perror("sched_setaffinity");
     return -1;
   }
@@ -108,8 +116,8 @@ int set_cpu_affinity(unsigned int cpuid) {
   return 0;
 }
 
-int set_thread_affinity(int cpuid) {
 #if CMK_SMP
+int set_thread_affinity(int cpuid) {
   unsigned long mask = 0xffffffff;
   unsigned int len = sizeof(mask);
 
@@ -117,22 +125,24 @@ int set_thread_affinity(int cpuid) {
   HANDLE hThread;
 #endif	
   
-  /* set the affinity mask if possible */
-  if ((cpuid / 8) > len) {
-    printf("Mask size too small to handle requested CPU ID\n");
-    return -1;
-  } else {
-    mask = 1 << cpuid;   /* set the affinity mask exclusively to one CPU */
-  }
-
 #ifdef _WIN32
+  SET_MASK(cpuid)
   hThread = GetCurrentThread();
   if (SetThreadAffinityMask(hThread, mask) == 0) {
     return -1;
   }
 #elif  CMK_HAS_PTHREAD_SETAFFINITY
-  /* PID 0 refers to the current process */
-  if (pthread_setaffinity_np(pthread_self(), len, &mask) < 0) {
+  int s, j;
+  cpu_set_t cpuset;
+  pthread_t thread;
+
+  thread = pthread_self();
+
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpuid, &cpuset);
+
+  s = pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  if (s != 0) {
     perror("pthread_setaffinity");
     return -1;
   }
@@ -144,8 +154,29 @@ int set_thread_affinity(int cpuid) {
 #endif
 
   return 0;
+}
+#endif
+
+
+int CmiSetCPUAffinity(int mycore)
+{
+  int core = mycore;
+  if (core < 0) {
+    core = CmiNumCores() + core;
+  }
+  if (core < 0) {
+    CmiError("Error: Invalid cpu affinity core number: %d\n", mycore);
+    CmiAbort("CmiSetCPUAffinity failed");
+  }
+
+  CpvAccess(myCPUAffToCore) = core;
+
+  /* set cpu affinity */
+#if CMK_SMP
+  return set_thread_affinity(core);
 #else
-  return -1;
+  return set_cpu_affinity(core);
+  /* print_cpu_affinity(); */
 #endif
 }
 
@@ -161,40 +192,93 @@ int print_cpu_affinity() {
     return -1;
   }
   
-  printf("CPU affinity mask is: %08lx\n", pMask);
+ CmiPrintf("[%d] CPU affinity mask is: 0x%08lx\n", CmiMyPe(), pMask);
   
 #elif CMK_HAS_BINDPROCESSOR
   printf("[%d] CPU affinity mask is unknown for AIX. \n", CmiMyPe());
 #else
-  unsigned long mask;
-  unsigned int len = sizeof(mask);
-
+  /*unsigned long mask;
+  unsigned int len = sizeof(mask);*/
+  cpu_set_t cpuset;
+  char str[256], pe[16];
+  int i;
+  CPU_ZERO(&cpuset);
+ 
   /* PID 0 refers to the current process */
-  if (sched_getaffinity(0, len, &mask) < 0) {
+  /*if (sched_getaffinity(0, len, &mask) < 0) {*/
+  if (sched_getaffinity(0, sizeof(cpuset), &cpuset) < 0) {
     perror("sched_getaffinity");
     return -1;
   }
 
-  printf("[%d] CPU affinity mask is: %08lx\n", CmiMyPe(), mask);
+  sprintf(str, "[%d] CPU affinity mask is: ", CmiMyPe());
+  for (i = 0; i < CPU_SETSIZE; i++)
+        if (CPU_ISSET(i, &cpuset)) {
+            sprintf(pe, " %d ", i);
+            strcat(str, pe);
+        }
+  CmiPrintf("%s\n", str);  
 #endif
   return 0;
 }
 
-int print_thread_affinity() {
 #if CMK_SMP
+int print_thread_affinity() {
   unsigned long mask;
   size_t len = sizeof(mask);
 
 #if  CMK_HAS_PTHREAD_SETAFFINITY
-  if (pthread_getaffinity_np(pthread_self(), len, &mask) < 0) {
-    perror("pthread_setaffinity");
+  int s, j;
+  cpu_set_t cpuset;
+  pthread_t thread;
+  char str[256], pe[16];
+
+  thread = pthread_self();
+  s = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  if (s != 0) {
+    perror("pthread_getaffinity");
     return -1;
   }
-  printf("[%d] pthread affinity mask is: %08lx\n", CmiMyPe(), mask);
-#endif
+
+  sprintf(str, "[%d] %s affinity is: ", CmiMyPe(), CmiMyPe()>=CmiNumPes()?"communication pthread":"pthread");
+  for (j = 0; j < CPU_SETSIZE; j++)
+        if (CPU_ISSET(j, &cpuset)) {
+            sprintf(pe, " %d ", j);
+            strcat(str, pe);
+        }
+  CmiPrintf("%s\n", str);
 #endif
   return 0;
 }
+#endif
+
+int CmiPrintCPUAffinity()
+{
+#if CMK_SMP
+  return print_thread_affinity();
+#else
+  return print_cpu_affinity();
+#endif
+}
+
+  /* returns which core is running on, only works on Linux */
+int CmiOnCore(void) {
+  FILE *fp;
+  int core=-1;
+  char str[128];
+  int n;
+
+  fp = fopen("/proc/self/stat", "r");
+  if (fp == NULL) return -1;
+  for (n=0; n<39; n++)  {
+    fscanf(fp, "%s", str);
+  }
+  fclose(fp);
+  core = atoi(str);
+
+  return core;
+}
+
 
 static int cpuAffinityHandlerIdx;
 static int cpuAffinityRecvHandlerIdx;
@@ -280,17 +364,6 @@ static void cpuAffinityHandler(void *m)
   }
 }
 
-static int set_myaffinitity(int myrank)
-{
-  /* set cpu affinity */
-#if CMK_SMP
-  return set_thread_affinity(myrank);
-#else
-  return set_cpu_affinity(myrank);
-  /* print_cpu_affinity(); */
-#endif
-}
-
 /* called on each processor */
 static void cpuAffinityRecvHandler(void *msg)
 {
@@ -303,46 +376,133 @@ static void cpuAffinityRecvHandler(void *msg)
 
   /*CmiPrintf("[%d %d] set to core #: %d\n", CmiMyNode(), CmiMyPe(), myrank);*/
 
-  if (-1 != set_myaffinitity(myrank)) {
+  if (-1 != CmiSetCPUAffinity(myrank)) {
     DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
   }
-  else
+  else{
     CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
-
+    CmiAbort("set cpu affinity abort!\n");
+  }
+  /*CpvAccess(myCPUAffToCore) = myrank;*/
   CmiFree(m);
+}
+
+#if defined(_WIN32) && ! defined(__CYGWIN__)
+  /* strtok is thread safe in VC++ */
+#define strtok_r(x,y,z) strtok(x,y)
+#endif
+
+static int search_pemap(char *pecoremap, int pe)
+{
+  int *map = (int *)malloc(CmiNumPes()*sizeof(int));
+  char *ptr = NULL;
+  int i, j, count;
+  char *str;
+
+  char *mapstr = (char*)malloc(strlen(pecoremap)+1);
+  strcpy(mapstr, pecoremap);
+
+  str = strtok_r(mapstr, ",", &ptr);
+  count = 0;
+  while (str)
+  {
+      int hasdash=0, hascolon=0, hasdot=0;
+      int start, end, stride=1, block=1;
+      for (i=0; i<strlen(str); i++) {
+          if (str[i] == '-' && i!=0) hasdash=1;
+          if (str[i] == ':') hascolon=1;
+	  if (str[i] == '.') hasdot=1;
+      }
+      if (hasdash) {
+          if (hascolon) {
+            if (hasdot) {
+              if (sscanf(str, "%d-%d:%d.%d", &start, &end, &stride, &block) != 4)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+            }
+            else {
+              if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+            }
+          }
+          else {
+            if (sscanf(str, "%d-%d", &start, &end) != 2)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+          }
+      }
+      else {
+          sscanf(str, "%d", &start);
+          end = start;
+      }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", str);
+        block=1;
+      }
+      for (i = start; i<=end; i+=stride) {
+        for (j=0; j<block; j++) {
+          if (i+j>end) break;
+          map[count++] = i+j;
+          if (count == CmiNumPes()) break;
+        }
+      }
+      if (count == CmiNumPes()) break;
+      str = strtok_r(NULL, ",", &ptr);
+  }
+  i = map[pe % count];
+
+  free(map);
+  free(mapstr);
+  return i;
 }
 
 #if CMK_CRAYXT
 extern int getXTNodeID(int mype, int numpes);
 #endif
 
+
 void CmiInitCPUAffinity(char **argv)
 {
   static skt_ip_t myip;
   int ret, i, exclude;
   hostnameMsg  *msg;
+  char *pemap = NULL;
+  char *commap = NULL;
   char *coremap = NULL;
  
+  int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
   
+    /* obsolete */
   CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   if (coremap!=NULL && excludecount>0)
     CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
+
+  CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  if (pemap!=NULL && (coremap != NULL || excludecount>0))
+    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.\n");
+  CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+  show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
+						"print cpu affinity");
 
   cpuAffinityHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityHandler);
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
+  CpvInitialize(int, myCPUAffToCore);
+  CpvAccess(myCPUAffToCore) = -1;
+
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();
   }
 
-  if (!affinity_flag) return;
+  if (!affinity_flag) {
+    if (show_affinity_flag) CmiPrintCPUAffinity();
+    return;
+  }
   else if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
@@ -351,15 +511,26 @@ void CmiInitCPUAffinity(char **argv)
        CmiPrintf(".\n");
      }
      if (coremap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity map : %s\n", coremap);
+       CmiPrintf("Charm++> cpuaffinity core map : %s\n", coremap);
+     if (pemap!=NULL)
+       CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
   }
 
-  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm trhead */
+  if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
       /* comm thread either can float around, or pin down to the last rank.
          however it seems to be reportedly slower if it is floating */
     CmiNodeAllBarrier();
-    /* if (set_myaffinitity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-    if (coremap == NULL) {
+    if (commap != NULL) {
+      int mycore = search_pemap(commap, CmiMyPe()-CmiNumPes());
+      printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
+      if (-1 == CmiSetCPUAffinity(mycore))
+        CmiAbort("set_cpu_affinity abort!");
+      /*CpvAccess(myCPUAffToCore) = mycore;*/
+    }
+    else {
+    /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
+    }
+    if (coremap == NULL && pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
@@ -369,7 +540,23 @@ void CmiInitCPUAffinity(char **argv)
 #endif
     }
     CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
+  }
+
+  if (pemap != NULL) {
+    int mycore = search_pemap(pemap, CmiMyPe());
+    CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if (mycore >= CmiNumCores()) {
+      CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
+      CmiAbort("Invalid core number");
+    }
+    if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
+    /*CpvAccess(myCPUAffToCore) = mycore;*/
+    CmiNodeAllBarrier();
+    CmiNodeAllBarrier();
+    if (show_affinity_flag) CmiPrintCPUAffinity();
+    return;
   }
 
   if (coremap!= NULL) {
@@ -384,12 +571,13 @@ void CmiInitCPUAffinity(char **argv)
     i=0;
     while(ct>0) if (coremap[i++]==',') ct--;
     myrank = atoi(coremap+i);
-    printf("Charm++> set PE%d on node #%d core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
+    printf("Charm++> set PE%d on node #%d to core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
     if (myrank >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
     }
-    if (set_myaffinitity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
+    if (CmiSetCPUAffinity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
+    /*CpvAccess(myCPUAffToCore) = myrank;*/
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     return;
@@ -440,19 +628,35 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
+
+  if (show_affinity_flag) CmiPrintCPUAffinity();
 }
 
 #else           /* not supporting affinity */
 
 
+int CmiPrintCPUAffinity()
+{
+  CmiPrintf("Warning: CmiPrintCPUAffinity not supported.\n");
+}
+
 void CmiInitCPUAffinity(char **argv)
 {
+  char *pemap = NULL;
+  char *commap = NULL;
+  char *coremap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
+  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
+  CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
+
+  CpvInitialize(int, myCPUAffToCore);
+  CpvAccess(myCPUAffToCore) = -1;
 }
 
 #endif

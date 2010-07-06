@@ -284,6 +284,7 @@ public:
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
+        void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
 	void pup(PUP::er &p) {
 		p|nInts;
 		p|dimension;
@@ -405,7 +406,7 @@ PUPmarshall(CkArrayID)
 #include "ckobjQ.h"
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 class ChareMlogData;
 #endif
 
@@ -424,7 +425,7 @@ class Chare {
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
@@ -702,19 +703,6 @@ class CProxy {
 
 PUPmarshall(CProxy)
 
-/*These disambiguation macros are needed to support
-  multiple inheritance in Chares (Groups, Arrays).
-  They resolve ambiguous accessor calls to the parent "super".
-  Because mutator routines need to change *all* the base
-  classes, mutators are generated in xi-symbol.C.
-*/
-#define CK_DISAMBIG_CPROXY(super) \
-    int ckIsDelegated(void) const {return super::ckIsDelegated();}\
-    inline CkDelegateMgr *ckDelegatedTo(void) const {return super::ckDelegatedTo();}\
-    inline CkDelegateData *ckDelegatedPtr(void) const {return super::ckDelegatedPtr();} \
-    CkGroupID ckDelegatedIdx(void) const {return super::ckDelegatedIdx();}\
-
-
 
 /*The base classes of each proxy type
 */
@@ -723,11 +711,11 @@ class CProxy_Chare : public CProxy {
     CkChareID _ck_cid;
   public:
     CProxy_Chare() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_cid.onPE=0; _ck_cid.objPtr=0;
 #endif
     }
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const  {   //Make sure this proxy has a value
 #ifdef CMK_CHARE_USE_PTR
 	if (_ck_cid.objPtr==0)
@@ -750,13 +738,6 @@ class CProxy_Chare : public CProxy {
     }
 };
 PUPmarshall(CProxy_Chare)
-
-#define CK_DISAMBIG_CHARE(super) \
-	CK_DISAMBIG_CPROXY(super) \
-	inline void ckCheck(void) const {super::ckCheck();} \
-	const CkChareID &ckGetChareID(void) const\
-    	   {return super::ckGetChareID();} \
-        operator const CkChareID &(void) const {return ckGetChareID();}
 
 /******************* Reduction Declarations ****************/
 //Silly: need the type of a reduction client here so it can be used by proxies.
@@ -791,13 +772,6 @@ PUPbytes(CkReductionClientBundle)
  	void className::ckSetReductionClient(CkCallback *cb) const \
 		{ (mgr)->ckSetReductionClient(cb); }\
 
-#define CK_REDUCTION_CLIENT_DISAMBIG(super) \
-	inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const \
-		{ super::setReductionClient(fn,param); } \
-	inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const \
-		{ super::ckSetReductionClient(fn,param); } \
-	inline void ckSetReductionClient(CkCallback *cb) const \
-		{ super::ckSetReductionClient(cb); }\
 
 class CProxy_NodeGroup;
 class CProxy_CkArrayReductionMgr;
@@ -807,7 +781,7 @@ class CProxy_Group : public CProxy {
 
   public:
     CProxy_Group() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_gid.setZero();
 #endif
 	//CkPrintf(" In CProxy_Group Constructor\n");
@@ -827,7 +801,7 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
 		CkAbort("Error! This group proxy has not been initialized!");
@@ -852,16 +826,6 @@ class CProxy_Group : public CProxy {
     CK_REDUCTION_CLIENT_DECL
 };
 PUPmarshall(CProxy_Group)
-#define CK_DISAMBIG_GROUP(super) \
-	CK_DISAMBIG_CPROXY(super) \
-	inline void ckCheck(void) const {super::ckCheck();} \
-	CkChareID ckGetChareID(void) const \
-	   {return super::ckGetChareID();} \
-	CkGroupID ckGetGroupID(void) const \
-	   {return super::ckGetGroupID();} \
-	operator CkGroupID () const { return ckGetGroupID(); } \
-	CK_REDUCTION_CLIENT_DISAMBIG(super)\
-
 
 class CProxyElement_Group : public CProxy_Group {
   private:
@@ -884,11 +848,6 @@ class CProxyElement_Group : public CProxy_Group {
     }
 };
 PUPmarshall(CProxyElement_Group)
-#define CK_DISAMBIG_GROUP_ELEMENT(super) \
-	CK_DISAMBIG_GROUP(super) \
-	int ckGetGroupPe(void) const\
-    	   {return super::ckGetGroupPe();} \
-
 
 class CProxySection_Group : public CProxy_Group {
 private:
@@ -918,12 +877,12 @@ public:
   }
   CProxySection_Group(const IrrGroup *g)
       :CProxy_Group(g), _nsid(0) {}
-  CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems)
+  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems)
       :CProxy_Group(gid[0]), _nsid(n) {
     _sid = new CkSectionID[n];
     for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
   }
-  CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems,CK_DELCTOR_PARAM)
+  CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
     _sid = new CkSectionID[n];
     for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
@@ -969,29 +928,6 @@ public:
   }
 };
 PUPmarshall(CProxySection_Group)
-#define CK_DISAMBIG_GROUP_SECTION(super) \
-    CK_DISAMBIG_GROUP(super) \
-        inline int ckGetNumSections() const \
-      { return super::ckGetNumSections(); } \
-        inline CkSectionInfo &ckGetSectionInfo() \
-      { return super::ckGetSectionInfo(); } \
-        inline CkSectionID *ckGetSectionIDs() \
-      { return super::ckGetSectionIDs(); } \
-        inline CkSectionID &ckGetSectionID() \
-      { return super::ckGetSectionID(); } \
-        inline CkSectionID &ckGetSectionID(int i) \
-      { return super::ckGetSectionID(i); } \
-        inline CkGroupID ckGetGroupIDn(int i) const \
-      { return super::ckGetGroupIDn(i); } \
-        inline int *ckGetElements() const \
-      { return super::ckGetElements(); } \
-        inline int *ckGetElements(int i) const \
-      { return super::ckGetElements(i); } \
-        inline int ckGetNumElements() const \
-      { return super::ckGetNumElements(); }  \
-        inline int ckGetNumElements(int i) const \
-      { return super::ckGetNumElements(i); }  \
-
 
 /* These classes exist to provide chare indices for the basic
  chare types.*/
@@ -1016,7 +952,7 @@ class CProxy_NodeGroup : public CProxy{
     CkGroupID _ck_gid;
   public:
     CProxy_NodeGroup() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	_ck_gid.setZero();
 #endif
 	//CkPrintf("In CProxy_NodeGroup0 Constructor %d\n",CkLocalNodeBranch(_ck_gid));
@@ -1030,7 +966,7 @@ class CProxy_NodeGroup : public CProxy{
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     inline void ckCheck(void) const {   //Make sure this proxy has a value
 	if (_ck_gid.isZero())
 		CkAbort("Error! This group proxy has not been initialized!");
@@ -1116,7 +1052,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #include "ckmessagelogging.h"
 #endif
 #include "ckmemcheckpoint.h"
@@ -1180,6 +1116,8 @@ inline T *CkAllocateMarshallMsgT(int size,const CkEntryOptions *opts)
 
 /************************** Debugging Utilities **************/
 
+CkpvExtern(DebugEntryTable, _debugEntryTable);
+
 //For debugging: convert given index to a string (NOT threadsafe)
 static const char *idx2str(const CkArrayIndex &ind) {
   static char retBuf[80];
@@ -1216,7 +1154,7 @@ public:
   }
     */
   void deallocate() {
-    CkPrintf("CkConditional::delete %d\n",refcount);
+    //CkPrintf("CkConditional::delete %d\n",refcount);
     if (--refcount == 0) {
       //((CkConditional*)p)->~CkConditional();
       delete this;

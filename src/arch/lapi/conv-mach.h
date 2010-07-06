@@ -18,7 +18,7 @@
 #define CMK_MEMORY_PAGESIZE                                8192
 #define CMK_MEMORY_PROTECTABLE                             0
 
-#define CMK_NODE_QUEUE_AVAILABLE                           1
+#define CMK_NODE_QUEUE_AVAILABLE                           0
 
 #define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0 /* SMP versions */

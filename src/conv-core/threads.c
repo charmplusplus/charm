@@ -380,12 +380,21 @@ void CthRegistered(int maxOffset) {
 /*********** Creation and Deletion **********/
 CthCpvStatic(int, _defaultStackSize);
 
+void CthSetSerialNo(CthThread t, int no)
+{
+  B(t)->token->serialNo = no;
+}
+
 static void CthThreadBaseInit(CthThreadBase *th)
 {
   static int serialno = 1;
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
+#if CMK_BLUEGENE_CHARM
+  th->token->serialNo = -1;
+#else
   th->token->serialNo = CpvAccess(Cth_serialNo)++;
+#endif
   th->scheduled = 0;
 
   th->awakenfn = 0;
@@ -510,7 +519,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	 * When unpacking, reset the thread pointer in token to this thread.
 	 */
 	  
-        if(BgOutOfCoreFlag!=0){
+        if(_BgOutOfCoreFlag!=0){
 	    pup_bytes(p, &t->token, sizeof(void *));
 	    if(!pup_isUnpacking(p)){
 		t->token->thread = NULL;
@@ -518,7 +527,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	    pup_int(p, &t->scheduled);
 	}
 	if(pup_isUnpacking(p)){
-		if(BgOutOfCoreFlag==0){
+		if(_BgOutOfCoreFlag==0){
 		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    t->token->thread = S(t);
 		    t->token->serialNo = CpvAccess(Cth_serialNo)++;
@@ -542,7 +551,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	}
 	
 	/*BIGSIM_OOC DEBUGGING */
-	/*if(BgOutOfCoreFlag!=0){
+	/*if(_BgOutOfCoreFlag!=0){
 	   if(pup_isUnpacking(p)){
 		CmiPrintf("Unpacking: ");
 	    }else{
@@ -673,7 +682,7 @@ void CthSuspend(void)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
@@ -692,7 +701,7 @@ void CthAwaken(CthThread th)
     return;
   } */
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -713,7 +722,7 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -1572,7 +1581,7 @@ CthThread t;
 #if CMK_THREADS_USE_CONTEXT && CMK_64BIT /* makecontext only pass integer arguments */
 void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
 {
-  CmiUInt8 fn0 = (((CmiUInt8)fn1) << 32) | fn2;
+  CmiUInt8 fn0 =  (((CmiUInt8)fn1) << 32) | fn2;
   CmiUInt8 arg0 = (((CmiUInt8)arg1) << 32) | arg2;
   void *arg = (void *)arg0;
   qt_userf_t *fn = (qt_userf_t*)fn0;
@@ -1642,10 +1651,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   errno = 0;
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
-    int fn1 = ((CmiUInt8)fn) >> 32;
-    int fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
-    int arg1 = ((CmiUInt8)arg) >> 32;
-    int arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
+    CmiUInt4 fn1 = ((CmiUInt8)fn) >> 32;
+    CmiUInt4 fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
+    CmiUInt4 arg1 = ((CmiUInt8)arg) >> 32;
+    CmiUInt4 arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
   }
   else

@@ -39,6 +39,10 @@ public class ASTHTMLPrinter implements TreeTraverser.Visitor {
         switch(visitType) {
             case VISIT_ENTER:
                 out_.append("<li>" + tree.toString());
+                if (tree.symbolType != null) {
+                    out_.append(" [type=" + tree.symbolType + "]");
+                    out_.append(" [def=" + tree.def + "]");
+                }
                 if (tree.getChildCount() != 0) {
                     out_.append("<ol>");
                 } else {

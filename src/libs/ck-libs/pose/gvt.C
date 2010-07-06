@@ -19,7 +19,7 @@ PVT::PVT()
   CpvInitialize(eventID, theEventID);
   CpvAccess(theEventID)=eventID();
   //  CpvAccess(theEventID).dump();
-  LBTurnInstrumentOff();
+  //LBTurnInstrumentOff();
   optGVT = POSE_UnsetTS; conGVT = POSE_UnsetTS;
   rdone=0;
   SRs=NULL;
@@ -71,10 +71,61 @@ PVT::PVT()
     else reportsExpected = 1 + (P-2)/4 + (P-2)%2;
   }
   //  CkPrintf("PE %d reports to %d, receives %d reports, reduces and sends to %d, and reports directly to GVT if %d = 1!\n", CkMyPe(), reportTo, reportsExpected, reportReduceTo, reportEnd);
+
+  parCheckpointInProgress = 0;
+  parLastCheckpointGVT = 0;
+  parLastCheckpointTime = parStartTime = 0.0;
+  parLBInProgress = 0;
+  parLastLBGVT = 0;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
+}
+
+/// PUP routine
+void PVT::pup(PUP::er &p) {
+  p|optPVT; p|conPVT; p|estGVT; p|repPVT;
+  p|simdone; p|iterMin; p|waitForFirst;
+  p|reportTo; p|reportsExpected; p|reportReduceTo; p|reportEnd;
+  p|gvtTurn; p|specEventCount; p|eventCount;
+  p|startPhaseActive; p|parStartTime; p|parCheckpointInProgress;
+  p|parLastCheckpointGVT; p|parLastCheckpointTime;
+  p|parLBInProgress; p|parLastLBGVT;
+  p|optGVT; p|conGVT; p|rdone;
+
+  if (p.isUnpacking()) {
+    parStartTime = parLastCheckpointTime;
+#ifndef CMK_OPTIMIZE
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+#ifdef MEM_TEMPORAL
+    localTimePool = (TimePool *)CkLocalBranch(TempMemID);
+#endif
+    SendsAndRecvs = new SRtable();
+  }
+
+  SendsAndRecvs->pup(p);
+
+  int nullFlag;
+  if (SRs == NULL) {
+    nullFlag = 1;
+  } else {
+    nullFlag = 0;
+  }
+  p|nullFlag;
+  if (p.isUnpacking()) {
+    if (nullFlag) {
+      SRs = NULL;
+    } else {
+      SRs = new SRentry();
+      SRs->pup(p);
+    }
+  } else {
+    if (!nullFlag) {
+      SRs->pup(p);
+    }
+  }
 }
 
 void PVT::startPhaseExp(prioBcMsg *m) {
@@ -205,6 +256,117 @@ void PVT::setGVT(GVTMsg *m)
 #ifdef MEM_TEMPORAL
   localTimePool->set_min_time(estGVT);
 #endif
+
+  // Parallel checkpointing: setGVT was broken into two functions, and
+  // beginCheckpoint was added.  Only initiate the checkpointing
+  // procedure on PE 0, after commits have occurred.  This should
+  // minimize the amount of data written to disk.  In order to ensure
+  // a stable state, we wait for quiescence to be reached before
+  // beginning the checkpoint.  Inconsistent results were obtained
+  // (possibly from messages still in transit) without this step.
+  // Once quiescence is reached, PE 0 begins the checkpoint, and then
+  // resumes the simulation in resumeAfterCheckpoint.  This Callback
+  // function is also the first POSE function to be called when
+  // restarting from a checkpoint.
+
+  // Checkpoints are initiated approximately every
+  // pose_config.checkpoint_gvt_interval GVT ticks or
+  // pose_config.checkpoint_time_interval seconds (both defined in
+  // pose_config.h).
+
+  if ((CkMyPe() == 0) && (parCheckpointInProgress == 0) && (estGVT > 0) && 
+      (((pose_config.checkpoint_gvt_interval > 0) && (estGVT >= (parLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
+       ((pose_config.checkpoint_time_interval > 0) && 
+	((CmiWallTimer() + parStartTime) >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
+    // ensure that everything that can be committed has been
+    objs.CheckpointCommit();
+    // wait for quiescence to occur before checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::beginCheckpoint(dummyMsg), CkMyPe(), ThePVT);
+    parCheckpointInProgress = 1;
+    parLastCheckpointTime = CmiWallTimer() + parStartTime;
+    CkStartQD(cb);
+  } else if ((CkMyPe() == 0) && (parLBInProgress == 0) && 
+      (((pose_config.lb_gvt_interval > 0) && (estGVT >= (parLastLBGVT + pose_config.lb_gvt_interval))))) {
+    // wait for quiescence to occur before checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::beginLoadbalancing(dummyMsg), CkMyPe(), ThePVT);
+    parLBInProgress = 1;
+    CkStartQD(cb);
+  } else {
+    // skip checkpointing
+    eventMsg *dummyMsg = new eventMsg();
+    p[CkMyPe()].resumeAfterCheckpoint(dummyMsg);
+  }
+}
+
+/// ENTRY: begin checkpoint now that quiescence has been reached
+void PVT::beginCheckpoint(eventMsg *m) {
+  CkFreeMsg(m);
+  if (parCheckpointInProgress) {  // ensure this only happens once
+    CkPrintf("POSE: quiescence detected\n");
+    CkPrintf("POSE: beginning checkpoint on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
+    eventMsg *dummyMsg = new eventMsg();
+    CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
+    CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
+  }
+}
+
+void PVT::beginLoadbalancing(eventMsg *m) {
+  CkFreeMsg(m);
+  if (parLBInProgress) {  // ensure this only happens once
+    CProxy_PVT p(ThePVT);
+    p.callAtSync();
+  }
+}
+
+void PVT::callAtSync()
+{
+  objs.callAtSync();
+}
+
+void PVT::doneLB() {
+  static int count = 0;
+  count ++;
+  if (count == objs.getNumObjs()) {
+    count =0;
+    if (CkMyPe()==0) { 
+      eventMsg *dummyMsg = new eventMsg();
+      CProxy_PVT p(ThePVT);
+      p[0].resumeAfterLB(dummyMsg);
+    }
+  }
+}
+
+/// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
+void PVT::resumeAfterCheckpoint(eventMsg *m) {
+  if (parCheckpointInProgress) {
+    CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
+    parCheckpointInProgress = 0;
+    parLastCheckpointGVT = estGVT;
+  }
+  CkFreeMsg(m);
+  CProxy_PVT p(ThePVT);
+  startPhaseActive = 0;
+  prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
+  startMsg->bc = 1;
+  *((int *)CkPriorityPtr(startMsg)) = 0;
+  CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
+  p[CkMyPe()].startPhase(startMsg);
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
+}
+
+void PVT::resumeAfterLB(eventMsg *m) {
+  if (parLBInProgress) {
+    CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
+    parLBInProgress = 0;
+    parLastLBGVT = estGVT;
+  }
+  CkFreeMsg(m);
+  CProxy_PVT p(ThePVT);
   startPhaseActive = 0;
   prioBcMsg *startMsg = new (8*sizeof(int)) prioBcMsg;
   startMsg->bc = 1;
@@ -388,6 +550,39 @@ GVT::GVT()
     *((int *)CkPriorityPtr(startMsg)) = 0;
     CkSetQueueing(startMsg, CK_QUEUEING_IFIFO); 
     p.startPhase(startMsg); // broadcast PVT calculation to all PVT branches
+  }
+}
+
+/// PUP routine
+void GVT::pup(PUP::er &p) {
+  p|estGVT; p|inactive; p|inactiveTime; p|nextLBstart;
+  p|lastEarliest; p|lastSends; p|lastRecvs; p|reportsExpected;
+  p|optGVT; p|conGVT; p|done; p|startOffset;
+
+  if (p.isUnpacking()) {
+#ifndef CMK_OPTIMIZE
+    localStats = (localStat *)CkLocalBranch(theLocalStats);
+#endif
+  }
+
+  int nullFlag;
+  if (SRs == NULL) {
+    nullFlag = 1;
+  } else {
+    nullFlag = 0;
+  }
+  p|nullFlag;
+  if (p.isUnpacking()) {
+    if (nullFlag) {
+      SRs = NULL;
+    } else {
+      SRs = new SRentry();
+      SRs->pup(p);
+    }
+  } else {
+    if (!nullFlag) {
+      SRs->pup(p);
+    }
   }
 }
 

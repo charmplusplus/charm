@@ -330,7 +330,7 @@ void workThreadInfo::scheduler(int count)
 
 static FILE *openBinaryReplayFile(int pe, const char* flags) {
         char fName[200];
-        sprintf(fName,"ckfullreplay_%06d.log",pe);
+        sprintf(fName,"bgfullreplay_%06d.log",pe);
         FILE *f;
         // CkPrintf("openBinaryReplayFile %s\n", fName);
         f = fopen(fName, flags);
@@ -349,13 +349,19 @@ void workThreadInfo::run()
     //  register for charm++ applications threads
   CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
 
-  if (cva(bgMach).record != -1 && (cva(bgMach).recordprocs.isEmpty() || cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID())))
+  if (cva(bgMach).record != -1 && ( cva(bgMach).recordprocs.isEmpty() && cva(bgMach).recordnodes.isEmpty() || (!cva(bgMach).recordprocs.isEmpty() && cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID()))) || (!cva(bgMach).recordnodes.isEmpty() && cva(bgMach).recordnodes.includes(BgMyNode())))
   {
-    watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"));
+    watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"), cva(bgMach).recordnode!=-1);
   }
   if (cva(bgMach).replay != -1)
   {
-    watcher = new BgMessageReplay(openBinaryReplayFile(cva(bgMach).replay, "rb"));
+    watcher = new BgMessageReplay(openBinaryReplayFile(cva(bgMach).replay, "rb"), 0);
+  }
+  if (cva(bgMach).replaynode != -1)
+  {
+    int startpe, endpe;
+    BgRead_nodeinfo(cva(bgMach).replaynode, startpe, endpe);
+    watcher = new BgMessageReplay(openBinaryReplayFile(startpe+BgGetThreadID(), "rb"), 1);
   }
 
 //  InitHandlerTable();
@@ -403,7 +409,7 @@ void workThreadInfo::addAffMessage(char *msgPtr)
 
 //=====Begin of stuff related with out-of-core scheduling======
 
-extern int BgOutOfCoreFlag;
+extern int _BgOutOfCoreFlag;
 
 //The Out-of-core implementation reuses the functions in the checkpoint
 //module. For standalone bigsim emulator programs, the definitions of
@@ -430,7 +436,7 @@ void threadInfo::broughtIntoMem(){
    if(oocPrefetchSpace->occupiedThd != this){
 	//in this case, the prefetch is not for this workthread
 
-        BgOutOfCoreFlag=2;
+        _BgOutOfCoreFlag=2;
         char *dirname = "/tmp/CORE";
         //every body make dir in case it is local directory
         //CmiMkdir(dirname);
@@ -442,7 +448,7 @@ void threadInfo::broughtIntoMem(){
             return;
         }
     
-        //BgOutOfCoreFlag=2;
+        //_BgOutOfCoreFlag=2;
         PUP::fromDisk p(fp);
         //out-of-core is not a real migration, so turn off the notifyListener option
         #if BIGSIM_OUT_OF_CORE
@@ -452,7 +458,7 @@ void threadInfo::broughtIntoMem(){
    }else
 #endif
 {    
-        BgOutOfCoreFlag=2;
+        _BgOutOfCoreFlag=2;
         workThreadInfo *wthd = (workThreadInfo *)this;
 #if BIGSIM_OOC_NOPREFETCH_AIO
         oocPrefetchSpace->newPrefetch(wthd);
@@ -467,7 +473,7 @@ void threadInfo::broughtIntoMem(){
 	}
 #else
 	//not doing prefetch optimization for ooc emulation
-	BgOutOfCoreFlag=2;
+	_BgOutOfCoreFlag=2;
 	char *dirname = "/tmp/CORE";
 	//every body make dir in case it is local directory
 	//CmiMkdir(dirname);
@@ -479,7 +485,7 @@ void threadInfo::broughtIntoMem(){
 		return;
 	}
 
-	//BgOutOfCoreFlag=2;
+	//_BgOutOfCoreFlag=2;
 	PUP::fromDisk p(fp);
 	//out-of-core is not a real migration, so turn off the notifyListener option
 	#if BIGSIM_OUT_OF_CORE
@@ -489,7 +495,7 @@ void threadInfo::broughtIntoMem(){
 #endif	
 
 
-    BgOutOfCoreFlag=0;
+    _BgOutOfCoreFlag=0;
     
     //printf("mem usage after thread %d in: %fMB\n",globalId, CmiMemoryUsage()/1024.0/1024.0);    
     isCoreOnDisk = 0;
@@ -501,7 +507,7 @@ void threadInfo::takenOutofMem(){
 
     assert(isCoreOnDisk==0);
 
-    BgOutOfCoreFlag=1;
+    _BgOutOfCoreFlag=1;
     char *dirname = "/tmp/CORE";
     //every body make dir in case it is local directory
     CmiMkdir(dirname);
@@ -513,7 +519,7 @@ void threadInfo::takenOutofMem(){
         return;
     }
 
-    //BgOutOfCoreFlag=1;
+    //_BgOutOfCoreFlag=1;
     PUP::toDisk p(fp);
     //out-of-core is not a real migration, so turn off the notifyListener option
     p.becomeDeleting();
@@ -538,7 +544,7 @@ void threadInfo::takenOutofMem(){
     CkRemoveArrayElements();
     #endif
 
-    BgOutOfCoreFlag=0;
+    _BgOutOfCoreFlag=0;
     isCoreOnDisk=1;
     //printf("mem usage after thread %d out: %fMB\n", globalId, CmiMemoryUsage()/1024.0/1024.0);  
 #if BIGSIM_OOC_PREFETCH
@@ -549,7 +555,7 @@ void threadInfo::takenOutofMem(){
 /*
 static int outCore()
 {
-  BgOutOfCoreFlag = 1;
+  _BgOutOfCoreFlag = 1;
   //printf("memory usage: out core before remove arrays %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
   int id = BgGetGlobalWorkerThreadID();
   //printf("[%d] Out core\n", id);
@@ -570,12 +576,12 @@ static int outCore()
 
   CkRemoveArrayElements();
   //printf("memory usage: out core after remove arrays %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
-  BgOutOfCoreFlag = 0;
+  _BgOutOfCoreFlag = 0;
 }
 
 static int inCore()
 {
-  BgOutOfCoreFlag = 2;
+  _BgOutOfCoreFlag = 2;
 //CmiPrintStackTrace(0);
   //printf("memory usage: in core before load core %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
   int id = BgGetGlobalWorkerThreadID();
@@ -592,7 +598,7 @@ static int inCore()
   fdatasync(fileno(fp));
   fclose(fp);
   //printf("memory usage: in core after load core %fMB\n", CmiMemoryUsage()/1024.0/1024.0);
-  BgOutOfCoreFlag = 0;
+  _BgOutOfCoreFlag = 0;
 }
 */
 

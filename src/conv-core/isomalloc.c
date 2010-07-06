@@ -57,7 +57,7 @@ static int read_randomflag(void)
 {
   FILE *fp;
   int random_flag;
-  CmiLock(smp_mutex);
+  CmiLock(_smp_mutex);
   fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
@@ -74,7 +74,7 @@ static int read_randomflag(void)
   else {
     random_flag = -1;
   }
-  CmiUnlock(smp_mutex);
+  CmiUnlock(_smp_mutex);
   return random_flag;
 }
 
@@ -1947,10 +1947,16 @@ static void init_ranges(char **argv)
   memRegion_t freeRegion;
   /*Largest value a signed int can hold*/
   memRange_t intMax=(((memRange_t)1)<<(sizeof(int)*8-1))-1;
+  int pagesize = 0;
 
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
-  slotsize=(slotsize+CMK_MEMORY_PAGESIZE-1) & ~(CMK_MEMORY_PAGESIZE-1);
+#if CMK_HAS_GETPAGESIZE
+  pagesize = getpagesize();
+#endif
+  if (pagesize < CMK_MEMORY_PAGESIZE)
+    pagesize = CMK_MEMORY_PAGESIZE;
+  slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
 #if CMK_THREADS_DEBUG
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif

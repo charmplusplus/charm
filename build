@@ -31,7 +31,7 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
-  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
   if test $more = 1
@@ -83,13 +83,17 @@ syntax() {
   echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
   echo "  --no-build-shared  don't build Charm++'s shared libraries"
   echo ''
+  echo 'Enable/disable features:'
+  src/scripts/configure --help | grep enable-
+  src/scripts/configure --help | grep with-
+  echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
+  echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR       specify additional include path for compiler'
   echo '  --libdir=DIR	     specify additional lib path for compiler'
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
-  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -300,6 +304,14 @@ do
 		WITH_PRODUCTION="true" 
 		shift
 		;;
+    --with-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
+    --without-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     --build-shared|-bs)
 		# obsolete, do nothing
 		shift
@@ -335,6 +347,19 @@ do
 		QUIET="--quiet"
 		shift;
 		;;
+    --enable-tracing|--enable-tracing=*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		ENABLE_TRACING=yes
+		shift
+		;;
+    --enable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
+    --disable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -368,6 +393,7 @@ do
           TestIfOption $1
           BOPTS="$BOPTS $1"
           [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
+          [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
         fi
         shift
 	;;
@@ -375,6 +401,12 @@ do
 done
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
+
+if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
+then
+  echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
+  exit 1
+fi
 
 if [ -z "$MAKE" ] 
 then
@@ -528,8 +560,10 @@ fi
 
 if test -n "$WITH_PRODUCTION"
 then
-    echo '#define CMK_OPTIMIZE' >> $ConvHeader
-    echo '#define CMK_REPLAYSYSTEM  0' >> $ConvHeader
+    echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
+    # Prepend optimize so that an explicit -no-optimize still works
+    OPTS="-optimize $OPTS"
+    CONFIG_OPTS="--disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
 fi
 
 # build with Tau
@@ -570,6 +604,7 @@ echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 if test $BUILD_EMULATOR = 1
 then
   PROGRAM="$PROGRAM bigsim"
+#  CONFIG_OPTS="--disable-charmdebug $CONFIG_OPTS"
 fi
 
 printError()
@@ -584,8 +619,10 @@ printError()
 
 echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
+echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > config_opts.sh
+chmod +x config_opts.sh
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError

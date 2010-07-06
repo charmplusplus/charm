@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
@@ -12,6 +5,7 @@
 
 #include "ampi.h"
 #include "charm++.h"
+#include "ckliststring.h"
 
 #if AMPI_COMLIB
 //#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
@@ -28,14 +22,15 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
 
-static int msgLogRank;
+//static int msgLogRank;
+static CkListString msgLogRanks;
 static int msgLogWrite;
 static int msgLogRead;
 static char *msgLogFilename;
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
 #include <zlib.h>
 namespace PUP{
 class zdisk : public er {
@@ -81,7 +76,11 @@ class fromzDisk : public zdisk {
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
+#if CMK_CONVERSE_LAPI ||  CMK_BLUEGENE_CHARM
+#define AMPI_ALLTOALL_MEDIUM_MSG   4194304
+#else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
+#endif
 
 #if AMPI_COUNTER
 class AmpiCounters{
@@ -591,7 +590,8 @@ public:
 	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
-	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
+	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
+	/// 4-SReq, 5-GPUReq
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -727,6 +727,40 @@ public:
 	virtual void print();
 };
 
+class SReq : public AmpiRequest {
+public:
+	bool statusIreq;
+	SReq(MPI_Comm comm_): statusIreq(false) {
+		comm = comm_; isvalid=true;
+	}
+	SReq(): statusIreq(false) {}
+	~SReq(){ }
+	CmiBool test(MPI_Status *sts);
+	void complete(MPI_Status *sts);
+	int wait(MPI_Status *sts);
+	void receive(ampi *ptr, AmpiMsg *msg) {}
+	inline int getType(void){ return 4; }
+	virtual void pup(PUP::er &p){
+		AmpiRequest::pup(p);
+		p|statusIreq;
+	}
+	//added due to BIGSIM_OOC DEBUGGING
+	virtual void print();
+};
+
+class GPUReq : public AmpiRequest {
+    bool isComplete;
+
+public:
+    GPUReq();
+    int getType() { return 5; }
+    CmiBool test(MPI_Status *sts);
+    void complete(MPI_Status *sts);
+    int wait(MPI_Status *sts);
+    void receive(ampi *ptr, AmpiMsg *msg);
+    void setComplete();
+};
+
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
 class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     AmpiRequest** block; //Elements of vector
@@ -798,7 +832,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
 
     inline void checkRequest(MPI_Request idx){
       if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
-        CkAbort("Invalide MPI_Request\n");
+        CkAbort("Invalid MPI_Request\n");
     }
 
     //find an AmpiRequest by its pointer value
@@ -1208,8 +1242,8 @@ public:
       // empty
     }
 
-    void startCheckpoint(char* dname);
-    void Checkpoint(int len, char* dname);
+    void startCheckpoint(const char* dname);
+    void Checkpoint(int len, const char* dname);
     void ResumeThread(void);
     TCharm* getTCharmThread() {return thread;}
 
@@ -1354,17 +1388,17 @@ public:
     void freeInfo(MPI_Info info);
 
  public:
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
     /* message logging */
     int pupBytes;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
     gzFile fMsgLog;
     PUP::tozDisk *toPUPer;
     PUP::fromzDisk *fromPUPer;
 #else
     FILE* fMsgLog;
-    PUP::tozDisk *toPUPer;
-    PUP::fromzDisk *fromPUPer;
+    PUP::toDisk *toPUPer;
+    PUP::fromDisk *fromPUPer;
 #endif
 #endif
     void init();
@@ -1377,6 +1411,7 @@ one MPI communicator.
 */
 class ampi : public CBase_ampi {
 friend class IReq;
+friend class SReq;
     CProxy_ampiParent parentProxy;
     void findParent(bool forMigration);
     ampiParent *parent;
@@ -1424,6 +1459,7 @@ friend class IReq;
     void unblock(void);
     void yield(void);
     void generic(AmpiMsg *);
+    void ssend_ack(int sreq);
     void reduceResult(CkReductionMsg *m);
     void splitPhase1(CkReductionMsg *msg);
     void commCreatePhase1(CkReductionMsg *msg);

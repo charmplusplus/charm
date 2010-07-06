@@ -39,7 +39,7 @@ CpvExtern (int ,serializer);
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
-extern CmiBool isAnytimeMigration;
+extern CmiBool _isAnytimeMigration;
 
 /**
 \addtogroup CkArray
@@ -360,27 +360,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxy_ArrayBase)
-#define CK_DISAMBIG_ARRAY(super) \
-	CK_DISAMBIG_CPROXY(super) \
-	inline void ckCheck(void) const {super::ckCheck();} \
-	inline operator CkArrayID () const {return ckGetArrayID();}\
-	inline static CkArrayID ckCreateEmptyArray(void)\
-	  { return super::ckCreateEmptyArray(); }\
-	inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)\
-	  { return super::ckCreateArray(m,ctor,opts); }\
-	inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx) \
-	  { super::ckInsertIdx(m,ctor,onPe,idx); }\
-	inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const \
-	  { super::ckBroadcast(m,ep,opts); } \
-	inline CkArrayID ckGetArrayID(void) const \
-	  { return super::ckGetArrayID();} \
-	inline CkArray *ckLocalBranch(void) const \
-	  { return super::ckLocalBranch(); } \
-	inline CkLocMgr *ckLocMgr(void) const \
-	  { return super::ckLocMgr(); } \
-	inline void doneInserting(void) { super::doneInserting(); }\
-	CK_REDUCTION_CLIENT_DISAMBIG(super) \
-
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -405,17 +384,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxyElement_ArrayBase)
-#define CK_DISAMBIG_ARRAY_ELEMENT(super) \
-	CK_DISAMBIG_ARRAY(super) \
-	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
-	  { super::ckInsert(m,ctor,onPe); }\
-	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const \
-	  { super::ckSend(m,ep,opts); }\
-	inline void *ckSendSync(CkArrayMessage *m, int ep) const \
-	  { return super::ckSendSync(m,ep); }\
-	inline const CkArrayIndex &ckGetIndex() const \
-	  { return super::ckGetIndex(); }\
-
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -449,12 +417,12 @@ public:
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
       } else _sid = NULL;
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, const CkArrayIndexMax **elems, const int *nElems)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, const CkArrayIndexMax **elems, const int *nElems,CK_DELCTOR_PARAM)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
@@ -494,28 +462,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase)
-#define CK_DISAMBIG_ARRAY_SECTION(super) \
-	CK_DISAMBIG_ARRAY(super) \
-	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) \
-	  { super::ckSend(m,ep,opts); } \
-        inline CkSectionInfo &ckGetSectionInfo() \
-	  { return super::ckGetSectionInfo(); } \
-        inline CkSectionID *ckGetSectionIDs() \
-	  { return super::ckGetSectionIDs(); } \
-        inline CkSectionID &ckGetSectionID() \
-	  { return super::ckGetSectionID(); } \
-        inline CkSectionID &ckGetSectionID(int i) \
-	  { return super::ckGetSectionID(i); } \
-        inline CkArrayID ckGetArrayIDn(int i) const \
-          { return super::ckGetArrayIDn(i); }  \
-        inline CkArrayIndexMax *ckGetArrayElements() const \
-	  { return super::ckGetArrayElements(); } \
-        inline CkArrayIndexMax *ckGetArrayElements(int i) const \
-          { return super::ckGetArrayElements(i); } \
-        inline int ckGetNumElements() const \
-	  { return super::ckGetNumElements(); }  \
-        inline int ckGetNumElements(int i) const \
-          { return super::ckGetNumElements(i); }  \
 
 //Simple C-like API:
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
@@ -533,15 +479,12 @@ class ArrayElement : public CkMigratable
 {
   friend class CkArray;
   friend class CkArrayListener;
+  int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
 public:
   ArrayElement(void);
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
-
-  int numElements; /// Initial number of array elements (DEPRICATED)
-  // On the previous line, someone wrote "deprecated", but nevertheless it is still
-  // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
 
 /// Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
@@ -562,8 +505,9 @@ public:
 
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 
-  const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+  inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
+  inline int ckGetArraySize(void) const { return numInitialElements; }
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
@@ -609,7 +553,7 @@ class ArrayElementT : public ArrayElement
 {
 public:
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         mlogData->objID.data.array.idx.asMax()=thisIndexMax;
 #endif
 }
@@ -844,7 +788,7 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
 	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
 	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);

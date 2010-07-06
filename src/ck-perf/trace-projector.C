@@ -17,7 +17,7 @@ typedef CkVec<UsrEvent *>   UsrEventVec;
 CkpvStaticDeclare(UsrEventVec, usrEvents);
 
 
-#ifdef CMK_OPTIMIZE
+#if ! CMK_TRACE_ENABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\

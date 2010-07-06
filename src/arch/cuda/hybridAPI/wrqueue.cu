@@ -82,6 +82,10 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
 #endif
 }
 
+void setWRCallback(workRequest *wr, void *cb) {
+    wr->callbackFn = cb;
+}
+
 void dequeue(workRequestQueue *q) {
   q->head++; 
   if (q->head == q->capacity) {

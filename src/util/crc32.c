@@ -109,3 +109,20 @@ unsigned int crc32_update(unsigned char *data, int len, unsigned int previous) {
   
   return ~result;
 }
+
+static unsigned char checksum3[4] = {0, 0, 0, 0xFF};
+static unsigned char checksum_array[7] = {0xFF, 0xFF, 0xFF, 0, 0, 0, 0};
+
+unsigned int checksum_update(unsigned char *data, int len, unsigned int previous) {
+  unsigned int result = previous;
+  int i;
+  unsigned int *ptr = (unsigned int *)data;
+  int size = len >> 2;
+  for (i=0; i<size; ++i) result ^= *ptr++;
+  result ^= *ptr & *(unsigned int*)&(checksum_array[3-(len&3)]);
+  return result;
+}
+
+unsigned int checksum_initial(unsigned char *data, int len) {
+  return checksum_update(data, len, 0);
+}

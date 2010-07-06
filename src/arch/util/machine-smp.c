@@ -416,7 +416,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
-  smp_mutex = CmiCreateLock();
+  _smp_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
   if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
@@ -463,7 +463,11 @@ static void CmiStartThreads(char **argv)
     pthread_attr_destroy(&attr);
   }
 #if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if CMK_CONVERSE_MPI
+  pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
+#else
   pthread_setspecific(Cmi_state_key, Cmi_state_vector);
+#endif
 #endif
 
 }

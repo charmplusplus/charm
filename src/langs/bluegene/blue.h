@@ -117,7 +117,7 @@ int  BgNumNodes();	/**<  total number of Blue Gene nodes */
 void BgSetSize(int sx, int sy, int sz);
 int  BgNodeSize();      /* return the number of nodes on this emulator pe */
 int  BgMyRank();	/* node ID, this is local ID */
-int  BgMyNode();
+int  BgMyNode();        /* global node serial number */
 
 int BgNodeToRealPE(int node);         /* return a real processor number from a bg node */
 int BgTraceProjectionOn(int pe);    /* true if pe is on for trace projections */
@@ -172,6 +172,7 @@ void BgSendPacket(int x, int y, int z, int threadID, int handlerID,
 
 void BgStartStreaming();
 void BgEndStreaming();
+void BgEnqueue(char *msg);         /* enqueue a msg to local queue */
 
 /************************ collective functions ************************/
 
@@ -226,6 +227,8 @@ double BgGetTime();
 char *BgGetNodeData();
 void BgSetNodeData(char *data);
 
+int BgIsMainthread();
+
 /************************ Timing utility functions ************************/
 
 #define BG_ELAPSE      1
@@ -276,6 +279,7 @@ void BgUnsetStartOutOfCore();
 /*********************** Record / Replay *************************/
 int BgIsRecord();
 int BgIsReplay();
+void BgRewindRecord();
 
 #if defined(__cplusplus)
 }
@@ -328,8 +332,8 @@ public:
 #define BnvExtern(T,v)         extern Cnv<T> CMK_CONCAT(Bnv_Var, v);
 #define BnvInitialize(T,v)     CMK_CONCAT(Bnv_Var, v).init()
 #define BnvInitialized(v)      CMK_CONCAT(Bnv_Var, v).inited()
-#define BnvAccess(v)           CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][BgMyRank()]
-#define BnvAccessOther(v, r)   CMK_CONCAT(Bnv_Var, v).data[CmiMyRank()][r]
+#define BnvAccess(v)           CMK_CONCAT(Bnv_Var, v).data[CmiMyRank_()][BgMyRank()]
+#define BnvAccessOther(v, r)   CMK_CONCAT(Bnv_Var, v).data[CmiMyRank_()][r]
 #endif
 
 #endif
@@ -367,9 +371,9 @@ public:
 #define BpvExtern(T,v)         extern Cpv<T> CMK_CONCAT(Bpv_Var, v);
 #define BpvInitialize(T,v)     CMK_CONCAT(Bpv_Var, v).init()
 #define BpvInitialized(v)      CMK_CONCAT(Bpv_Var, v).inited()
-#define BpvAccess(v)           CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][BgGetThreadID()]
+#define BpvAccess(v)           CMK_CONCAT(Bpv_Var, v).data[CmiMyRank_()][BgMyRank()][BgGetThreadID()]
 /*#define BpvAccess(v)           (CMK_CONCAT(Bpv_Var, v).getThreadData())*/
-#define BpvAccessOther(v, r)   CMK_CONCAT(Bpv_Var, v).data[CmiMyRank()][BgMyRank()][r]
+#define BpvAccessOther(v, r)   CMK_CONCAT(Bpv_Var, v).data[CmiMyRank_()][BgMyRank()][r]
 #endif
 
 #else
@@ -382,6 +386,9 @@ public:
 #endif
 
 #include "blue-conv.h"
+
+typedef void (*BgTracingFn) ();
+void BgRegisterUserTracingFunction(BgTracingFn fn);
 
 #endif
 

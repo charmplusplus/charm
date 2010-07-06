@@ -85,7 +85,7 @@ extern "C" {
 
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern int memory_status_info;
 extern int memory_chare_id;
 #define setMemoryStatus(p) { \
@@ -121,6 +121,8 @@ void setMemoryOwnedBy(void *p, int id);
 # define CpvInit_Alloc(t,n) (t *)calloc(n,sizeof(t))
 # define CpvInit_Alloc_scalar(t) (t *)calloc(1,sizeof(t))
 #endif
+
+extern int CmiMyRank_();
 
 #if CMK_SHARED_VARS_UNAVAILABLE /* Non-SMP version of shared vars. */
 extern int _Cmi_mype;
@@ -415,7 +417,7 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
-#define CMK_MAX_PTHREADS     64
+#define CMK_MAX_PTHREADS     128
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
@@ -437,7 +439,11 @@ for each processor in the node.
        if (CmiMyRank()) { \
 		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
        } else { \
-               CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()); \
+               if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
+		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
+		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
+		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
+	       } \
 	       CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0); \
@@ -481,7 +487,7 @@ for each processor in the node.
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
-extern CmiNodeLock smp_mutex;
+extern CmiNodeLock _smp_mutex;
 
 extern int CmiBarrier(void);
 extern int CmiBarrierZero(void);
@@ -496,6 +502,10 @@ extern int CmiNumPesOnPhysicalNode(int node);
 extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
+
+extern int CmiPrintCPUAffinity();
+extern int CmiSetCPUAffinity(int core);
+extern int CmiOnCore();
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
@@ -594,10 +604,30 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
-#if CMK_MEM_CHECKPOINT
+#if __FAULT__
 extern int cur_restart_phase;      /* number of restarts */
+#endif
+
+#if CMK_MEM_CHECKPOINT
 #undef CmiSetHandler
 #define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#define MESSAGE_PHASE_CHECK(msg)	\
+	{	\
+          int phase = CmiGetRestartPhase(msg);	\
+	  if (phase != 9999 && phase < cur_restart_phase) {	\
+            /* CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CmiFree(msg);	\
+	    return;	\
+          }	\
+          /* CmiAssert(phase == cur_restart_phase || phase == 9999); */ \
+          if (phase > cur_restart_phase && phase != 9999) {    \
+            /* CmiPrintf("[%d] enqueue message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CsdEnqueueFifo(msg);    \
+	    return;	\
+          }     \
+	}
+#else
+#define MESSAGE_PHASE_CHECK(msg)
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
@@ -665,11 +695,12 @@ void CmiResetMinMemory();
 void* CmiMallocAligned(const size_t size, const unsigned int alignment);
 void CmiFreeAligned(void* ptr);
 
-#define CMI_MEMORY_IS_ISOMALLOC (1<<1)
-#define CMI_MEMORY_IS_PARANOID  (1<<2)
-#define CMI_MEMORY_IS_GNU       (1<<3)
-#define CMI_MEMORY_IS_GNUOLD    (1<<4)
-#define CMI_MEMORY_IS_OS        (1<<5)
+#define CMI_MEMORY_IS_ISOMALLOC   (1<<1)
+#define CMI_MEMORY_IS_PARANOID    (1<<2)
+#define CMI_MEMORY_IS_GNU         (1<<3)
+#define CMI_MEMORY_IS_GNUOLD      (1<<4)
+#define CMI_MEMORY_IS_OS          (1<<5)
+#define CMI_MEMORY_IS_CHARMDEBUG  (1<<6)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
 #define CMI_THREAD_IS_QT         (1<<1)
@@ -808,14 +839,15 @@ void  CmiError(const char *format, ...);
 
 #endif
 
-#ifdef CMK_OPTIMIZE
-#define CmiAssert(expr) ((void) 0)
-#else
 #if defined(__STDC__) || defined(__cplusplus)
 #define __CMK_STRING(x) #x
 #else
 #define __CMK_STRING(x) "x"
 #endif
+
+#if ! CMK_ERROR_CHECKING
+#define CmiAssert(expr) ((void) 0)
+#else
 extern void __cmi_assert(const char *, const char *, int);
 #define CmiAssert(expr) \
   ((void) ((expr) ? 0 :                   \
@@ -1098,9 +1130,11 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 #else
+
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
+#if CMK_UTH_VERSION || CMK_MULTICORE
 #define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
@@ -1122,6 +1156,14 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
         } while(0)
+#else
+#define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
+#define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
+#define CmiSyncNodeBroadcastAndFree(s,m)    CmiSyncBroadcastAndFree(s,m)
+#define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
+#define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
+#define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#endif
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
@@ -1195,6 +1237,7 @@ typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
+void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
 int        CthMigratable();
@@ -1489,6 +1532,8 @@ void CcdRaiseCondition(int condnum);
 void CmiArgGroup(const char *parentName,const char *groupName);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
 int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc);
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest);
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc);
 int CmiGetArgDouble(char **argv,const char *arg,double *optDest);
 int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc);
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
@@ -1653,9 +1698,6 @@ extern int _immRunning;
 #elif CMK_PPC_ASM
 #define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
 #define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define AT TOSTRING(__LINE__)
 #define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
      __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \
@@ -1752,7 +1794,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else
@@ -1775,8 +1817,8 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #endif
 
 /* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int BgOutOfCoreFlag;
-extern int BgInOutOfCoreMode;
+extern int _BgOutOfCoreFlag;
+extern int _BgInOutOfCoreMode;
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

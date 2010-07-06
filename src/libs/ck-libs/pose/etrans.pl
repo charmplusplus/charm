@@ -292,6 +292,10 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	  {
 	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outhhandle->print("$repversion"."\n");
 	    $outhhandle->print("#endif\n");
 	  }
 	else
@@ -315,6 +319,10 @@ while (@line=split(' ',($thisline=getcodeline($inhhandle)))) {
 	  {
 	    $outhhandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outhhandle->print("$_"."\n");
+	    $outhhandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outhhandle->print("$repversion"."\n");
 	    $outhhandle->print("#endif\n");
 	  }
 	else
@@ -629,6 +637,7 @@ foreach my $incfile ($inC,@otherfiles)
 	#create the wrapper parent class constructor
 	$outChandle->print($returntype." ") if($returntype);
 	$outChandle->print(join('',$class,"::",$method,'(',$message,' *',$messagename,"){\n"));
+	$outChandle->print("  usesAtSync=true;\n");
 	$outChandle->print("#ifndef CMK_OPTIMIZE\n");
 	$outChandle->print("  if(pose_config.stats)\n");
 	$outChandle->print("    {localStats->TimerStart(SIM_TIMER);}\n");
@@ -671,8 +680,15 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("      if (p.isUnpacking()) {\n");
 	    $outChandle->print("        p(checkpointed);\n");
 	    $outChandle->print("        if (checkpointed) {\n");
-	    $outChandle->print("          ev->cpData = new state_$class(this, myStrat);\n");
-	    $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("          if (objID->usesAntimethods()) {\n");
+	    $outChandle->print("            ev->cpData = new rep();\n");
+	    $outChandle->print("            ev->cpData->myStrat = myStrat;\n");
+	    $outChandle->print("            ev->cpData->parent = this;\n");
+	    $outChandle->print("            ((rep *)ev->cpData)->pup(p);\n");
+	    $outChandle->print("          } else {\n");
+	    $outChandle->print("            ev->cpData = new state_$class(this, myStrat);\n");
+	    $outChandle->print("            ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("          }\n");
 	    $outChandle->print("        }\n");
 	    $outChandle->print("        else ev->cpData = NULL;\n");
 	    $outChandle->print("      }\n");
@@ -680,7 +696,11 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("        if (ev->cpData) {\n");
 	    $outChandle->print("          checkpointed = 1;\n");
 	    $outChandle->print("          p(checkpointed);\n");
-	    $outChandle->print("          ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("          if (objID->usesAntimethods()) {\n");
+	    $outChandle->print("            ((rep *)ev->cpData)->pup(p);\n");
+	    $outChandle->print("          } else {\n");
+	    $outChandle->print("            ((state_$class *)ev->cpData)->cpPup(p);\n");
+	    $outChandle->print("          }\n");
 	    $outChandle->print("        }\n");
 	    $outChandle->print("        else {\n");
 	    $outChandle->print("          checkpointed = 0;\n");
@@ -734,6 +754,10 @@ foreach my $incfile ($inC,@otherfiles)
 	  {
 	    $outChandle->print("#ifndef SEQUENTIAL_POSE\n");
 	    $outChandle->print("$_"."\n");
+	    $outChandle->print("#else"."\n");
+	    my $repversion=$_;
+	    $repversion =~ s/chpt<[^>]+>/rep/g;
+	    $outChandle->print("$repversion"."\n");
 	    $outChandle->print("#endif\n");
 	  }
 	else

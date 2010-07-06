@@ -23,26 +23,7 @@
 
 #if CMK_CCS_AVAILABLE
 
-/**********************************************
-  "ccs_getinfo"-- takes no data
-    Return the number of parallel nodes, and
-      the number of processors per node as an array
-      of 4-byte big-endian ints.
-*/
-
-static void ccs_getinfo(char *msg)
-{
-  int nNode=CmiNumNodes();
-  int len=(1+nNode)*sizeof(ChMessageInt_t);
-  ChMessageInt_t *table=(ChMessageInt_t *)malloc(len);
-  int n;
-  table[0]=ChMessageInt_new(nNode);
-  for (n=0;n<nNode;n++)
-    table[1+n]=ChMessageInt_new(CmiNodeSize(n));
-  CcsSendReply(len,(const char *)table);
-  free(table);
-  CmiFree(msg);
-}
+void ccs_getinfo(char *msg);
 
 /**********************************************
   "ccs_killport"-- takes one 4-byte big-endian port number
@@ -61,7 +42,7 @@ static killPortStruct *killList=NULL;
 static void ccs_killport(char *msg)
 {
   killPortStruct *oldList=killList;
-  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes));
+  int port=ChMessageInt(*(ChMessageInt_t *)(msg+CmiReservedHeaderSize));
   skt_ip_t ip;
   unsigned int connPort;
   CcsCallerId(&ip,&connPort);
@@ -175,7 +156,7 @@ static CpdListAccessor *CpdListLookup(const ChMessageInt_t *lenAndPath)
 //Get the length of the given list:
 static void CpdList_ccs_list_len(char *msg)
 {
-  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes);
+  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiReservedHeaderSize);
   CpdListAccessor *acc=CpdListLookup(req);
   if (acc!=NULL) {
     ChMessageInt_t reply=ChMessageInt_new(acc->getLength());
@@ -194,9 +175,9 @@ static void CpdList_ccs_list_len(char *msg)
 static CpdListAccessor *CpdListHeader_ccs_list_items(char *msg,
 	     CpdListItemsRequest &h)
 {
-  int msgLen=CmiSize((void *)msg)-CmiMsgHeaderSizeBytes;
+  int msgLen=CmiSize((void *)msg)-CmiReservedHeaderSize;
   CpdListAccessor *ret=NULL;
-  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiMsgHeaderSizeBytes);
+  const ChMessageInt_t *req=(const ChMessageInt_t *)(msg+CmiReservedHeaderSize);
   h.lo=ChMessageInt(req[0]); // first item to send
   h.hi=ChMessageInt(req[1]); // last item to send+1
   h.extraLen=ChMessageInt(req[2]); // extra data length
@@ -258,33 +239,39 @@ static void CpdList_ccs_list_items_set(char *msg)
 
 /** gather information about the machine we're currently running on */
 void CpdMachineArchitecture(char *msg) {
-  char reply[6]; // where we store our reply
+  char reply[8]; // where we store our reply
+  reply[0]=CHARMDEBUG_MAJOR;
+  reply[1]=CHARMDEBUG_MINOR;
   // decide if we are 32 bit (1) or 64 bit (2)
-  reply[0] = 0;
-  if (sizeof(char*) == 4) reply[0] = 1;
-  else if (sizeof(char*) == 8) reply[0] = 2;
+  reply[2] = 0;
+  if (sizeof(char*) == 4) reply[2] = 1;
+  else if (sizeof(char*) == 8) reply[2] = 2;
   // decide if we are little endian (1) or big endian (2)
-  reply[1] = 0;
+  reply[3] = 0;
   int value = 1;
   char firstByte = *((char*)&value);
-  if (firstByte == 1) reply[1] = 1;
-  else reply[1] = 2;
+  if (firstByte == 1) reply[3] = 1;
+  else reply[3] = 2;
+  // add the third bit if we are in bigsim
+#if CMK_BLUEGENE_CHARM
+  reply[3] |= 4;
+#endif
   // get the size of an "int"
-  reply[2] = sizeof(int);
+  reply[4] = sizeof(int);
   // get the size of an "long"
-  reply[3] = sizeof(long);
+  reply[5] = sizeof(long);
 #if CMK_LONG_LONG_DEFINED
   // get the size of an "long long"
-  reply[4] = sizeof(long long);
+  reply[6] = sizeof(long long);
 #else
   // Per Filippo, the debugger will be fine with this. It should never
   // come up, since configure didn't detect support for `long long` on
   // the machine.
-  reply[4] = 0;
+  reply[6] = 0;
 #endif
   // get the size of an "bool"
-  reply[5] = sizeof(bool);
-  CcsSendReply(6, (void*)reply);
+  reply[7] = sizeof(bool);
+  CcsSendReply(8, (void*)reply);
   CmiFree(msg);
 }
 
@@ -454,7 +441,7 @@ CCS Client->CWebHandler->...  (processor 0)
 #define MAXFNS 20 /*Largest number of performance functions to expect*/
 
 typedef struct {
-	char hdr[CmiMsgHeaderSizeBytes];
+	char hdr[CmiReservedHeaderSize];
 	int fromPE;/*Source processor*/
 	int perfData[MAXFNS];/*Performance numbers*/
 } CWeb_CollectedData;
@@ -582,9 +569,9 @@ static void CWebHandler(void){
       
       /*Start collecting data on each processor*/
       for(i = 0; i < CmiNumPes(); i++){
-        char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+        char *msg = (char *)CmiAlloc(CmiReservedHeaderSize);
         CmiSetHandler(msg, CWeb_CollectIndex);
-        CmiSyncSendAndFree(i, CmiMsgHeaderSizeBytes,msg);
+        CmiSyncSendAndFree(i, CmiReservedHeaderSize,msg);
       }
     }
   }

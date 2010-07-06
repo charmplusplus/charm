@@ -67,11 +67,13 @@ void POSE_registerCallBack(CkCallback cb);
 /// Stop POSE simulation
 /** Stops timer so statistics collection, callback, final output, etc. 
     are not counted in simulation time. */
-void POSE_stop(); 
+void POSE_stop();
 // Prepare to exit
-void POSE_prepExit(void *param, void *msg); 
+void POSE_prepExit(void *param, void *msg);
 /// Exit simulation program
-void POSE_exit(); 
+void POSE_exit();
+/// Set the poser index for an event to be executed when POSE detects quiescence
+void setPoseIndexOfStopEvent(int index);
 
 /// Whether or not pose is in sequential mode
 extern int _POSE_SEQUENTIAL;
@@ -105,8 +107,49 @@ extern int POSE_inactDetect;
 extern POSE_TimeType POSE_GlobalClock;
 extern POSE_TimeType POSE_GlobalTS;
 
+/// Class for storing data of events skipped while checkpointing (for sequential simulation)
+class Skipped_Event {
+ public:
+  int simIndex;
+  POSE_TimeType timestamp;
+
+  Skipped_Event() {}
+  Skipped_Event(int sIndex, POSE_TimeType ts) : simIndex(sIndex), timestamp(ts) {}
+  inline void pup(PUP::er &p) {
+    p|simIndex; p|timestamp;
+  }
+  inline Skipped_Event& operator=(const Skipped_Event &obj) {
+    simIndex = obj.simIndex;
+    timestamp = obj.timestamp;
+    return *this;
+  }
+};
+
+/// Checkpointing (for sequential simulation)
+extern int seqCheckpointInProgress;
+extern POSE_TimeType seqLastCheckpointGVT;
+extern double seqLastCheckpointTime;
+extern double seqStartTime;
+// Global queue for storing POSE object array indices that are
+// skipped during quiescence detection just before checkpointing
+// (used in sequential mode only)
+extern CkQ<Skipped_Event> POSE_Skipped_Events;
+
+/// The index of a poser that has an event that should be executed at simulation end (for sequential simulation)
+/* poseIndexOfStopEvent stores the index of a poser that has an event it
+   needs to execute when the simulation reaches pose::stop (i.e.,
+   after POSE quiescence has been detected).  It's set using
+   setPoseIndexOfStopEvent(...).  This can be used for invoking
+   events that occur after quiescence detection in the simulation
+   itself.  During pose::stop, sim::invokeStopEvent() is called on the
+   appropriate poser.  Currently, this can only be used in sequential
+   simulation mode. */
+extern int poseIndexOfStopEvent;
+
 /// For getting access to the commlib strategy
+#ifdef POSE_COMM_ON
 extern ComlibInstanceHandle POSE_commlib_insthndl;
+#endif
 
 extern POSE_Config pose_config;
 
@@ -149,7 +192,13 @@ class pose : public Chare {
 #endif
 
  }
+  /// Migration constructor
   pose(CkMigrateMessage *) { }
+  /// PUP routine
+  void pup(PUP::er &p) {
+    p|cb;
+    p|callBackSet;
+  }
   /// Register the callback with POSE
   void registerCallBack(callBack *);
   /// Stop the simulation

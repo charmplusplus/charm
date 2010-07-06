@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 #ifndef _MPI_H
 #define _MPI_H
 
@@ -281,7 +275,9 @@ int AMPI_Get_count(MPI_Status *sts, MPI_Datatype dtype, int *count);
 int AMPI_Isend(void *buf, int count, MPI_Datatype datatype, int dest,
               int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Ibsend AMPI_Isend
-#define MPI_Issend AMPI_Isend	/* FIXME: see MPI_Ssend */
+#define MPI_Issend AMPI_Issend
+int AMPI_Issend(void *buf, int count, MPI_Datatype datatype, int dest,
+              int tag, MPI_Comm comm, MPI_Request *request);
 #define MPI_Irsend AMPI_Isend   /* FIXME: see MPI_Rsend */
 #define MPI_Irecv AMPI_Irecv
 int AMPI_Irecv(void *buf, int count, MPI_Datatype datatype, int src,
@@ -654,6 +650,13 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
                           int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                           MPI_Datatype array_of_datatypes[]);
 
+#if CMK_CUDA
+typedef struct workRequest workRequest;
+
+/* AMPI GPU Request interface */
+int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request);
+int AMPI_GPU_Invoke(workRequest *to_call);
+#endif
 
 /*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */

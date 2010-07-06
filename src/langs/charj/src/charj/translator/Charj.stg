@@ -1,31 +1,37 @@
 group Charj;
 
-charjSource_ci(pd, ids, tds, debug) ::= 
-//<pd>
-//<ids>
+charjSource_ci(basename, pd, imports, types, ros, debug) ::=
 <<
-<if(debug)>/* \<charjSource_ci> */<endif>
-/*
- * packageDeclaration disabled...
-<pd>
- * end packageDeclaration
- */
 
-/*
- * importDeclarations disabled...
-<ids>
- * end importDeclarations
- */
+// interface for <basename>
+<imports; separator="\n">
+<types; separator="\n\n">
 
-<tds>
-<if(debug)>/* \</charjSource_ci> */<endif>
+module <basename>_readonly {
+<if(ros)>
+    <charjReadonly_ci(pds = pd, ros = ros)>
+<endif>
+
+}
 
 >>
 
-
-charjSource_h(pd, ids, tds, cb, debug) ::= 
+charjReadonly_ci(pds, ros) ::=
 <<
-<if(debug)>/* \<CHARJ_SOURCE> */<endif>
+<if(first(pds))>namespace <first(pds)>
+{
+    <charjReadonly_ci(pds = rest(pds), ros = ros)>
+} // namespace <first(pds)>
+<else>
+<ros; separator="\n">
+<endif>
+>>
+
+charjSource_h(basename, pd, imports, types, ros, debug) ::=
+<<
+#ifndef __<basename>__
+#define __<basename>__
+
 /**************************************************************************
  * WARNING                                                                *
  **************************************************************************
@@ -33,40 +39,63 @@ charjSource_h(pd, ids, tds, cb, debug) ::=
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
-<pd>
-<ids>
-<tds>
-<cb>
+<imports; separator="\n">
+<types; separator="\n\n">
+<if(ros)>
+/* Readonly variables */
+<readonlys_h(pds = pd, ros = ros)>
+#include "<basename>_readonly.decl.h"
+<endif>
 
-<if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
->>
+#endif // __<basename>__
 
-
-charjSource_cc(pd, ids, tds, cb, debug) ::= 
-<<
-<if(debug)>/* \<CHARJ_SOURCE> */<endif>
-<ids>
-<pd>
-<tds>
-<cb>
-<if(debug)>/* \</CHARJ_SOURCE> */<endif>
 
 >>
 
-packageDeclaration_cc_h(ids) ::= 
+charjSource_cc(basename, pd, imports, types, ros, debug) ::=
 <<
-<if(debug)>/* \<packageDeclaration> */<endif>
-namespace <ids; separator=" { namespace "> {
-<if(debug)>/* \</packageDeclaration> */<endif>
+#include "<basename>.h"
+
+<imports; separator="\n">
+<types; separator="\n\n">
+<if(ros)>
+
+/* Readonly variable support */
+<readonlys_cc(pds = pd, ros = ros, basename = basename)>
+<endif>
+
+
 >>
 
-importDeclaration_cc_h(inc_id, use_id) ::= 
+readonlys_h(pds, ros) ::=
 <<
-<if(debug)>/* \<importDeclaration> */<endif>
+<if(first(pds))>namespace <first(pds)>
+{
+    <readonlys_h(pds = rest(pds), ros = ros)>
+} // namespace <first(pds)>
+<else>
+<ros; separator="\n">
+<endif>
+>>
+
+readonlys_cc(pds, ros, basename) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <readonlys_cc(pds = rest(pds), ros = ros, basename = basename)>
+} // namespace <first(pds)>
+#include "<basename>_readonly.def.h"
+<else>
+<ros; separator="\n">
+<endif>
+
+>>
+
+importDeclaration_cc_h(inc_id, use_id) ::=
+<<
 #include \<<inc_id>\>
 using <use_id>;
-<if(debug)>/* \</importDeclaration> */<endif>
 >>
 
 classExtends_ci(type) ::= "<type>"
@@ -80,118 +109,292 @@ interfaceExtends(ts) ::=
 : public <ts; separator=", public ">
 >>
 
-
-classDeclaration_h(ident, ext, csds) ::=
+type_preamble_h(sym) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
-
-#include "<ident>.decl.h"
-/* superclass: <ext> */
-class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
-};
-<if(debug)>/* \</typeDeclaration> */<endif>
-
+<sym.Includes:{include| #include \<<include>\>
+}>
+<sym.Usings:{using| using <using>;
+}>
+<sym.MemberTypeNames:{name| class <name>;
+}>
 >>
 
-classDeclaration_cc(ident, ext, csds) ::=
+chare_preamble_h(sym) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
-
-
-#include "<ident>.decl.h"
-/* superclass: <ext> */
-class <ident>: public CBase_<ident> {
-    <csds; separator="\n">
-};
-#include "<ident>.def.h"
-<if(debug)>/* \</typeDeclaration> */<endif>
-
+<type_preamble_h(sym)>
 >>
 
-
-charedeclaration_ci(chareType, arrayDim, ident, ext, csds) ::=
+type_epilogue_h(sym) ::=
 <<
-<if(debug)>/* \<typeDeclaration> */<endif>
-module <ident> {
-<if(ext)>
-    extern module <ext>;
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident>: <ext> {
+>>
+
+chare_epilogue_h(sym) ::=
+<<
+<type_epilogue_h(sym)>
+>>
+
+classDeclaration_h(sym, ident, ext, csds, tident, hasDefaultCtor) ::=
+<<
+<type_preamble_h(sym)>
+<if(tident)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident, hasDefaultCtor = hasDefaultCtor)>
 <else>
-    <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident> {
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
 <endif>
-        <csds; separator="\n">
-    }
+<type_epilogue_h(sym)>
+>>
+
+classDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+} // namespace <first(pds)>
+<else>
+<if(ext)>
+class <ident> : public <ext> {
+<else>
+class <ident> {
+<endif>
+
+    <csds; separator="\n\n">
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
+    protected: void constructorHelper();
+    static bool _trace_registered;
+    void _initTrace();
+};
+<endif>
+>>
+
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor, inits) ::=
+<<
+template \<class <tident; separator=", class ">\>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor, inits=inits)>
+>>
+
+classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor, inits) ::=
+<<
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
+>>
+
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
+} // namespace <first(pds)>
+<else>
+#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#include \<trace-projections.h\>
+#endif
+<csds; separator="\n\n">
+
+<if(!hasDefaultCtor)>
+<sym.name>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
+
+void <sym.name>::constructorHelper()
+{
+    <inits; separator="\n">
 }
 
-<if(debug)>/* \</typeDeclaration> */<endif>
-
+bool <sym.name>::_trace_registered = false;
+void <sym.name>::_initTrace() {
+    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    if (_trace_registered) return;
+    <sym.traceInitializers; separator="\n">
+    _trace_registered = true;
+    #endif
+}
+<endif>
 >>
 
+
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
+<<
+#include "<ident>.decl.h"
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
+#include "<ident>.def.h"
+>>
+
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
+} // namespace <first(pds)>
+<else>
+#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#include \<trace-projections.h\>
+#endif
+<csds; separator="\n\n">
+
+<if(pupInits)>
+void <sym.name>::pupInitMethod()
+{
+    <pupInits; separator="\n">
+}
+<endif>
+
+void <sym.name>::pup(PUP::er &p)
+{
+<if(pupInits)>
+    pupInitMethod();
+
+<endif>
+    <pupers; separator="\n">
+}
+
+<if(!hasDefaultCtor)>
+<sym.name>::<ident>()
+{
+    constructorHelper();
+}
+<endif>
+
+void <sym.name>::constructorHelper()
+{
+    <inits; separator="\n">
+}
+
+<if(needsMigration)>
+<sym.name>::<ident>(CkMigrateMessage *m)
+{
+    constructorHelper();
+}
+<endif>
+
+bool <sym.name>::_trace_registered = false;
+void <sym.name>::_initTrace() {
+    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    if (_trace_registered) return;
+    <sym.traceInitializers; separator="\n">
+    _trace_registered = true;
+    #endif
+}
+<endif>
+>>
+
+chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
+<<
+<chare_preamble_h(sym)>
+#include "<ident>.decl.h"
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+<chare_epilogue_h(sym)>
+>>
+
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+} // namespace <first(pds)>
+<else>
+<if(ext)>/* superclass: <ext> */<endif>
+class <ident>: public CBase_<ident> {
+    <csds; separator="\n">
+    <if(needsPupInit)>
+    private: void pupInitMethod();
+    <endif>
+    public: void pup(PUP::er& p);
+    <if(!hasDefaultCtor)>
+    public: <ident>();
+    <endif>
+    protected: void constructorHelper();
+    <if(needsMigration)>
+    public: <ident>(CkMigrateMessage*);
+    <endif>
+    static bool _trace_registered;
+    void _initTrace();
+};
+<endif>
+>>
+
+chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(sym.isMainChare)>main<endif>module <ident> {
+<if(ext)>
+    extern module <ext>;
+<endif>
+    <sym.Externs:{ext| extern module <ext>;
+<if(sym.isMainChare)>
+extern module <basename>_readonly;
+<endif>
+    }>
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+}
+>>
+
+
+chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
+<<
+<if(first(pds))>namespace <first(pds)>
+{
+    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+} // namespace <first(pds)>
+<else>
+<chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
+    <csds; separator="\n">
+};
+<endif>
+>>
 
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl>;
+<modl><ty><gtpl> <id><fpl><adl>;
 >>
 
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-entry <ty> <gtpl> <id><fpl> <adl>;
+<modl><ty><gtpl> <id><fpl><adl>;
 >>
 
 
-funcMethodDecl_cc(modl, gtpl, ty, id, fpl, adl, block) ::=
+funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<if(modl)><modl>: <endif><ty> <gtpl> <id><fpl> <adl> {
+<modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
+{
+    #ifdef _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
     <block>
-}
->>
-
-
-voidMethodDecl_ci(modl, gtpl, id, fpl, block) ::=
-<<
-entry void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_h(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl>;
->>
-
-
-voidMethodDecl_cc(modl, gtpl, id, fpl, block) ::=
-<<
-<if(modl)><modl>: <endif>void<gtpl> <id><fpl> {
-    <block>
+    #ifdef _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
 }
 >>
 
 
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
-entry void<gtpl> <id><fpl>;
+<modl><gtpl><id><fpl>;
 >>
 
 
 ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl>:<endif><gtpl> <id><fpl>;
+<modl><id><fpl>;
 >>
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
-<if(modl)><modl>:<endif><gtpl> <id><fpl> {
-    <block>
-}
+<modl><id>::<id><fpl>
+<block>
 >>
 
 
 block_cc(bsl) ::=
 <<
-<bsl:{s| <s><\n>}>
+{
+    <bsl; separator="\n">
+}
 >>
 
 
@@ -205,7 +408,7 @@ embed_cc(str, blk) ::=
 
 class_var_decl(modl, type, declList) ::=
 <<
-<if(modl)><modl>:<else>public:<endif> <type> <declList>;
+<modl><type> <declList>;
 >>
 
 
@@ -215,15 +418,24 @@ var_decl_list(var_decls) ::=
 >>
 
 
-var_decl(id, initializer) ::=
+var_decl_cc(id, initializer) ::=
 <<
 <id><if(initializer)> = <initializer><endif>
 >>
 
-
-var_decl_id(id, array_decl_list) ::=
+var_decl_h(id, initializer) ::=
 <<
-<id><if(array_decl_list)> <array_decl_list><endif>
+<id>
+>>
+
+var_decl_ci(id, initializer) ::=
+<<
+<id><if(initializer)> = <initializer><endif>
+>>
+
+var_decl_id(id, domainExp) ::=
+<<
+<id><if(domainExp)>(<domainExp>)<endif>
 >>
 
 
@@ -233,31 +445,56 @@ var_id_decl(id, adl) ::=
 >>
 
 
-mod_list(mods) ::=
+mod_list_cc(accmods, localmods, charjmods, othermods) ::=
 <<
-<if(mods)><mods; separator=" "><endif>
+<if(localmods)><localmods; separator=" "> <endif><if(othermods)><othermods; separator=" "> <endif>
+>>
+
+mod_list_h(accmods, localmods, charjmods, othermods) ::=
+<<
+<if(accmods)><accmods; separator=" ">: <endif><if(othermods)><othermods; separator=" "> <endif>
+>>
+
+mod_list_ci(accmods, localmods, charjmods, othermods) ::=
+<<
+<if(charjmods)><charjmods; separator=" "> <endif>
+>>
+
+local_var_decl(modList, type, declList, domainExps) ::=
+<<
+<if(modList)><modList> <endif><type> <declList>;
+>>
+
+local_mod_list(mods) ::= 
+<<
+<mods; separator=" ">
 >>
 
 
-local_mod_list(mods) ::=
-<<
-<if(mods)><mods; separator=" "><endif>
->>
- 
-
-local_var_decl(modList, type, declList) ::=
-<<
-<if(modList)>
-<modList> <type> <declList>;
-<else>
-<type> <declList>;
-<endif>
->>
-
-
-type(typeID, arrDeclList) ::=
+simple_type(typeID, arrDeclList) ::=
 <<
 <typeID><arrDeclList>
+>>
+
+
+obj_type(typeID, arrDeclList) ::=
+<<
+<typeID><arrDeclList>
+>>
+
+proxy_type(typeID, arrDeclList) ::=
+<<
+CProxy_<typeID><arrDeclList>
+>>
+
+pointer_type(typeID, arrDeclList) ::=
+<<
+<typeID>*<arrDeclList>
+>>
+
+reference_type(typeID, arrDeclList) ::=
+<<
+<typeID>&<arrDeclList>
 >>
 
 
@@ -301,33 +538,23 @@ CkAssert(<cond>);
 
 if(cond, then, else_) ::=
 <<
-if <cond> {
-    <then>
-}<if(else_)> else {
-    <else_>
-}<endif>
+if <cond> <then><if(else_)> else <else_><endif>
 >>
 
 
 for(initializer, cond, update, body) ::=
 <<
-for (<initializer> <cond> <update>) {
-    <body>
-}
+for (<if(initializer)><initializer><else>;<endif> <cond>; <update; separator=", ">) <body>
 >>
 
 while(cond, body) ::=
 <<
-while <cond> {
-    <body>
-} 
+while <cond> <body>
 >>
 
 dowhile(cond, body) ::=
 <<
-do {
-    <body>
-} while <cond>;
+do <body> while <cond>;
 >>
 
 
@@ -353,16 +580,6 @@ case(expr, block) ::=
 case <expr>: <block>
 >>
 
-for_cond(expr) ::=
-<<
-<expr>
->>
-
-for_update(exprs) ::=
-<<
-<exprs; separator=", ">
->>
-
 method_call(primary, generic_types, args) ::=
 <<
 <if(generic_types)>
@@ -382,7 +599,7 @@ array_construction_with_init(array_decls, initializer) ::=
 array_construction(exprs, array_decls) ::=
 <<
 [<exprs; separator="][">]<array_decls>
->> 
+>>
 
 
 arguments(exprs) ::=
@@ -390,4 +607,30 @@ arguments(exprs) ::=
 <exprs; separator=", ">
 >>
 
+print(exprs) ::=
+<<
+<if(first(exprs))>cout <exprs : { n | \<\< <n> }>;<endif>
+>>
 
+println(exprs) ::=
+<<
+cout<if(first(exprs))> <exprs : { n | \<\< <n> }><else> <endif>\<\< endl;
+>>
+
+exit(expr) ::=
+<<
+<if(expr)>exit(<expr>)<else>exit(0)<endif>;
+>>
+
+exitall() ::=
+<<
+CkExit();
+>>
+
+range_constructor(range, others, len) ::=
+<<
+<if(range)>
+Domain\<<len>\>(<range>)<if(others)>, <others; separator=", "><endif>
+<else>
+<endif>
+>>

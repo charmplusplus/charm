@@ -1,0 +1,20 @@
+mainmodule main {
+
+
+    readonly CProxy_Main mainProxy;
+
+    mainchare Main{
+        entry Main(CkArgMsg* msg);
+    
+        //entry void done();
+        //entry [expedited]void done();
+        entry [expedited]void done(CkVec<int>);
+    };
+   
+    message par_SolverState;
+
+    chare mySolver{
+        entry mySolver(par_SolverState*);
+    };
+
+};

@@ -416,24 +416,49 @@ CDECL int armci_notify_wait(int proc, int *pval){
 /* ********************************* */
 /* Collective Operations             */
 CDECL void armci_msg_brdcst(void *buffer, int len, int root) {
+  armci_msg_bcast(buffer, len, root);
 }
 
 CDECL void armci_msg_bcast(void *buffer, int len, int root) {
+  TCHARM_API_TRACE("armci_msg_bcast", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgBcast(buffer, len, root);
 }
 
+// This does not look like an API actually used in ARMCI
 CDECL void armci_msg_gop2(void *x, int n, int type, char *op) {
 }
 
 CDECL void armci_msg_igop(int *x, int n, char *op) {
+  TCHARM_API_TRACE("armci_msg_dgop", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgGop(x, n, op, ARMCI_INT);
 }
 
-CDECL void armci_msg_lgop(long *x, int n, char *op) {
+CDECL void armci_msg_lgop(CmiInt8 *x, int n, char *op) {
+  TCHARM_API_TRACE("armci_msg_lgop", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgGop(x, n, op, ARMCI_LONG);
 }
+
+/*
+CDECL void armci_msg_llgop(long long *x, int n, char *op) {
+  TCHARM_API_TRACE("armci_msg_llgop", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgGop(x, n, op, ARMCI_LONG_LONG);
+}
+*/
 
 CDECL void armci_msg_fgop(float *x, int n, char *op) {
+  TCHARM_API_TRACE("armci_msg_fgop", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgGop(x, n, op, ARMCI_FLOAT);
 }
 
 CDECL void armci_msg_dgop(double *x, int n, char *op) {
+  TCHARM_API_TRACE("armci_msg_dgop", "armci");
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  vp->msgGop(x, n, op, ARMCI_DOUBLE);
 }
 
 CDECL void armci_msg_barrier(void) {

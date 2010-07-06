@@ -4,14 +4,21 @@
     to the dynamic optimization framework.
 
 */
+
+
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
+
+
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.decl.h"
+#else
+#include "ControlPoints.decl.h"
+#endif
 
 #include <vector>
 #include <map>
 #include <cmath>
-#include "ControlPoints.decl.h"
-
 #include <pup_stl.h>
 #include <string>
 #include <set>
@@ -28,6 +35,7 @@
 #include <limits>
 #include <algorithm>
 #include <float.h>
+#include <charm-api.h>
 
 #include "LBDatabase.h"
 #include "arrayRedistributor.h"
@@ -48,6 +56,7 @@
 /* readonly */ extern long controlPointSamplePeriod;
 /* readonly */ extern int whichTuningScheme;
 /* readonly */ extern bool writeDataFileAtShutdown;
+/* readonly */ extern bool shouldFilterOutputData;
 /* readonly */ extern bool loadDataFileAtStartup;
 /* readonly */ extern char CPDataFilename[512];
 
@@ -55,18 +64,21 @@
 
 void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase);
+
 
 void registerControlPointTiming(double time);
 
 /// Called once each application step. Can be used instead of registerControlPointTiming()
 void controlPointTimingStamp();
-
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)();
 
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
 /// This should be called before calling controlPoint()
 void gotoNextPhase();
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)();
 
 /// Return an integral power of 2 between c1 and c2
 /// The value returned will likely change between subsequent invocations
@@ -76,12 +88,17 @@ int controlPoint2Pow(const char *name, int c1, int c2);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, int lb, int ub);
 
+/// A fortran callable one. I couldn't figure out how to pass a string from fortran to C++ yet
+/// So far fortran can only have one control point
+FDECL int FTN_NAME(CONTROLPOINT,controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
+
+
 /// Return an integer from the provided vector of values
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-
-
+/// Write output data to disk. Callable from user program (for example, to periodically flush to disk if program might run out of time, or NAMD)
+void ControlPointWriteOutputToDisk();
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
@@ -336,7 +353,12 @@ public:
   double medianTime(){
     std::vector<double> sortedTimes = times;
     std::sort(sortedTimes.begin(), sortedTimes.end());
-    return sortedTimes[sortedTimes.size() / 2];
+    if(sortedTimes.size()>0){
+    	return sortedTimes[sortedTimes.size() / 2];
+    } else {
+    	CkAbort("Cannot compute medianTime for empty sortedTimes vector");
+    	return -1;
+    }
   }
 
   
@@ -460,7 +482,11 @@ public:
 	}
 
 	// Print the median time
-	s << (*runiter)->medianTime() << "\t";
+	if((*runiter)->times.size()>0){
+		s << (*runiter)->medianTime() << "\t";
+	} else {
+		s << "-1\t";
+	}
 
 	// Print the times
 	std::vector<double>::iterator titer;
@@ -568,6 +594,108 @@ public:
   
 };
 
+
+/** A class that implements the Nelder Mead Simplex Optimization Algorithm */
+class simplexScheme {
+private:
+        /** The states used by the Nelder Mead Simplex Algorithm. 
+	    The transitions between these states are displayed in the NelderMeadStateDiagram.pdf diagram.
+	*/
+	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, doneExpanding, stillContracting}  simplexStateT;
+
+	/// The indices into the allData->phases that correspond to the current simplex used one of the tuning schemes.
+	std::set<int> simplexIndices;
+	simplexStateT simplexState;
+
+	 /// Reflection coefficient
+	double alpha;
+	// Contraction coefficient
+	double beta;
+	// Expansion coefficient
+	double gamma;
+
+
+	/// The first phase that was used by the this scheme. This helps us ignore a few startup phases that are out of our control.
+	int firstSimplexPhase;
+
+	// Worst performing point in the simplex
+	int worstPhase;
+	double worstTime;
+	std::vector<double> worst; // p_h
+
+	// Centroid of remaining points in the simplex
+	std::vector<double> centroid;
+
+	// Best performing point in the simplex
+	int bestPhase;
+	double bestTime;
+	std::vector<double> best;
+
+	// P*
+	std::vector<double> P;
+	int pPhase;
+
+	// P**
+	std::vector<double> P2;
+	int p2Phase;
+
+	// A set of phases for which (P_i+P_l)/2 ought to be evaluated
+	std::set<int> stillMustContractList;
+
+	bool useBestKnown;
+
+	void computeCentroidBestWorst(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+	void doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doExpansion(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doContraction(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+
+	std::vector<double> pointCoords(instrumentedData &allData, int i);
+
+		inline int keepInRange(int v, int lb, int ub){
+			if(v < lb)
+				return lb;
+			if(v > ub)
+				return ub;
+			return v;
+		}
+
+		void printSimplex(instrumentedData &allData){
+			char s[2048];
+			s[0] = '\0';
+			for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+				sprintf(s+strlen(s), "%d: ", *iter);
+
+				for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
+					sprintf(s+strlen(s), " %d", citer->second);
+				}
+
+				sprintf(s+strlen(s), "\n");
+			}
+			CkPrintf("Current simplex is:\n%s\n", s);
+		}
+
+public:
+
+	simplexScheme() :
+		simplexState(beginning),
+		alpha(1.0), beta(0.5), gamma(2.0),
+		firstSimplexPhase(-1),
+		useBestKnown(false)
+	{
+		// Make sure the coefficients are reasonable
+		CkAssert(alpha >= 0);
+		CkAssert(beta >= 0.0 && beta <= 1.0);
+		CkAssert(gamma >= 1.0);
+	}
+
+	void adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+};
+
+
+
 class controlPointManager : public CBase_controlPointManager {
 public:
     
@@ -589,10 +717,12 @@ public:
   std::map<std::string,int> newControlPoints;
   int generatedPlanForStep;
 
+  simplexScheme s;
 
+  
   /// A user supplied callback to call when control point values are to be changed
-  CkCallback granularityCallback;
-  bool haveGranularityCallback;
+  CkCallback controlPointChangeCallback;
+  bool haveControlPointChangeCallback;
   bool frameworkShouldAdvancePhase;
   
   int phase_id;
@@ -632,6 +762,8 @@ public:
   /// User can register a callback that is called when application should advance to next phase
   void setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
 
+  void setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase);
+
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
   void processControlPoints();
@@ -666,10 +798,11 @@ public:
   /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
   void exitIfReady();
 
-  // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
+  /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().
   void doExitNow();
 
-
+  /// Write data to disk (when needed), likely at exit
+  void writeOutputToDisk();
 
 
   /// Entry method called on all PEs to request memory usage

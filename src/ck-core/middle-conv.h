@@ -17,6 +17,8 @@
 #define CksvInitialize 	   CsvInitialize
 #define CksvAccess	   CsvAccess
 
+#define CkReduce    CmiReduce
+
 #undef CkMyPe
 #undef CkNumPes
 
@@ -42,10 +44,10 @@
 #define CkVTimer(x)	      0
 #define CkElapse(x)   
 
-#if CMK_REPLAYSYSTEM
-int ConverseDeliver();
+#if CMK_CHARMDEBUG
+extern "C" int ConverseDeliver(int pe);
 #else
-#define ConverseDeliver()   1
+#define ConverseDeliver(pe)   1
 #endif
 
 #if ! CMK_NAMESPACES_BROKEN
@@ -57,43 +59,43 @@ static inline int CkNumPes() { return CmiNumPes(); }
 
 static inline void CmiSyncSend(int x, int y, char *z) 
 {
-  if (ConverseDeliver()) CmiSyncSendFn(x, y, z);
+  if (ConverseDeliver(x)) CmiSyncSendFn(x, y, z);
 }
 static inline void CmiSyncSendAndFree(int x, int y, char *z)
 {
-  if (ConverseDeliver()) CmiFreeSendFn(x, y, z);
+  if (ConverseDeliver(x)) CmiFreeSendFn(x, y, z);
 }
 static inline void CmiSyncBroadcast(int x, char *y)
 {
-  if (ConverseDeliver()) CmiSyncBroadcastFn(x, y);
+  if (ConverseDeliver(x)) CmiSyncBroadcastFn(x, y);
 }
 static inline void CmiSyncBroadcastAndFree(int x, char *y)
 {
-  if (ConverseDeliver()) CmiFreeBroadcastFn(x, y);
+  if (ConverseDeliver(x)) CmiFreeBroadcastFn(x, y);
 }
 static inline void CmiSyncBroadcastAll(int x, char *y)
 {
-  if (ConverseDeliver()) CmiSyncBroadcastAllFn(x, y);
+  if (ConverseDeliver(x)) CmiSyncBroadcastAllFn(x, y);
 }
 static inline void CmiSyncBroadcastAllAndFree(int x, char *y)
 {
-  if (ConverseDeliver()) CmiFreeBroadcastAllFn(x, y);
+  if (ConverseDeliver(x)) CmiFreeBroadcastAllFn(x, y);
 }
 static inline void CmiSyncListSend(int x, int *y, int w, char *z)
 {
-  if (ConverseDeliver()) CmiSyncListSendFn(x, y, w, z);
+  if (ConverseDeliver(-1)) CmiSyncListSendFn(x, y, w, z);
 }
 static inline void CmiSyncListSendAndFree(int x, int *y, int w, char *z)
 {
-  if (ConverseDeliver()) CmiFreeListSendFn(x, y, w, z);
+  if (ConverseDeliver(-1)) CmiFreeListSendFn(x, y, w, z);
 }
 static inline void CmiSyncMulticast(CmiGroup x, int y, char *z)
 {
-  if (ConverseDeliver()) CmiSyncMulticastFn(x, y, z);
+  if (ConverseDeliver(-1)) CmiSyncMulticastFn(x, y, z);
 }
 static inline void CmiSyncMulticastAndFree(CmiGroup x, int y, char *z)
 {
-  if (ConverseDeliver()) CmiFreeMulticastFn(x, y, z);
+  if (ConverseDeliver(-1)) CmiFreeMulticastFn(x, y, z);
 }
 
 #if 0

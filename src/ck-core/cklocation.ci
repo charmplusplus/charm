@@ -17,23 +17,28 @@ module CkLocation {
   };
   initnode void _CkLocMgrInit(void);
   
-//Array Map object support:
+  // Array Map object support:
   group [migratable] CkArrayMap {
-  };
-
-  readonly CkGroupID _defaultArrayMapID;
-
-  group [migratable] DefaultArrayMap : CkArrayMap {
-    entry DefaultArrayMap(void);
   };
 
   group [migratable] RRMap : CkArrayMap {
     entry RRMap(void);
   };
 
+  readonly CkGroupID _defaultArrayMapID;
+
+  group [migratable] DefaultArrayMap : RRMap {
+    entry DefaultArrayMap(void);
+  };
+
+  group [migratable] ReadFileMap : DefaultArrayMap {
+    entry ReadFileMap(void);
+  };
+
   group [migratable] BlockMap : RRMap {
     entry BlockMap(void);
   };
+
   group [migratable] CldMap : CkArrayMap {
     entry CldMap(void);
   };

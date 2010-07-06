@@ -185,7 +185,7 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, const int* iData,double t){
 		return;
 	}
 	CmiPrintf("TraceCore LogEvent called \n");
-#ifndef CMK_OPTIMIZE	
+#if CMK_TRACE_ENABLED	
 	int *iDataalloc;
 	if(iLen != 0){
 		iDataalloc = (int *)malloc(iLen*sizeof(int));
@@ -216,7 +216,7 @@ void TraceCore::LogEvent(int lID, int eID, int iLen, const int* iData, int sLen,
 	}
 		
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	int *iDataalloc;
 	char *sDataalloc;
 	if(iLen != 0){

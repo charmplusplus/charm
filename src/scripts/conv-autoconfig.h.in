@@ -12,6 +12,9 @@
 /* build MPI. */
 #undef CMK_BUILD_ON_MPI
 
+/* enable charmdebug */
+#undef CMK_CHARMDEBUG
+
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 
@@ -38,6 +41,9 @@
 
 /* whether getProcAddress works */
 #undef CMK_DLL_USE_WIN32
+
+/* enable error checking */
+#undef CMK_ERROR_CHECKING
 
 /* whether C++ class explicit keyword works */
 #undef CMK_EXPLICIT
@@ -78,10 +84,16 @@
 /* whether has elf.h */
 #undef CMK_HAS_ELF_H
 
+/* whether has fabsf */
+#undef CMK_HAS_FABSF
+
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
-/* whether getpid() exists */
+/* whether getpagesize exists */
+#undef CMK_HAS_GETPAGESIZE
+
+/* whether getpid exists */
 #undef CMK_HAS_GETPID
 
 /* whether get_myaddress() exists */
@@ -90,7 +102,7 @@
 /* whether iterator_traits works */
 #undef CMK_HAS_ITERATOR_TRAITS
 
-/* whether kill() exists */
+/* whether kill exists */
 #undef CMK_HAS_KILL
 
 /* whether has log2 */
@@ -120,6 +132,9 @@
 /* whether ntohl is available */
 #undef CMK_HAS_NTOHL
 
+/* whether NUMA control related functions exist */
+#undef CMK_HAS_NUMACTRL
+
 /* whether has popen */
 #undef CMK_HAS_POPEN
 
@@ -138,7 +153,7 @@
 /* whether the sched_setaffinity() exists */
 #undef CMK_HAS_SETAFFINITY
 
-/* whether the setpriority() exists */
+/* whether the setpriority exists */
 #undef CMK_HAS_SETPRIORITY
 
 /* whether has sleep */
@@ -192,6 +207,9 @@
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
 
+/* whether is power7 */
+#undef CMK_POWER7
+
 /* Allows PPC assembly. */
 #undef CMK_PPC_ASM
 
@@ -200,6 +218,9 @@
 
 /* Python version */
 #undef CMK_PYTHON_VERSION
+
+/* disable replay */
+#undef CMK_REPLAYSYSTEM
 
 /* whether C++ signed char and char differ */
 #undef CMK_SIGNEDCHAR_DIFF_CHAR
@@ -219,6 +240,9 @@
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
 
+/* disable tracing */
+#undef CMK_TRACE_ENABLED
+
 /* whether glibc backtrace works */
 #undef CMK_USE_BACKTRACE
 
@@ -228,7 +252,7 @@
 /* whether has mkstemp */
 #undef CMK_USE_MKSTEMP
 
-/* whether the poll() syscall exists */
+/* whether the poll syscall exists */
 #undef CMK_USE_POLL
 
 /* whether the std:: names for STL work */

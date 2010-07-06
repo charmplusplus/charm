@@ -7,8 +7,8 @@ import org.antlr.stringtemplate.language.AngleBracketTemplateLexer;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class MethodSymbol 
-    extends SymbolWithScope 
+public class MethodSymbol
+    extends SymbolWithScope
     implements Scope {
     /** The enclosing class */
     Scope enclosingScope;
@@ -19,19 +19,21 @@ public class MethodSymbol
     /** The list of local variables defined anywhere in the method */
     LocalScope locals;
 
+    public boolean isEntry = false;
     public boolean isStatic = false;
     public boolean isCtor = false;
+    public boolean isTraced = false;
 
-    public MethodSymbol(SymbolTable symtab) 
-    { 
-        super(symtab); 
+    public MethodSymbol(SymbolTable symtab)
+    {
+        super(symtab);
     }
 
     public MethodSymbol(
-            SymbolTable symtab, 
+            SymbolTable symtab,
             String name,
             Scope enclosingScope,
-            ClassSymbol retType)
+            Type retType)
     {
         super(symtab, name);
         this.enclosingScope = enclosingScope;
@@ -39,8 +41,8 @@ public class MethodSymbol
     }
 
     public VariableSymbol defineArg(
-            String name, 
-            ClassSymbol type) 
+            String name,
+            ClassSymbol type)
     {
         if ( orderedArgs.get(name)!=null ) {
             return null;
@@ -50,12 +52,12 @@ public class MethodSymbol
         return vs;
     }
 
-    public Scope getEnclosingScope() 
+    public Scope getEnclosingScope()
     {
         return enclosingScope;
     }
 
-    public LocalScope getLocalScope() 
+    public LocalScope getLocalScope()
     {
         return locals;
     }
@@ -65,12 +67,12 @@ public class MethodSymbol
         locals = s;
     }
 
-    public String getScopeName() 
+    public String getScopeName()
     {
-        return SymbolTable.mangle(name);
+        return name;
     }
 
-    public Map createMembers() 
+    public Map createMembers()
     {
         if ( orderedArgs==null ) {
             orderedArgs = new LinkedHashMap();
@@ -78,22 +80,40 @@ public class MethodSymbol
         return orderedArgs;
     }
 
-    public Map getMembers() 
+    public Map getMembers()
     {
         return orderedArgs;
     }
 
-    public String signature() 
+    public String signature()
     {
         return null;
     }
 
-    public String toString() 
+    public String getTraceID()
+    {
+        // Make sure we don't have any negative or overflow values
+        int id = Math.abs(hashCode()/2);
+        return String.valueOf(id);
+    }
+
+    public String getTraceInitializer()
     {
         StringTemplate st = new StringTemplate(
-                "<if(parent)><parent>.<endif><name>(<args; separator=\",\">)" +
+                "traceRegisterUserEvent(\"<name>\", <id>);",
+                AngleBracketTemplateLexer.class);
+        st.setAttribute("name", enclosingScope.getScopeName() + "." + name);
+        st.setAttribute("id", getTraceID());
+        return st.toString();
+    }
+
+    public String toString()
+    {
+        StringTemplate st = new StringTemplate(
+                "<if(entry)>entry <endif><if(parent)><parent>.<endif><name>(<args; separator=\",\">)" +
                 "<if(locals)>{<locals; separator=\",\">}<endif>",
                 AngleBracketTemplateLexer.class);
+        st.setAttribute("entry", isEntry);
         st.setAttribute("parent", enclosingScope.getScopeName());
         st.setAttribute("name", name);
         st.setAttribute("args", orderedArgs);
@@ -101,7 +121,7 @@ public class MethodSymbol
         return st.toString();
     }
 
-    public int hashCode() 
+    public int hashCode()
     {
         return name.hashCode() + orderedArgs.size() + enclosingScope.hashCode();
     }
@@ -109,14 +129,14 @@ public class MethodSymbol
     /** Two methods are equals() when they have the same name and
      *  the same number of arguments in the same scope.
      */
-    public boolean equals(Object object) 
+    public boolean equals(Object object)
     {
         return name.equals(((MethodSymbol)object).name) &&
             orderedArgs.size()==((MethodSymbol)object).orderedArgs.size() &&
             enclosingScope == ((MethodSymbol)object).enclosingScope;
     }
 
-    public String getMangledName() 
+    public String getMangledName()
     {
         String mangled = name;
         boolean isCtor = name.equals(enclosingScope.getScopeName());

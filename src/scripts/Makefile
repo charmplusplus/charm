@@ -100,11 +100,11 @@ fftlib: charm++
 # parser files, etc.  All they need is the libjade + include files,
 # antlr.jar, jade.jar, and a few scripts which the jade target takes
 # care of.
-jadeall: jade
+#jadeall: jade
 #	make parser.g -> .java files
-	cd langs/jade && $(MAKE) p
+#	cd langs/jade && $(MAKE) p
 #	make the jade.jar file
-	cd ../java/charm/jade && $(MAKE)
+#	cd ../java/charm/jade && $(MAKE)
 
 #include TAU defs
 TAU_MAKEFILE=Make.tau
@@ -183,7 +183,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
 	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
       comlib.h cmidirect.h cmidirectmanytomany.h \
-      controlPoints.h arrayRedistributor.h cp_effects.h register.h stats.h
+      controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -194,7 +194,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckIgetControl.h \
+	  ckfutures.h ckIgetControl.h cktiming.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
@@ -203,7 +203,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
-	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h heap.h \
+	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h ckheap.h \
           elements.h CommLBHeap.h topology.h manager.h \
 	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
 	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
@@ -245,7 +245,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 
 ALLHEADERS=$(CKHEADERS) \
     simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
-	graph.h bitvecset.h Set.h LBSimulation.h  \
+	graph.h bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
 basics: headers
@@ -253,10 +253,12 @@ basics: headers
 
 # Headers is used only for the dependencies
 headers: dirs+sources
+	$(MAKE) charmxi
 	$(MAKE) headerlinks
 
-conv-autoconfig.h: configure
-	./configure $(QUIET)
+conv-autoconfig.h: configure config_opts.sh
+	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
+	./configure $(QUIET) $$CONFIG_OPTS
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
@@ -308,10 +310,10 @@ dirs+sources:
 	rm -f ../bin/dep.pl ; cp dep.pl ../bin/
 	chmod +x charmc
 	-./system_ln  ../tmp/charmc ../bin/
-	-ln -s ../../java/bin charmjavabin
-	-ln -s ../../java/bin ../bin/charmjavabin
-	-ln -s charmjavabin/* ../bin/
-	-ln -s ../java ..
+#	-ln -s ../../java/bin charmjavabin
+#	-ln -s ../../java/bin ../bin/charmjavabin
+#	-ln -s charmjavabin/* ../bin/
+#	-ln -s ../java ..
 #	rm -f .gdir
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
@@ -358,11 +360,12 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
-	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o \
+	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o tracec.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
-	global-nop.o cmipool.o cpuaffinity.o cputopology.o modifyScheduler.o
+	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
+	memoryaffinity.o modifyScheduler.o
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -391,7 +394,7 @@ fmain-ok: fmain.f90
 QUICK_THREADS: $(CVHEADERS)
 	-( cd QuickThreads && $(MAKE) clean )
 	( cd QuickThreads;./configure )
-	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' )
+	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
@@ -490,7 +493,7 @@ conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
 	
 crc32.o: crc32.c crc32.h
-	$(CHARMC) -o crc32.o crc32.c
+	$(CHARMC) -optimize -o crc32.o crc32.c
 
 ## Converse load balancers (seed balancers, -balance)
 $(L)/libldb-none.o: cldb.none.c $(CVHEADERS)
@@ -643,9 +646,9 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
-           RefinerComm.o bitvecset.o Set.o heap.o CommLBHeap.o \
+           RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
-	   charmProjections.o pathHistory.o
+	   charmProjections.o cktiming.o pathHistory.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs 
 
@@ -654,129 +657,6 @@ CHARMLIBS: charm++ CONVLIBS
 
 $(L)/libck.a: $(LIBCK_CORE)
 	$(CHARMC) -o $@ $(LIBCK_CORE)
-
-CkFutures.def.h: CkFutures.decl.h
-
-CkFutures.decl.h: ckfutures.ci charmxi
-	$(CHARMXI) ckfutures.ci
-
-tempo.def.h: tempo.decl.h
-
-tempo.decl.h: tempo.ci charmxi
-	$(CHARMXI) tempo.ci
-
-waitqd.def.h: waitqd.decl.h
-
-waitqd.decl.h: waitqd.ci charmxi
-	$(CHARMXI) waitqd.ci
-
-LBDatabase.def.h: LBDatabase.decl.h
-
-LBDatabase.decl.h: LBDatabase.ci charmxi
-	$(CHARMXI) LBDatabase.ci
-
-NullLB.def.h: NullLB.decl.h
-
-NullLB.decl.h: NullLB.ci charmxi
-	$(CHARMXI) NullLB.ci
-
-BaseLB.def.h: BaseLB.decl.h
-
-BaseLB.decl.h: BaseLB.ci charmxi
-	$(CHARMXI) BaseLB.ci
-
-TraceProjections.def.h: TraceProjections.decl.h
-
-TraceProjections.decl.h: trace-projections.ci charmxi
-	$(CHARMXI) trace-projections.ci
-
-TraceSummary.def.h: TraceSummary.decl.h
-
-TraceSummary.decl.h: trace-summary.ci charmxi
-	$(CHARMXI) trace-summary.ci
-
- 
-TraceUtilization.def.h: TraceUtilization.decl.h
-
-TraceUtilization.decl.h: trace-utilization.ci charmxi
-	$(CHARMXI) trace-utilization.ci 
-
-TraceSimple.def.h: TraceSimple.decl.h
-
-TraceSimple.decl.h: trace-simple.ci charmxi
-	$(CHARMXI) trace-simple.ci
-
-TraceTau.def.h: TraceTau.decl.h
-
-TraceTau.decl.h: trace-Tau.ci charmxi
-	$(CHARMXI) trace-Tau.ci
-
-TraceControlPoints.def.h: TraceControlPoints.decl.h
-
-TraceControlPoints.decl.h: trace-controlPoints.ci charmxi
-	$(CHARMXI) trace-controlPoints.ci
-
-CkReduction.def.h: CkReduction.decl.h
-
-CkReduction.decl.h: ckreduction.ci charmxi
-	$(CHARMXI) ckreduction.ci
-
-CkCheckpoint.def.h: CkCheckpoint.decl.h
-
-CkCheckpoint.decl.h: ckcheckpoint.ci charmxi
-	$(CHARMXI) ckcheckpoint.ci
-
-CkMemCheckpoint.def.h: CkMemCheckpoint.decl.h
-
-CkMemCheckpoint.decl.h: ckmemcheckpoint.ci charmxi
-	$(CHARMXI) ckmemcheckpoint.ci
-
-CkMarshall.def.h: CkMarshall.decl.h
-
-CkMarshall.decl.h: ckmarshall.ci charmxi
-	$(CHARMXI) ckmarshall.ci
-
-CkArrayReductionMgr.def.h: CkArrayReductionMgr.decl.h
-
-CkArrayReductionMgr.decl.h: ckarrayreductionmgr.ci charmxi
-	$(CHARMXI) ckarrayreductionmgr.ci
-
-CkArray.def.h: CkArray.decl.h
-
-CkArray.decl.h : ckarray.ci charmxi
-	$(CHARMXI) ckarray.ci
-
-CkLocation.def.h: CkLocation.decl.h
-
-CkLocation.decl.h: cklocation.ci charmxi
-	$(CHARMXI) cklocation.ci
-
-CkCallback.def.h: CkCallback.decl.h
-
-CkCallback.decl.h: ckcallback.ci charmxi
-	$(CHARMXI) ckcallback.ci
-
-charisma.def.h: charisma.decl.h
-
-charisma.decl.h: charisma.ci charmxi
-	$(CHARMXI) charisma.ci
-
-## Charm++ Load balancer (Dynamic load balancer)
-
-CentralLB.def.h: CentralLB.decl.h
-
-CentralLB.decl.h: CentralLB.ci charmxi
-	$(CHARMXI) CentralLB.ci
-
-NborBaseLB.def.h: NborBaseLB.decl.h
-
-NborBaseLB.decl.h: NborBaseLB.ci charmxi
-	$(CHARMXI) NborBaseLB.ci
-
-HybridBaseLB.def.h: HybridBaseLB.decl.h
-
-HybridBaseLB.decl.h: HybridBaseLB.ci charmxi
-	$(CHARMXI) HybridBaseLB.ci
 
 ## Charm fortran AMPI
 
@@ -805,7 +685,7 @@ $(L)/libtrace-summary.a: $(LIBTRACE_SUMM)
  
 LIBTRACE_UTIL=trace-utilization.o
 $(L)/libtrace-utilization.a: $(LIBTRACE_UTIL)
-	$(CHARMC) -o $@ $(LIBTRACE_UTIL)           
+	$(CHARMC) -o $@ $(LIBTRACE_UTIL)
 
 LIBTRACE_SIMPLE=trace-simple.o
 $(L)/libtrace-simple.a: $(LIBTRACE_SIMPLE)
@@ -893,28 +773,16 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 
 CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o cp_effects.o
 
-ControlPoints.def.h: ControlPoints.decl.h
-
-ControlPoints.decl.h : controlPoints.ci charmxi
-	$(CHARMXI) controlPoints.ci
-
-controlPoints_objs: $(L)/libmoduleControlPoints.a
+controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
 
 $(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
 	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
 
+$(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
+	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
 
-######################################################################
-#
-# Critical Path Library
-#
-######################################################################
-
-
-PathHistory.def.h: PathHistory.decl.h
-
-PathHistory.decl.h : pathHistory.ci charmxi
-	$(CHARMXI) pathHistory.ci
+controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
+	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
 
 
 
@@ -950,12 +818,6 @@ CONVERSE_COM_OBJS = gridrouter.o hypercuberouter.o treerouter.o petable.o \
 		routerstrategy.o convcomlibmanager.o pipebroadcastconverse.o \
 		pipelinestrategy.o prefixrouter.o
 
-
-comlib.def.h: comlib.decl.h
-
-comlib.decl.h : ComlibManager.ci charmxi
-	$(CHARMXI) ComlibManager.ci
-
 COMLIB_OBJS = $(STRATEGY_OBJS) $(CONVERSE_COM_OBJS)
 
 comlib_objs: $(L)/libmodulecomlib.a $(L)/libconvcom.a
@@ -980,10 +842,6 @@ bigsim:  bigsim-target
 bigemulator: bigsim
 
 bigsim-target: charm++ $(L)/libconv-bigsim.a $(L)/libconv-bigsim-logs.a $(L)/libconv-bluegene-stub.a $(L)/libblue-standalone.a METIS
-
-# old (Charm++) Blue Gene emulator
-BlueGene.decl.h BlueGene.def.h : BlueGene.ci charmxi
-	$(CHARMXI) BlueGene.ci
 
 $(L)/libbluegene.a: BlueGene.C BlueGene.h BlueGene.decl.h BlueGene.def.h
 	$(CHARMC) -c BlueGene.C
@@ -1135,11 +993,12 @@ clean:
 	rm -f core *.o
 	rm -f core #*#
 	rm -f core *~
+	rm -f *.stamp
 	if [ -d charmrun ] ; then ( cd charmrun; make clean ) ; fi
-	-( cd doc && make clean )
-	( cd libs; make clean )
-	( cd ../examples && make clean )
-	( cd ../tests && make clean )
+	-( cd doc && $(MAKE) clean )
+	( cd libs; $(MAKE) clean )
+	( cd ../examples && $(MAKE) clean )
+	( cd ../tests && $(MAKE) clean )
 
 veryclean:
 	rm -rf ../bin
@@ -1180,7 +1039,13 @@ depends: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done; \
+	for cifile in $(wildcard *.ci); do \
+	      echo "checking generated modules for $$cifile" ; \
+	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
+	done
+# Note: Compilation commands are now appended to the generated ci file dependency info using sed.
+# This should ideally be just an implicit rule for generating %.ci.stamp files from %.ci files
 
 
 dependsCaseSensitive: basics
@@ -1206,7 +1071,11 @@ dependsCaseSensitive: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done; \
+	for cifile in $(wildcard *.ci); do \
+	      echo "checking generated modules for $$cifile" ; \
+	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
+	done
 
 
 

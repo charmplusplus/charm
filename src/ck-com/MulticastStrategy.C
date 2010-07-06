@@ -353,7 +353,6 @@ void MulticastStrategy::handleMessage(void *msg){
 
 }
 
-#include <string>
 
 void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
     

@@ -64,7 +64,8 @@ public:
     CkPrintf("[%d] constructing localStat\n",CkMyPe());
 #endif
   }
-  localStat(CkMigrateMessage *) { };
+  /// Migration constructor
+  localStat(CkMigrateMessage *msg) : Group(msg) { };
   /// Start the specified timer
   void TimerStart(int timer);  
   /// Stop the currently active timer
@@ -72,33 +73,34 @@ public:
   /// Switch to different timer, stopping active timer
   void SwitchTimer(int timer); 
   /// Increment event forward execution count
-  void Do() { dos++; }         
+  inline void Do() { dos++; }         
   /// Increment event rollback count
-  void Undo() { undos++; }    
+  inline void Undo() { undos++; }    
   /// Increment commit count
-  void Commit() { commits++; }    
+  inline void Commit() { commits++; }    
   /// Increment event loop count
-  void Loop() { loops++; }    
+  inline void Loop() { loops++; }    
   /// Increment GVT estimation count     
-  void GvtInc() { gvts++; }   
+  inline void GvtInc() { gvts++; }   
   /// Increment rollback count
-  void Rollback() { rollbacks++; }  
+  inline void Rollback() { rollbacks++; }  
   /// Increment checkpoint count and adjust max
-  void Checkpoint() { chkPts++; if (chkPts > maxChkPts) maxChkPts = chkPts; }
+  inline void Checkpoint() { chkPts++; if (chkPts > maxChkPts) maxChkPts = chkPts; }
   /// Decrement checkpoint count
-  void Reclaim() { chkPts--; }
+  inline void Reclaim() { chkPts--; }
   /// Add to checkpointed bytes count
-  void CPbytes(int n) { cpBytes += n; }  
+  inline void CPbytes(int n) { cpBytes += n; }  
   /// Send local stats to global collector
   void SendStats();
   /// Query which timer is active
-  int TimerRunning() { return (whichStat); }
+  inline int TimerRunning() { return (whichStat); }
   /// Set maximum times
-  void SetMaximums(int gvt, double grt) { 
+  inline void SetMaximums(int gvt, double grt) { 
     if (gvt > maxGVT) maxGVT = gvt; 
     if (grt > maxGRT) maxGRT = grt;
   }
 };
+PUPbytes(localStat)
 
 /// Entity to gather stats from each PE and prepare final report
 class globalStat : public Chare {
@@ -113,11 +115,13 @@ private:
 public:
   /// Basic Constructor
   globalStat(void);
-  globalStat(CkMigrateMessage *) { };
+  /// Migration constructor
+  globalStat(CkMigrateMessage *msg) { };
   /// Receive, calculate and print statistics
   void localStatReport(localStatSummary *m); 
   void DOPcalc(int gvt, double grt);
 };
+PUPbytes(globalStat)
 
 
 // All timer functions are inlined below

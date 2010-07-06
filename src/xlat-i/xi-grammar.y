@@ -1,6 +1,8 @@
 %expect 6
 %{
 #include <iostream>
+#include <string>
+#include <string.h>
 #include "xi-symbol.h"
 #include "EToken.h"
 using namespace xi;
@@ -511,7 +513,7 @@ Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
 		;
 
 TChare		: CHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2, new NamedType($3), $4, $5);}
+		{ $$ = new Chare(lineno, $2|Chare::CCHARE, new NamedType($3), $4, $5);}
 		| MAINCHARE CAttribs Name OptBaseList MemberEList
 		{ $$ = new MainChare(lineno, $2, new NamedType($3), $4, $5); }
 		;
@@ -626,6 +628,12 @@ InitNode	: INITNODE OptVoid QualName
 		{ $$ = new InitCall(lineno, $3, 1); }
 		| INITNODE OptVoid QualName '(' OptVoid ')'
 		{ $$ = new InitCall(lineno, $3, 1); }
+                | INITNODE OptVoid QualName '<' TParamList '>' '(' OptVoid ')'
+                { $$ = new InitCall(lineno,
+				    strdup((std::string($3) + '<' +
+					    ($5)->to_string() + '>').c_str()),
+				    1);
+		}
                 | INITCALL OptVoid QualName
 		{ printf("Warning: deprecated use of initcall. Use initnode or initproc instead.\n"); 
 		  $$ = new InitCall(lineno, $3, 1); }
@@ -638,6 +646,12 @@ InitProc	: INITPROC OptVoid QualName
 		{ $$ = new InitCall(lineno, $3, 0); }
 		| INITPROC OptVoid QualName '(' OptVoid ')'
 		{ $$ = new InitCall(lineno, $3, 0); }
+                | INITPROC OptVoid QualName '<' TParamList '>' '(' OptVoid ')'
+                { $$ = new InitCall(lineno,
+				    strdup((std::string($3) + '<' +
+					    ($5)->to_string() + '>').c_str()),
+				    0);
+		}
                 | INITPROC '[' ACCEL ']' OptVoid QualName '(' OptVoid ')'
                 {
                   InitCall* rtn = new InitCall(lineno, $6, 0);

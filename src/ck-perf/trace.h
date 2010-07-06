@@ -284,7 +284,7 @@ public:
 
 CkpvExtern(TraceArray*, _traces);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 #if CMK_BLUEGENE_CHARM
 extern void    resetVTime();
 #  define _TRACE_ONLY(code) do{ BgGetTime(); if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }  resetVTime(); } while(0)

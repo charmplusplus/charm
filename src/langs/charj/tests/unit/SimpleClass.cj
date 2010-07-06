@@ -1,3 +1,6 @@
 package tests.unit;
 
-public class SimpleClass {}
+public class SimpleClass {
+    void foo() {
+    }
+}

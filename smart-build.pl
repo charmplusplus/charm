@@ -133,12 +133,13 @@ Choose an interconnect from below: [1-11]
 	 3) Myrinet GM
 	 4) Myrinet MX
 	 5) LAPI
-	 6) Cray XT3, XT4 (not yet tested on CNL)
-	 7) Bluegene/L Native (only at T. J. Watson)
-	 8) Bluegene/L MPI
-	 9) Bluegene/P Native
-	10) Bluegene/P MPI
-	11) VMI
+	 6) Cray XT3, XT4
+         7) Cray XT5
+	 8) Bluegene/L Native (only at T. J. Watson)
+	 9) Bluegene/L MPI
+        10) Bluegene/P Native
+	11) Bluegene/P MPI
+	12) VMI
 
 EOF
 	
@@ -166,24 +167,27 @@ EOF
 		$arch = "mpi-crayxt3";
 		last;
 	  } elsif($line eq "7"){
+	        $arch = "mpi-crayxt";
+	        last;
+	  } elsif($line eq "8"){
 		$arch = "bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "8"){
+	  } elsif($line eq "9"){
 		$arch = "mpi-bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "9"){
+	  } elsif($line eq "10"){
 		$arch = "bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "10"){
+	  } elsif($line eq "11"){
 		$arch = "mpi-bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "11"){
+	  } elsif($line eq "12"){
 		$converse_network_type = "vmi";
 		last;
 	  } else {
@@ -334,6 +338,7 @@ $explanations{"ifc"} = "Use Intel's ifc compiler";
 $explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
 $explanations{"syncft"} = "Use initial fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
+$explanations{"causalft"} = "Use causal message logging fault tolerance support";
 
 
 

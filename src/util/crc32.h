@@ -12,6 +12,9 @@ extern "C" {
 unsigned int crc32_initial(unsigned char *data, int len);
 unsigned int crc32_update(unsigned char *data, int len, unsigned int previous);
 
+unsigned int checksum_initial(unsigned char *data, int len);
+unsigned int checksum_update(unsigned char *data, int len, unsigned int previous);
+
 #ifdef __cplusplus
 }
 #endif

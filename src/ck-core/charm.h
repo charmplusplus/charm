@@ -232,6 +232,9 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
  These were formerly in envelope.h
 
  *****************************************************************************/
+/*** WARNING!!!! The following enum is linked to charmdebug finals in MsgInfo.java.
+ *   Make sure the two remain synchronized if changing this one.
+ ***/
 typedef enum {
   NewChareMsg    =1,
   NewVChareMsg   =2,

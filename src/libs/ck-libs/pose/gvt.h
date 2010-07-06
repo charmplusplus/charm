@@ -95,9 +95,23 @@ class PVT : public Group {
   int specEventCount, eventCount;
   /// startPhase active flag
   int startPhaseActive;
+  /// starting time of the simulation
+  double parStartTime;
+  /// indicates if checkpointing is in progress
+  int parCheckpointInProgress;
+  /// GVT at which the last checkpoint was performed
+  POSE_TimeType parLastCheckpointGVT;
+  /// indicates if load balancing is in progress
+  int parLBInProgress;
+  /// GVT at which the last load balancing was performed
+  POSE_TimeType parLastLBGVT;
+  /// Time at which the last checkpoint was performed
+  double parLastCheckpointTime;
   /* things which used to be member function statics */
+  /// optimistic and coservative GVTs
   POSE_TimeType optGVT, conGVT;
   int rdone;
+  /// used in PVT report reduction
   SRentry *SRs;
 #ifdef MEM_TEMPORAL
   TimePool *localTimePool;
@@ -106,7 +120,12 @@ class PVT : public Group {
  public:
   /// Basic Constructor
   PVT(void);
-  PVT(CkMigrateMessage *) { };
+  /// Migration Constructor
+  PVT(CkMigrateMessage *msg) : Group(msg) { };
+  /// PUP routine
+  void pup(PUP::er &p);
+  /// Destructor
+  ~PVT() { }
   /// ENTRY: runs the PVT calculation and reports to GVT
   void startPhase(prioBcMsg *m);             
   /// ENTRY: runs the expedited PVT calculation and reports to GVT
@@ -115,16 +134,25 @@ class PVT : public Group {
   /** Receives the new GVT estimate and termination flag; wakes up objects
       for fossil collection and forward execution with new GVT estimate. */
   void setGVT(GVTMsg *m);            
-  /// Returns GVT estimate
-  POSE_TimeType getGVT() { return estGVT; }    
+  /// ENTRY: begin checkpoint now that quiescence has been reached
+  void beginCheckpoint(eventMsg *m);
+  /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
+  void resumeAfterCheckpoint(eventMsg *m);
+  void beginLoadbalancing(eventMsg *m);
+  void resumeAfterLB(eventMsg *m);
+  void callAtSync();
+  void doneLB();
 
-  int getSpecEventCount() { return specEventCount; }    
-  int getEventCount() { return eventCount; }    
-  void incSpecEventCount() { specEventCount++; }    
-  void incEventCount() { eventCount++; }
-  void decEventCount() { eventCount--; }
+  /// Returns GVT estimate
+  inline POSE_TimeType getGVT() { return estGVT; }    
+
+  inline int getSpecEventCount() { return specEventCount; }    
+  inline int getEventCount() { return eventCount; }    
+  inline void incSpecEventCount() { specEventCount++; }    
+  inline void incEventCount() { eventCount++; }
+  inline void decEventCount() { eventCount--; }
   /// Returns termination flag
-  int done() { return simdone; }
+  inline int done() { return simdone; }
   /// Register poser with PVT
   int objRegister(int arrIdx, POSE_TimeType safeTime, int sync, sim *myPtr);
   /// Unregister poser from PVT
@@ -137,7 +165,7 @@ class PVT : public Group {
   void reportReduce(UpdateMsg *);
   /// Adds incoming send/recv information to a list
   void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
-  int getNumObjs() { return objs.getNumObjs(); }
+  inline int getNumObjs() { return objs.getNumObjs(); }
 };
 
 /// GVT chare group for estimating GVT
@@ -165,14 +193,19 @@ private:
   /// Number of PVT reports expected (1 or 2)
   int reportsExpected;
   /* things which used to be member function static */
-  POSE_TimeType optGVT,  conGVT;
+  /// optimistic and coservative GVTs
+  POSE_TimeType optGVT, conGVT;
   int done;
+  /// used to calculate GVT from PVT reports
   SRentry *SRs;
   int startOffset;
 public:
   /// Basic Constructor
   GVT(void);
-  GVT(CkMigrateMessage *) { };
+  /// Migration Constructor
+  GVT(CkMigrateMessage *msg) : Group(msg) { };
+  /// PUP routine
+  void pup(PUP::er &p);
   //Use this for Ccd calls
   //static void _runGVT(UpdateMsg *);
   /// ENTRY: Run the GVT

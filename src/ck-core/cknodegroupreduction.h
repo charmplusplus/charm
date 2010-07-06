@@ -146,8 +146,6 @@ public:
 	 */
 	void ckSetReductionClient(CkCallback *cb);
 
-	void contributorDied(contributorInfo *ci);//Don't expect more contributions
-
 //Contribute-- the given msg can contain any data.  The reducerType
 // field of the message must be valid.
 // Each contributor must contribute exactly once to each reduction.
@@ -276,7 +274,8 @@ class NodeGroup : public CkNodeReductionMgr {
   public:
     CmiNodeLock __nodelock;
     NodeGroup();
-    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { }
+    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { __nodelock=CmiCreateLock(); }
+    
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}

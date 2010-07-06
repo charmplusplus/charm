@@ -24,6 +24,9 @@
  * major changes 10/28/09   Gengbin Zheng
  * - parameters changed from pe to node to be consistent with the function name
  * - two new functions:   CmiPhysicalNodeID and CmiPhysicalRank
+ *
+ * 3/5/2010   Gengbin Zheng
+ * - use CmiReduce to optimize the collection of node info
  */
 
 #if 1
@@ -100,13 +103,18 @@ struct _SYSTEM_INFO sysinfo;
 static int cpuTopoHandlerIdx;
 static int cpuTopoRecvHandlerIdx;
 
-typedef struct _hostnameMsg {
-  char core[CmiMsgHeaderSizeBytes];
+struct _procInfo {
   skt_ip_t ip;
   int pe;
   int ncores;
   int rank;
   int nodeID;
+};
+
+typedef struct _hostnameMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  int n;
+  _procInfo *procs;
 } hostnameMsg;
 
 typedef struct _nodeTopoMsg {
@@ -211,10 +219,9 @@ static void cpuTopoHandler(void *m)
 {
   static int count = 0;
   static int nodecount = 0;
-  hostnameMsg *rec;
+  _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
-  hostnameMsg *tmpm;
-  char str[128];
+  char str[256];
   int tag, tag1, pe, myrank;
 
   if (topomsg == NULL) {
@@ -227,40 +234,46 @@ static void cpuTopoHandler(void *m)
   }
   CmiAssert(topomsg != NULL);
 
+  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
+  CmiAssert(msg->n == CmiNumPes());
+  for (int i=0; i<msg->n; i++) 
+  {
+    _procInfo *proc = msg->procs+i;
+
 /*   for debug
   skt_print_ip(str, msg->ip);
   printf("hostname: %d %s\n", msg->pe, str);
 */
-  tag = *(int*)&msg->ip;
-  pe = msg->pe;
-  if ((rec = (hostnameMsg *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
-    CmiFree(msg);
-  }
-  else {
+    tag = *(int*)&proc->ip;
+    pe = proc->pe;
+    if ((rec = (_procInfo *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
+    }
+    else {
 //    msg->nodeID = nodecount++;
-    msg->nodeID = pe;           // we will compact the node ID later
-    rec = msg;
-    CmmPut(hostTable, 1, &tag, msg);
+      proc->nodeID = pe;           // we will compact the node ID later
+      rec = proc;
+      CmmPut(hostTable, 1, &tag, proc);
+    }
+    myrank = rec->rank%rec->ncores;
+    topomsg->nodes[pe] = rec->nodeID;
+    rec->rank ++;
   }
-  myrank = rec->rank%rec->ncores;
-  topomsg->nodes[pe] = rec->nodeID;
-  rec->rank ++;
-  count ++;
-  if (count == CmiNumPes()) {
-    char str[256];
-    int ncores = CmiNumCores();
-    if (ncores > 1)
-    sprintf(str, "Charm++> Running on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
-    else
-    sprintf(str, "Charm++> Running on %d unique compute nodes.\n", CmmEntries(hostTable));
-    CmiPrintf(str);
-    //hostnameMsg *tmpm;
-    tag = CmmWildCard;
-    while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1)) CmiFree(tmpm);
-    CmmFree(hostTable);
 
-    CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
-  }
+    // assume all nodes have same number of cores
+  int ncores = CmiNumCores();
+  if (ncores > 1)
+    sprintf(str, "Charm++> Running on %d unique compute nodes (%d-way SMP).\n", CmmEntries(hostTable), ncores);
+  else
+    sprintf(str, "Charm++> Running on %d unique compute nodes.\n", CmmEntries(hostTable));
+  CmiPrintf(str);
+    // clean up CmmTable
+  hostnameMsg *tmpm;
+  tag = CmmWildCard;
+  while (tmpm = (hostnameMsg *)CmmGet(hostTable, 1, &tag, &tag1));
+  CmmFree(hostTable);
+  CmiFree(msg);
+
+  CmiSyncBroadcastAllAndFree(sizeof(nodeTopoMsg)+CmiNumPes()*sizeof(int), (char *)topomsg);
 }
 
 /* called on each processor */
@@ -276,9 +289,37 @@ static void cpuTopoRecvHandler(void *msg)
   }
   else
     CmiFree(m);
+  done++;
   CmiUnlock(topoLock);
 
-//  if (CmiMyPe() == 0) cpuTopo.print();
+  //if (CmiMyPe() == 0) cpuTopo.print();
+}
+
+// reduction function
+static void * combineMessage(int *size, void *data, void **remote, int count) 
+{
+  int i, j;
+  int nprocs = ((hostnameMsg *)data)->n;
+  if (count == 0) return data;
+  for (i=0; i<count; i++) nprocs += ((hostnameMsg *)remote[i])->n;
+  *size = sizeof(hostnameMsg)+sizeof(_procInfo)*nprocs;
+  hostnameMsg *msg = (hostnameMsg *)CmiAlloc(*size);
+  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
+  msg->n = nprocs;
+  CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
+
+  int n=0;
+  hostnameMsg *m = (hostnameMsg*)data;
+  m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
+  for (j=0; j<m->n; j++)
+    msg->procs[n++] = m->procs[j];
+  for (i=0; i<count; i++) {
+    m = (hostnameMsg*)remote[i];
+    m->procs = (_procInfo*)((char*)m + sizeof(hostnameMsg));
+    for (j=0; j<m->n; j++)
+      msg->procs[n++] = m->procs[j];
+  }
+  return msg;
 }
 
 /******************  API implementation **********************/
@@ -346,14 +387,19 @@ extern "C" void CmiInitCPUTopology(char **argv)
   static skt_ip_t myip;
   int ret, i;
   hostnameMsg  *msg;
+  double startT;
  
   if (CmiMyRank() ==0) {
      topoLock = CmiCreateLock();
   }
 
-  int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
-					   "obtain cpu topology info");
-  obtain_flag = 1;
+  int obtain_flag = 1;              // default on
+#if __FAULT__
+  obtain_flag = 0;
+#endif
+  if(CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
+					   "obtain cpu topology info"))
+    obtain_flag = 1;
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
@@ -368,12 +414,15 @@ extern "C" void CmiInitCPUTopology(char **argv)
      CmiRegisterHandler((CmiHandler)cpuTopoRecvHandler);
   }
 
-  if (!obtain_flag) return;
+  if (!obtain_flag) {
+    cpuTopo.sort();
+    return;
+  }
   else if (CmiMyPe() == 0) {
 #if CMK_BLUEGENE_CHARM
-  if (BgNodeRank() == 0)
+    if (BgNodeRank() == 0)
 #endif
-     CmiPrintf("Charm++> cpu topology info is being gathered.\n");
+      startT = CmiWallTimer();
   }
 
 #if CMK_BLUEGENE_CHARM
@@ -400,7 +449,9 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (CmiMyPe() >= CmiNumPes()) {
     CmiNodeAllBarrier();         // comm thread waiting
 #if CMK_MACHINE_PROGRESS_DEFINED
+#if ! CMK_CRAYXT
     while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
 #endif
     return;    /* comm thread return */
   }
@@ -458,7 +509,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiNodeAllBarrier();
   return;
 #else
-  /* get my ip address */
+    /* get my ip address */
   if (CmiMyRank() == 0)
   {
   #if CMK_HAS_GETHOSTNAME
@@ -477,25 +528,26 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (_noip) return; 
 
     /* prepare a msg to send */
-  msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg));
+  msg = (hostnameMsg *)CmiAlloc(sizeof(hostnameMsg)+sizeof(_procInfo));
+  msg->n = 1;
+  msg->procs = (_procInfo*)((char*)msg + sizeof(hostnameMsg));
   CmiSetHandler((char *)msg, cpuTopoHandlerIdx);
-  msg->pe = CmiMyPe();
-  msg->ip = myip;
-  msg->ncores = CmiNumCores();
-  msg->rank = 0;
-  CmiSyncSendAndFree(0, sizeof(hostnameMsg), (char *)msg);
+  msg->procs[0].pe = CmiMyPe();
+  msg->procs[0].ip = myip;
+  msg->procs[0].ncores = CmiNumCores();
+  msg->procs[0].rank = 0;
+  CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
+
+    // blocking here
+  while (done != CmiMyNodeSize())
+    CsdSchedulePoll();
 
   if (CmiMyPe() == 0) {
-    for (i=0; i<CmiNumPes(); i++) CmiDeliverSpecificMsg(cpuTopoHandlerIdx);
-    // CsdScheduleCount(CmiNumPes());   // collecting node IP from every processor
+#if CMK_BLUEGENE_CHARM
+    if (BgNodeRank() == 0)
+#endif
+      CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
   }
-
-  // receive broadcast from PE 0
-  CmiDeliverSpecificMsg(cpuTopoRecvHandlerIdx);
-  // CsdScheduleCount(1);
-  CmiLock(topoLock);
-  done++;
-  CmiUnlock(topoLock);
 #endif
 
 #endif   /* __BLUEGENE__ */

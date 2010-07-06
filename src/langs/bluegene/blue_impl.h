@@ -31,8 +31,9 @@ public:
   double cpufactor;	   /* cpu factor to multiply to the time for walltime */
   double fpfactor;         /* fp time factor */
   double timercost;        /* cost of timer */
-  int    record, replay;   /* record/replay */
+  int    record, recordnode, replay, replaynode;   /* record/replay */
   CkListString recordprocs;
+  CkListString recordnodes;
   char *traceroot;	   /* bgTraceFile prefix */
   BigSimNetwork *network;  /* network setup */
   CkListString procList;   /* a list of processor numbers with projections */
@@ -41,8 +42,8 @@ public:
   ~BGMach() { if (network) delete network; }
   void nullify() { 
 	x=y=z=0; 
-	numCth=numWth=0; stacksize=0; 
-        record=replay=-1;
+	numCth=numWth=1; stacksize=0; 
+        record=recordnode=replay=replaynode=-1;
 	timingMethod = BG_WALLTIME; cpufactor=1.0; fpfactor=0.0;
 	traceroot=NULL; 
 	network=new BlueGeneNetwork;
@@ -63,7 +64,7 @@ public:
        }
   int traceProejctions(int pe);
   void setNetworkModel(char *model);
-  int inReplayMode() { return replay != -1; }
+  int inReplayMode() { return replay != -1 || replaynode != -1; }
 };
 
 // simulation state
@@ -470,6 +471,7 @@ public:
   double  currTime;		/* thread timer */
 
   BgMessageWatcher *watcher;
+  int     cth_serialNo;         /* for record/replay */
 
   /*
    * It is needed for out-of-core scheduling
@@ -501,7 +503,8 @@ public:
 public:
   threadInfo(int _id, ThreadType _type, nodeInfo *_node): 
   	id(_id), globalId(-1), type(_type), myNode(_node), currTime(0.0), 
-        watcher(NULL), isCoreOnDisk(0), memUsed(0.0),
+        watcher(NULL), cth_serialNo(2),
+        isCoreOnDisk(0), memUsed(0.0),
 	startOutOfCore(1), startOOCChanged(0){}
   inline void setThread(CthThread t) { me = t; }
   inline CthThread getThread() const { return me; }
@@ -519,8 +522,10 @@ class workThreadInfo : public threadInfo {
 private:
   int CsdStopFlag;
 public:
+  void* reduceMsg;
+  
   workThreadInfo(int _id, nodeInfo *_node): 
-        threadInfo(_id, WORK_THREAD, _node) { 
+        threadInfo(_id, WORK_THREAD, _node), reduceMsg(NULL) { 
     CsdStopFlag=0; 
     watcher = NULL;
     if (_id != -1) {
@@ -555,7 +560,8 @@ void    resetVTime();
 char * getFullBuffer();
 void   addBgNodeMessage(char *msgPtr);
 void   addBgThreadMessage(char *msgPtr, int threadID);
-void   BgProcessMessage(threadInfo *t, char *msg);
+void   BgProcessMessageDefault(threadInfo *t, char *msg);
+extern void (*BgProcessMessage)(threadInfo *t, char *msg);
 
 
 /* blue gene debug */

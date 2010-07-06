@@ -23,6 +23,8 @@ class eventQueue {
   POSE_TimeType largest;
   /// number of unexecuted events in the queue
   unsigned int eventCount;
+  /// Timestamp of the last event inserted in the queue
+  POSE_TimeType tsOfLastInserted;
   /// Output file name for stats for DOP calculation
   char filename[20];
   /// Output file pointer for stats for DOP calculation
@@ -49,9 +51,9 @@ class eventQueue {
       eventID, returns 0 if rollback necessary, 1 otherwise. */
   void InsertEventDeterministic(Event *e);      
   /// Return front pointer
-  Event *front() { return frontPtr; }
+  inline Event *front() { return frontPtr; }
   /// Return back pointer
-  Event *back() { return backPtr; }
+  inline Event *back() { return backPtr; }
   /// Move currentPtr to next event in queue
   /** If no more events, take one from heap */
   void ShiftEvent() { 
@@ -76,34 +78,36 @@ class eventQueue {
 #ifdef EQ_SANITIZE
     sanitize();
 #endif
-  }               
+  }
   /// Commit (delete) events before target timestamp ts
   void CommitEvents(sim *obj, POSE_TimeType ts); 
   /// Commit (delete) all events
   void CommitAll(sim *obj); 
+  /// Commit (delete) all events that are done (used in sequential mode)
+  void CommitDoneEvents(sim *obj);
   /// Change currentPtr to point to event e
   /** Be very very careful with this -- avoid using if possible */
   void SetCurrentPtr(Event *e);
   /// Delete event and reconnect surrounding events in queue
   void DeleteEvent(Event *ev);
   /// Return the event ID of the event pointed to by currentPtr
-  const eventID& CurrentEventID() { return currentPtr->evID; }
+  inline const eventID& CurrentEventID() { return currentPtr->evID; }
   /// Add id, e and ts as an entry in currentPtr's spawned list
   /** The poser e was sent to is id */
-  void AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts) {
+  inline void AddSpawnToCurrent(int id, eventID e, POSE_TimeType ts) {
     SpawnedEvent *newnode = 
       new SpawnedEvent(id, e, ts, currentPtr->spawnedList);
     CmiAssert(currentPtr->done == 2);
     currentPtr->spawnedList = newnode;
   }
   /// Return the first entry in currentPtr's spawned list and remove it
-  SpawnedEvent *GetNextCurrentSpawn() {
+  inline SpawnedEvent *GetNextCurrentSpawn() {
     SpawnedEvent *tmp = currentPtr->spawnedList;
     if (tmp) currentPtr->spawnedList = tmp->next;
     return tmp;
   }
   /// Find the largest timestamp of the unexecuted events
-  void FindLargest() {
+  inline void FindLargest() {
     POSE_TimeType hs = eqh->FindMax();
     if (backPtr->prev->done == 0) largest = backPtr->prev->timestamp;
     else largest = POSE_UnsetTS;

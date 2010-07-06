@@ -3,7 +3,7 @@
 module memory_temporal {
   readonly CkGroupID TempMemID;
 
-  group TimePool {
+  group [migratable] TimePool {
     entry TimePool();
   };
 };

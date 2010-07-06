@@ -60,7 +60,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 CpvDeclare(int ,serializer);
 
-CmiBool isAnytimeMigration;
+CmiBool _isAnytimeMigration;
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -184,7 +184,7 @@ void ArrayElement::initBasics(void)
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
-  numElements=info.numInitial.getCombinedCount();
+  numInitialElements=info.numInitial.getCombinedCount();
   if (info.listenerData) {
     memcpy(listenerData,info.listenerData,sizeof(listenerData));
   }
@@ -192,7 +192,7 @@ void ArrayElement::initBasics(void)
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));
   }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         mlogData->objID.type = TypeArray;
         mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
 #endif
@@ -234,7 +234,7 @@ CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
 {
-	if(BgOutOfCoreFlag!=1){ //in case of taking core out of memory
+	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
 	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
 	}
@@ -313,7 +313,7 @@ void ArrayElement::CkAbort(const char *str) const
 }
 
 void ArrayElement::recvBroadcast(CkMessage *m){
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CkArrayMessage *bcast = (CkArrayMessage *)m;
     envelope *env = UsrToEnv(m);
 	int epIdx= env->piggyBcastIdx;
@@ -886,7 +886,7 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (isAnytimeMigration) {
+  if (_isAnytimeMigration) {
     DEBB((AA"Received broadcast %d\n"AB,bcastNo));
     CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
     oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
@@ -903,7 +903,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep_bcast();
 
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
         return true;
 #else
@@ -914,7 +914,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 /// Deliver all needed broadcasts to the given local element
 CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (! isAnytimeMigration) return CmiTrue;
+  if (! _isAnytimeMigration) return CmiTrue;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -944,7 +944,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
-  if (! isAnytimeMigration) return;
+  if (! _isAnytimeMigration) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -978,7 +978,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
  	  int skipsched = opts & CK_MSG_EXPEDITED; 
 	  //int serializer=0;//1623802937%CkNumPes();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
                 CProxy_CkArray ap(_aid);
                 ap[CpvAccess(serializer)].sendBroadcast(msg);
                 CkGroupID _id = _aid;
@@ -1021,7 +1021,7 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 	thisProxy.recvExpeditedBroadcast(msg);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int _tempBroadcastCount=0;
 
 void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
@@ -1060,7 +1060,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster->incoming(msg);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _tempBroadcastCount=0;
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
@@ -1094,7 +1094,7 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
   		startVTimer();
 #endif
-	if (! isAnytimeMigration) {
+	if (! _isAnytimeMigration) {
 	  delete msg;
 	}
 }

@@ -79,6 +79,7 @@ char **papi_counters_desc = NULL;
 #define MAX_TOTAL_EVENTS 10
 #endif
 
+BgTracingFn userTracingFn = NULL;
 
 /****************************************************************************
      little utility functions
@@ -506,6 +507,7 @@ char * getFullBuffer()
  * called by a Converse handler or sendPacket()
  * add message msgPtr to a bluegene node's inbuffer queue 
  */
+extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
 #ifndef CMK_OPTIMIZE
@@ -539,6 +541,18 @@ void addBgNodeMessage(char *msgPtr)
   tMYNODE->addBgNodeMessage(msgPtr);
 }
 
+void BgEnqueue(char *msg)
+{
+#if 0
+  ASSERT(tTHREADTYPE == WORK_THREAD);
+  workThreadInfo *tinfo = (workThreadInfo *)cta(threadinfo);
+  tinfo->addAffMessage(msg);
+#else
+  nodeInfo *myNode = cta(threadinfo)->myNode;
+  addBgNodeInbuffer(msg, myNode->id);
+#endif
+}
+
 /** BG API Func 
  *  check if inBuffer on this node has msg available
  */
@@ -548,7 +562,6 @@ int checkReady()
     CmiAbort("checkReady called by a non-communication thread!\n");
   return !tINBUFFER.isEmpty();
 }
-
 
 /* handler to process the msg */
 void msgHandlerFunc(char *msg)
@@ -563,7 +576,15 @@ void msgHandlerFunc(char *msg)
     int lnodeID = nodeInfo::Global2Local(gnodeID);
     if (cva(bgMach).inReplayMode()) {
       int x, y, z;
-      BgGetXYZ(cva(bgMach).replay, &x, &y, &z);
+      int node;
+      if (cva(bgMach).replay != -1) {
+        node = cva(bgMach).replay;
+        node = node / cva(bgMach).numWth;
+      }
+      if (cva(bgMach).replaynode != -1) {
+        node = cva(bgMach).replaynode;
+      }
+      BgGetXYZ(node, &x, &y, &z);
       if (nodeInfo::XYZ2Local(x,y,z) != lnodeID) return;
       else lnodeID = 0;
     }
@@ -584,7 +605,13 @@ void nodeBCastMsgHandlerFunc(char *msg)
 
   if (gnodeID < -1) {
     gnodeID = - (gnodeID+100);
-    if (nodeInfo::Global2PE(gnodeID) == CmiMyPe())
+    if (cva(bgMach).replaynode != -1) {
+      if (gnodeID == cva(bgMach).replaynode)
+          lnodeID = 0;
+      else
+          lnodeID = -1;
+    }
+    else if (nodeInfo::Global2PE(gnodeID) == CmiMyPe())
       lnodeID = nodeInfo::Global2Local(gnodeID);
     else
       lnodeID = -1;
@@ -642,10 +669,27 @@ void threadBCastMsgHandlerFunc(char *msg)
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int gnodeID = CmiBgMsgNodeID(msg);
   CmiInt2 threadID = CmiBgMsgThreadID(msg);
+  if (cva(bgMach).replay != -1) {
+    if (gnodeID < -1) {
+      gnodeID = - (gnodeID+100);
+      if (gnodeID == cva(bgMach).replay/cva(bgMach).numWth && threadID == cva(bgMach).replay%cva(bgMach).numWth)
+        return;
+    }
+    CmiBgMsgThreadID(msg) = 0;
+    DEBUGF(("[%d] addBgNodeInbuffer to %d tid:%d\n", CmiMyPe(), i, j));
+    addBgNodeInbuffer(msg, 0);
+    return;
+  }
   int lnodeID;
   if (gnodeID < -1) {
       gnodeID = - (gnodeID+100);
-      if (nodeInfo::Global2PE(gnodeID) == CmiMyPe())
+      if (cva(bgMach).replaynode != -1) {
+        if (gnodeID == cva(bgMach).replaynode)
+          lnodeID = 0;
+        else
+          lnodeID = -1;
+      }
+      else if (nodeInfo::Global2PE(gnodeID) == CmiMyPe())
 	lnodeID = nodeInfo::Global2Local(gnodeID);
       else
 	lnodeID = -1;
@@ -920,6 +964,12 @@ void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, i
 
 static void _BgSendLocalPacket(nodeInfo *myNode, int threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
+  if (cva(bgMach).replay!=-1) { // replay mode
+    int t = cva(bgMach).replay%BgGetNumWorkThread();
+    if (t == threadID) threadID = 0;
+    else return;
+  }
+
   sendPacket_(myNode, myNode->x, myNode->y, myNode->z, threadID, handlerID, type, numbytes, data, 1);
 }
 
@@ -928,7 +978,10 @@ void BgSendLocalPacket(int threadID, int handlerID, WorkType type,
 {
   nodeInfo *myNode = cta(threadinfo)->myNode;
 
-  if (cva(bgMach).inReplayMode()) threadID = 0;    // replay mode
+  if (cva(bgMach).replay!=-1) {     // replay mode
+    threadID = 0;
+    CmiAssert(threadID != -1);
+  }
 
   _BgSendLocalPacket(myNode, threadID, handlerID, type, numbytes, data);
 }
@@ -955,14 +1008,19 @@ void BgBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * dat
 
 void BgThreadBroadcastPacketExcept(int node, CmiInt2 threadID, int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (cva(bgMach).inReplayMode()) return;    // replay mode
+  if (cva(bgMach).replay!=-1) return;    // replay mode
+  else if (cva(bgMach).replaynode!=-1) {    // replay mode
+    //if (node!=-1 && node == cva(bgMach).replaynode/cva(bgMach).numWth)
+    //  return;
+  }
   threadBroadcastPacketExcept_(node, threadID, handlerID, type, numbytes, data);
 }
 
 void BgThreadBroadcastAllPacket(int handlerID, WorkType type, int numbytes, char * data)
 {
-  if (cva(bgMach).inReplayMode()) {      // replay mode, send only to itself
-    BgSendLocalPacket(ANYTHREAD, handlerID, type, numbytes, data);
+  if (cva(bgMach).replay!=-1) {      // replay mode, send only to itself
+    int t = cva(bgMach).replay%BgGetNumWorkThread();
+    BgSendLocalPacket(t, handlerID, type, numbytes, data);
     return;
   }
   threadBroadcastPacketExcept_(BG_BROADCASTALL, ANYTHREAD, handlerID, type, numbytes, data);
@@ -992,12 +1050,13 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     int local = 0;
     int x,y,z,t;
     int pe = pes[i];
+    int node;
 #if CMK_BLUEGENE_NODE
     CmiAbort("Not implemented yet!");
 #else
     t = pe%BgGetNumWorkThread();
-    pe = pe/BgGetNumWorkThread();
-    BgGetXYZ(pe, &x, &y, &z);
+    node = pe/BgGetNumWorkThread();
+    BgGetXYZ(node, &x, &y, &z);
 #endif
 
     char *sendmsg = CmiCopyMsg(msg, numbytes);
@@ -1013,10 +1072,16 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     if (i!=0) CpvAccess(msgCounter) --;
     BG_ADDMSG(sendmsg, CmiBgMsgNodeID(sendmsg), t, now, local, i==0?npes:-1);
 
+#if 0
+    BgSendPacket(x, y, z, t, handlerID, type, numbytes, sendmsg);
+#else
     if (myNode->x == x && myNode->y == y && myNode->z == z)
       addBgNodeInbuffer(sendmsg, myNode->id);
-    else
+    else {
+      if (cva(bgMach).inReplayMode()) continue;  // replay mode, no outgoing msg
       CmiSendPacket(x, y, z, numbytes, sendmsg);
+    }
+#endif
   }
 
   CmiFree(msg);
@@ -1181,11 +1246,12 @@ void BgSetWorkerThreadStart(BgStartHandler f)
 extern "C" void CthResumeNormalThread(CthThreadToken* token);
 
 // kernel function for processing a bluegene message
-void BgProcessMessage(threadInfo *tinfo, char *msg)
+void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
 {
   DEBUGM(5, ("=====Begin of BgProcessing a msg on node[%d]=====\n", BgMyNode()));
   int handler = CmiBgMsgHandle(msg);
-  DEBUGF(("[%d] call handler %d\n", BgMyNode(), handler));
+  //CmiPrintf("[%d] call handler %d\n", BgMyNode(), handler);
+  CmiAssert(handler < 1000);
 
   BgHandlerInfo *handInfo;
 #if  CMK_BLUEGENE_NODE
@@ -1202,6 +1268,8 @@ void BgProcessMessage(threadInfo *tinfo, char *msg)
     CmiAbort("BgProcessMessage Failed!");
   }
   BgHandlerEx entryFunc = handInfo->fnPtr;
+
+  if (programExit == 2) return;    // program exit already
 
   CmiSetHandler(msg, CmiBgMsgHandle(msg));
 
@@ -1225,6 +1293,7 @@ void BgProcessMessage(threadInfo *tinfo, char *msg)
   DEBUGM(5, ("=====End of BgProcessing a msg on node[%d]=====\n\n", BgMyNode()));
 }
 
+void  (*BgProcessMessage)(threadInfo *t, char *msg) = BgProcessMessageDefault;
 
 void scheduleWorkerThread(char *msg)
 {
@@ -1286,6 +1355,26 @@ static void beginExitHandlerFunc(void *msg);
 static void writeToDisk();
 static void sendCorrectionStats();
 
+void callAllUserTracingFunction()
+{
+  if (userTracingFn == NULL) return;
+  int origPe = -2;
+  // close all tracing modules
+  for (int j=0; j<cva(numNodes); j++)
+    for (int i=0; i<cva(bgMach).numWth; i++) {
+      int pe = nodeInfo::Local2Global(j)*cva(bgMach).numWth+i;
+      int oldPe = CmiSwitchToPE(pe);
+      if (cva(bgMach).replay != -1)
+        if ( pe != cva(bgMach).replay ) continue;
+      if (origPe == -2) origPe = oldPe;
+      traceCharmClose();
+      delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
+      cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
+      if (userTracingFn) userTracingFn();
+    }
+    if (origPe!=-2) CmiSwitchToPE(origPe);
+}
+
 static CmiHandler exitHandlerFunc(char *msg)
 {
   // TODO: free memory before exit
@@ -1317,11 +1406,16 @@ static CmiHandler exitHandlerFunc(char *msg)
   // close all tracing modules
   for (j=0; j<cva(numNodes); j++)
     for (i=0; i<cva(bgMach).numWth; i++) {
-      int oldPe = CmiSwitchToPE(nodeInfo::Local2Global(j)*cva(bgMach).numWth+i);
+      int pe = nodeInfo::Local2Global(j)*cva(bgMach).numWth+i;
+      int oldPe = CmiSwitchToPE(pe);
+      if (cva(bgMach).replay != -1)
+        if ( pe != cva(bgMach).replay ) continue;
       if (origPe == -2) origPe = oldPe;
       traceCharmClose();
 //      CmiSwitchToPE(oldPe);
       delete cva(nodeinfo)[j].threadinfo[i]->watcher;   // force dump watcher
+      cva(nodeinfo)[j].threadinfo[i]->watcher = NULL;
+      if (userTracingFn) userTracingFn();
     }
     if (origPe!=-2) CmiSwitchToPE(origPe);
   }
@@ -1381,7 +1475,7 @@ static void sanityCheck()
 #endif
   }
   if (cva(bgMach).getNodeSize()<CmiNumPes()) {
-    CmiAbort("\nToo few BlueGene nodes!\n");
+    CmiAbort("\nToo few BigSim nodes!\n");
   }
 }
 
@@ -1394,6 +1488,7 @@ CmiStartFn bgMain(int argc, char **argv)
   int i;
   char *configFile = NULL;
 
+  BgProcessMessage = BgProcessMessageDefault;
 #if CMK_CONDS_USE_SPECIAL_CODE
   // overwrite possible implementation in machine.c
   CmiSwitchToPE = CmiSwitchToPEFn;
@@ -1501,16 +1596,64 @@ CmiStartFn bgMain(int argc, char **argv)
   }
 
   // record/replay
-  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim"))
+  if (CmiGetArgFlagDesc(argv,"+bgrecord","Record message processing order for BigSim")) {
     cva(bgMach).record = 1;
+    if (CmiMyPe() == 0)
+      CmiPrintf("BG info> full record mode. \n");
+  }
+  if (CmiGetArgFlagDesc(argv,"+bgrecordnode","Record message processing order for BigSim")) {
+    cva(bgMach).recordnode = 1;
+    if (CmiMyPe() == 0)
+      CmiPrintf("BG info> full record mode on node. \n");
+  }
   int replaype;
   if (CmiGetArgIntDesc(argv,"+bgreplay", &replaype, "Re-play message processing order for BigSim")) {
     cva(bgMach).replay = replaype;
+  }
+  else {
+    if (CmiGetArgFlagDesc(argv,"+bgreplay","Record message processing order for BigSim"))
+    cva(bgMach).replay = 0;    // default to 0
+  }
+  if (cva(bgMach).replay >= 0) {
+    if (CmiNumPes()>1)
+      CmiAbort("BG> bgreplay mode must run on one physical processor.");
+    if (cva(bgMach).x!=1 || cva(bgMach).y!=1 || cva(bgMach).z!=1 ||
+         cva(bgMach).numWth!=1 || cva(bgMach).numCth!=1)
+      CmiAbort("BG> bgreplay mode must run on one target processor.");
+    CmiPrintf("BG info> replay mode for target processor %d.\n", cva(bgMach).replay);
   }
   char *procs = NULL;
   if (CmiGetArgStringDesc(argv, "+bgrecordprocessors", &procs, "A list of processors to record, e.g. 0,10,20-30")) {
     cva(bgMach).recordprocs.set(procs);
   }
+
+    // record/replay at node level
+  char *nodes = NULL;
+  if (CmiGetArgStringDesc(argv, "+bgrecordnodes", &nodes, "A list of nodes to record, e.g. 0,10,20-30")) {
+    cva(bgMach).recordnodes.set(nodes);
+  }
+  int replaynode;
+  if (CmiGetArgIntDesc(argv,"+bgreplaynode", &replaynode, "Re-play message processing order for BigSim")) {      
+    cva(bgMach).replaynode = replaynode; 
+  }
+  else {
+    if (CmiGetArgFlagDesc(argv,"+bgreplaynode","Record message processing order for BigSim"))
+    cva(bgMach).replaynode = 0;    // default to 0
+  }
+  if (cva(bgMach).replaynode >= 0) {
+    int startpe, endpe;
+    BgRead_nodeinfo(replaynode, startpe, endpe);
+    if (cva(bgMach).numWth != endpe-startpe+1) {
+      cva(bgMach).numWth = endpe-startpe+1;     // update wth
+      CmiPrintf("BG info> numWth is changed to %d.\n", cva(bgMach).numWth);
+    }
+    if (CmiNumPes()>1)
+      CmiAbort("BG> bgreplay mode must run on one physical processor.");
+    if (cva(bgMach).x!=1 || cva(bgMach).y!=1 || cva(bgMach).z!=1)
+      CmiAbort("BG> bgreplay mode must run on one target processor.");
+    CmiPrintf("BG info> replay mode for target node %d.\n", cva(bgMach).replaynode);   
+  }     
+  CmiAssert(!(cva(bgMach).replaynode != -1 && cva(bgMach).replay != -1));
 
 
   /* parameters related with out-of-core execution */
@@ -1520,7 +1663,7 @@ CmiStartFn bgMain(int argc, char **argv)
     }
   if (CmiGetArgDoubleDesc(argv, "+bgooc", &bgOOCMaxMemSize, "Simulate with out-of-core support and the threshhold of memory size")){
       bgUseOutOfCore = 1;
-      BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
+      _BgInOutOfCoreMode = 1; //the global (the whole converse layer) out-of-core flag
 
       double curFreeMem = bgGetSysFreeMemSize();
       if(fabs(bgOOCMaxMemSize - 0.0)<=1e-6){
@@ -1643,8 +1786,10 @@ if(bgUseOutOfCore){
     /* initialize a BG node and fire all threads */
     BgNodeInitialize(ninfo);
   }
+
   // clear main thread.
   cta(threadinfo)->myNode = NULL;
+
   CpvInitialize(CthThread, mainThread);
   cva(mainThread) = CthSelf();
 
@@ -1674,7 +1819,7 @@ extern "C" int CmiSwitchToPEFn(int pe)
   else if (pe < 0) {
   }
   else {
-    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
+//    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
     int t = pe%cva(bgMach).numWth;
     int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;
@@ -2020,7 +2165,9 @@ static void writeToDisk()
 }
 
 
-// application Converse thread hook
+/*****************************************************************************
+             application Converse thread hook
+*****************************************************************************/
 
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 
@@ -2076,14 +2223,65 @@ void BgSetStrategyBigSimDefault(CthThread t)
   CthAddListener(t, a);
 }
 
+int BgIsMainthread()
+{
+    return tMYNODE == NULL;
+}
 
 int BgIsRecord()
 {
-    return cva(bgMach).record == 1;
+    return cva(bgMach).record == 1 || cva(bgMach).recordnode == 1;
 }
 
 int BgIsReplay()
 {
-    return cva(bgMach).replay != -1;
+    return cva(bgMach).replay != -1 || cva(bgMach).replaynode != -1;
 }
+
+extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
+  ((workThreadInfo*)cta(threadinfo))->reduceMsg = msg;
+  //CmiPrintf("Called CkReduce from %d %hd\n",CmiMyPe(),cta(threadinfo)->globalId);
+  int numLocal = 0, count = 0;
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t->reduceMsg == NULL) return; /* we are not yet ready to reduce */
+      numLocal ++;
+    }
+  }
+  
+  /* Since the current message is passed is as "local" to the merge function,
+   * and it will not be nullified in the upcoming loop, make it NULL explicitely. */
+  ((workThreadInfo*)cta(threadinfo))->reduceMsg = NULL;
+  
+  void **msgLocal = (void**)malloc(sizeof(void*)*(numLocal-1));
+  for (int j=0; j<cva(numNodes); j++){
+    for(int i=0;i<cva(bgMach).numWth;i++){
+      workThreadInfo *t = (workThreadInfo*)cva(nodeinfo)[j].threadinfo[i];
+      if (t == cta(threadinfo)) break;
+      msgLocal[count++] = t->reduceMsg;
+      t->reduceMsg = NULL;
+    }
+  }
+  CmiAssert(count==numLocal-1);
+  msg = mergeFn(&size, msg, msgLocal, numLocal-1);
+  CmiReduce(msg, size, mergeFn);
+  //CmiPrintf("Called CmiReduce %d\n",CmiMyPe());
+  for (int i=0; i<numLocal-1; ++i) CmiFree(msgLocal[i]);
+  free(msgLocal);
+}
+
+// for record/replay, to fseek back
+void BgRewindRecord()
+{
+  threadInfo *tinfo = cta(threadinfo);
+  if (tinfo->watcher) tinfo->watcher->rewind();
+}
+
+
+void BgRegisterUserTracingFunction(BgTracingFn fn)
+{
+  userTracingFn = fn;
+}
+
 

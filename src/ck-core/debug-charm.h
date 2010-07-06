@@ -14,6 +14,9 @@
 #include "pup.h"
 #include "cklists.h"
 
+#define CHARMDEBUG_MAJOR   10
+#define CHARMDEBUG_MINOR    4
+
 void *CpdGetCurrentObject();
 void *CpdGetCurrentMsg();
 
@@ -48,7 +51,7 @@ public:
   DebugEntryInfo() : isBreakpoint(CmiFalse) { }
 };
 
-extern CkVec<DebugEntryInfo> _debugEntryTable;
+typedef CkVec<DebugEntryInfo> DebugEntryTable;
 
 //These pup functions are useful in CpdLists, as they document the name
 //  of the variable.  Your object must be named "c" (a stupid hack).

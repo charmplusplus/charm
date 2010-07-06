@@ -11,22 +11,40 @@
 
 #define DEBUG 0
 #define REUSE_ITER_MSG 0
+#define TOUCH_MSGDATA 0
 
 CProxy_Main mainProxy;
 int gMsgSize;
 
 class toNeighborMsg: public CMessage_toNeighborMsg {
 public:
-    char *data;
+    int *data;
+    int size;
     int fromX;
     int nID;
 
 public:
+    toNeighborMsg() {};
+    toNeighborMsg(int s): size(s) {  
+#if TOUCH_MSGDATA
+	init(); 
+#endif
+    }
+
     void setMsgSrc(int X, int id) {
         fromX = X;
         nID = id;
     }
-
+    void init() {
+        for (int i=0; i<size; i++)
+          data[i] = i;
+    }
+    int sum() {
+        int s=0;
+        for (int i=0; i<size; i++)
+          s += data[i];
+        return s;
+    }
 };
 
 //#define MSGSIZECNT 1
@@ -68,6 +86,10 @@ public:
         }
 
         int numElems = atoi(m->argv[1]);
+	if(numElems < CkNumPes()){
+		printf("Warning: #elements is forced to be euqal to #pes\n");
+		numElems = CkNumPes();
+	}
 
         numSteps = atoi(m->argv[2]);
 
@@ -221,6 +243,8 @@ public:
     int curIterWorkSize;
     int internalStepCnt;
 
+    int sum;
+
 #if REUSE_ITER_MSG
     toNeighborMsg **iterMsg;
 #endif
@@ -336,7 +360,7 @@ public:
 #if REUSE_ITER_MSG
 	    toNeighborMsg *msg = iterMsg[i];
 #else
-            toNeighborMsg *msg = new(msgSize, 0) toNeighborMsg;
+            toNeighborMsg *msg = new(msgSize/4, 0) toNeighborMsg(msgSize/4);
 #endif
 
 #if DEBUG
@@ -375,7 +399,7 @@ public:
 #if REUSE_ITER_MSG
 	if(iterMsg[0]==NULL){ //indicating the messages have not been created
 	    for(int i=0; i<numNeighbors; i++)
-		iterMsg[i] = new(curIterMsgSize, 0) toNeighborMsg;
+		iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
 	}
 #endif
 	
@@ -422,6 +446,10 @@ public:
     void recvMsgs(toNeighborMsg *m) {
 #if DEBUG
 	CkPrintf("[%d]: recv msg from %d as its %dth neighbor\n", thisIndex, m->fromX, m->nID);
+#endif
+
+#if TOUCH_MSGDATA
+        sum = m->sum();
 #endif
         thisProxy(m->fromX).recvReplies(m);
     }

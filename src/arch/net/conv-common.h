@@ -39,6 +39,8 @@
 #define CMK_BROADCAST_SPANNING_TREE    			   0
 #define CMK_BROADCAST_HYPERCUBE        			   1
 
+#define CMK_BARRIER_USE_COMMON_CODE                        1
+
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
 #define NODE_0_IS_CONVHOST                                 0

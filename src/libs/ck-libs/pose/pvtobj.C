@@ -61,6 +61,13 @@ int pvtObjects::Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr)
   return idx;
 }
 
+void pvtObjects::callAtSync() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) {
+      (objs[i].localObjPtr)->AtSync();
+    }
+}
 /// Wake up all posers in list
 void pvtObjects::Wake() {
   register int i;
@@ -72,6 +79,12 @@ void pvtObjects::Commit() {
   register int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->Commit();
+}
+/// Call CheckpointCommit on all posers
+void pvtObjects::CheckpointCommit() {
+  register int i;
+  for (i=0; i<numSpaces; i++)
+    if (objs[i].isPresent()) (objs[i].localObjPtr)->CheckpointCommit();
 }
 
 /// Dump data fields

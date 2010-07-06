@@ -27,32 +27,32 @@ class pvtObjectNode {
   /// Basic Constructor
   pvtObjectNode() : ovt(POSE_UnsetTS), ovt2(POSE_UnsetTS), index(-1), present(false), sync(0), qdo(0.0) {  }
   /// Sets all data fields
-  void set(POSE_TimeType ts, int idx, bool on, short int s, sim *p) {
+  inline void set(POSE_TimeType ts, int idx, bool on, short int s, sim *p) {
     ovt = ts; index = idx; present = on; sync = s; localObjPtr = p; qdo = 0.0;
     ovt2 = POSE_UnsetTS;
   }
   /// Sets ovt to -1 to indicate idle
-  void setIdle() { ovt = ovt2 = POSE_UnsetTS; }
+  inline void setIdle() { ovt = ovt2 = POSE_UnsetTS; }
   /// Test present flag
-  bool isPresent() { return present; }
+  inline bool isPresent() { return present; }
   /// Test if synchronization strategy is optimistic
-  int isOptimistic() { return (sync == OPTIMISTIC); }
+  inline int isOptimistic() { return (sync == OPTIMISTIC); }
   /// Test if synchronization strategy is conservative
-  int isConservative() { return (sync == CONSERVATIVE); }
+  inline int isConservative() { return (sync == CONSERVATIVE); }
   /// Return ovt
-  POSE_TimeType getOVT() { return ovt; }
+  inline POSE_TimeType getOVT() { return ovt; }
   /// Return ovt2
-  POSE_TimeType getOVT2() { return ovt2; }
+  inline POSE_TimeType getOVT2() { return ovt2; }
   /// Set ovt to st
-  void setOVT(POSE_TimeType st) { ovt = st; }
+  inline void setOVT(POSE_TimeType st) { ovt = st; }
   /// Set ovt2 to st
-  void setOVT2(POSE_TimeType st) { ovt2 = st; }
+  inline void setOVT2(POSE_TimeType st) { ovt2 = st; }
   /// Add time to qdo
-  void addQdoTime(double t) { qdo += t; }
+  inline void addQdoTime(double t) { qdo += t; }
   /// Return qdo
-  double getQdo() { return qdo; }
+  inline double getQdo() { return qdo; }
   /// Reset qdo at start of quanta
-  void resetQdo() { qdo = 0.0; }
+  inline void resetQdo() { qdo = 0.0; }
   /// Dump data fields
   void dump() {
     if (localObjPtr == NULL)
@@ -82,24 +82,27 @@ class pvtObjects {
   /// Basic Constructor: preallocates space for 100 objects
   pvtObjects();    
   /// Get number of objects in the list
-  int getNumObjs() { return numObjs; }
+  inline int getNumObjs() { return numObjs; }
   /// Get number of spaces in use in list
-  int getNumSpaces() { return numSpaces; }
+  inline int getNumSpaces() { return numSpaces; }
   /// Set posers to idle (ovt==-1)
-  void SetIdle() { 
+  inline void SetIdle() { 
     register int i; 
     for (i=0; i<numSpaces; i++) objs[i].setIdle();
   }                           
   /// Wake up all posers in list
   void Wake();
+  void callAtSync();
   /// Call Commit on all posers
   void Commit();
+  /// Call CheckpointCommit on all posers
+  void CheckpointCommit();
   /// Insert poser in list
   /** Inserts an object in the list in the firstEmpty slot, expanding the list
       size if necessary */
   int Insert(int index, POSE_TimeType ovt, int sync, sim *myPtr); 
   /// Delete a poser from the list
-  void Delete(int idx) {
+  inline void Delete(int idx) {
     objs[idx].set(POSE_UnsetTS, POSE_UnsetTS, false, 0, NULL);
     numObjs--;
     if (idx < firstEmpty) firstEmpty = idx; // recalculate firstEmpty

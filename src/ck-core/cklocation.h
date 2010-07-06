@@ -60,7 +60,7 @@ public:
 	CkArrayIndexMax idx; // Array index that is migrating
 	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CkGroupID gid; //gid of location manager
 #endif
 	CmiBool bounced;
@@ -222,7 +222,7 @@ public:
   int  isReadyMigrate()	{ return readyMigrate; }
   CmiBool checkBufferedMigration();	// check and execute pending migration
   int   MigrateToPe();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         void Migrated();
 #endif
   inline void setMeasure(CmiBool status) { enable_measure = status; }
@@ -505,7 +505,7 @@ public:
 };
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 #endif
 
@@ -610,7 +610,7 @@ public:
 	/// Return true if this array element lives on another processor
 	bool isRemote(const CkArrayIndex &idx,int *onPe) const;
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	//mark the duringMigration variable .. used for parallel restart
 	void setDuringMigration(CmiBool _duringMigration);
 #endif
@@ -621,10 +621,10 @@ public:
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup), skip listeners
 	void restore(const CkArrayIndex &idx, PUP::er &p);
 	/// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
-#ifdef _FAULT_MLOG_
-	void resume(const CkArrayIndex &idx, PUP::er &p,int dummy=0);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool create, int dummy=0);
 #else
-	void resume(const CkArrayIndex &idx, PUP::er &p);
+	void resume(const CkArrayIndex &idx, PUP::er &p, CmiBool notify=CmiTrue);
 #endif
 
 //Communication:
@@ -658,9 +658,9 @@ private:
 
 	friend class CkLocation; //so it can call pupElementsFor
 	friend class ArrayElement;
-#ifdef _FAULT_MLOG_
- void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
-        CkElementCreation_t type,int dummy=0);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
+        CkElementCreation_t type, CmiBool create=CmiTrue, int dummy=0);
 #else
 	void pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 		CkElementCreation_t type);
@@ -673,7 +673,7 @@ private:
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
 	/// Create a new local record at this array index.
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 CkLocRec_local *createLocal(const CkArrayIndex &idx,
         CmiBool forMigration, CmiBool ignoreArrival,
         CmiBool notifyHome,int dummy=0);
@@ -743,7 +743,7 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
 #endif
 	void initLB(CkGroupID lbdbID);
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 public:
 	void callForAllRecords(CkLocFn,CkArray *,void *);
 	int homeElementCount;

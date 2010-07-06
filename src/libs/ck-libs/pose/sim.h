@@ -43,7 +43,7 @@ public:
   eventMsg() { rst = 0.0; parent = NULL; str = NULL; evID.init();}
   /// Destructor
   virtual ~eventMsg() { }
-  void sanitize() {
+  inline void sanitize() {
     CkAssert(timestamp > -1);
     CkAssert(evID.getPE() > -1);
     CkAssert(evID.getPE() < CkNumPes());
@@ -55,7 +55,7 @@ public:
   /** Timestamps this message and generates a unique event ID for the event
       to be invoked on the receiving side.  Sets the priority of this
       message to timestamp - POSE_TimeMax. */
-  void Timestamp(POSE_TimeType t) { 
+  inline void Timestamp(POSE_TimeType t) { 
     timestamp = t;  
     if (evID.getPE() == -1)
       evID = GetEventID();  
@@ -63,12 +63,12 @@ public:
     rst = 0.0;
     parent = NULL; str = NULL;
   }
-  void SetSequenceNumber(int ctrl) { 
+  inline void SetSequenceNumber(int ctrl) { 
     evID = GetEventID();  
     evID.setControl(ctrl);  
   }
   /// Assignment operator: copies priority too
-  eventMsg& operator=(const eventMsg& obj) {
+  inline eventMsg& operator=(const eventMsg& obj) {
     timestamp = obj.timestamp;
     evID = obj.evID;
     parent = obj.parent;
@@ -98,7 +98,7 @@ public:
 #endif
 #endif
   }
-  void operator delete(void *p) { 
+  inline void operator delete(void *p) { 
 #ifndef SEQUENTIAL_POSE
 #ifdef MSG_RECYCLING
     MemoryPool *localPool = (MemoryPool *)CkLocalBranch(MemPoolID);
@@ -115,7 +115,7 @@ public:
       CkFreeMsg(p);
   }
   /// Set priority field and queuing strategy
-  void setPriority(POSE_TimeType prio) {
+  inline void setPriority(POSE_TimeType prio) {
 #if USE_LONG_TIMESTAMPS
     memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
     CkSetQueueing(this, CK_QUEUEING_LFIFO);
@@ -140,9 +140,9 @@ public:
     return CkAllocMsg(CMessage_cancelMsg::__idx, size, 8*sizeof(POSE_TimeType));
   } 
   /// Delete cancellation message
-  void operator delete(void *p) {  CkFreeMsg(p);  }
+  inline void operator delete(void *p) {  CkFreeMsg(p);  }
   /// Set priority field and queuing strategy
-  void setPriority(POSE_TimeType prio) {
+  inline void setPriority(POSE_TimeType prio) {
 #if USE_LONG_TIMESTAMPS
     memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
     CkSetQueueing(this, CK_QUEUEING_LFIFO);
@@ -162,9 +162,9 @@ public:
     return CkAllocMsg(CMessage_eventMsg::__idx, size, 8*sizeof(POSE_TimeType));
   }
   /// Delete prioritized message
-  void operator delete(void *p) {  CkFreeMsg(p);  }
+  inline void operator delete(void *p) {  CkFreeMsg(p);  }
   /// Set priority field and queuing strategy
-  void setPriority(POSE_TimeType prio) {
+  inline void setPriority(POSE_TimeType prio) {
 #if USE_LONG_TIMESTAMPS
     memcpy(((POSE_TimeType *)CkPriorityPtr(this)),&prio,sizeof(POSE_TimeType));
     CkSetQueueing(this, CK_QUEUEING_LFIFO);
@@ -236,66 +236,43 @@ class sim : public CBase_sim {
   /// Destructor
   virtual ~sim();
   /// Pack/unpack/sizing operator
-  virtual void pup(PUP::er &p) {
-    ArrayElement1D::pup(p); // call parent class pup method
-    // pup simple types
-    p(active); p(myPVTidx); p(myLBidx); p(sync); p(DOs); p(UNDOs);
-    // pup event queue
-    if (p.isUnpacking())
-      eq = new eventQueue();
-    eq->pup(p);
-    // pup cancellations
-    cancels.pup(p);
-    if (p.isUnpacking()) { // reactivate migrated object
-#ifndef CMK_OPTIMIZE
-      localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
-#ifndef SEQUENTIAL_POSE
-      localPVT = (PVT *)CkLocalBranch(ThePVT);
-      myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
-      if(pose_config.lb_on){
-	localLBG = TheLBG.ckLocalBranch();
-	myLBidx = localLBG->objRegister(thisIndex, sync, this);
-      }
-#endif
-      active = 0;
-    }
-    else if (p.isPacking()) { // deactivate migrating object
-      active = -1;
-#ifndef SEQUENTIAL_POSE
-      localPVT->objRemove(myPVTidx);
-#endif
-      if(pose_config.lb_on)
-	localLBG->objRemove(myLBidx);
-    }
-  }
+  virtual void pup(PUP::er &p);
   /// Start a forward execution step on myStrat
   void Step();                 
   /// Start a prioritized forward execution step on myStrat
-  void Step(prioMsg *m);       
+  void Step(prioMsg *m);    
+  /// Start a forward execution step on myStrat after a checkpoint (sequential mode only)
+  void CheckpointStep(eventMsg *m);
   /// Report safe time to PVT branch
-  void Status() { 
+  inline void Status() { 
     localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime(), objID->OVT()); 
   }
   /// Commit events based on new GVT estimate
-  void Commit();               
+  void Commit();
+  /// Commit all possible events before a checkpoint to disk
+  void CheckpointCommit();
   /// Add m to cancellation list
-  void Cancel(cancelMsg *m); 
+  void Cancel(cancelMsg *m);
   /// Report load information to local load balancer
   void ReportLBdata();
   /// Migrate this poser to processor indicated in m
-  void Migrate(destMsg *m) { migrateMe(m->destPE); }
+  inline void Migrate(destMsg *m) { migrateMe(m->destPE); }
   /// Terminate this poser, when everyone is terminated we exit 
-
-  void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
+  inline void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
+  /// In sequential mode, begin checkpoint after reaching quiescence
+  void SeqBeginCheckpoint();
+  /// In sequential mode, resume after checkpointing or restarting
+  void SeqResumeAfterCheckpoint();
+  /// Implement this for posers that will need to execute events when POSE reaches quiescence
+  void invokeStopEvent() {}
   /// Return this poser's unique index on PVT branch
-  int PVTindex() { return myPVTidx; }
+  inline int PVTindex() { return myPVTidx; }
   /// Test active flag
-  int IsActive() { return active; }
+  inline int IsActive() { return active; }
   /// Set active flag
-  void Activate() { active = 1; }
+  inline void Activate() { active = 1; }
   /// Unset active flag
-  void Deactivate() { active = 0; }
+  inline void Deactivate() { active = 0; }
   /// Invoke an event on this poser according to fnIdx and pass it msg
   /** ResolveFn is generated along with the rest of the wrapper object and
       should handle all possible events on a poser. */
@@ -306,7 +283,7 @@ class sim : public CBase_sim {
       whatever the user wishes. */
   virtual void ResolveCommitFn(int fnIdx, void *msg) { }
   /// Notify the PVT of a message send
-  void registerSent(POSE_TimeType timestamp) {
+  inline void registerSent(POSE_TimeType timestamp) {
     localPVT->objUpdate(timestamp, SEND);
   }
   /// Used for buffered output
@@ -326,6 +303,7 @@ class sim : public CBase_sim {
     va_end(ap);
     myStrat->currentEvent->commitErr = 1;
   }
+  void ResumeFromSync(void);
   /// Dump all data fields
   void dump();
  private:

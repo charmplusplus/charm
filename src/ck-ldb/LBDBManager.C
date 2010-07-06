@@ -99,7 +99,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   
 #if 1
 #if CMK_BLUEGENE_CHARM
-  if(BgOutOfCoreFlag==2){ //taking object into memory
+  if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
     int newpos = -1;
     for(int i=0; i<objs.length(); i++){
@@ -152,7 +152,7 @@ void LBDB::UnregisterObj(LDObjHandle _h)
   //hack for BigSim out-of-core emulation.
   //we want the chare array object to keep at the same
   //position even going through the pupping routine.
-  if(BgOutOfCoreFlag==1){ //in taking object out of memory
+  if(_BgOutOfCoreFlag==1){ //in taking object out of memory
     objs[_h.handle] = (LBObj *)(LBOBJ_OOC_IDX);
   }else
 #endif
@@ -459,7 +459,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   if(nextfree==-1) nextfree = clients.size();
   first_free_client_slot = nextfree;
 
-  if(BgOutOfCoreFlag!=2){
+  if(_BgOutOfCoreFlag!=2){
     //during out-of-core emualtion for BigSim, if taking procs from disk to mem,
     //client_count should not be increased
     client_count++;
@@ -486,7 +486,7 @@ void LocalBarrier::RemoveClient(LDBarrierClient c)
 
     if(cnum<=first_free_client_slot) first_free_client_slot = cnum;
 
-    if(BgOutOfCoreFlag!=1){
+    if(_BgOutOfCoreFlag!=1){
 	//during out-of-core emulation for BigSim, if taking procs from mem to disk,
 	//client_count should not be increased
 	client_count--;

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "xi-symbol.h"
+#include <string>
 
 using std::cout;
 using std::endl;
@@ -117,6 +118,7 @@ ModuleList *Parse(char *interfacefile)
 
 ModuleList *Parse(FILE *fp)
 {
+  modlist = NULL;
   yyin = fp ;
   if(yyparse())
       exit(1);
@@ -127,7 +129,7 @@ ModuleList *Parse(FILE *fp)
 
 void abortxi(char *name)
 {
-  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic]  module.ci" << endl;
+  cout << "Usage : " << name << " [-ansi|-f90|-intrinsic|-M]  module.ci" << endl;
   exit(1) ;
 }
 
@@ -140,6 +142,7 @@ int main(int argc, char *argv[])
   char *fname=NULL;
   fortranMode = 0;
   internalMode = 0;
+  bool dependsMode = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
@@ -147,6 +150,7 @@ int main(int argc, char *argv[])
       else if (strcmp(argv[i],"-f90")==0)  fortranMode = 1;
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
       else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
+      else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
       else abortxi(argv[0]);
     }
     else
@@ -155,7 +159,18 @@ int main(int argc, char *argv[])
   //if (fname==NULL) abortxi(argv[0]);
 
   ModuleList *m = Parse(openFile(fname)) ;
+  if (!m) return 0;
   m->preprocess();
-  m->generate();
+  if (dependsMode)
+  {
+      std::string ciFileBaseName = fname;
+      size_t loc = ciFileBaseName.rfind('/');
+      if(loc != std::string::npos)
+          ciFileBaseName = ciFileBaseName.substr(loc+1);
+      m->genDepends(ciFileBaseName);
+      cout << ciFileBaseName << ".stamp: " << fname << endl;
+  }
+  else
+      m->generate();
   return 0 ;
 }

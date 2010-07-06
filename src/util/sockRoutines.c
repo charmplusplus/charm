@@ -16,6 +16,9 @@
 #include <signal.h>
 #include <time.h>
 #include <ctype.h>
+#if CMK_USE_POLL
+#include <poll.h>
+#endif
 
 #if CMK_BPROC
 #include <sys/bproc.h>
@@ -110,6 +113,8 @@ void skt_buffer_end(SOCKET sk) {}
 #endif
 
 
+static int ERRNO = -1;
+
 /*Called when a socket or select routine returns
 an error-- determines how to respond.
 Return 1 if the last call was interrupted
@@ -117,7 +122,7 @@ by, e.g., an alarm and should be retried.
 */
 static int skt_should_retry(void)
 {
-	int isinterrupt=0,istransient=0;
+	int isinterrupt=0,istransient=0,istimeout=0;
 #if defined(_WIN32) && !defined(__CYGWIN__) /*Windows systems-- check Windows Sockets Error*/
 	int err=WSAGetLastError();
 	if (err==WSAEINTR) isinterrupt=1;
@@ -126,6 +131,7 @@ static int skt_should_retry(void)
 #else /*UNIX systems-- check errno*/
 	int err=errno;
 	if (err==EINTR) isinterrupt=1;
+	if (err==ETIMEDOUT) istimeout=1;
 	if (err==EAGAIN||err==ECONNREFUSED
                ||err==EWOULDBLOCK||err==ENOBUFS
 #ifndef __CYGWIN__
@@ -134,6 +140,7 @@ static int skt_should_retry(void)
         )
 		istransient=1;
 #endif
+	ERRNO = err;
 	if (isinterrupt) {
 		/*We were interrupted by an alarm.  Schedule, then retry.*/
 		if (idleFunc!=NULL) idleFunc();
@@ -145,8 +152,50 @@ static int skt_should_retry(void)
 	}
 	else 
 		return 0; /*Some unrecognized problem-- abort!*/
+          /* timeout is used by send() for example to terminate node 
+             program normally, when charmrun dies  */
 	return 1;/*Otherwise, we recognized it*/
 }
+
+/* fd must be tcp socket */
+int skt_tcp_no_nagle(SOCKET fd)
+{
+  int flag, ok;
+  flag = 1;
+  ok = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+  return ok;
+}
+
+#if CMK_USE_POLL
+int skt_select1(SOCKET fd,int msec)
+{
+  struct pollfd fds[1];
+  int begin, nreadable;
+  int sec=msec/1000;
+  int  secLeft=sec;
+
+  fds[0].fd=fd; 
+  fds[0].events=POLLIN;
+
+  if (msec>0) begin = time(0);
+  do
+  {
+    skt_ignore_SIGPIPE=1;
+    nreadable = poll(fds, 1, msec);
+    skt_ignore_SIGPIPE=0;
+    
+    if (nreadable < 0) {
+		if (skt_should_retry()) continue;
+		else skt_abort(93200,"Fatal error in poll");
+	}
+    if (nreadable >0) return 1; /*We gotta good socket*/
+  }
+  while(msec>0 && ((secLeft = sec - (time(0) - begin))>0));
+
+  return 0;/*Timed out*/
+}
+
+#else
 
 /*Sleep on given read socket until msec or readable*/
 int skt_select1(SOCKET fd,int msec)
@@ -179,7 +228,7 @@ int skt_select1(SOCKET fd,int msec)
 
   return 0;/*Timed out*/
 }
-
+#endif
 
 /******* DNS *********/
 skt_ip_t _skt_invalid_ip={{0}};
@@ -394,7 +443,12 @@ SOCKET skt_connect(skt_ip_t ip, int port, int timeout)
 	else { /*Bad connect*/
 	  skt_close(ret);
 	  if (skt_should_retry()) continue;
-	  else return skt_abort(93515,"Error connecting to socket\n");
+	  else {
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+            if (ERRNO == ETIMEDOUT) continue;      /* time out is fine */
+#endif
+            return skt_abort(93515,"Error connecting to socket\n");
+          }
     }
   }
   /*Timeout*/
@@ -420,11 +474,7 @@ int skt_recvN(SOCKET hSocket,void *buff,int nBytes)
   nLeft = nBytes;
   while (0 < nLeft)
   {
-#if CMK_USE_IBVERBS
     if (0==skt_select1(hSocket,600*1000))
-#else
-    if (0==skt_select1(hSocket,60*1000))
-#endif
 	return skt_abort(93610,"Timeout on socket recv!");
     skt_ignore_SIGPIPE=1;
     nRead = recv(hSocket,pBuff,nLeft,0);

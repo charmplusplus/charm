@@ -214,7 +214,7 @@ void TCharm::pup(PUP::er &p) {
   //}
 
   checkPupMismatch(p,5134,"before TCHARM");
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(!isStopped){
 //      resumeAfterMigration = true;
     }
@@ -231,7 +231,7 @@ void TCharm::pup(PUP::er &p) {
 #ifndef CMK_OPTIMIZE
   DBG("Packing thread");
   if (!isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
-    if(BgOutOfCoreFlag==0) //not doing out-of-core scheduling
+    if(_BgOutOfCoreFlag==0) //not doing out-of-core scheduling
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
   if (tcharm_nomig) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
@@ -372,7 +372,7 @@ void TCharm::migrateDelayed(int destPE) {
 }
 void TCharm::ckJustMigrated(void) {
 	ArrayElement::ckJustMigrated();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  resumeAfterMigration = true;
 #endif
 	if (resumeAfterMigration) {
@@ -457,7 +457,7 @@ void TCharm::stop(void)
     we're resuming from migration!  (OSL 2003/9/23)
    */
   TCharm *dis=TCharm::get();
-#ifdef _FAULT_MLOG_ 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
 /*  CpvAccess(_currentObj) = dis;
  *      printf("[%d] _currentObject set to TCharm index %d %p\n",CkMyPe(),dis->thisIndex,dis);*/
 #endif
@@ -474,7 +474,7 @@ void TCharm::start(void)
   DBG("thread resuming soon");
   //CkPrintf("TCharm[%d]::start()\n", thisIndex);
   //CmiPrintStackTrace(0);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //CthAwakenPrio(tid, CQS_QUEUEING_BFIFO, 1, &prio);
   CthAwaken(tid);
 #else
@@ -580,13 +580,13 @@ CkArrayID TCHARM_Get_threads(void) {
 /************* Startup/Shutdown Coordination Support ************/
 
 // Useless values to reduce over:
-int vals[2]={0,1};
+int _vals[2]={0,1};
 
 //Called when we want to go to a barrier
 void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
 	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
-	contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+	contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
 #if CMK_BLUEGENE_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
@@ -612,7 +612,7 @@ void TCharm::done(void) {
 	if (exitWhenDone) {
 		//Contribute to a synchronizing reduction
 		CkCallback cb(index_t::atExit(0), thisProxy[0]);
-		contribute(sizeof(vals),&vals,CkReduction::sum_int,cb);
+		contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
 	}
 	isSelfDone = true;
 	stop();
@@ -746,14 +746,17 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID=CkCreatePropMap();
 #endif
 #endif
-  }else if(0==strcmp(mapping,"BLOCK_MAP")){
+  } else if(0 == strcmp(mapping,"BLOCK_MAP")) {
     CkPrintf("USING BLOCK_MAP\n");
-    mapID=CProxy_BlockMap::ckNew();
-  }else if(0==strcmp(mapping,"RR_MAP")){
+    mapID = CProxy_BlockMap::ckNew();
+  } else if(0 == strcmp(mapping,"RR_MAP")) {
     CkPrintf("USING RR_MAP\n");
-    mapID=CProxy_RRMap::ckNew();
-  }else{  // "PROP_MAP" or anything else
-    mapID=CkCreatePropMap();
+    mapID = CProxy_RRMap::ckNew();
+  } else if(0 == strcmp(mapping,"MAPFILE")) {
+    CkPrintf("Reading map from file\n");
+    mapID = CProxy_ReadFileMap::ckNew();
+  } else {  // "PROP_MAP" or anything else
+    mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
   int nElem=msg->numElements; //<- save it because msg will be deleted.

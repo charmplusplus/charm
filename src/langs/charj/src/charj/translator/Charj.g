@@ -16,7 +16,110 @@ options {
 }
 
 tokens {
+
     ENTRY                   = 'entry'           ;
+    TRACED                  = 'traced'          ;
+    PUBLIC                  = 'public'          ;
+    PROTECTED               = 'protected'       ;
+    PRIVATE                 = 'private'         ;
+    ABSTRACT                = 'abstract'        ;
+    NATIVE                  = 'native'          ;
+    FINAL                   = 'final'           ;
+    STATIC                  = 'static'          ;
+    VOLATILE                = 'volatile'        ;
+    VOID                    = 'void'            ;
+    BOOLEAN                 = 'boolean'         ;
+    CHAR                    = 'char'            ;
+    BYTE                    = 'byte'            ;
+    SHORT                   = 'short'           ;
+    INT                     = 'int'             ;
+    LONG                    = 'long'            ;
+    FLOAT                   = 'float'           ;
+    DOUBLE                  = 'double'          ;
+    TRUE                    = 'true'            ;
+    FALSE                   = 'false'           ;
+    NULL                    = 'null'            ;
+    THIS                    = 'this'            ;
+    SUPER                   = 'super'           ;
+    CHARE                   = 'chare'           ;
+    CHARE_ARRAY             = 'chare_array'     ;
+    MAINCHARE               = 'mainchare'       ;
+    INTERFACE               = 'interface'       ;
+    PACKAGE                 = 'package'         ;
+    IMPORT                  = 'import'          ;
+    CLASS                   = 'class'           ;
+    EXTENDS                 = 'extends'         ;
+    GROUP                   = 'group'           ;
+    NODEGROUP               = 'nodegroup'       ;
+    ENUM                    = 'enum'            ;
+    READONLY                = 'readonly'        ;
+
+    PRINT                   = 'print'           ;
+    PRINTLN                 = 'println'         ;
+    EXIT                    = 'exit'            ;
+    EXITALL                 = 'exitAll'         ;
+    GETMYPE                 = 'getMyPe'         ;
+    GETMYRANK               = 'getMyRank'       ;
+    GETMYNODE               = 'getMyNode'       ;
+    GETNUMPES               = 'getNumPes'       ;
+    GETNUMNODES             = 'getNumNodes'     ;
+
+    FOR                     = 'for'             ;
+    WHILE                   = 'while'           ;
+    IF                      = 'if'              ;
+    CASE                    = 'case'            ;
+    SWITCH                  = 'switch'          ;
+    RETURN                  = 'return'          ;
+    ELSE                    = 'else'            ;
+    CONTINUE                = 'continue'        ;
+    DO                      = 'do'              ;
+    DEFAULT                 = 'default'         ;
+    WHILE                   = 'while'           ;
+    THROW                   = 'throw'           ;
+    BREAK                   = 'break'           ;
+
+    DOT                     = '.'               ;
+    NEW                     = 'new'             ;
+    BITWISE_OR              = '|'               ;
+    BITWISE_AND             = '&'               ;
+    ASSIGNMENT              = '='               ;
+    EQUALS                  = '=='              ;
+    NOT_EQUALS              = '!='              ;
+    PLUS_EQUALS             = '+='              ;
+    MINUS_EQUALS            = '-='              ;
+    TIMES_EQUALS            = '*='              ;
+    DIVIDE_EQUALS           = '/='              ;
+    AND_EQUALS              = '&='              ;
+    OR_EQUALS               = '|='              ;
+    POWER_EQUALS            = '^='              ;
+    MOD_EQUALS              = '%='              ;
+    OR                      = '||'              ;
+    AND                     = '&&'              ;
+    POWER                   = '^'               ;
+    GT                      = '>'               ;
+    GTE                     = '>='              ;
+    LT                      = '<'               ;
+    LTE                     = '<='              ;
+    PLUS                    = '+'               ;
+    MINUS                   = '-'               ;
+    TIMES                   = '*'               ;
+    DIVIDE                  = '/'               ;
+    MOD                     = '%'               ;
+    UNARY_PLUS              = '++'              ;
+    UNARY_MINUS             = '--'              ;
+    NOT                     = '!'               ;
+    TILDE                   = '~'               ;
+    AT                      = '@'               ;
+    INSTANCEOF              = 'instanceof'      ;
+
+    // Charj keywords for things that are automatically generated
+    // and we don't want the user to use them as identifiers
+
+    PUP                     = 'pup'             ;
+    INITMETHOD              = 'initMethod'      ;
+    CTORHELPER              = 'ctorHelper'      ;
+    CHELPER                 = 'constructorHelper';
+
 
     // C++ keywords that aren't used in charj. 
     // We don't use these ourselves, but they're still reserved
@@ -64,11 +167,14 @@ tokens {
     CLASS_STATIC_INITIALIZER;
     CLASS_TOP_LEVEL_SCOPE;
     CONSTRUCTOR_DECL;
+    DOMAIN_EXPRESSION;
     ENUM_TOP_LEVEL_SCOPE;
     EXPR;
     EXTENDS_BOUND_LIST;
     EXTENDS_CLAUSE;
     FOR_EACH;
+    FOR_EXPR;
+    FOR_UPDATE;
     FORMAL_PARAM_LIST;
     FORMAL_PARAM_STD_DECL;
     FORMAL_PARAM_VARARG_DECL;
@@ -78,27 +184,40 @@ tokens {
     INTERFACE_TOP_LEVEL_SCOPE;
     IMPLEMENTS_CLAUSE;
     LABELED_STATEMENT;
-    LOCAL_MODIFIER_LIST;
     CHARJ_SOURCE;
     METHOD_CALL;
+    ENTRY_METHOD_CALL;
     MODIFIER_LIST;
+    NEW_EXPRESSION;
     PAREN_EXPR;
     POST_DEC;
     POST_INC;
     PRE_DEC;
     PRE_INC;
     QUALIFIED_TYPE_IDENT;
+    RANGE_EXPRESSION;
     STATIC_ARRAY_CREATOR;
     SUPER_CONSTRUCTOR_CALL;
+    TEMPLATE_INST;
     THIS_CONSTRUCTOR_CALL;
     TYPE;
-    UNARY_MINUS;
-    UNARY_PLUS;
+    SIMPLE_TYPE;
+    OBJECT_TYPE;
+    REFERENCE_TYPE;
+    POINTER_TYPE;
+    PROXY_TYPE;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
     VAR_DECLARATOR_LIST;
-    VOID_METHOD_DECL;
+    ARROW;
+    LOCAL_MODIFIER_LIST;
+    ACCESS_MODIFIER_LIST;
+    CHARJ_MODIFIER_LIST;
+    OTHER_MODIFIER_LIST;
+    POINTER_DEREFERENCE;
+    ENTRY_FUNCTION_DECL;
+    ENTRY_CONSTRUCTOR_DECL;
 }
 
 @header {
@@ -117,71 +236,84 @@ package charj.translator;
 
 // Starting point for parsing a Charj file.
 charjSource
-    :   compilationUnit
+    :   compilationUnit EOF
         ->  ^(CHARJ_SOURCE compilationUnit)
     ;
 
 compilationUnit
     :   packageDeclaration? 
-        importDeclaration* 
-        typeDeclaration
+        topLevelDeclaration+ 
+    ;
+
+topLevelDeclaration
+    :   importDeclaration
+    |   readonlyDeclaration
+    |   typeDeclaration
     ;
 
 packageDeclaration
-    :   'package'^ qualifiedIdentifier ';'!  
+    :   PACKAGE IDENT (DOT IDENT)* ';'
+        ->  ^(PACKAGE IDENT+)
     ;
 
 importDeclaration
-    :   'import'^ qualifiedIdentifier '.*'? ';'!
+    :   IMPORT^ qualifiedIdentifier '.*'? ';'!
+    ;
+
+readonlyDeclaration
+    :   READONLY^ localVariableDeclaration ';'!
     ;
 
 typeDeclaration
     :   classDefinition
+    |   templateDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
-    |   chareArrayDefinition
+    ;
+
+templateList
+    : 'class'! IDENT (','! 'class'! IDENT)*
+    ;
+
+templateDeclaration
+    : 'template' '<' templateList '>' classDefinition
+        -> ^('template' templateList classDefinition)
     ;
 
 classDefinition
-    :   'public'? 'class' IDENT ('extends' type)? ('implements' typeList)? '{'
-            classScopeDeclaration*
-        '}' ';'?
-        -> ^('class' IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+    :   PUBLIC? CLASS IDENT (EXTENDS type)? ('implements' typeList)? '{'
+      classScopeDeclaration* '}' ';'?
+        -> ^(TYPE CLASS IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 chareType
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   MAINCHARE
+    |   CHARE_ARRAY '[' ARRAY_DIMENSION ']' -> ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 chareDefinition
-    :   'public'? chareType IDENT ('extends' type)? ('implements' typeList)? '{'
+    :   PUBLIC? chareType IDENT (EXTENDS type)? ('implements' typeList)? '{'
             classScopeDeclaration*
         '}' ';'?
-        -> ^(chareType IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
-    ;
-
-chareArrayDefinition
-    :   'public'? 'chare_array' '[' ARRAY_DIMENSION ']' IDENT ('extends' type)? ('implements' typeList)? '{'
-            classScopeDeclaration*
-        '}' ';'?
-        -> ^('chare_array' ARRAY_DIMENSION IDENT ^('extends' type)? ^('implements' typeList)? classScopeDeclaration*)
+        -> ^(TYPE chareType IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
 interfaceDefinition
-    :   'interface' IDENT ('extends' typeList)?  '{'
+    :   'interface' IDENT (EXTENDS typeList)?  '{'
             interfaceScopeDeclaration*
         '}' ';'?
-        -> ^('interface' IDENT ^('extends' typeList)? interfaceScopeDeclaration*)
+        -> ^('interface' IDENT ^(EXTENDS typeList)? interfaceScopeDeclaration*)
     ;
 
 enumDefinition
-    :   'enum' IDENT ('implements' typeList)? '{'
+    :   ENUM IDENT ('implements' typeList)? '{'
             enumConstants ','? ';' classScopeDeclaration*
         '}' ';'?
-        -> ^('enum' IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
+        -> ^(ENUM IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
     ;
 
 enumConstants
@@ -199,11 +331,11 @@ typeList
 classScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList arrayDeclaratorList? (block | ';')
+            (   type IDENT formalParameterList (block | ';')
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
-                    formalParameterList arrayDeclaratorList? block?)
-            |   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)
+                    formalParameterList block?)
+            /*|   'void' IDENT formalParameterList (block | ';')
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -218,11 +350,11 @@ classScopeDeclaration
 interfaceScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList arrayDeclaratorList? ';'
+            (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
-                        type IDENT formalParameterList arrayDeclaratorList?)
-            |   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
+                        type IDENT formalParameterList)
+            /*|   'void' IDENT formalParameterList ';'
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -237,7 +369,7 @@ classFieldDeclaratorList
     ;
 
 classFieldDeclarator
-    :   variableDeclaratorId ('=' variableInitializer)?
+    :   variableDeclaratorId (ASSIGNMENT variableInitializer)?
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
     ;
 
@@ -247,13 +379,13 @@ interfaceFieldDeclaratorList
     ;
 
 interfaceFieldDeclarator
-    :   variableDeclaratorId '=' variableInitializer
+    :   variableDeclaratorId ASSIGNMENT variableInitializer
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
 
 variableDeclaratorId
-    :   IDENT^ arrayDeclaratorList?
+    :   IDENT^ domainExpression?
     ;
 
 variableInitializer
@@ -261,7 +393,7 @@ variableInitializer
     |   expression
     ;
 
-arrayDeclarator
+/*arrayDeclarator
     :   '[' ']'
         ->  ARRAY_DECLARATOR
     ;
@@ -269,11 +401,27 @@ arrayDeclarator
 arrayDeclaratorList
     :   arrayDeclarator+
         ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;
+    ;*/
 
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
         ->  ^(ARRAY_INITIALIZER[$lc, "ARRAY_INITIALIZER"] variableInitializer*)
+    ;
+
+templateArg
+    : genericTypeArgument
+    | literal
+    ;
+
+templateArgList
+    :   templateArg (','! templateArg)*
+    ;
+
+templateInstantiation
+    :    '<' templateArgList '>'
+        -> ^(TEMPLATE_INST templateArgList)
+    |    '<' templateInstantiation '>'
+        -> ^(TEMPLATE_INST templateInstantiation)
     ;
 
 genericTypeParameterList
@@ -296,7 +444,7 @@ genericTypeParameter
     ;
 
 bound
-    :   e='extends' type ('&' type)*
+    :   e=EXTENDS type ('&' type)*
         ->  ^(EXTENDS_BOUND_LIST[$e, "EXTENDS_BOUND_LIST"] type+)
     ;
 
@@ -306,12 +454,13 @@ modifierList
     ;
 
 modifier
-    :   'public'
-    |   'protected'
-    |   'entry'
-    |   'private'
-    |   'abstract'
-    |   'native'
+    :   PUBLIC
+    |   PROTECTED
+    |   ENTRY
+    |   TRACED
+    |   PRIVATE
+    |   ABSTRACT
+    |   NATIVE
     |   localModifier
     ;
 
@@ -321,50 +470,60 @@ localModifierList
     ;
 
 localModifier
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
     ;
 
 type
     :   simpleType
     |   objectType
+    |   VOID
+    ;
+
+constructorType
+    :   qualifiedTypeIdent AT domainExpression?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   qualifiedTypeIdent domainExpression?
+        ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 simpleType
-    :   primitiveType arrayDeclaratorList?
-        ->  ^(TYPE primitiveType arrayDeclaratorList?)  
+    :   primitiveType domainExpression?
+        ->  ^(SIMPLE_TYPE primitiveType domainExpression?)  
     ;
 
 objectType
-    :   qualifiedTypeIdent arrayDeclaratorList?
-        ->  ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   qualifiedTypeIdent AT domainExpression?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   qualifiedTypeIdent domainExpression?
+        ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 qualifiedTypeIdent
-    :   typeIdent ('.' typeIdent)*
+    :   typeIdent (DOT typeIdent)*
         ->  ^(QUALIFIED_TYPE_IDENT typeIdent+) 
     ;
 
 typeIdent
-    :   IDENT^ genericTypeArgumentList?
+    :   IDENT^ templateInstantiation?
     ;
 
 primitiveType
-    :   'boolean'
-    |   'char'
-    |   'byte'
-    |   'short'
-    |   'int'
-    |   'long'
-    |   'float'
-    |   'double'
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
-genericTypeArgumentList
+/*genericTypeArgumentList
     :   lt='<' genericTypeArgument (',' genericTypeArgument)* genericTypeListClosing
         ->  ^(GENERIC_TYPE_ARG_LIST[$lt, "GENERIC_TYPE_ARG_LIST"] genericTypeArgument+)
-    ;
+    ;*/
 
 genericTypeArgument
     :   type
@@ -403,14 +562,16 @@ qualifiedIdentifier
     :   (   IDENT
             ->  IDENT
         )
-        (   '.' ident=IDENT
-            ->  ^('.' $qualifiedIdentifier $ident)
+        (   DOT ident=IDENT
+            ->  ^(DOT $qualifiedIdentifier $ident)
         )*
     ;
 
 block
     :   lc='{' blockStatement* '}'
         ->  ^(BLOCK[$lc, "BLOCK"] blockStatement*)
+    |   nonBlockStatement
+        -> ^(BLOCK nonBlockStatement)
     ;
 
 blockStatement
@@ -424,53 +585,68 @@ localVariableDeclaration
     |   localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
     ;
-        
+
 statement
-    :   block
-    |   'assert' expr1=expression 
+    :   nonBlockStatement
+    |   block
+    ;
+        
+nonBlockStatement
+    :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
             ->  ^('assert' $expr1 $expr2)
         |   ';'
             ->  ^('assert' $expr1)
         )
-    |   'if' parenthesizedExpression ifStat=statement 
-        (   'else' elseStat=statement
-            ->  ^('if' parenthesizedExpression $ifStat $elseStat)
+    |   IF parenthesizedExpression ifStat=block
+        (   ELSE elseStat=block
+            ->  ^(IF parenthesizedExpression $ifStat $elseStat)
         |
-            ->  ^('if' parenthesizedExpression $ifStat)
+            ->  ^(IF parenthesizedExpression $ifStat)
         )   
-    |   f='for' '('
-        (   forInit? ';' expression? ';' expressionList? ')' statement
-            -> ^($f forInit expression? expressionList statement)
-        |   localModifierList? type IDENT ':' expression ')' statement
-            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression statement)
+    |   f=FOR '('
+        (   forInit? ';' expression? ';' expressionList? ')' block
+            -> ^($f forInit? FOR_EXPR expression? FOR_UPDATE expressionList? block)
+        |   localModifierList? type IDENT ':' expression ')' block
+            -> ^(FOR_EACH[$f, "FOR_EACH"] localModifierList? type IDENT expression block)
         )
-    |   'while' parenthesizedExpression statement
-        ->  ^('while' parenthesizedExpression statement)
-    |   'do' statement 'while' parenthesizedExpression ';'
-        ->  ^('do' statement parenthesizedExpression)
-    |   'switch' parenthesizedExpression '{' switchCaseLabel* '}'
-        ->  ^('switch' parenthesizedExpression switchCaseLabel*)
-    |   'return' expression? ';'
-        ->  ^('return' expression?)
-    |   'throw' expression ';'
-        ->  ^('throw' expression)
-    |   'break' IDENT? ';'
-        ->  ^('break' IDENT?)
-    |   'continue' IDENT? ';'
-        ->  ^('continue' IDENT?)
+    |   WHILE parenthesizedExpression block
+        ->  ^(WHILE parenthesizedExpression block)
+    |   DO block WHILE parenthesizedExpression ';'
+        ->  ^(DO block parenthesizedExpression)
+    |   SWITCH parenthesizedExpression '{' switchCaseLabel* '}'
+        ->  ^(SWITCH parenthesizedExpression switchCaseLabel*)
+    |   RETURN expression? ';'
+        ->  ^(RETURN expression?)
+    |   THROW expression ';'
+        ->  ^(THROW expression)
+    |   BREAK IDENT? ';'
+        ->  ^(BREAK IDENT?)
+    |   CONTINUE IDENT? ';'
+        ->  ^(CONTINUE IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
+    |   'delete' expression ';'
+        -> ^('delete' expression)
     |   'embed' STRING_LITERAL EMBED_BLOCK
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
     |   ';' // Preserve empty statements.
+    |   PRINT '(' (expression (',' expression)*)* ')' ';'
+        ->  ^(PRINT expression*)
+    |   PRINTLN '(' (expression (',' expression)*)* ')' ';'
+        ->  ^(PRINTLN expression*)
+    |   EXIT '(' expression? ')' ';'
+        ->  ^(EXIT expression?)
+    |   EXITALL '(' ')' ';'
+        ->  EXITALL
+
     ;           
         
 
 switchCaseLabel
-    :   'case'^ expression ':'! blockStatement*
-    |   'default'^ ':'! blockStatement*
+    :   CASE^ expression ':'! blockStatement*
+    |   DEFAULT^ ':'! blockStatement*
     ;
     
 forInit
@@ -485,6 +661,29 @@ parenthesizedExpression
         ->  ^(PAREN_EXPR[$lp, "PAREN_EXPR"] expression)
     ;
     
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem)
+    |   rangeItem ':' rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   rangeItem ':' rangeItem ':' rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression (','! rangeExpression)*
+    ;
+
+domainExpression
+    :   '[' rangeList ']'
+        -> ^(DOMAIN_EXPRESSION rangeList)
+    ;
+
 expressionList
     :   expression (','! expression)*
     ;
@@ -496,7 +695,7 @@ expression
 
 assignmentExpression
     :   conditionalExpression 
-        (   (   '='^
+        (   (   ASSIGNMENT^
             |   '+='^
             |   '-='^
             |   '*='^
@@ -538,7 +737,7 @@ andExpression
 
 equalityExpression
     :   instanceOfExpression 
-        (   (   '=='^
+        (   (   EQUALS^
             |   '!='^
             ) 
             instanceOfExpression
@@ -616,29 +815,30 @@ postfixedExpression
     :   (   primaryExpression
             ->  primaryExpression
         )
-        // ... and than the optional things that may follow a primary
-        // expression 0 or more times.
-        (   outerDot='.'                 
+        // ... and than the optional things that may follow a primary expression 0 or more times.
+        (   outerDot=DOT                 
             // Note: generic type arguments are only valid for method calls,
             // i.e. if there is an argument list
-            (   (   genericTypeArgumentList?  
+            (   (   templateInstantiation?  
                     IDENT
                     ->  ^($outerDot $postfixedExpression IDENT)
                 ) 
                 (   arguments
-                    ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentList? arguments)
+                    ->  ^(METHOD_CALL $postfixedExpression templateInstantiation? arguments)
                 )?
-            |   'this'
-                ->  ^($outerDot $postfixedExpression 'this')
-            |   s='super' arguments
+            |   THIS
+                ->  ^($outerDot $postfixedExpression THIS)
+            |   s=SUPER arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] $postfixedExpression arguments)
-            |   (   'super' innerDot='.' IDENT
-                    ->  ^($innerDot ^($outerDot $postfixedExpression 'super') IDENT)
+            |   (   SUPER innerDot=DOT IDENT
+                    ->  ^($innerDot ^($outerDot $postfixedExpression SUPER) IDENT)
                 )
                 (   arguments
                     ->  ^(METHOD_CALL $postfixedExpression arguments)
                 )?
             )
+        |   (AT templateInstantiation? IDENT arguments)
+            ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         )*
@@ -653,32 +853,43 @@ primaryExpression
     |   literal
     |   newExpression
     |   qualifiedIdentExpression
-    |   genericTypeArgumentList 
-        (   s='super'
+    |   domainExpression
+    |   templateInstantiation
+        (   s=SUPER
             (   arguments
-                ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] templateInstantiation arguments)
             |   IDENT arguments
-                ->  ^(METHOD_CALL ^('.' 'super' IDENT) genericTypeArgumentList arguments)
+                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) templateInstantiation arguments)
             )
         |   IDENT arguments
-            ->  ^(METHOD_CALL IDENT genericTypeArgumentList arguments)
-        |   t='this' arguments
-            ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
+            ->  ^(METHOD_CALL IDENT templateInstantiation arguments)
+        |   t=THIS arguments
+            ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] templateInstantiation arguments)
         )
-    |   (   'this'
-            ->  'this'
+    |   (   THIS
+            ->  THIS
         )
         (   arguments
             ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] arguments)
         )?
-    |   s='super' arguments
+    |   s=SUPER arguments
         ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] arguments)
-    |   (   'super' '.' IDENT
+    |   (   SUPER DOT IDENT
         )
         (   arguments
-            ->  ^(METHOD_CALL ^('.' 'super' IDENT) arguments)
-        |   ->  ^('.' 'super' IDENT)
+            ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
+        |   ->  ^(DOT SUPER IDENT)
         )
+    |   GETMYPE '(' ')'
+        ->  GETMYPE
+    |   GETNUMPES '(' ')'
+        ->  GETNUMPES
+    |   GETMYRANK '(' ')'
+        ->  GETMYRANK
+    |   GETMYNODE '(' ')'
+        -> GETMYNODE
+    |   GETNUMNODES '(' ')'
+        -> GETNUMNODES
     ;
     
 qualifiedIdentExpression
@@ -689,39 +900,39 @@ qualifiedIdentExpression
         // And now comes the stuff that may follow the qualified identifier.
         (   arguments
             ->  ^(METHOD_CALL qualifiedIdentifier arguments)
-        |   outerDot='.'
-            (   genericTypeArgumentList 
-                (   s='super' arguments
+        |   outerDot=DOT
+            (   templateInstantiation
+                (   s=SUPER arguments
                     ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"]
-                            qualifiedIdentifier genericTypeArgumentList arguments)
-                |   'super' innerDot='.' IDENT arguments
-                    ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier 'super') IDENT)
-                            genericTypeArgumentList arguments)
+                            qualifiedIdentifier templateInstantiation arguments)
+                |   SUPER innerDot=DOT IDENT arguments
+                    ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
+                            templateInstantiation arguments)
                 |   IDENT arguments
-                    ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) genericTypeArgumentList arguments)
+                    ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) templateInstantiation arguments)
                 )
-            |   'this'
-                ->  ^($outerDot qualifiedIdentifier 'this')
-            |   s='super' arguments
+            |   THIS
+                ->  ^($outerDot qualifiedIdentifier THIS)
+            |   s=SUPER arguments
                 ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] qualifiedIdentifier arguments)
             )
         )?
     ;
 
 newExpression
-    :   n='new'
-        (   primitiveType newArrayConstruction          // new static array of primitive type elements
-            ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction)
-        |   genericTypeArgumentList? qualifiedTypeIdent
-                newArrayConstruction                // new static array of object type reference elements
-            ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
+    :   n=NEW
+        (
+            domainExpression arguments?
+            ->  ^(NEW_EXPRESSION arguments? domainExpression)
+        |   constructorType arguments
+            -> ^(NEW constructorType arguments)
         )
     ;
     
-newArrayConstruction
+/*newArrayConstruction
     :   arrayDeclaratorList arrayInitializer
     |   '['! expression ']'! ('['! expression ']'!)* arrayDeclaratorList?
-    ;
+    ;*/
 
 arguments
     :   lp='(' expressionList? ')'
@@ -735,9 +946,9 @@ literal
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 
 // LEXER
@@ -748,8 +959,7 @@ DECIMAL_LITERAL : ('0' | '1'..'9' '0'..'9'*) INTEGER_TYPE_SUFFIX? ;
 
 OCTAL_LITERAL : '0' ('0'..'7')+ INTEGER_TYPE_SUFFIX? ;
 
-//fragment
-ARRAY_DIMENSION :  '1'..'6' ('d'|'D') ;
+ARRAY_DIMENSION :  ('1'..'6')('d'|'D') ;
 
 fragment
 HEX_DIGIT : ('0'..'9'|'a'..'f'|'A'..'F') ;
@@ -760,11 +970,11 @@ INTEGER_TYPE_SUFFIX : ('l'|'L') ;
 FLOATING_POINT_LITERAL
     :   ('0'..'9')+ 
         (
-            '.' ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
+            DOT ('0'..'9')* EXPONENT? FLOAT_TYPE_SUFFIX?
         |   EXPONENT FLOAT_TYPE_SUFFIX?
         |   FLOAT_TYPE_SUFFIX
         )
-    |   '.' ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
+    |   DOT ('0'..'9')+ EXPONENT? FLOAT_TYPE_SUFFIX?
     ;
 
 fragment
@@ -846,8 +1056,9 @@ COMMENT
     ;
 
 LINE_COMMENT
-    : '//' ~('\n'|'\r')* '\r'? '\n'
+    : ('//'|'#') ~('\n'|'\r')* '\r'? '\n'
     {   
         $channel = HIDDEN;
     }
     ;
+

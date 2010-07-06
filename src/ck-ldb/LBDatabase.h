@@ -208,6 +208,14 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
+  inline void GetObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+    LDGetObjLoad(h,&walltime,&cputime);
+  };
+
+  inline void QueryKnownObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+    LDQueryKnownObjLoad(h,&walltime,&cputime);
+  };
+
   inline int RunningObject(LDObjHandle* _o) const { 
 #if CMK_LBDB_ON
       LBDB *const db = (LBDB*)(myLDHandle.handle);
@@ -375,8 +383,8 @@ void LBChangePredictor(LBPredictorFunction *model);
 
 void LBSetPeriod(double second);
 
-void LBTurnInstrumentOn();
-void LBTurnInstrumentOff();
+extern "C" void LBTurnInstrumentOn();
+extern "C" void LBTurnInstrumentOff();
 void LBClearLoads();
 
 inline LBDatabase* LBDatabaseObj() { return LBDatabase::Object(); }

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /** @file
  * Basic NET implementation of Converse machine layer
@@ -1195,6 +1189,8 @@ CmiPrintStackTrace(0);
 
 static void node_addresses_store(ChMessage *msg);
 
+static int barrierReceived = 0;
+
 static void ctrl_getone(void)
 {
   ChMessage msg;
@@ -1222,7 +1218,7 @@ static void ctrl_getone(void)
     int pe=0;/*<- node-local processor number. Any one will do.*/
     void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
     MACHSTATE(2,"Incoming CCS request");
-    CmiPushPE(pe,cmsg);
+    if (cmsg!=NULL) CmiPushPE(pe,cmsg);
   }
 #endif
 #ifdef __FAULT__	
@@ -1236,10 +1232,17 @@ static void ctrl_getone(void)
 	// fprintf(stdout,"nodetable added %d\n",CmiMyPe());
   }
 #endif
+  else if(strcmp(msg.header.type,"barrier")==0) {
+        barrierReceived = 1;
+  }
+  else if(strcmp(msg.header.type,"barrier0")==0) {
+        barrierReceived = 2;
+  }
   else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
+    /* CmiPrintf("Unknown message: %s\n", msg.header.type); */
     charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
     machine_exit(1);
   }
@@ -1656,10 +1659,13 @@ static void node_addresses_obtain(char **argv)
 		free(me.info.qpList);
 	}
 #else
-	/*The nPE and IP fields are set by charmrun--
-	  these values don't matter. */
+	/*The nPE fields are set by charmrun--
+	  these values don't matter. 
+          Set IP in case it is mpiexec mode where charmrun does not have IP yet
+        */
 	me.info.nPE=ChMessageInt_new(0);
-	me.info.IP=_skt_invalid_ip;
+	/* me.info.IP=_skt_invalid_ip; */
+        me.info.IP=skt_innode_my_ip();
 	me.info.mach_id=ChMessageInt_new(Cmi_mach_id);
 #ifdef CMK_USE_MX
 	me.info.nic_id=ChMessageLong_new(Cmi_nic_id);
@@ -2391,6 +2397,78 @@ void CmiMachineProgressImpl()
  * Main code, Init, and Exit
  *
  *****************************************************************************/
+
+#if CMK_BARRIER_USE_COMMON_CODE
+
+/* happen at node level */
+/* must be called on every PE including communication processors */
+int CmiBarrier()
+{
+  int len, size, i;
+  int status;
+  int numnodes = CmiNumNodes();
+  static int barrier_phase = 0;
+
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
+    while (barrierReceived != 1) {
+      CmiCommLock();
+      ctrl_getone();
+      CmiCommUnlock();
+    }
+    barrierReceived = 0;
+    barrier_phase ++;
+  }
+
+  CmiNodeAllBarrier();
+  /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
+  return 0;
+}
+
+
+int CmiBarrierZero()
+{
+  int i;
+  int numnodes = CmiNumNodes();
+  ChMessage msg;
+
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    char str[64];
+    sprintf(str, "%d", CmiMyNode());
+    ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
+    if (CmiMyNode() == 0) {
+      while (barrierReceived != 2) {
+        CmiCommLock();
+        ctrl_getone();
+        CmiCommUnlock();
+      }
+      barrierReceived = 0;
+    }
+  }
+
+  CmiNodeAllBarrier();
+  return 0;
+}
+
+#endif
+
+/******************************************************************************
+ *
+ * Main code, Init, and Exit
+ *
+ *****************************************************************************/
 extern void CthInit(char **argv);
 extern void ConverseCommonInit(char **);
 
@@ -2717,6 +2795,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 	MACHSTATE2(5,"skt_connect at dataskt:%d Cmi_charmrun_port:%d",dataskt, Cmi_charmrun_port);
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
 	MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
+	skt_tcp_no_nagle(Cmi_charmrun_fd);
 	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");
@@ -2728,10 +2807,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   node_addresses_obtain(argv);
   MACHSTATE(5,"node_addresses_obtain done");
-
-#if CMK_USE_IBVERBS
-  if (Cmi_charmrun_fd==-1) CmiAbort("Fatal error: standalone mode is not supported in ibverbs. \n");
-#endif
 
   CmiCommunicationInit(argv);
 

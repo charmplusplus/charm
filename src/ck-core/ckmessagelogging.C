@@ -14,11 +14,11 @@
 #ifdef _FAULT_MLOG_
 
 //#define DEBUG(x)  if(_restartFlag) {x;}
-#define DEBUG_MEM(x) // x
+#define DEBUG_MEM(x) //x
 #define DEBUG(x)  //x
 #define DEBUGRESTART(x)  //x
 #define DEBUGLB(x) // x
-#define DEBUG_TEAM(x)  x
+#define DEBUG_TEAM(x)  // x
 
 #define BUFFERED_LOCAL
 #define BUFFERED_REMOTE 
@@ -59,6 +59,7 @@ int countClearBufferedLocalCalls=0;
 
 int countUpdateHomeAcks=0;
 
+extern int teamSize;
 extern int chkptPeriod;
 extern bool parallelRestart;
 
@@ -474,7 +475,7 @@ void generateCommonTicketRequest(CkObjID &recver,envelope *_env,int destPE,int _
 	if(isLocal(destPE)){
 		ticketLogLocalMessage(mEntry);
 	}else{
-		if((TEAM_SIZE_MLOG > 1) && isTeamLocal(destPE)){
+		if((teamSize > 1) && isTeamLocal(destPE)){
 
 			// look to see if this message already has a ticket in the team-table
 			Chare *senderObj = (Chare *)sender.getObject();
@@ -483,7 +484,7 @@ void generateCommonTicketRequest(CkObjID &recver,envelope *_env,int destPE,int _
 				Ticket ticket = ticketRow->get(env->SN);
 				if(ticket.TN != 0){
 					ticketNumber = ticket.TN;
-					CkPrintf("[%d] Found a team preticketed message\n",CkMyPe());
+					DEBUG(CkPrintf("[%d] Found a team preticketed message\n",CkMyPe()));
 				}
 			}
 		}
@@ -513,7 +514,7 @@ inline bool isLocal(int destPE){
 inline bool isTeamLocal(int destPE){
 
 	// they belong to the same group
-	if(TEAM_SIZE_MLOG > 1 && destPE/TEAM_SIZE_MLOG == CkMyPe()/TEAM_SIZE_MLOG)
+	if(teamSize > 1 && destPE/teamSize == CkMyPe()/teamSize)
 		return true;
 
 	return false;
@@ -898,8 +899,8 @@ inline bool _processTicketRequest(TicketRequest *ticketRequest,TicketReply *repl
 		Ticket ticket;
 
 		// checking if the message is team local and if it has a ticket already assigned
-		if(TEAM_SIZE_MLOG > 1 && TN != 0){
-			CkPrintf("[%d] Message has a ticket already assigned\n",CkMyPe());
+		if(teamSize > 1 && TN != 0){
+			DEBUG(CkPrintf("[%d] Message has a ticket already assigned\n",CkMyPe()));
 			ticket.TN = TN;
 			recverObj->mlogData->verifyTicket(sender,SN,TN);
 		}
@@ -1486,11 +1487,11 @@ void startMlogCheckpoint(void *_dummy,double curWallTime){
 	
 	CkPupROData(psizer);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupGroupData(psizer);
+	CkPupGroupData(psizer,CmiTrue);
 	DEBUG_MEM(CmiMemoryCheck());
-	CkPupNodeGroupData(psizer);
+	CkPupNodeGroupData(psizer,CmiTrue);
 	DEBUG_MEM(CmiMemoryCheck());
-	pupArrayElementsSkip(psizer,NULL);
+	pupArrayElementsSkip(psizer,CmiTrue,NULL);
 	DEBUG_MEM(CmiMemoryCheck());
 
 	int dataSize = psizer.size();
@@ -1507,9 +1508,9 @@ void startMlogCheckpoint(void *_dummy,double curWallTime){
 	pBuf | checkpointCount;
 	
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf);
-	CkPupNodeGroupData(pBuf);
-	pupArrayElementsSkip(pBuf,NULL);
+	CkPupGroupData(pBuf,CmiTrue);
+	CkPupNodeGroupData(pBuf,CmiTrue);
+	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
 
 	unAckedCheckpoint=1;
 	CmiSetHandler(msg,_storeCheckpointHandlerIdx);
@@ -1556,10 +1557,12 @@ public:
     }
 };
 
-
-void pupArrayElementsSkip(PUP::er &p, MigrationRecord *listToSkip,int listsize){
+/**
+ * Pups all the array elements in this processor.
+ */
+void pupArrayElementsSkip(PUP::er &p, CmiBool create, MigrationRecord *listToSkip,int listsize){
 	int numElements,i;
-  int numGroups = CkpvAccess(_groupIDTable)->size();	
+	int numGroups = CkpvAccess(_groupIDTable)->size();	
 	if(!p.isUnpacking()){
 		numElements = CkCountArrayElements();
 	}	
@@ -1577,13 +1580,13 @@ void pupArrayElementsSkip(PUP::er &p, MigrationRecord *listToSkip,int listsize){
 			}
 		}
 		
- printf("numElements = %d\n",numElements);
+		printf("numElements = %d\n",numElements);
 	
-	  for (int i=0; i<numElements; i++) {
+		for (int i=0; i<numElements; i++) {
 			CkGroupID gID;
 			CkArrayIndexMax idx;
 			p|gID;
-	    p|idx;
+	    	p|idx;
 			int flag=0;
 			int matchedIdx=0;
 			for(int j=0;j<listsize;j++){
@@ -1602,12 +1605,13 @@ void pupArrayElementsSkip(PUP::er &p, MigrationRecord *listToSkip,int listsize){
 			}
 				
 			CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-			mgr->resume(idx,p,flag);
+			CkPrintf("numLocalElements = %d\n",mgr->numLocalElements());
+			mgr->resume(idx,p,create,flag);
 			if(flag == 1){
 				int homePE = mgr->homePe(idx);
 				informLocationHome(gID,idx,homePE,listToSkip[matchedIdx].toPE);
 			}
-	  }
+	  	}
 	}
 };
 
@@ -1863,11 +1867,11 @@ void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg){
 	// setting the restart flag
 	_restartFlag = 1;
 
-	// if we are using group-based message logging, all members of the group have to be restarted
-	if(TEAM_SIZE_MLOG > 1){
-		for(int i=(CkMyPe()/TEAM_SIZE_MLOG)*TEAM_SIZE_MLOG; i<((CkMyPe()/TEAM_SIZE_MLOG)+1)*TEAM_SIZE_MLOG; i++){
+	// if we are using team-based message logging, all members of the group have to be restarted
+	if(teamSize > 1){
+		for(int i=(CkMyPe()/teamSize)*teamSize; i<((CkMyPe()/teamSize)+1)*teamSize; i++){
 			if(i != CkMyPe() && i < CkNumPes()){
-				// sending a message to the group member
+				// sending a message to the team member
 				msg.PE = CkMyPe();
 			    CmiSetHandler(&msg,_restartHandlerIdx);
 			    CmiSyncSend(i,sizeof(RestartRequest),(char *)&msg);
@@ -1895,7 +1899,8 @@ void _restartHandler(RestartRequest *restartMsg){
     // setting the restart flag
 	_restartFlag = 1;
 
-	// flushing all buffers	
+	// flushing all buffers
+	//TEST END
 /*	CkPrintf("[%d] HERE numGroups = %d\n",CkMyPe(),numGroups);
 	CKLOCMGR_LOOP(mgr->flushAllRecs(););	
 	for(int i=0;i<numGroups;i++){
@@ -1982,10 +1987,9 @@ void _recvRestartCheckpointHandler(char *_restartData){
 	PUP::fromMem pBuf(buf);
 	pBuf | checkpointCount;
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf);
-	CkPupNodeGroupData(pBuf);
-//	pupArrayElementsSkip(pBuf,migratedAwayElements,restartData->numMigratedAwayElements);
-	pupArrayElementsSkip(pBuf,NULL);
+	CkPupGroupData(pBuf,CmiFalse);
+	CkPupNodeGroupData(pBuf,CmiFalse);
+	pupArrayElementsSkip(pBuf,CmiFalse,NULL);
 	CkAssert(pBuf.size() == restartData->checkPointSize);
 	printf("[%d] Restart Objects created from CheckPointData at %.6lf \n",CkMyPe(),CmiWallTimer());
 	
@@ -2272,8 +2276,8 @@ void createObjIDList(void *data,ChareMlogData *mlogData){
 	entry.recver = mlogData->objID;
 	entry.tProcessed = mlogData->tProcessed;
 	list->push_back(entry);
-	char objString[100];
-	DEBUG(printf("[%d] %s restored with tProcessed set to %d \n",CkMyPe(),mlogData->objID.toString(objString),mlogData->tProcessed));
+	DEBUG_TEAM(char objString[100]);
+	DEBUG_TEAM(CkPrintf("[%d] %s restored with tProcessed set to %d \n",CkMyPe(),mlogData->objID.toString(objString),mlogData->tProcessed));
 }
 
 
@@ -2308,10 +2312,9 @@ void _recvCheckpointHandler(char *_restartData){
 	pBuf | checkpointCount;
 
 	CkPupROData(pBuf);
-	CkPupGroupData(pBuf);
-	CkPupNodeGroupData(pBuf);
-//	pupArrayElementsSkip(pBuf,migratedAwayElements,restartData->numMigratedAwayElements);
-	pupArrayElementsSkip(pBuf,NULL);
+	CkPupGroupData(pBuf,CmiTrue);
+	CkPupNodeGroupData(pBuf,CmiTrue);
+	pupArrayElementsSkip(pBuf,CmiTrue,NULL);
 	CkAssert(pBuf.size() == restartData->checkPointSize);
 	printf("[%d] Restart Objects created from CheckPointData at %.6lf \n",CkMyPe(),CmiWallTimer());
 	
@@ -2524,6 +2527,7 @@ char name[100];
  * particular metadata information.
  */
 void setTeamRecovery(void *data, ChareMlogData *mlogData){
+	char name[100];
 	mlogData->teamRecoveryFlag = 1;	
 }
 
@@ -2816,7 +2820,13 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 	// increases the number of resendReply received
 	obj->mlogData->resendReplyRecvd++;
 
-	CkPrintf("[%d] processReceivedTN with %d listSize",CkMyPe(),listSize);	
+	DEBUG(char objName[100]);
+	DEBUG(CkPrintf("[%d] processReceivedTN obj->mlogData->resendReplyRecvd=%d CkNumPes()=%d\n",CkMyPe(),obj->mlogData->resendReplyRecvd,CkNumPes()));
+	//CkPrintf("[%d] processReceivedTN with %d listSize by %s\n",CkMyPe(),listSize,obj->mlogData->objID.toString(objName));
+	//if(obj->mlogData->receivedTNs == NULL)
+	//	CkPrintf("NULL\n");	
+	//CkPrintf("using %d entries\n",obj->mlogData->receivedTNs->length());	
+
 	// includes the tickets into the receivedTN structure
 	for(int j=0;j<listSize;j++){
 		obj->mlogData->receivedTNs->push_back(listTNs[j]);
@@ -2839,7 +2849,7 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 			int numberHoles = ((*obj->mlogData->receivedTNs)[vecsize-1] - obj->mlogData->tProcessed)-(vecsize -1 - tProcessedIndex);
 			
 			// updating tCount with the highest ticket handed out
-			if(TEAM_SIZE_MLOG > 1){
+			if(teamSize > 1){
 				if(obj->mlogData->tCount < (*obj->mlogData->receivedTNs)[vecsize-1])
 					obj->mlogData->tCount = (*obj->mlogData->receivedTNs)[vecsize-1];
 			}else{
@@ -2857,7 +2867,7 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 					if((*obj->mlogData->receivedTNs)[k] != (*obj->mlogData->receivedTNs)[k-1]+1){
 						//the TNs are not consecutive at this point
 						for(MCount newTN=(*obj->mlogData->receivedTNs)[k-1]+1;newTN<(*obj->mlogData->receivedTNs)[k];newTN++){
-							printf("hole no %d at %d next available ticket %d \n",countHoles,newTN,(*obj->mlogData->receivedTNs)[k]);
+							DEBUG(CKPrintf("hole no %d at %d next available ticket %d \n",countHoles,newTN,(*obj->mlogData->receivedTNs)[k]));
 							obj->mlogData->ticketHoles[countHoles] = newTN;
 							countHoles++;
 						}	
@@ -2875,6 +2885,7 @@ void processReceivedTN(Chare *obj, int listSize, MCount *listTNs){
 	
 		// cleaning up structures and getting ready to continue execution	
 		delete obj->mlogData->receivedTNs;
+		DEBUG(CkPrintf("[%d] Resetting receivedTNs\n",CkMyPe()));
 		obj->mlogData->receivedTNs = NULL;
 		obj->mlogData->restartFlag = 0;
 
@@ -3025,7 +3036,7 @@ void _distributedLocationHandler(char *receivedMsg){
 	pmem |idx;
 	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
 	donotCountMigration=1;
-	mgr->resume(idx,pmem);
+	mgr->resume(idx,pmem,CmiTrue);
 	donotCountMigration=0;
 	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
 	printf("Array element inserted at processor %d after distribution at restart ",CkMyPe());
@@ -3101,12 +3112,6 @@ void _dummyMigrationHandler(DummyMigrationMsg *msg){
 	CmiFree(msg);
 };
 
-
-
-
-
-
-
 /*****************************************************
 	Implementation of a method that can be used to call
 	any method on the ChareMlogData of all the chares on
@@ -3152,8 +3157,6 @@ void forAllCharesDo(MlogFn fnPointer,void *data){
 	}
 	int i;
 	CKLOCMGR_LOOP(ElementCaller caller(mgr, fnPointer,data); mgr->iterate(caller););
-	
-	
 };
 
 
@@ -3176,6 +3179,7 @@ void initMlogLBStep(CkGroupID gid){
 
 void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 	DEBUGLB(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
+	DEBUG_TEAM(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
 	
 	resumeLbFnPtr = _fnPtr;
 	centralLb = _centralLb;
@@ -3431,7 +3435,7 @@ void _messageLoggingExit(){
 	printf("[%d] _messageLoggingExit \n",CmiMyPe());
 
 	//TML: printing some statistics for group approach
-	//if(TEAM_SIZE_MLOG > 1)
+	//if(teamSize > 1)
 		CkPrintf("[%d] Logged messages = %.0f, log size =  %.2f MB\n",CkMyPe(),MLOGFT_totalMessages,MLOGFT_totalLogSize/(float)MEGABYTE);
 
 }
@@ -4019,8 +4023,8 @@ void ChareMlogData::pup(PUP::er &p){
  */
 int getCheckPointPE(){
 	//TML: assigning a team-based buddy
-	if(TEAM_SIZE_MLOG != 1){
-		return (CmiMyPe() + TEAM_SIZE_MLOG) % CmiNumPes();
+	if(teamSize != 1){
+		return (CmiMyPe() + teamSize) % CmiNumPes();
 	}
 	return (CmiNumPes() -1 - CmiMyPe());
 }

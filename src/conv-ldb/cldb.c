@@ -74,13 +74,25 @@ int CldRegisterPackFn(CldPackFn fn)
 
 void CldSwitchHandler(char *cmsg, int handler)
 {
+#if CMK_MEM_CHECKPOINT
+  int old_phase = CmiGetRestartPhase(cmsg);
+#endif
   CmiSetXHandler(cmsg, CmiGetHandler(cmsg));
   CmiSetHandler(cmsg, handler);
+#if CMK_MEM_CHECKPOINT
+  CmiGetRestartPhase(cmsg) = old_phase;
+#endif
 }
 
 void CldRestoreHandler(char *cmsg)
 {
+#if CMK_MEM_CHECKPOINT
+  int old_phase = CmiGetRestartPhase(cmsg);
+#endif
   CmiSetHandler(cmsg, CmiGetXHandler(cmsg));
+#if CMK_MEM_CHECKPOINT
+  CmiGetRestartPhase(cmsg) = old_phase;
+#endif
 }
 
 void Cldhandler(char *);
@@ -267,6 +279,14 @@ void CldModuleGeneralInit(char **argv)
   /* lock to protect token queue for immediate message and smp */
   CpvInitialize(CmiNodeLock, cldLock);
   CpvAccess(cldLock) = CmiCreateLock();
+
+  
+  if (CmiMyPe() == 0) {
+    char *stra = CldGetStrategy();
+    if (strcmp(stra, "rand") != 0) {
+      CmiPrintf("Charm++: %s seed load balancer.\n", stra);
+    }
+  } 
 }
 
 /* function can be called in an immediate handler at node level

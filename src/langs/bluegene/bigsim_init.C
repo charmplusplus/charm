@@ -43,6 +43,8 @@ extern "C" void BgAttach(CthThread t)
   CtvAccessOther(t, threadinfo)= cta(threadinfo);
     // special thread scheduling
   BgSetStrategyBigSimDefault(t);
+    // set serial number
+  CthSetSerialNo(t, CtvAccessOther(t, threadinfo)->cth_serialNo++);
 }
 
 extern "C" void BgSetStartOutOfCore(){
@@ -72,7 +74,7 @@ static void BroadcastShutdown(void *null, double t)
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
   CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
   CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
   CsdExitScheduler();
 /*
@@ -104,7 +106,7 @@ void BgShutdown()
     if(bgUseOutOfCore)
         deInitTblThreadInMem();
 
-    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+    CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
     CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
     ConverseExit();
     exit(0);

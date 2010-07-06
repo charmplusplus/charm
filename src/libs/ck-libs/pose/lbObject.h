@@ -27,7 +27,7 @@ class lbObjectNode {  // lbObjects is a list of these nodes
     totalComm = localComm = remoteComm = maxComm = 0;
     maxCommPE = -1;
   }
-  void Set(POSE_TimeType ts, int idx, short int on, short int s) {
+  inline void Set(POSE_TimeType ts, int idx, short int on, short int s) {
     ovt = ts;  index = idx;  present = on;  sync = s;
   }
   void dump() {  // print the node contents

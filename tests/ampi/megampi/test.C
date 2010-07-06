@@ -121,6 +121,8 @@ inline int fn(int a,int b,int c) {
 
 void MPI_Tester::test(void)
 { 
+	MPI_Request req;
+	MPI_Status  status;
 	int i;
 /// Send and receive:
 	beginTest(3,"Send/recv");
@@ -133,6 +135,16 @@ void MPI_Tester::test(void)
 	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,next,tag,comm));
 	testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
 	
+	// Forward around ring:
+        if (size >= 2) {
+	  if (rank == 0) {
+	    TEST_MPI(MPI_Issend,(&rank,1,MPI_INT,next,tag,comm, &req));
+	    TEST_MPI(MPI_Wait, (&req, &status));
+	  }
+	  else if (rank == 1)
+	    testEqual(recv(prev,tag),prev,"Received rank (using prev as source)");
+	}
+
 	// Simultanious forward and backward:
 	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,next,tag,comm));
 	TEST_MPI(MPI_Send,(&rank,1,MPI_INT,prev,tag,comm));

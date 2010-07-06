@@ -173,6 +173,7 @@ void _createTracesummary(char **argv)
   CkpvAccess(previouslySentBins) = 0;
   CkpvAccess(_trace) = new  TraceSummary(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+  if (CkMyPe()==0) CkPrintf("Charm++: Tracemode Summary enabled.\n");
 }
 
 
@@ -1165,7 +1166,7 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());
