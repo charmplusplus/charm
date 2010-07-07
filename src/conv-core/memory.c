@@ -57,7 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
-int cpdInSystem=0;
+int cpdInSystem=1; /*Start inside the system (until we start executing user code)*/
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT

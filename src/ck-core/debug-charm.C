@@ -78,6 +78,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     memoryBackup = &_debugData.peek().memoryBackup;
     if (!_entryTable[ep]->inCharm) {
       CpdResetMemory();
+      CpdSystemExit();
     }
     CkVec<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
     for (int i=0; i<preExecutes.size(); ++i) {
@@ -98,6 +99,7 @@ void CpdAfterEp(int ep) {
     }
     memoryBackup = &entry.memoryBackup;
     if (!_entryTable[ep]->inCharm) {
+      CpdSystemEnter();
       CpdCheckMemory();
     }
     if (entry.msg != NULL) CmiFree(UsrToEnv(entry.msg));
