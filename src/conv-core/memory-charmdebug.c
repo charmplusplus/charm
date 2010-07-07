@@ -1254,13 +1254,15 @@ static void *setSlot(Slot **sl,int userSize) {
   Slot *s = *sl;
   char *user=(char*)(s+1);
 
-  /* TODO: Handle correctly memory protection while changing neighbor blocks */
-  if (CpdMprotect) {
-    if (s->next->chareID != 0); 
-  }
-  /* Splice into the slot list just past the head */
+  /* Splice into the slot list just past the head (part 1) */
   s->next=slot_first->next;
   s->prev=slot_first;
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
+  /* Splice into the slot list just past the head (part 2) */
   s->next->prev=s;
   s->prev->next=s;
 
@@ -1268,6 +1270,10 @@ static void *setSlot(Slot **sl,int userSize) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
 #endif
 
@@ -1315,6 +1321,11 @@ static void freeSlot(Slot *s) {
    * the pointer "s" becomes invalid.
    */
 #else
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
   /* Splice out of the slot list */
   s->next->prev=s->prev;
   s->prev->next=s->next;
@@ -1322,6 +1333,10 @@ static void freeSlot(Slot *s) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
 
