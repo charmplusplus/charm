@@ -51,6 +51,7 @@ struct _Slot {
   int userSize;
 
 #define FLAGS_MASK        0xFF
+#define BLOCK_PROTECTED   0x80
 #define MODIFIED          0x40
 #define NEW_BLOCK         0x20
 #define LEAK_CLEAN        0x10
@@ -132,6 +133,10 @@ static Slot *UserToSlot(void *user) {
 
 static int isLeakSlot(Slot *s) {
   return s->magic & LEAK_FLAG;
+}
+
+static int isProtected(Slot *s) {
+  return s->magic & BLOCK_PROTECTED;
 }
 
 int Slot_ChareOwner(void *s) {
@@ -1049,6 +1054,7 @@ static void protectMemory() {
 #else
       char * data = (char *)cur;
 #endif
+      cur->magic |= BLOCK_PROTECTED;
       mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
@@ -1066,6 +1072,7 @@ static void unProtectMemory() {
       char * data = (char *)cur;
 #endif
     mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+    cur->magic &= ~BLOCK_PROTECTED;
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
@@ -1105,6 +1112,7 @@ void CpdSystemEnter() {
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
           mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+          cur->magic &= ~BLOCK_PROTECTED;
         }
       SLOT_ITERATE_END
     }
@@ -1120,6 +1128,7 @@ void CpdSystemExit() {
     if (CpdMprotect) {
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
+          cur->magic |= BLOCK_PROTECTED;
           mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
         }
       SLOT_ITERATE_END
