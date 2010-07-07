@@ -1398,6 +1398,7 @@ static void meta_init(char **argv) {
   }
   if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) {
     CpdMemBackup = 1;
+    saveAllocationHistory = 1;
   }
   if (CmiGetArgFlagDesc(argv,"+memory_crc", "Use CRC32 to detect memory changes")) {
     CpdCRC32 = 1;
