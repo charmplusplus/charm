@@ -186,7 +186,7 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
     <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
 } // namespace <first(pds)>
 <else>
-#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
@@ -205,7 +205,7 @@ void <sym.name>::constructorHelper()
 
 bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
-    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
     if (_trace_registered) return;
     <sym.traceInitializers; separator="\n">
     _trace_registered = true;
@@ -229,7 +229,7 @@ chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaul
     <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
 } // namespace <first(pds)>
 <else>
-#ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+#if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
@@ -272,7 +272,7 @@ void <sym.name>::constructorHelper()
 
 bool <sym.name>::_trace_registered = false;
 void <sym.name>::_initTrace() {
-    #ifdef _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
+    #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
     if (_trace_registered) return;
     <sym.traceInitializers; separator="\n">
     _trace_registered = true;
@@ -361,11 +361,11 @@ funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
 {
-    #ifdef _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     int _charj_method_trace_timer = CkWallTimer();
     #endif
     <block>
-    #ifdef _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    #if _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
     #endif
 }
