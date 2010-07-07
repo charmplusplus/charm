@@ -2434,6 +2434,7 @@ CpvExtern(int      , CthResumeBigSimThreadIdx);
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+    CmiArgGroup("Charm++","Record/Replay");
     CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
     _replaySystem = 0;
