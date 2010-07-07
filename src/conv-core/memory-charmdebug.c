@@ -1109,12 +1109,20 @@ void CpdSystemEnter() {
   Slot *cur;
   if (++cpdInSystem == 1) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
           cur->magic &= ~BLOCK_PROTECTED;
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemEnter: unprotected %d elements\n",count);
     }
   }
 #endif
@@ -1126,12 +1134,20 @@ void CpdSystemExit() {
   int i;
   if (--cpdInSystem == 0) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
           cur->magic |= BLOCK_PROTECTED;
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemExit: protected %d elements\n",count);
       /* unprotect the pages that have been unprotected by a signal SEGV */
       for (i=0; i<unProtectedPagesSize; ++i) {
         mprotect(unProtectedPages[i], 4, PROT_READ|PROT_WRITE);
