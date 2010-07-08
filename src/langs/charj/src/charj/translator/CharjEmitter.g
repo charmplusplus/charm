@@ -150,22 +150,19 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
                 inits={initializers})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds},
-                hasDefaultCtor={currentClass.hasDefaultConstructor})
+                csds={$csds})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
             tident={$i0},
             ident={$i1.text},
             ext={$su.st},
-            csds={$csds},
-            hasDefaultCtor={currentClass.hasDefaultConstructor})
+            csds={$csds})
         -> 
     |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
@@ -174,7 +171,7 @@ typeDeclaration
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
-            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationConstructor;
+            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationCtor;
 
             for (VariableInitializer init : currentClass.initializers) {
                 initializers.add(init.emit());
@@ -188,7 +185,6 @@ typeDeclaration
                 csds={$csds},
                 pupInits={currentClass.generateInits()},
                 pupers={currentClass.generatePUPers()},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
                 needsMigration={needsMigration},
                 inits={initializers})
         -> {emitCI()}? chareDeclaration_ci(
@@ -205,7 +201,6 @@ typeDeclaration
                 ext={$su.st}, 
                 csds={$csds},
                 needsPupInit={currentClass.generateInits() != null},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
                 needsMigration={needsMigration})
         ->
     ;

@@ -133,22 +133,22 @@ chare_epilogue_h(sym) ::=
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h(sym, ident, ext, csds, tident, hasDefaultCtor) ::=
+classDeclaration_h(sym, ident, ext, csds, tident) ::=
 <<
 <type_preamble_h(sym)>
 <if(tident)>
-<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident, hasDefaultCtor = hasDefaultCtor)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident)>
 <else>
-<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
 <endif>
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h_cont(pds, sym, ident, ext, csds, hasDefaultCtor) ::=
+classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor)>
+    <classDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>
@@ -158,7 +158,7 @@ class <ident> {
 <endif>
 
     <csds; separator="\n\n">
-    <if(!hasDefaultCtor)>
+    <if(!sym.hasDefaultCtor)>
     public: <ident>();
     <endif>
     protected: void constructorHelper();
@@ -168,22 +168,22 @@ class <ident> {
 <endif>
 >>
 
-templateDeclaration_h(pds, sym, ident, ext, csds, tident, hasDefaultCtor, inits) ::=
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, inits) ::=
 <<
 template \<class <tident; separator=", class ">\>
-<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, hasDefaultCtor=hasDefaultCtor, inits=inits)>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, inits=inits)>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds, hasDefaultCtor, inits) ::=
+classDeclaration_cc(sym, ident, ext, csds, inits) ::=
 <<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
 >>
 
-classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, hasDefaultCtor = hasDefaultCtor, inits = inits)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
@@ -191,7 +191,7 @@ classDeclaration_cc_cont(pds, sym, ident, ext, csds, hasDefaultCtor, inits) ::=
 #endif
 <csds; separator="\n\n">
 
-<if(!hasDefaultCtor)>
+<if(!sym.hasDefaultCtor)>
 <sym.name>::<ident>()
 {
     constructorHelper();
@@ -215,18 +215,18 @@ void <sym.name>::_initTrace() {
 >>
 
 
-chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
+chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
 <<
 #include "<ident>.decl.h"
-<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
+<chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, needsMigration = needsMigration, inits = inits)>
 #include "<ident>.def.h"
 >>
 
-chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, hasDefaultCtor, needsMigration, inits) ::=
+chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration, inits = inits)>
+    <chareDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, needsMigration = needsMigration, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
@@ -251,11 +251,18 @@ void <sym.name>::pup(PUP::er &p)
     <pupers; separator="\n">
 }
 
-<if(!hasDefaultCtor)>
+<if(!sym.hasDefaultCtor)>
+<if(sym.isMainChare)>
+<sym.name>::<ident>(CkArgMsg* msg)
+{
+    constructorHelper();
+}
+<else>
 <sym.name>::<ident>()
 {
     constructorHelper();
 }
+<endif>
 <endif>
 
 void <sym.name>::constructorHelper()
@@ -281,19 +288,19 @@ void <sym.name>::_initTrace() {
 <endif>
 >>
 
-chareDeclaration_h(sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
+chareDeclaration_h(sym, ident, ext, csds, needsPupInit, needsMigration) ::=
 <<
 <chare_preamble_h(sym)>
 #include "<ident>.decl.h"
-<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+<chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, needsMigration = needsMigration)>
 <chare_epilogue_h(sym)>
 >>
 
-chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, hasDefaultCtor, needsMigration) ::=
+chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, needsMigration) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, hasDefaultCtor = hasDefaultCtor, needsMigration = needsMigration)>
+    <chareDeclaration_h_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, needsMigration = needsMigration)>
 } // namespace <first(pds)>
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
@@ -303,8 +310,12 @@ class <ident>: public CBase_<ident> {
     private: void pupInitMethod();
     <endif>
     public: void pup(PUP::er& p);
-    <if(!hasDefaultCtor)>
+    <if(!sym.hasDefaultCtor)>
+    <if(sym.isMainChare)>
+    public: <ident>(CkArgMsg *msg);
+    <else>
     public: <ident>();
+    <endif>
     <endif>
     protected: void constructorHelper();
     <if(needsMigration)>
