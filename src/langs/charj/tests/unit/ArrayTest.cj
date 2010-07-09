@@ -1,14 +1,22 @@
 
-class ArrayTest {
-      Array<int> test[10];
+public mainchare ArrayTest {
+      public entry ArrayTest(CkArgMsg msg) {
+           thisProxy@entry1();
+      }
 
-      void test() {
-           test[0] = 0;
+      public entry void entry1() {
+           Array<int> test = new Array<int>([10]);
 
-	   int i;
-
-	   for (i = 0; i < 10; i++) {
-               test[i] = 0;
+	   for (int i = 0; i < test.size(); i++) {
+               test[i] = i;
            }
+
+           for (int i = 0; i < test.size(); i++) {
+                printf("%d\n", test[i]);
+           }
+
+           delete test;
+
+           CkExit();
       }
 }

@@ -7,7 +7,8 @@ public mainchare Main {
     int n;
 
     public entry Main(CkArgMsg m) {
-        n = atoi(m.argv[1]);
+        if (m.argc < 2) n = 16;
+        else n = atoi(m.argv[1]);
         main = thishandle;
         Fib@ fib = new Fib@(true, n, thishandle);
     }
@@ -46,12 +47,12 @@ public chare Fib {
         }
     }
 
-    public entry void gather(int value) {
+    public traced entry void gather(int value) {
         partialResult += value;
         if (--pendingChildren == 0) passUp();
     }
 
-    public void passUp() {
+    public traced void passUp() {
         if (root) main@done(partialResult);
         else parent@gather(partialResult);
         delete this;

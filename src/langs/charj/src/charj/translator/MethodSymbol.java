@@ -22,6 +22,7 @@ public class MethodSymbol
     public boolean isEntry = false;
     public boolean isStatic = false;
     public boolean isCtor = false;
+    public boolean isTraced = false;
 
     public MethodSymbol(SymbolTable symtab)
     {
@@ -87,6 +88,23 @@ public class MethodSymbol
     public String signature()
     {
         return null;
+    }
+
+    public String getTraceID()
+    {
+        // Make sure we don't have any negative or overflow values
+        int id = Math.abs(hashCode()/2);
+        return String.valueOf(id);
+    }
+
+    public String getTraceInitializer()
+    {
+        StringTemplate st = new StringTemplate(
+                "traceRegisterUserEvent(\"<name>\", <id>);",
+                AngleBracketTemplateLexer.class);
+        st.setAttribute("name", enclosingScope.getScopeName() + "." + name);
+        st.setAttribute("id", getTraceID());
+        return st.toString();
     }
 
     public String toString()

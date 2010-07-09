@@ -78,6 +78,7 @@ void CpdBeforeEp(int ep, void *obj, void *msg) {
     memoryBackup = &_debugData.peek().memoryBackup;
     if (!_entryTable[ep]->inCharm) {
       CpdResetMemory();
+      CpdSystemExit();
     }
     CkVec<DebugPersistentCheck> &preExecutes = CkpvAccess(_debugEntryTable)[ep].preProcess;
     for (int i=0; i<preExecutes.size(); ++i) {
@@ -98,6 +99,7 @@ void CpdAfterEp(int ep) {
     }
     memoryBackup = &entry.memoryBackup;
     if (!_entryTable[ep]->inCharm) {
+      CpdSystemEnter();
       CpdCheckMemory();
     }
     if (entry.msg != NULL) CmiFree(UsrToEnv(entry.msg));
@@ -428,6 +430,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
 
 struct ConditionalList {
   int count;
+  int deliver;
   int msgs[1];
 };
 CkpvStaticDeclare(void *, lastBreakPointMsg);
@@ -592,6 +595,7 @@ static pid_t CpdConditional_SetupComm() {
     int shmemid = shmget(IPC_PRIVATE, 1024*1024, IPC_CREAT | 0666);
     conditionalShm = (ConditionalList*)shmat(shmemid, NULL, 0);
     conditionalShm->count = 0;
+    conditionalShm->deliver = 0;
     shmctl(shmemid, IPC_RMID, &dummy);
   }
   
@@ -642,10 +646,29 @@ extern "C" void CpdEndConditionalDeliver_master() {
   close(conditionalPipe[1]);
   conditionalPipe[1] = 0;
   wait(NULL);
+  int i;
+  // Check if we have to deliver unconditionally some messages
+  if (conditionalShm->deliver > 0) {
+    // Deliver the requested number of messages
+    for (i=0; i < conditionalShm->deliver; ++i) {
+      int msgNum = conditionalShm->msgs[i];
+      if (msgNum == -1) CpdDeliverSingleMessage();
+      else CpdDeliverMessageInt(msgNum);
+    }
+    // Move back the remaining messages accordingly
+    for (i=conditionalShm->deliver; i < conditionalShm->count; ++i) {
+      conditionalShm->msgs[i-conditionalShm->deliver] = conditionalShm->msgs[i];
+    }
+    conditionalShm->count -= conditionalShm->deliver;
+    conditionalShm->deliver = 0;
+    CmiMachineProgressImpl();
+  }
+  CkAssert(conditionalShm->count >= 0);
   if (conditionalShm->count == 0) {
     CcsSendReply(0,NULL);
     shmdt((char*)conditionalShm);
     conditionalShm = NULL;
+    CkPrintf("Conditional delivery on %d concluded; normal mode resumed\n",CkMyPe());
   } else {
     if (CpdConditional_SetupComm()==0) {
       // We are in the child, deliver again the messages
@@ -672,6 +695,14 @@ void CpdDeliverMessageConditionally(char * msg) {
     if (msgNum == -1) CpdDeliverSingleMessage();
     else CpdDeliverMessageInt(msgNum);
   }
+}
+
+void CpdCommitConditionalDelivery(char * msg) {
+  int msgNum;
+  sscanf(msg+CmiMsgHeaderSizeBytes, "%d", &msgNum);\
+  conditionalShm->deliver = msgNum;
+  shmdt((char*)conditionalShm);
+  _exit(0);
 }
 
 class CpdList_msgStack : public CpdListAccessor {
@@ -829,6 +860,7 @@ void CpdSetBreakPoint (char *msg)
     // Replace entry in entry table with _call_freeze_on_break_point
     tableIdx = atoi(functionName);
     if (tableIdx >= 0 && tableIdx < tableSize) {
+      if (! CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint) {
            EntryInfo * breakPointEntryInfo = (EntryInfo *)CpvAccess(breakPointEntryTable)->get(tableIdx);
            if (breakPointEntryInfo == 0) {
              breakPointEntryInfo = new EntryInfo(_entryTable[tableIdx]->name, _entryTable[tableIdx]->call, 1, 0 );
@@ -837,6 +869,11 @@ void CpdSetBreakPoint (char *msg)
              _entryTable[tableIdx]->name = "debug_breakpoint_ep";
              _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
            } else {
+             if (breakPointEntryInfo->msgIdx == 0) {
+               // Reset the breakpoint info
+               _entryTable[tableIdx]->name = "debug_breakpoint_ep";
+               _entryTable[tableIdx]->call = (CkCallFnPtr)_call_freeze_on_break_point;
+             }
              breakPointEntryInfo->msgIdx ++;
              //CkAssert(breakPointEntryInfo->name == _entryTable[tableIdx]->name);
              //CkAssert(breakPointEntryInfo->call == _entryTable[tableIdx]->call);
@@ -845,6 +882,7 @@ void CpdSetBreakPoint (char *msg)
            }
            CkpvAccess(_debugEntryTable)[tableIdx].isBreakpoint = CmiTrue;
            reply = ~0;
+      }
     }
 
   }
@@ -866,17 +904,19 @@ void CpdRemoveBreakPoint (char *msg)
   if (strlen(functionName) > 0) {
     int idx = atoi(functionName);
     if (idx >= 0 && idx < _entryTable.size()) {
-      EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
-      if (breakPointEntryInfo != NULL) {
-        if (--breakPointEntryInfo->msgIdx == 0) {
-          // If we are the last to delete the breakpoint, then restore the original name and call function pointer
-          _entryTable[idx]->name =  breakPointEntryInfo->name;
-          _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+      if (CkpvAccess(_debugEntryTable)[idx].isBreakpoint) {
+        EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(idx);
+        if (breakPointEntryInfo != NULL) {
+          if (--breakPointEntryInfo->msgIdx == 0) {
+            // If we are the last to delete the breakpoint, then restore the original name and call function pointer
+            _entryTable[idx]->name =  breakPointEntryInfo->name;
+            _entryTable[idx]->call = (CkCallFnPtr)breakPointEntryInfo->call;
+          }
+          reply = ~0 ;
+          CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
+          //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
+          //CkpvAccess(breakPointEntryTable)->remove(idx);
         }
-        reply = ~0 ;
-        CkpvAccess(_debugEntryTable)[idx].isBreakpoint = CmiFalse;
-        //CmiPrintf("Breakpoint is removed for function %s with epIdx %ld\n", _entryTable[idx]->name, idx);
-        //CkpvAccess(breakPointEntryTable)->remove(idx);
       }
     }
   }
@@ -998,14 +1038,17 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
   CcsSetMergeFn("ccs_remove_all_break_points",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
+  CcsSetMergeFn("ccs_continue_break_point",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
+  CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
   CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
   CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
   CcsRegisterHandler("endConditional",(CmiHandler)CpdEndConditionalDelivery);
+  CcsRegisterHandler("commitConditional",(CmiHandler)CpdCommitConditionalDelivery);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());

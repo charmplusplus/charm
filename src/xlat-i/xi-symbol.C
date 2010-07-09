@@ -613,15 +613,10 @@ Module::preprocess()
 void
 Module::genDepend(const char *cifile)
 {
-  cout << name << ".decl.h: " << cifile;
+  cout << name << ".decl.h " << name << ".def.h: " << cifile << ".stamp";
   if (internalMode)
     cout << " charmxi";
   cout << endl;
-  cout << '\t' << "$(CHARMC) ";
-  if (internalMode)
-	  cout << "-intrinsic ";
-  cout << cifile << endl;
-  cout << name << ".def.h: " << name << ".decl.h" << endl;
 }
 
 void
@@ -645,9 +640,9 @@ ModuleList::preprocess()
 }
 
 void
-ModuleList::genDepends()
+ModuleList::genDepends(std::string ciFileBaseName)
 {
-    perElemGen(modules, cur_file, &Module::genDepend);
+    perElemGen(modules, ciFileBaseName.c_str(), &Module::genDepend);
 }
 
 void

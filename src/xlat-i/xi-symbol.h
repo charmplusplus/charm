@@ -1163,7 +1163,7 @@ class ModuleList : public Printable {
     void print(XStr& str);
     void generate();
     void preprocess();
-    void genDepends();
+    void genDepends(std::string ciFileBaseName);
 };
 
 class Readonly : public Member {

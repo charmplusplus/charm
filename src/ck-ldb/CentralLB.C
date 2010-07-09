@@ -11,6 +11,7 @@
 /*@{*/
 
 #include <charm++.h>
+#include "ck.h"
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBDBManager.h"
@@ -573,6 +574,14 @@ void CentralLB::LoadBalance()
 //      }
   }
 
+#if CMK_REPLAYSYSTEM
+  LDHandle *loadBalancer_pointers;
+  if (_replaySystem) {
+    loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
+    for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
+  }
+#endif
+  
   double strat_start_time = CkWallTimer();
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -587,6 +596,14 @@ void CentralLB::LoadBalance()
 
 //    CkPrintf("returned successfully\n");
 
+#if CMK_REPLAYSYSTEM
+  CpdHandleLBMessage(&migrateMsg);
+  if (_replaySystem) {
+    for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
+    free(loadBalancer_pointers);
+  }
+#endif
+  
   LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
   migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
 
@@ -613,7 +630,20 @@ void CentralLB::LoadBalance()
     lbDecisionCount++;
     migrateMsg->lbDecisionCount = lbDecisionCount;
 #endif
-  thisProxy.ReceiveMigration(migrateMsg);
+
+  envelope *env = UsrToEnv(migrateMsg);
+  if (CkNumPes() <= 512 || env->getTotalsize() < 8*1024*1024) {
+      // broadcast
+    thisProxy.ReceiveMigration(migrateMsg);
+  }
+  else {
+    // split the migration for each processor
+    for (int p=0; p<CkNumPes(); p++) {
+      LBMigrateMsg *m = extractMigrateMsg(migrateMsg, p);
+      thisProxy[p].ReceiveMigration(m);
+    }
+    delete migrateMsg;
+  }
 
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
@@ -990,6 +1020,9 @@ void CentralLB::preprocess(LDStats* stats,int count)
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
 #if CMK_LBDB_ON
+  if (_lb_args.debug())
+    CkPrintf("[%d] %s started at: %f. \n",CkMyPe(), lbname, CmiWallTimer());
+
   work(stats, count);
 
   if (_lb_args.debug()>1)  {
@@ -998,7 +1031,14 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     CkPrintf("\n");
   }
 
-  return createMigrateMsg(stats, count);
+  LBMigrateMsg *msg = createMigrateMsg(stats, count);
+
+  if (_lb_args.debug()) {
+    envelope *env = UsrToEnv(msg);
+    CkPrintf("[%d] %s finished at: %f. %d objects migrating. Total LBMigrateMsg size:%.2fMB\n", CkMyPe(), lbname, CmiWallTimer(), msg->n_moves, env->getTotalsize()/1024.0/1024.0);
+  }
+
+  return msg;
 #else
   return NULL;
 #endif
@@ -1042,6 +1082,33 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
   }
   if (_lb_args.debug())
     CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
+  return msg;
+}
+
+LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
+{
+  int nmoves = 0;
+  int i;
+  for (i=0; i<m->n_moves; i++) {
+    MigrateInfo* item = (MigrateInfo*) &m->moves[i];
+    if (item->from_pe == p || item->to_pe == p) nmoves++;
+  }
+  LBMigrateMsg* msg = new(nmoves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  msg->n_moves = nmoves;
+  msg->level = m->level;
+  msg->next_lb = m->next_lb;
+  for (i=0,nmoves=0; i<m->n_moves; i++) {
+    MigrateInfo* item = (MigrateInfo*) &m->moves[i];
+    if (item->from_pe == p || item->to_pe == p) {
+      msg->moves[nmoves] = *item;
+      nmoves++;
+    }
+  }
+  // copy processor data
+  for (i=0; i<CkNumPes();i++) {
+    msg->avail_vector[i] = m->avail_vector[i];
+    msg->expectedLoad[i] = m->expectedLoad[i];
+  }
   return msg;
 }
 

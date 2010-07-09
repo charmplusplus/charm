@@ -85,16 +85,14 @@ public class CharjAST extends CommonTree
 
     public CharjAST getChildOfType(int type)
     {
-        try
-        {
-            for(CharjAST c : getChildren())
+        List<CharjAST> children = getChildren();
+        
+        if (children != null) {
+            for(CharjAST c : children)
                 if(c.getType() == type)
                     return c;
         }
-        catch(NullPointerException npe)
-        {
-            npe.printStackTrace();
-        }
+        
         return null;
     }
 
@@ -151,6 +149,7 @@ public class CharjAST extends CommonTree
             for(CharjAST c : children)
                addChild(c);
         }
+        //TODO: fix this bad code, do not catch an NPE and act on it
         catch(NullPointerException npe)
         {
             //npe.printStackTrace();

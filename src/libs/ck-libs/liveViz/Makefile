@@ -1,5 +1,5 @@
 CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARMC=$(CDIR)/bin/charmc $(OPTS) -I../../..
 FLAGS=-DEXTERIOR_BLACK_PIXEL_ELIMINATION
 
 HEADERS=liveViz.h liveViz.decl.h liveVizPoll.decl.h liveViz0.h colorScale.h ImageData.h

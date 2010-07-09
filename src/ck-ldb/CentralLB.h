@@ -222,6 +222,7 @@ public:
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  

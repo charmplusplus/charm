@@ -18,9 +18,9 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
-    ENTRY                   = 'entry'           ;
     PRIVATE                 = 'private'         ;
     ABSTRACT                = 'abstract'        ;
     NATIVE                  = 'native'          ;
@@ -118,6 +118,7 @@ tokens {
     PUP                     = 'pup'             ;
     INITMETHOD              = 'initMethod'      ;
     CTORHELPER              = 'ctorHelper'      ;
+    CHELPER                 = 'constructorHelper';
 
 
     // C++ keywords that aren't used in charj. 
@@ -456,6 +457,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   PRIVATE
     |   ABSTRACT
     |   NATIVE
@@ -485,7 +487,6 @@ constructorType
     |   qualifiedTypeIdent domainExpression?
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
     ;
-
 
 simpleType
     :   primitiveType domainExpression?
@@ -852,6 +853,7 @@ primaryExpression
     |   literal
     |   newExpression
     |   qualifiedIdentExpression
+    |   domainExpression
     |   templateInstantiation
         (   s=SUPER
             (   arguments

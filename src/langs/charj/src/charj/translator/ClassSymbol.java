@@ -8,9 +8,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
     public List<String> templateArgs;
-    public List<CharjAST> initializers;
-
-    public CharjAST constructor;
+    public List<VariableInitializer> initializers;
+    public List<CharjAST> varsToPup;
 
     Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
@@ -27,6 +26,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public boolean isPrimitive = false;
     public boolean isChare = false;
     public boolean isMainChare = false;
+    public boolean isChareArray = false;
+    public boolean hasDefaultCtor = false;
+    public boolean hasMigrationCtor = false;
 
     public CharjAST migrationCtor = null;
 
@@ -38,8 +40,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
-	this.initializers = new ArrayList<CharjAST>();
-	constructor = null;
+	initializers = new ArrayList<VariableInitializer>();
+        varsToPup = new ArrayList<CharjAST>();
     }
 
     public ClassSymbol(
@@ -51,8 +53,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.superClass = superClass;
         this.scope = scope;
         this.type = this;
-	this.initializers = new ArrayList<CharjAST>();
-	constructor = null;
+	this.initializers = new ArrayList<VariableInitializer>();
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
@@ -63,6 +64,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.includes.add("iostream");
         this.usings.add("std::cout");
         this.usings.add("std::endl");
+
+        // For now always include the array package
+        this.includes.add("Array.h");
+        this.usings.add("CharjArray::Array");
+        this.usings.add("CharjArray::Domain");
+        this.usings.add("CharjArray::Range");
     }
 
     public Scope getEnclosingScope() {
@@ -281,6 +288,15 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return names;
     }
 
+    public List<String> getTraceInitializers()
+    {
+        List<String> inits = new ArrayList<String>();
+        for (Map.Entry<String, MethodSymbol> e : methods.entrySet()) {
+            inits.add(e.getValue().getTraceInitializer());
+        }
+        return inits;
+    }
+
     public String getName()
     {
         return name;
@@ -289,5 +305,40 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public String getTypeName()
     {
         return name;
+    }
+
+    private boolean requiresInit() {
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<String> generateInits() {
+        List<String> inits = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                VariableSymbol vs = (VariableSymbol)varAst.def;
+                inits.add(vs.generateInit());
+            }
+        }
+        if (inits.size() == 0)
+            return null;
+        else
+            return inits;
+    }
+
+    public List<String> generatePUPers() {
+        List<String> PUPers = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol) {
+                PUPers.add(((VariableSymbol)varAst.def).generatePUP());
+            }
+        }
+        return PUPers;
     }
 }

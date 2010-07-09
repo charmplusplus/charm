@@ -171,7 +171,7 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
+    :   ^(MODIFIER_LIST accessModifierList localModifierList charjModifierList otherModifierList)
     ;
 
 modifier
@@ -182,19 +182,19 @@ modifier
     ;
 
 localModifierList
-    :   ^(LOCAL_MODIFIER_LIST localModifier+)
+    :   ^(LOCAL_MODIFIER_LIST localModifier*)
     ;
 
 accessModifierList
-    :   ^(ACCESS_MODIFIER_LIST accessModifier+)
+    :   ^(ACCESS_MODIFIER_LIST accessModifier*)
     ;
 
 charjModifierList
-    :   ^(CHARJ_MODIFIER_LIST charjModifier+)
+    :   ^(CHARJ_MODIFIER_LIST charjModifier*)
     ;
 
 otherModifierList
-    :   ^(OTHER_MODIFIER_LIST otherModifier+)
+    :   ^(OTHER_MODIFIER_LIST otherModifier*)
     ;
     
 localModifier
@@ -211,6 +211,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   TRACED
     ;
 
 otherModifier
@@ -426,6 +427,7 @@ primaryExpression
         )
     |   parenthesizedExpression
     |   IDENT
+    |   CHELPER
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
@@ -440,6 +442,7 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+    |   domainExpression
     ;
     
 explicitConstructorCall
@@ -554,6 +557,7 @@ entryPrimaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+    |   domainExpression
     ;
 
 literal 
@@ -580,7 +584,7 @@ rangeExpression
     ;
 
 rangeList
-    :   rangeExpression (','! rangeExpression)*
+    :   rangeExpression+
     ;
 
 domainExpression

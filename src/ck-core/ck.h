@@ -131,28 +131,23 @@ public:
 	 * The message is processed by the watcher starting from the innermost one
 	 * up to the outermost
 	 */
-	inline CmiBool processMessage(envelope **env,CkCoreState *ck) {
-	  CmiBool result = CmiTrue;
-	  if (next != NULL) result &= next->processMessage(env, ck);
-	  result &= process(env, ck);
-#if CMK_BLUEGENE_CHARM
-	  //if (!result) BgRewindRecord();
-#endif
-	  return result;
-	}
-	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
-	   int result = 1;
-	   if (next != NULL) result &= next->processThread(token, ck);
-	   result &= process(token, ck);
-#if CMK_BLUEGENE_CHARM
-	   //if (!result) BgRewindRecord();
-#endif
-	   return result;
-	}
+#define PROCESS_MACRO(name,type) inline CmiBool process##name(type *input,CkCoreState *ck) { \
+  CmiBool result = CmiTrue; \
+    if (next != NULL) result &= next->process##name(input, ck); \
+    result &= process(input, ck); \
+    return result; \
+  }
+
+    PROCESS_MACRO(Message,envelope*);
+    PROCESS_MACRO(Thread,CthThreadToken);
+    PROCESS_MACRO(LBMessage,LBMigrateMsg*);
+
+#undef PROCESS_MACRO
 protected:
     /** These are used internally by this class to call the correct subclass method */
 	virtual CmiBool process(envelope **env,CkCoreState *ck) =0;
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {return CmiTrue;}
+	virtual CmiBool process(LBMigrateMsg **msg, CkCoreState *ck) {return CmiTrue;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };
@@ -200,6 +195,7 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
+void CpdHandleLBMessage(LBMigrateMsg **msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);

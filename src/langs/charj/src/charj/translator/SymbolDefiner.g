@@ -86,10 +86,20 @@ boolean entry = false;
                 /*System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");*/
                 typeName = "void";
             }
+            boolean isTraced = false;
+            if ($MODIFIER_LIST != null) {
+                CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+                if (charj_mod != null) {
+                    charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
+                    isTraced = (charj_mod != null);
+                    if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+                }
+            }
             Type returnType = currentScope.resolveType(typeName);
             //System.out.println("Resolving type " + typeName + " in scope " + currentScope + "->" + returnType);
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
             sym.isEntry = entry;
+            sym.isTraced = isTraced;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
@@ -101,18 +111,23 @@ boolean entry = false;
     |   ^((CONSTRUCTOR_DECL
           | ENTRY_CONSTRUCTOR_DECL {
                 entry = true;
-                if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) {
-                    currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
-                }
             })
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             IDENT .*)
         {
             //System.out.println("entering constructor scope " + $IDENT.text);
+            boolean isTraced = false;
+            CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+            if (charj_mod != null) {
+                charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
+                isTraced = (charj_mod != null);
+                if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+            }
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, currentClass);
             sym.isEntry = entry;
             sym.isCtor = true;
+            sym.isTraced = isTraced;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
@@ -159,7 +174,9 @@ enterClass
                 currentClass.isChare = true;
             } else if (classTypeName.equals("chare_array")) {
                 // TODO: test this; might need to use startswith instead of equals
+                // TODO: should "isChare" be set to true?
                 currentClass.isChare = true;
+                currentClass.isChareArray = true;
             } else if (classTypeName.equals("mainchare")) {
                 currentClass.isChare = true;
                 currentClass.isMainChare = true;
