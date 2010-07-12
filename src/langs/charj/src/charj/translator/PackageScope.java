@@ -24,8 +24,8 @@ public class PackageScope extends SymbolWithScope {
 
     /** See if type is already defined in this package.  If not, look
      *  for type on the disk in same package.  For example, first time
-     *  charj.lang.Chare fails to resolve.  Load from disk and put File
-     *  in package io which is in package charj.  Next time, File will
+     *  charj.lang.Chare fails to resolve.  Load from disk and put Chare
+     *  in package lang which is in package charj.  Next time, Chare will
      *  be found.
      */
     public ClassSymbol resolveType(String type) {
@@ -33,6 +33,9 @@ public class PackageScope extends SymbolWithScope {
         if (debug()) System.out.println(
                 " PackageScope.resolveType(" + type + 
                 "): examine " + toString());
+
+        ClassSymbol cs = symtab.primitiveTypes.get(type);
+        if (cs != null) return cs;
 
         // break off leading package names and look them up,
         // then look up the base class name within the appropriate package scope.
