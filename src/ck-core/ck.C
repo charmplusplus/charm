@@ -2449,6 +2449,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CkPrintf("Charm++> Recording full detail for processor %d\n",CkMyPe());
           CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }

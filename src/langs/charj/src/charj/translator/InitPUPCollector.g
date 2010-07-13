@@ -14,7 +14,6 @@ options {
 @members {
     Scope currentScope;
     ClassSymbol currentClass = null;
-    boolean inMainchare = false;
     boolean inMethod = false;
 }
 
@@ -28,19 +27,26 @@ topdown
 
 bottomup
     :   exitMethod
-    |   exitMainchare
+    ;
+
+classType
+    :   CLASS
+    |   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   MAINCHARE
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 enterClass
-    :   ^(TYPE .* m=MAINCHARE .* IDENT
-            (^('extends' .*))?
-            (^('implements' .*))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
-                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
+    :   ^(TYPE classType IDENT
+        (^('extends' .*))?
+        (^('implements' .*))?
+        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             currentClass = (ClassSymbol)$IDENT.def.type;
-            if($m!=null)
-                currentClass.isMainChare = true;
+            currentClass.isMainChare = $classType.text.equals("mainchare");
         }
     ;
 
@@ -82,17 +88,6 @@ exitMethod
             | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*)
         {
             inMethod = false;
-        }
-    ;
-
-exitMainchare
-    :   ^(TYPE .* IDENT
-            (^('extends' .*))?
-            (^('implements' .*))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
-                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
-        {
-            inMainchare = false;
         }
     ;
 
