@@ -792,7 +792,7 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
 	lbDecisionCount = m->lbDecisionCount;
 #endif
 
-  if (_lb_args.debug > 1) 
+  if (_lb_args.debug() > 1) 
     if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
