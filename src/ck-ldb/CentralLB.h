@@ -104,6 +104,7 @@ public:
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
 #endif
@@ -246,6 +247,7 @@ private:
   int future_migrates_expected;
   int lbdone;
   double start_lb_time;
+  LBMigrateMsg   *storedMigrateMsg;
 
   FutureModel *predicted_model;
 
