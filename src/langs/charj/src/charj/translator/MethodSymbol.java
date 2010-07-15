@@ -24,9 +24,12 @@ public class MethodSymbol
     public boolean isCtor = false;
     public boolean isTraced = false;
 
-    public MethodSymbol(SymbolTable symtab)
-    {
+    public MethodSymbol(SymbolTable symtab) {
         super(symtab);
+    }
+
+    public MethodSymbol(SymbolTable symtab, String name) {
+        super(symtab, name);
     }
 
     public MethodSymbol(
