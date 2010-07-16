@@ -44,6 +44,10 @@ extern "C" void req_fw_handler(char *msg)
   CmiFree(msg);
 }
 
+#ifdef _MSC_VER
+extern "C" size_t write(int fd, const void *buf, size_t count);
+#endif
+
 extern "C" int rep_fw_handler_idx;
 /**
  * Decide if the reply is ready to be forwarded to the waiting client,
@@ -73,7 +77,12 @@ extern "C" int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
       CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
     }
   } else {
-    CcsImpl_reply(rep, repLen, repData);
+    if (_conditionalDelivery == 0) CcsImpl_reply(rep, repLen, repData);
+    else {
+      /* We are the child of a conditional delivery, write to the parent the reply */
+      write(conditionalPipe[1], &repLen, 4);
+      write(conditionalPipe[1], repData, repLen);
+    }
   }
   return 0;
 }

@@ -30,6 +30,7 @@ module ControlPoints {
   };
 
  initnode void controlPointInitNode();
+ initproc void ControlPoint::initControlPointEffects();
 
  group  [migratable]  controlPointManager {
     entry controlPointManager();

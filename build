@@ -83,13 +83,17 @@ syntax() {
   echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
   echo "  --no-build-shared  don't build Charm++'s shared libraries"
   echo ''
+  echo 'Enable/disable features:'
+  src/scripts/configure --help | grep enable-
+  src/scripts/configure --help | grep with-
+  echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
+  echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR       specify additional include path for compiler'
   echo '  --libdir=DIR	     specify additional lib path for compiler'
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
-  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"

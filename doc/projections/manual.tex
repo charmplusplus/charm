@@ -75,7 +75,7 @@ even if no performance analysis traces are desired. Developers of
 \charmpp{} applications who consider such an overhead to be
 unacceptable (e.g. for a production application which requires the
 absolute best performance) may recompile the \charmpp{} runtime with
-the {\tt -DCMK\_OPTIMIZE} flag which removes the instrumentation
+the {\tt -{}-with-production} flag which removes the instrumentation
 stubs.
 
 To enable performance tracing of your application, users simply need
@@ -342,10 +342,14 @@ processor. The logs are emptied and flushed to disk when filled.
 \item
 {\tt +binary-trace}:  generate projections log in binary form.
 \item
-{\tt +gz-trace}:      generated gzip (if available) compressed log files.
+{\tt +gz-trace}:      generate gzip (if available) compressed log files.
 \item
 {\tt +checknested}: a debug option. Checks if events are improperly nested
 while recorded and issue a warning immediately.
+
+\item {\tt +trace-subdirs NUM}: divide the generated log files among
+  {\tt NUM} subdirectories of the trace root, each named {\tt
+    PROGNAME.projdir.K}
 \end{itemize}
 
 \subsubsection{Tracemode {\tt summary}}
@@ -846,10 +850,6 @@ field.
 
 Standard \projections{} dialog options and buttons are also available
 (see \ref{sec::misc} for details).
-
-\textbf{Warning: You might have to click ``update'' before being able
-to click ok on the dialog box. This is a known bug.}
-
 
 
 The following menu options are available:

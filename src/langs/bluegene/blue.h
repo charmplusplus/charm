@@ -387,6 +387,9 @@ public:
 
 #include "blue-conv.h"
 
+typedef void (*BgTracingFn) ();
+void BgRegisterUserTracingFunction(BgTracingFn fn);
+
 #endif
 
 

@@ -33,6 +33,7 @@ CkpvDeclare(CkVec<VidBlock *>, vidblocks);
 
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
+CkpvDeclare(int, currentChareIdx);
 #endif
 
 
@@ -56,6 +57,8 @@ void _initChareTables()
   CkpvInitialize(CkVec<int>, chare_types);
   CkpvInitialize(CkVec<VidBlock *>, vidblocks);
   CkpvInitialize(Vidblockmap, vmap);
+  CkpvInitialize(int, currentChareIdx);
+  CkpvAccess(currentChareIdx) = -1;
 #endif
 }
 
@@ -65,7 +68,10 @@ Chare::Chare(void) {
   thishandle.objPtr=this;
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
-  if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
+  if (CkpvAccess(currentChareIdx) >= 0) {
+    thishandle.objPtr=(void*)CkpvAccess(currentChareIdx);
+  }
+  chareIdx = CkpvAccess(currentChareIdx);
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   mlogData = new ChareMlogData();
@@ -643,7 +649,8 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkpvAccess(_currentGroup) = groupID;
   CkpvAccess(_currentGroupRednMgr) = env->getRednMgr();
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = -1;
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj); /* can't trace groups: would cause nested begin's */
   _STATS_RECORD_PROCESS_GROUP_1();
@@ -666,7 +673,8 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
 //  store nodegroup into _currentNodeGroupObj
   CkpvAccess(_currentNodeGroupObj) = obj;
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = -1;
+  //((Chare *)obj)->chareIdx = -1;
+  CkpvAccess(currentChareIdx) = -1;
 #endif
   _invokeEntryNoTrace(epIdx,env,obj);
   CkpvAccess(_currentNodeGroupObj) = NULL;
@@ -836,7 +844,8 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   int idx;
   register void *obj = _allocNewChare(env, idx);
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = idx;
+  //((Chare *)obj)->chareIdx = idx;
+  CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
 }
@@ -875,7 +884,8 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 #endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
-  ((Chare *)obj)->chareIdx = idx;
+  //((Chare *)obj)->chareIdx = idx;
+  CkpvAccess(currentChareIdx) = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
 }
@@ -1293,8 +1303,8 @@ void _skipCldHandler(void *converseMsg)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(pe)) {
     CmiFree(env);
     return;
   }
@@ -1361,8 +1371,8 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(-1)) {
     CmiFree(env);
     return;
   }
@@ -1379,8 +1389,8 @@ static void _noCldEnqueue(int pe, envelope *env)
     CmiHandleMessage(env);
   } else
 */
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(pe)) {
     CmiFree(env);
     return;
   }
@@ -1401,8 +1411,8 @@ void _noCldNodeEnqueue(int node, envelope *env)
     CmiHandleMessage(env);
   } else {
 */
-#if CMK_REPLAYSYSTEM
-  if (_replaySystem) {
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(node)) {
     CmiFree(env);
     return;
   }
@@ -2001,13 +2011,37 @@ int _recplay_crc = 0;
 int _recplay_checksum = 0;
 int _recplay_logsize = 1024*1024;
 
+//#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
+#define REPLAYDEBUG(args) /* empty */
+
 CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
+
+#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
+
+static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
+
+    int i;
+    char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
+    strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
+    sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
+    FILE *f=fopen(fName,permissions);
+    REPLAYDEBUG("openReplayfile "<<fName);
+    if (f==NULL) {
+        CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+            CkMyPe(),fName,permissions);
+        CkAbort("openReplayFile> Could not open replay file");
+    }
+    return f;
+}
+
+#include "BaseLB.h" /* For LBMigrateMsg message */
 
 class CkMessageRecorder : public CkMessageWatcher {
   char *buffer;
   unsigned int curpos;
+  bool firstOpen;
 public:
-  CkMessageRecorder(FILE *f_): curpos(0) { f=f_; buffer=new char[_recplay_logsize]; }
+  CkMessageRecorder(FILE *f_): curpos(0), firstOpen(true) { f=f_; buffer=new char[_recplay_logsize]; }
   ~CkMessageRecorder() {
     flushLog(0);
     fprintf(f,"-1 -1 -1 ");
@@ -2049,10 +2083,24 @@ private:
     }
     return CmiTrue;
   }
-  virtual int process(CthThreadToken *token,CkCoreState *ck) {
+  virtual CmiBool process(CthThreadToken *token,CkCoreState *ck) {
     curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
-    return 1;
+    return CmiTrue;
+  }
+  
+  virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+    FILE *f;
+    if (firstOpen) f = openReplayFile("ckreplay_",".lb","w");
+    else f = openReplayFile("ckreplay_",".lb","a");
+    firstOpen = false;
+    if (f != NULL) {
+      PUP::toDisk p(f);
+      p | (*msg)->n_moves; // Need to store to be able to reload the message during replay
+      (*msg)->pup(p);
+      fclose(f);
+    }
+    return CmiTrue;
   }
 };
 
@@ -2080,9 +2128,6 @@ private:
   }
 };
 
-//#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
-#define REPLAYDEBUG(args) /* empty */
-
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
 extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
@@ -2096,6 +2141,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
 	int nextEP;
 	unsigned int crc1, crc2;
+	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
 	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
@@ -2215,7 +2261,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	}
 
 public:
-	CkMessageReplay(FILE *f_) {
+	CkMessageReplay(FILE *f_) : lbFile(NULL) {
 	  counter=0;
 	  f=f_;
 	  getNext();
@@ -2258,19 +2304,34 @@ private:
 			return CmiFalse;
 		}
 	}
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {
       REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
 	  if (isNext(token)) {
         REPLAYDEBUG("Executing token: "<<token->serialNo)
 	    getNext();
 	    flush();
-	    return 1;
+	    return CmiTrue;
 	  } else {
         REPLAYDEBUG("Queueing token: "<<token->serialNo
             <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 	    delayedTokens.enq(token);
-	    return 0;
+	    return CmiFalse;
 	  }
+	}
+
+	virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
+	  if (lbFile != NULL) {
+	    int num_moves;
+        PUP::fromDisk p(lbFile);
+	    p | num_moves;
+	    if (num_moves != (*msg)->n_moves) {
+	      delete *msg;
+	      *msg = new (num_moves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+	    }
+	    (*msg)->pup(p);
+	  }
+	  return CmiTrue;
 	}
 };
 
@@ -2328,12 +2389,12 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   ConverseExit();
 }
 
-static int CpdExecuteThreadResume(CthThreadToken *token) {
+static CmiBool CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     return ck->watcher->processThread(token,ck);
   }
-  return 1;
+  return CmiTrue;
 }
 
 CpvCExtern(int, CthResumeNormalThreadIdx);
@@ -2360,22 +2421,11 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
   }
 }
 
-#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
-
-static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
-
-	int i;
-	char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
-	strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
-	sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
-	FILE *f=fopen(fName,permissions);
-	REPLAYDEBUG("openReplayfile "<<fName);
-	if (f==NULL) {
-		CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
-			CkMyPe(),fName,permissions);
-		CkAbort("openReplayFile> Could not open replay file");
-	}
-	return f;
+void CpdHandleLBMessage(LBMigrateMsg **msg) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  if (ck->watcher!=NULL) {
+    ck->watcher->processLBMessage(msg, ck);
+  }
 }
 
 #if CMK_BLUEGENE_CHARM
@@ -2384,6 +2434,7 @@ CpvExtern(int      , CthResumeBigSimThreadIdx);
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+    CmiArgGroup("Charm++","Record/Replay");
     CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
     _replaySystem = 0;
@@ -2398,6 +2449,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CkPrintf("Charm++> Recording full detail for processor %d\n",CkMyPe());
           CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }

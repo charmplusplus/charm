@@ -1255,6 +1255,8 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
+	if (arg_mpiexec)
+           nodetab_getinfo(nt)->ip = i.IP;   /* get IP */
 	i.IP=nodetab_ip(nt);
 #if CMK_USE_IBVERBS 
 	nodeinfo_arr[node] = i;
@@ -1409,6 +1411,10 @@ void req_ccs_connect(void)
   pe=ChMessageInt(h.hdr.pe);
   reqBytes=ChMessageInt(h.hdr.len);
 
+  if (pe == -1) {
+    /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
+    pe = 0;
+  }
   if ((pe<=-nodetab_size || pe>=nodetab_size) && 0==replay_single) {
     /*Treat out of bound values as errors. Helps detecting bugs*/
     /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
@@ -1420,10 +1426,6 @@ void req_ccs_connect(void)
     free(reqData);
     return;
 #endif
-  }
-  if (pe == -1) {
-    /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
-    pe = 0;
   }
   else if (pe < -1) {
     /*Treat negative values as multicast to a number of processors specified by -pe.

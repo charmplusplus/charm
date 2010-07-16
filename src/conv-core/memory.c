@@ -57,7 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
-int cpdInSystem=0;
+int cpdInSystem=1; /*Start inside the system (until we start executing user code)*/
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
@@ -305,6 +305,7 @@ void CmiMemoryInit(argv)
 {
   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
+  CmiArgGroup("Converse","Memory module");
   meta_init(argv);
 #endif
   CmiOutOfMemoryInit();
@@ -558,6 +559,7 @@ The locking code is common to all implementations except OS-builtin.
 
 void CmiMemoryInit(char **argv)
 {
+  CmiArgGroup("Converse","Memory module");
   meta_init(argv);
   CmiOutOfMemoryInit();
 }
