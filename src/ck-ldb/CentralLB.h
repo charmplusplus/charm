@@ -245,6 +245,7 @@ private:
   int future_migrates_expected;
   int lbdone;
   double start_lb_time;
+  int  reduction_started;
 
   FutureModel *predicted_model;
 
