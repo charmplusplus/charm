@@ -102,6 +102,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsData = NULL;
 
   storedMigrateMsg = NULL;
+  reduction_started = 0;
 
   // for future predictor
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
@@ -189,8 +190,9 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
-
 #if CMK_LBDB_ON
+  if (reduction_started) return;              // reducton in progress
+
   CmiAssert(CmiNodeAlive(CkMyPe()));
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
@@ -214,6 +216,7 @@ void CentralLB::ProcessAtSync()
   CkCallback cb(CkIndex_CentralLB::ReceiveCounts((CkReductionMsg*)NULL), 
                   thisProxy[0]);
   contribute(2*sizeof(int), counts, CkReduction::sum_int, cb);
+  reduction_started = 1;
 #else
   SendStats();
 #endif
@@ -1332,6 +1335,15 @@ void CentralLB::pup(PUP::er &p) {
   BaseLB::pup(p); 
   if (p.isUnpacking())  {
     initLB(CkLBOptions(seqno)); 
+  }
+  p|reduction_started;
+  int has_statsMsg=0;
+  if (p.isPacking()) has_statsMsg = (statsMsg!=NULL);
+  p|has_statsMsg;
+  if (has_statsMsg) {
+    if (p.isUnpacking())
+      statsMsg = new CLBStatsMsg;
+    statsMsg->pup(p);
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | lbDecisionCount;
