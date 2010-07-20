@@ -294,6 +294,7 @@ void CentralLB::SendStats()
 {
 #if CMK_LBDB_ON
   CmiAssert(statsMsg != NULL);
+  reduction_started = 0;
 
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
