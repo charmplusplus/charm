@@ -1848,6 +1848,21 @@ _ACEOF
 
 fi
 
+# test cp -p
+{ echo "$as_me:$LINENO: checking \"cp command as\"" >&5
+echo $ECHO_N "checking \"cp command as\"... $ECHO_C" >&6; }
+CP="cp -p"
+touch test_file
+if ! $CP test_file test_file.cp 2>err
+then
+  CP="cp"
+fi
+rm -f test_file test_file.cp
+{ echo "$as_me:$LINENO: result: $CP" >&5
+echo "${ECHO_T}$CP" >&6; }
+add_flag CP=\""$CP"\" "cp command"
+
+
 # try to decide the version of glibc
 get_glibc_version() {
 t=test.c
