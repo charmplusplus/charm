@@ -3061,6 +3061,36 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+### test getifaddrs ####
+cat > $tc <<EOT
+#include <netinet/in.h> /* for sockaddr_in */
+#include <ifaddrs.h> /* for getifaddrs */
+#include <net/if.h> /* for IFF_RUNNING */
+
+int main()
+{
+  struct ifaddrs *interfaces=0;
+  if( getifaddrs(&interfaces) == 0 ) {
+        struct ifaddrs *interface;
+        for( interface=interfaces; interface; interface=interface->ifa_next ) {
+            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+                if( addr && addr->sin_family==AF_INET ) {
+                    break;
+                }
+            }
+        }
+        freeifaddrs(interfaces);
+  }
+}
+EOT
+test_linkc "whether getifaddrs call exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETIFADDRS $pass
+_ACEOF
+
+
 #### check if mmap exists ####
 cat > $t <<EOT
 #include <sys/types.h>

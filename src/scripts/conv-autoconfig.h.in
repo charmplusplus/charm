@@ -90,6 +90,9 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
+/* whether getifaddrs() exists */
+#undef CMK_HAS_GETIFADDRS
+
 /* whether getpagesize exists */
 #undef CMK_HAS_GETPAGESIZE
 
