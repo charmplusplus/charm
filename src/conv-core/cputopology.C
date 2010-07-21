@@ -514,6 +514,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   {
   #if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
+    // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
   #elif CMK_BPROC
     myip = skt_innode_my_ip();
   #else
