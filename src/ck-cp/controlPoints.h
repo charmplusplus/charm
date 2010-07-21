@@ -9,6 +9,9 @@
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
 
+#if CMK_WITH_CONTROLPOINT
+
+
 #include "ControlPoints.decl.h"
 
 #include <vector>
@@ -828,7 +831,7 @@ public:
 
 };
 
-
+#endif
 
 /** @} */
 #endif

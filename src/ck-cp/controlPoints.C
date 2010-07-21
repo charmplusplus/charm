@@ -14,6 +14,8 @@
 #include <math.h>
 #include <climits>
 
+#if CMK_WITH_CONTROLPOINT
+
 #define roundDouble(x)        ((long)(x+0.5))
 #define myAbs(x)   (((x)>=0.0)?(x):(-1.0*(x)))
 #define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
@@ -2711,3 +2713,5 @@ void ControlPointWriteOutputToDisk(){
 /*! @} */
 
 #include "ControlPoints.def.h"
+
+#endif
