@@ -96,11 +96,11 @@ ccs-builtins.o: ccs-builtins.C converse.h conv-config.h conv-autoconfig.h \
   ccs-builtins.h
 	$(CHARMC) -c -I. ccs-builtins.C
 
-middle-ccs.o: middle-ccs.C middle.h middle-conv.h converse.h \
-  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
-  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h \
-  ccs-server.h sockRoutines.h conv-ccs.h ckhashtable.h pup.h
+middle-ccs.o: middle-ccs.C middle.h charm.h converse.h conv-config.h \
+  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+  conv-trace.h persistent.h debug-conv.h pup.h middle-conv.h ccs-server.h \
+  sockRoutines.h conv-ccs.h ckhashtable.h
 	$(CHARMC) -c -I. middle-ccs.C
 
 traceCore.o: traceCore.C converse.h conv-config.h conv-autoconfig.h \
@@ -501,7 +501,8 @@ ck.o: ck.C ck.h charm++.h charm.h converse.h conv-config.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
   trace-bluegene.h envelope.h qd.h register.h stats.h ckfutures.h \
-  ckIgetControl.h crc32.h trace-common.h ckliststring.h CkMarshall.def.h
+  ckIgetControl.h crc32.h trace-common.h BaseLB.h ckliststring.h \
+  CkMarshall.def.h
 	$(CHARMC) -c -I. ck.C
 
 main.o: main.C ck.h charm++.h charm.h converse.h conv-config.h \
@@ -1045,11 +1046,12 @@ CentralLB.o: CentralLB.C charm++.h charm.h converse.h conv-config.h \
   CkArray.decl.h CkFutures.decl.h charisma.h charisma.decl.h tempo.h \
   tempo.decl.h waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h \
   CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h trace.h \
-  trace-bluegene.h envelope.h envelope.h CentralLB.h BaseLB.h \
-  LBDatabase.h CentralLB.decl.h charm++.h BaseLB.decl.h LBDatabase.decl.h \
-  CentralLBMsg.h LBDBManager.h LBSimulation.h ComlibStrategy.h \
-  ckhashtable.h pup.h convcomlibstrategy.h converse.h cklists.h \
-  ComlibLearner.h CentralLB.def.h
+  trace-bluegene.h envelope.h ck.h charm++.h envelope.h qd.h register.h \
+  stats.h ckfutures.h CkFutures.decl.h ckIgetControl.h charisma.h \
+  CentralLB.h BaseLB.h LBDatabase.h CentralLB.decl.h BaseLB.decl.h \
+  LBDatabase.decl.h CentralLBMsg.h LBDBManager.h LBSimulation.h \
+  ComlibStrategy.h ckhashtable.h pup.h convcomlibstrategy.h converse.h \
+  cklists.h ComlibLearner.h CentralLB.def.h
 	$(CHARMC) -c -I. CentralLB.C
 
 HybridBaseLB.o: HybridBaseLB.C charm++.h charm.h converse.h conv-config.h \
@@ -1353,6 +1355,70 @@ pathHistory.o: pathHistory.C charm++.h charm.h converse.h conv-config.h \
   pathHistory.h envelope.h pup_stl.h register.h trace-projections.h \
   trace.h trace-common.h ckhashtable.h pup.h PathHistory.def.h
 	$(CHARMC) -c -I. pathHistory.C
+
+controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
+  envelope.h controlPoints.h ControlPoints.decl.h charm++.h pup_stl.h \
+  charm-api.h LBDatabase.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h envelope.h cp_effects.h ck.h qd.h register.h stats.h \
+  ckfutures.h ckIgetControl.h ckarray.h trace-controlPoints.h trace.h \
+  register.h trace-common.h trace-projections.h ckhashtable.h pup.h \
+  pathHistory.h cp_effects.h ControlPoints.def.h
+	$(CHARMC) -c -I. controlPoints.C
+
+arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
+  envelope.h trace-controlPoints.h trace.h envelope.h register.h \
+  trace-common.h LBDatabase.h controlPoints.h ControlPoints.decl.h \
+  charm++.h pup_stl.h charm-api.h arrayRedistributor.h pathHistory.h \
+  PathHistory.decl.h cp_effects.h ck.h qd.h register.h stats.h \
+  ckfutures.h ckIgetControl.h ckarray.h
+	$(CHARMC) -c -I. arrayRedistributor.C
+
+cp_effects.o: cp_effects.C cp_effects.h charm++.h charm.h converse.h \
+  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
+  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
+  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
+  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
+  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
+  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
+  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
+  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
+  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
+  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
+  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
+  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
+  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
+  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
+  envelope.h ck.h qd.h register.h stats.h ckfutures.h ckIgetControl.h \
+  ckarray.h
+	$(CHARMC) -c -I. cp_effects.C
 
 EveryLB.o: EveryLB.C charm++.h charm.h converse.h conv-config.h \
   conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
@@ -2685,247 +2751,183 @@ prefixrouter.o: prefixrouter.C prefixrouter.h converse.h conv-config.h \
   trace-bluegene.h envelope.h convcomlibstrategy.h ComlibLearner.h
 	$(CHARMC) -c -I. prefixrouter.C
 
-controlPoints.o: controlPoints.C charm++.h charm.h converse.h \
-  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
-  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
-  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
-  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
-  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
-  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
-  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
-  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h controlPoints.h ControlPoints.decl.h charm++.h pup_stl.h \
-  charm-api.h LBDatabase.h arrayRedistributor.h pathHistory.h \
-  PathHistory.decl.h envelope.h cp_effects.h ck.h qd.h register.h stats.h \
-  ckfutures.h ckIgetControl.h ckarray.h trace-controlPoints.h trace.h \
-  register.h trace-common.h trace-projections.h ckhashtable.h pup.h \
-  pathHistory.h cp_effects.h ControlPoints.def.h
-	$(CHARMC) -c -I. controlPoints.C
-
-arrayRedistributor.o: arrayRedistributor.C charm++.h charm.h converse.h \
-  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
-  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
-  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
-  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
-  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
-  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
-  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
-  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h trace-controlPoints.h trace.h envelope.h register.h \
-  trace-common.h LBDatabase.h controlPoints.h ControlPoints.decl.h \
-  charm++.h pup_stl.h charm-api.h arrayRedistributor.h pathHistory.h \
-  PathHistory.decl.h cp_effects.h ck.h qd.h register.h stats.h \
-  ckfutures.h ckIgetControl.h ckarray.h
-	$(CHARMC) -c -I. arrayRedistributor.C
-
-cp_effects.o: cp_effects.C cp_effects.h charm++.h charm.h converse.h \
-  conv-config.h conv-autoconfig.h conv-common.h conv-mach.h \
-  conv-mach-opt.h pup_c.h queueing.h conv-cpm.h conv-cpath.h conv-qd.h \
-  conv-random.h conv-lists.h conv-trace.h persistent.h debug-conv.h pup.h \
-  middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
-  ckhashtable.h debug-charm.h simd.h CkMarshall.decl.h charm++.h \
-  cksection.h ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h \
-  ckobjQ.h ckreduction.h CkReduction.decl.h cknodegroupreduction.h \
-  CkArrayReductionMgr.decl.h ckmemcheckpoint.h CkMemCheckpoint.decl.h \
-  readonly.h ckarray.h cklocation.h LBDatabase.h lbdb.h LBDBManager.h \
-  LBObj.h LBOM.h LBComm.h LBMachineUtil.h lbdb++.h LBDatabase.decl.h \
-  NullLB.decl.h BaseLB.decl.h CkLocation.decl.h CkArray.decl.h \
-  CkFutures.decl.h charisma.h charisma.decl.h tempo.h tempo.decl.h \
-  waitqd.h waitqd.decl.h sdag.h ckcheckpoint.h CkCheckpoint.decl.h \
-  ckevacuation.h ckarrayreductionmgr.h trace.h trace-bluegene.h \
-  envelope.h ck.h qd.h register.h stats.h ckfutures.h ckIgetControl.h \
-  ckarray.h
-	$(CHARMC) -c -I. cp_effects.C
-
 BaseLB.decl.h BaseLB.def.h: BaseLB.ci.stamp charmxi
-BaseLB.ci.stamp: BaseLB.ci
+BaseLB.ci.stamp: BaseLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 BlockLB.decl.h BlockLB.def.h: BlockLB.ci.stamp charmxi
-BlockLB.ci.stamp: BlockLB.ci
+BlockLB.ci.stamp: BlockLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 BlueGene.decl.h BlueGene.def.h: BlueGene.ci.stamp charmxi
-BlueGene.ci.stamp: BlueGene.ci
+BlueGene.ci.stamp: BlueGene.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CentralLB.decl.h CentralLB.def.h: CentralLB.ci.stamp charmxi
-CentralLB.ci.stamp: CentralLB.ci
+CentralLB.ci.stamp: CentralLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 charisma.decl.h charisma.def.h: charisma.ci.stamp charmxi
-charisma.ci.stamp: charisma.ci
+charisma.ci.stamp: charisma.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp charmxi
-ckarray.ci.stamp: ckarray.ci
+ckarray.ci.stamp: ckarray.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkArrayReductionMgr.decl.h CkArrayReductionMgr.def.h: ckarrayreductionmgr.ci.stamp charmxi
-ckarrayreductionmgr.ci.stamp: ckarrayreductionmgr.ci
+ckarrayreductionmgr.ci.stamp: ckarrayreductionmgr.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkCallback.decl.h CkCallback.def.h: ckcallback.ci.stamp charmxi
-ckcallback.ci.stamp: ckcallback.ci
+ckcallback.ci.stamp: ckcallback.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkCheckpoint.decl.h CkCheckpoint.def.h: ckcheckpoint.ci.stamp charmxi
-ckcheckpoint.ci.stamp: ckcheckpoint.ci
+ckcheckpoint.ci.stamp: ckcheckpoint.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkFutures.decl.h CkFutures.def.h: ckfutures.ci.stamp charmxi
-ckfutures.ci.stamp: ckfutures.ci
+ckfutures.ci.stamp: ckfutures.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkLocation.decl.h CkLocation.def.h: cklocation.ci.stamp charmxi
-cklocation.ci.stamp: cklocation.ci
+cklocation.ci.stamp: cklocation.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkMarshall.decl.h CkMarshall.def.h: ckmarshall.ci.stamp charmxi
-ckmarshall.ci.stamp: ckmarshall.ci
+ckmarshall.ci.stamp: ckmarshall.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkMemCheckpoint.decl.h CkMemCheckpoint.def.h: ckmemcheckpoint.ci.stamp charmxi
-ckmemcheckpoint.ci.stamp: ckmemcheckpoint.ci
+ckmemcheckpoint.ci.stamp: ckmemcheckpoint.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp charmxi
-ckreduction.ci.stamp: ckreduction.ci
+ckreduction.ci.stamp: ckreduction.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp charmxi
-ComboCentLB.ci.stamp: ComboCentLB.ci
+ComboCentLB.ci.stamp: ComboCentLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 comlib.decl.h comlib.def.h: ComlibManager.ci.stamp charmxi
-ComlibManager.ci.stamp: ComlibManager.ci
+ComlibManager.ci.stamp: ComlibManager.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 Comm1LB.decl.h Comm1LB.def.h: Comm1LB.ci.stamp charmxi
-Comm1LB.ci.stamp: Comm1LB.ci
+Comm1LB.ci.stamp: Comm1LB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp charmxi
-controlPoints.ci.stamp: controlPoints.ci
+controlPoints.ci.stamp: controlPoints.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 ControlPointsNoTrace.decl.h ControlPointsNoTrace.def.h: controlPointsNoTrace.ci.stamp charmxi
-controlPointsNoTrace.ci.stamp: controlPointsNoTrace.ci
+controlPointsNoTrace.ci.stamp: controlPointsNoTrace.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 DummyLB.decl.h DummyLB.def.h: DummyLB.ci.stamp charmxi
-DummyLB.ci.stamp: DummyLB.ci
+DummyLB.ci.stamp: DummyLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp charmxi
-EveryLB.ci.stamp: EveryLB.ci
+EveryLB.ci.stamp: EveryLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 f90main.decl.h f90main.def.h: f90main.ci.stamp charmxi
-f90main.ci.stamp: f90main.ci
+f90main.ci.stamp: f90main.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GreedyAgentLB.decl.h GreedyAgentLB.def.h: GreedyAgentLB.ci.stamp charmxi
-GreedyAgentLB.ci.stamp: GreedyAgentLB.ci
+GreedyAgentLB.ci.stamp: GreedyAgentLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GreedyCommLB.decl.h GreedyCommLB.def.h: GreedyCommLB.ci.stamp charmxi
-GreedyCommLB.ci.stamp: GreedyCommLB.ci
+GreedyCommLB.ci.stamp: GreedyCommLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GreedyLB.decl.h GreedyLB.def.h: GreedyLB.ci.stamp charmxi
-GreedyLB.ci.stamp: GreedyLB.ci
+GreedyLB.ci.stamp: GreedyLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GridCommLB.decl.h GridCommLB.def.h: GridCommLB.ci.stamp charmxi
-GridCommLB.ci.stamp: GridCommLB.ci
+GridCommLB.ci.stamp: GridCommLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GridCommRefineLB.decl.h GridCommRefineLB.def.h: GridCommRefineLB.ci.stamp charmxi
-GridCommRefineLB.ci.stamp: GridCommRefineLB.ci
+GridCommRefineLB.ci.stamp: GridCommRefineLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GridHybridLB.decl.h GridHybridLB.def.h: GridHybridLB.ci.stamp charmxi
-GridHybridLB.ci.stamp: GridHybridLB.ci
+GridHybridLB.ci.stamp: GridHybridLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GridHybridSeedLB.decl.h GridHybridSeedLB.def.h: GridHybridSeedLB.ci.stamp charmxi
-GridHybridSeedLB.ci.stamp: GridHybridSeedLB.ci
+GridHybridSeedLB.ci.stamp: GridHybridSeedLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 GridMetisLB.decl.h GridMetisLB.def.h: GridMetisLB.ci.stamp charmxi
-GridMetisLB.ci.stamp: GridMetisLB.ci
+GridMetisLB.ci.stamp: GridMetisLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 HbmLB.decl.h HbmLB.def.h: HbmLB.ci.stamp charmxi
-HbmLB.ci.stamp: HbmLB.ci
+HbmLB.ci.stamp: HbmLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp charmxi
-HybridBaseLB.ci.stamp: HybridBaseLB.ci
+HybridBaseLB.ci.stamp: HybridBaseLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 HybridLB.decl.h HybridLB.def.h: HybridLB.ci.stamp charmxi
-HybridLB.ci.stamp: HybridLB.ci
+HybridLB.ci.stamp: HybridLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 LBDatabase.decl.h LBDatabase.def.h: LBDatabase.ci.stamp charmxi
-LBDatabase.ci.stamp: LBDatabase.ci
+LBDatabase.ci.stamp: LBDatabase.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 MetisLB.decl.h MetisLB.def.h: MetisLB.ci.stamp charmxi
-MetisLB.ci.stamp: MetisLB.ci
+MetisLB.ci.stamp: MetisLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 NborBaseLB.decl.h NborBaseLB.def.h: NborBaseLB.ci.stamp charmxi
-NborBaseLB.ci.stamp: NborBaseLB.ci
+NborBaseLB.ci.stamp: NborBaseLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 NeighborCommLB.decl.h NeighborCommLB.def.h: NeighborCommLB.ci.stamp charmxi
-NeighborCommLB.ci.stamp: NeighborCommLB.ci
+NeighborCommLB.ci.stamp: NeighborCommLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 NeighborLB.decl.h NeighborLB.def.h: NeighborLB.ci.stamp charmxi
-NeighborLB.ci.stamp: NeighborLB.ci
+NeighborLB.ci.stamp: NeighborLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 NullLB.decl.h NullLB.def.h: NullLB.ci.stamp charmxi
-NullLB.ci.stamp: NullLB.ci
+NullLB.ci.stamp: NullLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 OrbLB.decl.h OrbLB.def.h: OrbLB.ci.stamp charmxi
-OrbLB.ci.stamp: OrbLB.ci
+OrbLB.ci.stamp: OrbLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 PathHistory.decl.h PathHistory.def.h: pathHistory.ci.stamp charmxi
-pathHistory.ci.stamp: pathHistory.ci
+pathHistory.ci.stamp: pathHistory.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 PhasebyArrayLB.decl.h PhasebyArrayLB.def.h: PhasebyArrayLB.ci.stamp charmxi
-PhasebyArrayLB.ci.stamp: PhasebyArrayLB.ci
+PhasebyArrayLB.ci.stamp: PhasebyArrayLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RandCentLB.decl.h RandCentLB.def.h: RandCentLB.ci.stamp charmxi
-RandCentLB.ci.stamp: RandCentLB.ci
+RandCentLB.ci.stamp: RandCentLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RecBisectBfLB.decl.h RecBisectBfLB.def.h: RecBisectBfLB.ci.stamp charmxi
-RecBisectBfLB.ci.stamp: RecBisectBfLB.ci
+RecBisectBfLB.ci.stamp: RecBisectBfLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RefineCommLB.decl.h RefineCommLB.def.h: RefineCommLB.ci.stamp charmxi
-RefineCommLB.ci.stamp: RefineCommLB.ci
+RefineCommLB.ci.stamp: RefineCommLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RefineKLB.decl.h RefineKLB.def.h: RefineKLB.ci.stamp charmxi
-RefineKLB.ci.stamp: RefineKLB.ci
+RefineKLB.ci.stamp: RefineKLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RefineLB.decl.h RefineLB.def.h: RefineLB.ci.stamp charmxi
-RefineLB.ci.stamp: RefineLB.ci
+RefineLB.ci.stamp: RefineLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp charmxi
-RefineTopoLB.ci.stamp: RefineTopoLB.ci
+RefineTopoLB.ci.stamp: RefineTopoLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp charmxi
-RotateLB.ci.stamp: RotateLB.ci
+RotateLB.ci.stamp: RotateLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 tempo.decl.h tempo.def.h: tempo.ci.stamp charmxi
-tempo.ci.stamp: tempo.ci
+tempo.ci.stamp: tempo.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TopoCentLB.decl.h TopoCentLB.def.h: TopoCentLB.ci.stamp charmxi
-TopoCentLB.ci.stamp: TopoCentLB.ci
+TopoCentLB.ci.stamp: TopoCentLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TopoLB.decl.h TopoLB.def.h: TopoLB.ci.stamp charmxi
-TopoLB.ci.stamp: TopoLB.ci
+TopoLB.ci.stamp: TopoLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceControlPoints.decl.h TraceControlPoints.def.h: trace-controlPoints.ci.stamp charmxi
-trace-controlPoints.ci.stamp: trace-controlPoints.ci
+trace-controlPoints.ci.stamp: trace-controlPoints.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceProjections.decl.h TraceProjections.def.h: trace-projections.ci.stamp charmxi
-trace-projections.ci.stamp: trace-projections.ci
+trace-projections.ci.stamp: trace-projections.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp charmxi
-trace-simple.ci.stamp: trace-simple.ci
+trace-simple.ci.stamp: trace-simple.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci.stamp charmxi
-trace-summary.ci.stamp: trace-summary.ci
+trace-summary.ci.stamp: trace-summary.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceTau.decl.h TraceTau.def.h: trace-Tau.ci.stamp charmxi
-trace-Tau.ci.stamp: trace-Tau.ci
+trace-Tau.ci.stamp: trace-Tau.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 TraceUtilization.decl.h TraceUtilization.def.h: trace-utilization.ci.stamp charmxi
-trace-utilization.ci.stamp: trace-utilization.ci
+trace-utilization.ci.stamp: trace-utilization.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 waitqd.decl.h waitqd.def.h: waitqd.ci.stamp charmxi
-waitqd.ci.stamp: waitqd.ci
+waitqd.ci.stamp: waitqd.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
 WSLB.decl.h WSLB.def.h: WSLB.ci.stamp charmxi
-WSLB.ci.stamp: WSLB.ci
+WSLB.ci.stamp: WSLB.ci charmxi
 	 $(CHARMC) -intrinsic $< && touch $@
