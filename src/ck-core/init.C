@@ -799,7 +799,9 @@ static void _nullFn(void *, void *)
 
 extern void _registerLBDatabase(void);
 extern void _registerPathHistory(void);
+#if CMK_WITH_CONTROLPOINT
 extern void _registerControlPoints(void);
+#endif
 extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
@@ -1048,9 +1050,11 @@ void _initCharm(int unused_argc, char **argv)
 		  in.
 		  
 		*/
+#if CMK_WITH_CONTROLPOINT
 		_registerPathHistory();
 		_registerControlPoints();
 		_registerTraceControlPoints();
+#endif
 
 
 		/**

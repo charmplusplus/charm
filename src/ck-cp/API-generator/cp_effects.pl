@@ -65,6 +65,8 @@ print OUT_H <<EOF;
 #ifndef __CP_EFFECTS_H__
 #define __CP_EFFECTS_H__
 
+#if CMK_WITH_CONTROLPOINT
+
 namespace ControlPoint {
 
   enum DIRECTION {EFF_DEC, EFF_INC};
@@ -127,6 +129,7 @@ CkpvExtern(ControlPoint::cp_effect_map, cp_effects);
 //CkpvExtern(ControlPoint::cp_name_map, cp_names);
 
 #endif
+#endif
 EOF
 
 
@@ -138,6 +141,7 @@ print OUT_CPP <<EOF;
 
 #include "cp_effects.h"
 
+#if CMK_WITH_CONTROLPOINT
 
 using namespace ControlPoint;
 using namespace std;
@@ -175,4 +179,5 @@ void insert(const std::string effect, const std::string name, const ControlPoint
 
 $funcdefs
 
+#endif
 EOF

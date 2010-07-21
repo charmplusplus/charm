@@ -7,6 +7,10 @@
 #include <vector>
 #include <utility>
 
+
+#if CMK_WITH_CONTROLPOINT
+
+
 #include "PathHistory.decl.h"
 #include "LBDatabase.h"
 #include "pathHistory.h"
@@ -619,3 +623,4 @@ void criticalPath_split(){
 
 /*! @} */
 
+#endif

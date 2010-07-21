@@ -5,6 +5,7 @@
 
 #include "cp_effects.h"
 
+#if CMK_WITH_CONTROLPOINT
 
 using namespace ControlPoint;
 using namespace std;
@@ -266,3 +267,4 @@ void ControlPoint::EffectIncrease::GPUOffloadedWork(std::string s) {
 }
 
 
+#endif

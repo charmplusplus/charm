@@ -96,4 +96,8 @@
 #define CMK_TRACE_ENABLED          1
 #endif
 
+#ifndef  CMK_WITH_CONTROLPOINT
+#define CMK_WITH_CONTROLPOINT            1
+#endif
+
 #endif
