@@ -404,7 +404,7 @@ static int search_pemap(char *pecoremap, int pe)
 
   str = strtok_r(mapstr, ",", &ptr);
   count = 0;
-  while (str)
+  while (str && count < CmiNumPes())
   {
       int hasdash=0, hascolon=0, hasdot=0;
       int start, end, stride=1, block=1;
@@ -443,8 +443,8 @@ static int search_pemap(char *pecoremap, int pe)
           map[count++] = i+j;
           if (count == CmiNumPes()) break;
         }
+        if (count == CmiNumPes()) break;
       }
-      if (count == CmiNumPes()) break;
       str = strtok_r(NULL, ",", &ptr);
   }
   i = map[pe % count];
