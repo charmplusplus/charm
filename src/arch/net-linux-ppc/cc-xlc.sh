@@ -1,5 +1,5 @@
 CMK_CC='xlc_r '
-CMK_CXX='xlC_r -qstaticinline '
+CMK_CXX='xlC_r '
 CMK_C_OPTIMIZE='-O3 -qstrict -Q  '
 CMK_CXX_OPTIMIZE='-O3 -qstrict -Q '
 CMK_PIC='-qpic=small'
@@ -14,7 +14,7 @@ CMK_NM='nm '
 
 CMK_NATIVE_CC='xlc_r '
 CMK_NATIVE_LD='xlc_r '
-CMK_NATIVE_CXX='xlC_r -qstaticinline '
+CMK_NATIVE_CXX='xlC_r '
 CMK_NATIVE_LDXX='xlC_r '
 
 CMK_CF77='xlf_r  '
