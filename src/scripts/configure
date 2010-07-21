@@ -1194,6 +1194,7 @@ Optional Features:
   --enable-tracing        enable tracing modules
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
+  --enable-controlpoint   enable control point
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1731,6 +1732,24 @@ then
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
+_ACEOF
+
+fi
+
+# Check whether --enable-controlpoint was given.
+if test "${enable_controlpoint+set}" = set; then
+  enableval=$enable_controlpoint; enable_controlpoint=$enableval
+else
+  enable_controlpoint=yes
+fi
+
+
+if test "$enable_controlpoint" = "no"
+then
+  Echo "Charm control point is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 0
 _ACEOF
 
 fi

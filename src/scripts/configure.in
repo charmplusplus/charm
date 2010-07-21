@@ -72,6 +72,18 @@ then
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
+AC_ARG_ENABLE([controlpoint],
+            [AS_HELP_STRING([--enable-controlpoint],
+              [enable control point])],
+            [enable_controlpoint=$enableval],
+            [enable_controlpoint=yes])
+
+if test "$enable_controlpoint" = "no"
+then
+  Echo "Charm control point is disabled"
+  AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
+fi
+
 AC_ARG_WITH([numa],
             [AS_HELP_STRING([--with-numa],
               [support memory affinity with NUMA])],
