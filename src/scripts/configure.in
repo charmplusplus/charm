@@ -293,6 +293,19 @@ then
   AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
 fi
 
+# test cp -p
+AC_MSG_CHECKING("cp command as")
+CP="cp -p"
+touch test_file
+if ! $CP test_file test_file.cp 2>err
+then
+  CP="cp"
+fi
+rm -f test_file test_file.cp
+AC_MSG_RESULT($CP)
+add_flag CP=\""$CP"\" "cp command"
+ 
+
 # try to decide the version of glibc
 get_glibc_version() {
 t=test.c
