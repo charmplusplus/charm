@@ -1,7 +1,6 @@
 #include <charm++.h>
 
 // This file is compiled twice to make a version that is capable of not needing the tracing to be turned on. 
-// The Makefile will have -DCP_DISABLE_TRACING
 
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
@@ -54,7 +53,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherAll;
 /* readonly */ char CPDataFilename[512];
 
-
+extern bool enableCPTracing;
 
 /// The control point values to be used for the first few phases if the strategy doesn't choose to do something else.
 /// These probably come from the command line arguments, so are available only on PE 0
@@ -643,37 +642,34 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
-    
-#ifndef CP_DISABLE_TRACING
-    CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
+    CkPrintf("gotoNextPhase shouldGatherAll=%d enableCPTracing=%d\n", (int)shouldGatherAll, (int)enableCPTracing);
     fflush(stdout);
-
-    if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
-      alreadyRequestedAll = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
-      CkPrintf("Requesting all measurements\n");
-      thisProxy.requestAll(*cb);
-      delete cb;
-    
-    } else {
       
-      if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-	alreadyRequestedMemoryUsage = true;
-	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-	thisProxy.requestMemoryUsage(*cb);
+    if(enableCPTracing){
+      if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
+	alreadyRequestedAll = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
+	CkPrintf("Requesting all measurements\n");
+	thisProxy.requestAll(*cb);
 	delete cb;
-      }
-      
-      if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
-	alreadyRequestedIdleTime = true;
-	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-	thisProxy.requestIdleTime(*cb);
-	delete cb;
+	
+      } else {
+	
+	if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+	  alreadyRequestedMemoryUsage = true;
+	  CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+	  thisProxy.requestMemoryUsage(*cb);
+	  delete cb;
+	}
+	
+	if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+	  alreadyRequestedIdleTime = true;
+	  CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+	  thisProxy.requestIdleTime(*cb);
+	  delete cb;
+	}
       }
     }
-    
-
-#endif
 
 
 
@@ -740,7 +736,8 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   
   /// Entry method called on all PEs to request CPU utilization statistics
   void controlPointManager::requestIdleTime(CkCallback cb){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+   
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
     idle[0] = i;
@@ -750,16 +747,14 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     //    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
     
     localControlPointTracingInstance()->resetTimings();
-
+    
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherIdleTime(CkReductionMsg *msg){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==3);
     double *r=(double *) msg->getData();
@@ -778,9 +773,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     alreadyRequestedIdleTime = false;
     checkForShutdown();
     delete msg;
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
 
 
@@ -790,7 +782,8 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
   void controlPointManager::requestAll(CkCallback cb){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     TraceControlPoints *t = localControlPointTracingInstance();
 
     double data[ALL_REDUCTION_SIZE];
@@ -824,14 +817,12 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     localControlPointTracingInstance()->resetAll();
 
     contribute(ALL_REDUCTION_SIZE*sizeof(double),data,allMeasuresReductionType, cb);
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherAll(CkReductionMsg *msg){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     CkAssert(msg->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     int size=msg->getSize() / sizeof(double);
     double *data=(double *) msg->getData();
@@ -890,9 +881,6 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     alreadyRequestedAll = false;
     checkForShutdown();
     delete msg;
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
 
 
@@ -907,10 +895,10 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   void controlPointManager::exitIfReady(){
      if( !alreadyRequestedMemoryUsage && !alreadyRequestedAll && !alreadyRequestedIdleTime && CkMyPe()==0){
-       CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
+       //  CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
        doExitNow();
      } else {
-       CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
+       // CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
        exitWhenReady = true;
      }
   }
@@ -919,7 +907,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
   void controlPointManager::doExitNow(){
 	  writeOutputToDisk();
-	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
+	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
 	  CkExit();
   }
 
@@ -1058,8 +1046,7 @@ public:
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
 
-    
-    
+  
     
     whichTuningScheme = RandomSelection;
 
@@ -2723,8 +2710,4 @@ void ControlPointWriteOutputToDisk(){
 
 /*! @} */
 
-#ifdef CP_DISABLE_TRACING
-#include "ControlPointsNoTrace.def.h"
-#else
 #include "ControlPoints.def.h"
-#endif
