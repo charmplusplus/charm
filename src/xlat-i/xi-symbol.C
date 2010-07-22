@@ -613,10 +613,8 @@ Module::preprocess()
 void
 Module::genDepend(const char *cifile)
 {
-  cout << name << ".decl.h " << name << ".def.h: " << cifile << ".stamp";
-  if (internalMode)
-    cout << " charmxi";
-  cout << endl;
+  cout << name << ".decl.h " << name << ".def.h: "
+       << cifile << ".stamp" << endl;
 }
 
 void
