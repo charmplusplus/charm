@@ -266,6 +266,21 @@ controlPointManager::controlPointManager() {
 //    CkPrintf("[%d] controlPointManager() Destructor\n", CkMyPe());
   }
 
+  void controlPointManager::pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+      // FIXME: does not work when control point is actually used,
+      // just minimal pup so that it allows exit function to work (exitIfReady).
+    p|generatedPlanForStep;
+    p|exitWhenReady;
+    p|alreadyRequestedMemoryUsage;
+    p|alreadyRequestedIdleTime;
+    p|alreadyRequestedAll;
+    p|frameworkShouldAdvancePhase;
+    p|haveControlPointChangeCallback;
+    p|phase_id;
+  }
+  
 
   /// Loads the previous run data file
   void controlPointManager::loadDataFile(){

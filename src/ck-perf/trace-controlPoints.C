@@ -227,6 +227,7 @@ extern "C" void traceControlPointsExitFunction() {
 
 // Initialization of the parallel trace module.
 void initTraceControlPointsBOC() {
+/*
 #ifdef __BLUEGENE__
   if (BgNodeRank()==0) {
 #else
@@ -234,6 +235,7 @@ void initTraceControlPointsBOC() {
 #endif
       registerExitFn(traceControlPointsExitFunction);
     }
+*/
 }
 
 #include "TraceControlPoints.def.h"
