@@ -127,29 +127,6 @@ scope ScopeStack; // top-level type scope
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))? (^('implements' type+))?
             {
-                Scope outerScope = $ScopeStack[-1]::current;
-                $sym = new ClassSymbol(symtab, $IDENT.text, outerScope.resolveType($parent.text), outerScope);
-                outerScope.define($sym.name, $sym);
-                currentClass = $sym;
-                $sym.definition = $typeDeclaration.start;
-                $sym.definitionTokenStream = input.getTokenStream();
-                $IDENT.symbol = $sym;
-                $ScopeStack::current = $sym;
-                String classTypeName = $classType.text;
-                if (classTypeName.equals("class")) {
-                } else if (classTypeName.equals("chare")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("group")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("nodegroup")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("chare_array")) {
-                    currentClass.isChare = true;
-                } else if (classTypeName.equals("mainchare")) {
-                    currentClass.isChare = true;
-                    currentClass.isMainChare = true;
-                } else System.out.println("Error: type " + classTypeName + " not recognized.");
-                importPackages($sym, imports);
             }
             classScopeDeclaration*)
             {
@@ -158,6 +135,11 @@ scope ScopeStack; // top-level type scope
                 //    System.out.println(entry.getKey());
                 //}
             }
+    |   ^('template' i1=IDENT* typeDeclaration)
+        {
+            // JL: Need to fill the templateArgs in ClassSymbol, and push this down
+            // to the class subtree
+        }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -185,53 +167,31 @@ scope ScopeStack;
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
         {
-            ClassSymbol returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $FUNCTION_METHOD_DECL.symbol = sym;
         }
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList?
             ty=type IDENT formalParameterList a=arrayDeclaratorList? b=block)
         {
-            ClassSymbol returnType = currentClass.resolveType($ty.text);
-            MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
-            currentMethod = sym;
-            sym.definition = $classScopeDeclaration.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            currentClass.define($IDENT.text, sym);
-            $ENTRY_FUNCTION_DECL.symbol = sym;
         }
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
-            ^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
+            ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
-            ^(VAR_DECLARATOR_LIST field[$objectType.type]+))
+            ^(VAR_DECLARATOR_LIST field[$objectType.type, false]+))
         {
-            ClassSymbol type = $objectType.type;
-            if (type != null && type.isChare) currentClass.addExtern(type.getName());
         }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            if (astmod.isMigrationCtor($CONSTRUCTOR_DECL)) currentClass.migrationCtor = $CONSTRUCTOR_DECL;
+
         }
     |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
         {
-            if (astmod.isMigrationCtor($ENTRY_CONSTRUCTOR_DECL)) currentClass.migrationCtor = $ENTRY_CONSTRUCTOR_DECL;
         }
     ;
 
-field [ClassSymbol type]
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
+field [Type type, boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     {
-            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, $type);
-            sym.definition = $field.start;
-            sym.definitionTokenStream = input.getTokenStream();
-            $VAR_DECLARATOR.symbol = sym;
-            currentClass.define($IDENT.text, sym);
     }
     ;
     
@@ -241,21 +201,41 @@ interfaceScopeDeclaration
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[false])
     ;
 
-variableDeclaratorList
-    :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
+variableDeclaratorList[boolean localdef]
+    :   ^(VAR_DECLARATOR_LIST variableDeclarator[localdef]+)
     ;
 
-variableDeclarator
-    :   ^(VAR_DECLARATOR ^(IDENT arrayDeclaratorList?) variableInitializer?)
-
+variableDeclarator[boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     ;
     
-variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+variableDeclaratorId[boolean localdef] returns [String ident]
+    :   ^(IDENT domainExpression?
+        { 
+        } )
+    ;
+
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
     ;
 
 variableInitializer
@@ -324,6 +304,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   TRACED
     ;
 
 otherModifier
@@ -340,7 +321,6 @@ type
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
         {
-            $type = symtab.resolveBuiltinType($primitiveType.text);
         }
     ;
     
@@ -350,7 +330,6 @@ objectType returns [ClassSymbol type]
     |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
     |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
         {
-            $type = $qualifiedTypeIdent.type;
         }
     ;
 
@@ -360,33 +339,35 @@ String name = "";
 }
     :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
         {
-            $type = null;
-            /*System.out.println("trying to resolve type " + name + " in type " + currentClass);*/
-            if (currentClass != null) $type = currentClass.resolveType(name);
-            /*System.out.println("got " + $type);*/
-            if ($type == null) $type = symtab.resolveBuiltinType(name);
-            $QUALIFIED_TYPE_IDENT.symbol = $type;
         }
     ;
 
 typeIdent returns [String name]
-    :   ^(IDENT genericTypeArgumentList?)
-        { $name = $IDENT.text; }
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
-    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
     :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
+    ;
+
+templateArgList
+    :   genericTypeArgument+
+    ;
+
+templateInstantiation
+    :   ^(TEMPLATE_INST templateArgList)
+    |   ^(TEMPLATE_INST templateInstantiation)
     ;
     
 genericTypeArgument
@@ -399,11 +380,11 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
@@ -423,12 +404,9 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList[true])
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
         {
-            ClassSymbol type = $objectType.type;
-            /*System.out.println("looked up type " + type + " for declaration " + $objectType.text);*/
-            if (type != null && type.isChare && currentClass != null) currentClass.addExtern(type.getName());
         }
     ;
 
@@ -459,7 +437,7 @@ nonBlockStatement
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^('delete' qualifiedIdentifier)
+    |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     |   ^(PRINT expression*)
@@ -483,7 +461,7 @@ forInit
 parenthesizedExpression
     :   ^(PAREN_EXPR expression)
     ;
-    
+
 expression
     :   ^(EXPR expr)
     ;
@@ -575,11 +553,9 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
+        {
+        }
     |   ^(NEW type arguments)
     ;
 

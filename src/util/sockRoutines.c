@@ -36,6 +36,12 @@
 typedef int socklen_t;
 #endif
 
+#if CMK_HAS_GETIFADDRS
+#include <netinet/in.h> /* for sockaddr_in */
+#include <ifaddrs.h> /* for getifaddrs */
+#include <net/if.h> /* for IFF_RUNNING */
+#endif
+
 /*Just print out error message and exit*/
 static int default_skt_abort(int code,const char *msg)
 {
@@ -235,12 +241,34 @@ skt_ip_t _skt_invalid_ip={{0}};
 
 skt_ip_t skt_my_ip(void)
 {
+#if CMK_HAS_GETIFADDRS
+  skt_ip_t ip = _skt_invalid_ip;
+    /* Code snippet from  Jens Alfke
+ *     http://lists.apple.com/archives/macnetworkprog/2008/May/msg00013.html */
+  struct ifaddrs *interfaces=0;
+  if( getifaddrs(&interfaces) == 0 ) {
+        struct ifaddrs *interface;
+        for( interface=interfaces; interface; interface=interface->ifa_next ) {
+            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+                if( addr && addr->sin_family==AF_INET ) {
+                    memcpy(&ip, &addr->sin_addr, sizeof(ip));
+                    break;
+                }
+            }
+        }
+        freeifaddrs(interfaces);
+  }
+  /* fprintf(stderr, "My IP is %d.%d.%d.%d\n", ip.data[0],ip.data[1],ip.data[2],ip.data[3]); */
+  return ip;
+#else
   char hostname[1000];
   
   if (gethostname(hostname, 999)==0)
       return skt_lookup_ip(hostname);
 
   return _skt_invalid_ip;
+#endif
 }
 
 static int skt_parse_dotted(const char *str,skt_ip_t *ret)

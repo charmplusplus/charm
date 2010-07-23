@@ -43,7 +43,7 @@ CpvDeclare(int, myCPUAffToCore);
 #endif
 
 
-#define MAX_EXCLUDE      16
+#define MAX_EXCLUDE      32
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
@@ -396,7 +396,7 @@ static int search_pemap(char *pecoremap, int pe)
 {
   int *map = (int *)malloc(CmiNumPes()*sizeof(int));
   char *ptr = NULL;
-  int i, count;
+  int i, j, count;
   char *str;
 
   char *mapstr = (char*)malloc(strlen(pecoremap)+1);
@@ -404,18 +404,25 @@ static int search_pemap(char *pecoremap, int pe)
 
   str = strtok_r(mapstr, ",", &ptr);
   count = 0;
-  while (str)
+  while (str && count < CmiNumPes())
   {
-      int hasdash=0, hascolon=0;
-      int start, end, stride=1;
+      int hasdash=0, hascolon=0, hasdot=0;
+      int start, end, stride=1, block=1;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-' && i!=0) hasdash=1;
           if (str[i] == ':') hascolon=1;
+	  if (str[i] == '.') hasdot=1;
       }
       if (hasdash) {
           if (hascolon) {
-            if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+            if (hasdot) {
+              if (sscanf(str, "%d-%d:%d.%d", &start, &end, &stride, &block) != 4)
                  printf("Warning: Check the format of \"%s\".\n", str);
+            }
+            else {
+              if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+            }
           }
           else {
             if (sscanf(str, "%d-%d", &start, &end) != 2)
@@ -426,11 +433,18 @@ static int search_pemap(char *pecoremap, int pe)
           sscanf(str, "%d", &start);
           end = start;
       }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", str);
+        block=1;
+      }
       for (i = start; i<=end; i+=stride) {
-        map[count++] = i;
+        for (j=0; j<block; j++) {
+          if (i+j>end) break;
+          map[count++] = i+j;
+          if (count == CmiNumPes()) break;
+        }
         if (count == CmiNumPes()) break;
       }
-      if (count == CmiNumPes()) break;
       str = strtok_r(NULL, ",", &ptr);
   }
   i = map[pe % count];
@@ -441,7 +455,7 @@ static int search_pemap(char *pecoremap, int pe)
 }
 
 #if CMK_CRAYXT
-extern int getXTNodeID(int mype, int numpes);
+extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
 
@@ -452,7 +466,6 @@ void CmiInitCPUAffinity(char **argv)
   hostnameMsg  *msg;
   char *pemap = NULL;
   char *commap = NULL;
-  char *coremap = NULL;
  
   int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
@@ -460,15 +473,10 @@ void CmiInitCPUAffinity(char **argv)
 
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
     if (CmiMyRank() == 0) add_exclude(exclude);
-  
-    /* obsolete */
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
-  if (coremap!=NULL && excludecount>0)
-    CmiAbort("Charm++> +excludecore and +coremap can not be used togetehr!");
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
-  if (pemap!=NULL && (coremap != NULL || excludecount>0))
-    CmiAbort("Charm++> +pemap can not be used with either +excludecore or +coremap.\n");
+  if (pemap!=NULL && excludecount>0)
+    CmiAbort("Charm++> +pemap can not be used with +excludecore.\n");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
@@ -496,8 +504,6 @@ void CmiInitCPUAffinity(char **argv)
        for (i=1; i<excludecount; i++) CmiPrintf(" %d", excludecore[i]);
        CmiPrintf(".\n");
      }
-     if (coremap!=NULL)
-       CmiPrintf("Charm++> cpuaffinity core map : %s\n", coremap);
      if (pemap!=NULL)
        CmiPrintf("Charm++> cpuaffinity PE-core map : %s\n", pemap);
   }
@@ -516,7 +522,7 @@ void CmiInitCPUAffinity(char **argv)
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
-    if (coremap == NULL && pemap == NULL) {
+    if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
@@ -545,35 +551,11 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-  if (coremap!= NULL) {
-    /* each processor finds its mapping */
-    int i, ct=1, myrank;
-    for (i=0; i<strlen(coremap); i++) if (coremap[i]==',' && i<strlen(coremap)-1) ct++;
-#if CMK_SMP
-    ct = CmiMyRank()%ct;
-#else
-    ct = CmiMyPe()%ct;
-#endif
-    i=0;
-    while(ct>0) if (coremap[i++]==',') ct--;
-    myrank = atoi(coremap+i);
-    printf("Charm++> set PE%d on node #%d to core #%d\n", CmiMyPe(), CmiMyNode(), myrank); 
-    if (myrank >= CmiNumCores()) {
-      CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", myrank, CmiNumCores(), CmiNumCores()-1);
-      CmiAbort("Invalid core number");
-    }
-    if (CmiSetCPUAffinity(myrank) == -1) CmiAbort("set_cpu_affinity abort!");
-    /*CpvAccess(myCPUAffToCore) = myrank;*/
-    CmiNodeAllBarrier();
-    CmiNodeAllBarrier();
-    return;
-  }
-
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
 #if CMK_CRAYXT
-    ret = getXTNodeID(CmiMyPe(), CmiNumPes());
+    ret = getXTNodeID(CmiMyNode(), CmiNumNodes());
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
@@ -630,12 +612,10 @@ void CmiInitCPUAffinity(char **argv)
 {
   char *pemap = NULL;
   char *commap = NULL;
-  char *coremap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
-  CmiGetArgStringDesc(argv, "+coremap", &coremap, "define core mapping");
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)

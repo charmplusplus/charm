@@ -15,8 +15,10 @@ public class CharjAST extends CommonTree
 {
     /** Semantic information about this node. Includes type, scope, location
      * of definition, etc. */
-    public Symbol symbol;
-
+    public Scope scope;
+    public Symbol def;
+    public Type symbolType;
+    
     public CharjAST(Token t) {
         super(t);
     }
@@ -52,8 +54,8 @@ public class CharjAST extends CommonTree
     @Override
     public String toString() {
         String s = super.toString();
-        if (symbol != null) {
-            s += "(" + symbol + ")" ;
+        if (symbolType != null) {
+            s += "(" + symbolType + ")" ;
         }
         return s;
     }
@@ -62,7 +64,9 @@ public class CharjAST extends CommonTree
     public CharjAST dupNode()
     {
         CharjAST node = new CharjAST(getType(), getText());
-        node.symbol = symbol;
+        node.def = def;
+        node.scope = scope;
+        node.symbolType = symbolType;
         return node;
     }
 
@@ -81,16 +85,14 @@ public class CharjAST extends CommonTree
 
     public CharjAST getChildOfType(int type)
     {
-        try
-        {
-            for(CharjAST c : getChildren())
+        List<CharjAST> children = getChildren();
+        
+        if (children != null) {
+            for(CharjAST c : children)
                 if(c.getType() == type)
                     return c;
         }
-        catch(NullPointerException npe)
-        {
-            npe.printStackTrace();
-        }
+        
         return null;
     }
 
@@ -100,6 +102,21 @@ public class CharjAST extends CommonTree
             if(getChild(i).getType() == type)
                 return getChild(i+1);
         return getChild(0);
+    }
+
+    public boolean hasParentOfType(int type)
+    {
+        //System.out.println("checking parent type = " + type);
+        CharjAST node = getParent();
+        while (node != null && node.getType() != type) {
+            //System.out.println("looking at parents, type = " + node.getType() + ": " + node.toString());
+            node = node.getParent();
+        }
+        boolean found = (node != null);
+        //if (found) System.out.println("looking at parents, type = " + node.getType() + ": " + node.toString());
+        //else System.out.println("null parent");
+        //System.out.println("Result: " + found);
+        return found;
     }
 
     @Override
@@ -132,6 +149,7 @@ public class CharjAST extends CommonTree
             for(CharjAST c : children)
                addChild(c);
         }
+        //TODO: fix this bad code, do not catch an NPE and act on it
         catch(NullPointerException npe)
         {
             //npe.printStackTrace();

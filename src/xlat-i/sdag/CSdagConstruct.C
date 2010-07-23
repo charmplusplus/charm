@@ -799,6 +799,8 @@ void SdagConstruct::generateWhen(XStr& op)
     e = el->entry;
     if (e->paramIsMarshalled() == 1) {
         op << "       delete " << e->getEntryName() << "_msg;\n";
+    } else if (e->param->isMessage() == 1) {
+	op << "       CmiFree(UsrToEnv(" << e->param->param->getGivenName() << "));\n";
     }
     el = el->next;
   }

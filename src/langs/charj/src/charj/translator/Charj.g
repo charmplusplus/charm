@@ -18,9 +18,9 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
-    ENTRY                   = 'entry'           ;
     PRIVATE                 = 'private'         ;
     ABSTRACT                = 'abstract'        ;
     NATIVE                  = 'native'          ;
@@ -118,6 +118,7 @@ tokens {
     PUP                     = 'pup'             ;
     INITMETHOD              = 'initMethod'      ;
     CTORHELPER              = 'ctorHelper'      ;
+    CHELPER                 = 'constructorHelper';
 
 
     // C++ keywords that aren't used in charj. 
@@ -166,6 +167,7 @@ tokens {
     CLASS_STATIC_INITIALIZER;
     CLASS_TOP_LEVEL_SCOPE;
     CONSTRUCTOR_DECL;
+    DOMAIN_EXPRESSION;
     ENUM_TOP_LEVEL_SCOPE;
     EXPR;
     EXTENDS_BOUND_LIST;
@@ -186,14 +188,17 @@ tokens {
     METHOD_CALL;
     ENTRY_METHOD_CALL;
     MODIFIER_LIST;
+    NEW_EXPRESSION;
     PAREN_EXPR;
     POST_DEC;
     POST_INC;
     PRE_DEC;
     PRE_INC;
     QUALIFIED_TYPE_IDENT;
+    RANGE_EXPRESSION;
     STATIC_ARRAY_CREATOR;
     SUPER_CONSTRUCTOR_CALL;
+    TEMPLATE_INST;
     THIS_CONSTRUCTOR_CALL;
     TYPE;
     SIMPLE_TYPE;
@@ -261,15 +266,24 @@ readonlyDeclaration
 
 typeDeclaration
     :   classDefinition
+    |   templateDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
     ;
 
+templateList
+    : 'class'! IDENT (','! 'class'! IDENT)*
+    ;
+
+templateDeclaration
+    : 'template' '<' templateList '>' classDefinition
+        -> ^('template' templateList classDefinition)
+    ;
+
 classDefinition
     :   PUBLIC? CLASS IDENT (EXTENDS type)? ('implements' typeList)? '{'
-            classScopeDeclaration*
-        '}' ';'?
+      classScopeDeclaration* '}' ';'?
         -> ^(TYPE CLASS IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
@@ -317,9 +331,11 @@ typeList
 classScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList arrayDeclaratorList? (block | ';')
+            (   type IDENT formalParameterList (block | ';')
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
-                    formalParameterList arrayDeclaratorList? block?)
+                    formalParameterList block?)
+            /*|   'void' IDENT formalParameterList (block | ';')
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -334,9 +350,11 @@ classScopeDeclaration
 interfaceScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList arrayDeclaratorList? ';'
+            (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
-                        type IDENT formalParameterList arrayDeclaratorList?)
+                        type IDENT formalParameterList)
+            /*|   'void' IDENT formalParameterList ';'
+                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -367,7 +385,7 @@ interfaceFieldDeclarator
 
 
 variableDeclaratorId
-    :   IDENT^ arrayDeclaratorList?
+    :   IDENT^ domainExpression?
     ;
 
 variableInitializer
@@ -375,7 +393,7 @@ variableInitializer
     |   expression
     ;
 
-arrayDeclarator
+/*arrayDeclarator
     :   '[' ']'
         ->  ARRAY_DECLARATOR
     ;
@@ -383,11 +401,27 @@ arrayDeclarator
 arrayDeclaratorList
     :   arrayDeclarator+
         ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;
+    ;*/
 
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
         ->  ^(ARRAY_INITIALIZER[$lc, "ARRAY_INITIALIZER"] variableInitializer*)
+    ;
+
+templateArg
+    : genericTypeArgument
+    | literal
+    ;
+
+templateArgList
+    :   templateArg (','! templateArg)*
+    ;
+
+templateInstantiation
+    :    '<' templateArgList '>'
+        -> ^(TEMPLATE_INST templateArgList)
+    |    '<' templateInstantiation '>'
+        -> ^(TEMPLATE_INST templateInstantiation)
     ;
 
 genericTypeParameterList
@@ -423,6 +457,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   PRIVATE
     |   ABSTRACT
     |   NATIVE
@@ -447,23 +482,22 @@ type
     ;
 
 constructorType
-    :   qualifiedTypeIdent AT arrayDeclaratorList?
-        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   qualifiedTypeIdent arrayDeclaratorList?
-        ->  ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   qualifiedTypeIdent AT domainExpression?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   qualifiedTypeIdent domainExpression?
+        ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
-
 simpleType
-    :   primitiveType arrayDeclaratorList?
-        ->  ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)  
+    :   primitiveType domainExpression?
+        ->  ^(SIMPLE_TYPE primitiveType domainExpression?)  
     ;
 
 objectType
-    :   qualifiedTypeIdent AT arrayDeclaratorList?
-        ->  ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   qualifiedTypeIdent arrayDeclaratorList?
-        ->  ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   qualifiedTypeIdent AT domainExpression?
+        ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   qualifiedTypeIdent domainExpression?
+        ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 qualifiedTypeIdent
@@ -472,7 +506,7 @@ qualifiedTypeIdent
     ;
 
 typeIdent
-    :   IDENT^ genericTypeArgumentList?
+    :   IDENT^ templateInstantiation?
     ;
 
 primitiveType
@@ -486,10 +520,10 @@ primitiveType
     |   DOUBLE
     ;
 
-genericTypeArgumentList
+/*genericTypeArgumentList
     :   lt='<' genericTypeArgument (',' genericTypeArgument)* genericTypeListClosing
         ->  ^(GENERIC_TYPE_ARG_LIST[$lt, "GENERIC_TYPE_ARG_LIST"] genericTypeArgument+)
-    ;
+    ;*/
 
 genericTypeArgument
     :   type
@@ -592,8 +626,8 @@ nonBlockStatement
         ->  ^(CONTINUE IDENT?)
     |   IDENT ':' statement
         ->  ^(LABELED_STATEMENT IDENT statement)
-    |   'delete' qualifiedIdentifier ';'
-        -> ^('delete' qualifiedIdentifier)
+    |   'delete' expression ';'
+        -> ^('delete' expression)
     |   'embed' STRING_LITERAL EMBED_BLOCK
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
@@ -627,6 +661,29 @@ parenthesizedExpression
         ->  ^(PAREN_EXPR[$lp, "PAREN_EXPR"] expression)
     ;
     
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem)
+    |   rangeItem ':' rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   rangeItem ':' rangeItem ':' rangeItem
+        -> ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression (','! rangeExpression)*
+    ;
+
+domainExpression
+    :   '[' rangeList ']'
+        -> ^(DOMAIN_EXPRESSION rangeList)
+    ;
+
 expressionList
     :   expression (','! expression)*
     ;
@@ -758,17 +815,16 @@ postfixedExpression
     :   (   primaryExpression
             ->  primaryExpression
         )
-        // ... and than the optional things that may follow a primary
-        // expression 0 or more times.
+        // ... and than the optional things that may follow a primary expression 0 or more times.
         (   outerDot=DOT                 
             // Note: generic type arguments are only valid for method calls,
             // i.e. if there is an argument list
-            (   (   genericTypeArgumentList?  
+            (   (   templateInstantiation?  
                     IDENT
                     ->  ^($outerDot $postfixedExpression IDENT)
                 ) 
                 (   arguments
-                    ->  ^(METHOD_CALL $postfixedExpression genericTypeArgumentList? arguments)
+                    ->  ^(METHOD_CALL $postfixedExpression templateInstantiation? arguments)
                 )?
             |   THIS
                 ->  ^($outerDot $postfixedExpression THIS)
@@ -781,8 +837,8 @@ postfixedExpression
                     ->  ^(METHOD_CALL $postfixedExpression arguments)
                 )?
             )
-        |   (AT genericTypeArgumentList? IDENT arguments)
-            ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) genericTypeArgumentList? arguments)
+        |   (AT templateInstantiation? IDENT arguments)
+            ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         )*
@@ -797,17 +853,18 @@ primaryExpression
     |   literal
     |   newExpression
     |   qualifiedIdentExpression
-    |   genericTypeArgumentList 
+    |   domainExpression
+    |   templateInstantiation
         (   s=SUPER
             (   arguments
-                ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
+                ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"] templateInstantiation arguments)
             |   IDENT arguments
-                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) genericTypeArgumentList arguments)
+                ->  ^(METHOD_CALL ^(DOT SUPER IDENT) templateInstantiation arguments)
             )
         |   IDENT arguments
-            ->  ^(METHOD_CALL IDENT genericTypeArgumentList arguments)
+            ->  ^(METHOD_CALL IDENT templateInstantiation arguments)
         |   t=THIS arguments
-            ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] genericTypeArgumentList arguments)
+            ->  ^(THIS_CONSTRUCTOR_CALL[$t, "THIS_CONSTRUCTOR_CALL"] templateInstantiation arguments)
         )
     |   (   THIS
             ->  THIS
@@ -844,15 +901,15 @@ qualifiedIdentExpression
         (   arguments
             ->  ^(METHOD_CALL qualifiedIdentifier arguments)
         |   outerDot=DOT
-            (   genericTypeArgumentList 
+            (   templateInstantiation
                 (   s=SUPER arguments
                     ->  ^(SUPER_CONSTRUCTOR_CALL[$s, "SUPER_CONSTRUCTOR_CALL"]
-                            qualifiedIdentifier genericTypeArgumentList arguments)
+                            qualifiedIdentifier templateInstantiation arguments)
                 |   SUPER innerDot=DOT IDENT arguments
                     ->  ^(METHOD_CALL ^($innerDot ^($outerDot qualifiedIdentifier SUPER) IDENT)
-                            genericTypeArgumentList arguments)
+                            templateInstantiation arguments)
                 |   IDENT arguments
-                    ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) genericTypeArgumentList arguments)
+                    ->  ^(METHOD_CALL ^($outerDot qualifiedIdentifier IDENT) templateInstantiation arguments)
                 )
             |   THIS
                 ->  ^($outerDot qualifiedIdentifier THIS)
@@ -864,20 +921,18 @@ qualifiedIdentExpression
 
 newExpression
     :   n=NEW
-        (   primitiveType newArrayConstruction          // new static array of primitive type elements
-            ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] primitiveType newArrayConstruction)
-        |   genericTypeArgumentList? qualifiedTypeIdent
-                newArrayConstruction                // new static array of object type reference elements
-            ->  ^(STATIC_ARRAY_CREATOR[$n, "STATIC_ARRAY_CREATOR"] genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction)
+        (
+            domainExpression arguments?
+            ->  ^(NEW_EXPRESSION arguments? domainExpression)
         |   constructorType arguments
             -> ^(NEW constructorType arguments)
         )
     ;
     
-newArrayConstruction
+/*newArrayConstruction
     :   arrayDeclaratorList arrayInitializer
     |   '['! expression ']'! ('['! expression ']'!)* arrayDeclaratorList?
-    ;
+    ;*/
 
 arguments
     :   lp='(' expressionList? ')'

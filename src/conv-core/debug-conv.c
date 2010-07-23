@@ -287,7 +287,12 @@ void CpdFreezeModeScheduler(void)
 	    / * Debug messages should be handled immediately * /
 	    CmiHandleMessage(msg);
 	  } else */
-        
+      if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
+        // Since we are conditionally delivering, forward all messages to the child
+        int bytes = SIZEFIELD(msg); // reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
+        write(conditionalPipe[1], &bytes, 4);
+        write(conditionalPipe[1], msg, bytes);
+      }
       if (CpdIsDebugMessage(msg)) {
         CmiHandleMessage(msg);
 	  }
@@ -317,10 +322,10 @@ void CpdInit(void)
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
+#endif
 
   CpvInitialize(void *, conditionalQueue);
   CpvAccess(conditionalQueue) = CdsFifo_Create();
-#endif
   
   CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
   CcsSetMergeFn("ccs_debug", CcsMerge_concat);

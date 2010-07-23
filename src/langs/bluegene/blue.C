@@ -2249,6 +2249,11 @@ extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
       numLocal ++;
     }
   }
+  
+  /* Since the current message is passed is as "local" to the merge function,
+   * and it will not be nullified in the upcoming loop, make it NULL explicitely. */
+  ((workThreadInfo*)cta(threadinfo))->reduceMsg = NULL;
+  
   void **msgLocal = (void**)malloc(sizeof(void*)*(numLocal-1));
   for (int j=0; j<cva(numNodes); j++){
     for(int i=0;i<cva(bgMach).numWth;i++){
@@ -2261,7 +2266,7 @@ extern "C" void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn) {
   CmiAssert(count==numLocal-1);
   msg = mergeFn(&size, msg, msgLocal, numLocal-1);
   CmiReduce(msg, size, mergeFn);
-  CmiPrintf("Called CmiReduce %d\n",CmiMyPe());
+  //CmiPrintf("Called CmiReduce %d\n",CmiMyPe());
   for (int i=0; i<numLocal-1; ++i) CmiFree(msgLocal[i]);
   free(msgLocal);
 }

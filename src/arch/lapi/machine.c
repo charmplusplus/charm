@@ -1960,7 +1960,10 @@ static void ConverseRunPE(int everReturn) {
     
     CpvAccess(CmiLocalQueue) = CmiGetState()->localqueue;
 
-    CmiMyArgv=CmiCopyArgs(Cmi_argv);
+    if(CmiMyRank())
+        CmiMyArgv=CmiCopyArgs(Cmi_argv);
+    else
+	CmiMyArgv=Cmi_argv;
 
     CthInit(CmiMyArgv);
 
@@ -2085,8 +2088,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     CmiNumPes() = CmiNumNodes() * CmiMyNodeSize();
     Cmi_nodestart = CmiMyNode() * CmiMyNodeSize();
-
-    /*Cmi_argvcopy = CmiCopyArgs(argv);  Not needed?? --Chao Mei*/
 
     Cmi_argv = argv;
     Cmi_startfn = fn;

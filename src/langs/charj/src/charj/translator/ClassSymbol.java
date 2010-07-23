@@ -3,16 +3,19 @@ package charj.translator;
 
 import java.util.*;
 
-public class ClassSymbol extends SymbolWithScope implements Scope {
+public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
+    public List<String> templateArgs;
+    public List<VariableInitializer> initializers;
+    public List<CharjAST> varsToPup;
 
     Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
     List<String> includes = new ArrayList<String>();
     List<String> usings = new ArrayList<String>();
-    List<String> externs = new ArrayList<String>();
+    Set<String> externs = new TreeSet<String>();
 
     /** Record of all fields and methods */
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
@@ -23,6 +26,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     public boolean isPrimitive = false;
     public boolean isChare = false;
     public boolean isMainChare = false;
+    public boolean isChareArray = false;
+    public boolean hasDefaultCtor = false;
+    public boolean hasMigrationCtor = false;
 
     public CharjAST migrationCtor = null;
 
@@ -34,6 +40,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
+	initializers = new ArrayList<VariableInitializer>();
+        varsToPup = new ArrayList<CharjAST>();
     }
 
     public ClassSymbol(
@@ -44,20 +52,24 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         this(symtab, name);
         this.superClass = superClass;
         this.scope = scope;
+        this.type = this;
+	this.initializers = new ArrayList<VariableInitializer>();
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
-        this.includes.add("list");
-        this.usings.add("std::list");
         this.includes.add("string");
         this.usings.add("std::string");
         this.includes.add("vector");
         this.usings.add("std::vector");
-        this.includes.add("map");
-        this.usings.add("std::map");
         this.includes.add("iostream");
         this.usings.add("std::cout");
         this.usings.add("std::endl");
+
+        // For now always include the array package
+        this.includes.add("Array.h");
+        this.usings.add("CharjArray::Array");
+        this.usings.add("CharjArray::Domain");
+        this.usings.add("CharjArray::Range");
     }
 
     public Scope getEnclosingScope() {
@@ -122,7 +134,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
      *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
-    public ClassSymbol resolveType(String type) {
+    public Type resolveType(String type) {
         if (debug()) System.out.println(
                 "ClassSymbol.resolveType(" + type + "): context is " + name +
                 ":" + members.keySet());
@@ -136,6 +148,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
                     "ClassSymbol.resolveType(" + type +
                     "): surrounding class " + name + ":" + members.keySet());
             return this;
+        }
+
+        // Look in our enclosing package
+        if (scope != null) {
+            Type cs = scope.resolveType(type);
+            if (cs != null && cs instanceof ClassSymbol) return (ClassSymbol)cs;
         }
 
         // look for type in classes already defined in imported packages
@@ -152,21 +170,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
                 return cs;
             }
         }
-
-        // not already seen in one of the imported packages, look on disk
-        //for (String packageName : imports.keySet()) {
-        //    PackageScope pkg = resolvePackage(packageName);
-        //    ClassSymbol cs = symtab.translator.loadType(
-        //            pkg.getFullyQualifiedName(), type);
-        //    if ( cs!=null ) {
-        //        pkg.define(type, cs); // add to symbol table
-        //        if ( debug() ) System.out.println(
-        //                "ClassSymbol.resolveType(" + type +
-        //                "): found after loading in context " + name +
-        //                ":" + members.keySet());
-        //        return cs;
-        //    }
-        //}
 
         if ( debug() ) System.out.println(
                 "ClassSymbol.resolveType(" + type +
@@ -210,7 +213,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
     }
 
     public String toString() {
-        return "ClassSymbol[" + name + "]: " + members;
+        if (isPrimitive) return name;
+        else return getFullyQualifiedName() + members;
     }
 
     public String getFullyQualifiedName() {
@@ -246,7 +250,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return usings;
     }
 
-    public List<String> getExterns()
+    public Set<String> getExterns()
     {
         return externs;
     }
@@ -268,8 +272,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         for (Map.Entry<String, VariableSymbol> entry : fields.entrySet()) {
             // note: type info may be null for unknown types, but this might
             // need to be changed at some point.
-            ClassSymbol type = ((VariableSymbol)entry.getValue()).type;
-            if (type != null) types.add(type);
+            Type type = ((VariableSymbol)entry.getValue()).type;
+            if (type != null && type instanceof ClassSymbol) types.add((ClassSymbol)type);
         }
         return types;
     }
@@ -284,8 +288,57 @@ public class ClassSymbol extends SymbolWithScope implements Scope {
         return names;
     }
 
+    public List<String> getTraceInitializers()
+    {
+        List<String> inits = new ArrayList<String>();
+        for (Map.Entry<String, MethodSymbol> e : methods.entrySet()) {
+            inits.add(e.getValue().getTraceInitializer());
+        }
+        return inits;
+    }
+
     public String getName()
     {
         return name;
+    }
+
+    public String getTypeName()
+    {
+        return name;
+    }
+
+    private boolean requiresInit() {
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public List<String> generateInits() {
+        List<String> inits = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol &&
+                ((VariableSymbol)varAst.def).isPointerType()) {
+                VariableSymbol vs = (VariableSymbol)varAst.def;
+                inits.add(vs.generateInit());
+            }
+        }
+        if (inits.size() == 0)
+            return null;
+        else
+            return inits;
+    }
+
+    public List<String> generatePUPers() {
+        List<String> PUPers = new ArrayList<String>();
+        for (CharjAST varAst : varsToPup) {
+            if (varAst.def instanceof VariableSymbol) {
+                PUPers.add(((VariableSymbol)varAst.def).generatePUP());
+            }
+        }
+        return PUPers;
     }
 }

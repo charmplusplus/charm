@@ -119,6 +119,7 @@ public:
 			next();
 	}
 	void threadedTest(void) {
+#if 0
 		//Reflect a value off each processor:
 		for (int pe=0;pe<CkNumPes();pe+=2) {
 			CkCallback cb(CkCallback::resumeThread);
@@ -128,6 +129,17 @@ public:
 			int gotVal=msg2val(m);
 			if (gotVal!=expectedVal) CkAbort("Threaded callback returned wrong value");
 		}
+#else
+		//Reflect a value off each processor:
+		for (int pe=0;pe<CkNumPes();pe+=2) {
+			callbackMsg *m;
+			int pe = 2;
+			int expectedVal=237+13*pe;
+			gp[pe].reflect(CkCallbackResumeThread((void*&)m),expectedVal);
+			int gotVal=msg2val(m);
+                	if (gotVal!=expectedVal) CkAbort("Threaded callback returned wrong value");
+		}
+#endif
 		megatest_finish();
 	}
 };

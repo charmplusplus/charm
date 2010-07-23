@@ -26,10 +26,6 @@ do
         [ $bal = 'GridHybridLB' ] && manager="manager.o"
         [ $bal = 'GridHybridSeedLB' ] && manager="manager.o"
 	cat >> $out << EOB 
-$bal.def.h: $bal.decl.h
-
-$bal.decl.h: $bal.ci charmxi
-	\$(CHARMXI) $bal.ci
 
 \$(L)/libmodule$bal.a: $bal.o $manager
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
@@ -55,11 +51,6 @@ do
 done
 echo "    manager.o" >> $out
 cat >> $out <<EOB
-
-EveryLB.def.h: EveryLB.decl.h
-
-EveryLB.decl.h: EveryLB.ci charmxi
-	\$(CHARMXI) EveryLB.ci
 
 \$(L)/libmoduleEveryLB.a: \$(LB_OBJ)
 	\$(CHARMC) -o \$(L)/libmoduleEveryLB.a \$(LB_OBJ)

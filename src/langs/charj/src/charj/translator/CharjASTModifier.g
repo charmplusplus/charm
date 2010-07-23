@@ -17,7 +17,6 @@ package charj.translator;
 }
 
 @members {
-    SymbolTable symtab = null;
     PackageScope currentPackage = null;
     ClassSymbol currentClass = null;
     MethodSymbol currentMethod = null;
@@ -37,21 +36,18 @@ package charj.translator;
 
 
 // Starting point for parsing a Charj file.
-charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
-@init {
-    symtab = _symtab;
-}
+charjSource
     // TODO: go back to allowing multiple type definitions per file, check that
     // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         packageDeclaration?
         importDeclaration*
         readonlyDeclaration*
-        (typeDeclaration { $cs = $typeDeclaration.sym; })*)
+        typeDeclaration*)
     ;
 
 packageDeclaration
-    :   ^(PACKAGE (ids+=IDENT)+)  
+    :   ^(PACKAGE (ids+=IDENT)+)
     ;
     
 importDeclaration
@@ -62,20 +58,23 @@ readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
     ;
 
-typeDeclaration returns [ClassSymbol sym]
+typeOfType returns [boolean array_type]
+    : CLASS 
+    | chareType 
+    | chareArrayType { $array_type = true; }
+    ;
+
+typeDeclaration
 @init {
-    boolean array_type = false;
     astmod = new AstModifier();
 }
-    :   ^(TYPE (CLASS | (chareType | (chareArrayType { array_type = true; }))) IDENT
+    :   ^(TYPE typeOfType IDENT
         (^('extends' parent=type))? (^('implements' type+))? classScopeDeclaration*)
         {
-            $TYPE.tree.addChild(astmod.getPupRoutineNode());
-            $TYPE.tree.addChild(astmod.getInitRoutineNode());
-            $TYPE.tree.addChild(astmod.getCtorHelperNode());
-            astmod.ensureDefaultCtor($TYPE.tree);
-            if (array_type) astmod.ensureMigrationCtor($TYPE.tree);
         }
+        -> ^(TYPE typeOfType IDENT
+            (^('extends' type))? (^('implements' type+))? classScopeDeclaration* 
+        )
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
@@ -97,43 +96,36 @@ enumConstant
     
 classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
+            ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($d.tree);
-
-            if(astmod.isEntry($d.tree))
-                $d.tree.setType(CharjParser.ENTRY_FUNCTION_DECL, "ENTRY_FUNCTION_DECL");
-        }
+        -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
+            genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
+        -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
+            type IDENT formalParameterList domainExpression? block?)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($PRIMITIVE_VAR_DECLARATION.tree);
-        }
+        -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        -> ^(PRIMITIVE_VAR_DECLARATION 
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            simpleType variableDeclaratorList)
     |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($OBJECT_VAR_DECLARATION.tree);
-        }
+        -> {$modifierList.tree != null}? ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        -> ^(OBJECT_VAR_DECLARATION  
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
-            b=block)
-        {
-            if($m.tree == null)
-                astmod.fillPrivateModifier($CONSTRUCTOR_DECL.tree);
-
-            astmod.insertHelperRoutineCall($CONSTRUCTOR_DECL.tree);
-            astmod.checkForDefaultCtor($CONSTRUCTOR_DECL, $CONSTRUCTOR_DECL.tree);
-            astmod.checkForMigrationCtor($CONSTRUCTOR_DECL);
-
-            if(astmod.isEntry($CONSTRUCTOR_DECL.tree))
-                $CONSTRUCTOR_DECL.tree.setType(CharjParser.ENTRY_CONSTRUCTOR_DECL, "ENTRY_CONSTRUCTOR_DECL");
-        }
+            ^(BLOCK (blockStatement*)))
+        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
+            genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+        -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
+            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList arrayDeclaratorList?)
+            type IDENT formalParameterList domainExpression?)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
@@ -147,16 +139,10 @@ variableDeclaratorList
 
 variableDeclarator
     :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-        {
-            astmod.dealWithInit($VAR_DECLARATOR);
-        }
     ;
     
 variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
-        {
-            astmod.varPup($IDENT);
-        }
+    :   ^(IDENT domainExpression?)
     ;
 
 variableInitializer
@@ -164,12 +150,22 @@ variableInitializer
     |   expression
     ;
 
-arrayDeclaratorList
-    :   ^(ARRAY_DECLARATOR_LIST ARRAY_DECLARATOR*)  
-    ;
-    
 arrayInitializer
     :   ^(ARRAY_INITIALIZER variableInitializer*)
+    ;
+
+templateArg
+    : genericTypeArgument
+    | literal
+    ;
+
+templateArgList
+    :   templateArg (','! templateArg)*
+    ;
+
+templateInstantiation
+    :    ^(TEMPLATE_INST templateArgList)
+    |    ^(TEMPLATE_INST templateInstantiation)
     ;
 
 genericTypeParameterList
@@ -184,11 +180,32 @@ bound
     :   ^(EXTENDS_BOUND_LIST type+)
     ;
 
-modifierList
-    :   ^(MODIFIER_LIST modifier+)
-        {
-            astmod.arrangeModifiers($MODIFIER_LIST.tree);
-        }
+modifierList returns [boolean isEntry]
+    :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier {if ($charjModifier.isEntry) {$isEntry = true;}} | otherModifier)*)
+        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
+    ;
+
+localModifier
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
+    ;
+
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier returns [boolean isEntry] 
+    :   ENTRY { $isEntry = true; }
+    |   TRACED
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
     ;
 
 modifier
@@ -196,6 +213,7 @@ modifier
     |   PRIVATE
     |   PROTECTED
     |   ENTRY
+    |   TRACED
     |   ABSTRACT
     |   NATIVE
     |   localModifier
@@ -205,12 +223,6 @@ localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
-localModifier
-    :   FINAL
-    |   STATIC
-    |   VOLATILE
-    ;
-
 type
     :   simpleType
     |   objectType 
@@ -218,14 +230,20 @@ type
     ;
 
 simpleType
-    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+    :   ^(SIMPLE_TYPE primitiveType domainExpression?)
     ;
     
 objectType
-    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
-    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    :   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+        {
+            // TODO: This breaks all pointer types inside chares not used for sending
+            // them in entry methods, converting them to object types, which breaks
+            // Arrays inside chares.
+            //astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
+        }
     ;
 
 qualifiedTypeIdent
@@ -233,18 +251,18 @@ qualifiedTypeIdent
     ;
 
 typeIdent
-    :   ^(IDENT genericTypeArgumentList?)
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
-    :   BOOLEAN     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   CHAR        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   BYTE        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   SHORT       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   INT         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   LONG        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   FLOAT       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   DOUBLE      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
@@ -316,7 +334,7 @@ nonBlockStatement
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^('delete' qualifiedIdentifier)
+    |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
     |   ^(PRINT expression*)
@@ -420,6 +438,7 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+    |   domainExpression
     ;
     
 explicitConstructorCall
@@ -432,17 +451,8 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
     |   ^(NEW type arguments)
-    ;
-
-newArrayConstruction
-    :   arrayDeclaratorList arrayInitializer
-    |   expression+ arrayDeclaratorList?
     ;
 
 arguments
@@ -461,3 +471,21 @@ literal
     |   NULL
     ;
 
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression+
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
+    ;

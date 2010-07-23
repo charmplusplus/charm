@@ -30,8 +30,9 @@ module ControlPoints {
   };
 
  initnode void controlPointInitNode();
+ initproc void ControlPoint::initControlPointEffects();
 
- group  [migratable]  controlPointManager {
+ group [migratable] controlPointManager {
     entry controlPointManager();
 
     entry [expedited] void requestMemoryUsage(CkCallback cb);

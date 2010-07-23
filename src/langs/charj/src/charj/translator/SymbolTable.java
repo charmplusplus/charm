@@ -67,17 +67,34 @@ public class SymbolTable {
         primitiveTypes.put("char",   new ClassSymbol(this, "char",   null, lang));
         primitiveTypes.put("short",  new ClassSymbol(this, "short",  null, lang));
         primitiveTypes.put("boolean",new ClassSymbol(this, "bool",   null, lang));
+        primitiveTypes.put("string", new ClassSymbol(this, "string", null, lang));
+        primitiveTypes.put("byte", primitiveTypes.get("char"));
         for (Map.Entry<String, ClassSymbol> entry : primitiveTypes.entrySet()) {
             ClassSymbol c = entry.getValue();
             lang.define(entry.getKey(), c);
             c.isPrimitive = true;
         }
+
+        defaultPkg.define("CkArgMsg", new ExternalSymbol(this, "CkArgMsg"));
+        defaultPkg.define("CkPrintf", new MethodSymbol(this, "CkPrintf"));
+        defaultPkg.define("CkNumPes", new MethodSymbol(this, "CkNumPes"));
+        defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
+        defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
+        defaultPkg.define("CmiWallTimer", new MethodSymbol(this, "CmiWallTimer"));
     }
 
     public ClassSymbol resolveBuiltinType(String type) {
         ClassSymbol ptype = primitiveTypes.get(type);
         if (ptype != null) return ptype;
-        return objectRoot.resolveType(type);
+        return (ClassSymbol)objectRoot.resolveType(type);
+    }
+
+    public ClassSymbol getEnclosingClass(Scope scope) {
+        while (scope != null) {
+            if (scope instanceof ClassSymbol) return (ClassSymbol)scope;
+            scope = scope.getEnclosingScope();
+        }
+        return null;
     }
 
     /** Given a package like foo or charj.io, define it by breaking it up and

@@ -11,6 +11,7 @@
 /*@{*/
 
 #include <charm++.h>
+#include "ck.h"
 #include "envelope.h"
 #include "CentralLB.h"
 #include "LBDBManager.h"
@@ -100,6 +101,9 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsMsgsList = NULL;
   statsData = NULL;
 
+  storedMigrateMsg = NULL;
+  reduction_started = 0;
+
   // for future predictor
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
@@ -186,8 +190,9 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
-
 #if CMK_LBDB_ON
+  if (reduction_started) return;              // reducton in progress
+
   CmiAssert(CmiNodeAlive(CkMyPe()));
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
@@ -211,6 +216,7 @@ void CentralLB::ProcessAtSync()
   CkCallback cb(CkIndex_CentralLB::ReceiveCounts((CkReductionMsg*)NULL), 
                   thisProxy[0]);
   contribute(2*sizeof(int), counts, CkReduction::sum_int, cb);
+  reduction_started = 1;
 #else
   SendStats();
 #endif
@@ -288,6 +294,7 @@ void CentralLB::SendStats()
 {
 #if CMK_LBDB_ON
   CmiAssert(statsMsg != NULL);
+  reduction_started = 0;
 
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
@@ -573,6 +580,14 @@ void CentralLB::LoadBalance()
 //      }
   }
 
+#if CMK_REPLAYSYSTEM
+  LDHandle *loadBalancer_pointers;
+  if (_replaySystem) {
+    loadBalancer_pointers = (LDHandle*)malloc(CkNumPes()*sizeof(LDHandle));
+    for (int i=0; i<statsData->n_objs; ++i) loadBalancer_pointers[statsData->from_proc[i]] = statsData->objData[i].handle.omhandle.ldb;
+  }
+#endif
+  
   double strat_start_time = CkWallTimer();
   LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -587,6 +602,14 @@ void CentralLB::LoadBalance()
 
 //    CkPrintf("returned successfully\n");
 
+#if CMK_REPLAYSYSTEM
+  CpdHandleLBMessage(&migrateMsg);
+  if (_replaySystem) {
+    for (int i=0; i<migrateMsg->n_moves; ++i) migrateMsg->moves[i].obj.omhandle.ldb = loadBalancer_pointers[migrateMsg->moves[i].from_pe];
+    free(loadBalancer_pointers);
+  }
+#endif
+  
   LBDatabaseObj()->get_avail_vector(migrateMsg->avail_vector);
   migrateMsg->next_lb = LBDatabaseObj()->new_lbbalancer();
 
@@ -613,7 +636,20 @@ void CentralLB::LoadBalance()
     lbDecisionCount++;
     migrateMsg->lbDecisionCount = lbDecisionCount;
 #endif
-  thisProxy.ReceiveMigration(migrateMsg);
+
+  envelope *env = UsrToEnv(migrateMsg);
+  if (1) {
+      // broadcast
+    thisProxy.ReceiveMigration(migrateMsg);
+  }
+  else {
+    // split the migration for each processor
+    for (int p=0; p<CkNumPes(); p++) {
+      LBMigrateMsg *m = extractMigrateMsg(migrateMsg, p);
+      thisProxy[p].ReceiveMigration(m);
+    }
+    delete migrateMsg;
+  }
 
   // Zero out data structures for next cycle
   // CkPrintf("zeroing out data\n");
@@ -732,8 +768,19 @@ extern int restarted;
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
+  storedMigrateMsg = m;
+  CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
+                  thisProxy);
+  contribute(0, NULL, CkReduction::max_int, cb);
+}
+
+void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
+{
 #if CMK_LBDB_ON
 	int i;
+        LBMigrateMsg *m = storedMigrateMsg;
+        CmiAssert(m!=NULL);
+        delete msg;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int *dummyCounts;
@@ -748,6 +795,9 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 	}
 	lbDecisionCount = m->lbDecisionCount;
 #endif
+
+  if (_lb_args.debug() > 1) 
+    if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
@@ -990,6 +1040,9 @@ void CentralLB::preprocess(LDStats* stats,int count)
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 {
 #if CMK_LBDB_ON
+  if (_lb_args.debug())
+    CkPrintf("[%d] %s started at: %f. \n",CkMyPe(), lbname, CmiWallTimer());
+
   work(stats, count);
 
   if (_lb_args.debug()>1)  {
@@ -998,7 +1051,14 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
     CkPrintf("\n");
   }
 
-  return createMigrateMsg(stats, count);
+  LBMigrateMsg *msg = createMigrateMsg(stats, count);
+
+  if (_lb_args.debug()) {
+    envelope *env = UsrToEnv(msg);
+    CkPrintf("[%d] %s finished at: %f. %d objects migrating. Total LBMigrateMsg size:%.2fMB\n", CkMyPe(), lbname, CmiWallTimer(), msg->n_moves, env->getTotalsize()/1024.0/1024.0);
+  }
+
+  return msg;
 #else
   return NULL;
 #endif
@@ -1042,6 +1102,40 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
   }
   if (_lb_args.debug())
     CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
+  return msg;
+}
+
+LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
+{
+  int nmoves = 0;
+  int nunavail = 0;
+  int i;
+  for (i=0; i<m->n_moves; i++) {
+    MigrateInfo* item = (MigrateInfo*) &m->moves[i];
+    if (item->from_pe == p || item->to_pe == p) nmoves++;
+  }
+  for (i=0; i<CkNumPes();i++) {
+    if (!m->avail_vector[i]) nunavail++;
+  }
+  LBMigrateMsg* msg;
+  if (nunavail) msg = new(nmoves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  else msg = new(nmoves,0,0,0) LBMigrateMsg;
+  msg->n_moves = nmoves;
+  msg->level = m->level;
+  msg->next_lb = m->next_lb;
+  for (i=0,nmoves=0; i<m->n_moves; i++) {
+    MigrateInfo* item = (MigrateInfo*) &m->moves[i];
+    if (item->from_pe == p || item->to_pe == p) {
+      msg->moves[nmoves] = *item;
+      nmoves++;
+    }
+  }
+  // copy processor data
+  if (nunavail)
+  for (i=0; i<CkNumPes();i++) {
+    msg->avail_vector[i] = m->avail_vector[i];
+    msg->expectedLoad[i] = m->expectedLoad[i];
+  }
   return msg;
 }
 
@@ -1242,6 +1336,15 @@ void CentralLB::pup(PUP::er &p) {
   BaseLB::pup(p); 
   if (p.isUnpacking())  {
     initLB(CkLBOptions(seqno)); 
+  }
+  p|reduction_started;
+  int has_statsMsg=0;
+  if (p.isPacking()) has_statsMsg = (statsMsg!=NULL);
+  p|has_statsMsg;
+  if (has_statsMsg) {
+    if (p.isUnpacking())
+      statsMsg = new CLBStatsMsg;
+    statsMsg->pup(p);
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | lbDecisionCount;

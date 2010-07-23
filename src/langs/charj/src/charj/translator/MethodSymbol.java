@@ -19,19 +19,24 @@ public class MethodSymbol
     /** The list of local variables defined anywhere in the method */
     LocalScope locals;
 
+    public boolean isEntry = false;
     public boolean isStatic = false;
     public boolean isCtor = false;
+    public boolean isTraced = false;
 
-    public MethodSymbol(SymbolTable symtab)
-    {
+    public MethodSymbol(SymbolTable symtab) {
         super(symtab);
+    }
+
+    public MethodSymbol(SymbolTable symtab, String name) {
+        super(symtab, name);
     }
 
     public MethodSymbol(
             SymbolTable symtab,
             String name,
             Scope enclosingScope,
-            ClassSymbol retType)
+            Type retType)
     {
         super(symtab, name);
         this.enclosingScope = enclosingScope;
@@ -88,12 +93,30 @@ public class MethodSymbol
         return null;
     }
 
+    public String getTraceID()
+    {
+        // Make sure we don't have any negative or overflow values
+        int id = Math.abs(hashCode()/2);
+        return String.valueOf(id);
+    }
+
+    public String getTraceInitializer()
+    {
+        StringTemplate st = new StringTemplate(
+                "traceRegisterUserEvent(\"<name>\", <id>);",
+                AngleBracketTemplateLexer.class);
+        st.setAttribute("name", enclosingScope.getScopeName() + "." + name);
+        st.setAttribute("id", getTraceID());
+        return st.toString();
+    }
+
     public String toString()
     {
         StringTemplate st = new StringTemplate(
-                "<if(parent)><parent>.<endif><name>(<args; separator=\",\">)" +
+                "<if(entry)>entry <endif><if(parent)><parent>.<endif><name>(<args; separator=\",\">)" +
                 "<if(locals)>{<locals; separator=\",\">}<endif>",
                 AngleBracketTemplateLexer.class);
+        st.setAttribute("entry", isEntry);
         st.setAttribute("parent", enclosingScope.getScopeName());
         st.setAttribute("name", name);
         st.setAttribute("args", orderedArgs);

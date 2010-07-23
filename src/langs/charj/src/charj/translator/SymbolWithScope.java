@@ -22,22 +22,22 @@ public abstract class SymbolWithScope
         Symbol s = null;
         
         // in this scope?
-        if ( getMembers()!=null ) {
+        if (getMembers() != null) {
             s = (Symbol)getMembers().get(name);
         }
 
         // if not, check any enclosing scope
-        if ( s==null && getEnclosingScope() != null ) {
-            return getEnclosingScope().resolve(name);
+        if (s == null && getEnclosingScope() != null) {
+            s = getEnclosingScope().resolve(name);
         }
 
         return s;
     }
 
-    /** Scopes other other package and class don't know how to resolve types
+    /** Scopes other than package and class don't know how to resolve types
      *  (e.g., MethodSymbol).  Look to enclosing scope.
      */
-    public ClassSymbol resolveType(String type) {
+    public Type resolveType(String type) {
         if ( getEnclosingScope()!=null ) {
             return getEnclosingScope().resolveType(type);
         }

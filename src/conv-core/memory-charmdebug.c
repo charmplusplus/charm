@@ -51,6 +51,7 @@ struct _Slot {
   int userSize;
 
 #define FLAGS_MASK        0xFF
+#define BLOCK_PROTECTED   0x80
 #define MODIFIED          0x40
 #define NEW_BLOCK         0x20
 #define LEAK_CLEAN        0x10
@@ -132,6 +133,10 @@ static Slot *UserToSlot(void *user) {
 
 static int isLeakSlot(Slot *s) {
   return s->magic & LEAK_FLAG;
+}
+
+static int isProtected(Slot *s) {
+  return s->magic & BLOCK_PROTECTED;
 }
 
 int Slot_ChareOwner(void *s) {
@@ -1049,6 +1054,7 @@ static void protectMemory() {
 #else
       char * data = (char *)cur;
 #endif
+      cur->magic |= BLOCK_PROTECTED;
       mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
@@ -1066,6 +1072,7 @@ static void unProtectMemory() {
       char * data = (char *)cur;
 #endif
     mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+    cur->magic &= ~BLOCK_PROTECTED;
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
@@ -1102,11 +1109,20 @@ void CpdSystemEnter() {
   Slot *cur;
   if (++cpdInSystem == 1) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+          cur->magic &= ~BLOCK_PROTECTED;
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemEnter: unprotected %d elements\n",count);
     }
   }
 #endif
@@ -1118,11 +1134,20 @@ void CpdSystemExit() {
   int i;
   if (--cpdInSystem == 0) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
+          cur->magic |= BLOCK_PROTECTED;
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemExit: protected %d elements\n",count);
       /* unprotect the pages that have been unprotected by a signal SEGV */
       for (i=0; i<unProtectedPagesSize; ++i) {
         mprotect(unProtectedPages[i], 4, PROT_READ|PROT_WRITE);
@@ -1229,13 +1254,15 @@ static void *setSlot(Slot **sl,int userSize) {
   Slot *s = *sl;
   char *user=(char*)(s+1);
 
-  /* TODO: Handle correctly memory protection while changing neighbor blocks */
-  if (CpdMprotect) {
-    if (s->next->chareID != 0); 
-  }
-  /* Splice into the slot list just past the head */
+  /* Splice into the slot list just past the head (part 1) */
   s->next=slot_first->next;
   s->prev=slot_first;
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
+  /* Splice into the slot list just past the head (part 2) */
   s->next->prev=s;
   s->prev->next=s;
 
@@ -1243,6 +1270,10 @@ static void *setSlot(Slot **sl,int userSize) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
 #endif
 
@@ -1290,6 +1321,11 @@ static void freeSlot(Slot *s) {
    * the pointer "s" becomes invalid.
    */
 #else
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
   /* Splice out of the slot list */
   s->next->prev=s->prev;
   s->prev->next=s->next;
@@ -1297,6 +1333,10 @@ static void freeSlot(Slot *s) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
 
@@ -1358,6 +1398,7 @@ static void meta_init(char **argv) {
   }
   if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) {
     CpdMemBackup = 1;
+    saveAllocationHistory = 1;
   }
   if (CmiGetArgFlagDesc(argv,"+memory_crc", "Use CRC32 to detect memory changes")) {
     CpdCRC32 = 1;

@@ -88,6 +88,7 @@ void CEntry::generateCode(XStr& op)
            op <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
         }
         if (paramMarshalling ==0) {
+	   op << "    CmiReference(UsrToEnv(" << sv->name->charstar() << "_msg));\n";
            if(refNumNeeded) {
               op << "    int refnum = CkGetRefNum(" <<sv->name->charstar() <<"_msg);\n";
               op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg , (void *) _bgParentLog, refnum);\n";

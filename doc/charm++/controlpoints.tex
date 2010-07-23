@@ -84,11 +84,7 @@ Alternatively, the program can specify that it wants to call \texttt{gotoNextPha
 
 \subsection{Linking With The Control Point Framework}
 
-The program should be linked with the following options to compile in the control point framework:
-
-\texttt{-module ControlPoints -tracemode controlPoints}
-
-The \texttt{ControlPoint} module contains the framework code responsible for recording information about the running program as well as adjust the control point values. The trace module will enable measurements to be gathered including information about utilization, idle time, and memory usage. 
+The control point tuning framework is now an integral part of the Charm++ runtime system. It does not need to be linked in to an application in any special way. It contains the framework code responsible for recording information about the running program as well as adjust the control point values. The trace module will enable measurements to be gathered including information about utilization, idle time, and memory usage. 
 
 \subsection{Runtime Command Line Arguments}
 
@@ -105,7 +101,13 @@ The scheme used for tuning can be selected at runtime by the use of one of the f
       +CPMemoryAware            Adjust control points to approach available memory
 \end{alltt} 
 
-To intelligently tune or steer an application's performance, performance measurements ought to be used. Some of the schemes above require that memory footprint statistics and utilization statistics be gathered. The following flags enable the gathering of such measurements.
+To intelligently tune or steer an application's performance, performance measurements ought to be used. Some of the schemes above require that memory footprint statistics and utilization statistics be gathered. All measurements are performed by a tracing module that has some overheads, so is not enabled by default. To use any type of measurement based steering scheme, it is necessary to add a runtime command line argument to the user program to enable the tracing module:
+
+\begin{alltt} 
+    +CPEnableMeasurements
+\end{alltt}
+
+The following flags enable the gathering of the different types of available measurements.
 \begin{alltt} 
         +CPGatherAll            Gather all types of measurements for each phase
 +CPGatherMemoryUsage            Gather memory usage after each phase

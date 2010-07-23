@@ -2011,13 +2011,37 @@ int _recplay_crc = 0;
 int _recplay_checksum = 0;
 int _recplay_logsize = 1024*1024;
 
+//#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
+#define REPLAYDEBUG(args) /* empty */
+
 CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
+
+#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
+
+static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
+
+    int i;
+    char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
+    strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
+    sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
+    FILE *f=fopen(fName,permissions);
+    REPLAYDEBUG("openReplayfile "<<fName);
+    if (f==NULL) {
+        CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
+            CkMyPe(),fName,permissions);
+        CkAbort("openReplayFile> Could not open replay file");
+    }
+    return f;
+}
+
+#include "BaseLB.h" /* For LBMigrateMsg message */
 
 class CkMessageRecorder : public CkMessageWatcher {
   char *buffer;
   unsigned int curpos;
+  bool firstOpen;
 public:
-  CkMessageRecorder(FILE *f_): curpos(0) { f=f_; buffer=new char[_recplay_logsize]; }
+  CkMessageRecorder(FILE *f_): curpos(0), firstOpen(true) { f=f_; buffer=new char[_recplay_logsize]; }
   ~CkMessageRecorder() {
     flushLog(0);
     fprintf(f,"-1 -1 -1 ");
@@ -2059,10 +2083,24 @@ private:
     }
     return CmiTrue;
   }
-  virtual int process(CthThreadToken *token,CkCoreState *ck) {
+  virtual CmiBool process(CthThreadToken *token,CkCoreState *ck) {
     curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
     if (curpos > _recplay_logsize-128) flushLog();
-    return 1;
+    return CmiTrue;
+  }
+  
+  virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+    FILE *f;
+    if (firstOpen) f = openReplayFile("ckreplay_",".lb","w");
+    else f = openReplayFile("ckreplay_",".lb","a");
+    firstOpen = false;
+    if (f != NULL) {
+      PUP::toDisk p(f);
+      p | (*msg)->n_moves; // Need to store to be able to reload the message during replay
+      (*msg)->pup(p);
+      fclose(f);
+    }
+    return CmiTrue;
   }
 };
 
@@ -2090,9 +2128,6 @@ private:
   }
 };
 
-//#define REPLAYDEBUG(args) ckout<<"["<<CkMyPe()<<"] "<< args <<endl;
-#define REPLAYDEBUG(args) /* empty */
-
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
 extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
@@ -2106,6 +2141,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	int nextPE, nextSize, nextEvent, nexttype; //Properties of next message we need:
 	int nextEP;
 	unsigned int crc1, crc2;
+	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
 	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
@@ -2225,7 +2261,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	}
 
 public:
-	CkMessageReplay(FILE *f_) {
+	CkMessageReplay(FILE *f_) : lbFile(NULL) {
 	  counter=0;
 	  f=f_;
 	  getNext();
@@ -2268,19 +2304,34 @@ private:
 			return CmiFalse;
 		}
 	}
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {
       REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
 	  if (isNext(token)) {
         REPLAYDEBUG("Executing token: "<<token->serialNo)
 	    getNext();
 	    flush();
-	    return 1;
+	    return CmiTrue;
 	  } else {
         REPLAYDEBUG("Queueing token: "<<token->serialNo
             <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
 	    delayedTokens.enq(token);
-	    return 0;
+	    return CmiFalse;
 	  }
+	}
+
+	virtual CmiBool process(LBMigrateMsg **msg,CkCoreState *ck) {
+	  if (lbFile == NULL) lbFile = openReplayFile("ckreplay_",".lb","r");
+	  if (lbFile != NULL) {
+	    int num_moves;
+        PUP::fromDisk p(lbFile);
+	    p | num_moves;
+	    if (num_moves != (*msg)->n_moves) {
+	      delete *msg;
+	      *msg = new (num_moves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+	    }
+	    (*msg)->pup(p);
+	  }
+	  return CmiTrue;
 	}
 };
 
@@ -2338,12 +2389,12 @@ extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
   ConverseExit();
 }
 
-static int CpdExecuteThreadResume(CthThreadToken *token) {
+static CmiBool CpdExecuteThreadResume(CthThreadToken *token) {
   CkCoreState *ck = CkpvAccess(_coreState);
   if (ck->watcher!=NULL) {
     return ck->watcher->processThread(token,ck);
   }
-  return 1;
+  return CmiTrue;
 }
 
 CpvCExtern(int, CthResumeNormalThreadIdx);
@@ -2370,22 +2421,11 @@ extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
   }
 }
 
-#include "trace-common.h" /* For traceRoot and traceRootBaseLength */
-
-static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
-
-	int i;
-	char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
-	strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
-	sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
-	FILE *f=fopen(fName,permissions);
-	REPLAYDEBUG("openReplayfile "<<fName);
-	if (f==NULL) {
-		CkPrintf("[%d] Could not open replay file '%s' with permissions '%w'\n",
-			CkMyPe(),fName,permissions);
-		CkAbort("openReplayFile> Could not open replay file");
-	}
-	return f;
+void CpdHandleLBMessage(LBMigrateMsg **msg) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  if (ck->watcher!=NULL) {
+    ck->watcher->processLBMessage(msg, ck);
+  }
 }
 
 #if CMK_BLUEGENE_CHARM
@@ -2394,6 +2434,7 @@ CpvExtern(int      , CthResumeBigSimThreadIdx);
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+    CmiArgGroup("Charm++","Record/Replay");
     CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
     _replaySystem = 0;
@@ -2408,6 +2449,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CkPrintf("Charm++> Recording full detail for processor %d\n",CkMyPe());
           CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }

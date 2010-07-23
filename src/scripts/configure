@@ -1194,6 +1194,7 @@ Optional Features:
   --enable-tracing        enable tracing modules
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
+  --enable-controlpoint   enable control point
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -1735,6 +1736,24 @@ _ACEOF
 
 fi
 
+# Check whether --enable-controlpoint was given.
+if test "${enable_controlpoint+set}" = set; then
+  enableval=$enable_controlpoint; enable_controlpoint=$enableval
+else
+  enable_controlpoint=yes
+fi
+
+
+if test "$enable_controlpoint" = "no"
+then
+  Echo "Charm control point is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 0
+_ACEOF
+
+fi
+
 
 # Check whether --with-numa was given.
 if test "${with_numa+set}" = set; then
@@ -1975,6 +1994,21 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 fi
+
+# test cp -p
+{ echo "$as_me:$LINENO: checking \"cp command as\"" >&5
+echo $ECHO_N "checking \"cp command as\"... $ECHO_C" >&6; }
+CP="cp -p"
+touch test_file
+if ! $CP test_file test_file.cp 2>err
+then
+  CP="cp"
+fi
+rm -f test_file test_file.cp
+{ echo "$as_me:$LINENO: result: $CP" >&5
+echo "${ECHO_T}$CP" >&6; }
+add_flag CP=\""$CP"\" "cp command"
+
 
 # try to decide the version of glibc
 get_glibc_version() {
@@ -3046,6 +3080,36 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+### test getifaddrs ####
+cat > $tc <<EOT
+#include <netinet/in.h> /* for sockaddr_in */
+#include <ifaddrs.h> /* for getifaddrs */
+#include <net/if.h> /* for IFF_RUNNING */
+
+int main()
+{
+  struct ifaddrs *interfaces=0;
+  if( getifaddrs(&interfaces) == 0 ) {
+        struct ifaddrs *interface;
+        for( interface=interfaces; interface; interface=interface->ifa_next ) {
+            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+                if( addr && addr->sin_family==AF_INET ) {
+                    break;
+                }
+            }
+        }
+        freeifaddrs(interfaces);
+  }
+}
+EOT
+test_linkc "whether getifaddrs call exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETIFADDRS $pass
+_ACEOF
+
+
 #### check if mmap exists ####
 cat > $t <<EOT
 #include <sys/types.h>
@@ -3621,24 +3685,6 @@ echo "${ECHO_T}\"$ext\"" >&6; }
         /bin/rm -f $name
   fi
   /bin/rm -f conftest.f90
-fi
-
-### Check that Linux's C library is recent enough to provide working pthreads
-if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
-then
-case $version in *linux*smp*|*linux*vmi*)
-    { echo "$as_me:$LINENO: checking glibc version" >&5
-echo $ECHO_N "checking glibc version... $ECHO_C" >&6; }
-    get_glibc_version
-    { echo "$as_me:$LINENO: result: $GLIBCVERSION" >&5
-echo "${ECHO_T}$GLIBCVERSION" >&6; }
-    if test 0 = `expr $GLIBCVERSION \> 2.2.92`
-    then
-       echo "Your version of GLIBC is ancient, and does not have sufficient "
-       echo "support for pthreads."
-       test_finish 1
-    fi
-esac
 fi
 
 ac_config_files="$ac_config_files libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun"

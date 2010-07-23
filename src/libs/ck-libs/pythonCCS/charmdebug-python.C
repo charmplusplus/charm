@@ -213,7 +213,7 @@ void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
   pyMsg->unpack();
   CmiUInt4 pyReference = prepareInterpreter(pyMsg);
   PyEval_ReleaseLock();
-  CcsSendDelayedReply(msg->reply, sizeof(pyReference), &pyReference);
+  replyIntFn(this, &msg->reply, &pyReference);
   if (pyReference == 0) return;
   pyMsg->setInterpreter(pyReference);
   PythonIterator *iter = pyMsg->info.info;
@@ -226,7 +226,6 @@ void CpdPythonGroup::registerPersistent(CkCcsRequestMsg *msg) {
     else CkpvAccess(_debugEntryTable)[-ep].preProcess.push_back(dpc);
   }
   CkPrintf("[%d] Registering Persistent method (reference=%d)\n",CkMyPe(),pyReference);
-
 }
 
 #include "charmdebug_python.def.h"

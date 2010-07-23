@@ -85,6 +85,8 @@ extern "C" {
 
 /* Global variables used by charmdebug to maintain information */
 extern void CpdSetInitializeMemory(int v);
+extern void CpdSystemEnter();
+extern void CpdSystemExit();
 #if CMK_ERROR_CHECKING
 extern int memory_status_info;
 extern int memory_chare_id;

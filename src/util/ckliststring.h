@@ -27,16 +27,23 @@ public:
     char *dupstr = strdup(list);   // don't touch the orignal string
     char *str = strtok(dupstr, ",");
     while (str) {
-      int hasdash=0, hascolon=0;
+      int hasdash=0, hascolon=0, hasdot=0;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-') hasdash=1;
           if (str[i] == ':') hascolon=1;
+          if (str[i] == '.') hasdot=1;
       }
-      int start, end, stride=1;
+      int start, end, stride=1, block=1;
       if (hasdash) {
           if (hascolon) {
-            if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+            if (hasdot) {
+              if (sscanf(str, "%d-%d:%d.%d", &start, &end, &stride, &block) != 4)
                  printf("Warning: Check the format of \"%s\".\n", str);
+            }
+            else {
+              if (sscanf(str, "%d-%d:%d", &start, &end, &stride) != 3)
+                 printf("Warning: Check the format of \"%s\".\n", str);
+            }
           }
           else {
             if (sscanf(str, "%d-%d", &start, &end) != 2)
@@ -47,8 +54,13 @@ public:
           sscanf(str, "%d", &start);
           end = start;
       }
+      if (block > stride) {
+        printf("Warning: invalid block size in \"%s\" ignored.\n", str);
+        block=1;
+      }
+      //CmiPrintf("GOT %d %d %d %d\n", start, end, block, stride);
       if (p<=end && p>=start) {
-          if ((p-start)%stride == 0) ret = 1;
+          if ((p-start)%stride < block) ret = 1;
           break;
       }
       str = strtok(NULL, ",");

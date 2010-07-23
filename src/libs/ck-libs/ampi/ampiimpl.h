@@ -5,6 +5,7 @@
 
 #include "ampi.h"
 #include "charm++.h"
+#include "ckliststring.h"
 
 #if AMPI_COMLIB
 //#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
@@ -21,14 +22,15 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
 
-static int msgLogRank;
+//static int msgLogRank;
+static CkListString msgLogRanks;
 static int msgLogWrite;
 static int msgLogRead;
 static char *msgLogFilename;
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
 #include <zlib.h>
 namespace PUP{
 class zdisk : public er {
@@ -1386,17 +1388,17 @@ public:
     void freeInfo(MPI_Info info);
 
  public:
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
     /* message logging */
     int pupBytes;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
     gzFile fMsgLog;
     PUP::tozDisk *toPUPer;
     PUP::fromzDisk *fromPUPer;
 #else
     FILE* fMsgLog;
-    PUP::tozDisk *toPUPer;
-    PUP::fromzDisk *fromPUPer;
+    PUP::toDisk *toPUPer;
+    PUP::fromDisk *fromPUPer;
 #endif
 #endif
     void init();
