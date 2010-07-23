@@ -489,12 +489,12 @@ class IrrGroup : public Chare {
 
 /*Templated implementation of CBase_* classes.*/
 template <class Parent,class CProxy_Derived>
-class CBaseT : public Parent {
+class CBaseT1 : public Parent {
 public:
 	CBASE_PROXY_MEMBERS(CProxy_Derived)
 
-	CBaseT(void) :Parent()  { thisProxy=this; }
-	CBaseT(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
+	CBaseT1(void) :Parent()  { thisProxy=this; }
+	CBaseT1(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
 	void pup(PUP::er &p) {
 		Parent::pup(p);
 		p|thisProxy;

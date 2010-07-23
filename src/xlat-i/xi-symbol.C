@@ -1002,7 +1002,7 @@ Chare::genDecls(XStr& str)
   } else {
     str << "typedef ";
   }
-  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT<");
+  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT1<");
   if (isPython()) {
     str << Prefix::Python << type;
   } else {
