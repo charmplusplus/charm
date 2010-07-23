@@ -233,17 +233,7 @@ class ReferenceType : public Type {
     const char *getBaseName(void) const { return referant->getBaseName(); }
     const char *getScope(void) const { return NULL; }
 };
-/* I don't think these are useful any longer (OSL 11/30/2001)
-class ConstType : public Type {
-  private:
-    Type *type;
-  public:
-    ConstType(Type *t) : type(t) {}
-    int isConst(void) const {return 1;}
-    void print(XStr& str) {str<<"const "<<type;}
-    char *getBaseName(void) const { return type->getBaseName(); }
-};
-*/
+
 //This is used as a list of base classes
 class TypeList : public Printable {
     Type *type;
