@@ -242,7 +242,6 @@ class TypeList : public Printable {
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
     int length(void) const;
     Type *getFirst(void) {return type;}
-    Type *getSecond(void) {if (next) return next->getFirst(); return NULL;}
     void print(XStr& str);
     void genProxyNames(XStr& str, const char *prefix, const char *middle, 
                         const char *suffix, const char *sep, forWhom forElement);
