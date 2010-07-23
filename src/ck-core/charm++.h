@@ -524,6 +524,96 @@ public:
 	CHARM_INPLACE_NEW
 };
 
+#define BASEN(n) CMK_CONCAT(CBaseT, n)
+#define PARENTN(n) CMK_CONCAT(Parent,n)
+
+#define CBASETN(n)                                                    \
+  BASEN(n)() : base(), PARENTN(n)() {}				      \
+  BASEN(n)(CkMigrateMessage *m)                                       \
+	  : base(m), PARENTN(n)(m) {}				      \
+  void pup(PUP::er &p) {                                              \
+    base::pup(p);                                                     \
+    PARENTN(n)::pup(p);                                               \
+  }                                                                   \
+  static int isIrreducible() {                                        \
+    return (base::isIrreducible() && PARENTN(n)::isIrreducible());    \
+  }
+
+
+template <class Parent1, class Parent2, class Parent3, class CProxy_Derived>
+struct CBaseT3 : public CBaseT2<Parent1, Parent2, CProxy_Derived>,
+                 public Parent3
+{
+  typedef CBaseT2<Parent1, Parent2, CProxy_Derived> base;
+  CBASETN(3)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class CProxy_Derived>
+  struct CBaseT4 : public CBaseT3<Parent1, Parent2, Parent3, 
+  CProxy_Derived>,
+                 public Parent4
+{
+  typedef CBaseT3<Parent1, Parent2, Parent3, CProxy_Derived> base;
+  CBASETN(4)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class Parent5, class CProxy_Derived>
+  struct CBaseT5 : public CBaseT4<Parent1, Parent2, Parent3, 
+  Parent4, CProxy_Derived>,
+                 public Parent5
+{
+  typedef CBaseT4<Parent1, Parent2, Parent3, Parent4, CProxy_Derived> base;
+  CBASETN(5)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class Parent5, class Parent6, class CProxy_Derived>
+  struct CBaseT6 : public CBaseT5<Parent1, Parent2, Parent3, 
+  Parent4, Parent5, CProxy_Derived>,
+                 public Parent6
+{
+  typedef CBaseT5<Parent1, Parent2, Parent3, Parent4, Parent5, 
+    CProxy_Derived> base;
+  CBASETN(6)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class Parent5, class Parent6, class Parent7, class CProxy_Derived>
+  struct CBaseT7 : public CBaseT6<Parent1, Parent2, Parent3, 
+  Parent4, Parent5, Parent6, CProxy_Derived>,
+                 public Parent7
+{
+  typedef CBaseT6<Parent1, Parent2, Parent3, Parent4, Parent5, 
+    Parent6, CProxy_Derived> base;
+  CBASETN(7)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class Parent5, class Parent6, class Parent7, class Parent8, class CProxy_Derived>
+  struct CBaseT8 : public CBaseT7<Parent1, Parent2, Parent3, 
+  Parent4, Parent5, Parent6, Parent7, CProxy_Derived>,
+                 public Parent8
+{
+  typedef CBaseT7<Parent1, Parent2, Parent3, Parent4, Parent5, Parent6, Parent7, CProxy_Derived> base;
+  CBASETN(8)
+};
+
+template <class Parent1, class Parent2, class Parent3, class Parent4,
+  class Parent5, class Parent6, class Parent7, class Parent8, class Parent9, class CProxy_Derived>
+  struct CBaseT9 : public CBaseT8<Parent1, Parent2, Parent3, 
+  Parent4, Parent5, Parent6, Parent7, Parent8, CProxy_Derived>,
+                 public Parent9
+{
+  typedef CBaseT8<Parent1, Parent2, Parent3, Parent4, Parent5, Parent6, Parent7, Parent8, CProxy_Derived> base;
+  CBASETN(9)
+};
+
+#undef CBASETN
+#undef BASEN
+#undef PARENTN
+
 /**************************** CkDelegateMgr **************************/
 
 class CProxy;
