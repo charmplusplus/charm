@@ -555,7 +555,7 @@ void CmiInitCPUAffinity(char **argv)
   if (CmiMyRank() == 0)
   {
 #if CMK_CRAYXT
-    ret = getXTNodeID(CmiMyPe(), CmiNumPes());
+    ret = getXTNodeID(CmiMyNode(), CmiNumNodes());
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
