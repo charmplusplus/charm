@@ -10,8 +10,9 @@ CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 if test "$isAIX" = true
 then
-  CMK_LD="$CMK_LD -brtl -Wl,-bbigtoc"
-  CMK_LDXX="$CMK_LDXX -brtl -Wl,-bbigtoc"
+  CMK_LD="$CMK_LD -brtl"
+  CMK_LDXX="$CMK_LDXX -brtl"
+  CMK_LD_SHARED="$CMK_LD_SHARED -Wl,-bbigtoc"
 fi
 
 CMK_SEQ_CC='xlc_r -q64'
