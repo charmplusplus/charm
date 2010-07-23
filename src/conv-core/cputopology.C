@@ -43,7 +43,7 @@
 #endif
 
 #if CMK_CRAYXT
-extern "C" int getXTNodeID(int mype, int numpes);
+extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H

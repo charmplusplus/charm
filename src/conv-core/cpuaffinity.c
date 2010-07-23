@@ -455,7 +455,7 @@ static int search_pemap(char *pecoremap, int pe)
 }
 
 #if CMK_CRAYXT
-extern int getXTNodeID(int mype, int numpes);
+extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
 
