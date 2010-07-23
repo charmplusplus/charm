@@ -422,6 +422,14 @@ static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
   switch(env->getMsgtype()) {
+    case StartExitMsg:
+      CkAssert(CkMyPe()==0);
+      if (!_CkExitFnVec.isEmpty()) {
+        CkExitFn fn = _CkExitFnVec.deq();
+        fn();
+        break;
+      }
+      // else goto next
     case ExitMsg:
       CkAssert(CkMyPe()==0);
       if(_exitStarted) {
@@ -725,12 +733,14 @@ static void _initHandler(void *msg, CkCoreState *ck)
   }
 }
 
-// CkExit: start the termination process, but
-//   then drop into the scheduler so the user's
-//   method never returns (which would be confusing).
+#if 0
+/*****************************************
+ *          no longer needed
+ * ***************************************/
 extern "C"
 void _CkExit(void) 
 {
+  CmiAssert(CkMyPe() == 0);
   // Shuts down Converse handlers for the upper layers on this processor
   //
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
@@ -757,24 +767,29 @@ void _CkExit(void)
   CsdScheduler(-1);
 #endif
 }
+#endif
 
 CkQ<CkExitFn> _CkExitFnVec;
 
-// wrapper of CkExit
-// traverse _CkExitFnVec to call registered user exit functions
-// CkExitFn will call CkExit() when finished to make sure other
-// registered functions get called.
+// triger exit on PE 0,
+// which traverses _CkExitFnVec to call every registered user exit functions.
+// Every user exit functions should end with CkExit() to continue the chain
 extern "C"
 void CkExit(void)
 {
 	/*FAULT_EVAC*/
-	DEBUGF(("[%d] CkExit called \n",CkMyPe()));
-  if (!_CkExitFnVec.isEmpty()) {
-    CkExitFn fn = _CkExitFnVec.deq();
-    fn();
-  }
-  else
-    _CkExit();
+  DEBUGF(("[%d] CkExit called \n",CkMyPe()));
+    // always send to PE 0
+  envelope *env = _allocEnv(StartExitMsg);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+
+#if ! CMK_BLUEGENE_THREAD
+  _TRACE_END_EXECUTE();
+  //Wait for stats, which will call ConverseExit when finished:
+  CsdScheduler(-1);
+#endif
 }
 
 /* This is a routine called in case the application is closing due to a signal.
