@@ -483,18 +483,20 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
+    int numNodes = CmiNumNodes();
     cpuTopo.nodeIDs = new int[numPes];
     CpuTopology::supported = 1;
 
     int nid;
     for(int i=0; i<numPes; i++) {
-      nid = getXTNodeID(i, numPes);
+      nid = getXTNodeID(CmiNodeOf(i), numNodes);
       cpuTopo.nodeIDs[i] = nid;
     }
     int prev = -1;
     nid = -1;
 
-    // this assumes TXYZ mapping and changes nodeIDs
+    // this assumes that all cores on a node have consecutive MPI rank IDs
+    // and then changes nodeIDs to 0 to numNodes-1
     for(int i=0; i<numPes; i++) {
       if(cpuTopo.nodeIDs[i] != prev) {
 	prev = cpuTopo.nodeIDs[i];
