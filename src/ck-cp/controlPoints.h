@@ -736,18 +736,10 @@ public:
      
   ~controlPointManager();
 
-
-
-  void pup(PUP::er &p)
-  {
-    CBase_controlPointManager::pup(p);
-    if(p.isUnpacking()){
-      CkPrintf("Group controlPointManager is not yet capable of migration.\n");
-    }
-  }
+  void pup(PUP::er &p);
   
  controlPointManager(CkMigrateMessage* m) : CBase_controlPointManager(m) {
-    CkPrintf("Warning: control point framework likely won't work after checkpoint restart, please fix this problem if you need the functionality.");
+    // CkPrintf("Warning: control point framework likely won't work after checkpoint restart, please fix this problem if you need the functionality.");
   }
 
 
