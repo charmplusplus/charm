@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
       m->genDepends(ciFileBaseName);
       cout << ciFileBaseName << ".stamp: " << fname;
       if (internalMode)
-	  cout << " charmxi";
+	  cout << " " << argv[0];
       cout << endl;
   }
   else
