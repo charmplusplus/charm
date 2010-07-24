@@ -346,6 +346,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-hooks-charmdebug.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
+	  $(L)/libthreads-context-tls.o  $(L)/libthreads-qt-tls.o  \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
 	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o \
           $(L)/libthreads-qt-memoryalias.o	\
@@ -365,7 +366,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	memoryaffinity.o modifyScheduler.o
+	cmitls.o memoryaffinity.o modifyScheduler.o
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -591,8 +592,14 @@ $(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 $(L)/libthreads-qt.o: $(LIBTHREADSDEPS) 
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
+$(L)/libthreads-qt-tls.o: $(LIBTHREADSDEPS) 
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c || touch $@
+
 $(L)/libthreads-context.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS) 
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@

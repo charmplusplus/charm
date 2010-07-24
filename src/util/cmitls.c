@@ -1,28 +1,8 @@
 
-#include "conv-config.h"
+#include "converse.h"
+#include "cmitls.h"
 
 #if CMK_HAS_ELF_H && CMK_TLS_THREAD
-
-#include <elf.h>
-#include <string.h>
-#include <stdlib.h>
-#include <malloc.h>
-
-#if ( __LP64__ || _LP64 )
-#define ELF64
-#else
-#define ELF32
-#endif
-
-#ifdef ELF32
-typedef Elf32_Addr Addr;
-typedef Elf32_Ehdr Ehdr;
-typedef Elf32_Phdr Phdr;
-#else
-typedef Elf64_Addr Addr;
-typedef Elf64_Ehdr Ehdr;
-typedef Elf64_Phdr Phdr;
-#endif
 
 extern void* __executable_start;
 
@@ -56,12 +36,6 @@ Phdr* getTLSPhdrEntry() {
   return NULL;
 }
 
-typedef struct {
-  Addr memseg;
-  size_t size;
-  size_t align;
-} tlsseg_t;
-
 void allocNewTLSSeg(tlsseg_t* t) {
   Phdr* phdr;
 
@@ -71,11 +45,11 @@ void allocNewTLSSeg(tlsseg_t* t) {
     t->align = phdr->p_align;
     t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size);
     //t->memseg = memalign(t->align, t->size);
-          memset((void*)t->memseg, 0, t->size);
+    memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
     t->memseg = (Addr)( ((void*)(t->memseg)) + t->size );
     //printf("2 ALIGN %d MEM %p SIZE %d\n", t->align, t->memseg, t->size);
-        } else {
+  } else {
     t->memseg = (Addr)NULL;
     t->size = 0;
     t->align = 0;
