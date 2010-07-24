@@ -119,7 +119,7 @@ public:
 			next();
 	}
 	void threadedTest(void) {
-#if 0
+#if 1
 		//Reflect a value off each processor:
 		for (int pe=0;pe<CkNumPes();pe+=2) {
 			CkCallback cb(CkCallback::resumeThread);
