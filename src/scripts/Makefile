@@ -329,7 +329,7 @@ dirs+sources:
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
-	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
+	  $(L)/libtrace-simple.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
           $(L)/libtracef_f.a $(L)/libtrace-memory.a
@@ -656,7 +656,7 @@ CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE)
-	$(CHARMC) -o $@ $(LIBCK_CORE)
+	$(CHARMC) -o $@ $^
 
 ## Charm fortran AMPI
 
@@ -717,14 +717,6 @@ tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp
 $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
 
-
-# Note there is a BG/P specific addition to this target in Makefile.machine
-# Do not change this rule!
-LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
-$(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
-	$(CHARMC) -o $@ $^
-# Do not change this rule!
-
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -738,7 +730,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
-$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o trace-utilization.o
+$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -760,7 +752,7 @@ tracef_f.o: tracef_f.f90
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
-	      trace-counter.o trace-controlPoints.o trace-utilization.o	\
+	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o
 

@@ -1,8 +1,9 @@
 #  Bluegene/P specific Make rules
 
+# Add the BGP UPC code to libk, as the control point tracing module is always
+# linked in.
 
-$(L)/libtrace-controlPoints.a : trace-controlPoints-BGP.o
-
+$(L)/libck.a:  trace-controlPoints-BGP.o
 
 # The BGP performance counter library UPC must be compiled with gcc:
 trace-controlPoints-BGP.o : trace-controlPoints-BGP.C converse.h

@@ -31,8 +31,10 @@ class TraceControlPointsInit : public Chare {
 class TraceControlPointsBOC : public CBase_TraceControlPointsBOC {
 public:
   TraceControlPointsBOC(void) {
+#if 0
 #ifdef CMK_BLUEGENEP
       initBGP_UPC_Counters();
+#endif
 #endif
   };
 
