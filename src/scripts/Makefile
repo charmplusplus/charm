@@ -593,13 +593,13 @@ $(L)/libthreads-qt.o: $(LIBTHREADSDEPS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
 $(L)/libthreads-qt-tls.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c || touch $@
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
 $(L)/libthreads-context.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
 
 $(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS) 
-	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c || touch $@
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
 $(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
