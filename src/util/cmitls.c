@@ -75,7 +75,8 @@ void switchTLS(tlsseg_t* cur, tlsseg_t* next) {
                 : "r"(next->memseg));
 #endif
 #else
-  abort("TLS globals are not supported.");
+  fprintf(stderr, "TLS globals are not supported.");
+  abort();
 #endif
 }
 
