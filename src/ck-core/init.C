@@ -311,6 +311,39 @@ static inline void _parseCommandLineOpts(char **argv)
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
 	  _isAnytimeMigration = CmiFalse;
 	}
+
+
+#if ! CMK_WITH_CONTROLPOINT
+	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
+	if( CmiGetArgFlag(argv,"+CPSamplePeriod") || 
+	    CmiGetArgFlag(argv,"+CPSamplePeriodMs") || 
+	    CmiGetArgFlag(argv,"+CPSchemeRandom") || 
+	    CmiGetArgFlag(argv,"+CPExhaustiveSearch") || 
+	    CmiGetArgFlag(argv,"+CPAlwaysUseDefaults") || 
+	    CmiGetArgFlag(argv,"+CPSimulAnneal") || 
+	    CmiGetArgFlag(argv,"+CPCriticalPathPrio") || 
+	    CmiGetArgFlag(argv,"+CPBestKnown") || 
+	    CmiGetArgFlag(argv,"+CPSteering") || 
+	    CmiGetArgFlag(argv,"+CPMemoryAware") || 
+	    CmiGetArgFlag(argv,"+CPSimplex") || 
+	    CmiGetArgFlag(argv,"+CPDivideConquer") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriod") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodLinear") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodQuadratic") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodOptimal") || 
+	    CmiGetArgFlag(argv,"+CPDefaultValues") || 
+	    CmiGetArgFlag(argv,"+CPGatherAll") || 
+	    CmiGetArgFlag(argv,"+CPGatherMemoryUsage") || 
+	    CmiGetArgFlag(argv,"+CPGatherUtilization") || 
+	    CmiGetArgFlag(argv,"+CPSaveData") || 
+	    CmiGetArgFlag(argv,"+CPNoFilterData") || 
+	    CmiGetArgFlag(argv,"+CPLoadData") || 
+	    CmiGetArgFlag(argv,"+CPDataFilename")    )
+	  {	    
+	    CkAbort("You specified a control point command line argument, but compiled charm++ without control point support.\n");
+	  }
+#endif
+       
 }
 
 static void _bufferHandler(void *msg)
