@@ -362,11 +362,11 @@ CVLIBS=$(L)/libconv-core.a \
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
-	traceCore.o traceCoreCommon.o tracec.o \
+	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o modifyScheduler.o
+	cmitls.o memoryaffinity.o
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -645,7 +645,7 @@ $(L)/loadsym.o: loadsym.c  $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
@@ -654,7 +654,7 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
-	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
+	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
 	   charmProjections.o cktiming.o pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
