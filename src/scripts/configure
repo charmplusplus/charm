@@ -2089,6 +2089,7 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_SIZET_64BIT $strictpass
 _ACEOF
 
+in64bit=$strictpass
 
 
 #### check strings.h ####
@@ -2574,6 +2575,50 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_TLS_THREAD $strictpass
 _ACEOF
 
+
+### test if switching TLS register ###
+if test $in64bit = 1
+then
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf64_Addr m1, m2;
+  asm volatile ("movq %%fs:0x0, %0\n\t"
+                "movq %1, %%fs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TLS_SWITCHING64 $strictpass
+_ACEOF
+
+else
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf32_Addr m1, m2;
+  asm volatile ("movl %%gs:0x0, %0\n\t"
+                "movl %1, %%gs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TLS_SWITCHING32 $strictpass
+_ACEOF
+
+fi
 
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
