@@ -241,8 +241,8 @@ public:
     nLevels = k;
     span = new int[nLevels-1];
     int P=CkNumPes();
-    G = exp(log(P)/(nLevels-1));
-    if (pow(G, nLevels-1) != P) {
+    G = exp(log(P*1.0)/(nLevels-1));
+    if (pow(G*1.0, nLevels-1) != P) {
       CkPrintf("KLevelTree: G=%d\n", G);
       CmiAbort("KLevelTree failed");
     }
