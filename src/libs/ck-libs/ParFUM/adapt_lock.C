@@ -243,14 +243,14 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
     gotlocks[i] = -1;
   }
   while(!done) {
-#ifdef CPSD_4
+#ifdef CPSD
       int gotlock = 1;
 #else
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 #endif
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
-#ifndef CPSD_4
+#ifndef CPSD
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 #endif
 #ifdef DEBUG_1
@@ -262,7 +262,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       done = true;
     }
     else {
-#ifndef CPSD_4
+#ifndef CPSD
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 #endif
       locknodes[2] = n3;
@@ -281,7 +281,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
     }
   }
   int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
-#ifndef CPSD_4
+#ifndef CPSD
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 #endif
 
