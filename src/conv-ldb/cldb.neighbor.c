@@ -93,7 +93,8 @@ static void CldStillIdle(void *dummy, double curT)
   CmiBecomeImmediate(&msg);
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     msg.to_rank = CmiRankOf(CpvAccess(neighbors)[i].pe);
-    CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
+    CmiSyncNodeSend(CpvAccess(neighbors)[i].pe,sizeof(requestmsg),(char *)&msg);
+    //CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
   }
   /*
   msg.to_rank = rand() % CmiNumPes();
@@ -134,10 +135,10 @@ static void CldAskLoadHandler(requestmsg *msg)
 #endif
     sendLoad = myload / CpvAccess(numNeighbors);
     if (sendLoad < 1) sendLoad = 1;
-    //sendLoad = 1;
     for (i=0; i<CpvAccess(numNeighbors); i++) 
       if (CpvAccess(neighbors)[i].pe == receiver) break;
-    CmiAssert(i<CpvAccess(numNeighbors));
+    if(i >= CpvAccess(numNeighbors)) return;
+    //CmiAssert(i<CpvAccess(numNeighbors));
     CpvAccess(neighbors)[i].load += sendLoad;
     CldMultipleSend(receiver, sendLoad, rank, 0);
 #if 0
