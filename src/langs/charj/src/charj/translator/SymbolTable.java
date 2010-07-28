@@ -74,6 +74,13 @@ public class SymbolTable {
             lang.define(entry.getKey(), c);
             c.isPrimitive = true;
         }
+
+        defaultPkg.define("CkArgMsg", new ExternalSymbol(this, "CkArgMsg"));
+        defaultPkg.define("CkPrintf", new MethodSymbol(this, "CkPrintf"));
+        defaultPkg.define("CkNumPes", new MethodSymbol(this, "CkNumPes"));
+        defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
+        defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
+        defaultPkg.define("CmiWallTimer", new MethodSymbol(this, "CmiWallTimer"));
     }
 
     public ClassSymbol resolveBuiltinType(String type) {

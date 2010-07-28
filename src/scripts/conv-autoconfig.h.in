@@ -90,6 +90,9 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
+/* whether getifaddrs() exists */
+#undef CMK_HAS_GETIFADDRS
+
 /* whether getpagesize exists */
 #undef CMK_HAS_GETPAGESIZE
 
@@ -237,6 +240,12 @@
 /* including STL <foo> does not works */
 #undef CMK_STL_USE_DOT_H
 
+/* Allows switching TLS in 32-bit. */
+#undef CMK_TLS_SWITCHING32
+
+/* Allows switching TLS 64-bit. */
+#undef CMK_TLS_SWITCHING64
+
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
 
@@ -257,6 +266,9 @@
 
 /* whether the std:: names for STL work */
 #undef CMK_USE_STL
+
+/* disable controlpoint */
+#undef CMK_WITH_CONTROLPOINT
 
 /* whether __int64 works */
 #undef CMK___int64_DEFINED

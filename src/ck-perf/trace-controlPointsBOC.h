@@ -31,11 +31,23 @@ class TraceControlPointsInit : public Chare {
 class TraceControlPointsBOC : public CBase_TraceControlPointsBOC {
 public:
   TraceControlPointsBOC(void) {
+#if 0
 #ifdef CMK_BLUEGENEP
       initBGP_UPC_Counters();
 #endif
+#endif
   };
-  TraceControlPointsBOC(CkMigrateMessage *m) {};
+
+
+  void pup(PUP::er &p)
+  {
+    CBase_TraceControlPointsBOC::pup(p);
+    if(p.isUnpacking()){
+      CkPrintf("Group TraceControlPointsBOC is not yet capable of migration.\n");
+    }
+  }
+
+ TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) {};
 
   void printBGP_UPC_CountersBOC(void);
 

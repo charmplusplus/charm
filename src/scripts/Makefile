@@ -329,7 +329,7 @@ dirs+sources:
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o $(L)/libldb-prioritycentralized.o     $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
 TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
-	  $(L)/libtrace-simple.a $(L)/libtrace-controlPoints.a\
+	  $(L)/libtrace-simple.a \
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
           $(L)/libtracef_f.a $(L)/libtrace-memory.a
@@ -346,6 +346,7 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-hooks-charmdebug.o
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
 	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
+	  $(L)/libthreads-context-tls.o  $(L)/libthreads-qt-tls.o  \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
 	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o \
           $(L)/libthreads-qt-memoryalias.o	\
@@ -361,11 +362,11 @@ CVLIBS=$(L)/libconv-core.a \
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
 	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
-	traceCore.o traceCoreCommon.o tracec.o \
+	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	memoryaffinity.o modifyScheduler.o
+	cmitls.o memoryaffinity.o
 
 #############################################
 #Comlib Core objects that go into libck.a
@@ -598,8 +599,14 @@ $(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 $(L)/libthreads-qt.o: $(LIBTHREADSDEPS) 
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
+$(L)/libthreads-qt-tls.o: $(LIBTHREADSDEPS) 
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
+
 $(L)/libthreads-context.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -IQuickThreads threads.c || touch $@
+
+$(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS) 
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_CONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads threads.c 2> /dev/null || touch $@
 
 $(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
@@ -645,7 +652,7 @@ $(L)/loadsym.o: loadsym.c  $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
@@ -654,16 +661,16 @@ LIBCK_CORE=trace-common.o tracef.o init.o register.o qd.o ck.o main.o  \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
            ObjGraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
-	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) \
-	   charmProjections.o cktiming.o pathHistory.o
+	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
+	   charmProjections.o cktiming.o pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
 
-charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs controlPoints_objs 
+charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
 
 CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE)
-	$(CHARMC) -o $@ $(LIBCK_CORE)
+	$(CHARMC) -o $@ $^
 
 ## Charm fortran AMPI
 
@@ -724,14 +731,6 @@ tau_selective.o: $(TAUROOT)/utils/tau_selective.cpp
 $(L)/libtrace-Tau.a: $(TAU_TRACE_OBJ) tau_selective.o
 	$(CHARMC) $(TAU_LIBS) -o $@ $(TAU_TRACE_OBJ) tau_selective.o $(TAU_TRACE_OBJ)
 
-
-# Note there is a BG/P specific addition to this target in Makefile.machine
-# Do not change this rule!
-LIBTRACE_CONTROLPOINTS=trace-controlPoints.o
-$(L)/libtrace-controlPoints.a: $(LIBTRACE_CONTROLPOINTS)
-	$(CHARMC) -o $@ $^
-# Do not change this rule!
-
 LIBTRACE_COUNT=trace-counter.o
 $(L)/libtrace-counter.a: $(LIBTRACE_COUNT)
 	$(CHARMC) -o $@ $(LIBTRACE_COUNT)
@@ -745,7 +744,7 @@ $(L)/libtrace-memory.a: $(LIBTRACE_MEMORY)
 	$(CHARMC) -o $@ $(LIBTRACE_MEMORY)
 
 LIBTRACE_ALL=trace-all.o trace-projections.o trace-summary.o trace-simple.o \
-$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-controlPoints.o trace-utilization.o
+$(TAU_TRACE_OBJ) trace-projector.o traceCore.o traceCoreCommon.o charmProjections.o converseProjections.o machineProjections.o trace-memory.o trace-utilization.o
 
 $(L)/libtrace-all.a: $(LIBTRACE_ALL)
 	$(CHARMC) -o $@ $(LIBTRACE_ALL)
@@ -767,30 +766,9 @@ tracef_f.o: tracef_f.f90
 
 # used for make depends
 TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
-	      trace-counter.o trace-controlPoints.o trace-utilization.o	\
+	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o
-
-######################################################################
-#
-#Control Point Library
-#
-######################################################################
-
-
-CONTROLPOINTS_OBJS = controlPoints.o arrayRedistributor.o cp_effects.o
-
-controlPoints_objs: $(L)/libmoduleControlPoints.a $(L)/libmoduleControlPointsNoTrace.a
-
-$(L)/libmoduleControlPoints.a: $(CONTROLPOINTS_OBJS)
-	$(CHARMC) -o $(L)/libmoduleControlPoints.a $(CONTROLPOINTS_OBJS)
-
-$(L)/libmoduleControlPointsNoTrace.a: controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
-	$(CHARMC) -o $(L)/libmoduleControlPointsNoTrace.a controlPointsNoTrace.o arrayRedistributor.o cp_effects.o
-
-controlPointsNoTrace.o: controlPoints.C controlPoints.h ControlPointsNoTrace.decl.h
-	$(CHARMC) -I. -c controlPoints.C -o controlPointsNoTrace.o -DCP_DISABLE_TRACING $(OPTS)
-
 
 
 ###############################################################################
@@ -1032,7 +1010,7 @@ depends: basics
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS) ; do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1062,7 +1040,7 @@ dependsCaseSensitive: basics
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(CONTROLPOINTS_OBJS); do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(LB_OBJ) $(LIBBLUE_OBJS) $(COMLIB_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\

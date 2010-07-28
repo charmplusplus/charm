@@ -20,6 +20,9 @@ CkGroupID traceControlPointsGID;
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
+
+  This module is special in that it is always included in charm, but sometimes it does nothing.
+  This is called on all processors in SMP version.
 */
 void _createTracecontrolPoints(char **argv)
 {
@@ -110,6 +113,7 @@ void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe,
 
 void TraceControlPoints::endExecute(void)
 {
+  //  CkPrintf("TraceControlPoints::endExecute\n");
   nesting_level--;
   if(nesting_level == 0){
     
@@ -169,8 +173,10 @@ void TraceControlPoints::traceClose(void)
 {
   // Print out some performance counters on BG/P
   CProxy_TraceControlPointsBOC myProxy(traceControlPointsGID);
-  myProxy.ckLocalBranch()->printBGP_UPC_CountersBOC();
 
+#if 0
+  myProxy.ckLocalBranch()->printBGP_UPC_CountersBOC();
+#endif
     
   CkpvAccess(_trace)->endComputation();
   // remove myself from traceArray so that no tracing will be called.
@@ -180,8 +186,10 @@ void TraceControlPoints::traceClose(void)
 void printBGP_UPC_Counters(void);
 
 void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
+#if CMK_WITH_CONTROLPOINT
 #ifdef CMK_BLUEGENEP
 	printBGP_UPC_Counters();
+#endif
 #endif
 }
 
@@ -223,6 +231,7 @@ extern "C" void traceControlPointsExitFunction() {
 
 // Initialization of the parallel trace module.
 void initTraceControlPointsBOC() {
+/*
 #ifdef __BLUEGENE__
   if (BgNodeRank()==0) {
 #else
@@ -230,6 +239,7 @@ void initTraceControlPointsBOC() {
 #endif
       registerExitFn(traceControlPointsExitFunction);
     }
+*/
 }
 
 #include "TraceControlPoints.def.h"

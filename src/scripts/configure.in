@@ -72,6 +72,18 @@ then
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
+AC_ARG_ENABLE([controlpoint],
+            [AS_HELP_STRING([--enable-controlpoint],
+              [enable control point])],
+            [enable_controlpoint=$enableval],
+            [enable_controlpoint=yes])
+
+if test "$enable_controlpoint" = "no"
+then
+  Echo "Charm control point is disabled"
+  AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
+fi
+
 AC_ARG_WITH([numa],
             [AS_HELP_STRING([--with-numa],
               [support memory affinity with NUMA])],
@@ -293,6 +305,19 @@ then
   AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
 fi
 
+# test cp -p
+AC_MSG_CHECKING("cp command as")
+CP="cp -p"
+touch test_file
+if ! $CP test_file test_file.cp 2>err
+then
+  CP="cp"
+fi
+rm -f test_file test_file.cp
+AC_MSG_RESULT($CP)
+add_flag CP=\""$CP"\" "cp command"
+ 
+
 # try to decide the version of glibc
 get_glibc_version() {
 t=test.c
@@ -364,6 +389,7 @@ return x[[0]];
 EOT
 test_cxx "whether compiler is 64bit" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIZET_64BIT, $strictpass, [whether size_t 64bit])
+in64bit=$strictpass
 
 
 #### check strings.h ####
@@ -721,6 +747,42 @@ void foo(void)
 EOT
 test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TLS_THREAD, $strictpass, [Allows __thread.])
+
+### test if switching TLS register ###
+if test $in64bit = 1
+then
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf64_Addr m1, m2;
+  asm volatile ("movq %%fs:0x0, %0\n\t"
+                "movq %1, %%fs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING64, $strictpass, [Allows switching TLS 64-bit.])
+else
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf32_Addr m1, m2;
+  asm volatile ("movl %%gs:0x0, %0\n\t"
+                "movl %1, %%gs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_TLS_SWITCHING32, $strictpass, [Allows switching TLS in 32-bit.])
+fi
 
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
@@ -1127,6 +1189,32 @@ void foo(void) {
 EOT
 test_cxx "whether has socklen_t" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SOCKLEN, $pass, [whether has socklen_t])
+
+### test getifaddrs ####
+cat > $tc <<EOT
+#include <netinet/in.h> /* for sockaddr_in */
+#include <ifaddrs.h> /* for getifaddrs */
+#include <net/if.h> /* for IFF_RUNNING */
+
+int main()
+{
+  struct ifaddrs *interfaces=0;
+  if( getifaddrs(&interfaces) == 0 ) {
+        struct ifaddrs *interface;
+        for( interface=interfaces; interface; interface=interface->ifa_next ) {
+            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+                if( addr && addr->sin_family==AF_INET ) {
+                    break;
+                }
+            }
+        }
+        freeifaddrs(interfaces);
+  }
+}
+EOT
+test_linkc "whether getifaddrs call exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETIFADDRS, $pass, [whether getifaddrs() exists])
 
 #### check if mmap exists ####
 cat > $t <<EOT

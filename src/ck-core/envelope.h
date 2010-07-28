@@ -55,7 +55,11 @@ class PathHistoryEnvelope {
   double getTotalTime() const{ return totalTime; }
   int get_sender_history_table_idx() const{ return sender_history_table_idx; }
   void set_sender_history_table_idx(int i) { sender_history_table_idx = i; }
-  PathHistoryEnvelope(){ reset(); }
+  PathHistoryEnvelope(){ 
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+    reset(); 
+#endif
+  }
   double getTime() const{ return totalTime; }
   void setTime(double t){ totalTime = t; }
   void pup(PUP::er &p) {

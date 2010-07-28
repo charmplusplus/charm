@@ -101,6 +101,9 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsMsgsList = NULL;
   statsData = NULL;
 
+  storedMigrateMsg = NULL;
+  reduction_started = 0;
+
   // for future predictor
   if (_lb_predict) predicted_model = new FutureModel(_lb_predict_window);
   else predicted_model=0;
@@ -187,8 +190,9 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
-
 #if CMK_LBDB_ON
+  if (reduction_started) return;              // reducton in progress
+
   CmiAssert(CmiNodeAlive(CkMyPe()));
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
@@ -212,6 +216,7 @@ void CentralLB::ProcessAtSync()
   CkCallback cb(CkIndex_CentralLB::ReceiveCounts((CkReductionMsg*)NULL), 
                   thisProxy[0]);
   contribute(2*sizeof(int), counts, CkReduction::sum_int, cb);
+  reduction_started = 1;
 #else
   SendStats();
 #endif
@@ -289,6 +294,7 @@ void CentralLB::SendStats()
 {
 #if CMK_LBDB_ON
   CmiAssert(statsMsg != NULL);
+  reduction_started = 0;
 
 #if USE_LDB_SPANNING_TREE
   if(CkNumPes()>1024)
@@ -632,7 +638,7 @@ void CentralLB::LoadBalance()
 #endif
 
   envelope *env = UsrToEnv(migrateMsg);
-  if (CkNumPes() <= 512 || env->getTotalsize() < 8*1024*1024) {
+  if (1) {
       // broadcast
     thisProxy.ReceiveMigration(migrateMsg);
   }
@@ -762,8 +768,19 @@ extern int restarted;
 
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
+  storedMigrateMsg = m;
+  CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
+                  thisProxy);
+  contribute(0, NULL, CkReduction::max_int, cb);
+}
+
+void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
+{
 #if CMK_LBDB_ON
 	int i;
+        LBMigrateMsg *m = storedMigrateMsg;
+        CmiAssert(m!=NULL);
+        delete msg;
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int *dummyCounts;
@@ -778,6 +795,9 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 	}
 	lbDecisionCount = m->lbDecisionCount;
 #endif
+
+  if (_lb_args.debug() > 1) 
+    if (CkMyPe()%1024==0) CmiPrintf("[%d] Starting ReceiveMigration step %d at %f\n",CkMyPe(),step(), CmiWallTimer());
 
   for (i=0; i<CkNumPes(); i++) theLbdb->lastLBInfo.expectedLoad[i] = m->expectedLoad[i];
   CmiAssert(migrates_expected <= 0 || migrates_completed == migrates_expected);
@@ -1088,12 +1108,18 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
 LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
 {
   int nmoves = 0;
+  int nunavail = 0;
   int i;
   for (i=0; i<m->n_moves; i++) {
     MigrateInfo* item = (MigrateInfo*) &m->moves[i];
     if (item->from_pe == p || item->to_pe == p) nmoves++;
   }
-  LBMigrateMsg* msg = new(nmoves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  for (i=0; i<CkNumPes();i++) {
+    if (!m->avail_vector[i]) nunavail++;
+  }
+  LBMigrateMsg* msg;
+  if (nunavail) msg = new(nmoves,CkNumPes(),CkNumPes(),0) LBMigrateMsg;
+  else msg = new(nmoves,0,0,0) LBMigrateMsg;
   msg->n_moves = nmoves;
   msg->level = m->level;
   msg->next_lb = m->next_lb;
@@ -1105,6 +1131,7 @@ LBMigrateMsg * CentralLB::extractMigrateMsg(LBMigrateMsg *m, int p)
     }
   }
   // copy processor data
+  if (nunavail)
   for (i=0; i<CkNumPes();i++) {
     msg->avail_vector[i] = m->avail_vector[i];
     msg->expectedLoad[i] = m->expectedLoad[i];
@@ -1309,6 +1336,15 @@ void CentralLB::pup(PUP::er &p) {
   BaseLB::pup(p); 
   if (p.isUnpacking())  {
     initLB(CkLBOptions(seqno)); 
+  }
+  p|reduction_started;
+  int has_statsMsg=0;
+  if (p.isPacking()) has_statsMsg = (statsMsg!=NULL);
+  p|has_statsMsg;
+  if (has_statsMsg) {
+    if (p.isUnpacking())
+      statsMsg = new CLBStatsMsg;
+    statsMsg->pup(p);
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | lbDecisionCount;

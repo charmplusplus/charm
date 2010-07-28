@@ -13,6 +13,10 @@
 #ifndef __PATH_HISTORY_H__
 #define __PATH_HISTORY_H__
 
+
+#if CMK_WITH_CONTROLPOINT
+
+
 #include <vector>
 #include <map>
 #include <utility>
@@ -392,4 +396,5 @@ extern void criticalPath_split();
 
 
 /** @} */
+#endif
 #endif

@@ -71,7 +71,7 @@ static void CldStillIdle(void *dummy, double curT)
   cldData->lastCheck = now;
 
   myload = CldLoad();
-  CmiAssert(myload == 0);
+  /* CmiAssert(myload == 0); */
   if (myload > 0) return;
 
   msg.from_pe = CmiMyPe();
