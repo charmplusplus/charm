@@ -14,6 +14,7 @@ The implemementation is based on Heapsort as described in
 typedef struct priormsg_s {
     unsigned int priority;
     int     pe;
+    int     load;
     void* msg;
 } priormsg;
 

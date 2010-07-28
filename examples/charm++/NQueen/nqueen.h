@@ -2,33 +2,34 @@
 #define _NQueenState_H_
 
 #define MAX 20
-class NQueen : public CBase_NQueen {
-
-public:
-
-    NQueen(QueenState *);
-    NQueen(CkMigrateMessage *msg);
-    
-private:
-    //place another queen
-
-    void printSolution(int[]);
-    void sequentialSolve(int[], int row, int colum);
-
-    //indicate which colum has a queen for each row
-    int current_row;
-
-};
+#define MAX_BOARDSIZE 30
 
 class QueenState: public CMessage_QueenState {
 
 public:
-    int row;
-    int queenInWhichColum[MAX]; 
+    int aQueenBitRes;//[MAX_BOARDSIZE];
+    int aQueenBitCol;//[MAX_BOARDSIZE];
+    int aQueenBitPosDiag;//[MAX_BOARDSIZE];
+    int aQueenBitNegDiag;//[MAX_BOARDSIZE];
+    
+    //int bitfield;
+    int numrows;
 };
 
 class DUMMYMSG : public CMessage_DUMMYMSG {
 public:
 };
 
+class NQueen : public CBase_NQueen {
+
+public:
+
+    NQueen(QueenState *);
+    NQueen(CkMigrateMessage *msg);
+    void sequentialSolve( QueenState *msg);
+    
+private:
+    void printSolution(int[]);
+
+};
 #endif

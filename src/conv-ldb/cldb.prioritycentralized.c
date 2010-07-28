@@ -30,8 +30,6 @@ CpvDeclare(int,  CldstorecharemsgHandlerIndex);
 CpvDeclare(int, CldHigherPriorityComesHandlerIndex);
 CpvDeclare(int, CldReadytoExecHandlerIndex);
 CpvDeclare(void*, CldRequestQueue);
-CpvDeclare(CldPriorityToken, headsentinel);
-CpvDeclare(priormsg, nexttoexec);
 
 void LoadNotifyFn(int l)
 {
@@ -71,7 +69,7 @@ inline void SendTasktoPe(int receiver, void *msg)
     CpvAccess(CldSlavesPriorityQueue)[receiver].load = new_load;
 
 #if YH_DEBUG
-    CmiPrintf(" sending this msg with prior %u  to processor %d len=%d \n", *prioptr, receiver, len);
+    CmiPrintf(" P%d====>P%d sending this msg with prior %u  to processor %d len=%d \n", CmiMyPe(), receiver, *prioptr, receiver, len);
 #endif
 }
 /* master processor , what to do when receive a new msg from network */
@@ -97,7 +95,7 @@ static void CldStoreCharemsg(void *msg)
     /* find the processor with the highest priority */
     int i=0; 
     unsigned int _max_ = *prioptr;
-    int index = 0;
+    int index = 1;
     double max_evaluation = 0;
     int old_load;
     //check which processor has underload and also the task priority is lower than the msg priority
@@ -167,18 +165,16 @@ static void CldAskLoadHandler(requestmsg *msg)
 #if YH_DEBUG
     CmiPrintf(" Step 6 :%f %d<======= getrequest  from processor queue current size=%d, notidle=%d, load=%d\n", CmiTimer(), receiver, heap_size( &CpvAccess(CldManagerLoadQueue)), msg->notidle, CpvAccess(CldSlavesPriorityQueue)[receiver].load);
 #endif
-    if(msg->notidle){
-        if(old_load == 0 || old_load == 1)
-        {
-            CpvAccess(CldSlavesPriorityQueue)[receiver].average_priority = _U_INT_MAX;
-            CpvAccess(CldSlavesPriorityQueue)[receiver].load = 0;
-        }else
-        {
-            new_load = old_load - 1;
-            CpvAccess(CldSlavesPriorityQueue)[receiver].load = new_load;
-            CpvAccess(CldSlavesPriorityQueue)[receiver].average_priority = old_average_prior/new_load * old_load - msg->priority/new_load;
-        }
-    } 
+    if(!msg->notidle || old_load == 0 || old_load == 1)
+    {
+        CpvAccess(CldSlavesPriorityQueue)[receiver].average_priority = _U_INT_MAX;
+        CpvAccess(CldSlavesPriorityQueue)[receiver].load = 0;
+    }else
+    {
+        new_load = old_load - 1;
+        CpvAccess(CldSlavesPriorityQueue)[receiver].load = new_load;
+        CpvAccess(CldSlavesPriorityQueue)[receiver].average_priority = old_average_prior/new_load * old_load - msg->priority/new_load;
+    }
    
     old_load = CpvAccess(CldSlavesPriorityQueue)[receiver].load;
     if(old_load < THRESHOLD_LOAD)
@@ -211,8 +207,6 @@ static void CldEndIdle(void *dummy)
 
 static void CldStillIdle(void *dummy, double curT)
 {
-
-
     if(CmiMyPe() == 0) 
     {
 #if YH_DEBUG
@@ -233,92 +227,42 @@ static void CldStillIdle(void *dummy, double curT)
     double now = curT;
     double lt = cldData->lastCheck;
    
-    
-    CldPriorityToken  head = CpvAccess(headsentinel);
-    CldPriorityToken exectoken;
-    unsigned int priority = _U_INT_MAX; 
-    exectoken = CpvAccess(headsentinel)->succ;
-    if(exectoken)
-    {
-        CldRestoreHandler(exectoken->msg); 
-        CmiHandleMessage(exectoken->msg);
-        head->succ= exectoken->succ;
-        CmiFree(exectoken);
-        cldData->load = cldData->load - 1;
-        msg.notidle = 1;
+    cldData->load  = 0;
+    msg.notidle = 0;
+    if ((lt!=-1 && now-lt< PERIOD*0.001) ) return;
 #if YH_DEBUG
-        CmiPrintf("Step 1000: processor %d finishes processing one msg =>Send request for task,  last check time %f, current time=%f, notidle11=%d, load=%d\n", CmiMyPe(), lt, now, msg.notidle, cldData->load);
+    CmiPrintf("Step 1000: processor %d task is already zero ", CmiMyPe());
 #endif
-    }else
-    {
-        cldData->load  = 0;
-        msg.notidle = 0;
-        if ((lt!=-1 && now-lt< PERIOD*0.001) ) return;
-#if YH_DEBUG
-        CmiPrintf("Step 1000: processor %d task is already zero ", CmiMyPe());
-#endif
-    }
 
-    if(cldData->load >= THRESHOLD_LOAD)
-    {
-#if YH_DEBUG
-        CmiPrintf(" worker processor %d finishes processing one msg =>Send request for task,  last check time %f, current time=%f, load=%d\n", CmiMyPe(), lt, now, cldData->load);
-#endif
-        return;
-    }
     cldData->lastCheck = now;
     msg.from_pe = CmiMyPe();
     CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
 
     cldData->sent = 1;
-    /* fixme */
-    //CmiBecomeImmediate(&msg);
-    //msg.to_rank = CmiRankOf(0);
 #if YH_DEBUG
     CmiPrintf("Step 1000: processor %d task is already zero sentidle=%d", CmiMyPe(), (&msg)->notidle);
 #endif
     CmiSyncSend(0, sizeof(requestmsg), &msg);
 }
-/*
-void CldReadytoExec(CldPriorityToken readytoken)
+void CldReadytoExec(void *msg)
 {
-    CldPriorityToken  head = CpvAccess(headsentinel);
-    CldPriorityToken exectoken;
-    unsigned int priority = _U_INT_MAX; 
-    exectoken = CpvAccess(headsentinel)->succ;
-#if YH_DEBUG
-    CmiPrintf("Step 4: processor %d, task is ready to run with priority=%u, Timer=%f\n", CmiMyPe(), readytoken->priority, CmiTimer());
-#endif
 
-    if(exectoken)
-    {
-        priority = exectoken->priority;
-#if YH_DEBUG
-    CmiPrintf("Step 4-1: processor %d, task is ready to run with priority=%u, Timer=%f\n", CmiMyPe(), priority, CmiTimer());
-#endif
-        CldRestoreHandler(exectoken->msg); 
-        CmiHandleMessage(exectoken->msg);
-        head->succ= exectoken->succ;
-        CmiFree(exectoken);
-    }
-#if YH_DEBUG
-    CmiPrintf("Step 4-2: processor %d, task is done Timer=%f\n", CmiMyPe(), CmiTimer());
-#endif
-#if YH_DEBUG
-    CmiPrintf("Step 5: processor %d, send request to processor 0 to ask for load Timer=%f\n", CmiMyPe(), CmiTimer());
-#endif
-    requestmsg updatemsg;
+    CldProcInfo  cldData = CpvAccess(CldData);
+    CldRestoreHandler(msg);
+    CmiHandleMessage(msg);
+    cldData->load = cldData->load - 1;
 
-    CldInfoFn ifn;
-    CldPackFn pfn;
-    int len, queueing, priobits; 
-    updatemsg.priority = priority;
-    updatemsg.from_pe = CmiMyPe();
-    CmiSetHandler(&updatemsg, CpvAccess(CldAskLoadHandlerIndex));
-    //CmiBecomeImmediate(&updatemsg);
-    CmiSyncSend(0, sizeof(requestmsg), &updatemsg);
+    requestmsg r_msg;
+
+    r_msg.notidle = 1;
+    r_msg.from_pe = CmiMyPe();
+    CmiSetHandler(&r_msg, CpvAccess(CldAskLoadHandlerIndex));
+    CmiSyncSend(0, sizeof(requestmsg), &r_msg);
+
+#if YH_DEBUG
+    CmiPrintf(" Step final: message is handled on processor %d, task left=%d", CmiMyPe(), cldData->load);
+#endif
 }
-*/
 void HigherPriorityWork(void *msg)
 {
     //wrap this msg with token and put it into token queue
@@ -327,39 +271,16 @@ void HigherPriorityWork(void *msg)
     CldPackFn pfn;
     int len, queueing, priobits; 
     unsigned int *prioptr;
-    CldPriorityToken priortoken;
     CldProcInfo  cldData = CpvAccess(CldData);
     ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+    CldRestoreHandler(msg);
+    CldSwitchHandler(msg, CpvAccess(CldReadytoExecHandlerIndex));
+    CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+    cldData->load = cldData->load  + 1;
 
 #if YH_DEBUG
-        CmiPrintf(" Step 3:  processor %d, Task arrives and sort the task first, prior=%u Timer=%f\n", CmiMyPe(), *prioptr, CmiTimer());
-#endif
-    priortoken = (CldPriorityToken) CmiAlloc(sizeof(struct CldPriorityToken_s));
-    priortoken->msg = msg;
-    priortoken->priority = *prioptr; 
-    CldPriorityToken head = CpvAccess(headsentinel);
-    CldPriorityToken  tmptoken = head;//
-    CldPriorityToken  predtoken;
-    if(head->succ == NULL)
-    {
-        head->succ = priortoken;
-        priortoken->succ = NULL;
-        cldData->load = 1;
-    }else  //insert this token into queue accord to prior smaller ->higher
-    {
-        do{
-            predtoken = tmptoken;
-            tmptoken = tmptoken->succ;
-        }while(tmptoken != NULL && tmptoken->priority<= *prioptr);
-        priortoken->succ = tmptoken;
-        predtoken->succ = priortoken;
-        cldData->load = cldData->load  + 1;
-    }
-    //CmiSetHandler(priortoken, CpvAccess(CldReadytoExecHandlerIndex));
-    //CmiSyncSend(CmiMyPe(), sizeof(struct CldPriorityToken_s), priortoken); 
-#if YH_DEBUG
-        CmiPrintf(" Step 3-1:  processor %d, Task has been inserted and re-Queue prior=%u Timer=%f, enqueue load=%d\n", CmiMyPe(), *prioptr, CmiTimer(), cldData->load);
+    CmiPrintf(" Step 3:  processor %d, Task arrives and put it into charm++ queue, prior=%u Timer=%f\n", CmiMyPe(), *prioptr, CmiTimer());
 #endif
 }
 
@@ -390,6 +311,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
               pfn(&msg);
               ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
           }
+#if YH_DEBUG
+          CmiPrintf(" Step 1-1: Creation New msg on pe%d ==> p0  priority=%u Timer:%f (msg len=%d)\n", CmiMyPe(),  *prioptr, CmiTimer(), len);
+#endif
+
           CmiSyncSendAndFree(0, len, msg);
       }
   }else if((pe == CmiMyPe()) || (CmiNumPes() == 1) ) {
@@ -466,8 +391,7 @@ void  CldOtherInit()
       CpvAccess(CldSlavesPriorityQueue) = (CldSlavePriorInfo*)CmiAlloc(sizeof(CldSlavePriorInfo) * numpes);
       int i=0;
       for(i=0; i<numpes; i++){
-          CpvAccess(CldSlavesPriorityQueue)[i].priority_1 = _U_INT_MAX;
-          CpvAccess(CldSlavesPriorityQueue)[i].priority_2 = _U_INT_MAX;
+          CpvAccess(CldSlavesPriorityQueue)[i].average_priority = _U_INT_MAX;
           CpvAccess(CldSlavesPriorityQueue)[i].load = 0;
       }
   }
@@ -486,18 +410,11 @@ void CldModuleInit(char **argv)
   CpvInitialize(MsgHeap, CldManagerLoadQueue);
   CpvInitialize(CldSlavePriorInfo*, CldSlavesPriorityQueue);
   CpvInitialize(void*, CldRequestQueue);
-  CpvInitialize(priormsg, nexttoexec);
-  CpvInitialize(CldPriorityToken, headsentinel);
-
-
-  CpvAccess(headsentinel) = (CldPriorityToken) CmiAlloc(sizeof(struct CldPriorityToken_s));
-  CpvAccess(headsentinel)->succ = NULL;
-  CpvAccess(nexttoexec).priority = _U_INT_MAX;
 
   CpvAccess(CldstorecharemsgHandlerIndex) = CmiRegisterHandler(CldStoreCharemsg);
   CpvAccess(CldHigherPriorityComesHandlerIndex) = CmiRegisterHandler(HigherPriorityWork);
   CpvAccess(CldAskLoadHandlerIndex) = CmiRegisterHandler((CmiHandler)CldAskLoadHandler);
-  //CpvAccess(CldReadytoExecHandlerIndex) = CmiRegisterHandler((CmiHandler)CldReadytoExec);
+  CpvAccess(CldReadytoExecHandlerIndex) = CmiRegisterHandler((CmiHandler)CldReadytoExec);
   CpvAccess(CldRequestQueue) = (void *)CqsCreate();
   CldModuleGeneralInit(argv);
   

@@ -89,6 +89,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
+    //CmiPrintf("   myself processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -101,7 +102,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
     else {
-        CmiPrintf(" on processor %d Send msg to pe:%d, length=%d Timer:%f \n", CmiMyPe(), pe, len, CmiWallTimer());
+        //CmiPrintf("   processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
         CmiSyncSendAndFree(pe, len, msg);
     }
   }

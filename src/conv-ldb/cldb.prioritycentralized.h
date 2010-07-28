@@ -53,25 +53,8 @@ typedef struct CldProcPriorInfo_s {
 typedef struct CldSlavePriorInfo_s {
     int pe;
     double average_priority;
-    int priority_1;
-    int priority_2;
+    //int priority_1;
+    //int priority_2;
     int load;
 } CldSlavePriorInfo;
-
-typedef struct CldPriorityToken_s {
-
-    char msg_header[CmiMsgHeaderSizeBytes];
-    unsigned int priority;
-    struct CldPriorityToken_s *pred;
-    struct CldPriorityToken_s *succ;
-    void* msg;
-} *CldPriorityToken;
-
-typedef struct CldPriorityTokenInfo_s {
-  int tokenhandleridx;
-  int load; /* number of items in doubly-linked circle besides sentinel */
-  CldPriorityToken head;
-  CldPriorityToken tail;
-} *CldPriorityTokenInfo;
-
 
