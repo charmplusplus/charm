@@ -762,8 +762,9 @@ public:
     for(i=0;i<dimension;i++) {
       VirtualNodeCount *= Cardinality[i];
     }
-
+#ifdef YHDEBUG
     CmiPrintf(" ppn=%d, NumOfNodes=%d\n", ppn, NumOfNodes);
+#endif
   }
   ~LBTopo_torus_nd_smp() {
     delete[] Cardinality;
@@ -780,8 +781,9 @@ public:
     int node = CmiPhysicalNodeID(mype);
     int _ppn_ = CmiNumPesOnPhysicalNode(node);
     CmiGetPesOnPhysicalNode(node, &nodePeList, &numpes); 
+#ifdef YHDEBUG
     CmiPrintf(" 22222222222222ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", _ppn_, NumOfNodes, rank, node, numpes);
-   
+#endif   
     for(int i=0; i<numpes; i++)
     {
         int _pid = nodePeList[i];
@@ -803,7 +805,9 @@ public:
         }
     }
 
+#ifdef YHDEBUG
   CmiPrintf(" Yes my neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", nb, _ppn_, NumOfNodes, rank, node, numpes);
+#endif
   }
   virtual int get_dimension() {
     return dimension;
@@ -1121,6 +1125,39 @@ void LBTopo_graph::neighbors(int mype, int* na, int &nb)
   gengraph(CmiNumPes(), (int)(sqrt(1.0*CmiNumPes())+0.5), 234, na, &nb, 0);
 }
 
+
+template <int dimension>
+class LBTopo_graph_nc: public LBTopology {
+
+public:
+    LBTopo_graph_nc(int p): LBTopology(p) {}
+    int max_neighbors()
+    {
+        return dimension + 1; 
+    }
+
+    void neighbors(int mype, int* na, int &nb)
+    {
+        gengraph(CmiNumPes(), dimension, 234, na, &nb, 0);
+    }
+
+};
+typedef LBTopo_graph_nc<2> LBTopo_graph_nc_2;
+typedef LBTopo_graph_nc<4> LBTopo_graph_nc_4;
+typedef LBTopo_graph_nc<6> LBTopo_graph_nc_6;
+typedef LBTopo_graph_nc<8> LBTopo_graph_nc_8;
+typedef LBTopo_graph_nc<10> LBTopo_graph_nc_10;
+typedef LBTopo_graph_nc<20> LBTopo_graph_nc_20;
+
+LBTOPO_MACRO(LBTopo_graph_nc_2);
+LBTOPO_MACRO(LBTopo_graph_nc_4);
+LBTOPO_MACRO(LBTopo_graph_nc_6);
+LBTOPO_MACRO(LBTopo_graph_nc_8);
+LBTOPO_MACRO(LBTopo_graph_nc_10);
+LBTOPO_MACRO(LBTopo_graph_nc_20);
+
+
+
 // complete graph
 
 class LBTopo_complete: public LBTopology {
@@ -1218,6 +1255,12 @@ public:
     lbTopos.push_back(new LBTopoMap("imesh_nd_6", createLBTopo_imesh_nd_6));
     lbTopos.push_back(new LBTopoMap("imesh_nd_7", createLBTopo_imesh_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
+    lbTopos.push_back(new LBTopoMap("graph_nc_2", createLBTopo_graph_nc_2));
+    lbTopos.push_back(new LBTopoMap("graph_nc_4", createLBTopo_graph_nc_4));
+    lbTopos.push_back(new LBTopoMap("graph_nc_6", createLBTopo_graph_nc_6));
+    lbTopos.push_back(new LBTopoMap("graph_nc_8", createLBTopo_graph_nc_8));
+    lbTopos.push_back(new LBTopoMap("graph_nc_10", createLBTopo_graph_nc_10));
+    lbTopos.push_back(new LBTopoMap("graph_nc_20", createLBTopo_graph_nc_20));
     lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
     lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
     lbTopos.push_back(new LBTopoMap("3_arytree", createLBTopo_3_arytree));

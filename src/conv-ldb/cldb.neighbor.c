@@ -93,7 +93,7 @@ static void CldStillIdle(void *dummy, double curT)
   CmiBecomeImmediate(&msg);
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     msg.to_rank = CmiRankOf(CpvAccess(neighbors)[i].pe);
-    CmiSyncNodeSend(CpvAccess(neighbors)[i].pe,sizeof(requestmsg),(char *)&msg);
+    CmiSyncSend(CpvAccess(neighbors)[i].pe,sizeof(requestmsg),(char *)&msg);
     //CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
   }
   /*
@@ -191,6 +191,10 @@ int CldMinAvg()
   int sum=0, i;
 
   int nNeighbors = CpvAccess(numNeighbors);
+  
+#ifdef YHDEBUG
+  CmiPrintf("Line 196 processor %d, numNeighbor=%d\n", CmiMyPe(), nNeighbors);
+#endif
   if (CpvAccess(start) == -1)
     CpvAccess(start) = CmiMyPe() % nNeighbors;
 
@@ -612,6 +616,11 @@ static void CldComputeNeighborData()
   }
   CpvAccess(neighborGroup) = CmiEstablishGroup(CpvAccess(numNeighbors), pes);
   free(pes);
+
+#ifdef YHDEBUG
+  CmiPrintf("Line 617 On processor=%d npe=%d, numNeighbors=%d\n", CmiMyPe(), npe, CpvAccess(numNeighbors));
+#endif
+
 }
 
 void CldGraphModuleInit(char **argv)
@@ -680,6 +689,8 @@ void CldGraphModuleInit(char **argv)
     CmiNodeBarrier();
 #endif
     CldBalancePeriod(NULL, CmiWallTimer());
+
+
   }
 
 #if 1
@@ -694,6 +705,16 @@ void CldGraphModuleInit(char **argv)
       CmiPrintf("Charm++> Work stealing is enabled. \n");
   }
 #endif
+}
+
+void CldCallback()
+{
+    CldComputeNeighborData();
+#if CMK_MULTICORE
+    CmiNodeBarrier();
+#endif
+    CldBalancePeriod(NULL, CmiWallTimer());
+
 }
 
 void CldModuleInit(char **argv)

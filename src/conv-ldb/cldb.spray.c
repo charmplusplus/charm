@@ -258,3 +258,5 @@ void CldModuleInit(char **argv)
   CldModuleGeneralInit(argv);
   CldInitiateReduction();
 }
+void CldCallback()
+{}

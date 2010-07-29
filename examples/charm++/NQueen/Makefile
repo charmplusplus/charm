@@ -1,6 +1,6 @@
 CHARMC = ../../../bin/charmc $(OPTS)
 default: all
-all: nqueen nqueen_prj nqueen_rand  nqueen_neighbor nqueen_neighbor.prj
+all: nqueen nqueen_prj nqueen_rand  nqueen_neighbor nqueen_neighbor.prj nqueen_workstealing
 
 nqueen : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -o nqueen main.o nqueen.o counter.o
@@ -10,6 +10,9 @@ nqueen_rand : main.o nqueen.o counter.o
 
 nqueen_neighbor : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -balance neighbor -o nqueen_neighbor main.o nqueen.o counter.o
+
+nqueen_workstealing : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -balance workstealing -o nqueen_workstealing main.o nqueen.o counter.o
 
 nqueen_prj : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -tracemode projections -balance rand -o nqueen_prj main.o nqueen.o counter.o

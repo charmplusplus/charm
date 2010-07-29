@@ -146,3 +146,6 @@ void CldModuleInit(char **argv)
     CpvAccess(CldMessageChunks) = 0;
   CldModuleGeneralInit(argv);
 }
+
+void CldCallback()
+{}

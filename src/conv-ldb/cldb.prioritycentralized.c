@@ -474,3 +474,5 @@ void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn)
 }
 
 
+void CldCallback()
+{}
