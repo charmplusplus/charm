@@ -192,11 +192,11 @@ int CldMinAvg()
 {
   int sum=0, i;
 
-
   int nNeighbors = CpvAccess(numNeighbors);
-  
   if(CpvAccess(topologyReady) == 0 || nNeighbors == 0)
+  {
       return CmiMyPe();
+  }
 #ifdef YHDEBUG
   CmiPrintf("Line 196 processor %d, numNeighbor=%d\n", CmiMyPe(), nNeighbors);
 #endif
@@ -702,6 +702,8 @@ void CldGraphModuleInit(char **argv)
 
 void CldCallback()
 {
+    if(CpvAccess(topologyReady))
+        return;
     CldComputeNeighborData();
     CpvAccess(topologyReady) = 1;
 #if CMK_MULTICORE
