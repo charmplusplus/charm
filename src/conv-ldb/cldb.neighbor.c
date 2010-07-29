@@ -44,6 +44,8 @@ CpvStaticDeclare(int, MinProc);
 CpvStaticDeclare(int, Mindex);
 CpvStaticDeclare(int, start);
 
+CpvStaticDeclare(int, topologyReady);
+
 void LoadNotifyFn(int l)
 {
   CldProcInfo  cldData = CpvAccess(CldData);
@@ -190,20 +192,17 @@ int CldMinAvg()
 {
   int sum=0, i;
 
+
   int nNeighbors = CpvAccess(numNeighbors);
   
+  if(CpvAccess(topologyReady) == 0 || nNeighbors == 0)
+      return CmiMyPe();
 #ifdef YHDEBUG
   CmiPrintf("Line 196 processor %d, numNeighbor=%d\n", CmiMyPe(), nNeighbors);
 #endif
   if (CpvAccess(start) == -1)
     CpvAccess(start) = CmiMyPe() % nNeighbors;
 
-#if 0
-    /* update load from neighbors for multicore */
-  for (i=0; i<nNeighbors; i++) {
-    CpvAccess(neighbors)[i].load = CldLoadRank(CpvAccess(neighbors)[i].pe);
-  }
-#endif
   CpvAccess(MinProc) = CpvAccess(neighbors)[CpvAccess(start)].pe;
   CpvAccess(MinLoad) = CpvAccess(neighbors)[CpvAccess(start)].load;
   sum = CpvAccess(neighbors)[CpvAccess(start)].load;
@@ -684,12 +683,6 @@ void CldGraphModuleInit(char **argv)
     else fclose(fp);
     CldReadNeighborData();
 #endif
-    CldComputeNeighborData();
-#if CMK_MULTICORE
-    CmiNodeBarrier();
-#endif
-    CldBalancePeriod(NULL, CmiWallTimer());
-
 
   }
 
@@ -710,6 +703,7 @@ void CldGraphModuleInit(char **argv)
 void CldCallback()
 {
     CldComputeNeighborData();
+    CpvAccess(topologyReady) = 1;
 #if CMK_MULTICORE
     CmiNodeBarrier();
 #endif
@@ -723,9 +717,11 @@ void CldModuleInit(char **argv)
   CpvInitialize(int, CldRelocatedMessages);
   CpvInitialize(int, CldLoadBalanceMessages);
   CpvInitialize(int, CldMessageChunks);
+  CpvInitialize(int, topologyReady);
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
   CpvAccess(CldMessageChunks) = 0;
+  CpvAccess(topologyReady) = 0;
 
   CldModuleGeneralInit(argv);
   CldGraphModuleInit(argv);
