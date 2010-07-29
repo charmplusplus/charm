@@ -228,7 +228,6 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
 void CldGraphModuleInit(char **argv)
 {
   CpvInitialize(CldProcInfo, CldData);
-  CpvInitialize(int, CldLoadResponseHandlerIndex);
   CpvInitialize(int, CldAskLoadHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
 
