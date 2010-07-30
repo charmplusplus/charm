@@ -1149,12 +1149,12 @@ typedef LBTopo_graph_nc<8> LBTopo_graph_nc_8;
 typedef LBTopo_graph_nc<10> LBTopo_graph_nc_10;
 typedef LBTopo_graph_nc<20> LBTopo_graph_nc_20;
 
-LBTOPO_MACRO(LBTopo_graph_nc_2);
-LBTOPO_MACRO(LBTopo_graph_nc_4);
-LBTOPO_MACRO(LBTopo_graph_nc_6);
-LBTOPO_MACRO(LBTopo_graph_nc_8);
-LBTOPO_MACRO(LBTopo_graph_nc_10);
-LBTOPO_MACRO(LBTopo_graph_nc_20);
+LBTOPO_MACRO(LBTopo_graph_nc_2)
+LBTOPO_MACRO(LBTopo_graph_nc_4)
+LBTOPO_MACRO(LBTopo_graph_nc_6)
+LBTOPO_MACRO(LBTopo_graph_nc_8)
+LBTOPO_MACRO(LBTopo_graph_nc_10)
+LBTOPO_MACRO(LBTopo_graph_nc_20)
 
 
 
