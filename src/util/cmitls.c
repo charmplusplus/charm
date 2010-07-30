@@ -1,4 +1,6 @@
 
+#include <stdio.h>
+
 #include "converse.h"
 #include "cmitls.h"
 
