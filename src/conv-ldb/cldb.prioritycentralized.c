@@ -42,7 +42,7 @@ char *CldGetStrategy(void)
   return "prioritycentralized";
 }
 
-inline void SendTasktoPe(int receiver, void *msg)
+void SendTasktoPe(int receiver, void *msg)
 {
     CldInfoFn ifn; 
     CldPackFn pfn;
@@ -86,11 +86,6 @@ static void CldStoreCharemsg(void *msg)
     int request_pe;
     void* loadmsg;
 
-    ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
-    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-#if YH_DEBUG
-    CmiPrintf(" Step 2: on processor 0, Get new created msg and store it , PRIOR=%u Timer=%f\n", *prioptr, CmiTimer());
-#endif
     /* check whether there is processor with lower priority, it exists, push this task to that processor */
     /* find the processor with the highest priority */
     int i=0; 
@@ -98,6 +93,12 @@ static void CldStoreCharemsg(void *msg)
     int index = 1;
     double max_evaluation = 0;
     int old_load;
+   
+    ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+    ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+#if YH_DEBUG
+    CmiPrintf(" Step 2: on processor 0, Get new created msg and store it , PRIOR=%u Timer=%f\n", *prioptr, CmiTimer());
+#endif
     //check which processor has underload and also the task priority is lower than the msg priority
     for(i=1; i<CmiNumPes();i++)
     {   //underload to avoid overflow
