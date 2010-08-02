@@ -1143,16 +1143,24 @@ public:
 
 };
 typedef LBTopo_graph_nc<2> LBTopo_graph_nc_2;
+typedef LBTopo_graph_nc<3> LBTopo_graph_nc_3;
 typedef LBTopo_graph_nc<4> LBTopo_graph_nc_4;
+typedef LBTopo_graph_nc<5> LBTopo_graph_nc_5;
 typedef LBTopo_graph_nc<6> LBTopo_graph_nc_6;
+typedef LBTopo_graph_nc<7> LBTopo_graph_nc_7;
 typedef LBTopo_graph_nc<8> LBTopo_graph_nc_8;
+typedef LBTopo_graph_nc<9> LBTopo_graph_nc_9;
 typedef LBTopo_graph_nc<10> LBTopo_graph_nc_10;
 typedef LBTopo_graph_nc<20> LBTopo_graph_nc_20;
 
 LBTOPO_MACRO(LBTopo_graph_nc_2)
+LBTOPO_MACRO(LBTopo_graph_nc_3)
 LBTOPO_MACRO(LBTopo_graph_nc_4)
+LBTOPO_MACRO(LBTopo_graph_nc_5)
 LBTOPO_MACRO(LBTopo_graph_nc_6)
+LBTOPO_MACRO(LBTopo_graph_nc_7)
 LBTOPO_MACRO(LBTopo_graph_nc_8)
+LBTOPO_MACRO(LBTopo_graph_nc_9)
 LBTOPO_MACRO(LBTopo_graph_nc_10)
 LBTOPO_MACRO(LBTopo_graph_nc_20)
 
@@ -1256,9 +1264,13 @@ public:
     lbTopos.push_back(new LBTopoMap("imesh_nd_7", createLBTopo_imesh_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
     lbTopos.push_back(new LBTopoMap("graph_nc_2", createLBTopo_graph_nc_2));
+    lbTopos.push_back(new LBTopoMap("graph_nc_3", createLBTopo_graph_nc_3));
     lbTopos.push_back(new LBTopoMap("graph_nc_4", createLBTopo_graph_nc_4));
+    lbTopos.push_back(new LBTopoMap("graph_nc_5", createLBTopo_graph_nc_5));
     lbTopos.push_back(new LBTopoMap("graph_nc_6", createLBTopo_graph_nc_6));
+    lbTopos.push_back(new LBTopoMap("graph_nc_7", createLBTopo_graph_nc_7));
     lbTopos.push_back(new LBTopoMap("graph_nc_8", createLBTopo_graph_nc_8));
+    lbTopos.push_back(new LBTopoMap("graph_nc_9", createLBTopo_graph_nc_9));
     lbTopos.push_back(new LBTopoMap("graph_nc_10", createLBTopo_graph_nc_10));
     lbTopos.push_back(new LBTopoMap("graph_nc_20", createLBTopo_graph_nc_20));
     lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
