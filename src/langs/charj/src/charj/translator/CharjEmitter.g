@@ -135,6 +135,7 @@ typeDeclaration
 @init {
     boolean needsMigration = false;
     List<String> initializers = new ArrayList<String>();
+    List<String> pupInitializers = new ArrayList<String>();
 }
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
@@ -176,6 +177,10 @@ typeDeclaration
             for (VariableInitializer init : currentClass.initializers) {
                 initializers.add(init.emit());
             }
+
+            for (VariableInitializer init : currentClass.pupInitializers) {
+                pupInitializers.add(init.emit());
+            }
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -183,7 +188,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                pupInits={currentClass.generateInits()},
+                pupInits={pupInitializers},
                 pupers={currentClass.generatePUPers()},
                 needsMigration={needsMigration},
                 inits={initializers})
@@ -200,7 +205,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                needsPupInit={currentClass.generateInits() != null},
+                needsPupInit={pupInitializers.size() > 0},
                 needsMigration={needsMigration})
         ->
     ;

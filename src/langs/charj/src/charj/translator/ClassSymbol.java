@@ -9,6 +9,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<String> interfaceImpls;
     public List<String> templateArgs;
     public List<VariableInitializer> initializers;
+    public List<VariableInitializer> pupInitializers;
     public List<CharjAST> varsToPup;
 
     Map<String, PackageScope> imports =
@@ -41,6 +42,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             importPackage(pkg);
         }
 	initializers = new ArrayList<VariableInitializer>();
+        pupInitializers = new ArrayList<VariableInitializer>();
         varsToPup = new ArrayList<CharjAST>();
     }
 
@@ -54,6 +56,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.scope = scope;
         this.type = this;
 	this.initializers = new ArrayList<VariableInitializer>();
+        this.pupInitializers = new ArrayList<VariableInitializer>();
 
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
@@ -315,21 +318,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             }
         }
         return false;
-    }
-
-    public List<String> generateInits() {
-        List<String> inits = new ArrayList<String>();
-        for (CharjAST varAst : varsToPup) {
-            if (varAst.def instanceof VariableSymbol &&
-                ((VariableSymbol)varAst.def).isPointerType()) {
-                VariableSymbol vs = (VariableSymbol)varAst.def;
-                inits.add(vs.generateInit());
-            }
-        }
-        if (inits.size() == 0)
-            return null;
-        else
-            return inits;
     }
 
     public List<String> generatePUPers() {

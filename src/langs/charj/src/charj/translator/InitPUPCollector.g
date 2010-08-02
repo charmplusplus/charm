@@ -101,6 +101,7 @@ varDeclaration
 
             if (!inMethod && currentClass != null) {
                 currentClass.varsToPup.add($IDENT);
+                currentClass.pupInitializers.add(new VariableInitializer($expr, $IDENT));
             }
         }
     ;
