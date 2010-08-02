@@ -134,16 +134,14 @@ importDeclaration
 typeDeclaration
 @init {
     boolean needsMigration = false;
-    List<String> initializers = new ArrayList<String>();
-    List<String> pupInitializers = new ArrayList<String>();
+    List<String> inits = new ArrayList<String>();
+    List<String> pupInits = new ArrayList<String>();
 }
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
 
-            for (VariableInitializer init : currentClass.initializers) {
-                initializers.add(init.emit());
-            }
+            inits = currentClass.generateInits(currentClass.initializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -151,7 +149,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                inits={initializers})
+                inits={inits})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
@@ -174,13 +172,8 @@ typeDeclaration
             currentClass = (ClassSymbol)$IDENT.def;
             needsMigration = currentClass.isChareArray && !currentClass.hasMigrationCtor;
 
-            for (VariableInitializer init : currentClass.initializers) {
-                initializers.add(init.emit());
-            }
-
-            for (VariableInitializer init : currentClass.pupInitializers) {
-                pupInitializers.add(init.emit());
-            }
+            inits = currentClass.generateInits(currentClass.initializers);
+            pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -188,10 +181,10 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                pupInits={pupInitializers},
+                pupInits={pupInits},
                 pupers={currentClass.generatePUPers()},
                 needsMigration={needsMigration},
-                inits={initializers})
+                inits={inits})
         -> {emitCI()}? chareDeclaration_ci(
                 basename={basename()},
                 sym={currentClass},
@@ -205,7 +198,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                needsPupInit={pupInitializers.size() > 0},
+                needsPupInit={pupInits.size() > 0},
                 needsMigration={needsMigration})
         ->
     ;

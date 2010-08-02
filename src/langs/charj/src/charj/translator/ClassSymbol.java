@@ -320,6 +320,14 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return false;
     }
 
+    public List<String> generateInits(List<VariableInitializer> inits) {
+        List<String> strInits = new ArrayList<String>();
+        for (VariableInitializer init : inits) {
+            strInits.add(init.emit());
+        }
+        return strInits;
+    }
+
     public List<String> generatePUPers() {
         List<String> PUPers = new ArrayList<String>();
         for (CharjAST varAst : varsToPup) {
