@@ -250,6 +250,11 @@ void CldBalance(void *dummy, double curT)
   int myload = CldLoad();
   int minload;
   int numberoflessthanme = 0;
+
+  int already_sort = 0;
+  int thisload;
+  int sum = 0;
+
   cldData->lastBalanceTime = CmiWallTimer();
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   double startT = curT;
@@ -260,10 +265,6 @@ void CldBalance(void *dummy, double curT)
   overload = CldLoad() - avgLoad;
   if (overload > CldCountTokens())
     overload = CldCountTokens();
-
-  int already_sort = 0;
-  int thisload;
-  int sum = 0;
 
   for (i=0; i<nNeighbors; i++) {
       thisload = CpvAccess(neighbors)[i].load;
