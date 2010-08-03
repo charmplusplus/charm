@@ -863,7 +863,7 @@ extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 
-extern "C" void CldCallback();
+//extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -1213,7 +1213,7 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
-    CldCallback();
+    //CldCallback();
 #if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
       // Register the BG handler for CCS. Notice that this is put into a variable shared by
       // the whole real processor. This because converse needs to find it. We check that all
