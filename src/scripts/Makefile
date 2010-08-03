@@ -673,7 +673,7 @@ CHARMLIBS: charm++ CONVLIBS
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
 $(L)/libck.a: $(LIBCK_CORE)
-	$(CHARMC) -o $@ $^
+	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 ## Charm fortran AMPI
 
