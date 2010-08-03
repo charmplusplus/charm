@@ -18,7 +18,7 @@ public mainchare ArrayTest {
                 printf("%d %d\n", test1[i], test2[i]);
            }
 
-           delete test1;
+           delete test2;
 
            CkExit();
       }
