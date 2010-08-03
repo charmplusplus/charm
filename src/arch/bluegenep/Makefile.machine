@@ -1,23 +1,2 @@
 #  Bluegene/P specific Make rules
 
-# Add the BGP UPC code to libk, as the control point tracing module is always
-# linked in.
-
-$(L)/libck.a:  trace-controlPoints-BGP.o
-
-# The BGP performance counter library UPC must be compiled with gcc:
-trace-controlPoints-BGP.o : trace-controlPoints-BGP.C converse.h
-	$(CHARMC) -c++ g++ -c $< -o $@ -I/bgsys/drivers/ppcfloor/arch/include/ $(OPTS) -no-optimize
-
-
-
-# Add in these dependencies because we need to 
-# make sure autoconf runs before we build the above targets.
-#
-# Furthermore, there is a CVS checked in version of Make.depends, probably
-# generated on something other than BG/L, so the dependencies for 
-# trace-controlPoints-BGP.o never are generated.
-
-converse.h: conv-autoconfig.h 
-
-conv-config.h: conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h

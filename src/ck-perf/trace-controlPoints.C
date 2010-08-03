@@ -174,24 +174,12 @@ void TraceControlPoints::traceClose(void)
   // Print out some performance counters on BG/P
   CProxy_TraceControlPointsBOC myProxy(traceControlPointsGID);
 
-#if 0
-  myProxy.ckLocalBranch()->printBGP_UPC_CountersBOC();
-#endif
     
   CkpvAccess(_trace)->endComputation();
   // remove myself from traceArray so that no tracing will be called.
   CkpvAccess(_traces)->removeTrace(this);
 }
 
-void printBGP_UPC_Counters(void);
-
-void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
-#if CMK_WITH_CONTROLPOINT
-#ifdef CMK_BLUEGENEP
-	printBGP_UPC_Counters();
-#endif
-#endif
-}
 
 
 
