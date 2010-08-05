@@ -53,14 +53,9 @@ message is deleted.
 \subsubsection{What are priorities?}
 
 Priorities are special values that can be associated with messages, so that the
-Charm++ scheduler will prefer higher priority messages when choosing a message
-to deliver. Priorities are respected by Charm++ as much as possible: until there
-are higher priority messages in the queue, lower priority message will never be
-delivered. Nevertheless, this is not a guarantee, and a lower priority message
-can be delivered before a higher priority one.
+Charm++ scheduler will generally prefer higher priority messages when choosing a message
+to deliver. Priorities are often respected by Charm++ scheduler, but for correctness, a program must never rely upon any particular ordering of message deliveries. Messages with priorities are typically used to encourage high performance behavior of an application.
 
-Messages with priorities are typically used to perform optimizations on the
-order of the computation.
 
 For integer priorities, the smaller the priority value, the higher the priority
 of the message. Negative value are therefore higher priority than positive ones. 
