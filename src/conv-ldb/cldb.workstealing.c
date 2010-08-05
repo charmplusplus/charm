@@ -8,7 +8,7 @@
 #define IDLE_IMMEDIATE 		1
 #define TRACE_USEREVENTS        0
 
-#define PERIOD 20                /* default: 30 */
+#define PERIOD 10                /* default: 30 */
 #define MSGDELAY 10
 #define MAXOVERLOAD 1
 
