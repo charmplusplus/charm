@@ -24,9 +24,11 @@ typedef struct CldProcInfo_s {
   double lastBalanceTime;
 } *CldProcInfo;
 
+int _stealonly1 = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
+CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 
 void LoadNotifyFn(int l)
 {
@@ -58,6 +60,7 @@ static void CldStillIdle(void *dummy, double curT)
   int myload;
   CldProcInfo  cldData = CpvAccess(CldData);
   int  victim;
+  int mype;
 
   double now = curT;
   double lt = cldData->lastCheck;
@@ -69,8 +72,11 @@ static void CldStillIdle(void *dummy, double curT)
   if (myload > 0) return;
 
   msg.from_pe = CmiMyPe();
+  mype = CmiMyPe();
 
-  victim = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
+  do{
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%CmiNumPes());
+  }while(victim == mype);
 
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
   /* fixme */
@@ -93,19 +99,52 @@ static void CldAskLoadHandler(requestmsg *msg)
   double now = CmiWallTimer();
   CldProcInfo  cldData = CpvAccess(CldData);
 
+  int sendLoad;
+  sendLoad = myload / 2; 
+  receiver = msg->from_pe;
   /* only give you work if I have more than 1 */
-  if (myload>0) {
-    int sendLoad;
-    receiver = msg->from_pe;
-    rank = CmiMyRank();
-    if (msg->to_rank != -1) rank = msg->to_rank;
-    sendLoad = myload / 2; 
-    CmiFree(msg);
-    if (sendLoad < 1) return;
-    CldMultipleSend(receiver, sendLoad, rank, 0);
+  if (sendLoad>0) {
+      if(_stealonly1) sendLoad = 1;
+      rank = CmiMyRank();
+      if (msg->to_rank != -1) rank = msg->to_rank;
+      CldMultipleSend(receiver, sendLoad, rank, 0);
+  }else
+  {
+      requestmsg r_msg;
+      r_msg.from_pe = CmiMyPe();
+      r_msg.to_rank = CmiMyRank();
+
+      CmiSetHandler(&r_msg, CpvAccess(CldAckNoTaskHandlerIndex));
+      CmiSyncSend(receiver, sizeof(requestmsg),(char *)&r_msg);
+    /* send ack indicating there is no task */
   }
+  CmiFree(msg);
 }
 
+void  CldAckNoTaskHandler(requestmsg *msg)
+{
+    int victim; 
+    requestmsg r_msg;
+    int notaskpe = msg->from_pe;
+    CldProcInfo  cldData = CpvAccess(CldData);
+    int mype = CmiMyPe();
+  do{
+      victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
+  }while(victim == mype || victim == notaskpe);
+
+  /* fixme */
+  //CmiBecomeImmediate(&msg);
+  r_msg.to_rank = CmiRankOf(victim);
+  r_msg.from_pe = mype;
+  CmiSetHandler(&r_msg, CpvAccess(CldAskLoadHandlerIndex));
+  CmiSyncSend(victim, sizeof(requestmsg),(char *)&r_msg);
+  cldData->sent = 1;
+
+  cldData->lastCheck = CmiWallTimer();
+
+  CmiFree(msg);
+
+}
 void CldHandler(void *msg)
 {
   CldInfoFn ifn; CldPackFn pfn;
@@ -229,6 +268,7 @@ void CldGraphModuleInit(char **argv)
 {
   CpvInitialize(CldProcInfo, CldData);
   CpvInitialize(int, CldAskLoadHandlerIndex);
+  CpvInitialize(int, CldAckNoTaskHandlerIndex);
   CpvInitialize(int, CldBalanceHandlerIndex);
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
@@ -244,9 +284,14 @@ void CldGraphModuleInit(char **argv)
     CmiRegisterHandler(CldBalanceHandler);
   CpvAccess(CldAskLoadHandlerIndex) = 
     CmiRegisterHandler((CmiHandler)CldAskLoadHandler);
+  
+  CpvAccess(CldAckNoTaskHandlerIndex) = 
+    CmiRegisterHandler((CmiHandler)CldAckNoTaskHandler);
 
   /* communication thread */
   if (CmiMyRank() == CmiMyNodeSize())  return;
+
+  _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
 
 #if 1
   /* register idle handlers - when idle, keep asking work from neighbors */
