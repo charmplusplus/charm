@@ -51,7 +51,8 @@ TraceControlPoints::TraceControlPoints(char **argv)
 
 
 void TraceControlPoints::traceBegin(void){
-  totalUntracedTime += CmiWallTimer() - whenStoppedTracing;
+  if(whenStoppedTracing != 0)
+    totalUntracedTime += CmiWallTimer() - whenStoppedTracing;
   whenStoppedTracing = 0;
   CkPrintf("[%d] TraceControlPoints::traceBegin() totalUntracedTime=%f\n", CkMyPe(), totalUntracedTime);
 }
