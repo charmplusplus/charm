@@ -31,6 +31,12 @@ class TraceControlPoints : public Trace {
   /** The start of the idle region */
   double lastBeginIdle;
   
+  /** Amount of time spent so far in untraced regions */
+  double totalUntracedTime;
+
+  /** When tracing was suspended (0 if not currently suspended) */
+  double whenStoppedTracing;
+
   /** The amount of time spent executing entry methods since we last reset the counters */
   double totalEntryMethodTime;
 
@@ -59,6 +65,11 @@ class TraceControlPoints : public Trace {
  public:
   TraceControlPoints(char **argv);
   
+  //begin/end tracing
+  void traceBegin(void);
+  void traceEnd(void);
+
+
   // a user event has just occured
   void userEvent(int eventID);
   // a pair of begin/end user event has just occured
@@ -114,13 +125,22 @@ class TraceControlPoints : public Trace {
   /** Fraction of the time spent idle since resetting the counters */
   double idleRatio(){
     double t = CmiWallTimer() - lastResetTime;
-    return (totalIdleTime) / t;
+    return (totalIdleTime) /  (t-untracedTime());
+  }
+
+  double untracedTime(){
+    if(whenStoppedTracing == 0){
+      return totalUntracedTime;     
+    } else {
+      return totalUntracedTime + (CmiWallTimer()-whenStoppedTracing);
+    }
+
   }
 
   /** Fraction of time spent as overhead since resetting the counters */
   double overheadRatio(){
     double t = CmiWallTimer() - lastResetTime;
-    return (t - totalIdleTime - totalEntryMethodTime) / t;
+    return (t - totalIdleTime - totalEntryMethodTime) / (t-untracedTime());
   }
 
   /** Highest memory usage (in MB) value we've seen since resetting the counters */

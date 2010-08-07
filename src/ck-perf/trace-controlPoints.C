@@ -37,6 +37,8 @@ TraceControlPoints::TraceControlPoints(char **argv)
 
   nesting_level = 0;
 
+  whenStoppedTracing = 0;
+
   b1=0;
   b2=0;
   b3=0;
@@ -46,6 +48,22 @@ TraceControlPoints::TraceControlPoints(char **argv)
   // Process runtime arguments intended for the module
   // CmiGetArgIntDesc(argv,"+ControlPointsPar0", &par0, "Fake integer parameter 0");
 }
+
+
+void TraceControlPoints::traceBegin(void){
+  totalUntracedTime += CmiWallTimer() - whenStoppedTracing;
+  whenStoppedTracing = 0;
+  CkPrintf("[%d] TraceControlPoints::traceBegin() totalUntracedTime=%f\n", CkMyPe(), totalUntracedTime);
+}
+
+
+void TraceControlPoints::traceEnd(void){
+  CkPrintf("[%d] TraceControlPoints::traceEnd()\n", CkMyPe());
+  CkAssert(whenStoppedTracing == 0); // can't support nested traceEnds on one processor yet...
+  whenStoppedTracing = CmiWallTimer();
+}
+
+
 
 void TraceControlPoints::userEvent(int eventID) 
 {
@@ -145,7 +163,7 @@ void TraceControlPoints::endIdle(double curWallTime) {
 
 void TraceControlPoints::beginComputation(void)
 {
-  //  CkPrintf("[%d] Computation Begins\n", CkMyPe());
+  CkPrintf("[%d] TraceControlPoints::beginComputation\n", CkMyPe());
   // Code Below shows what trace-summary would do.
   // initialze arrays because now the number of entries is known.
   // _logPool->initMem();
@@ -153,7 +171,7 @@ void TraceControlPoints::beginComputation(void)
 
 void TraceControlPoints::endComputation(void)
 {
-  //  CkPrintf("[%d] Computation Ends\n", CkMyPe());
+  CkPrintf("[%d] TraceControlPoints::endComputationn", CkMyPe());
 }
 
 void TraceControlPoints::malloc(void *where, int size, void **stack, int stackSize)
@@ -188,6 +206,10 @@ void TraceControlPoints::resetTimings(){
   totalEntryMethodTime = 0.0;
   totalEntryMethodInvocations = 0;
   lastResetTime = CmiWallTimer();
+  totalUntracedTime = 0;
+  if(whenStoppedTracing !=0){
+    whenStoppedTracing = CmiWallTimer();
+  }
 }
 
 void TraceControlPoints::resetAll(){
@@ -200,7 +222,14 @@ void TraceControlPoints::resetAll(){
   b2=0;
   b3=0;
   lastResetTime = CmiWallTimer();
+  totalUntracedTime = 0;
+  if(whenStoppedTracing !=0){
+    whenStoppedTracing = CmiWallTimer();
+  }
 }
+
+
+
 
 
 
@@ -229,6 +258,8 @@ void initTraceControlPointsBOC() {
     }
 */
 }
+
+
 
 #include "TraceControlPoints.def.h"
 
