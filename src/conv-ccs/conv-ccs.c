@@ -183,6 +183,11 @@ void CcsSendReply(int replyLen, const void *replyData)
   CpvAccess(ccsReq) = NULL;
 }
 
+void CcsSendReplyNoError(int replyLen, const void *replyData) {
+  if (CpvAccess(ccsReq)==NULL) return;
+  CcsSendReply(replyLen, replyData);
+}
+
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData)
 {
   CcsImplHeader *h = d.hdr;
