@@ -497,6 +497,11 @@ public:
     const char *type="Converse";
     p.comment("name");
     char name[128];
+    if (msg == (void*)-1) {
+      type="Sentinel";
+      p((char*)type, strlen(type));
+      return;
+    }
 #if ! CMK_BLUEGENE_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
