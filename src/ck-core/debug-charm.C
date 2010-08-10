@@ -1045,6 +1045,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsSetMergeFn("ccs_continue_break_point",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
+  CcsSetMergeFn("ccs_single_step",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
