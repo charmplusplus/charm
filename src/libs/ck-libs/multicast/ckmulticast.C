@@ -1099,6 +1099,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     if (redInfo.npProcessed == nFrags) {
 
       newmsg = combineFrags (id, entry, redInfo);
+      CkSetRefNum(newmsg, userFlag);
 
       if (!msg_cb.isInvalid()) {
         msg_cb.send(newmsg);
