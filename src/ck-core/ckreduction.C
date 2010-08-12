@@ -732,7 +732,7 @@ void CkReductionMgr::finishReduction(void)
       CkAbort("ERROR! Too many contributions at root!\n");
     }
     DEBR((AA"Passing result to client function\n"AB));
-    CkSetRefNum(result, redNo);
+    CkSetRefNum(result, result->getUserFlag());
     if (!result->callback.isInvalid())
 	    result->callback.send(result);
     else if (!storedCallback.isInvalid())
@@ -763,7 +763,7 @@ void CkReductionMgr::finishReduction(void)
 #if DEBUGRED
     CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of SIMPLIFIED GROUP REDUCTION %d at %.6f\n",redNo,CmiWallTimer());
 #endif
-    CkSetRefNum(result, redNo);
+    CkSetRefNum(result, result->getUserFlag());
     if (!result->callback.isInvalid())
         result->callback.send(result);
     else if (!storedCallback.isInvalid())
@@ -1169,7 +1169,7 @@ void CkReductionMgr :: endArrayReduction(){
 #if DEBUGRED
 	CkPrintf("~~~~~~~~~~~~~~~~~ About to call callback from end of GROUP REDUCTION %d at %.6f\n",completedRedNo,CmiWallTimer());
 #endif
-	CkSetRefNum(ret, ret->redNo);
+	CkSetRefNum(ret, ret->getUserFlag());
 	if (!ret->secondaryCallback.isInvalid())
 	    ret->secondaryCallback.send(ret);
     else if (!storedCallback.isInvalid())
@@ -2038,7 +2038,7 @@ void CkNodeReductionMgr::finishReduction(void)
 #if DEBUGRED
    CkPrintf("[%d,%d]------------------- END OF REDUCTION %d with %d remote contributions passed to client function at %.6f\n",CkMyNode(),CkMyPe(),redNo,nRemote,CkWallTimer());
 #endif
-   CkSetRefNum(result, redNo);
+    CkSetRefNum(result, result->getUserFlag());
     if (!result->callback.isInvalid()){
 #if DEBUGRED
 	    CkPrintf("[%d,%d] message Callback used \n",CkMyNode(),CkMyPe());
