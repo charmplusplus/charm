@@ -265,10 +265,6 @@ primitiveType
     |   DOUBLE
     ;
 
-genericTypeArgumentList
-    :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
-    ;
-    
 genericTypeArgument
     :   type
     |   '?'
@@ -423,11 +419,12 @@ primaryExpression
              )
     |   parenthesizedExpression
     |   IDENT
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
-        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
+    |   ^(METHOD_CALL primaryExpression templateInstantiation? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) templateInstantiation? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) templateInstantiation? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
     |   THIS
@@ -442,8 +439,8 @@ primaryExpression
     ;
     
 explicitConstructorCall
-    :   ^(THIS_CONSTRUCTOR_CALL genericTypeArgumentList? arguments)
-    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? genericTypeArgumentList? arguments)
+    :   ^(THIS_CONSTRUCTOR_CALL templateInstantiation? arguments)
+    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? templateInstantiation? arguments)
     ;
 
 arrayTypeDeclarator
