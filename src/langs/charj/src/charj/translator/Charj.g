@@ -383,7 +383,6 @@ interfaceFieldDeclarator
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
-
 variableDeclaratorId
     :   IDENT^ domainExpression?
     ;
