@@ -29,7 +29,7 @@ public interface Scope {
     /** Look up a typename in this scope or in enclosing scope if not here.
      *  Load from disk if necessary.
      */
-    public Type resolveType(List<String> name);
+    public Type resolveType(List<TypeName> name);
 
     /** To look up a method, we need to know number of arguments for overloading
      *  so we need separate method to distinguish from resolve().

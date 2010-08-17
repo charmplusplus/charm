@@ -81,10 +81,10 @@ boolean entry = false;
             type IDENT .*)
         {
             //System.out.println("entering method scope " + $IDENT.text);
-            List<String> typeName = $type.typeName;
+            List<TypeName> typeName = $type.typeName;
             if (typeName == null || typeName.size() == 0) {
                 /*System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");*/
-                typeName.add("void");
+                typeName.add(new TypeName("void"));
             }
             boolean isTraced = false;
             if ($MODIFIER_LIST != null) {
@@ -154,10 +154,10 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
-            List<String> p = new ArrayList<String>();
-            p.add($parent.text);
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
-                    (ClassSymbol)currentScope.resolveType(p), currentScope);
+                    (ClassSymbol)currentScope.
+                      resolveType(TypeName.createTypeName($parent.text)),
+                                  currentScope);
             currentScope.define(sym.name, sym);
             currentClass = sym;
             sym.definition = $IDENT;
@@ -236,27 +236,27 @@ varDeclaration
     ;
 
 
-type returns [List<String> typeName]
+type returns [List<TypeName> typeName]
 @init {
-    $typeName = new ArrayList<String>();
+    $typeName = new ArrayList<TypeName>();
     if (currentScope == null) System.out.println("*****ERROR: null type scope");
     assert currentScope != null;
 }
     :   VOID {
             $VOID.scope = currentScope;
-            $typeName.add("void");
+            $typeName.add(new TypeName("void"));
         }
     |   ^(SIMPLE_TYPE t=. .*) {
             $SIMPLE_TYPE.scope = currentScope;
-            $typeName.add($t.toString());
+            $typeName.add(new TypeName($t.toString()));
         }
-    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add($IDENT.text);} .*))+) .*)
+    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $OBJECT_TYPE.scope = currentScope; }
-    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add($IDENT.text);} .*))+) .*)
+    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $REFERENCE_TYPE.scope = currentScope; }
-    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add($IDENT.text);} .*))+) .*)
+    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $PROXY_TYPE.scope = currentScope; }
-    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add($IDENT.text);} .*))+) .*)
+    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
     ;
 

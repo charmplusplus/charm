@@ -30,13 +30,13 @@ public class PackageScope extends SymbolWithScope {
      *  in package lang which is in package charj.  Next time, Chare will
      *  be found.
      */
-    public ClassSymbol resolveType(List<String> type) {
+    public ClassSymbol resolveType(List<TypeName> type) {
         if (type == null) return null;
 
         String typeStr = "";
 
         if (debug()) { 
-            typeStr = ClassSymbol.typeToString(type);
+            typeStr = TypeName.typeToString(type);
             System.out.println(" PackageScope.resolveType(" + typeStr + 
                                 "): examine " + toString());
         }
@@ -44,17 +44,15 @@ public class PackageScope extends SymbolWithScope {
         ClassSymbol cs = symtab.primitiveTypes.get(type);
         if (cs != null) return cs;
 
-        if (type.size() == 1) return (ClassSymbol)members.get(type.get(0));
-        PackageScope innerPackage = (PackageScope)members.get(type.get(0));
+        if (type.size() == 1) return (ClassSymbol)members.get(type.get(0).name);
+        PackageScope innerPackage = (PackageScope)members.get(type.get(0).name);
         if (innerPackage == null) {
             if (debug()) System.out.println("Package lookup for " +
                                             type.get(0) + "failed.\n");
             return null;
         }
 
-        List<String> ret = new ArrayList<String>();
-        ret.add(type.get(1));
-        return innerPackage.resolveType(ret);
+        return innerPackage.resolveType(TypeName.createTypeName(type.get(1).name));
     }
 
     public String getFullyQualifiedName() {

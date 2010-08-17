@@ -137,11 +137,11 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
      *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
-    public Type resolveType(List<String> type) {
+    public Type resolveType(List<TypeName> type) {
         String typeStr = "";
         
         if (debug()) {
-            typeStr = ClassSymbol.typeToString(type);
+            typeStr = TypeName.typeToString(type);
             System.out.println("ClassSymbol.resolveType(" + typeStr + 
                                "): context is " + name + ":" + 
                                members.keySet());
@@ -152,7 +152,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         }
 
         // Assume that the first part of the type is in position 0
-        if ( name.equals(type.get(0)) ) {
+        if ( name.equals(type.get(0).name) ) {
             if (debug()) 
                 System.out.println("ClassSymbol.resolveType(" + typeStr +
                                    "): surrounding class " + name + ":" + 
@@ -344,18 +344,5 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             }
         }
         return PUPers;
-    }
-
-    public static String typeToString(List<String> type) {
-        if (type != null && type.size() != 0) {
-            StringBuilder sb = new StringBuilder();
-            Iterator<String> it = type.iterator();
-            while (it.hasNext()) {
-                sb.append(it.next());
-            }
-            return sb.toString();
-        } else {
-            return "";
-        }
     }
 }
