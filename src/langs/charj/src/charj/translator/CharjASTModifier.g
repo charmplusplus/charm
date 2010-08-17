@@ -160,7 +160,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
