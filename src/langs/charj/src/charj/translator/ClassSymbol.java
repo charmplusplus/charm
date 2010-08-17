@@ -323,7 +323,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<String> generateInits(List<VariableInitializer> inits) {
         List<String> strInits = new ArrayList<String>();
         for (VariableInitializer init : inits) {
-            strInits.add(init.emit());
+            if (init.init != null)
+                strInits.add(init.emit());
         }
         return strInits;
     }
