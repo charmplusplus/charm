@@ -19,7 +19,7 @@ CpvDeclare(CmiNodeLock, cldLock);
 
 extern void LoadNotifyFn(int);
 
-char* _lbtopo = "torus_nd_5";
+char* _lbtopo = "torus2d";
 
 /* Estimator stuff.  Of any use? */
 /*

@@ -1109,7 +1109,7 @@ LBTOPO_MACRO(LBTopo_imesh_nd_6)
 LBTOPO_MACRO(LBTopo_imesh_nd_7)
 
 
-// dense graph
+// dense graph with connectivity of square root processor number
 
 LBTOPO_MACRO(LBTopo_graph)
 
@@ -1125,7 +1125,7 @@ void LBTopo_graph::neighbors(int mype, int* na, int &nb)
   gengraph(CmiNumPes(), (int)(sqrt(1.0*CmiNumPes())+0.5), 234, na, &nb, 0);
 }
 
-
+/* add by Yanhua Aug-2010*/
 template <int dimension>
 class LBTopo_graph_nc: public LBTopology {
 
@@ -1165,6 +1165,9 @@ LBTOPO_MACRO(LBTopo_graph_nc_10)
 LBTOPO_MACRO(LBTopo_graph_nc_20)
 
 
+/* Centralized  balancer, one processor has the neighbors of all other processors, while the other ones only have one neighbor, the centralized processor */
+
+ 
 
 // complete graph
 
@@ -1202,11 +1205,15 @@ public:
 
 typedef LBTopo_karytree<2> LBTopo_2_arytree;
 typedef LBTopo_karytree<3> LBTopo_3_arytree;
-typedef LBTopo_karytree<3> LBTopo_4_arytree;
+typedef LBTopo_karytree<4> LBTopo_4_arytree;
+typedef LBTopo_karytree<128> LBTopo_128_arytree;
+typedef LBTopo_karytree<512> LBTopo_512_arytree;
 
 LBTOPO_MACRO(LBTopo_2_arytree)
 LBTOPO_MACRO(LBTopo_3_arytree)
 LBTOPO_MACRO(LBTopo_4_arytree)
+LBTOPO_MACRO(LBTopo_128_arytree)
+LBTOPO_MACRO(LBTopo_512_arytree)
 
 //
 
@@ -1277,6 +1284,8 @@ public:
     lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
     lbTopos.push_back(new LBTopoMap("3_arytree", createLBTopo_3_arytree));
     lbTopos.push_back(new LBTopoMap("4_arytree", createLBTopo_4_arytree));
+    lbTopos.push_back(new LBTopoMap("128_arytree", createLBTopo_128_arytree));
+    lbTopos.push_back(new LBTopoMap("512_arytree", createLBTopo_512_arytree));
     lbTopos.push_back(new LBTopoMap("smp_n_1", createLBTopo_smp_n_1));
     lbTopos.push_back(new LBTopoMap("smp_n_2", createLBTopo_smp_n_2));
     lbTopos.push_back(new LBTopoMap("smp_n_3", createLBTopo_smp_n_3));
