@@ -339,7 +339,8 @@ type returns [Type sym]
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 
     // TODO: Special case for Arrays, should be fixed
-    if (typeText.contains(new TypeName("Array")) && $start.symbolType == null) {
+    if (typeText != null && typeText.size() > 0 &&
+        typeText.get(0).name.equals("Array") && $start.symbolType == null) {
         System.out.println("found Array XXXX");
         ClassSymbol cs = new ClassSymbol(symtab, "Array");
         $start.symbolType = new PointerType(symtab, cs);
