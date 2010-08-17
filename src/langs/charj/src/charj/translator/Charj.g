@@ -392,16 +392,6 @@ variableInitializer
     |   expression
     ;
 
-/*arrayDeclarator
-    :   '[' ']'
-        ->  ARRAY_DECLARATOR
-    ;
-
-arrayDeclaratorList
-    :   arrayDeclarator+
-        ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;*/
-
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
         ->  ^(ARRAY_INITIALIZER[$lc, "ARRAY_INITIALIZER"] variableInitializer*)
