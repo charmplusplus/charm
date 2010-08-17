@@ -137,19 +137,26 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
      *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
-    public Type resolveType(String type) {
-        if (debug()) System.out.println(
-                "ClassSymbol.resolveType(" + type + "): context is " + name +
-                ":" + members.keySet());
+    public Type resolveType(List<String> type) {
+        String typeStr = "";
+        
+        if (debug()) {
+            typeStr = ClassSymbol.typeToString(type);
+            System.out.println("ClassSymbol.resolveType(" + typeStr + 
+                               "): context is " + name + ":" + 
+                               members.keySet());
+        }
 
-        if (type == null) {
+        if (type == null || type.size() == 0) {
             return null;
         }
 
-        if ( name.equals(type) ) {
-            if ( debug() ) System.out.println(
-                    "ClassSymbol.resolveType(" + type +
-                    "): surrounding class " + name + ":" + members.keySet());
+        // Assume that the first part of the type is in position 0
+        if ( name.equals(type.get(0)) ) {
+            if (debug()) 
+                System.out.println("ClassSymbol.resolveType(" + typeStr +
+                                   "): surrounding class " + name + ":" + 
+                                   members.keySet());
             return this;
         }
 
@@ -162,12 +169,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         // look for type in classes already defined in imported packages
         for (String packageName : imports.keySet()) {
             if ( debug() ) System.out.println( "Looking for type " +
-                    type + " in package " + packageName);
+                    typeStr + " in package " + packageName);
             PackageScope pkg = resolvePackage(packageName);
             ClassSymbol cs = pkg.resolveType(type);
             if ( cs != null) { // stop looking, found it
                 if ( debug() ) System.out.println(
-                        "ClassSymbol.resolveType(" + type +
+                        "ClassSymbol.resolveType(" + typeStr +
                         "): found in context " + name + ":" +
                         members.keySet());
                 return cs;
@@ -175,7 +182,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         }
 
         if ( debug() ) System.out.println(
-                "ClassSymbol.resolveType(" + type +
+                "ClassSymbol.resolveType(" + typeStr +
                 "): not in context " + name + ":" + members.keySet());
         return null;
     }
@@ -337,5 +344,18 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             }
         }
         return PUPers;
+    }
+
+    public static String typeToString(List<String> type) {
+        if (type != null && type.size() != 0) {
+            StringBuilder sb = new StringBuilder();
+            Iterator<String> it = type.iterator();
+            while (it.hasNext()) {
+                sb.append(it.next());
+            }
+            return sb.toString();
+        } else {
+            return "";
+        }
     }
 }

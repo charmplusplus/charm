@@ -324,14 +324,13 @@ literal returns [Type type]
 
 type returns [Type sym]
 @init {
-    String typeText = "";
+    List<String> typeText = new ArrayList<String>();
     CharjAST head = null;
     Scope scope = null;
     boolean proxy = false;
     boolean pointer = false;
 }
 @after {
-    typeText = typeText.substring(1);
     //System.out.println("\ntype string: " + typeText);
     //System.out.println("direct scope: " + scope);
     $start.symbolType = scope.resolveType(typeText);
@@ -340,7 +339,7 @@ type returns [Type sym]
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 
     // TODO: Special case for Arrays, should be fixed
-    if (typeText.equals("Array") && $start.symbolType == null) {
+    if (typeText.contains("Array") && $start.symbolType == null) {
         System.out.println("found Array XXXX");
         ClassSymbol cs = new ClassSymbol(symtab, "Array");
         $start.symbolType = new PointerType(symtab, cs);
@@ -351,20 +350,20 @@ type returns [Type sym]
 }
     :   VOID {
             scope = $VOID.scope;
-            typeText = ".void";
+            typeText.add("void");
         }
     |   ^(SIMPLE_TYPE t=. {
             scope = $SIMPLE_TYPE.scope;
-            typeText += "." + $t.getText();
+            typeText.add($t.getText());
         } .*)
     |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add($IDENT.text);} .*))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add($IDENT.text);} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add($IDENT.text);} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add($IDENT.text);} .*))+) .*)
     ;
 
 classType

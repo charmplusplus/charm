@@ -86,7 +86,9 @@ public class SymbolTable {
     public ClassSymbol resolveBuiltinType(String type) {
         ClassSymbol ptype = primitiveTypes.get(type);
         if (ptype != null) return ptype;
-        return (ClassSymbol)objectRoot.resolveType(type);
+        List<String> typeName = new ArrayList<String>();
+        typeName.add(type);
+        return (ClassSymbol)objectRoot.resolveType(typeName);
     }
 
     public ClassSymbol getEnclosingClass(Scope scope) {

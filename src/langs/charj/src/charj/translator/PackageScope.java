@@ -3,6 +3,8 @@ package charj.translator;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 public class PackageScope extends SymbolWithScope {
 
@@ -28,26 +30,31 @@ public class PackageScope extends SymbolWithScope {
      *  in package lang which is in package charj.  Next time, Chare will
      *  be found.
      */
-    public ClassSymbol resolveType(String type) {
+    public ClassSymbol resolveType(List<String> type) {
         if (type == null) return null;
-        if (debug()) System.out.println(
-                " PackageScope.resolveType(" + type + 
-                "): examine " + toString());
+
+        String typeStr = "";
+
+        if (debug()) { 
+            typeStr = ClassSymbol.typeToString(type);
+            System.out.println(" PackageScope.resolveType(" + typeStr + 
+                                "): examine " + toString());
+        }
 
         ClassSymbol cs = symtab.primitiveTypes.get(type);
         if (cs != null) return cs;
 
-        // break off leading package names and look them up,
-        // then look up the base class name within the appropriate package scope.
-        String[] nameParts = type.split("[.]", 2);
-        if (nameParts.length == 1) return (ClassSymbol)members.get(type);
-        PackageScope innerPackage = (PackageScope)members.get(nameParts[0]);
+        if (type.size() == 1) return (ClassSymbol)members.get(type.get(0));
+        PackageScope innerPackage = (PackageScope)members.get(type.get(0));
         if (innerPackage == null) {
             if (debug()) System.out.println("Package lookup for " +
-                    nameParts[0] + "failed.\n");
+                                            type.get(0) + "failed.\n");
             return null;
         }
-        return innerPackage.resolveType(nameParts[1]);
+
+        List<String> ret = new ArrayList<String>();
+        ret.add(type.get(1));
+        return innerPackage.resolveType(ret);
     }
 
     public String getFullyQualifiedName() {
