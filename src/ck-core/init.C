@@ -1014,7 +1014,12 @@ void _initCharm(int unused_argc, char **argv)
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
+
+#ifdef __BLUEGENE__
+	if(BgNodeRank()==0) 
+#endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
 
