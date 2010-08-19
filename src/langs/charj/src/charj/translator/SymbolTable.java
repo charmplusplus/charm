@@ -89,6 +89,22 @@ public class SymbolTable {
         return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
     }
 
+    public ClassSymbol resolveBuiltinLitType(String type, String literal) {
+        ClassSymbol ptype = primitiveTypes.get(type);
+        if (ptype != null) {
+            LiteralType t = new LiteralType(this, ptype);
+            t.literal = literal;
+            return (ClassSymbol)t;
+        }
+        return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
+    }
+
+    public ClassSymbol resolveBuiltinType(String type, String lit) {
+        ClassSymbol ptype = primitiveTypes.get(type);
+        if (ptype != null) return ptype;
+        return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
+    }
+
     public ClassSymbol getEnclosingClass(Scope scope) {
         while (scope != null) {
             if (scope instanceof ClassSymbol) return (ClassSymbol)scope;

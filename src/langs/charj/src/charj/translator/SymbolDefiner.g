@@ -250,14 +250,29 @@ type returns [List<TypeName> typeName]
             $SIMPLE_TYPE.scope = currentScope;
             $typeName.add(new TypeName($t.toString()));
         }
-    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
+    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $OBJECT_TYPE.scope = currentScope; }
     |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $REFERENCE_TYPE.scope = currentScope; }
     |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $PROXY_TYPE.scope = currentScope; }
-    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
+    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($i1.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
+    ;
+
+literal returns [String lit]
+@init {
+$lit = $start.getText().toString();
+}
+    :   HEX_LITERAL
+    |   OCTAL_LITERAL
+    |   DECIMAL_LITERAL
+    |   FLOATING_POINT_LITERAL
+    |   CHARACTER_LITERAL
+    |   STRING_LITERAL
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 
 classType

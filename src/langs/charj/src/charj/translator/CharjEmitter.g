@@ -388,13 +388,26 @@ rangeList returns [int len]
     :   (r+=rangeExpression)*
         { $len = $r.size(); }
         -> template(t={$r}) "<t; separator=\", \">"
-        
     ;
 
 domainExpression[List<StringTemplate> otherParams]
     :   ^(DOMAIN_EXPRESSION rl=rangeList)
         -> range_constructor(range={$rl.st}, others={$otherParams}, len={$rl.len})
+    ;
 
+domainExpressionAccess
+    :   ^(DOMAIN_EXPRESSION rl=rangeListAccess)
+        -> template(t={$rangeListAccess.st}) "<t>"
+    ;
+
+rangeListAccess
+    :   (r+=rangeExpressionAccess)*
+        -> template(t={$r}) "<t; separator=\", \">"
+    ;
+
+rangeExpressionAccess
+    :   ^(RANGE_EXPRESSION (ri+=rangeItem)*)
+        -> template(t={$ri}) "<t; separator=\",\">"
     ;
 
 arrayInitializer
@@ -722,6 +735,13 @@ parenthesizedExpression
     :   ^(PAREN_EXPR exp=expression)
         -> template(expr={$exp.st}) "(<expr>)"
     ;
+
+expressionArrayAccess
+    :   ^(EXPR expr)
+        -> {$expr.st}
+    |    domainExpressionAccess
+        -> {$domainExpressionAccess.st}
+    ;
     
 expression
     :   ^(EXPR expr)
@@ -822,6 +842,7 @@ expr
     ;
 
 primaryExpression
+@init { int dims = 1; }
     :   ^(DOT prim=primaryExpression
             ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
@@ -846,9 +867,23 @@ primaryExpression
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
-    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expression)
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType}?
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
+            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
+                PointerType p = (PointerType)($pe.start.symbolType);
+                if (p.baseType instanceof ClassSymbol) {
+                    ClassSymbol cs = (ClassSymbol)(p.baseType);
+                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
+                        cs.templateArgs.get(1) instanceof LiteralType) {
+                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
+                        dims = Integer.valueOf(l.literal);
+                    }
+                }
+            }
+        }
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
                template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
         -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
     |   literal
         -> {$literal.st}

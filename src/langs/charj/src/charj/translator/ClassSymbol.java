@@ -7,7 +7,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
-    public List<String> templateArgs;
+    public List<Type> templateArgs;
     public List<VariableInitializer> initializers;
     public List<VariableInitializer> pupInitializers;
     public List<CharjAST> varsToPup;
@@ -224,7 +224,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public String toString() {
         if (isPrimitive) return name;
-        else return getFullyQualifiedName() + members;
+        else return getFullyQualifiedName() + members + templateArgs;
     }
 
     public String getFullyQualifiedName() {
