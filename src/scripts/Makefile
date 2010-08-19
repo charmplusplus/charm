@@ -460,6 +460,9 @@ pup_c.o: pup_c.C $(CVHEADERS) $(UTILHEADERS)
 pup_paged.o: pup_paged.C $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o pup_paged.o pup_paged.C
 
+pup_f.f90: pup_f.f90.sh
+	./pup_f.f90
+
 pup_f.o: pup_f.f90 $(CVHEADERS)
 	-$(CHARMC) -c pup_f.f90 && $(CHARMC) -cpmod ../include pupmod.M || touch pup_f.o
 
