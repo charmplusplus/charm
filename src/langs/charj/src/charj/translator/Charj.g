@@ -383,7 +383,6 @@ interfaceFieldDeclarator
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
-
 variableDeclaratorId
     :   IDENT^ domainExpression?
     ;
@@ -392,16 +391,6 @@ variableInitializer
     :   arrayInitializer
     |   expression
     ;
-
-/*arrayDeclarator
-    :   '[' ']'
-        ->  ARRAY_DECLARATOR
-    ;
-
-arrayDeclaratorList
-    :   arrayDeclarator+
-        ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;*/
 
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
@@ -841,6 +830,8 @@ postfixedExpression
             ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
+        |   domainExpression
+            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression domainExpression)
         )*
         // At the end there may follow a post increment/decrement.
         (   op='++'-> ^(POST_INC[$op, "POST_INC"] $postfixedExpression)

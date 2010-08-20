@@ -1,3 +1,4 @@
+!     DON NOT EDIT THIS FILE, GENERATE IT FROM RUNNING pup_f.f90.sh
       module pupmod
       implicit none
       interface

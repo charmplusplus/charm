@@ -4,6 +4,7 @@
 #  Used to avoid duplicate copy-and-paste codein pup_f.f90.
 
 cat > pup_f.f90 << END_OF_HEADER
+!     DON NOT EDIT THIS FILE, GENERATE IT FROM RUNNING pup_f.f90.sh
       module pupmod
       implicit none
       interface

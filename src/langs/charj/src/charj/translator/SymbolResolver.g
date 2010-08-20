@@ -9,6 +9,8 @@ options {
 
 @header {
 package charj.translator;
+
+import java.util.Iterator;
 }
 
 @members {
@@ -322,16 +324,39 @@ literal returns [Type type]
         }
     ;
 
+literalVal returns [Type type]
+@init { String lit = $start.getText().toString(); }
+@after { $start.symbolType = $type; }
+    :   (HEX_LITERAL | OCTAL_LITERAL | DECIMAL_LITERAL) {
+            $type = symtab.resolveBuiltinLitType("int", lit);
+        }
+    |   FLOATING_POINT_LITERAL {
+            $type = symtab.resolveBuiltinLitType("double", lit);
+        }
+    |   CHARACTER_LITERAL {
+            $type = symtab.resolveBuiltinLitType("char", lit);
+        }
+    |   STRING_LITERAL {
+            $type = symtab.resolveBuiltinLitType("string", lit);
+        }
+    |   (TRUE | FALSE) {
+            $type = symtab.resolveBuiltinLitType("boolean", lit);
+        }
+    |   NULL {
+            $type = symtab.resolveBuiltinLitType("null", lit);
+        }
+    ;
+
 type returns [Type sym]
 @init {
-    String typeText = "";
+    List<TypeName> typeText = new ArrayList<TypeName>();
+    List<Type> tparams = new ArrayList<Type>();
     CharjAST head = null;
     Scope scope = null;
     boolean proxy = false;
     boolean pointer = false;
 }
 @after {
-    typeText = typeText.substring(1);
     //System.out.println("\ntype string: " + typeText);
     //System.out.println("direct scope: " + scope);
     $start.symbolType = scope.resolveType(typeText);
@@ -339,10 +364,21 @@ type returns [Type sym]
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 
-    // TODO: Special case for Arrays, should be fixed
-    if (typeText.equals("Array") && $start.symbolType == null) {
-        System.out.println("found Array XXXX");
+    // TODO: Special case for Arrays, change this?
+    if (typeText != null && typeText.size() > 0 &&
+        typeText.get(0).name.equals("Array") && $start.symbolType == null) {
+
+        int numDims = 1;
+
         ClassSymbol cs = new ClassSymbol(symtab, "Array");
+        cs.templateArgs = typeText.get(0).parameters;
+
+        if (cs.templateArgs != null &&
+            cs.templateArgs.size() > 1) {
+            if (cs.templateArgs.get(1) instanceof LiteralType) {
+                numDims = Integer.valueOf(((LiteralType)cs.templateArgs.get(1)).literal);
+            }
+        }
         $start.symbolType = new PointerType(symtab, cs);
     }
 
@@ -351,20 +387,24 @@ type returns [Type sym]
 }
     :   VOID {
             scope = $VOID.scope;
-            typeText = ".void";
+            typeText.add(new TypeName("void"));
         }
     |   ^(SIMPLE_TYPE t=. {
             scope = $SIMPLE_TYPE.scope;
-            typeText += "." + $t.getText();
+            typeText.add(new TypeName($t.getText()));
         } .*)
     |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
+                (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
+                {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText += "." + $IDENT.text;} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
+            (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
+            {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
     ;
 
 classType

@@ -150,7 +150,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
@@ -432,6 +432,7 @@ primaryExpression
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
     |   THIS
