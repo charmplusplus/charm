@@ -17,7 +17,7 @@ mainmodule main {
 
     chare NQueen {
         entry NQueen(QueenState *);
-        entry void sequentialSolve( QueenState *msg);
+        //entry void sequentialSolve( QueenState *msg);
     };
 
 };

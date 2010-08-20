@@ -1138,7 +1138,11 @@ public:
 
     void neighbors(int mype, int* na, int &nb)
     {
+#if CMK_NODE_QUEUE_AVAILABLE
+        gengraph(CmiNumNodes(), dimension, 234, na, &nb, 0);
+#else
         gengraph(CmiNumPes(), dimension, 234, na, &nb, 0);
+#endif
     }
 
 };
