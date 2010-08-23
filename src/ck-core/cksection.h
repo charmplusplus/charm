@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
 @file 
  
@@ -30,21 +23,29 @@
 #define COMLIB_MULTICAST_NEW_SECTION 2
 #define COMLIB_MULTICAST_SECTION_ERROR 3
 
+/** Structure that holds info relevant to the use of an array/group section
+ */
 class CkSectionInfo {
  public:
-    // NOTICE: aid is used to store also a CkGroupID for group multicasts
-    CkArrayID aid;
+    /// The array ID of the array that has been sectioned
+    CkArrayID aid; ///< @note: Also used to store a CkGroupID for group multicasts
+    /// The pe on which this object has been created
     int pe;
+    /// Info needed by the section comm managers
     union section_type {
-        struct sec_mcast {    // used for section multicast
+        // Used when section is delegated to CkMulticast
+        struct sec_mcast {
+            /// Counter tracking the last reduction that has traversed this section
             int redNo;
-            void *val;        // point to mCastCookie
+            // Pointer to mCastCookie
+            void *val;
         } 
         sCookie;
 
-        struct commlibInfo{     // used for commlib
-            short  instId;	//the instance of the comm. lib.
-            
+        // Used when section is delegated to Comlib
+        struct commlibInfo{
+            // The instance of the comm. lib.
+            short  instId;
             // This field indicates local array indices to multicast to:
             // (Deprecated) COMLIB_MULTICAST_ALL for all local elements, 
             // COMLIB_MULTICAST_NEW_SECTION, elements are attached 
@@ -52,11 +53,12 @@ class CkSectionInfo {
             // COMLIB_MULTICAST_OLD_SECTION use previously created section
             // COMLIB_MULTICAST_SECTION_ERROR mark the section as old
             short status;      
-            int id;      //Used to compare section ID's
+            // Used to compare section ID's
+            int id;
         } 
         cInfo;
-
     } sInfo;
+    // Indicates which library has been delegated the section comm
     char type;
     
     CkSectionInfo()  {
@@ -83,12 +85,14 @@ class CkSectionInfo {
         CmiAssert(0);
       }
     }
+
     CkSectionInfo(CkArrayID _aid, void *p = NULL): pe(CkMyPe()),
     type(MulticastMsg) {
       aid = _aid;
       sInfo.sCookie.val=p;
       sInfo.sCookie.redNo=0;
     }
+
     CkSectionInfo(int e, void *p, int r, CkArrayID _aid) {
       type = MulticastMsg;
       pe = e; 
@@ -96,12 +100,10 @@ class CkSectionInfo {
       sInfo.sCookie.val=p;
       sInfo.sCookie.redNo=r;
     }
-    inline int &get_pe() { return pe; }
-    inline int &get_redNo() { CmiAssert(type==MulticastMsg); 
-                              return sInfo.sCookie.redNo; }
-    inline void * &get_val() { CmiAssert(type==MulticastMsg); 
-                               return sInfo.sCookie.val; }
 
+    inline int   &get_pe()    { return pe; }
+    inline int   &get_redNo() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.redNo; }
+    inline void* &get_val()   { CmiAssert(type==MulticastMsg); return sInfo.sCookie.val; }
 
     /*
     void pup(PUP::er &p) {
@@ -126,6 +128,8 @@ class CkSectionInfo {
 PUPbytes(CkSectionInfo) //FIXME: write a real pup routine
 PUPmarshall(CkSectionInfo)
 
+
+
 class CkArrayIndex1D;
 class CkArrayIndex2D;
 class CkArrayIndex3D;
@@ -135,66 +139,71 @@ class CkArrayIndex6D;
 
 #define _SECTION_MAGIC     88       /* multicast magic number for error checking */
 
-/**
- * CkMcastBaseMsg is the base class for all multicast message.
- */
+/// CkMcastBaseMsg is the base class for all multicast messages
 class CkMcastBaseMsg {
- public:
-  CkSectionInfo _cookie;
-  char magic;
-  unsigned short ep;
-//  CkArrayID aid; 
-
- public:
-  CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
-  static inline int checkMagic(CkMcastBaseMsg *m) 
-      { return m->magic == _SECTION_MAGIC; }
-  inline int &gpe(void) { return _cookie.get_pe(); }
-  inline int &redno(void) { return _cookie.get_redNo(); }
-  inline void *&cookie(void) { return _cookie.get_val(); }
+    public:
+        // Current info about the state of this section
+        CkSectionInfo _cookie;
+        // A magic number to detect msg corruption
+        char magic;
+        unsigned short ep;
+        
+        CkMcastBaseMsg(): magic(_SECTION_MAGIC) {}
+        static inline int checkMagic(CkMcastBaseMsg *m) { return m->magic == _SECTION_MAGIC; }
+        inline int &gpe(void)      { return _cookie.get_pe(); }
+        inline int &redno(void)    { return _cookie.get_redNo(); }
+        inline void *&cookie(void) { return _cookie.get_val(); }
 };
+
+
 
 #define CKSECTIONID_CONSTRUCTOR(index) \
   CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems);
 
+/** A class that holds complete info about an array/group section
+ *
+ * Describes section members, host PEs, current section status etc.
+ */
 class CkSectionID {
-public:
-  CkSectionInfo   _cookie;		// used by array and group section multicast
-  CkArrayIndexMax *_elems;
-  int _nElems;
-  
-  //Two reasons, (i) potentially extend sections to groups. (ii) For
-  //array sections these point to the processors (ranks in the
-  //commlib) the destinations array elements are on.
-  int *pelist;   // Currently not saved when pupped across processors 
-  int npes;
-  
-public:
-  CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
-  CkSectionID(const CkSectionID &sid);
-  CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes);
-  CKSECTIONID_CONSTRUCTOR(1D)
-  CKSECTIONID_CONSTRUCTOR(2D)
-  CKSECTIONID_CONSTRUCTOR(3D)
-  CKSECTIONID_CONSTRUCTOR(4D)
-  CKSECTIONID_CONSTRUCTOR(5D)
-  CKSECTIONID_CONSTRUCTOR(6D)
-  CKSECTIONID_CONSTRUCTOR(Max)
+    public:
+        /// Minimal section info
+        CkSectionInfo _cookie;
+        /// The list of array indices that are section members
+        CkArrayIndexMax *_elems;
+        /// The number of section members
+        int _nElems;
+        /** A list of PEs that host section members
+         *
+         * @note: Two reasons:
+         * (i) potentially extend sections to groups
+         * (ii) For array sections these point to the processors
+         * (ranks in commlib) the destinations array elements are on
+         * @note: Currently not saved when pupped across processors
+         */
+        int *pelist;
+        /// The number of PEs that host section members
+        int npes;
+        
+        CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
+        CkSectionID(const CkSectionID &sid);
+        CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes);
+        CKSECTIONID_CONSTRUCTOR(1D)
+        CKSECTIONID_CONSTRUCTOR(2D)
+        CKSECTIONID_CONSTRUCTOR(3D)
+        CKSECTIONID_CONSTRUCTOR(4D)
+        CKSECTIONID_CONSTRUCTOR(5D)
+        CKSECTIONID_CONSTRUCTOR(6D)
+        CKSECTIONID_CONSTRUCTOR(Max)
 
-  inline int getSectionID(){
-    return _cookie.sInfo.cInfo.id;
-  }
-
-  void operator=(const CkSectionID &);
-
-  ~CkSectionID() {
-    if (_elems != NULL) delete [] _elems;
-    if (pelist != NULL) delete [] pelist;
-  }
-
-  void pup(PUP::er &p);
-
+        inline int getSectionID(){ return _cookie.sInfo.cInfo.id; }
+        void operator=(const CkSectionID &);
+        ~CkSectionID() {
+            if (_elems != NULL) delete [] _elems;
+            if (pelist != NULL) delete [] pelist;
+        }
+        void pup(PUP::er &p);
 };
 PUPmarshall(CkSectionID)
 
 #endif
+
