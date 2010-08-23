@@ -95,7 +95,7 @@ int main(char **argv, int argc){
 	  	  
 	  // Create the index file which references 
 	  // all the chunks from this timestep
-	  sprintf(tfile, "ParaViewData/timesteps/%010d.pvtu", timestep);   // save index to here
+	  sprintf(tfile, "ParaViewData/timesteps/step_%010d.pvtu", timestep);   // save index to here
 	  sprintf(infile, "NetFEM/%d/0.dat", timestep); // the chunk file from which attributes will be extracted
 	  save_index(tfile, infile, timestep, total_chunks);
 	
