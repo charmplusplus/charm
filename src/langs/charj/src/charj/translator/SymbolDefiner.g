@@ -13,8 +13,9 @@ package charj.translator;
 
 @members {
     SymbolTable symtab;
-    Scope currentScope;
-    ClassSymbol currentClass;
+    Scope currentScope = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
     AstModifier astmod = new AstModifier();
 
     public SymbolDefiner(TreeNodeStream input, SymbolTable symtab) {
@@ -105,6 +106,7 @@ boolean entry = false;
             currentScope.define($IDENT.text, sym);
             $IDENT.def = sym;
             currentScope = sym;
+            currentMethod = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -133,6 +135,7 @@ boolean entry = false;
             currentScope.define($IDENT.text, sym);
             $IDENT.def = sym;
             currentScope = sym;
+            currentMethod = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -142,9 +145,9 @@ exitMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*) {
             //System.out.println("method " + currentScope);
             currentScope = currentScope.getEnclosingScope();
+            currentMethod = null;
         }
     ;
-
 
 
 enterClass
@@ -289,5 +292,9 @@ atoms
     :  (IDENT|THIS|SUPER) {
             assert currentScope != null;
             t.scope = currentScope;
+       }
+    |  (WHEN|OVERLAP) {
+            assert currentMethod != null;
+            currentMethod.hasSDAG = true;
        }
     ;
