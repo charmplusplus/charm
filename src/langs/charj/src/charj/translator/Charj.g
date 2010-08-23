@@ -54,6 +54,9 @@ tokens {
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
 
+    OVERLAP                 = 'overlap'         ;
+    WHEN                    = 'when'            ;
+
     PRINT                   = 'print'           ;
     PRINTLN                 = 'println'         ;
     EXIT                    = 'exit'            ;
@@ -577,9 +580,17 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
     ;
-        
+
+sdagStatement
+    :   OVERLAP block
+        -> ^(OVERLAP block)
+    |   WHEN IDENT '(' type IDENT ')' (',' '(' type IDENT ')')* block
+        -> ^(WHEN (IDENT type IDENT)+ block)
+    ;
+
 nonBlockStatement
     :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
@@ -629,7 +640,6 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
-
     ;           
         
 

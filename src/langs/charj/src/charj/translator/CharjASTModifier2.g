@@ -320,7 +320,13 @@ localVariableDeclaration
 
 statement
     : nonBlockStatement
+    | sdagStatement
     | block
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT type IDENT)+ block)
     ;
 
 nonBlockStatement

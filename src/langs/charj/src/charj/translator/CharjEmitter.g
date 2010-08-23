@@ -668,8 +668,17 @@ localVariableDeclaration
 statement
     :   nonBlockStatement
         -> {$nonBlockStatement.st}
+    |   sdagStatement
+        -> {$sdagStatement.st}
     |   block
         -> {$block.st}
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+        -> template(b={$block.st}) "/* !!overlap not implemented <block> */
+    |   ^(WHEN (IDENT type IDENT)+ block)
+        -> template(b={$block.st}) "/* !!when not implemented <block> */
     ;
 
 nonBlockStatement
