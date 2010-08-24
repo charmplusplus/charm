@@ -346,7 +346,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return PUPers;
     }
 
-    public boolean hasSDAG() {
+    public boolean getHasSDAG() {
         List<String> inits = new ArrayList<String>();
         for (Map.Entry<String, MethodSymbol> e : methods.entrySet()) {
             if (e.getValue().hasSDAG) return true;

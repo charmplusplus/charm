@@ -676,9 +676,9 @@ statement
 
 sdagStatement
     :   ^(OVERLAP block)
-        -> template(b={$block.st}) "/* !!overlap not implemented <block> */
-    |   ^(WHEN (IDENT type IDENT)+ block)
-        -> template(b={$block.st}) "/* !!when not implemented <block> */
+        -> template(b={$block.st}) "/* !!overlap not implemented */"
+    |   ^(WHEN IDENT expression? (type IDENT)* block)
+        -> template(b={$block.st}) "/* !!when not implemented */"
     ;
 
 nonBlockStatement

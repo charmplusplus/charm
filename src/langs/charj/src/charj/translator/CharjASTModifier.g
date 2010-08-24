@@ -311,7 +311,7 @@ statement
 
 sdagStatement
     :   ^(OVERLAP block)
-    |   ^(WHEN (IDENT type IDENT)+ block)
+    |   ^(WHEN IDENT expression? (type IDENT)* block)
     ;
 
 nonBlockStatement
