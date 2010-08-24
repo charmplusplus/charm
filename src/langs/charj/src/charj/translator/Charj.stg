@@ -383,7 +383,7 @@ funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
     int _charj_method_trace_timer = CkWallTimer();
     #endif
     <block>
-    #if _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
     #endif
 }
