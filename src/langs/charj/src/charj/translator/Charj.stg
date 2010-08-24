@@ -249,7 +249,9 @@ void <sym.name>::pup(PUP::er &p)
 
 <endif>
     <pupers; separator="\n">
-    <if(sym.hasSDAG)>__sdag_pup(p)<endif>
+<if(sym.hasSDAG)>
+    __sdag_pup(p)
+<endif>
 }
 
 <if(!sym.hasDefaultCtor)>
@@ -269,7 +271,9 @@ void <sym.name>::pup(PUP::er &p)
 void <sym.name>::constructorHelper()
 {
     <inits; separator="\n">
-    <if(sym.hasSDAG)>__sdag_init(p)<endif>
+<if(sym.hasSDAG)>
+    __sdag_init(p)
+<endif>
 }
 
 <if(needsMigration)>
@@ -307,7 +311,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, needsMigration
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
-    <if(hasSDAG)><ident>_SDAG_CODE<endif>
+    <if(sym.hasSDAG)><ident>_SDAG_CODE<endif>
     <csds; separator="\n">
     <if(needsPupInit)>
     private: void pupInitMethod();
