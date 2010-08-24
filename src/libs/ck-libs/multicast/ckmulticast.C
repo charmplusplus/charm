@@ -318,7 +318,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
 
 
 
-// prepare a mCastEntry entry and set up in CkSectionID
+/// Build a mCastEntry object with relevant section info and set the section cookie to point to this object
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid)
 {
   for (int i=0; i<count; i++) {
@@ -650,8 +650,6 @@ void CkMulticastMgr::rebuild(CkSectionInfo &sectId)
   resetCookie(sectId);
 }
 
-// mark old cookie spanning tree as old and 
-// build a new one
 void CkMulticastMgr::resetCookie(CkSectionInfo s)
 {
   mCastEntry *newCookie = (mCastEntry*)s.get_val();
