@@ -200,6 +200,7 @@ accessModifier
 
 charjModifier returns [boolean isEntry] 
     :   ENTRY { $isEntry = true; }
+    |   SDAGENTRY { $isEntry = true; }
     |   TRACED
     ;
 

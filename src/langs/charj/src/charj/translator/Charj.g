@@ -18,6 +18,7 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    SDAGENTRY               = 'sdagentry'       ;
     TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
@@ -449,6 +450,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   SDAGENTRY
     |   TRACED
     |   PRIVATE
     |   ABSTRACT

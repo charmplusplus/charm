@@ -88,12 +88,18 @@ boolean entry = false;
                 typeName.add(new TypeName("void"));
             }
             boolean isTraced = false;
+            boolean sdagEntry = false;
             if ($MODIFIER_LIST != null) {
                 CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
                 if (charj_mod != null) {
                     charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
                     isTraced = (charj_mod != null);
                     if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+                }
+                charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+                if (charj_mod != null) {
+                    charj_mod = charj_mod.getChildOfType(CharjParser.SDAGENTRY);
+                    sdagEntry = (charj_mod != null);
                 }
             }
             Type returnType = currentScope.resolveType(typeName);
@@ -102,6 +108,7 @@ boolean entry = false;
             sym.isEntry = entry;
             sym.isTraced = isTraced;
             sym.definition = $enterMethod.start;
+            sym.hasSDAG = sdagEntry;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
             $IDENT.def = sym;

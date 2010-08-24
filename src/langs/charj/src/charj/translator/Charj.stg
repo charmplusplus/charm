@@ -375,6 +375,25 @@ funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
+funcMethodDecl_sdag_ci(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl>
+{
+    /* FIXME: macros aren't allowed in sdag code yet, so tracing doesn't work right
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    */
+    <block>
+    /*
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
+    */
+};
+>>
+
+
 funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
@@ -412,6 +431,13 @@ ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 block_cc(bsl) ::=
 <<
 {
+    <bsl; separator="\n">
+}
+>>
+
+block_sdag_ci(bsl) ::=
+<<
+atomic {
     <bsl; separator="\n">
 }
 >>

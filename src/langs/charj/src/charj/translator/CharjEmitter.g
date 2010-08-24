@@ -225,12 +225,12 @@ classScopeDeclaration
 {
     boolean entry = false;
     boolean migrationCtor = false;
+    boolean sdagMethod = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList
-            b=block?) {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
+            { currentMethod = (MethodSymbol)$IDENT.def; }
+            b=block?)
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
@@ -251,10 +251,12 @@ classScopeDeclaration
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
-            b=block?) {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
-        -> {emitCC()}? funcMethodDecl_cc(
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+                sdagMethod = currentMethod.hasSDAG;
+            }
+            b=block?) 
+        -> {emitCC() && !sdagMethod}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
                 modl={$m.st}, 
@@ -264,7 +266,7 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitH()}? funcMethodDecl_h(
+        -> {emitH() && !sdagMethod}? funcMethodDecl_h(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -272,7 +274,17 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitCI()}? funcMethodDecl_ci(
+        -> {emitCI() && sdagMethod}? funcMethodDecl_sdag_ci(
+                classSym={currentClass},
+                methodSym={currentMethod},
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                block={$b.st})
+        -> {emitCI() && !sdagMethod}? funcMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -292,10 +304,11 @@ classScopeDeclaration
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
         ->
-    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
+    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+            }
+            b=block)
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -310,11 +323,13 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        {
-            currentMethod = (MethodSymbol)$IDENT.def;
-            migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
-        }
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+                migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
+            }
+            b=block)
+
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -507,6 +522,7 @@ accessModifier
 
 charjModifier
     :   ENTRY -> {%{$ENTRY.text}}
+    |   SDAGENTRY -> template() "entry"
     |   TRACED
     ;
 
@@ -638,8 +654,10 @@ block
 @init { boolean emptyBlock = true; }
     :   ^(BLOCK (b+=blockStatement)*)
         { emptyBlock = ($b == null || $b.size() == 0); }
-        -> {emitCC() && emptyBlock}? template(bsl={$b}) "{ }"
-        -> {emitCC()}? block_cc(bsl={$b})
+        -> {((emitCC() && (currentMethod == null || !currentMethod.hasSDAG)) ||
+            (emitCI() && (currentMethod != null && currentMethod.hasSDAG))) && emptyBlock}? template(bsl={$b}) "{ }"
+        -> {emitCC() && (currentMethod == null || !currentMethod.hasSDAG)}? block_cc(bsl={$b})
+        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_sdag_ci(bsl={$b})
         ->
     ;
     
@@ -676,9 +694,13 @@ statement
 
 sdagStatement
     :   ^(OVERLAP block)
-        -> template(b={$block.st}) "/* !!overlap not implemented */"
-    |   ^(WHEN IDENT expression? (type IDENT)* block)
-        -> template(b={$block.st}) "/* !!when not implemented */"
+        -> template(b={$block.st}) "} overlap <b> atomic {"
+    |   ^(WHEN IDENT expression? (wa+=whenArgument)* block)
+        -> template(i={$IDENT}, e={$expression.st}, w={wa}, b={$block.st}) "} when <i> <if(e)>[<e>]<endif> <w> <b> atomic {"
+    ;
+
+whenArgument
+    : type IDENT -> template(t={$type.st}, i={$IDENT}) "(<t> <i>)"
     ;
 
 nonBlockStatement
