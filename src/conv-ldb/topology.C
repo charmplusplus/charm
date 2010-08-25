@@ -771,7 +771,7 @@ public:
     delete[] TempCo;
   }
   virtual int max_neighbors() {
-    return dimension*2 + ppn - 1;
+    return dimension*2;
   }
   virtual void neighbors(int mype, int* _n, int &nb) {
     nb = 0;

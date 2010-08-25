@@ -102,7 +102,9 @@
 #include <stdlib.h>
 #include <string.h>
 #if CMK_MEMORY_PROTECTABLE
+#if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
+#endif
 #endif
 #if CMK_BLUEGENEL
 #include "rts.h"	/*<- for rts_memory_alias */
@@ -1500,8 +1502,8 @@ typedef void (*uJcontext_fn_t)(void);
 
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
-#include <uJcontext.h>
-#include <uJcontext.c>
+#include "uJcontext.h"
+#include "uJcontext.c"
 
 #endif
 

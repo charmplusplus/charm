@@ -6,7 +6,9 @@
 #include <elf.h>
 #include <string.h>
 #include <stdlib.h>
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 
 #if ( __LP64__ || _LP64 )
 #define ELF64

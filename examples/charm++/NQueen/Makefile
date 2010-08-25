@@ -1,7 +1,7 @@
 CHARMC = charmc $(OPTS) 
 default: all
-all: nqueen  
-#all: nqueen  nqueen_rand nqueen_rand.prj  nqueen_neighbor nqueen_neighbor.prj nqueen_workstealing nqueen_workstealing.prj
+all: nqueen  nqueen_rand nqueen_rand.prj  nqueen_neighbor nqueen_neighbor.prj nqueen_workstealing nqueen_workstealing.prj
+#all: nqueen nqueen_prj nqueen_rand  nqueen_neighbor nqueen_neighbor.prj 
 
 nqueen : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -o nqueen main.o nqueen.o counter.o
@@ -49,7 +49,7 @@ counter.decl.h counter.def.h : counter.ci
 	$(CHARMC) counter.ci
 
 test:
-	 ./charmrun +p8 ./nqueen 17 5 
+	 ./charmrun +p128 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 
 
 clean:
 	rm -f main.decl.h main.def.h main.o
