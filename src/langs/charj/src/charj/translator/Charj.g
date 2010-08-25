@@ -335,11 +335,9 @@ typeList
 classScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList (block | ';')
+            (   type IDENT formalParameterList (';' | block)
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList block?)
-            /*|   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -357,8 +355,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList)
-            /*|   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)

@@ -250,7 +250,8 @@ void <sym.name>::pup(PUP::er &p)
 <endif>
     <pupers; separator="\n">
 <if(sym.hasSDAG)>
-    __sdag_pup(p)
+    __sdag_pup(p);
+
 <endif>
 }
 
@@ -272,7 +273,8 @@ void <sym.name>::constructorHelper()
 {
     <inits; separator="\n">
 <if(sym.hasSDAG)>
-    __sdag_init(p)
+    __sdag_init();
+
 <endif>
 }
 
@@ -377,9 +379,9 @@ funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 
 funcMethodDecl_sdag_ci(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
-<modl><ty><gtpl> <id><fpl><adl>
+<modl><ty><gtpl> <id><fpl><adl><if(!block)>;<else>
 {
-    /* FIXME: macros aren't allowed in sdag code yet, so tracing doesn't work right
+    /* FIXME: macros aren't allowed in sdag code, so tracing doesn't work right
     #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     int _charj_method_trace_timer = CkWallTimer();
     #endif
@@ -391,11 +393,13 @@ funcMethodDecl_sdag_ci(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block)
     #endif
     */
 };
+<endif>
 >>
 
 
 funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
+<if(block)>
 <modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
 {
     #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
@@ -406,6 +410,7 @@ funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
     traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
     #endif
 }
+<endif>
 >>
 
 
