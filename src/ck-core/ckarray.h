@@ -450,6 +450,7 @@ public:
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
+    inline int ckGetNumSubSections() const { return _nsid; }
 	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
 	inline CkSectionID *ckGetSectionIDs() {return _sid;}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
