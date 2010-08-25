@@ -80,7 +80,7 @@ public class SymbolTable {
         defaultPkg.define("CkNumPes", new MethodSymbol(this, "CkNumPes"));
         defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
         defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
-        defaultPkg.define("CmiWallTimer", new MethodSymbol(this, "CmiWallTimer"));
+        defaultPkg.define("CkWallTimer", new MethodSymbol(this, "CkWallTimer"));
     }
 
     public ClassSymbol resolveBuiltinType(String type) {

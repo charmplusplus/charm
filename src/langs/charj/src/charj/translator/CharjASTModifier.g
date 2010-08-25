@@ -200,6 +200,7 @@ accessModifier
 
 charjModifier returns [boolean isEntry] 
     :   ENTRY { $isEntry = true; }
+    |   SDAGENTRY { $isEntry = true; }
     |   TRACED
     ;
 
@@ -305,7 +306,13 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement

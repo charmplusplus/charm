@@ -18,6 +18,7 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    SDAGENTRY               = 'sdagentry'       ;
     TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
@@ -53,6 +54,9 @@ tokens {
     NODEGROUP               = 'nodegroup'       ;
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
+
+    OVERLAP                 = 'overlap'         ;
+    WHEN                    = 'when'            ;
 
     PRINT                   = 'print'           ;
     PRINTLN                 = 'println'         ;
@@ -331,11 +335,9 @@ typeList
 classScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList (block | ';')
+            (   type IDENT formalParameterList (';' | block)
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList block?)
-            /*|   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -353,8 +355,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList)
-            /*|   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -446,6 +446,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   SDAGENTRY
     |   TRACED
     |   PRIVATE
     |   ABSTRACT
@@ -577,9 +578,17 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
     ;
-        
+
+sdagStatement
+    :   OVERLAP block
+        -> ^(OVERLAP block)
+    |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
+        -> ^(WHEN (IDENT expression? formalParameterList)* block)
+    ;
+
 nonBlockStatement
     :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
@@ -629,7 +638,6 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
-
     ;           
         
 

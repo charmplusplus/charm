@@ -211,6 +211,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   SDAGENTRY
     |   TRACED
     ;
 
@@ -320,7 +321,13 @@ localVariableDeclaration
 
 statement
     : nonBlockStatement
+    | sdagStatement
     | block
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement

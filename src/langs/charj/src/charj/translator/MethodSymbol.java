@@ -23,6 +23,7 @@ public class MethodSymbol
     public boolean isStatic = false;
     public boolean isCtor = false;
     public boolean isTraced = false;
+    public boolean hasSDAG = false;
 
     public MethodSymbol(SymbolTable symtab) {
         super(symtab);
