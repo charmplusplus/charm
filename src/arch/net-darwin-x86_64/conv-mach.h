@@ -24,6 +24,7 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       0
 
+#define CMK_MEMORY_BUILD_GNU_HOOKS                         0
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 
