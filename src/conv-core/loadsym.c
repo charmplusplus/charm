@@ -34,6 +34,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#if CMK_HAS_ELF_H
 #include <elf.h>
 
 #include "converse.h"
@@ -516,3 +518,4 @@ init_symtab(char *exename)
 }
 
 
+#endif

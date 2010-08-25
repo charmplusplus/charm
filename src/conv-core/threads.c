@@ -1502,8 +1502,8 @@ typedef void (*uJcontext_fn_t)(void);
 
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
-#include <uJcontext.h>
-#include <uJcontext.c>
+#include "uJcontext.h"
+#include "uJcontext.c"
 
 #endif
 
