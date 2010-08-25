@@ -589,8 +589,8 @@ statement
 sdagStatement
     :   OVERLAP block
         -> ^(OVERLAP block)
-    |   WHEN IDENT ('[' expression ']')? ('(' type IDENT ')' (',' '(' type IDENT ')')*)* block
-        -> ^(WHEN IDENT expression? (type IDENT)* block)
+    |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
+        -> ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement

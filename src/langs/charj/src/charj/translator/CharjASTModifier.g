@@ -312,7 +312,7 @@ statement
 
 sdagStatement
     :   ^(OVERLAP block)
-    |   ^(WHEN IDENT expression? (type IDENT)* block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement

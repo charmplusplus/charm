@@ -695,12 +695,13 @@ statement
 sdagStatement
     :   ^(OVERLAP block)
         -> template(b={$block.st}) "} overlap <b> atomic {"
-    |   ^(WHEN IDENT expression? (wa+=whenArgument)* block)
-        -> template(i={$IDENT}, e={$expression.st}, w={wa}, b={$block.st}) "} when <i> <if(e)>[<e>]<endif> <w> <b> atomic {"
+    |   ^(WHEN (wa+=whenArgument)* block)
+        -> template(w={wa}, b={$block.st}) "} when <w> <b> atomic {"
     ;
 
 whenArgument
-    : type IDENT -> template(t={$type.st}, i={$IDENT}) "(<t> <i>)"
+    :   IDENT expression? formalParameterList
+        -> template(i={$IDENT}, e={$expression.st}, f={$formalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
     ;
 
 nonBlockStatement
