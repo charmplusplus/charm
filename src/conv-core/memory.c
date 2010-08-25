@@ -233,7 +233,9 @@ static void meta_free_hook(void* p, const void* c) {meta_free(p);}
   __memalign_hook = meta_memalign_hook; \
   __free_hook = meta_free_hook;
 
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 static void *(*old_malloc_hook) (size_t, const void*);
 static void *(*old_realloc_hook) (void*,size_t, const void*);
 static void *(*old_memalign_hook) (size_t,size_t, const void*);
@@ -378,7 +380,9 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
 #else
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 #if CMK_C_INLINE
 inline
 #endif

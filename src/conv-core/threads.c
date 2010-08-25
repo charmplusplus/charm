@@ -102,7 +102,9 @@
 #include <stdlib.h>
 #include <string.h>
 #if CMK_MEMORY_PROTECTABLE
+#if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
+#endif
 #endif
 #if CMK_BLUEGENEL
 #include "rts.h"	/*<- for rts_memory_alias */
