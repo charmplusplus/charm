@@ -419,13 +419,19 @@ public:
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
 
     ~CProxySection_ArrayBase() {
