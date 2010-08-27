@@ -341,14 +341,16 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
 void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
 {
   CProxySection_ArrayBase *proxy = (CProxySection_ArrayBase *)cproxy;
-  CkArrayID aid = proxy->ckGetArrayID();
-  CkSectionID *sid = proxy->ckGetSectionIDs();
-
-  mCastEntry *entry = new mCastEntry(aid);
-
-  const CkArrayIndexMax *al = proxy->ckGetArrayElements();
-  prepareCookie(entry, *sid, al, proxy->ckGetNumElements(), aid);
-  initCookie(sid->_cookie);
+  int numSubSections = proxy->ckGetNumSubSections();
+  for (int i=0; i<numSubSections; i++)
+  {
+      CkArrayID aid = proxy->ckGetArrayIDn(i);
+      mCastEntry *entry = new mCastEntry(aid);
+      CkSectionID *sid = &( proxy->ckGetSectionID(i) );
+      const CkArrayIndexMax *al = proxy->ckGetArrayElements(i);
+      prepareCookie(entry, *sid, al, proxy->ckGetNumElements(i), aid);
+      initCookie(sid->_cookie);
+  }
 }
 
 
@@ -683,14 +685,25 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
 
 void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsid, CkSectionID *sid, int opts)
 {
-  DEBUGF(("ArraySectionSend\n"));
+    for (int snum = 0; snum < nsid; snum++) {
+        void *msgCopy = m;
+        if (nsid - snum > 1)
+            msgCopy = CkCopyMsg(&m);
+        sendToSection(pd, ep, msgCopy, &(sid[snum]), opts);
+    }
+}
+
+
+
+void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts)
+{
+            DEBUGF(("ArraySectionSend\n"));
 
   multicastGrpMsg *msg = (multicastGrpMsg *)m;
 //  msg->aid = a;
   msg->ep = ep;
 
   CkSectionInfo &s = sid->_cookie;
-  CmiAssert(nsid == 1);
 
   mCastEntry *entry;
   if (s.get_pe() == CkMyPe()) {

@@ -141,6 +141,8 @@ class CkMulticastMgr: public CkDelegateMgr
         void prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid);
         /// Get info from the CkSectionInfo and call setup() to start the spanning tree build
         void initCookie(CkSectionInfo sid);
+        /// Actually trigger the multicast to a section of a chare array
+        void sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts);
         /// Mark old cookie spanning tree as old and build a new one
         void resetCookie(CkSectionInfo sid);
         enum {MAXREDUCERS=256};
