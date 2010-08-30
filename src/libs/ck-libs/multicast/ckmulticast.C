@@ -16,6 +16,7 @@
 
 #include "ckmulticast.h"
 #include "spanningTreeStrategy.h"
+#include "XArraySectionReducer.h"
 
 #define DEBUGF(x)  // CkPrintf x;
 
@@ -904,9 +905,36 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
 
 void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, CkCallback *cb)
 {
-  CkSectionInfo &id = proxy.ckGetSectionInfo();
-  mCastEntry *entry = (mCastEntry *)id.get_val();
-  entry->red.storedCallback = cb;
+  CkCallback *sectionCB;
+  int numSubSections = proxy.ckGetNumSubSections();
+  // If its a cross-array section,
+  if (numSubSections > 1)
+  {
+      /** @warning: Each instantiation is a mem leak! :o
+       * The class is trivially small, but there's one instantiation for each
+       * section delegated to CkMulticast. The objects need to live as long as
+       * their section exists and is used. The idea of 'destroying' an array
+       * section is still academic, and hence no effort has been made to charge
+       * some 'owner' entity with the task of deleting this object.
+       *
+       * Reimplementing delegated x-array reductions will make this consideration moot
+       */
+      // Configure the final cross-section reducer
+      ck::impl::XArraySectionReducer *red =
+          new ck::impl::XArraySectionReducer(numSubSections, cb);
+      // Configure the subsection callback to deposit with the final reducer
+      sectionCB = new CkCallback(ck::impl::processSectionContribution, red);
+  }
+  // else, just direct the reduction to the actual client cb
+  else
+      sectionCB = cb;
+  // Wire the sections together by storing the subsection cb in each sectionID
+  for (int i=0; i<numSubSections; i++)
+  {
+      CkSectionInfo &sInfo = proxy.ckGetSectionID(i)._cookie;
+      mCastEntry *entry = (mCastEntry *)sInfo.get_val();
+      entry->red.storedCallback = sectionCB;
+  }
 }
 
 void CkMulticastMgr::setReductionClient(CProxySection_ArrayElement &proxy, redClientFn fn,void *param)
@@ -1074,6 +1102,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
   newmsg->nFrags = nFrags;
   newmsg->fragNo = fragNo;
   newmsg->userFlag = userFlag;
+  newmsg->reducer = reducer;
 
   // increment num-frags processed
   redInfo.npProcessed ++;
@@ -1093,7 +1122,6 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
   if (entry->hasParent()) {
     // send up to parent
     newmsg->sid        = entry->parentGrp;
-    newmsg->reducer    = reducer;
     newmsg->sourceFlag = 2;
     newmsg->redNo      = oldRedNo;
     newmsg->gcount     = redInfo.gcount [index];
