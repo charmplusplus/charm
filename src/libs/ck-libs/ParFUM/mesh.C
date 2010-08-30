@@ -2221,7 +2221,7 @@ FEM_Mesh *FEM_readMesh(const char *prefix, int chunkNo, int nChunks)
 	ret->pup(p);
   	fclose(fp);
 
-#ifdef PRINT_SHARED_NODE_INFO
+#if 1 // PRINT_SHARED_NODE_INFO
         // For Abhinav, print out the neighbors for this vp
 	// CkPrintf("%d: Finding Neighbors for VP\n", chunkNo);
         
@@ -2243,6 +2243,7 @@ FEM_Mesh *FEM_readMesh(const char *prefix, int chunkNo, int nChunks)
           CkPrintf("chunk %d at %f %f communicates with chunk %d through %d shared nodes\n", chunkNo, sumx/(double)nnodes, sumy/(double)nnodes, list.getDest(), list.size()); 
         }
 #endif
+	fflush(NULL);
 
 	return ret;
 }

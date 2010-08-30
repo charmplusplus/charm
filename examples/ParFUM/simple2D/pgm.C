@@ -38,8 +38,8 @@ init(void)
 {
   CkPrintf("init started\n");
   double startTime=CmiWallTimer();
-  const char *eleName="xxx.1.ele";
-  const char *nodeName="xxx.1.node";
+  const char *eleName="hex1k.1.ele";
+  const char *nodeName="hex1k.1.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
 
