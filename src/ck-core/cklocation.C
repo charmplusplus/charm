@@ -283,9 +283,6 @@ public:
   void pup(PUP::er& p){
     p|_nelems;
     p|_binSize;
-    p|_numChares;
-    p|_remChares;
-    p|_numFirstSet;
   }
 };
 
