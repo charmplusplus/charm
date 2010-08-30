@@ -1,15 +1,13 @@
 mainmodule hello {
-  readonly CProxy_Main mainProxy;
-
   message pingMsg;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void done(void);
+    entry void rednPong(CkReductionMsg *msg);
   };
 
   array [1D] Hello {
-    entry Hello(int aNum);
-    entry void SayHi(pingMsg *msg);
+    entry Hello(int aNum, CkGroupID mcastMgrGID);
+    entry void mcastPing(pingMsg *msg);
   };
 };

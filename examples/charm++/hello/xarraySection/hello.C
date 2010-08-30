@@ -1,9 +1,6 @@
-#include <stdio.h>
 #include "hello.decl.h"
 #include "ckmulticast.h"
-
-/*readonly*/ CProxy_Main mainProxy;
-
+#include <stdio.h>
 
 class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
 {
@@ -12,11 +9,12 @@ class pingMsg: public CkMcastBaseMsg, public CMessage_pingMsg
         int hiNo;
 };
 
-/*mainchare*/
+
+/// Test controller. Main chare
 class Main : public CBase_Main
 {
 public:
-  Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numReceived(0), numIter(0)
+  Main(CkArgMsg* m): numArrays(2), numElements(5), sectionSize(numElements), maxIter(3), numIter(0)
   {
     //Process command-line arguments
     if (m->argc > 1) numElements = atoi(m->argv[1]);
@@ -31,7 +29,10 @@ public:
     CkPrintf("\tnum PEs = %d\n\tnum arrays = %d\n\tnum elements = %d\n\tsection size = %d\n\tnum iterations = %d\n",
              CkNumPes(), numArrays, numElements, sectionSize, maxIter);
 
-    mainProxy = thisProxy;
+    // Create a multicast manager group
+    CkGroupID mcastMgrGID = CProxy_CkMulticastMgr::ckNew();
+    CkMulticastMgr *mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
+
     // Setup section member index bounds
     int afloor = 0, aceiling = sectionSize-1;
 
@@ -45,7 +46,7 @@ public:
     for(int k=0; k < numArrays; k++)
     {
         // Create the array
-        arrayOfArrays[k] = CProxy_Hello::ckNew(k, numElements);
+        arrayOfArrays[k] = CProxy_Hello::ckNew(k, mcastMgrGID, numElements);
         // Store the AID
         arrID[k]  = arrayOfArrays[k].ckGetArrayID();
         // Create a list of section member indices in this array
@@ -57,64 +58,85 @@ public:
     // Create the x-array-section
     sectionProxy = CProxySection_Hello(numArrays, arrID, elems, nelems);
 
-    // Create a multicast manager group
-    CkGroupID mcastMgrGID = CProxy_CkMulticastMgr::ckNew();
-    CkMulticastMgr *mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
     // Delegate the section comm to the CkMulticast library
     sectionProxy.ckSectionDelegate(mcastMgr);
+    // Configure the client of the section reduction
+    CkCallback *rednCB = new CkCallback(CkIndex_Main::rednPong(NULL), thisProxy); 
+    mcastMgr->setReductionClient(sectionProxy, rednCB);
 
     // Start the test by pinging the section
     pingMsg *msg = new pingMsg(numIter);
-    sectionProxy.SayHi(msg);
-  };
+    sectionProxy.mcastPing(msg);
+  }
 
   /// Test controller method
-  void done(void)
+  void rednPong(CkReductionMsg *msg)
   {
-      if (++numReceived >= numArrays * sectionSize)
-      {
-          numReceived = 0;
-          if (++numIter == maxIter) {
-              CkPrintf("----------------- testController: All %d iterations done\n", numIter);
-              CkExit();
-          }
-          else {
-              // Ping the section
-              CkPrintf("----------------- testController: Iteration %d done\n", numIter);
-              pingMsg *msg = new pingMsg(numIter);
-              sectionProxy.SayHi(msg);
-          }
+      CkPrintf("----------------- testController: Received pong via reduction msg for iter %d\n", numIter+1);
+      CkAssert( msg->getSize() == sizeof(int) );
+      CkAssert( *( reinterpret_cast<int*>(msg->getData()) ) == numIter * numArrays * sectionSize);
+
+      if (++numIter == maxIter) {
+          CkPrintf("----------------- testController: All %d iterations done\n", numIter);
+          CkExit();
       }
-  };
+      else
+      {
+          // Ping the section
+          CkPrintf("----------------- testController: Iteration %d done\n", numIter);
+          pingMsg *nextPing = new pingMsg(numIter);
+          sectionProxy.mcastPing(nextPing);
+      }
+
+      delete msg;
+  }
 
 private:
   /// Input parameters
   int numArrays, numElements, sectionSize, maxIter;
   /// Counters
-  int numReceived, numIter;
+  int numIter;
   /// The cross-array section proxy
   CProxySection_Hello sectionProxy;
 };
 
-/*array [1D]*/
+
+
+/** 1D chare array.
+ *
+ * Sections of multiple instances of this array participate in a cross-array section reduction
+ */
 class Hello : public CBase_Hello
 {
 public:
-  Hello(int _aNum): aNum(_aNum)
+  Hello(int _aNum, CkGroupID mcastMgrGID): aNum(_aNum), mcastMgr(NULL), isCookieSet(false)
   {
-    CkPrintf("AID[%d] Hello %d created on pe %d\n", aNum, thisIndex, CkMyPe());
+    CkPrintf("Array %d, Element %d created on PE %d\n", aNum, thisIndex, CkMyPe());
+    mcastMgr = CProxy_CkMulticastMgr(mcastMgrGID).ckLocalBranch();
   }
 
   Hello(CkMigrateMessage *m) {}
 
-  void SayHi(pingMsg *msg)
+  void mcastPing(pingMsg *msg)
   {
-    CkPrintf("AID[%d] Hi[%d] from element %d\n", aNum, msg->hiNo, thisIndex);
-    mainProxy.done();
+    // Say hello world
+    CkPrintf("Array %d, Element %d received ping number %d\n", aNum, thisIndex, msg->hiNo);
+    // Save the section cookie, the first time you get it
+    if (! isCookieSet)
+    {
+        sectionCookie = msg->_cookie;
+        isCookieSet = true;
+    }
+    // Contribute to the section reduction
+    mcastMgr->contribute(sizeof(int), &(msg->hiNo), CkReduction::sum_int, sectionCookie);
     delete msg;
   }
+
 private:
   int aNum;
+  CkMulticastMgr *mcastMgr;
+  CkSectionInfo sectionCookie;
+  bool isCookieSet;
 };
 
 #include "hello.def.h"
