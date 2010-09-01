@@ -150,6 +150,9 @@
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
 
+/* whether getrusage accepts RUSAGE_THREAD */
+#undef CMK_HAS_RUSAGE_THREAD
+
 /* whether has sbrk */
 #undef CMK_HAS_SBRK
 

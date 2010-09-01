@@ -2697,6 +2697,24 @@ fi
 
 ################### Syscalls and Libraries ###################
 
+#### test for getrusage with RUSAGE_THREAD ###
+cat > $tc <<EOT
+#include <sys/time.h>
+#define __USE_GNU   1
+#include <sys/resource.h>
+int main() {
+  struct rusage usage;
+  getrusage(RUSAGE_THREAD, &usage);
+  return 0;
+}
+EOT
+test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_RUSAGE_THREAD $pass
+_ACEOF
+
+
 #### test for log2 ###
 cat > $t <<EOT
 #include <math.h>
@@ -3630,13 +3648,13 @@ echo $ECHO_N "checking subroutine name used by Fortran 90 compiler... $ECHO_C" >
 
 if test -r conftest.o
 then
-  if test "${fortran_postfix+set}" = set; then
+  if test "${_cv_fortran_postfix+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   NAME=`$CMK_NM conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
-    fortran_postfix=TWOSCORE
+    _cv_fortran_postfix=TWOSCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_TWOSCORE 1
@@ -3646,7 +3664,7 @@ _ACEOF
     NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
-      fortran_postfix=ONESCORE
+      _cv_fortran_postfix=ONESCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ONESCORE 1
@@ -3656,7 +3674,7 @@ _ACEOF
       NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
-        fortran_postfix=NOSCORE
+        _cv_fortran_postfix=NOSCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_NOSCORE 1
@@ -3666,7 +3684,7 @@ _ACEOF
         NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
-          fortran_postfix=ALLCAPS
+          _cv_fortran_postfix=ALLCAPS
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ALLCAPS 1
@@ -3684,8 +3702,8 @@ _ACEOF
 
 fi
 
-  { echo "$as_me:$LINENO: result: $fortran_postfix" >&5
-echo "${ECHO_T}$fortran_postfix" >&6; }
+  { echo "$as_me:$LINENO: result: $_cv_fortran_postfix" >&5
+echo "${ECHO_T}$_cv_fortran_postfix" >&6; }
 else
   { echo "$as_me:$LINENO: result: \"Fortran compiler not working\"" >&5
 echo "${ECHO_T}\"Fortran compiler not working\"" >&6; }
