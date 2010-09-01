@@ -853,6 +853,20 @@ fi
 
 ################### Syscalls and Libraries ###################
 
+#### test for getrusage with RUSAGE_THREAD ###
+cat > $tc <<EOT
+#include <sys/time.h>
+#define __USE_GNU   1
+#include <sys/resource.h>
+int main() {
+  struct rusage usage;
+  getrusage(RUSAGE_THREAD, &usage);
+  return 0;
+}
+EOT
+test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_RUSAGE_THREAD, $pass, [whether getrusage accepts RUSAGE_THREAD])
+
 #### test for log2 ###
 cat > $t <<EOT
 #include <math.h>
@@ -1571,30 +1585,30 @@ AC_MSG_CHECKING(subroutine name used by Fortran 90 compiler)
 
 if test -r conftest.o
 then
-  AC_CACHE_VAL(fortran_postfix,
+  AC_CACHE_VAL(_cv_fortran_postfix,
 
   NAME=`$CMK_NM conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
-    fortran_postfix=TWOSCORE
+    _cv_fortran_postfix=TWOSCORE
     AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_TWOSCORE, 1, [TWOSCORE])
   else
     NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
-      fortran_postfix=ONESCORE
+      _cv_fortran_postfix=ONESCORE
       AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ONESCORE, 1, [ONESCORE])
     else
       NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
-        fortran_postfix=NOSCORE
+        _cv_fortran_postfix=NOSCORE
         AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_NOSCORE, 1, [NOSCORE])
       else
         NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
-          fortran_postfix=ALLCAPS
+          _cv_fortran_postfix=ALLCAPS
           AC_DEFINE_UNQUOTED(CMK_FORTRAN_USES_ALLCAPS, 1, [ALLCAPS])
         else
           echo "#################################################"
@@ -1606,7 +1620,7 @@ then
   fi
   rm -f conftest.f conftest.o
   )
-  AC_MSG_RESULT($fortran_postfix)
+  AC_MSG_RESULT($_cv_fortran_postfix)
 else
   AC_MSG_RESULT("Fortran compiler not working")
 fi
