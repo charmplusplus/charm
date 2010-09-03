@@ -9,6 +9,8 @@
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
 
+#include "conv-config.h"
+
 #if CMK_WITH_CONTROLPOINT
 
 
