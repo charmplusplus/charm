@@ -570,16 +570,16 @@ $(L)/libmemory-isomalloc.o: memory-isomalloc.c $(MEM_DEPS)
 	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_ISOMALLOC memory.c || touch $@
 
 $(L)/libmemory-charmdebug.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
+	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG memory.c || touch $@
 
 $(L)/libmemory-charmdebug-slot.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT memory.c || touch $@
+	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCMK_SEPARATE_SLOT memory.c || touch $@
 
 $(L)/libmemory-charmdebug-mmap.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP memory.c || touch $@
+	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP memory.c || touch $@
 
 $(L)/libmemory-charmdebug-mmap-slot.o: memory-charmdebug.c $(MEM_DEPS)
-	-$(CHARMC) -I. -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT memory.c || touch $@
+	-$(CHARMC) -I. -optimize -o $@ -DCMK_MEMORY_BUILD_CHARMDEBUG -DCPD_USE_MMAP -DCMK_SEPARATE_SLOT memory.c || touch $@
 
 ## Thread libraries (-thread)
 
