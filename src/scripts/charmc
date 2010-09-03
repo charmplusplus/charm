@@ -1177,7 +1177,7 @@ do
                 test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
                 if [ -n "$PREPROCESS" ]
                 then
-		  Do $CMK_CPP_CHARM $FILE | Do $CHARMBIN/charmxi $XIOPTS
+		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS
                 else
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi
