@@ -857,6 +857,7 @@ MemStat * CreateMemStat() {
 
 
 /*********************** Cross-chare corruption detection *******************/
+static int reportMEM = 0;
 
 /* This first method uses two fields (userCRC and slotCRC) of the Slot structure
  * to store the CRC32 checksum of the user data and the slot itself. It compares
@@ -899,7 +900,7 @@ static void ResetAllCRC() {
   SLOT_ITERATE_END
 }
 
-static void CheckAllCRC(int report) {
+static void CheckAllCRC() {
   Slot *cur;
   unsigned int crc1, crc2;
 
@@ -908,9 +909,9 @@ static void CheckAllCRC(int report) {
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
     /* Here we can check if a modification has occured */
-    if (report && cur->slotCRC != crc1) CmiPrintf("CRC: Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
+    if (reportMEM && cur->slotCRC != crc1) CmiPrintf("CRC: Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
     cur->slotCRC = crc1;
-    if (report && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
+    if (reportMEM && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
       CmiPrintf("CRC: Object %d modified memory of object %d for %p\n",memory_chare_id,cur->chareID,SlotToUser(cur));
     cur->userCRC = crc2;
   SLOT_ITERATE_END
@@ -922,7 +923,6 @@ static void CheckAllCRC(int report) {
  */
 
 static int CpdMemBackup = 0;
-static int reportMEM = 0;
 
 static void backupMemory() {
   Slot *cur;
@@ -1037,7 +1037,7 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     unProtectedPages = newUnProtectedPages;
   }
   unProtectedPages[unProtectedPagesSize++] = pageToUnprotect;
-  CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
+  if (reportMEM) CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
   //CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
   //CmiPrintStackTrace(0);
 }
@@ -1090,9 +1090,9 @@ void CpdResetMemory() {
 /** Called after the entry method to check if the chare that just received the
  * message has corrupted the memory of some other chare, or some system memory.
  */
-void CpdCheckMemory(int report) {
+void CpdCheckMemory() {
   if (CpdMprotect) unProtectMemory();
-  if (CpdCRC32) CheckAllCRC(report);
+  if (CpdCRC32) CheckAllCRC();
   if (CpdMemBackup) checkBackup();
   Slot *cur;
   SLOT_ITERATE_START(cur)
