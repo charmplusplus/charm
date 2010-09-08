@@ -932,7 +932,7 @@ static void backupMemory() {
   int totalMemory = SLOTSPACE;
   {
     SLOT_ITERATE_START(cur)
-      totalMemory += SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
+      totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
     SLOT_ITERATE_END
   }
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
