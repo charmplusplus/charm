@@ -576,10 +576,14 @@ void CpdDeliverMessage(char * msg) {
   CpdDeliverMessageInt(msgNum);
 }
 
-void *CpdGetNextMessageConditional(CsdSchedulerState_t*) {
+void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
   int len;
+  void *msg;
+  if ((msg=CdsFifo_Dequeue(s->localQ)) != NULL) return msg;
+  CqsDequeue((Queue_struct*)s->schedQ,(void **)&msg);
+  if (msg!=NULL) return msg;
   read(conditionalPipe[0], &len, 4);
-  void *msg = CmiAlloc(len);
+  msg = CmiAlloc(len);
   read(conditionalPipe[0], msg, len);
   return msg;
 }
