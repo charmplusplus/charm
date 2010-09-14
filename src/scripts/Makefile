@@ -1044,7 +1044,7 @@ depends: basics $(CIFILES:.ci=.ci.stamp)
         done;
 
 dependsCaseSensitive: basics $(CIFILES:.ci=.ci.stamp)
-	echo "Creating " $(DEPENDFILE) " ...";
+	@echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
