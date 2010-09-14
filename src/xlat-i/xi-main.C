@@ -168,10 +168,6 @@ int main(int argc, char *argv[])
       if(loc != std::string::npos)
           ciFileBaseName = ciFileBaseName.substr(loc+1);
       m->genDepends(ciFileBaseName);
-      cout << ciFileBaseName << ".stamp: " << fname;
-      if (internalMode)
-	  cout << " " << argv[0];
-      cout << endl;
   }
   else
       m->generate();
