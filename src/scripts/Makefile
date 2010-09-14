@@ -212,32 +212,22 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 		ckmessagelogging.h ckobjid.h\
 	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
-	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h \
+	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
 	  Refiner.h RefinerApprox.h RefinerComm.h ObjGraph.h ckheap.h \
           elements.h CommLBHeap.h topology.h manager.h \
-	  BaseLB.h CentralLB.h CentralLBMsg.h RandCentLB.h RecBisectBfLB.h \
-	  RefineLB.h RefineKLB.h RefineCommLB.h OrbLB.h \
-	  GreedyLB.h GreedyCommLB.h GreedyAgentLB.h Comm1LB.h MetisLB.h \
-	  TopoLB.h RefineTopoLB.h  TopoCentLB.h  PhasebyArrayLB.h RotateLB.h \
-	  GridCommLB.h GridCommRefineLB.h GridMetisLB.h GridHybridLB.h GridHybridSeedLB.h \
-	  DummyLB.h BlockLB.h NborBaseLB.h HybridBaseLB.h HybridLB.h HybridLBMsg.h HbmLB.h \
-	  NeighborLB.h NeighborCommLB.h NeighborLBMsg.h WSLB.h \
+	  BaseLB.h CentralLB.h CentralLBMsg.h \
+	  NborBaseLB.h HybridBaseLB.h HybridLBMsg.h \
+	  NeighborLBMsg.h \
 	  BlueGene.h middle.h middle-conv.h middle-blue.h \
           CkMarshall.decl.h CkArray.decl.h CkLocation.decl.h 	\
           CkReduction.decl.h CkArrayReductionMgr.decl.h\
           tempo.decl.h waitqd.decl.h \
           CkFutures.decl.h CkCheckpoint.decl.h CkMemCheckpoint.decl.h \
-          LBDatabase.decl.h CentralLB.decl.h ComboCentLB.decl.h NullLB.decl.h \
-          RandCentLB.decl.h RecBisectBfLB.decl.h BaseLB.decl.h MetisLB.decl.h \
-          DummyLB.decl.h RotateLB.decl.h RefineLB.decl.h RefineKLB.decl.h BlockLB.decl.h \
-          RefineCommLB.decl.h OrbLB.decl.h GreedyLB.decl.h GreedyCommLB.decl.h \
-          Comm1LB.decl.h GreedyAgentLB.decl.h \
-          GridCommLB.decl.h GridCommRefineLB.decl.h GridMetisLB.decl.h GridHybridLB.decl.h \
-	  GridHybridSeedLB.decl.h PhasebyArrayLB.decl.h TopoLB.decl.h RefineTopoLB.decl.h \
-	  TopoCentLB.decl.h NborBaseLB.decl.h NeighborLB.decl.h \
-          NeighborCommLB.decl.h HbmLB.decl.h \
-          HybridBaseLB.decl.h HybridLB.decl.h WSLB.decl.h EveryLB.decl.h \
+          LBDatabase.decl.h CentralLB.decl.h NullLB.decl.h \
+          BaseLB.decl.h \
+	  NborBaseLB.decl.h \
+          HybridBaseLB.decl.h EveryLB.decl.h \
           charisma.decl.h TraceSummary.decl.h TraceProjections.decl.h \
           TraceSimple.decl.h TraceControlPoints.decl.h TraceTau.decl.h \
 	  TraceUtilization.decl.h BlueGene.decl.h \

@@ -30,6 +30,7 @@ do
 \$(L)/libmodule$bal.a: $bal.o $manager
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
 	$dep
+LBHEADERS += $bal.h $bal.decl.h
 
 EOB
 done
