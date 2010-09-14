@@ -44,7 +44,7 @@ done
 echo "   initnode void initEveryLB(void);" >>EveryLB.ci
 echo "};" >> EveryLB.ci
 
-echo "# used for make dependes" >>$out
+echo "# used for make depends" >>$out
 echo "LB_OBJ=EveryLB.o \\" >>$out
 for bal in $LOADBALANCERS
 do
