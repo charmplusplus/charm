@@ -163,6 +163,17 @@ DEPENDFILE = Make.depends
 
 include $(DEPENDFILE)
 
+CIFILES = $(wildcard *.ci)
+
+%.di: %.ci ../bin/charmxi
+	@echo "Generating module dependencies from $<"
+	$(CHARMXI) -M $< > $@
+
+%.ci.stamp: %.ci ../bin/charmxi
+	$(CHARMXI) $< && touch $@
+
+include $(CIFILES:.ci=.di)
+
 ###############################################################################
 #
 # The basics (bin, lib, include, headers, charmc, conv-mach.sh)
@@ -1009,7 +1020,7 @@ veryclean:
 config: configure.in
 	autoconf && autoheader
 
-depends: basics
+depends: basics $(CIFILES:.ci=.ci.stamp)
 	echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
@@ -1030,17 +1041,10 @@ depends: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done; \
-	for cifile in $(wildcard *.ci); do \
-	      echo "checking generated modules for $$cifile" ; \
-	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
-	done
-# Note: Compilation commands are now appended to the generated ci file dependency info using sed.
-# This should ideally be just an implicit rule for generating %.ci.stamp files from %.ci files
+        done;
 
-
-dependsCaseSensitive: basics
-	echo "Creating " $(DEPENDFILE) " ...";
+dependsCaseSensitive: basics $(CIFILES:.ci=.ci.stamp)
+	@echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
@@ -1062,11 +1066,7 @@ dependsCaseSensitive: basics
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done; \
-	for cifile in $(wildcard *.ci); do \
-	      echo "checking generated modules for $$cifile" ; \
-	      $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
-	done
+        done;
 
 
 
