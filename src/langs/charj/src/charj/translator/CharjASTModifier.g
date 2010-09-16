@@ -443,6 +443,8 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+	|	THISINDEX
+	|	THISPROXY
     |   domainExpression
     ;
     

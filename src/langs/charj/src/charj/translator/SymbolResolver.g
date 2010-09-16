@@ -300,6 +300,12 @@ primaryExpression returns [Type type]
     |   GETMYRANK {
             $type = symtab.resolveBuiltinType("int");
         }
+	|	THISINDEX {
+			$type = symtab.resolveBuiltinType("int");
+		}
+	|	THISPROXY {
+			// TODO
+		}
     ;
 
 literal returns [Type type]

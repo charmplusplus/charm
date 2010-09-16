@@ -937,6 +937,10 @@ primaryExpression
         ->  template() "CkMyNode()"
     |   GETMYRANK
         ->  template() "CkMyRank()"
+	|	THISINDEX
+		->	template() "thisIndex"
+	|	THISPROXY
+		->	template() "thisProxy"
     |   domainExpression[null]
         ->  {$domainExpression.st}
     ;

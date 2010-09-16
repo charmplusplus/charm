@@ -68,6 +68,9 @@ tokens {
     GETNUMPES               = 'getNumPes'       ;
     GETNUMNODES             = 'getNumNodes'     ;
 
+	THISINDEX				= 'thisIndex'		;
+	THISPROXY				= 'thisProxy'		;
+
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
     IF                      = 'if'              ;
@@ -889,6 +892,8 @@ primaryExpression
         -> GETMYNODE
     |   GETNUMNODES '(' ')'
         -> GETNUMNODES
+	|	THISINDEX
+	|	THISPROXY
     ;
     
 qualifiedIdentExpression
