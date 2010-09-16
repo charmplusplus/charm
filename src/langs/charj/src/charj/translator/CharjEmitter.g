@@ -292,6 +292,7 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null])
         -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
@@ -690,6 +691,24 @@ statement
         -> {$sdagStatement.st}
     |   block
         -> {$block.st}
+    ;
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
     ;
 
 sdagStatement

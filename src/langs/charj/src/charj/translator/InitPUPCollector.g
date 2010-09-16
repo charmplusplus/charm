@@ -42,7 +42,7 @@ enterClass
     :   ^(TYPE classType IDENT
         (^('extends' .*))?
         (^('implements' .*))?
-        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION
             OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             currentClass = (ClassSymbol)$IDENT.def.type;

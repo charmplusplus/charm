@@ -102,6 +102,7 @@ classScopeDeclaration
             genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList domainExpression? block?)
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
         -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> ^(PRIMITIVE_VAR_DECLARATION 
@@ -309,6 +310,24 @@ statement
     :   nonBlockStatement
     |   sdagStatement
     |   block
+    ;
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
     ;
 
 sdagStatement

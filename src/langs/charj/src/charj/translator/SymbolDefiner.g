@@ -161,7 +161,7 @@ enterClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
@@ -200,7 +200,7 @@ exitClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL |  DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             //System.out.println("class " + currentScope);

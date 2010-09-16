@@ -99,6 +99,7 @@ classScopeDeclaration
             type IDENT formalParameterList domainExpression? b=block)
     |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
             type IDENT entryFormalParameterList domainExpression? b=block)
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
             //^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
@@ -323,6 +324,24 @@ statement
     : nonBlockStatement
     | sdagStatement
     | block
+    ;
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
     ;
 
 sdagStatement
