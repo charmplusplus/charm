@@ -28,23 +28,24 @@
 #endif
 
 /** \function getXTNodeID
- *  returns nodeID corresponding to the CkMyPe() passed to it
+ *  returns nodeID corresponding to the MPI rank (possibly obtained
+ *  from CmiMyNode()/CmiNodeOf(pe)) passed to it
  */
-int getXTNodeID(int mype, int numpes) {
+int getXTNodeID(int mpirank, int nummpiranks) {
   int nid = -1;
 
 #if XT3_TOPOLOGY
   cnos_nidpid_map_t *nidpid; 
   int ierr;
   
-  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
+  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * nummpiranks);
 
   ierr = cnos_get_nidpid_map(&nidpid);
-  nid = nidpid[mype].nid;
+  nid = nidpid[mpirank].nid;
   /* free(nidpid); */
 
 #else	/* if it is a XT4/5 */
-  PMI_Portals_get_nid(mype, &nid);
+  PMI_Portals_get_nid(mpirank, &nid);
 #endif
 
   return nid;

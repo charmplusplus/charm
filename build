@@ -459,6 +459,7 @@ fi
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
+rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
 
@@ -503,6 +504,7 @@ EOF
 fi
 
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
@@ -563,7 +565,7 @@ then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
     OPTS="-optimize $OPTS"
-    CONFIG_OPTS="--disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
+    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
 fi
 
 # build with Tau

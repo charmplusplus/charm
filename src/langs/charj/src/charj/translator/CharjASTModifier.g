@@ -160,7 +160,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
@@ -182,7 +182,8 @@ bound
 
 modifierList returns [boolean isEntry]
     :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier {if ($charjModifier.isEntry) {$isEntry = true;}} | otherModifier)*)
-        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> {$am == null && $isEntry}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PUBLIC["public"]) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"]) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
         -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
     ;
 
@@ -200,6 +201,7 @@ accessModifier
 
 charjModifier returns [boolean isEntry] 
     :   ENTRY { $isEntry = true; }
+    |   SDAGENTRY { $isEntry = true; }
     |   TRACED
     ;
 
@@ -265,10 +267,6 @@ primitiveType
     |   DOUBLE
     ;
 
-genericTypeArgumentList
-    :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
-    ;
-    
 genericTypeArgument
     :   type
     |   '?'
@@ -309,7 +307,13 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement
@@ -423,11 +427,12 @@ primaryExpression
              )
     |   parenthesizedExpression
     |   IDENT
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
-        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
+    |   ^(METHOD_CALL primaryExpression templateInstantiation? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) templateInstantiation? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) templateInstantiation? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
     |   THIS
@@ -438,12 +443,14 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+	|	THISINDEX
+	|	THISPROXY
     |   domainExpression
     ;
     
 explicitConstructorCall
-    :   ^(THIS_CONSTRUCTOR_CALL genericTypeArgumentList? arguments)
-    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? genericTypeArgumentList? arguments)
+    :   ^(THIS_CONSTRUCTOR_CALL templateInstantiation? arguments)
+    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? templateInstantiation? arguments)
     ;
 
 arrayTypeDeclarator

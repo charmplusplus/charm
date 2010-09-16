@@ -150,7 +150,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
@@ -211,6 +211,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   SDAGENTRY
     |   TRACED
     ;
 
@@ -320,7 +321,13 @@ localVariableDeclaration
 
 statement
     : nonBlockStatement
+    | sdagStatement
     | block
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement
@@ -432,6 +439,7 @@ primaryExpression
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
     |   THIS
@@ -442,6 +450,8 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+	|	THISINDEX
+	|	THISPROXY
     |   domainExpression
     ;
     

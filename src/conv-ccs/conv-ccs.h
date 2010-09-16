@@ -94,6 +94,7 @@ int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
 void CcsSendReply(int replyLen, const void *replyData);
+void CcsSendReplyNoError(int replyLen, const void *replyData);
 CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData);
 void CcsNoReply();
@@ -111,6 +112,7 @@ typedef void *CcsDelayedReply;
 #define CcsCallerId(x,y)  /*empty*/
 #define CcsDelayReply() 0
 #define CcsSendReply(s,r) /*empty*/
+#define CcsSendReplyNoError(s,r) /*empty*/
 #define CcsSendDelayedReply(d,s,r); 
 #define CcsNoReply() /*empty*/
 #define CcsNoDelayedReply(d) /*empty*/

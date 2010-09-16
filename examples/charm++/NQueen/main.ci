@@ -4,7 +4,7 @@ mainmodule main {
     readonly int numQueens;
     readonly int grainsize;
     readonly CkGroupID counterGroup;
-    
+    readonly int mask;    
 
     message QueenState; 
     message DUMMYMSG;
@@ -17,6 +17,7 @@ mainmodule main {
 
     chare NQueen {
         entry NQueen(QueenState *);
+        //entry void sequentialSolve( QueenState *msg);
     };
 
 };

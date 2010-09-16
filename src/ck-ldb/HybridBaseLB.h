@@ -230,6 +230,71 @@ public:
   }
 };
 
+// a tree with same G branching factor at all levels
+class KLevelTree: public MyHierarchyTree {
+private:
+  int toproot;
+  int G;
+public:
+  KLevelTree(int k) {
+    myname = "KLevelTree";
+    nLevels = k;
+    span = new int[nLevels-1];
+    int P=CkNumPes();
+    G = exp(log(P*1.0)/(nLevels-1));
+    if (pow(G*1.0, nLevels-1) != P) {
+      CkPrintf("KLevelTree: G=%d\n", G);
+      CmiAbort("KLevelTree failed");
+    }
+    for (int i=0; i<nLevels-1; i++) span[i] = G;
+    if (CmiNumPhysicalNodes() > 1)
+      toproot = CmiGetFirstPeOnPhysicalNode(1);
+    else
+      toproot = 1;
+    if (CkMyPe()==0) CmiPrintf("KLevelTree: %d (toproot:%d).\n", G, toproot);
+  }
+  virtual ~KLevelTree() { delete [] span; }
+  virtual int parent(int mype, int level) {
+    if (level == nLevels-2) return toproot;
+    if (level == nLevels-1) return -1;
+    int S = 1;
+    for (int i=0; i<=level; i++) S*=span[i];
+    return mype/S*S+level;
+  }
+  virtual int isroot(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == nLevels-1) return mype == toproot;
+    int S = 1;
+    for (int i=0; i<level; i++) S*=span[i];
+    if ((mype - (level-1)) % S == 0) return 1;
+    return 0;
+  }
+  virtual int numChildren(int mype, int level) {
+    if (level == 0) return 0;
+    return span[level-1];
+  }
+  virtual void getChildren(int mype, int level, int *children, int &count) {
+    CmiAssert(isroot(mype, level));
+    count = numChildren(mype, level);
+    if (count == 0) { return; }
+    int S = 1;
+    for (int i=0; i<level-1; i++) S*=span[i];
+
+    if (level == nLevels-1) {
+      for (int i=0; i<count; i++)
+        children[i] = i*S+(level-2);
+    }
+    else if (level == 1) {
+      for (int i=0; i<count; i++)
+        children[i] = mype+i*S;
+    }
+    else {
+      for (int i=0; i<count; i++)
+        children[i] = mype-1+i*S;
+    }
+  }
+};
+
 class HybridBaseLB : public BaseLB
 {
 public:

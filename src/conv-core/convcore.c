@@ -834,6 +834,16 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_GETRUSAGE
 
+#if CMK_SMP
+# if CMK_HAS_RUSAGE_THREAD
+#define RUSAGE_WHO        1   /* RUSAGE_THREAD, only in latest Linux kernels */
+#else
+#undef RUSAGE_WHO
+#endif
+#else
+#define RUSAGE_WHO        0
+#endif
+
 static double inittime_wallclock;
 CpvStaticDeclare(double, inittime_virtual);
 
@@ -857,10 +867,14 @@ void CmiTimerInit()
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
-  getrusage(0, &ru); 
+#ifndef RUSAGE_WHO
+  CpvAccess(inittime_virtual) = inittime_wallclock;
+#else
+  getrusage(RUSAGE_WHO, &ru); 
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#endif
 
 #if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
@@ -870,14 +884,18 @@ void CmiTimerInit()
 
 double CmiCpuTimer()
 {
+#ifndef RUSAGE_WHO
+  return CmiWallTimer();
+#else
   struct rusage ru;
   double currenttime;
 
-  getrusage(0, &ru);
+  getrusage(RUSAGE_WHO, &ru);
   currenttime =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
   return currenttime - CpvAccess(inittime_virtual);
+#endif
 }
 
 static double lastT = -1.0;
@@ -1424,7 +1442,7 @@ void CmiHandleMessage(void *msg)
 	(h->hdlr)(msg,h->userPtr);
 #if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
-	_LOG_E_HANDLER_END(handler); 	/* projector */
+	//_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
 

@@ -239,13 +239,18 @@ public:
 };
 
 /** 
- * Class used to store the dimensions of the array and precalculate binSize for
- * the DefaultArrayMap -- ASB
+ * Class used to store the dimensions of the array and precalculate numChares,
+ * binSize and other values for the DefaultArrayMap -- ASB
  */
 class dimInfo {
 public:
   CkArrayIndexMax _nelems;
-  int _binSize;
+  int _binSize;			/* floor of numChares/numPes */
+  int _numChares;		/* initial total number of chares */
+  int _remChares;		/* numChares % numPes -- equals the number of
+				   processors in the first set */
+  int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
+				   chares in the first set */
 
   dimInfo(void) { }
 
@@ -259,19 +264,28 @@ public:
   int compute_binsize()
   {
     int numPes = CkNumPes();
+
     if (_nelems.nInts == 1) {
-      _binSize = (int)ceil((double)(_nelems.data()[0])/(double)numPes);
+      _numChares = _nelems.data()[0];
     } else if (_nelems.nInts == 2) {
-      _binSize = (int)ceil((double)(_nelems.data()[0] * _nelems.data()[1])/(double)numPes);
+      _numChares = _nelems.data()[0] * _nelems.data()[1];
     } else if (_nelems.nInts == 3) {
-      _binSize = (int)ceil((double)(_nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2])/(double)numPes);
+      _numChares = _nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2];
     }
+
+    _remChares = _numChares % numPes;
+    _binSize = (int)floor((double)_numChares/(double)numPes);
+    _numFirstSet = _remChares * (_binSize + 1);
+
     return _binSize;
   }
 
   void pup(PUP::er& p){
     p|_nelems;
     p|_binSize;
+    p|_numChares;
+    p|_remChares;
+    p|_numFirstSet;
   }
 };
 
@@ -316,7 +330,12 @@ public:
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
 
-    return (flati/arrs[arrayHdl]->_binSize);
+    if(flati < arrs[arrayHdl]->_numFirstSet)
+      return (flati/(arrs[arrayHdl]->_binSize + 1));
+    else if (flati < arrs[arrayHdl]->_numChares)
+      return (arrs[arrayHdl]->_remChares + (flati - arrs[arrayHdl]->_numFirstSet) / (arrs[arrayHdl]->_binSize));
+    else
+      return (flati % CkNumPes());
   }
 
   void pup(PUP::er& p){

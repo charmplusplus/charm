@@ -248,6 +248,7 @@ private:
   int lbdone;
   double start_lb_time;
   LBMigrateMsg   *storedMigrateMsg;
+  int  reduction_started;
 
   FutureModel *predicted_model;
 

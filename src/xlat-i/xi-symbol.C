@@ -1,10 +1,3 @@
-/*****************************************************************************
-* $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include <list>
 using std::list;
 #include <algorithm>
@@ -613,10 +606,8 @@ Module::preprocess()
 void
 Module::genDepend(const char *cifile)
 {
-  cout << name << ".decl.h " << name << ".def.h: " << cifile << ".stamp";
-  if (internalMode)
-    cout << " charmxi";
-  cout << endl;
+  cout << name << ".decl.h " << name << ".def.h: "
+       << cifile << ".stamp" << endl;
 }
 
 void
@@ -1011,12 +1002,11 @@ Chare::genDecls(XStr& str)
   } else {
     str << "typedef ";
   }
-  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT<");
+  str << "CBaseT" << b->length() << "<";
   if (isPython()) {
     str << Prefix::Python << type;
   } else {
-    str << b->getFirst();
-    if (b->length() >= 2) str << "," << b->getSecond();
+    str << b;
   }
   str << ", CProxy_" << type;
   if (templat) {

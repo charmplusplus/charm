@@ -1098,7 +1098,7 @@ void nodetab_init()
   int rightgroup, basicsize, i, remain;
   
   /* if arg_local is set, ignore the nodelist file */
-  if (arg_local) {
+  if (arg_local || arg_mpiexec) {
     nodetab_init_for_local();
     goto fin;
   }
@@ -2466,7 +2466,7 @@ char *create_netstart(int node)
   static char dest[1024];
   int port=0;
   if (arg_mpiexec)
-    sprintf(dest,"$OMPI_COMM_WORLD_RANK %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
+    sprintf(dest,"$CmiMyNode %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
   else
     sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
@@ -2896,10 +2896,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
   char *arg_nodeprog_r,*arg_currdir_r;
   char *dbg=nodetab_debugger(nodeno);
   char *host=nodetab_name(nodeno);
-#define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
 
   if (arg_mpiexec)
         fprintf(f, "#!/bin/sh\n");
+
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
   	"  echo 'Charmrun remote shell(%s.%d)>' $*\n"
@@ -2940,21 +2940,34 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
 */
   if (arg_display && !arg_ssh_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
-  netstart = create_netstart(rank0no);
-  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
-  if (arg_mpiexec)
-    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK; export CmiMyNode\n");
+  if (arg_mpiexec) {
+    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
+    fprintf(f,"export CmiMyNode\n");
+  }
   else
     fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+
+  netstart = create_netstart(rank0no);
+  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
+
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
+
   if (restart || arg_mpiexec)    /* skip fork */
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",0);
   else
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
-  if (arg_mpiexec)
-    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE; export CmiNumNodes\n");
+
+  if (arg_mpiexec) {
+    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$MPIRUN_NPROCS\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$PMI_SIZE\n");
+    fprintf(f,"export CmiNumNodes\n");
+  }
   else
     fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
   fprintf (f, "VMI_PROCS='%d'; export VMI_PROCS\n", arg_requested_pes);
@@ -3150,7 +3163,10 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
      to do this, we have to close stdin, stdout, stderr, and 
      run the subshell in the background. */
   fprintf(f,")");
-  fprintf(f,CLOSE_ALL "\n");
+  fprintf(f," < /dev/null 1> /dev/null 2> /dev/null");
+  if (!arg_mpiexec)
+      fprintf(f, " &");
+  fprintf(f, "\n");
   
   if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
   fprintf(f, /* Check for startup errors: */
@@ -3336,7 +3352,7 @@ int rsh_fork_one(const char *startScript)
     s = skipblanks(e); e = skipstuff(s);
   }
 
-  rshargv[num++]="-np";
+  rshargv[num++]="-n";
   sprintf(npes, "%d", nodetab_rank0_size);
   rshargv[num++]=npes;
   rshargv[num++]=(char*)startScript;

@@ -497,6 +497,11 @@ public:
     const char *type="Converse";
     p.comment("name");
     char name[128];
+    if (msg == (void*)-1) {
+      type="Sentinel";
+      p((char*)type, strlen(type));
+      return;
+    }
 #if ! CMK_BLUEGENE_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
@@ -571,10 +576,14 @@ void CpdDeliverMessage(char * msg) {
   CpdDeliverMessageInt(msgNum);
 }
 
-void *CpdGetNextMessageConditional(CsdSchedulerState_t*) {
+void *CpdGetNextMessageConditional(CsdSchedulerState_t *s) {
   int len;
+  void *msg;
+  if ((msg=CdsFifo_Dequeue(s->localQ)) != NULL) return msg;
+  CqsDequeue((Queue_struct*)s->schedQ,(void **)&msg);
+  if (msg!=NULL) return msg;
   read(conditionalPipe[0], &len, 4);
-  void *msg = CmiAlloc(len);
+  msg = CmiAlloc(len);
   read(conditionalPipe[0], msg, len);
   return msg;
 }
@@ -1040,6 +1049,7 @@ void CpdCharmInit()
   CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
   CcsSetMergeFn("ccs_continue_break_point",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
+  CcsSetMergeFn("ccs_single_step",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
   CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
   CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);

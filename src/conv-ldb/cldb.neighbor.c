@@ -70,7 +70,6 @@ static void CldStillIdle(void *dummy, double curT)
   cldData->lastCheck = now;
 
   myload = CldLoad();
-  CmiAssert(myload == 0);
   if (myload > 0) return;
 
   msg.from_pe = CmiMyPe();
@@ -120,7 +119,8 @@ static void CldAskLoadHandler(requestmsg *msg)
     sendLoad = 1;
     for (i=0; i<CpvAccess(numNeighbors); i++) 
       if (CpvAccess(neighbors)[i].pe == receiver) break;
-    CmiAssert(i<CpvAccess(numNeighbors));
+    
+    if(i<CpvAccess(numNeighbors)) {CmiFree(msg); return;}
     CpvAccess(neighbors)[i].load += sendLoad;
     CldMultipleSend(receiver, sendLoad, rank, 0);
 #if 0
@@ -155,7 +155,6 @@ void CldSendLoad()
         found = 1;
         break;
       }
-    CmiAssert(found == 1);
   }
 #else
   loadmsg msg;
@@ -231,9 +230,9 @@ void CldBalance(void *dummy, double curT)
       }
     if (numUnderAvg > 0)
       for (i=0; ((i<nNeighbors) && (overload>0)); i++) {
-	j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
-        if (CpvAccess(neighbors)[j].load < avgLoad) {
-          numToMove = (avgLoad - CpvAccess(neighbors)[j].load)/numUnderAvg;
+          j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
+          if (CpvAccess(neighbors)[j].load < avgLoad) {
+              numToMove = (avgLoad - CpvAccess(neighbors)[j].load);
           if (numToMove > overload)
             numToMove = overload;
           overload -= numToMove;
@@ -257,9 +256,14 @@ void CldBalance(void *dummy, double curT)
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(CpvAccess(CldData)->balanceEvt, startT, CmiWallTimer());
 #endif
-  CcdCallFnAfterOnPE((CcdVoidFn)CldBalance, NULL, PERIOD, CmiMyPe());
-
 }
+
+void CldBalancePeriod(void *dummy, double curT)
+{
+    CldBalance(NULL, curT);
+    CcdCallFnAfterOnPE((CcdVoidFn)CldBalancePeriod, NULL, PERIOD, CmiMyPe());
+}
+
 
 void CldLoadResponseHandler(loadmsg *msg)
 {
@@ -401,16 +405,16 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
       pe = CpvAccess(MinProc);
     node = CmiNodeOf(pe);
     if (node != CmiMyNode()){
-      CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
-      CpvAccess(CldRelocatedMessages)++;
-      ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-      if (pfn) {
-	pfn(&msg);
-	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-      }
-      CmiSetInfo(msg,infofn);
-      CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
-      CmiSyncNodeSendAndFree(node, len, msg);
+        CpvAccess(neighbors)[CpvAccess(Mindex)].load++;
+        CpvAccess(CldRelocatedMessages)++;
+        ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+        if (pfn) {
+            pfn(&msg);
+            ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+        }
+        CmiSetInfo(msg,infofn);
+        CldSwitchHandler(msg, CpvAccess(CldBalanceHandlerIndex));
+        CmiSyncNodeSendAndFree(node, len, msg);
     }
     else {
       ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -574,10 +578,11 @@ void CldGraphModuleInit(char **argv)
     CldReadNeighborData();
 #endif
     CldComputeNeighborData();
-#if CMK_MULTICORE
+    #if CMK_MULTICORE
     CmiNodeBarrier();
 #endif
-    CldBalance(NULL, CmiWallTimer());
+    CldBalancePeriod(NULL, CmiWallTimer());
+
   }
 
 #if 1
@@ -593,6 +598,7 @@ void CldGraphModuleInit(char **argv)
   }
 #endif
 }
+
 
 void CldModuleInit(char **argv)
 {

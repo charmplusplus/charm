@@ -6,7 +6,7 @@ OBJS = jacobi3d.o
 all: jacobi3d
 
 jacobi3d: $(OBJS)
-	$(CHARMC) -language charm++ -module RefineLB -g -o jacobi3d $(OBJS)
+	$(CHARMC) -language charm++ -module RefineLB -o jacobi3d $(OBJS)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)
@@ -21,7 +21,7 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o jacobi3d jacobi3d.prj charmrun *~
 
 jacobi3d.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) -c jacobi3d.C -g
+	$(CHARMC) -c jacobi3d.C
 
 run: jacobi3d
 	./charmrun +p2 ./jacobi3d 20 10 +balancer Refine 

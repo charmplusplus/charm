@@ -255,5 +255,6 @@ void CldModuleInit(char **argv)
   CldModuleGeneralInit(argv);
 }
 
+void CldCallback(){}
 
 #endif

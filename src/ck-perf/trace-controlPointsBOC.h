@@ -2,9 +2,6 @@
 
 extern CkGroupID traceControlPointsGID;
 
-#ifdef CMK_BLUEGENEP
-void initBGP_UPC_Counters(void);
-#endif
 
 // We typically declare parallel object classes here for the purposes of
 // performing parallel operations for the trace module after the main
@@ -31,13 +28,18 @@ class TraceControlPointsInit : public Chare {
 class TraceControlPointsBOC : public CBase_TraceControlPointsBOC {
 public:
   TraceControlPointsBOC(void) {
-#ifdef CMK_BLUEGENEP
-      initBGP_UPC_Counters();
-#endif
   };
-  TraceControlPointsBOC(CkMigrateMessage *m) {};
 
-  void printBGP_UPC_CountersBOC(void);
+
+  void pup(PUP::er &p)
+  {
+    CBase_TraceControlPointsBOC::pup(p);
+    if(p.isUnpacking()){
+      CkPrintf("Group TraceControlPointsBOC is not yet capable of migration.\n");
+    }
+  }
+
+ TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) {};
 
 };
 

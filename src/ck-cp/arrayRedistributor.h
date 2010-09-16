@@ -16,6 +16,8 @@
 #include<pup_stl.h>
 
 
+#if CMK_WITH_CONTROLPOINT
+
 
 /**
  * \addtogroup ControlPointFramework
@@ -667,4 +669,5 @@ class redistributor2D: public CBase_redistributor2D {
 };
 
 /** @} */
+#endif
 #endif

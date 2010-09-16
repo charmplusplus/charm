@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +161,6 @@ int main(int argc, char *argv[])
       if(loc != std::string::npos)
           ciFileBaseName = ciFileBaseName.substr(loc+1);
       m->genDepends(ciFileBaseName);
-      cout << ciFileBaseName << ".stamp: " << fname << endl;
   }
   else
       m->generate();

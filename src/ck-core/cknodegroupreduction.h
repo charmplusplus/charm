@@ -22,6 +22,11 @@ class countAdjustment {
 		void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
 };
 
+/** @todo: Fwd decl for a temporary class. Remove after
+ * delegated cross-array reductions are implemented more optimally
+ */
+namespace ck { namespace impl { class XArraySectionReducer; } }
+
 class CkReductionMsg;
 //CkReduction is just a "namespace class" for the user-visible
 // parts of the reduction system.
@@ -99,6 +104,7 @@ private:
  	friend class CkNodeReductionMgr;
 	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
+    friend class ck::impl::XArraySectionReducer;
 //System-level interface
 	//This is the maximum number of possible reducers,
 	// including both builtin and user-defined types

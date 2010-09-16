@@ -18,6 +18,7 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    SDAGENTRY               = 'sdagentry'       ;
     TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
@@ -54,6 +55,9 @@ tokens {
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
 
+    OVERLAP                 = 'overlap'         ;
+    WHEN                    = 'when'            ;
+
     PRINT                   = 'print'           ;
     PRINTLN                 = 'println'         ;
     EXIT                    = 'exit'            ;
@@ -63,6 +67,9 @@ tokens {
     GETMYNODE               = 'getMyNode'       ;
     GETNUMPES               = 'getNumPes'       ;
     GETNUMNODES             = 'getNumNodes'     ;
+
+	THISINDEX				= 'thisIndex'		;
+	THISPROXY				= 'thisProxy'		;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -331,11 +338,9 @@ typeList
 classScopeDeclaration
     :   modifierList?
         (   genericTypeParameterList?
-            (   type IDENT formalParameterList (block | ';')
+            (   type IDENT formalParameterList (';' | block)
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
                     formalParameterList block?)
-            /*|   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
             |   ident=IDENT formalParameterList block
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
@@ -353,8 +358,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList)
-            /*|   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -383,7 +386,6 @@ interfaceFieldDeclarator
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
-
 variableDeclaratorId
     :   IDENT^ domainExpression?
     ;
@@ -392,16 +394,6 @@ variableInitializer
     :   arrayInitializer
     |   expression
     ;
-
-/*arrayDeclarator
-    :   '[' ']'
-        ->  ARRAY_DECLARATOR
-    ;
-
-arrayDeclaratorList
-    :   arrayDeclarator+
-        ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;*/
 
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
@@ -457,6 +449,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   SDAGENTRY
     |   TRACED
     |   PRIVATE
     |   ABSTRACT
@@ -588,9 +581,17 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
     ;
-        
+
+sdagStatement
+    :   OVERLAP block
+        -> ^(OVERLAP block)
+    |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
+        -> ^(WHEN (IDENT expression? formalParameterList)* block)
+    ;
+
 nonBlockStatement
     :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
@@ -640,7 +641,6 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
-
     ;           
         
 
@@ -841,6 +841,8 @@ postfixedExpression
             ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
+        |   domainExpression
+            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression domainExpression)
         )*
         // At the end there may follow a post increment/decrement.
         (   op='++'-> ^(POST_INC[$op, "POST_INC"] $postfixedExpression)
@@ -890,6 +892,8 @@ primaryExpression
         -> GETMYNODE
     |   GETNUMNODES '(' ')'
         -> GETNUMNODES
+	|	THISINDEX
+	|	THISPROXY
     ;
     
 qualifiedIdentExpression

@@ -43,7 +43,7 @@
 #endif
 
 #if CMK_CRAYXT
-extern "C" int getXTNodeID(int mype, int numpes);
+extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
@@ -483,18 +483,20 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
+    int numNodes = CmiNumNodes();
     cpuTopo.nodeIDs = new int[numPes];
     CpuTopology::supported = 1;
 
     int nid;
     for(int i=0; i<numPes; i++) {
-      nid = getXTNodeID(i, numPes);
+      nid = getXTNodeID(CmiNodeOf(i), numNodes);
       cpuTopo.nodeIDs[i] = nid;
     }
     int prev = -1;
     nid = -1;
 
-    // this assumes TXYZ mapping and changes nodeIDs
+    // this assumes that all cores on a node have consecutive MPI rank IDs
+    // and then changes nodeIDs to 0 to numNodes-1
     for(int i=0; i<numPes; i++) {
       if(cpuTopo.nodeIDs[i] != prev) {
 	prev = cpuTopo.nodeIDs[i];
@@ -514,6 +516,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   {
   #if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
+    // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
   #elif CMK_BPROC
     myip = skt_innode_my_ip();
   #else

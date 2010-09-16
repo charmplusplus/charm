@@ -79,6 +79,7 @@ public class Translator {
 
     public String translate(String filename) throws Exception {
         m_basename = filename.substring(0, filename.lastIndexOf("."));
+        m_basename = m_basename.substring(m_basename.lastIndexOf("/") + 1);
 
         ANTLRFileStream input = new ANTLRFileStream(filename);
             

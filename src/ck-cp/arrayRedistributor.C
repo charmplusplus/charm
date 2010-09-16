@@ -27,6 +27,8 @@
  *
  */
 
+#if CMK_WITH_CONTROLPOINT
+
 
 using namespace std;
 
@@ -90,3 +92,4 @@ int redistributor2D::myheight(){
 
 /*! @} */
 
+#endif

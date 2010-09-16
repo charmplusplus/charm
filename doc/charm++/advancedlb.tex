@@ -73,21 +73,22 @@ load balancer {\em fooLB} to illustrate the steps).
 
 \begin{enumerate}
 \item Create files named {\em fooLB.ci, fooLB.h and fooLB.C}. One can choose to
-copy and rename the files RandCentLB (a random centralized load balancer) and 
-rename the class name in those files.
+copy and rename the files RotateLB.* and rename the class name in those files.
 
-\item Implement the {\em fooLB} class method --- 
-{\bf fooLB::work(CentralLB::LDStats* stats, int count)} 
-This method takes the load balancing database ({\em stats}) as an input,
-and output the new mapping of objects to processors in {\em stats->to\_proc} array.
+\item Implement the {\em fooLB} class method --- {\bf
+fooLB::work(CentralLB::LDStats* stats, int count)} This method takes the load
+balancing database ({\em stats}) as an input, and output the new mapping of
+objects to processors in {\em stats->to\_proc} array.
 
-\item To compile the strategy files, first add {\em fooLB} into the load 
-balancer list in charm/tmp/Makefile\_lb.sh. Run the script in charm/tmp, 
-which creates the new Makefile named ``Make.lb''.
+\item Build charm for your platform (This will create the required links in the tmp directory).
 
-\item Run ``make depends'' to update dependence rule of Charm++ files.
-   And run ``make charm++'' to compile Charm++ which includes the new 
-load balancing strategy files.
+\item To compile the strategy files, first add {\em fooLB} into the load
+balancer list in charm/tmp/Makefile\_lb.sh. Run the script in charm/tmp, which
+creates the new Makefile named ``Make.lb''.
+
+\item Run ``make depends'' to update dependence rule of Charm++ files.  And run
+``make charm++'' to compile Charm++ which includes the new load balancing
+strategy files.
 \end{enumerate}
 
 

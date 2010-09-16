@@ -13,8 +13,9 @@ package charj.translator;
 
 @members {
     SymbolTable symtab;
-    Scope currentScope;
-    ClassSymbol currentClass;
+    Scope currentScope = null;
+    ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
     AstModifier astmod = new AstModifier();
 
     public SymbolDefiner(TreeNodeStream input, SymbolTable symtab) {
@@ -81,18 +82,24 @@ boolean entry = false;
             type IDENT .*)
         {
             //System.out.println("entering method scope " + $IDENT.text);
-            String typeName = $type.typeName;
-            if (typeName == null) {
+            List<TypeName> typeName = $type.typeName;
+            if (typeName == null || typeName.size() == 0) {
                 /*System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");*/
-                typeName = "void";
+                typeName.add(new TypeName("void"));
             }
             boolean isTraced = false;
+            boolean sdagEntry = false;
             if ($MODIFIER_LIST != null) {
                 CharjAST charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
                 if (charj_mod != null) {
                     charj_mod = charj_mod.getChildOfType(CharjParser.TRACED);
                     isTraced = (charj_mod != null);
                     if (isTraced) System.out.println("method " + $IDENT.text + " is traced");
+                }
+                charj_mod = $MODIFIER_LIST.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
+                if (charj_mod != null) {
+                    charj_mod = charj_mod.getChildOfType(CharjParser.SDAGENTRY);
+                    sdagEntry = (charj_mod != null);
                 }
             }
             Type returnType = currentScope.resolveType(typeName);
@@ -101,10 +108,12 @@ boolean entry = false;
             sym.isEntry = entry;
             sym.isTraced = isTraced;
             sym.definition = $enterMethod.start;
+            sym.hasSDAG = sdagEntry;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
             $IDENT.def = sym;
             currentScope = sym;
+            currentMethod = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -133,6 +142,7 @@ boolean entry = false;
             currentScope.define($IDENT.text, sym);
             $IDENT.def = sym;
             currentScope = sym;
+            currentMethod = sym;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -142,9 +152,9 @@ exitMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*) {
             //System.out.println("method " + currentScope);
             currentScope = currentScope.getEnclosingScope();
+            currentMethod = null;
         }
     ;
-
 
 
 enterClass
@@ -155,7 +165,9 @@ enterClass
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
-                    (ClassSymbol)currentScope.resolveType($parent.text), currentScope);
+                    (ClassSymbol)currentScope.
+                      resolveType(TypeName.createTypeName($parent.text)),
+                                  currentScope);
             currentScope.define(sym.name, sym);
             currentClass = sym;
             sym.definition = $IDENT;
@@ -234,31 +246,43 @@ varDeclaration
     ;
 
 
-type returns [String typeName]
+type returns [List<TypeName> typeName]
 @init {
-    $typeName = "";
+    $typeName = new ArrayList<TypeName>();
     if (currentScope == null) System.out.println("*****ERROR: null type scope");
     assert currentScope != null;
 }
-@after {
-    $typeName = $typeName.substring(1);
-}
     :   VOID {
             $VOID.scope = currentScope;
-            $typeName = ".void";
+            $typeName.add(new TypeName("void"));
         }
     |   ^(SIMPLE_TYPE t=. .*) {
             $SIMPLE_TYPE.scope = currentScope;
-            $typeName = "." + $t;
+            $typeName.add(new TypeName($t.toString()));
         }
-    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName += "." + $IDENT.text;} .*))+) .*)
+    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $OBJECT_TYPE.scope = currentScope; }
-    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName += "." + $IDENT.text;} .*))+) .*)
+    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $REFERENCE_TYPE.scope = currentScope; }
-    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName += "." + $IDENT.text;} .*))+) .*)
+    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
             { $PROXY_TYPE.scope = currentScope; }
-    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName += "." + $IDENT.text;} .*))+) .*)
+    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($i1.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
+    ;
+
+literal returns [String lit]
+@init {
+$lit = $start.getText().toString();
+}
+    :   HEX_LITERAL
+    |   OCTAL_LITERAL
+    |   DECIMAL_LITERAL
+    |   FLOATING_POINT_LITERAL
+    |   CHARACTER_LITERAL
+    |   STRING_LITERAL
+    |   TRUE
+    |   FALSE
+    |   NULL
     ;
 
 classType
@@ -275,5 +299,9 @@ atoms
     :  (IDENT|THIS|SUPER) {
             assert currentScope != null;
             t.scope = currentScope;
+       }
+    |  (WHEN|OVERLAP) {
+            assert currentMethod != null;
+            currentMethod.hasSDAG = true;
        }
     ;
