@@ -46,18 +46,10 @@ boolean entry = false;
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             type IDENT .*)
-        {
-            $IDENT.def.type = $type.sym;
-            $IDENT.symbolType = $IDENT.def.type;
-        }
     |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
             IDENT .*)
-        {
-            $IDENT.def.type = (ClassSymbol)$IDENT.def.scope;
-            $IDENT.symbolType = $IDENT.def.type;
-        }
     ;
 
 enterClass
@@ -67,8 +59,6 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL |  PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
-            $IDENT.def.type = (ClassSymbol)$IDENT.def;
-            $IDENT.symbolType = $IDENT.def.type;
             currentClass = (ClassSymbol)$IDENT.def.type;
         }
     ;
@@ -87,9 +77,8 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                $IDENT.def.type = $type.sym;
-                $IDENT.symbolType = $type.sym;
-                //System.out.println("Resolved type of variable " + $IDENT.text + ": " + $IDENT.def.type + ", symbol is " + $IDENT.def);
+                //System.out.println("Resolved type of variable " + $IDENT.text + ": " +
+                //    $IDENT.def.type + ", symbol is " + $IDENT.def);
                 if (currentClass != null) {
                     ClassSymbol declType = null;
                     if ($type.sym instanceof ClassSymbol) {
@@ -109,10 +98,6 @@ varDeclaration
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
-        {
-            $IDENT.def.type = $type.sym;
-            $IDENT.symbolType = $type.sym;
-        }
     ;
 
 expression returns [Type type]
@@ -216,7 +201,7 @@ primaryExpression returns [Type type]
             if ($IDENT.def != null) {
                 $type = $IDENT.def.type;
                 $IDENT.symbolType = $type;
-                /*System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.def);*/
+                //System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.def);
             } else {
                 System.out.println("Couldn't resolve IDENT type: " + $IDENT.text);
             }
@@ -258,7 +243,7 @@ primaryExpression returns [Type type]
                 parentNode.def = s;
                 parentNode.symbolType = $type;
             } else {
-                //System.out.println("Couldn't resolve access " + memberText);
+                System.out.println("Couldn't resolve access " + memberText);
             }
         }
     |   ^(PAREN_EXPR expression) {
