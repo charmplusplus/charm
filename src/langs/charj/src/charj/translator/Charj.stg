@@ -85,10 +85,11 @@ readonlys_cc(pds, ros, basename) ::=
 {
     <readonlys_cc(pds = rest(pds), ros = ros, basename = basename)>
 } // namespace <first(pds)>
-#include "<basename>_readonly.def.h"
 <else>
 <ros; separator="\n">
 <endif>
+
+#include "<basename>_readonly.def.h"
 
 >>
 
