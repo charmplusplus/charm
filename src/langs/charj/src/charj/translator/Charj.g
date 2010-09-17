@@ -33,7 +33,9 @@ tokens {
     CHAR                    = 'char'            ;
     BYTE                    = 'byte'            ;
     SHORT                   = 'short'           ;
+    IN                      = 'in'              ;
     INT                     = 'int'             ;
+    LET                     = 'let'             ;
     LONG                    = 'long'            ;
     FLOAT                   = 'float'           ;
     DOUBLE                  = 'double'          ;
@@ -67,6 +69,9 @@ tokens {
     GETMYNODE               = 'getMyNode'       ;
     GETNUMPES               = 'getNumPes'       ;
     GETNUMNODES             = 'getNumNodes'     ;
+
+    THISINDEX		    = 'thisIndex'	;
+    THISPROXY		    = 'thisProxy'	;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -164,6 +169,7 @@ tokens {
     ARRAY_ELEMENT_ACCESS;
     ARRAY_INITIALIZER;
     BLOCK;
+    DIVCON_BLOCK;
     CAST_EXPR;
     CATCH_CLAUSE_LIST;
     CLASS_CONSTRUCTOR_CALL;
@@ -183,11 +189,13 @@ tokens {
     FORMAL_PARAM_STD_DECL;
     FORMAL_PARAM_VARARG_DECL;
     FUNCTION_METHOD_DECL;
+    DIVCON_METHOD_DECL;
     GENERIC_TYPE_ARG_LIST;
     GENERIC_TYPE_PARAM_LIST;
     INTERFACE_TOP_LEVEL_SCOPE;
     IMPLEMENTS_CLAUSE;
     LABELED_STATEMENT;
+    LET_ASSIGNMENT;
     CHARJ_SOURCE;
     METHOD_CALL;
     ENTRY_METHOD_CALL;
@@ -344,6 +352,8 @@ classScopeDeclaration
                 ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
                         formalParameterList block)
             )
+        |   type IDENT formalParameterList divconBlock
+            ->  ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
         |   simpleType classFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
         |   objectType classFieldDeclaratorList ';'
@@ -589,6 +599,32 @@ sdagStatement
         -> ^(OVERLAP block)
     |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
         -> ^(WHEN (IDENT expression? formalParameterList)* block)
+    ;
+
+divconBlock
+    :   divconExpr
+        ->  ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   IDENT '=' expression
+        -> ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment (','! divconAssignment)*
+    ;
+
+divconExpr
+    :   IF parenthesizedExpression ifExpr=divconExpr
+        (   ELSE elseExpr=divconExpr
+            ->  ^(IF parenthesizedExpression $ifExpr $elseExpr)
+        |
+            ->  ^(IF parenthesizedExpression $ifExpr)
+        )
+    |   LET ^divconAssignmentList IN divconExpr
+    |   expression ';'!
+    |   '{'! divconExpr '}'!
     ;
 
 nonBlockStatement
@@ -891,6 +927,8 @@ primaryExpression
         -> GETMYNODE
     |   GETNUMNODES '(' ')'
         -> GETNUMNODES
+	|	THISINDEX
+	|	THISPROXY
     ;
     
 qualifiedIdentExpression

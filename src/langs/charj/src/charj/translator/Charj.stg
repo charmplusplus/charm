@@ -79,18 +79,26 @@ readonlys_h(pds, ros) ::=
 <endif>
 >>
 
-readonlys_cc(pds, ros, basename) ::=
+
+readonlys_cc_inner(pds, ros, basename) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <readonlys_cc(pds = rest(pds), ros = ros, basename = basename)>
+    <readonlys_cc_inner(pds = rest(pds), ros = ros, basename = basename)>
 } // namespace <first(pds)>
-#include "<basename>_readonly.def.h"
 <else>
 <ros; separator="\n">
 <endif>
+>>
+
+
+readonlys_cc(pds, ros, basename) ::=
+<<
+<readonlys_cc_inner(pds = pds, ros = ros, basename = basename)>
+#include "<basename>_readonly.def.h"
 
 >>
+
 
 importDeclaration_cc_h(inc_id, use_id) ::=
 <<

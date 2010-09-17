@@ -224,7 +224,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public String toString() {
         if (isPrimitive) return name;
-        else return getFullyQualifiedName() + members + templateArgs;
+        else return getFullyQualifiedName() + members + (templateArgs != null ? templateArgs : "");
     }
 
     public String getFullyQualifiedName() {

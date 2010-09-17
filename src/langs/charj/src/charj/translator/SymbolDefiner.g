@@ -111,9 +111,10 @@ boolean entry = false;
             sym.hasSDAG = sdagEntry;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.def = sym;
             currentScope = sym;
             currentMethod = sym;
+            $IDENT.def = sym;
+            $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -140,9 +141,10 @@ boolean entry = false;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.def = sym;
             currentScope = sym;
             currentMethod = sym;
+            $IDENT.def = sym;
+            $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -161,7 +163,7 @@ enterClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
@@ -172,8 +174,8 @@ enterClass
             currentClass = sym;
             sym.definition = $IDENT;
             sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.def = sym;
             currentScope = sym;
+            $IDENT.def = sym;
             $IDENT.scope = currentScope;
             $IDENT.symbolType = sym;
             String classTypeName = $classType.text;
@@ -200,7 +202,7 @@ exitClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL |  DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             //System.out.println("class " + currentScope);
@@ -227,7 +229,6 @@ varDeclaration
                 $IDENT.scope = currentScope;
                 $IDENT.symbolType = varType;
                 currentScope.define($IDENT.text, sym);
-
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))

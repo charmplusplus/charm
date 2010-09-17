@@ -100,10 +100,10 @@ public class Translator {
         // do AST rewriting and semantic checking
         if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
         preSemanticPass();
-        if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
+        if (m_printAST) printAST("After PreSemantics Pass", "after_presem.html");
 
         resolveTypes();
-        if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+        if (m_printAST) printAST("After Type Resolution", "after_types.html");
 
         initPupCollect();
         if (m_printAST) printAST("After Collector Pass", "after_collector.html");
@@ -178,6 +178,7 @@ public class Translator {
         SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
         definer.downup(m_ast);
         if (m_verbose) System.out.println("\nResolver Phase\n----------------");
+        if (m_printAST) printAST("After Type Definition", "after_definition.html");
         m_nodes.reset();
         SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
         resolver.downup(m_ast);

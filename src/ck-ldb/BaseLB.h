@@ -126,6 +126,8 @@ public:
   virtual int  useMem()  { return 0; }
   virtual void pup(PUP::er &p);
   virtual void flushStates();
+
+  CkGroupID getGroupID() {return thisgroup;}
 };
 
 /// migration decision for an obj.
