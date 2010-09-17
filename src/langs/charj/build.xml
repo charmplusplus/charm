@@ -98,8 +98,13 @@
         <antlr3 grammar.name="CharjSemantics.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
+    
+    <target name="AtomicBlocks" depends="Charj">
+        <antlr3 grammar.name="AtomicBlocks.g"
+            grammar.path="${buildsrc}/charj/translator"/>
+    </target>
 
-    <target name="CharjEmitter" depends="CharjSemantics,CharjASTModifier,CharjASTModifier2,SymbolDefiner,SymbolResolver,InitPUPCollector">
+    <target name="CharjEmitter" depends="Charj">
         <antlr3 grammar.name="CharjEmitter.g"
             grammar.path="${buildsrc}/charj/translator"/>
     </target>
