@@ -177,6 +177,8 @@ public class Translator {
         if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
         SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
         definer.downup(m_ast);
+        m_nodes.reset();
+        definer.downup(m_ast);
         if (m_verbose) System.out.println("\nResolver Phase\n----------------");
         if (m_printAST) printAST("After Type Definition", "after_definition.html");
         m_nodes.reset();
