@@ -569,6 +569,8 @@ nonProxyType
 proxyType
     :   ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?)
         -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?) // TODO array sections
+		-> template() "not implemented yet"
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -984,7 +986,7 @@ newExpression[StringTemplate obtype]
     :   ^(NEW_EXPRESSION arguments? domainExpression[$arguments.args])
         -> template(domain={$domainExpression.st},type={$obtype}) "new <type>(<domain>)"
     |   ^(NEW proxyType arguments)
-        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
+        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)" // TODO array sections
     |   ^(NEW nonProxyType arguments)
         -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
     ;

@@ -242,6 +242,7 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?) // TODO deal with it!!
     ;
 
 entryArgObjectType returns [ClassSymbol type]

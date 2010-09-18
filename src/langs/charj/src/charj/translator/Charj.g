@@ -222,6 +222,8 @@ tokens {
     REFERENCE_TYPE;
     POINTER_TYPE;
     PROXY_TYPE;
+	ARRAY_SECTION_TYPE;
+	ARRAY_SECTION;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -490,6 +492,8 @@ constructorType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+	|	MOD qualifiedTypeIdent AT domainExpression
+		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
     ;
 
 simpleType
@@ -502,6 +506,8 @@ objectType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	MOD qualifiedTypeIdent AT
+		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent)
     ;
 
 qualifiedTypeIdent
@@ -961,13 +967,13 @@ qualifiedIdentExpression
     ;
 
 newExpression
-    :   n=NEW
+    :   NEW
         (
             domainExpression arguments?
             ->  ^(NEW_EXPRESSION arguments? domainExpression)
         |   constructorType arguments
             -> ^(NEW constructorType arguments)
-        )
+		)
     ;
     
 /*newArrayConstruction
