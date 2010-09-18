@@ -5,6 +5,7 @@ options {
     tokenVocab = Charj;
     ASTLabelType = CharjAST;
     filter = true;
+    output = AST;
 }
 
 @header {
@@ -14,82 +15,18 @@ import java.util.Iterator;
 
 @members {
     SymbolTable symtab;
-    Scope currentScope;
-    ClassSymbol currentClass = null;
 
-    public SymbolResolver(TreeNodeStream input, SymbolTable symtab) {
+    public AtomicBlocks(TreeNodeStream input, SymbolTable symtab) {
         this(input);
         this.symtab = symtab;
-        this.currentScope = symtab.getDefaultPkg();
     }
 }
 
 
 topdown
-    :   enterClass
-    |   enterMethod
-    |   varDeclaration
-    |   expression
-    |   assignment
+    :   block
     ;
 
-bottomup
-    :   exitClass
-    ;
-
-enterMethod
-@init {
-boolean entry = false;
-}
-    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL {entry = true;})
-            (^(MODIFIER_LIST .*))?
-            (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            type IDENT .*)
-        {
-            $IDENT.def.type = $type.sym;
-            $IDENT.symbolType = $IDENT.def.type;
-        }
-    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
-            (^(MODIFIER_LIST .*))?
-            (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            IDENT .*)
-        {
-            $IDENT.def.type = (ClassSymbol)$IDENT.def.scope;
-            $IDENT.symbolType = $IDENT.def.type;
-        }
-    ;
-
-enterClass
-    :   ^(TYPE classType IDENT
-            (^('extends' parent=type))?
-            (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
-                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
-        {
-            currentClass = (ClassSymbol)$IDENT.def.type;
-        }
-    ;
-
-exitClass
-    :   ^(TYPE classType IDENT
-            (^('extends' parent=type))?
-            (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
-                OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
-        { currentClass = null; }
-    ;
-
-varDeclaration
-    :   ^((PRIMITIVE_VAR_DECLARATION | OBJECT_VAR_DECLARATION)
-            (^(MODIFIER_LIST .*))? type
-            ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
-            )+))
-    |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
-        {
-            $IDENT.def.type = $type.sym;
-            $IDENT.symbolType = $type.sym;
-        }
-    ;
 
 parenthesizedExpression
     :   ^(PAREN_EXPR exp=expression)
@@ -100,31 +37,17 @@ expression
     ;
 
 assignment
-    :   ^(ASSIGNMENT IDENT expr)
+    :   ^(ASSIGNMENT IDENT expression)
     ;
 
 
 type
-    :   VOID {
-            scope = $VOID.scope;
-            typeText.add(new TypeName("void"));
-        }
-    |   ^(SIMPLE_TYPE t=. {
-            scope = $SIMPLE_TYPE.scope;
-            typeText.add(new TypeName($t.getText()));
-        } .*)
-    |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
-                (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-                {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
-    |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
-    |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
-    |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
-            (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-            {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
+    :   VOID 
+    |   ^(SIMPLE_TYPE .*)
+    |   ^(OBJECT_TYPE .*)
+    |   ^(REFERENCE_TYPE .*)
+    |   ^(PROXY_TYPE .*)
+    |   ^(POINTER_TYPE .*)
     ;
 
 classType
@@ -136,12 +59,14 @@ classType
     |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
+
 block returns [boolean containsSDAG]
 @init { boolean hasSDAGstatement = false; }
     :   ^(BLOCK (sdagNonLeader |
             sdagLeader {hasSDAGstatement = $sdagLeader.containsSDAG; } |
-            block {hasSDAGstatement |= $block.containsSDAG})*) {
+            b=block {hasSDAGstatement |= $b.containsSDAG;})*) {
             $containsSDAG = hasSDAGstatement;
+            ((LocalScope)$BLOCK.def).hasSDAG = $containsSDAG;
         }
     ;
     
@@ -152,29 +77,27 @@ statement
     ;
 
 sdagLeader returns [boolean containsSDAG]
+@init { $containsSDAG = false; }
     :   ^(OVERLAP block) {$containsSDAG = true;}
-    |   ^(WHEN (IDENT expression? formalParameterList)* block) {$containsSDAG = true;}
-    |   ^(IF parenthesizedExpression ifblock=block elseblock=block?) {
-            $containsSDAG = $ifblock.containsSDAG || $elseblock.containsSDAG;
+    |   ^(WHEN (IDENT expression? ^(FORMAL_PARAM_LIST .*))* block) {$containsSDAG = true;}
+    |   ^(IF parenthesizedExpression ifblock=block elseblock=block?
+            {$ifblock.containsSDAG || $elseblock.containsSDAG}?)
+        {
+            $containsSDAG = true;
         }
-    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block) {
-            $containsSDAG = $block.containsSDAG;
+        -> ^(SDAG_IF parenthesizedExpression $ifblock $elseblock)
+    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block {$block.containsSDAG}?) {
+            $containsSDAG = true;
         }
-        -> {$containsSDAG}? ^(SDAG_FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
-        -> ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
-    |   ^(FOR_EACH localModifierList? type IDENT expression block) {
-            $containsSDAG = $block.containsSDAG;
+        -> ^(SDAG_FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
+    |   ^(WHILE parenthesizedExpression block {$block.containsSDAG}?) {
+            $containsSDAG = true;
         }
-    |   ^(WHILE parenthesizedExpression block) {
-            $containsSDAG = $block.containsSDAG;
+        -> ^(SDAG_WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression {$block.containsSDAG}?) {
+            $containsSDAG = true;
         }
-        -> {$containsSDAG}? ^(SDAG_WHILE parenthesizedExpression block)
-        -> ^(WHILE parenthesizedExpression block)
-    |   ^(DO block parenthesizedExpression) {
-            $containsSDAG = $block.containsSDAG;
-        }
-        -> {$containsSDAG}? ^(SDAG_DO block parenthesizedExpression)
-        -> ^(DO block parenthesizedExpression)
+        -> ^(SDAG_DO block parenthesizedExpression)
     ;
 
 sdagNonLeader
@@ -184,16 +107,8 @@ sdagNonLeader
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
-    |   ^(BREAK IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
-            }
-        }
-    |   ^(CONTINUE IDENT?) {
-            if ($IDENT != null) {
-                translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
-            }
-        }
+    |   ^(BREAK IDENT?)
+    |   ^(CONTINUE IDENT?)
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
     |   ^('delete' expression)
@@ -206,12 +121,13 @@ sdagNonLeader
     ;
         
 switchCaseLabel
-    :   ^(CASE expression blockStatement*)
-    |   ^(DEFAULT blockStatement*)
+    :   ^(CASE expression statement*)
+    |   ^(DEFAULT statement*)
     ;
     
 forInit
-    :   localVariableDeclaration 
+    :   ^(PRIMITIVE_VAR_DECLARATION .*)
+    |   ^(OBJECT_VAR_DECLARATION .*)
     |   expression+
     ;
 

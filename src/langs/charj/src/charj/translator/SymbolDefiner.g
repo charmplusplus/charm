@@ -61,7 +61,9 @@ enterPackage
 
 enterBlock
     :   BLOCK {
-            currentScope = new LocalScope(symtab, currentScope);
+            $BLOCK.scope = new LocalScope(symtab, currentScope);
+            $BLOCK.def = (LocalScope)$BLOCK.scope;
+            currentScope = $BLOCK.scope;
         }
     ;
 
@@ -166,6 +168,7 @@ enterClass
             (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
+            //System.out.println("Defined class " + $IDENT.text);
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
                     (ClassSymbol)currentScope.
                       resolveType(TypeName.createTypeName($parent.text)),
@@ -216,8 +219,8 @@ varDeclaration
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
                 Type varType = currentScope.resolveType($type.typeName);
-                /*System.out.println("Defining var " + $IDENT.text + " with type " +
-                    varType + " typename " + $type.typeName);*/
+                //System.out.println("Defining var " + $IDENT.text + " with type " +
+                //    varType + " typename " + $type.typeName);
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
@@ -234,7 +237,7 @@ varDeclaration
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
         {
             Type varType = currentScope.resolveType($type.typeName);
-            /*System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);*/
+            //System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);
             VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text,
                     currentScope.resolveType($type.typeName));
             sym.definition = $IDENT;

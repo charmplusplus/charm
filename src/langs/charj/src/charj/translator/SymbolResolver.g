@@ -231,7 +231,7 @@ primaryExpression returns [Type type]
                 s = null;
                 /*System.out.println("No expression context: " + $e.text);*/
             } else {
-                /*System.out.println("Expression context is: " + cxt + " for symbol named " + memberText);*/
+                //System.out.println("Expression context is: " + cxt + " for symbol named " + memberText);
                 if (memberText.equals("this")) s = cxt;
                 else if (memberText.equals("super")) s = cxt.superClass;
                 else s = cxt.resolve(memberText);

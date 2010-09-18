@@ -8,6 +8,8 @@ public abstract class SymbolWithScope
     extends Symbol 
     implements Scope {
 
+    public boolean hasSDAG = false;
+
     public SymbolWithScope(SymbolTable symtab) {
         super(symtab);
     }

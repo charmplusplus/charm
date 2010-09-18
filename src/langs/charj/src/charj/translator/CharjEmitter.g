@@ -716,6 +716,10 @@ sdagStatement
         -> template(b={$block.st}) "} overlap <b> atomic {"
     |   ^(WHEN (wa+=whenArgument)* block)
         -> template(w={wa}, b={$block.st}) "} when <w> <b> atomic {"
+    |   ^(SDAG_IF parenthesizedExpression ifblock=block elseblock=block?)
+    |   ^(SDAG_FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
+    |   ^(SDAG_WHILE parenthesizedExpression block)
+    |   ^(SDAG_DO block parenthesizedExpression)
     ;
 
 whenArgument
