@@ -4,7 +4,7 @@ TOKENS=6
 
 all: ampi
 
-ampi: jacobi jacobi.iso jacobi-get
+ampi: jacobi jacobi.iso jacobi.tls jacobi-get
 
 mpi: jacobi.C
 	mpiCC -o jacobi jacobi.C  $(OPTS)
@@ -20,6 +20,10 @@ jacobi: jacobi.C
 jacobi.iso: jacobi.C
 	$(CHARMC) -c -DNO_PUP jacobi.C -o jacobi.iso.o
 	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module EveryLB -memory isomalloc
+
+jacobi.tls: jacobi.C
+	$(CHARMC) -c -DNO_PUP -tlsglobal jacobi.C -o jacobi.tls.o 
+	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -Wl,--allow-multiple-definition -thread context-tls -module EveryLB #-memory isomalloc
 
 jacobi-get: jacobi-get.C
 	$(CHARMC) -c jacobi-get.C
