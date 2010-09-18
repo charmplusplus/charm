@@ -98,6 +98,8 @@ classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
+		-> {$m.tree==null}?	^(FUNCTION_METHOD_DECL ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"]) LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
+								genericTypeParameterList type IDENT formalParameterList domainExpression? block?)
         -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
             genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
@@ -117,9 +119,16 @@ classScopeDeclaration
             objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             ^(BLOCK (blockStatement*)))
-        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
-            genericTypeParameterList? IDENT formalParameterList 
-            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
+		-> { $m.tree == null }?	^(CONSTRUCTOR_DECL ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"])
+																LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
+								genericTypeParameterList? IDENT formalParameterList 
+			   		         ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
+        -> { $m.isEntry }? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
+					            genericTypeParameterList? IDENT formalParameterList 
+				   		         ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
         -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
