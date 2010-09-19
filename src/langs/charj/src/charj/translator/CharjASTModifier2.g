@@ -51,7 +51,7 @@ package charj.translator;
 	protected String getArraySectionInitString(ArrayList<ArrayList<Object>> ranges)
     {
 		StringBuffer sb = new StringBuffer();
-		sb.append("CkVec<CkArrayIndex3D> elems_"+(proxySectionCount++)+";\n");
+		sb.append("CkVec<CkArrayIndex1D> elems_"+(proxySectionCount++)+";\n");
 		int count = 0;
 		for(ArrayList range : ranges)
 		{
@@ -95,7 +95,7 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-    :   ^(TYPE classType IDENT
+    :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
             (^('extends' parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
@@ -257,6 +257,15 @@ type
     |   objectType
     |   VOID
     ;
+
+nonArraySectionObjectType
+	:	simpleType
+	|   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	VOID
+	;	
 
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType domainExpression?)
@@ -511,13 +520,17 @@ arrayTypeDeclarator
 
 newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
-	|	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
-		->	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent ARRAY_SECTION_INIT[getArraySectionInitString($domainExpression.ranges)])
-    |   ^(NEW type arguments)
+	|	^(NEW ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression) ^(ARGUMENT_LIST expression))
+		{
+			System.out.println("WHATEVER");
+			currentClass.sectionInitializers.add(new ArraySectionInitializer($domainExpression.ranges, $qualifiedTypeIdent.text));
+		}
+		->	^(METHOD_CALL IDENT["arraySectionInit" + ArraySectionInitializer.getCount()] ^(ARGUMENT_LIST expression))
+    |   ^(NEW nonArraySectionObjectType arguments)
     ;
 
-arguments
-    :   ^(ARGUMENT_LIST expression*)
+arguments returns [Object expr]
+    :   ^(ARGUMENT_LIST expression*) 
     ;
 
 entryArguments
