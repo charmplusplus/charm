@@ -45,8 +45,33 @@ package charj.translator;
             return false;
         return true;
     }
-}
 
+	int proxySectionCount = 0;
+
+	protected String getArraySectionInitString(ArrayList<ArrayList<Object>> ranges)
+    {
+		StringBuffer sb = new StringBuffer();
+		sb.append("CkVec<CkArrayIndex3D> elems_"+(proxySectionCount++)+";\n");
+		int count = 0;
+		for(ArrayList range : ranges)
+		{
+			Object start = range.get(0);
+			Object end = range.get(1);
+			Object step = range.size() > 2 ? range.get(2) : 1;
+			String iName = "i_"+(count++);
+			sb.append("for int " + iName + "=" + start + "; " + iName + "<" + end + ";" + iName + "++\n");
+			for(int i=0; i<count; i++)
+				sb.append("\t");
+		}
+		sb.append("elems.push_back(CkArrayIndex"+count+"D(i_0");
+		for(int i=1; i<count; i++)
+			sb.append(", i_" + i);
+		sb.append("));");
+		return sb.toString();
+	}
+
+}
+	
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     :   ^(CHARJ_SOURCE 
@@ -242,7 +267,7 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
-	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?) // TODO deal with it!!
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 entryArgObjectType returns [ClassSymbol type]
@@ -486,6 +511,8 @@ arrayTypeDeclarator
 
 newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
+	|	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
+		->	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent ARRAY_SECTION_INIT[getArraySectionInitString($domainExpression.ranges)])
     |   ^(NEW type arguments)
     ;
 
@@ -602,21 +629,29 @@ literal
     |   NULL 
     ;
 
-rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
+rangeItem returns [Object item]
+    :   DECIMAL_LITERAL { $item = $DECIMAL_LITERAL; }
+    |   IDENT			{ $item = $IDENT; }
     ;
 
-rangeExpression
-    :   ^(RANGE_EXPRESSION rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+rangeExpression returns [ArrayList<Object> range]
+@init
+{
+	$range = new ArrayList<Object>();
+}
+    :   ^(RANGE_EXPRESSION rangeItem)								{ $range.add($rangeItem.item); }	
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem)				{ $range.add($i1.item); $range.add($i2.item); }
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem i3=rangeItem)	{ $range.add($i1.item); $range.add($i2.item); $range.add($i3.item); }
     ;
 
-rangeList
-    :   rangeExpression+
+rangeList returns [ArrayList<ArrayList<Object>> ranges]
+@init
+{
+	$ranges = new ArrayList<ArrayList<Object>>();
+}
+    :   (rangeExpression { $ranges.add($rangeExpression.range); })+
     ;
 
-domainExpression
-    :   ^(DOMAIN_EXPRESSION rangeList)
+domainExpression returns [ArrayList<ArrayList<Object>> ranges]
+    :   ^(DOMAIN_EXPRESSION rangeList)	{ $ranges = $rangeList.ranges; }
     ;
