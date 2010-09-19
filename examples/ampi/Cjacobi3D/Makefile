@@ -22,7 +22,7 @@ jacobi.iso: jacobi.C
 	-$(CHARMC) -o jacobi.iso jacobi.iso.o -module EveryLB -memory isomalloc
 
 jacobi.tls: jacobi.C
-	$(CHARMC) -c -DNO_PUP -tlsglobal jacobi.C -o jacobi.tls.o 
+	-$(CHARMC) -c -DNO_PUP -tlsglobal jacobi.C -o jacobi.tls.o 
 	-$(CHARMC) -o jacobi.tls jacobi.tls.o -tlsglobal -Wl,--allow-multiple-definition -thread context-tls -module EveryLB #-memory isomalloc
 
 jacobi-get: jacobi-get.C
