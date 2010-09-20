@@ -45,29 +45,6 @@ package charj.translator;
             return false;
         return true;
     }
-	
-	protected String getProxySectionCreationText(ArrayList<ArrayList<Object>> ranges)
-    {
-		StringBuffer sb = new StringBuffer();
-		sb.append("CkVec<CkArrayIndex3D> elems_"+(proxySectionCount++)+";\n");
-		int count = 0;
-		for(ArrayList range : ranges)
-		{
-			Object start = range.get(0);
-			Object end = range.get(1);
-			Object step = range.size() > 2 ? range.get(2) : 1;
-			String iName = "i_"+(count++);
-			sb.append("for int " + iName + "=" + start + "; " + iName + "<" + end + ";" + iName + "++\n");
-			for(int i=0; i<count; i++)
-				sb.append("\t");
-		}
-		sb.append("elems.push_back(CkArrayIndex"+count+"D(i_0");
-		for(int i=1; i<count; i++)
-			sb.append(", i_" + i);
-		sb.append("));");
-		return sb.toString();
-	}
-
 }
 	
 // Starting point for parsing a Charj file.
@@ -93,7 +70,7 @@ readonlyDeclaration
     ;
 
 typeDeclaration returns [ClassSymbol sym]
-    :   ^(TYPE classType IDENT
+    :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
             (^('extends' parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
@@ -255,6 +232,15 @@ type
     |   objectType
     |   VOID
     ;
+
+nonArraySectionObjectType
+	:	simpleType
+	|   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	VOID
+	;	
 
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType domainExpression?)
@@ -509,13 +495,16 @@ arrayTypeDeclarator
 
 newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
-	|	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
-		->	^(NEW ARRAY_SECTION_TYPE qualifiedTypeIdent ARRAY_SECTION_INIT[getArraySectionInitString($domainExpression.ranges)])
-    |   ^(NEW type arguments)
+	|	^(NEW ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression) ^(ARGUMENT_LIST expression))
+		{
+			currentClass.sectionInitializers.add(new ArraySectionInitializer($domainExpression.ranges, $qualifiedTypeIdent.text));
+		}
+		->	^(METHOD_CALL IDENT["arraySectionInit" + ArraySectionInitializer.getCount()] ^(ARGUMENT_LIST expression))
+    |   ^(NEW nonArraySectionObjectType arguments)
     ;
 
-arguments
-    :   ^(ARGUMENT_LIST expression*)
+arguments returns [Object expr]
+    :   ^(ARGUMENT_LIST expression*) 
     ;
 
 entryArguments
@@ -627,21 +616,29 @@ literal
     |   NULL 
     ;
 
-rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
+rangeItem returns [Object item]
+    :   DECIMAL_LITERAL { $item = $DECIMAL_LITERAL; }
+    |   IDENT			{ $item = $IDENT; }
     ;
 
-rangeExpression
-    :   ^(RANGE_EXPRESSION rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+rangeExpression returns [ArrayList<Object> range]
+@init
+{
+	$range = new ArrayList<Object>();
+}
+    :   ^(RANGE_EXPRESSION rangeItem)								{ $range.add($rangeItem.item); }	
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem)				{ $range.add($i1.item); $range.add($i2.item); }
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem i3=rangeItem)	{ $range.add($i1.item); $range.add($i2.item); $range.add($i3.item); }
     ;
 
-rangeList
-    :   rangeExpression+
+rangeList returns [ArrayList<ArrayList<Object>> ranges]
+@init
+{
+	$ranges = new ArrayList<ArrayList<Object>>();
+}
+    :   (rangeExpression { $ranges.add($rangeExpression.range); })+
     ;
 
-domainExpression
-    :   ^(DOMAIN_EXPRESSION rangeList)
+domainExpression returns [ArrayList<ArrayList<Object>> ranges]
+    :   ^(DOMAIN_EXPRESSION rangeList)	{ $ranges = $rangeList.ranges; }
     ;

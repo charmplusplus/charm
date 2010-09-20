@@ -986,7 +986,7 @@ newExpression[StringTemplate obtype]
     :   ^(NEW_EXPRESSION arguments? domainExpression[$arguments.args])
         -> template(domain={$domainExpression.st},type={$obtype}) "new <type>(<domain>)"
     |   ^(NEW proxyType arguments)
-        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)" // TODO array sections
+        -> template(t={$proxyType.st}, a={$arguments.st}) "<t>::ckNew(<a>)"
     |   ^(NEW nonProxyType arguments)
         -> template(q={$nonProxyType.st}, a={$arguments.st}) "new <q>(<a>)"
     ;
