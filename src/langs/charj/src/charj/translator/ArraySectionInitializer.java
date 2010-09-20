@@ -8,6 +8,7 @@ public class ArraySectionInitializer
 	private static int count = 0; // counts how many instances of this class have been created
 	private ArrayList<ArrayList<Object>> ranges;
 	private String classType;
+	private String methodName;
 
 	public static int getCount()
 	{
@@ -16,9 +17,14 @@ public class ArraySectionInitializer
 
 	public ArraySectionInitializer(ArrayList<ArrayList<Object>> ranges, String classType)
 	{
-		count++;
+		methodName = "arraySectionInitializer" + (count++);
 		this.ranges = ranges;
 		this.classType = classType;
+	}
+
+	public String getClassType()
+	{
+		return classType;
 	}
 
 	public String emitCI()
@@ -28,13 +34,13 @@ public class ArraySectionInitializer
 
 	public String emitH()
 	{
-		return "CProxySection_" + classType + " arraySectionInitializer" + count + "(CProxy_" + classType + " proxyObject)";
+		return "CProxySection_" + classType + " " + methodName + "(CProxy_" + classType + " proxyObject)";
 	}
 
-	public String emitCC()
+	public String getForLoop()
 	{
 		ArrayList<String> indicies = new ArrayList<String>();
-
+/*
 		StringTemplate st = new StringTemplate("$signature$\n{\n\t$forLoop$\n}\nreturn CProxySection_$type$::ckNew(proxyObject, elems.getVec(), elems.size());");
 
 		st.setAttribute("signature", emitH());
@@ -42,9 +48,11 @@ public class ArraySectionInitializer
 		st.setAttribute("type", classType);
 
 		return st.toString();
+*/
+		return emitCC(indicies, 0);
 	}
 	
-	public String emitCC(ArrayList<String> indicies, int dim)
+	private String emitCC(ArrayList<String> indicies, int dim)
 	{
 		if(dim == ranges.size())
 		{

@@ -522,7 +522,6 @@ newExpression
     :   ^(NEW_EXPRESSION arguments? domainExpression)
 	|	^(NEW ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression) ^(ARGUMENT_LIST expression))
 		{
-			System.out.println("WHATEVER");
 			currentClass.sectionInitializers.add(new ArraySectionInitializer($domainExpression.ranges, $qualifiedTypeIdent.text));
 		}
 		->	^(METHOD_CALL IDENT["arraySectionInit" + ArraySectionInitializer.getCount()] ^(ARGUMENT_LIST expression))
