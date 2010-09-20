@@ -346,6 +346,7 @@ type returns [Type sym]
     Scope scope = null;
     boolean proxy = false;
     boolean pointer = false;
+	boolean proxySection = false;
 }
 @after {
     //System.out.println("\ntype string: " + typeText);
@@ -354,6 +355,7 @@ type returns [Type sym]
     //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
+	if (proxySection && $start.symbolType != null) $start.symbolType = new ProxySectionType(symtab, $start.symbolType);
 
     // TODO: Special case for Arrays, change this?
     if (typeText != null && typeText.size() > 0 &&
@@ -392,6 +394,8 @@ type returns [Type sym]
             ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
+	|	^(ARRAY_SECTION_TYPE { scope = $ARRAY_SECTION_TYPE.scope; proxySection = true; }
+			^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
             (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
