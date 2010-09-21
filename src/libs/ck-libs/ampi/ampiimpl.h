@@ -1423,6 +1423,7 @@ friend class SReq;
     groupStruct tmpVec; // stores temp group info
     CProxy_ampi remoteProxy; // valid only for intercommunicator
 
+#if AMPI_COMLIB
     /// A proxy used when delegating message sends to comlib
     CProxy_ampi comlibProxy;
     
@@ -1431,7 +1432,7 @@ friend class SReq;
     ComlibInstanceHandle ciBcast;
     ComlibInstanceHandle ciAllgather;
     ComlibInstanceHandle ciAlltoall;
-
+#endif
     
     int seqEntries; //Number of elements in below arrays
     AmpiSeqQ oorder;
@@ -1477,7 +1478,9 @@ friend class SReq;
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                          int type,MPI_Comm destcomm, int sync=0);
 
+#if AMPI_COMLIB
     inline void comlibsend(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
+#endif
     inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
@@ -1512,17 +1515,17 @@ friend class SReq;
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
-    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
     inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
+#if AMPI_COMLIB
+    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline ComlibInstanceHandle getStreaming(void) { return ciStreaming; }
     inline ComlibInstanceHandle getBcast(void) { return ciBcast; }
     inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
     inline ComlibInstanceHandle getAlltoall(void) { return ciAlltoall; }
 
-#if AMPI_COMLIB
     inline Strategy* getStreamingStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciStreaming); }
     inline Strategy* getBcastStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciBcast); }
     inline Strategy* getAllgatherStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAllgather); }
