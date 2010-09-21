@@ -250,13 +250,23 @@ classScopeDeclaration
         -> {emitCI()}? // do nothing, since it's not an entry method
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
+            ty=type IDENT f=formalParameterList a=domainExpression[null]?) 
+        -> {emitCI()}?  funcMethodDecl_ci(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                block={null})
+        ->
+    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
             {
                 currentMethod = (MethodSymbol)$IDENT.def;
                 sdagMethod = currentMethod.hasSDAG;
             }
-            b=block?) 
-        -> {emitCC() && !sdagMethod}? funcMethodDecl_cc(
+            b=block) 
+        -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
                 modl={$m.st}, 
@@ -266,7 +276,7 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitH() && !sdagMethod}? funcMethodDecl_h(
+        -> {emitH()}? funcMethodDecl_h(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
@@ -274,7 +284,23 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitCI() && sdagMethod}? funcMethodDecl_sdag_ci(
+        -> {emitCI()}? funcMethodDecl_ci(
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                block={$b.st})
+        ->
+    |   ^(SDAG_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
+            ty=type IDENT f=formalParameterList a=domainExpression[null]? 
+            {
+            currentMethod = (MethodSymbol)$IDENT.def;
+            sdagMethod = currentMethod.hasSDAG;
+            }
+            ^(BLOCK (sdg+=sdagBasicBlock)*))
+            //sdgb=nakedSdagBlock?) 
+        -> {emitCI()}? funcMethodDecl_sdag_ci(
                 classSym={currentClass},
                 methodSym={currentMethod},
                 modl={$m.st}, 
@@ -283,14 +309,7 @@ classScopeDeclaration
                 id={$IDENT.text}, 
                 fpl={$f.st}, 
                 adl={$a.st},
-                block={$b.st})
-        -> {emitCI() && !sdagMethod}? funcMethodDecl_ci(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                ty={$ty.st},
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={$b.st})
+                block={$sdg})
         ->
     |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null])
@@ -330,7 +349,6 @@ classScopeDeclaration
                 migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
             }
             b=block)
-
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -658,8 +676,27 @@ block
         -> {((emitCC() && (currentMethod == null || !currentMethod.hasSDAG)) ||
             (emitCI() && (currentMethod != null && currentMethod.hasSDAG))) && emptyBlock}? template(bsl={$b}) "{ }"
         -> {emitCC() && (currentMethod == null || !currentMethod.hasSDAG)}? block_cc(bsl={$b})
-        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_sdag_ci(bsl={$b})
+        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_cc(bsl={$b})
         ->
+    ;
+
+
+nakedSdagBlock
+    :   ^(BLOCK (sdg+=sdagBasicBlock)*)
+        -> template(sdg={$sdg}) "<sdg>"
+    ;
+
+
+sdagBlock
+    :   ^(BLOCK (sdg+=sdagBasicBlock)*)
+        -> block_cc(bsl={$sdg})
+    ;
+
+sdagBasicBlock
+    :   sdagStatement
+        -> {$sdagStatement.st}
+    |   (s+=statement)+
+        -> block_atomic(s={$s})
     ;
     
 blockStatement
@@ -687,8 +724,6 @@ localVariableDeclaration
 statement
     :   nonBlockStatement
         -> {$nonBlockStatement.st}
-    |   sdagStatement
-        -> {$sdagStatement.st}
     |   block
         -> {$block.st}
     ;
@@ -712,14 +747,21 @@ divconExpr
     ;
 
 sdagStatement
-    :   ^(OVERLAP block)
-        -> template(b={$block.st}) "} overlap <b> atomic {"
-    |   ^(WHEN (wa+=whenArgument)* block)
-        -> template(w={wa}, b={$block.st}) "} when <w> <b> atomic {"
-    |   ^(SDAG_IF parenthesizedExpression ifblock=block elseblock=block?)
-    |   ^(SDAG_FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
-    |   ^(SDAG_WHILE parenthesizedExpression block)
-    |   ^(SDAG_DO block parenthesizedExpression)
+    :   ^(OVERLAP sdagBlock)
+        -> template(b={$sdagBlock.st}) "overlap <b>"
+    |   ^(WHEN (wa+=whenArgument)* nakedSdagBlock)
+        -> template(w={wa}, b={$nakedSdagBlock.st}) "when <w> <b>"
+    |   ^(SDAG_IF pe=parenthesizedExpression
+            ifblock=sdagBlock elseblock=sdagBlock?)
+        -> if(cond={$pe.st}, then={$ifblock.st}, else_={$elseblock.st})
+    |   ^(SDAG_FOR forInit? FOR_EXPR cond=expression?
+            FOR_UPDATE (update+=expression)* b=sdagBlock)
+        -> for(initializer={$forInit.st}, cond={$cond.st},
+                update={$update}, body={$b.st})
+    |   ^(SDAG_WHILE pe=parenthesizedExpression b=sdagBlock)
+        -> while(cond={$pe.st}, body={$b.st})
+    |   ^(SDAG_DO b=sdagBlock pe=parenthesizedExpression)
+        -> dowhile(cond={$pe.st}, block={$b.st})
     ;
 
 whenArgument

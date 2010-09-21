@@ -98,7 +98,11 @@ classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
             type IDENT formalParameterList domainExpression? b=block)
     |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
-            type IDENT entryFormalParameterList domainExpression? b=block)
+            type IDENT entryFormalParameterList domainExpression? b=block?)
+        -> {$b.sdag}? ^(SDAG_FUNCTION_DECL modifierList? genericTypeParameterList?
+                type IDENT entryFormalParameterList domainExpression? block?)
+        -> ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
+            type IDENT entryFormalParameterList domainExpression? block?)
     |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
             //^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
@@ -306,13 +310,15 @@ qualifiedIdentifier
     |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
-block
-    :   ^(BLOCK (blockStatement)*)
+block returns [boolean sdag]
+@init { $sdag = false; }
+    :   ^(BLOCK (blockStatement { $sdag |= $blockStatement.sdag; })*)
     ;
-    
-blockStatement
+
+blockStatement returns [boolean sdag]
+@init { $sdag = false; }
     :   localVariableDeclaration
-    |   statement
+    |   statement { $sdag = $statement.sdag; }
     ;
     
 localVariableDeclaration
@@ -320,10 +326,11 @@ localVariableDeclaration
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
     ;
 
-statement
-    : nonBlockStatement
-    | sdagStatement
-    | block
+statement returns [boolean sdag]
+@init { $sdag = false; }
+    : nonBlockStatement { $sdag = $nonBlockStatement.sdag; }
+    | sdagStatement { $sdag = true; }
+    | block { $sdag = $block.sdag; }
     ;
 
 divconBlock
@@ -349,13 +356,24 @@ sdagStatement
     |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
-nonBlockStatement
+nonBlockStatement returns [boolean sdag]
+@init { $sdag = false; }
     :   ^(ASSERT expression expression?)
-    |   ^(IF parenthesizedExpression block block?)
-    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
-    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
-    |   ^(WHILE parenthesizedExpression block)
-    |   ^(DO block parenthesizedExpression)
+    |   ^(IF parenthesizedExpression (i=block { $sdag |= $i.sdag; }) (e=block { $sdag |= $e.sdag; })?)
+        -> {$sdag}? ^(SDAG_IF parenthesizedExpression $i $e)
+        -> ^(IF parenthesizedExpression $i $e)
+    |   ^(FOR forInit? FOR_EXPR (e1=expression)? FOR_UPDATE (e2+=expression)* block {
+            $sdag = $block.sdag;
+        })
+        -> {$sdag}? ^(SDAG_FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
+        -> ^(FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
+    |   ^(FOR_EACH localModifierList? type IDENT expression block { $sdag = $block.sdag; })
+    |   ^(WHILE parenthesizedExpression block { $sdag = $block.sdag; })
+        -> {$sdag}? ^(SDAG_WHILE parenthesizedExpression block)
+        -> ^(WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression { $sdag = $block.sdag; })
+        -> {$sdag}? ^(SDAG_DO block parenthesizedExpression)
+        -> ^(DO block parenthesizedExpression)
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)

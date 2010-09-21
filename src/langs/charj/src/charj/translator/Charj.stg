@@ -446,15 +446,16 @@ block_cc(bsl) ::=
 {
     <bsl; separator="\n">
 }
+
 >>
 
-block_sdag_ci(bsl) ::=
+block_atomic(s) ::=
 <<
 atomic {
-    <bsl; separator="\n">
+    <s; separator="\n">
 }
->>
 
+>>
 
 embed_cc(str, blk) ::=
 <<
