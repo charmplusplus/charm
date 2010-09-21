@@ -272,6 +272,8 @@ type returns [List<TypeName> typeName]
             { $PROXY_TYPE.scope = currentScope; }
     |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($i1.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
+	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} . ))+) .*)
+			{ $ARRAY_SECTION_TYPE.scope = currentScope; }
     ;
 
 literal returns [String lit]
