@@ -111,9 +111,11 @@ Main::Main(CkArgMsg *m)
 
     /// Prepare the output and logging buffers
     log<<std::fixed<<std::setprecision(6);
-    log<<"\n"<<std::setw(cfg.fieldWidth)<<"Msg size (KB)"<<std::setw(cfg.fieldWidth)<<"Avg time (ms)";
-    for (int i=1;i<=cfg.numRepeats;i++)
-        log<<std::setw(cfg.fieldWidth-3)<<"Trial "<<std::setw(3)<<i;
+    log<<"\n"<<std::setw(cfg.fieldWidth)<<"Msg size (KB)"
+             <<std::setw(cfg.fieldWidth)<<"Avg time (ms)"
+             <<std::setw(cfg.fieldWidth)<<"Min time (ms)"
+             <<std::setw(cfg.fieldWidth)<<"Max time (ms)"
+             <<std::setw(cfg.fieldWidth)<<"Std Dev  (ms)";
 
     out<<std::fixed<<std::setprecision(6);
     out<<"\n\nSummary: Avg time taken (ms) for different msg sizes by each comm mechanism\n"<<std::setw(commNameLen)<<"Mechanism";
@@ -214,15 +216,28 @@ void Main::receiveReduction(CkReductionMsg *msg)
     /// If this ends the timings for a msg size
     if (++curRepeatNum >= cfg.numRepeats)
     {
-        /// Compute the average time
-        double avgTime = 0;
+        /// Compute some statistics (avg, std dev, min and max times)
+        double avgTime = 0, stdDev = 0;
+        double minTime = loopTimes[0], maxTime = loopTimes[0];
+
         for (int i=0; i< loopTimes.size(); i++)
+        {
             avgTime += loopTimes[i];
+            stdDev  += loopTimes[i] * loopTimes[i];
+            if (loopTimes[i] > maxTime)
+                maxTime = loopTimes[i];
+            if (loopTimes[i] < minTime)
+                minTime = loopTimes[i];
+        }
         avgTime /= loopTimes.size();
+        stdDev   = sqrt( stdDev/loopTimes.size() - avgTime*avgTime );
+
         /// Collate the results
-        log<<"\n"<<std::setw(cfg.fieldWidth)<<curMsgSize<<std::setw(cfg.fieldWidth)<<avgTime;
-        for (int i=0; i< loopTimes.size(); i++)
-            log<<std::setw(cfg.fieldWidth)<<loopTimes[i];
+        log<<"\n"<<std::setw(cfg.fieldWidth)<<curMsgSize
+                 <<std::setw(cfg.fieldWidth)<<avgTime
+                 <<std::setw(cfg.fieldWidth)<<minTime
+                 <<std::setw(cfg.fieldWidth)<<maxTime
+                 <<std::setw(cfg.fieldWidth)<<stdDev;
         out<<std::setw(cfg.fieldWidth)<<avgTime;
 
         /// Reset counters, timings and sizes
