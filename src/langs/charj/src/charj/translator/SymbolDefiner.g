@@ -61,7 +61,9 @@ enterPackage
 
 enterBlock
     :   BLOCK {
-            currentScope = new LocalScope(symtab, currentScope);
+            $BLOCK.scope = new LocalScope(symtab, currentScope);
+            $BLOCK.def = (LocalScope)$BLOCK.scope;
+            currentScope = $BLOCK.scope;
         }
     ;
 
@@ -111,9 +113,10 @@ boolean entry = false;
             sym.hasSDAG = sdagEntry;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.def = sym;
             currentScope = sym;
             currentMethod = sym;
+            $IDENT.def = sym;
+            $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -140,9 +143,10 @@ boolean entry = false;
             sym.definition = $enterMethod.start;
             sym.definitionTokenStream = input.getTokenStream();
             currentScope.define($IDENT.text, sym);
-            $IDENT.def = sym;
             currentScope = sym;
             currentMethod = sym;
+            $IDENT.def = sym;
+            $IDENT.symbolType = sym.type;
             $IDENT.scope = currentScope;
             //System.out.println(currentScope);
         }
@@ -161,9 +165,10 @@ enterClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
+            //System.out.println("Defined class " + $IDENT.text);
             ClassSymbol sym = new ClassSymbol(symtab, $IDENT.text,
                     (ClassSymbol)currentScope.
                       resolveType(TypeName.createTypeName($parent.text)),
@@ -172,8 +177,8 @@ enterClass
             currentClass = sym;
             sym.definition = $IDENT;
             sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.def = sym;
             currentScope = sym;
+            $IDENT.def = sym;
             $IDENT.scope = currentScope;
             $IDENT.symbolType = sym;
             String classTypeName = $classType.text;
@@ -200,7 +205,7 @@ exitClass
     :   ^(TYPE classType IDENT
             (^('extends' parent=type))?
             (^('implements' type+))?
-            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+            (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL |  DIVCON_METHOD_DECL | PRIMITIVE_VAR_DECLARATION |
                 OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             //System.out.println("class " + currentScope);
@@ -214,8 +219,8 @@ varDeclaration
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
                 Type varType = currentScope.resolveType($type.typeName);
-                /*System.out.println("Defining var " + $IDENT.text + " with type " +
-                    varType + " typename " + $type.typeName);*/
+                //System.out.println("Defining var " + $IDENT.text + " with type " +
+                //    varType + " typename " + $type.typeName);
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
@@ -227,13 +232,12 @@ varDeclaration
                 $IDENT.scope = currentScope;
                 $IDENT.symbolType = varType;
                 currentScope.define($IDENT.text, sym);
-
             }
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
         {
             Type varType = currentScope.resolveType($type.typeName);
-            /*System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);*/
+            //System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);
             VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text,
                     currentScope.resolveType($type.typeName));
             sym.definition = $IDENT;
@@ -268,6 +272,8 @@ type returns [List<TypeName> typeName]
             { $PROXY_TYPE.scope = currentScope; }
     |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($i1.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
+	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} . ))+) .*)
+			{ $ARRAY_SECTION_TYPE.scope = currentScope; }
     ;
 
 literal returns [String lit]

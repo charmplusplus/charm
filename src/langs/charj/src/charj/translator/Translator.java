@@ -73,7 +73,12 @@ public class Translator {
             if (t == null) {
                 return null;
             }
-            return create(((CharjAST)t).token);
+            CharjAST orig = (CharjAST)t;
+            CharjAST node = (CharjAST)create(orig.token);
+            node.def = orig.def;
+            node.symbolType = orig.symbolType;
+            node.scope = orig.scope;
+            return node;
         }
     };
 
@@ -100,10 +105,10 @@ public class Translator {
         // do AST rewriting and semantic checking
         if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
         preSemanticPass();
-        if (m_printAST) printAST("Before Semantic Pass", "before_sem.html");
+        if (m_printAST) printAST("After PreSemantics Pass", "after_presem.html");
 
         resolveTypes();
-        if (m_printAST) printAST("After Semantic Pass", "after_sem.html");
+        if (m_printAST) printAST("After Type Resolution", "after_types.html");
 
         initPupCollect();
         if (m_printAST) printAST("After Collector Pass", "after_collector.html");
@@ -111,7 +116,7 @@ public class Translator {
         postSemanticPass();
         if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
 
-	m_nodes = new CommonTreeNodeStream(m_ast);
+		m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
@@ -155,8 +160,7 @@ public class Translator {
         m_nodes.reset();
         CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
         mod.setTreeAdaptor(m_adaptor);
-        //m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
-        mod.charjSource(m_symtab);
+        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
@@ -177,7 +181,10 @@ public class Translator {
         if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
         SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
         definer.downup(m_ast);
+        m_nodes.reset();
+        definer.downup(m_ast);
         if (m_verbose) System.out.println("\nResolver Phase\n----------------");
+        if (m_printAST) printAST("After Type Definition", "after_definition.html");
         m_nodes.reset();
         SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
         resolver.downup(m_ast);

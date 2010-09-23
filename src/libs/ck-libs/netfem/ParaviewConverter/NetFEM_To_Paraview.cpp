@@ -40,7 +40,6 @@ int main(int argc, char **argv)
   char infile[1024];
   char outfile[1024];
   char tfile[1024];
-  int numchunks=1000;
  
   DIR *pdir, *pdir2;
   struct dirent *pent, *pent2;

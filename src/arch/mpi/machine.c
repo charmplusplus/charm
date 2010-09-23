@@ -153,7 +153,6 @@ static int checksum_flag = 0;
 #define MPI_POST_RECV_SIZE 200
 #endif
 /* #undef  MPI_POST_RECV_DEBUG  */
-#error "The following variables are never CpvInitialize'd. If you want to use POST_RECV, fix this first."
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
 CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
@@ -1982,6 +1981,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 
 #if MPI_POST_RECV_COUNT > 0
+
+  CpvInitialize(unsigned long long, Cmi_posted_recv_total);
+  CpvInitialize(unsigned long long, Cmi_unposted_recv_total);
+  CpvInitialize(MPI_Request*, CmiPostedRecvRequests); 
+  CpvInitialize(char*,CmiPostedRecvBuffers);
 
     /* Post some extra recvs to help out with incoming messages */
     /* On some MPIs the messages are unexpected and thus slow */

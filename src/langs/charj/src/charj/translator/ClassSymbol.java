@@ -8,9 +8,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
     public List<Type> templateArgs;
-    public List<VariableInitializer> initializers;
-    public List<VariableInitializer> pupInitializers;
-    public List<CharjAST> varsToPup;
+    public List<VariableInitializer> initializers = new ArrayList<VariableInitializer>();
+    public List<VariableInitializer> pupInitializers = new ArrayList<VariableInitializer>();
+    public List<CharjAST> varsToPup = new ArrayList<CharjAST>();
+	public List<ArraySectionInitializer> sectionInitializers = new ArrayList<ArraySectionInitializer>();
 
     Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
@@ -41,9 +42,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
-	initializers = new ArrayList<VariableInitializer>();
-        pupInitializers = new ArrayList<VariableInitializer>();
-        varsToPup = new ArrayList<CharjAST>();
     }
 
     public ClassSymbol(
@@ -55,9 +53,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.superClass = superClass;
         this.scope = scope;
         this.type = this;
-	this.initializers = new ArrayList<VariableInitializer>();
-        this.pupInitializers = new ArrayList<VariableInitializer>();
-
+	
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
         this.includes.add("string");
@@ -224,7 +220,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public String toString() {
         if (isPrimitive) return name;
-        else return getFullyQualifiedName() + members + templateArgs;
+        else return getFullyQualifiedName() + members + (templateArgs != null ? templateArgs : "");
     }
 
     public String getFullyQualifiedName() {
