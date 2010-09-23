@@ -20,7 +20,7 @@ inline void MyChareArray::crunchData(DataMsg *msg)
     /// Touch the data cursorily
     msg->data[0]++;
     /// Prepare some data to be returned
-    double *returnData = new double[msg->size];
+    double *returnData = msg->data;
     /// Contribute to reduction
     #ifdef VERBOSE_OPERATION
         CkPrintf("\n[%d,%d,%d] Going to trigger reduction using mechanism: %s",thisIndex.x,thisIndex.y,thisIndex.z,commName[msg->commType]);
