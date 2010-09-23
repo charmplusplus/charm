@@ -19,7 +19,7 @@ class TraceControlPointsInit : public Chare {
   TraceControlPointsInit(CkArgMsg*) {
     traceControlPointsGID = CProxy_TraceControlPointsBOC::ckNew();
     CProxy_TraceControlPointsBOC controlPointsProxy(traceControlPointsGID);
-    CkPrintf("Initializing counters on pe %d\n", CkMyPe());
+    //CkPrintf("Initializing counters on pe %d\n", CkMyPe());
    
   }
   TraceControlPointsInit(CkMigrateMessage *m):Chare(m) {}
