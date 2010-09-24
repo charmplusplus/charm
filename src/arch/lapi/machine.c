@@ -2120,13 +2120,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void CmiAbort(const char *message) {
     CmiError(message);
-    check_lapi(LAPI_Term,(lapiContext));
+    LAPI_Term(lapiContext);
     exit(1);
 }
 
 static void PerrorExit(const char *msg) {
     perror(msg);
-    check_lapi(LAPI_Term, (lapiContext));
+    LAPI_Term(lapiContext);
     exit(1);
 }
 
