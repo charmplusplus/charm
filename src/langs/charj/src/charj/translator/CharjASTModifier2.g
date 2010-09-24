@@ -370,8 +370,8 @@ nonBlockStatement returns [boolean sdag]
 @init { $sdag = false; }
     :   ^(ASSERT expression expression?)
     |   ^(IF parenthesizedExpression (i=block { $sdag |= $i.sdag; }) (e=block { $sdag |= $e.sdag; })?)
-        -> {$sdag}? ^(SDAG_IF parenthesizedExpression $i $e)
-        -> ^(IF parenthesizedExpression $i $e)
+        -> {$sdag}? ^(SDAG_IF parenthesizedExpression $i $e?)
+        -> ^(IF parenthesizedExpression $i $e?)
     |   ^(FOR forInit? FOR_EXPR (e1=expression)? FOR_UPDATE (e2+=expression)* block {
             $sdag = $block.sdag;
         })

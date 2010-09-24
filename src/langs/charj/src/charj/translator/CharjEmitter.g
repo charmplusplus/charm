@@ -250,22 +250,12 @@ classScopeDeclaration
         -> {emitCI()}? // do nothing, since it's not an entry method
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=domainExpression[null]?) 
-        -> {emitCI()}?  funcMethodDecl_ci(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                ty={$ty.st},
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={null})
-        ->
-    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
             {
                 currentMethod = (MethodSymbol)$IDENT.def;
                 sdagMethod = currentMethod.hasSDAG;
             }
-            b=block) 
+            b=block?) 
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
