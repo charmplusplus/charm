@@ -380,6 +380,7 @@ static void lapi_err_hndlr(lapi_handle_t *hndl, int *error_code,
  * 
  */
 static lapi_handle_t lapiContext;
+static int isLapiCxtValid = 0;
 static lapi_long_t lapiHeaderHandler = 1;
 
 /**
@@ -2058,6 +2059,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     /* info.num_compl_hndlr_thr = 1; */
 
     check_lapi(LAPI_Init,(&lapiContext, &info));
+
+    isLapiCxtValid = 1;
     
     /* It's a good idea to start with a fence,
        because packets recv'd before a LAPI_Init are just dropped. */
@@ -2120,13 +2123,13 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 void CmiAbort(const char *message) {
     CmiError(message);
-    check_lapi(LAPI_Term,(lapiContext));
+    if(isLapiCxtValid) check_lapi(LAPI_Term,(lapiContext));
     exit(1);
 }
 
 static void PerrorExit(const char *msg) {
     perror(msg);
-    check_lapi(LAPI_Term, (lapiContext));
+    if(isLapiCxtValid) check_lapi(LAPI_Term,(lapiContext));
     exit(1);
 }
 
