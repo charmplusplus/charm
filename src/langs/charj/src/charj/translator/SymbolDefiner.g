@@ -84,11 +84,6 @@ boolean entry = false;
             type IDENT .*)
         {
             //System.out.println("entering method scope " + $IDENT.text);
-            List<TypeName> typeName = $type.typeName;
-            if (typeName == null || typeName.size() == 0) {
-                /*System.out.println("Warning: return type of " + $IDENT.text + " has null text, using void");*/
-                typeName.add(new TypeName("void"));
-            }
             boolean isTraced = false;
             boolean sdagEntry = false;
             if ($MODIFIER_LIST != null) {
@@ -104,8 +99,9 @@ boolean entry = false;
                     sdagEntry = (charj_mod != null);
                 }
             }
-            Type returnType = currentScope.resolveType(typeName);
-            //System.out.println("Resolving type " + typeName + " in scope " + currentScope + "->" + returnType);
+            Type returnType = $type.namedType;
+            /*System.out.println("Resolving return type in scope " +
+                    currentScope + "->" + returnType);*/
             MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
             sym.isEntry = entry;
             sym.isTraced = isTraced;
@@ -218,9 +214,9 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                Type varType = currentScope.resolveType($type.typeName);
-                //System.out.println("Defining var " + $IDENT.text + " with type " +
-                //    varType + " typename " + $type.typeName);
+                Type varType = $type.namedType;
+                /*System.out.println("Defining var " + $IDENT.text + " with type " +
+                    varType);*/
                 VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
                 sym.definition = $IDENT;
                 sym.definitionTokenStream = input.getTokenStream();
@@ -236,10 +232,9 @@ varDeclaration
             )+))
     |   ^(FORMAL_PARAM_STD_DECL (^(MODIFIER_LIST .*))? type ^(IDENT .*))
         {
-            Type varType = currentScope.resolveType($type.typeName);
+            Type varType = $type.namedType;
             //System.out.println("Defining argument var " + $IDENT.text + " with type " + varType);
-            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text,
-                    currentScope.resolveType($type.typeName));
+            VariableSymbol sym = new VariableSymbol(symtab, $IDENT.text, varType);
             sym.definition = $IDENT;
             sym.definitionTokenStream = input.getTokenStream();
             $IDENT.def = sym;
@@ -250,30 +245,48 @@ varDeclaration
     ;
 
 
-type returns [List<TypeName> typeName]
+type returns [Type namedType]
 @init {
-    $typeName = new ArrayList<TypeName>();
+    ArrayList<TypeName> typeName = new ArrayList<TypeName>();
     if (currentScope == null) System.out.println("*****ERROR: null type scope");
     assert currentScope != null;
 }
     :   VOID {
             $VOID.scope = currentScope;
-            $typeName.add(new TypeName("void"));
+            typeName.add(new TypeName("void"));
+            $namedType = currentScope.resolveType(typeName);
         }
     |   ^(SIMPLE_TYPE t=. .*) {
             $SIMPLE_TYPE.scope = currentScope;
-            $typeName.add(new TypeName($t.toString()));
+            typeName.add(new TypeName($t.toString()));
+            $namedType = currentScope.resolveType(typeName);
         }
-    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
-            { $OBJECT_TYPE.scope = currentScope; }
-    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
-            { $REFERENCE_TYPE.scope = currentScope; }
-    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} .*))+) .*)
-            { $PROXY_TYPE.scope = currentScope; }
-    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {$typeName.add(new TypeName($i1.text));} .*))+) .*)
+    |   ^(OBJECT_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {typeName.add(new TypeName($IDENT.text));} .*))+) .*)
+            {
+                $OBJECT_TYPE.scope = currentScope;
+                $namedType = currentScope.resolveType(typeName);
+            }
+    |   ^(REFERENCE_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeName.add(new TypeName($IDENT.text));} .*))+) .*)
+            {
+                $REFERENCE_TYPE.scope = currentScope;
+                Type base = currentScope.resolveType(typeName);
+                $namedType = base == null ? null : new PointerType(symtab, base);
+            }
+    |   ^(PROXY_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeName.add(new TypeName($IDENT.text));} .*))+) .*)
+            {
+                $PROXY_TYPE.scope = currentScope;
+                Type base = currentScope.resolveType(typeName);
+                $namedType = base == null ? null : new ProxyType(symtab, base);
+            }
+    |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {typeName.add(new TypeName($i1.text));} .*))+) .*)
             { $POINTER_TYPE.scope = currentScope; }
-	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT (^(IDENT {$typeName.add(new TypeName($IDENT.text));} . ))+) .*)
-			{ $ARRAY_SECTION_TYPE.scope = currentScope; }
+	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT
+            (^(IDENT {typeName.add(new TypeName($IDENT.text));} . ))+) .*)
+			{
+                $ARRAY_SECTION_TYPE.scope = currentScope;
+                Type base = currentScope.resolveType(typeName);
+                $namedType = base == null ? null : new ProxySectionType(symtab, base);
+            }
     ;
 
 literal returns [String lit]
