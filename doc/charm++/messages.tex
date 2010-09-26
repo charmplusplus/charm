@@ -530,7 +530,7 @@ priority field is specified in bits, it is always padded to an integral number
 of {\tt int}s.  A pointer to the priority part of the message buffer can be
 obtained with this call:
 
-\function{unsigned int *CkPriorityPtr(MsgType msg)}
+\function{void *CkPriorityPtr(MsgType msg)}
 \index{CkPriorityPtr}
 \index{priority pointer}
 
@@ -545,7 +545,7 @@ system that the message contains an integer priority using
 
 \begin{alltt}
   MsgType *msg = new (8*sizeof(int)) MsgType;
-  *CkPriorityPtr(msg) = prio;
+  *(int*)CkPriorityPtr(msg) = prio;
   CkSetQueueing(msg, CK_QUEUEING_IFIFO);
 \end{alltt}
 
