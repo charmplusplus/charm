@@ -6,8 +6,10 @@
 
 /// Pointer to the mainchare on pe 0 used by the converse redn handler
 Main *mainChare;
+/// A list of array elements local to each address space (pe)
+std::vector<MyChareArray*> localElems;
 /// Converse broadcast and reduction handler function IDs. Global vars.
-int bcastHandlerID, rednHandlerID;
+int bcastHandlerID, rednHandlerID, bcastConverterID;
 
 
 
@@ -73,11 +75,34 @@ void convBcastHandler(void *env)
 
 
 
+/// Converse message handler that translates a converse broadcast to a charm array bcast
+void convBcastToArrayBcastHandler(void *env)
+{
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Received converse bcast. Gonna deliver to local array elements",CkMyPe());
+    #endif
+    /// Get an unpacked charm msg from the envelope
+    DataMsg *msg = DataMsg::unpack( EnvToUsr((envelope*)env) );
+    /// Deliver to each local element
+    int numElems = localElems.size();
+    for (int i=0; i < localElems.size(); i++)
+    {
+        DataMsg *aMsgPtr = (numElems - i > 1) ? (DataMsg*)CkCopyMsg((void**)&msg) : msg;
+        localElems[i]->crunchData(aMsgPtr);
+    }
+    /// If there are no local elements, delete the incoming msg
+    if (numElems == 0)
+        delete msg;
+}
+
+
+
 // Register the converse msg handlers used for the converse bcast/redn test
 void registerHandlers()
 {
     bcastHandlerID   = CmiRegisterHandler(convBcastHandler);
     rednHandlerID    = CmiRegisterHandler(convRednHandler);
+    bcastConverterID = CmiRegisterHandler(convBcastToArrayBcastHandler);
 }
 
 
@@ -88,6 +113,7 @@ MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
         CkPrintf("\n[%d,%d,%d] Just born...",thisIndex.x,thisIndex.y,thisIndex.z);
     #endif
     mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
+    localElems.push_back(this);
 }
 //-----------------------------------------------------------------------------------------
 
@@ -124,6 +150,10 @@ inline void MyChareArray::crunchData(DataMsg *msg)
 
         case ConverseBcast:
             CkAbort("The Converse bcast/redn loop should NOT end up in a chare array entry method! Kick the test writer!");
+            break;
+
+        case ConverseToArrayBcast:
+            contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double);
             break;
 
         default:
@@ -280,6 +310,16 @@ void Main::sendMulticast(const CommMechanism commType, const int msgSize)
             DataMsg::pack(msg);
             envelope *env = UsrToEnv(msg);
             CmiSetHandler(env, bcastHandlerID);
+            timeStart = CmiWallTimer();
+            CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
+            break;
+        }
+
+        case ConverseToArrayBcast:
+        {
+            DataMsg::pack(msg);
+            envelope *env = UsrToEnv(msg);
+            CmiSetHandler(env, bcastConverterID);
             timeStart = CmiWallTimer();
             CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
             break;
