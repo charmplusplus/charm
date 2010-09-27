@@ -2,6 +2,86 @@
 #include <iomanip>
 #include <math.h>
 
+//--------------- Functions for the converse bcast/redn portion of the test ---------------
+
+/// Pointer to the mainchare on pe 0 used by the converse redn handler
+Main *mainChare;
+/// Converse broadcast and reduction handler function IDs. Global vars.
+int bcastHandlerID, rednHandlerID;
+
+
+
+/// Converse reduction merge function triggered at each vertex along the reduction spanning tree
+void* convRedn_sum (int *size, void *local, void **remote, int count)
+{
+    CkReductionMsg *localMsg = CkReductionMsg::unpack( EnvToUsr( (envelope*)local ) );
+    double *dataBuf          = reinterpret_cast<double*>( localMsg->getData() );
+    int msgSize              = localMsg->getSize()/sizeof(double);
+    // Reduce all the remote msgs from children in the tree
+    for (int i=0; i < count; i++)
+    {
+        envelope *aEnv       = (envelope*)( remote[i] );
+        CkReductionMsg *aMsg = CkReductionMsg::unpack( EnvToUsr(aEnv) );
+        CkAssert( localMsg->getSize() == aMsg->getSize() );
+        double *anotherBuf   = reinterpret_cast<double*>( aMsg->getData() );
+        for (int j=0; j< msgSize; j++)
+            dataBuf[j] += anotherBuf[j];
+    }
+    // Repack the local msg
+    CkReductionMsg::pack(localMsg);
+    // Return a handle to the final reduced msg
+    return local;
+}
+
+
+
+// Converse Reduction msg handler triggered at the root of the converse reduction
+void convRednHandler(void *env)
+{
+    CkReductionMsg *msg = CkReductionMsg::unpack( EnvToUsr((envelope*)env) );
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Converse reduction handler triggered",CkMyPe());
+    #endif
+    mainChare->receiveReduction(msg);
+}
+
+
+
+/// Converse broadcast handler
+void convBcastHandler(void *env)
+{
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Received converse bcast",CkMyPe());
+    #endif
+    /// Touch the data cursorily
+    DataMsg *msg = DataMsg::unpack( EnvToUsr((envelope*)env) );
+    msg->data[0] = 0;
+    /// Prepare some data to be returned
+    double *returnData = msg->data;
+    CkReductionMsg *redMsg = CkReductionMsg::buildNew( msg->size*sizeof(double), returnData, CkReduction::sum_double);
+    CkReductionMsg::pack( redMsg );
+    envelope *redEnv = UsrToEnv(redMsg);
+    /// Contribute to reduction
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Going to trigger reduction using mechanism: %s",CkMyPe(), commName[msg->commType]);
+    #endif
+    CmiSetHandler(redEnv, rednHandlerID);
+    CmiReduce(redEnv, redEnv->getTotalsize(), convRedn_sum);
+    /// Delete the incoming msg
+    delete msg;
+}
+
+
+
+// Register the converse msg handlers used for the converse bcast/redn test
+void registerHandlers()
+{
+    bcastHandlerID   = CmiRegisterHandler(convBcastHandler);
+    rednHandlerID    = CmiRegisterHandler(convRednHandler);
+}
+
+
+
 MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
 {
     #ifdef VERBOSE_CREATION
@@ -9,6 +89,7 @@ MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
     #endif
     mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
 }
+//-----------------------------------------------------------------------------------------
 
 
 
@@ -18,7 +99,7 @@ inline void MyChareArray::crunchData(DataMsg *msg)
         CkPrintf("\n[%d,%d,%d] Received msg number %d",thisIndex.x,thisIndex.y,thisIndex.z,msgNum++);
     #endif
     /// Touch the data cursorily
-    msg->data[0]++;
+    msg->data[0] = 0;
     /// Prepare some data to be returned
     double *returnData = msg->data;
     /// Contribute to reduction
@@ -39,6 +120,10 @@ inline void MyChareArray::crunchData(DataMsg *msg)
         case Comlib:
             CkGetSectionInfo(sid, msg);
             mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+            break;
+
+        case ConverseBcast:
+            CkAbort("The Converse bcast/redn loop should NOT end up in a chare array entry method! Kick the test writer!");
             break;
 
         default:
@@ -88,6 +173,9 @@ Main::Main(CkArgMsg *m)
     CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
              CkNumPes(), cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
 
+    // Initialize the mainchare pointer used by the converse redn handler
+    mainChare = this;
+
     // Setup the multicast manager stuff
     CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew(4);
     CkMulticastMgr *mgr   = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
@@ -121,6 +209,7 @@ Main::Main(CkArgMsg *m)
     out<<"\n\nSummary: Avg time taken (ms) for different msg sizes by each comm mechanism\n"<<std::setw(commNameLen)<<"Mechanism";
     for (int i=cfg.msgSizeMin; i<= cfg.msgSizeMax; i*=2)
         out<<std::setw(cfg.fieldWidth-3)<<i<<std::setw(3)<<" KB";
+    out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
     /// Wait for quiescence and then start the timing tests
     CkCallback trigger(CkIndex_Main::startTest(), thisProxy);
@@ -186,6 +275,16 @@ void Main::sendMulticast(const CommMechanism commType, const int msgSize)
             arraySections[0].crunchData(msg);
             break;
 
+        case ConverseBcast:
+        {
+            DataMsg::pack(msg);
+            envelope *env = UsrToEnv(msg);
+            CmiSetHandler(env, bcastHandlerID);
+            timeStart = CmiWallTimer();
+            CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
+            break;
+        }
+
         default:
             CkAbort("Attempting to use unknown mechanism to communicate with chare array");
             break;
@@ -205,12 +304,11 @@ void Main::receiveReduction(CkReductionMsg *msg)
     #endif
 
     /// If this is the first ever multicast/reduction loop, dont time it as it includes tree setup times etc
-    if (msg->getRedNo() == 0)
+    if (curCommType == CkMulticast && msg->getRedNo() == 0)
     {
         CkPrintf("\nFirst xcast/redn loop took: %.6f ms. Discarding this from collected measurements as it might include tree setup times etc",loopTimes[0]);
         loopTimes.pop_back();
         curRepeatNum--;
-        out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
     }
 
     /// If this ends the timings for a msg size
@@ -262,6 +360,8 @@ void Main::receiveReduction(CkReductionMsg *msg)
                 CkPrintf("%s\n",out.str().c_str());
                 CkExit();
             }
+            else
+                out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
         }
     }
 

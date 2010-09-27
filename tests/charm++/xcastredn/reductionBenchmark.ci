@@ -2,6 +2,7 @@ mainmodule reductionBenchmark {
 
     readonly config cfg;
 
+    initproc void registerHandlers();
 
     message DataMsg
     {

@@ -15,10 +15,10 @@
 
 /// Enumerate the different mechanisms for collective comm 
 enum CommMechanism
-{ CkMulticast, CharmBcast, Comlib };
+{ CkMulticast, CharmBcast, ConverseBcast, Comlib};
 /// The names of the collective mechanisms
 const int commNameLen = 30;
-char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Comlib"};
+char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Converse-Bcast/Redn", "Comlib"};
 
 
 
