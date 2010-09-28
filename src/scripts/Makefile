@@ -201,7 +201,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
 	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
-	TopoManager.h XT3Torus.h XT4Torus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
+	TopoManager.h XT3Torus.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h \
@@ -472,7 +472,7 @@ pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
 
-TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XT4Torus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
+TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o TopoManager.o TopoManager.C
 
 CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
