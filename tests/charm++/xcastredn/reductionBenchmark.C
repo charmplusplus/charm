@@ -4,6 +4,8 @@
 
 //--------------- Functions for the converse bcast/redn portion of the test ---------------
 
+/// Readonly proxy to the QHogger group
+CProxy_QHogger hogger;
 /// Pointer to the mainchare on pe 0 used by the converse redn handler
 Main *mainChare;
 /// A list of array elements local to each address space (pe)
@@ -165,6 +167,26 @@ inline void MyChareArray::crunchData(DataMsg *msg)
 
 
 
+/// Function that fills the scheduler q and then triggers the test
+void qFiller(void *param, void *msg)
+{
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Filling scheduler Q with %d entry methods of duration %d us", CkMyPe(), cfg.qLength, cfg.uSecs);
+    #endif
+    /// Build up a scheduler queue of the required length
+    for (int i=0; i < cfg.qLength; i++)
+        hogger[CkMyPe()].doSomething(cfg.uSecs);
+    /// Trigger the test via the callback
+    CkCallback *triggerCB =  (CkCallback*)param;
+    if (!triggerCB)    CkAbort("Test trigger callback not supplied!");
+    #ifdef VERBOSE_OPERATION
+        CkPrintf("\n[%d] Triggering test", CkMyPe());
+    #endif
+    if (CkMyPe() == 0) triggerCB->send();
+    delete triggerCB;
+}
+
+
 
 Main::Main(CkArgMsg *m)
 {
@@ -173,7 +195,7 @@ Main::Main(CkArgMsg *m)
     {
         // just proceed silently for empty args
     }
-    else if ( ((m->argc>=2) && (m->argc<=5)) || (m->argc == 8) || (m->argc == 11) )
+    else if ( ((m->argc>=2) && (m->argc<=7)) || (m->argc == 10) || (m->argc == 13) )
     {
         if (m->argc >= 2)
             cfg.numRepeats       = atoi(m->argv[1]);
@@ -183,28 +205,34 @@ Main::Main(CkArgMsg *m)
             cfg.msgSizeMax       = atoi(m->argv[3]);
         if (m->argc >= 5)
             cfg.useContiguousSection =(atoi(m->argv[4]) == 0)? false: true;
-        if (m->argc >= 8)
+        if (m->argc >= 6)
+            cfg.qLength          = atoi(m->argv[5]);
+        if (m->argc >= 7)
+            cfg.uSecs            = atoi(m->argv[6]);
+        if (m->argc >= 10)
         {
-            cfg.section.X        = atoi(m->argv[5]);
-            cfg.section.Y        = atoi(m->argv[6]);
-            cfg.section.Z        = atoi(m->argv[7]);
+            cfg.section.X        = atoi(m->argv[7]);
+            cfg.section.Y        = atoi(m->argv[8]);
+            cfg.section.Z        = atoi(m->argv[9]);
         }
-        if (m->argc == 11)
+        if (m->argc >= 13)
         {
-            cfg.X                = atoi(m->argv[8]);
-            cfg.Y                = atoi(m->argv[9]);
-            cfg.Z                = atoi(m->argv[10]);
+            cfg.X                = atoi(m->argv[10]);
+            cfg.Y                = atoi(m->argv[11]);
+            cfg.Z                = atoi(m->argv[12]);
         }
     }
     else
-        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
+        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous qFillLength fillMethodDuration(us) sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d",
-             CkNumPes(), cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats);
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
+             CkNumPes(), cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
 
     // Initialize the mainchare pointer used by the converse redn handler
     mainChare = this;
+    // Set up a QHogger group to keep the scheduler Q non-empty
+    hogger = CProxy_QHogger::ckNew();
 
     // Setup the multicast manager stuff
     CkGroupID mcastGrpID  = CProxy_CkMulticastMgr::ckNew(4);
@@ -242,8 +270,9 @@ Main::Main(CkArgMsg *m)
     out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
     /// Wait for quiescence and then start the timing tests
-    CkCallback trigger(CkIndex_Main::startTest(), thisProxy);
-    CkStartQD(trigger);
+    CkCallback *trigger = new CkCallback(CkIndex_Main::startTest(), thisProxy);
+    CkCallback filler(qFiller, (void*)trigger);
+    CkStartQD(filler);
 }
 
 
@@ -251,7 +280,7 @@ Main::Main(CkArgMsg *m)
 
 CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
 {
-    /// Determing the lower starting index of the section along each dimension
+    /// Determine the lower starting index of the section along each dimension
     int Xl = 0, Yl = 0, Zl = 0;
 
     /// Determine a step size based on whether a contiguous section is needed

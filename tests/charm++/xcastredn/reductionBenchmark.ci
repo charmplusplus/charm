@@ -1,6 +1,7 @@
 mainmodule reductionBenchmark {
 
     readonly config cfg;
+    readonly CProxy_QHogger hogger;
 
     initproc void registerHandlers();
 
@@ -14,6 +15,13 @@ mainmodule reductionBenchmark {
     {
         entry MyChareArray(CkGroupID grpID);
         entry void crunchData(DataMsg *msg);
+    };
+
+
+    group QHogger
+    {
+        entry QHogger();
+        entry void doSomething(int uSecs);
     };
 
 

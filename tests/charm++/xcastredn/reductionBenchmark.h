@@ -31,6 +31,7 @@ class config
                   msgSizeMin(4), msgSizeMax(64),
                   useContiguousSection(false),
                   X(5), Y(5), Z(5),
+                  qLength(0), uSecs(0),
                   fieldWidth(15)
         {
             section.X= 3; section.Y = 3; section.Z = 3;
@@ -41,8 +42,9 @@ class config
             p|section.X; p|section.Y; p|section.Z;
             p|numRepeats;
             p|msgSizeMin;   p|msgSizeMax;
-            p|useContiguousSection; 
+            p|useContiguousSection;
             p|X; p|Y; p|Z;
+            p|qLength; p|uSecs;
         }
 
         /// Array section dimensions
@@ -55,6 +57,10 @@ class config
         bool useContiguousSection;
         /// The dimensions of the chare array
         int X, Y, Z;
+        /// How long the scheduler q should be (num enqueued entry methods)
+        int qLength;
+        /// How long each entry method should be (micro seconds)
+        int uSecs;
         /// Some output beauty
         const int fieldWidth;
 } cfg; ///< readonly
@@ -88,6 +94,32 @@ class MyChareArray: public CBase_MyChareArray
         CkGroupID mcastGrpID;
         CkMulticastMgr *mcastMgr;
         CkSectionInfo sid;
+};
+
+
+
+
+/** A group to maintains its presence in the scheduler queue
+ *
+ * Used to mimic a real application scenario to measure the
+ * performance degradation caused by having xcast msgs wait
+ * in the scheduler q
+ */
+class QHogger: public CBase_QHogger
+{
+    public:
+        QHogger(): numCalled(0) {}
+        /// @entry An entry method that recursively hogs the scheduler Q
+        void doSomething(int uSecs = 0)
+        {
+            numCalled++;
+            /// Do something to hog some time
+            usleep(uSecs);
+            /// Renqueue myself to keep the scheduler busy
+            thisProxy[CkMyPe()].doSomething(uSecs);
+        }
+    private:
+        long int numCalled;
 };
 
 
