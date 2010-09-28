@@ -61,7 +61,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 #elif XT3_TOPOLOGY
   xt3tm.rankToCoordinates(pe, x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-  xt4tm.rankToCoordinates(pe, x, y, z, t);
+  xttm.rankToCoordinates(pe, x, y, z, t);
 #else
   if(dimNY > 1) {
     t = pe % dimNT;
@@ -128,7 +128,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 #elif XT3_TOPOLOGY
   return xt3tm.coordinatesToRank(x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-  return xt4tm.coordinatesToRank(x, y, z, t);
+  return xttm.coordinatesToRank(x, y, z, t);
 #else
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;

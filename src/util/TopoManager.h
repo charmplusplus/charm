@@ -54,7 +54,7 @@ class TopoManager {
 #elif XT3_TOPOLOGY
     XT3TorusManager xt3tm;
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-    XTTorusManager xt4tm;
+    XTTorusManager xttm;
 #endif
 
   public:
@@ -115,18 +115,18 @@ class TopoManager {
       torusT = torus[3];
 
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-      dimX = xt4tm.getDimX();
-      dimY = xt4tm.getDimY();
-      dimZ = xt4tm.getDimZ();
+      dimX = xttm.getDimX();
+      dimY = xttm.getDimY();
+      dimZ = xttm.getDimZ();
     
-      dimNX = xt4tm.getDimNX();
-      dimNY = xt4tm.getDimNY();
-      dimNZ = xt4tm.getDimNZ();
-      dimNT = xt4tm.getDimNT();
+      dimNX = xttm.getDimNX();
+      dimNY = xttm.getDimNY();
+      dimNZ = xttm.getDimNZ();
+      dimNT = xttm.getDimNT();
 
-      procsPerNode = xt4tm.getProcsPerNode();
+      procsPerNode = xttm.getProcsPerNode();
       int *torus;
-      torus = xt4tm.isTorus();
+      torus = xttm.isTorus();
       torusX = torus[0];
       torusY = torus[1];
       torusZ = torus[2];
