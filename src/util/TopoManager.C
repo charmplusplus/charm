@@ -1,11 +1,4 @@
- /*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
- /** \file TopoManager.C
+/** \file TopoManager.C
  *  Author: Abhinav S Bhatele
  *  Date Created: March 19th, 2007
  *
