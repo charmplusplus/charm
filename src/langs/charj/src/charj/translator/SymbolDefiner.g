@@ -279,7 +279,11 @@ type returns [Type namedType]
                 $namedType = base == null ? null : new ProxyType(symtab, base);
             }
     |   ^(POINTER_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {typeName.add(new TypeName($i1.text));} .*))+) .*)
-            { $POINTER_TYPE.scope = currentScope; }
+            {
+                $POINTER_TYPE.scope = currentScope;
+                Type base = currentScope.resolveType(typeName);
+                $namedType = base == null ? null : new PointerType(symtab, base);
+            }
 	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT
             (^(IDENT {typeName.add(new TypeName($IDENT.text));} . ))+) .*)
 			{
