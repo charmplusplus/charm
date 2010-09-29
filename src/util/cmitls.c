@@ -58,6 +58,8 @@ void allocNewTLSSeg(tlsseg_t* t) {
   }
 }
 
+void switchTLS(tlsseg_t* , tlsseg_t* ) __attribute__((optimize(0)));
+
 /* void allocNewTLSSegEmpty(tlsseg_t* t) {
  *   void* aux = CmiIsomallocAlign(t->align, t->size);
  *     t->memseg = (Addr) (aux + t->size);
