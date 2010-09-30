@@ -588,6 +588,7 @@ int CmiIsFortranLibraryCall() {
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
+          || strncmp(trimmed, "_gfortran_", 10) == 0 
 	 )
           {  /* CmiPrintf("[%d] NAME:%s\n", CmiMyPe(), trimmed); */
              ret = 1; break; }
