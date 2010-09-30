@@ -349,32 +349,13 @@ type returns [Type sym]
 	boolean proxySection = false;
 }
 @after {
+    $start.symbolType = scope.resolveType(typeText);
     //System.out.println("\ntype string: " + typeText);
     //System.out.println("direct scope: " + scope);
-    $start.symbolType = scope.resolveType(typeText);
     //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 	if (proxySection && $start.symbolType != null) $start.symbolType = new ProxySectionType(symtab, $start.symbolType);
-
-    // TODO: Special case for Arrays, change this?
-    if (typeText != null && typeText.size() > 0 &&
-        typeText.get(0).name.equals("Array") && $start.symbolType == null) {
-
-        int numDims = 1;
-
-        ClassSymbol cs = new ClassSymbol(symtab, "Array");
-        cs.templateArgs = typeText.get(0).parameters;
-
-        if (cs.templateArgs != null &&
-            cs.templateArgs.size() > 1) {
-            if (cs.templateArgs.get(1) instanceof LiteralType) {
-                numDims = Integer.valueOf(((LiteralType)cs.templateArgs.get(1)).literal);
-            }
-        }
-        $start.symbolType = new PointerType(symtab, cs);
-    }
-
     $sym = $start.symbolType;
     if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
 }

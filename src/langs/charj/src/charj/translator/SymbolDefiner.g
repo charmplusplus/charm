@@ -251,6 +251,25 @@ type returns [Type namedType]
     if (currentScope == null) System.out.println("*****ERROR: null type scope");
     assert currentScope != null;
 }
+@after {
+    // TODO: Special case for Arrays, change this?
+    if (typeName.size() > 0 && typeName.get(0).name.equals("Array") &&
+            $namedType == null) {
+
+        int numDims = 1;
+        ClassSymbol cs = new ClassSymbol(symtab, "Array");
+        cs.templateArgs = typeName.get(0).parameters;
+
+        if (cs.templateArgs != null &&
+            cs.templateArgs.size() > 1) {
+            if (cs.templateArgs.get(1) instanceof LiteralType) {
+                numDims = Integer.valueOf(
+                    ((LiteralType)cs.templateArgs.get(1)).literal);
+            }
+        }
+        $namedType = new PointerType(symtab, cs);
+    }
+}
     :   VOID {
             $VOID.scope = currentScope;
             typeName.add(new TypeName("void"));
