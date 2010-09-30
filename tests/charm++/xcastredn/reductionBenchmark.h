@@ -26,8 +26,7 @@ char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Converse-Bca
 class config
 {
     public:
-        config(): fieldWidth(15)
-        { setDefaults(); }
+        config(): fieldWidth(15) { setDefaults(); }
 
         void pup(PUP::er &p)
         {
@@ -42,7 +41,7 @@ class config
         {
             arraySize   = CkNumPes();
             sectionSize = CkNumPes();
-            msgSizeMin  = 4;
+            msgSizeMin  = 8;
             msgSizeMax  = 64;
             qLength     = 0;
             uSecs       = 0;
@@ -54,8 +53,10 @@ class config
         int arraySize, sectionSize;
         /// Number of times to repeat the multicast/reduction for a single message size
         int numRepeats;
-        /// The range of message sizes for which the benchmark should be run (in KB)
-        int msgSizeMin, msgSizeMax;
+        /// The minimum msg (payload) size (in bytes)
+        int msgSizeMin;
+        /// The maximum msg (payload) size (in KB)
+        int msgSizeMax;
         /// Is the section constructed out of randomly chosen array elements
         bool useContiguousSection;
         /// How long the scheduler q should be (num enqueued entry methods)

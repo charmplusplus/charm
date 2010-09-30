@@ -226,10 +226,10 @@ Main::Main(CkArgMsg *m)
         }
     }
     else
-        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous qFillLength fillMethodDuration(us) sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
+        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) isSectionContiguous qFillLength fillMethodDuration(us) sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
              CkNumPes(), cfg.arraySize, cfg.sectionSize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
 
     // Initialize the mainchare pointer used by the converse redn handler
@@ -268,8 +268,8 @@ Main::Main(CkArgMsg *m)
 
     out<<std::fixed<<std::setprecision(6);
     out<<"\n\nSummary: Avg time taken (ms) for different msg sizes by each comm mechanism\n"<<std::setw(commNameLen)<<"Mechanism";
-    for (int i=cfg.msgSizeMin; i<= cfg.msgSizeMax; i*=2)
-        out<<std::setw(cfg.fieldWidth-3)<<i<<std::setw(3)<<" KB";
+    for (int i=cfg.msgSizeMin; i<= cfg.msgSizeMax*1024; i*=2)
+        out<<std::setw(cfg.fieldWidth-3)<<(float)i/1024<<std::setw(3)<<" KB";
     out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
     /// Wait for quiescence and then start the timing tests
@@ -302,10 +302,10 @@ CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
 void Main::sendMulticast(const CommMechanism commType, const int msgSize)
 {
     #ifdef VERBOSE_STATUS
-        CkPrintf("\nMsgSize: %d Sending out multicast number %d",curMsgSize,curRepeatNum+1);
+        CkPrintf("\nMsgSize: %f Sending out multicast number %d",(float)curMsgSize/1024,curRepeatNum+1);
     #endif
     /// Create a message of required size
-    int numUnits = curMsgSize*1024/sizeof(double);
+    int numUnits = curMsgSize/sizeof(double);
     DataMsg *msg = new (numUnits) DataMsg(numUnits,commType);
     /// Fill it with data
     for (int i=0; i<numUnits; i++)
@@ -363,7 +363,7 @@ void Main::receiveReduction(CkReductionMsg *msg)
     loopTimes.push_back( 1000*(CmiWallTimer() - timeStart) );
 
     #ifdef VERBOSE_STATUS
-        CkPrintf("\nMsgSize: %d Received reduction number %d for repeat number %d",curMsgSize,msg->getRedNo(),curRepeatNum+1);
+        CkPrintf("\nMsgSize: %f Received reduction number %d for repeat number %d", (float)curMsgSize/1024, msg->getRedNo(), curRepeatNum+1);
     #endif
 
     /// If this is the first ever multicast/reduction loop, dont time it as it includes tree setup times etc
@@ -394,7 +394,7 @@ void Main::receiveReduction(CkReductionMsg *msg)
         stdDev   = sqrt( stdDev/loopTimes.size() - avgTime*avgTime );
 
         /// Collate the results
-        log<<"\n"<<std::setw(cfg.fieldWidth)<<curMsgSize
+        log<<"\n"<<std::setw(cfg.fieldWidth)<<(float)curMsgSize/1024
                  <<std::setw(cfg.fieldWidth)<<avgTime
                  <<std::setw(cfg.fieldWidth)<<minTime
                  <<std::setw(cfg.fieldWidth)<<maxTime
@@ -407,7 +407,7 @@ void Main::receiveReduction(CkReductionMsg *msg)
         loopTimes.clear();
 
         /// If this ends the timings for all msg sizes, print results and proceed to the next phase
-        if (curMsgSize > cfg.msgSizeMax)
+        if (curMsgSize > cfg.msgSizeMax*1024)
         {
             /// Print the results
             CkPrintf("\n----------------------------------------------------------------");
