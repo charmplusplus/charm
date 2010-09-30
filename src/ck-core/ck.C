@@ -493,14 +493,22 @@ void *CkLocalChare(const CkChareID *pCid)
 	if (pe<0) { //A virtual chare ID
 		if (pe!=(-(CkMyPe()+1)))
 			return NULL;//VID block not on this PE
+#ifdef CMK_CHARE_USE_PTR
 		VidBlock *v=(VidBlock *)pCid->objPtr;
+#else
+		VidBlock *v=CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
+#endif
 		return v->getLocalChare();
 	}
 	else
 	{ //An ordinary chare ID
 		if (pe!=CkMyPe())
 			return NULL;//Chare not on this PE
+#ifdef CMK_CHARE_USE_PTR
 		return pCid->objPtr;
+#else
+		return CkpvAccess(chare_objs)[(CmiIntPtr)pCid->objPtr];
+#endif
 	}
 }
 
