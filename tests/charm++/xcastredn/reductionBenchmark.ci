@@ -11,7 +11,7 @@ mainmodule reductionBenchmark {
     };
 
 
-    array[3D] MyChareArray
+    array[1D] MyChareArray
     {
         entry MyChareArray(CkGroupID grpID);
         entry void crunchData(DataMsg *msg);

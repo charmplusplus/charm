@@ -112,7 +112,7 @@ void registerHandlers()
 MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
 {
     #ifdef VERBOSE_CREATION
-        CkPrintf("\n[%d,%d,%d] Just born...",thisIndex.x,thisIndex.y,thisIndex.z);
+        CkPrintf("\nArrayElem[%d] Just born...",thisIndex);
     #endif
     mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
     localElems.push_back(this);
@@ -124,7 +124,7 @@ MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
 inline void MyChareArray::crunchData(DataMsg *msg)
 {
     #ifdef VERBOSE_OPERATION
-        CkPrintf("\n[%d,%d,%d] Received msg number %d",thisIndex.x,thisIndex.y,thisIndex.z,msgNum++);
+        CkPrintf("\nArrayElem[%d] Received msg number %d", thisIndex, msgNum++);
     #endif
     /// Touch the data cursorily
     msg->data[0] = 0;
@@ -132,7 +132,7 @@ inline void MyChareArray::crunchData(DataMsg *msg)
     double *returnData = msg->data;
     /// Contribute to reduction
     #ifdef VERBOSE_OPERATION
-        CkPrintf("\n[%d,%d,%d] Going to trigger reduction using mechanism: %s",thisIndex.x,thisIndex.y,thisIndex.z,commName[msg->commType]);
+        CkPrintf("\nArrayElem[%d] Going to trigger reduction using mechanism: %s",thisIndex,commName[msg->commType]);
     #endif
     switch (msg->commType)
     {
@@ -190,12 +190,15 @@ void qFiller(void *param, void *msg)
 
 Main::Main(CkArgMsg *m)
 {
+    /// Set default configs
+    cfg.setDefaults();
+
     //Process command-line arguments
     if (m->argc == 1)
     {
         // just proceed silently for empty args
     }
-    else if ( ((m->argc>=2) && (m->argc<=7)) || (m->argc == 10) || (m->argc == 13) )
+    else if ( (m->argc >= 2) && (m->argc <= 9) )
     {
         if (m->argc >= 2)
             cfg.numRepeats       = atoi(m->argv[1]);
@@ -209,25 +212,25 @@ Main::Main(CkArgMsg *m)
             cfg.qLength          = atoi(m->argv[5]);
         if (m->argc >= 7)
             cfg.uSecs            = atoi(m->argv[6]);
-        if (m->argc >= 10)
+        if (m->argc >= 8)
         {
-            cfg.section.X        = atoi(m->argv[7]);
-            cfg.section.Y        = atoi(m->argv[8]);
-            cfg.section.Z        = atoi(m->argv[9]);
+            cfg.sectionSize      = atoi(m->argv[7]);
+            if (cfg.arraySize < cfg.sectionSize)
+                cfg.arraySize    = cfg.sectionSize;
         }
-        if (m->argc >= 13)
+        if (m->argc >= 9)
         {
-            cfg.X                = atoi(m->argv[10]);
-            cfg.Y                = atoi(m->argv[11]);
-            cfg.Z                = atoi(m->argv[12]);
+            cfg.arraySize        = atoi(m->argv[8]);
+            if (cfg.arraySize < cfg.sectionSize)
+                CkAbort("Invalid input. Ensure that section size <= array size");
         }
     }
     else
         CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin msgSizeMax isSectionContiguous qFillLength fillMethodDuration(us) sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: (%d,%d,%d) \n\tSection size: (%d,%d,%d) \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
-             CkNumPes(), cfg.X,cfg.Y,cfg.Z, cfg.section.X, cfg.section.Y, cfg.section.Z, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes (KB): %d to %d \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
+             CkNumPes(), cfg.arraySize, cfg.sectionSize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
 
     // Initialize the mainchare pointer used by the converse redn handler
     mainChare = this;
@@ -239,7 +242,7 @@ Main::Main(CkArgMsg *m)
     CkMulticastMgr *mgr   = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
 
     /// Create the array
-    chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.X,cfg.Y,cfg.Z); 
+    chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.arraySize);
     /// Create the array section to use with CkMulticast
     arraySections.push_back( createSection(cfg.useContiguousSection) );
 
@@ -281,25 +284,16 @@ Main::Main(CkArgMsg *m)
 CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
 {
     /// Determine the lower starting index of the section along each dimension
-    int Xl = 0, Yl = 0, Zl = 0;
-
+    int Xl = 0;
     /// Determine a step size based on whether a contiguous section is needed
-    int dX = 1, dY = 1, dZ = 1;
+    int dX = 1;
     if (!isSectionContiguous)
-    {
-        dX = floor( cfg.X/cfg.section.X );
-        dY = floor( cfg.Y/cfg.section.Y );
-        dZ = floor( cfg.Z/cfg.section.Z );
-    }
-
-    /// Determine the extent of the section along each dimension
-    int Xu = (cfg.section.X-1)*dX;
-    int Yu = (cfg.section.Y-1)*dY;
-    int Zu = (cfg.section.Z-1)*dZ;
-    CkAssert(cfg.X >= Xu && cfg.Y >= Yu && cfg.Z >= Zu);
-
+        dX = floor( cfg.arraySize / cfg.sectionSize );
+    /// Determine the upper index bounds for the section
+    int Xu = (cfg.sectionSize - 1) * dX;
+    CkAssert(cfg.arraySize >= Xu);
     /// Create the section
-    return CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX,Yl,Yu,dY,Zl,Zu,dZ);
+    return CProxySection_MyChareArray::ckNew(chareArray,Xl,Xu,dX);
 }
 
 

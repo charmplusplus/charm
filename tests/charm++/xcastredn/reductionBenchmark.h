@@ -26,37 +26,38 @@ char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Converse-Bca
 class config
 {
     public:
-        config(): 
-                  numRepeats(3),
-                  msgSizeMin(4), msgSizeMax(64),
-                  useContiguousSection(false),
-                  X(5), Y(5), Z(5),
-                  qLength(0), uSecs(0),
-                  fieldWidth(15)
-        {
-            section.X= 3; section.Y = 3; section.Z = 3;
-        }
+        config(): fieldWidth(15)
+        { setDefaults(); }
 
         void pup(PUP::er &p)
         {
-            p|section.X; p|section.Y; p|section.Z;
+            p|arraySize;  p|sectionSize;
+            p|msgSizeMin; p|msgSizeMax;
+            p|qLength;    p|uSecs;
             p|numRepeats;
-            p|msgSizeMin;   p|msgSizeMax;
             p|useContiguousSection;
-            p|X; p|Y; p|Z;
-            p|qLength; p|uSecs;
         }
 
-        /// Array section dimensions
-        struct dims { int X, Y, Z; } section;
+        void setDefaults()
+        {
+            arraySize   = CkNumPes();
+            sectionSize = CkNumPes();
+            msgSizeMin  = 4;
+            msgSizeMax  = 64;
+            qLength     = 0;
+            uSecs       = 0;
+            numRepeats  = 3;
+            useContiguousSection = true;
+        }
+
+        /// Array and Section sizes
+        int arraySize, sectionSize;
         /// Number of times to repeat the multicast/reduction for a single message size
         int numRepeats;
         /// The range of message sizes for which the benchmark should be run (in KB)
         int msgSizeMin, msgSizeMax;
         /// Is the section constructed out of randomly chosen array elements
         bool useContiguousSection;
-        /// The dimensions of the chare array
-        int X, Y, Z;
         /// How long the scheduler q should be (num enqueued entry methods)
         int qLength;
         /// How long each entry method should be (micro seconds)
