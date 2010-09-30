@@ -508,6 +508,10 @@ static void CthBaseInit(char **argv)
   
   CpvInitialize(int, Cth_serialNo);
   CpvAccess(Cth_serialNo) = 1;
+
+#if CMK_THREADS_BUILD_TLS
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
+#endif
 }
 
 int CthImplemented() { return 1; } 
@@ -1550,9 +1554,6 @@ void CthInit(char **argv)
 #endif
 #if CMK_THREADS_ALIAS_STACK
   CmiThreadIs_flag |= CMI_THREAD_IS_ALIAS;
-#endif
-#if CMK_THREADS_BUILD_TLS
-  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
 #endif
 }
 
