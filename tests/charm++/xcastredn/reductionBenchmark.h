@@ -16,9 +16,10 @@
 /// Enumerate the different mechanisms for collective comm 
 enum CommMechanism
 { CkMulticast, CharmBcast, ConverseBcast, ConverseToArrayBcast, Comlib};
-/// The names of the collective mechanisms
+/// The names of the communication mechanisms being tested in this benchmark
 const int commNameLen = 30;
 char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Converse-Bcast/Redn", "ConverseBcast/ArrayRedn", "Comlib"};
+
 
 
 
@@ -70,6 +71,7 @@ class config
 
 
 
+/// A charm msg that is used in the xcast loop
 class DataMsg: public CkMcastBaseMsg, public CMessage_DataMsg
 {
     public:
@@ -82,6 +84,7 @@ class DataMsg: public CkMcastBaseMsg, public CMessage_DataMsg
 
 
 
+/// A chare array that participates in the xcast/redn loop
 class MyChareArray: public CBase_MyChareArray
 {
     public: 
@@ -101,7 +104,7 @@ class MyChareArray: public CBase_MyChareArray
 
 
 
-/** A group to maintains its presence in the scheduler queue
+/** A group that maintains its presence in the scheduler queue
  *
  * Used to mimic a real application scenario to measure the
  * performance degradation caused by having xcast msgs wait
@@ -127,6 +130,7 @@ class QHogger: public CBase_QHogger
 
 
 
+/// Test controller. Triggers and measures each xcast/redn loop
 class Main: public CBase_Main
 {
     public:
