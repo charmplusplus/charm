@@ -213,6 +213,9 @@
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
 
+/* OS is Linux */
+#undef CMK_OS_IS_LINUX
+
 /* whether is power7 */
 #undef CMK_POWER7
 

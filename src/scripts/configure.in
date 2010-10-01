@@ -307,6 +307,15 @@ then
   AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
 fi
 
+# detect OS
+OSNAME=`uname -s`
+if test $OSNAME = "Linux"
+then
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 1, [OS is Linux])
+else
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 0, [OS is Linux])
+fi
+
 # test cp -p
 AC_MSG_CHECKING("cp command as")
 CP="cp -p"

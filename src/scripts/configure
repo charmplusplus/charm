@@ -2000,6 +2000,24 @@ _ACEOF
 
 fi
 
+
+#detect OS
+OSNAME=`uname -s`
+if test $OSNAME = "Linux"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_OS_IS_LINUX 1
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_OS_IS_LINUX 0
+_ACEOF
+
+fi
+
 # test cp -p
 { echo "$as_me:$LINENO: checking \"cp command as\"" >&5
 echo $ECHO_N "checking \"cp command as\"... $ECHO_C" >&6; }
