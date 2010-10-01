@@ -1738,11 +1738,10 @@ fi
 
 # Check whether --enable-controlpoint was given.
 if test "${enable_controlpoint+set}" = set; then
-  enableval=$enable_controlpoint; enable_controlpoint=$enableval
+  enableval=$enable_controlpoint 
 else
-  enable_controlpoint=yes
+  enable_controlpoint=no
 fi
-
 
 if test "$enable_controlpoint" = "no"
 then
@@ -1750,6 +1749,12 @@ then
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_WITH_CONTROLPOINT 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 1
 _ACEOF
 
 fi

@@ -44,7 +44,7 @@ then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
 else
-  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [disable tracing])
+  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
 fi
 
 AC_ARG_ENABLE([charmdebug],
@@ -76,10 +76,12 @@ AC_ARG_ENABLE([controlpoint],
             [AS_HELP_STRING([--enable-controlpoint],
               [enable control point])],
             [enable_controlpoint=$enableval],
-            [enable_controlpoint=yes])
+            [enable_controlpoint=no])
 
-if test "$enable_controlpoint" = "no"
+if test "$enable_controlpoint" = "yes"
 then
+  AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 1, [enable controlpoint])
+else
   Echo "Charm control point is disabled"
   AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
 fi
