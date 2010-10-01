@@ -17,6 +17,14 @@ cpu affinity.
 
 #define DEBUGP(x)   /* CmiPrintf x;  */
 CpvDeclare(int, myCPUAffToCore);
+#if CMK_OS_IS_LINUX
+/* 
+ * /proc/<PID>/[task/<TID>]/stat file descriptor 
+ * Used to retrieve the info about which physical
+ * coer this process or thread is on.
+ **/
+CpvDeclare(void *, myProcStatFP);
+#endif
 
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
@@ -32,6 +40,10 @@ CpvDeclare(int, myCPUAffToCore);
 #include <sched.h>
 //long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 //long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
+#endif
+
+#if CMK_OS_IS_LINUX
+#include <sys/syscall.h>
 #endif
 
 #if defined(__APPLE__) 
@@ -261,22 +273,30 @@ int CmiPrintCPUAffinity()
 #endif
 }
 
-  /* returns which core is running on, only works on Linux */
 int CmiOnCore(void) {
-  FILE *fp;
-  int core=-1;
-  char str[128];
+#if CMK_OS_IS_LINUX
+  /*
+   * The info (task_cpu) is read from the Linux /proc virtual file system.
+   * The /proc/<PID>/[task/<TID>]/stat is explained in the Linux
+   * kernel documentation. The online one could be found in:
+   * http://www.mjmwired.net/kernel/Documentation/filesystems/proc.txt
+   * Based on the documentation, task_cpu is found at the 39th field in
+   * the stat file.
+   **/
+#define TASK_CPU_POS (39)
   int n;
-
-  fp = fopen("/proc/self/stat", "r");
+  char str[128];
+  FILE *fp = (FILE *)CpvAccess(myProcStatFP);
   if (fp == NULL) return -1;
-  for (n=0; n<39; n++)  {
+  fseek(fp, 0, SEEK_SET);
+  for (n=0; n<TASK_CPU_POS; n++)  {
     fscanf(fp, "%s", str);
-  }
-  fclose(fp);
-  core = atoi(str);
-
-  return core;
+  }  
+  return atoi(str);
+#else
+  printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+  return -1;
+#endif
 }
 
 
@@ -383,7 +403,6 @@ static void cpuAffinityRecvHandler(void *msg)
     CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
     CmiAbort("set cpu affinity abort!\n");
   }
-  /*CpvAccess(myCPUAffToCore) = myrank;*/
   CmiFree(m);
 }
 
@@ -486,9 +505,6 @@ void CmiInitCPUAffinity(char **argv)
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
-  CpvInitialize(int, myCPUAffToCore);
-  CpvAccess(myCPUAffToCore) = -1;
-
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();
   }
@@ -517,7 +533,6 @@ void CmiInitCPUAffinity(char **argv)
       printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
       if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
-      /*CpvAccess(myCPUAffToCore) = mycore;*/
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
@@ -544,7 +559,6 @@ void CmiInitCPUAffinity(char **argv)
       CmiAbort("Invalid core number");
     }
     if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
-    /*CpvAccess(myCPUAffToCore) = mycore;*/
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
@@ -600,6 +614,25 @@ void CmiInitCPUAffinity(char **argv)
   if (show_affinity_flag) CmiPrintCPUAffinity();
 }
 
+/* called in ConverseCommonInit to initialize basic variables */
+void CmiInitCPUAffinityUtil(){
+    CpvInitialize(int, myCPUAffToCore);
+    CpvAccess(myCPUAffToCore) = -1;
+#if CMK_OS_IS_LINUX
+    char fname[128];
+#if CMK_SMP
+    sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));
+#else
+    sprintf(fname, "/proc/%d/stat", getpid());
+#endif	
+    CpvInitialize(void *, myProcStatFP);
+    CpvAccess(myProcStatFP) = (void *)fopen(fname, "r");
+    if(CpvAccess(myProcStatFP) == NULL){
+        CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
+    }
+#endif
+}
+
 #else           /* not supporting affinity */
 
 
@@ -620,9 +653,19 @@ void CmiInitCPUAffinity(char **argv)
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
-
-  CpvInitialize(int, myCPUAffToCore);
-  CpvAccess(myCPUAffToCore) = -1;
 }
 
+/* called in ConverseCommonInit to initialize basic variables */
+void CmiInitCPUAffinityUtil(){
+    CpvInitialize(int, myCPUAffToCore);
+    CpvAccess(myCPUAffToCore) = -1;
+#if CMK_OS_IS_LINUX	
+    CpvInitialize(void *, myProcStatFP);
+    CpvAccess(myProcStatFP) = NULL;
+ #endif
+}
+
+int CmiOnCore(){
+	return -1;
+}
 #endif

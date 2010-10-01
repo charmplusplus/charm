@@ -3088,6 +3088,9 @@ extern void CmiIsomallocInit(char **argv);
 void CmiIOInit(char **argv);
 #endif
 
+/* defined in cpuaffinity.c */
+extern void CmiInitCPUAffinityUtil();
+
 static void CmiProcessPriority(char **argv)
 {
   int dummy, nicelevel=-100;      /* process priority */
@@ -3227,6 +3230,7 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
 #endif
 
+  CmiInitCPUAffinityUtil();
   CmiArgInit(argv);
   CmiMemoryInit(argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
