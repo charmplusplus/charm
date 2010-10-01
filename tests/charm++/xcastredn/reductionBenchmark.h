@@ -131,10 +131,10 @@ class QHogger: public CBase_QHogger
 
 
 /// Test controller. Triggers and measures each xcast/redn loop
-class Main: public CBase_Main
+class TestController: public CBase_TestController
 {
     public:
-        Main(CkArgMsg *m);
+        TestController(CkArgMsg *m);
         /// @entry Starts the timing tests
         void startTest() { sendMulticast(curCommType, curMsgSize); }
         /// @entry Reduction client method. Receives the result of the reduction

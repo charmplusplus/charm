@@ -7,7 +7,7 @@
 /// Readonly proxy to the QHogger group
 CProxy_QHogger hogger;
 /// Pointer to the mainchare on pe 0 used by the converse redn handler
-Main *mainChare;
+TestController *mainChare;
 /// A list of array elements local to each address space (pe)
 std::vector<MyChareArray*> localElems;
 /// Converse broadcast and reduction handler function IDs. Global vars.
@@ -188,7 +188,7 @@ void qFiller(void *param, void *msg)
 
 
 
-Main::Main(CkArgMsg *m)
+TestController::TestController(CkArgMsg *m)
 {
     /// Set default configs
     cfg.setDefaults();
@@ -249,7 +249,7 @@ Main::Main(CkArgMsg *m)
     /// Delegate the section collectives to the multicast manager
     arraySections[0].ckSectionDelegate(mgr);
     /// Setup the client at the root of the reductions
-    CkCallback *cb = new CkCallback(CkIndex_Main::receiveReduction(0),thisProxy);
+    CkCallback *cb = new CkCallback(CkIndex_TestController::receiveReduction(0),thisProxy);
     chareArray.ckSetReductionClient(cb);
     mgr->setReductionClient(arraySections[0],cb);
 
@@ -273,7 +273,7 @@ Main::Main(CkArgMsg *m)
     out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
     /// Wait for quiescence and then start the timing tests
-    CkCallback *trigger = new CkCallback(CkIndex_Main::startTest(), thisProxy);
+    CkCallback *trigger = new CkCallback(CkIndex_TestController::startTest(), thisProxy);
     CkCallback filler(qFiller, (void*)trigger);
     CkStartQD(filler);
 }
@@ -281,7 +281,7 @@ Main::Main(CkArgMsg *m)
 
 
 
-CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
+CProxySection_MyChareArray TestController::createSection(const bool isSectionContiguous)
 {
     /// Determine the lower starting index of the section along each dimension
     int Xl = 0;
@@ -299,7 +299,7 @@ CProxySection_MyChareArray Main::createSection(const bool isSectionContiguous)
 
 
 
-void Main::sendMulticast(const CommMechanism commType, const int msgSize)
+void TestController::sendMulticast(const CommMechanism commType, const int msgSize)
 {
     #ifdef VERBOSE_STATUS
         CkPrintf("\nMsgSize: %f Sending out multicast number %d",(float)curMsgSize/1024,curRepeatNum+1);
@@ -357,7 +357,7 @@ void Main::sendMulticast(const CommMechanism commType, const int msgSize)
 
 
 
-void Main::receiveReduction(CkReductionMsg *msg)
+void TestController::receiveReduction(CkReductionMsg *msg)
 {
     /// Compute the time taken (in milliseconds) for this multicast/reduction loop
     loopTimes.push_back( 1000*(CmiWallTimer() - timeStart) );
