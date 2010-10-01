@@ -17,6 +17,7 @@ import java.util.Iterator;
     SymbolTable symtab;
     Scope currentScope;
     ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
 
     public SymbolResolver(TreeNodeStream input, SymbolTable symtab) {
         this(input);
@@ -36,20 +37,29 @@ topdown
 
 bottomup
     :   exitClass
+    |   exitMethod
     ;
 
 enterMethod
-@init {
-boolean entry = false;
-}
-    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL {entry = true;})
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            type IDENT .*)
-    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
+            type IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            IDENT .*)
+            IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+    ;
+
+exitMethod
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
+            (^(MODIFIER_LIST .*))?
+            (^(GENERIC_TYPE_PARAM_LIST .*))? 
+            type IDENT .*) { currentMethod = null; }
+    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
+            (^(MODIFIER_LIST .*))?
+            (^(GENERIC_TYPE_PARAM_LIST .*))? 
+            IDENT .*) { currentMethod = null; }
     ;
 
 enterClass
@@ -77,8 +87,9 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                //System.out.println("Resolved type of variable " + $IDENT.text + ": " +
-                //    $IDENT.def.type + ", symbol is " + $IDENT.def);
+                /*System.out.println("Resolved type of variable " + $IDENT.text + ": " +
+                    $IDENT.def.type + ", symbol is " + $IDENT.def);*/
+                Type varType = (Type)$IDENT.def.type;
                 if (currentClass != null) {
                     ClassSymbol declType = null;
                     if ($type.sym instanceof ClassSymbol) {
@@ -88,11 +99,15 @@ varDeclaration
                     }
 
                     if (declType != null) {
-                        //System.out.println("Looking to extern " + $IDENT.text + " as " + declType);
                         if (declType.isChare && declType != currentClass) {
-                            //System.out.println("extern added");
                             currentClass.addExtern(declType.getTypeName());
                         }
+                    }
+                    if (currentMethod != null && currentMethod.hasSDAG && varType != null) {
+                        String mangledName = "_sdag_" + currentMethod.getScopeName() + "_" + $IDENT.text;
+                        //System.out.println("var " + $IDENT.text + " is an sdag local; adding to class as " +
+                        //    varType.getTypeName() + " " + mangledName + "\n");
+                        currentClass.addSDAGLocal(varType.getTranslatedTypeName(), $IDENT.text, mangledName);
                     }
                 }
             }

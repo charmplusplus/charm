@@ -350,6 +350,7 @@ class <ident>: public CBase_<ident> {
     static bool _trace_registered;
     void _initTrace();
 	<sym.sectionInitializers : { private: CProxySection_<it.classType> <it.methodName>(CProxy_<it.classType>); }>
+    <sym.SDAGLocalTypeDefinitions; separator="\n">
 };
 <endif>
 >>
@@ -491,6 +492,10 @@ var_decl_list(var_decls) ::=
 <var_decls; separator=", ">
 >>
 
+var_decl_list_sdag_ci(var_decls) ::=
+<<
+<var_decls; separator="\n">
+>>
 
 var_decl_cc(id, initializer) ::=
 <<
@@ -505,6 +510,13 @@ var_decl_h(id, initializer) ::=
 var_decl_ci(id, initializer) ::=
 <<
 <id><if(initializer)> = <initializer><endif>
+>>
+
+var_decl_sdag_ci(id, initializer) ::=
+<<
+<if(initializer)>
+<id> = <initializer>;
+<endif>
 >>
 
 var_decl_id(id, domainExp) ::=
@@ -537,6 +549,11 @@ mod_list_ci(accmods, localmods, charjmods, othermods) ::=
 local_var_decl(modList, type, declList, domainExps) ::=
 <<
 <if(modList)><modList> <endif><type> <declList>;
+>>
+
+local_var_decl_sdag_ci(declList) ::=
+<<
+<declList>
 >>
 
 local_mod_list(mods) ::= 
