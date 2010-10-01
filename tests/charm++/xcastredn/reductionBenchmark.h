@@ -13,13 +13,13 @@
 #ifndef REDUCTION_BENCHMARK_H
 #define REDUCTION_BENCHMARK_H
 
-/// Enumerate the different mechanisms for collective comm 
+/// The different communication mechanisms being benchmarked
 enum CommMechanism
 { CkMulticast, CharmBcast, ConverseBcast, ConverseToArrayBcast, Comlib};
-/// The names of the communication mechanisms being tested in this benchmark
-const int commNameLen = 30;
-char commName[][commNameLen] = {"CkMulticast", "Charm-Bcast/Redn", "Converse-Bcast/Redn", "ConverseBcast/ArrayRedn", "Comlib"};
 
+const int commNameLen        = 30;
+/// The names of all the comm mechanisms (used in output)
+extern char commName[][commNameLen];
 
 
 
@@ -66,7 +66,10 @@ class config
         int uSecs;
         /// Some output beauty
         const int fieldWidth;
-} cfg; ///< readonly
+};
+
+/// readonly
+extern config cfg;
 
 
 
@@ -79,26 +82,6 @@ class DataMsg: public CkMcastBaseMsg, public CMessage_DataMsg
         int size;
         CommMechanism commType;
         double *data;
-};
-
-
-
-
-/// A chare array that participates in the xcast/redn loop
-class MyChareArray: public CBase_MyChareArray
-{
-    public: 
-        MyChareArray(CkGroupID grpID);
-        MyChareArray(CkMigrateMessage *msg) {}
-        void pup(PUP::er &p) {}
-        /// @entry Receives data and toys with it. Returns confirmation via a reduction
-        void crunchData(DataMsg *msg);
-
-    private:
-        int msgNum;
-        CkGroupID mcastGrpID;
-        CkMulticastMgr *mcastMgr;
-        CkSectionInfo sid;
 };
 
 
@@ -126,45 +109,6 @@ class QHogger: public CBase_QHogger
     private:
         long int numCalled;
 };
-
-
-
-
-/// Test controller. Triggers and measures each xcast/redn loop
-class TestController: public CBase_TestController
-{
-    public:
-        TestController(CkArgMsg *m);
-        /// @entry Starts the timing tests
-        void startTest() { sendMulticast(curCommType, curMsgSize); }
-        /// @entry Reduction client method. Receives the result of the reduction
-        void receiveReduction(CkReductionMsg *msg);
-
-    private:
-        /// Create an array section that I will multicast to
-        CProxySection_MyChareArray createSection(const bool isSectionContiguous);
-        /// Sends out a multicast to the array section
-        void sendMulticast(const CommMechanism commType, const int msgSize);
-
-        /// Chare array that is going to receive the multicasts
-        CProxy_MyChareArray chareArray;
-        /// Array section proxy
-        std::vector<CProxySection_MyChareArray> arraySections;
-        /// Counter for tracking the comm mechanism that is currently being tested
-        CommMechanism curCommType;
-        /// Counters for tracking test progress
-        int curMsgSize,curRepeatNum;
-        /// Stream holding all the results
-        std::stringstream out, log;
-        /// Start time for the multicast
-        double timeStart;
-        /// A vector (of size numRepeats) of times taken for a multicast/reduction loop
-        std::vector<double> loopTimes;
-};
-
-/// An overloaded increment for comfort when handling the enum
-inline CommMechanism operator++(CommMechanism &m)
-{ return m = (CommMechanism)(m + 1); }
 
 #endif // REDUCTION_BENCHMARK_H
 
