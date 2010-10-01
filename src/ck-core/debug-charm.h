@@ -27,6 +27,7 @@ extern void CpdFinishInitialization();
 
 class CpdPersistentChecker {
 public:
+  virtual ~CpdPersistentChecker() {}
   virtual void cpdCheck(void*) {}
 };
 
