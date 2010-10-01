@@ -1649,7 +1649,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthThreadInit(result);
 #ifdef MINSIGSTKSZ
   /* if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize); */
-  if (size<MINSIGSTKSZ) size = MINSIGSTKSZ;
+  if (size && size<MINSIGSTKSZ) size = MINSIGSTKSZ;
 #endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;

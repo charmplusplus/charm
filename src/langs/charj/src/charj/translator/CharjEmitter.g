@@ -371,6 +371,8 @@ interfaceScopeDeclaration
 
 variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_list_sdag_ci(var_decls={$var_decls})
         -> var_decl_list(var_decls={$var_decls})
     ;
 
@@ -378,6 +380,8 @@ variableDeclarator[StringTemplate obtype]
     :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer[obtype]?)
         -> {emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
         -> {emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_sdag_ci(id={currentClass.getSDAGLocalName($id.st.toString())}, initializer={$initializer.st})
         -> {emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
         ->
     ; 
@@ -656,6 +660,8 @@ formalParameterVarargDecl
     
 qualifiedIdentifier
     :   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($text)}) "<t>"
         -> template(t={$text}) "<t>"
     |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
@@ -687,7 +693,7 @@ sdagBlock
 sdagBasicBlock
     :   sdagStatement
         -> {$sdagStatement.st}
-    |   (s+=statement)+
+    |   (s+=blockStatement)+
         -> block_atomic(s={$s})
     ;
     
@@ -701,11 +707,15 @@ blockStatement
 
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$vdl.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$objectType.st},
@@ -947,6 +957,8 @@ primaryExpression
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($IDENT.text)}) "<t>"
         -> {%{$IDENT.text}}
     |   CHELPER
         -> {%{"constructorHelper"}}
