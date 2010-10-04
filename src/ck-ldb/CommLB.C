@@ -164,7 +164,7 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
       x = new ObjectRecord;
       x->id = obj;
       x->pos = obj;
-      x->load = objData.wallTime;
+      x->val = objData.wallTime;
       x->pe = onpe;
       maxh.insert(x);
       mean_load += objData.wallTime;
@@ -216,7 +216,7 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
 	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
       }
       temp_cost = compute_cost(maxid,spe,id,out_msg,out_byte);
-      alloc(spe,maxid,x->load,out_msg,out_byte);
+      alloc(spe, maxid, x->val, out_msg, out_byte);
       continue;
     }
 
@@ -244,7 +244,7 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
     }
     CmiAssert(minpe < npe);
 
-    alloc(minpe,maxid,x->load,min_msg,min_byte);
+    alloc(minpe, maxid, x->val, min_msg, min_byte);
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);

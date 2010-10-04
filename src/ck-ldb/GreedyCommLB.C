@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -230,7 +223,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
         x = new ObjectRecord;
         x->id = obj;
         x->pos = obj;
-        x->load = objData.wallTime;
+        x->val = objData.wallTime;
         x->pe = onpe;
         maxh.insert(x);
       }
@@ -311,7 +304,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	//    CkPrintf("before 2nd alloc\n");
         stats->assign(maxid, minpe);
 	
-	alloc(minpe,maxid,x->load + min_temp);
+	alloc(minpe, maxid, x->val + min_temp);
 
 	// now that maxid assigned to minpe, update other pes load
 	update(maxid, minpe);
