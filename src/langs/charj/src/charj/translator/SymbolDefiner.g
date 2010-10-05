@@ -303,8 +303,7 @@ type returns [Type namedType]
                 Type base = currentScope.resolveType(typeName);
                 $namedType = base == null ? null : new PointerType(symtab, base);
             }
-	|	^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT
-            (^(IDENT {typeName.add(new TypeName($IDENT.text));} . ))+) .*)
+    |   ^(ARRAY_SECTION_TYPE ^(QUALIFIED_TYPE_IDENT (^(i1=IDENT {typeName.add(new TypeName($i1.text));} .*))+) .*)
 			{
                 $ARRAY_SECTION_TYPE.scope = currentScope;
                 Type base = currentScope.resolveType(typeName);

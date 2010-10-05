@@ -443,11 +443,6 @@ primaryExpression
                 |   SUPER
                 )
         )
-        ->   ^(ARROW primaryExpression
-                   IDENT?
-                   THIS?
-                   SUPER?
-             )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression templateInstantiation? arguments)

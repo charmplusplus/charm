@@ -11,4 +11,10 @@ public class ProxySectionType extends Symbol implements Type {
     public String getTypeName() {
         return baseType.getTypeName();
     }
+
+	// TODO dummy implementation so as to compile
+	public String getTranslatedTypeName()
+	{
+		return getTypeName();
+	}
 }

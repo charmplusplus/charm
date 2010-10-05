@@ -237,10 +237,14 @@ type
     |   VOID
     ;
 
-nonArraySectionObjectType
+nonArraySectionObjectType returns [Type type]
+@after
+{
+	$type = $start.symbolType;
+}
 	:	simpleType
 	|   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
-    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+	|   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
 	|	VOID
@@ -466,32 +470,52 @@ expr
     |   primaryExpression
     ;
     
-primaryExpression
-    :   ^(DOT primaryExpression
-                (   IDENT
-                |   THIS
-                |   SUPER
+primaryExpression returns [Type type]
+    :   ^(DOT pe=primaryExpression
+                (   IDENT { $type = $IDENT.symbolType; }
+                |   THIS  { $type = $IDENT.symbolType; }
+                |   SUPER { $type = $IDENT.symbolType; }
                 )
         )
-    |   ^(ARROW primaryExpression
-                (   IDENT
-                |   THIS
-                |   SUPER
-                )
-        )
+		-> { $pe.type instanceof PointerType }? ^(ARROW primaryExpression IDENT? THIS? SUPER?)
+		->										^(DOT primaryExpression IDENT? THIS? SUPER?)
     |   parenthesizedExpression
     |   IDENT
+		{
+			$type = $IDENT.symbolType;
+		}
     |   CHELPER
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
+    |   ^(METHOD_CALL pe=primaryExpression genericTypeArgumentList? arguments) 
+		{
+			$type = $METHOD_CALL.symbolType;
+		}
+    |   ^(ENTRY_METHOD_CALL pe=primaryExpression genericTypeArgumentList? entryArguments)
+		{
+			$type = $ENTRY_METHOD_CALL.symbolType;
+		}
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+		{
+			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
+		}
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
+		{
+			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
+		}
     |   literal
     |   newExpression
-    |   THIS
+		{
+			$type = $newExpression.type;
+		}
+	|	THIS
+		{
+			$type = $THIS.symbolType;
+		}
     |   arrayTypeDeclarator
     |   SUPER
+		{
+			$type = $SUPER.symbolType;
+		}
     |   GETNUMPES
     |   GETNUMNODES
     |   GETMYPE
@@ -499,6 +523,9 @@ primaryExpression
     |   GETMYRANK
 	|	THISINDEX
 	|	THISPROXY
+		{
+			$type = $THISPROXY.symbolType;
+		}
     |   domainExpression
     ;
     
@@ -511,7 +538,7 @@ arrayTypeDeclarator
     :   ^(ARRAY_DECLARATOR (arrayTypeDeclarator | qualifiedIdentifier | primitiveType))
     ;
 
-newExpression
+newExpression returns [Type type]
     :   ^(NEW_EXPRESSION arguments? domainExpression)
 	|	^(NEW ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression) ^(ARGUMENT_LIST expression))
 		{
@@ -519,6 +546,9 @@ newExpression
 		}
 		->	^(METHOD_CALL IDENT["arraySectionInit" + ArraySectionInitializer.getCount()] ^(ARGUMENT_LIST expression))
     |   ^(NEW nonArraySectionObjectType arguments)
+		{
+			$type = $nonArraySectionObjectType.type;
+		}
     ;
 
 arguments returns [Object expr]
