@@ -633,8 +633,8 @@ void CmiInitCPUAffinityUtil(){
 /*
     if(CmiMyPe()==0 && CpvAccess(myProcStatFP) == NULL){
         CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
-*/
     }
+*/
 #endif
 }
 
