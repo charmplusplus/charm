@@ -10,6 +10,121 @@
 
 #include "TopoManager.h"
 
+TopoManager::TopoManager() {
+#if CMK_BLUEGENEL
+  dimX = bgltm.getDimX();
+  dimY = bgltm.getDimY();
+  dimZ = bgltm.getDimZ();
+
+  dimNX = bgltm.getDimNX();
+  dimNY = bgltm.getDimNY();
+  dimNZ = bgltm.getDimNZ();
+  dimNT = bgltm.getDimNT();
+
+  procsPerNode = bgltm.getProcsPerNode();
+  int *torus;
+  torus = bgltm.isTorus();
+  torusX = torus[0];
+  torusY = torus[1];
+  torusZ = torus[2];
+  torusT = torus[3];
+
+#elif CMK_BLUEGENEP
+  dimX = bgptm.getDimX();
+  dimY = bgptm.getDimY();
+  dimZ = bgptm.getDimZ();
+
+  dimNX = bgptm.getDimNX();
+  dimNY = bgptm.getDimNY();
+  dimNZ = bgptm.getDimNZ();
+  dimNT = bgptm.getDimNT();
+
+  procsPerNode = bgptm.getProcsPerNode();
+  int *torus;
+  torus = bgptm.isTorus();
+  torusX = torus[0];
+  torusY = torus[1];
+  torusZ = torus[2];
+  torusT = torus[3];
+
+#elif XT3_TOPOLOGY
+  dimX = xt3tm.getDimX();
+  dimY = xt3tm.getDimY();
+  dimZ = xt3tm.getDimZ();
+
+  dimNX = xt3tm.getDimNX();
+  dimNY = xt3tm.getDimNY();
+  dimNZ = xt3tm.getDimNZ();
+  dimNT = xt3tm.getDimNT();
+
+  procsPerNode = xt3tm.getProcsPerNode();
+  int *torus;
+  torus = xt3tm.isTorus();
+  torusX = torus[0];
+  torusY = torus[1];
+  torusZ = torus[2];
+  torusT = torus[3];
+
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+  dimX = xttm.getDimX();
+  dimY = xttm.getDimY();
+  dimZ = xttm.getDimZ();
+
+  dimNX = xttm.getDimNX();
+  dimNY = xttm.getDimNY();
+  dimNZ = xttm.getDimNZ();
+  dimNT = xttm.getDimNT();
+
+  procsPerNode = xttm.getProcsPerNode();
+  int *torus;
+  torus = xttm.isTorus();
+  torusX = torus[0];
+  torusY = torus[1];
+  torusZ = torus[2];
+  torusT = torus[3];
+
+#else
+  dimX = CkNumPes();
+  dimY = 1;
+  dimZ = 1;
+
+  dimNX = dimX;
+  dimNY = 1;
+  dimNZ = 1;
+
+  dimNT = procsPerNode = 1;
+  torusX = true;
+  torusY = true;
+  torusZ = true;
+  torusT = false;
+#endif
+
+#if CMK_BLUEGENE_CHARM
+  BgGetSize(&dimNX, &dimNY, &dimNZ);
+
+  dimNT = procsPerNode = BgGetNumWorkThread();
+  dimX = dimNX * procsPerNode;
+  dimY = dimNY;
+  dimZ = dimNZ;
+
+  torusX = true;
+  torusY = true;
+  torusZ = true;
+  torusT = false;
+#endif
+}
+
+TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
+  // we rashly assume only one dimension is expanded 
+  procsPerNode = dimNT;
+  dimX = dimNX * dimNT;
+  dimY = dimNY;
+  dimZ = dimNZ;
+  torusX = true;
+  torusY = true;
+  torusZ = true;
+}
+
 int TopoManager::hasMultipleProcsPerNode() {
   if(procsPerNode == 1)
     return 0;
