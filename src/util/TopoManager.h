@@ -36,27 +36,6 @@
 #endif
 
 class TopoManager {
-  private:
-    int dimX;	// dimension of the allocation in X (no. of processors)
-    int dimY;	// dimension of the allocation in Y (no. of processors)
-    int dimZ;	// dimension of the allocation in Z (no. of processors)
-    int dimNX;	// dimension of the allocation in X (no. of nodes)
-    int dimNY;	// dimension of the allocation in Y (no. of nodes)
-    int dimNZ;	// dimension of the allocation in Z (no. of nodes)
-    int dimNT;  // dimension of the allocation in T (no. of processors per node)
-    int torusX, torusY, torusZ, torusT; 
-    int procsPerNode;
-
-#if CMK_BLUEGENEL
-    BGLTorusManager bgltm;
-#elif CMK_BLUEGENEP
-    BGPTorusManager bgptm;
-#elif XT3_TOPOLOGY
-    XT3TorusManager xt3tm;
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
-    XTTorusManager xttm;
-#endif
-
   public:
     TopoManager();
     TopoManager(int NX, int NY, int NZ, int NT);
@@ -114,11 +93,30 @@ class TopoManager {
       else
         return pz;
     }
-    
+
   private:
+    int dimX;	// dimension of the allocation in X (no. of processors)
+    int dimY;	// dimension of the allocation in Y (no. of processors)
+    int dimZ;	// dimension of the allocation in Z (no. of processors)
+    int dimNX;	// dimension of the allocation in X (no. of nodes)
+    int dimNY;	// dimension of the allocation in Y (no. of nodes)
+    int dimNZ;	// dimension of the allocation in Z (no. of nodes)
+    int dimNT;  // dimension of the allocation in T (no. of processors per node)
+    int torusX, torusY, torusZ, torusT;
+    int procsPerNode;
+
+#if CMK_BLUEGENEL
+    BGLTorusManager bgltm;
+#elif CMK_BLUEGENEP
+    BGPTorusManager bgptm;
+#elif XT3_TOPOLOGY
+    XT3TorusManager xt3tm;
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+    XTTorusManager xttm;
+#endif
+
     void quicksort(int pe, int *pes, int *arr, int left, int right);
     int partition(int pe, int *pes, int *idx, int left, int right);
-
 };
 
 #endif //_TOPO_MANAGER_H_

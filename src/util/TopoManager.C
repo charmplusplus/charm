@@ -115,7 +115,7 @@ TopoManager::TopoManager() {
 }
 
 TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
-  // we rashly assume only one dimension is expanded 
+  /* we rashly assume only one dimension is expanded */
   procsPerNode = dimNT;
   dimX = dimNX * dimNT;
   dimY = dimNY;
