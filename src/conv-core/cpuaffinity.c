@@ -627,8 +627,10 @@ void CmiInitCPUAffinityUtil(){
 #endif	
     CpvInitialize(void *, myProcStatFP);
     CpvAccess(myProcStatFP) = (void *)fopen(fname, "r");
+/*
     if(CmiMyPe()==0 && CpvAccess(myProcStatFP) == NULL){
         CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
+*/
     }
 #endif
 }
