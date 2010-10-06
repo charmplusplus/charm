@@ -13,10 +13,13 @@ BUILD_GRAMMARS := $(subst $(SRCDIR),$(BUILDDIR),$(SRC_GRAMMARS:.g=.d))
 all: build grammars
 	$(ANT) dist
 
+# TODO: Maybe we should be using something like gathertree to create the
+# build directory instead of ad-hoc copying.
 build:
 	@echo "\ninit:"
 	@mkdir -p $(BUILDDIR)
 	@cp -p $(SRCDIR)/* $(BUILDDIR)
+	@cp -p $(SRCDIR)/../Main.java $(BUILDDIR)/../
 	@mkdir -p build/classes
 	@mkdir -p build/classes/META-INF
 	@mkdir -p build/lib
