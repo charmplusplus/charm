@@ -287,7 +287,10 @@ int CmiOnCore(void) {
   int n;
   char str[128];
   FILE *fp = (FILE *)CpvAccess(myProcStatFP);
-  if (fp == NULL) return -1;
+  if (fp == NULL){
+    printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+    return -1;
+  }
   fseek(fp, 0, SEEK_SET);
   for (n=0; n<TASK_CPU_POS; n++)  {
     fscanf(fp, "%s", str);
@@ -668,6 +671,7 @@ void CmiInitCPUAffinityUtil(){
 }
 
 int CmiOnCore(){
-	return -1;
+  printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+  return -1;
 }
 #endif
