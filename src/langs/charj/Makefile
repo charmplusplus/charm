@@ -1,38 +1,41 @@
-ANT=ant -lib lib/ant-antlr3.jar
-# Ant does the actual building, just invoke it
-.DEFAULT_GOAL:dist
-dist:
+
+ANT := ant -lib lib/ant-antlr3.jar
+CLASSPATH := lib/antlr-3.2.jar:lib/JSAP-2.1.jar
+SRCDIR := src/charj/translator
+BUILDDIR := build/src/charj/translator
+ANTLR := java -classpath $(CLASSPATH) org.antlr.Tool -o $(BUILDDIR) -lib $(BUILDDIR)
+ANTLRFLAGS := -Xmultithreaded
+
+SRC_GRAMMARS := $(wildcard $(SRCDIR)/*.g)
+BUILD_GRAMMARS := $(subst $(SRCDIR),$(BUILDDIR),$(SRC_GRAMMARS:.g=.d))
+
+.PHONY: all build compile grammars clean doc
+all: build grammars
 	$(ANT) dist
-compile:
+
+build:
+	@echo "\ninit:"
+	@mkdir -p $(BUILDDIR)
+	@cp -p $(SRCDIR)/* $(BUILDDIR)
+	@mkdir -p build/classes
+	@mkdir -p build/classes/META-INF
+	@mkdir -p build/lib
+	@mkdir -p docs
+	@echo "\nantlr:"
+
+compile: $(wildcard $(BUILDDIR)/*.java)
 	$(ANT) compile
+
 clean:
 	$(ANT) clean
+
 doc:
 	$(ANT) doc
-all:
-	$(ANT) all
 
-# The lousy antlrv3 ant task won't give proper output from antlr errors, so
-# use these horrible direct invocations instead
-.PHONY: debug debug-charj debug-semantics debug-emitter
-debug: debug-charj debug-semantics debug-emitter
+grammars: build $(BUILD_GRAMMARS)
 
-CLASSPATH = lib/antlr-3.2.jar:lib/JSAP-2.1.jar
-debug-charj:
-	cp src/charj/translator/Charj.g build/src/charj/translator/Charj.g
-	java -classpath $(CLASSPATH) org.antlr.Tool \
-	    -o build/src/charj/translator -lib build/src/charj/translator \
-	    build/src/charj/translator/Charj.g
-debug-semantics:
-	cp src/charj/translator/CharjSemantics.g build/src/charj/translator/CharjSemantics.g	
-	java -classpath $(CLASSPATH) org.antlr.Tool \
-	    -o build/src/charj/translator -lib build/src/charj/translator \
-	    build/src/charj/translator/CharjSemantics.g
-debug-emitter:
-	cp src/charj/translator/CharjEmitter.g build/src/charj/translator/CharjEmitter.g
-	java -classpath $(CLASSPATH) org.antlr.Tool -o build/src/charj/translator \
-	    -lib build/src/charj/translator build/src/charj/translator/CharjEmitter.g
+$(BUILDDIR)/%.d: $(SRCDIR)/%.g $(SRCDIR)/Charj.g
+	@echo "\n    [antlr] $(<F)"
+	$(ANTLR) $(ANTLRFLAGS) $(BUILDDIR)/$(<F)
+	@touch $@
 
-# For any unrecognized rules, try to compile a test program with that name
-%:
-	./bin/charjc --debug --verbose --AST --stdout --translate-only tests/$@/$@.cj

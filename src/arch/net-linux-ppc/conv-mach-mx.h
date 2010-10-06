@@ -13,3 +13,7 @@
 #undef CMK_MALLOC_USE_OS_BUILTIN
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
+
+#undef CMK_BARRIER_USE_COMMON_CODE
+#define CMK_BARRIER_USE_COMMON_CODE                        0
+

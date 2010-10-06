@@ -215,7 +215,7 @@ void <sym.name>::_initTrace() {
     #endif
 }
 
-<sym.sectionInitializers : { init | sectionInitializer_cc(classSym = sym, initSym = init) }>
+<sym.sectionInitializers : { init | <sectionInitializer_cc(classSym = sym, initSym = init)> }; separator="\n">
 
 <endif>
 >>
@@ -224,9 +224,11 @@ sectionInitializer_cc(classSym, initSym) ::=
 <<
 CProxySection_<initSym.classType> <classSym.name>::<initSym.methodName>(CProxy_<initSym.classType> proxyObject)
 {
+	CkVec\<CkArrayIndex<initSym.dimensions>D\> elems;
 	<initSym.forLoop>
 	return CProxySection_<initSym.classType>::ckNew(proxyObject, elems.getVec(), elems.size());
 }
+
 >>
 
 chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
@@ -308,7 +310,7 @@ void <sym.name>::_initTrace() {
     #endif
 }
 
-<sym.sectionInitializers : { init | sectionInitializer_cc(classSym = sym, initSym = init) }>
+<sym.sectionInitializers : { init | <sectionInitializer_cc(classSym = sym, initSym = init)> }>
 
 <endif>
 >>
@@ -349,7 +351,8 @@ class <ident>: public CBase_<ident> {
     <endif>
     static bool _trace_registered;
     void _initTrace();
-	<sym.sectionInitializers : { private: CProxySection_<it.classType> <it.methodName>(CProxy_<it.classType>); }>
+	<sym.sectionInitializers : 
+	{private: CProxySection_<it.classType> <it.methodName>(CProxy_<it.classType>);}; separator="\n">
     <sym.SDAGLocalTypeDefinitions; separator="\n">
 };
 <endif>

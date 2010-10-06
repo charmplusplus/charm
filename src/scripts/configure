@@ -1738,23 +1738,24 @@ fi
 
 # Check whether --enable-controlpoint was given.
 if test "${enable_controlpoint+set}" = set; then
-  enableval=$enable_controlpoint 
+  enableval=$enable_controlpoint; enable_controlpoint=$enableval
 else
-  enable_controlpoint=no
+  enable_controlpoint=yes
 fi
 
-if test "$enable_controlpoint" = "no"
+
+if test "$enable_controlpoint" = "yes"
 then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 1
+_ACEOF
+
+else
   Echo "Charm control point is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_WITH_CONTROLPOINT 0
-_ACEOF
-
-else
-
-cat >>confdefs.h <<_ACEOF
-#define CMK_WITH_CONTROLPOINT 1
 _ACEOF
 
 fi
@@ -2000,8 +2001,7 @@ _ACEOF
 
 fi
 
-
-#detect OS
+# detect OS
 OSNAME=`uname -s`
 if test $OSNAME = "Linux"
 then

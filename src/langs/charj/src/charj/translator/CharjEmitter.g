@@ -581,8 +581,8 @@ nonProxyType
 proxyType
     :   ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?)
         -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
-	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?) // TODO array sections
-		-> template() "not implemented yet"
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?)
+		-> template(type={$qualifiedTypeIdent.st}) "CProxySection_<type>"
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]

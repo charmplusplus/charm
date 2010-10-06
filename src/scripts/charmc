@@ -500,7 +500,9 @@ do
 		TLSGLOBALS="1"
 		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
 		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
 		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 		;;
 
 	"-verbose")

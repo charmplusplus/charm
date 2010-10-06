@@ -18,6 +18,12 @@ public: static int __idx;
 };
 #define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
 
+#ifdef __GNUC__
+#define UNUSED __attribute__ ((unused))
+#else
+#define UNUSED
+#endif
+
 #include "pup.h"
 #include "cklists.h"
 #include "ckbitvector.h"
@@ -1220,7 +1226,8 @@ static const char *idx2str(const CkArrayIndex &ind) {
   return retBuf;
 }
 
-static const char *idx2str(const ArrayElement *el) {
+static const char *idx2str(const ArrayElement *el) UNUSED;
+static const char *idx2str(const ArrayElement* el) {
   return idx2str(el->thisIndexMax);
 }
 

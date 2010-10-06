@@ -223,12 +223,12 @@ primaryExpression returns [Type type]
         }
     |   THIS {
             $THIS.def = symtab.getEnclosingClass($THIS.scope);
-            $type = $THIS.def.type;
+            $type = new PointerType(symtab, $THIS.def.type);
             $THIS.symbolType = $type;
         }
     |   SUPER {
             $SUPER.def = symtab.getEnclosingClass($SUPER.scope).superClass;
-            $type = $SUPER.def.type;
+            $type = new PointerType(symtab, $SUPER.def.type);
             $SUPER.symbolType = $type;
         }
     |   ^((DOT { parentNode = $DOT; } | ARROW { parentNode = $ARROW; } ) e=expr
@@ -240,6 +240,7 @@ primaryExpression returns [Type type]
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
             if (et instanceof PointerType) et = ((PointerType)et).baseType;
+			if (et instanceof ProxySectionType) et = ((ProxySectionType)et).baseType;
             ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {

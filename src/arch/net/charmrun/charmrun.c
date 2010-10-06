@@ -122,7 +122,24 @@ char *mylogin(void)
   struct passwd *self;
 
   self = getpwuid(getuid());
-  if (self==0) { return "unknown"; }
+  if (self==0) { 
+#if CMK_HAS_POPEN
+    char cmd[16];
+    char uname[64];
+    FILE *p;
+    sprintf(cmd, "id -u -n");
+    p = popen(cmd, "r");
+    if (p){
+        fscanf(p, "%s", uname);
+        pclose(p);
+        return strdup(uname);
+    }
+    else
+        return "unknown"; 
+#else
+    return "unknown"; 
+#endif
+  }
   return self->pw_name;
 #endif
 } 

@@ -76,7 +76,7 @@ AC_ARG_ENABLE([controlpoint],
             [AS_HELP_STRING([--enable-controlpoint],
               [enable control point])],
             [enable_controlpoint=$enableval],
-            [enable_controlpoint=no])
+            [enable_controlpoint=yes])
 
 if test "$enable_controlpoint" = "yes"
 then
