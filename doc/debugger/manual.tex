@@ -76,28 +76,24 @@ application.  It is a mechanism used to detect bugs that happen only
 once in a while depending on the order in which messages are
 processed. The program in consideration is first run in a record mode
 which produces a trace. When the program is run in replay mode it uses
-a previous trace got from a record run to ensure that messages are
+a previous trace gotten from a record run to ensure that messages are
 processed in the same order as the recorded run. The idea is to make
 use of a message-sequence number and a theorem says that the serial
 numbers will be the same if the messages are processed in the same
 order. \cite{rashmithesis}
 
-\begin{description}
-
-\item[{\tt -tracemode} {\em recordreplay}]
-
-To enable the required tracing for record and replay, a \charmpp{} 
-program is linked with the option ``\textit{-tracemode recordreplay}''
-and run with the ``\textit{+record}'' option, which records messages
-in order in a file for each processor.  The same execution order can be 
-replayed using the ``\textit{+replay}'' runtime option; which can be 
-used at the same time as the other debugging tools in \charmpp{}.
+\textit{Record Replay} tracing is automatically enabled for \charmpp{}
+programs and requires nothing special to be done during compilation
+(linking with the option ``\textit{-tracemode recordreplay}'' used to
+be necessary).  At run time, the ``\textit{+record}'' option is used,
+which records messages in order in a file for each processor.  The
+same execution order can be replayed using the ``\textit{+replay}''
+runtime option, which can be used at the same time as the other
+debugging tools in \charmpp{}.
 
 \emph{ Note! } If your \charmpp{} is built with {\tt CMK\_OPTIMIZE} on,
 all tracing will be disabled. So, use an unoptimized \charmpp{} to do your
 debugging.
-
-\end{description}
 
 \section{Running the Debugger}
 
