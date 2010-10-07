@@ -14,7 +14,7 @@ INTF      = reductionBenchmark.ci
 # Specify the exe name and the arguments to run it with
 NP        = 4
 TARGET    = testReduction
-ARGS      = 10 8 128 1 10 1
+ARGS      = 10 8 128 10 1
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc

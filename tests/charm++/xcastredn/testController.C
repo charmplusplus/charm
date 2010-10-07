@@ -67,17 +67,17 @@ TestController::TestController(CkArgMsg *m)
         if (m->argc >= 4)
             cfg.msgSizeMax       = atoi(m->argv[3]);
         if (m->argc >= 5)
-            cfg.useContiguousSection =(atoi(m->argv[4]) == 0)? false: true;
+            cfg.qLength          = atoi(m->argv[4]);
         if (m->argc >= 6)
-            cfg.qLength          = atoi(m->argv[5]);
+            cfg.uSecs            = atoi(m->argv[5]);
         if (m->argc >= 7)
-            cfg.uSecs            = atoi(m->argv[6]);
-        if (m->argc >= 8)
         {
-            cfg.sectionSize      = atoi(m->argv[7]);
+            cfg.sectionSize      = atoi(m->argv[6]);
             if (cfg.arraySize < cfg.sectionSize)
                 cfg.arraySize    = cfg.sectionSize;
         }
+        if (m->argc >= 8)
+            cfg.useContiguousSection =(atoi(m->argv[7]) == 0)? false: true;
         if (m->argc >= 9)
         {
             cfg.arraySize        = atoi(m->argv[8]);
@@ -86,10 +86,10 @@ TestController::TestController(CkArgMsg *m)
         }
     }
     else
-        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) isSectionContiguous qFillLength fillMethodDuration(us) sectionDimX sectionDimY sectionDimZ arrayDimX arrayDimY arrayDimZ",m->argv[0]);
+        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) qFillLength fillMethodDuration(us) sectionDim isSectionContiguous arrayDim",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nInputs are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nTest parameters are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
              CkNumPes(), cfg.arraySize, cfg.sectionSize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
 
     // Initialize the mainchare pointer used by the converse redn handler
