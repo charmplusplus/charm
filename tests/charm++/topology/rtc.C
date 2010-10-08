@@ -1,3 +1,9 @@
+/** \file rtc.C
+ *  Author: Abhinav S Bhatele
+ *  E-mail: bhatele@illinois.edu
+ *  Date Created: October 12th, 2007
+ */
+
 #include <stdio.h>
 #include "topo.decl.h"
 #include "TopoManager.h"
@@ -6,6 +12,9 @@
 #include <bglpersonality.h>
 #elif CMK_BLUEGENEP
 #include <dcmf.h>
+/** /bgsys/drivers/ppcfloor/comm/include/dcmf.h
+ *  /bgsys/drivers/ppcfloor/arch/include/common/bgp_personality.h
+ */
 #endif
 
 /*readonly*/ CProxy_Main mainProxy;
