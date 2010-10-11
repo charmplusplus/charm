@@ -1,7 +1,7 @@
 #ifndef _BLUE_TYPES_H_
 #define _BLUE_TYPES_H_
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define ASSERT(x)	if (!(x)) { CmiPrintf("Assert failure at %s:%d\n", __FILE__,__LINE__); CmiAbort("Abort!"); }
 #else
 #define ASSERT(x)

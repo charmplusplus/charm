@@ -505,7 +505,7 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
       if (_ringexit) {
@@ -1142,7 +1142,7 @@ void _initCharm(int unused_argc, char **argv)
 	// Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
 

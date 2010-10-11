@@ -1151,7 +1151,7 @@ void CkMigratableList::setSize(int s) {
 }
 
 void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (atIdx>=length())
 		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
 #endif
@@ -1356,7 +1356,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	startTiming();
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
@@ -1372,7 +1372,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	   CkDeliverMessageReadonly(epIdx,msg,obj);
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_END_EXECUTE();
@@ -1563,7 +1563,7 @@ public:
 		:CkLocRec_aging(Narr)
 		{
 			onPe=NonPe;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 			if (onPe==CkMyPe())
 				CkAbort("ERROR!  'remote' array element on this Pe!\n");
 #endif
@@ -2120,7 +2120,7 @@ void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 	delete rec;
 }
 void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
@@ -2128,7 +2128,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
         CmiImmediateLock(hashImmLock);
 	hash.remove(*(CkArrayIndexMax *)&idx);
         CmiImmediateUnlock(hashImmLock);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
@@ -2669,7 +2669,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
 	//immediately updated real migration
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
@@ -2822,7 +2822,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 
 //Look up array element in hash table.  Index out-of-bounds if not found.
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 //Assume the element will be found
 	return hash.getRef(*(CkArrayIndexMax *)&idx);
 #else

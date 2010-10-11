@@ -429,7 +429,7 @@ class CkMagicNumber : public CkMagicNumber_impl {
 	inline void check(const char *file,int line,void *obj) const {
 		if (magic!=good) badMagicNumber(good,file,line,obj);
 	}
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #   define CK_MAGICNUMBER_CHECK magic.check(__FILE__,__LINE__,this);
 #else
 #   define CK_MAGICNUMBER_CHECK /*empty, for speed*/
@@ -570,7 +570,7 @@ public:
 //Interface used by CkLocRec_local
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif

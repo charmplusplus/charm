@@ -323,7 +323,7 @@ private:
 	CkArrayID _aid;
 public:
 	CProxy_ArrayBase() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		_aid.setZero();
 #endif
 	}
@@ -333,7 +333,7 @@ public:
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
 	  if (_aid.isZero())
 		CkAbort("Error! This array proxy has not been initialized!");
