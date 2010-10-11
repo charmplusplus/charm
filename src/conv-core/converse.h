@@ -1797,7 +1797,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#if CMK_ERROR_CHECKING
+#if CMK_CHARMDEBUG
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else
