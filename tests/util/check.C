@@ -49,6 +49,17 @@ void check_test(int argc, char** argv) {
     exit(1);
   }
 
+  // Test for changes in CkEnvelopeType
+  // If the test below fails, it means the CkEnvelopeType enum was modified.
+  // BEFORE changing this test, make sure the CHARMDEBUG_MINOR version number is
+  // incremented, and the CharmDebug correspondant enumeration (in
+  // charm.debug.pdata.MsgInfo.java) is updated accordingly.
+  if (LAST_CK_ENVELOPE_TYPE != 19) {
+    CmiPrintf("Error: LAST_CK_ENVELOPE_TYPE changed. Update CharmDebug and fix this test:\n");
+    CmiPrintf("       BEFORE changing this test, make sure the CHARMDEBUG_MINOR version number is incremented, and the CharmDebug correspondant enumeration (in charm.debug.pdata.MsgInfo.java) is updated accordingly.");
+    exit(1);
+  }
+
 #if ! CMK_SMP
   const int s = 1*1024*1024;
   void *buf1 = CmiAlloc(s);
