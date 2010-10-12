@@ -15,7 +15,7 @@
 #include "cklists.h"
 
 #define CHARMDEBUG_MAJOR   10
-#define CHARMDEBUG_MINOR    4
+#define CHARMDEBUG_MINOR    5
 
 void *CpdGetCurrentObject();
 void *CpdGetCurrentMsg();
