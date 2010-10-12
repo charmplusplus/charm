@@ -372,6 +372,8 @@ int n;
   machine_exit(1);
 }
 
+CpvExtern(int, freezeModeFlag);
+
 static void KillOnAllSigs(int sigNo)
 {
   const char *sig="unknown signal";
@@ -382,8 +384,12 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
   if (CpvAccess(cmiArgDebugFlag)) {
+    int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
-    CpdFreeze();
+    CcsSendReplyNoError(4,&reply);/*Send an empty reply if not*/
+    CpvAccess(freezeModeFlag) = 1;
+    CpdFreezeModeScheduler();
+    /*CpdFreeze();*/
   }
   
   CmiDestoryLocks();		/* destory locks */
