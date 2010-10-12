@@ -493,14 +493,22 @@ void *CkLocalChare(const CkChareID *pCid)
 	if (pe<0) { //A virtual chare ID
 		if (pe!=(-(CkMyPe()+1)))
 			return NULL;//VID block not on this PE
+#ifdef CMK_CHARE_USE_PTR
 		VidBlock *v=(VidBlock *)pCid->objPtr;
+#else
+		VidBlock *v=CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
+#endif
 		return v->getLocalChare();
 	}
 	else
 	{ //An ordinary chare ID
 		if (pe!=CkMyPe())
 			return NULL;//Chare not on this PE
+#ifdef CMK_CHARE_USE_PTR
 		return pCid->objPtr;
+#else
+		return CkpvAccess(chare_objs)[(CmiIntPtr)pCid->objPtr];
+#endif
 	}
 }
 
@@ -2449,6 +2457,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
+          CkPrintf("Charm++> Recording full detail for processor %d\n",CkMyPe());
           CpdSetInitializeMemory(1);
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }

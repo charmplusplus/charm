@@ -9,12 +9,12 @@
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
 
+#include "conv-config.h"
 
-#ifdef CP_DISABLE_TRACING
-#include "ControlPointsNoTrace.decl.h"
-#else
+#if CMK_WITH_CONTROLPOINT
+
+
 #include "ControlPoints.decl.h"
-#endif
 
 #include <vector>
 #include <map>
@@ -738,18 +738,10 @@ public:
      
   ~controlPointManager();
 
-
-
-  virtual void pup(PUP::er &p)
-  {
-    CBase_controlPointManager::pup(p);
-    if(p.isUnpacking()){
-      CkAbort("Group controlPointManager is not yet capable of migration.\n");
-    }
-  }
-
-  controlPointManager(CkMigrateMessage* m) {
-    // TODO: Implement this
+  void pup(PUP::er &p);
+  
+ controlPointManager(CkMigrateMessage* m) : CBase_controlPointManager(m) {
+    // CkPrintf("Warning: control point framework likely won't work after checkpoint restart, please fix this problem if you need the functionality.");
   }
 
 
@@ -833,7 +825,7 @@ public:
 
 };
 
-
+#endif
 
 /** @} */
 #endif

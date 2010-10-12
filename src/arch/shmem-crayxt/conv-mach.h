@@ -1,14 +1,11 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
 #define CMK_CRAYXT                                         1
+
+#define XT4_TOPOLOGY                                       0
+
+#define XT5_TOPOLOGY                                       0
 
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1

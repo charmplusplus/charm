@@ -869,34 +869,43 @@ static int CpdCRC32 = 0;
 
 static int checkSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
-  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
-  return sl->slotCRC == crc;
+  if (sl!=NULL) {
+    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+    return sl->slotCRC == crc;
+  } else return 0;
 }
 
 static int checkUserCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  return sl->userCRC == crc32_initial((unsigned char*)userPtr, sl->userSize);
+  if (sl!=NULL) return sl->userCRC == crc32_initial((unsigned char*)userPtr, sl->userSize);
+  else return 0;
 }
 
 static void resetUserCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  sl->userCRC = crc32_initial((unsigned char*)userPtr, sl->userSize);
+  if (sl!=NULL) sl->userCRC = crc32_initial((unsigned char*)userPtr, sl->userSize);
 }
 
 static void resetSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
-  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
-  sl->slotCRC = crc;
+  if (sl!=NULL) {
+    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+    sl->slotCRC = crc;
+  }
 }
 
 static void ResetAllCRC() {
   Slot *cur;
+  unsigned int crc1, crc2;
 
   SLOT_ITERATE_START(cur)
-    resetUserCRC(cur+1);
-    resetSlotCRC(cur+1);
+    crc1 = crc32_initial((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
+    crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
+    crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
+    cur->slotCRC = crc1;
+    cur->userCRC = crc2;
   SLOT_ITERATE_END
 }
 
@@ -932,7 +941,7 @@ static void backupMemory() {
   int totalMemory = SLOTSPACE;
   {
     SLOT_ITERATE_START(cur)
-      totalMemory += SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
+      totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
     SLOT_ITERATE_END
   }
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);

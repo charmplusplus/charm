@@ -60,9 +60,7 @@ public:
       }
       //CmiPrintf("GOT %d %d %d %d\n", start, end, block, stride);
       if (p<=end && p>=start) {
-          //if ((p-start)%stride == 0) ret = 1;
-          int n = (p-start)/stride*stride;
-          if ((p - n) < block) ret = 1;
+          if ((p-start)%stride < block) ret = 1;
           break;
       }
       str = strtok(NULL, ",");

@@ -20,6 +20,9 @@ CkGroupID traceControlPointsGID;
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
+
+  This module is special in that it is always included in charm, but sometimes it does nothing.
+  This is called on all processors in SMP version.
 */
 void _createTracecontrolPoints(char **argv)
 {
@@ -34,6 +37,8 @@ TraceControlPoints::TraceControlPoints(char **argv)
 
   nesting_level = 0;
 
+  whenStoppedTracing = 0;
+
   b1=0;
   b2=0;
   b3=0;
@@ -43,6 +48,23 @@ TraceControlPoints::TraceControlPoints(char **argv)
   // Process runtime arguments intended for the module
   // CmiGetArgIntDesc(argv,"+ControlPointsPar0", &par0, "Fake integer parameter 0");
 }
+
+
+void TraceControlPoints::traceBegin(void){
+  if(whenStoppedTracing != 0)
+    totalUntracedTime += CmiWallTimer() - whenStoppedTracing;
+  whenStoppedTracing = 0;
+  CkPrintf("[%d] TraceControlPoints::traceBegin() totalUntracedTime=%f\n", CkMyPe(), totalUntracedTime);
+}
+
+
+void TraceControlPoints::traceEnd(void){
+  CkPrintf("[%d] TraceControlPoints::traceEnd()\n", CkMyPe());
+  CkAssert(whenStoppedTracing == 0); // can't support nested traceEnds on one processor yet...
+  whenStoppedTracing = CmiWallTimer();
+}
+
+
 
 void TraceControlPoints::userEvent(int eventID) 
 {
@@ -110,6 +132,7 @@ void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe,
 
 void TraceControlPoints::endExecute(void)
 {
+  //  CkPrintf("TraceControlPoints::endExecute\n");
   nesting_level--;
   if(nesting_level == 0){
     
@@ -141,7 +164,7 @@ void TraceControlPoints::endIdle(double curWallTime) {
 
 void TraceControlPoints::beginComputation(void)
 {
-  //  CkPrintf("[%d] Computation Begins\n", CkMyPe());
+  CkPrintf("[%d] TraceControlPoints::beginComputation\n", CkMyPe());
   // Code Below shows what trace-summary would do.
   // initialze arrays because now the number of entries is known.
   // _logPool->initMem();
@@ -149,7 +172,7 @@ void TraceControlPoints::beginComputation(void)
 
 void TraceControlPoints::endComputation(void)
 {
-  //  CkPrintf("[%d] Computation Ends\n", CkMyPe());
+  CkPrintf("[%d] TraceControlPoints::endComputationn", CkMyPe());
 }
 
 void TraceControlPoints::malloc(void *where, int size, void **stack, int stackSize)
@@ -169,7 +192,6 @@ void TraceControlPoints::traceClose(void)
 {
   // Print out some performance counters on BG/P
   CProxy_TraceControlPointsBOC myProxy(traceControlPointsGID);
-  myProxy.ckLocalBranch()->printBGP_UPC_CountersBOC();
 
     
   CkpvAccess(_trace)->endComputation();
@@ -177,13 +199,6 @@ void TraceControlPoints::traceClose(void)
   CkpvAccess(_traces)->removeTrace(this);
 }
 
-void printBGP_UPC_Counters(void);
-
-void TraceControlPointsBOC::printBGP_UPC_CountersBOC(void) {
-#ifdef CMK_BLUEGENEP
-	printBGP_UPC_Counters();
-#endif
-}
 
 
 
@@ -192,6 +207,10 @@ void TraceControlPoints::resetTimings(){
   totalEntryMethodTime = 0.0;
   totalEntryMethodInvocations = 0;
   lastResetTime = CmiWallTimer();
+  totalUntracedTime = 0;
+  if(whenStoppedTracing !=0){
+    whenStoppedTracing = CmiWallTimer();
+  }
 }
 
 void TraceControlPoints::resetAll(){
@@ -204,7 +223,14 @@ void TraceControlPoints::resetAll(){
   b2=0;
   b3=0;
   lastResetTime = CmiWallTimer();
+  totalUntracedTime = 0;
+  if(whenStoppedTracing !=0){
+    whenStoppedTracing = CmiWallTimer();
+  }
 }
+
+
+
 
 
 
@@ -223,6 +249,7 @@ extern "C" void traceControlPointsExitFunction() {
 
 // Initialization of the parallel trace module.
 void initTraceControlPointsBOC() {
+/*
 #ifdef __BLUEGENE__
   if (BgNodeRank()==0) {
 #else
@@ -230,7 +257,10 @@ void initTraceControlPointsBOC() {
 #endif
       registerExitFn(traceControlPointsExitFunction);
     }
+*/
 }
+
+
 
 #include "TraceControlPoints.def.h"
 

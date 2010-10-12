@@ -191,7 +191,7 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBPredictorDelay", &_lb_predict_delay, "Number of balance steps before learning a model");
   CmiGetArgIntDesc(argv, "+LBPredictorWindow", &_lb_predict_window, "Number of steps to use to learn a model");
   if (_lb_predict_window < _lb_predict_delay) {
-    CmiPrintf("LB> Argument LBPredictorWindow less than LBPredictorDelay, fixing\n");
+    CmiPrintf("LB> [%d] Argument LBPredictorWindow (%d) less than LBPredictorDelay (%d) , fixing\n", CkMyPe(), _lb_predict_window, _lb_predict_delay);
     _lb_predict_delay = _lb_predict_window;
   }
 

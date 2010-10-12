@@ -66,6 +66,8 @@ CDECL int pup_isUserlevel(const pup_er p)
   { return (mp.isUserlevel())?1:0;}
 CDECL int pup_isRestarting(const pup_er p)
   { return (mp.isRestarting())?1:0;}
+CDECL char* pup_typeString(const pup_er p)
+  { return (char *)mp.typeString(); }
 
 FDECL int FTN_NAME(FPUP_ISPACKING,fpup_ispacking)(const pup_er p)
   { return (mp.isPacking())?1:0;}

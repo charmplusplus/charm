@@ -11,7 +11,7 @@ import org.antlr.stringtemplate.language.AngleBracketTemplateLexer;
  *  reference of the AST to the emitter. 
  */
 public class VariableInitializer {
-    private CharjAST init;
+    public CharjAST init;
     private CharjAST ident;
 
     public VariableInitializer(CharjAST init_, CharjAST ident_) {

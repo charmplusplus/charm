@@ -5,6 +5,7 @@ HEADERS=$(CDIR)/include/tcharm_impl.h $(CDIR)/include/tcharm.h \
         $(CDIR)/include/tcharm.decl.h
 OBJS=tcharm.o
 COMPAT=compat_uns.o compat_us.o compat_funs.o compat_fus.o compat_regmm.o
+CHARMXI=$(CDIR)/tmp/charmxi
 
 LIB=libmoduletcharm
 DEST=$(LIBDIR)/$(LIB).a
@@ -35,12 +36,6 @@ $(COMPATLIB): $(COMPAT)
 
 headers: $(HEADERS)
 
-tcharm.decl.h tcharm.def.h: tcharm.ci
-	$(CHARMC) tcharm.ci
-
-tcharmmain.decl.h tcharmmain.def.h: tcharmmain.ci
-	$(CHARMC) tcharmmain.ci
-
 clean: 
 	-rm -fr *.o *~ *.decl.h *.def.h gmon.out headers conv-host charmrun
 
@@ -64,5 +59,10 @@ depends:  $(CIFILES)
               echo "checking dependencies for $$i : $$SRCFILE" ; \
               g++ -MM -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
-        done;
+        done; \
+	for cifile in $(wildcard *.ci); do \
+              echo "checking generated modules for $$cifile" ; \
+              $(CHARMXI) -intrinsic -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
+        done
+
 

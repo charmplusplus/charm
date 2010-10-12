@@ -347,6 +347,10 @@ private:
   int nloadbalancers;
 
 public:
+  BaseLB** getLoadBalancers() {return loadbalancers.getVec();}
+  int getNLoadBalancers() {return nloadbalancers;}
+
+public:
   static int manualOn;
 
 public:

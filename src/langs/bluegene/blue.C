@@ -510,7 +510,7 @@ char * getFullBuffer()
 extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (lnodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
 #endif
   nodeInfo &nInfo = cva(nodeinfo)[lnodeID];
@@ -526,7 +526,7 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
  */
 void addBgThreadMessage(char *msgPtr, int threadID)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (!cva(bgMach).isWorkThread(threadID)) CmiAbort("ThreadID is out of range!");
 #endif
   workThreadInfo *tInfo = (workThreadInfo *)tMYNODE->threadinfo[threadID];
@@ -569,7 +569,7 @@ void msgHandlerFunc(char *msg)
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int gnodeID = CmiBgMsgNodeID(msg);
   if (gnodeID >= 0) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (nodeInfo::Global2PE(gnodeID) != CmiMyPe())
       CmiAbort("msgHandlerFunc received wrong message!");
 #endif
@@ -952,7 +952,7 @@ void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, i
 {
   if (cva(bgMach).inReplayMode()) return;     // replay mode, no outgoing msg
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (x<0 || y<0 || z<0 || x>=cva(bgMach).x || y>=cva(bgMach).y || z>=cva(bgMach).z) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
@@ -1143,7 +1143,7 @@ int BgNodeSize()
 /* return the bg node ID (local array index) */
 int BgMyRank()
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (tMYNODE == NULL) CmiAbort("Calling BgMyRank in the main thread!");
 #endif
   ASSERT(!cva(simState).inEmulatorInit);
@@ -1153,7 +1153,7 @@ int BgMyRank()
 /* return my serialed blue gene node number */
 int BgMyNode()
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (tMYNODE == NULL) CmiAbort("Calling BgMyNode in the main thread!");
 #endif
   return nodeInfo::XYZ2Global(tMYX, tMYY, tMYZ);

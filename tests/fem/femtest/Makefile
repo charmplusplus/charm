@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS) 
 
-all: pgm fpgm
+all: pgm 
 
 pgm: pgm.o
 	$(CHARMC) -o pgm pgm.o -language fem

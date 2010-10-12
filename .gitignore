@@ -6,6 +6,7 @@
 # Ignore files generated from ci file parsing
 *.decl.h
 *.def.h
+*.ci.stamp
 
 # Ignore build artifacts created in the top-level directory
 smart-build.log

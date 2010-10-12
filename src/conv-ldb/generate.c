@@ -426,9 +426,15 @@ static void copyOut(VerticesListType *vertices, int *npe, int *pes)
  adj = vertices->adjArray;
  vertexRecs = vertices->vertexArray;
 
+#if CMK_NODE_QUEUE_AVAILABLE
+ *npe = vertexRecs[CmiMyNode()].degree;
+ for (i=0; i<vertexRecs[CmiMyNode()].degree; i++)
+       pes[i] = adj[ vertexRecs[CmiMyNode()].adjListInd + i ];
+#else
  *npe = vertexRecs[CmiMyPe()].degree;
  for (i=0; i<vertexRecs[CmiMyPe()].degree; i++)
        pes[i] = adj[ vertexRecs[CmiMyPe()].adjListInd + i ];
+#endif
 }
 
 static void printOut(VerticesListType *vertices)

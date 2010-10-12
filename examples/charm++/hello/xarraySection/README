@@ -1,0 +1,7 @@
+Demo for delegated cross-array sections.
+
+Test creates one or more chare arrays and creates a cross-array section that
+includes chares from each of these chare arrays. Section members are pinged
+via a multicast and then participate in a hello world.
+
+Multicasts to the section are delegated to the CkMulticast library.

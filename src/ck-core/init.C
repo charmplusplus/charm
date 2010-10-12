@@ -160,6 +160,7 @@ CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
+
 /*
 	FAULT_EVAC
 */
@@ -310,6 +311,39 @@ static inline void _parseCommandLineOpts(char **argv)
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
 	  _isAnytimeMigration = CmiFalse;
 	}
+
+
+#if ! CMK_WITH_CONTROLPOINT
+	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
+	if( CmiGetArgFlag(argv,"+CPSamplePeriod") || 
+	    CmiGetArgFlag(argv,"+CPSamplePeriodMs") || 
+	    CmiGetArgFlag(argv,"+CPSchemeRandom") || 
+	    CmiGetArgFlag(argv,"+CPExhaustiveSearch") || 
+	    CmiGetArgFlag(argv,"+CPAlwaysUseDefaults") || 
+	    CmiGetArgFlag(argv,"+CPSimulAnneal") || 
+	    CmiGetArgFlag(argv,"+CPCriticalPathPrio") || 
+	    CmiGetArgFlag(argv,"+CPBestKnown") || 
+	    CmiGetArgFlag(argv,"+CPSteering") || 
+	    CmiGetArgFlag(argv,"+CPMemoryAware") || 
+	    CmiGetArgFlag(argv,"+CPSimplex") || 
+	    CmiGetArgFlag(argv,"+CPDivideConquer") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriod") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodLinear") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodQuadratic") || 
+	    CmiGetArgFlag(argv,"+CPLDBPeriodOptimal") || 
+	    CmiGetArgFlag(argv,"+CPDefaultValues") || 
+	    CmiGetArgFlag(argv,"+CPGatherAll") || 
+	    CmiGetArgFlag(argv,"+CPGatherMemoryUsage") || 
+	    CmiGetArgFlag(argv,"+CPGatherUtilization") || 
+	    CmiGetArgFlag(argv,"+CPSaveData") || 
+	    CmiGetArgFlag(argv,"+CPNoFilterData") || 
+	    CmiGetArgFlag(argv,"+CPLoadData") || 
+	    CmiGetArgFlag(argv,"+CPDataFilename")    )
+	  {	    
+	    CkAbort("You specified a control point command line argument, but compiled charm++ without control point support.\n");
+	  }
+#endif
+       
 }
 
 static void _bufferHandler(void *msg)
@@ -421,6 +455,14 @@ static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
   switch(env->getMsgtype()) {
+    case StartExitMsg:
+      CkAssert(CkMyPe()==0);
+      if (!_CkExitFnVec.isEmpty()) {
+        CkExitFn fn = _CkExitFnVec.deq();
+        fn();
+        break;
+      }
+      // else goto next
     case ExitMsg:
       CkAssert(CkMyPe()==0);
       if(_exitStarted) {
@@ -463,7 +505,7 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
       if (_ringexit) {
@@ -724,12 +766,14 @@ static void _initHandler(void *msg, CkCoreState *ck)
   }
 }
 
-// CkExit: start the termination process, but
-//   then drop into the scheduler so the user's
-//   method never returns (which would be confusing).
+#if 0
+/*****************************************
+ *          no longer needed
+ * ***************************************/
 extern "C"
 void _CkExit(void) 
 {
+  CmiAssert(CkMyPe() == 0);
   // Shuts down Converse handlers for the upper layers on this processor
   //
   CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
@@ -756,24 +800,29 @@ void _CkExit(void)
   CsdScheduler(-1);
 #endif
 }
+#endif
 
 CkQ<CkExitFn> _CkExitFnVec;
 
-// wrapper of CkExit
-// traverse _CkExitFnVec to call registered user exit functions
-// CkExitFn will call CkExit() when finished to make sure other
-// registered functions get called.
+// triger exit on PE 0,
+// which traverses _CkExitFnVec to call every registered user exit functions.
+// Every user exit functions should end with CkExit() to continue the chain
 extern "C"
 void CkExit(void)
 {
 	/*FAULT_EVAC*/
-	DEBUGF(("[%d] CkExit called \n",CkMyPe()));
-  if (!_CkExitFnVec.isEmpty()) {
-    CkExitFn fn = _CkExitFnVec.deq();
-    fn();
-  }
-  else
-    _CkExit();
+  DEBUGF(("[%d] CkExit called \n",CkMyPe()));
+    // always send to PE 0
+  envelope *env = _allocEnv(StartExitMsg);
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+
+#if ! CMK_BLUEGENE_THREAD
+  _TRACE_END_EXECUTE();
+  //Wait for stats, which will call ConverseExit when finished:
+  CsdScheduler(-1);
+#endif
 }
 
 /* This is a routine called in case the application is closing due to a signal.
@@ -798,6 +847,10 @@ static void _nullFn(void *, void *)
 
 extern void _registerLBDatabase(void);
 extern void _registerPathHistory(void);
+#if CMK_WITH_CONTROLPOINT
+extern void _registerControlPoints(void);
+#endif
+extern void _registerTraceControlPoints();
 extern void _registerExternalModules(char **argv);
 extern void _ckModuleInit(void);
 extern void _loadbalancerInit();
@@ -809,6 +862,8 @@ extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
+
+//extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 {
@@ -959,7 +1014,12 @@ void _initCharm(int unused_argc, char **argv)
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
+
+#ifdef __BLUEGENE__
+	if(BgNodeRank()==0) 
+#endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
+
 	_triggerHandlerIdx = CkRegisterHandler((CmiHandler)_triggerHandler);
 	_ckModuleInit();
 
@@ -1030,8 +1090,27 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_MEM_CHECKPOINT
 		_registerCkMemCheckpoint();
 #endif
-		
+
+
+		/*
+		  Setup Control Point Automatic Tuning Framework.
+
+		  By default it is enabled as a part of charm, 
+		  however it won't enable its tracing module 
+		  unless a +CPEnableMeasurements command line argument
+		  is specified. See trace-common.C for more info
+
+		  Thus there should be no noticable overhead to 
+		  always having the control point framework linked
+		  in.
+		  
+		*/
+#if CMK_WITH_CONTROLPOINT
 		_registerPathHistory();
+		_registerControlPoints();
+		_registerTraceControlPoints();
+#endif
+
 
 		/**
 		  CkRegisterMainModule is generated by the (unique)
@@ -1060,10 +1139,10 @@ void _initCharm(int unused_argc, char **argv)
 	}
 	CmiNodeAllBarrier();
 
-    // Execute the initcalls registered in modules
+	// Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
 
@@ -1139,7 +1218,7 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
-
+    //CldCallback();
 #if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
       // Register the BG handler for CCS. Notice that this is put into a variable shared by
       // the whole real processor. This because converse needs to find it. We check that all

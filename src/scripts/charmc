@@ -496,6 +496,15 @@ do
 		OPTS_LD="$OPTS_LD $OPTS_PIC"
 		;;
 
+	"-tlsglobal"|"-tlsglobals")
+		TLSGLOBALS="1"
+		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
+		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
+		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
+		;;
+
 	"-verbose")
 		echo "Verbose mode set"
 		VERBOSE=true
@@ -1170,7 +1179,7 @@ do
                 test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
                 if [ -n "$PREPROCESS" ]
                 then
-		  Do $CMK_CPP_CHARM $FILE | Do $CHARMBIN/charmxi $XIOPTS
+		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS
                 else
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi

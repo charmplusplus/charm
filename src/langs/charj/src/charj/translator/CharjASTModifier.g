@@ -98,10 +98,13 @@ classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
+		-> {$m.tree==null}?	^(FUNCTION_METHOD_DECL ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"]) LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
+								genericTypeParameterList type IDENT formalParameterList domainExpression? block?)
         -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
             genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList domainExpression? block?)
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
         -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
         -> ^(PRIMITIVE_VAR_DECLARATION 
@@ -116,9 +119,16 @@ classScopeDeclaration
             objectType variableDeclaratorList)
     |   ^(cd=CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             ^(BLOCK (blockStatement*)))
-        -> {$m.isEntry}? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
-            genericTypeParameterList? IDENT formalParameterList 
-            ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
+		-> { $m.tree == null }?	^(CONSTRUCTOR_DECL ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"])
+																LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
+								genericTypeParameterList? IDENT formalParameterList 
+			   		         ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
+        -> { $m.isEntry }? ^(ENTRY_CONSTRUCTOR_DECL modifierList? 
+					            genericTypeParameterList? IDENT formalParameterList 
+				   		         ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
+
         -> ^(CONSTRUCTOR_DECL modifierList? genericTypeParameterList? IDENT formalParameterList 
             ^(BLOCK ^(EXPR ^(METHOD_CALL CHELPER ARGUMENT_LIST)) blockStatement*))
     ;
@@ -160,7 +170,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
@@ -182,7 +192,8 @@ bound
 
 modifierList returns [boolean isEntry]
     :   ^(MODIFIER_LIST (localModifier | (am+=accessModifier) | charjModifier {if ($charjModifier.isEntry) {$isEntry = true;}} | otherModifier)*)
-        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> {$am == null && $isEntry}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PUBLIC["public"]) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
+        -> {$am == null}? ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"]) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*))
         -> ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST accessModifier*) ^(LOCAL_MODIFIER_LIST localModifier*) ^(CHARJ_MODIFIER_LIST charjModifier*) ^(OTHER_MODIFIER_LIST otherModifier*)) 
     ;
 
@@ -200,6 +211,7 @@ accessModifier
 
 charjModifier returns [boolean isEntry] 
     :   ENTRY { $isEntry = true; }
+    |   SDAGENTRY { $isEntry = true; }
     |   TRACED
     ;
 
@@ -238,12 +250,7 @@ objectType
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
-        {
-            // TODO: This breaks all pointer types inside chares not used for sending
-            // them in entry methods, converting them to object types, which breaks
-            // Arrays inside chares.
-            //astmod.dealWithEntryMethodParam($POINTER_TYPE, $POINTER_TYPE.tree);
-        }
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 qualifiedTypeIdent
@@ -265,10 +272,6 @@ primitiveType
     |   DOUBLE
     ;
 
-genericTypeArgumentList
-    :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
-    ;
-    
 genericTypeArgument
     :   type
     |   '?'
@@ -309,7 +312,31 @@ localVariableDeclaration
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
+    ;
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
     ;
 
 nonBlockStatement
@@ -416,18 +443,14 @@ primaryExpression
                 |   SUPER
                 )
         )
-        ->   ^(ARROW primaryExpression
-                   IDENT?
-                   THIS?
-                   SUPER?
-             )
     |   parenthesizedExpression
     |   IDENT
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) genericTypeArgumentList? arguments)
-        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) genericTypeArgumentList? arguments)
+    |   ^(METHOD_CALL primaryExpression templateInstantiation? arguments)
+    |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) templateInstantiation? arguments)
+        ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) templateInstantiation? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
     |   THIS
@@ -438,12 +461,14 @@ primaryExpression
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+	|	THISINDEX
+	|	THISPROXY
     |   domainExpression
     ;
     
 explicitConstructorCall
-    :   ^(THIS_CONSTRUCTOR_CALL genericTypeArgumentList? arguments)
-    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? genericTypeArgumentList? arguments)
+    :   ^(THIS_CONSTRUCTOR_CALL templateInstantiation? arguments)
+    |   ^(SUPER_CONSTRUCTOR_CALL primaryExpression? templateInstantiation? arguments)
     ;
 
 arrayTypeDeclarator

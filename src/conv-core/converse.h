@@ -712,6 +712,7 @@ int CmiMemoryIs(int flag); /* return state of this flag */
 #define CMI_THREAD_IS_FIBERS     (1<<5)
 #define CMI_THREAD_IS_ALIAS      (1<<6)
 #define CMI_THREAD_IS_STACKCOPY  (1<<7)
+#define CMI_THREAD_IS_TLS        (1<<8)
 int CmiThreadIs(int flag); /* return state of this flag */
 
 void CmiMkdir(const char *dirName);
@@ -1796,7 +1797,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#if CMK_ERROR_CHECKING
+#if CMK_CHARMDEBUG
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else

@@ -12,4 +12,8 @@ public class PointerType extends Symbol implements Type {
     public String getTypeName() {
         return baseType.getTypeName();
     }
+
+    public String getTranslatedTypeName() {
+        return baseType.getTypeName() + "*";
+    }
 }

@@ -29,5 +29,6 @@ module EveryLB {
    extern module HybridLB;
    extern module HbmLB;
    extern module BlockLB;
+   extern module GraphPartLB;
    initnode void initEveryLB(void);
 };

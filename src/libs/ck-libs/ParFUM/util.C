@@ -925,7 +925,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   //a ghost elem should be coming from only one chunk
   int remChk = mmod->fmMesh->elem[0].ghost->ghostRecv.getRec(FEM_From_ghost_index(localIdx))->getChk(0);
-#ifndef CPSD_2
+#ifndef CPSD
   for(int i=0; i<nodesPerEl; i++) {
     if(FEM_Is_ghost_index(adjnodes[i])) { 
       //this will be a new node on this chunk, lock it on all shared chunks
@@ -965,7 +965,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   copyElemData(0,localIdx,newEl); //special copy across chunk
   FEM_purge_element(mmod->fmMesh,localIdx,elemtype);
-#ifndef CPSD_2
+#ifndef CPSD
   for(int i=0; i<nodesPerEl; i++) {
     if(adjnodes[i]!=oldnodes[i]) {
       //correct the lock

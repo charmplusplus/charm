@@ -50,7 +50,7 @@ class GroupIdxArray {
   //This non-inline version of "find", below, allows the (much simpler)
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); dtype *nul=NULL; return *nul;}
       else 
 #endif

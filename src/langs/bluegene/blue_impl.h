@@ -268,7 +268,7 @@ public:
    if(num < middleCnt){
       //in the first part of emulating processors
       int ret = num/(avgNs+1);
-   #if !CMK_OPTIMIZE
+   #if CMK_ERROR_CHECKING
       if(ret<0){
           CmiAbort("Global2PE: unknown pe!");
           return -1;
@@ -278,7 +278,7 @@ public:
    }else{
       //in the second part of emulating processors
       int ret = (num-middleCnt)/avgNs+remains;
-   #if !CMK_OPTIMIZE
+   #if CMK_ERROR_CHECKING
       if(ret>=CmiNumPes()){
           CmiAbort("Global2PE: unknown pe!");
           return -1;

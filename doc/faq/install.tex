@@ -310,3 +310,18 @@ the arguments for the installed libraries are listed in the library manuals.
 %<p>There are various interesting experiements one can run with speedshop.
 %See speedshop(1) for more details.
 %<br>&nbsp;</ol>
+
+\subsubsection{What should I do if my program hangs while gathering
+  CPU topology information at startup?}
+
+This is an indication that your cluster's DNS server is not responding
+properly. Ideally, the DNS resolver configured to serve your cluster
+nodes should be able to rapidly map their hostnames to their IP
+addresses. As an immediate workaround, you can run your program with
+the {\tt +skip\_cpu\_topology} flag, at the possible cost of reduced
+performance. Another workaround is installing and running {\tt nscd},
+the ``name service caching daemon'', on your cluster nodes; this may
+add some noise on your systems and hence reduce performance. A third
+workaround is adding the addresses and names of all cluster nodes in
+each node's {\tt /etc/hosts} file; this poses maintainability problems
+for ongoing system administration.

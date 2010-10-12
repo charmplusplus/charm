@@ -90,6 +90,9 @@
 /* whether gethostname() exists */
 #undef CMK_HAS_GETHOSTNAME
 
+/* whether getifaddrs() exists */
+#undef CMK_HAS_GETIFADDRS
+
 /* whether getpagesize exists */
 #undef CMK_HAS_GETPAGESIZE
 
@@ -146,6 +149,9 @@
 
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
+
+/* whether getrusage accepts RUSAGE_THREAD */
+#undef CMK_HAS_RUSAGE_THREAD
 
 /* whether has sbrk */
 #undef CMK_HAS_SBRK
@@ -207,6 +213,9 @@
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
 
+/* OS is Linux */
+#undef CMK_OS_IS_LINUX
+
 /* whether is power7 */
 #undef CMK_POWER7
 
@@ -237,10 +246,16 @@
 /* including STL <foo> does not works */
 #undef CMK_STL_USE_DOT_H
 
+/* Allows switching TLS in 32-bit. */
+#undef CMK_TLS_SWITCHING32
+
+/* Allows switching TLS 64-bit. */
+#undef CMK_TLS_SWITCHING64
+
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
 
-/* disable tracing */
+/* enable tracing */
 #undef CMK_TRACE_ENABLED
 
 /* whether glibc backtrace works */
@@ -257,6 +272,9 @@
 
 /* whether the std:: names for STL work */
 #undef CMK_USE_STL
+
+/* disable controlpoint */
+#undef CMK_WITH_CONTROLPOINT
 
 /* whether __int64 works */
 #undef CMK___int64_DEFINED

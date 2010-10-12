@@ -35,11 +35,11 @@ void save_index(char* to, char* chunkfile, int t, int num_chunks){
 }
 
 
-int main(char **argv, int argc){  
+int main(int argc, char **argv)
+{
   char infile[1024];
   char outfile[1024];
   char tfile[1024];
-  int numchunks=1000;
  
   DIR *pdir, *pdir2;
   struct dirent *pent, *pent2;
@@ -47,12 +47,9 @@ int main(char **argv, int argc){
   int chunk_num;
   int total_chunks=0;
 
-  int timestep;
-  
-  if(pdir=opendir("NetFEM")){
+  if (pdir=opendir("NetFEM")) {
 	printf("Successfully opened directory NetFEM\n");
-  }
-  else{
+  } else{
 	printf("ERROR: couldn't open directory NetFEM\n");
 	printf("Run from directory containing the NetFEM directory\n");
 	exit(-1);
@@ -65,16 +62,18 @@ int main(char **argv, int argc){
   sprintf(dirName,"ParaViewData/timesteps");
   mkdir(dirName,0777);
 
-  // process data for each timestep
-  while ((pent=readdir(pdir))){
+  int low=0, high=INT_MAX, stride=1;
+  if (argc > 1) low = (int)strtol(argv[1], NULL, 10);
+  if (argc > 2) high = (int)strtol(argv[2], NULL, 10);
+  if (argc > 3) stride = (int)strtol(argv[3], NULL, 10);
+  printf("Processing timesteps [%d:%d:%d]\n", low, high, stride);
 
-	char temp[1024];
-	if(strcmp(pent->d_name,".") && strcmp(pent->d_name,"..")) {
-	  assert(sscanf(pent->d_name, "%d%s", &timestep, &temp)==1);
+  // process data for each timestep
+  for (int timestep = low; timestep<=high; timestep += stride) {
 	  
 	  // open directory containing .dat files
-	  sprintf(dirName,"NetFEM/%s", pent->d_name);
-	  assert(pdir2=opendir(dirName));
+	  sprintf(dirName,"NetFEM/%d", timestep);
+          if (!(pdir2 = opendir(dirName))) break;
 	  
 	  // create output directory
 	  sprintf(dirName,"ParaViewData/%d", timestep);
@@ -82,9 +81,9 @@ int main(char **argv, int argc){
 
 	  // convert each file for this timestep
 	  total_chunks=0;
-	  while ((pent2=readdir(pdir2)))
+	  while ((pent2=readdir(pdir2))) {
 		if(strcmp(pent2->d_name,".") && strcmp(pent2->d_name,"..")) {
-		  sprintf(infile, "NetFEM/%s/%s", pent->d_name, pent2->d_name);
+		  sprintf(infile, "NetFEM/%d/%s", timestep, pent2->d_name);
 		  assert(sscanf(pent2->d_name, "%d.dat", &chunk_num)==1);
 		  sprintf(outfile, "ParaViewData/%d/%d.vtu", timestep, chunk_num);
 		  printf("Converting file %s\n",infile);
@@ -92,19 +91,17 @@ int main(char **argv, int argc){
 		  convert(infile,outfile);
 		  total_chunks++;
 		}
+          }
 	  	  
 	  // Create the index file which references 
 	  // all the chunks from this timestep
-	  sprintf(tfile, "ParaViewData/timesteps/%010d.pvtu", timestep);   // save index to here
+	  sprintf(tfile, "ParaViewData/timesteps/step_%010d.pvtu", timestep);   // save index to here
 	  sprintf(infile, "NetFEM/%d/0.dat", timestep); // the chunk file from which attributes will be extracted
 	  save_index(tfile, infile, timestep, total_chunks);
-	
 	  closedir(pdir2);
-	}
   }
   
   closedir(pdir);
-  
   printf("done\n");
   return 0;
 }

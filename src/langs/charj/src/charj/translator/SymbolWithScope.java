@@ -2,10 +2,13 @@
 package charj.translator;
 
 import java.util.Map;
+import java.util.List;
 
 public abstract class SymbolWithScope 
     extends Symbol 
     implements Scope {
+
+    public boolean hasSDAG = false;
 
     public SymbolWithScope(SymbolTable symtab) {
         super(symtab);
@@ -37,7 +40,7 @@ public abstract class SymbolWithScope
     /** Scopes other than package and class don't know how to resolve types
      *  (e.g., MethodSymbol).  Look to enclosing scope.
      */
-    public Type resolveType(String type) {
+    public Type resolveType(List<TypeName> type) {
         if ( getEnclosingScope()!=null ) {
             return getEnclosingScope().resolveType(type);
         }

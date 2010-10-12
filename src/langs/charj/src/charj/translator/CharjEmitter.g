@@ -134,15 +134,14 @@ importDeclaration
 typeDeclaration
 @init {
     boolean needsMigration = false;
-    List<String> initializers = new ArrayList<String>();
+    List<String> inits = new ArrayList<String>();
+    List<String> pupInits = new ArrayList<String>();
 }
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
 
-            for (VariableInitializer init : currentClass.initializers) {
-                initializers.add(init.emit());
-            }
+            inits = currentClass.generateInits(currentClass.initializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -150,22 +149,19 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
-                inits={initializers})
+                inits={inits})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds},
-                hasDefaultCtor={currentClass.hasDefaultConstructor})
+                csds={$csds})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
             tident={$i0},
             ident={$i1.text},
             ext={$su.st},
-            csds={$csds},
-            hasDefaultCtor={currentClass.hasDefaultConstructor})
+            csds={$csds})
         -> 
     |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
         -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
@@ -174,11 +170,10 @@ typeDeclaration
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
         {
             currentClass = (ClassSymbol)$IDENT.def;
-            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationConstructor;
+            needsMigration = currentClass.isChareArray && !currentClass.hasMigrationCtor;
 
-            for (VariableInitializer init : currentClass.initializers) {
-                initializers.add(init.emit());
-            }
+            inits = currentClass.generateInits(currentClass.initializers);
+            pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? chareDeclaration_cc(
@@ -186,11 +181,10 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                pupInits={currentClass.generateInits()},
+                pupInits={pupInits},
                 pupers={currentClass.generatePUPers()},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
                 needsMigration={needsMigration},
-                inits={initializers})
+                inits={inits})
         -> {emitCI()}? chareDeclaration_ci(
                 basename={basename()},
                 sym={currentClass},
@@ -204,8 +198,7 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
-                needsPupInit={currentClass.generateInits() != null},
-                hasDefaultCtor={currentClass.hasDefaultConstructor},
+                needsPupInit={pupInits.size() > 0},
                 needsMigration={needsMigration})
         ->
     ;
@@ -232,12 +225,12 @@ classScopeDeclaration
 {
     boolean entry = false;
     boolean migrationCtor = false;
+    boolean sdagMethod = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList
-            b=block?) {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
+            { currentMethod = (MethodSymbol)$IDENT.def; }
+            b=block?)
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
@@ -258,9 +251,11 @@ classScopeDeclaration
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
-            b=block?) {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+                sdagMethod = currentMethod.hasSDAG;
+            }
+            b=block?) 
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
@@ -287,6 +282,26 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
+    |   ^(SDAG_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
+            ty=type IDENT f=formalParameterList a=domainExpression[null]? 
+            {
+            currentMethod = (MethodSymbol)$IDENT.def;
+            sdagMethod = currentMethod.hasSDAG;
+            }
+            ^(BLOCK (sdg+=sdagBasicBlock)*))
+            //sdgb=nakedSdagBlock?) 
+        -> {emitCI()}? funcMethodDecl_sdag_ci(
+                classSym={currentClass},
+                methodSym={currentMethod},
+                modl={$m.st}, 
+                gtpl={$g.st}, 
+                ty={$ty.st},
+                id={$IDENT.text}, 
+                fpl={$f.st}, 
+                adl={$a.st},
+                block={$sdg})
+        ->
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[null])
         -> {emitH()}? class_var_decl(
             modl={$modifierList.st},
@@ -299,10 +314,11 @@ classScopeDeclaration
             type={$objectType.st},
             declList={$variableDeclaratorList.st})
         ->
-    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        {
-            currentMethod = (MethodSymbol)$IDENT.def;
-        }
+    |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+            }
+            b=block)
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -317,11 +333,12 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList b=block)
-        {
-            currentMethod = (MethodSymbol)$IDENT.def;
-            migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
-        }
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList
+            {
+                currentMethod = (MethodSymbol)$IDENT.def;
+                migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
+            }
+            b=block)
         -> {emitCC()}? ctorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
@@ -354,6 +371,8 @@ interfaceScopeDeclaration
 
 variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_list_sdag_ci(var_decls={$var_decls})
         -> var_decl_list(var_decls={$var_decls})
     ;
 
@@ -361,6 +380,8 @@ variableDeclarator[StringTemplate obtype]
     :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer[obtype]?)
         -> {emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
         -> {emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_sdag_ci(id={currentClass.getSDAGLocalName($id.st.toString())}, initializer={$initializer.st})
         -> {emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
         ->
     ; 
@@ -395,13 +416,26 @@ rangeList returns [int len]
     :   (r+=rangeExpression)*
         { $len = $r.size(); }
         -> template(t={$r}) "<t; separator=\", \">"
-        
     ;
 
 domainExpression[List<StringTemplate> otherParams]
     :   ^(DOMAIN_EXPRESSION rl=rangeList)
         -> range_constructor(range={$rl.st}, others={$otherParams}, len={$rl.len})
+    ;
 
+domainExpressionAccess
+    :   ^(DOMAIN_EXPRESSION rl=rangeListAccess)
+        -> template(t={$rangeListAccess.st}) "<t>"
+    ;
+
+rangeListAccess
+    :   (r+=rangeExpressionAccess)*
+        -> template(t={$r}) "<t; separator=\", \">"
+    ;
+
+rangeExpressionAccess
+    :   ^(RANGE_EXPRESSION (ri+=rangeItem)*)
+        -> template(t={$ri}) "<t; separator=\",\">"
     ;
 
 arrayInitializer
@@ -501,6 +535,7 @@ accessModifier
 
 charjModifier
     :   ENTRY -> {%{$ENTRY.text}}
+    |   SDAGENTRY -> template() "entry"
     |   TRACED
     ;
 
@@ -546,6 +581,8 @@ nonProxyType
 proxyType
     :   ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?)
         -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?)
+		-> template(type={$qualifiedTypeIdent.st}) "CProxySection_<type>"
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -623,6 +660,8 @@ formalParameterVarargDecl
     
 qualifiedIdentifier
     :   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($text)}) "<t>"
         -> template(t={$text}) "<t>"
     |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
@@ -632,9 +671,30 @@ block
 @init { boolean emptyBlock = true; }
     :   ^(BLOCK (b+=blockStatement)*)
         { emptyBlock = ($b == null || $b.size() == 0); }
-        -> {emitCC() && emptyBlock}? template(bsl={$b}) "{ }"
-        -> {emitCC()}? block_cc(bsl={$b})
+        -> {((emitCC() && (currentMethod == null || !currentMethod.hasSDAG)) ||
+            (emitCI() && (currentMethod != null && currentMethod.hasSDAG))) && emptyBlock}? template(bsl={$b}) "{ }"
+        -> {emitCC() && (currentMethod == null || !currentMethod.hasSDAG)}? block_cc(bsl={$b})
+        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_cc(bsl={$b})
         ->
+    ;
+
+
+nakedSdagBlock
+    :   ^(BLOCK (sdg+=sdagBasicBlock)*)
+        -> template(sdg={$sdg}) "<sdg>"
+    ;
+
+
+sdagBlock
+    :   ^(BLOCK (sdg+=sdagBasicBlock)*)
+        -> block_cc(bsl={$sdg})
+    ;
+
+sdagBasicBlock
+    :   sdagStatement
+        -> {$sdagStatement.st}
+    |   (s+=blockStatement)+
+        -> block_atomic(s={$s})
     ;
     
 blockStatement
@@ -647,11 +707,15 @@ blockStatement
 
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$vdl.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$objectType.st},
@@ -664,6 +728,47 @@ statement
         -> {$nonBlockStatement.st}
     |   block
         -> {$block.st}
+    ;
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
+    ;
+
+sdagStatement
+    :   ^(OVERLAP sdagBlock)
+        -> template(b={$sdagBlock.st}) "overlap <b>"
+    |   ^(WHEN (wa+=whenArgument)* nakedSdagBlock)
+        -> template(w={wa}, b={$nakedSdagBlock.st}) "when <w> <b>"
+    |   ^(SDAG_IF pe=parenthesizedExpression
+            ifblock=sdagBlock elseblock=sdagBlock?)
+        -> if(cond={$pe.st}, then={$ifblock.st}, else_={$elseblock.st})
+    |   ^(SDAG_FOR forInit? FOR_EXPR cond=expression?
+            FOR_UPDATE (update+=expression)* b=sdagBlock)
+        -> for(initializer={$forInit.st}, cond={$cond.st},
+                update={$update}, body={$b.st})
+    |   ^(SDAG_WHILE pe=parenthesizedExpression b=sdagBlock)
+        -> while(cond={$pe.st}, body={$b.st})
+    |   ^(SDAG_DO b=sdagBlock pe=parenthesizedExpression)
+        -> dowhile(cond={$pe.st}, block={$b.st})
+    ;
+
+whenArgument
+    :   IDENT expression? formalParameterList
+        -> template(i={$IDENT}, e={$expression.st}, f={$formalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
     ;
 
 nonBlockStatement
@@ -728,6 +833,13 @@ forInit
 parenthesizedExpression
     :   ^(PAREN_EXPR exp=expression)
         -> template(expr={$exp.st}) "(<expr>)"
+    ;
+
+expressionArrayAccess
+    :   ^(EXPR expr)
+        -> {$expr.st}
+    |    domainExpressionAccess
+        -> {$domainExpressionAccess.st}
     ;
     
 expression
@@ -829,6 +941,7 @@ expr
     ;
 
 primaryExpression
+@init { int dims = 1; }
     :   ^(DOT prim=primaryExpression
             ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
@@ -844,6 +957,8 @@ primaryExpression
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($IDENT.text)}) "<t>"
         -> {%{$IDENT.text}}
     |   CHELPER
         -> {%{"constructorHelper"}}
@@ -853,9 +968,23 @@ primaryExpression
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
-    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expression)
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType}?
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
+            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
+                PointerType p = (PointerType)($pe.start.symbolType);
+                if (p.baseType instanceof ClassSymbol) {
+                    ClassSymbol cs = (ClassSymbol)(p.baseType);
+                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
+                        cs.templateArgs.get(1) instanceof LiteralType) {
+                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
+                        dims = Integer.valueOf(l.literal);
+                    }
+                }
+            }
+        }
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
                template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
         -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
     |   literal
         -> {$literal.st}
@@ -877,6 +1006,10 @@ primaryExpression
         ->  template() "CkMyNode()"
     |   GETMYRANK
         ->  template() "CkMyRank()"
+	|	THISINDEX
+		->	template() "thisIndex"
+	|	THISPROXY
+		->	template() "thisProxy"
     |   domainExpression[null]
         ->  {$domainExpression.st}
     ;

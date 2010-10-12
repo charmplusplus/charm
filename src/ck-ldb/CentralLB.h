@@ -104,6 +104,7 @@ public:
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
+  void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void ReceiveDummyMigration(int _step);
 #endif
@@ -222,6 +223,7 @@ public:
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
@@ -245,6 +247,8 @@ private:
   int future_migrates_expected;
   int lbdone;
   double start_lb_time;
+  LBMigrateMsg   *storedMigrateMsg;
+  int  reduction_started;
 
   FutureModel *predicted_model;
 

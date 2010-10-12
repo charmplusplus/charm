@@ -1,5 +1,5 @@
 #!/bin/sh
-LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB GridCommRefineLB GridMetisLB GridHybridLB GridHybridSeedLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB TopoLB RefineTopoLB TopoCentLB HybridLB HbmLB BlockLB"
+LOADBALANCERS="DummyLB ComboCentLB RandCentLB RefineLB RefineKLB  RefineCommLB GreedyLB GreedyCommLB GreedyAgentLB GridCommLB GridCommRefineLB GridMetisLB GridHybridLB GridHybridSeedLB Comm1LB OrbLB RecBisectBfLB MetisLB PhasebyArrayLB RotateLB NeighborLB NeighborCommLB WSLB TopoLB RefineTopoLB TopoCentLB HybridLB HbmLB BlockLB GraphPartLB"
 
 out="Make.lb"
 
@@ -30,6 +30,7 @@ do
 \$(L)/libmodule$bal.a: $bal.o $manager
 	\$(CHARMC) -o \$(L)/libmodule$bal.a $bal.o $manager
 	$dep
+LBHEADERS += $bal.h $bal.decl.h
 
 EOB
 done
@@ -43,7 +44,7 @@ done
 echo "   initnode void initEveryLB(void);" >>EveryLB.ci
 echo "};" >> EveryLB.ci
 
-echo "# used for make dependes" >>$out
+echo "# used for make depends" >>$out
 echo "LB_OBJ=EveryLB.o \\" >>$out
 for bal in $LOADBALANCERS
 do

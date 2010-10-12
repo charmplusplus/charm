@@ -22,6 +22,7 @@ group [migratable] CentralLB : BaseLB {
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);
   entry void ReceiveMigration(LBMigrateMsg*);	
+  entry void ProcessReceiveMigration(CkReductionMsg  *);
   entry void MissMigrate(int);
 };
 

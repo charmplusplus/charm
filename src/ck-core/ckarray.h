@@ -323,7 +323,7 @@ private:
 	CkArrayID _aid;
 public:
 	CProxy_ArrayBase() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		_aid.setZero();
 #endif
 	}
@@ -333,7 +333,7 @@ public:
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
 	  if (_aid.isZero())
 		CkAbort("Error! This array proxy has not been initialized!");
@@ -419,13 +419,19 @@ public:
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
 
     ~CProxySection_ArrayBase() {
@@ -450,6 +456,7 @@ public:
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
+    inline int ckGetNumSubSections() const { return _nsid; }
 	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
 	inline CkSectionID *ckGetSectionIDs() {return _sid;}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}

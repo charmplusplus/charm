@@ -1,10 +1,3 @@
-/*****************************************************************************
-* $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include <list>
 using std::list;
 #include <algorithm>
@@ -613,10 +606,8 @@ Module::preprocess()
 void
 Module::genDepend(const char *cifile)
 {
-  cout << name << ".decl.h " << name << ".def.h: " << cifile << ".stamp";
-  if (internalMode)
-    cout << " charmxi";
-  cout << endl;
+  cout << name << ".decl.h " << name << ".def.h: "
+       << cifile << ".stamp" << endl;
 }
 
 void
@@ -1011,12 +1002,11 @@ Chare::genDecls(XStr& str)
   } else {
     str << "typedef ";
   }
-  str << (b->length() == 2 ? "CBaseT2<" : "CBaseT<");
+  str << "CBaseT" << b->length() << "<";
   if (isPython()) {
     str << Prefix::Python << type;
   } else {
-    str << b->getFirst();
-    if (b->length() >= 2) str << "," << b->getSecond();
+    str << b;
   }
   str << ", CProxy_" << type;
   if (templat) {
@@ -3211,17 +3201,17 @@ void Entry::genArrayDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
       str << "  "<<container->baseName()<<" *obj = ckLocal();\n";
-      str << "#ifndef CMK_OPTIMIZE\n";
+      str << "#if CMK_ERROR_CHECKING\n";
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
       if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
@@ -3407,12 +3397,12 @@ void Entry::genGroupDefs(XStr& str)
 "    the_lbdb->ObjectStop(objHandle);\n"
 "  }\n"
 "#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n"

@@ -122,3 +122,9 @@ compat_regmm.o: compat_regmm.c ../../../../include/charm-api.h \
   ../../../../include/conv-common.h ../../../../include/conv-mach.h \
   ../../../../include/conv-mach-opt.h
 	$(CHARMC) -o compat_regmm.o compat_regmm.c
+tcharm.decl.h tcharm.def.h: tcharm.ci.stamp
+tcharm.ci.stamp: tcharm.ci ../../../../tmp/charmxi
+	 $(CHARMC) -intrinsic $< && touch $@
+tcharmmain.decl.h tcharmmain.def.h: tcharmmain.ci.stamp
+tcharmmain.ci.stamp: tcharmmain.ci ../../../../tmp/charmxi
+	 $(CHARMC) -intrinsic $< && touch $@
