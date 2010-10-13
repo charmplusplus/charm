@@ -16,6 +16,7 @@ CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp
 ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp
 comlib.decl.h comlib.def.h: ComlibManager.ci.stamp
 Comm1LB.decl.h Comm1LB.def.h: Comm1LB.ci.stamp
+CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp
 ControlPointsNoTrace.decl.h ControlPointsNoTrace.def.h: controlPointsNoTrace.ci.stamp
 DummyLB.decl.h DummyLB.def.h: DummyLB.ci.stamp
