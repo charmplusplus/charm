@@ -2,7 +2,7 @@
 
 module CommonLBs {
   extern module BlockLB;
-  extern module Comm1LB;
+  extern module CommLB;
   extern module DummyLB;
   extern module GreedyAgentLB;
   extern module GreedyCommLB;

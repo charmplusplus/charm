@@ -3,7 +3,7 @@
 module EveryLB {
   extern module BlockLB;
   extern module ComboCentLB;
-  extern module Comm1LB;
+  extern module CommLB;
   extern module DummyLB;
   extern module GraphPartLB;
   extern module GreedyAgentLB;
