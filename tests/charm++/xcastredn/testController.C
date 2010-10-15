@@ -277,7 +277,7 @@ void TestController::receiveReduction(CkReductionMsg *msg)
             /// Reset the counters
             curMsgSize = cfg.msgSizeMin;
             /// Exit if done
-            if (++curCommType >= Comlib)
+            if (++curCommType >= EndOfTest)
             {
                 CkPrintf("\n----------------------------------------------------------------");
                 CkPrintf("%s\n",out.str().c_str());
