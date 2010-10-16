@@ -522,7 +522,7 @@ objectType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
-	|	MOD qualifiedTypeIdent AT
+	|	qualifiedTypeIdent '[' MOD ']' AT
 		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent)
     ;
 
