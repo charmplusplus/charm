@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -26,7 +19,7 @@
 
 #include "cklists.h"
 
-#include "Comm1LB.h"
+#include "CommLB.h"
 
 #define alpha 35e-6
 #define beeta 8.5e-9
@@ -35,22 +28,22 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
-CreateLBFunc_Def(Comm1LB, "another variation of CommLB")
+CreateLBFunc_Def(CommLB, "another variation of CommLB")
 
-Comm1LB::Comm1LB(const CkLBOptions &opt): CentralLB(opt)
+CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
 {
   if (CkMyPe() == 0)
-    CkPrintf("[%d] Comm1LB created\n",CkMyPe());
-  lbname = "Comm1LB";
+    CkPrintf("[%d] CommLB created\n",CkMyPe());
+  lbname = "CommLB";
 }
 
-CmiBool Comm1LB::QueryBalanceNow(int _step)
+CmiBool CommLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
-void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
+void CommLB::alloc(int pe , int id, double load, int nmsg, int nbyte){
   alloc_array[npe][id].load = 1.0;
   alloc_array[pe][id].load = load;
   alloc_array[pe][id].nmsg = nmsg;
@@ -60,7 +53,7 @@ void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
   alloc_array[pe][nobj].nbyte += nbyte;
 }
 
-double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_data){
+double CommLB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_data){
   int j;
   double total_cost, com_cost, weight=0.0;
   graph * ptr;
@@ -95,7 +88,7 @@ double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com
   return total_cost;
 }
 
-void Comm1LB::add_graph(int x, int y, int data, int nmsg){
+void CommLB::add_graph(int x, int y, int data, int nmsg){
   graph * ptr, *temp;
 
 //  CkPrintf("Add graph : %d,%d", data, nmsg);
@@ -142,13 +135,13 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
   }
 }
 
-void Comm1LB::work(BaseLB::LDStats* stats, int count)
+void CommLB::work(BaseLB::LDStats* stats, int count)
 {
   int pe,obj,com;
   double mean_load =0.0;
   ObjectRecord *x;
 
-  //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
   nobj = stats->n_objs;
   npe = count;
@@ -261,7 +254,7 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
   }
 }
 
-#include "Comm1LB.def.h"
+#include "CommLB.def.h"
 
 /*@}*/
 

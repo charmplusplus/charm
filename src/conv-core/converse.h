@@ -51,6 +51,7 @@
 #include <stdint.h>
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Paste the tokens x and y together, without any space between them.
@@ -1853,6 +1854,11 @@ extern int CmiGridQueueLookup (int gid, int nInts, int index1, int index2, int i
 extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 #endif
+
+/******** I/O wrappers ***********/
+
+size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+int CmiFclose(FILE *fp);
 
 #include "debug-conv.h"
 

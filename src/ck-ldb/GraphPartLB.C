@@ -12,7 +12,7 @@
 
 #include "GraphPartLB.h"
 
-CreateLBFunc_Def(GraphPartLB, "Algorithm which used graph partitioning for a communication aware load balancing")
+CreateLBFunc_Def(GraphPartLB, "Algorithm which uses graph partitioning for communication aware load balancing")
 
 GraphPartLB::GraphPartLB(const CkLBOptions &opt) : CentralLB(opt) {
   lbname = "GraphPartLB";

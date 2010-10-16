@@ -9,7 +9,7 @@ OBJS = 	jacobi2DAMR.o
 all: $(DEST)
 
 $(DEST): $(OBJS)
-	$(CHARMC) -module EveryLB -lm -language charm++ -o $(DEST) $(OBJS) $(AMRLIB) 
+	$(CHARMC) -module CommonLBs -lm -language charm++ -o $(DEST) $(OBJS) $(AMRLIB) 
 	chmod 755 $(DEST)
 
 jacobi2DAMR.o: jacobi2DAMR.C jacobi2DAMR.decl.h jacobi2DAMR.def.h
