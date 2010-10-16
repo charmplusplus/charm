@@ -606,11 +606,19 @@ blockStatement
     ;
 
 localVariableDeclaration
-    :   localModifierList? simpleType classFieldDeclaratorList
+    :	primitiveVarDeclaration
+	|   objectVarDeclaration
+	;
+
+primitiveVarDeclaration
+	:	localModifierList? simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType classFieldDeclaratorList)
-    |   localModifierList? objectType classFieldDeclaratorList
+	;
+
+objectVarDeclaration
+	:	localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
-    ;
+	;
 
 statement
     :   nonBlockStatement
