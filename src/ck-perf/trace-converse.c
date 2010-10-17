@@ -52,3 +52,7 @@ void traceUserSuppliedNote(char *note) {}
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
 void EmergencyExit(void) {}
 void CpdEndConditionalDeliver_master() {}
+
+
+int _lb_version;
+

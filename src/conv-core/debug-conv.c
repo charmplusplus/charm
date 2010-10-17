@@ -199,39 +199,19 @@ static void CpdDebugCallMemStat(char *msg) {
   CmiFree(msg);
 }
 
-static void CpdDebugHandler(char *msg)
-{
-    char name[128];
-    sscanf(msg+CmiReservedHeaderSize, "%s", name);
-
-    if (strcmp(name, "freeze") == 0) {
-      CpdFreeze();
-    }
-    else if (strcmp(name, "unfreeze") == 0) {
-      CpdUnFreeze();
-    }
-    else if (strncmp(name, "step", strlen("step")) == 0){
-      /*CmiPrintf("step received\n");*/
-      CpvAccess(stepFlag) = 1;
-      CpdUnFreeze();
-    }
-    else if (strncmp(name, "continue", strlen("continue")) == 0){
-      /*CmiPrintf("continue received\n");*/
-      CpvAccess(continueFlag) = 1;
-      CpdUnFreeze();
-    }
-#if ! CMK_NO_SOCKETS
-    else if (strncmp(name, "status", strlen("status")) == 0) {
-      ChMessageInt_t reply[2];
-      reply[0] = ChMessageInt_new(CmiMyPe());
-      reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
-      CcsSendReply(2*sizeof(ChMessageInt_t), reply);
-    }
+static void CpdDebugHandlerStatus(char *msg) {
+#if ! CMK_NO_SOCKETS    
+  ChMessageInt_t reply[2];
+  reply[0] = ChMessageInt_new(CmiMyPe());
+  reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
+  CcsSendReply(2*sizeof(ChMessageInt_t), reply);
 #endif
-    else{
-      CmiPrintf("bad debugger command:%s received,len=%ld\n",name,strlen(name));
-    }
-    CmiFree(msg);
+  CmiFree(msg);
+}
+
+static void CpdDebugHandlerFreeze(char *msg) {
+  CpdFreeze();
+  CmiFree(msg);
 }
 
 
@@ -327,25 +307,26 @@ void CpdInit(void)
   CpvInitialize(void *, conditionalQueue);
   CpvAccess(conditionalQueue) = CdsFifo_Create();
   
-  CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
-  CcsSetMergeFn("ccs_debug", CcsMerge_concat);
+  CcsRegisterHandler("debug/converse/freeze", (CmiHandler)CpdDebugHandlerFreeze);
+  CcsRegisterHandler("debug/converse/status", (CmiHandler)CpdDebugHandlerStatus);
+  CcsSetMergeFn("debug/converse/status", CcsMerge_concat);
 
-  CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
+  CcsRegisterHandler("debug/memory/allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);
   CpvAccess(CpdDebugCallAllocationTree_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallAllocationTree);
   
-  CcsRegisterHandler("ccs_debug_memStat", (CmiHandler)CpdDebugCallMemStat);
+  CcsRegisterHandler("debug/memory/stat", (CmiHandler)CpdDebugCallMemStat);
   CpvInitialize(int, CpdDebugCallMemStat_Index);
   CpvAccess(CpdDebugCallMemStat_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallMemStat);
 
-  CcsRegisterHandler("converse_memory_leak",(CmiHandler)CpdSearchLeaks);
+  CcsRegisterHandler("debug/memory/leak",(CmiHandler)CpdSearchLeaks);
   CpvInitialize(int, CpdSearchLeaks_Index);
   CpvAccess(CpdSearchLeaks_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaks);
   CpvInitialize(int, CpdSearchLeaksDone_Index);
   CpvAccess(CpdSearchLeaksDone_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaksDone);
   
-  CcsRegisterHandler("converse_memory_mark",(CmiHandler)CpdMemoryMarkClean);
-  CcsSetMergeFn("converse_memory_mark", CcsMerge_concat);
+  CcsRegisterHandler("debug/memory/mark",(CmiHandler)CpdMemoryMarkClean);
+  CcsSetMergeFn("debug/memory/mark", CcsMerge_concat);
 
   _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
 #if 0
