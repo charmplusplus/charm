@@ -2298,7 +2298,7 @@ void req_client_start_and_connect(void)
 				break;
 			}
 		}
-		finish_set_nodes(clientstart,client);
+		if (!arg_ssh_display) finish_set_nodes(clientstart,client);
 
 #if CMK_IBVERBS_FAST_START
 		for (c=clientstart;c<client;c++) { 
