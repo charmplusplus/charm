@@ -1,4 +1,10 @@
-HPC_SDK="c:\Program Files\Microsoft HPC Pack 2008 SDK"
+
+if test -n "$CCP_LIB64"
+then
+  HPC_SDK="$CCP_LIB64\..\.."
+else
+  HPC_SDK="c:\Program Files\Microsoft HPC Pack 2008 SDK"
+fi
 HPC_SDK=`cygpath -d "$HPC_SDK"`
 
 CMK_CC="unix2nt_cc -D_CRT_SECURE_NO_DEPRECATE -I `cygpath -u "$HPC_SDK\Include"`"
