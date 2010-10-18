@@ -2298,7 +2298,11 @@ void req_client_start_and_connect(void)
 				break;
 			}
 		}
-		if (!arg_ssh_display) finish_set_nodes(clientstart,client);
+#if CMK_USE_RSH
+		  /* ssh x11 forwarding will make sure ssh exit */
+		if (!arg_ssh_display) 
+#endif
+		finish_set_nodes(clientstart,client);
 
 #if CMK_IBVERBS_FAST_START
 		for (c=clientstart;c<client;c++) { 
