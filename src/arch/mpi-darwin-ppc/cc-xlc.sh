@@ -1,6 +1,7 @@
 CMK_CC="xlc_r -qnocommon -qpic "
 #CMK_CXX="xlc++_r "
-CMK_CXX="xlc++_r -qnocommon -qpic "
+CMK_PIC="-qpic"
+CMK_CXX="xlc++_r -qnocommon "
 CMK_LD="$CMK_CC -qnofullpath "
 CMK_LDXX="$CMK_CXX -qnofullpath "
 CMK_C_OPTIMIZE="-O3 -qstrict -Q  "

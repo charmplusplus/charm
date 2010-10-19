@@ -1,9 +1,10 @@
 CMK_64bit=" -m64 "
+CMK_PIC="-fpic"
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E"
-CMK_CC="gcc $CMK_64bit -fPIC "
-CMK_CXX="g++ $CMK_64bit -fPIC "
+CMK_CC="gcc $CMK_64bit "
+CMK_CXX="g++ $CMK_64bit "
 CMK_CXXPP="$CMK_CXX -x c++ -E "
 CMK_RANLIB="ranlib"
 CMK_LIBS="-lckqt"

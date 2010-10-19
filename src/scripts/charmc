@@ -49,8 +49,8 @@ OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""  
 OPTS_LDXX=""
-OPTS_PIC="$CMK_PIC"
-test -z "$OPTS_PIC" && OPTS_PIC='-fpic'
+OPTS_PIC=""
+USE_PIC="0"
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -482,18 +482,12 @@ do
 	
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
 		;;
 
 	"-copyglobal"|"-copyglobals")
 		SWAPGLOBALS="2"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
 		;;
 
 	"-tlsglobal"|"-tlsglobals")
@@ -868,6 +862,15 @@ then
 	then
 		BUILD_SHARE="0"
 	fi
+fi
+
+OPTS_PIC="$CMK_PIC"
+if [ "$USE_PIC" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $OPTS_PIC"
+       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
+       OPTS_F90="$OPTS_F90 $OPTS_PIC"
+       OPTS_LD="$OPTS_LD $OPTS_PIC"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
