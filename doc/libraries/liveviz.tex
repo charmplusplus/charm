@@ -4,8 +4,7 @@ If array elements compute a small piece of a large 2D image, then these
 image chunks can be combined across processors to form one large 
 image using the liveViz library. In other 
 words, liveViz provides a way to reduce 2D-image data, which 
-combines small chunks
- of images deposited by chares into one large image.
+combines small chunks of images deposited by chares into one large image.
 
 This visualization library follows the client server model.
 The server, a parallel Charm++ program, does all image assembly, 
@@ -13,10 +12,18 @@ and opens a network (CCS) socket which clients use to request and
 download images.  The client is a small Java program.
 A typical use of this is:
 \begin{alltt}
-	cd charm/pgms/charm++/ccs/liveViz/server
+	cd charm/examples/charm++/lvServer
 	make
-	./charmrun ./pgm +p2 ++server ++server-port 1234 &
-	~/charm/bin/liveViz localhost 1234
+	./charmrun ./lvServer +p2 ++server ++server-port 1234 
+	~/ccs_tools/bin/lvClient localhost 1234
+\end{alltt}
+
+Use git to obtain a copy of ccs_tools (prior to using lvClient)
+ and build it by:
+
+\begin{alltt}
+      cd ccs_tools;
+      ant;
 \end{alltt}
 
 
@@ -53,7 +60,7 @@ This will show up on the client's assembled image at 0-based pixel
 (startX,startY).  The client's display width and height are stored
 in m->req.wid and m->req.ht.
 
-By default liveViz combines image chunks by doing a saturating sum of 
+By default, liveViz combines image chunks by doing a saturating sum of 
 overlapping pixel values. If you want liveViz to combine image chunks by using 
 max (i.e. for overlapping pixels in deposited image chunks, final image will 
 have the pixel with highest intensity or in other words largest value), you need
