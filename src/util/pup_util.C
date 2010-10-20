@@ -156,6 +156,21 @@ size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
         return nwritten;
 }
 
+FILE *CmiFopen(const char *path, const char *mode)
+{
+        FILE *fp = NULL;
+        while (1) {
+          fp = fopen(path, mode);
+          if (fp == 0 && errno==EINTR) {
+            printf("Warning: CmiFopen retrying ...\n");
+            continue;
+          }
+          else
+            break;
+        }
+        return fp;
+}
+
 // more robust fclose that handling interrupt
 int CmiFclose(FILE *fp)
 {

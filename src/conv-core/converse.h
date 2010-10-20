@@ -1858,6 +1858,7 @@ extern int CmiGridQueueLookupMsg (char *msg);
 /******** I/O wrappers ***********/
 
 size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+FILE *CmiFopen(const char *path, const char *mode);
 int CmiFclose(FILE *fp);
 
 #include "debug-conv.h"
