@@ -83,6 +83,12 @@ Causes files to be compiled with maximum optimization.
 If this follows -O on the command line, it turns optimization back off.
 This is just a convenience for simple-minded makefiles.
 
+\item[{\tt -production}:]
+
+Enable architecture-specific production-mode features. For instance,
+use available hardware features more aggressively. It's probably a bad
+idea to build some objects with this, and others without.
+
 \item[{\tt -s}:]
 
 Strip the executable of debugging symbols.  Only meaningful when
