@@ -7,7 +7,3 @@
 
 #undef CMK_RSH_NOT_NEEDED
 #define CMK_RSH_NOT_NEEDED				   1
-
-/* poll does not work with kill STOP/CONT in on-demand queueing system */
-#undef CMK_USE_POLL
-#define CMK_USE_POLL                                       0
