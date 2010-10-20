@@ -1980,6 +1980,7 @@ void req_poll()
   if (status==0) return;/*Nothing to do-- timeout*/
 
   if (status<0){ 
+		if (errno == EINTR || errno == EAGAIN) return;
 		fflush(stdout);
 		fflush(stderr);
 		socket_error_in_poll(1359,"Node program terminated unexpectedly!\n");
