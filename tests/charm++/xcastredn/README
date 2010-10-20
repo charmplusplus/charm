@@ -6,9 +6,10 @@ The mechanisms that are tested are:
 1) Converse broadcast
 2) Charm Array broadcast
 3) CkMulticast Array section multicast
-4) Converse reduction
-5) Charm Array reduction
-6) CkMulticast Array section reduction
+4) Comlib Array section multicast
+5) Converse reduction
+6) Charm Array reduction
+7) CkMulticast Array section reduction
 
 
 The test defaults to placing a single chare array member on each PE and then measuring

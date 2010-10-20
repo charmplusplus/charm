@@ -1,4 +1,5 @@
 #include "testController.h"
+#include "comlib.h"
 #include <iomanip>
 
 //----------------- externed globals -----------------
@@ -12,12 +13,12 @@ config cfg;
 /// The names of the communication mechanisms being tested in this benchmark
 char commName[][commNameLen] = {
                                  "CkMulticast-Bcast",
+                                 "Comlib-Bcast",
                                  "Charm-Bcast",
                                  "Converse-Bcast",
                                  "CkMulticast-Redn",
                                  "Charm-Redn",
                                  "Converse-Redn",
-                                 "Comlib-Bcast",
                                };
 
 
@@ -93,9 +94,19 @@ TestController::TestController(CkArgMsg *m)
     chareArray            = CProxy_MyChareArray::ckNew(mcastGrpID,cfg.arraySize);
     /// Create the array section to use with CkMulticast
     arraySections.push_back( createSection(cfg.useContiguousSection) );
+    arraySections.push_back( createSection(cfg.useContiguousSection) );
 
-    /// Delegate the section collectives to the multicast manager
+    /// Delegate the section collectives to the communication libraries
+    //                            CkMulticast
     arraySections[0].ckSectionDelegate(mgr);
+    //                            Comlib
+    /* Charm startup makes no guarantees that comlib will be
+     * set up before the user mainchare starts. Hence all
+     * delegation will have to wait until after this mainchare
+     * is done.
+     * uggghhh!
+     */
+
     /// Setup the client at the root of the reductions
     CkCallback *cb = new CkCallback(CkIndex_TestController::receiveReduction(0),thisProxy);
     chareArray.ckSetReductionClient(cb);
@@ -147,6 +158,20 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
 
 
 
+void TestController::startTest()
+{
+    sendMulticast(curCommType, curMsgSize);
+    /* The comlib mainchare can be instantiated after the user mainchare
+     * Hence, strategy association should happen outside of user mainchare
+     */
+    Strategy *comStrat = new MultiRingMulticastStrategy();
+    ComlibDoneCreating();
+    ComlibAssociateProxy(comStrat, arraySections[1]);
+}
+
+
+
+
 void TestController::sendMulticast(const CommMechanism commType, const int msgSize)
 {
     /// Create a message of required size
@@ -182,7 +207,7 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
 
         case bcastComlib:
             timeStart = CmiWallTimer();
-            arraySections[0].crunchData(msg);
+            arraySections[1].crunchData(msg);
             break;
 
         case bcastCharm:

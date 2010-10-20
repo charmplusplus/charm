@@ -9,7 +9,7 @@ class TestController: public CBase_TestController
     public:
         TestController(CkArgMsg *m);
         /// @entry Starts the timing tests
-        void startTest() { sendMulticast(curCommType, curMsgSize); }
+        void startTest();
         /// @entry Reduction client method. Receives the result of the reduction
         void receiveReduction(CkReductionMsg *msg);
 

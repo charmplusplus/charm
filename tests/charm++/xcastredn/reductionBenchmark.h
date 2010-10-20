@@ -15,7 +15,7 @@
 
 /// The different communication mechanisms being benchmarked
 enum CommMechanism
-{ bcastCkMulticast, bcastCharm, bcastConverse, rednCkMulticast, rednCharm, rednConverse, EndOfTest, bcastComlib};
+{ bcastCkMulticast, bcastComlib, bcastCharm, bcastConverse, rednCkMulticast, rednCharm, rednConverse, EndOfTest};
 
 const int commNameLen        = 30;
 /// The names of all the comm mechanisms (used in output)
