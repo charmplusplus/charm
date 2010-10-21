@@ -74,6 +74,7 @@ DELETE=""
 MAINOBJ=""   
 GENCPM=""
 OPTIMIZE_MODE=""
+PRODUCTION_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
@@ -709,6 +710,13 @@ do
 	"-no-optimize")
 		OPTIMIZE_MODE=false
 		;;
+
+	"-production")
+		PRODUCTION_MODE=true
+		;;
+	"-no-production")
+		PRODUCTION_MODE=false
+		;;
 	
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
@@ -986,6 +994,16 @@ then
     OPTS_F90="$CMK_F90_OPTIMIZE $OPTS_F90"
     OPTS_LD="$CMK_C_OPTIMIZE $OPTS_LD"
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
+fi
+
+# Pick up per-architecture production mode settings
+if [ "$PRODUCTION_MODE" = "true" ]
+then
+    OPTS_CC="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_CC"
+    OPTS_CXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_CXX"
+    OPTS_F90="$CMK_PRODUCTION $CMK_F90_PRODUCTION $OPTS_F90"
+    OPTS_LD="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_LD"
+    OPTS_LDXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_LDXX"
 fi
 
 if [ -n "$XI_INTERNAL" ]
