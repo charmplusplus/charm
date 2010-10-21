@@ -48,7 +48,7 @@ fi
 #CL command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
 CL_CMD="CL.EXE"
-CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS /FD'
+CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
