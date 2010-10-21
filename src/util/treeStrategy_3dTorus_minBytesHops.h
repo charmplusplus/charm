@@ -113,7 +113,7 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     /// If there are any local vertices at all
     if (numLocalDestinations > 0)
     {
-        numLocalBranches = (numRemoteDestinations >= maxBranches-1)? 1 : (maxBranches - numRemoteDestinations);
+        numLocalBranches = (numRemoteDestinations >= maxBranches)? 1 : (maxBranches - numRemoteDestinations);
         /// Distribute the local destination vertices amongst numLocalBranches branches
         SpanningTreeVertex *localTree = impl::buildNextGen_topoUnaware(firstVtx,beyondLastLocal,numLocalBranches);
         /// Append the local tree info to the child info
@@ -125,7 +125,7 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
 
     /// Partition the remote-vertex bounding box into the remaining number of branches
     impl::TreeBoundingBoxOn3dTorus<Iterator> treePart;
-    treePart.partition(firstVtx,beyondLastLocal,beyondLastVtx,maxBranches-numLocalBranches);
+    treePart.partition(firstVtx,beyondLastLocal,beyondLastVtx,maxBranches);
 
     /// Identify the closest member in each remote branch and put it at the corresponding childIndex location
     for (int i=numLocalBranches, numChildren=(*firstVtx).childIndex.size(); i<numChildren; i++)
