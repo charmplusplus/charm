@@ -53,7 +53,7 @@ HybridLB::~HybridLB()
   delete refine;
 }
 
-void HybridLB::work(LDStats* stats,int count)
+void HybridLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   LevelData *lData = levelData[currentLevel];
@@ -62,9 +62,9 @@ void HybridLB::work(LDStats* stats,int count)
   //  take into account the outObjs
   //if (currentLevel == tree->numLevels()-1) 
   if (currentLevel == 1) 
-    greedy->work(stats, count);
+    greedy->work(stats);
   else
-    refine->work(stats, count);
+    refine->work(stats);
 #endif
 }
   

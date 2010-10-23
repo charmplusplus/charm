@@ -91,7 +91,7 @@ void PhasebyArrayLB::updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempSta
 	
 }
 
-void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
+void PhasebyArrayLB::work(BaseLB::LDStats *stats){
 	//It is assumed that statically placed arrays are set non-migratable in the application
 	tempStats = new BaseLB::LDStats;
 
@@ -139,7 +139,7 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 					odata->migratable=CmiFalse;
  			}
 			//Call a strategy here
-			lb->work(tempStats,count);
+			lb->work(tempStats);
 			if(i!=omids.size()-1){
 				for(obj = 0; obj < tempStats->n_objs; obj++)
 					tempStats->from_proc[obj]=tempStats->to_proc[obj];
