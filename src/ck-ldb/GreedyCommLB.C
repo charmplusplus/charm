@@ -56,7 +56,7 @@ void GreedyCommLB::alloc(int pe,int id,double load){
 }
 
 // communication cost when obj id is put on proc pe
-double GreedyCommLB::compute_com(int id, int pe){
+double GreedyCommLB::compute_com(LDStats* stats, int id, int pe){
     int j,com_data=0,com_msg=0;
     double total_time;
     graph * ptr;
@@ -78,7 +78,7 @@ double GreedyCommLB::compute_com(int id, int pe){
 }
 
 // update all communicating processors after assigning obj id on proc pe
-void GreedyCommLB::update(int id, int pe){
+void GreedyCommLB::update(LDStats* stats, int id, int pe){
     graph * ptr = object_graph[id].next;
     
     for(int j=0;(j<2*nobj)&&(ptr != NULL);j++,ptr=ptr->next){
@@ -135,15 +135,14 @@ static void init_data(int *assign, graph * object_graph, int l, int b){
     }
 }
 
-void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
+void GreedyCommLB::work(LDStats* stats)
 {
     int pe,obj,com;
     ObjectRecord *x;
     int i;
     
     if (_lb_args.debug()) CkPrintf("In GreedyCommLB strategy\n",CkMyPe());
-    stats = _stats; 
-    npe = count;
+    npe = stats->count;
     nobj = stats->n_objs;
 
     // nmigobj is calculated as the number of migratable objects
@@ -161,8 +160,8 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 #define MAXDOUBLE   1e10;
 
     // processor heap
-    processors = new processorInfo[count];
-    for (int p=0; p<count; p++) {
+    processors = new processorInfo[npe];
+    for (int p=0; p<npe; p++) {
       processors[p].Id = p;
       processors[p].backgroundLoad = stats->procs[p].bg_cputime;
       processors[p].computeLoad = 0;
@@ -217,7 +216,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
         }
         alloc(onpe, obj, objData.wallTime);
-	update(obj, onpe);	     // update communication cost on other pes
+	update(stats, obj, onpe);	     // update communication cost on other pes
       }
       else {
         x = new ObjectRecord;
@@ -229,8 +228,8 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
       }
     }
 
-    minHeap *lightProcessors = new minHeap(count);
-    for (i=0; i<count; i++)
+    minHeap *lightProcessors = new minHeap(npe);
+    for (i=0; i<npe; i++)
       if (stats->procs[i].available)
         lightProcessors->insert((InfoRecord *) &(processors[i]));
 
@@ -241,8 +240,8 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
     */
 
-    double *pe_comm = new double[count];
-    for (int i=0; i<count; i++) pe_comm[i] = 0.0;
+    double *pe_comm = new double[npe];
+    for (int i=0; i<npe; i++) pe_comm[i] = 0.0;
 
     for(id = 0;id<nmigobj;id++){
 	x  = maxh.deleteMax();
@@ -254,7 +253,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
         processorInfo *donor = (processorInfo *) lightProcessors->deleteMin();
 	CmiAssert(donor);
 	int first_avail_pe = donor->Id;
-	temp = compute_com(maxid,first_avail_pe);
+	temp = compute_com(stats, maxid, first_avail_pe);
 	min_temp = temp;
 	//total_time = temp + alloc_array[first_avail_pe][nobj];
 	total_time = temp + donor->load; 
@@ -307,7 +306,7 @@ void GreedyCommLB::work(BaseLB::LDStats* _stats, int count)
 	alloc(minpe, maxid, x->val + min_temp);
 
 	// now that maxid assigned to minpe, update other pes load
-	update(maxid, minpe);
+	update(stats, maxid, minpe);
 
         // update heap
  	lightProcessors->insert(donor);
