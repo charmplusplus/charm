@@ -49,7 +49,7 @@ private:
       _n[3] = (me + npe - bigstep) % npe;
   };
 
-  LBMigrateMsg* Strategy(NborBaseLB::LDStats* stats, int count);
+  LBMigrateMsg* Strategy(NborBaseLB::LDStats* stats, int n_nbrs);
 };
 
 #endif /* _NeighborCommLB_H_ */
