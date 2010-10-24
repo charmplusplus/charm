@@ -61,10 +61,11 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void RecBisectBfLB::work(BaseLB::LDStats* stats, 
-				       int numPartitions)
+void RecBisectBfLB::work(LDStats* stats)
 {
   int i;
+  int numPartitions = stats->count;
+
   PartitionList *partitions;
 
   CkPrintf("[%d] RecBisectBfLB strategy\n",CkMyPe());

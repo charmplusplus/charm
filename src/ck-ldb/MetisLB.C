@@ -84,7 +84,7 @@ extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                                     int*, int*, int*, int*, int*,
                                     int*, int*);
 
-void MetisLB::work(BaseLB::LDStats* stats, int count)
+void MetisLB::work(LDStats* stats)
 {
   if (_lb_args.debug() >= 2) {
     CkPrintf("[%d] In MetisLB Strategy...\n", CkMyPe());
@@ -94,9 +94,10 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 
   stats->makeCommHash();
 
-  removeNonMigratable(stats, count);
-
+  int n_pes = stats->count;
   int numobjs = stats->n_objs;
+
+  removeNonMigratable(stats, n_pes);
 
   // allocate space for the computing data
   double *objtime = new double[numobjs];
@@ -199,7 +200,7 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 
   if (_lb_args.debug() >= 2) {
   CkPrintf("Pre-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, objtime, comm, origmap);
+  printStats(n_pes, numobjs, objtime, comm, origmap);
   }
 
   int wgtflag = 3; // Weights both on vertices and edges
@@ -210,10 +211,10 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   int *newmap;
   int sameMapFlag = 1;
 
-  if (count < 1) {
+  if (n_pes < 1) {
     CkPrintf("error: Number of Pe less than 1!");
   }
-  else if (count == 1) {
+  else if (n_pes == 1) {
     newmap = origmap;
     sameMapFlag = 1;
   }
@@ -236,19 +237,19 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
     So right now I just comment that function out and always use the other one.
 */
 /*
-      if (count > 8)
+      if (n_pes > 8)
 	METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
-			    &wgtflag, &numflag, &count, options, 
+			    &wgtflag, &numflag, &n_pes, options,
 			    &edgecut, newmap);
       else
 	METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
-				 &wgtflag, &numflag, &count, options, 
+				 &wgtflag, &numflag, &n_pes, options,
 				 &edgecut, newmap);
 */
       if (_lb_args.debug() >= 1)
         CkPrintf("[%d] calling METIS_PartGraphRecursive.\n", CkMyPe());
       METIS_PartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt,
-                                 &wgtflag, &numflag, &count, options,
+                                 &wgtflag, &numflag, &n_pes, options,
                                  &edgecut, newmap);
       if (_lb_args.debug() >= 1)
         CkPrintf("[%d] after calling Metis functions.\n", CkMyPe());
@@ -256,28 +257,28 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
     else if (WEIGHTED == option) {
       CkPrintf("unepected\n");
       float maxtotal_walltime = stats->procs[0].total_walltime;
-      for (m=1; m<count; m++) {
+      for (m = 1; m < n_pes; m++) {
 	if (maxtotal_walltime < stats->procs[m].total_walltime)
 	  maxtotal_walltime = stats->procs[m].total_walltime;
       }
       float totaltimeAllPe = 0.0;
-      for (m=0; m<count; m++) {
+      for (m = 0; m < n_pes; m++) {
 	totaltimeAllPe += stats->procs[m].pe_speed * 
 	  (maxtotal_walltime-stats->procs[m].bg_walltime);
       }
       // set up the different weights
-      float *tpwgts = new float[count];
-      for (m=0; m<count; m++) {
+      float *tpwgts = new float[n_pes];
+      for (m = 0; m < n_pes; m++) {
 	tpwgts[m] = stats->procs[m].pe_speed * 
 	  (maxtotal_walltime-stats->procs[m].bg_walltime) / totaltimeAllPe;
       }
-      if (count > 8)
+      if (n_pes > 8)
 	METIS_WPartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
-			     &wgtflag, &numflag, &count, tpwgts, options, 
+			     &wgtflag, &numflag, &n_pes, tpwgts, options,
 			     &edgecut, newmap);
       else
 	METIS_WPartGraphRecursive(&numobjs, xadj, adjncy, objwt, edgewt, 
-				  &wgtflag, &numflag, &count, tpwgts, options, 
+				  &wgtflag, &numflag, &n_pes, tpwgts, options,
 				  &edgecut, newmap);
       delete[] tpwgts;
     }
@@ -288,7 +289,7 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
   }
   if (_lb_args.debug() >= 2) {
   CkPrintf("Post-LDB Statistics step %d\n", step());
-  printStats(count, numobjs, objtime, comm, newmap);
+  printStats(n_pes, numobjs, objtime, comm, newmap);
   }
 
   for(i=0;i<numobjs;i++)
@@ -319,8 +320,8 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 
 /*
 	int avg=0;
-	int *chkwt = new int[count];
-	for(i=0;i<count;i++)
+	int *chkwt = new int[n_pes];
+	for(i=0; i<n_pes; i++)
 		chkwt[i]=0;
 	//totalwt=0;
 	for(i=0;i<numobjs;i++){
@@ -330,7 +331,7 @@ void MetisLB::work(BaseLB::LDStats* stats, int count)
 	}
 	
 	
-	for(i=0;i<count;i++)
+	for(i=0; i<n_pes; i++)
 		CkPrintf("%d -- %d\n",i,chkwt[i]);
 */
   delete[] origmap;

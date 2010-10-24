@@ -47,7 +47,7 @@ ComboCentLB::ComboCentLB(const CkLBOptions &opt): CentralLB(opt)
   }
 }
 
-void ComboCentLB::work(BaseLB::LDStats* stats)
+void ComboCentLB::work(LDStats* stats)
 {
   int nlbs = clbs.length();
   int n_objs = stats->n_objs;

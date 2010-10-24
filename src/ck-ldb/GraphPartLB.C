@@ -24,7 +24,7 @@ CmiBool GraphPartLB::QueryBalanceNow(int _step) {
   return CmiTrue;
 }
 
-void GraphPartLB::work(BaseLB::LDStats *stats, int count) {
+void GraphPartLB::work(LDStats *stats) {
 
 }
 

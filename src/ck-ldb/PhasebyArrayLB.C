@@ -91,7 +91,7 @@ void PhasebyArrayLB::updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempSta
 	
 }
 
-void PhasebyArrayLB::work(BaseLB::LDStats *stats){
+void PhasebyArrayLB::work(LDStats *stats){
 	//It is assumed that statically placed arrays are set non-migratable in the application
 	tempStats = new BaseLB::LDStats;
 

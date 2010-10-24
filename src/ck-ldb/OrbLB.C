@@ -304,14 +304,14 @@ void OrbLB::mapPartitionsToNodes()
 
 }
 
-void OrbLB::work(BaseLB::LDStats* stats, int count)
+void OrbLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int i,j;
 
   statsData = stats;
 
-  P = count;
+  P = stats->count;
 
   // calculate total number of migratable objects
   nObjs = stats->n_migrateobjs;

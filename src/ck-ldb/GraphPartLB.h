@@ -23,7 +23,7 @@ class GraphPartLB : public CentralLB {
     GraphPartLB(const CkLBOptions &opt);
     GraphPartLB(CkMigrateMessage *m) : CentralLB (m) { };
 
-    void work(BaseLB::LDStats *stats, int count);
+    void work(LDStats *stats);
     void pup(PUP::er &p) { CentralLB::pup(p); }
 
   private:

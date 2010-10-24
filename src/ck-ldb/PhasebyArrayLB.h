@@ -31,7 +31,7 @@ private:
 	CmiBool QueryBalanceNow(int step);
 	void copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
 	void updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
-	void work(BaseLB::LDStats* stats);
+	void work(LDStats* stats);
 };
 
 #endif /* _PHASEBYARRAYLB_H_ */

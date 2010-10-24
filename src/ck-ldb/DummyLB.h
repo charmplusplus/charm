@@ -24,7 +24,7 @@ public:
   DummyLB(CkMigrateMessage *m):CentralLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  void work(BaseLB::LDStats* stats, int count) {}
+  void work(LDStats* stats) {}
 };
 
 #endif /* _DUMMYLB_H_ */

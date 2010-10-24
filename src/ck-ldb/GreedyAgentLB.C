@@ -192,12 +192,14 @@ GreedyAgentLB::BuildCpuArray(CentralLB::LDStats* stats,
   return data;
 }
 
-void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
+void GreedyAgentLB::work(LDStats* stats)
 {
   int  i, obj, heapSize, objCount;
-  int *pemap = new int [count];
-  HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
-  HeapData *objData = BuildObjectArray(stats, count, &objCount);
+  int n_pes = stats->count;
+
+  int *pemap = new int [n_pes];
+  HeapData *cpuData = BuildCpuArray(stats, n_pes, &heapSize);
+  HeapData *objData = BuildObjectArray(stats, n_pes, &objCount);
 	
  	int max_neighbors=0;
  
@@ -205,8 +207,8 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
 	//CkPrintf("\nnum of procs:%d\n",simprocs);
 	
 
-	CkPrintf("num procs in stats:%d\n",count);
-	topologyAgent = new TopologyAgent(stats,count);
+	CkPrintf("num procs in stats:%d\n", n_pes);
+	topologyAgent = new TopologyAgent(stats, n_pes);
 
 	max_neighbors = topologyAgent->topo->max_neighbors();
 	
@@ -214,11 +216,11 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
 
   heapSize--;
 	
-	HeapData *minCpu = new HeapData[count];
+	HeapData *minCpu = new HeapData[n_pes];
 	double minLoad = 0.0;
 	double loadThreshold = 0.0;
-	int *trialpes = new int[count+1];
-	int *trialmap = new int[count];
+	int *trialpes = new int[n_pes + 1];
+	int *trialmap = new int[n_pes];
 	int *existing_map = new int[objCount];
 	Agent::Elem *preferList;
 	
@@ -237,7 +239,7 @@ void GreedyAgentLB::work(CentralLB::LDStats* stats, int count)
     //int extractIndex=0;
 		
 			CkPrintf("obj count:%d\n",obj);
-		for(i=0;i<=count;i++)
+		for(i = 0; i <= n_pes; i++)
 			trialpes[i]=-1;
 
 		if(extractIndex==0)

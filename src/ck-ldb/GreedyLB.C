@@ -184,7 +184,7 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
   return data;
 }
 
-void GreedyLB::work(BaseLB::LDStats* stats, int count)
+void GreedyLB::work(LDStats* stats, int count)
 {
   int  obj, heapSize, objCount;
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
