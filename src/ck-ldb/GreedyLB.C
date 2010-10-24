@@ -184,11 +184,14 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
   return data;
 }
 
-void GreedyLB::work(LDStats* stats, int count)
+void GreedyLB::work(LDStats* stats)
 {
   int  obj, heapSize, objCount;
-  HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
-  HeapData *objData = BuildObjectArray(stats, count, &objCount);
+  int n_pes = stats->n_pes;
+
+  HeapData *cpuData = BuildCpuArray(stats, n_pes, &heapSize);
+  HeapData *objData = BuildObjectArray(stats, n_pes, &objCount);
+
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In GreedyLB strategy\n",CkMyPe());
   heapSize--;

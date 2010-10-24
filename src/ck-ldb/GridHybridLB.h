@@ -93,7 +93,7 @@ class GridHybridLB : public CentralLB
     GridHybridLB (CkMigrateMessage *msg);
 
     CmiBool QueryBalanceNow (int step);
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:

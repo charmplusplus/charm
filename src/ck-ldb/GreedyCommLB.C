@@ -235,10 +235,8 @@ void GreedyCommLB::work(LDStats* stats)
 
     int id,maxid,spe=0,minpe=0,mpos;
     double temp,total_time,min_temp;
-    /*
-    for(pe=0;pe < count;pe++)
-	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
-    */
+    // for(pe=0;pe < count;pe++)
+    //	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
 
     double *pe_comm = new double[npe];
     for (int i=0; i<npe; i++) pe_comm[i] = 0.0;
