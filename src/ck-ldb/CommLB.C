@@ -144,7 +144,7 @@ void CommLB::work(LDStats* stats)
   //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
   nobj = stats->n_objs;
-  npe = stats->count;
+  npe = stats->n_pes;
 
   stats->makeCommHash();
 

@@ -366,7 +366,7 @@ void CentralLB::MissMigrate(int waitForBarrier)
 // not used when USE_REDUCTION = 1
 void CentralLB::buildStats()
 {
-    statsData->count = stats_msg_count;
+    statsData->n_pes = stats_msg_count;
     // allocate space
     statsData->objData.resize(statsData->n_objs);
     statsData->from_proc.resize(statsData->n_objs);
@@ -507,7 +507,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
  
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
-    statsData->count = stats_msg_count;
+    statsData->n_pes = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
   }
 #endif

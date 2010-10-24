@@ -64,7 +64,7 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
 void RecBisectBfLB::work(LDStats* stats)
 {
   int i;
-  int numPartitions = stats->count;
+  int numPartitions = stats->n_pes;
 
   PartitionList *partitions;
 

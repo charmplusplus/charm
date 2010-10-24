@@ -79,9 +79,9 @@ BaseLB::LDStats::LDStats(int c, int complete)
 	: n_objs(0), n_migrateobjs(0), n_comm(0), 
           objHash(NULL), complete_flag(complete)
 {
-  count = c;
-  if (count == 0) count = CkNumPes();
-  procs = new ProcStats[count]; 
+  n_pes = c;
+  if (n_pes == 0) n_pes = CkNumPes();
+  procs = new ProcStats[n_pes];
 }
 
 const static unsigned int doublingPrimes[] = {
@@ -251,7 +251,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 	      senderPE = to_proc[idx];
 	      CmiAssert(senderPE != -1);
 	    }
-	    CmiAssert(senderPE < count && senderPE >= 0);
+	    CmiAssert(senderPE < n_pes && senderPE >= 0);
 
             // find receiver: point-to-point and multicast two cases
 	    int receiver_type = cdata.receiver.get_type();
@@ -266,7 +266,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 		}
 		else {
 	          receiverPE = to_proc[idx];
-                  CmiAssert(receiverPE < count && receiverPE >= 0);
+                  CmiAssert(receiverPE < n_pes && receiverPE >= 0);
 		}
               }
 	      if(senderPE != receiverPE)
@@ -285,7 +285,7 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 		CmiAssert(idx != -1);
 	        if (idx == -1) continue;    // receiver has just been removed?
 	        receiverPE = to_proc[idx];
-		CmiAssert(receiverPE < count && receiverPE >= 0);
+		CmiAssert(receiverPE < n_pes && receiverPE >= 0);
 		int exist = 0;
 	        for (int p=0; p<pes.size(); p++) 
 		  if (receiverPE == pes[p]) { exist=1; break; }
@@ -306,8 +306,8 @@ void BaseLB::LDStats::print()
 {
 #if CMK_LBDB_ON
   int i;
-  CkPrintf("------------- Processor Data: %d -------------\n", count);
-  for(int pe=0; pe < count; pe++) {
+  CkPrintf("------------- Processor Data: %d -------------\n", n_pes);
+  for(int pe=0; pe < n_pes; pe++) {
     struct ProcStats &proc = procs[pe];
 
     CkPrintf(
@@ -362,7 +362,7 @@ double BaseLB::LDStats::computeAverageLoad()
   double total = 0;
   for (i=0; i<n_objs; i++) total += objData[i].wallTime;
                                                                                 
-  for (i=0; i<count; i++)
+  for (i=0; i<n_pes; i++)
     if (procs[i].available == CmiTrue) {
         total += procs[i].bg_walltime;
 	numAvail++;
@@ -403,13 +403,13 @@ void BaseLB::LDStats::removeObject(int obj)
 void BaseLB::LDStats::pup(PUP::er &p)
 {
   int i;
-  p(count);  
+  p(n_pes);
   p(n_objs);
   p(n_migrateobjs);
   p(n_comm);
   if (p.isUnpacking()) {
     // user can specify simulated processors other than the real # of procs.
-    int maxpe = count>LBSimulation::simProcs?count:LBSimulation::simProcs;
+    int maxpe = n_pes > LBSimulation::simProcs ? n_pes : LBSimulation::simProcs;
     procs = new ProcStats[maxpe];
     objData.resize(n_objs);
     commData.resize(n_comm);
@@ -421,10 +421,10 @@ void BaseLB::LDStats::pup(PUP::er &p)
   // otherwise load everything
   if (p.isUnpacking() && LBSimulation::procsChanged) {
     ProcStats dummy;
-    for (i=0; i<count; i++) p|dummy; 
+    for (i=0; i<n_pes; i++) p|dummy;
   }
   else
-    for (i=0; i<count; i++) p|procs[i];
+    for (i=0; i<n_pes; i++) p|procs[i];
   for (i=0; i<n_objs; i++) p|objData[i]; 
   for (i=0; i<n_objs; i++) p|from_proc[i]; 
   for (i=0; i<n_objs; i++) p|to_proc[i]; 
@@ -433,18 +433,18 @@ void BaseLB::LDStats::pup(PUP::er &p)
     for (i=0; i<n_objs; i++) to_proc[i] = from_proc[i];
   for (i=0; i<n_comm; i++) p|commData[i];
   if (p.isUnpacking())
-    count = LBSimulation::simProcs;
+    n_pes = LBSimulation::simProcs;
   if (p.isUnpacking()) {
     objHash = NULL;
     if (_lb_args.lbversion() <= 1) 
-      for (i=0; i<count; i++) procs[i].pe = i;
+      for (i=0; i<n_pes; i++) procs[i].pe = i;
   }
 }
 
 int BaseLB::LDStats::useMem() { 
   // calculate the memory usage of this LB (superclass).
-  return sizeof(LDStats) + sizeof(ProcStats)*count + 
-	 (sizeof(LDObjData) + 2*sizeof(int)) * n_objs +
+  return sizeof(LDStats) + sizeof(ProcStats) * n_pes +
+	 (sizeof(LDObjData) + 2 * sizeof(int)) * n_objs +
  	 sizeof(LDCommData) * n_comm;
 }
 

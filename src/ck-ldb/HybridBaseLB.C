@@ -312,7 +312,7 @@ void HybridBaseLB::buildStats(int atlevel)
 
   // statsMsgsList
   DEBUGF(("[%d] buildStats for %d nobj:%d\n", CkMyPe(), stats_msg_count, statsData->n_objs));
-  statsData->count = stats_msg_count;
+  statsData->n_pes = stats_msg_count;
   statsData->objData.resize(statsData->n_objs);
   statsData->commData.resize(statsData->n_comm);
   statsData->from_proc.resize(statsData->n_objs);
@@ -397,7 +397,7 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   cmsg->bg_walltime = 0.0;
   cmsg->bg_cputime = 0.0;
 
-  for (int pe=0; pe<statsData->count; pe++) {
+  for (int pe=0; pe<statsData->n_pes; pe++) {
         struct ProcStats &procStat = statsData->procs[pe];
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;

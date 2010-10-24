@@ -28,7 +28,7 @@ RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 void RefineLB::work(LDStats* stats)
 {
   int obj;
-  int n_pes = stats->count;
+  int n_pes = stats->n_pes;
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 

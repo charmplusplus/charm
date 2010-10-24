@@ -195,7 +195,7 @@ GreedyAgentLB::BuildCpuArray(CentralLB::LDStats* stats,
 void GreedyAgentLB::work(LDStats* stats)
 {
   int  i, obj, heapSize, objCount;
-  int n_pes = stats->count;
+  int n_pes = stats->n_pes;
 
   int *pemap = new int [n_pes];
   HeapData *cpuData = BuildCpuArray(stats, n_pes, &heapSize);

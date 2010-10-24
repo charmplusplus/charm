@@ -311,7 +311,7 @@ void OrbLB::work(LDStats* stats)
 
   statsData = stats;
 
-  P = stats->count;
+  P = stats->n_pes;
 
   // calculate total number of migratable objects
   nObjs = stats->n_migrateobjs;

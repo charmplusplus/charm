@@ -34,7 +34,7 @@ void RefineCommLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int obj;
-  int n_pes = stats->count;
+  int n_pes = stats->n_pes;
 
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 

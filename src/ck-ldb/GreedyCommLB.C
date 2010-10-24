@@ -142,7 +142,7 @@ void GreedyCommLB::work(LDStats* stats)
     int i;
     
     if (_lb_args.debug()) CkPrintf("In GreedyCommLB strategy\n",CkMyPe());
-    npe = stats->count;
+    npe = stats->n_pes;
     nobj = stats->n_objs;
 
     // nmigobj is calculated as the number of migratable objects

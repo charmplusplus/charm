@@ -68,15 +68,16 @@ public:
   };
 
   struct LDStats {  // Passed to Strategy
-    ProcStats  *procs;
-    int count; 
-    
-    int   n_objs;
-    int   n_migrateobjs;
+    int n_pes;		// number of pes in the array procs
+    ProcStats *procs;	// array of pes
+
+    int n_objs;		// number of objects in the database
+    int n_migrateobjs;	// number of migratable objects
     CkVec<LDObjData> objData;
-    int   n_comm;
+
+    int n_comm;		// number of edges in the vector commData
     CkVec<LDCommData> commData;
-    CkVec<int>  from_proc, to_proc;
+    CkVec<int> from_proc, to_proc;
 
     int *objHash; 
     int  hashSize;
@@ -103,7 +104,7 @@ public:
       deleteCommHash();
     }
     void clearBgLoad() {
-      for (int i=0; i<count; i++) procs[i].clearBgLoad();
+      for (int i=0; i<n_pes; i++) procs[i].clearBgLoad();
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();

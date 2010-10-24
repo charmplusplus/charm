@@ -47,7 +47,7 @@ CmiBool PhasebyArrayLB::QueryBalanceNow(int _step)
 
 void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats){
 	int i;
-	tempStats->count = stats->count;
+	tempStats->n_pes = stats->n_pes;
 	tempStats->n_objs = stats->n_objs;
 	tempStats->n_comm = stats->n_comm;
 	tempStats->n_migrateobjs = stats->n_migrateobjs;
@@ -71,8 +71,8 @@ void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats
 	for(i=0;i<tempStats->n_comm;i++)
 		tempStats->commData[i]=stats->commData[i];
 	
-	tempStats->procs = new BaseLB::ProcStats[tempStats->count];
-	for(i=0;i<tempStats->count;i++)
+	tempStats->procs = new BaseLB::ProcStats[tempStats->n_pes];
+	for(i=0; i<tempStats->n_pes; i++)
 		tempStats->procs[i]=stats->procs[i];
 }
 
