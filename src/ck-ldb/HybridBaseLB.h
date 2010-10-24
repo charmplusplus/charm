@@ -349,14 +349,14 @@ private:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-  virtual void work(LDStats* stats,int count);
-  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual void work(LDStats* stats);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
 
-    // helper function
+  // helper function
   LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count);
 
-  virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats,int count);
+  virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
 
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index

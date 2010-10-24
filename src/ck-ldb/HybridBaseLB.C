@@ -468,14 +468,14 @@ void HybridBaseLB::Loadbalancing(int atlevel)
 
   if ((statsStrategy == SHRINK || statsStrategy == SHRINK_NULL) && atlevel == tree->numLevels()-1) {
     // no obj and comm data
-    LBVectorMigrateMsg* migrateMsg = VectorStrategy(statsData, nclients);
+    LBVectorMigrateMsg* migrateMsg = VectorStrategy(statsData);
     strat_end_time = CkWallTimer();
 
     // send to children 
     thisProxy.ReceiveVectorMigration(migrateMsg, nclients, lData->children);
   }
   else {
-    LBMigrateMsg* migrateMsg = Strategy(statsData, nclients);
+    LBMigrateMsg* migrateMsg = Strategy(statsData);
     strat_end_time = CkWallTimer();
 
     // send to children 
@@ -513,10 +513,10 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   }
 }
 
-LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
-  work(stats, count);
+  work(stats);
 
   if (_lb_args.debug()>2)  {
     CkPrintf("Obj Map:\n");
@@ -524,7 +524,7 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
     CkPrintf("\n");
   }
 
-  return createMigrateMsg(stats, count);
+  return createMigrateMsg(stats);
 #else
   return NULL;
 #endif
@@ -600,9 +600,9 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 #endif
 }
 
-extern LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count);
+extern LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats);
 
-LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats,int count)
+LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
   LBVectorMigrateMsg* msg;
@@ -612,7 +612,7 @@ LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats,int count)
     msg->level = currentLevel;
   }
   else {
-    msg = ::VectorStrategy(stats, count);
+    msg = ::VectorStrategy(stats);
     msg->level = currentLevel;
 
     // translate pe number
@@ -1142,14 +1142,14 @@ void HybridBaseLB::ResumeClients(int balancing)
 #endif
 }
 
-void HybridBaseLB::work(LDStats* stats,int count)
+void HybridBaseLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   CkPrintf("[%d] HybridBaseLB::work called!\n", CkMyPe());
 #endif
 }
   
-LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
+LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int i;
