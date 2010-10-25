@@ -27,14 +27,19 @@ class TraceControlPointsInit : public Chare {
 
 class TraceControlPointsBOC : public CBase_TraceControlPointsBOC {
 public:
-  TraceControlPointsBOC(void) {};
+  TraceControlPointsBOC(void) {
+  };
+
 
   void pup(PUP::er &p)
   {
     CBase_TraceControlPointsBOC::pup(p);
+    if(p.isUnpacking()){
+      CkPrintf("Group TraceControlPointsBOC is not yet capable of migration.\n");
+    }
   }
 
- TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) { delete m; };
+ TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) {};
 
 };
 
