@@ -92,8 +92,9 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minBytesHops<Iterator,SpanningT
     {
         (*itr).X.reserve(3);
         (*itr).X.assign(3,0);
+        int coreNum; ///< dummy var. Get and discard the core number
         ///@todo: If the machine coordinates are already stored in the vertices, do we want to find them again?
-        aTopoMgr.rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2] );
+        aTopoMgr.rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2], coreNum );
         /// If this is a not a local node (separated by the network from the tree root)
         if (numHops(*firstVtx,*itr) > 0)
             numRemoteDestinations++;
