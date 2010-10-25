@@ -673,6 +673,21 @@ EOT
 test_cxx "whether std::distance is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_DISTANCE, $pass, [whether std::distance works])
 
+#### check if std::inserter is defined #####
+cat > $t <<EOT
+#include <list>
+#include <iterator>
+
+void foo()
+{
+  using namespace std;
+  list<int> L;
+  inserter ( L, L.end ( ) ) = 500;
+}
+EOT
+test_cxx "whether std::inserter is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
