@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <iterator>
+#include <cstdlib>
 
 #include "conv-config.h"
 #include "spanningTreeVertex.h"
