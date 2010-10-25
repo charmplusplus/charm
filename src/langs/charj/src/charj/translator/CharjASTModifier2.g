@@ -510,10 +510,19 @@ primaryExpression returns [Type type]
 		{
 			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
 		}
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression domainExpression)
 		{
-			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
+			$type = $ARRAY_ELEMENT_ACCESS.symbolType; // TODO this is not correct, as it's always null
+			if($pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1)
+			{
+				System.out.println("creating a new ArraySectionInitializer");
+				ArraySectionInitializer asi = new ArraySectionInitializer($domainExpression.ranges, ((ProxyType)$pe.type).baseType.getTypeName());
+				currentClass.sectionInitializers.add(asi);
+				System.out.println(asi);
+			}
 		}
+			->	{ $pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1 }? ^(METHOD_CALL IDENT["arraySectionInitializer" + (ArraySectionInitializer.getCount() - 1)] ^(ARGUMENT_LIST ^(EXPR primaryExpression)))
+			-> 																			 		 ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
 		{
@@ -552,14 +561,6 @@ arrayTypeDeclarator
 
 newExpression returns [Type type]
     :   ^(NEW_EXPRESSION arguments? domainExpression)
-	|	^(NEW ^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression) ^(ARGUMENT_LIST expression))
-		{
-			System.out.println("creating a new ArraySectionInitializer");
-			ArraySectionInitializer asi = new ArraySectionInitializer($domainExpression.ranges, getQualIdText($qualifiedTypeIdent.tree));
-			currentClass.sectionInitializers.add(asi);
-			System.out.println(asi);
-		}
-		->	^(METHOD_CALL IDENT["arraySectionInitializer" + (ArraySectionInitializer.getCount() - 1)] ^(ARGUMENT_LIST expression))
     |   ^(NEW nonArraySectionObjectType arguments)
 		{
 			$type = $nonArraySectionObjectType.type;

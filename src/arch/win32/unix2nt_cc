@@ -1,14 +1,12 @@
 #!/bin/sh
 ##############################################################################
-# unix2nt_cc:  for VC++ ver 8
+# unix2nt_cc:  for VC++ ver 8 and later (VS 2003, 2008, 2010)
 # Maps UNIX C/C++ compiler command-line options to 
-# Microsoft Visual C++ 6.0 command line options. 
+# Microsoft Visual C++ command line options.
 # That is, this script is a UNIX-ifying wrapper for 
 # the NT CL and LINK commands. 
 #
 # Known bugs: pathnames with spaces cause quoting problems.
-#
-# Orion Sky Lawlor, olawlor@acm.org, 1/22/2001
 ##############################################################################
 
 #TMP environment variable seems get lost in sub shell
@@ -47,7 +45,7 @@ fi
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
-CL_COMMON=' /nologo /W1 /EHsc /DWIN32 /D_WINDOWS /FD /Zp4'
+CL_COMMON=' /nologo /W1 /EHsc /DWIN32 /D_WINDOWS /Zp4'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
 CL_DEF=$CL_COMMON" /MT"

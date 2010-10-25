@@ -564,7 +564,7 @@ if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize $OPTS"
+    OPTS="-optimize -production $OPTS"
     CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
 fi
 
