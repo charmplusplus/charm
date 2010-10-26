@@ -238,6 +238,8 @@ class CkVerboseListener : public CkArrayListener {
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
+	friend class CkArray;
+
 	CkArrayIndexMax numInitial;///< Number of elements to create
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
@@ -624,7 +626,7 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 class CkArrayBroadcaster : public CkArrayListener {
   inline int &getData(ArrayElement *el) {return *ckGetData(el);}
 public:
-  CkArrayBroadcaster(void);
+  CkArrayBroadcaster(bool _stableLocations);
   CkArrayBroadcaster(CkMigrateMessage *m);
   virtual void pup(PUP::er &p);
   virtual ~CkArrayBroadcaster();
@@ -655,6 +657,7 @@ private:
   //This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
   CkQ<CkArrayMessage *> oldBcasts;
+  bool stableLocations;
 
   CmiBool bringUpToDate(ArrayElement *el);
 };

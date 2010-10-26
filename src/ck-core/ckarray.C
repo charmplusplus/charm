@@ -538,7 +538,7 @@ CkArray::CkArray(CkArrayOptions &opts,
 
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
-  broadcaster=new CkArrayBroadcaster();
+  broadcaster=new CkArrayBroadcaster(stableLocations);
   addListener(broadcaster);
   reducer=new CkArrayReducer(thisgroup);
   addListener(reducer);
@@ -871,11 +871,10 @@ CkArrayReducer::~CkArrayReducer() {}
 
 /*********************** CkArray Broadcast ******************/
 
-CkArrayBroadcaster::CkArrayBroadcaster(void)
-  :CkArrayListener(1) //Each array element carries a broadcast number
-{
-  bcastNo=oldBcastNo=0;
-}
+CkArrayBroadcaster::CkArrayBroadcaster(bool stableLocations_)
+    :CkArrayListener(1), //Each array element carries a broadcast number
+     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_)
+{ }
 CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
     :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1)
 { }
@@ -885,6 +884,7 @@ void CkArrayBroadcaster::pup(PUP::er &p) {
   /* Assumption: no migrants during checkpoint, so no need to
      save old broadcasts. */
   p|bcastNo;
+  p|stableLocations;
   if (p.isUnpacking()) {
     oldBcastNo=bcastNo; /* because we threw away oldBcasts */
   }
@@ -899,7 +899,7 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (_isAnytimeMigration) {
+  if (!stableLocations) {
     DEBB((AA"Received broadcast %d\n"AB,bcastNo));
     CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
     oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
@@ -927,7 +927,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 /// Deliver all needed broadcasts to the given local element
 CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (! _isAnytimeMigration) return CmiTrue;
+  if (stableLocations) return CmiTrue;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -957,7 +957,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
-  if (! _isAnytimeMigration) return;
+  if (stableLocations) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -1107,7 +1107,8 @@ void CkArray::recvBroadcast(CkMessage *m)
 	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
 	startVTimer();
 #endif
-	if (! _isAnytimeMigration) {
+
+	if (stableLocations) {
 	  delete msg;
 	}
 }
