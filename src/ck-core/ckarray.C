@@ -60,7 +60,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 CpvDeclare(int ,serializer);
 
-CmiBool _isAnytimeMigration;
+bool _isAnytimeMigration;
 
 #define ARRAY_DEBUG_OUTPUT 0
 
