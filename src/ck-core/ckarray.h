@@ -242,6 +242,10 @@ class CkArrayOptions {
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
+
+	/// Set various safe defaults for all the constructors
+	void init();
+
  public:
  //Used by external world:
 	CkArrayOptions(void); ///< Default: empty array
