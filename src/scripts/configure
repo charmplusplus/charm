@@ -2489,6 +2489,25 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if std::inserter is defined #####
+cat > $t <<EOT
+#include <list>
+#include <iterator>
+
+void foo()
+{
+  using namespace std;
+  list<int> L;
+  inserter ( L, L.end ( ) ) = 500;
+}
+EOT
+test_cxx "whether std::inserter is defined" "ok" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STD_INSERTER $pass
+_ACEOF
+
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
