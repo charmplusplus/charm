@@ -513,18 +513,16 @@ void _ckArrayInit(void)
 
 CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
   : CkReductionMgr(),
-  locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),locMgrID(c.getLocationManager()),
-  thisProxy(thisgroup)
+    locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
+    locMgrID(c.getLocationManager()),
+    thisProxy(thisgroup),
+    // Register with our location manager
+    elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
+    numInitial(c.getNumInitial()), isInserting(CmiTrue)
 {
-  //Registration
-  elements=(ArrayElementList *)locMgr->addManager(thisgroup,this);
 //  moved to _ckArrayInit()
 //  CkpvInitialize(ArrayElement_initInfo,initInfo);
   CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
-
-  //Set class variables
-  numInitial=c.getNumInitial();
-  isInserting=CmiTrue;
 
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
