@@ -1081,7 +1081,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 	while (NULL!=(el=elements->next(idx))) {
 #if CMK_BLUEGENE_CHARM
-//                BgEntrySplit("split-broadcast");
+                //BgEntrySplit("split-broadcast");
   		stopVTimer();
                 void *curlog = BgSplitEntry("split-broadcast", &root, 1);
                 logs.push_back(curlog);
@@ -1092,10 +1092,10 @@ void CkArray::recvBroadcast(CkMessage *m)
 #endif
 
 #if CMK_BLUEGENE_CHARM
-//                BgEntrySplit("end-broadcast");
-  		stopVTimer();
-                BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
-  		startVTimer();
+	//BgEntrySplit("end-broadcast");
+	stopVTimer();
+	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
+	startVTimer();
 #endif
 	if (! _isAnytimeMigration) {
 	  delete msg;
