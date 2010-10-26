@@ -242,6 +242,9 @@ class CkArrayOptions {
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
+	CkCallback reductionClient; // Default target of reductions
+	bool anytimeMigration; // Elements are allowed to move freely
+	bool staticInsertion; // Elements are only inserted at construction
 
 	/// Set various safe defaults for all the constructors
 	void init();
@@ -295,6 +298,11 @@ class CkArrayOptions {
 
 	/// Add an array listener component to this array (keeps the new'd listener)
 	CkArrayOptions &addListener(CkArrayListener *listener);
+
+	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
+	CkArrayOptions &setStaticInsertion(bool b) { staticInsertion = b; return *this; }
+	CkArrayOptions &setReductionClient(CkCallback cb)
+	{ reductionClient = cb; return *this; }
 
   //Used by the array manager:
 	const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
@@ -697,6 +705,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
+  bool stableLocations;
 
 public:
 //Array Creation:

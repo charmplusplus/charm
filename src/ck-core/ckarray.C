@@ -377,6 +377,9 @@ CkArrayOptions::CkArrayOptions(int ni1, int ni2, int ni3) //With initial element
 void CkArrayOptions::init()
 {
     locMgr.setZero();
+    anytimeMigration = _isAnytimeMigration;
+    staticInsertion = false;
+    reductionClient.type = CkCallback::invalid;
 }
 
 /// Bind our elements to this array
@@ -399,6 +402,9 @@ void CkArrayOptions::pup(PUP::er &p) {
 	p|map;
 	p|locMgr;
 	p|arrayListeners;
+	p|reductionClient;
+	p|anytimeMigration;
+	p|staticInsertion;
 }
 
 CkArrayListener::CkArrayListener(int nInts_) 
@@ -525,6 +531,7 @@ CkArray::CkArray(CkArrayOptions &opts,
     thisProxy(thisgroup),
     // Register with our location manager
     elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
+    stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(CmiTrue)
 {
   CcdCallOnConditionKeep(CcdPERIODIC_1minute, staticSpringCleaning, (void *)this);
