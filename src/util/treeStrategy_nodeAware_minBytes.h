@@ -98,14 +98,14 @@ namespace impl {
         {
             /// Determine how many branches can be used to span the local destinations
             int numRemoteDestinations = std::distance(firstVtx,beyondLastVtx) -1 - numLocalDestinations; ///< @warning: This is O(treeSize) for Iterator != random iterator
-            numLocalBranches = (numRemoteDestinations >= maxBranches-1)? 1 : (maxBranches - numRemoteDestinations);
+            numLocalBranches = (numRemoteDestinations >= maxBranches)? 1 : (maxBranches - numRemoteDestinations);
 
             /// Distribute the local destination vertices amongst numLocalBranches branches
             Iterator beyondLastLocal = lastLocal;
             parent = buildNextGen_topoUnaware(firstVtx,++beyondLastLocal,numLocalBranches);
 
             /// Construct a topo-unaware tree for the rest (off-node PEs) of the vertices
-            SpanningTreeVertex *remoteSubTrees = buildNextGen_topoUnaware(lastLocal,beyondLastVtx,maxBranches-numLocalBranches); ///< Abuse the interface by faking lastLocal as the tree root
+            SpanningTreeVertex *remoteSubTrees = buildNextGen_topoUnaware(lastLocal,beyondLastVtx,maxBranches); ///< Abuse the interface by faking lastLocal as the tree root
 
             /// Append the remote sub-tree info to the result object
             for (int i=0, n=remoteSubTrees->childIndex.size(); i< n; i++)
