@@ -562,6 +562,9 @@ CkArray::CkArray(CkArrayOptions &opts,
   nodeProxy = nodetemp;
   //nodeProxy = new CProxy_CkArrayReductionMgr (nodereductionID);
 #endif
+
+  if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)
+      ckSetReductionClient(&opts.reductionClient);
 }
 
 CkArray::CkArray(CkMigrateMessage *m)
