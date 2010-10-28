@@ -302,7 +302,7 @@ class CkArrayOptions {
 	CkArrayOptions &addListener(CkArrayListener *listener);
 
 	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
-	CkArrayOptions &setStaticInsertion(bool b) { staticInsertion = b; return *this; }
+	CkArrayOptions &setStaticInsertion(bool b);
 	CkArrayOptions &setReductionClient(CkCallback cb)
 	{ reductionClient = cb; return *this; }
 

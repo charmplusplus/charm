@@ -203,6 +203,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 }
 
 CkGroupID _defaultArrayMapID;
+CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {
@@ -820,6 +821,7 @@ class CkMapsInit : public Chare
 public:
 	CkMapsInit(CkArgMsg *msg) {
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+		_fastArrayMapID = _defaultArrayMapID;
 		delete msg;
 	}
 

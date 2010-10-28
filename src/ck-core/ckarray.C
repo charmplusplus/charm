@@ -385,6 +385,14 @@ void CkArrayOptions::init()
     reductionClient.type = CkCallback::invalid;
 }
 
+CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
+{
+    staticInsertion = b;
+    if (b && map == _defaultArrayMapID)
+	map = _fastArrayMapID;
+    return *this;
+}
+
 /// Bind our elements to this array
 CkArrayOptions &CkArrayOptions::bindTo(const CkArrayID &b)
 {
