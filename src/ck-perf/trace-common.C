@@ -662,4 +662,30 @@ void traceEndFuncIndexProj(int idx){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
 }
 
+#if CMK_SMP_TRACE_COMMTHREAD
+extern "C"
+void traceBeginCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginExecute((envelope *)msg);
+#endif
+}
+
+extern "C"
+void traceEndCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endExecute();
+#endif
+}
+#endif
+
+extern "C"
+void traceChangeLastTimestamp(double ts){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->changeLastEntryTimestamp(ts);
+#endif
+}
+
 /*@}*/

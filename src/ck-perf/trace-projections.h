@@ -345,7 +345,7 @@ class LogPool {
     void setWriteData(bool b){
       writeData = b;
     }
-
+    void modLastEntryTimestamp(double ts);
 };
 
 /*
@@ -466,6 +466,7 @@ class TraceProjections : public Trace {
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
+    void changeLastEntryTimestamp(double ts);
     void beginExecuteLocal(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
     void endExecuteLocal(void);
