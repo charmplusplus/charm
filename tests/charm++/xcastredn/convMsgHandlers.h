@@ -2,12 +2,10 @@
 #define CONV_MSG_HANDLERS_H
 
 /// Converse broadcast and reduction handler function IDs. Global vars.
-extern int bcastHandlerID, rednHandlerID, bcastConverterID;
+extern int bcastHandlerID, rednHandlerID;
 
-/// Converse broadcast handler
-void convBcastHandler(void *env);
 /// Converse msg handler. Converts a converse bcast to a charm array bcast
-void convBcastToArrayBcastHandler(void *env);
+void convBcastHandler(void *env);
 // Converse redn msg handler triggered at the root of the converse redn
 void convRednHandler(void *env);
 /// Converse redn merge fn triggered at each vertex along the redn tree

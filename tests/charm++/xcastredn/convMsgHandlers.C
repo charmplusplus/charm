@@ -48,34 +48,8 @@ void convRednHandler(void *env)
 
 
 
-/// Converse broadcast handler
-void convBcastHandler(void *env)
-{
-    #ifdef VERBOSE_OPERATION
-        CkPrintf("\n[%d] Received converse bcast",CkMyPe());
-    #endif
-    /// Touch the data cursorily
-    DataMsg *msg = DataMsg::unpack( EnvToUsr((envelope*)env) );
-    msg->data[0] = 0;
-    /// Prepare some data to be returned
-    double *returnData = msg->data;
-    CkReductionMsg *redMsg = CkReductionMsg::buildNew( msg->size*sizeof(double), returnData, CkReduction::sum_double);
-    CkReductionMsg::pack( redMsg );
-    envelope *redEnv = UsrToEnv(redMsg);
-    /// Contribute to reduction
-    #ifdef VERBOSE_OPERATION
-        CkPrintf("\n[%d] Going to trigger reduction using mechanism: %s",CkMyPe(), commName[msg->commType]);
-    #endif
-    CmiSetHandler(redEnv, rednHandlerID);
-    CmiReduce(redEnv, redEnv->getTotalsize(), convRedn_sum);
-    /// Delete the incoming msg
-    delete msg;
-}
-
-
-
 /// Converse message handler that translates a converse broadcast to a charm array bcast
-void convBcastToArrayBcastHandler(void *env)
+void convBcastHandler(void *env)
 {
     #ifdef VERBOSE_OPERATION
         CkPrintf("\n[%d] Received converse bcast. Gonna deliver to local array elements",CkMyPe());
@@ -101,7 +75,6 @@ void registerHandlers()
 {
     bcastHandlerID   = CmiRegisterHandler(convBcastHandler);
     rednHandlerID    = CmiRegisterHandler(convRednHandler);
-    bcastConverterID = CmiRegisterHandler(convBcastToArrayBcastHandler);
 }
 
 #include "reductionBenchmark.def.h"

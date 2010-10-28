@@ -3,7 +3,7 @@
 
 //----------------- externed globals -----------------
 extern TestController *mainChare;
-extern int bcastHandlerID, bcastConverterID;
+extern int bcastHandlerID;
 
 /// Readonly proxy to the QHogger group
 CProxy_QHogger hogger;
@@ -208,7 +208,7 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
         {
             DataMsg::pack(msg);
             envelope *env = UsrToEnv(msg);
-            CmiSetHandler(env, bcastConverterID);
+            CmiSetHandler(env, bcastHandlerID);
             timeStart = CmiWallTimer();
             CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
             break;
