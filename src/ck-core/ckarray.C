@@ -516,14 +516,16 @@ void _ckArrayInit(void)
   // by default anytime migration is allowed
 }
 
-CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID nodereductionID)
+CkArray::CkArray(CkArrayOptions &opts,
+		 CkMarshalledMessage &initMsg,
+		 CkNodeGroupID nodereductionID)
   : CkReductionMgr(),
-    locMgr(CProxy_CkLocMgr::ckLocalBranch(c.getLocationManager())),
-    locMgrID(c.getLocationManager()),
+    locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
+    locMgrID(opts.getLocationManager()),
     thisProxy(thisgroup),
     // Register with our location manager
     elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
-    numInitial(c.getNumInitial()), isInserting(CmiTrue)
+    numInitial(opts.getNumInitial()), isInserting(CmiTrue)
 {
 //  moved to _ckArrayInit()
 //  CkpvInitialize(ArrayElement_initInfo,initInfo);
@@ -540,8 +542,8 @@ CkArray::CkArray(CkArrayOptions &c,CkMarshalledMessage &initMsg,CkNodeGroupID no
   //calistener = new ComlibArrayListener();
   //addListener(calistener,dataOffset);
 
-  int lNo,nL=c.getListeners(); //User-added listeners
-  for (lNo=0;lNo<nL;lNo++) addListener(c.getListener(lNo));
+  int lNo,nL=opts.getListeners(); //User-added listeners
+  for (lNo=0;lNo<nL;lNo++) addListener(opts.getListener(lNo));
 
   for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
 
