@@ -18,6 +18,7 @@ class MyChareArray: public CBase_MyChareArray
         CkGroupID mcastGrpID;
         CkMulticastMgr *mcastMgr;
         CkSectionInfo sid;
+        double *returnData;
 };
 
 #endif // MY_CHARE_ARRAY_H

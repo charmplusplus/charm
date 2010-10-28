@@ -1,4 +1,5 @@
 #include "myChareArray.h"
+#include <algorithm>
 
 //----------------- externed globals -----------------
 extern std::vector<MyChareArray*> localElems;
@@ -12,6 +13,10 @@ MyChareArray::MyChareArray(CkGroupID grpID): msgNum(0), mcastGrpID(grpID)
     #endif
     mcastMgr = CProxy_CkMulticastMgr(mcastGrpID).ckLocalBranch();
     localElems.push_back(this);
+    /// Prepare some data to be returned (max sized contribution)
+    int numUnits = cfg.msgSizeMax * 1024 /sizeof(double);
+    returnData   = new double[numUnits];
+    std::fill(returnData, returnData + numUnits, 100);
 }
 
 
@@ -24,8 +29,6 @@ void MyChareArray::crunchData(DataMsg *msg)
     #endif
     /// Touch the data cursorily
     msg->data[0] = 0;
-    /// Prepare some data to be returned
-    double *returnData = msg->data;
     /// Contribute to reduction
     #ifdef VERBOSE_OPERATION
         CkPrintf("\nArrayElem[%d] Going to trigger reduction using mechanism: %s",thisIndex,commName[msg->commType]);
