@@ -78,8 +78,9 @@ extern config cfg;
 class DataMsg: public CkMcastBaseMsg, public CMessage_DataMsg
 {
     public:
-        DataMsg(int numUnits, CommMechanism cType): size(numUnits), commType(cType) {}
-        int size;
+        DataMsg(int numXcastUnits, int numRednUnits, CommMechanism cType)
+               : size(numXcastUnits), rednSize(numRednUnits), commType(cType) {}
+        int size, rednSize;
         CommMechanism commType;
         double *data;
 };

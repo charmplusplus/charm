@@ -36,17 +36,17 @@ void MyChareArray::crunchData(DataMsg *msg)
     switch (msg->commType)
     {
         case CharmBcast:
-            contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double);
+            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
             break;
 
         case CkMulticast:
             CkGetSectionInfo(sid, msg);
-            mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case Comlib:
             CkGetSectionInfo(sid, msg);
-            mcastMgr->contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double,sid);
+            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         case ConverseBcast:
@@ -54,7 +54,7 @@ void MyChareArray::crunchData(DataMsg *msg)
             break;
 
         case ConverseToArrayBcast:
-            contribute(msg->size*sizeof(double),returnData,CkReduction::sum_double);
+            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
             break;
 
         default:

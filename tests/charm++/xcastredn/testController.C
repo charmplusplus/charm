@@ -161,15 +161,20 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
 
 void TestController::sendMulticast(const CommMechanism commType, const int msgSize)
 {
-    #ifdef VERBOSE_STATUS
-        CkPrintf("\nMsgSize: %f Sending out multicast number %d",(float)curMsgSize/1024,curRepeatNum+1);
-    #endif
     /// Create a message of required size
-    int numUnits = curMsgSize/sizeof(double);
-    DataMsg *msg = new (numUnits) DataMsg(numUnits,commType);
+    int numXcastUnits = curMsgSize/sizeof(double);
+    int numRednUnits  = curMsgSize/sizeof(double);
+
+    #ifdef VERBOSE_STATUS
+        CkPrintf("\nMsgSize: %f Sending out multicast number %d",(float)(numXcastUnits*sizeof(double))/1024,curRepeatNum+1);
+    #endif
+
+    DataMsg *msg = new (numXcastUnits) DataMsg(numXcastUnits, numRednUnits,commType);
+
     /// Fill it with data
-    for (int i=0; i<numUnits; i++)
+    for (int i=0; i<numXcastUnits; i++)
         msg->data[i] = i;
+
     /// Start the timer and trigger the send to the array / section
     switch (commType)
     {
@@ -223,7 +228,7 @@ void TestController::receiveReduction(CkReductionMsg *msg)
     loopTimes.push_back( 1000*(CmiWallTimer() - timeStart) );
 
     #ifdef VERBOSE_STATUS
-        CkPrintf("\nMsgSize: %f Received reduction number %d for repeat number %d", (float)curMsgSize/1024, msg->getRedNo(), curRepeatNum+1);
+        CkPrintf("\nMsgSize: %f Received reduction number %d for repeat number %d", (float)msg->getSize()/1024, msg->getRedNo(), curRepeatNum+1);
     #endif
 
     /// If this is the first ever multicast/reduction loop, dont time it as it includes tree setup times etc
