@@ -13,14 +13,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
-#  include <fstream.h>
-#  include <iostream.h>
-#else /* ISO C++ */
-#  include <fstream>
-#  include <iostream>
-   using namespace std;
-#endif
+#include <fstream>
+#include <iostream>
+using namespace std;
 
 #include "bigsim_debug.h"
 #undef DEBUGLEVEL

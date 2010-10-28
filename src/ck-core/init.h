@@ -2,11 +2,7 @@
 #define _INIT_H
 
 #include "charm.h" // For CkNumPes
-#if CMK_STL_DONT_USE_DOT_H
 #include <new>   // for in-place new operator
-#else
-#include <new.h>   // for in-place new operator
-#endif
 #include "ckhashtable.h"
 
 typedef CkQ<void *> PtrQ;
