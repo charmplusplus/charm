@@ -396,8 +396,8 @@ CkArrayOptions &CkArrayOptions::addListener(CkArrayListener *listener)
 
 void CkArrayOptions::pup(PUP::er &p) {
 	p|numInitial;
-	p|locMgr;
 	p|map;
+	p|locMgr;
 	p|arrayListeners;
 }
 
