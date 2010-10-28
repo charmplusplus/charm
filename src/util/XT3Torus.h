@@ -64,11 +64,11 @@ class XT3TorusManager {
       int nid = 0, oldnid = -1, lx, ly, lz;
       int minX=XDIM, minY=YDIM, minZ=ZDIM, minT=0, maxX=0, maxY=0, maxZ=0;
 
-      int numprocs = CmiNumPes();
-      pid2coords = (struct loc*)malloc(sizeof(struct loc) * numprocs);
+      int numPes = CmiNumPes();
+      pid2coords = (struct loc*)malloc(sizeof(struct loc) * numPes);
 
       // first fill the nid2pid and pid2nid data structures
-      pidtonid(numprocs);
+      pidtonid(numPes);
  
       for(int i=0; i<XDIM; i++)
 	for(int j=0; j<YDIM; j++)
@@ -78,7 +78,7 @@ class XT3TorusManager {
 
       dimNT = 1;			// assume SN mode first
       // now fill the coords2pid and pid2coords data structures
-      for(int i=0; i<numprocs; i++)
+      for(int i=0; i<numPes; i++)
       {
         nid = pid2nid[i];
 	if (nid != oldnid)

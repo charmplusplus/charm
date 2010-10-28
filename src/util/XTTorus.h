@@ -8,6 +8,7 @@
 #define _XT_TORUS_H_
 
 #include "converse.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -67,10 +68,12 @@ class XTTorusManager {
       int nid = 0, oldnid = -1, lx, ly, lz;
       int i, j, k, l;
       int minX=XDIM, minY=YDIM, minZ=ZDIM, minT=0, maxX=0, maxY=0, maxZ=0;
-      pid2coords = (struct loc*)malloc(sizeof(struct loc) * CmiNumPes());
+
+      int numPes = CmiNumPes();
+      pid2coords = (struct loc*)malloc(sizeof(struct loc) * numPes);
 
       // fill the nid2pid and pid2nid data structures
-      pidtonid(CmiNumPes());
+      pidtonid(numPes);
 
       for(i=0; i<XDIM; i++)
 	for(j=0; j<YDIM; j++)
@@ -80,7 +83,7 @@ class XTTorusManager {
 
       dimNT = 1;			// assume SN mode first
       // now fill the coords2pid and pid2coords data structures
-      for(int i=0; i<CmiNumPes(); i++)
+      for(i=0; i<numPes; i++)
       {
         nid = pid2nid[i];
 	if (nid != oldnid)

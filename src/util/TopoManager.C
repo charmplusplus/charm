@@ -84,7 +84,7 @@ TopoManager::TopoManager() {
   torusT = torus[3];
 
 #else
-  dimX = CkNumPes();
+  dimX = CmiNumPes();
   dimY = 1;
   dimZ = 1;
 
