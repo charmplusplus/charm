@@ -15,8 +15,8 @@ mainmodule kNeighbor {
 
     array [1D] Block {
 	entry Block(int);
-	entry void commWithNeighbors();
 	entry void commWithNeighbors(int);
+	entry void commWithNeighbors(int, int);
 	entry void recvReplies(toNeighborMsg *);
 	entry void recvMsgs(toNeighborMsg *);
 	entry void printSts(int);

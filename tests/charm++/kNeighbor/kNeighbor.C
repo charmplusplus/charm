@@ -139,10 +139,10 @@ public:
         gStarttime = CmiWallTimer();
 #if REUSE_ITER_MSG
         for (int i=0; i<totalElems; i++)
-            array(i).commWithNeighbors();
+            array(i).commWithNeighbors(currentStep);
 #else
         for (int i=0; i<totalElems; i++)
-            array(i).commWithNeighbors(currentMsgSize);
+            array(i).commWithNeighbors(currentMsgSize, currentStep);
 #endif	
         //array.commWithNeighbors(currentMsgSize);
     }
@@ -223,6 +223,8 @@ public:
 
 //#define WORKSIZECNT 5
 #define WORKSIZECNT 1
+#define TRACE_BEGIN_STEP 10
+#define TRACE_END_STEP 12
 //no wrap around for sending messages to neighbors
 class Block: public CBase_Block {
 public:
@@ -249,11 +251,15 @@ public:
     toNeighborMsg **iterMsg;
 #endif
 
+    bool specialTracing;
+
 public:
     Block(int numElems) {
         //srand(thisIndex.x+thisIndex.y);
 
         totalElems = numElems;
+		
+		specialTracing = traceAvailable() && (traceIsOn()==0);
 
 #if WRAPROUND
         numNeighbors = 2*STRIDEK;
@@ -376,7 +382,9 @@ public:
         }
     }
 
-    void commWithNeighbors(int msgSize) {
+    void commWithNeighbors(int msgSize, int currentStep) {
+	modTraceStatus(currentStep);
+
         internalStepCnt = 0;
         curIterMsgSize = msgSize;
         //currently the work size is only changed every big steps (which
@@ -388,7 +396,9 @@ public:
         startInternalIteration();
     }
 
-    void commWithNeighbors() {
+    void commWithNeighbors(int currentStep) {
+	modTraceStatus(currentStep);
+
         internalStepCnt = 0;
         curIterMsgSize = gMsgSize;
         //currently the work size is only changed every big steps (which
@@ -460,6 +470,13 @@ public:
     inline int MIN(int a, int b) {
         return (a<b)?a:b;
     }
+    
+    inline void modTraceStatus(int step){
+		if(specialTracing){
+			if(step == TRACE_BEGIN_STEP) traceBegin();
+			if(step == TRACE_END_STEP) traceEnd();
+		}
+	}
 };
 
 //int Block::workSizeArr[WORKSIZECNT] = {20, 60, 120, 180, 240};
