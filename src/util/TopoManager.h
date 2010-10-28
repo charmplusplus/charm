@@ -102,6 +102,7 @@ class TopoManager {
     int dimNY;	// dimension of the allocation in Y (no. of nodes)
     int dimNZ;	// dimension of the allocation in Z (no. of nodes)
     int dimNT;  // dimension of the allocation in T (no. of processors per node)
+    int numPes;
     int torusX, torusY, torusZ, torusT;
     int procsPerNode;
 
