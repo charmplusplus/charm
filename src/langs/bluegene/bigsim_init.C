@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file: bigsim_init.C -- Converse BlueGene Emulator Code
  *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 5/16/2003
  */
