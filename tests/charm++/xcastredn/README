@@ -10,7 +10,7 @@ The mechanisms that are tested are:
 
 The test defaults to placing a single chare array member on each PE and then measuring
 the average time taken for multiple xcast/redn loops using different mechanisms. Tests
-are conducted for a range of message sizes. Output reported includes the average tine,
+are conducted for a range of message sizes. Output reported includes the average time,
 max, min and std. deviation to put the results in a correct perspective.
 
 These tests can be conducted as a pure benchmark or (to mimic real-world scenarios)
