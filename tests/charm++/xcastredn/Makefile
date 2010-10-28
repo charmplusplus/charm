@@ -6,7 +6,7 @@ CHARMBIN := $(CHARMHOME)/bin
 CHARMINC := $(CHARMHOME)/include
 
 # The relevant source files for this project
-HDR       = myChareArray.h testController.h reductionBenchmark.h
+HDR       = myChareArray.h testController.h convMsgHandlers.h reductionBenchmark.h
 SRC       = myChareArray.C testController.C convMsgHandlers.C
 OBJ       = $(SRC:.C=.o)
 INTF      = reductionBenchmark.ci   

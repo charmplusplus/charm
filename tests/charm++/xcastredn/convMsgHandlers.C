@@ -1,4 +1,5 @@
 #include "reductionBenchmark.h"
+#include "convMsgHandlers.h"
 #include "myChareArray.h"
 #include "testController.h"
 
