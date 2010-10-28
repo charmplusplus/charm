@@ -112,6 +112,8 @@ TopoManager::TopoManager() {
   torusZ = true;
   torusT = false;
 #endif
+
+  numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
 TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
@@ -133,7 +135,7 @@ int TopoManager::hasMultipleProcsPerNode() const {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
-  CkAssert( pe >= 0 && pe < CkNumPes() );
+  CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
@@ -170,7 +172,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
-  CkAssert( pe >= 0 && pe < CkNumPes() );
+  CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEP
@@ -209,7 +211,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
-  CkAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
+  CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
 #if CMK_BLUEGENE_CHARM
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -232,7 +234,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
-  CkAssert( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT );
+  CmiAssert( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT );
 #if CMK_BLUEGENE_CHARM
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
@@ -257,8 +259,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 }
 
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
-  CkAssert( pe1 >= 0 && pe1 < CkNumPes() );
-  CkAssert( pe2 >= 0 && pe2 < CkNumPes() );
+  CmiAssert( pe1 >= 0 && pe1 < numPes );
+  CmiAssert( pe2 >= 0 && pe2 < numPes );
   int x1, y1, z1, x2, y2, z2, t1, t2;
   rankToCoordinates(pe1, x1, y1, z1, t1);
   rankToCoordinates(pe2, x2, y2, z2, t2);
@@ -266,7 +268,6 @@ int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
 }
 
 void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
-  CkAssert( pe >= 0 && pe < CkNumPes() );
   int minHops = getHopsBetweenRanks(pe, pes[0]);
   int minIdx = 0;
   int nowHops, tmp;
@@ -287,7 +288,6 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n) {
 */
 
 int TopoManager::pickClosestRank(int mype, int *pes, int n){
-  CkAssert( mype >= 0 && mype < CkNumPes() );
   int minHops = getHopsBetweenRanks(mype, pes[0]);
   int minIdx=0;
   int nowHops; 
