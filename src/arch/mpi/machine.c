@@ -764,7 +764,7 @@ int PumpMsgs(void)
 	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	traceEndCommOp(msg);
 	char tmp[32];
-	sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+	sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif	
 	
@@ -1210,7 +1210,7 @@ static int SendMsgBuf()
 		traceChangeLastTimestamp(CpvAccess(projTraceStart));
 		traceEndCommOp(msg);
 		char tmp[64];
-		sprintf(tmp, "from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
+		sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
 		traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 		
