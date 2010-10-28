@@ -72,27 +72,13 @@ TestController::TestController(CkArgMsg *m)
             cfg.qLength          = atoi(m->argv[4]);
         if (m->argc >= 6)
             cfg.uSecs            = atoi(m->argv[5]);
-        if (m->argc >= 7)
-        {
-            cfg.sectionSize      = atoi(m->argv[6]);
-            if (cfg.arraySize < cfg.sectionSize)
-                cfg.arraySize    = cfg.sectionSize;
-        }
-        if (m->argc >= 8)
-            cfg.useContiguousSection =(atoi(m->argv[7]) == 0)? false: true;
-        if (m->argc >= 9)
-        {
-            cfg.arraySize        = atoi(m->argv[8]);
-            if (cfg.arraySize < cfg.sectionSize)
-                CkAbort("Invalid input. Ensure that section size <= array size");
-        }
     }
     else
-        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) qFillLength fillMethodDuration(us) sectionDim isSectionContiguous arrayDim",m->argv[0]);
+        CkPrintf("Wrong number of arguments. Try %s numRepeats msgSizeMin(bytes) msgSizeMax(KB) qFillLength fillMethodDuration(us)",m->argv[0]);
 
     delete m;
-    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nTest parameters are: \n\tArray size: %d \n\tSection size: %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
-             CkNumPes(), cfg.arraySize, cfg.sectionSize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
+    CkPrintf("\nMeasuring performance of chare array collectives using different communication libraries in charm++. \nNum PEs: %d \nTest parameters are: \n\tArray size = Section size = Num PEs = %d \n\tMsg sizes: %d bytes to %d KB \n\tNum repeats: %d \n\tScheduler Q Fill Length: %d entry methods \n\tScheduler Q Fill Method Duration: %d us",
+             CkNumPes(), cfg.arraySize, cfg.msgSizeMin, cfg.msgSizeMax, cfg.numRepeats, cfg.qLength, cfg.uSecs);
 
     // Initialize the mainchare pointer used by the converse redn handler
     mainChare = this;

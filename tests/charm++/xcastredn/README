@@ -3,9 +3,12 @@ charm software stack. The comm operations being measured are Xcasts and Reductio
 
 
 The mechanisms that are tested are:
-1) Converse broadcast/reduction
-2) Charm Array broadcast/reduction
-3) CkMulticast Array section multicast/reduction
+1) Converse broadcast
+2) Charm Array broadcast
+3) CkMulticast Array section multicast
+4) Converse reduction
+5) Charm Array reduction
+6) CkMulticast Array section reduction
 
 
 The test defaults to placing a single chare array member on each PE and then measuring
@@ -36,23 +39,9 @@ The args must be specified in the following order:
 - qLength             [int]  : The length of the scheduler queue (num of pending entry methods)
 - fillMethodDuration  [int]  : The time taken for each fill entry method to execute in us (microseconds)
 
-- sectionDim          [int]
-- isSectionContiguous [bool] : Should the array section be contiguous (0/1) [see below]
-- arrayDim            [int]
-
 
 -------------------------------------------------------------------------------
 Note:
 
 1) The minimum msg size is in *bytes* while the max message size is in *Kilobytes*.
-
-2) isSectionContiguous can toggle the creation of sections where elements are
-   picked at discrete intervals within the chare array. This makes sense only
-   if the section size is appropriately smaller than the array size. For eg,
-   if the array is 10 and the section size is 2 then indices of the elements in
-   the section will be:
-
-    contiguous section: 0, 1
-    not contiguous sec: 0, 5
-
 
