@@ -19,6 +19,7 @@
 #include <catamount/dclock.h>
 #endif
 
+
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
@@ -748,7 +749,7 @@ int PumpMsgs(void)
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-
+    
     START_EVENT();
 
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
@@ -759,14 +760,13 @@ int PumpMsgs(void)
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
-	char tmp[80];
-	int srcNode = sts.MPI_SOURCE;
-	int srcProc1 = CmiNodeFirst(srcNode);
-	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
-	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+        traceBeginCommOp(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
+	traceEndCommOp(msg);
+	char tmp[32];
+	sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
-#endif
-	
+#endif	
 	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
@@ -847,14 +847,13 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
    memcpy(msg, buf, nbytes);
 
 #if CMK_SMP_TRACE_COMMTHREAD
-	char tmp[80];
-	int srcNode = sts.MPI_SOURCE;
-	int srcProc1 = CmiNodeFirst(srcNode);
-	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
-	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+        traceBeginCommOp(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
+	traceEndCommOp(msg);
+	char tmp[32];
+	sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
-
   
 #if CMK_NODE_QUEUE_AVAILABLE
    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
@@ -1207,8 +1206,11 @@ static int SendMsgBuf()
 #endif
 	
 #if CMK_SMP_TRACE_COMMTHREAD
-		char tmp[60];
-		sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
+		traceBeginCommOp(msg);
+		traceChangeLastTimestamp(CpvAccess(projTraceStart));
+		traceEndCommOp(msg);
+		char tmp[64];
+		sprintf(tmp, "from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
 		traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 		
