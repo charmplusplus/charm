@@ -11,11 +11,13 @@ CProxy_QHogger hogger;
 config cfg;
 /// The names of the communication mechanisms being tested in this benchmark
 char commName[][commNameLen] = {
-                                 "CkMulticast",
-                                 "Charm-Bcast/Redn",
-                                 "Converse-Bcast/Redn",
-                                 "ConverseBcast/ArrayRedn",
-                                 "Comlib"
+                                 "CkMulticast-Bcast",
+                                 "Charm-Bcast",
+                                 "Converse-Bcast",
+                                 "CkMulticast-Redn",
+                                 "Charm-Redn",
+                                 "Converse-Redn",
+                                 "Comlib-Bcast",
                                };
 
 
@@ -114,7 +116,7 @@ TestController::TestController(CkArgMsg *m)
     mgr->setReductionClient(arraySections[0],cb);
 
     /// Start off with the first comm type and the smallest message size
-    curCommType    = CkMulticast;
+    curCommType    = bcastCkMulticast;
     curMsgSize     = cfg.msgSizeMin;
     curRepeatNum   = 0;
 
@@ -162,8 +164,17 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
 void TestController::sendMulticast(const CommMechanism commType, const int msgSize)
 {
     /// Create a message of required size
-    int numXcastUnits = curMsgSize/sizeof(double);
-    int numRednUnits  = curMsgSize/sizeof(double);
+    int numXcastUnits, numRednUnits;
+    if (commType < rednCkMulticast)
+    {
+        numXcastUnits = curMsgSize/sizeof(double);
+        numRednUnits  = 1;
+    }
+    else
+    {
+        numXcastUnits = 1;
+        numRednUnits  = curMsgSize/sizeof(double);
+    }
 
     #ifdef VERBOSE_STATUS
         CkPrintf("\nMsgSize: %f Sending out multicast number %d",(float)(numXcastUnits*sizeof(double))/1024,curRepeatNum+1);
@@ -178,32 +189,22 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
     /// Start the timer and trigger the send to the array / section
     switch (commType)
     {
-        case CharmBcast:
+        case bcastCkMulticast:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
+
+        case bcastComlib:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
+
+        case bcastCharm:
             timeStart = CmiWallTimer();
             chareArray.crunchData(msg);
             break;
 
-        case CkMulticast:
-            timeStart = CmiWallTimer();
-            arraySections[0].crunchData(msg);
-            break;
-
-        case Comlib:
-            timeStart = CmiWallTimer();
-            arraySections[0].crunchData(msg);
-            break;
-
-        case ConverseBcast:
-        {
-            DataMsg::pack(msg);
-            envelope *env = UsrToEnv(msg);
-            CmiSetHandler(env, bcastHandlerID);
-            timeStart = CmiWallTimer();
-            CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
-            break;
-        }
-
-        case ConverseToArrayBcast:
+        case bcastConverse:
         {
             DataMsg::pack(msg);
             envelope *env = UsrToEnv(msg);
@@ -212,6 +213,21 @@ void TestController::sendMulticast(const CommMechanism commType, const int msgSi
             CmiSyncBroadcastAllAndFree(env->getTotalsize(), (char*)env);
             break;
         }
+
+        case rednCkMulticast:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
+
+        case rednCharm:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
+
+        case rednConverse:
+            timeStart = CmiWallTimer();
+            arraySections[0].crunchData(msg);
+            break;
 
         default:
             CkAbort("Attempting to use unknown mechanism to communicate with chare array");
@@ -232,7 +248,7 @@ void TestController::receiveReduction(CkReductionMsg *msg)
     #endif
 
     /// If this is the first ever multicast/reduction loop, dont time it as it includes tree setup times etc
-    if (curCommType == CkMulticast && msg->getRedNo() == 0)
+    if (curCommType == bcastCkMulticast && msg->getRedNo() == 0)
     {
         CkPrintf("\nFirst xcast/redn loop took: %.6f ms. Discarding this from collected measurements as it might include tree setup times etc",loopTimes[0]);
         loopTimes.pop_back();

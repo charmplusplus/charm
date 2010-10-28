@@ -1,4 +1,5 @@
 #include "myChareArray.h"
+#include "convMsgHandlers.h"
 #include <algorithm>
 
 //----------------- externed globals -----------------
@@ -35,26 +36,41 @@ void MyChareArray::crunchData(DataMsg *msg)
     #endif
     switch (msg->commType)
     {
-        case CharmBcast:
-            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
-            break;
-
-        case CkMulticast:
+        case bcastCkMulticast:
             CkGetSectionInfo(sid, msg);
             mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
-        case Comlib:
+        case bcastCharm:
+            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            break;
+
+        case bcastConverse:
+            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
+            break;
+
+        case rednCkMulticast:
             CkGetSectionInfo(sid, msg);
             mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
-        case ConverseBcast:
-            CkAbort("The Converse bcast/redn loop should NOT end up in a chare array entry method! Kick the test writer!");
+        case rednCharm:
+            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
             break;
 
-        case ConverseToArrayBcast:
-            contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double);
+        case rednConverse:
+        {
+            CkReductionMsg *redMsg = CkReductionMsg::buildNew( msg->rednSize*sizeof(double), returnData, CkReduction::sum_double);
+            CkReductionMsg::pack( redMsg );
+            envelope *redEnv = UsrToEnv(redMsg);
+            /// Contribute to reduction
+            CmiSetHandler(redEnv, rednHandlerID);
+            CmiReduce(redEnv, redEnv->getTotalsize(), convRedn_sum);
+            break;
+        }
+
+        case bcastComlib:
+            mcastMgr->contribute(msg->rednSize*sizeof(double),returnData,CkReduction::sum_double,sid);
             break;
 
         default:
