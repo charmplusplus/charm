@@ -67,19 +67,23 @@ public:
     }
   };
 
-  struct LDStats {  // Passed to Strategy
-    int n_pes;		// number of pes in the array procs
-    ProcStats *procs;	// array of pes
+  /** Passed to the virtual functions Strategy(...) and work(...) */
+  struct LDStats {
+    int n_pes;			// number of pes in the array "procs"
+    ProcStats *procs;		// processor statistics
 
-    int n_objs;		// number of objects in the database
-    int n_migrateobjs;	// number of migratable objects
-    CkVec<LDObjData> objData;
+    int n_objs;			// total number of objects in the vector "objData"
+    int n_migrateobjs;		// total number of migratable objects
+    CkVec<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
+    CkVec<int> from_proc;	// current pe an object is on
+    CkVec<int> to_proc;		// new pe you want the object to be on
 
-    int n_comm;		// number of edges in the vector commData
-    CkVec<LDCommData> commData;
-    CkVec<int> from_proc, to_proc;
+    int n_comm;			// number of edges in the vector "commData"
+    CkVec<LDCommData> commData;	// communication data - edge list representation
+				// of the communication between objects
 
-    int *objHash; 
+    int *objHash;		// this a map from the hash for the 4 integer
+				// LDObjId to the index in the vector "objData"
     int  hashSize;
 
     int complete_flag;		// if this ocg is complete, eg in HybridLB,
@@ -96,7 +100,7 @@ public:
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
     void clear() {
-      n_objs = n_comm = n_migrateobjs = 0;
+      n_objs = n_migrateobjs = n_comm = 0;
       objData.free();
       commData.free();
       from_proc.free();
