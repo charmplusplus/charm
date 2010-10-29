@@ -324,6 +324,9 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.
+
+This does not get called for arrays with stable locations (all
+insertions done at creation, migration only at discrete points).
 */
 
 inline void CkArray::springCleaning(void)
@@ -534,7 +537,9 @@ CkArray::CkArray(CkArrayOptions &opts,
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(CmiTrue)
 {
-  CcdCallOnConditionKeep(CcdPERIODIC_1minute, staticSpringCleaning, (void *)this);
+  if (!stableLocations)
+      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
+			     staticSpringCleaning, (void *)this);
 
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
