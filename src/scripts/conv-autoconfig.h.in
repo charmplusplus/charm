@@ -1,6 +1,6 @@
 /* conv-autoconfig.h.in.  Generated from configure.in by autoheader.  */
 
-/* Charm++ version number */
+/* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
 /* whether C++ bool works */
@@ -176,6 +176,9 @@
 
 /* whether std::distance works */
 #undef CMK_HAS_STD_DISTANCE
+
+/* whether std::inserter works */
+#undef CMK_HAS_STD_INSERTER
 
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H

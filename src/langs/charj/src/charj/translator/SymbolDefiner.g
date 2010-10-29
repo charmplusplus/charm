@@ -28,6 +28,7 @@ package charj.translator;
 
 topdown
     :   enterPackage
+    |   externDeclaration
     |   enterClass
     |   enterMethod
     |   enterBlock
@@ -56,6 +57,13 @@ enterPackage
                 symtab.addScope(ps);
             }
             currentScope = ps;
+        }
+    ;
+
+externDeclaration
+    :   ^(EXTERN IDENT) {
+            ExternalSymbol sym = new ExternalSymbol(symtab, $IDENT.text);
+            currentScope.define(sym.name, sym);
         }
     ;
 

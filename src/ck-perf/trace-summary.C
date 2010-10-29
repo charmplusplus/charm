@@ -726,18 +726,20 @@ void TraceSummary::endExecute(void)
   double ts = start;
   double nts = binStart;
 
+/*
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
     // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
     return;
   }
+*/
 
   if (execEp == INVALIDEP) {
     TRACE_WARN("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
     return;
   }
 
-  if (execEp != -1)
+  if (execEp >= 0)
   {
     _logPool->setEp(execEp, t-ts);
   }
@@ -798,6 +800,16 @@ void TraceSummary::endIdle(double currT)
     t_idleStart = t_binStart;
   }
   binIdle += t - t_idleStart;
+}
+
+void TraceSummary::traceBegin(void)
+{
+  beginExecute(-1, -1, TRACEON_EP, -1, -1);
+}
+
+void TraceSummary::traceEnd(void)
+{
+  endExecute();
 }
 
 void TraceSummary::beginPack(void)

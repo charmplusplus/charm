@@ -124,7 +124,8 @@ SpanningTreeVertex* SpanningTreeStrategy_3dTorus_minHops<Iterator,SpanningTreeVe
     {
         (*itr).X.reserve(3);
         (*itr).X.assign(3,0);
-        aTopoMgr.rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2] );
+        int coreNum; ///< dummy var. Get and discard the core number
+        aTopoMgr.rankToCoordinates( (*itr).id, (*itr).X[0], (*itr).X[1], (*itr).X[2], coreNum );
     }
     ///@todo: If the machine coordinates are already stored in the vertices, do we want to find them again?
 

@@ -50,6 +50,21 @@
 
 #include "ParFUM_Adapt.decl.h"
 
+#if defined(WIN32)
+#include <iterator>
+#endif
+
+#if ! CMK_HAS_STD_INSERTER
+#include <list>
+namespace std {
+template<class Container, class Iterator>
+   insert_iterator<Container> inserter(
+      Container& _Cont, 
+      Iterator _It
+   );
+};
+#endif
+
 #if defined(WIN32) && defined(max)
 #undef max
 #endif

@@ -752,6 +752,12 @@ void LogPool::postProcessLog()
 #endif
 }
 
+void LogPool::modLastEntryTimestamp(double ts)
+{
+  pool[numEntries-1].time = ts;
+  //pool[numEntries-1].cputime = ts;
+}
+
 // /** Constructor for a multicast log entry */
 // 
 //  THIS WAS MOVED TO trace-projections.h with the other constructors
@@ -1116,6 +1122,12 @@ void TraceProjections::traceClose(void)
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
     bocProxy.traceProjectionsParallelShutdown(-1);
   }
+  if(CkMyRank() == CkMyNodeSize()){ //communication thread
+    CkpvAccess(_trace)->endComputation();
+    delete _logPool;              // will write
+    // remove myself from traceArray so that no tracing will be called.
+    CkpvAccess(_traces)->removeTrace(this);
+  }
 #else
   // we've already deleted the logpool, so multiple calls to traceClose
   // are tolerated.
@@ -1326,6 +1338,11 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
     nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
+}
+
+void TraceProjections::changeLastEntryTimestamp(double ts)
+{
+  _logPool->modLastEntryTimestamp(ts);
 }
 
 void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int srcPe,

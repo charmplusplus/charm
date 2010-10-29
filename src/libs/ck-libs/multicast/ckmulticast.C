@@ -519,7 +519,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         int *peListPtr = mySubTreePEs.getVec();
         topo::SpanningTreeVertex *nextGenInfo;
         nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
-        CkAssert(nextGenInfo->childIndex.size() == numchild);
+        numchild    = nextGenInfo->childIndex.size();
 
         // Distribute the section members across the number of direct children (branches)
         // Direct children are simply the first section member in each of the branch lists

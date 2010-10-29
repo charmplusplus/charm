@@ -30,8 +30,9 @@
     <target name="compile"
         description="compile">
         <javac debug="true" srcdir="${buildsrc}" destdir="${classes}"
-               target="1.5" listfiles="Yes" deprecation="Yes">
-               <classpath refid="${classpath}"/>
+            target="1.5" listfiles="Yes" deprecation="Yes"
+            includeantruntime="false">
+            <classpath refid="${classpath}"/>
         </javac>
     </target>
 

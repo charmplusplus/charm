@@ -41,14 +41,14 @@ class TopoManager {
     TopoManager(int NX, int NY, int NZ, int NT);
     ~TopoManager() { }
 
-    inline int getDimNX() { return dimNX; }
-    inline int getDimNY() { return dimNY; }
-    inline int getDimNZ() { return dimNZ; }
-    inline int getDimNT() { return dimNT; }
+    inline int getDimNX() const { return dimNX; }
+    inline int getDimNY() const { return dimNY; }
+    inline int getDimNZ() const { return dimNZ; }
+    inline int getDimNT() const { return dimNT; }
 
-    inline int getProcsPerNode() { return procsPerNode; }
+    inline int getProcsPerNode() const { return procsPerNode; }
 
-    int hasMultipleProcsPerNode();
+    int hasMultipleProcsPerNode() const;
     void rankToCoordinates(int pe, int &x, int &y, int &z, int &t);
     int coordinatesToRank(int x, int y, int z, int t);
     int getHopsBetweenRanks(int pe1, int pe2);
@@ -102,6 +102,7 @@ class TopoManager {
     int dimNY;	// dimension of the allocation in Y (no. of nodes)
     int dimNZ;	// dimension of the allocation in Z (no. of nodes)
     int dimNT;  // dimension of the allocation in T (no. of processors per node)
+    int numPes;
     int torusX, torusY, torusZ, torusT;
     int procsPerNode;
 

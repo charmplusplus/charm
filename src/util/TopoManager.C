@@ -84,7 +84,7 @@ TopoManager::TopoManager() {
   torusT = torus[3];
 
 #else
-  dimX = CkNumPes();
+  dimX = CmiNumPes();
   dimY = 1;
   dimZ = 1;
 
@@ -112,6 +112,8 @@ TopoManager::TopoManager() {
   torusZ = true;
   torusT = false;
 #endif
+
+  numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
 TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
@@ -125,7 +127,7 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   torusZ = true;
 }
 
-int TopoManager::hasMultipleProcsPerNode() {
+int TopoManager::hasMultipleProcsPerNode() const {
   if(procsPerNode == 1)
     return 0;
   else
@@ -133,6 +135,7 @@ int TopoManager::hasMultipleProcsPerNode() {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
+  CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
@@ -169,6 +172,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
 }
 
 void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
+  CmiAssert( pe >= 0 && pe < numPes );
 #if CMK_BLUEGENEL
   bgltm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEP
@@ -207,6 +211,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
+  CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
 #if CMK_BLUEGENE_CHARM
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -229,6 +234,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
 }
 
 int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
+  CmiAssert( x>=0 && x<dimNX && y>=0 && y<dimNY && z>=0 && z<dimNZ && t>=0 && t<dimNT );
 #if CMK_BLUEGENE_CHARM
   if(dimNY > 1)
     return t + (x + (y + z*dimNY) * dimNX) * dimNT;
@@ -253,6 +259,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 }
 
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
+  CmiAssert( pe1 >= 0 && pe1 < numPes );
+  CmiAssert( pe2 >= 0 && pe2 < numPes );
   int x1, y1, z1, x2, y2, z2, t1, t2;
   rankToCoordinates(pe1, x1, y1, z1, t1);
   rankToCoordinates(pe2, x2, y2, z2, t2);
