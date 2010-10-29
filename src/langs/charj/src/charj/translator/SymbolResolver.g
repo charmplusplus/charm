@@ -218,7 +218,11 @@ primaryExpression returns [Type type]
                 $IDENT.symbolType = $type;
                 //System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.def);
             } else {
-                System.out.println("Couldn't resolve IDENT type: " + $IDENT.text);
+                if (!$IDENT.text.equals("thishandle") &&
+                        !$IDENT.text.equals("thisIndex") &&
+                        !$IDENT.text.equals("thisProxy")) {
+                    System.out.println("ERROR: Couldn't resolve IDENT type: " + $IDENT.text);
+                }
             }
         }
     |   THIS {
@@ -258,7 +262,7 @@ primaryExpression returns [Type type]
                 memberNode.symbolType = $type;
                 parentNode.def = s;
                 parentNode.symbolType = $type;
-            } else {
+            } else if (!(et instanceof ExternalSymbol)) {
                 System.out.println("Couldn't resolve access " + memberText);
             }
         }
@@ -366,14 +370,16 @@ type returns [Type sym]
 }
 @after {
     $start.symbolType = scope.resolveType(typeText);
-    //System.out.println("\ntype string: " + typeText);
-    //System.out.println("direct scope: " + scope);
-    //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 	if (proxySection && $start.symbolType != null) $start.symbolType = new ProxySectionType(symtab, $start.symbolType);
     $sym = $start.symbolType;
-    if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
+    if ($sym == null) {
+        //System.out.println("type string: " + typeText);
+        //System.out.println("direct scope: " + scope);
+        //System.out.println("symbolType: " + $start.symbolType);
+        System.out.println("ERROR: Couldn't resolve type " + typeText);
+    }
 }
     :   VOID {
             scope = $VOID.scope;
@@ -386,17 +392,18 @@ type returns [Type sym]
     |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
                 (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-                {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
+                {typeText.add(new TypeName($IDENT.text, tparams)); }))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
 	|	^(ARRAY_SECTION_TYPE { scope = $ARRAY_SECTION_TYPE.scope; proxySection = true; }
 			^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
-            (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-            {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
+                        (t1=type {tparams.add($t1.sym);}
+                        |lit1=literalVal {tparams.add($lit1.type);} )*))?)
+            {typeText.add(new TypeName($IDENT.text, tparams));})+) .*)
     ;
 
 classType

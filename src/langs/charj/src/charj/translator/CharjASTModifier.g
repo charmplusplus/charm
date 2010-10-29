@@ -42,8 +42,9 @@ charjSource
     :   ^(CHARJ_SOURCE 
         packageDeclaration?
         importDeclaration*
-        readonlyDeclaration*
-        typeDeclaration*)
+        (externDeclaration
+        |readonlyDeclaration
+        |typeDeclaration)*)
     ;
 
 packageDeclaration
@@ -56,6 +57,10 @@ importDeclaration
 
 readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
     ;
 
 typeOfType returns [boolean array_type]
