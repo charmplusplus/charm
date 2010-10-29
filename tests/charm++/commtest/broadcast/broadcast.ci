@@ -12,6 +12,7 @@ mainmodule broadcast {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void Intermediate(void);
+    entry void Intermediate1(void);
     entry void exit();		
   };
 
