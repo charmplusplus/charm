@@ -1,6 +1,6 @@
 # Makefile for compiling Comlib tests
 
-CHARMC=/expand/home/abhigupta/openatom/charm/bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = broadcast.o
 
