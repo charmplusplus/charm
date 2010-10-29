@@ -242,7 +242,7 @@ public:
  * Class used to store the dimensions of the array and precalculate numChares,
  * binSize and other values for the DefaultArrayMap -- ASB
  */
-class dimInfo {
+class arrayMapInfo {
 public:
   CkArrayIndexMax _nelems;
   int _binSize;			/* floor of numChares/numPes */
@@ -255,14 +255,14 @@ public:
   /** All processors are divided into two sets. Processors in the first set
    *  have one chare more than the processors in the second set. */
 
-  dimInfo(void) { }
+  arrayMapInfo(void) { }
 
-  dimInfo(CkArrayIndexMax& n) {
+  arrayMapInfo(CkArrayIndexMax& n) {
     _nelems = n;
     compute_binsize();
   }
 
-  ~dimInfo() {}
+  ~arrayMapInfo() {}
   
   int compute_binsize()
   {
@@ -300,7 +300,9 @@ public:
 class DefaultArrayMap : public RRMap
 {
 public:
-  CkPupPtrVec<dimInfo> arrs;
+  /** This array stores information about different chare arrays in a Charm
+   *  program (dimensions, binsize, numChares etc ... ) */
+  CkPupPtrVec<arrayMapInfo> amaps;
 
 public:
   DefaultArrayMap(void) {
@@ -311,32 +313,32 @@ public:
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
-    int idx = arrs.size();
-    arrs.resize(idx+1);
-    arrs[idx] = new dimInfo(numElements);
+    int idx = amaps.size();
+    amaps.resize(idx+1);
+    amaps[idx] = new arrayMapInfo(numElements);
     return idx;
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati;
-    if (arrs[arrayHdl]->_nelems.nInts == 0) {
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
     }
 
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
 
-    if(flati < arrs[arrayHdl]->_numFirstSet)
-      return (flati/(arrs[arrayHdl]->_binSize + 1));
-    else if (flati < arrs[arrayHdl]->_numChares)
-      return (arrs[arrayHdl]->_remChares + (flati - arrs[arrayHdl]->_numFirstSet) / (arrs[arrayHdl]->_binSize));
+    if(flati < amaps[arrayHdl]->_numFirstSet)
+      return (flati/(amaps[arrayHdl]->_binSize + 1));
+    else if (flati < amaps[arrayHdl]->_numChares)
+      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSize));
     else
       return (flati % CkNumPes());
   }
@@ -345,10 +347,10 @@ public:
     RRMap::pup(p);
     int npes = CkNumPes();
     p|npes;
-    p|arrs;
+    p|amaps;
     if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
-      for (int i=0; i<arrs.size(); i++)
-        arrs[i]->compute_binsize();
+      for (int i=0; i<amaps.size(); i++)
+        amaps[i]->compute_binsize();
     }
   }
 };
@@ -377,12 +379,12 @@ public:
     if(mapping.size() == 0) {
       int numChares;
 
-      if (arrs[idx]->_nelems.nInts == 1) {
-	numChares = arrs[idx]->_nelems.data()[0];
-      } else if (arrs[idx]->_nelems.nInts == 2) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1];
-      } else if (arrs[idx]->_nelems.nInts == 3) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1] * arrs[idx]->_nelems.data()[2];
+      if (amaps[idx]->_nelems.nInts == 1) {
+	numChares = amaps[idx]->_nelems.data()[0];
+      } else if (amaps[idx]->_nelems.nInts == 2) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1];
+      } else if (amaps[idx]->_nelems.nInts == 3) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1] * amaps[idx]->_nelems.data()[2];
       } else {
 	CkAbort("CkArrayIndex has more than 3 integers!");
       }
@@ -408,9 +410,9 @@ public:
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
