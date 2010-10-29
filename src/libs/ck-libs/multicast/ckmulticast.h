@@ -109,7 +109,7 @@ class CkMulticastMgr: public CkDelegateMgr
         /// entry
         void recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
         // ------------------------- Reductions ------------------------
-        /// entry
+        /// entry Accept a redn msg from a child in the spanning tree
         void recvRedMsg(CkReductionMsg *msg);
         /// entry
         void updateRedNo(mCastEntryPtr, int red);
