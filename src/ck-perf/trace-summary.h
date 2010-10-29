@@ -270,6 +270,8 @@ class TraceSummary : public Trace {
     void endExecute(void);
     void beginIdle(double currT);
     void endIdle(double currT);
+    void traceBegin(void);
+    void traceEnd(void);
     void beginPack(void);
     void endPack(void);
     void beginUnpack(void);
