@@ -8,6 +8,7 @@
 /**
  *  \addtogroup CkLdb
  */
+
 /*@{*/
 
 #ifndef _GRAPHPARTLB_H_

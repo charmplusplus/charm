@@ -8,9 +8,11 @@
 /**
  *  \addtogroup CkLdb
  */
+
 /*@{*/
 
 #include "GraphPartLB.h"
+#include "ckgraph.h"
 
 CreateLBFunc_Def(GraphPartLB, "Algorithm which uses graph partitioning for communication aware load balancing")
 
