@@ -1,13 +1,13 @@
-/**
-\file
-\addtogroup CkArrayImpl
+/** \file cklocation.C
+ *  \addtogroup CkArrayImpl
+ *
+ *  The location manager keeps track of an indexed set of migratable objects.
+ *  It is used by the array manager to locate array elements, interact with the
+ *  load balancer, and perform migrations.
+ *
+ *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
+ */
 
-The location manager keeps track of an indexed set of migratable
-objects.  It is used by the array manager to locate array elements,
-interact with the load balancer, and perform migrations.
-
-Orion Sky Lawlor, olawlor@acm.org 9/29/2001
-*/
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
@@ -251,6 +251,9 @@ public:
 				   processors in the first set */
   int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
 				   chares in the first set */
+
+  /** All processors are divided into two sets. Processors in the first set
+   *  have one chare more than the processors in the second set. */
 
   dimInfo(void) { }
 
