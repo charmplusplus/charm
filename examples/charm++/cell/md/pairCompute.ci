@@ -10,30 +10,30 @@ module pairCompute {
     entry void init(int numParticlesPerPatch);
 
     entry void patchData(int numParticles,
-                         float particleX[numParticles],
-                         float particleY[numParticles],
-                         float particleZ[numParticles],
-                         float particleQ[numParticles],
+                         MD_FLOAT particleX[numParticles],
+                         MD_FLOAT particleY[numParticles],
+                         MD_FLOAT particleZ[numParticles],
+                         MD_FLOAT particleQ[numParticles],
                          int fromPatch
                         );
 
     entry [accel] void doCalc()[  readonly : int numParticles <impl_obj->numParticles>,
                                   readonly : int thisIndex_x <impl_obj->thisIndex.x>,
                                   readonly : int thisIndex_y <impl_obj->thisIndex.y>,
-                                  readonly : float p0_x[numParticles] <impl_obj->particleX[0]>,
-                                  readonly : float p1_x[numParticles] <impl_obj->particleX[1]>,
-                                  readonly : float p0_y[numParticles] <impl_obj->particleY[0]>,
-                                  readonly : float p1_y[numParticles] <impl_obj->particleY[1]>,
-                                  readonly : float p0_z[numParticles] <impl_obj->particleZ[0]>,
-                                  readonly : float p1_z[numParticles] <impl_obj->particleZ[1]>,
-                                  readonly : float p0_q[numParticles] <impl_obj->particleQ[0]>,
-                                  readonly : float p1_q[numParticles] <impl_obj->particleQ[1]>,
-                                 writeonly : float f0_x[numParticles] <impl_obj->forceX[0]>,
-                                 writeonly : float f1_x[numParticles] <impl_obj->forceX[1]>,
-                                 writeonly : float f0_y[numParticles] <impl_obj->forceY[0]>,
-                                 writeonly : float f1_y[numParticles] <impl_obj->forceY[1]>,
-                                 writeonly : float f0_z[numParticles] <impl_obj->forceZ[0]>,
-                                 writeonly : float f1_z[numParticles] <impl_obj->forceZ[1]>,
+                                  readonly : MD_FLOAT p0_x[numParticles] <impl_obj->particleX[0]>,
+                                  readonly : MD_FLOAT p1_x[numParticles] <impl_obj->particleX[1]>,
+                                  readonly : MD_FLOAT p0_y[numParticles] <impl_obj->particleY[0]>,
+                                  readonly : MD_FLOAT p1_y[numParticles] <impl_obj->particleY[1]>,
+                                  readonly : MD_FLOAT p0_z[numParticles] <impl_obj->particleZ[0]>,
+                                  readonly : MD_FLOAT p1_z[numParticles] <impl_obj->particleZ[1]>,
+                                  readonly : MD_FLOAT p0_q[numParticles] <impl_obj->particleQ[0]>,
+                                  readonly : MD_FLOAT p1_q[numParticles] <impl_obj->particleQ[1]>,
+                                 writeonly : MD_FLOAT f0_x[numParticles] <impl_obj->forceX[0]>,
+                                 writeonly : MD_FLOAT f1_x[numParticles] <impl_obj->forceX[1]>,
+                                 writeonly : MD_FLOAT f0_y[numParticles] <impl_obj->forceY[0]>,
+                                 writeonly : MD_FLOAT f1_y[numParticles] <impl_obj->forceY[1]>,
+                                 writeonly : MD_FLOAT f0_z[numParticles] <impl_obj->forceZ[0]>,
+                                 writeonly : MD_FLOAT f1_z[numParticles] <impl_obj->forceZ[1]>,
                                  writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                ] {
 
@@ -51,20 +51,20 @@ module pairCompute {
         localFlopCount = 0;
       #endif
 
-      register vecf* p1_x_vec = (vecf*)p1_x;
-      register vecf* p1_y_vec = (vecf*)p1_y;
-      register vecf* p1_z_vec = (vecf*)p1_z;
-      register vecf* p1_q_vec = (vecf*)p1_q;
-      register vecf* f1_x_vec = (vecf*)f1_x;
-      register vecf* f1_y_vec = (vecf*)f1_y;
-      register vecf* f1_z_vec = (vecf*)f1_z;
+      register MD_VEC* p1_x_vec = (MD_VEC*)p1_x;
+      register MD_VEC* p1_y_vec = (MD_VEC*)p1_y;
+      register MD_VEC* p1_z_vec = (MD_VEC*)p1_z;
+      register MD_VEC* p1_q_vec = (MD_VEC*)p1_q;
+      register MD_VEC* f1_x_vec = (MD_VEC*)f1_x;
+      register MD_VEC* f1_y_vec = (MD_VEC*)f1_y;
+      register MD_VEC* f1_z_vec = (MD_VEC*)f1_z;
       register int i;
       register int j;
-      register const int numParticlesByVecSize = numParticles / vecf_numElems;
+      register const int numParticlesByVecSize = numParticles / myvec_numElems;
 
       // Zero out the force array for p1 (p0's force array will be zero'ed for each
       //   particle in the outer loop)
-      vecf zero_vec = vspreadf(0.0f);
+      MD_VEC zero_vec = vspread_MDF(zero);
       for (j = 0; j < numParticlesByVecSize; j++) {
         f1_x_vec[j] = zero_vec;
         f1_y_vec[j] = zero_vec;
@@ -72,19 +72,19 @@ module pairCompute {
       }
 
       // Spread coulumb's constant across a vector
-      vecf coulomb_vec = vspreadf(COULOMBS_CONSTANT);
+      MD_VEC coulomb_vec = vspread_MDF(COULOMBS_CONSTANT);
 
       // Outer-loop (p0)
       for (i = 0; i < numParticles; i++) {
 
         // Spread this particle's values out over vectors
-        vecf p0_x_i_vec = vspreadf(p0_x[i]);
-        vecf p0_y_i_vec = vspreadf(p0_y[i]);
-        vecf p0_z_i_vec = vspreadf(p0_z[i]);
-        vecf p0_q_i_vec = vspreadf(p0_q[i]);
-        vecf f0_x_i_vec = vspreadf(0.0f);
-        vecf f0_y_i_vec = vspreadf(0.0f);
-        vecf f0_z_i_vec = vspreadf(0.0f);
+        MD_VEC p0_x_i_vec = vspread_MDF(p0_x[i]);
+        MD_VEC p0_y_i_vec = vspread_MDF(p0_y[i]);
+        MD_VEC p0_z_i_vec = vspread_MDF(p0_z[i]);
+        MD_VEC p0_q_i_vec = vspread_MDF(p0_q[i]);
+        MD_VEC f0_x_i_vec = vspread_MDF(zero);
+        MD_VEC f0_y_i_vec = vspread_MDF(zero);
+        MD_VEC f0_z_i_vec = vspread_MDF(zero);
 
         #if 1
 
@@ -97,22 +97,21 @@ module pairCompute {
         /// Loop Preamble ///
 
         const int loopUpper = numParticlesByVecSize - 3;
-
         // Setup Input for Stage 2 - Initially for j+2
         const int jPlus2 = 2;
-        vecf p1_x_j_vec = p1_x_vec[jPlus2];
-        vecf p1_y_j_vec = p1_y_vec[jPlus2];
-        vecf p1_z_j_vec = p1_z_vec[jPlus2];
-        vecf p1_q_j_vec = p1_q_vec[jPlus2];
+        MD_VEC p1_x_j_vec = p1_x_vec[jPlus2];
+        MD_VEC p1_y_j_vec = p1_y_vec[jPlus2];
+        MD_VEC p1_z_j_vec = p1_z_vec[jPlus2];
+        MD_VEC p1_q_j_vec = p1_q_vec[jPlus2];
 
         // Setup Input for Stage 3 - Initial for j+1
         const int jPlus1 = 1;
-        vecf p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus1];
-        vecf p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus1];
-        vecf p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus1];
-        vecf p1_q_j_vec_s2 = p1_q_vec[jPlus1];
-        vecf r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-        vecf r_vec = vsqrtf(r_2_vec);
+        MD_VEC p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus1];
+        MD_VEC p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus1];
+        MD_VEC p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus1];
+        MD_VEC p1_q_j_vec_s2 = p1_q_vec[jPlus1];
+        MD_VEC r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+        MD_VEC r_vec = vsqrt_MDF(r_2_vec);
 
         // DMK - DEBUG
         #if COUNT_FLOPS != 0
@@ -121,21 +120,21 @@ module pairCompute {
 
         // Setup Input for Stage 4 - Initially for j+0
         const int jPlus0 = 0;
-        vecf f_x_vec;
-        vecf f_y_vec;
-        vecf f_z_vec;
+        MD_VEC f_x_vec;
+        MD_VEC f_y_vec;
+        MD_VEC f_z_vec;
         {
-          vecf p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus0];
-          vecf p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus0];
-          vecf p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus0];
-          vecf r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-          vecf r_vec = vsqrtf(r_2_vec);
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vecf f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_vec[jPlus0]) * r_2_recip_vec);
+          MD_VEC p_x_diff_vec = p0_x_i_vec - p1_x_vec[jPlus0];
+          MD_VEC p_y_diff_vec = p0_y_i_vec - p1_y_vec[jPlus0];
+          MD_VEC p_z_diff_vec = p0_z_i_vec - p1_z_vec[jPlus0];
+          MD_VEC r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          MD_VEC r_vec = vsqrt_MDF(r_2_vec);
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          MD_VEC f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_vec[jPlus0]) * r_2_recip_vec);
           f_x_vec = p_x_diff_norm_vec * f_mag_vec;
           f_y_vec = p_y_diff_norm_vec * f_mag_vec;
           f_z_vec = p_z_diff_norm_vec * f_mag_vec;
@@ -153,31 +152,31 @@ module pairCompute {
           #if 1
 
           // Stage 4 - Apply force vector
-          f0_x_i_vec = vaddf(f0_x_i_vec, f_x_vec);
-          f0_y_i_vec = vaddf(f0_y_i_vec, f_y_vec);
-          f0_z_i_vec = vaddf(f0_z_i_vec, f_z_vec);
-          f1_x_vec[j] = vsubf(f1_x_vec[j], f_x_vec);
-          f1_y_vec[j] = vsubf(f1_y_vec[j], f_y_vec);
-          f1_z_vec[j] = vsubf(f1_z_vec[j], f_z_vec);
+          f0_x_i_vec = vadd_MDF(f0_x_i_vec, f_x_vec);
+          f0_y_i_vec = vadd_MDF(f0_y_i_vec, f_y_vec);
+          f0_z_i_vec = vadd_MDF(f0_z_i_vec, f_z_vec);
+          f1_x_vec[j] = vsub_MDF(f1_x_vec[j], f_x_vec);
+          f1_y_vec[j] = vsub_MDF(f1_y_vec[j], f_y_vec);
+          f1_z_vec[j] = vsub_MDF(f1_z_vec[j], f_z_vec);
 
           // Stage 3 - Calculate force vector
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_z_diff_norm_vec = vmulf(p_z_diff_vec, r_recip_vec);
-          vecf p_y_diff_norm_vec = vmulf(p_y_diff_vec, r_recip_vec);
-          vecf p_x_diff_norm_vec = vmulf(p_x_diff_vec, r_recip_vec);
-          vecf f_mag_vec = vmulf(vmulf(coulomb_vec, p0_q_i_vec), vmulf(p1_q_j_vec_s2, r_2_recip_vec));
-          f_x_vec = vmulf(p_x_diff_norm_vec, f_mag_vec);
-          f_y_vec = vmulf(p_y_diff_norm_vec, f_mag_vec);
-          f_z_vec = vmulf(p_z_diff_norm_vec, f_mag_vec);
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+          MD_VEC p_z_diff_norm_vec = vmul_MDF(p_z_diff_vec, r_recip_vec);
+          MD_VEC p_y_diff_norm_vec = vmul_MDF(p_y_diff_vec, r_recip_vec);
+          MD_VEC p_x_diff_norm_vec = vmul_MDF(p_x_diff_vec, r_recip_vec);
+          MD_VEC f_mag_vec = vmul_MDF(vmul_MDF(coulomb_vec, p0_q_i_vec), vmul_MDF(p1_q_j_vec_s2, r_2_recip_vec));
+          f_x_vec = vmul_MDF(p_x_diff_norm_vec, f_mag_vec);
+          f_y_vec = vmul_MDF(p_y_diff_norm_vec, f_mag_vec);
+          f_z_vec = vmul_MDF(p_z_diff_norm_vec, f_mag_vec);
 
           // Stage 2 - Calculate radius
           p1_q_j_vec_s2 = p1_q_j_vec;
-          p_x_diff_vec = vsubf(p0_x_i_vec, p1_x_j_vec);
-          p_y_diff_vec = vsubf(p0_y_i_vec, p1_y_j_vec);
-          p_z_diff_vec = vsubf(p0_z_i_vec, p1_z_j_vec);
-          r_2_vec = vmaddf(p_x_diff_vec, p_x_diff_vec, vmaddf(p_y_diff_vec, p_y_diff_vec, vmulf(p_z_diff_vec, p_z_diff_vec)));
-          r_vec = vsqrtf(r_2_vec);
+          p_x_diff_vec = vsub_MDF(p0_x_i_vec, p1_x_j_vec);
+          p_y_diff_vec = vsub_MDF(p0_y_i_vec, p1_y_j_vec);
+          p_z_diff_vec = vsub_MDF(p0_z_i_vec, p1_z_j_vec);
+          r_2_vec = vmadd_MDF(p_x_diff_vec, p_x_diff_vec, vmadd_MDF(p_y_diff_vec, p_y_diff_vec, vmul_MDF(p_z_diff_vec, p_z_diff_vec)));
+          r_vec = vsqrt_MDF(r_2_vec);
 
           // Stage 1 - Load particle data
           const int jIndexToLoad = j + 3;
@@ -197,12 +196,12 @@ module pairCompute {
           f1_z_vec[j] -= f_z_vec;
 
           // Stage 3 - Calculate force vector
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vecf f_mag_vec = coulomb_vec * p0_q_i_vec * p1_q_j_vec_s2 * r_2_recip_vec;  // Calc force magnitude
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          MD_VEC f_mag_vec = coulomb_vec * p0_q_i_vec * p1_q_j_vec_s2 * r_2_recip_vec;  // Calc force magnitude
           f_x_vec = p_x_diff_norm_vec * f_mag_vec;  // Multiply normalized vector by force magnitude
           f_y_vec = p_y_diff_norm_vec * f_mag_vec;
           f_z_vec = p_z_diff_norm_vec * f_mag_vec;
@@ -213,7 +212,7 @@ module pairCompute {
           p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
           p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
           r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-          r_vec = vsqrtf(r_2_vec);
+          r_vec = vsqrt_MDF(r_2_vec);
 
           // Stage 1 - Load particle data
           const int jIndexToLoad = j + 3;
@@ -249,15 +248,15 @@ module pairCompute {
 
         // Complete Calc for Stage 2 Data - Calculate Force Vector, Apply Force Vector
         {
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vecf f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) * r_2_recip_vec);
-          vecf f_x_vec = p_x_diff_norm_vec * f_mag_vec;
-          vecf f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vecf f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          MD_VEC f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec_s2) * r_2_recip_vec);
+          MD_VEC f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          MD_VEC f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          MD_VEC f_z_vec = p_z_diff_norm_vec * f_mag_vec;
           f0_x_i_vec += f_x_vec;
           f0_y_i_vec += f_y_vec;
           f0_z_i_vec += f_z_vec;
@@ -273,20 +272,20 @@ module pairCompute {
 
         // Complete Calc for Stage 1 Data - Calculate Radius, Calculate Force Vector, Apply Force Vector
         {
-          vecf p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
-          vecf p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
-          vecf p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
-          vecf r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-          vecf r_vec = vsqrtf(r_2_vec);
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vecf f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) * r_2_recip_vec);
-          vecf f_x_vec = p_x_diff_norm_vec * f_mag_vec;
-          vecf f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vecf f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          MD_VEC p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
+          MD_VEC p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
+          MD_VEC p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
+          MD_VEC r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          MD_VEC r_vec = vsqrt_MDF(r_2_vec);
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          MD_VEC f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) * r_2_recip_vec);
+          MD_VEC f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          MD_VEC f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          MD_VEC f_z_vec = p_z_diff_norm_vec * f_mag_vec;
           f0_x_i_vec += f_x_vec;
           f0_y_i_vec += f_y_vec;
           f0_z_i_vec += f_z_vec;
@@ -306,36 +305,36 @@ module pairCompute {
         for (j = 0; j < numParticlesByVecSize; j++) {
 
           // Load the particles' data
-          vecf p1_x_j_vec = p1_x_vec[j];
-          vecf p1_y_j_vec = p1_y_vec[j];
-          vecf p1_z_j_vec = p1_z_vec[j];
-          vecf p1_q_j_vec = p1_q_vec[j];
+          MD_VEC p1_x_j_vec = p1_x_vec[j];
+          MD_VEC p1_y_j_vec = p1_y_vec[j];
+          MD_VEC p1_z_j_vec = p1_z_vec[j];
+          MD_VEC p1_q_j_vec = p1_q_vec[j];
 
           // Calculate the vector between the particles
-          vecf p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
-          vecf p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
-          vecf p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
+          MD_VEC p_x_diff_vec = p0_x_i_vec - p1_x_j_vec;
+          MD_VEC p_y_diff_vec = p0_y_i_vec - p1_y_j_vec;
+          MD_VEC p_z_diff_vec = p0_z_i_vec - p1_z_j_vec;
 
           // Calculate r and r^2 between the particles
-          vecf p_x_diff_2_vec = p_x_diff_vec * p_x_diff_vec;
-          vecf p_y_diff_2_vec = p_y_diff_vec * p_y_diff_vec;
-          vecf p_z_diff_2_vec = p_z_diff_vec * p_z_diff_vec;
-          vecf r_2_vec = p_x_diff_2_vec + p_y_diff_2_vec + p_z_diff_2_vec;
-          vecf r_vec = vsqrtf(r_2_vec);
+          MD_VEC p_x_diff_2_vec = p_x_diff_vec * p_x_diff_vec;
+          MD_VEC p_y_diff_2_vec = p_y_diff_vec * p_y_diff_vec;
+          MD_VEC p_z_diff_2_vec = p_z_diff_vec * p_z_diff_vec;
+          MD_VEC r_2_vec = p_x_diff_2_vec + p_y_diff_2_vec + p_z_diff_2_vec;
+          MD_VEC r_vec = vsqrt_MDF(r_2_vec);
 
           // Normalize the vector between the particles
-          vecf p_x_diff_norm_vec = p_x_diff_vec / r_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec / r_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec / r_vec;
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec / r_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec / r_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec / r_vec;
 
           // Calculate the magnitude of the electrostatic force between the particles
-          vecf f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);
+          MD_VEC f_mag_vec = coulomb_vec * ((p0_q_i_vec * p1_q_j_vec) / r_2_vec);
 
           // Multiply the magnitude by the normalized postition difference vector to
           //   create the force vector
-          vecf f_x_vec = p_x_diff_norm_vec * f_mag_vec;
-          vecf f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vecf f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          MD_VEC f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          MD_VEC f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          MD_VEC f_z_vec = p_z_diff_norm_vec * f_mag_vec;
 
           // Add the force to the outer-loop particle and subtract it from the inner-loop particles
           f0_x_i_vec += f_x_vec;
@@ -353,11 +352,23 @@ module pairCompute {
         }
 
         #endif
-
         // Write force values for the outer-loop particle back to memory
-        f0_x[i] = vextractf(f0_x_i_vec, 0) + vextractf(f0_x_i_vec, 1) + vextractf(f0_x_i_vec, 2) + vextractf(f0_x_i_vec, 3);
-        f0_y[i] = vextractf(f0_y_i_vec, 0) + vextractf(f0_y_i_vec, 1) + vextractf(f0_y_i_vec, 2) + vextractf(f0_y_i_vec, 3);
-        f0_z[i] = vextractf(f0_z_i_vec, 0) + vextractf(f0_z_i_vec, 1) + vextractf(f0_z_i_vec, 2) + vextractf(f0_z_i_vec, 3);
+#ifdef USE_DOUBLE
+        f0_x[i] = vextract_MDF(f0_x_i_vec, 0) + vextract_MDF(f0_x_i_vec, 1);
+        f0_y[i] = vextract_MDF(f0_y_i_vec, 0) + vextract_MDF(f0_y_i_vec, 1);
+        f0_z[i] = vextract_MDF(f0_z_i_vec, 0) + vextract_MDF(f0_z_i_vec, 1);
+#else
+
+        f0_x[i] = vextract_MDF(f0_x_i_vec, 0) + vextract_MDF(f0_x_i_vec, 1) + vextract_MDF(f0_x_i_vec, 2) + vextract_MDF(f0_x_i_vec, 3);
+        f0_y[i] = vextract_MDF(f0_y_i_vec, 0) + vextract_MDF(f0_y_i_vec, 1) + vextract_MDF(f0_y_i_vec, 2) + vextract_MDF(f0_y_i_vec, 3);
+        f0_z[i] = vextract_MDF(f0_z_i_vec, 0) + vextract_MDF(f0_z_i_vec, 1) + vextract_MDF(f0_z_i_vec, 2) + vextract_MDF(f0_z_i_vec, 3);
+#endif
+#if SANITY_CHECK
+	CkAssert(finite(f0_x[i]));
+	CkAssert(finite(f0_y[i]));
+	CkAssert(finite(f0_z[i]));
+
+#endif	
       }
 
       // DMK - DEBUG
@@ -369,7 +380,7 @@ module pairCompute {
           CkPrintf("[DEBUG] :: PairCompute[%d,%d]::doCalc() - Took %lf ms to execute... numParticles:%d\n"
                    "             p0[0] = { %e, %e, %e : %e }, p1[0] = { %e, %e, %e : %e }...\n"
                    "             f0[0] = { %e, %e, %e }, f1[0] = { %e, %e, %e }...\n",
-                   thisIndex_x, thisIndex_y, deltaTime * 1000.0f, numParticles,
+                   thisIndex_x, thisIndex_y, deltaTime * 100zero, numParticles,
                    p0_x[0], p0_y[0], p0_z[0], p0_q[0], p1_x[0], p1_y[0], p1_z[0], p1_q[0],
                    f0_x[0], f0_y[0], f0_z[0], f1_x[0], f1_y[0], f1_z[0]
                   );

@@ -37,5 +37,6 @@ clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
 	rm -f jacobi3D maxReduce prime ping octo line ring
+	rm -f jacobi3D.exe maxReduce.exe prime.exe ping.exe octo.exe line.exe ring.exe
 	rm -f conv-host charmrun
 	cd littleMD; $(MAKE) clean

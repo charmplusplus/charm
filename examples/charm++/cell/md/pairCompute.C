@@ -47,21 +47,21 @@ void PairCompute::init(int numParticlesPerPatch) {
   // Initialize the arrays
   numParticles = numParticlesPerPatch;
   #if USE_PROXY_PATCHES == 0
-    particleX[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleX[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleY[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleY[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleZ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleZ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleQ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleQ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleX[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleX[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleY[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleY[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleZ[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleZ[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleQ[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleQ[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
   #endif
-  forceX[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceX[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceY[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceY[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceZ[0] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceZ[1] = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceX[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceX[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceY[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceY[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceZ[0] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceZ[1] = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
   patchDataCount = 0;
 
   // Check in with the main chare
@@ -69,14 +69,14 @@ void PairCompute::init(int numParticlesPerPatch) {
 }
 
 
-void PairCompute::patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch, CProxy_ProxyPatch proxyPatchProxy) {
+void PairCompute::patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, int fromPatch, CProxy_ProxyPatch proxyPatchProxy) {
   #if USE_PROXY_PATCHES != 0
     this->proxyPatchProxy[fromPatch] = proxyPatchProxy;
   #endif
   patchData(numParticles, particleX, particleY, particleZ, particleQ, fromPatch);
 }
 
-void PairCompute::patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, int fromPatch) {
+void PairCompute::patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, int fromPatch) {
 
   // Copy the data from the parameters
   #if USE_PROXY_PATCHES != 0
@@ -85,10 +85,10 @@ void PairCompute::patchData(int numParticles, float* particleX, float* particleY
     this->particleZ[fromPatch] = particleZ;
     this->particleQ[fromPatch] = particleQ;
   #else
-    memcpy(this->particleX[fromPatch], particleX, numParticles * sizeof(float));
-    memcpy(this->particleY[fromPatch], particleY, numParticles * sizeof(float));
-    memcpy(this->particleZ[fromPatch], particleZ, numParticles * sizeof(float));
-    memcpy(this->particleQ[fromPatch], particleQ, numParticles * sizeof(float));
+    memcpy(this->particleX[fromPatch], particleX, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleY[fromPatch], particleY, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleZ[fromPatch], particleZ, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleQ[fromPatch], particleQ, numParticles * sizeof(MD_FLOAT));
   #endif
 
   // Increment the patch count and initiate the calculation of both patches have

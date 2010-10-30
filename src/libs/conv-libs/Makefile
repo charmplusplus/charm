@@ -7,7 +7,7 @@ all:
 	cd ddt; $(MAKE) all OPTS='$(OPTS)'
 
 clean:
-	cd master-slave; make clean
-	cd packlib; make clean
-#	cd metis; make clean
-	cd ddt; make clean
+	cd master-slave; $(MAKE) clean
+	cd packlib; $(MAKE) clean
+#	cd metis; $(MAKE) clean
+	cd ddt; $(MAKE) clean

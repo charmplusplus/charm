@@ -16,7 +16,7 @@
 #include "charm++.h"
 #include <BaseLB.h>
 #include <cklists.h>
-#include "heap.h"
+#include "ckheap.h"
 #include "WSLB.h"
 #include "LBDBManager.h"
 

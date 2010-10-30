@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS) 
 
-all: pgm
+all: pgm fpgm
 
 pgm: pgm.o
 	$(CHARMC) -o pgm pgm.o -language fem
@@ -15,7 +15,7 @@ fpgm.o: fpgm.f90
 	$(CHARMC) -c fpgm.f90
 
 clean:
-	rm -f pgm fpgm *.o conv-host charmrun
+	rm -f pgm fpgm *.o conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
 	./charmrun ./pgm +p1 +vp1 $(TESTOPTS)

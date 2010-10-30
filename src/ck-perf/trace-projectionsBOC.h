@@ -135,11 +135,12 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   double dummy;
   double endTime;
   double analysisStartTime;
+  int endPe;                          // end PE which calls CkExit()
  public:
- TraceProjectionsBOC(bool _findOutliers) : findOutliers(_findOutliers) {};
- TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m) {};
+ TraceProjectionsBOC(bool _findOutliers) : findOutliers(_findOutliers), parModulesRemaining(0), endPe(-1) {};
+ TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0), endPe(-1) {};
 
-  void traceProjectionsParallelShutdown();
+  void traceProjectionsParallelShutdown(int);
   void startEndTimeAnalysis();
   void endTimeDone(CkReductionMsg *);
   void kMeansDone(CkReductionMsg *);

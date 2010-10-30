@@ -70,6 +70,34 @@ class MeshModel{
             elemIDHash = NULL;
 	    allocatedForCUDADevice = false;
         }
+
+
+	void print(){
+	  CkPrintf("MeshModel::print() on pe %d\n", CkMyPe());
+	  CkPrintf("mesh=%p\n", mesh);
+	  CkPrintf("mAtt=%p\n", mAtt);
+	  CkPrintf("ElemData_T = %p\n", ElemData_T );
+	  CkPrintf("GhostElemData_T = %p\n", GhostElemData_T);
+	  CkPrintf("NodeData_T = %p\n", NodeData_T);
+          CkPrintf("GhostNodeData_T = %p\n", GhostNodeData_T);
+          CkPrintf("ElemConn_T = %p\n", ElemConn_T);
+          CkPrintf("coord_T = %p\n", coord_T);
+          CkPrintf("node_id_T = %p\n", node_id_T);
+          CkPrintf("elem_id_T = %p\n", elem_id_T);
+          CkPrintf("n2eConn_T = %p\n", n2eConn_T);
+
+          CkPrintf("nodeIDHash = %p\n", nodeIDHash);
+	  CkPrintf("elemIDHash = %p\n", elemIDHash);
+
+	  CkPrintf("node_attr_size = %d\n", node_attr_size);
+	  CkPrintf("elem_attr_size = %d\n", elem_attr_size);
+          CkPrintf("model_attr_size = %d\n", model_attr_size);    
+          CkPrintf("num_local_elem = %d\n", num_local_elem);
+          CkPrintf("num_local_node = %d\n", num_local_node);
+          CkPrintf("target_device = %d\n", target_device);
+
+	}
+
 };
 
 
@@ -155,8 +183,8 @@ MeshModel* meshModel_Create_Init();
 
 
 /** Create and access a mesh model. Only call from Driver */
-MeshModel* meshModel_Create_Driver(MeshDevice target_device,
-        int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt);
+void meshModel_Create_Driver(MeshDevice target_device,
+        int elem_attr_sz, int node_attr_sz, int model_attr_sz, void* mAtt, MeshModel &model);
 
 /** Cleanup a model. Currently does nothing */
 void meshModel_Destroy(MeshModel* m);
@@ -657,6 +685,11 @@ inline void meshFacetItr_Destroy (MeshFacetItr* itr){
 
 // End of Inline Iterator Section
 #endif
+
+
+
+
+void setTableReferences(MeshModel* model, bool recomputeHash=false);
 
 
 #endif

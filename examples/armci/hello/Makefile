@@ -12,4 +12,4 @@ bgtest: hello
 	./charmrun +p1 ./hello +vp2 +x2 +y1 +z1 $(TESTOPTS)
 
 clean:
-	rm -f hello charmrun
+	rm -f hello charmrun *.o charmrun.exe hello.exe hello.pdb hello.ilk

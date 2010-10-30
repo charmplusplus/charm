@@ -10,7 +10,7 @@
 class bitvectorMessage : public CMessage_bitvectorMessage {
 };
 
-bool test(bool result, char *what) {
+bool test(bool result, const char *what) {
   if ( result ) {
 //    ckout << what << " passed." << endl;
   } else {

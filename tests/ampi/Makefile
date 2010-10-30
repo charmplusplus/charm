@@ -1,4 +1,4 @@
-DIRS=megampi stacksize
+DIRS=megampi stacksize migration
 #DIRS=megampi stacksize chkpt 
 
 all:

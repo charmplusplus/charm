@@ -13,3 +13,6 @@
 
 #undef __ONESIDED_GM_HARDWARE
 #define __ONESIDED_GM_HARDWARE  1
+
+#undef CMK_BARRIER_USE_COMMON_CODE
+#define CMK_BARRIER_USE_COMMON_CODE                        0

@@ -34,7 +34,7 @@ public: static int __idx;
 
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
-
+PUPbytes(CmiGroup)
   
 /**
  * CkMessage is the superclass of all Charm++ messages.
@@ -101,9 +101,10 @@ class CkEntryOptions : public CkNoncopyable {
 	typedef unsigned int prio_t; //Datatype used to represent priorities
 	prio_t *prioPtr; //Points to message priority values
 	prio_t prioStore; //For short priorities, stores the priority value
+	CkGroupID  depGroupID;  // group dependence
 public:
 	CkEntryOptions(void): queueingtype(CK_QUEUEING_FIFO), prioBits(0), 
-                              prioPtr(NULL), prioStore(0) {}
+                              prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
 		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
@@ -152,11 +153,13 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
+	inline void setGroupDepID(CkGroupID &gid) { depGroupID = gid; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
 	inline int getPriorityBits(void) const {return prioBits;}
 	inline const prio_t *getPriorityPtr(void) const {return prioPtr;}
+	inline const CkGroupID getGroupDepID() const { return depGroupID; }
 };
 
 #include "CkMarshall.decl.h"
@@ -281,6 +284,7 @@ public:
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
+        void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
 	void pup(PUP::er &p) {
 		p|nInts;
 		p|dimension;
@@ -402,7 +406,7 @@ PUPmarshall(CkArrayID)
 #include "ckobjQ.h"
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 class ChareMlogData;
 #endif
 
@@ -421,7 +425,7 @@ class Chare {
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     ChareMlogData *mlogData;
 #endif
     Chare(CkMigrateMessage *m);
@@ -915,12 +919,12 @@ public:
   }
   CProxySection_Group(const IrrGroup *g)
       :CProxy_Group(g), _nsid(0) {}
-  CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems)
+  CProxySection_Group(const int n, const CkGroupID *gid,  int const * const *elems, const int *nElems)
       :CProxy_Group(gid[0]), _nsid(n) {
     _sid = new CkSectionID[n];
     for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
   }
-  CProxySection_Group(const int n, const CkGroupID *gid, const int **elems, const int *nElems,CK_DELCTOR_PARAM)
+  CProxySection_Group(const int n, const CkGroupID *gid, int const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
       :CProxy_Group(gid[0],CK_DELCTOR_ARGS), _nsid(n) {
     _sid = new CkSectionID[n];
     for (int i=0; i<n; ++i) _sid[i] = CkSectionID(gid[i], elems[i], nElems[i]);
@@ -1113,7 +1117,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #include "ckmessagelogging.h"
 #endif
 #include "ckmemcheckpoint.h"

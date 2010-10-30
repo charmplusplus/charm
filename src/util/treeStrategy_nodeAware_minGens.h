@@ -71,7 +71,7 @@ namespace impl {
      *
      * We sidestep the issue by supplying our own binary predicate when we use std::find_first_of when
      * charm is built with a PGI compiler.
-     * @note: Hack will not be needed once PGI fixes this
+     * @note: This hack is not needed from pgCC 10.1 onwards
      */
     class vtxEqual
     {

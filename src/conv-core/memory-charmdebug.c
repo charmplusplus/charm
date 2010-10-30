@@ -50,9 +50,10 @@ struct _Slot {
   /*The number of bytes of user data*/
   int userSize;
 
-#define FLAGS_MASK        0x3F
-#define MODIFIED          0x20
-#define NEW_BLOCK         0x10
+#define FLAGS_MASK        0xFF
+#define MODIFIED          0x40
+#define NEW_BLOCK         0x20
+#define LEAK_CLEAN        0x10
 #define LEAK_FLAG         0x8
 #define UNKNOWN_TYPE      0x0
 #define SYSTEM_TYPE       0x1
@@ -62,8 +63,8 @@ struct _Slot {
   /* A magic number field, to verify this is an actual malloc'd buffer, and what
      type of allocation it is. The last 4 bits of the magic number are used to
      define a classification of mallocs. */
-#define SLOTMAGIC            0x8402a5c0
-#define SLOTMAGIC_VALLOC     0x7402a5c0
+#define SLOTMAGIC            0x8402a500
+#define SLOTMAGIC_VALLOC     0x7402a500
 #define SLOTMAGIC_FREED      0xDEADBEEF
   int magic;
 
@@ -105,7 +106,7 @@ void *lastMemoryAllocated = NULL;
 Slot **allocatedSince = NULL;
 int allocatedSinceSize = 0;
 int allocatedSinceMaxSize = 0;
-int saveAllocationHistory = 1;
+int saveAllocationHistory = 0;
 
 /* Convert a slot to a user address */
 static char *SlotToUser(Slot *s) {
@@ -479,6 +480,21 @@ void check_memory_leaks(LeakSearchInfo *info) {
   CkDeleteHashtable(table);
 
   memory_charmdebug_internal = 0;
+}
+
+void CpdMemoryMarkClean(char *msg) {
+  Slot *sl;
+  /* The first byte of the data packet indicates if we want o mark or unmark */
+  if ((msg+CmiMsgHeaderSizeBytes)[0]) {
+    SLOT_ITERATE_START(sl)
+      sl->magic |= LEAK_CLEAN;
+    SLOT_ITERATE_END
+  } else {
+    SLOT_ITERATE_START(sl)
+      sl->magic &= ~LEAK_CLEAN;
+    SLOT_ITERATE_END
+  }
+  CmiFree(msg);
 }
 
 /****************** memory allocation tree ******************/
@@ -1320,6 +1336,7 @@ static void meta_init(char **argv) {
   char buf[100];
   sprintf(buf,"slot size %d\n",sizeof(Slot));
   status(buf);
+  CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
   cpdInitializeMemory = 0;
   charmEnvelopeSize = getCharmEnvelopeSize();
   CpdDebugGetAllocationTree = (void* (*)(int*))CreateAllocationTree;
@@ -1358,6 +1375,9 @@ static void meta_init(char **argv) {
   if (CmiGetArgFlagDesc(argv,"+memory_verbose", "Print all memory-related operations")) {
     disableVerbosity = 0;
   }
+  if (CmiGetArgFlagDesc(argv,"+memory_nostack", "Do not collect stack traces for memory allocations")) {
+    stackTraceDisabled = 1;
+  }
 }
 
 static void *meta_malloc(size_t size) {
@@ -1374,7 +1394,9 @@ static void *meta_malloc(size_t size) {
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
+#if ! CMK_BLUEGENE_CHARM
       traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
     }
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1425,7 +1447,9 @@ static void meta_free(void *mem) {
     int memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
+#if ! CMK_BLUEGENE_CHARM
     traceFree_c(mem, memSize);
+#endif
 
     if (disableVerbosity == 0) {
       disableVerbosity = 1;
@@ -1516,7 +1540,9 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
+#if ! CMK_BLUEGENE_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
+#endif
   return user;
 }
 

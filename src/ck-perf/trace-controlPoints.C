@@ -32,6 +32,8 @@ TraceControlPoints::TraceControlPoints(char **argv)
 {
   resetTimings();
 
+  nesting_level = 0;
+
   b1=0;
   b2=0;
   b3=0;
@@ -70,58 +72,56 @@ void TraceControlPoints::messageRecv(char *env, int pe) {
   
 void TraceControlPoints::beginExecute(CmiObjId *tid)
 {
-  // CmiObjId is a 4-integer tuple uniquely identifying a migratable
-  //   Charm++ object. Note that there are other non-migratable Charm++
-  //   objects that CmiObjId will not identify.
-  b1++;
-  lastBeginExecuteTime = CmiWallTimer();
-  lastbeginMessageSize = -1;
-
-  //  CkPrintf("[%d] TraceControlPoints::beginExecute(CmiObjId *tid)\n", CkMyPe());
+  nesting_level++;
+  if(nesting_level == 1){
+    // CmiObjId is a 4-integer tuple uniquely identifying a migratable
+    //   Charm++ object. Note that there are other non-migratable Charm++
+    //   objects that CmiObjId will not identify.
+    b1++;
+    lastBeginExecuteTime = CmiWallTimer();
+    lastbeginMessageSize = -1;
+  }
 }
+
+
 
 void TraceControlPoints::beginExecute(envelope *e)
 {
-  lastBeginExecuteTime = CmiWallTimer();
-  lastbeginMessageSize = e->getTotalsize();
-  b2++;
-  b2mlen += lastbeginMessageSize;
-  //  CkPrintf("[%d] WARNING ignoring TraceControlPoints::beginExecute(envelope *e)\n", CkMyPe());
-
-  // no message means thread execution
-  //  if (e != NULL) {
-  //  CkPrintf("[%d] TraceControlPoints::beginExecute  Method=%d, type=%d, source pe=%d, size=%d\n", 
-  //	     CkMyPe(), e->getEpIdx(), e->getMsgtype(), e->getSrcPe(), e->getTotalsize() );
-  //}  
-
-  //  CkPrintf("[%d] TraceControlPoints::beginExecute(envelope *e=%p)\n", CkMyPe(), e);
-
+  nesting_level++;
+  if(nesting_level == 1){
+    lastBeginExecuteTime = CmiWallTimer();
+    lastbeginMessageSize = e->getTotalsize();
+    b2++;
+    b2mlen += lastbeginMessageSize;
+  }
 }
  
 void TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe, 
 			       int mlen, CmiObjId *idx)
 {
-  b3++;
-  b3mlen += mlen;
-  lastBeginExecuteTime = CmiWallTimer();
-  lastbeginMessageSize = mlen;
-  //  CkPrintf("[%d] TraceControlPoints::beginExecute event=%d, msgType=%d, ep=%d, srcPe=%d, mlen=%d CmiObjId is also avaliable\n", CkMyPe(), event, msgType, ep, srcPe, mlen);
-  //  CkPrintf("[%d] TraceControlPoints::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)\n", CkMyPe());
-
+  nesting_level++;
+  if(nesting_level == 1){
+    b3++;
+    b3mlen += mlen;
+    lastBeginExecuteTime = CmiWallTimer();
+    lastbeginMessageSize = mlen;
+  }
 }
 
 void TraceControlPoints::endExecute(void)
 {
-  double executionTime = CmiWallTimer() - lastBeginExecuteTime;
-  totalEntryMethodTime += executionTime;
-  totalEntryMethodInvocations ++;
-
-  double m = (double)CmiMemoryUsage();
-  if(memUsage < m){
-    memUsage = m;
+  nesting_level--;
+  if(nesting_level == 0){
+    
+    double executionTime = CmiWallTimer() - lastBeginExecuteTime;
+    totalEntryMethodTime += executionTime;
+    totalEntryMethodInvocations ++;
+    
+    double m = (double)CmiMemoryUsage();
+    if(memUsage < m){
+      memUsage = m;
+    }    
   }
-
-  //  CkPrintf("[%d] Previously executing Entry Method completes. lastbeginMessageSize=%d executionTime=%lf\n", CkMyPe(), lastbeginMessageSize, executionTime);
 }
 
 void TraceControlPoints::beginIdle(double curWallTime) {

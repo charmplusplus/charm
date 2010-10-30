@@ -25,6 +25,45 @@
 #define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
+// Flag that tells the system if we are replaying using Record/Replay
+extern int _replaySystem;
+
+#if CMK_REPLAYSYSTEM
+inline void _CldEnqueue(int pe, void *msg, int infofn) {
+  if (_replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueue(pe, msg, infofn);
+}
+inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
+  if (_replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueMulti(npes, pes, msg, infofn);
+}
+inline void _CldEnqueueGroup(CmiGroup grp, void *msg, int infofn) {
+  if (_replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldEnqueueGroup(grp, msg, infofn);
+}
+inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
+  if (_replaySystem) {
+    CmiFree(msg);
+    return;
+  }
+  CldNodeEnqueue(node, msg, infofn);
+}
+#else
+#define _CldEnqueue       CldEnqueue
+#define _CldEnqueueMulti  CldEnqueueMulti
+#define _CldEnqueueGroup  CldEnqueueGroup
+#define _CldNodeEnqueue   CldNodeEnqueue
+#endif
+
 /// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
@@ -36,7 +75,7 @@ class VidBlock {
         //env->setSrcPe(CkMyPe());
         env->setMsgtype(ForChareMsg);
         env->setObjPtr(actualID.objPtr);
-        CldEnqueue(actualID.onPE, env, _infoIdx);
+        _CldEnqueue(actualID.onPE, env, _infoIdx);
         CpvAccess(_qd)->create();      
     }
   public:
@@ -92,12 +131,21 @@ public:
 	 * up to the outermost
 	 */
 	inline CmiBool processMessage(envelope *env,CkCoreState *ck) {
-	  if (next != NULL) next->processMessage(env, ck);
-	  return process(env, ck);
+	  CmiBool result = CmiTrue;
+	  if (next != NULL) result &= next->processMessage(env, ck);
+	  result &= process(env, ck);
+	  return result;
+	}
+	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
+	   int result = 1;
+	   if (next != NULL) result &= next->processThread(token, ck);
+	   result &= process(token, ck);
+	   return result;
 	}
 protected:
-    /** This is used internally by this class to call the correct subclass method */
+    /** These are used internally by this class to call the correct subclass method */
 	virtual CmiBool process(envelope *env,CkCoreState *ck) =0;
+	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };

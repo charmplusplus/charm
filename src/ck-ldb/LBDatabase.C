@@ -433,22 +433,23 @@ const char *LBDatabase::loadbalancer(int seq) {
 
 void LBDatabase::pup(PUP::er& p)
 { 
-  IrrGroup::pup(p); 
-  // the memory should be already allocated
-  int np;
-  if (!p.isUnpacking()) np = CkNumPes();
-  p|np;
+	IrrGroup::pup(p); 
+	// the memory should be already allocated
+	int np;
+	if (!p.isUnpacking()) np = CkNumPes();
+	p|np;
 	CmiAssert(avail_vector);
-  // in case number of processors changes
-  if (p.isUnpacking() && np > CkNumPes()) {
-    CmiLock(avail_vector_lock);
-    delete [] avail_vector;
-    avail_vector = new char[np];
-    for (int i=0; i<np; i++) avail_vector[i] = 1;
-    CmiUnlock(avail_vector_lock);
-  }
-  p(avail_vector, np);
+	// in case number of processors changes
+	if (p.isUnpacking() && np > CkNumPes()) {
+		CmiLock(avail_vector_lock);
+		delete [] avail_vector;
+		avail_vector = new char[np];
+		for (int i=0; i<np; i++) avail_vector[i] = 1;
+		CmiUnlock(avail_vector_lock);
+	}
+	p(avail_vector, np);
 	p|mystep;
+	if(p.isUnpacking()) nloadbalancers = 0;
 }
 
 
@@ -492,7 +493,7 @@ void TurnManualLBOff()
 #endif
 }
 
-void LBTurnInstrumentOn() { 
+extern "C" void LBTurnInstrumentOn() { 
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
     LBDatabase::Object()->CollectStatsOn(); 
@@ -501,7 +502,7 @@ void LBTurnInstrumentOn() {
 #endif
 }
 
-void LBTurnInstrumentOff() { 
+extern "C" void LBTurnInstrumentOff() { 
 #if CMK_LBDB_ON
   if (CkpvAccess(lbdatabaseInited))
     LBDatabase::Object()->CollectStatsOff(); 

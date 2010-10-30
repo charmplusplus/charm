@@ -49,7 +49,7 @@ bgtest: pgm
 
 clean:
 	rm -rf *.o pgm *.sts *.log *.bak *~ SunWS_cache ii_files ti_files
-	rm -f conv-host getmesh charmrun
+	rm -f conv-host getmesh charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 veryclean: clean
 	rm -f *.mesh *.graph meshdata.*

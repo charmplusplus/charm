@@ -3,6 +3,7 @@
 
 using namespace std;
 
+int **_armciRednLookupTable;
 
 // FIXME: might be memory leakage in put
 // This is the way to adapt a library's preferred start interface with the
@@ -13,11 +14,31 @@ extern "C" void armciLibStart(void) {
   ARMCI_Main_cpp(argc, argv);
 }
 
+_ARMCI_GENERATE_POLYMORPHIC_REDUCTION(sum,ret[i]+=value[i];)
+_ARMCI_GENERATE_POLYMORPHIC_REDUCTION(product,ret[i]*=value[i];)
+_ARMCI_GENERATE_POLYMORPHIC_REDUCTION(max,if (ret[i]<value[i]) ret[i]=value[i];)
+_ARMCI_GENERATE_POLYMORPHIC_REDUCTION(min,if (ret[i]>value[i]) ret[i]=value[i];)
+_ARMCI_GENERATE_ABS_REDUCTION()
+
 static int armciLibStart_idx = -1;
 
 void armciNodeInit(void) {
   CmiAssert(armciLibStart_idx == -1);
   armciLibStart_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)armciLibStart);
+
+  // initialize the reduction table
+  _armciRednLookupTable = new int*[_ARMCI_NUM_REDN_OPS];
+  for (int ops=0; ops<_ARMCI_NUM_REDN_OPS; ops++) {
+    _armciRednLookupTable[ops] = new int[ARMCI_NUM_DATATYPES];
+  }
+
+  // Add the new reducers for ARMCI.
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(sum,_ARMCI_REDN_OP_SUM);
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(product,_ARMCI_REDN_OP_SUM);
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(max,_ARMCI_REDN_OP_MAX);
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(min,_ARMCI_REDN_OP_MIN);
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(absmax,_ARMCI_REDN_OP_ABSMAX);
+  _ARMCI_REGISTER_POLYMORPHIC_REDUCTION(absmin,_ARMCI_REDN_OP_ABSMIN);
 }
 
 // Default startup routine (can be overridden by user's own)
@@ -206,7 +227,7 @@ void ArmciVirtualProcessor::waitproc(int proc){
   for(int i=0;i<hdlList.size();i++){
     if((hdlList[i]->acked == 0) && 
        (hdlList[i]->proc == proc) && 
-       (hdlList[i]->op & IMPLICIT_MASK != 0)) {
+       ((hdlList[i]->op & IMPLICIT_MASK) != 0)) {
       hdlList[i]->wait = 1;
       procs.push_back(i);
     }
@@ -218,7 +239,7 @@ void ArmciVirtualProcessor::waitall(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
     if((hdlList[i]->acked == 0) && 
-       (hdlList[i]->op & IMPLICIT_MASK != 0)) {
+       ((hdlList[i]->op & IMPLICIT_MASK) != 0)) {
       hdlList[i]->wait = 1;
       procs.push_back(i);
     }
@@ -230,7 +251,7 @@ void ArmciVirtualProcessor::fence(int proc){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
     if((hdlList[i]->acked == 0) && 
-       (hdlList[i]->op & BLOCKING_MASK != 0) && 
+       ((hdlList[i]->op & BLOCKING_MASK) != 0) && 
        (hdlList[i]->proc == proc))
       procs.push_back(i);
   }
@@ -240,7 +261,7 @@ void ArmciVirtualProcessor::allfence(){
   vector<int> procs;
   for(int i=0;i<hdlList.size();i++){
     if((hdlList[i]->acked == 0) && 
-       (hdlList[i]->op & BLOCKING_MASK != 0))
+       ((hdlList[i]->op & BLOCKING_MASK) != 0))
       procs.push_back(i);
   }
   waitmulti(procs);
@@ -601,6 +622,72 @@ void ArmciVirtualProcessor::mallocClient(CkReductionMsg *msg) {
   // broadcast the results to everyone.
   thisProxy.getAddresses(addrmsg);
   delete msg;
+}
+
+// **** CAF collective operations **** 
+
+// **CWL**
+//   Assumptions:
+//   1. this operation blocks until data is ready.
+//   2. buffer pointers can be different for each Virtual Processor.
+//   3. len represents length of buffer in bytes.
+void ArmciVirtualProcessor::msgBcast(void *buffer, int len, int root) {
+  int me;
+  ARMCI_Myid(&me);
+  if (me == root) {
+    thisProxy.recvMsgBcast(len, (char *)buffer, root);
+  } else {
+    // copy the buffer pointer to thread object
+    collectiveTmpBufferPtr = buffer;
+    thread->suspend();
+  }
+}
+
+// **CWL** For now, we have to live with a double-copy
+void ArmciVirtualProcessor::recvMsgBcast(int len, char *buffer, int root) {
+  int me;
+  ARMCI_Myid(&me);
+  if (me != root) {
+    // Copy broadcast buffer into the area of memory pointed to by
+    //   buffer specified in the original broadcast collective and then
+    //   setting the temporary thread object pointer back to NULL.
+    collectiveTmpBufferPtr = memcpy(collectiveTmpBufferPtr, buffer, len);
+    collectiveTmpBufferPtr = NULL;
+    thread->resume();
+  }
+}
+
+// **CWL**
+//   Assumptions (seems true from ARMCI 1.4 implementation):
+//   1. the root is always 0.
+void ArmciVirtualProcessor::msgGop(void *x, int n, char *op, int type) {
+  CkReduction::reducerType reducer;
+  if (strcmp(op,"+") == 0) {
+  } else if (strcmp(op,"*") == 0) {
+  } else if (strcmp(op,"min") == 0) {
+  } else if (strcmp(op,"max") == 0) {
+  } else if (strcmp(op,"absmin") == 0) {
+  } else if (strcmp(op,"absmax") == 0) {
+  } else {
+    CkPrintf("Operator %s not supported\n",op);
+    CmiAbort("ARMCI ERROR: msgGop - Unknown operator\n");
+  }
+  switch (type) {
+  case ARMCI_INT:
+    
+    break;
+  case ARMCI_LONG:
+    break;
+  case ARMCI_LONG_LONG:
+    break;
+  case ARMCI_FLOAT:
+    break;
+  case ARMCI_DOUBLE:
+    break;
+  default:
+    CkPrintf("ARMCI Type %d not supported\n", type);
+    CmiAbort("ARMCI ERROR: msgGop - Unknown type\n");
+  }
 }
 
 // reduction client data - preparation for checkpointing

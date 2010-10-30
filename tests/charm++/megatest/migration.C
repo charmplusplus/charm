@@ -54,7 +54,7 @@ void
 mig_Element::done(void)
 {
   numDone++;
-  if(numDone==numElements)
+  if(numDone==ckGetArraySize())
     megatest_finish();
 }
 

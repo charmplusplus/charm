@@ -18,9 +18,9 @@ bgtest: all
 	./charmrun +p3 ./hello 10 +x1 +y1 +z3
 
 clean:
-	rm -f conv-host *.o charmrun
+	rm -f conv-host *.o charmrun charmrun.exe
 	rm -f *.def.h *.decl.h
-	rm -f pgm pgm.*.log pgm.sts
+	rm -f hello hello.*.log hello.sts hello.exe hello.pdb hello.ilk
 	rm -f gmon.out #*#
 	rm -f core *~
 	rm -f TAGS *.headers hello

@@ -622,8 +622,7 @@ static void open_tcp_sockets()
     skt = skt_accept(dataskt, &clientIP,&clientPort);
     if (skt<0) KillEveryoneCode(98246554);
 #if NO_NAGLE_ALG
-    flag = 1;
-    ok = setsockopt(skt, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+    skt_tcp_no_nagle(skt);
 #endif
     ok = skt_recvN(skt, &pe, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);
@@ -642,8 +641,7 @@ static void open_tcp_sockets()
     skt = skt_connect(nodes[pe].IP, nodes[pe].dataport, 300);
     if (skt<0) KillEveryoneCode(894788843);
 #if NO_NAGLE_ALG
-    flag = 1;
-    ok = setsockopt(skt, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
+    skt_tcp_no_nagle(skt);
 #endif
     ok = skt_sendN(skt, &mype, sizeof(int));
     if (ok<0) KillEveryoneCode(98246556);

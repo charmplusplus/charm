@@ -3,6 +3,7 @@
 
 CProxy_Main mainProxy;
 CProxy_Hello helloProxy;
+CProxy_CHello chelloProxy;
 int nElements;
 
 class Main : public CBase_Main {
@@ -20,6 +21,9 @@ public:
     mainProxy = thisProxy;
     helloProxy = CProxy_Hello::ckNew(nElements);
     helloProxy.SayHi();
+
+    chelloProxy = CProxy_CHello::ckNew(0);
+    chelloProxy.SayHi(0);
   }
   
   Main(CkMigrateMessage *m) : CBase_Main(m) { 
@@ -42,6 +46,10 @@ public:
 
   void myClient(CkReductionMsg *m){
     step++;
+
+      // if restarted from a different num of pes, we have to ignore the chare
+    if (!_restarted || _chareRestored) chelloProxy.SayHi(step);
+
     int stepInc = *((int *)m->getData());
     CkAssert(step == stepInc);
     CkPrintf("myClient. a=%d(%p), b[0]=%d(%p), b[1]=%d.\n",a,&a,b[0],b,b[1]);
@@ -82,6 +90,25 @@ public:
   void pup(PUP::er &p){
     CBase_Hello::pup(p);
     p|step;
+  }
+};
+
+class CHello : public Chare 
+{
+  int step;
+public:
+  CHello(){ step = 0; }
+  CHello(CkMigrateMessage *m): Chare(m) { step = 0; }
+
+  void SayHi(int s) {
+    step = s;
+    printf("step %d done\n", step);
+  }
+
+  void pup(PUP::er &p){
+    Chare::pup(p);
+    p|step;
+    printf("CHello's PUPer. step=%d.\n", step);
   }
 };
 

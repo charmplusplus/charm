@@ -1,5 +1,5 @@
 OPTS = -O3
-CHARMC = ../../../bin/charmc -language ampi -memory gnu
+CHARMC = ../../../bin/charmc -language ampi
 MPICC = mpicc
 
 all: mpibench mpibench.mpi

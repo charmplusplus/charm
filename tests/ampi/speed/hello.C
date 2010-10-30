@@ -17,6 +17,9 @@ void startMPItests(int isLocal);
 void startMPItestsLocal(void);
 void startMPItestsRemote(void);
 
+int startMPItestsLocal_idx = -1;
+int startMPItestsRemote_idx = -1;
+
 /*mainchare*/
 class Main : public Chare
 {
@@ -63,7 +66,7 @@ public:
       arr.start(1);
       break;
     case 5:
-      TCHARM_Create(2,startMPItestsLocal);
+      TCHARM_Create(2,startMPItestsLocal_idx);
       break;
     case 6:
       if (CkNumPes()<2) {
@@ -81,7 +84,7 @@ public:
       arr.start(1);
       break;
     case 9:
-      TCHARM_Create(2,startMPItestsRemote);
+      TCHARM_Create(2,startMPItestsRemote_idx);
       break;
     case 10:
       CkPrintf("Tests Complete\n");
@@ -335,5 +338,11 @@ void startMPItests(int isLocal) {
 }
 void startMPItestsLocal(void) {startMPItests(1);}
 void startMPItestsRemote(void) {startMPItests(0);}
+
+static void nodeInit()
+{
+  startMPItestsLocal_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)startMPItestsLocal);
+  startMPItestsRemote_idx = TCHARM_Register_thread_function((TCHARM_Thread_data_start_fn)startMPItestsRemote);
+}
 
 #include "hello.def.h"

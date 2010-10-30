@@ -14,7 +14,7 @@
 
 #include "cklists.h"
 
-#include "heap.h"
+#include "ckheap.h"
 #include "NeighborLB.h"
 
 CreateLBFunc_Def(NeighborLB, "The neighborhood load balancer")

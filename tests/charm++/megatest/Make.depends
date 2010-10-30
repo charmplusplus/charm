@@ -40,6 +40,13 @@ groupcast.o: \
 	groupcast.decl.h \
 	groupcast.def.h
 	$(CHARMC) -o groupcast.o groupcast.C
+groupmulti.o: \
+	groupmulti.C \
+	groupmulti.h \
+	megatest.h \
+	groupmulti.decl.h \
+	groupmulti.def.h
+	$(CHARMC) -o groupmulti.o groupmulti.C
 groupsectiontest.o: \
 	groupsectiontest.C \
 	groupsectiontest.h \
@@ -185,3 +192,9 @@ callback.o: \
 	megatest.h \
 	callback.def.h
 	$(CHARMC) -o callback.o callback.C
+inlineem.o: \
+	inlineem.C \
+	inlineem.decl.h \
+	megatest.h \
+	inlineem.def.h
+	$(CHARMC) -o inlineem.o inlineem.C

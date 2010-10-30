@@ -24,8 +24,8 @@ class SRentry {
   /// Basic constructor
   /** Initializes all data members */
   SRentry() :timestamp(POSE_UnsetTS), sends(0), recvs(0), next(NULL) 
-{ 
-  }
+    {
+    }
   /// Initializing constructor 1
   /** Initializes timestamp & next w/parameters, sends & recvs to 0 */
   SRentry(POSE_TimeType ts, SRentry *p) :timestamp(ts), sends(0), recvs(0), next(p) 
@@ -46,6 +46,31 @@ class SRentry {
       if (sr == SEND) { sends = 1; recvs = 0; }
       else { sends = 0; recvs = 1; }
     }
+  /// PUP routine
+  /** This traverses the whole list of SRentrys using the next
+      pointer, PUPing each one */
+  void pup(PUP::er &p) {
+    p|timestamp; p|sends; p|recvs;
+    int nullFlag;
+    if (next == NULL) {
+      nullFlag = 1;
+    } else {
+      nullFlag = 0;
+    }
+    p|nullFlag;
+    if (p.isUnpacking()) {
+      if (nullFlag) {
+	next = NULL;
+      } else {
+	next = new SRentry();
+	next->pup(p);
+      }
+    } else {
+      if (!nullFlag) {
+	next->pup(p);
+      }
+    }
+  }
   /// Assignment operator
   SRentry& operator=(const SRentry& e) {
     timestamp = e.timestamp;
@@ -115,6 +140,79 @@ class SRtable {
   SRtable();
   /// Destructor
   ~SRtable() { FreeTable(); }
+  /// PUP routine
+  void pup(PUP::er &p) {
+    p|offset; p|b; p|size_b; p|numOverflow;
+    PUParray(p, sends, MAX_B);
+    PUParray(p, recvs, MAX_B);
+    p|ofSends; p|ofRecvs;
+    PUParray(p, numEntries, MAX_B);
+
+    // pup buckets
+    int nullFlag;
+    SRentry *tmp;
+    for (int i = 0; i < MAX_B; i++) {
+      if (buckets[i] == NULL) {
+	nullFlag = 1;
+      } else {
+	nullFlag = 0;
+      }
+      p|nullFlag;
+      if (p.isUnpacking()) {  // unpacking
+	if (nullFlag) {
+	  buckets[i] = end_bucket[i] = NULL;
+	} else {
+	  buckets[i] = new SRentry();
+	  buckets[i]->pup(p);
+	}
+      } else {  // packing
+	if (!nullFlag) {
+	  buckets[i]->pup(p);
+	}
+      }
+    }
+
+    // pup overflow bucket
+    if (overflow == NULL) {
+      nullFlag = 1;
+    } else {
+      nullFlag = 0;
+    }
+    p|nullFlag;
+    if (p.isUnpacking()) {  // unpacking
+      if (nullFlag) {
+	overflow = end_overflow = NULL;
+      } else {
+	overflow = new SRentry();
+	tmp = overflow;
+	do {
+	  tmp->pup(p);
+	  // At this point in unpacking, tmp->next is the old
+	  // pointer to the next SRentry in the list, which of
+	  // course is no longer valid.  However, if it's not NULL,
+	  // that does indicate the existence of another SRentry in
+	  // the list, so create a new one and unpack it in the next
+	  // do-while iteration.
+	  if (tmp->next) {
+	    tmp->next = new SRentry();
+	  } else {
+	    // tmp currently points to the last SRentry in the list,
+	    // so point end_overflow to it, too
+	    end_overflow = tmp;
+	  }
+	  tmp = tmp->next;
+	} while (tmp);
+      }
+    } else {  // packing
+      if (!nullFlag) {
+	tmp = overflow;
+	while (tmp) {
+	  tmp->pup(p);
+	  tmp = tmp->next;
+	}
+      }
+    }
+  }
   /// Initialize table to a minimum size
   void Initialize();
   /// Insert send/recv record sr at timestamp ts

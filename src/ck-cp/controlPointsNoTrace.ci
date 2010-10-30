@@ -1,0 +1,63 @@
+module ControlPointsNoTrace {
+
+  readonly CProxy_controlPointManager controlPointManagerProxy;
+  readonly int random_seed;
+  readonly long controlPointSamplePeriod;
+  readonly int whichTuningScheme;
+  readonly bool shouldGatherMemoryUsage;
+  readonly bool shouldGatherUtilization;
+  readonly bool shouldGatherAll;
+  readonly char CPDataFilename[512];
+
+  readonly bool shouldFilterOutputData;
+  readonly bool writeDataFileAtShutdown;
+
+  initproc void registerCPReductions(void);	
+
+
+ message controlPointMsg { 
+ 	 char data[];
+ };
+
+
+ message redistributor2DMsg {  
+	double data[]; 
+ }; 
+ 
+
+  mainchare controlPointMain {
+    entry controlPointMain(CkArgMsg*);
+  };
+
+ initnode void controlPointInitNode();
+
+ group  [migratable]  controlPointManager {
+    entry controlPointManager();
+
+    entry [expedited] void requestMemoryUsage(CkCallback cb);
+    entry [expedited] void gatherMemoryUsage(CkReductionMsg *msg);
+
+    entry [expedited] void requestIdleTime(CkCallback cb);
+    entry [expedited] void gatherIdleTime(CkReductionMsg *msg);
+
+    entry [expedited] void requestAll(CkCallback cb);
+    entry [expedited] void gatherAll(CkReductionMsg *msg);
+  
+ }   
+
+
+ 
+  array [2D] redistributor2D {
+   entry redistributor2D(void);
+
+   entry void startup();	
+   
+    entry void resizeGranules(int, int);
+    entry void receiveTransposeData(redistributor2DMsg *msg);
+
+  } 
+
+
+
+
+};

@@ -7,10 +7,34 @@ CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
 #keep it a decimal
-VERSION=60200
+VERSION=60301
 echo $VERSION > ../include/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
 
+# check enable/disable
+AC_ARG_ENABLE([tracing],
+            [AS_HELP_STRING([--enable-tracing],
+              [enable tracing modules])],
+            [enable_tracing=$enableval],
+            [enable_tracing=yes])
+
+if test "$enable_tracing" = "no"
+then
+  AC_DEFINE_UNQUOTED(CMK_TRACE_DISABLED, 1, [disable tracing])
+fi
+
+AC_ARG_ENABLE([replay],
+            [AS_HELP_STRING([--enable-replay],
+              [enable record/replay])],
+            [enable_replay=$enableval],
+            [enable_replay=yes])
+
+if test "$enable_replay" = "no"
+then
+  AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+fi
+
+#
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
 base_version=`cat .vdir`
@@ -643,6 +667,9 @@ test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_TLS_THREAD, $strictpass, [Allows __thread.])
 
 #### test if we can build MPI ####
+if test "$CMK_BUILD_MPI" = 1
+then
+
 cat > $t <<EOT
 #include "mpi.h"
 int main(int argc, char **argv)
@@ -655,7 +682,40 @@ test_cxx "whether build on MPI" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_BUILD_ON_MPI, $strictpass, [build MPI.])
 BUILD_MPI=$strictpass
 
-if test $strictpass -eq 1
+if test $BUILD_MPI -eq 0
+then
+  echo "Error: Can not compile a MPI program"
+  exit 1
+fi
+
+if test $BUILD_MPI -eq 1
+then
+  test_link "whether need to specify MPI library" "no" "yes" ""
+  if test $pass -ne 1
+  then
+    if test -z "$CMK_MPI_LIB"
+    then
+      test_link "whether -lmpich" "ok" "no" "-lmpich"
+      if test $pass -eq 1
+      then
+        add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpich"' "mpi lib"
+      else
+        test_link "whether -lmpi" "ok" "no" "-lmpi"
+        if test $pass -eq 1
+        then
+                add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
+        else
+                echo "Error: can not find mpi library"
+                exit 1
+        fi
+      fi
+    else
+      add_flag CMK_SYSLIBS='"$CMK_SYSLIBS $CMK_MPI_LIB"' "mpi lib"
+    fi
+  fi
+fi
+
+if test "$BUILD_MPI" = "1"
 then
 cat > $t <<EOT
 #include "mpi.h"
@@ -671,6 +731,7 @@ AC_DEFINE_UNQUOTED(CMK_MPI_INIT_THREAD, $strictpass, [Allows MPI_Init_thread.])
 fi
 mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 
+fi
 
 ################### Syscalls and Libraries ###################
 
@@ -695,6 +756,17 @@ int main() {
 EOT
 test_link "whether has sqrtf" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SQRTF, $pass, [whether has sqrtf])
+
+#### test for fabsf ###
+cat > $t <<EOT
+#include <math.h>
+int main() {
+  float i = fabsf((float)10.0);
+  return 0;
+}
+EOT
+test_link "whether has fabsf" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_FABSF, $pass, [whether has fabsf])
 
 #### test for mkstemp ###
 cat > $t <<EOT
@@ -770,8 +842,19 @@ void foo(void) {
   poll(pos, 1, 1);
 }
 EOT
-test_cxx "whether poll() syscall exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll() syscall exists])
+test_cxx "whether has poll" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_USE_POLL, $pass, [whether the poll syscall exists])
+
+#### check if getpagesize exists ####
+cat > $tc <<EOT
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    int s = getpagesize();
+}
+EOT
+test_linkc "whether has getpagesize" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETPAGESIZE, $pass, [whether getpagesize exists])
 
 #### check if getpid exists ####
 cat > $tc <<EOT
@@ -782,8 +865,8 @@ int main(int argc, char **argv) {
     pid_t pid = getpid();
 }
 EOT
-test_linkc "whether getpid() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid() exists])
+test_linkc "whether has getpid" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GETPID, $pass, [whether getpid exists])
 
 #### check if kill exists ####
 cat > $tc <<EOT
@@ -797,8 +880,8 @@ int main(int argc, char**argv)
     kill(pid, 9);
 }
 EOT
-test_linkc "whether kill() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill() exists])
+test_linkc "whether has kill" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_KILL, $pass, [whether kill exists])
 
 #### test for setpriority ###
 cat > $t <<EOT
@@ -808,8 +891,8 @@ void foo(void) {
   setpriority(PRIO_PROCESS, 0, 0);
 }
 EOT
-test_cxx "whether setpriority() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority() exists])
+test_cxx "whether has setpriority" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_SETPRIORITY, $pass, [whether the setpriority exists])
 
 #### test for system ###
 cat > $t <<EOT
@@ -1213,7 +1296,7 @@ then
 	add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 else
 	BUILD_SHARED=1
-        if test $BUILD_MPI -eq 1
+        if test "$BUILD_MPI" = "1"
 	then
 cat > $t <<EOT
 #include "stdlib.h"

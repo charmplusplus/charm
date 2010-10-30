@@ -37,6 +37,7 @@ void TCHARM_Create(int nThreads,int threadFn);
 typedef void (*TCHARM_Thread_data_start_fn)(void *threadData);
 void TCHARM_Create_data(int nThreads,int threadFn,
 		  void *threadData,int threadDataLen);
+int TCHARM_Register_thread_function(TCHARM_Thread_data_start_fn fn);
 
 
 /**** Routines you can call from the thread (driver) ****/

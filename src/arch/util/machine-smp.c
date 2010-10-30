@@ -230,7 +230,7 @@ static void CmiStartThreads(char **argv)
 /*  CmiStateInit(-1,_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize)); */
   CmiStateInit(_Cmi_mynode+CmiNumPes(),_Cmi_mynodesize,CmiGetStateN(_Cmi_mynodesize));
   
-#if CMK_MULTICORE
+#if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread)
     tocreate = _Cmi_mynodesize-1;
   else
@@ -416,7 +416,7 @@ static void CmiStartThreads(char **argv)
 
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
-  smp_mutex = CmiCreateLock();
+  _smp_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
   if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
@@ -445,7 +445,7 @@ static void CmiStartThreads(char **argv)
 #endif
 #endif
 
-#if CMK_MULTICORE
+#if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread)
     tocreate = _Cmi_mynodesize-1;
   else
@@ -492,7 +492,7 @@ void  CmiNodeBarrier(void) {
 /* unfortunately this could also be called in a seemingly non smp version
    net-win32, which actually is implemented as smp with comm. thread */
 void CmiNodeAllBarrier(void) {
-#if CMK_MULTICORE
+#if CMK_MULTICORE || CMK_SMP_NO_COMMTHD
   if (!Cmi_commthread)
   CmiNodeBarrierCount(CmiMyNodeSize());
   else

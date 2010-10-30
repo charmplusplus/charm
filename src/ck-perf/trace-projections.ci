@@ -53,7 +53,7 @@ module TraceProjections {
   group [migratable] TraceProjectionsBOC {
     entry TraceProjectionsBOC(bool);
 
-    entry void traceProjectionsParallelShutdown(void);
+    entry void traceProjectionsParallelShutdown(int);
     entry void startEndTimeAnalysis(void);
     entry void endTimeDone(CkReductionMsg *);
     entry void kMeansDone(void);

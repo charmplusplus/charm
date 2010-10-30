@@ -152,7 +152,7 @@ inline __veclf __vmaddlf(const __veclf a, const __veclf b, const __veclf c) { __
 /***** Reciprocal *****/
 /* TODO | FIXME  - See if there is a better way to do this (few cycles and avoid the memory load) */
 inline  __vecf  __vrecipf(const  __vecf a) {  __vecf r; r.v0 = 1.0f / a.v0; r.v1 = 1.0f / a.v1; r.v2 = 1.0f / a.v2; r.v3 = 1.0f / a.v3; return r; }
-inline __veclf __vreciplf(const __veclf a) { __veclf r; r.v0 = 1.0 / a.v0; r.v1 = 1.0 / a.v1; return r; }
+inline __veclf __vreciplf(const __veclf a) { __veclf r; r.v0 = 1.0f / a.v0; r.v1 = 1.0f / a.v1; return r; }
 
 /***** Square Root *****/
 inline  __vecf  __vsqrtf(const  __vecf a) {  __vecf r; r.v0 = sqrtf(a.v0); r.v1 = sqrtf(a.v1); r.v2 = sqrtf(a.v2); r.v3 = sqrtf(a.v3); return r; }
@@ -360,6 +360,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   inline  float  vextractf( vecf v, const int i) { return (( float*)(&v))[i]; }
   inline double vextractlf(veclf v, const int i) { return ((double*)(&v))[i]; }
 
+
   /***** Set *****/
   #define  vseti(a)  (_mm_set1_epi32((int)(a)))
   #define  vsetf(a)  (_mm_set1_ps((float)(a)))
@@ -418,7 +419,12 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 
   /***** Reciprocal *****/
   #define  vrecipf(a)  (_mm_rcp_ps(a))
-  #define vreciplf(a)  (_mm_rcp_pd(a))
+
+// why, oh why hath the SSE2 developers forsaken us?
+//  #define vreciplf(a)  (_mm_rcp_pd(a)) <-- no worky
+
+// vrecip goes to a not very vector implementation
+inline veclf vreciplf(const veclf a) { veclf r; double* a_ptr =  (double*)(&a); double* r_ptr = (double*)(&r); r_ptr[0] = 1.0f /  a_ptr[0]; r_ptr[1] = 1.0f / a_ptr[1]; return r; }
 
   /***** Square Root *****/
   #define  vsqrtf(a)  (_mm_sqrt_ps(a))
@@ -652,7 +658,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Data Types *****/
   typedef vector signed int veci;
   typedef vector float vecf;
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7
 /** power 7 VSX supports 64 bit operands, it also includes VMX support
  * which means that things like vec_div, vec_insert, etcetera work for
  * ints floats and doubles.  These intrinsics also require a suitably
@@ -661,6 +667,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
  * of whoopass on whoever installed the tool chain, because that kind
  * of stupidity should not be tolerated.
  */
+ 
   typedef vector double  veclf;
 #else
   typedef __veclf veclf;
@@ -671,7 +678,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
      so values stay in registers */
 
 
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
 // swap argument order
  #define  vinserti(a, b, c)  (vec_insert((b)), ((a)), ((c)))
  #define  vinsertf(a, b, c)  (vec_insert((b)), ((a)), ((c)))
@@ -684,10 +691,10 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 #endif
   /***** Extract *****/
 
-#ifdef defined(_ARCH_PWR7) 
- #define  vextracti(a, b)  (vec_extract((a)), ((b)))
- #define  vextractf(a, b)  (vec_extract((a)), ((b)))
- #define  vextractlf(a, b)  (vec_extract((a)), ((b)))
+#ifdef _ARCH_PWR7 
+#define  vextracti(a, b)  (vec_extract((a), (b)))
+#define  vextractf(a, b)  (vec_extract((a), (b)))
+#define  vextractlf(a, b)  (vec_extract((a), (b)))
 #else
   /* TODO | FIXME - Try to make these functions not reference memory so values stay in registers */
   inline    int  vextracti( veci v, const int i) {    int* vPtr = (   int*)(&v); return vPtr[i]; }
@@ -696,11 +703,11 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   inline double vextractlf(veclf v, const int i) { double* vPtr = (double*)(&v); return vPtr[i]; }
 #endif
   /***** Set *****/
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   /***** Set *****/
- #define  vseti(a)  (vec_promote((a)), ((0)))
- #define  vsetf(a)  (vec_promote((a)), ((0)))
- #define  vsetlf(a)  (vec_promote((a)), ((0)))
+#define  vseti(a)  (vec_promote((a), 0))
+#define  vsetf(a)  (vec_promote((a), 0))
+#define  vsetlf(a)  (vec_promote((a), 0))
 #else
   /* TODO : FIXME - There must be a better way to do this, but it
   seems the only way to convert scalar to vector is to go through
@@ -721,7 +728,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Constant Zero *****/
   #define  const_vzeroi  (vec_splat_s32(0))
   #define  const_vzerof  (vec_ctf(vec_splat_s32(0), 0))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define const_vzerolf  (vec_splats(0))
 #else
   #define const_vzerolf  (__const_vzerolf)
@@ -729,7 +736,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Constant One *****/
   #define  const_vonei  (vec_splat_s32(1))
   #define  const_vonef  (vec_ctf(vec_splat_s32(1), 0))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define const_vonelf  (vec_splats(1))
 #else
   #define const_vonelf  (__const_vonelf)
@@ -738,7 +745,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Constant Two *****/
   #define  const_vtwoi  (vec_splat_s32(2))
   #define  const_vtwof  (vec_ctf(vec_splat_s32(2), 0))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define const_vtwolf  (vec_splats(2))
 #else
   #define const_vtwolf  (__const_vtwolf)
@@ -746,7 +753,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Constant Negative One *****/
   #define  const_vnegonei  (vec_splat_s32(-1))
   #define  const_vnegonef  (vec_ctf(vec_splat_s32(-1), 0))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define const_vnegonelf  (vec_splats(-1))
 #else
   #define const_vnegonelf  (__const_veclf)
@@ -764,7 +771,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Addition *****/
   #define  vaddi(a, b)  (vec_add((a), (b)))
   #define  vaddf(a, b)  (vec_add((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vaddlf(a, b)  (vec_add((a), (b)))
 #else
   #define vaddlf __vaddlf
@@ -772,7 +779,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Subtraction *****/
   #define  vsubi(a, b)  (vec_sub((a), (b)))
   #define  vsubf(a, b)  (vec_sub((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vsublf(a, b)  (vec_sub((a), (b)))
 #else
   #define vsublf __vsublf
@@ -781,15 +788,15 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 
 // NOTE: Try to find a way to do this without double evaluating a
 
-#ifdef defined(_ARCH_PWR7) 
-  #define  vmulf(a, b)  (vec_mul((a)), ((b)))
-  #define  vmullf(a, b)  (vec_mul((a)), ((b)))
+#ifdef _ARCH_PWR7 
+#define  vmulf(a, b)  (vec_mul((a), (b)))
+  #define  vmullf(a, b)  (vec_mul((a), (b)))
 #else
   #define  vmulf(a, b)  (vec_madd((a), (b), vec_xor((a), (a))))
   #define vmullf __vmullf
 #endif
   /***** Division *****/
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vdivf(a, b)  (vec_div((a)), ((b)))
   #define vdivlf(a, b)  (vec_div((a)), ((b)))
 #else
@@ -799,7 +806,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 
   /***** Fused Multiply Add *****/
   #define vmaddf(a, b, c)  (vec_madd((a), (b), (c)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vmaddlf(a, b, c)  (vec_madd((a), (b), (c)))
 #else
   #define vmaddlf __vmaddlf
@@ -807,21 +814,21 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 
   /***** Reciprocal *****/
   #define vrecipf(a)  (vec_re(a))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vreciplf(a)  (vec_re(a))
 #else
   #define vreciplf __vreciplf
 #endif
   /***** Square Root *****/
   #define vsqrtf(a)  (vec_re(vec_rsqrte(a)))
-#ifdef defined(_ARCH_PWR7) 
-  #define vsqrtlf(a)  (vec_sqrte(a)))
+#ifdef _ARCH_PWR7 
+#define vsqrtlf(a)  (vec_sqrt(a))
 #else
   #define vsqrtlf __vsqrtlf
 #endif
   /***** Reciprocal Square Root *****/
   #define vrsqrtf(a)  (vec_rsqrte(a))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vrsqrtlf(a)  (vec_rsqrte(a))
 #else
   #define vrsqrtlf __vrsqrtlf
@@ -830,7 +837,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Not *****/
 
 
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vnoti(a)  (vec_neg(a))
   #define vnotf(a)  (vec_neg(a))
   #define vnotlf(a)  (vec_neg(a))
@@ -843,7 +850,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Or *****/
   #define vori(a, b)  (vec_or((a), (b)))
   #define vorf(a, b)  (vec_or((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vorlf(a, b)  (vec_or((a), (b)))
 #else
   #define vorlf __vorlf
@@ -852,7 +859,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Nor *****/
   #define vnori(a, b)  (vec_nor((a), (b)))
   #define vnorf(a, b)  (vec_nor((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vnorlf(a, b)  (vec_nor((a), (b)))
 #else
   #define vnorlf __vnorlf
@@ -860,7 +867,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** And *****/
   #define vandi(a, b)  (vec_and((a), (b)))
   #define vandf(a, b)  (vec_and((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vandlf(a, b)  (vec_and((a), (b)))
 #else
   #define vandlf __vandlf
@@ -868,7 +875,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Nand *****/
   #define vnandi(a, b)  (vnoti(vandi((a), (b))))
   #define vnandf(a, b)  (vnotf(vandf((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vnandlf(a, b)  (vnotf(vandf((a), (b))))
 #else
   #define vnandlf __vnandlf
@@ -876,7 +883,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Xor *****/
   #define vxori(a, b)  (vec_xor((a), (b)))
   #define vxorf(a, b)  (vec_xor((a), (b)))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vxorlf(a, b)  (vec_xor((a), (b)))
 #else
   #define vxorlf __vxorlf
@@ -885,7 +892,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Nxor *****/
   #define vnxori(a, b)  (vnoti(vxori((a), (b))))
   #define vnxorf(a, b)  (vnotf(vxorf((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define vnxorlf(a, b)  (vnotlf(vxorf((a), (b))))
 #else
   #define vnxorlf __vnxorlf
@@ -893,7 +900,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Equal To *****/
   #define  vcmpeqi(a, b)  ((veci)(vec_cmpeq((a), (b))))
   #define  vcmpeqf(a, b)  ((veci)(vec_cmpeq((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vcmpeqlf(a, b)  ((veci)(vec_cmpeq((a), (b))))
 #else
   #define vcmpeqlf __vcmpeqlf
@@ -901,7 +908,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Greater Than *****/
   #define  vcmpgti(a, b)  ((veci)(vec_cmpgt((a), (b))))
   #define  vcmpgtf(a, b)  ((veci)(vec_cmpgt((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vcmpgtlf(a, b)  ((veci)(vec_cmpgt((a), (b))))
 #else
   #define vcmpgtlf __vcmpgtlf
@@ -910,7 +917,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Greater Than Or Equal To *****/
   #define  vcmpgei(a, b)  ((veci)(vec_cmpge((a), (b))))
   #define  vcmpgef(a, b)  ((veci)(vec_cmpge((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vcmpgelf(a, b)  ((veci)(vec_cmpge((a), (b))))
 #else
   #define vcmpgelf __vcmpgelf
@@ -919,7 +926,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Less Than *****/
   #define  vcmplti(a, b)  ((veci)(vec_cmplt((a), (b))))
   #define  vcmpltf(a, b)  ((veci)(vec_cmplt((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vcmpltlf(a, b)  ((veci)(vec_cmplt((a), (b))))
 #else
   #define vcmpltlf __vcmpltlf
@@ -928,7 +935,7 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
   /***** Less Than Or Equal To *****/
   #define  vcmplei(a, b)  ((veci)(vec_cmple((a), (b))))
   #define  vcmplef(a, b)  ((veci)(vec_cmple((a), (b))))
-#ifdef defined(_ARCH_PWR7) 
+#ifdef _ARCH_PWR7 
   #define  vcmplelf(a, b)  ((veci)(vec_cmple((a), (b))))
 // NOTE: vec_cmple not listed in Calin's wiki page of builtins for
 // PWR7, but has a header definition in the compiler
@@ -1109,6 +1116,10 @@ inline __veci __vcmplelf(const  __vecf a, const  __vecf b) {  __veci r; r.v0 = r
 #define  vspreadi(a)  ( vseti(a))
 #define  vspreadf(a)  ( vsetf(a))
 #define vspreadlf(a)  (vsetlf(a))
+
+#define visfinitef(a) ( isfinite(vextractf((a),0)) && isfinite(vextractf((a),1)) && isfinite(vextractf((a),2)) && isfinite(vextractf((a),3)))
+#define visfinitelf(a) (isfinite(vextractlf((a),0)) && isfinite(vextractlf((a),1)))
+
 
 /***** Add to Scalar *****/
 #define   vaddis(a, b)  ( vaddi((a),  vseti(b)))

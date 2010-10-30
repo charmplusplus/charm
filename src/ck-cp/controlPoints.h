@@ -4,14 +4,21 @@
     to the dynamic optimization framework.
 
 */
+
+
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
+
+
+#ifdef CP_DISABLE_TRACING
+#include "ControlPointsNoTrace.decl.h"
+#else
+#include "ControlPoints.decl.h"
+#endif
 
 #include <vector>
 #include <map>
 #include <cmath>
-#include "ControlPoints.decl.h"
-
 #include <pup_stl.h>
 #include <string>
 #include <set>
@@ -48,7 +55,9 @@
 /* readonly */ extern long controlPointSamplePeriod;
 /* readonly */ extern int whichTuningScheme;
 /* readonly */ extern bool writeDataFileAtShutdown;
+/* readonly */ extern bool shouldFilterOutputData;
 /* readonly */ extern bool loadDataFileAtStartup;
+/* readonly */ extern char CPDataFilename[512];
 
 
 
@@ -79,14 +88,8 @@ int controlPoint(const char *name, int lb, int ub);
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, std::vector<int>& values);
 
-/// Associate a control point as affecting priorities for an array
-void controlPointPriorityArray(const char *name, CProxy_ArrayBase &arraybase);
-
-/// Associate a control point with an entry method, whose priorities are affected by the control point
-void controlPointPriorityEntry(const char *name, int idx);
-
-
-
+/// Write output data to disk. Callable from user program (for example, to periodically flush to disk if program might run out of time, or NAMD)
+void ControlPointWriteOutputToDisk();
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
@@ -133,6 +136,32 @@ public:
 }; 
 
 
+/// A container that stores overhead statistics (min/max/avg etc.)
+class overheadContainer {
+public:
+  double min;
+  double avg;
+  double max;
+  
+  overheadContainer(){
+    min = -1.0;
+    max = -1.0;
+    avg = -1.0;
+  }
+  
+  bool isValid() const{
+    return (min >= 0.0 && avg >= min && max >= avg && max <= 1.0);
+  }
+  
+  void print() const{
+    if(isValid())
+      CkPrintf("[%d] Overhead Time is Min=%.2lf%% Avg=%.2lf%% Max=%.2lf%%\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);    
+    else
+      CkPrintf("[%d] Overhead Time is invalid\n", CkMyPe(), min*100.0, avg*100.0, max*100.0);
+  }
+  
+}; 
+
 
 
 /// Stores data for a phase (a time range in which a single set of control point values is used).
@@ -150,6 +179,8 @@ public:
   double memoryUsageMB;
 
   idleTimeContainer idleTime;
+  overheadContainer overheadTime;
+
 
   /** Approximately records the average message size for an entry method. */
   double bytesPerInvoke;
@@ -313,7 +344,12 @@ public:
   double medianTime(){
     std::vector<double> sortedTimes = times;
     std::sort(sortedTimes.begin(), sortedTimes.end());
-    return sortedTimes[sortedTimes.size() / 2];
+    if(sortedTimes.size()>0){
+    	return sortedTimes[sortedTimes.size() / 2];
+    } else {
+    	CkAbort("Cannot compute medianTime for empty sortedTimes vector");
+    	return -1;
+    }
   }
 
   
@@ -409,7 +445,7 @@ public:
       s << "# There are " << ps.size()  << " control points\n";
       s << "# number of recorded phases: " << phases.size() << "\n";
       
-      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tByte Per Invoke\tGrain Size\t";
+      s << "# Memory (MB)\tIdle Min\tIdle Avg\tIdle Max\tOverhead Min\tOverhead Avg\tOverhead Max\tByte Per Invoke\tGrain Size\t";
       for(cpiter = ps.begin(); cpiter != ps.end(); cpiter++){
 	s << cpiter->first << "\t";
       }
@@ -423,6 +459,8 @@ public:
 	s << (*runiter)->memoryUsageMB << "\t"; 
 
 	s << (*runiter)->idleTime.min << "\t" << (*runiter)->idleTime.avg << "\t" << (*runiter)->idleTime.max << "\t";
+	s << (*runiter)->overheadTime.min << "\t" << (*runiter)->overheadTime.avg << "\t" << (*runiter)->overheadTime.max << "\t";
+
 
 	s << (*runiter)->bytesPerInvoke << "\t";
 
@@ -435,7 +473,11 @@ public:
 	}
 
 	// Print the median time
-	s << (*runiter)->medianTime() << "\t";
+	if((*runiter)->times.size()>0){
+		s << (*runiter)->medianTime() << "\t";
+	} else {
+		s << "-1\t";
+	}
 
 	// Print the times
 	std::vector<double>::iterator titer;
@@ -543,11 +585,111 @@ public:
   
 };
 
+
+/** A class that implements the Nelder Mead Simplex Optimization Algorithm */
+class simplexScheme {
+private:
+        /** The states used by the Nelder Mead Simplex Algorithm. 
+	    The transitions between these states are displayed in the NelderMeadStateDiagram.pdf diagram.
+	*/
+	typedef enum simplexStateEnumT {beginning, reflecting, expanding, contracting, doneExpanding, stillContracting}  simplexStateT;
+
+	/// The indices into the allData->phases that correspond to the current simplex used one of the tuning schemes.
+	std::set<int> simplexIndices;
+	simplexStateT simplexState;
+
+	 /// Reflection coefficient
+	double alpha;
+	// Contraction coefficient
+	double beta;
+	// Expansion coefficient
+	double gamma;
+
+
+	/// The first phase that was used by the this scheme. This helps us ignore a few startup phases that are out of our control.
+	int firstSimplexPhase;
+
+	// Worst performing point in the simplex
+	int worstPhase;
+	double worstTime;
+	std::vector<double> worst; // p_h
+
+	// Centroid of remaining points in the simplex
+	std::vector<double> centroid;
+
+	// Best performing point in the simplex
+	int bestPhase;
+	double bestTime;
+	std::vector<double> best;
+
+	// P*
+	std::vector<double> P;
+	int pPhase;
+
+	// P**
+	std::vector<double> P2;
+	int p2Phase;
+
+	// A set of phases for which (P_i+P_l)/2 ought to be evaluated
+	std::set<int> stillMustContractList;
+
+	bool useBestKnown;
+
+	void computeCentroidBestWorst(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+	void doReflection(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doExpansion(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+	void doContraction(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+
+	std::vector<double> pointCoords(instrumentedData &allData, int i);
+
+		inline int keepInRange(int v, int lb, int ub){
+			if(v < lb)
+				return lb;
+			if(v > ub)
+				return ub;
+			return v;
+		}
+
+		void printSimplex(instrumentedData &allData){
+			char s[2048];
+			s[0] = '\0';
+			for(std::set<int>::iterator iter = simplexIndices.begin(); iter != simplexIndices.end(); ++iter){
+				sprintf(s+strlen(s), "%d: ", *iter);
+
+				for(std::map<std::string,int>::iterator citer = allData.phases[*iter]->controlPoints.begin(); citer != allData.phases[*iter]->controlPoints.end(); ++citer){
+					sprintf(s+strlen(s), " %d", citer->second);
+				}
+
+				sprintf(s+strlen(s), "\n");
+			}
+			CkPrintf("Current simplex is:\n%s\n", s);
+		}
+
+public:
+
+	simplexScheme() :
+		simplexState(beginning),
+		alpha(1.0), beta(0.5), gamma(2.0),
+		firstSimplexPhase(-1),
+		useBestKnown(false)
+	{
+		// Make sure the coefficients are reasonable
+		CkAssert(alpha >= 0);
+		CkAssert(beta >= 0.0 && beta <= 1.0);
+		CkAssert(gamma >= 1.0);
+	}
+
+	void adapt(std::map<std::string, std::pair<int,int> > & controlPointSpace, std::map<std::string,int> &newControlPoints, const int phase_id, instrumentedData &allData);
+
+};
+
+
+
 class controlPointManager : public CBase_controlPointManager {
 public:
-  
-  char * dataFilename;
-  
+    
   instrumentedData allData;
   
   /// The lower and upper bounds for each named control point
@@ -566,10 +708,12 @@ public:
   std::map<std::string,int> newControlPoints;
   int generatedPlanForStep;
 
+  simplexScheme s;
 
+  
   /// A user supplied callback to call when control point values are to be changed
-  CkCallback granularityCallback;
-  bool haveGranularityCallback;
+  CkCallback controlPointChangeCallback;
+  bool haveControlPointChangeCallback;
   bool frameworkShouldAdvancePhase;
   
   int phase_id;
@@ -584,6 +728,20 @@ public:
   controlPointManager();
      
   ~controlPointManager();
+
+
+
+  virtual void pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+    if(p.isUnpacking()){
+      CkAbort("Group controlPointManager is not yet capable of migration.\n");
+    }
+  }
+
+  controlPointManager(CkMigrateMessage* m) {
+    // TODO: Implement this
+  }
 
 
   /// Loads the previous run data file
@@ -629,10 +787,11 @@ public:
   /// Start shutdown procedures for the controlPoints module(s). CkExit will be called once all outstanding operations have completed (e.g. waiting for idle time & memory usage to be gathered)
   void exitIfReady();
 
-  // All outstanding operations have completed, so do the shutdown now. First write files to output, and then call CkExit().
+  /// All outstanding operations have completed, so do the shutdown now. First write files to disk, and then call CkExit().
   void doExitNow();
 
-
+  /// Write data to disk (when needed), likely at exit
+  void writeOutputToDisk();
 
 
   /// Entry method called on all PEs to request memory usage
@@ -653,11 +812,11 @@ public:
   void gatherAll(CkReductionMsg *msg);
   
 
-  /// Inform the control point framework that a named control point affects the priorities of some array  
-  void associatePriorityArray(const char *name, int groupIdx);
+/*   /// Inform the control point framework that a named control point affects the priorities of some array   */
+/*   void associatePriorityArray(const char *name, int groupIdx); */
   
-  /// Inform the control point framework that a named control point affects the priority of some entry method
-  void associatePriorityEntry(const char *name, int idx);
+/*   /// Inform the control point framework that a named control point affects the priority of some entry method */
+/*   void associatePriorityEntry(const char *name, int idx); */
   
 
 

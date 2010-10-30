@@ -186,11 +186,14 @@ typedef struct {
 typedef struct _ckGroupID{
   int idx;		/* pe(processor number) is removed from the structure */
 #ifdef __cplusplus
-  void pup(PUP::er &p) {  p|idx; }
-  int isZero(void) const { return (idx==0); }
-  void setZero(void) { idx=0; }
-  int operator==(const struct _ckGroupID& gid) const {
+  inline void pup(PUP::er &p) {  p|idx; }
+  inline int isZero(void) const { return (idx==0); }
+  inline void setZero(void) { idx=0; }
+  inline int operator==(const struct _ckGroupID& gid) const {
     return (gid.idx==idx);
+  }
+  inline int operator<(const struct _ckGroupID& gid) const {
+    return (gid.idx<idx);
   }
 #endif
 } CkGroupID;
@@ -229,6 +232,9 @@ extern void CkCreateLocalNodeGroup(CkGroupID groupID, int constructorIdx, envelo
  These were formerly in envelope.h
 
  *****************************************************************************/
+/*** WARNING!!!! The following enum is linked to charmdebug finals in MsgInfo.java.
+ *   Make sure the two remain synchronized if changing this one.
+ ***/
 typedef enum {
   NewChareMsg    =1,
   NewVChareMsg   =2,
@@ -237,15 +243,16 @@ typedef enum {
   ForBocMsg      =5,
   ForVidMsg      =6,
   FillVidMsg     =7,
-  RODataMsg      =8,
-  ROMsgMsg       =9,
-  ExitMsg        =10,
-  ReqStatMsg     =11,
-  StatMsg        =12,
-  NodeBocInitMsg =13,
-  ForNodeBocMsg  =14,
-  ArrayEltInitMsg =15,
-  ForArrayEltMsg  =16
+  DeleteVidMsg   =8,
+  RODataMsg      =9,
+  ROMsgMsg       =10,
+  ExitMsg        =11,
+  ReqStatMsg     =12,
+  StatMsg        =13,
+  NodeBocInitMsg =14,
+  ForNodeBocMsg  =15,
+  ArrayEltInitMsg =16,
+  ForArrayEltMsg  =17
 } CkEnvelopeType;
 
 
@@ -273,6 +280,7 @@ extern void CkSendMsgBranch(int eIdx, void *msg, int destPE, CkGroupID gID, int 
 extern void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *chare, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *pes, int opts CK_MSGOPTIONAL);
+extern void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranch(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchInline(int eIdx, void *msg, int destNode, CkGroupID gID, int opts CK_MSGOPTIONAL);
 extern void CkSendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID, int npes, int *nodes, int opts CK_MSGOPTIONAL);

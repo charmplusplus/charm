@@ -38,6 +38,10 @@ while [ $# -gt 0 ]
 	  llfile=$2
 	  shift
 	  ;;
+      +name)
+	  jobname=$2
+	  shift
+	  ;;
       *)
 	  args=$args"$1 "
 	  ;;
@@ -58,6 +62,7 @@ if [ -z "$args" -o "$args1" == "-" -o "$args1" == "+" ]
 fi
 
 executable=`echo $args | awk '{print $1}'`
+args=`echo ${args#*$executable}`
 
 # check if the node size has been set, or a file called .nodesize is present
 #if [ -z "$nodesize" ]
@@ -99,8 +104,27 @@ if [ -z "$llfile" ]
     then
     echo "No load leveler template specified. Either use the flag \"+ll <llfile>\" or create"
     echo "a file called \"charmrun.ll\" in the current directory on in your home directory."
+    echo "An example of the template can be found at src/arch/lapi/charmrun.ll, this may"
+    echo "require tuning for the specific machine (for example account_no or class)."
     echo
     exit
+fi
+
+if [ -n "$ppnused" ]
+then
+if [ $ppnused -gt 0 ]
+    then
+#The MALLOCMULTIHEAP env var helps to improve the memory allocation performance
+#by splitting the heap into multiple parts where each thread has its
+#own access without locks. However, enabling this var will increase the memory
+#usage, so we only use it when it's a smp run.
+    heaps=`expr $ppnused + 1`
+    if [ $heaps -gt 32 ]
+        then
+        heaps=32
+    fi
+    export MALLOCMULTIHEAP=heaps:$heaps
+fi
 fi
 
 filename="charmrun_script.$$.ll"
@@ -136,6 +160,8 @@ if [ -n "$ppnused" ]
     if [ -n "$nodesize" ]
 	then
 	tasks_per_node=`expr $nodesize / $ppnused`
+    else
+	echo "WARNING: ns (node size) is missing, it should be used together with ppn!"
     fi
     if [ -n "$logical" -a -n "$nodesize" ]
 	then if [ $logical -ne $tasks_per_node ]
@@ -146,7 +172,18 @@ if [ -n "$ppnused" ]
 	    exit
 	fi
     fi
+    nodes=`expr $total_tasks / $tasks_per_node`
+    if [ `expr $nodes '*' $tasks_per_node` -ne $total_tasks ]
+      then
+      nodes=`expr $nodes + 1` 
+    fi 
+    if [ $tasks_per_node -gt $total_tasks ]
+      then
+      tasks_per_node=$total_tasks
+    fi
+    nodes="#@ node ="$nodes
     tasks_per_node="#@ tasks_per_node = "$tasks_per_node
+    total_tasks=""
 else
     total_tasks=$pes
     if test -z "$nodes"
@@ -161,13 +198,14 @@ else
       fi
     fi
     nodes="#@ node = "$nodes
+    total_tasks="#@ total_tasks = "$total_tasks 
 fi
 
 cat > $filename <<EOF
 # System settings
 #@ node_usage = $node_usage
 #@ network.LAPI = csss,,US
-#@ total_tasks = $total_tasks
+$total_tasks
 $nodes
 $tasks_per_node
 
@@ -188,11 +226,16 @@ if [ $present -eq 0 ]
 EOF
 fi
 
+if [ -z "$jobname" ]
+    then
+    jobname=$executable
+fi
+
 present=`grep job_name $llfile|wc -l`
 if [ $present -eq 0 ]
     then
     cat >> $filename <<EOF
-#@ job_name = charmrun_$executable.$$
+#@ job_name = charmrun_$jobname.$$
 EOF
 fi
 
@@ -218,15 +261,15 @@ if [ $interactive -ne 0 ]
     if [ $present -eq 0 ]
 	then
 	cat >> $filename <<EOF
-#@ output = output_$executable.$$
+#@ output = output_$jobname.$$
 EOF
     fi
 
     present=`grep error $llfile|wc -l`
     if [ $present -eq 0 ]
-    then
-	cat >> $filename <<EOF
-#@ error = error_$executable.$$
+        then
+        cat >> $filename <<EOF
+#@ error = error_$jobname.$$
 EOF
     fi
 fi
@@ -251,17 +294,21 @@ EOF
 # user exports
 grep -E -v "#@" $llfile | grep "export" >> $filename
 
-if [ ! -x "$PWD/$executable" ]
+if [ ! -x "$executable" ]
     then
-    echo "Executable not found: $PWD/$executable"
+    executable = "$PWD/$executable"
+fi
+if [ ! -x "$executable" ]
+    then
+    echo "Executable not found: $executable"
     exit
 fi
 
 if [ $interactive -eq 0 ]
     then
     # submit the job as poe, iterating 
-    echo "Running interactively> poe $PWD/$args -llfile $filename"
-    poe $PWD/$args -llfile $filename
+    echo "Running interactively> poe $executable $args -llfile $filename"
+    poe $executable $args -llfile $filename
     status=$?
     if [ $status -eq 255 ];
       then
@@ -273,7 +320,7 @@ if [ $interactive -eq 0 ]
       do
       echo "Retrying in two minutes..."
       sleep 120
-      poe $PWD/$args -llfile $filename;
+      poe $executable $args -llfile $filename;
       status=$?
       if [ $status -eq 255 ];
         then
@@ -286,10 +333,10 @@ if [ $interactive -eq 0 ]
     
 else
     # append the command at the end of the file and llsubmit it
-    echo "Submitting batch> poe $PWD/$args"
+    echo "Submitting batch> poe $executable $args"
     cat >> $filename <<EOF
 
-poe $PWD/$args
+poe $executable $args
 EOF
     llsubmit $filename
 fi

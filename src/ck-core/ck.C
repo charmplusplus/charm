@@ -26,9 +26,15 @@ void automaticallySetMessagePriority(envelope *env); // in control point framewo
 #endif // CMK_LBDB_ON
 
 #ifndef CMK_CHARE_USE_PTR
+#include <map>
 CpvDeclare(CkVec<void *>, chare_objs);
+CpvDeclare(CkVec<int>, chare_types);
 CpvDeclare(CkVec<VidBlock *>, vidblocks);
+
+typedef std::map<int, CkChareID>  Vidblockmap;
+CpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 #endif
+
 
 #define CK_MSG_SKIP_OR_IMM    (CK_MSG_EXPEDITED | CK_MSG_IMMEDIATE)
 
@@ -42,15 +48,26 @@ int CkIndex_ArrayBase::__idx=-1;
 
 extern int _defaultObjectQ;
 
+void _initChareTables()
+{
+#ifndef CMK_CHARE_USE_PTR
+          /* chare and vidblock table */
+  CpvInitialize(CkVec<void *>, chare_objs);
+  CpvInitialize(CkVec<int>, chare_types);
+  CpvInitialize(CkVec<VidBlock *>, vidblocks);
+  CpvInitialize(Vidblockmap, vmap);
+#endif
+}
+
 //Charm++ virtual functions: declaring these here results in a smaller executable
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 #ifndef CMK_CHARE_USE_PTR
-     // for plain chare, objPtr is actually the index to chare table
+     // for plain chare, objPtr is actually the index to chare obj table
   if (chareIdx >= 0) thishandle.objPtr=(void*)chareIdx;
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   mlogData = new ChareMlogData();
   mlogData->objID.type = TypeChare;
   mlogData->objID.data.chare.id = thishandle;
@@ -64,6 +81,10 @@ Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+        mlogData = NULL;
+#endif
+
 #if CMK_OBJECT_QUEUE_AVAILABLE
   if (_defaultObjectQ)  CkEnableObjQ();
 #endif
@@ -76,7 +97,32 @@ void Chare::CkEnableObjQ()
 #endif
 }
 
-Chare::~Chare() {}
+Chare::~Chare() {
+#ifndef CMK_CHARE_USE_PTR
+/*
+  if (chareIdx >= 0 && chareIdx < CpvAccess(chare_objs).size() && CpvAccess(chare_objs)[chareIdx] == this) 
+*/
+  if (chareIdx != -1)
+  {
+    CmiAssert(CpvAccess(chare_objs)[chareIdx] == this);
+    CpvAccess(chare_objs)[chareIdx] = NULL;
+    Vidblockmap::iterator iter = CpvAccess(vmap).find(chareIdx);
+    if (iter != CpvAccess(vmap).end()) {
+      register CkChareID *pCid = (CkChareID *)
+        _allocMsg(DeleteVidMsg, sizeof(CkChareID));
+      int srcPe = iter->second.onPE;
+      *pCid = iter->second;
+      register envelope *ret = UsrToEnv(pCid);
+      ret->setVidPtr(iter->second.objPtr);
+      ret->setSrcPe(CkMyPe());
+      CmiSetHandler(ret, _charmHandlerIdx);
+      CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
+      CpvAccess(_qd)->create();
+      CpvAccess(vmap).erase(iter);
+    }
+  }
+#endif
+}
 
 void Chare::pup(PUP::er &p)
 {
@@ -86,11 +132,12 @@ void Chare::pup(PUP::er &p)
   p(chareIdx);
   if (chareIdx != -1) thishandle.objPtr=(void*)chareIdx;
 #endif
-#ifdef _FAULT_MLOG_
-  if(p.isUnpacking()){
-    mlogData = new ChareMlogData();
-  }
-  mlogData->pup(p);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	if(p.isUnpacking()){
+		if(mlogData == NULL || !mlogData->teamRecoveryFlag)
+        	mlogData = new ChareMlogData();
+	}
+	mlogData->pup(p);
 #endif
 }
 
@@ -128,7 +175,7 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
 
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         mlogData->objID.type = TypeGroup;
         mlogData->objID.data.group.id = thisgroup;
         mlogData->objID.data.group.onPE = CkMyPe();
@@ -462,7 +509,7 @@ extern "C" int CkGetArgc(void) {
 /******************** Basic support *****************/
 extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CpvAccess(_currentObj) = (Chare *)obj;
 //      printf("[%d] CurrentObj set to %p\n",CkMyPe(),obj);
 #endif
@@ -488,7 +535,7 @@ extern "C" void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
   //fflush(stdout);
 
   void *deliverMsg;
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CpvAccess(_currentObj) = (Chare *)obj;
 #endif
   if (_entryTable[epIdx]->noKeep)
@@ -569,7 +616,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
     env->setForAnyPE(1);
   else
     env->setForAnyPE(0);
-  CldEnqueue(destPE, env, _infoIdx);
+  _CldEnqueue(destPE, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
 }
 
@@ -587,7 +634,7 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
-      CldEnqueue(CkMyPe(), pending, _infoIdx);
+      _CldEnqueue(CkMyPe(), pending, _infoIdx);
 //    delete ptrq;
       CkpvAccess(_groupTable)->find(groupID).clearPending();
   }
@@ -634,7 +681,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   if(ptrq) {
     void *pending;
     while((pending=ptrq->deq())!=0)
-      CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
+      _CldNodeEnqueue(CkMyNode(), pending, _infoIdx);
 //    delete ptrq;
       CksvAccess(_nodeGroupTable)->find(groupID).clearPending();
   }
@@ -774,11 +821,12 @@ static inline void *_allocNewChare(envelope *env, int &idx)
 {
   int chareIdx = _entryTable[env->getEpIdx()]->chareIdx;
   void *tmp=malloc(_chareTable[chareIdx]->size);
+  _MEMCHECK(tmp);
 #ifndef CMK_CHARE_USE_PTR
   CpvAccess(chare_objs).push_back(tmp);
+  CpvAccess(chare_types).push_back(chareIdx);
   idx = CpvAccess(chare_objs).size()-1;
 #endif
-  _MEMCHECK(tmp);
   setMemoryTypeChare(tmp);
   return tmp;
 }
@@ -791,6 +839,12 @@ static void _processNewChareMsg(CkCoreState *ck,envelope *env)
   ((Chare *)obj)->chareIdx = idx;
 #endif
   _invokeEntry(env->getEpIdx(),env,obj);
+}
+
+void CkCreateLocalChare(int epIdx, envelope *env)
+{
+  env->setEpIdx(epIdx);
+  _processNewChareMsg(NULL, env);
 }
 
 static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
@@ -812,6 +866,13 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   ret->setSrcPe(CkMyPe());
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
+#ifndef CMK_CHARE_USE_PTR
+  // register the remote vidblock for deletion when chare is deleted
+  CkChareID vid;
+  vid.onPE = srcPe;
+  vid.objPtr = env->getVidPtr();
+  CpvAccess(vmap)[idx] = vid;    
+#endif
   CpvAccess(_qd)->create();
 #ifndef CMK_CHARE_USE_PTR
   ((Chare *)obj)->chareIdx = idx;
@@ -826,7 +887,7 @@ static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
   register int epIdx = env->getEpIdx();
   register int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
   register void *obj;
-  if (mainIdx != -1)  {
+  if (mainIdx != -1)  {           // mainchare
     CmiAssert(CkMyPe()==0);
     obj = _mainTable[mainIdx]->getObj();
   }
@@ -860,7 +921,7 @@ static inline void _processFillVidMsg(CkCoreState *ck,envelope *env)
 #endif
   register CkChareID *pcid = (CkChareID *) EnvToUsr(env);
   _CHECK_VALID(pcid, "FillVidMsg: Not a valid pCid\n");
-  vptr->fill(pcid->onPE, pcid->objPtr);
+  if (vptr) vptr->fill(pcid->onPE, pcid->objPtr);
   CmiFree(env);
 }
 
@@ -876,14 +937,28 @@ static inline void _processForVidMsg(CkCoreState *ck,envelope *env)
   vptr->send(env);
 }
 
+static inline void _processDeleteVidMsg(CkCoreState *ck,envelope *env)
+{
+#ifndef CMK_CHARE_USE_PTR
+  register VidBlock *vptr = CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()];
+  delete vptr;
+  CpvAccess(vidblocks)[(CmiIntPtr)env->getVidPtr()] = NULL;
+#endif
+  CmiFree(env);
+}
+
 /************** Receive: Groups ****************/
 
 /**
- This message is sent to this groupID--prepare to
- handle this message by looking up the group,
- and possibly stashing the message.
+ Return a pointer to the local BOC of "groupID".
+ The message "env" passed in has some known dependency on this groupID
+ (either it is to be delivered to this BOC, or it depends on this BOC being there).
+ Therefore, if the return value is NULL, this function buffers the massage so that
+ it will be re-sent (by CkCreateLocalBranch) when this groupID is eventually constructed.
+ The message passed in must have its handlers correctly set so that it can be
+ scheduled again.
 */
-IrrGroup *_lookupGroup(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
+static inline IrrGroup *_lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
 {
 
 	CmiImmediateLock(CkpvAccess(_groupTableImmLock));
@@ -920,7 +995,7 @@ static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,Irr
 static inline void _processForBocMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID =  env->getGroupNum();
-  register IrrGroup *obj = _lookupGroup(ck,env,env->getGroupNum());
+  register IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,env->getGroupNum());
   if(obj) {
     _deliverForBocMsg(ck,env->getEpIdx(),env,obj);
   }
@@ -972,6 +1047,13 @@ void _processBocInitMsg(CkCoreState *ck,envelope *env)
 {
   register CkGroupID groupID = env->getGroupNum();
   register int epIdx = env->getEpIdx();
+  if (!env->getGroupDep().isZero()) {      // dependence
+    CkGroupID dep = env->getGroupDep();
+    IrrGroup *obj = _lookupGroupAndBufferIfNotThere(ck,env,dep);
+    if (obj == NULL) return;
+  }
+  else
+    ck->process();
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -985,14 +1067,14 @@ void _processNodeBocInitMsg(CkCoreState *ck,envelope *env)
 /************** Receive: Arrays *************/
 
 static void _processArrayEltInitMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->insertElement((CkMessage *)EnvToUsr(env));
   }
 }
 static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
-  CkArray *mgr=(CkArray *)_lookupGroup(ck,env,env->getsetArrayMgr());
+  CkArray *mgr=(CkArray *)_lookupGroupAndBufferIfNotThere(ck,env,env->getsetArrayMgr());
   if (mgr) {
     _SET_USED(env, 0);
     mgr->getLocMgr()->deliverInline((CkMessage *)EnvToUsr(env));
@@ -1011,12 +1093,14 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   register envelope *env = (envelope *) converseMsg;
 
+  MESSAGE_PHASE_CHECK(env);
+
 //#if CMK_RECORD_REPLAY
   if (ck->watcher!=NULL) {
     if (!ck->watcher->processMessage(env,ck)) return;
   }
 //#endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         Chare *obj=NULL;
         CkObjID sender;
         MCount SN;
@@ -1042,7 +1126,9 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
 // Group support
     case BocInitMsg :
       TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: BocInitMsg\n", CkMyPe());)
-      ck->process(); if(env->isPacked()) CkUnpackMessage(&env);
+      // QD processing moved inside _processBocInitMsg because it is conditional
+      //ck->process(); 
+      if(env->isPacked()) CkUnpackMessage(&env);
       _processBocInitMsg(ck,env);
       break;
     case NodeBocInitMsg :
@@ -1106,11 +1192,16 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
       ck->process();
       _processFillVidMsg(ck,env);
       break;
+    case DeleteVidMsg  :
+      TELLMSGTYPE(CkPrintf("proc[%d]: _processHandler with msg type: DeleteVidMsg\n", CkMyPe());)
+      ck->process();
+      _processDeleteVidMsg(ck,env);
+      break;
 
     default:
       CmiAbort("Fatal Charm++ Error> Unknown msg-type in _processHandler.\n");
   }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         if(obj != NULL){
                 postProcessReceivedMessage(obj,sender,SN,entry);
         }
@@ -1172,11 +1263,11 @@ void CkUnpackMessage(envelope **pEnv)
 // the PE can never be CLD_ANYWHERE; wasting _infoFn calls.
 // Thus these accellerated versions of the Cld calls.
 
-int index_objectQHandler;
+static int index_objectQHandler;
 int index_tokenHandler;
-static int index_skipCldHandler;
+int index_skipCldHandler;
 
-static void _skipCldHandler(void *converseMsg)
+void _skipCldHandler(void *converseMsg)
 {
   register envelope *env = (envelope *)(converseMsg);
   CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
@@ -1202,6 +1293,12 @@ static void _skipCldHandler(void *converseMsg)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 {
+#if CMK_REPLAYSYSTEM
+  if (_replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   if(pe == CkMyPe() ){
     if(!CmiNodeAlive(CkMyPe())){
 	printf("[%d] Invalid processor sending itself a message \n",CkMyPe());
@@ -1230,7 +1327,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-#ifdef _FAULT_MLOG_             
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
                         CmiSyncBroadcast(len, (char *)env);
 #else
  			CmiSyncBroadcastAndFree(len, (char *)env); 
@@ -1238,7 +1335,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 }
     else if (pe==CLD_BROADCAST_ALL) { 
-#ifdef _FAULT_MLOG_             
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
                         CmiSyncBroadcastAll(len, (char *)env);
 #else
                         CmiSyncBroadcastAllAndFree(len, (char *)env);
@@ -1246,7 +1343,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 
 }
     else{
-#ifdef _FAULT_MLOG_             
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))             
                         CmiSyncSend(pe, len, (char *)env);
 #else
                         CmiSyncSendAndFree(pe, len, (char *)env);
@@ -1257,12 +1354,18 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 }
 
 #if CMK_BLUEGENE_CHARM
-#   define  _skipCldEnqueue   CldEnqueue
+#   define  _skipCldEnqueue   _CldEnqueue
 #endif
 
 // by pass Charm++ priority queue, send as Converse message
 static void _noCldEnqueueMulti(int npes, int *pes, envelope *env)
 {
+#if CMK_REPLAYSYSTEM
+  if (_replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   CmiSyncListSendAndFree(npes, pes, len, (char *)env);
@@ -1275,6 +1378,12 @@ static void _noCldEnqueue(int pe, envelope *env)
     CmiHandleMessage(env);
   } else
 */
+#if CMK_REPLAYSYSTEM
+  if (_replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, (char *)env); }
@@ -1291,17 +1400,23 @@ void _noCldNodeEnqueue(int node, envelope *env)
     CmiHandleMessage(env);
   } else {
 */
+#if CMK_REPLAYSYSTEM
+  if (_replaySystem) {
+    CmiFree(env);
+    return;
+  }
+#endif
   CkPackMessage(&env);
   int len=env->getTotalsize();
   if (node==CLD_BROADCAST) { 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CmiSyncNodeBroadcast(len, (char *)env);
 #else
 	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
 #endif
 }
   else if (node==CLD_BROADCAST_ALL) { 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
                 CmiSyncNodeBroadcastAll(len, (char *)env);
 #else
 		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
@@ -1309,7 +1424,7 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
 }
   else {
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CmiSyncNodeSend(node, len, (char *)env);
 #else
 	CmiSyncNodeSendAndFree(node, len, (char *)env);
@@ -1405,7 +1520,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
     if (opts & CK_MSG_SKIP_OR_IMM)
       _noCldEnqueue(destPE, env);
     else
-      CldEnqueue(destPE, env, _infoIdx);
+      _CldEnqueue(destPE, env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);
 }
@@ -1430,7 +1545,7 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
   }
   else {
     //No way to inline a cross-processor message:
-    CkSendMsg(entryIndex,msg,pCid,opts&!CK_MSG_INLINE);
+    CkSendMsg(entryIndex, msg, pCid, opts & (~CK_MSG_INLINE));
   }
 }
 
@@ -1475,8 +1590,8 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#ifdef _FAULT_MLOG_
-        sendTicketGroupRequest(env,pe,_infoIdx);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+  sendTicketGroupRequest(env,pe,_infoIdx);
 #else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
@@ -1493,7 +1608,7 @@ static inline void _sendMsgBranchMulti(int eIdx, void *msg, CkGroupID gID,
 {
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
   _TRACE_CREATION_MULTICAST(env, npes, pes);
-  CldEnqueueMulti(npes, pes, env, _infoIdx);
+  _CldEnqueueMulti(npes, pes, env, _infoIdx);
   _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
 }
 
@@ -1543,7 +1658,7 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
     }
   }
   //Can't inline-- send the usual way, clear CK_MSG_INLINE
-  CkSendMsgBranch(eIdx,msg,destPE,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgBranch(eIdx, msg, destPE, gID, opts & (~CK_MSG_INLINE));
 }
 
 extern "C"
@@ -1592,6 +1707,25 @@ void CkSendMsgBranchMulti(int eIdx,void *msg,CkGroupID gID,int npes,int *pes, in
 }
 
 extern "C"
+void CkSendMsgBranchGroup(int eIdx,void *msg,CkGroupID gID,CmiGroup grp, int opts)
+{
+  int npes;
+  int *pes;
+  if (opts & CK_MSG_IMMEDIATE) {
+    CmiAbort("CkSendMsgBranchGroup: immediate messages not supported!");
+    return;
+  }
+    // normal mesg
+  register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
+  CmiLookupGroup(grp, &npes, &pes);
+  _TRACE_CREATION_MULTICAST(env, npes, pes);
+  _CldEnqueueGroup(grp, env, _infoIdx);
+  _TRACE_CREATION_DONE(1); 	// since it only creates one creation event.
+  _STATS_RECORD_SEND_BRANCH_N(npes);
+  CpvAccess(_qd)->create(npes);
+}
+
+extern "C"
 void CkBroadcastMsgBranch(int eIdx, void *msg, CkGroupID gID, int opts)
 {
   _sendMsgBranch(eIdx, msg, gID, CLD_BROADCAST_ALL, opts);
@@ -1604,7 +1738,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         sendTicketNodeGroupRequest(env,node,_infoIdx);
 #else
   _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
@@ -1616,7 +1750,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
     }
   }
   else
-    CldNodeEnqueue(node, env, _infoIdx);
+    _CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
 #endif
 }
@@ -1627,7 +1761,7 @@ static inline void _sendMsgNodeBranchMulti(int eIdx, void *msg, CkGroupID gID,
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
   _TRACE_CREATION_N(env, npes);
   for (int i=0; i<npes; i++) {
-    CldNodeEnqueue(nodes[i], env, _infoIdx);
+    _CldNodeEnqueue(nodes[i], env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
@@ -1678,7 +1812,7 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
     }
   }
   //Can't inline-- send the usual way
-  CkSendMsgNodeBranch(eIdx,msg,node,gID,opts&!CK_MSG_INLINE);
+  CkSendMsgNodeBranch(eIdx, msg, node, gID, opts & ~(CK_MSG_INLINE));
 }
 
 extern "C"
@@ -1774,15 +1908,15 @@ void CkArrayManagerInsert(int pe,void *msg,CkGroupID aID) {
   register envelope *env = UsrToEnv(msg);
   env->getsetArrayMgr()=aID;
   _prepareOutgoingArrayMsg(env,ArrayEltInitMsg);
-  CldEnqueue(pe, env, _infoIdx);
+  _CldEnqueue(pe, env, _infoIdx);
 }
 
 extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-#ifdef _FAULT_MLOG_
-        sendTicketArrayRequest(env,pe,_infoIdx);
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+   sendTicketArrayRequest(env,pe,_infoIdx);
 #else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);
@@ -1843,29 +1977,55 @@ printf("[%d] DELETE!\n", CkMyPe());
 #include "crc32.h"
 
 CkpvDeclare(int, envelopeEventID);
+int _recplay_crc = 0;
+int _recplay_checksum = 0;
+int _recplay_logsize = 1024*1024;
 
 CkMessageWatcher::~CkMessageWatcher() {}
 
 class CkMessageRecorder : public CkMessageWatcher {
+  char *buffer;
+  unsigned int curpos;
 public:
-  CkMessageRecorder(FILE *f_) { f=f_; }
+  CkMessageRecorder(FILE *f_): curpos(0) { f=f_; buffer=new char[_recplay_logsize]; }
   ~CkMessageRecorder() {
-    fprintf(f,"-1 -1 -1");
+    CkPrintf("closing log\n");
+    flushLog();
+    fprintf(f,"-1 -1 -1 ");
     fclose(f);
+    delete[] buffer;
   }
 
 private:
+  void flushLog() {
+    CkPrintf("flushing log\n");
+    fprintf(f, "%s", buffer);
+    curpos=0;
+  }
   virtual CmiBool process(envelope *env,CkCoreState *ck) {
     if (env->getEvent()) {
+      char tmp[128];
       bool wasPacked = env->isPacked();
       if (!wasPacked) CkPackMessage(&env);
-      //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-      unsigned int crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
-      unsigned int crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
-      fprintf(f,"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      unsigned int crc1=0, crc2=0;
+      if (_recplay_crc) {
+        //unsigned int crc = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+        crc1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+        crc2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      } else if (_recplay_checksum) {
+        crc1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+        crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+      }
+      curpos+=sprintf(&buffer[curpos],"%d %d %d %hhd %x %x\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2);
+      if (curpos > _recplay_logsize-128) flushLog();
       if (!wasPacked) CkUnpackMessage(&env);
     }
     return CmiTrue;
+  }
+  virtual int process(CthThreadToken *token,CkCoreState *ck) {
+    curpos+=sprintf(&buffer[curpos], "%d %d %d\n",CkMyPe(), -2, token->serialNo);
+    if (curpos > _recplay_logsize-128) flushLog();
+    return 1;
   }
 };
 
@@ -1896,6 +2056,7 @@ private:
 #define REPLAYDEBUG(args) /* empty */
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
+extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
 class CkMessageReplay : public CkMessageWatcher {
   int counter;
@@ -1903,56 +2064,113 @@ class CkMessageReplay : public CkMessageWatcher {
 	unsigned int crc1, crc2;
 	/// Read the next message we need from the file:
 	void getNext(void) {
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+          REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
+	  if (nextSize > 0) {
+	    // We are reading a regular message
+	    if (3!=fscanf(f,"%d%x%x", &nexttype,&crc1,&crc2)) {
+	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	    }
+	  } else if (nextSize == -2) {
+	    // We are reading a special message (right now only thread awaken)
+	    // Nothing to do since we have already read all info
+#if CMK_BLUEGENE_CHARM
+	    return getNext();          // ignoring thread event is ok
+#endif
+	  } else if (nextPE!=-1 || nextSize!=-1 || nextEvent!=-1) {
+	    CkPrintf("Read from file item %d %d %d\n",nextPE,nextSize,nextEvent);
+	    CkAbort("CkMessageReplay> Unrecognized input");
+	  }
+	    /*
 		if (6!=fscanf(f,"%d%d%d%d%x%x", &nextPE,&nextSize,&nextEvent,&nexttype,&crc1,&crc2)) {
-			// CkAbort("CkMessageReplay> Syntax error reading replay file");
+			CkAbort("CkMessageReplay> Syntax error reading replay file");
 			nextPE=nextSize=nextEvent=nexttype=-1; //No destructor->record file just ends in the middle!
 		}
+		*/
 		counter++;
 	}
 	/// If this is the next message we need, advance and return CmiTrue.
 	CmiBool isNext(envelope *env) {
 		if (nextPE!=env->getSrcPe()) return CmiFalse;
 		if (nextEvent!=env->getEvent()) return CmiFalse;
+		if (nextSize<0) return CmiFalse; // not waiting for a regular message
+#if ! CMK_BLUEGENE_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("CkMessageReplay> Message size changed during replay org: [%d %d %d] got: [%d %d %d]\n", nextPE, nextEvent, nextSize, env->getSrcPe(), env->getEvent(), env->getTotalsize());
                         return CmiFalse;
                 }
-		bool wasPacked = env->isPacked();
-		if (!wasPacked) CkPackMessage(&env);
-		//unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
-		unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
-		unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
-		if (crcnew1 != crc1) {
-		  CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
+		if (_recplay_crc || _recplay_checksum) {
+		  bool wasPacked = env->isPacked();
+		  if (!wasPacked) CkPackMessage(&env);
+		  if (_recplay_crc) {
+		    //unsigned int crcnew = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, env->getTotalsize()-CmiMsgHeaderSizeBytes);
+		    unsigned int crcnew1 = crc32_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+		    unsigned int crcnew2 = crc32_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+		    if (crcnew1 != crc1) {
+		      CkPrintf("CkMessageReplay %d> Envelope CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
+		    }
+		    if (crcnew2 != crc2) {
+		      CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+		    }
+		  } else if (_recplay_checksum) {
+            unsigned int crcnew1 = checksum_initial(((unsigned char*)env)+CmiMsgHeaderSizeBytes, sizeof(*env)-CmiMsgHeaderSizeBytes);
+            unsigned int crcnew2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
+            if (crcnew1 != crc1) {
+              CkPrintf("CkMessageReplay %d> Envelope Checksum changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc1,crcnew1);
+            }
+            if (crcnew2 != crc2) {
+              CkPrintf("CkMessageReplay %d> Message Checksum changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
+            }		    
+		  }
+		  if (!wasPacked) CkUnpackMessage(&env);
 		}
-        if (crcnew2 != crc2) {
-          CkPrintf("CkMessageReplay %d> Message CRC changed during replay org: [0x%x] got: [0x%x]\n",CkMyPe(),crc2,crcnew2);
-        }
-        if (!wasPacked) CkUnpackMessage(&env);
+#endif
 		return CmiTrue;
+	}
+	CmiBool isNext(CthThreadToken *token) {
+	  if (nextPE==CkMyPe() && nextSize==-2 && nextEvent==token->serialNo) return CmiTrue;
+	  return CmiFalse;
 	}
 
 	/// This is a (short) list of messages we aren't yet ready for:
-	CkQ<envelope *> delayed;
+	CkQ<envelope *> delayedMessages;
+	/// This is a (short) list of tokens (i.e messages that awake user-threads) we aren't yet ready for:
+	CkQ<CthThreadToken *> delayedTokens;
 
 	/// Try to flush out any delayed messages
 	void flush(void) {
-		int len=delayed.length();
+	  if (nextSize>0) {
+		int len=delayedMessages.length();
 		for (int i=0;i<len;i++) {
-			envelope *env=delayed.deq();
+			envelope *env=delayedMessages.deq();
 			if (isNext(env)) { /* this is the next message: process it */
 				REPLAYDEBUG("Dequeueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
-				CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
+				//CmiSyncSendAndFree(CkMyPe(),env->getTotalsize(),(char *)env);
+				CsdEnqueueLifo((void*)env); // Make it at the beginning since this is the one we want next
 				return;
 			}
 			else /* Not ready yet-- put it back in the
 				queue */
 			  {
 				REPLAYDEBUG("requeueing delayed message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
-				delayed.enq(env);
+				delayedMessages.enq(env);
 			  }
 		}
+	  } else if (nextSize==-2) {
+	    int len=delayedTokens.length();
+	    for (int i=0;i<len;++i) {
+	      CthThreadToken *token=delayedTokens.deq();
+	      if (isNext(token)) {
+            REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
+	        CsdEnqueueLifo((void*)token);
+	        return;
+	      } else {
+            REPLAYDEBUG("requeueing delayed token: "<<token->serialNo)
+	        delayedTokens.enq(token);
+	      }
+	    }
+	  }
 	}
 
 public:
@@ -1961,12 +2179,13 @@ public:
 	  f=f_;
 	  getNext();
 	  REPLAYDEBUG("Constructing ckMessageReplay: "<< nextPE <<" "<< nextSize <<" "<<nextEvent);
-	  CmiStartQD(CkMessageReplayQuiescence, this);
+	  if (CkMyPe()==0) CmiStartQD(CkMessageReplayQuiescence, this);
 	}
 	~CkMessageReplay() {fclose(f);}
 
 private:
 	virtual CmiBool process(envelope *env,CkCoreState *ck) {
+	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx());
                 if (env->getEvent() == 0) return CmiTrue;
 		if (isNext(env)) { /* This is the message we were expecting */
@@ -1989,17 +2208,111 @@ private:
 		else /*!isNext(env) */ {
 			REPLAYDEBUG("Queueing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent()
 				<<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
-			delayed.enq(env);
+			delayedMessages.enq(env);
                         flush();
 			return CmiFalse;
 		}
 	}
+	virtual int process(CthThreadToken *token, CkCoreState *ck) {
+      REPLAYDEBUG("ProcessToken token: "<<token->serialNo);
+	  if (isNext(token)) {
+        REPLAYDEBUG("Executing token: "<<token->serialNo)
+	    getNext();
+	    flush();
+	    return 1;
+	  } else {
+        REPLAYDEBUG("Queueing token: "<<token->serialNo
+            <<" because we wanted "<<nextPE<<" "<<nextSize<<" "<<nextEvent)
+	    delayedTokens.enq(token);
+	    return 0;
+	  }
+	}
+};
+
+class CkMessageDetailReplay : public CkMessageWatcher {
+  void *getNext() {
+    CmiUInt4 size; size_t nread;
+    if ((nread=fread(&size, 4, 1, f)) < 1) {
+      if (feof(f)) return NULL;
+      CkPrintf("Broken record file (metadata) got %d\n",nread);
+      CkAbort("");
+    }
+    void *env = CmiAlloc(size);
+    long tell = ftell(f);
+    if ((nread=fread(env, size, 1, f)) < 1) {
+      CkPrintf("Broken record file (data) expecting %d, got %d (file position %lld)\n",size,nread,tell);
+      CkAbort("");
+    }
+    //*(int*)env = 0x34567890; // set first integer as magic
+    return env;
+  }
+public:
+  double starttime;
+  CkMessageDetailReplay(FILE *f_) {
+    f=f_;
+    starttime=CkWallTimer();
+    /* This must match what CkMessageDetailRecorder did */
+    CmiUInt2 little;
+    fread(&little, 2, 1, f);
+    if (little != sizeof(void*)) {
+      CkAbort("Replaying on a different architecture from which recording was done!");
+    }
+
+    CsdEnqueue(getNext());
+
+    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)CkMessageDetailReplayDone, (void*)this);
+  }
+  virtual CmiBool process(envelope *env,CkCoreState *ck) {
+    void *msg = getNext();
+    if (msg != NULL) CsdEnqueue(msg);
+    return CmiTrue;
+  }
 };
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
+#if ! CMK_BLUEGENE_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
+#endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
+  //CmiStartQD(CkMessageReplayQuiescence, replay);
+}
+
+extern "C" void CkMessageDetailReplayDone(void *rep, double time) {
+  CkMessageDetailReplay *replay = (CkMessageDetailReplay *)rep;
+  CkPrintf("[%d] Detailed replay finished after %f seconds. Exiting.\n",CkMyPe(),CkWallTimer()-replay->starttime);
+  ConverseExit();
+}
+
+static int CpdExecuteThreadResume(CthThreadToken *token) {
+  CkCoreState *ck = CkpvAccess(_coreState);
+  if (ck->watcher!=NULL) {
+    return ck->watcher->processThread(token,ck);
+  }
+  return 1;
+}
+
+CpvCExtern(int, CthResumeNormalThreadIdx);
+extern "C" void CthResumeNormalThreadDebug(CthThreadToken* token)
+{
+  CthThread t = token->thread;
+
+  if(t == NULL){
+    free(token);
+    return;
+  }
+#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_IN_CHARM
+  if(CpvAccess(traceOn))
+    CthTraceResume(t);
+/*    if(CpvAccess(_traceCoreOn)) 
+            resumeTraceCore();*/
+#endif
+#endif
   
+  /* For Record/Replay debugging: need to notify the upper layer that we are resuming a thread */
+  if (CpdExecuteThreadResume(token)) {
+    CthResume(t);
+  }
 }
 
 #include "trace-common.h" /* For traceRoot and traceRootBaseLength */
@@ -2022,8 +2335,17 @@ static FILE *openReplayFile(const char *prefix, const char *suffix, const char *
 
 #include "ckliststring.h"
 void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
+    CmiBool forceReplay = CmiFalse;
     char *procs = NULL;
-	REPLAYDEBUG("CkMessageWaterInit ");
+    _replaySystem = 0;
+    if (CmiGetArgFlagDesc(argv,"+recplay-crc","Enable crc32 for message record-replay")) {
+      _recplay_crc = 1;
+    }
+    if (CmiGetArgFlagDesc(argv,"+recplay-checksum","Enable simple checksum for message record-replay")) {
+      _recplay_checksum = 1;
+    }
+    CmiGetArgIntDesc(argv,"+recplay-logsize",&_recplay_logsize,"Specify the size of the buffer used by the message recorder");
+    REPLAYDEBUG("CkMessageWatcherInit ");
     if (CmiGetArgStringDesc(argv,"+record-detail",&procs,"Record full message content for the specified processors")) {
         CkListString list(procs);
         if (list.includes(CkMyPe())) {
@@ -2031,17 +2353,49 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
           ck->addWatcher(new CkMessageDetailRecorder(openReplayFile("ckreplay_",".detail","w")));
         }
     }
-	if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+    if (CmiGetArgFlagDesc(argv,"+record","Record message processing order")) {
+      if (CkMyPe() == 0) {
+        CmiPrintf("Charm++> record mode.\n");
+        if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
+          CmiPrintf("Charm++> Warning: disabling recording for message integrity detection (requires linking with -memory charmdebug)\n");
+          _recplay_crc = _recplay_checksum = 0;
+        }
+      }
+      CpdSetInitializeMemory(1);
+      CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
+      ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
+    }
+	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Replay the specified processors from recorded message content")) {
+	    forceReplay = CmiTrue;
 	    CpdSetInitializeMemory(1);
-		ck->addWatcher(new CkMessageRecorder(openReplayFile("ckreplay_",".log","w")));
+	    // Set the parameters of the processor
+#if CMK_SHARED_VARS_UNAVAILABLE
+	    _Cmi_mype = atoi(procs);
+	    while (procs[0]!='/') procs++;
+	    procs++;
+	    _Cmi_numpes = atoi(procs);
+#else
+	    CkAbort("+replay-detail available only for non-SMP build");
+#endif
+	    _replaySystem = 1;
+	    ck->addWatcher(new CkMessageDetailReplay(openReplayFile("ckreplay_",".detail","r")));
 	}
-	if (CmiGetArgFlagDesc(argv,"+replay","Re-play recorded message stream")) {
-	    CpdSetInitializeMemory(1);
-		ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
+	if (CmiGetArgFlagDesc(argv,"+replay","Replay recorded message stream") || forceReplay) {
+	  if (CkMyPe() == 0)  {
+	    CmiPrintf("Charm++> replay mode.\n");
+	    if (!CmiMemoryIs(CMI_MEMORY_IS_CHARMDEBUG)) {
+	      CmiPrintf("Charm++> Warning: disabling message integrity detection during replay (requires linking with -memory charmdebug)\n");
+	      _recplay_crc = _recplay_checksum = 0;
+	    }
+	  }
+	  CpdSetInitializeMemory(1);
+#if ! CMK_BLUEGENE_CHARM
+	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
+#endif
+	  ck->addWatcher(new CkMessageReplay(openReplayFile("ckreplay_",".log","r")));
 	}
-	if (CmiGetArgStringDesc(argv,"+replay-detail",&procs,"Re-play the specified processors from recorded message content")) {
-	    CpdSetInitializeMemory(1);
-	  /*Nothing yet*/
+	if (_recplay_crc && _recplay_checksum) {
+	  CmiAbort("Both +recplay-crc and +recplay-checksum options specified, only one allowed.");
 	}
 }
 

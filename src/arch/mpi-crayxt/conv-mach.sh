@@ -17,8 +17,10 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 # compiler for compiling sequential programs
 if test -n "$PGCC"
 then
+CMK_CC="$CMK_CC -DCMK_CC_PGCC=1 "
+CMK_CXX="$CMK_CXX -DCMK_CC_PGCC=1 "
 # gcc is needed for building QT
-CMK_SEQ_CC="gcc -fPIC"
+CMK_SEQ_CC="gcc -fPIC "
 CMK_SEQ_CXX="pgCC -fPIC "
 else
 CMK_SEQ_CC="gcc -fPIC"

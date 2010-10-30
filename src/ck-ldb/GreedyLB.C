@@ -187,12 +187,12 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
 void GreedyLB::work(BaseLB::LDStats* stats, int count)
 {
   int  obj, heapSize, objCount;
-  int *pemap = new int [count];
   HeapData *cpuData = BuildCpuArray(stats, count, &heapSize);
   HeapData *objData = BuildObjectArray(stats, count, &objCount);
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In GreedyLB strategy\n",CkMyPe());
   heapSize--;
+  int nmoves = 0;
   for (obj=0; obj < objCount; obj++) {
     HeapData minCpu;  
     // Operation of extracting the least loaded processor
@@ -212,6 +212,7 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
     const int id   = objData[obj].id;
     if (dest != pe) {
       stats->to_proc[id] = dest;
+      nmoves ++;
       if (_lb_args.debug()>2) 
         CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),objData[obj].id,pe,dest);
     }
@@ -226,8 +227,11 @@ void GreedyLB::work(BaseLB::LDStats* stats, int count)
     cpuData[location] = minCpu;
   }
 
-  delete [] cpuData;
+  if (_lb_args.debug()>0) 
+    CkPrintf("[%d] %d objects migrating.\n", CkMyPe(), nmoves);
+
   delete [] objData;
+  delete [] cpuData;
 }
 
 #include "GreedyLB.def.h"

@@ -9,7 +9,13 @@
 #
 # ***********************************************************************
 
-OPTS=-O#-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+# For parallel simulation
+OPTS=-O #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+ETRANS_OPTS=
+
+# For sequential simulation
+#OPTS=-O -DSEQUENTIAL_POSE=1 #-DCMK_OPTIMIZE=1 -DCMK_MEMCHECKS_OFF=1
+#ETRANS_OPTS=-s
 
 CHARMBASE=../../..
 CHARMBIN=$(CHARMBASE)/bin
@@ -114,8 +120,15 @@ Worker.def.h Worker.decl.h : Worker_sim.ci
 	$(CHARMC) $(INCLUDES) $(LIBS) Worker_sim.ci
 
 Worker_sim.C Worker_sim.h Worker_sim.ci: Worker.C Worker.h Worker.ci 
-	$(CHARMBIN)/etrans.pl Worker
+	$(CHARMBIN)/etrans.pl $(ETRANS_OPTS) Worker
 
 test: $(PGM)
 	./pgm 20 200 MEDIUM -gm 10
 
+partest: $(PGM)
+	./charmrun +p4 ./pgm 20 200 MEDIUM -gm 1
+	./charmrun +p4 ./pgm +restart __pose_chkpt_files/
+
+seqtest: $(PGM).seq
+	./pgm.seq 20 800 MEDIUM -gm 1
+	./pgm.seq +restart __pose_chkpt_files/

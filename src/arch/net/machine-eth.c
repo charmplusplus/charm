@@ -170,7 +170,7 @@ void TransmitAckDatagram(OtherNode node)
   
   seqno = node->recv_next;
   MACHSTATE2(3,"  TransmitAckDgram [seq %d to 'pe' %d]",seqno,node->nodestart)
-  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, _Cmi_numnodes, seqno, 0);
+  DgramHeaderMake(&ack, DGRAM_ACKNOWLEDGE, Cmi_nodestart, Cmi_net_magic, seqno, 0);
   LOG(Cmi_clock, Cmi_nodestart, 'A', node->nodestart, seqno);
   for (i=0; i<Cmi_window_size; i++) {
     slot = seqno % Cmi_window_size;
@@ -214,7 +214,7 @@ void TransmitImplicitDgram(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, _Cmi_numnodes, dg->seqno, dg->broot);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_net_magic, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char*)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -240,7 +240,7 @@ void TransmitImplicitDgram1(ImplicitDgram dg)
   head = (DgramHeader *)(data - DGRAM_HEADER_SIZE);
   temp = *head;
   dest = dg->dest;
-  DgramHeaderMake(head, dg->rank, dg->srcpe, _Cmi_numnodes, dg->seqno, dg->broot);
+  DgramHeaderMake(head, dg->rank, dg->srcpe, Cmi_net_magic, dg->seqno, dg->broot);
 #ifdef CMK_USE_CHECKSUM
   head->magic ^= computeCheckSum((unsigned char *)head, len + DGRAM_HEADER_SIZE);
 #endif
@@ -728,7 +728,7 @@ void ReceiveDatagram()
 #ifdef CMK_USE_CHECKSUM
     if (computeCheckSum((unsigned char*)dg->data, dg->len) == 0)
 #else
-    if (magic == (_Cmi_numnodes&DGRAM_MAGIC_MASK))
+    if (magic == (Cmi_net_magic&DGRAM_MAGIC_MASK))
 #endif
     {
       if (dg->rank == DGRAM_ACKNOWLEDGE)
@@ -826,115 +826,4 @@ void CmiMachineExit()
 {
 }
 
-static void sendBarrierMessage(int pe)
-{
-  char buf[32];
-  OtherNode  node = nodes + pe;
-  int retval = -1;
-  if (dataskt!=-1) {
-  buf[0] = 61; buf[1] = 31;
-  while (retval == -1) {
-     retval = sendto(dataskt, (char *)buf, 32, 0,
-	 (struct sockaddr *)&(node->addr),
-	 sizeof(struct sockaddr_in));
-  }
-  }
-}
 
-static void recvBarrierMessage()
-{
-  char buf[32];
-  int nreadable, ok, s;
-  
-  if (dataskt!=-1) {
-    retry:
-        do {
-        CMK_PIPE_DECL(10);
-	CMK_PIPE_ADDREAD(dataskt);
-          nreadable=CMK_PIPE_CALL();
-          if (nreadable == 0) continue;
-          s = CMK_PIPE_CHECKREAD(dataskt);
-          if (s) break;
-        } while (1);
-        ok = recv(dataskt,buf,32,0);
-        CmiAssert(ok >= 0);
-        if (buf[0]!=61 || buf[1]!=31) goto retry;
-  }
-}
-
-/* happen at node level */
-/* must be called on every PE including communication processors */
-int CmiBarrier()
-{
-return 0;
-  int len, size, i;
-  int status;
-  int count = 0;
-  OtherNode node;
-  int numnodes = CmiNumNodes();
-
-#if !CMK_SMP
-  if (Cmi_netpoll == 0) return -1;
-#endif
-
-  if (CmiMyRank() == 0) {
-    /* every one send to pe 0 */
-    if (CmiMyNode() != 0) {
-      sendBarrierMessage(0);
-    }
-    if (CmiMyNode() == 0) 
-    {
-      for (count = 1; count < numnodes; count ++) 
-      {
-        recvBarrierMessage();
-      }
-      /* pe 0 broadcast */
-      for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-        int p = i;
-        if (p > numnodes - 1) break;
-        /* printf("[%d] BD => %d \n", CmiMyPe(), p); */
-        sendBarrierMessage(p);
-      }
-    }
-    /* non 0 node waiting */
-    if (CmiMyNode() != 0) 
-    {
-      recvBarrierMessage();
-      for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-        int p = CmiMyNode();
-        p = BROADCAST_SPANNING_FACTOR*p + i;
-        if (p > numnodes - 1) break;
-        p = p%numnodes;
-        /* printf("[%d] RELAY => %d \n", CmiMyPe(), p);  */
-        sendBarrierMessage(p);
-      }
-    }
-  }
-  CmiNodeAllBarrier();
-  /* printf("[%d] OUT of barrier \n", CmiMyPe()); */
-  return 0;
-}
-
-
-int CmiBarrierZero()
-{
-  int i;
-
-#if !CMK_SMP
-  if (Cmi_netpoll == 0) return -1;
-#endif
-
-  if (CmiMyRank() == 0) {
-    if (CmiMyNode()) {
-      sendBarrierMessage(0);
-    }
-    else {
-      for (i=0; i<CmiNumNodes()-1; i++)
-      {
-        recvBarrierMessage();
-      }
-    }
-  }
-  CmiNodeAllBarrier();
-  return 0;
-}

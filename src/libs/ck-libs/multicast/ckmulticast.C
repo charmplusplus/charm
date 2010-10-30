@@ -523,7 +523,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         arrayIndexPosList *slots = new arrayIndexPosList[numchild];
 
         // For each direct child, collate indices of all section members on the PEs in that branch
-        for (int i=0; i < numchild; i++)
+        for (i=0; i < numchild; i++)
         {
             // Determine the indices of the first and last PEs in this branch of my sub-tree
             int childStartIndex = nextGenInfo->childIndex[i], childEndIndex;
@@ -532,7 +532,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
             else
                 childEndIndex = mySubTreePEs.size();
             // For each PE in this branch, add the section members on that PE to a list
-            for (int j = childStartIndex; j < childEndIndex; j++)
+            for (j = childStartIndex; j < childEndIndex; j++)
             {
                 int pe = mySubTreePEs[j];
                 for (int k=0; k<lists[pe].size(); k++)
@@ -570,6 +570,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         childrenReady(entry);
     }
     delete [] lists;
+    delete msg;
 }
 
 

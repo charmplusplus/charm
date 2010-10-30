@@ -683,6 +683,8 @@ static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd=-1;
+/* Magic number to be used for sanity check in messege header */
+static int 				Cmi_net_magic;
 
 static int    Cmi_netpoll;
 static int    Cmi_asyncio;
@@ -713,7 +715,16 @@ static void parse_forks(void) {
   }
 }
 #endif
-
+static void parse_magic(void)
+{
+	char* nm;	
+	int nread;
+  nm = getenv("NETMAGIC");
+  if (nm!=0) 
+  {/*Read values set by Charmrun*/
+        nread = sscanf(nm, "%d",&Cmi_net_magic);
+	}
+}
 static void parse_netstart(void)
 {
   char *ns;
@@ -1195,6 +1206,8 @@ CmiPrintStackTrace(0);
 
 static void node_addresses_store(ChMessage *msg);
 
+static int barrierReceived = 0;
+
 static void ctrl_getone(void)
 {
   ChMessage msg;
@@ -1222,7 +1235,7 @@ static void ctrl_getone(void)
     int pe=0;/*<- node-local processor number. Any one will do.*/
     void *cmsg=(void *)CcsImpl_ccs2converse(hdr,msg.data+sizeof(CcsImplHeader),NULL);
     MACHSTATE(2,"Incoming CCS request");
-    CmiPushPE(pe,cmsg);
+    if (cmsg!=NULL) CmiPushPE(pe,cmsg);
   }
 #endif
 #ifdef __FAULT__	
@@ -1236,10 +1249,17 @@ static void ctrl_getone(void)
 	// fprintf(stdout,"nodetable added %d\n",CmiMyPe());
   }
 #endif
+  else if(strcmp(msg.header.type,"barrier")==0) {
+        barrierReceived = 1;
+  }
+  else if(strcmp(msg.header.type,"barrier0")==0) {
+        barrierReceived = 2;
+  }
   else {
   /* We do not use KillEveryOne here because it calls CmiMyPe(),
    * which is not available to the communication thread on an SMP version.
    */
+    /* CmiPrintf("Unknown message: %s\n", msg.header.type); */
     charmrun_abort("ERROR> Unrecognized message from charmrun.\n");
     machine_exit(1);
   }
@@ -2391,6 +2411,78 @@ void CmiMachineProgressImpl()
  * Main code, Init, and Exit
  *
  *****************************************************************************/
+
+#if CMK_BARRIER_USE_COMMON_CODE
+
+/* happen at node level */
+/* must be called on every PE including communication processors */
+int CmiBarrier()
+{
+  int len, size, i;
+  int status;
+  int numnodes = CmiNumNodes();
+  static int barrier_phase = 0;
+
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    ctrl_sendone_locking("barrier",NULL,0,NULL,0);
+    while (barrierReceived != 1) {
+      CmiCommLock();
+      ctrl_getone();
+      CmiCommUnlock();
+    }
+    barrierReceived = 0;
+    barrier_phase ++;
+  }
+
+  CmiNodeAllBarrier();
+  /* printf("[%d] OUT of barrier %d \n", CmiMyPe(), barrier_phase); */
+  return 0;
+}
+
+
+int CmiBarrierZero()
+{
+  int i;
+  int numnodes = CmiNumNodes();
+  ChMessage msg;
+
+  if (Cmi_charmrun_fd == -1) return 0;                // standalone
+  if (numnodes == 1) {
+    CmiNodeAllBarrier();
+    return 0;
+  }
+
+  if (CmiMyRank() == 0) {
+    char str[64];
+    sprintf(str, "%d", CmiMyNode());
+    ctrl_sendone_locking("barrier0",str,strlen(str)+1,NULL,0);
+    if (CmiMyNode() == 0) {
+      while (barrierReceived != 2) {
+        CmiCommLock();
+        ctrl_getone();
+        CmiCommUnlock();
+      }
+      barrierReceived = 0;
+    }
+  }
+
+  CmiNodeAllBarrier();
+  return 0;
+}
+
+#endif
+
+/******************************************************************************
+ *
+ * Main code, Init, and Exit
+ *
+ *****************************************************************************/
 extern void CthInit(char **argv);
 extern void ConverseCommonInit(char **);
 
@@ -2655,6 +2747,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
       CmiGetArgFlagDesc(argv,"++debug",NULL /*meaning: don't show this*/)) Cmi_truecrash = 1;
     /* netpoll disable signal */
   if (CmiGetArgFlagDesc(argv,"+netpoll","Do not use SIGIO--poll instead")) Cmi_netpoll = 1;
+  if (CmiGetArgFlagDesc(argv,"+netint","Use SIGIO")) Cmi_netpoll = 0;
     /* idlepoll use poll instead if sleep when idle */
   if (CmiGetArgFlagDesc(argv,"+idlepoll","Do not sleep when idle")) Cmi_idlepoll = 1;
     /* idlesleep use sleep instead if busywait when idle */
@@ -2683,6 +2776,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
+  parse_magic();
 #if ! CMK_SMP && ! defined(_WIN32)
   /* only get forks in non-smp mode */
   parse_forks();
@@ -2717,7 +2811,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   	Cmi_charmrun_fd = skt_connect(Cmi_charmrun_IP, Cmi_charmrun_port, 1800);
 	MACHSTATE2(5,"Opened connection to charmrun at socket %d, dataport=%d", Cmi_charmrun_fd, dataport);
 	skt_tcp_no_nagle(Cmi_charmrun_fd);
-
 	CmiStdoutInit();
   } else {/*Standalone operation*/
   	printf("Charm++: standalone mode (not using charmrun)\n");
@@ -2729,10 +2822,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
 
   node_addresses_obtain(argv);
   MACHSTATE(5,"node_addresses_obtain done");
-
-#if CMK_USE_IBVERBS
-  if (Cmi_charmrun_fd==-1) CmiAbort("Fatal error: standalone mode is not supported in ibverbs. \n");
-#endif
 
   CmiCommunicationInit(argv);
 

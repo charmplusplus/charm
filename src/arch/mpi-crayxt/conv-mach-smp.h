@@ -7,3 +7,5 @@
 #undef CMK_SHARED_VARS_POSIX_THREADS_SMP
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  1
+
+#define CMK_THREADS_USE_JCONTEXT                           1

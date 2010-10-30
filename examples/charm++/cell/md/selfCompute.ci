@@ -10,23 +10,23 @@ module selfCompute {
     entry void init(int numParticlesPerPatch);
 
     entry void patchData(int numParticles,
-                         float particleX[numParticles],
-                         float particleY[numParticles],
-                         float particleZ[numParticles],
-                         float particleQ[numParticles]
+                         MD_FLOAT particleX[numParticles],
+                         MD_FLOAT particleY[numParticles],
+                         MD_FLOAT particleZ[numParticles],
+                         MD_FLOAT particleQ[numParticles]
                         );
 
     entry [accel] void doCalc()[
                                  readonly : int numParticles <impl_obj->numParticles>,
                                  readonly : int thisIndex_x <impl_obj->thisIndex.x>,
                                  readonly : int thisIndex_y <impl_obj->thisIndex.y>,
-                                 readonly : float particleX[numParticles] <impl_obj->particleX>,
-                                 readonly : float particleY[numParticles] <impl_obj->particleY>,
-                                 readonly : float particleZ[numParticles] <impl_obj->particleZ>,
-                                 readonly : float particleQ[numParticles] <impl_obj->particleQ>,
-                                writeonly : float f0_x[numParticles] <impl_obj->forceX>,
-                                writeonly : float f0_y[numParticles] <impl_obj->forceY>,
-                                writeonly : float f0_z[numParticles] <impl_obj->forceZ>,
+                                 readonly : MD_FLOAT particleX[numParticles] <impl_obj->particleX>,
+                                 readonly : MD_FLOAT particleY[numParticles] <impl_obj->particleY>,
+                                 readonly : MD_FLOAT particleZ[numParticles] <impl_obj->particleZ>,
+                                 readonly : MD_FLOAT particleQ[numParticles] <impl_obj->particleQ>,
+                                writeonly : MD_FLOAT f0_x[numParticles] <impl_obj->forceX>,
+                                writeonly : MD_FLOAT f0_y[numParticles] <impl_obj->forceY>,
+                                writeonly : MD_FLOAT f0_z[numParticles] <impl_obj->forceZ>,
                                 writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                ] {
 
@@ -42,20 +42,22 @@ module selfCompute {
       #if COUNT_FLOPS != 0
         localFlopCount = 0;
       #endif
-
-      register vecf* p0_x_vec = (vecf*)particleX;
-      register vecf* p0_y_vec = (vecf*)particleY;
-      register vecf* p0_z_vec = (vecf*)particleZ;
-      register vecf* p0_q_vec = (vecf*)particleQ;
-      register vecf* f0_x_vec = (vecf*)f0_x;
-      register vecf* f0_y_vec = (vecf*)f0_y;
-      register vecf* f0_z_vec = (vecf*)f0_z;
+      const int vec_numElems= myvec_numElems;
+      const int VEC_MASK= vec_numElems-1;
+      const int shifter= sizeof(MD_FLOAT)==4 ? 2 :1;
+      register MD_VEC* p0_x_vec = (MD_VEC*)particleX;
+      register MD_VEC* p0_y_vec = (MD_VEC*)particleY;
+      register MD_VEC* p0_z_vec = (MD_VEC*)particleZ;
+      register MD_VEC* p0_q_vec = (MD_VEC*)particleQ;
+      register MD_VEC* f0_x_vec = (MD_VEC*)f0_x;
+      register MD_VEC* f0_y_vec = (MD_VEC*)f0_y;
+      register MD_VEC* f0_z_vec = (MD_VEC*)f0_z;
       register int i;
       register int j;
-      register const int numParticlesByVecSize = numParticles / vecf_numElems;
+      register const int numParticlesByVecSize = numParticles / myvec_numElems;
 
       // Zero out the force output
-      vecf zero_vec = vspreadf(0.0f);
+      MD_VEC zero_vec = vspread_MDF(zero);
       for (j = 0; j < numParticlesByVecSize; j++) {
         f0_x_vec[j] = zero_vec;
         f0_y_vec[j] = zero_vec;
@@ -63,30 +65,30 @@ module selfCompute {
       }
 
       // Spread coulumb's constant across a vector
-      vecf coulomb_vec = vspreadf(COULOMBS_CONSTANT);
+      MD_VEC coulomb_vec = vspread_MDF(COULOMBS_CONSTANT);
 
       // Outer-loop
       for (i = 0; i < numParticles; i++) {
 
         // Interact with all particles (one-by-one) until the vector boundary
-        for (j = i + 1; ((j & 0x3) != 0x0) && (j < numParticles); j++) {
+        for (j = i + 1; ((j & VEC_MASK) != 0x0) && (j < numParticles); j++) {
 
-          float p_x_diff = particleX[i] - particleX[j];
-          float p_y_diff = particleY[i] - particleY[j];
-          float p_z_diff = particleZ[i] - particleZ[j];
-          float r_2 = (p_x_diff * p_x_diff) + (p_y_diff * p_y_diff) + (p_z_diff * p_z_diff);
-          float r = sqrt(r_2);
+          MD_FLOAT p_x_diff = particleX[i] - particleX[j];
+          MD_FLOAT p_y_diff = particleY[i] - particleY[j];
+          MD_FLOAT p_z_diff = particleZ[i] - particleZ[j];
+          MD_FLOAT r_2 = (p_x_diff * p_x_diff) + (p_y_diff * p_y_diff) + (p_z_diff * p_z_diff);
+          MD_FLOAT r = sqrt(r_2);
 
-          float p_x_diff_norm = p_x_diff / r;
-          float p_y_diff_norm = p_y_diff / r;
-          float p_z_diff_norm = p_z_diff / r;
+          MD_FLOAT p_x_diff_norm = p_x_diff / r;
+          MD_FLOAT p_y_diff_norm = p_y_diff / r;
+          MD_FLOAT p_z_diff_norm = p_z_diff / r;
 
-          float p_q_prod = particleQ[i] * particleQ[j];
-          float f_mag = COULOMBS_CONSTANT * (p_q_prod / r_2);
+          MD_FLOAT p_q_prod = particleQ[i] * particleQ[j];
+          MD_FLOAT f_mag = COULOMBS_CONSTANT * (p_q_prod / r_2);
 
-          float f_x = f_mag * p_x_diff_norm;
-          float f_y = f_mag * p_y_diff_norm;
-          float f_z = f_mag * p_z_diff_norm;
+          MD_FLOAT f_x = f_mag * p_x_diff_norm;
+          MD_FLOAT f_y = f_mag * p_y_diff_norm;
+          MD_FLOAT f_z = f_mag * p_z_diff_norm;
 
           f0_x[i] += f_x;
           f0_y[i] += f_y;
@@ -102,45 +104,55 @@ module selfCompute {
         }
 
         // Spread this particle's (p0[i]) values out over vectors
-        vecf p0_x_i_vec = vspreadf(particleX[i]);
-        vecf p0_y_i_vec = vspreadf(particleY[i]);
-        vecf p0_z_i_vec = vspreadf(particleZ[i]);
-        vecf p0_q_i_vec = vspreadf(particleQ[i]);
-        vecf f0_x_i_vec = vspreadf(0.0f);
-        vecf f0_y_i_vec = vspreadf(0.0f);
-        vecf f0_z_i_vec = vspreadf(0.0f);
+        MD_VEC p0_x_i_vec = vspread_MDF(particleX[i]);
+        MD_VEC p0_y_i_vec = vspread_MDF(particleY[i]);
+        MD_VEC p0_z_i_vec = vspread_MDF(particleZ[i]);
+        MD_VEC p0_q_i_vec = vspread_MDF(particleQ[i]);
+        MD_VEC f0_x_i_vec = vspread_MDF(zero);
+        MD_VEC f0_y_i_vec = vspread_MDF(zero);
+        MD_VEC f0_z_i_vec = vspread_MDF(zero);
 
         // Switch to vectorized loop for the remaining elements in the particle array
-        for (j = j >> 2; j < numParticlesByVecSize; j++) {
+	
+        for (j = j >>shifter; j < numParticlesByVecSize; j++) {
 
           // Load the particles' data
-          vecf p0_x_j_vec = p0_x_vec[j];
-          vecf p0_y_j_vec = p0_y_vec[j];
-          vecf p0_z_j_vec = p0_z_vec[j];
-          vecf p0_q_j_vec = p0_q_vec[j];
+          MD_VEC p0_x_j_vec = p0_x_vec[j];
+          MD_VEC p0_y_j_vec = p0_y_vec[j];
+          MD_VEC p0_z_j_vec = p0_z_vec[j];
+          MD_VEC p0_q_j_vec = p0_q_vec[j];
 
           // Calculate the vector between the particles
-          vecf p_x_diff_vec = p0_x_i_vec - p0_x_j_vec;
-          vecf p_y_diff_vec = p0_y_i_vec - p0_y_j_vec;
-          vecf p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
-
+          MD_VEC p_x_diff_vec = p0_x_i_vec - p0_x_j_vec;
+          MD_VEC p_y_diff_vec = p0_y_i_vec - p0_y_j_vec;
+          MD_VEC p_z_diff_vec = p0_z_i_vec - p0_z_j_vec;
           // Calculate r and r^2 between the particles
-          vecf r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
-          vecf r_vec = vsqrtf(r_2_vec);
+          MD_VEC r_2_vec = (p_x_diff_vec * p_x_diff_vec) + (p_y_diff_vec * p_y_diff_vec) + (p_z_diff_vec * p_z_diff_vec);
+          MD_VEC r_vec = vsqrt_MDF(r_2_vec);
 
           // Normalize the vector between the particles
-          vecf r_recip_vec = vrecipf(r_vec);
-          vecf r_2_recip_vec = vrecipf(r_2_vec);
-          vecf p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
-          vecf p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
-          vecf p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
-          vecf f_mag_vec = coulomb_vec * p0_q_i_vec * p0_q_j_vec * r_2_recip_vec;  // Calc force magnitude
+          MD_VEC r_recip_vec = vrecip_MDF(r_vec);
+          MD_VEC r_2_recip_vec = vrecip_MDF(r_2_vec);
+#if SANITY_CHECK
+	  CkAssert(visfinite_MDF(r_2_vec));
+	  CkAssert(visfinite_MDF(r_vec));
+#endif
+//		CkAssert(&p0_x_vec !=);
+/*
+	{ // how the hell does this not flake out?
+		CkPrintf("i %d j %d px_i %+6e px_j %+6e py_i %+6e py_j %+6e pz_i %+6e pz_j%+6e\n",i,j,vextract_MDF(p0_x_i_vec,0),vextract_MDF(p0_x_j_vec,0),vextract_MDF(p0_y_i_vec,0),vextract_MDF(p0_y_j_vec,0),vextract_MDF(p0_z_i_vec,0),vextract_MDF(p0_z_j_vec,0));
+	}
+*/
+          MD_VEC p_x_diff_norm_vec = p_x_diff_vec * r_recip_vec;
+          MD_VEC p_y_diff_norm_vec = p_y_diff_vec * r_recip_vec;
+          MD_VEC p_z_diff_norm_vec = p_z_diff_vec * r_recip_vec;
+          MD_VEC f_mag_vec = coulomb_vec * p0_q_i_vec * p0_q_j_vec * r_2_recip_vec;  // Calc force magnitude
 
           // Multiply the magnitude by the normalized postition difference vector to
           //   create the force vector
-          vecf f_x_vec = p_x_diff_norm_vec * f_mag_vec;
-          vecf f_y_vec = p_y_diff_norm_vec * f_mag_vec;
-          vecf f_z_vec = p_z_diff_norm_vec * f_mag_vec;
+          MD_VEC f_x_vec = p_x_diff_norm_vec * f_mag_vec;
+          MD_VEC f_y_vec = p_y_diff_norm_vec * f_mag_vec;
+          MD_VEC f_z_vec = p_z_diff_norm_vec * f_mag_vec;
 
           // Add the force to the outer-loop particle and subtract it from the inner-loop particles
           f0_x_i_vec += f_x_vec;
@@ -157,9 +169,9 @@ module selfCompute {
         }
 
         // Add force values for p0[i] into f0
-        f0_x[i] += vextractf(f0_x_i_vec, 0) + vextractf(f0_x_i_vec, 1) + vextractf(f0_x_i_vec, 2) + vextractf(f0_x_i_vec, 3);
-        f0_y[i] += vextractf(f0_y_i_vec, 0) + vextractf(f0_y_i_vec, 1) + vextractf(f0_y_i_vec, 2) + vextractf(f0_y_i_vec, 3);
-        f0_z[i] += vextractf(f0_z_i_vec, 0) + vextractf(f0_z_i_vec, 1) + vextractf(f0_z_i_vec, 2) + vextractf(f0_z_i_vec, 3);
+        f0_x[i] += vextract_MDF(f0_x_i_vec, 0) + vextract_MDF(f0_x_i_vec, 1) + vextract_MDF(f0_x_i_vec, 2) + vextract_MDF(f0_x_i_vec, 3);
+        f0_y[i] += vextract_MDF(f0_y_i_vec, 0) + vextract_MDF(f0_y_i_vec, 1) + vextract_MDF(f0_y_i_vec, 2) + vextract_MDF(f0_y_i_vec, 3);
+        f0_z[i] += vextract_MDF(f0_z_i_vec, 0) + vextract_MDF(f0_z_i_vec, 1) + vextract_MDF(f0_z_i_vec, 2) + vextract_MDF(f0_z_i_vec, 3);
       }
 
       // DMK - DEBUG

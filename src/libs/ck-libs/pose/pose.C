@@ -16,8 +16,15 @@ POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
 POSE_Config pose_config;
+#ifdef POSE_COMM_ON
 ComlibInstanceHandle POSE_commlib_insthndl;
+#endif
 int _POSE_SEQUENTIAL;
+int seqCheckpointInProgress;
+POSE_TimeType seqLastCheckpointGVT;
+double seqLastCheckpointTime;
+double seqStartTime;
+CkQ<Skipped_Event> POSE_Skipped_Events;
 
 const eventID& GetEventID() {
   //CpvStaticDeclare(eventID, theEventID);  // initializes to [0.pe]
@@ -42,6 +49,12 @@ void POSE_init(int IDflag, int ET) // can specify both
 {
   CkPrintf("Initializing POSE...  \n");
   POSEreadCmdLine();
+  if (pose_config.checkpoint_gvt_interval) {
+    CkPrintf("POSE checkpointing interval set to %lld GVT ticks\n", pose_config.checkpoint_gvt_interval);
+  }
+  if (pose_config.checkpoint_time_interval) {
+    CkPrintf("POSE checkpointing interval set to %d seconds\n", pose_config.checkpoint_time_interval);
+  }
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;
 #ifdef SEQUENTIAL_POSE
@@ -117,6 +130,9 @@ void POSE_init(int IDflag, int ET) // can specify both
   CkStartQD(fnIdx, &POSE_Coordinator_ID);
   POSE_GlobalClock = 0;
   POSE_GlobalTS = 0;
+  seqCheckpointInProgress = 0;
+  seqLastCheckpointGVT = 0;
+  seqLastCheckpointTime = seqStartTime = 0.0;
 #else
   /*  CkPrintf("WARNING: Charm Quiescence termination enabled!\n");
   int fnIdx = CkIndex_pose::stop();
@@ -211,13 +227,18 @@ void pose::registerCallBack(callBack *cbm)
 void pose::stop(void) 
 { 
 #ifdef SEQUENTIAL_POSE
+  // don't stop if quiescence was reached for a checkpoint operation
+  if (seqCheckpointInProgress) {
+    POSE_Objects[0].SeqBeginCheckpoint();
+  } else {
 #if USE_LONG_TIMESTAMPS
-  CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
+    CkPrintf("Sequential Endtime Approximation: %lld\n", POSE_GlobalClock);
 #else
-  CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
+    CkPrintf("Sequential Endtime Approximation: %d\n", POSE_GlobalClock);
 #endif
-  // Call sequential termination here, when done it calls prepExit
-  POSE_Objects.Terminate();
+    // Call sequential termination here, when done it calls prepExit
+    POSE_Objects.Terminate();
+  }
 #endif
   // prepExit();
 }
@@ -300,7 +321,27 @@ void POSEreadCmdLine()
   CmiGetArgIntDesc(argv, "+lb_skip_pose", &pose_config.lb_skip , "Load balancing skip N; default 51");
   CmiGetArgIntDesc(argv, "+lb_threshold_pose", &pose_config.lb_threshold , "Load balancing threshold N; default 4000");
   CmiGetArgIntDesc(argv, "+lb_diff_pose", &pose_config.lb_diff , "Load balancing  min diff between min and max load PEs; default 2000");
-  CmiGetArgIntDesc(argv, "+checkpoint_rate_pose", &pose_config.store_rate , " Set checkpoint to 1 for every <rate> events. Default to 1. ");
+  CmiGetArgIntDesc(argv, "+checkpoint_rate_pose", &pose_config.store_rate , "Sets checkpoint to 1 for every <rate> events. Default to 1. ");
+  CmiGetArgIntDesc(argv, "+checkpoint_gvt_pose", &pose_config.checkpoint_gvt_interval, 
+		   "Checkpoint approximately every <gvt #> of GVT ticks; default = 0 = no checkpointing; overrides +checkpoint_time_pose");
+  if (pose_config.checkpoint_gvt_interval < 0) {
+    CmiAbort("+checkpoint_gvt_pose value must be >= 0; 0 = no checkpointing\n");
+  }
+  CmiGetArgIntDesc(argv, "+checkpoint_time_pose", &pose_config.checkpoint_time_interval, 
+		   "Checkpoint approximately every <time> seconds; default = 0 = no checkpointing; overridden by checkpoint_gvt_pose");
+  if (pose_config.checkpoint_time_interval < 0) {
+    CmiAbort("+checkpoint_time_pose value must be >= 0; 0 = no checkpointing\n");
+  }
+  if ((pose_config.checkpoint_gvt_interval > 0) && (pose_config.checkpoint_time_interval > 0)) {
+    CmiPrintf("WARNING: checkpoint GVT and time values both set; ignoring time value\n");
+    pose_config.checkpoint_time_interval = 0;
+  }
+  /* load balancing */
+  CmiGetArgIntDesc(argv, "+lb_gvt_pose", &pose_config.lb_gvt_interval, 
+		   "Load balancing approximately every <gvt #> of GVT ticks; default = 0 = no lb");
+  if (pose_config.lb_gvt_interval < 0) {
+    CmiAbort("+lb_gvt_pose value must be >= 0; 0 = no load balancing\n");
+  }
   /* max_iteration seems to be defunct */
   //  CmiGetArgIntDesc(argv, "+FEmax_pose", &pose_config.max_iter , "Sets max events executed in single forward execution step.  Default to 100.");
   CmiGetArgIntDesc(argv, "+leash_specwindow_pose", &pose_config.spec_window , "Sets speculative window behavior.");
@@ -309,8 +350,6 @@ void POSEreadCmdLine()
   CmiGetArgIntDesc(argv, "+leash_flex_pose", &pose_config.max_leash , "Sets speculative window behavior leash flex. Default 10.");
   if(pose_config.deterministic= CmiGetArgFlagDesc(argv, "+deterministic_pose",  "sorts events of same timestamp by event id for repeatable behavior "))
     {
-      CkPrintf("enter at your own risk, this feature is broken\n");
+      CkPrintf("WARNING: deterministic_pose: enter at your own risk, though this feature is hopefully not broken anymore\n");
     }
-
-
 }  

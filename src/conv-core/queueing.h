@@ -40,7 +40,7 @@ typedef struct prio_struct
   unsigned short ints;
   unsigned int data[1];
 }
-*prio;
+*_prio;
 
 /**
    A double ended queue of void* pointers stored in a circular buffer,
@@ -55,7 +55,7 @@ typedef struct deq_struct
   void **tail; /**< Pointer to next available slot in circular buffer */
   void *space[4]; /**< Enough space for the first 4 entries */
 }
-*deq;
+*_deq;
 
 #ifndef FASTQ
 /**
@@ -70,7 +70,7 @@ typedef struct prioqelt_struct
   struct prioqelt_struct **ht_handle; /**< Pointer to pointer that points to me (!) */
   struct prio_struct pri;
 }
-*prioqelt;
+*_prioqelt;
 #else
 typedef struct prioqelt_struct
 {
@@ -82,7 +82,7 @@ typedef struct prioqelt_struct
   struct prio_struct pri;
   /*  int deleted; */
 }
-*prioqelt;
+*_prioqelt;
 #endif
 /*
 #ifndef FASTQ
@@ -101,12 +101,12 @@ typedef struct prioq_struct
 {
   int heapsize; 
   int heapnext;
-  prioqelt *heap; /**< An array of prioqelt's */
-  prioqelt *hashtab;
+  _prioqelt *heap; /**< An array of prioqelt's */
+  _prioqelt *hashtab;
   int hash_key_size;
   int hash_entry_size;
 }
-*prioq;
+*_prioq;
 /*#else
 typedef struct prioq1_struct
 {
@@ -193,10 +193,10 @@ void CqsDequeue(Queue, void **msgPtr);
 
 unsigned int CqsLength(Queue);
 int CqsEmpty(Queue);
-int CqsPrioGT(prio, prio);
+int CqsPrioGT(_prio, _prio);
 
 /** Get the priority of the highest priority message in q */
-prio CqsGetPriority(Queue);
+_prio CqsGetPriority(Queue);
 
 void CqsIncreasePriorityForEntryMethod(Queue q, const int entrymethod);
 

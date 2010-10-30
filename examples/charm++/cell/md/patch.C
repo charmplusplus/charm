@@ -8,14 +8,14 @@ void Patch::randomizeParticles() {
 
   // Fill in a box with electrons that initially have no velocity
   for (int i = 0; i < numParticles; i++) {
-    particleX[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / 2.0f);
-    particleY[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / 2.0f);
-    particleZ[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / 2.0f);
+    particleX[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / two);
+    particleY[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / two);
+    particleZ[i] = (randf() * SIM_BOX_SIDE_LEN) - (SIM_BOX_SIDE_LEN / two);
     particleQ[i] = ELECTRON_CHARGE;
     particleM[i] = ELECTRON_MASS;
-    velocityX[i] = 0.0f;
-    velocityY[i] = 0.0f;
-    velocityZ[i] = 0.0f;
+    velocityX[i] = zero;
+    velocityY[i] = zero;
+    velocityZ[i] = zero;
 
     // DMK - DEBUG
     #if DUMP_INITIAL_PARTICLE_DATA != 0
@@ -26,13 +26,24 @@ void Patch::randomizeParticles() {
                velocityX[i], velocityY[i], velocityZ[i]
               );
     #endif
+      //EJB DEBUG
+    #if SANITY_CHECK
+      CkAssert(finite(particleX[i]));
+      CkAssert(finite(particleY[i]));
+      CkAssert(finite(particleZ[i]));
+      CkAssert(finite(velocityX[i]));
+      CkAssert(finite(velocityY[i]));
+      CkAssert(finite(velocityZ[i]));
+    #endif 
+
   }
 }
 
 
-float Patch::randf() {
+MD_FLOAT Patch::randf() {
   const int mask = 0x7FFFFFFF;
-  return (((float)(rand() % mask)) / ((float)(mask)));
+  return (((MD_FLOAT)(rand() % mask)) / ((MD_FLOAT)(mask)));
+
 }
 
 
@@ -81,17 +92,17 @@ void Patch::init_common(int numParticles) {
 
   // Allocate memory for the particles
   this->numParticles = numParticles;
-  particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleM = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  velocityX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  velocityY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  velocityZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleQ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleM = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  velocityX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  velocityY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  velocityZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
 
   // Initialize the particles
   randomizeParticles();
@@ -138,15 +149,15 @@ void Patch::startIteration_common(int numIters) {
 
   // Clear the force sum arrays
   #if 1
-    memset(forceSumX, 0, sizeof(float) * numParticles);
-    memset(forceSumY, 0, sizeof(float) * numParticles);
-    memset(forceSumZ, 0, sizeof(float) * numParticles);
+    memset(forceSumX, 0, sizeof(MD_FLOAT) * numParticles);
+    memset(forceSumY, 0, sizeof(MD_FLOAT) * numParticles);
+    memset(forceSumZ, 0, sizeof(MD_FLOAT) * numParticles);
   #else
-    register vecf* fsx = (vecf*)forceSumX;
-    register vecf* fsy = (vecf*)forceSumY;
-    register vecf* fsz = (vecf*)forceSumZ;
-    const vecf zero_vec = vspreadf(0.0f);
-    register const int numParticles_vec = numParticles / vecf_numElems;
+    register MD_VEC* fsx = (MD_VEC*)forceSumX;
+    register MD_VEC* fsy = (MD_VEC*)forceSumY;
+    register MD_VEC* fsz = (MD_VEC*)forceSumZ;
+    const MD_VEC zero_vec = vspread_MDF(zero);
+    register const int numParticles_vec = numParticles / myvec_numElems;
     for (int i = 0; i < numParticles_vec; i++) {
       fsx[i] = zero_vec;
       fsy[i] = zero_vec;
@@ -200,28 +211,33 @@ void Patch::startIteration_common(int numIters) {
 }
 
 
-void Patch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ) {
+void Patch::forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ) {
   forceCheckIn(numParticles, forceX, forceY, forceZ, 1);
 }
-void Patch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ, int numForceCheckIns) {
+void Patch::forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ, int numForceCheckIns) {
 
   // Accumulate the force data
   #if 0
-    register vecf* fsx = (vecf*)forceSumX;
-    register vecf* fsy = (vecf*)forceSumY;
-    register vecf* fsz = (vecf*)forceSumZ;
-    register vecf* fx = (vecf*)forceX;
-    register vecf* fy = (vecf*)forceY;
-    register vecf* fz = (vecf*)forceZ;
-    register const int numParticles_vec = numParticles / vecf_numElems;
+    register MD_VEC* fsx = (MD_VEC*)forceSumX;
+    register MD_VEC* fsy = (MD_VEC*)forceSumY;
+    register MD_VEC* fsz = (MD_VEC*)forceSumZ;
+    register MD_VEC* fx = (MD_VEC*)forceX;
+    register MD_VEC* fy = (MD_VEC*)forceY;
+    register MD_VEC* fz = (MD_VEC*)forceZ;
+    register const int numParticles_vec = numParticles / myvec_numElems;
     register int i;
     for (i = 0; i < numParticles_vec; i++) {
-      fsx[i] = vaddf(fsx[i], fx[i]);
-      fsy[i] = vaddf(fsy[i], fy[i]);
-      fsz[i] = vaddf(fsz[i], fz[i]);
+      fsx[i] = vadd_MDF(fsx[i], fx[i]);
+      fsy[i] = vadd_MDF(fsy[i], fy[i]);
+      fsz[i] = vadd_MDF(fsz[i], fz[i]);
     }
   #else
     for (int i = 0; i < numParticles; i++) {
+#if SANITY_CHECK
+      CkAssert(finite(forceX[i]));
+      CkAssert(finite(forceY[i]));
+      CkAssert(finite(forceZ[i]));
+#endif 
       forceSumX[i] += forceX[i];
       forceSumY[i] += forceY[i];
       forceSumZ[i] += forceZ[i];
@@ -300,31 +316,31 @@ void ProxyPatch::init(int numParticles) {
 
   // Allocate memory for the particles
   this->numParticles = numParticles;
-  particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceSumZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  particleX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  particleQ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceSumZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
 
   // Check in with the main proxy
   mainProxy.initCheckIn();
 }
 
 
-void ProxyPatch::patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ) {
+void ProxyPatch::patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ) {
 
   // Copy in the updated particle data
-  memcpy(this->particleX, particleX, numParticles * sizeof(float));
-  memcpy(this->particleY, particleY, numParticles * sizeof(float));
-  memcpy(this->particleZ, particleZ, numParticles * sizeof(float));
-  memcpy(this->particleQ, particleQ, numParticles * sizeof(float));
+  memcpy(this->particleX, particleX, numParticles * sizeof(MD_FLOAT));
+  memcpy(this->particleY, particleY, numParticles * sizeof(MD_FLOAT));
+  memcpy(this->particleZ, particleZ, numParticles * sizeof(MD_FLOAT));
+  memcpy(this->particleQ, particleQ, numParticles * sizeof(MD_FLOAT));
 
   // Clear out the force arrays
-  memset(this->forceSumX, 0, numParticles * sizeof(float));
-  memset(this->forceSumY, 0, numParticles * sizeof(float));
-  memset(this->forceSumZ, 0, numParticles * sizeof(float));
+  memset(this->forceSumX, 0, numParticles * sizeof(MD_FLOAT));
+  memset(this->forceSumY, 0, numParticles * sizeof(MD_FLOAT));
+  memset(this->forceSumZ, 0, numParticles * sizeof(MD_FLOAT));
 
   // Reset the patch checkin counters
   checkInCount = 0;
@@ -361,17 +377,17 @@ void ProxyPatch::patchData(int numParticles, float* particleX, float* particleY,
 }
 
 
-void ProxyPatch::forceCheckIn(int numParticles, float* forceX, float* forceY, float* forceZ) {
+void ProxyPatch::forceCheckIn(int numParticles, MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ) {
 
   // Accumulate the force data
   #if USE_PROXY_PATCHES != 0  // Calls will be local and pointers will be aligned, so take advantage and vectorize the code
-    register vecf* forceX_vec = (vecf*)forceX;
-    register vecf* forceY_vec = (vecf*)forceY;
-    register vecf* forceZ_vec = (vecf*)forceZ;
-    register vecf* forceSumX_vec = (vecf*)forceSumX;
-    register vecf* forceSumY_vec = (vecf*)forceSumY;
-    register vecf* forceSumZ_vec = (vecf*)forceSumZ;
-    const int numParticles_vec = numParticles / vecf_numElems;
+    register MD_VEC* forceX_vec = (MD_VEC*)forceX;
+    register MD_VEC* forceY_vec = (MD_VEC*)forceY;
+    register MD_VEC* forceZ_vec = (MD_VEC*)forceZ;
+    register MD_VEC* forceSumX_vec = (MD_VEC*)forceSumX;
+    register MD_VEC* forceSumY_vec = (MD_VEC*)forceSumY;
+    register MD_VEC* forceSumZ_vec = (MD_VEC*)forceSumZ;
+    const int numParticles_vec = numParticles / myvec_numElems;
     for (int i = 0; i < numParticles_vec; i++) {
       forceSumX_vec[i] += forceX_vec[i];
       forceSumY_vec[i] += forceY_vec[i];

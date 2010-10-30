@@ -28,7 +28,7 @@ static CkDDT *getDDT(void) {
 //------------- startup -------------
 static mpi_comm_worlds mpi_worlds;
 
-int mpi_nworlds; /*Accessed by ampif*/
+int _mpi_nworlds; /*Accessed by ampif*/
 int MPI_COMM_UNIVERSE[MPI_MAX_COMM_WORLDS]; /*Accessed by user code*/
 
 /* ampiReducer: AMPI's generic reducer type 
@@ -451,7 +451,7 @@ static int AMPI_threadstart_idx = -1;
 
 static void ampiNodeInit(void)
 {
-  mpi_nworlds=0;
+  _mpi_nworlds=0;
   for(int i=0;i<MPI_MAX_COMM_WORLDS; i++)
   {
     MPI_COMM_UNIVERSE[i] = MPI_COMM_WORLD+1+i;
@@ -629,11 +629,11 @@ static ampi *ampiInit(char **argv)
 
 // FIXME: Need to serialize global communicator allocation in one place.
 	//Allocate the next communicator
-	if(mpi_nworlds == MPI_MAX_COMM_WORLDS)
+	if(_mpi_nworlds == MPI_MAX_COMM_WORLDS)
 	{
 		CkAbort("AMPI> Number of registered comm_worlds exceeded limit.\n");
 	}
-	int new_idx=mpi_nworlds;
+	int new_idx=_mpi_nworlds;
 	new_world=MPI_COMM_WORLD+new_idx; // Isaac guessed there shouldn't be a +1 here
 
         //Create and attach the ampiParent array
@@ -749,7 +749,7 @@ public:
     void add(const ampiCommStruct &nextWorld) {
       int new_idx=nextWorld.getComm()-(MPI_COMM_WORLD); // Isaac guessed there shouldn't be a +1 after the MPI_COMM_WORLD
         mpi_worlds[new_idx].comm=nextWorld;
-	if (mpi_nworlds<=new_idx) mpi_nworlds=new_idx+1;
+	if (_mpi_nworlds<=new_idx) _mpi_nworlds=new_idx+1;
 	STARTUP_DEBUG("ampiInit> listed MPI_COMM_UNIVERSE "<<new_idx)
     }
 };
@@ -966,21 +966,21 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,ampiCommStruct s,bool forMigration)
 // reduction client data - preparation for checkpointing
 class ckptClientStruct {
 public:
-  char *dname;
+  const char *dname;
   ampiParent *ampiPtr;
-  ckptClientStruct(char *s, ampiParent *a): dname(s), ampiPtr(a) {}
+  ckptClientStruct(const char *s, ampiParent *a): dname(s), ampiPtr(a) {}
 };
 
 static void checkpointClient(void *param,void *msg)
 {
   ckptClientStruct *client = (ckptClientStruct*)param;
-  char *dname = client->dname;
+  const char *dname = client->dname;
   ampiParent *ampiPtr = client->ampiPtr;
   ampiPtr->Checkpoint(strlen(dname), dname);
   delete client;
 }
 
-void ampiParent::startCheckpoint(char* dname){
+void ampiParent::startCheckpoint(const char* dname){
   //if(thisIndex==0) thisProxy[thisIndex].Checkpoint(strlen(dname),dname);
   if (thisIndex==0) {
 	ckptClientStruct *clientData = new ckptClientStruct(dname, this);
@@ -1005,7 +1005,8 @@ void ampiParent::startCheckpoint(char* dname){
   TRACE_BG_ADD_TAG("CHECKPOINT_RESUME");
 #endif
 }
-void ampiParent::Checkpoint(int len, char* dname){
+
+void ampiParent::Checkpoint(int len, const char* dname){
   if (len == 0) {
     // memory checkpoint
     CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
@@ -1122,9 +1123,9 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
   comlibProxy = thisProxy; // Will later be associated with comlib
   
-  seqEntries=parent->numElements;
+  seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     if(thisIndex == 0){
 /*      CkAssert(CkMyPe() == 0);
  *              CkGroupID _myManagerGID = thisProxy.ckGetArrayID();     
@@ -1158,7 +1159,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStr
   //  ComlibAssociateProxy(ciAlltoall, comlibProxy);
 #endif
 
-  seqEntries=parent->numElements;
+  seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
 }
 
@@ -1284,7 +1285,7 @@ void ampi::pup(PUP::er &p)
 
 ampi::~ampi()
 {
-  if (CkInRestarting() || BgOutOfCoreFlag==1) {
+  if (CkInRestarting() || _BgOutOfCoreFlag==1) {
     // in restarting, we need to flush messages
     int tags[3], sts[3];
     tags[0] = tags[1] = tags[2] = CmmWildCard;
@@ -1662,7 +1663,7 @@ const ampiCommStruct &universeComm2CommStruct(MPI_Comm universeNo)
 {
   if (universeNo>MPI_COMM_WORLD) {
     int worldDex=universeNo-MPI_COMM_WORLD-1;
-    if (worldDex>=mpi_nworlds)
+    if (worldDex>=_mpi_nworlds)
       CkAbort("Bad world communicator passed to universeComm2CommStruct");
     return mpi_worlds[worldDex].comm;
   }
@@ -1680,6 +1681,20 @@ void ampi::yield(void){
 
 void ampi::unblock(void){
 	thread->resume();
+}
+
+void ampi::ssend_ack(int sreq_idx){
+	if (sreq_idx == 1)
+	  thread->resume();           // MPI_Ssend
+	else {
+	  sreq_idx -= 2;              // start from 2
+	  AmpiRequestList *reqs = &(parent->ampiReqs);
+	  SReq *sreq = (SReq *)(*reqs)[sreq_idx];
+	  sreq->statusIreq = true;
+	  if (resumeOnRecv) {
+	     thread->resume();
+	  }
+	}
 }
 
 void
@@ -1715,9 +1730,9 @@ MSG_ORDER_DEBUG(
   }
   
     // msg may be free'ed from calling inorder()
-  if (sync==1) {         // send an ack to sender
+  if (sync>0) {         // send an ack to sender
     CProxy_ampi pa(thisArrayID);
-    pa[srcIdx].unblock();
+    pa[srcIdx].ssend_ack(sync);
   }
 
   if(resumeOnRecv){
@@ -1813,7 +1828,7 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
    TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND", NULL, 0, 1);
 #endif
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   MPI_Comm disComm = myComm.getComm();
   ampi *dis = getAmpiInstance(disComm);
   CpvAccess(_currentObj) = dis;
@@ -1826,7 +1841,7 @@ ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MP
    TRACE_BG_AMPI_BREAK(thread->getThread(), "AMPI_SEND_END", NULL, 0, 1);
 #endif
 
-  if (sync) {
+  if (sync == 1) {
     // waiting for receiver side
     resumeOnRecv = false;            // so no one else awakes it
     block();
@@ -1860,10 +1875,12 @@ ampi::delesend(int t, int sRank, const void* buf, int count, int type,  int rank
 
   arrproxy[destIdx].generic(makeAmpiMsg(destIdx,t,sRank,buf,count,type,destcomm,sync));
 
-#ifndef CMK_OPTIMIZE
+#if 0
+#if ! CMK_TRACE_DISABLED
   int size=0;
   MPI_Type_size(type,&size);
   _LOG_E_AMPI_MSG_SEND(t,destIdx,count,size)
+#endif
 #endif
 }
 
@@ -1932,7 +1949,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 
   resumeOnRecv=true;
   ampi *dis = getAmpiInstance(disComm);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  dis->yield();
 //  processRemoteMlogMessages();
 #endif
@@ -1948,7 +1965,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     dis = getAmpiInstance(disComm);
   }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         CpvAccess(_currentObj) = dis;
         MSG_ORDER_DEBUG( printf("[%d] AMPI thread rescheduled  to Index %d buf %p src %d\n",CkMyPe(),dis->thisIndex,buf,s); )
 #endif
@@ -2055,7 +2072,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
     ciBcast.beginIteration();
     comlibProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
 #else
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CpvAccess(_currentObj) = this;
 #endif
     thisProxy.generic(makeAmpiMsg(-1,MPI_BCAST_TAG,0, buf,count,type, MPI_BCAST_COMM));
@@ -2169,6 +2186,11 @@ void ATAReq::print(){ //not complete for myreqs
     CmiPrintf("In ATAReq: elmcount=%d, idx=%d\n", elmcount, idx);
 } 
 
+void SReq::print(){
+    AmpiRequest::print();
+    CmiPrintf("In SReq: this=%p, status=%d\n", this, statusIreq);
+}
+
 void AmpiRequestList::pup(PUP::er &p) { 
 	if(!CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
 		return;
@@ -2266,7 +2288,7 @@ CDECL void AMPI_Migrate(void)
 #endif
   TCHARM_Migrate();
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     ampi *currentAmpi = getAmpiInstance(MPI_COMM_WORLD);
     CpvAccess(_currentObj) = currentAmpi;
 #endif
@@ -2505,7 +2527,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  ptr->yield();
 //  //  processRemoteMlogMessages();
 #endif
@@ -2533,6 +2555,41 @@ int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
     ptr->send(tag, ptr->getRank(comm), msg, count, type, dest, comm, 1);
 #if AMPI_COUNTER
   getAmpiParent()->counters.send++;
+#endif
+
+  return 0;
+}
+
+CDECL
+int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
+              int tag, MPI_Comm comm, MPI_Request *request)
+{
+  AMPIAPI("AMPI_Issend");
+
+#ifdef AMPIMSGLOG
+  ampiParent* pptr = getAmpiParent();
+  if(msgLogRead){
+    PUParray(*(pptr->fromPUPer), (char *)request, sizeof(MPI_Request));
+    return 0;
+  }
+#endif
+
+  USER_CALL_DEBUG("AMPI_Issend("<<type<<","<<dest<<","<<tag<<","<<comm<<")");
+  ampi *ptr = getAmpiInstance(comm);
+  AmpiRequestList* reqs = getReqs();
+  SReq *newreq = new SReq(comm);
+  *request = reqs->insert(newreq);
+    // 1:  blocking now  - used by MPI_Ssend
+    // >=2:  the index of the requests - used by MPI_Issend
+  ptr->send(tag, ptr->getRank(comm), buf, count, type, dest, comm, *request+2);
+#if AMPI_COUNTER
+  getAmpiParent()->counters.isend++;
+#endif
+
+#ifdef AMPIMSGLOG
+  if(msgLogWrite && pptr->thisIndex == msgLogRank){
+    PUParray(*(pptr->toPUPer), (char *)request, sizeof(MPI_Request));
+  }
 #endif
 
   return 0;
@@ -2672,7 +2729,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
     PUParray(*(pptr->toPUPer), (char *)buf, (pptr->pupBytes));
   }
 #endif
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 //  ptr->yield();
 //  //  processRemoteMlogMessages();
 #endif
@@ -3142,7 +3199,7 @@ int IReq::wait(MPI_Status *sts){
 		ptr->block();
 			
 		//BIGSIM_OOC DEBUGGING
-		//CmiPrintf("After blocking: %dth time: %d: in Ireq::wait\n", ooccnt, ampiIndex);
+		//CmiPrintf("[%d] After blocking: in Ireq::wait\n", ptr->thisIndex);
 		//CmiPrintf("IReq's this pointer: %p\n", this);
 		//print();
 
@@ -3150,7 +3207,7 @@ int IReq::wait(MPI_Status *sts){
 		//Because of the out-of-core emulation, this pointer is changed after in-out
 		//memory operation. So we need to return from this function and do the while loop
 		//in the outer function call.	
-		if(BgInOutOfCoreMode)
+		if(_BgInOutOfCoreMode)
 		    return -1;
 	    #endif	
 	}   // end of while
@@ -3194,6 +3251,17 @@ int ATAReq::wait(MPI_Status *sts){
 	return 0;
 }
 
+int SReq::wait(MPI_Status *sts){
+  	ampi *ptr = getAmpiInstance(comm);
+	while (statusIreq == false) {
+          ptr->resumeOnRecv = true;
+	  ptr->block();
+	  ptr = getAmpiInstance(comm);
+	  ptr->resumeOnRecv = false;
+	}
+	return 0;
+}
+
 CDECL
 int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
 {
@@ -3224,7 +3292,7 @@ int AMPI_Wait(MPI_Request *request, MPI_Status *sts)
   do{
     AmpiRequest *waitReq = (*reqs)[*request];
     waitResult = waitReq->wait(sts);
-    if(BgInOutOfCoreMode){
+    if(_BgInOutOfCoreMode){
 	reqs = getReqs();
     }
   }while(waitResult==-1);
@@ -3290,7 +3358,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
   for(i=0;i<reqvec->size();i++){
     for(j=0;j<((*reqvec)[i]).size();j++){
-      //CkPrintf("in loop [%d, %d]\n", i, j);
+      //CkPrintf("[%d] in loop [%d, %d]\n", pptr->thisIndex,i, j);
       if(request[((*reqvec)[i])[j]] == MPI_REQUEST_NULL){
         stsempty(sts[((*reqvec)[i])[j]]);
         continue;
@@ -3301,7 +3369,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
       do{	
 	AmpiRequest *waitReq = ((*reqs)[request[((*reqvec)[i])[j]]]);
 	waitResult = waitReq->wait(&sts[((*reqvec)[i])[j]]);
-	if(BgInOutOfCoreMode){
+	if(_BgInOutOfCoreMode){
 	    reqs = getReqs();
 	    reqvec = vecIndex(count, request);
 	}
@@ -3317,13 +3385,13 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
     
 #if 1
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
             //for fault evacuation
       if(oldPe != CkMyPe()){
 #endif
 			reqs = getReqs();
 			reqvec  = vecIndex(count,request);
-#ifndef _FAULT_MLOG_
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
             }
 #endif
 #endif
@@ -3434,12 +3502,27 @@ CmiBool IReq::test(MPI_Status *sts){
 	return getAmpiInstance(comm)->iprobe(tag, src, comm, (int*)sts);
 */
 }
+
+CmiBool SReq::test(MPI_Status *sts){
+        if (statusIreq == true) {
+          return true;
+        }
+        else {
+          getAmpiInstance(comm)->yield();
+          return false;
+        }
+}
+
 void IReq::complete(MPI_Status *sts){
 	wait(sts);
 /*
 	if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
 		CkAbort("AMPI> Error in non-blocking request complete");
 */
+}
+
+void SReq::complete(MPI_Status *sts){
+	wait(sts);
 }
 
 void IReq::receive(ampi *ptr, AmpiMsg *msg)
@@ -5343,33 +5426,50 @@ int AMPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords) {
   return 0;
 }
 
+// Offset coords[direction] by displacement, and set the rank that
+// results
+static void cart_clamp_coord(MPI_Comm comm, const CkVec<int> &dims,
+			     const CkVec<int> &periodicity, int *coords,
+			     int direction, int displacement, int *rank_out)
+{
+  int base_coord = coords[direction];
+  coords[direction] += displacement;
+
+  if (periodicity[direction] == 1) {
+      while (coords[direction] < 0)
+	coords[direction] += dims[direction];
+      while (coords[direction] >= dims[direction])
+	coords[direction] -= dims[direction];
+  }
+
+  if (coords[direction]<0 || coords[direction]>= dims[direction])
+    *rank_out = MPI_PROC_NULL;
+  else
+    AMPI_Cart_rank(comm, coords, rank_out);
+
+  coords[direction] = base_coord;
+}
+
 CDECL
-int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp, int *rank_source, 
-		   int *rank_dest) {
+int AMPI_Cart_shift(MPI_Comm comm, int direction, int disp,
+                    int *rank_source, int *rank_dest) {
   AMPIAPI("AMPI_Cart_shift");
   
   ampiCommStruct &c = getAmpiParent()->getCart(comm);
   int ndims = c.getndims();
+  if ((direction < 0) || (direction >= ndims))
+    CkAbort("MPI_Cart_shift: direction not within dimensions range");
+
   const CkVec<int> &dims = c.getdims();
   const CkVec<int> &periods = c.getperiods();
   int *coords = new int[ndims];
 
-  AMPI_Comm_rank(comm, rank_source);
-  AMPI_Cart_coords(comm, *rank_source, ndims, coords);
+  int mype;
+  AMPI_Comm_rank(comm, &mype);
+  AMPI_Cart_coords(comm, mype, ndims, coords);
 
-  if ((direction < 0) || (direction >= ndims))
-    CkAbort("MPI_Cart_shift: direction not within dimensions range");
-
-  coords[direction] += disp;
-  if (coords[direction] < 0)
-    if (periods[direction] == 1) {
-      coords[direction] += dims[direction];
-      AMPI_Cart_rank(comm, coords, rank_dest);
-    }
-    else
-      *rank_dest = MPI_PROC_NULL;
-  else
-    AMPI_Cart_rank(comm, coords, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction,  disp, rank_dest);
+  cart_clamp_coord(comm, dims, periods, coords, direction, -disp, rank_source);
 
   delete [] coords;
   return 0;

@@ -192,6 +192,8 @@ CthThreadToken *CthGetToken(CthThread t){
 	return B(t)->token;
 }
 
+CpvStaticDeclare(int, Cth_serialNo);
+
 /*********************** Stack Aliasing *********************
   Stack aliasing: instead of consuming virtual address space
   with isomalloc, map all stacks to the same virtual addresses
@@ -378,11 +380,21 @@ void CthRegistered(int maxOffset) {
 /*********** Creation and Deletion **********/
 CthCpvStatic(int, _defaultStackSize);
 
+void CthSetSerialNo(CthThread t, int no)
+{
+  B(t)->token->serialNo = no;
+}
+
 static void CthThreadBaseInit(CthThreadBase *th)
 {
   static int serialno = 1;
   th->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
   th->token->thread = S(th);
+#if CMK_BLUEGENE_CHARM
+  th->token->serialNo = -1;
+#else
+  th->token->serialNo = CpvAccess(Cth_serialNo)++;
+#endif
   th->scheduled = 0;
 
   th->awakenfn = 0;
@@ -483,6 +495,9 @@ static void CthBaseInit(char **argv)
   
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthDatasize)=0;
+  
+  CpvInitialize(int, Cth_serialNo);
+  CpvAccess(Cth_serialNo) = 1;
 }
 
 int CthImplemented() { return 1; } 
@@ -504,7 +519,7 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	 * When unpacking, reset the thread pointer in token to this thread.
 	 */
 	  
-        if(BgOutOfCoreFlag!=0){
+        if(_BgOutOfCoreFlag!=0){
 	    pup_bytes(p, &t->token, sizeof(void *));
 	    if(!pup_isUnpacking(p)){
 		t->token->thread = NULL;
@@ -512,9 +527,10 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	    pup_int(p, &t->scheduled);
 	}
 	if(pup_isUnpacking(p)){
-		if(BgOutOfCoreFlag==0){
+		if(_BgOutOfCoreFlag==0){
 		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    t->token->thread = S(t);
+		    t->token->serialNo = CpvAccess(Cth_serialNo)++;
 		    /*For normal runs where this pup is needed,
 		    set scheduled to 0 in the unpacking period since the thread has
 		    not been scheduled */
@@ -530,11 +546,12 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 			t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
 		    }
 		    t->token->thread = S(t);
+            t->token->serialNo = CpvAccess(Cth_serialNo)++;
 		}
 	}
 	
 	/*BIGSIM_OOC DEBUGGING */
-	/*if(BgOutOfCoreFlag!=0){
+	/*if(_BgOutOfCoreFlag!=0){
 	   if(pup_isUnpacking(p)){
 		CmiPrintf("Unpacking: ");
 	    }else{
@@ -665,7 +682,7 @@ void CthSuspend(void)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
@@ -684,7 +701,7 @@ void CthAwaken(CthThread th)
     return;
   } */
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -705,7 +722,7 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);

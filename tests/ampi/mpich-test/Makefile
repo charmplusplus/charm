@@ -3,8 +3,8 @@ ALL: default
 ##### User configurable options #####
 
 MPIR_HOME   = 
-CC          = ../../../bin/mpiCC
-CLINKER     = ../../../bin/mpiCC
+CC          = ../../../../bin/ampiCC
+CLINKER     = ../../../../bin/ampiCC
 CCC         = 
 CCLINKER    = $(CCC)
 F77         = :

@@ -382,10 +382,12 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}
 inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
+    /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
     struct mallinfo mi = mallinfo();
-    CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;
-    CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;
-    memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;
+    CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
+    CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
+    memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
+    /* printf("%lld %lld %lld %lld %lld\n", mi.uordblks, mi.usmblks,mi.hblkhd,mi.arena,mi.keepcost); */
     if(memtotal2 > memtotal) memtotal = memtotal2;
     return memtotal;
 }
@@ -743,6 +745,7 @@ void cpd_memory_leak(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
 void check_memory_leaks(LeakSearchInfo* i) { }
 size_t  cpd_memory_getLength(void *lenParam) { return 0; }
 void cpd_memory_get(void *itemParam,pup_er p,CpdListItemsRequest *req) { }
+void CpdMemoryMarkClean(char *msg) { }
 /* routine used by CthMemory{Protect,Unprotect} to specify that some region of
    memory has been protected */
 void setProtection(char *mem, char *ptr, int len, int flag) { }

@@ -17,6 +17,9 @@
 #define __CP_EFFECTS_H__
 
 namespace ControlPoint {
+
+  enum DIRECTION {EFF_DEC, EFF_INC};
+
   class ControlPointAssociation {
   public:
     std::set<int> EntryID;
@@ -53,8 +56,11 @@ namespace ControlPoint {
   ControlPointAssociatedEntry assocWithEntry(const int entry);
   ControlPointAssociatedArray assocWithArray(const CProxy_ArrayBase &array);
 
-  typedef std::map<std::string,std:: map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > > cp_effect_map;
-  typedef std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
+ //                 effect               cp                 direction           associations
+  typedef std::map<std::string,std::map<std::string, std::pair<int, std::vector<ControlPoint::ControlPointAssociation> > > > cp_effect_map;
+
+ //                   cp                          direction           associations
+ //  typedef std::map<std::string, std::vector<std::pair<int, ControlPoint::ControlPointAssociation> > > cp_name_map;
 
 
 namespace EffectIncrease {
@@ -62,8 +68,8 @@ namespace EffectIncrease {
 	void Priority(std::string name);
 	void MemoryConsumption(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void MemoryConsumption(std::string name);
-	void Granularity(std::string name, const ControlPoint::ControlPointAssociation &a);
-	void Granularity(std::string name);
+	void GrainSize(std::string name, const ControlPoint::ControlPointAssociation &a);
+	void GrainSize(std::string name);
 	void ComputeDurations(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void ComputeDurations(std::string name);
 	void FlopRate(std::string name, const ControlPoint::ControlPointAssociation &a);
@@ -94,8 +100,8 @@ namespace EffectDecrease {
 	void Priority(std::string name);
 	void MemoryConsumption(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void MemoryConsumption(std::string name);
-	void Granularity(std::string name, const ControlPoint::ControlPointAssociation &a);
-	void Granularity(std::string name);
+	void GrainSize(std::string name, const ControlPoint::ControlPointAssociation &a);
+	void GrainSize(std::string name);
 	void ComputeDurations(std::string name, const ControlPoint::ControlPointAssociation &a);
 	void ComputeDurations(std::string name);
 	void FlopRate(std::string name, const ControlPoint::ControlPointAssociation &a);
@@ -125,6 +131,6 @@ namespace EffectDecrease {
 } //namespace ControlPoint
 
 CkpvExtern(ControlPoint::cp_effect_map, cp_effects);
-CkpvExtern(ControlPoint::cp_name_map, cp_names);
+//CkpvExtern(ControlPoint::cp_name_map, cp_names);
 
 #endif

@@ -20,7 +20,7 @@ Counter.def.h Counter.decl.h : counter.ci
 clean:
 	rm -f conv-host *.o charmrun
 	rm -f *.def.h *.decl.h
-	rm -f pgm pgm.*.log pgm.sts
+	rm -f pgm pgm.*.log pgm.sts charmrun.exe pgm.exe pgm.pdb pgm.ilk
 	rm -f gmon.out #*#
 	rm -f core *~
 	rm -f TAGS *.headers

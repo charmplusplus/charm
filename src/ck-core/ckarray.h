@@ -39,7 +39,7 @@ CpvExtern (int ,serializer);
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
-extern CmiBool isAnytimeMigration;
+extern CmiBool _isAnytimeMigration;
 
 /**
 \addtogroup CkArray
@@ -449,12 +449,12 @@ public:
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
       } else _sid = NULL;
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, const CkArrayIndexMax **elems, const int *nElems)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, const CkArrayIndexMax **elems, const int *nElems,CK_DELCTOR_PARAM)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
@@ -533,15 +533,12 @@ class ArrayElement : public CkMigratable
 {
   friend class CkArray;
   friend class CkArrayListener;
+  int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
 public:
   ArrayElement(void);
   ArrayElement(CkMigrateMessage *m);
   virtual ~ArrayElement();
-
-  int numElements; /// Initial number of array elements (DEPRICATED)
-  // On the previous line, someone wrote "deprecated", but nevertheless it is still
-  // used on TempoArray (tempo.C), ampi.C, irecv (receiver.h), as well as many tests and examples!
 
 /// Pack/unpack routine (called before and after migration)
   virtual void pup(PUP::er &p);
@@ -562,8 +559,9 @@ public:
 
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 
-  const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
+  inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
+  inline int ckGetArraySize(void) const { return numInitialElements; }
 protected:
   CkArray *thisArray;//My source array
   CkArrayID thisArrayID;//My source array's ID
@@ -609,7 +607,7 @@ class ArrayElementT : public ArrayElement
 {
 public:
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         mlogData->objID.data.array.idx.asMax()=thisIndexMax;
 #endif
 }
@@ -844,7 +842,7 @@ private:
   CkArrayBroadcaster *broadcaster; //Read-only copy of default broadcaster
 public:
   void flushStates() { CkReductionMgr::flushStates(); CK_ARRAYLISTENER_LOOP(listeners, l->flushState()); }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	// the mlogft only support 1D arrays, then returning the number of elements in the first dimension
 	virtual int numberReductionMessages(){CkAssert(CkMyPe() == 0);return numInitial.data()[0];}
 	void broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index);

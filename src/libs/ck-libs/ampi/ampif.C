@@ -9,6 +9,7 @@ FDECL {
 #define mpi_bsend FTN_NAME( MPI_BSEND , mpi_bsend )
 #define mpi_rsend FTN_NAME( MPI_RSEND , mpi_rsend )
 #define mpi_ssend FTN_NAME( MPI_SSEND , mpi_ssend )
+#define mpi_issend FTN_NAME( MPI_ISSEND , mpi_issend )
 #define mpi_irecv FTN_NAME( MPI_IRECV , mpi_irecv )
 #define mpi_wait FTN_NAME( MPI_WAIT , mpi_wait )
 #define mpi_test FTN_NAME( MPI_TEST , mpi_test )
@@ -216,7 +217,7 @@ inline MPI_Op & GET_MPI_OP(int idx)      { MPI_Op *tab=CtvAccess(mpi_ops); retur
 void mpi_init_universe(int *unicomm)
 {
   AMPIAPI("mpi_init_universe");
-  for(int i=0;i<mpi_nworlds; i++)
+  for(int i=0;i<_mpi_nworlds; i++)
   {
     unicomm[i] = MPI_COMM_UNIVERSE[i];
   }
@@ -280,6 +281,12 @@ void mpi_ssend(void *msg, int *count, int *type, int *dest,
   int *tag, int *comm, int *ierr)
 {
   *ierr = AMPI_Ssend(msg, *count, *type, *dest, *tag, *comm);
+}
+
+void mpi_issend(void *buf, int *count, int *datatype, int *dest,
+   int *tag, int *comm, int *request, int *ierr)
+{
+  *ierr = AMPI_Issend(buf, *count, *datatype, *dest, *tag, *comm, (MPI_Request *)request);
 }
 
 void mpi_probe(int *src, int *tag, int *comm, int *status, int *ierr)

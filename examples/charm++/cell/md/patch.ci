@@ -5,21 +5,21 @@ module patch {
   accelblock {
 
     void accumForce(int numParticles,
-                    float* forceSumX, float* forceSumY, float* forceSumZ,
-                    float* forceX, float* forceY, float* forceZ
+                    MD_FLOAT* forceSumX, MD_FLOAT* forceSumY, MD_FLOAT* forceSumZ,
+                    MD_FLOAT* forceX, MD_FLOAT* forceY, MD_FLOAT* forceZ
                    ) {
-      register vecf* fsx = (vecf*)forceSumX;
-      register vecf* fsy = (vecf*)forceSumY;
-      register vecf* fsz = (vecf*)forceSumZ;
-      register vecf* fx = (vecf*)forceX;
-      register vecf* fy = (vecf*)forceY;
-      register vecf* fz = (vecf*)forceZ;
-      register const int numParticles_vec = numParticles / vecf_numElems;
+      register MD_VEC* fsx = (MD_VEC*)forceSumX;
+      register MD_VEC* fsy = (MD_VEC*)forceSumY;
+      register MD_VEC* fsz = (MD_VEC*)forceSumZ;
+      register MD_VEC* fx = (MD_VEC*)forceX;
+      register MD_VEC* fy = (MD_VEC*)forceY;
+      register MD_VEC* fz = (MD_VEC*)forceZ;
+      register const int numParticles_vec = numParticles / myvec_numElems;
       register int i;
       for (i = 0; i < numParticles_vec; i++) {
-        fsx[i] = vaddf(fsx[i], fx[i]);
-        fsy[i] = vaddf(fsy[i], fy[i]);
-        fsz[i] = vaddf(fsz[i], fz[i]);
+        fsx[i] = vadd_MDF(fsx[i], fx[i]);
+        fsy[i] = vadd_MDF(fsy[i], fy[i]);
+        fsz[i] = vadd_MDF(fsz[i], fz[i]);
       }
     }
   };
@@ -31,16 +31,16 @@ module patch {
     entry void init(int numParticles);
 
     entry void patchData(int numParticles,
-                         float particleX[numParticles],
-                         float particleY[numParticles],
-                         float particleZ[numParticles],
-                         float particleQ[numParticles]
+                         MD_FLOAT particleX[numParticles],
+                         MD_FLOAT particleY[numParticles],
+                         MD_FLOAT particleZ[numParticles],
+                         MD_FLOAT particleQ[numParticles]
                         );
 
     entry void forceCheckIn(int numParticles,
-                            float forceX[numParticles],
-                            float forceY[numParticles],
-                            float forceZ[numParticles]
+                            MD_FLOAT forceX[numParticles],
+                            MD_FLOAT forceY[numParticles],
+                            MD_FLOAT forceZ[numParticles]
                            );
   };
 
@@ -55,14 +55,14 @@ module patch {
     entry void startIterations(int numIters);
 
     entry void forceCheckIn(int numParticles,
-                            float forceX[numParticles],
-                            float forceY[numParticles],
-                            float forceZ[numParticles]
+                            MD_FLOAT forceX[numParticles],
+                            MD_FLOAT forceY[numParticles],
+                            MD_FLOAT forceZ[numParticles]
                            );
     entry void forceCheckIn(int numParticles,
-                            float forceX[numParticles],
-                            float forceY[numParticles],
-                            float forceZ[numParticles],
+                            MD_FLOAT forceX[numParticles],
+                            MD_FLOAT forceY[numParticles],
+                            MD_FLOAT forceZ[numParticles],
                             int numForceCheckIns
                            );
 
@@ -70,16 +70,16 @@ module patch {
                                     readonly : int thisIndex_x <impl_obj->thisIndex.x>,
                                     readonly : int thisIndex_y <impl_obj->thisIndex.y>,
                                     readonly : int thisIndex_z <impl_obj->thisIndex.z>,
-                                   readwrite : float p_x[numParticles] <impl_obj->particleX>,
-                                   readwrite : float p_y[numParticles] <impl_obj->particleY>,
-                                   readwrite : float p_z[numParticles] <impl_obj->particleZ>,
-                                    readonly : float p_m[numParticles] <impl_obj->particleM>,
-                                    readonly : float f_x[numParticles] <impl_obj->forceSumX>,
-                                    readonly : float f_y[numParticles] <impl_obj->forceSumY>,
-                                    readonly : float f_z[numParticles] <impl_obj->forceSumZ>,
-                                   readwrite : float v_x[numParticles] <impl_obj->velocityX>,
-                                   readwrite : float v_y[numParticles] <impl_obj->velocityY>,
-                                   readwrite : float v_z[numParticles] <impl_obj->velocityZ>,
+                                   readwrite : MD_FLOAT p_x[numParticles] <impl_obj->particleX>,
+                                   readwrite : MD_FLOAT p_y[numParticles] <impl_obj->particleY>,
+                                   readwrite : MD_FLOAT p_z[numParticles] <impl_obj->particleZ>,
+                                    readonly : MD_FLOAT p_m[numParticles] <impl_obj->particleM>,
+                                    readonly : MD_FLOAT f_x[numParticles] <impl_obj->forceSumX>,
+                                    readonly : MD_FLOAT f_y[numParticles] <impl_obj->forceSumY>,
+                                    readonly : MD_FLOAT f_z[numParticles] <impl_obj->forceSumZ>,
+                                   readwrite : MD_FLOAT v_x[numParticles] <impl_obj->velocityX>,
+                                   readwrite : MD_FLOAT v_y[numParticles] <impl_obj->velocityY>,
+                                   readwrite : MD_FLOAT v_z[numParticles] <impl_obj->velocityZ>,
                                    writeonly : unsigned int localFlopCount <impl_obj->localFlopCount>
                                   ] {
 
@@ -88,28 +88,28 @@ module patch {
         localFlopCount = 0;
       #endif
 
-      register vecf* p_x_vec = (vecf*)p_x;
-      register vecf* p_y_vec = (vecf*)p_y;
-      register vecf* p_z_vec = (vecf*)p_z;
-      register vecf* p_m_vec = (vecf*)p_m;
-      register vecf* f_x_vec = (vecf*)f_x;
-      register vecf* f_y_vec = (vecf*)f_y;
-      register vecf* f_z_vec = (vecf*)f_z;
-      register vecf* v_x_vec = (vecf*)v_x;
-      register vecf* v_y_vec = (vecf*)v_y;
-      register vecf* v_z_vec = (vecf*)v_z;
+      register MD_VEC* p_x_vec = (MD_VEC*)p_x;
+      register MD_VEC* p_y_vec = (MD_VEC*)p_y;
+      register MD_VEC* p_z_vec = (MD_VEC*)p_z;
+      register MD_VEC* p_m_vec = (MD_VEC*)p_m;
+      register MD_VEC* f_x_vec = (MD_VEC*)f_x;
+      register MD_VEC* f_y_vec = (MD_VEC*)f_y;
+      register MD_VEC* f_z_vec = (MD_VEC*)f_z;
+      register MD_VEC* v_x_vec = (MD_VEC*)v_x;
+      register MD_VEC* v_y_vec = (MD_VEC*)v_y;
+      register MD_VEC* v_z_vec = (MD_VEC*)v_z;
       register int i;
-      register const int numParticles_vec = numParticles / vecf_numElems;
+      register const int numParticles_vec = numParticles / myvec_numElems;
 
-      vecf delta_time_vec = vspreadf(TIME_PER_STEP);
+      MD_VEC delta_time_vec = vspread_MDF(TIME_PER_STEP);
 
       // Add the acceleration to the velocity and add the update velocity to the position
       for (i = 0; i < numParticles_vec; i++) {
 
         // Update the velocity : v_new = v_old + (F/m)dt
-        vecf new_v_x_vec = v_x_vec[i] + (delta_time_vec * (f_x_vec[i] / p_m_vec[i]));
-        vecf new_v_y_vec = v_y_vec[i] + (delta_time_vec * (f_y_vec[i] / p_m_vec[i]));
-        vecf new_v_z_vec = v_z_vec[i] + (delta_time_vec * (f_z_vec[i] / p_m_vec[i]));
+        MD_VEC new_v_x_vec = v_x_vec[i] + (delta_time_vec * (f_x_vec[i] / p_m_vec[i]));
+        MD_VEC new_v_y_vec = v_y_vec[i] + (delta_time_vec * (f_y_vec[i] / p_m_vec[i]));
+        MD_VEC new_v_z_vec = v_z_vec[i] + (delta_time_vec * (f_z_vec[i] / p_m_vec[i]));
         v_x_vec[i] = new_v_x_vec;
         v_y_vec[i] = new_v_y_vec;
         v_z_vec[i] = new_v_z_vec;

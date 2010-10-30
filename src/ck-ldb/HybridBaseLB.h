@@ -13,6 +13,8 @@
 #ifndef HYBRIDBASELB_H
 #define HYBRIDBASELB_H
 
+#include <map>
+
 #include "charm++.h"
 #include "BaseLB.h"
 #include "CentralLB.h"
@@ -29,15 +31,70 @@ inline int mymin(int x, int y) { return x<y?x:y; }
 
 // base class
 class MyHierarchyTree {
+protected:
+  int *span;
+  int nLevels;
+  const char *myname;
 public:
-  MyHierarchyTree() {}
+  MyHierarchyTree(): span(NULL), myname(NULL) {}
   virtual ~MyHierarchyTree() {}
-  virtual int numLevels() = 0;
+  const char* name() const { return myname; }
+  virtual const int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
   virtual void getChildren(int mype, int level, int *children, int &count) = 0;
-  virtual int numNodes(int level) = 0;
+  virtual int numNodes(int level) {
+    CmiAssert(level>=0 && level<nLevels);
+    int count=1;
+    for (int i=0; i<level; i++) count *= span[i];
+    CmiAssert(CkNumPes()%count ==0);
+    return CkNumPes()/count;
+  }
+};
+
+// a simple 2 layer tree, fat at level 1
+//        0
+//     ---+---
+//     0  1  2
+class TwoLevelTree: public MyHierarchyTree {
+private:
+  int toproot;
+public:
+  TwoLevelTree() {
+    myname = "TwoLevelTree";
+    span = new int[1];
+    nLevels = 2;
+    span[0] = CkNumPes();
+    toproot = 0;
+  }
+  virtual ~TwoLevelTree() { delete [] span; }
+  virtual int parent(int mype, int level) {
+    if (level == 0) return toproot;
+    if (level == 1) return -1;
+    CmiAssert(0);
+    return -1;
+  }
+  virtual int isroot(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1 && mype == toproot) return 1;
+    return 0;
+  }
+  virtual int numChildren(int mype, int level) {
+    if (level == 0) return 0;
+    if (level == 1) return CkNumPes();
+    CmiAssert(0);
+    return 0;
+  }
+  virtual void getChildren(int mype, int level, int *children, int &count) {
+    CmiAssert(isroot(mype, level));
+    count = numChildren(mype, level);
+    if (count == 0) { return; }
+    if (level == 1) {
+      for (int i=0; i<count; i++) 
+        children[i] = i;
+    }
+  }
 };
 
 // a simple 3 layer tree, fat at level 1
@@ -48,20 +105,25 @@ public:
 //  0 1 2 3
 class ThreeLevelTree: public MyHierarchyTree {
 private:
-  int span[2];
   int toproot;
-  int nLevels;
 public:
   ThreeLevelTree() {
+    myname = "ThreeLevelTree";
+    span = new int[2];
     nLevels = 3;
-    span[0] = CkNumPes()/8;
-    if (span[0] < 2) span[0] = CkNumPes()/4;
+    int groupsize = 512;
+    while (groupsize && CkNumPes() / groupsize < 2) {
+      groupsize /= 2;
+    }
+    span[0] = groupsize;
     CmiAssert(span[0]>1);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
-    toproot = 1;
+    if (CmiNumPhysicalNodes() > 1)
+      toproot = CmiGetFirstPeOnPhysicalNode(1);
+    else
+      toproot = 1;
   }
-  virtual ~ThreeLevelTree() {}
-  virtual int numLevels() { return nLevels; }
+  virtual ~ThreeLevelTree() { delete [] span; }
   virtual int parent(int mype, int level) {
     if (level == 0) return mype/span[0]*span[0];
     if (level == 1) return toproot;
@@ -95,13 +157,6 @@ public:
         children[i] = i*span[0];
     }
   }
-  virtual int numNodes(int level) {
-    CmiAssert(level>=0 && level<nLevels);
-    int count=1;
-    for (int i=0; i<level; i++) count *= span[i];
-    CmiAssert(CkNumPes()%count ==0);
-    return CkNumPes()/count;
-  }
 };
 
 // a simple 4 layer tree, fat at level 1
@@ -114,11 +169,11 @@ public:
 // 0 1 2 3
 class FourLevelTree: public MyHierarchyTree {
 private:
-  int span[3];
   int toproot;
-  int nLevels;
 public:
   FourLevelTree() {
+    myname = "FourLevelTree";
+    span = new int[3];
     nLevels = 4;
 #if 1
     span[0] = 64;
@@ -132,8 +187,7 @@ public:
     CmiAssert(CkNumPes() == span[0]*span[1]*span[2]);
     toproot = 2;
   }
-  virtual ~FourLevelTree() {}
-  virtual int numLevels() { return nLevels; }
+  virtual ~FourLevelTree() { delete [] span; }
   virtual int parent(int mype, int level) {
     if (level == 0) return mype/span[0]*span[0];
     if (level == 1) return mype/span[0]/span[1]*span[0]*span[1]+1;
@@ -174,13 +228,6 @@ public:
         children[i] = i*span[0]*span[1]+1;
     }
   }
-  virtual int numNodes(int level) {
-    CmiAssert(level>=0 && level<nLevels);
-    int count=1;
-    for (int i=0; i<level; i++) count *= span[i];
-    CmiAssert(CkNumPes()%count ==0);
-    return CkNumPes()/count;
-  }
 };
 
 class HybridBaseLB : public BaseLB
@@ -206,12 +253,13 @@ public:
   void Migrated(LDObjHandle h, int waitBarrier);
 
   void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
+  void ObjsMigrated(LDObjData *data, int m, LDCommData *cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete
   void NotifyObjectMigrationDone(int level);	
   virtual void Loadbalancing(int level);	// start load balancing
-  void StartCollectInfo();
+  void StartCollectInfo(DummyMsg *m);
   void CollectInfo(Location *loc, int n, int fromlevel);
   void PropagateInfo(Location *loc, int n, int fromlevel);
 
@@ -230,6 +278,8 @@ public:
 private:
   CProxy_HybridBaseLB  thisProxy;
   int              foundNeighbors;
+  CmiGroup            group1;              // level 1 multicast group
+  int                 group1_created;
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
@@ -237,6 +287,9 @@ protected:
   virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
   virtual void work(LDStats* stats,int count);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+
+    // helper function
+  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count);
 
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats,int count);
 
@@ -260,7 +313,8 @@ protected:
     int vector_expected, vector_completed;
     int resumeAfterMigration;
     CkVec<MigrationRecord> outObjs;
-    CkVec<Location> unmatchedObjs;
+    //CkVec<Location> unmatchedObjs;
+    std::map< LDObjKey, int >  unmatchedObjs;
     CkVec<Location> matchedObjs;	 // don't need to be sent up
   public:
     LevelData(): parent(-1), children(NULL), nChildren(0), 
@@ -296,7 +350,7 @@ protected:
       if (statsData) statsData->clear();
       outObjs.free();
       matchedObjs.free();
-      unmatchedObjs.free();
+      unmatchedObjs.clear();
     }
     int useMem() {
       int memused = sizeof(LevelData);
@@ -311,7 +365,7 @@ protected:
 
   int currentLevel;
 
-  enum StatsStrategy { FULL, SHRINK } ;
+  enum StatsStrategy { FULL, SHRINK, SHRINK_NULL} ;
   StatsStrategy statsStrategy;
 
 private:

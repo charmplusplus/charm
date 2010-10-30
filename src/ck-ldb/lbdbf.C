@@ -7,19 +7,16 @@
 #include "charm-api.h"
 
 
-FDECL {
+#define flbturninstrumentoff  FTN_NAME(FLBTURNINSTRUMENTOFF, flbturninstrumentoff)
+#define flbturninstrumenton   FTN_NAME(FLBTURNINSTRUMENTON, flbturninstrumenton)
 
-#define flbturninstrumentoff   FTN_NAME(FLBTURNINSTRUMENTATIONOFF, flbturninstrumentationoff)
-#define flbturninstrumenton    FTN_NAME(FLBTURNINSTRUMENTATIONON, flbturninstrumentationon)
-
-void flbturninstrumenton()
+FDECL void flbturninstrumenton()
 {
   LBTurnInstrumentOn();
 }
 
-void flbturninstrumentoff()
+FDECL void flbturninstrumentoff()
 {
   LBTurnInstrumentOff();
 }
 
-}  // FDECL

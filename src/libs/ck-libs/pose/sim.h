@@ -236,43 +236,13 @@ class sim : public CBase_sim {
   /// Destructor
   virtual ~sim();
   /// Pack/unpack/sizing operator
-  virtual void pup(PUP::er &p) {
-    ArrayElement1D::pup(p); // call parent class pup method
-    // pup simple types
-    p(active); p(myPVTidx); p(myLBidx); p(sync); p(DOs); p(UNDOs);
-    // pup event queue
-    if (p.isUnpacking())
-      eq = new eventQueue();
-    eq->pup(p);
-    // pup cancellations
-    cancels.pup(p);
-    if (p.isUnpacking()) { // reactivate migrated object
-#ifndef CMK_OPTIMIZE
-      localStats = (localStat *)CkLocalBranch(theLocalStats);
-#endif
-#ifndef SEQUENTIAL_POSE
-      localPVT = (PVT *)CkLocalBranch(ThePVT);
-      myPVTidx = localPVT->objRegister(thisIndex, localPVT->getGVT(), sync, this);
-      if(pose_config.lb_on){
-	localLBG = TheLBG.ckLocalBranch();
-	myLBidx = localLBG->objRegister(thisIndex, sync, this);
-      }
-#endif
-      active = 0;
-    }
-    else if (p.isPacking()) { // deactivate migrating object
-      active = -1;
-#ifndef SEQUENTIAL_POSE
-      localPVT->objRemove(myPVTidx);
-#endif
-      if(pose_config.lb_on)
-	localLBG->objRemove(myLBidx);
-    }
-  }
+  virtual void pup(PUP::er &p);
   /// Start a forward execution step on myStrat
   void Step();                 
   /// Start a prioritized forward execution step on myStrat
-  void Step(prioMsg *m);       
+  void Step(prioMsg *m);    
+  /// Start a forward execution step on myStrat after a checkpoint (sequential mode only)
+  void CheckpointStep(eventMsg *m);
   /// Report safe time to PVT branch
   void Status() { 
     localPVT->objUpdateOVT(myPVTidx, myStrat->SafeTime(), objID->OVT()); 
@@ -286,8 +256,11 @@ class sim : public CBase_sim {
   /// Migrate this poser to processor indicated in m
   void Migrate(destMsg *m) { migrateMe(m->destPE); }
   /// Terminate this poser, when everyone is terminated we exit 
-
   void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
+  /// In sequential mode, begin checkpoint after reaching quiescence
+  void SeqBeginCheckpoint();
+  /// In sequential mode, resume after checkpointing or restarting
+  void SeqResumeAfterCheckpoint();
   /// Return this poser's unique index on PVT branch
   int PVTindex() { return myPVTidx; }
   /// Test active flag
@@ -326,6 +299,7 @@ class sim : public CBase_sim {
     va_end(ap);
     myStrat->currentEvent->commitErr = 1;
   }
+  void ResumeFromSync(void);
   /// Dump all data fields
   void dump();
  private:

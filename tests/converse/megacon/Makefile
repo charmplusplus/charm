@@ -84,7 +84,7 @@ clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
 	rm -f pgm
-	rm -f conv-host charmrun
+	rm -f conv-host charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk
 
 test: pgm
 	./charmrun ./pgm +p1 $(TESTOPTS)

@@ -106,7 +106,7 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand48_seed,3);
+    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand_seed); p(prand48_seed,3);
   }
 #ifdef SEQUENTIAL_POSE
   void checkpoint(rep *) { }
@@ -127,8 +127,13 @@ class rep
     prand_seed = rnum+INT_MAX; 
     return prand_seed;
   }
+#if !defined(_WIN32) || defined(__CYGWIN__) 
   inline long int POSE_Linear_rand() { return nrand48(prand48_seed); }
   inline double POSE_Uniform_rand() { return erand48(prand48_seed); }
+#else
+  inline long int POSE_Linear_rand() { return CrnRand(); }
+  inline double POSE_Uniform_rand() { return 1.0*CrnRand()/MAXINT; }
+#endif
 
 };
 

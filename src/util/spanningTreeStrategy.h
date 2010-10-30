@@ -62,7 +62,7 @@ int distance(Iterator first, Iterator last)
  * trees will be based on the best available information (node-awareness, network-topo awareness etc.).
  *
  * The focus remains on distributed logic that generates efficient (for practical purposes) spanning trees and not
- * theoretical MSTs (minimum spanning trees) etc. Hence the intented use is to supply a list of PEs as input and
+ * theoretical MSTs (minimum spanning trees) etc. Hence the intended use is to supply a list of PEs as input and
  * obtain info about the immediate next generation of vertices in the tree and the members of each of their
  * respective sub-trees. As an afterthought, the API includes calls that will generate a complete spanning tree
  * from the input too. However, no guarantees are currently made about the efficiency of this use.
@@ -119,15 +119,29 @@ class SpanningTreeVertex;
 template <typename Iterator,typename ValueType = typename std::iterator_traits<Iterator>::value_type>
 class SpanningTreeStrategy;
 
+//@{
 /// Builds one generation of the spanning tree given a container of vertices with the tree root as the first element in the container
+// Use a default strategy
 template <typename Iterator>
 SpanningTreeVertex* buildSpanningTreeGeneration
-(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2, SpanningTreeStrategy<Iterator> *bldr = 0);
+(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2);
+// Use the strategy provided by the caller
+template <typename Iterator>
+SpanningTreeVertex* buildSpanningTreeGeneration
+(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches, SpanningTreeStrategy<Iterator> *bldr);
+//@}
 
+//@{
 /// Builds the complete spanning tree given a container of vertices with the tree root as the first element in the container
+// Use a default strategy
 template <typename Iterator>
 void buildSpanningTree
-(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2, SpanningTreeStrategy<Iterator> *bldr = 0);
+(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches=2);
+// Use the strategy provided by the caller
+template <typename Iterator>
+void buildSpanningTree
+(const Iterator firstVtx, const Iterator beyondLastVtx, const int maxBranches, SpanningTreeStrategy<Iterator> *bldr);
+//@}
 
 /// Tiny factory method that returns a tree construction strategy that it thinks is best (based on inputs, the machine's network topology info etc)
 template <typename Iterator>
@@ -181,24 +195,37 @@ inline SpanningTreeVertex* buildSpanningTreeGeneration(const Iterator firstVtx,
                                                        SpanningTreeStrategy<Iterator> *bldr
                                                       )
 {
+    CkAssert(NULL != bldr);
+
     /// Validate input. Invalid inputs are not exceptions. They are just no-ops
     if (maxBranches < 1 || firstVtx == beyondLastVtx)
-        return (new SpanningTreeVertex() );
-
-    /// If no strategy is passed in, instantiate one
-    if (bldr == 0)
-        bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
-
-    return bldr->buildNextGen(firstVtx,beyondLastVtx,maxBranches);
+        return new SpanningTreeVertex();
+    else
+	/// Delegate the actual work
+	return bldr->buildNextGen(firstVtx,beyondLastVtx,maxBranches);
 }
 
+
+// Overload to automatically use the default strategy
+template <typename Iterator>
+inline SpanningTreeVertex* buildSpanningTreeGeneration(const Iterator firstVtx,
+                                                       const Iterator beyondLastVtx,
+                                                       const int maxBranches
+                                                      )
+{
+    SpanningTreeStrategy<Iterator> *bldr =
+	getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+    SpanningTreeVertex *result = buildSpanningTreeGeneration(firstVtx, beyondLastVtx, maxBranches, bldr);
+    delete bldr;
+    return result;
+}
 
 
 
 /// Nested namespace to prevent the implementation muck from polluting topo::
 namespace impl {
 
-/// Tag dispatched function that does the actual work of building the spanning complete tree
+/// Tag dispatched function that does the actual work of building the complete spanning tree
 template <typename Iterator>
 void buildSpanningTree(SpanningTreeVertex* dispatchTag,
                        const Iterator firstVtx,
@@ -233,7 +260,7 @@ void buildSpanningTree(SpanningTreeVertex* dispatchTag,
 }
 
 } // end namespace impl
- 
+
 
 
 
@@ -249,12 +276,25 @@ inline void buildSpanningTree(const Iterator firstVtx,
                               SpanningTreeStrategy<Iterator> *bldr
                              )
 {
-    /// If no strategy is passed in, instantiate one
-    if (bldr == 0) bldr = getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+    CkAssert(NULL != bldr);
     /// Create a tag
     typename std::iterator_traits<Iterator>::value_type *tag = 0;
     /// Delegate the work
     impl::buildSpanningTree(tag,firstVtx,beyondLastVtx,maxBranches,bldr);
+}
+
+
+// Overload to automatically use the default strategy
+template <typename Iterator>
+inline void buildSpanningTree(const Iterator firstVtx,
+                              const Iterator beyondLastVtx,
+                              const int maxBranches
+                             )
+{
+    SpanningTreeStrategy<Iterator> *bldr =
+	getSpanningTreeStrategy(firstVtx,beyondLastVtx,maxBranches);
+    buildSpanningTree(firstVtx, beyondLastVtx, maxBranches, bldr);
+    delete bldr;
 }
 
 } // end namespace topo

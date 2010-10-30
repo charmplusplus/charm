@@ -21,7 +21,7 @@ class maxheap;
 #include "RefineKLB.decl.h"
 
 #include "elements.h"
-#include "heap.h"
+#include "ckheap.h"
 
 void CreateRefineKLB();
 BaseLB *AllocateRefineKLB();

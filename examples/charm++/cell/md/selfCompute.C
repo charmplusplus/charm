@@ -38,28 +38,28 @@ void SelfCompute::init(int numParticlesPerPatch) {
   // Allocate buffers for force data
   numParticles = numParticlesPerPatch;
   #if USE_PROXY_PATCHES == 0
-    particleX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-    particleQ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+    particleX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+    particleQ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
   #endif
-  forceX = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceY = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
-  forceZ = (float*)(CmiMallocAligned(numParticles * sizeof(float), 128));
+  forceX = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceY = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
+  forceZ = (MD_FLOAT*)(CmiMallocAligned(numParticles * sizeof(MD_FLOAT), 128));
 
   // Check in with the main chare
   mainProxy.initCheckIn();
 }
 
 
-void SelfCompute::patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ, CProxy_ProxyPatch proxyPatchProxy) {
+void SelfCompute::patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ, CProxy_ProxyPatch proxyPatchProxy) {
   #if USE_PROXY_PATCHES != 0
     this->proxyPatchProxy = proxyPatchProxy;
   #endif
   patchData(numParticles, particleX, particleY, particleZ, particleQ);
 }
 
-void SelfCompute::patchData(int numParticles, float* particleX, float* particleY, float* particleZ, float* particleQ) {
+void SelfCompute::patchData(int numParticles, MD_FLOAT* particleX, MD_FLOAT* particleY, MD_FLOAT* particleZ, MD_FLOAT* particleQ) {
 
   // Copy the data from the parameters
   #if USE_PROXY_PATCHES != 0
@@ -68,10 +68,10 @@ void SelfCompute::patchData(int numParticles, float* particleX, float* particleY
     this->particleZ = particleZ;
     this->particleQ = particleQ;
   #else
-    memcpy(this->particleX, particleX, numParticles * sizeof(float));
-    memcpy(this->particleY, particleY, numParticles * sizeof(float));
-    memcpy(this->particleZ, particleZ, numParticles * sizeof(float));
-    memcpy(this->particleQ, particleQ, numParticles * sizeof(float));
+    memcpy(this->particleX, particleX, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleY, particleY, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleZ, particleZ, numParticles * sizeof(MD_FLOAT));
+    memcpy(this->particleQ, particleQ, numParticles * sizeof(MD_FLOAT));
   #endif
 
   // Initiate the calculation for this compute

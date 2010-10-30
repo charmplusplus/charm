@@ -33,6 +33,8 @@
 
 #define PROJECTION_VERSION  "7.0"
 
+#define PROJ_ANALYSIS 1
+
 // Macro to make projections check for errors before an fprintf succeeds.
 #define CheckAndFPrintF(f,string,data) \
 { \

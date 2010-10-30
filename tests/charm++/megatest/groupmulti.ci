@@ -1,0 +1,16 @@
+module groupmulti {
+  readonly CmiGroup cgrp;
+
+  message groupmulti_SimpleMsg;
+  message groupmulti_BCMsg;
+
+  chare groupmulti_main {
+    entry groupmulti_main(void);
+    entry void groupReady(void);
+  };
+
+  group groupmulti_group {
+    entry groupmulti_group(groupmulti_SimpleMsg *);
+    entry void doBroadcast(groupmulti_BCMsg *);
+  };
+};

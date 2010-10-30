@@ -79,7 +79,7 @@ void fillIDHash(MeshModel* model)
 // If the number of nodes or elements increases, then this function should be called
 // because the attribute arrays may have been resized, after which the old pointers
 // would be invalid.
-void setTableReferences(MeshModel* model, bool recomputeHash=false)
+void setTableReferences(MeshModel* model, bool recomputeHash)
 {
     model->ElemConn_T = &((FEM_IndexAttribute*)model->mesh->elem[MESH_ELEMENT_TET4].lookup(FEM_CONN,""))->get();
     model->elem_id_T = &((FEM_DataAttribute*)model->mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_ID,""))->getInt();
@@ -185,8 +185,8 @@ MeshModel* meshModel_Create_Init(){
   data values which were not done in init.
 
 */
-MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
-        int node_attr_sz, int model_attr_sz, void *mAtt) {
+void meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
+        int node_attr_sz, int model_attr_sz, void *mAtt, MeshModel &model) {
 
     CkAssert(ATT_NODE_ID != FEM_COORD);
     CkAssert(ATT_NODE_DATA != FEM_COORD);
@@ -204,37 +204,37 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
     CkAssert(elem_attr_sz > 0);
     CkAssert(node_attr_sz > 0);
     int which_mesh=FEM_Mesh_default_read();
-    MeshModel *model = new MeshModel;
-    memset(model, 0, sizeof(MeshModel));
+
+    memset(&model, 0, sizeof(MeshModel));
     
-    model->target_device = target_device;
-    model->elem_attr_size = elem_attr_sz;
-    model->node_attr_size = node_attr_sz;
-    model->model_attr_size = model_attr_sz;
+    model.target_device = target_device;
+    model.elem_attr_size = elem_attr_sz;
+    model.node_attr_size = node_attr_sz;
+    model.model_attr_size = model_attr_sz;
     
-    model->mesh = FEM_Mesh_lookup(which_mesh,"meshModel_Create_Driver");
-    model->mAtt = mAtt;
+    model.mesh = FEM_Mesh_lookup(which_mesh,"meshModel_Create_Driver");
+    model.mAtt = mAtt;
     
-    model->num_local_elem = model->mesh->elem[MESH_ELEMENT_TET4].size();
-    model->num_local_node = model->mesh->node.size();
+    model.num_local_elem = model.mesh->elem[MESH_ELEMENT_TET4].size();
+    model.num_local_node = model.mesh->node.size();
 
     // Allocate user model attributes
     FEM_Mesh_become_set(which_mesh);
-    char* temp_array = (char*) malloc(model->num_local_elem * model->elem_attr_size);
-    FEM_Mesh_data(which_mesh,FEM_ELEM+MESH_ELEMENT_TET4,ATT_ELEM_DATA,temp_array,0,model->num_local_elem,FEM_BYTE,model->elem_attr_size);
+    char* temp_array = (char*) malloc(model.num_local_elem * model.elem_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_ELEM+MESH_ELEMENT_TET4,ATT_ELEM_DATA,temp_array,0,model.num_local_elem,FEM_BYTE,model.elem_attr_size);
     free(temp_array);
 
-    temp_array = (char*) malloc(model->num_local_node * model->node_attr_size);
-    FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_DATA,temp_array,0,model->num_local_node,FEM_BYTE,model->node_attr_size);
+    temp_array = (char*) malloc(model.num_local_node * model.node_attr_size);
+    FEM_Mesh_data(which_mesh,FEM_NODE,ATT_NODE_DATA,temp_array,0,model.num_local_node,FEM_BYTE,model.node_attr_size);
     free(temp_array);
 
 
-    const int connSize = model->mesh->elem[MESH_ELEMENT_TET4].getConn().width();
-    temp_array = (char*) malloc(model->num_local_node * connSize);
+    const int connSize = model.mesh->elem[MESH_ELEMENT_TET4].getConn().width();
+    temp_array = (char*) malloc(model.num_local_node * connSize);
     FEM_Mesh_data(which_mesh,FEM_ELEM+MESH_ELEMENT_TET4,ATT_ELEM_N2E_CONN,temp_array, 0, 1, FEM_INT, connSize);
     free(temp_array);
 
-    setTableReferences(model, true);
+    setTableReferences(&model, true);
 
     // Setup the adjacencies
     int nodesPerTuple = 3;
@@ -244,9 +244,9 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
     FEM_Add_elem2face_tuples(which_mesh, MESH_ELEMENT_TET4,  nodesPerTuple, tuplesPerTet, tetFaces);
     FEM_Add_elem2face_tuples(which_mesh, MESH_ELEMENT_COH3T3,  nodesPerTuple, tuplesPerCoh, cohFaces);
 
-    model->mesh->createNodeElemAdj();
-    model->mesh->createNodeNodeAdj();
-    model->mesh->createElemElemAdj();
+    model.mesh->createNodeElemAdj();
+    model.mesh->createNodeNodeAdj();
+    model.mesh->createElemElemAdj();
 
 #if CUDA
     int* n2eTable;
@@ -254,16 +254,16 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
     FEM_Mesh_create_node_elem_adjacency(which_mesh);
     FEM_Mesh* mesh = FEM_Mesh_lookup(which_mesh, "meshModel_Create_Driver");
     FEM_DataAttribute * at = (FEM_DataAttribute*) 
-        model->mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"meshModel_Create_Driver");
+        model.mesh->elem[MESH_ELEMENT_TET4].lookup(ATT_ELEM_N2E_CONN,"meshModel_Create_Driver");
     n2eTable = at->getInt().getData();
 
     FEM_IndexAttribute * iat = (FEM_IndexAttribute*) 
-        model->mesh->elem[MESH_ELEMENT_TET4].lookup(FEM_CONN,"meshModel_Create_Driver");
+        model.mesh->elem[MESH_ELEMENT_TET4].lookup(FEM_CONN,"meshModel_Create_Driver");
     int* connTable  = iat->get().getData();
 
     int* adjElements;
     int size;
-    for (int i=0; i<model->num_local_node; ++i) {
+    for (int i=0; i<model.num_local_node; ++i) {
         mesh->n2e_getAll(i, adjElements, size);
         for (int j=0; j<size; ++j) {
             for (int k=0; k<connSize+1; ++k) {
@@ -297,12 +297,11 @@ MeshModel* meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
     FEM_Mesh_become_get(which_mesh);
 
 #if CUDA
-    if (model->target_device == DeviceGPU) {
-      allocateModelForCUDADevice(model);
+    if (model.target_device == DeviceGPU) {
+      allocateModelForCUDADevice(&model);
     }
 #endif
 
-    return model;
 }
 
 

@@ -141,7 +141,7 @@ static void setspeed_gigabit()
 static void extract_args(char **argv)
 {
   int ms;
-  setspeed_eth();
+  setspeed_gigabit();
   if (CmiGetArgFlagDesc(argv,"+atm","Tune for a low-latency ATM network"))
     setspeed_atm();
   if (CmiGetArgFlagDesc(argv,"+eth","Tune for an ethernet network"))
@@ -157,7 +157,7 @@ static void extract_args(char **argv)
   if (CmiGetArgIntDesc(argv,"+delay_retransmit",&ms, "Milliseconds to wait before retransmit"))
 	  Cmi_delay_retransmit=0.001*ms;
   if (CmiGetArgIntDesc(argv,"+ack_delay",&ms, "Milliseconds to wait before ack'ing"))
-	  Cmi_delay_retransmit=0.001*ms;
+	  Cmi_ack_delay=0.001*ms;
   extract_common_args(argv);
   Cmi_dgram_max_data = Cmi_max_dgram_size - DGRAM_HEADER_SIZE;
   Cmi_half_window = Cmi_window_size >> 1;
@@ -508,8 +508,11 @@ static void node_addresses_store(ChMessage *msg)
   _Cmi_numnodes=ChMessageInt(n32[0]);
 
 #if CMK_USE_IBVERBS
-	ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
-  if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
+  ChInfiAddr *remoteInfiAddr = (ChInfiAddr *) (&msg->data[sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes]);
+  if (Cmi_charmrun_fd == -1) {
+    d = &((ChSingleNodeinfo*)n32)->info;
+  }
+  else if ((sizeof(ChMessageInt_t)+sizeof(ChNodeinfo)*_Cmi_numnodes +sizeof(ChInfiAddr)*_Cmi_numnodes )
          !=(unsigned int)msg->len)
     {printf("Node table has inconsistent length!");machine_exit(1);}
 
@@ -803,17 +806,14 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #elif CMK_USE_AMMASSO
 
 #include "machine-ammasso.c"
-#define BARRIER_NULL           1
 
 #elif CMK_USE_TCP
 
 #include "machine-tcp.c"
-#define BARRIER_NULL           1
 
 #elif CMK_USE_IBVERBS
 
 #include "machine-ibverbs.c"
-/*#define BARRIER_NULL           1*/
 
 #elif CMK_USE_IBUD
 #include "machine-ibud.c"
@@ -831,18 +831,5 @@ void SendHypercube(OutgoingMsg ogm, int root, int size, char *msg, unsigned int 
 #include "machine-pxshm.c"
 #endif
 
-
-
-#if  BARRIER_NULL
-int CmiBarrier()
-{
-  return -1;
-}
-
-int CmiBarrierZero()
-{
-  return -1;
-}
-#endif
 
 /*@}*/

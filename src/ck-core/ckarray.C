@@ -60,7 +60,7 @@ Orion Sky Lawlor, olawlor@acm.org
 
 CpvDeclare(int ,serializer);
 
-CmiBool isAnytimeMigration;
+CmiBool _isAnytimeMigration;
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -184,7 +184,7 @@ void ArrayElement::initBasics(void)
   ArrayElement_initInfo &info=CkpvAccess(initInfo);
   thisArray=info.thisArray;
   thisArrayID=info.thisArrayID;
-  numElements=info.numInitial.getCombinedCount();
+  numInitialElements=info.numInitial.getCombinedCount();
   if (info.listenerData) {
     memcpy(listenerData,info.listenerData,sizeof(listenerData));
   }
@@ -192,7 +192,7 @@ void ArrayElement::initBasics(void)
     CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			  l->ckElementCreating(this));
   }
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         mlogData->objID.type = TypeArray;
         mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
 #endif
@@ -234,7 +234,7 @@ CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
 {
-	if(BgOutOfCoreFlag!=1){ //in case of taking core out of memory
+	if(_BgOutOfCoreFlag!=1){ //in case of taking core out of memory
 	    CK_ARRAYLISTENER_LOOP(thisArray->listeners,
 			   l->ckElementDied(this));
 	}
@@ -313,7 +313,7 @@ void ArrayElement::CkAbort(const char *str) const
 }
 
 void ArrayElement::recvBroadcast(CkMessage *m){
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CkArrayMessage *bcast = (CkArrayMessage *)m;
     envelope *env = UsrToEnv(m);
 	int epIdx= env->piggyBcastIdx;
@@ -419,28 +419,31 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 					  const CkArrayOptions &opts_)
 {
   CkArrayOptions opts(opts_);
-  if (opts.getLocationManager().isZero())
+  CkGroupID locMgr = opts.getLocationManager();
+  if (locMgr.isZero())
   { //Create a new location manager
 #if !CMK_LBDB_ON
     CkGroupID _lbdb;
 #endif
-    opts.setLocationManager(CProxy_CkLocMgr::ckNew(
-      opts.getMap(),_lbdb,opts.getNumInitial()
-      ));
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial());
+    opts.setLocationManager(locMgr);
   }
   //Create the array manager
   m->array_ep()=ctor;
   CkMarshalledMessage marsh(m);
+  CkEntryOptions  e_opts;
+  e_opts.setGroupDepID(locMgr);       // group creation dependence
 #if !GROUP_LEVEL_REDUCTION
   CProxy_CkArrayReductionMgr nodereductionProxy = CProxy_CkArrayReductionMgr::ckNew();
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,nodereductionProxy,&e_opts);
   nodereductionProxy.setAttachedGroup(ag);
 #else
   CkNodeGroupID dummyid;
-  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid);
+  CkGroupID ag=CProxy_CkArray::ckNew(opts,marsh,dummyid,&e_opts);
 #endif
   return (CkArrayID)ag;
 }
+
 CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
 {
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
@@ -657,6 +660,9 @@ CmiBool CkArray::insertElement(CkMessage *me)
   int ctorIdx=m->array_ep();
   int chareType=_entryTable[ctorIdx]->chareIdx;
   ArrayElement *elt=allocate(chareType,idx,me,CmiFalse);
+#ifndef CMK_CHARE_USE_PTR
+  ((Chare *)elt)->chareIdx = -1;
+#endif
   if (!locMgr->addElement(thisgroup,idx,elt,ctorIdx,(void *)m)) return CmiFalse;
   CK_ARRAYLISTENER_LOOP(listeners,
       if (!l->ckElementCreated(elt)) return CmiFalse;);
@@ -768,10 +774,16 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) cons
 	  ckDelegatedTo()->ArraySend(ckDelegatedPtr(),ep,msg,_idx,ckGetArrayID());
 	else 
 	{ //Usual case: a direct send
-	  if (opts & CK_MSG_INLINE)
-	    ckLocalBranch()->deliver(msg, CkDeliver_inline, opts&!CK_MSG_INLINE);
-	  else
-	    ckLocalBranch()->deliver(msg, CkDeliver_queue, opts);
+	  CkArray *localbranch = ckLocalBranch();
+	  if (localbranch == NULL) {             // array not created yet
+	    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+          }
+	  else {
+	    if (opts & CK_MSG_INLINE)
+	      localbranch->deliver(msg, CkDeliver_inline, opts & (~CK_MSG_INLINE));
+	    else
+	      localbranch->deliver(msg, CkDeliver_queue, opts);
+	  }
 	}
 }
 
@@ -809,7 +821,10 @@ void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex
   m->array_index()=idx;
   msg_prepareSend(m,entryIndex,aID);
   CkArray *a=(CkArray *)_localBranch(aID);
-  a->deliver(m,CkDeliver_queue,opts);
+  if (a == NULL)
+    CkArrayManagerDeliver(CkMyPe(), msg, 0);
+  else
+    a->deliver(m,CkDeliver_queue,opts);
 }
 
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts)
@@ -871,7 +886,7 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (isAnytimeMigration) {
+  if (_isAnytimeMigration) {
     DEBB((AA"Received broadcast %d\n"AB,bcastNo));
     CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
     oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
@@ -888,7 +903,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   DEBB((AA"Delivering broadcast %d to element %s\n"AB,elBcastNo,idx2str(el)));
   int epIdx=bcast->array_ep_bcast();
 
-#ifdef _FAULT_MLOG_     
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
         return true;
 #else
@@ -899,7 +914,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 /// Deliver all needed broadcasts to the given local element
 CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 {
-  if (! isAnytimeMigration) return CmiTrue;
+  if (! _isAnytimeMigration) return CmiTrue;
   int &elBcastNo=getData(el);
   if (elBcastNo<bcastNo)
   {//This element needs some broadcasts-- it must have
@@ -929,7 +944,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
-  if (! isAnytimeMigration) return;
+  if (! _isAnytimeMigration) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -963,7 +978,7 @@ void CProxy_ArrayBase::ckBroadcast(CkArrayMessage *msg, int ep, int opts) const
 	  _TRACE_CREATION_DETAILED(UsrToEnv(msg), ep);
  	  int skipsched = opts & CK_MSG_EXPEDITED; 
 	  //int serializer=0;//1623802937%CkNumPes();
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
                 CProxy_CkArray ap(_aid);
                 ap[CpvAccess(serializer)].sendBroadcast(msg);
                 CkGroupID _id = _aid;
@@ -1006,7 +1021,7 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 	thisProxy.recvExpeditedBroadcast(msg);
 }
 
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int _tempBroadcastCount=0;
 
 void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
@@ -1045,7 +1060,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster->incoming(msg);
-#ifdef _FAULT_MLOG_
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _tempBroadcastCount=0;
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
@@ -1079,7 +1094,7 @@ void CkArray::recvBroadcast(CkMessage *m)
                 BgSplitEntry("end-broadcast", logs.getVec(), logs.size());
   		startVTimer();
 #endif
-	if (! isAnytimeMigration) {
+	if (! _isAnytimeMigration) {
 	  delete msg;
 	}
 }

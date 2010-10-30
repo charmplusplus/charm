@@ -31,14 +31,14 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
-  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft papi'
+  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
   if test $more = 1
   then
   echo ''
   echo 'For platform specific options, use help option:'
-  echo '  help		  platform specific help, e.g. ./build charm++ net-linux help'
+  echo '  help		  platform specific help, e.g. ./build charm++ net-linux-x86_64 help'
   echo ''
   echo 'Choose a compiler (only one option is allowed from this section):'
   echo '  cc, cc64        For Sun WorkShop C++ 32/64 bit compilers'
@@ -66,7 +66,7 @@ syntax() {
   echo '  mpt             use SGI Message Passing Toolkit (only for mpi version)'
   echo '  gm              use Myrinet for communication'
   echo '  tcp             use TCP sockets for communication (only for net version)'
-  echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-amd64 currently)'
+  echo '  ibverbs         use the Infiniband OpenIB layer for communication (only for net-linux-x86_64 currently)'
   echo "  vmi             use NCSA's VMI for communication (only for mpi version)"
   echo '  scyld           compile for Scyld Beowulf cluster based on bproc'
   echo '  clustermatic    compile for Clustermatic (support version 3 and 4) '
@@ -89,6 +89,7 @@ syntax() {
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
+  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -99,11 +100,11 @@ syntax() {
   then
   echo ''
   echo 'Examples:'
-  echo "1. display all supported options for net-linux using 'help':"
-  echo '  ./build charm++ net-linux help'
+  echo "1. display all supported options for net-linux-x86_64 using 'help':"
+  echo '  ./build charm++ net-linux-x86_64 help'
   echo '2. compile Charm++ on Linux with optimizations:'
-  echo '  ./build charm++ net-linux -O -DCMK_OPTIMIZE'
-  echo '3. compile Charm++ for Linux clustermatic Beowulf cluster with Intel compiler:'
+  echo '  ./build charm++ net-linux-x86_64 -O -DCMK_OPTIMIZE'
+  echo '3. compile Charm++ for Linux (32bit) clustermatic Beowulf cluster with Intel compiler:'
   echo '  ./build charm++ net-linux clustermatic icc -O'
   echo '4. compile Charm++ for IA64 Linux cluster with MPICH-GM:'
   echo '  ./build charm++ mpi-linux-ia64 gm -O'
@@ -207,6 +208,7 @@ INCDIR=
 ARCH=
 BUILD_SHARED=
 WITH_ROMIO=
+WITH_PRODUCTION=
 BUILD_EMULATOR=0
 DESTINATION=""
 DESTINATION_SUFFIX=""
@@ -294,6 +296,10 @@ do
     --with-romio)
 		WITH_ROMIO="true"; shift
 		;;
+    --with-production)
+		WITH_PRODUCTION="true" 
+		shift
+		;;
     --build-shared|-bs)
 		# obsolete, do nothing
 		shift
@@ -329,6 +335,15 @@ do
 		QUIET="--quiet"
 		shift;
 		;;
+    --enable-tracing|--enable-tracing=*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		ENABLE_TRACING=yes
+		shift
+		;;
+    --enable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     -j*)
                 PMAKENUM=`echo $1 | awk -Fj '{print $2}'`
 		MAKEOPTS="$MAKEOPTS -j $PMAKENUM"
@@ -362,6 +377,7 @@ do
           TestIfOption $1
           BOPTS="$BOPTS $1"
           [ $1 =  "bigemulator" ] && BUILD_EMULATOR=1
+          [ $1 =  "bigsim" ] && BUILD_EMULATOR=1
         fi
         shift
 	;;
@@ -369,6 +385,12 @@ do
 done
 
 [ "x$VERSION" = "x" ] && syntax && exit 1
+
+if test -n "$WITH_PRODUCTION" -a $BUILD_EMULATOR -eq 1 -a -z "$ENABLE_TRACING"
+then
+  echo "Error: bigemulator requires tracing modules, --with-production must be used with --enable-tracing"
+  exit 1
+fi
 
 if [ -z "$MAKE" ] 
 then
@@ -520,6 +542,13 @@ then
     echo "CMK_AMPI_WITH_ROMIO=\"true\"" >> $ConvSh
 fi
 
+if test -n "$WITH_PRODUCTION"
+then
+    echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
+    # Prepend optimize so that an explicit -no-optimize still works
+    OPTS="-optimize $OPTS"
+    CONFIG_OPTS="--disable-tracing --disable-replay $CONFIG_OPTS"
+fi
 
 # build with Tau
 WITH_TAU=0
@@ -571,13 +600,17 @@ printError()
 	exit $MAKEEXIT
 }
 
-Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
+
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
+echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > config_opts.sh
+chmod +x config_opts.sh
 $MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
-Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $VERSION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS" QUIET="$QUIET"' in $DESTINATION/tmp"
 $MAKE $MAKEOPTS $PROGRAM OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 if [ $MAKEEXIT -eq 0 ]
@@ -585,7 +618,7 @@ then
 	Echo "-------------------------------------------------"
 	Echo "$PROGRAM built successfully."
 	Echo "Next, try out a sample program like" \
-	     "tests/charm++/simplearrayhello"
+	     "$DESTINATION/tests/charm++/simplearrayhello"
 else
         printError
 fi

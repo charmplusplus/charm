@@ -74,13 +74,25 @@ int CldRegisterPackFn(CldPackFn fn)
 
 void CldSwitchHandler(char *cmsg, int handler)
 {
+#if CMK_MEM_CHECKPOINT
+  int old_phase = CmiGetRestartPhase(cmsg);
+#endif
   CmiSetXHandler(cmsg, CmiGetHandler(cmsg));
   CmiSetHandler(cmsg, handler);
+#if CMK_MEM_CHECKPOINT
+  CmiGetRestartPhase(cmsg) = old_phase;
+#endif
 }
 
 void CldRestoreHandler(char *cmsg)
 {
+#if CMK_MEM_CHECKPOINT
+  int old_phase = CmiGetRestartPhase(cmsg);
+#endif
   CmiSetHandler(cmsg, CmiGetXHandler(cmsg));
+#if CMK_MEM_CHECKPOINT
+  CmiGetRestartPhase(cmsg) = old_phase;
+#endif
 }
 
 void Cldhandler(char *);

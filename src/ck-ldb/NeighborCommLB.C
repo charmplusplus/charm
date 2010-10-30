@@ -14,7 +14,7 @@
 
 #include "cklists.h"
 
-#include "heap.h"
+#include "ckheap.h"
 #include "NeighborCommLB.h"
 #include "topology.h"
 

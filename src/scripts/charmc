@@ -79,6 +79,7 @@ USE_FASTEST_CC=""
 PROG_EXT=""
 
 COPY_CHARMRUN=true
+USE_BUILD_OPTIONS=0
 
 COPY_EXIT="true"
 CHARM_SHARED="0"
@@ -118,6 +119,7 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
+    echo "        -gendeps"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -622,6 +624,11 @@ do
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		;;
+	"-gendeps")
+# Generate dependencies for consumption by make
+		SKIPLINK="yes"
+        GENDEPS="yes"
+        ;;
 	"-default-to-aout")
 		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
 		then
@@ -692,11 +699,11 @@ do
 		# used internally not to build Charm++ lib_so
 		BUILD_SHARE="0"
 		;;
-	"-O")
+	"-optimize")
 		OPTIMIZE_MODE=true
 		;;
 
-	"-NO")
+	"-no-optimize")
 		OPTIMIZE_MODE=false
 		;;
 	
@@ -723,6 +730,9 @@ do
 		;;
 	-no-charmrun)
 		COPY_CHARMRUN=false
+		;;
+	-use-build-options)
+		USE_BUILD_OPTIONS=1
 		;;
         -h|--help)
 	        printUsage
@@ -770,6 +780,12 @@ Debug "Read config script, setting defaults..."
 . $CHARMINC/conv-config.sh $CHARMINC
 
 Debug "Setting vars..."
+
+if [ "$USE_BUILD_OPTIONS" = "1" ]  
+then
+	[ -n "$VERBOSE" ] && echo "Charmc applying build time options: $BUILDOPTS"
+	OPTS="$OPTS $BUILDOPTS"
+fi
 
 # If we are debugging, add "-g -O0" to the C/C++ flags
 if [ -n "$CHARMDEBUG" ]; then
@@ -951,7 +967,7 @@ then
 fi
 
 Debug "set 4"
-if [ -n "$OPTIMIZE_MODE" ]
+if [ "$OPTIMIZE_MODE" = "true" ]
 then
     OPTS_CC="$CMK_C_OPTIMIZE $OPTS_CC"
     OPTS_CXX="$CMK_CXX_OPTIMIZE $OPTS_CXX"
@@ -1150,6 +1166,17 @@ do
                 if [ -n "$PREPROCESS" ]
                 then
 		  Do $CMK_CPP_CHARM $FILE | Do $CHARMBIN/charmxi $XIOPTS
+                elif [ -n "$GENDEPS" ]
+                then
+		  Do $CHARMBIN/gendeps4ci $FILE && \
+          {
+            # Strictly, we should just generate dependencies.
+            # However x.decl.h from y.ci is not amenable to pattern rules in make.
+            # Hence generate compilation rules for the ci file and send it to stdout
+            printf '\n\t@echo Parsing interface definitions in $(<F)'
+            printf '\n\t@%s -c $<' $0
+            printf '\n\n'
+          }
                 else
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi

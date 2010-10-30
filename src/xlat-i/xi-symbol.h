@@ -216,8 +216,7 @@ class PtrType : public Type {
       if(numstars != 1) {
         die("too many stars-- entry parameter must have form 'MTYPE *msg'"); 
       } else {
-        str << Prefix::Message;
-        type->print(str);
+        type->genMsgProxyName(str);
       }
     }
 };

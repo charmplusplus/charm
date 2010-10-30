@@ -104,7 +104,10 @@ CheckOutput() {
 	cmpfile=""
         # Handle Fortran systems that generate stop statements
         rm -f ${bfile}.tout
-	grep -v 'FORTRAN STOP' ${bfile}.out > ${bfile}.tout
+	grep -v 'FORTRAN STOP' ${bfile}.out |
+	grep -v '^Charm++: scheduler running in netpoll mode.' |
+	grep -v '^Charm++> cpu topology info is being gathered.' |
+	grep -v '^Charm++> Running on ' > ${bfile}.tout
 	for stdfile in $srcdir/${bfile}.std $srcdir/${bfile}.std2 \
 			$srcdir/std/${bfile}.std ${bfile}.stdo ; do
 	    if [ -z "$cmpfile" -a -s "$stdfile" ] ; then
@@ -119,14 +122,14 @@ CheckOutput() {
 	    if [ -n "$difffile" ] ; then
    	        if [ -n "$cmpfile" ] ; then
                     echo "Differences in ${bfile}.out" >> ${difffile}
-	            diff -b ${bfile}.tout $cmpfile >> ${difffile}
+	            diff -bu ${bfile}.tout $cmpfile >> ${difffile}
 	        else
                     echo "Cannot find a file to compare against for test ${bfile}.out"
 	        fi
 	    else
    	        if [ -n "$cmpfile" ] ; then
                     echo "Differences in ${bfile}.out"
-	            diff -b ${bfile}.tout $cmpfile
+	            diff -bu ${bfile}.tout $cmpfile
 	        else
                     echo "Cannot find a file to compare against for test ${bfile}.out"
 	        fi
@@ -201,7 +204,7 @@ RunTest() {
         # tokenized.  The ./$1 ensures that the program will be found,
         # even if . is not in the PATH.
         
-        eval charmrun ./$pgm $4 +quiet +p$np  </dev/null >> $pgm.out 2>&1
+        eval ./charmrun ./$pgm $4 +quiet +p$np  </dev/null >> $pgm.out 2>&1
         if [ -n "$5" ] ; then 
             for file in $5 ; do 
                 if [ -s $file ] ; then 

@@ -135,6 +135,12 @@ static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
+#if CMK_MEM_CHECKPOINT
+void (*notify_crash_fn)(int) = NULL;
+#endif
+
+CpvDeclare(char *, _validProcessors);
+
 /*****************************************************************************
  *
  * Unix Stub Functions
@@ -181,7 +187,7 @@ CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 CpvDeclare(int,   CsdStopFlag);
 CpvDeclare(int,   CsdLocalCounter);
 
-CmiNodeLock smp_mutex;               /* for smp */
+CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CONVERSE_VERSION_VMI
 void *CMI_VMI_CmiAlloc (int size);
@@ -419,6 +425,45 @@ int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc)
 }
 int CmiGetArgInt(char **argv,const char *arg,int *optDest) {
 	return CmiGetArgIntDesc(argv,arg,optDest,"");
+}
+
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc)
+{
+	int i;
+	int argLen=strlen(arg);
+	CmiAddCLA(arg,"integer",desc);
+	for (i=0;argv[i]!=NULL;i++)
+		if (0==strncmp(argv[i],arg,argLen))
+		{/*We *may* have found the argument*/
+			const char *opt=NULL;
+			int nDel=0;
+			switch(argv[i][argLen]) {
+			case 0: /* like "-p","27" */
+				opt=argv[i+1]; nDel=2; break;
+			case '=': /* like "-p=27" */
+				opt=&argv[i][argLen+1]; nDel=1; break;
+			case '-':case '+':
+			case '0':case '1':case '2':case '3':case '4':
+			case '5':case '6':case '7':case '8':case '9':
+				/* like "-p27" */
+				opt=&argv[i][argLen]; nDel=1; break;
+			default:
+				continue; /*False alarm-- skip it*/
+			}
+			if (opt==NULL) continue; /*False alarm*/
+			if (sscanf(opt,"%ld",optDest)<1) {
+			/*Bad command line argument-- die*/
+				fprintf(stderr,"Cannot parse %s option '%s' "
+					"as a long integer.\n",arg,opt);
+				CmiAbort("Bad command-line argument\n");
+			}
+			CmiDeleteArgs(&argv[i],nDel);
+			return 1;
+		}
+	return 0;/*Didn't find the argument-- dest is unchanged*/	
+}
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest) {
+	return CmiGetArgLongDesc(argv,arg,optDest,"");
 }
 
 /** Find the given argument in argv.  If present, delete
@@ -803,10 +848,12 @@ void CmiTimerInit()
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
 
+#if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
+#endif
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
@@ -815,8 +862,10 @@ void CmiTimerInit()
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 
+#if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
 /*  CmiBarrierZero(); */
+#endif
 }
 
 double CmiCpuTimer()
@@ -864,7 +913,7 @@ static double readMHz(void)
   char str[1000];
   char buf[100];
   FILE *fp;
-  CmiLock(smp_mutex);
+  CmiLock(_smp_mutex);
   fp = fopen("/proc/cpuinfo", "r");
   if (fp != NULL)
   while(fgets(str, 1000, fp)!=0) {
@@ -873,11 +922,11 @@ static double readMHz(void)
       char *s = strchr(str, ':'); s=s+1;
       sscanf(s, "%lf", &x);
       fclose(fp);
-      CmiUnlock(smp_mutex);
+      CmiUnlock(_smp_mutex);
       return x;
     }
   }
-  CmiUnlock(smp_mutex);
+  CmiUnlock(_smp_mutex);
   CmiAbort("Cannot read CPU MHz from /proc/cpuinfo file.");
   return 0.0;
 }
@@ -1347,20 +1396,6 @@ void CsdEndIdle(void)
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
-#if CMK_MEM_CHECKPOINT
-#define MESSAGE_PHASE_CHECK	\
-	{	\
-          int phase = CmiGetRestartPhase(msg);	\
-	  if (phase < cur_restart_phase) {	\
-            /*CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d handler:%d. \n", CmiMyPe(), phase, cur_restart_phase, handler);*/	\
-            CmiFree(msg);	\
-	    return;	\
-          }	\
-	}
-#else
-#define MESSAGE_PHASE_CHECK
-#endif
-
 extern int _exitHandlerIdx;
 
 /** Takes a message and calls its corresponding handler. */
@@ -1383,7 +1418,7 @@ void CmiHandleMessage(void *msg)
 		return;
 	}*/
 	
-        MESSAGE_PHASE_CHECK
+        MESSAGE_PHASE_CHECK(msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
@@ -1496,12 +1531,12 @@ int CsdScheduler(int maxmsgs)
       int *CsdStopFlag_ptr = &CpvAccess(CsdStopFlag); \
       int cycle = CpvAccess(CsdStopFlag); \
       CsdSchedulerState_t state;\
-      CsdSchedulerState_new(&state);\
+      CsdSchedulerState_new(&state);
 
 /*A message is available-- process it*/
 #define SCHEDULE_MESSAGE \
       CmiHandleMessage(msg);\
-      if (*CsdStopFlag_ptr != cycle) break;\
+      if (*CsdStopFlag_ptr != cycle) break;
 
 /*No message available-- go (or remain) idle*/
 #define SCHEDULE_IDLE \
@@ -1510,7 +1545,8 @@ int CsdScheduler(int maxmsgs)
       if (*CsdStopFlag_ptr != cycle) {\
 	CsdEndIdle();\
 	break;\
-      }\
+      }
+
 /*
 	EVAC
 */
@@ -1661,7 +1697,7 @@ int handler;
 CpvStaticDeclare(CthThread, CthMainThread);
 CpvStaticDeclare(CthThread, CthSchedulingThread);
 CpvStaticDeclare(CthThread, CthSleepingStandins);
-CpvStaticDeclare(int      , CthResumeNormalThreadIdx);
+CpvDeclare(int      , CthResumeNormalThreadIdx);
 CpvStaticDeclare(int      , CthResumeSchedulingThreadIdx);
 
 
@@ -1696,6 +1732,7 @@ CthThread CthSuspendSchedulingThread()
   return succ;
 }
 
+/* Notice: For changes to the following function, make sure the function CthResumeNormalThreadDebug is also kept updated. */
 void CthResumeNormalThread(CthThreadToken* token)
 {
   CthThread t = token->thread;
@@ -1708,7 +1745,7 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -1716,11 +1753,12 @@ void CthResumeNormalThread(CthThreadToken* token)
 	        resumeTraceCore();*/
 #endif
 #endif
-
+  
   /* BIGSIM_OOC DEBUGGING
   CmiPrintf("In CthResumeNormalThread:   ");
   CthPrintThdMagic(t);
   */
+
   CthResume(t);
 }
 
@@ -1735,7 +1773,7 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -2045,7 +2083,7 @@ void CmiSendReduce(CmiReduction *red) {
     }
     CmiSetHandler(msg, CpvAccess(CmiReductionMessageHandler));
     CmiSetRedID(msg, red->seqID);
-    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,CpvAccess(_reduce_parent));*/
+    /*CmiPrintf("CmiSendReduce(%d): sending %d bytes to %d\n",CmiMyPe(),msg_size,red->parent);*/
     CmiSyncSendAndFree(red->parent, msg_size, msg);
   } else {
     (red->ops.destination)(msg);
@@ -3193,7 +3231,7 @@ void ConverseCommonInit(char **argv)
    }
 #endif
 	
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
@@ -3242,7 +3280,7 @@ void ConverseCommonExit(void)
 {
   CcsImpl_kill();
 
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   traceClose();
 /*closeTraceCore();*/ /* projector */
 #endif
@@ -3259,6 +3297,7 @@ void ConverseCommonExit(void)
   exitHybridAPI(); 
 #endif
 
+  EmergencyExit();
 }
 
 
@@ -3410,8 +3449,8 @@ unsigned char computeCheckSum(unsigned char *data, int len)
 }
 
 /* Flag for bigsim's out-of-core emulation */
-int BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
-int BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
+int _BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
+int _BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
 unsigned int CmiLog2(unsigned int val) {

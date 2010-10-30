@@ -1,0 +1,13 @@
+module inlineem
+{
+  group inline_group
+  {
+    entry inline_group();
+    entry [inline] void try_inline();
+  }
+  chare inline_tester
+  {
+    entry inline_tester(CProxy_inline_group &);
+    entry void start_test();
+  }
+}

@@ -52,7 +52,7 @@ CkReduction::reducerType minMaxReductionType;
 CkpvStaticDeclare(TraceProjections*, _trace);
 CtvStaticDeclare(int,curThreadEvent);
 
-CkpvDeclare(int, CtrLogBufSize);
+CkpvDeclare(CmiInt8, CtrLogBufSize);
 
 typedef CkVec<char *>  usrEventVec;
 CkpvStaticDeclare(usrEventVec, usrEventlist);
@@ -82,14 +82,14 @@ void flushTraceLog()
   CkpvAccess(_trace)->traceFlushLog();
 }
 
-#ifdef CMK_OPTIMIZE
+#if CMK_TRACE_DISABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not available in optimized version!!!!\n\n\n"); }
 #else
 #define OPTIMIZED_VERSION /*empty*/
-#endif // CMK_OPTIMIZE
+#endif // CMK_TRACE_DISABLED
 
 /*
 On T3E, we need to have file number control by open/close files only when needed.
@@ -125,6 +125,7 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
+  if (CkMyPe()==0) CkPrintf("Charm++: Tracemode Projections enabled.\n");
 }
  
 /* ****** CW TEMPORARY LOCATION ***** Support for thread listeners */
@@ -170,7 +171,7 @@ void traceThreadListener_free(struct CthThreadListener *l)
 
 void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
   /* strip essential information from the envelope */
   TraceThreadListener *a= new TraceThreadListener;
   
@@ -560,15 +561,18 @@ void LogPool::writeSts(TraceProjections *traceProj){
 
 void LogPool::writeRC(void)
 {
+    //CkPrintf("write RC is being executed\n");
 #ifdef PROJ_ANALYSIS  
-  //  CkAssert(CkMyPe() == 0);
-  //  fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
-  //	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
-  //  if (CkpvAccess(_trace)->isOutlierAutomatic()) {
-  //    fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
-  //  } else {
-  //    fprintf(rcfp,"RC_OUTLIER_FILTERED false\n");
-  //  }
+    CkAssert(CkMyPe() == 0);
+    fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
+  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
+    /* //Yanhua comment it because isOutlierAutomatic is not a variable in trace
+    if (CkpvAccess(_trace)->isOutlierAutomatic()) {
+      fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
+    } else {
+      fprintf(rcfp,"RC_OUTLIER_FILTERED false\n");
+    }
+    */
 #endif //PROJ_ANALYSIS
   fclose(rcfp);
 }
@@ -949,13 +953,13 @@ TraceProjections::TraceProjections(char **argv):
   if (CkpvAccess(traceOnPe) == 0) return;
 
   CtvInitialize(int,curThreadEvent);
-  CkpvInitialize(int, CtrLogBufSize);
+  CkpvInitialize(CmiInt8, CtrLogBufSize);
   CkpvAccess(CtrLogBufSize) = DefaultLogBufSize;
   CtvAccess(curThreadEvent)=0;
-  if (CmiGetArgIntDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
+  if (CmiGetArgLongDesc(argv,"+logsize",&CkpvAccess(CtrLogBufSize), 
 		       "Log entries to buffer per I/O")) {
     if (CkMyPe() == 0) {
-      CmiPrintf("Trace: logsize: %d\n", CkpvAccess(CtrLogBufSize));
+      CmiPrintf("Trace: logsize: %ld\n", CkpvAccess(CtrLogBufSize));
     }
   }
   checknested = 
@@ -992,7 +996,7 @@ TraceProjections::TraceProjections(char **argv):
   _logPool->setBinary(binary);
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
-#endif CMK_PROJECTIONS_USE_ZLIB
+#endif
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
@@ -1020,7 +1024,7 @@ TraceProjections::TraceProjections(char **argv):
   }
   papiValues = new long_long[numPAPIEvents];
   memset(papiValues, 0, numPAPIEvents*sizeof(long_long));
-#endif CMK_HAS_COUNTER_PAPI
+#endif
 }
 
 int TraceProjections::traceRegisterUserEvent(const char* evt, int e)
@@ -1087,7 +1091,7 @@ void TraceProjections::traceClose(void)
   converseExit = 1;
   if (CkMyPe() == 0) {
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
-    bocProxy.traceProjectionsParallelShutdown();
+    bocProxy.traceProjectionsParallelShutdown(-1);
   }
 #else
   // we've already deleted the logpool, so multiple calls to traceClose
@@ -1663,12 +1667,13 @@ void registerOutlierReduction() {
 // FIXME: WHY extern "C"???
 extern "C" void TraceProjectionsExitHandler()
 {
-#ifndef CMK_OPTIMIZE
+#if ! CMK_TRACE_DISABLED
+  // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
-  bocProxy.traceProjectionsParallelShutdown();
+  bocProxy.traceProjectionsParallelShutdown(CkMyPe());
 #else
   CkExit();
-#endif CMK_OPTIMIZE
+#endif
 }
 
 // This is called once on each processor but the idiom of use appears
@@ -1682,7 +1687,7 @@ void initTraceProjectionsBOC()
   if (BgNodeRank() == 0) {
 #else
     if (CkMyRank() == 0) {
-#endif __BLUEGENE__
+#endif
       registerExitFn(TraceProjectionsExitHandler);
     }
 #if 0
@@ -1734,10 +1739,12 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
 					entryThreshold,
 					outlierUsePhases);
   }
-};
+}
 
 // Called on every processor.
-void TraceProjectionsBOC::traceProjectionsParallelShutdown() {
+void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
+  //CmiPrintf("[%d] traceProjectionsParallelShutdown called from . \n", CkMyPe(), pe);
+  endPe = pe;                // the pe that starts CkExit()
   if (CkMyPe() == 0) {
     analysisStartTime = CmiWallTimer();
   }
@@ -2365,8 +2372,8 @@ void KMeansBOC::findRepresentatives() {
   int numCandidateOutliers = CkNumPes() - 
     exemplarsPerCluster*numNonEmptyClusters;
 
-  double remainders[numK];
-  int assigned[numK];
+  double *remainders = new double[numK];
+  int *assigned = new int[numK];
   exemplarChoicesLeft = new int[numK];
   outlierChoicesLeft = new int[numK];
 
@@ -2425,6 +2432,9 @@ void KMeansBOC::findRepresentatives() {
     DEBUGF("%d | Exemplar = %d | Outlier = %d\n", i, exemplarChoicesLeft[i],
 	   outlierChoicesLeft[i]);
   }
+
+  delete [] assigned;
+  delete [] remainders;
 
   // send out first broadcast
   KSelectionMessage *outmsg = NULL;
@@ -2578,7 +2588,7 @@ void KMeansBOC::phaseDone() {
 
 void TraceProjectionsBOC::startEndTimeAnalysis()
 {
- if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
+ //CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
 
   endTime = CkpvAccess(_trace)->endTime;
   // CkPrintf("[%d] End time is %lf us\n", CkMyPe(), endTime*1e06);
@@ -2590,7 +2600,7 @@ void TraceProjectionsBOC::startEndTimeAnalysis()
 
 void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
 {
- if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::endTimeDone time=\t%g\n", CkMyPe(), CkWallTimer() );
+ //if(CkMyPe()==0)    CkPrintf("[%d] TraceProjectionsBOC::endTimeDone time=\t%g parModulesRemaining:%d\n", CkMyPe(), CkWallTimer(), parModulesRemaining);
 
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
@@ -2637,8 +2647,8 @@ void TraceProjectionsBOC::kMeansDone() {
 void TraceProjectionsBOC::finalize()
 {
   CkAssert(CkMyPe() == 0);
-  CkPrintf("Total Analysis Time = %lf seconds\n", 
-	   CmiWallTimer()-analysisStartTime);
+  //CkPrintf("Total Analysis Time = %lf seconds\n", 
+  //	   CmiWallTimer()-analysisStartTime);
   thisProxy.closingTraces();
 }
 
@@ -2646,17 +2656,19 @@ void TraceProjectionsBOC::finalize()
 void TraceProjectionsBOC::closingTraces() {
   CkpvAccess(_trace)->closeTrace();
 
-  int dummy = 0;
+    // subtle:  reduction needs to go to the PE which started CkExit()
+  int pe = 0;
+  if (endPe != -1) pe = endPe;
   CkCallback cb(CkIndex_TraceProjectionsBOC::closeParallelShutdown(NULL), 
-		0, thisProxy);
-  contribute(sizeof(int), &dummy, CkReduction::sum_int, cb);  
+		pe, thisProxy); 
+  contribute(0, NULL, CkReduction::sum_int, cb);  
 }
 
 // The sole purpose of this reduction is to decide whether or not
 //   Projections as a module needs to call CkExit() to get other
 //   modules to shutdown.
 void TraceProjectionsBOC::closeParallelShutdown(CkReductionMsg *msg) {
-  CkAssert(CkMyPe() == 0);
+  CkAssert(endPe == -1 && CkMyPe() ==0 || CkMyPe() == endPe);
   delete msg;
   // decide if CkExit() needs to be called
   if (!CkpvAccess(_trace)->converseExit) {
@@ -2737,7 +2749,7 @@ CkReductionMsg *minMaxReduction(int nMsgs,
   CkAssert(numBytes%sizeof(double) == 0);
   int numK = (numBytes/sizeof(double))/4;
 
-  double ret[numK*4];
+  double *ret = new double[numK*4];
   // fill with out-of-band values
   for (int i=0; i<numK; i++) {
     ret[i*4] = -1.0;
@@ -2784,7 +2796,9 @@ CkReductionMsg *minMaxReduction(int nMsgs,
       }
     }
   }
-  return CkReductionMsg::buildNew(numBytes, ret);
+  CkReductionMsg *redmsg = CkReductionMsg::buildNew(numBytes, ret);
+  delete [] ret;
+  return redmsg;
 }
 
 #include "TraceProjections.def.h"

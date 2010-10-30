@@ -93,31 +93,6 @@ if($cpu =~ m/i[0-9]86/){
 $converse_network_type = "net";
 
 
-print << "EOF";
-How do you want to handle SMP/Multicore: [1-4]
-         1) single-threaded [default]
-         2) multicore(single node only)
-         3) SMP
-         4) POSIX Shared Memory
-
-EOF
-
-while($line = <>){
-	chomp $line;
-	if($line eq "1" || $line eq ""){
-	    last;
-	} elsif($line eq "2"){
-	    $converse_network_type = "multicore";
-	    last;
-	} elsif($line eq "3"){
-	    $options = "$options smp ";
-	    last;
-	} elsif($line eq "4"){
-	    $options = "$options pxshm ";
-	    last;
-	}
-}
-
 # check for MPI
 
 $skip_choosing = "false";
@@ -158,12 +133,13 @@ Choose an interconnect from below: [1-11]
 	 3) Myrinet GM
 	 4) Myrinet MX
 	 5) LAPI
-	 6) Cray XT3, XT4 (not yet tested on CNL)
-	 7) Bluegene/L Native (only at T. J. Watson)
-	 8) Bluegene/L MPI
-	 9) Bluegene/P Native
-	10) Bluegene/P MPI
-	11) VMI
+	 6) Cray XT3, XT4
+         7) Cray XT5
+	 8) Bluegene/L Native (only at T. J. Watson)
+	 9) Bluegene/L MPI
+        10) Bluegene/P Native
+	11) Bluegene/P MPI
+	12) VMI
 
 EOF
 	
@@ -191,24 +167,27 @@ EOF
 		$arch = "mpi-crayxt3";
 		last;
 	  } elsif($line eq "7"){
+	        $arch = "mpi-crayxt";
+	        last;
+	  } elsif($line eq "8"){
 		$arch = "bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "8"){
+	  } elsif($line eq "9"){
 		$arch = "mpi-bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "9"){
+	  } elsif($line eq "10"){
 		$arch = "bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "10"){
+	  } elsif($line eq "11"){
 		$arch = "mpi-bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "11"){
+	  } elsif($line eq "12"){
 		$converse_network_type = "vmi";
 		last;
 	  } else {
@@ -244,6 +223,60 @@ if($arch eq "net-darwin"){
 } elsif($arch eq "multicore-linux-x86_64"){
 	$arch = "multicore-linux64";
 } 
+
+
+
+
+
+#================ Choose SMP/PXSHM =================================
+
+# find what options are available
+$opts = `./build charm++ $arch help 2>&1 | grep "Supported options"`;
+$opts =~ m/Supported options: (.*)/;
+$opts = $1;
+
+
+#always provide multicore and single-threaded versions
+print << "EOF";
+How do you want to handle SMP/Multicore: [1-4]
+         1) single-threaded [default]
+         2) multicore(single node only)
+EOF
+
+# only add the smp or pxshm options if they are available
+$counter = 3; # the next index used in the list
+
+$smpIndex = -1;
+if($opts =~ m/smp/){
+  print "         $counter) SMP\n";
+  $smpIndex = $counter; 
+  $counter ++;
+}
+
+$pxshmIndex = -1;
+if($opts =~ m/pxshm/){
+  print "         $counter) POSIX Shared Memory\n";
+  $pxshmIndex = $counter; 
+  $counter ++;
+}
+
+while($line = <>){
+	chomp $line;
+	if($line eq "1" || $line eq ""){
+	    last;
+	} elsif($line eq "2"){
+	    $converse_network_type = "multicore";
+	    last;
+	} elsif($line eq $smpIndex){
+	    $options = "$options smp ";
+	    last;
+	} elsif($line eq $pxshmIndex){
+	    $options = "$options pxshm ";
+	    last;
+	}
+}
+
+
 
 
 
@@ -289,6 +322,7 @@ if ($numc > 0) {
 
 
 
+
 #================ Choose Options =================================
 
 #Create a hash table containing descriptions of various options
@@ -304,6 +338,7 @@ $explanations{"ifc"} = "Use Intel's ifc compiler";
 $explanations{"ammasso"} = "Use native RDMA support on Ammasso interconnect";
 $explanations{"syncft"} = "Use initial fault tolerance support";
 $explanations{"mlogft"} = "Use message logging fault tolerance support";
+$explanations{"causalft"} = "Use causal message logging fault tolerance support";
 
 
 
@@ -382,6 +417,12 @@ $explanations{"mlogft"} = "Use message logging fault tolerance support";
           }
       }
   }
+
+
+
+
+
+
 
 
 

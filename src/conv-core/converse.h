@@ -481,7 +481,7 @@ for each processor in the node.
 #define CsvAccess(v) CMK_TAG(Csv_,v)
 #endif
 
-extern CmiNodeLock smp_mutex;
+extern CmiNodeLock _smp_mutex;
 
 extern int CmiBarrier(void);
 extern int CmiBarrierZero(void);
@@ -496,6 +496,8 @@ extern int CmiNumPesOnPhysicalNode(int node);
 extern void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num);
 extern int CmiGetFirstPeOnPhysicalNode(int node);
 extern int CmiPhysicalRank(int pe);
+
+extern int CmiPrintCPUAffinity();
 
 /** Return 1 if our outgoing message queue 
    for this node is longer than this many bytes. */
@@ -594,10 +596,30 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerInfo(env) (CmiHandlerToInfo(CmiGetHandler(env)))
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
-#if CMK_MEM_CHECKPOINT
+#if __FAULT__
 extern int cur_restart_phase;      /* number of restarts */
+#endif
+
+#if CMK_MEM_CHECKPOINT
 #undef CmiSetHandler
 #define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#define MESSAGE_PHASE_CHECK(msg)	\
+	{	\
+          int phase = CmiGetRestartPhase(msg);	\
+	  if (phase != 9999 && phase < cur_restart_phase) {	\
+            /* CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CmiFree(msg);	\
+	    return;	\
+          }	\
+          /* CmiAssert(phase == cur_restart_phase || phase == 9999); */ \
+          if (phase > cur_restart_phase && phase != 9999) {    \
+            /* CmiPrintf("[%d] enqueue message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
+            CsdEnqueueFifo(msg);    \
+	    return;	\
+          }     \
+	}
+#else
+#define MESSAGE_PHASE_CHECK(msg)
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
@@ -665,11 +687,12 @@ void CmiResetMinMemory();
 void* CmiMallocAligned(const size_t size, const unsigned int alignment);
 void CmiFreeAligned(void* ptr);
 
-#define CMI_MEMORY_IS_ISOMALLOC (1<<1)
-#define CMI_MEMORY_IS_PARANOID  (1<<2)
-#define CMI_MEMORY_IS_GNU       (1<<3)
-#define CMI_MEMORY_IS_GNUOLD    (1<<4)
-#define CMI_MEMORY_IS_OS        (1<<5)
+#define CMI_MEMORY_IS_ISOMALLOC   (1<<1)
+#define CMI_MEMORY_IS_PARANOID    (1<<2)
+#define CMI_MEMORY_IS_GNU         (1<<3)
+#define CMI_MEMORY_IS_GNUOLD      (1<<4)
+#define CMI_MEMORY_IS_OS          (1<<5)
+#define CMI_MEMORY_IS_CHARMDEBUG  (1<<6)
 int CmiMemoryIs(int flag); /* return state of this flag */
 
 #define CMI_THREAD_IS_QT         (1<<1)
@@ -733,50 +756,52 @@ double   CmiWallTimer(void);
 int      CmiTimerIsSynchronized();
 #endif
 
+#include "queueing.h" /* for "Queue" */
+
 #if CMK_NODE_QUEUE_AVAILABLE
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueGeneral(CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
+          CqsEnqueueGeneral((Queue)CsvAccess(CsdNodeQueue),(x),(s),(i),(p)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueFifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x)); \
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x)); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueueLifo(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueLifo(CsvAccess(CsdNodeQueue),(x))); \
+          CqsEnqueueLifo((Queue)CsvAccess(CsdNodeQueue),(x))); \
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 #define CsdNodeEnqueue(x)     do { \
           CmiLock(CsvAccess(CsdNodeQueueLock));\
-          CqsEnqueueFifo(CsvAccess(CsdNodeQueue),(x));\
+          CqsEnqueueFifo((Queue)CsvAccess(CsdNodeQueue),(x));\
           CmiUnlock(CsvAccess(CsdNodeQueueLock)); \
         } while(0)
 
-#define CsdNodeEmpty()            (CqsEmpty(CpvAccess(CsdNodeQueue)))
-#define CsdNodeLength()           (CqsLength(CpvAccess(CsdNodeQueue)))
+#define CsdNodeEmpty()            (CqsEmpty(C(Queue)pvAccess(CsdNodeQueue)))
+#define CsdNodeLength()           (CqsLength((Queue)CpvAccess(CsdNodeQueue)))
 
 #else
 
 #define CsdNodeEnqueueGeneral(x,s,i,p) (CsdEnqueueGeneral(x,s,i,p))
-#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueFifo(x) (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdNodeEnqueueLifo(x) (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
 #define CsdNodeEnqueue(x)     (CsdEnqueue(x))
-#define CsdNodeEmpty()        (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdNodeLength()       (CqsLength(CpvAccess(CsdSchedQueue)))
+#define CsdNodeEmpty()        (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdNodeLength()       (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #endif
 
 #define CsdEnqueueGeneral(x,s,i,p)\
-    (CqsEnqueueGeneral(CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
-#define CsdEnqueueFifo(x)     (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueueLifo(x)     (CqsEnqueueLifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEnqueue(x)         (CqsEnqueueFifo(CpvAccess(CsdSchedQueue),(x)))
-#define CsdEmpty()            (CqsEmpty(CpvAccess(CsdSchedQueue)))
-#define CsdLength()           (CqsLength(CpvAccess(CsdSchedQueue)))
+    (CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),(x),(s),(i),(p)))
+#define CsdEnqueueFifo(x)     (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueueLifo(x)     (CqsEnqueueLifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEnqueue(x)         (CqsEnqueueFifo((Queue)CpvAccess(CsdSchedQueue),(x)))
+#define CsdEmpty()            (CqsEmpty((Queue)CpvAccess(CsdSchedQueue)))
+#define CsdLength()           (CqsLength((Queue)CpvAccess(CsdSchedQueue)))
 
 #if CMK_CMIPRINTF_IS_A_BUILTIN /* these are implemented in machine.c */
 void  CmiPrintf(const char *, ...);
@@ -962,6 +987,8 @@ void     CmiLookupGroup(CmiGroup grp, int *npes, int **pes);
   }\
 }
 
+void CmiPushPE(int, void*);
+
 void          CmiSyncSendFn(int, int, char *);
 CmiCommHandle CmiAsyncSendFn(int, int, char *);
 void          CmiFreeSendFn(int, int, char *);
@@ -1094,9 +1121,11 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
 #define CmiAsyncNodeBroadcastAll(s,m)       (CmiAsyncNodeBroadcastAllFn((s),(char *)(m)))
 #define CmiSyncNodeBroadcastAllAndFree(s,m) (CmiFreeNodeBroadcastAllFn((s),(char *)(m)))
 #else
+
 #define CmiSyncNodeSend(n,s,m)        CmiSyncSend(CmiNodeFirst(n),s,m)
 #define CmiAsyncNodeSend(n,s,m)       CmiAsyncSend(CmiNodeFirst(n),s,m)
 #define CmiSyncNodeSendAndFree(n,s,m) CmiSyncSendAndFree(CmiNodeFirst(n),s,m)
+#if CMK_UTH_VERSION || CMK_MULTICORE
 #define CmiSyncNodeBroadcast(s,m)           do { \
           int _i; \
           for(_i=0; _i<CmiNumNodes(); _i++) \
@@ -1118,6 +1147,14 @@ void          CmiFreeNodeBroadcastAllFn(int, char *);
           CmiSyncNodeBroadcastAll(s,m); \
           CmiFree(m); \
         } while(0)
+#else
+#define CmiSyncNodeBroadcast(s,m)           CmiSyncBroadcast(s,m)
+#define CmiAsyncNodeBroadcast(s,m)          CmiAsyncBroadcast(s,m)
+#define CmiSyncNodeBroadcastAndFree(s,m)    CmiSyncBroadcastAndFree(s,m)
+#define CmiSyncNodeBroadcastAll(s,m)        CmiSyncBroadcastAll(s,m)
+#define CmiAsyncNodeBroadcastAll(s,m)       CmiAsyncBroadcastAll(s,m)
+#define CmiSyncNodeBroadcastAllAndFree(s,m) CmiSyncBroadcastAllAndFree(s,m)
+#endif
 #endif
 
 /******** CMI MESSAGE RECEPTION ********/
@@ -1181,6 +1218,7 @@ typedef struct {
   */
   char cmicore[CmiReservedHeaderSize];
   CthThread thread;
+  int serialNo;
 } CthThreadToken;
 
 CthThreadToken *CthGetToken(CthThread);
@@ -1190,6 +1228,7 @@ typedef void        (*CthAwkFn)(CthThreadToken *,int,
 				int prioBits,unsigned int *prioptr);
 typedef CthThread   (*CthThFn)();
 
+void       CthSetSerialNo(CthThread t, int no);
 int        CthImplemented(void);
 
 int        CthMigratable();
@@ -1390,6 +1429,7 @@ char *CldGetStrategy(void);
 
 void CldEnqueue(int pe, void *msg, int infofn);
 void CldEnqueueMulti(int npes, int *pes, void *msg, int infofn);
+void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn);
 void CldNodeEnqueue(int node, void *msg, int infofn);
 
 /****** CMM: THE MESSAGE MANAGER ******/
@@ -1448,10 +1488,11 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
 #define CcdPERIODIC_10s      20 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  21 /*every minute*/
-#define CcdPERIODIC_10minute 22 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    23 /*every hour*/
-#define CcdPERIODIC_12hour   24 /*every 12 hours*/
-#define CcdPERIODIC_1day     25 /*every day*/
+#define CcdPERIODIC_5minute  22 /*every 5 minute*/
+#define CcdPERIODIC_10minute 23 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    24 /*every hour*/
+#define CcdPERIODIC_12hour   25 /*every 12 hours*/
+#define CcdPERIODIC_1day     26 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
@@ -1482,6 +1523,8 @@ void CcdRaiseCondition(int condnum);
 void CmiArgGroup(const char *parentName,const char *groupName);
 int CmiGetArgInt(char **argv,const char *arg,int *optDest);
 int CmiGetArgIntDesc(char **argv,const char *arg,int *optDest,const char *desc);
+int CmiGetArgLong(char **argv,const char *arg,CmiInt8 *optDest);
+int CmiGetArgLongDesc(char **argv,const char *arg,CmiInt8 *optDest,const char *desc);
 int CmiGetArgDouble(char **argv,const char *arg,double *optDest);
 int CmiGetArgDoubleDesc(char **argv,const char *arg,double *optDest,const char *desc);
 int CmiGetArgString(char **argv,const char *arg,char **optDest);
@@ -1768,8 +1811,8 @@ extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #endif
 
 /* The flag tells whether we are in the process of doing out-of-core emulation in BigSim */
-extern int BgOutOfCoreFlag;
-extern int BgInOutOfCoreMode;
+extern int _BgOutOfCoreFlag;
+extern int _BgInOutOfCoreMode;
 
 #ifdef ADAPT_SCHED_MEM
 extern int numMemCriticalEntries;

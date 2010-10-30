@@ -1,0 +1,2 @@
+
+CMK_BUILD_MPI=1

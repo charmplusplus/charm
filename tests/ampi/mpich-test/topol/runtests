@@ -6,8 +6,8 @@
 # -mvhome is needed for the ANL SP, and is ignored by others
 args=
 device=
-top_srcdir=/Users/abecker/Desktop/mpich-test
-srcdir=/Users/abecker/Desktop/mpich-test/topol
+top_srcdir=..
+srcdir=../topol
 MPICH_VERSION=
 STOPFILE=${MPITEST_STOPTEST:-"$HOME/.stopmpichtests"}
 mpirun=${MPIRUN:-"mpirun"}

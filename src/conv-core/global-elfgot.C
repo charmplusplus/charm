@@ -59,6 +59,12 @@ A more readable summary is at:
 
 #define DEBUG_GOT_MANAGER 0
 
+#define UNPROTECT_GOT     0
+
+#if UNPROTECT_GOT
+#include <sys/mman.h>
+#endif
+
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
@@ -198,6 +204,7 @@ int CtgGlobalList::isUserSymbol(const char *name) {
        || (strncmp("Csv_", name, 4) == 0) || (strncmp("Ctv_", name, 4) == 0)
        || (strncmp("Bnv_", name, 4) == 0) || (strncmp("Bpv_", name, 4) == 0)
        || (strncmp("ckout", name, 5) == 0) || (strncmp("stdout", name, 6) == 0)
+       || (strncmp("ckerr", name, 5) == 0)
        || (strncmp("environ", name, 7) == 0)
        || (strncmp("stderr", name, 6) == 0) || (strncmp("stdin", name, 5) == 0)) {
 #ifdef CMK_GFORTRAN
@@ -312,6 +319,15 @@ CtgGlobalList::CtgGlobalList() {
 #endif
 	if ((void *)*gGot != (void *)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
+
+#if UNPROTECT_GOT
+	static void *last = NULL;
+        void *pg = (void*)(((size_t)gGot) & ~(CMK_MEMORY_PAGESIZE-1));
+        if (pg != last) {
+            mprotect(pg, CMK_MEMORY_PAGESIZE, PROT_READ | PROT_WRITE);
+            last = pg;
+        }
+#endif
 
 	rec.push_back(CtgRec(gGot,datalen));
 	datalen+=gSize;

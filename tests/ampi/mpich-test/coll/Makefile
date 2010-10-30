@@ -3,8 +3,8 @@ ALL: default
 ##### User configurable options #####
 
 MPIR_HOME    = 
-CC           = /Users/abecker/code/charm.git/bin/mpiCC
-CLINKER      = /Users/abecker/code/charm.git/bin/mpiCC
+CC           = ../../../../bin/ampiCC
+CLINKER      = ../../../../bin/ampiCC
 CCC          = 
 CCLINKER     = $(CCC)
 F77          = :
@@ -16,8 +16,8 @@ MAKE         = make
 
 SHELL = /bin/sh
 prefix     = 
-top_srcdir = /Users/abecker/Desktop/mpich-test
-srcdir     = /Users/abecker/Desktop/mpich-test/coll
+top_srcdir = ..
+srcdir     = ../coll
 VPATH=.:$(srcdir)
 
 PROFLIB =
