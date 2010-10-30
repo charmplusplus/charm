@@ -84,9 +84,10 @@ charjSource[SymbolTable symtab, OutputMode m]
     this.mode_ = m;
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
-        (i+=importDeclaration)*
-        (r+=readonlyDeclaration)*
-        (t+=typeDeclaration)*)
+        ((i+=importDeclaration)
+        |(r+=readonlyDeclaration)
+        |externDeclaration
+        |(t+=typeDeclaration))*)
         -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
@@ -111,6 +112,11 @@ readonlyDeclaration
         -> {emitCI()}? template(bn={basename()}, v={$lvd.st}) "readonly <v>"
         -> {emitH()}? template(v={$lvd.st}) "extern <v>"
         -> {emitCC()}? {$lvd.st;}
+        ->
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
         ->
     ;
     

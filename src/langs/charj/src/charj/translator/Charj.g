@@ -268,6 +268,7 @@ compilationUnit
 topLevelDeclaration
     :   importDeclaration
     |   readonlyDeclaration
+    |   externDeclaration
     |   typeDeclaration
     ;
 
@@ -282,6 +283,10 @@ importDeclaration
 
 readonlyDeclaration
     :   READONLY^ localVariableDeclaration ';'!
+    ;
+
+externDeclaration
+    :   EXTERN^ qualifiedIdentifier ';'!
     ;
 
 typeDeclaration
