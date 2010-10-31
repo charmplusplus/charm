@@ -83,8 +83,7 @@
 #endif
 
 
-//#define HSTART
-
+#define HSTART
 #ifdef HSTART
 /*Hierarchical-start routines*/
 int mynodes_start ;	/* To keep a global node numbering */
@@ -1175,7 +1174,7 @@ int branchfactor;
 int nodes_per_child;
 int * nodetab_unique_table;
 int nodetab_unique_size;
-char        *nodetab_name(int i);
+char  *nodetab_name(int i);
 void nodetab_init_hierarchical_start(void)
 {
 	int node_start = 0;
@@ -1187,7 +1186,8 @@ void nodetab_init_hierarchical_start(void)
 			nodetab_unique_table[nodetab_unique_size++] = node_start;
 			node_name = nodetab_name(node_start);
 			do{
-					node_start++;}
+					node_start++;
+            }
 			while(node_start<nodetab_rank0_size&&(!strcmp(nodetab_name(node_start),node_name)));
 				
 	}
@@ -1631,7 +1631,6 @@ int req_reply_child(SOCKET fd, char *type,
 		int status = req_reply(fd, type, data, dataLen);
 		if(status != REQ_OK) return status;
 	    SOCKET clientFd ;
-		/* Handle Error ?? */
  		skt_recvN(fd, (const char *)&clientFd, sizeof(SOCKET));
 	    skt_sendN(fd, (const char *)&clientFd, sizeof(fd)); 
 		return status;
@@ -1705,13 +1704,13 @@ int req_handle_initnodetab1(ChMessage *msg,SOCKET fd)
 {
 	ChMessageHeader hdr;
 	ChMessageInt_t nNodes=ChMessageInt_new(nodetab_rank0_size);
-	ChMessageHeader_new("initnodetab1",sizeof(ChMessageInt_t)+
+	ChMessageHeader_new("initnttab",sizeof(ChMessageInt_t)+
 			    sizeof(ChNodeinfo)*nodetab_rank0_size,&hdr);
 	skt_sendN(fd,(const char *)&hdr,sizeof(hdr));
 	skt_sendN(fd,(const char *)&nNodes,sizeof(nNodes));
 	skt_sendN(fd,(const char *)nodeinfo_arr,
 		  sizeof(ChNodeinfo)*nodetab_rank0_size);
-			
+	
 	return REQ_OK;
 }
 /*Get the array of node numbers, IPs, and ports.
@@ -1735,7 +1734,6 @@ int req_handle_initnodedistribution(ChMessage *msg,SOCKET fd, int client)
 	for(k =0; k <rank0_finish- rank0_start; k++)
 			nodemsg[k] = ChMessageInt_new(nodetab_rank0_table[rank0_start+k]);
 	ChMessageHeader hdr;
-/*Remove	printf("Nodes to fire %d %d %d \n", rank0_finish, rank0_start, nodetab_rank0_size); */
 	ChMessageInt_t nNodes=ChMessageInt_new(rank0_finish- rank0_start);
 	ChMessageInt_t nTotalNodes=ChMessageInt_new(nodetab_rank0_size);
 	ChMessageHeader_new("initnodetab",sizeof(ChMessageInt_t)*2+
@@ -1766,8 +1764,6 @@ void forward_nodetab_to_children()
 {
 	/*it just needs to receive and copy the nodetab info if required and send it as it is to its nodes */	
 if (!skt_select1(parent_charmrun_fd,1200*1000)){
-	//	CmiAbort("Timeout waiting for nodetab!\n");
-	//	Timeout mechanism to be inserted
 	exit(0);
 	}
 ChMessage msg;
@@ -1793,9 +1789,8 @@ for (client=0;client<nodetab_rank0_size;client++)	{
 void receive_nodeset_from_child(ChMessage *msg, SOCKET fd)
 {
 	ChMessageInt_t * n32 = (ChMessageInt_t *)msg->data;	
-int numOfNodes =ChMessageInt(n32[0]); /*TODO*/
-	/*TODO : Introduce error checks in msg format*/
-ChSingleNodeinfo *childNodeInfo = (ChSingleNodeinfo*) (n32+1);
+    int numOfNodes =ChMessageInt(n32[0]); 
+    ChSingleNodeinfo *childNodeInfo = (ChSingleNodeinfo*) (n32+1);
 	int k;
 	for(k = 0; k<numOfNodes; k++)
 			nodeinfo_add(childNodeInfo+k,fd);
@@ -1805,7 +1800,6 @@ void set_sockets_list(ChMessage *msg, SOCKET fd)
 {
 	ChMessageInt_t * n32 = (ChMessageInt_t *)msg->data;	
     int node_start =ChMessageInt(n32[0]); 
-	//printf("unique number = %d %d\n", node_start, nodes_per_child);
 	charmrun_fds[node_start/nodes_per_child] = fd;
 }
 #endif
@@ -1968,7 +1962,9 @@ void anounce_crash(int socket_index,int crashed_node);
 static int _last_crash = 0;			/* last crashed pe number */
 static int _crash_socket_index = 0;		/* last restart socket */
 #ifdef HSTART
-static int _crash_socket_charmrun = 0;		/* last restart socket */
+static int _crash_socket_charmrun_index = 0;		/* last restart socket */
+int crashed_pe_id;
+int restarted_pe_id;
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 static int numCrashes=0;  /*number of crashes*/
@@ -1986,7 +1982,7 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 			/* only after everybody else update its nodetab, can this
 			   restarted process continue */
 			printf("Charmrun> continue node: %d\n", _last_crash);
-			req_handle_initnodetab1(NULL,req_clients[_crash_socket_charmrun]);
+			req_handle_initnodetab1(NULL,req_clients[_crash_socket_charmrun_index]);
 			_last_crash = 0;
 			count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -2021,7 +2017,7 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 			int nt=nodetab_rank0_table[ChMessageInt(nodeInfo->nodeNo)-mynodes_start];
 			nodeInfo->nodeNo = ChMessageInt_new(nt);
 			/* Required for CCS */
-		/*Nodetable index for this node*/
+	    	/*Nodetable index for this node*/
 			int pe;
 			for (pe=0;pe<nodetab_cpus(nt);pe++)
 			  {
@@ -2032,6 +2028,12 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 /* Receives new dataport of restarted prcoess	and resends nodetable to everyone*/
 		int req_handle_crash(ChMessage *msg,SOCKET fd)
 		{
+
+			ChMessageInt_t oldpe, newpe;
+ 			skt_recvN(fd, (const char *)&oldpe, sizeof(oldpe));
+ 			skt_recvN(fd, (const char *)&newpe, sizeof(newpe));
+			*nodetab_table[ChMessageInt(oldpe)] = *nodetab_table[ChMessageInt(newpe)]; 
+
 			int status = req_handle_initnode(msg,fd);
 			int i;
 			for(i=0;i<req_nClients;i++){
@@ -2039,9 +2041,10 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 				break;
 				}
 			}	
-			_crash_socket_charmrun = i;
+			_crash_socket_charmrun_index = i;
 
-			/* TODO:set last crashed node ? */
+			fprintf(stdout,"Root charmrun : Socket %d failed %d\n",fd, _crash_socket_charmrun_index);
+			fflush(stdout);
 			ChSingleNodeinfo *nodeInfo = (ChSingleNodeinfo *)msg->data;
 			int crashed_node = ChMessageInt(nodeInfo->nodeNo);
 			_last_crash = crashed_node;
@@ -2073,6 +2076,7 @@ void error_in_req_serve_client(SOCKET fd){
 	int crashed_node,crashed_pe,node_index,socket_index;
 	fprintf(stdout,"Socket %d failed \n",fd);
 
+	
 #ifdef HSTART
 	if(arg_hierarchical_start)
 			{
@@ -2103,10 +2107,11 @@ void error_in_req_serve_client(SOCKET fd){
 		}
 	}
 	crashed_node = i;
+	
 	/** should also send a message to all the other processors telling them that this guy has crashed*/
 	/*anounce_crash(socket_index,crashed_node);*/
 	restart_node(crashed_node);
-	
+
 	fprintf(stdout,"charmrun says Processor %d failed on Node %d\n",crashed_pe,crashed_node);
 	/** after the crashed processor has been recreated 
 	 it connects to charmrun. That data must now be filled 
@@ -2122,32 +2127,6 @@ void error_in_req_serve_client(SOCKET fd){
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	skt_close(fd);
 #endif
-}
-#endif
-#ifdef HSTART
-int req_handler_forward_dispatch(ChMessage *msg,SOCKET replyFd)
-{
-  char *cmd=msg->header.type;
-  int recv_status;
-  
-  if (strcmp(cmd,"print")==0)      return req_handle_print(msg,replyFd);
-  else if (strcmp(cmd,"printerr")==0)   return req_handle_printerr(msg,replyFd);
-  else if (strcmp(cmd,"printsyn")==0)  return req_handle_printsyn(msg,replyFd);
-  else if (strcmp(cmd,"printerrsyn")==0) return req_handle_printerrsyn(msg,replyFd);
-  else if (strcmp(cmd,"scanf")==0)      return req_handle_scanf(msg,replyFd);
-  else if (strcmp(cmd,"ending")==0)     return req_handle_ending(msg,replyFd);
-  else if (strcmp(cmd,"abort")==0)      return req_handle_abort(msg,replyFd);
-#ifdef __FAULT__	
-  else if (strcmp(cmd,"crash_ack")==0)   return req_handle_crashack(msg,replyFd);
-#endif
-  else {
-#ifndef __FAULT__	
-        fprintf(stderr,"Charmrun> Bad control socket request '%s'\n",cmd); 
-        abort();
-	return REQ_OK;
-#endif				
-  }
-  return REQ_OK;
 }
 #endif
 
@@ -2243,42 +2222,43 @@ void req_forward_root(SOCKET fd)
 
   char *cmd=msg.header.type;
 
-#ifdef __FAULT__	
-  if(recv_status < 0) error_in_req_serve_client(fd);
+#ifdef __FAULT__
+	if(recv_status < 0)
+  {
+		  error_in_req_serve_client(fd);
+		  return;
+  }
+
 	/*called from reconnect_crashed_client */
-	if(arg_hierarchical_start)
 	if (strcmp(cmd,"initnode")==0)
   {
 		set_crashed_socket_id(&msg,fd);
 	}
 #endif
-/*TODO : Do we need this :
- #ifdef __FAULT__
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
- if(recv_status < 0){
-        if(replyFd == last_crashed_fd){
-            return REQ_OK;
-        }
-        DEBUGF(("recv_status %d on socket %d \n",recv_status,replyFd));
-        error_in_req_serve_client(replyFd);
-    }
-*/
-  /* TODO : Special handling for ending and abort */
+
   if (strcmp(cmd,"ping")!=0)
   {
 		  status = req_reply(parent_charmrun_fd, cmd, msg.data,ChMessageInt(msg.header.len));
 
   if (strcmp(cmd,"scanf")==0 || strcmp(cmd,"printsyn")==0 || strcmp(cmd,"printerrsyn")==0)
 		  skt_sendN(parent_charmrun_fd,(const char *)&fd, sizeof(fd)); 
+  
+#ifdef __FAULT__
+  if (strcmp(cmd,"initnode")==0)
+  {
+	ChMessageInt_t oldpe=ChMessageInt_new(crashed_pe_id);
+	ChMessageInt_t newpe=ChMessageInt_new(restarted_pe_id);
+	skt_sendN(parent_charmrun_fd,(const char *)&oldpe, sizeof(oldpe)); 
+    skt_sendN(parent_charmrun_fd,(const char *)&newpe, sizeof(newpe)); 
   }
+#endif
+  }
+
 
   switch (status) 
   {
     case REQ_OK: break;
     case REQ_FAILED:
-		/*TODO:Redirect fprintfs*/
-		/* Error happened */
-       /* fprintf(stderr,"Charmrun> Error processing control socket request %s\n",msg.header.type);  */
         abort();
         break;
   }
@@ -2291,10 +2271,17 @@ void req_forward_client()
   int status;
   ChMessage msg;
   recv_status = ChMessage_recv(parent_charmrun_fd,&msg);
-
+  if(recv_status < 0)
+      {
+          int i;
+          for (i=0;i<req_nClients;i++)
+              skt_close(req_clients[i]);
+          exit(0);
+      }
+    
   char *cmd=msg.header.type;
 
-	if(strcmp(cmd, "barrier") ==0){
+    if(strcmp(cmd, "barrier") ==0){
 			int i;
 		for (i=0;i<req_nClients;i++)
       if (REQ_OK != req_reply(req_clients[i],cmd,msg.data,ChMessageInt(msg.header.len)))
@@ -2305,9 +2292,12 @@ void req_forward_client()
 	}
 #ifdef __FAULT__
 	if(strcmp(cmd, "initnodetab") ==0){
+	
+		if(_last_crash ==0 ) 
+				cur_restart_phase++;
 		int i;
 		for (i=0;i<req_nClients;i++)
-			if(i !=_crash_socket_index)
+			if(_last_crash==0 || i !=_crash_socket_index)
       if (REQ_OK != req_reply(req_clients[i],cmd,msg.data,ChMessageInt(msg.header.len)))
 	   {
 		abort();
@@ -2316,17 +2306,19 @@ void req_forward_client()
 	}
 
 	if(strcmp(cmd, "crashnode") ==0){
+
 		int i;
 		for (i=0;i<req_nClients;i++)
-			if(i !=_crash_socket_index)
+			if(_last_crash==0 || i !=_crash_socket_index)
       if (REQ_OK != req_reply(req_clients[i],cmd,msg.data,ChMessageInt(msg.header.len)))
 	   {
 		abort();
       }
 		return;
 	}
-	if(strcmp(cmd, "initnodetab1") ==0){
-	    if (REQ_OK != req_reply(req_clients[_crash_socket_index],cmd,msg.data,ChMessageInt(msg.header.len)))
+	if(strcmp(cmd, "initnttab") ==0){
+			_last_crash = 0;
+	    if (REQ_OK != req_reply(req_clients[_crash_socket_index],"initnodetab",msg.data,ChMessageInt(msg.header.len)))
 	   {
 		abort();
       }
@@ -2348,7 +2340,7 @@ void req_forward_client()
 		  {
 			fd = nodetab_table[0]->ctrlfd;
 		  }
-  		else
+    else
 		  skt_recvN(parent_charmrun_fd, (const char *)&fd,sizeof(SOCKET));
 		  
 		  status = req_reply(fd, cmd, msg.data,ChMessageInt(msg.header.len));
@@ -2357,14 +2349,11 @@ void req_forward_client()
 		  {
 			case REQ_OK: break;
 			case REQ_FAILED:
-				/*TODO:Redirect fprintfs*/
-				/* Error happened */
-			   /* fprintf(stderr,"Charmrun> Error processing control socket request %s\n",msg.header.type);  */
 				abort();
 				break;
 		  }
 		  ChMessage_free(&msg);
-		}
+}
 
 #endif	
 
@@ -2557,7 +2546,6 @@ void req_poll()
 		  DEBUGF(("Req_poll: Select returned %d...\n",status));
 
 		  if (status==0) return;/*Nothing to do-- timeout*/
-		  /*TODO: Does it need to announce its death: something like ending/abort message*/
 		  if (status<0){ 
 				fflush(stdout);
 				fflush(stderr);
@@ -2591,11 +2579,7 @@ void req_poll()
 				while (1==skt_select1(parent_charmrun_fd,0) && readcount>0);
 			  }
 
-	
-
-
 		  /*Wait to receive responses and Forward responses */
-
 		  if (CcsServer_fd()!=INVALID_SOCKET)
 			 if (FD_ISSET(CcsServer_fd(),&rfds)) {
 				  DEBUGF(("Activity on CCS server port...\n"));
@@ -2815,7 +2799,7 @@ void req_set_client_connect(int start,int end) {
 }
 #else
 /*int charmrun_phase =0; meaningful for main charmun to decide what to receive*/
-		void req_set_client_connect(int start,int end) {
+void req_set_client_connect(int start,int end) {
 			fd_set sockset;
 			ChMessage msg;
 			int client,i;
@@ -2847,8 +2831,6 @@ void req_set_client_connect(int start,int end) {
 			done=0;
 			while(!done) {
 				/* check server socket for messages */
-				/* TODO:Do we need to do this in second phase as well that is when the child charmruns are already connected*/	
-						/* check server socket for messages */
 #if ! CMK_USE_IBVERBS || CMK_IBVERBS_FAST_START
 		while(curclientstart==curclientend||skt_select1(server_fd,1)!=0) {
 			errorcheck_one_client_connect(curclientend++);
@@ -2890,7 +2872,7 @@ void req_set_client_connect(int start,int end) {
 			ChMessage_free(&msg);
 
 			free(finished);
-		}
+}
 #endif
 						
 						
@@ -3004,7 +2986,7 @@ void exchange_qpdata_clients(){
 #ifdef HSTART
 		void req_charmrun_connect(void)
 		{
-			double t1, t2, t3, t4;
+		//	double t1, t2, t3, t4;
 			int client;
 			nodeinfo_allocate();
 			req_nClients=branchfactor;
@@ -3023,10 +3005,10 @@ void exchange_qpdata_clients(){
 				read_initnode_one_client(client);
 			}
 #else
-if(!arg_child_charmrun) getthetime(t1);
+//if(!arg_child_charmrun) getthetime(t1);
 
 			req_set_client_connect(0,req_nClients);
-if(!arg_child_charmrun)	getthetime(t2);		/* also need to process received nodesets JIT */
+//if(!arg_child_charmrun)	getthetime(t2);		/* also need to process received nodesets JIT */
 #endif
 			
 				if (portOk == 0) exit(1);
@@ -3038,14 +3020,11 @@ if(!arg_child_charmrun)	getthetime(t2);		/* also need to process received nodese
 			for (client=0;client<req_nClients;client++)	{
 							// add flag to check what leval charmrun it is and what phase
 				req_handle_initnodedistribution(NULL, charmrun_fds[client], client);
-		//		req_handle_initnodetab(NULL,req_clients[client]);
 			}
-getthetime(t3);
+//getthetime(t3);
 
 			/* Now receive the nodetab from child charmruns*/
 			charmrun_phase = 1;
-			/*for(client=0;client<req_nClients;client++)
-				req_clients[client]=-1;*/
 			
 			skt_set_abort(client_connect_problem);
 
@@ -3055,10 +3034,10 @@ getthetime(t3);
 			for (client=0;client<req_nClients;client++)	{			
 				req_handle_initnodetab(NULL,req_clients[client]);
 			}
-if(!arg_child_charmrun) getthetime(t4);
+//if(!arg_child_charmrun) getthetime(t4);
 #endif
 			if (arg_verbose) printf("Charmrun> IP tables sent.\n");
-if(!arg_child_charmrun) printf("Time for charmruns connect= %f , sending nodes to fire= %f, node clients connected= %f n ", t2-t1, t3-t2, t4-t3);
+//if(!arg_child_charmrun) printf("Time for charmruns connect= %f , sending nodes to fire= %f, node clients connected= %f n ", t2-t1, t3-t2, t4-t3);
 		}
 
 #endif
@@ -3263,11 +3242,8 @@ int unique_node_start;
 			}
 			ChMessage_recv(parent_charmrun_fd,&nodelistmsg);
 		  
-		//#if CMK_USE_IBVERBS	
-		//#else
 		  my_nodetab_store(&nodelistmsg);
 		  ChMessage_free(&nodelistmsg);
-		//#endif	
 		}
 
 
@@ -3277,7 +3253,7 @@ int unique_node_start;
 		if (!skt_ip_match(parent_charmrun_IP,_skt_invalid_ip)) {
 			dataskt=skt_server(&dataport);
 			parent_charmrun_fd = skt_connect(parent_charmrun_IP, parent_charmrun_port, 1800);
-			  } else {/*TODO: Error*/
+			  } else {
 			parent_charmrun_fd=-1;
 		  }
 
@@ -3340,14 +3316,11 @@ int main(int argc, char **argv, char **envp)
   
   /* Initialize the IO module */
   input_init();
-
-
   
 #ifdef HSTART
 		 /* Hierarchical startup*/
 		 if(arg_child_charmrun)
 			{
-				//	sleep(90);
 				init_mynodes(); /* contacts root charmrun and gets list  of nodes to start*/
 			}
 #endif
@@ -3997,7 +3970,7 @@ void start_nodes_local(char ** env)
 #if CMK_AIX && CMK_SMP
   fprintf(f,"MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
 #endif
- 
+
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
   }
@@ -4281,7 +4254,6 @@ void start_nodes_local(char ** env)
 		
 		   int client;
 			 int nextIndex =0;
-			 //rsh_pids=(int *)malloc(sizeof(int)*branchfactor);
 			 client=0;
 			 while(nextIndex<branchfactor){
 			 /* need to index into unique_table*/
@@ -4341,35 +4313,39 @@ void start_nodes_local(char ** env)
 #if CMK_SMP || defined(_WIN32)
 	clientgroup=client+1; /* smp already handles this functionality */
 #else
-	if(!arg_scalable_start)
+
 #ifdef HSTART
-        if(!arg_hierarchical_start)
-#endif
+	if(!arg_scalable_start && !arg_hierarchical_start)
 		clientgroup=client+1; /* only launch 1 core per rsh call */
 	else {
 		clientgroup=client;
 		do {
 			clientgroup++; /* add one more client to group if not greater than nodes and shares the same name as client */
-		}
-#ifdef HSTART
-		while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_name(nodetab_rank0_table[clientgroup]),nodetab_name(nodetab_rank0_table[client]))));
+       		if(clientgroup>=nodetab_rank0_size)
+                break;
+            if(arg_scalable_start&&!arg_hierarchical_start)
+                if(strcmp(nodetab_name(clientgroup),nodetab_name(client)))
+                        break;
+            /*Hierarchical-start*/
+            if(strcmp(nodetab_name(nodetab_rank0_table[clientgroup]),nodetab_name(nodetab_rank0_table[client])))
+                        break;
+        }
+        while(1);
+	}
+
 #else
-		while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_name(clientgroup),nodetab_name(client))));
-#endif
+	if(!arg_scalable_start)
+		clientgroup=client+1; /* only launch 1 core per rsh call */
+	else {
+		clientgroup=client;
+		do {
+			clientgroup++; /* add one more client to group if not greater than nodes and shares the same name as client */
+        }while(clientgroup<nodetab_rank0_size&&(!strcmp(nodetab_name(clientgroup),nodetab_name(client))));
 	}
 #endif
+
+#endif
 			nodetab_getnodeinfo(client)->forks=clientgroup-client-1; /* already have 1 process launching */
-		/*Useful for debugging REMOVE 
-		  	 FILE *f;
-			 char bugScript[200];
-			 sprintf(bugScript,"charmrun2.%d.%d",getpid(), client);
-			 f=fopen(bugScript,"w");
-			 fprintf(f, "%d  %d %s  %d ", nodetab_rank0_size,mynodes_start+client , nodetab_name(nodetab_rank0_table[client]), server_port);
-			 char str[1024];
-					  sprintf(str," %s %d %d ",server_addr,server_port,getpid()&0x7FFF);
-			 fprintf(f, str);
-			 fclose(f);
-		*/
 			start_one_node_rsh(client);
 			return clientgroup-client; /* return number of entries in group */
 		}
@@ -4613,7 +4589,7 @@ void restart_node(int crashed_node){
 
 	rsh_script(f,pe,crashed_node,restart_argv,1);
   	fclose(f);
-	/** change the nodetable entry of the crashed
+		/** change the nodetable entry of the crashed
 	processor to connect it to a new one**/
 	refill_nodetab_entry(crashed_node);
 	/**start the new processor */
@@ -4662,8 +4638,11 @@ nodetab_host *replacement_host(int pe){
 	int x=pe;
 	while(x == pe){
 #ifdef HSTART         
-	 if(arg_hierarchical_start) 
+	 if(arg_hierarchical_start){ 
 	 	x = nodetab_rank0_table[rand()%nodetab_rank0_size];	
+	 	crashed_pe_id = pe;
+		restarted_pe_id = x;
+	 }
 	 else
 #endif
 	 	x = rand()%nodetab_size;	
@@ -4688,9 +4667,10 @@ void reconnect_crashed_client(int socket_index,int crashed_node){
 		if(!skt_select1(req_clients[socket_index],arg_timeout*1000)){
 			client_connect_problem(socket_index,"Timeout on IP request for restarted processor");
 		}
+
 #ifdef HSTART
 		if(arg_hierarchical_start){ 
-			req_forward_root(socket_index);
+			req_forward_root(req_clients[socket_index]);
 		if (_last_crash != 0) {
           	  fprintf(stderr, "ERROR> Charmrun detected multiple crashes.\n");
                	  exit(1);
