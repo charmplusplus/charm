@@ -65,6 +65,12 @@ A more readable summary is at:
 #include <sys/mman.h>
 #endif
 
+#ifdef __INTEL_COMPILER
+#define ALIGN_GOT(x)       (long)((~15)&((x)+15))
+#else
+#define ALIGN_GOT(x)       ALIGN8(x)
+#endif
+
 #if !CMK_SHARED_VARS_UNAVAILABLE
 #  error "Global-elfgot won't work properly under smp version: -swapglobals disabled"
 #endif
@@ -309,7 +315,7 @@ CtgGlobalList::CtgGlobalList() {
 
 	// It's got the right name-- it's a user global
 	int size = symt[symindx].st_size;
-	int gSize = ALIGN8(size);
+	int gSize = ALIGN_GOT(size);
 	padding += gSize - size;
 	ELFXX_TYPE_Addr *gGot=(ELFXX_TYPE_Addr *)relt[count].r_offset;
 

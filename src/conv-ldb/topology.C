@@ -144,8 +144,12 @@ public:
   virtual int max_neighbors() { return npes - 1; }
 
   virtual void neighbors(int mype, int* _n, int &nb){
-		CkPrintf("neighbors:Nothing in here..\n");
-	}
+      nb = 0;
+      for(int i=1; i<=ppn; i++)
+      {
+          _n[nb++] = (mype+i)%npes;
+      }
+  }
 	
 	int get_hop_count(int src,int dest){
 		
@@ -168,11 +172,23 @@ typedef LBTopo_smp_n<1> LBTopo_smp_n_1;
 typedef LBTopo_smp_n<2> LBTopo_smp_n_2;
 typedef LBTopo_smp_n<3> LBTopo_smp_n_3;
 typedef LBTopo_smp_n<4> LBTopo_smp_n_4;
+typedef LBTopo_smp_n<5> LBTopo_smp_n_5;
+typedef LBTopo_smp_n<6> LBTopo_smp_n_6;
+typedef LBTopo_smp_n<7> LBTopo_smp_n_7;
+typedef LBTopo_smp_n<8> LBTopo_smp_n_8;
+typedef LBTopo_smp_n<9> LBTopo_smp_n_9;
+typedef LBTopo_smp_n<10> LBTopo_smp_n_10;
 
 LBTOPO_MACRO(LBTopo_smp_n_1)
 LBTOPO_MACRO(LBTopo_smp_n_2)
 LBTOPO_MACRO(LBTopo_smp_n_3)
 LBTOPO_MACRO(LBTopo_smp_n_4)
+LBTOPO_MACRO(LBTopo_smp_n_5)
+LBTOPO_MACRO(LBTopo_smp_n_6)
+LBTOPO_MACRO(LBTopo_smp_n_7)
+LBTOPO_MACRO(LBTopo_smp_n_8)
+LBTOPO_MACRO(LBTopo_smp_n_9)
+LBTOPO_MACRO(LBTopo_smp_n_10)
 
 
 // ring
@@ -681,6 +697,9 @@ typedef LBTopo_torus_nd<4> LBTopo_torus_nd_4;
 typedef LBTopo_torus_nd<5> LBTopo_torus_nd_5;
 typedef LBTopo_torus_nd<6> LBTopo_torus_nd_6;
 typedef LBTopo_torus_nd<7> LBTopo_torus_nd_7;
+typedef LBTopo_torus_nd<8> LBTopo_torus_nd_8;
+typedef LBTopo_torus_nd<9> LBTopo_torus_nd_9;
+typedef LBTopo_torus_nd<10> LBTopo_torus_nd_10;
 
 LBTOPO_MACRO(LBTopo_torus_nd_1)
 LBTOPO_MACRO(LBTopo_torus_nd_2)
@@ -689,7 +708,180 @@ LBTOPO_MACRO(LBTopo_torus_nd_4)
 LBTOPO_MACRO(LBTopo_torus_nd_5)
 LBTOPO_MACRO(LBTopo_torus_nd_6)
 LBTOPO_MACRO(LBTopo_torus_nd_7)
+LBTOPO_MACRO(LBTopo_torus_nd_8)
+LBTOPO_MACRO(LBTopo_torus_nd_9)
+LBTOPO_MACRO(LBTopo_torus_nd_10)
 
+//  TORUS ND  and SMP Awareness
+//  added by Yanhua Sun 
+
+template <int dimension>
+class LBTopo_torus_nd_smp: public LBTopology {
+private:
+  // inherited int npes;
+  int* Cardinality;
+  int  VirtualNodeCount;
+  int* TempCo;
+  int  ppn;
+  int  NumOfNodes;
+private:
+  int GetNeighborID(int ProcessorID, int number) {
+    CmiAssert(number>=0 && number<max_neighbors());
+    CmiAssert(ProcessorID>=0 && ProcessorID<npes);
+    int neighborId; 
+    int nodeId = CmiPhysicalNodeID(ProcessorID);
+    
+    get_node_coordinates(nodeId, TempCo);
+
+    int index = number/2;
+    int displacement = (number%2)? -1: 1;
+    do{
+      TempCo[index] = (TempCo[index] + displacement + Cardinality[index]) % Cardinality[index];
+      get_node_id(TempCo, &nodeId);
+    } while (nodeId >= NumOfNodes);
+    neighborId = CmiGetFirstPeOnPhysicalNode(nodeId);
+    return neighborId;
+  }
+public:
+  LBTopo_torus_nd_smp(int p): LBTopology(p) /*inherited :npes(p) */ {
+    int i;
+    CmiAssert(dimension>=1 && dimension<=32);
+    CmiAssert(p>=1);
+
+    int ppn = CmiNumPesOnPhysicalNode(0);
+    int NumOfNodes = CmiNumPhysicalNodes();
+
+    Cardinality = new int[dimension];
+    TempCo = new int[dimension];
+    double pp = NumOfNodes;
+    for(i=0;i<dimension;i++) {
+      Cardinality[i] = (int)ceil(pow(pp,1.0/(dimension-i))-1e-5);
+      pp = pp / Cardinality[i];
+    }
+    VirtualNodeCount = 1;
+    for(i=0;i<dimension;i++) {
+      VirtualNodeCount *= Cardinality[i];
+    }
+#ifdef YHDEBUG
+    CmiPrintf(" ppn=%d, NumOfNodes=%d\n", ppn, NumOfNodes);
+#endif
+  }
+  ~LBTopo_torus_nd_smp() {
+    delete[] Cardinality;
+    delete[] TempCo;
+  }
+  virtual int max_neighbors() {
+    return dimension*2;
+  }
+  virtual void neighbors(int mype, int* _n, int &nb) {
+    nb = 0;
+    int *nodePeList; 
+    int numpes;
+    int rank = CmiPhysicalRank(mype);
+    int node = CmiPhysicalNodeID(mype);
+    int _ppn_ = CmiNumPesOnPhysicalNode(node);
+    CmiGetPesOnPhysicalNode(node, &nodePeList, &numpes); 
+#ifdef YHDEBUG
+    CmiPrintf(" 22222222222222ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", _ppn_, NumOfNodes, rank, node, numpes);
+#endif   
+    for(int i=0; i<numpes; i++)
+    {
+        int _pid = nodePeList[i];
+        if(_pid != mype)
+        {
+             _n[nb] = _pid;
+             nb++;
+        }
+    }
+
+    /* for inter-node communication */
+    if(mype == CmiGetFirstPeOnPhysicalNode(node))
+    {
+        for(int j=0; j<dimension*2; j++)
+        {
+            _n[nb] = (mype+1)%npes;//GetNeighborID(mype, j);
+            /* the first processors in other nodes */
+            if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
+        }
+    }
+
+#ifdef YHDEBUG
+  CmiPrintf(" Yes my neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", nb, _ppn_, NumOfNodes, rank, node, numpes);
+#endif
+  }
+  virtual int get_dimension() {
+    return dimension;
+  }
+  virtual bool get_node_coordinates(int node_id, int* node_coordinates) {
+    CmiAssert(node_id>=0 && node_id<VirtualNodeCount);
+    CmiAssert( node_coordinates != NULL );
+    for(int i=0;i<dimension;i++) {
+      node_coordinates[i] = node_id % Cardinality[i];
+      node_id = node_id / Cardinality[i];
+    }
+    return true;
+  }
+  virtual bool get_node_id(const int* node_coordinates, int* node_id) {
+    int i;
+    CmiAssert( node_coordinates != NULL );
+    CmiAssert( node_id != NULL );
+    for(i=dimension-1;i>=0;i--) 
+      CmiAssert( 0<=node_coordinates[i] && node_coordinates[i]<Cardinality[i]);
+    (*node_id) = 0;
+    for(i=dimension-1;i>=0;i--) {
+      (*node_id) = (*node_id)* Cardinality[i] + node_coordinates[i];
+    }
+    return true;
+  }
+  //Note: if abs(difference)*2 = cardinality, the difference is set to zero
+  virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { 
+    CmiAssert( my_coordinates != NULL);
+    CmiAssert( target_coordinates != NULL);
+    CmiAssert( difference != NULL);
+    for(int i=0;i<dimension;i++) {
+      difference[i] = target_coordinates[i] - my_coordinates[i];
+      if (abs(difference[i])*2 > Cardinality[i]) {
+        difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
+      } else if (abs(difference[i])*2 == Cardinality[i]) {
+        difference[i] = 0;
+      }
+    }
+    return true;
+  }
+  //Note: if abs(difference)*2 = cardinality, the difference is set to zero
+  virtual bool coordinate_difference(int my_processor_id, int target_processor_id, int* difference) { 
+    CmiAssert( difference != NULL);
+    int my_coordinates[dimension];
+    int target_coordinates[dimension];
+    get_processor_coordinates(my_processor_id, my_coordinates);
+    get_processor_coordinates(target_processor_id, target_coordinates);
+    coordinate_difference(my_coordinates, target_coordinates, difference);
+    return true;
+  }
+};
+
+
+typedef LBTopo_torus_nd_smp<1> LBTopo_torus_nd_smp_1;
+typedef LBTopo_torus_nd_smp<2> LBTopo_torus_nd_smp_2;
+typedef LBTopo_torus_nd_smp<3> LBTopo_torus_nd_smp_3;
+typedef LBTopo_torus_nd_smp<4> LBTopo_torus_nd_smp_4;
+typedef LBTopo_torus_nd_smp<5> LBTopo_torus_nd_smp_5;
+typedef LBTopo_torus_nd_smp<6> LBTopo_torus_nd_smp_6;
+typedef LBTopo_torus_nd_smp<7> LBTopo_torus_nd_smp_7;
+typedef LBTopo_torus_nd_smp<8> LBTopo_torus_nd_smp_8;
+typedef LBTopo_torus_nd_smp<9> LBTopo_torus_nd_smp_9;
+typedef LBTopo_torus_nd_smp<10> LBTopo_torus_nd_smp_10;
+
+LBTOPO_MACRO(LBTopo_torus_nd_smp_1)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_2)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_3)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_4)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_5)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_6)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_7)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_8)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_9)
+LBTOPO_MACRO(LBTopo_torus_nd_smp_10)
 
 
 //Torus ND with unequal number of processors in each dimension
@@ -917,7 +1109,7 @@ LBTOPO_MACRO(LBTopo_imesh_nd_6)
 LBTOPO_MACRO(LBTopo_imesh_nd_7)
 
 
-// dense graph
+// dense graph with connectivity of square root processor number
 
 LBTOPO_MACRO(LBTopo_graph)
 
@@ -932,6 +1124,54 @@ void LBTopo_graph::neighbors(int mype, int* na, int &nb)
 {
   gengraph(CmiNumPes(), (int)(sqrt(1.0*CmiNumPes())+0.5), 234, na, &nb, 0);
 }
+
+/* add by Yanhua Aug-2010*/
+template <int dimension>
+class LBTopo_graph_nc: public LBTopology {
+
+public:
+    LBTopo_graph_nc(int p): LBTopology(p) {}
+    int max_neighbors()
+    {
+        return dimension + 1; 
+    }
+
+    void neighbors(int mype, int* na, int &nb)
+    {
+#if CMK_NODE_QUEUE_AVAILABLE
+        gengraph(CmiNumNodes(), dimension, 234, na, &nb, 0);
+#else
+        gengraph(CmiNumPes(), dimension, 234, na, &nb, 0);
+#endif
+    }
+
+};
+typedef LBTopo_graph_nc<2> LBTopo_graph_nc_2;
+typedef LBTopo_graph_nc<3> LBTopo_graph_nc_3;
+typedef LBTopo_graph_nc<4> LBTopo_graph_nc_4;
+typedef LBTopo_graph_nc<5> LBTopo_graph_nc_5;
+typedef LBTopo_graph_nc<6> LBTopo_graph_nc_6;
+typedef LBTopo_graph_nc<7> LBTopo_graph_nc_7;
+typedef LBTopo_graph_nc<8> LBTopo_graph_nc_8;
+typedef LBTopo_graph_nc<9> LBTopo_graph_nc_9;
+typedef LBTopo_graph_nc<10> LBTopo_graph_nc_10;
+typedef LBTopo_graph_nc<20> LBTopo_graph_nc_20;
+
+LBTOPO_MACRO(LBTopo_graph_nc_2)
+LBTOPO_MACRO(LBTopo_graph_nc_3)
+LBTOPO_MACRO(LBTopo_graph_nc_4)
+LBTOPO_MACRO(LBTopo_graph_nc_5)
+LBTOPO_MACRO(LBTopo_graph_nc_6)
+LBTOPO_MACRO(LBTopo_graph_nc_7)
+LBTOPO_MACRO(LBTopo_graph_nc_8)
+LBTOPO_MACRO(LBTopo_graph_nc_9)
+LBTOPO_MACRO(LBTopo_graph_nc_10)
+LBTOPO_MACRO(LBTopo_graph_nc_20)
+
+
+/* Centralized  balancer, one processor has the neighbors of all other processors, while the other ones only have one neighbor, the centralized processor */
+
+ 
 
 // complete graph
 
@@ -969,11 +1209,15 @@ public:
 
 typedef LBTopo_karytree<2> LBTopo_2_arytree;
 typedef LBTopo_karytree<3> LBTopo_3_arytree;
-typedef LBTopo_karytree<3> LBTopo_4_arytree;
+typedef LBTopo_karytree<4> LBTopo_4_arytree;
+typedef LBTopo_karytree<128> LBTopo_128_arytree;
+typedef LBTopo_karytree<512> LBTopo_512_arytree;
 
 LBTOPO_MACRO(LBTopo_2_arytree)
 LBTOPO_MACRO(LBTopo_3_arytree)
 LBTOPO_MACRO(LBTopo_4_arytree)
+LBTOPO_MACRO(LBTopo_128_arytree)
+LBTOPO_MACRO(LBTopo_512_arytree)
 
 //
 
@@ -1002,6 +1246,19 @@ public:
     lbTopos.push_back(new LBTopoMap("torus_nd_5", createLBTopo_torus_nd_5));
     lbTopos.push_back(new LBTopoMap("torus_nd_6", createLBTopo_torus_nd_6));
     lbTopos.push_back(new LBTopoMap("torus_nd_7", createLBTopo_torus_nd_7));
+    lbTopos.push_back(new LBTopoMap("torus_nd_8", createLBTopo_torus_nd_8));
+    lbTopos.push_back(new LBTopoMap("torus_nd_9", createLBTopo_torus_nd_9));
+    lbTopos.push_back(new LBTopoMap("torus_nd_10", createLBTopo_torus_nd_10));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_1", createLBTopo_torus_nd_smp_1));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_2", createLBTopo_torus_nd_smp_2));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_3", createLBTopo_torus_nd_smp_3));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_4", createLBTopo_torus_nd_smp_4));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_5", createLBTopo_torus_nd_smp_5));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_6", createLBTopo_torus_nd_smp_6));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_7", createLBTopo_torus_nd_smp_7));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_8", createLBTopo_torus_nd_smp_8));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_9", createLBTopo_torus_nd_smp_9));
+    lbTopos.push_back(new LBTopoMap("torus_nd_smp_10", createLBTopo_torus_nd_smp_10));
     lbTopos.push_back(new LBTopoMap("itorus_nd_1", createLBTopo_itorus_nd_1));
     lbTopos.push_back(new LBTopoMap("itorus_nd_2", createLBTopo_itorus_nd_2));
     lbTopos.push_back(new LBTopoMap("itorus_nd_3", createLBTopo_itorus_nd_3));
@@ -1017,14 +1274,32 @@ public:
     lbTopos.push_back(new LBTopoMap("imesh_nd_6", createLBTopo_imesh_nd_6));
     lbTopos.push_back(new LBTopoMap("imesh_nd_7", createLBTopo_imesh_nd_7));
     lbTopos.push_back(new LBTopoMap("graph", createLBTopo_graph));
+    lbTopos.push_back(new LBTopoMap("graph_nc_2", createLBTopo_graph_nc_2));
+    lbTopos.push_back(new LBTopoMap("graph_nc_3", createLBTopo_graph_nc_3));
+    lbTopos.push_back(new LBTopoMap("graph_nc_4", createLBTopo_graph_nc_4));
+    lbTopos.push_back(new LBTopoMap("graph_nc_5", createLBTopo_graph_nc_5));
+    lbTopos.push_back(new LBTopoMap("graph_nc_6", createLBTopo_graph_nc_6));
+    lbTopos.push_back(new LBTopoMap("graph_nc_7", createLBTopo_graph_nc_7));
+    lbTopos.push_back(new LBTopoMap("graph_nc_8", createLBTopo_graph_nc_8));
+    lbTopos.push_back(new LBTopoMap("graph_nc_9", createLBTopo_graph_nc_9));
+    lbTopos.push_back(new LBTopoMap("graph_nc_10", createLBTopo_graph_nc_10));
+    lbTopos.push_back(new LBTopoMap("graph_nc_20", createLBTopo_graph_nc_20));
     lbTopos.push_back(new LBTopoMap("complete", createLBTopo_complete));
     lbTopos.push_back(new LBTopoMap("2_arytree", createLBTopo_2_arytree));
     lbTopos.push_back(new LBTopoMap("3_arytree", createLBTopo_3_arytree));
     lbTopos.push_back(new LBTopoMap("4_arytree", createLBTopo_4_arytree));
+    lbTopos.push_back(new LBTopoMap("128_arytree", createLBTopo_128_arytree));
+    lbTopos.push_back(new LBTopoMap("512_arytree", createLBTopo_512_arytree));
     lbTopos.push_back(new LBTopoMap("smp_n_1", createLBTopo_smp_n_1));
     lbTopos.push_back(new LBTopoMap("smp_n_2", createLBTopo_smp_n_2));
     lbTopos.push_back(new LBTopoMap("smp_n_3", createLBTopo_smp_n_3));
     lbTopos.push_back(new LBTopoMap("smp_n_4", createLBTopo_smp_n_4));
+    lbTopos.push_back(new LBTopoMap("smp_n_5", createLBTopo_smp_n_5));
+    lbTopos.push_back(new LBTopoMap("smp_n_6", createLBTopo_smp_n_6));
+    lbTopos.push_back(new LBTopoMap("smp_n_7", createLBTopo_smp_n_7));
+    lbTopos.push_back(new LBTopoMap("smp_n_8", createLBTopo_smp_n_8));
+    lbTopos.push_back(new LBTopoMap("smp_n_9", createLBTopo_smp_n_9));
+    lbTopos.push_back(new LBTopoMap("smp_n_10", createLBTopo_smp_n_10));
   }
   ~LBTopoVec() {
     for (int i=0; i<lbTopos.length(); i++)

@@ -1,5 +1,5 @@
 BIN=../../bin
-CHARMC=$(BIN)/charmc $(OPTS) -lm
+CHARMC=$(BIN)/charmc $(OPTS) -lm -I..
 
 SHELL=/bin/sh
 

@@ -9,12 +9,12 @@
 #ifndef __CONTROLPOINTS_H__
 #define __CONTROLPOINTS_H__
 
+#include "conv-config.h"
 
-#ifdef CP_DISABLE_TRACING
-#include "ControlPointsNoTrace.decl.h"
-#else
+#if CMK_WITH_CONTROLPOINT
+
+
 #include "ControlPoints.decl.h"
-#endif
 
 #include <vector>
 #include <map>
@@ -35,6 +35,7 @@
 #include <limits>
 #include <algorithm>
 #include <float.h>
+#include <charm-api.h>
 
 #include "LBDatabase.h"
 #include "arrayRedistributor.h"
@@ -63,18 +64,21 @@
 
 void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase);
 
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase);
+
 
 void registerControlPointTiming(double time);
 
 /// Called once each application step. Can be used instead of registerControlPointTiming()
 void controlPointTimingStamp();
-
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)();
 
 
 /// The application specifies that it is ready to proceed to a new set of control point values.
 /// This should be called after registerControlPointTiming()
 /// This should be called before calling controlPoint()
 void gotoNextPhase();
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)();
 
 /// Return an integral power of 2 between c1 and c2
 /// The value returned will likely change between subsequent invocations
@@ -83,6 +87,11 @@ int controlPoint2Pow(const char *name, int c1, int c2);
 /// Return an integer between lb and ub inclusive
 /// The value returned will likely change between subsequent invocations
 int controlPoint(const char *name, int lb, int ub);
+
+/// A fortran callable one. I couldn't figure out how to pass a string from fortran to C++ yet
+/// So far fortran can only have one control point
+FDECL int FTN_NAME(CONTROLPOINT,controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub);
+
 
 /// Return an integer from the provided vector of values
 /// The value returned will likely change between subsequent invocations
@@ -729,18 +738,10 @@ public:
      
   ~controlPointManager();
 
-
-
-  virtual void pup(PUP::er &p)
-  {
-    CBase_controlPointManager::pup(p);
-    if(p.isUnpacking()){
-      CkAbort("Group controlPointManager is not yet capable of migration.\n");
-    }
-  }
-
-  controlPointManager(CkMigrateMessage* m) {
-    // TODO: Implement this
+  void pup(PUP::er &p);
+  
+ controlPointManager(CkMigrateMessage* m) : CBase_controlPointManager(m) {
+    // CkPrintf("Warning: control point framework likely won't work after checkpoint restart, please fix this problem if you need the functionality.");
   }
 
 
@@ -752,6 +753,8 @@ public:
 
   /// User can register a callback that is called when application should advance to next phase
   void setCPCallback(CkCallback cb, bool _frameworkShouldAdvancePhase);
+
+  void setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase);
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
@@ -822,7 +825,7 @@ public:
 
 };
 
-
+#endif
 
 /** @} */
 #endif

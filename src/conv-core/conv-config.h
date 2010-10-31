@@ -68,6 +68,7 @@
 #define CMK_64BIT                1
 #endif
 
+
 /* set up what production/non-production means */
 #ifdef CMK_OPTIMIZE
 /*
@@ -86,8 +87,17 @@
 #define CMK_REPLAYSYSTEM            0
 #endif
 
-#ifndef CMK_TRACE_DISABLED
-#define CMK_TRACE_DISABLED          0
+#if ! CMK_CCS_AVAILABLE
+#undef CMK_CHARMDEBUG
+#define  CMK_CHARMDEBUG             0
+#endif
+
+#ifndef CMK_TRACE_ENABLED
+#define CMK_TRACE_ENABLED          1
+#endif
+
+#ifndef  CMK_WITH_CONTROLPOINT
+#define CMK_WITH_CONTROLPOINT            1
 #endif
 
 #endif

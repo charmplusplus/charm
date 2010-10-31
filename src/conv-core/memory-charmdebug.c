@@ -51,6 +51,7 @@ struct _Slot {
   int userSize;
 
 #define FLAGS_MASK        0xFF
+#define BLOCK_PROTECTED   0x80
 #define MODIFIED          0x40
 #define NEW_BLOCK         0x20
 #define LEAK_CLEAN        0x10
@@ -132,6 +133,10 @@ static Slot *UserToSlot(void *user) {
 
 static int isLeakSlot(Slot *s) {
   return s->magic & LEAK_FLAG;
+}
+
+static int isProtected(Slot *s) {
+  return s->magic & BLOCK_PROTECTED;
 }
 
 int Slot_ChareOwner(void *s) {
@@ -852,6 +857,7 @@ MemStat * CreateMemStat() {
 
 
 /*********************** Cross-chare corruption detection *******************/
+static int reportMEM = 0;
 
 /* This first method uses two fields (userCRC and slotCRC) of the Slot structure
  * to store the CRC32 checksum of the user data and the slot itself. It compares
@@ -863,38 +869,47 @@ static int CpdCRC32 = 0;
 
 static int checkSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
-  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
-  return sl->slotCRC == crc;
+  if (sl!=NULL) {
+    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+    return sl->slotCRC == crc;
+  } else return 0;
 }
 
 static int checkUserCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  return sl->userCRC == crc32_initial((unsigned char*)userPtr, sl->userSize);
+  if (sl!=NULL) return sl->userCRC == crc32_initial((unsigned char*)userPtr, sl->userSize);
+  else return 0;
 }
 
 static void resetUserCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  sl->userCRC = crc32_initial((unsigned char*)userPtr, sl->userSize);
+  if (sl!=NULL) sl->userCRC = crc32_initial((unsigned char*)userPtr, sl->userSize);
 }
 
 static void resetSlotCRC(void *userPtr) {
   Slot *sl = UserToSlot(userPtr);
-  unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
-  crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
-  sl->slotCRC = crc;
+  if (sl!=NULL) {
+    unsigned int crc = crc32_initial((unsigned char*)sl, sizeof(Slot)-2*sizeof(unsigned int));
+    crc = crc32_update((unsigned char*)sl->from, sl->stackLen*sizeof(void*), crc);
+    sl->slotCRC = crc;
+  }
 }
 
 static void ResetAllCRC() {
   Slot *cur;
+  unsigned int crc1, crc2;
 
   SLOT_ITERATE_START(cur)
-    resetUserCRC(cur+1);
-    resetSlotCRC(cur+1);
+    crc1 = crc32_initial((unsigned char*)cur, sizeof(Slot)-2*sizeof(unsigned int));
+    crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
+    crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
+    cur->slotCRC = crc1;
+    cur->userCRC = crc2;
   SLOT_ITERATE_END
 }
 
-static void CheckAllCRC(int report) {
+static void CheckAllCRC() {
   Slot *cur;
   unsigned int crc1, crc2;
 
@@ -903,9 +918,9 @@ static void CheckAllCRC(int report) {
     crc1 = crc32_update((unsigned char*)cur->from, cur->stackLen*sizeof(void*), crc1);
     crc2 = crc32_initial((unsigned char*)SlotToUser(cur), cur->userSize);
     /* Here we can check if a modification has occured */
-    if (report && cur->slotCRC != crc1) CmiPrintf("CRC: Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
+    if (reportMEM && cur->slotCRC != crc1) CmiPrintf("CRC: Object %d modified slot for %p\n",memory_chare_id,SlotToUser(cur));
     cur->slotCRC = crc1;
-    if (report && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
+    if (reportMEM && cur->userCRC != crc2 && memory_chare_id != cur->chareID)
       CmiPrintf("CRC: Object %d modified memory of object %d for %p\n",memory_chare_id,cur->chareID,SlotToUser(cur));
     cur->userCRC = crc2;
   SLOT_ITERATE_END
@@ -917,7 +932,6 @@ static void CheckAllCRC(int report) {
  */
 
 static int CpdMemBackup = 0;
-static int reportMEM = 0;
 
 static void backupMemory() {
   Slot *cur;
@@ -927,7 +941,7 @@ static void backupMemory() {
   int totalMemory = SLOTSPACE;
   {
     SLOT_ITERATE_START(cur)
-      totalMemory += SLOTSPACE + cur->userSize + cur->stackLen*sizeof(void*);
+      totalMemory += sizeof(Slot) + cur->userSize + cur->stackLen*sizeof(void*);
     SLOT_ITERATE_END
   }
   if (reportMEM) CmiPrintf("CPD: total memory in use (%d): %d\n",CmiMyPe(),totalMemory);
@@ -1032,7 +1046,7 @@ static void CpdMMAPhandler(int sig, siginfo_t *si, void *unused){
     unProtectedPages = newUnProtectedPages;
   }
   unProtectedPages[unProtectedPagesSize++] = pageToUnprotect;
-  CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
+  if (reportMEM) CpdNotify(CPD_CROSSCORRUPTION, si->si_addr, memory_chare_id);
   //CmiPrintf("Got SIGSEGV at address: 0x%lx\n", (long) si->si_addr);
   //CmiPrintStackTrace(0);
 }
@@ -1049,6 +1063,7 @@ static void protectMemory() {
 #else
       char * data = (char *)cur;
 #endif
+      cur->magic |= BLOCK_PROTECTED;
       mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
     } /*else printf(" (%p)",cur->userData);*/
   SLOT_ITERATE_END
@@ -1066,6 +1081,7 @@ static void unProtectMemory() {
       char * data = (char *)cur;
 #endif
     mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+    cur->magic &= ~BLOCK_PROTECTED;
   SLOT_ITERATE_END
   /*printf("unprotecting memory\n");*/
 #endif
@@ -1083,9 +1099,9 @@ void CpdResetMemory() {
 /** Called after the entry method to check if the chare that just received the
  * message has corrupted the memory of some other chare, or some system memory.
  */
-void CpdCheckMemory(int report) {
+void CpdCheckMemory() {
   if (CpdMprotect) unProtectMemory();
-  if (CpdCRC32) CheckAllCRC(report);
+  if (CpdCRC32) CheckAllCRC();
   if (CpdMemBackup) checkBackup();
   Slot *cur;
   SLOT_ITERATE_START(cur)
@@ -1102,11 +1118,20 @@ void CpdSystemEnter() {
   Slot *cur;
   if (++cpdInSystem == 1) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ|PROT_WRITE);
+          cur->magic &= ~BLOCK_PROTECTED;
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemEnter: unprotected %d elements\n",count);
     }
   }
 #endif
@@ -1118,11 +1143,20 @@ void CpdSystemExit() {
   int i;
   if (--cpdInSystem == 0) {
     if (CpdMprotect) {
+      int count=0;
       SLOT_ITERATE_START(cur)
         if (cur->chareID == 0) {
-          mprotect(cur, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+#ifdef CMK_SEPARATE_SLOT
+          char * data = cur->userData;
+#else
+          char * data = (char *)cur;
+#endif
+          cur->magic |= BLOCK_PROTECTED;
+          mprotect(data, cur->userSize+SLOTSPACE+cur->stackLen*sizeof(void*), PROT_READ);
+          count++;
         }
       SLOT_ITERATE_END
+      //printf("CpdSystemExit: protected %d elements\n",count);
       /* unprotect the pages that have been unprotected by a signal SEGV */
       for (i=0; i<unProtectedPagesSize; ++i) {
         mprotect(unProtectedPages[i], 4, PROT_READ|PROT_WRITE);
@@ -1229,13 +1263,15 @@ static void *setSlot(Slot **sl,int userSize) {
   Slot *s = *sl;
   char *user=(char*)(s+1);
 
-  /* TODO: Handle correctly memory protection while changing neighbor blocks */
-  if (CpdMprotect) {
-    if (s->next->chareID != 0); 
-  }
-  /* Splice into the slot list just past the head */
+  /* Splice into the slot list just past the head (part 1) */
   s->next=slot_first->next;
   s->prev=slot_first;
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
+  /* Splice into the slot list just past the head (part 2) */
   s->next->prev=s;
   s->prev->next=s;
 
@@ -1243,6 +1279,10 @@ static void *setSlot(Slot **sl,int userSize) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
 #endif
 
@@ -1290,6 +1330,11 @@ static void freeSlot(Slot *s) {
    * the pointer "s" becomes invalid.
    */
 #else
+  /* Handle correctly memory protection while changing neighbor blocks */
+  if (CpdMprotect) {
+    mprotect(s->next, 4, PROT_READ | PROT_WRITE);
+    mprotect(s->prev, 4, PROT_READ | PROT_WRITE);
+  }
   /* Splice out of the slot list */
   s->next->prev=s->prev;
   s->prev->next=s->next;
@@ -1297,6 +1342,10 @@ static void freeSlot(Slot *s) {
     /* fix crc for previous and next block */
     resetSlotCRC(s->next + 1);
     resetSlotCRC(s->prev + 1);
+  }
+  if (CpdMprotect) {
+    if (isProtected(s->next)) mprotect(s->next, 4, PROT_READ);
+    if (isProtected(s->prev)) mprotect(s->prev, 4, PROT_READ);
   }
   s->prev=s->next=(Slot *)0;//0x0F00; why was it not 0?
 
@@ -1358,6 +1407,7 @@ static void meta_init(char **argv) {
   }
   if (CmiGetArgFlagDesc(argv,"+memory_backup", "Backup all memory at every entry method")) {
     CpdMemBackup = 1;
+    saveAllocationHistory = 1;
   }
   if (CmiGetArgFlagDesc(argv,"+memory_crc", "Use CRC32 to detect memory changes")) {
     CpdCRC32 = 1;

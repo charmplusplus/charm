@@ -561,7 +561,7 @@ CkArray::CkArray(CkMigrateMessage *m)
   isInserting=CmiTrue;
 }
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 inline void testPup(PUP::er &p,int shouldBe) {
   int a=shouldBe;
   p|a;
@@ -761,7 +761,7 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid)
 
 void CProxyElement_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts) const
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Check our array index for validity
 	if (_idx.nInts<0) CkAbort("Array index length is negative!\n");
 	if (_idx.nInts>CK_ARRAYINDEX_MAXLEN)
@@ -797,7 +797,7 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
-	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(),ep,msg,1,_sid, opts);
+	  ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _nsid, _sid, opts);
 	else {
 	  // send through all
 	  for (int k=0; k<_nsid; ++k) {

@@ -82,14 +82,14 @@ void flushTraceLog()
   CkpvAccess(_trace)->traceFlushLog();
 }
 
-#if CMK_TRACE_DISABLED
+#if ! CMK_TRACE_ENABLED
 static int warned=0;
 #define OPTIMIZED_VERSION 	\
 	if (!warned) { warned=1; 	\
 	CmiPrintf("\n\n!!!! Warning: traceUserEvent not available in optimized version!!!!\n\n\n"); }
 #else
 #define OPTIMIZED_VERSION /*empty*/
-#endif // CMK_TRACE_DISABLED
+#endif // CMK_TRACE_ENABLED
 
 /*
 On T3E, we need to have file number control by open/close files only when needed.
@@ -171,7 +171,7 @@ void traceThreadListener_free(struct CthThreadListener *l)
 
 void TraceProjections::traceAddThreadListeners(CthThread tid, envelope *e)
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   /* strip essential information from the envelope */
   TraceThreadListener *a= new TraceThreadListener;
   
@@ -292,17 +292,33 @@ void LogPool::createFile(const char *fix)
   if (fileCreated) {
     return;
   }
+
+  char* filenameLastPart = strrchr(pgmname, PATHSEP) + 1; // Last occurrence of path separator
+  char *pathPlusFilePrefix = new char[1024];
+
+  if(nSubdirs > 0){
+    int sd = CkMyPe() % nSubdirs;
+    char *subdir = new char[1024];
+    sprintf(subdir, "%s.projdir.%d", pgmname, sd);
+    CmiMkdir(subdir);
+    sprintf(pathPlusFilePrefix, "%s%c%s%s", subdir, PATHSEP, filenameLastPart, fix);
+    delete[] subdir;
+  } else {
+    sprintf(pathPlusFilePrefix, "%s%s", pgmname, fix);
+  }
+
   char pestr[10];
   sprintf(pestr, "%d", CkMyPe());
 #if CMK_PROJECTIONS_USE_ZLIB
   int len;
   if(compressed)
-    len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+strlen(".gz")+3;
+    len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+strlen(".gz")+3;
   else
-    len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+3;
+    len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+3;
 #else
-  int len = strlen(pgmname)+strlen(fix)+strlen(".logold")+strlen(pestr)+3;
+  int len = strlen(pathPlusFilePrefix)+strlen(".logold")+strlen(pestr)+3;
 #endif
+
   if (nonDeltaLog) {
     fname = new char[len];
   }
@@ -312,40 +328,41 @@ void LogPool::createFile(const char *fix)
 #if CMK_PROJECTIONS_USE_ZLIB
   if(compressed) {
     if (deltaLog && nonDeltaLog) {
-      sprintf(fname, "%s%s.%s.logold.gz", pgmname, fix, pestr);
-      sprintf(dfname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+      sprintf(fname, "%s.%s.logold.gz",  pathPlusFilePrefix, pestr);
+      sprintf(dfname, "%s.%s.log.gz", pathPlusFilePrefix, pestr);
     } else {
       if (nonDeltaLog) {
-	sprintf(fname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+	sprintf(fname, "%s.%s.log.gz", pathPlusFilePrefix,pestr);
       } else {
-	sprintf(dfname, "%s%s.%s.log.gz", pgmname, fix, pestr);
+	sprintf(dfname, "%s.%s.log.gz", pathPlusFilePrefix, pestr);
       }
     }
   } else {
     if (deltaLog && nonDeltaLog) {
-      sprintf(fname, "%s%s.%s.logold", pgmname, fix, pestr);
-      sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+      sprintf(fname, "%s.%s.logold", pathPlusFilePrefix, pestr);
+      sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
     } else {
       if (nonDeltaLog) {
-	sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+	sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
       } else {
-	sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+	sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
       }
     }
   }
 #else
   if (deltaLog && nonDeltaLog) {
-    sprintf(fname, "%s%s.%s.logold", pgmname, fix, pestr);
-    sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+    sprintf(fname, "%s.%s.logold", pathPlusFilePrefix, pestr);
+    sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
   } else {
     if (nonDeltaLog) {
-      sprintf(fname, "%s%s.%s.log", pgmname, fix, pestr);
+      sprintf(fname, "%s.%s.log", pathPlusFilePrefix, pestr);
     } else {
-      sprintf(dfname, "%s%s.%s.log", pgmname, fix, pestr);
+      sprintf(dfname, "%s.%s.log", pathPlusFilePrefix, pestr);
     }
   }
 #endif
   fileCreated = true;
+  delete[] pathPlusFilePrefix;
   openLog("w+");
   CLOSE_LOG 
 }
@@ -735,6 +752,12 @@ void LogPool::postProcessLog()
 #endif
 }
 
+void LogPool::modLastEntryTimestamp(double ts)
+{
+  pool[numEntries-1].time = ts;
+  //pool[numEntries-1].cputime = ts;
+}
+
 // /** Constructor for a multicast log entry */
 // 
 //  THIS WAS MOVED TO trace-projections.h with the other constructors
@@ -971,6 +994,11 @@ TraceProjections::TraceProjections(char **argv):
   int binary = 
     CmiGetArgFlagDesc(argv,"+binary-trace",
 		      "Write log files in binary format");
+
+  CmiInt8 nSubdirs = 0;
+  CmiGetArgLongDesc(argv,"+trace-subdirs", &nSubdirs, "Number of subdirectories into which traces will be written");
+
+
 #if CMK_PROJECTIONS_USE_ZLIB
   int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
 #else
@@ -993,6 +1021,7 @@ TraceProjections::TraceProjections(char **argv):
 				  "Generate Delta encoded and simple timestamped log files");
 
   _logPool = new LogPool(CkpvAccess(traceRoot));
+  _logPool->setNumSubdirs(nSubdirs);
   _logPool->setBinary(binary);
 #if CMK_PROJECTIONS_USE_ZLIB
   _logPool->setCompressed(compressed);
@@ -1092,6 +1121,12 @@ void TraceProjections::traceClose(void)
   if (CkMyPe() == 0) {
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
     bocProxy.traceProjectionsParallelShutdown(-1);
+  }
+  if(CkMyRank() == CkMyNodeSize()){ //communication thread
+    CkpvAccess(_trace)->endComputation();
+    delete _logPool;              // will write
+    // remove myself from traceArray so that no tracing will be called.
+    CkpvAccess(_traces)->removeTrace(this);
   }
 #else
   // we've already deleted the logpool, so multiple calls to traceClose
@@ -1303,6 +1338,11 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
     nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
+}
+
+void TraceProjections::changeLastEntryTimestamp(double ts)
+{
+  _logPool->modLastEntryTimestamp(ts);
 }
 
 void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int srcPe,
@@ -1667,7 +1707,7 @@ void registerOutlierReduction() {
 // FIXME: WHY extern "C"???
 extern "C" void TraceProjectionsExitHandler()
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   // CkPrintf("[%d] TraceProjectionsExitHandler called!\n", CkMyPe());
   CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
   bocProxy.traceProjectionsParallelShutdown(CkMyPe());

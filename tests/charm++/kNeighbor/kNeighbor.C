@@ -11,22 +11,40 @@
 
 #define DEBUG 0
 #define REUSE_ITER_MSG 0
+#define TOUCH_MSGDATA 0
 
 CProxy_Main mainProxy;
 int gMsgSize;
 
 class toNeighborMsg: public CMessage_toNeighborMsg {
 public:
-    char *data;
+    int *data;
+    int size;
     int fromX;
     int nID;
 
 public:
+    toNeighborMsg() {};
+    toNeighborMsg(int s): size(s) {  
+#if TOUCH_MSGDATA
+	init(); 
+#endif
+    }
+
     void setMsgSrc(int X, int id) {
         fromX = X;
         nID = id;
     }
-
+    void init() {
+        for (int i=0; i<size; i++)
+          data[i] = i;
+    }
+    int sum() {
+        int s=0;
+        for (int i=0; i<size; i++)
+          s += data[i];
+        return s;
+    }
 };
 
 //#define MSGSIZECNT 1
@@ -68,6 +86,10 @@ public:
         }
 
         int numElems = atoi(m->argv[1]);
+	if(numElems < CkNumPes()){
+		printf("Warning: #elements is forced to be euqal to #pes\n");
+		numElems = CkNumPes();
+	}
 
         numSteps = atoi(m->argv[2]);
 
@@ -117,10 +139,10 @@ public:
         gStarttime = CmiWallTimer();
 #if REUSE_ITER_MSG
         for (int i=0; i<totalElems; i++)
-            array(i).commWithNeighbors();
+            array(i).commWithNeighbors(currentStep);
 #else
         for (int i=0; i<totalElems; i++)
-            array(i).commWithNeighbors(currentMsgSize);
+            array(i).commWithNeighbors(currentMsgSize, currentStep);
 #endif	
         //array.commWithNeighbors(currentMsgSize);
     }
@@ -201,6 +223,8 @@ public:
 
 //#define WORKSIZECNT 5
 #define WORKSIZECNT 1
+#define TRACE_BEGIN_STEP 10
+#define TRACE_END_STEP 12
 //no wrap around for sending messages to neighbors
 class Block: public CBase_Block {
 public:
@@ -221,15 +245,21 @@ public:
     int curIterWorkSize;
     int internalStepCnt;
 
+    int sum;
+
 #if REUSE_ITER_MSG
     toNeighborMsg **iterMsg;
 #endif
+
+    bool specialTracing;
 
 public:
     Block(int numElems) {
         //srand(thisIndex.x+thisIndex.y);
 
         totalElems = numElems;
+		
+		specialTracing = traceAvailable() && (traceIsOn()==0);
 
 #if WRAPROUND
         numNeighbors = 2*STRIDEK;
@@ -336,7 +366,7 @@ public:
 #if REUSE_ITER_MSG
 	    toNeighborMsg *msg = iterMsg[i];
 #else
-            toNeighborMsg *msg = new(msgSize, 0) toNeighborMsg;
+            toNeighborMsg *msg = new(msgSize/4, 0) toNeighborMsg(msgSize/4);
 #endif
 
 #if DEBUG
@@ -352,7 +382,9 @@ public:
         }
     }
 
-    void commWithNeighbors(int msgSize) {
+    void commWithNeighbors(int msgSize, int currentStep) {
+	modTraceStatus(currentStep);
+
         internalStepCnt = 0;
         curIterMsgSize = msgSize;
         //currently the work size is only changed every big steps (which
@@ -364,7 +396,9 @@ public:
         startInternalIteration();
     }
 
-    void commWithNeighbors() {
+    void commWithNeighbors(int currentStep) {
+	modTraceStatus(currentStep);
+
         internalStepCnt = 0;
         curIterMsgSize = gMsgSize;
         //currently the work size is only changed every big steps (which
@@ -375,7 +409,7 @@ public:
 #if REUSE_ITER_MSG
 	if(iterMsg[0]==NULL){ //indicating the messages have not been created
 	    for(int i=0; i<numNeighbors; i++)
-		iterMsg[i] = new(curIterMsgSize, 0) toNeighborMsg;
+		iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
 	}
 #endif
 	
@@ -423,6 +457,10 @@ public:
 #if DEBUG
 	CkPrintf("[%d]: recv msg from %d as its %dth neighbor\n", thisIndex, m->fromX, m->nID);
 #endif
+
+#if TOUCH_MSGDATA
+        sum = m->sum();
+#endif
         thisProxy(m->fromX).recvReplies(m);
     }
 
@@ -432,6 +470,13 @@ public:
     inline int MIN(int a, int b) {
         return (a<b)?a:b;
     }
+    
+    inline void modTraceStatus(int step){
+		if(specialTracing){
+			if(step == TRACE_BEGIN_STEP) traceBegin();
+			if(step == TRACE_END_STEP) traceEnd();
+		}
+	}
 };
 
 //int Block::workSizeArr[WORKSIZECNT] = {20, 60, 120, 180, 240};

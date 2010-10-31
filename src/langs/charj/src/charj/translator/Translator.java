@@ -2,6 +2,9 @@
 package charj.translator;
 
 import java.io.*;
+import java.nio.*;
+import java.nio.channels.*;
+import java.nio.charset.*;
 import java.util.*;
 import org.antlr.runtime.*;
 import org.antlr.runtime.tree.*;
@@ -31,9 +34,11 @@ public class Translator {
     private String m_stdlib;
     private List<String> m_usrlibs;
 
+    private String m_basename;
     private SymbolTable m_symtab;
     private CommonTree m_ast;
     private CommonTreeNodeStream m_nodes;
+    private CommonTokenStream m_tokens;
 
     public Translator(
             String _charmc,
@@ -57,6 +62,7 @@ public class Translator {
 
     public boolean debug()      { return m_debug; }
     public boolean verbose()    { return m_verbose; }
+    public String basename()    { return m_basename; }
 
     public static TreeAdaptor m_adaptor = new CommonTreeAdaptor() {
         public Object create(Token token) {
@@ -67,44 +73,63 @@ public class Translator {
             if (t == null) {
                 return null;
             }
-            return create(((CharjAST)t).token);
+            CharjAST orig = (CharjAST)t;
+            CharjAST node = (CharjAST)create(orig.token);
+            node.def = orig.def;
+            node.symbolType = orig.symbolType;
+            node.scope = orig.scope;
+            return node;
         }
     };
 
     public String translate(String filename) throws Exception {
+        m_basename = filename.substring(0, filename.lastIndexOf("."));
+        m_basename = m_basename.substring(m_basename.lastIndexOf("/") + 1);
+
         ANTLRFileStream input = new ANTLRFileStream(filename);
             
         CharjLexer lexer = new CharjLexer(input);
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        m_tokens = new CommonTokenStream(lexer);
 
         // Use lexer tokens to feed tree parser
-        CharjParser parser = new CharjParser(tokens);
+        CharjParser parser = new CharjParser(m_tokens);
         parser.setTreeAdaptor(m_adaptor);
         CharjParser.charjSource_return r = parser.charjSource();
 
         // Create node stream for AST traversals
         m_ast = (CommonTree)r.getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
-        m_nodes.setTokenStream(tokens);
+        m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
 
-        // do AST rewriting in semantic phase
-        if (m_printAST) printAST("Before Semantic Pass", "before.html");
-        semanticPass();
-        if (m_printAST) printAST("After Semantic Pass", "after.html");
+        // do AST rewriting and semantic checking
+        if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
+        preSemanticPass();
+        if (m_printAST) printAST("After PreSemantics Pass", "after_presem.html");
+
+        resolveTypes();
+        if (m_printAST) printAST("After Type Resolution", "after_types.html");
+
+        initPupCollect();
+        if (m_printAST) printAST("After Collector Pass", "after_collector.html");
+
+        postSemanticPass();
+        if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
+
+		m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
 
         // emit code for .ci, .h, and .cc based on rewritten AST
-        m_nodes.reset();
         String ciOutput = translationPass(OutputMode.ci);
         writeTempFile(filename, ciOutput, OutputMode.ci);
 
-        m_nodes.reset();
         String hOutput = translationPass(OutputMode.h);
         writeTempFile(filename, hOutput, OutputMode.h);
         
-        m_nodes.reset();
         String ccOutput = translationPass(OutputMode.cc);
         writeTempFile(filename, ccOutput, OutputMode.cc);
+
         if (!m_translate_only) compileTempFiles(filename, m_charmc);
 
         // Build a string representing all emitted code. This will be printed
@@ -117,16 +142,67 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
+    private void preSemanticPass() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        CharjASTModifier mod = new CharjASTModifier(m_nodes);
+        mod.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)mod.charjSource().getTree();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+    }
+
+    private void postSemanticPass() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
+        mod.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTokenStream(m_tokens);
+        m_nodes.setTreeAdaptor(m_adaptor);
+    }
+
     private ClassSymbol semanticPass() throws
         RecognitionException, IOException, InterruptedException
     {
+        m_nodes.reset();
         CharjSemantics sem = new CharjSemantics(m_nodes);
         return sem.charjSource(m_symtab);
+    }
+
+    private void resolveTypes() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nDefiner Phase\n----------------");
+        SymbolDefiner definer = new SymbolDefiner(m_nodes, m_symtab);
+        definer.downup(m_ast);
+        m_nodes.reset();
+        definer.downup(m_ast);
+        if (m_verbose) System.out.println("\nResolver Phase\n----------------");
+        if (m_printAST) printAST("After Type Definition", "after_definition.html");
+        m_nodes.reset();
+        SymbolResolver resolver = new SymbolResolver(m_nodes, m_symtab);
+        resolver.downup(m_ast);
+    }
+
+    private void initPupCollect() throws
+        RecognitionException, IOException, InterruptedException
+    {
+        m_nodes.reset();
+        if (m_verbose) System.out.println("\nInitPupCollector Phase\n----------------");
+        InitPUPCollector collector = new InitPUPCollector(m_nodes);
+        collector.downup(m_ast);
     }
 
     private String translationPass(OutputMode m) throws
         RecognitionException, IOException, InterruptedException
     {
+        m_nodes.reset();
         CharjEmitter emitter = new CharjEmitter(m_nodes);
         StringTemplateGroup templates = getTemplates(templateFile);
         emitter.setTemplateLib(templates);
@@ -135,7 +211,7 @@ public class Translator {
         return st.toString();
     }
 
-    private StringTemplateGroup getTemplates(String templateFile) {
+    public static StringTemplateGroup getTemplates(String templateFile) {
         StringTemplateGroup templates = null;
         try {
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -145,7 +221,8 @@ public class Translator {
             templates = new StringTemplateGroup(reader);
             reader.close();
         } catch(IOException ex) {
-            error("Failed to load template file", ex); 
+            System.err.println(ex.getMessage());
+            ex.printStackTrace(System.err);
         }
         return templates;
     }
@@ -203,7 +280,7 @@ public class Translator {
             String fullName = packageDir + "/" + typeName + ".cj";
 		
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            boolean fileExists = (cl.getResource(fullName) == null);
+            boolean fileExists = (cl.getResource(fullName) != null);
             if (!fileExists) {
                 if (debug()) System.out.println(
                         " \tloadType(" + typeName + "): not found");
@@ -224,6 +301,21 @@ public class Translator {
             e.printStackTrace();
         }
         return cs;
+    }
+
+    /**
+     * Read the given file name in as a string.
+     */
+    public static String readFile(String path) throws IOException {
+      FileInputStream stream = new FileInputStream(new File(path));
+      try {
+        FileChannel fc = stream.getChannel();
+        MappedByteBuffer bb = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
+        return Charset.defaultCharset().decode(bb).toString();
+      }
+      finally {
+        stream.close();
+      }
     }
 
     /**
@@ -249,24 +341,17 @@ public class Translator {
             String output) throws
         IOException
     {
-        int lastDot = filename.lastIndexOf(".");
-        int lastSlash = filename.lastIndexOf(java.io.File.separator);
-        String tempFile = filename.substring(0, lastSlash + 1) +
-            ".charj" + java.io.File.separator;
-        new File(tempFile).mkdir();
-        tempFile += filename.substring(lastSlash + 1, filename.length());
-        if (m_verbose) System.out.println(" [charjc] create: " + tempFile);
-        FileWriter fw = new FileWriter(tempFile);
+        if (m_verbose) System.out.println(" [charjc] create: " + filename);
+        FileWriter fw = new FileWriter(filename);
         fw.write(output);
         fw.close();
         return;
     }
 
     /**
-     * Enters the .charj directory and compiles the .cc and .ci files 
-     * generated from the given filename. The given charmc string 
-     * includes all options to be passed to charmc. Any generated .o 
-     * file is moved back to the initial directory.
+     * Compiles the .cc and .ci files generated from the given filename.
+     * The given charmc string includes all options to be passed to charmc.
+     * Any generated .o file is moved back to the initial directory.
      */
     private void compileTempFiles(
             String filename,
@@ -279,44 +364,36 @@ public class Translator {
         if (baseDirectory.equals("")) {
             baseDirectory = "./";
         }
-        String tempDirectory = baseDirectory + ".charj/";
         String moduleName = filename.substring(lastSlash + 1, lastDot);
-        String baseTempFilename = tempDirectory + moduleName;
+        String baseTempFilename = moduleName;
 
         // Compile interface file
         String cmd = charmc + " " + baseTempFilename + ".ci";
         File currentDir = new File(".");
         int retVal = exec(cmd, currentDir);
         if (retVal != 0) {
-            error("Could not compile generated interface file");
+            error("Could not compile generated interface file.");
             return;
         }
 
         // Move decl.h and def.h into temp directory.
         // charmxi/charmc doesn't offer control over where to generate these
-        cmd = "mv " + moduleName + ".decl.h " + moduleName + ".def.h " +
-            tempDirectory;
+        cmd = "touch " + baseTempFilename + ".decl.h " +
+            baseTempFilename + ".def.h";
         retVal = exec(cmd, currentDir);
-         if (retVal != 0) {
-            error("Could not move .decl.h and .def.h files " +
-                    "into temp directory");
+        if (retVal != 0) {
+            error("Could not touch .decl.h and .def.h files.");
             return;
-        }       
+        }
 
         // Compile c++ output
-        cmd = charmc + " -c " + baseTempFilename + ".cc" + 
-            " -o " + baseTempFilename + ".o";
+        cmd = charmc + " -I" + m_stdlib + "/charj/libs -c " +
+            baseTempFilename + ".cc" + " -o " + baseTempFilename + ".o";
         retVal = exec(cmd, currentDir);
         if (retVal != 0) {
             error("Could not compile generated C++ file");
             return;
         }
-
-        // move generated .o and .h file into .cj directory
-        cmd = "mv -f " + baseTempFilename + ".o " + baseDirectory;
-        exec(cmd, currentDir);
-        cmd = "cp -f " + baseTempFilename + ".h " + baseDirectory;
-        exec(cmd, currentDir);
     }
 
     /**
@@ -344,7 +421,7 @@ public class Translator {
      * Print a representation of the Charj AST. If message is not null,
      * it is printed, along with an ASCII representation of the tree,
      * to stdout. If filename is not null, an html temp file containin
-     * the representation is printed to .charj/filename.
+     * the representation is printed to filename.
      */
     public void printAST(String message, String filename) throws IOException
     {

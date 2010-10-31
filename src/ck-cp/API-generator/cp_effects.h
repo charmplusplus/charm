@@ -16,6 +16,8 @@
 #ifndef __CP_EFFECTS_H__
 #define __CP_EFFECTS_H__
 
+#if CMK_WITH_CONTROLPOINT
+
 namespace ControlPoint {
 
   enum DIRECTION {EFF_DEC, EFF_INC};
@@ -133,4 +135,5 @@ namespace EffectDecrease {
 CkpvExtern(ControlPoint::cp_effect_map, cp_effects);
 //CkpvExtern(ControlPoint::cp_name_map, cp_names);
 
+#endif
 #endif

@@ -726,18 +726,20 @@ void TraceSummary::endExecute(void)
   double ts = start;
   double nts = binStart;
 
+/*
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
     // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
     return;
   }
+*/
 
   if (execEp == INVALIDEP) {
     TRACE_WARN("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
     return;
   }
 
-  if (execEp != -1)
+  if (execEp >= 0)
   {
     _logPool->setEp(execEp, t-ts);
   }
@@ -798,6 +800,16 @@ void TraceSummary::endIdle(double currT)
     t_idleStart = t_binStart;
   }
   binIdle += t - t_idleStart;
+}
+
+void TraceSummary::traceBegin(void)
+{
+  beginExecute(-1, -1, TRACEON_EP, -1, -1);
+}
+
+void TraceSummary::traceEnd(void)
+{
+  endExecute();
 }
 
 void TraceSummary::beginPack(void)
@@ -1082,22 +1094,23 @@ void TraceSummaryBOC::askSummary(int size)
 
   int traced = CkpvAccess(_trace)->traceOnPE();
 
-  double *reductionBuffer = new double[size+1];
-  reductionBuffer[size] = traced;  // last element is the traced pe count
+  BinEntry *reductionBuffer = new BinEntry[size+1];
+  reductionBuffer[size].time() = traced;  // last element is the traced pe count
+  reductionBuffer[size].getIdleTime() = 0;  // last element is the traced pe count
   if (traced) {
     CkpvAccess(_trace)->endComputation();
     int n = CkpvAccess(_trace)->pool()->getNumEntries();
     BinEntry *localBins = CkpvAccess(_trace)->pool()->bins();
     if (n>size) n=size;
-    for (int i=0; i<n; i++) reductionBuffer[i] = localBins[i].time();
+    for (int i=0; i<n; i++) reductionBuffer[i] = localBins[i];
   }
 
-  contribute(sizeof(double)*(size+1), reductionBuffer, 
+  contribute(sizeof(BinEntry)*(size+1), reductionBuffer, 
 	     CkReduction::sum_double);
   delete [] reductionBuffer;
 }
 
-extern "C" void _CkExit();
+//extern "C" void _CkExit();
 
 void TraceSummaryBOC::sendSummaryBOC(CkReductionMsg *msg)
 {
@@ -1109,13 +1122,13 @@ void TraceSummaryBOC::sendSummaryBOC(CkReductionMsg *msg)
   nBins = n-1;
   bins = (BinEntry *)msg->getData();
   nTracedPEs = (int)bins[n-1].time();
-  //CmiPrintf("traced: %d entry:%d\n", nTracedPEs, nBins);
+  // CmiPrintf("traced: %d entry:%d\n", nTracedPEs, nBins);
 
   write();
 
   delete msg;
 
-  _CkExit();
+  CkExit();
 }
 
 void TraceSummaryBOC::write(void) 
@@ -1166,7 +1179,7 @@ void TraceSummaryBOC::write(void)
 
 extern "C" void CombineSummary()
 {
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
   if (sumonly) {
     CmiPrintf("[%d] Sum Only start!\n", CkMyPe());

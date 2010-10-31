@@ -68,8 +68,11 @@ void IDXL_Chunk::pup(PUP::er &p) {
 	p|mpi_comm;
 
 	p|layouts;
-	if (currentComm && !currentComm->isComplete()) CkAbort("Cannot migrate with ongoing IDXL communication");
-	
+	if (currentComm && !currentComm->isComplete()){
+	  CkPrintf("ERROR: Cannot migrate with ongoing IDXL communication: currentComm=%p ispacking=%d isunpacking=%d\n", currentComm, (int)p.isPacking(), (int)p.isUnpacking());
+	  CkAbort("Cannot migrate with ongoing IDXL communication");
+	}	
+
 	//Pack the dynamic IDXLs (static IDXLs must re-add themselves)
 	int i, nDynamic=0;
 	if (!p.isUnpacking()) //Count the number of non-NULL idxls:
@@ -97,6 +100,7 @@ IDXL_Chunk::~IDXL_Chunk() {
 	for (int i=0;i<dynamic_idxls.size();i++) 
 		if (dynamic_idxls[i]) delete dynamic_idxls[i];
 	delete currentComm;
+	currentComm = 0;
 }
 
 /****** IDXL List ******/

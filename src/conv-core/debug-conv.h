@@ -35,6 +35,9 @@ void CpdStartGdb(void);
 void Cpd_CmiHandleMessage(void *msg);
 
 extern int (*CpdIsDebugMessage)(void*);
+extern void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
+extern int _conditionalDelivery;
+extern int conditionalPipe[2];
 
 enum {
   CPD_ERROR = 0,

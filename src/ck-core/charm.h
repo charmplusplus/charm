@@ -246,13 +246,15 @@ typedef enum {
   DeleteVidMsg   =8,
   RODataMsg      =9,
   ROMsgMsg       =10,
-  ExitMsg        =11,
-  ReqStatMsg     =12,
-  StatMsg        =13,
-  NodeBocInitMsg =14,
-  ForNodeBocMsg  =15,
-  ArrayEltInitMsg =16,
-  ForArrayEltMsg  =17
+  StartExitMsg   =11,
+  ExitMsg        =12,
+  ReqStatMsg     =13,
+  StatMsg        =14,
+  NodeBocInitMsg =15,
+  ForNodeBocMsg  =16,
+  ArrayEltInitMsg =17,
+  ForArrayEltMsg  =18,
+  LAST_CK_ENVELOPE_TYPE =19
 } CkEnvelopeType;
 
 

@@ -28,6 +28,8 @@ package charj.translator;
     MethodSymbol currentMethod = null;
     LocalScope currentLocalScope = null;
     Translator translator;
+    List<CharjAST> imports = new ArrayList<CharjAST>();
+    AstModifier astmod = new AstModifier();
 
     /**
      *  Test a list of CharjAST nodes to see if any of them has the given token
@@ -62,6 +64,10 @@ package charj.translator;
             }
         }
     }
+
+    public void addImport(CharjAST importNode) {
+        imports.add(importNode);
+    }
 }
 
 
@@ -81,22 +87,23 @@ scope ScopeStack; // default scope
     symtab = _symtab;
     $ScopeStack::current = symtab.getDefaultPkg();
 }
-    // TODO: go back to allowing multiple type definitions per file, check that
-    // there is exactly one public type and return that one.
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
-        (importDeclarations) 
-        (typeDeclaration[$importDeclarations.packageNames]))
-        { $cs = $typeDeclaration.sym; }
+        (importDeclaration
+        | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | externDeclaration
+        | readonlyDeclaration)*)
     ;
 
 // note: no new scope here--this replaces the default scope
 packageDeclaration
 @init { 
     List<String> names = null; 
+    String packageName = "";
 }
-    :   ^('package' qualifiedIdentifier)  {
-            String packageName = $qualifiedIdentifier.text;
+    :   ^(PACKAGE ((ids+=IDENT) { packageName += "." + $IDENT.text; })+)
+        {
+            packageName = packageName.substring(1);
             PackageScope ps = symtab.resolvePackage(packageName);
             if (ps == null) {
                 ps = symtab.definePackage(packageName);
@@ -104,43 +111,55 @@ packageDeclaration
             }
             currentPackage = ps;
             $ScopeStack::current = ps;
-            $qualifiedIdentifier.start.symbol = ps;
         }
     ;
     
-importDeclarations returns [List<CharjAST> packageNames]
-@init {
-	packageNames = new ArrayList<CharjAST>();
-}
-    :   (^('import' qualifiedIdentifier './*'?)
-		{ packageNames.add($qualifiedIdentifier.start); })*
+importDeclaration
+    :   ^(IMPORT qualifiedIdentifier '.*'?)
+        { addImport($qualifiedIdentifier.start); }
     ;
 
+readonlyDeclaration
+    :   ^(READONLY localVariableDeclaration)
+    ;
 
-typeDeclaration[List<CharjAST> imports] returns [ClassSymbol sym]
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
+    ;
+
+typeDeclaration returns [ClassSymbol sym]
 scope ScopeStack; // top-level type scope
-    :   ^('class' IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    :   ^(TYPE classType IDENT
+            (^('extends' parent=type))? (^('implements' type+))?
+            {
+            }
+            classScopeDeclaration*)
+            {
+                //System.out.println("Members for type " + $sym.name + ":");
+                //for (Map.Entry<String, Symbol> entry : $sym.members.entrySet()) {
+                //    System.out.println(entry.getKey());
+                //}
+            }
+    |   ^('template' i1=IDENT* typeDeclaration)
         {
-            Scope outerScope = $ScopeStack[-1]::current;
-            $sym = new ClassSymbol(symtab, $IDENT.text, null, outerScope);
-            outerScope.define($sym.name, $sym);
-            currentClass = $sym;
-            $sym.definition = $typeDeclaration.start;
-            $sym.definitionTokenStream = input.getTokenStream();
-            $IDENT.symbol = $sym;
-            $ScopeStack::current = $sym;
-            importPackages($sym, $imports);
+            // JL: Need to fill the templateArgs in ClassSymbol, and push this down
+            // to the class subtree
         }
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
-    |   ^(chareType IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
-    |   ^('chare_array' ARRAY_DIMENSION IDENT (^('extends' type))? (^('implements' type+))? classScopeDeclaration*)
+    ;
+
+classType
+    :   CLASS
+    |   chareType
     ;
 
 chareType
-    :   'chare'
-    |   'group'
-    |   'nodegroup'
+    :   CHARE
+    |   GROUP
+    |   NODEGROUP
+    |   MAINCHARE
+    |   ^(CHARE_ARRAY ARRAY_DIMENSION)
     ;
 
 enumConstant
@@ -148,38 +167,81 @@ enumConstant
     ;
     
 classScopeDeclaration
+scope ScopeStack;
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=arrayDeclaratorList? 
             b=block?)
-    |   ^(VOID_METHOD_DECL m=modifierList? g=genericTypeParameterList? IDENT 
-            f=formalParameterList b=block?)
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        {
+        }
+    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList?
+            ty=type IDENT formalParameterList a=arrayDeclaratorList? b=block)
+        {
+        }
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
+            ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
+            ^(VAR_DECLARATOR_LIST field[$objectType.type, false]+))
+        {
+        }
     |   ^(CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
             b=block)
+        {
+
+        }
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList 
+            b=block)
+        {
+        }
+    ;
+
+field [Type type, boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
+    {
+    }
     ;
     
 interfaceScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
             type IDENT formalParameterList arrayDeclaratorList?)
-    |   ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)
         // Interface constant declarations have been switched to variable
         // declarations by Charj.g; the parser has already checked that
         // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[false])
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[false])
     ;
 
-variableDeclaratorList
-    :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
+variableDeclaratorList[boolean localdef]
+    :   ^(VAR_DECLARATOR_LIST variableDeclarator[localdef]+)
     ;
 
-variableDeclarator
-    :   ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
+variableDeclarator[boolean localdef]
+    :   ^(VAR_DECLARATOR variableDeclaratorId[localdef] variableInitializer?)
     ;
     
-variableDeclaratorId
-    :   ^(IDENT arrayDeclaratorList?)
+variableDeclaratorId[boolean localdef] returns [String ident]
+    :   ^(IDENT domainExpression?
+        { 
+        } )
+    ;
+
+rangeItem
+    :   DECIMAL_LITERAL
+    |   IDENT
+    ;
+
+rangeExpression
+    :   ^(RANGE_EXPRESSION rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
+    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    ;
+
+rangeList
+    :   rangeExpression*
+    ;
+
+domainExpression
+    :   ^(DOMAIN_EXPRESSION rangeList)
     ;
 
 variableInitializer
@@ -208,63 +270,110 @@ bound
     ;
 
 modifierList
-    :   ^(MODIFIER_LIST modifier+)
+    :   ^(MODIFIER_LIST accessModifierList? localModifierList? charjModifierList? otherModifierList?)
     ;
 
 modifier
-    :   'public'
-    |   'protected'
-    |   'private'
-    |   'entry'
-    |   'abstract'
-    |   'native'
+    :   accessModifier
     |   localModifier
+    |   charjModifier
+    |   otherModifier
     ;
 
 localModifierList
     :   ^(LOCAL_MODIFIER_LIST localModifier+)
     ;
 
+accessModifierList
+    :   ^(ACCESS_MODIFIER_LIST accessModifier+)
+    ;
+
+charjModifierList
+    :   ^(CHARJ_MODIFIER_LIST charjModifier+)
+    ;
+
+otherModifierList
+    :   ^(OTHER_MODIFIER_LIST otherModifier+)
+    ;
+    
 localModifier
-    :   'final'
-    |   'static'
-    |   'volatile'
+    :   FINAL
+    |   STATIC
+    |   VOLATILE
+    ;
+
+accessModifier
+    :   PUBLIC
+    |   PROTECTED
+    |   PRIVATE
+    ;
+
+charjModifier
+    :   ENTRY
+    |   TRACED
+    ;
+
+otherModifier
+    :   ABSTRACT
+    |   NATIVE
     ;
 
 type
     :   simpleType
-    |   objectType 
+    |   objectType
+    |   VOID
     ;
 
-simpleType
-    :   ^(TYPE primitiveType arrayDeclaratorList?)
+simpleType returns [ClassSymbol type]
+    :   ^(SIMPLE_TYPE primitiveType arrayDeclaratorList?)
+        {
+        }
     ;
     
-objectType
-    :   ^(TYPE qualifiedTypeIdent arrayDeclaratorList?)
+objectType returns [ClassSymbol type]
+    :   ^(OBJECT_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent arrayDeclaratorList?)
+        {
+        }
     ;
 
-qualifiedTypeIdent
-    :   ^(QUALIFIED_TYPE_IDENT typeIdent+) 
+qualifiedTypeIdent returns [ClassSymbol type]
+@init {
+String name = "";
+}
+    :   ^(QUALIFIED_TYPE_IDENT (typeIdent {name += $typeIdent.name;})+) 
+        {
+        }
     ;
 
-typeIdent
-    :   ^(IDENT genericTypeArgumentList?)
+typeIdent returns [String name]
+    :   ^(IDENT templateInstantiation?)
     ;
 
 primitiveType
-    :   'boolean'     { $start.symbol = new Symbol(symtab, "bool_primitive", symtab.resolveBuiltinType("bool")); }
-    |   'char'        { $start.symbol = new Symbol(symtab, "char_primitive", symtab.resolveBuiltinType("char")); }
-    |   'byte'        { $start.symbol = new Symbol(symtab, "byte_primitive", symtab.resolveBuiltinType("char")); }
-    |   'short'       { $start.symbol = new Symbol(symtab, "short_primitive", symtab.resolveBuiltinType("short")); }
-    |   'int'         { $start.symbol = new Symbol(symtab, "int_primitive", symtab.resolveBuiltinType("int")); }
-    |   'long'        { $start.symbol = new Symbol(symtab, "long_primitive", symtab.resolveBuiltinType("long")); }
-    |   'float'       { $start.symbol = new Symbol(symtab, "float_primitive", symtab.resolveBuiltinType("float")); }
-    |   'double'      { $start.symbol = new Symbol(symtab, "double_primitive", symtab.resolveBuiltinType("double")); }
+    :   BOOLEAN
+    |   CHAR
+    |   BYTE
+    |   SHORT
+    |   INT
+    |   LONG
+    |   FLOAT
+    |   DOUBLE
     ;
 
 genericTypeArgumentList
     :   ^(GENERIC_TYPE_ARG_LIST genericTypeArgument+)
+    ;
+
+templateArgList
+    :   genericTypeArgument+
+    ;
+
+templateInstantiation
+    :   ^(TEMPLATE_INST templateArgList)
+    |   ^(TEMPLATE_INST templateInstantiation)
     ;
     
 genericTypeArgument
@@ -277,18 +386,18 @@ formalParameterList
     ;
     
 formalParameterStandardDecl
-    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
+    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId[false])
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
-// IDENT (^('.' qualifiedIdentifier IDENT))*
+// IDENT (^(DOT qualifiedIdentifier IDENT))*
 qualifiedIdentifier
     :   IDENT
-    |   ^('.' qualifiedIdentifier IDENT)
+    |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
 block
@@ -301,40 +410,70 @@ blockStatement
     ;
     
 localVariableDeclaration
-    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
+    :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType variableDeclaratorList[true])
+    |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
+        {
+        }
+    ;
+
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
     ;
 
 statement
-    :   block
-    |   ^('assert' expression expression?)
-    |   ^('if' parenthesizedExpression statement statement?)
-    |   ^('for' forInit expression? expression* statement)
-    |   ^(FOR_EACH localModifierList? type IDENT expression statement) 
-    |   ^('while' parenthesizedExpression statement)
-    |   ^('do' statement parenthesizedExpression)
-    |   ^('switch' parenthesizedExpression switchCaseLabel*)
-    |   ^('return' expression?)
-    |   ^('throw' expression)
-    |   ^('break' IDENT?) {
+    : nonBlockStatement
+    | block
+    ;
+
+nonBlockStatement
+    :   ^(ASSERT expression expression?)
+    |   ^(IF parenthesizedExpression block block?)
+    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
+    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
+    |   ^(WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression)
+    |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
+    |   ^(RETURN expression?)
+    |   ^(THROW expression)
+    |   ^(BREAK IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled break not supported yet, ignoring.", $IDENT);
             }
         }
-    |   ^('continue' IDENT?) {
+    |   ^(CONTINUE IDENT?) {
             if ($IDENT != null) {
                 translator.error(this, "Labeled continue not supported yet, ignoring.", $IDENT);
             }
         }
     |   ^(LABELED_STATEMENT IDENT statement)
     |   expression
-    |   ^('embed' STRING_LITERAL EMBED_BLOCK)
+    |   ^('delete' expression)
+    |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
+    |   ^(PRINT expression*)
+    |   ^(PRINTLN expression*)
+    |   ^(EXIT expression?)
+    |   EXITALL
     ;
         
 switchCaseLabel
-    :   ^('case' expression blockStatement*)
-    |   ^('default' blockStatement*)
+    :   ^(CASE expression blockStatement*)
+    |   ^(DEFAULT blockStatement*)
     ;
     
 forInit
@@ -347,74 +486,86 @@ forInit
 parenthesizedExpression
     :   ^(PAREN_EXPR expression)
     ;
-    
+
 expression
     :   ^(EXPR expr)
     ;
 
 expr
-    :   ^('=' expr expr)
-    |   ^('+=' expr expr)
-    |   ^('-=' expr expr)
-    |   ^('*=' expr expr)
-    |   ^('/=' expr expr)
-    |   ^('&=' expr expr)
-    |   ^('|=' expr expr)
-    |   ^('^=' expr expr)
-    |   ^('%=' expr expr)
+    :   ^(ASSIGNMENT expr expr)
+    |   ^(PLUS_EQUALS expr expr)
+    |   ^(MINUS_EQUALS expr expr)
+    |   ^(TIMES_EQUALS expr expr)
+    |   ^(DIVIDE_EQUALS expr expr)
+    |   ^(AND_EQUALS expr expr)
+    |   ^(OR_EQUALS expr expr)
+    |   ^(POWER_EQUALS expr expr)
+    |   ^(MOD_EQUALS expr expr)
     |   ^('>>>=' expr expr)
     |   ^('>>=' expr expr)
     |   ^('<<=' expr expr)
     |   ^('?' expr expr expr)
-    |   ^('||' expr expr)
-    |   ^('&&' expr expr)
-    |   ^('|' expr expr)
-    |   ^('^' expr expr)
-    |   ^('&' expr expr)
-    |   ^('==' expr expr)
-    |   ^('!=' expr expr)
-    |   ^('instanceof' expr type)
-    |   ^('<=' expr expr)
-    |   ^('>=' expr expr)
+    |   ^(OR expr expr)
+    |   ^(AND expr expr)
+    |   ^(BITWISE_OR expr expr)
+    |   ^(POWER expr expr)
+    |   ^(BITWISE_AND expr expr)
+    |   ^(EQUALS expr expr)
+    |   ^(NOT_EQUALS expr expr)
+    |   ^(INSTANCEOF expr type)
+    |   ^(LTE expr expr)
+    |   ^(GTE expr expr)
     |   ^('>>>' expr expr)
     |   ^('>>' expr expr)
-    |   ^('>' expr expr)
+    |   ^(GT expr expr)
     |   ^('<<' expr expr)
-    |   ^('<' expr expr)
-    |   ^('+' expr expr)
-    |   ^('-' expr expr)
-    |   ^('*' expr expr)
-    |   ^('/' expr expr)
-    |   ^('%' expr expr)
+    |   ^(LT expr expr)
+    |   ^(PLUS expr expr)
+    |   ^(MINUS expr expr)
+    |   ^(TIMES expr expr)
+    |   ^(DIVIDE expr expr)
+    |   ^(MOD expr expr)
     |   ^(UNARY_PLUS expr)
     |   ^(UNARY_MINUS expr)
     |   ^(PRE_INC expr)
     |   ^(PRE_DEC expr)
     |   ^(POST_INC expr)
     |   ^(POST_DEC expr)
-    |   ^('~' expr)
-    |   ^('!' expr)
+    |   ^(TILDE expr)
+    |   ^(NOT expr)
     |   ^(CAST_EXPR type expr)
     |   primaryExpression
     ;
     
 primaryExpression
-    :   ^(  '.' primaryExpression
+    :   ^(DOT primaryExpression
                 (   IDENT
-                |   'this'
-                |   'super'
+                |   THIS
+                |   SUPER
+                )
+        )
+    |   ^(ARROW primaryExpression
+                (   IDENT
+                |   THIS
+                |   SUPER
                 )
         )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
+    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   literal
     |   newExpression
-    |   'this'
+    |   THIS
     |   arrayTypeDeclarator
-    |   'super'
+    |   SUPER
+    |   GETNUMPES
+    |   GETNUMNODES
+    |   GETMYPE
+    |   GETMYNODE
+    |   GETMYRANK
     ;
     
 explicitConstructorCall
@@ -427,11 +578,10 @@ arrayTypeDeclarator
     ;
 
 newExpression
-    :   ^(  STATIC_ARRAY_CREATOR
-            (   primitiveType newArrayConstruction
-            |   genericTypeArgumentList? qualifiedTypeIdent newArrayConstruction
-            )
-        )
+    :   ^(NEW_EXPRESSION arguments? domainExpression)
+        {
+        }
+    |   ^(NEW type arguments)
     ;
 
 newArrayConstruction
@@ -450,8 +600,8 @@ literal
     |   FLOATING_POINT_LITERAL
     |   CHARACTER_LITERAL
     |   STRING_LITERAL          
-    |   'true'
-    |   'false'
-    |   'null'
+    |   TRUE
+    |   FALSE
+    |   NULL 
     ;
 

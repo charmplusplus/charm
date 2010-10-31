@@ -3,6 +3,8 @@
 
 /// Message watcher: for record/replay support
 class BgMessageWatcher {
+protected:
+        int nodelevel;
 public:
         virtual ~BgMessageWatcher() {}
         /**
@@ -18,7 +20,7 @@ class BgMessageRecorder : public BgMessageWatcher {
         FILE *f;
 	long pos;
 public:
-        BgMessageRecorder(FILE * f_);
+        BgMessageRecorder(FILE * f_, int node);
         ~BgMessageRecorder() { fclose(f); }
 
         virtual CmiBool record(char *msg) {
@@ -26,7 +28,12 @@ public:
                 int d = CmiBgMsgSrcPe(msg);
 		pos = ftell(f);
                 fwrite(&d, sizeof(int), 1, f);
-                if (d == BgGetGlobalWorkerThreadID()) return CmiTrue; // don't record local msg
+//CmiAssert(CmiBgMsgThreadID(msg) != -1);
+                if ( (nodelevel == 0 && d == BgGetGlobalWorkerThreadID()) ||
+                     (nodelevel == 1 && d/BgGetNumWorkThread() == BgGetGlobalWorkerThreadID()/BgGetNumWorkThread()) ) {
+                    //CmiPrintf("[%d] local message.\n", BgGetGlobalWorkerThreadID());
+                    return CmiTrue; // don't record local msg
+                }
                 d = CmiBgMsgLength(msg);
                 fwrite(&d, sizeof(int), 1, f);
 /*
@@ -36,6 +43,7 @@ printf("replay: %d %d\n", m[0], m[1]);
 }
 */
                 fwrite(msg, sizeof(char), d, f);
+                //CmiPrintf("[%d] BgMessageRecord>  PE: %d size: %d msg: %p\n", BgGetGlobalWorkerThreadID(), CmiBgMsgSrcPe(msg),CmiBgMsgLength(msg), msg);
                 return CmiTrue;
         }
         virtual int replay() { return 0; }
@@ -43,26 +51,37 @@ printf("replay: %d %d\n", m[0], m[1]);
 //if (BgGetGlobalWorkerThreadID()==0) printf("rewind to %ld\n", pos);
 		fseek(f, pos, SEEK_SET);
 	}
+	void write_nodeinfo();
 };
 
 class BgMessageReplay : public BgMessageWatcher {
         FILE * f;
         int lcount, rcount;
         /// Read the next message we need from the file:
+private:
+	void done() {
+   		int mype = BgGetGlobalWorkerThreadID();
+                printf("[%d] BgMessageReplay> Emulation replay finished at %f seconds due to end of log.\n", mype, CmiWallTimer());
+                printf("[%d] BgMessageReplay> Replayed %d local records and %d remote records, total of %lld bytes of data replayed.\n", mype, lcount, rcount, ftell(f));
+       }
 public:
-        BgMessageReplay(FILE * f_);
-        ~BgMessageReplay() {fclose(f);}
+        BgMessageReplay(FILE * f_, int node);
+        ~BgMessageReplay() {
+		done();
+ 		fclose(f);
+	}
         CmiBool record(char *msg) { return CmiFalse; }
         int replay(void) {
                 int nextPE;
                 int ret =  fread(&nextPE, sizeof(int), 1, f);
                 if (-1 == ret || ret == 0) {
-                        printf("BgMessageReplay> Emulation replay finished at %f seconds due to end of log.\n", CmiWallTimer());
-                        printf("BgMessageReplay> Replayed %d local records and %d remote records, total of %d bytes of data replayed.\n", lcount, rcount, ftell(f));
+			done();
                         ConverseExit();
                         return 0;
                 }
-                if (nextPE == BgGetGlobalWorkerThreadID()) {
+		int mype = BgGetGlobalWorkerThreadID();
+                if ( (nodelevel == 0 && nextPE == mype) ||
+                     (nodelevel == 1 && nextPE/BgGetNumWorkThread() == mype/BgGetNumWorkThread()) ) {
 //printf("BgMessageReplay> local message\n");
                   lcount ++;
                   return 0;
@@ -78,13 +97,14 @@ public:
                 CmiAssert(ret == nextSize);
                 }
                 CmiAssert(CmiBgMsgLength(msg) == nextSize);
-//                CmiPrintf("BgMessageReplay>  pe:%d size: %d handle: %d msg: %p\n", nextPE, nextSize, CmiBgMsgHandle(msg), msg);
-                BgSendLocalPacket(ANYTHREAD, CmiBgMsgHandle(msg), LARGE_WORK, nextSize, msg);
+                // CmiPrintf("BgMessageReplay>  pe:%d size: %d handle: %d msg: %p\n", nextPE, nextSize, CmiBgMsgHandle(msg), msg);
+                BgSendLocalPacket(mype%BgGetNumWorkThread(), CmiBgMsgHandle(msg), LARGE_WORK, nextSize, msg);
                 rcount ++;
                 return 1;
         }
 };
 
 
+extern void BgRead_nodeinfo(int node, int &startpe, int &endpe);
 
 #endif

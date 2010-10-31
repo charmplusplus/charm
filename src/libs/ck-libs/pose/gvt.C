@@ -278,6 +278,8 @@ void PVT::setGVT(GVTMsg *m)
       (((pose_config.checkpoint_gvt_interval > 0) && (estGVT >= (parLastCheckpointGVT + pose_config.checkpoint_gvt_interval))) || 
        ((pose_config.checkpoint_time_interval > 0) && 
 	((CmiWallTimer() + parStartTime) >= (parLastCheckpointTime + (double)pose_config.checkpoint_time_interval))))) {
+    // ensure that everything that can be committed has been
+    objs.CheckpointCommit();
     // wait for quiescence to occur before checkpointing
     eventMsg *dummyMsg = new eventMsg();
     CkCallback cb(CkIndex_PVT::beginCheckpoint(dummyMsg), CkMyPe(), ThePVT);

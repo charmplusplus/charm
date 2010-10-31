@@ -8,6 +8,8 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
+// specify the version of the UNIX APIs that we want to use (for ucontext headers)
+#define _XOPEN_SOURCE
 
 #define CMK_ASYNC_NOT_NEEDED                               0
 #define CMK_ASYNC_USE_FIOASYNC_AND_FIOSETOWN               0
@@ -21,6 +23,7 @@
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 #define CMK_MALLOC_USE_GNUOLD_MALLOC                       0
 
+#define CMK_MEMORY_BUILD_GNU_HOOKS                         0
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
 

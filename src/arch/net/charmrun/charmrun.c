@@ -83,7 +83,7 @@
 #endif
 
 
-#define HSTART
+//#define HSTART
 #ifdef HSTART
 /*Hierarchical-start routines*/
 int mynodes_start ;	/* To keep a global node numbering */
@@ -131,7 +131,24 @@ char *mylogin(void)
   struct passwd *self;
 
   self = getpwuid(getuid());
-  if (self==0) { return "unknown"; }
+  if (self==0) { 
+#if CMK_HAS_POPEN
+    char cmd[16];
+    char uname[64];
+    FILE *p;
+    sprintf(cmd, "id -u -n");
+    p = popen(cmd, "r");
+    if (p){
+        fscanf(p, "%s", uname);
+        pclose(p);
+        return strdup(uname);
+    }
+    else
+        return "unknown"; 
+#else
+    return "unknown"; 
+#endif
+  }
   return self->pw_name;
 #endif
 } 
@@ -699,6 +716,7 @@ char *arg_currdir_r;
 int   arg_server;
 int   arg_server_port=0;
 char *arg_server_auth=NULL;
+int   replay_single=0;
 
 #if CMK_BPROC
 int   arg_startpe;
@@ -840,6 +858,14 @@ void arg_init(int argc, char **argv)
 	arg_argv[arg_argc++]="++debug";
   }
 
+  /* Check for +replay-detail to know we have to load only one single processor */
+  for (i=0;argv[i];i++) {
+    if (0==strcmp(argv[i],"+replay-detail")) {
+      replay_single = 1;
+      arg_requested_pes = 1;
+    }
+  }
+  
 #ifdef CMK_BPROC
   if (arg_local) {
     fprintf(stderr,"Warning> ++local cannot be used in bproc version, ignored!\n");
@@ -1205,7 +1231,7 @@ void nodetab_init()
   int rightgroup, basicsize, i, remain;
   
   /* if arg_local is set, ignore the nodelist file */
-  if (arg_local) {
+  if (arg_local || arg_mpiexec) {
     nodetab_init_for_local();
     goto fin;
   }
@@ -1366,6 +1392,8 @@ void nodeinfo_add(const ChSingleNodeinfo *in,SOCKET ctrlfd)
 		{fprintf(stderr,"Unexpected node %d registered!\n",node);exit(1);}
 	nt=nodetab_rank0_table[node];/*Nodetable index for this node*/	
 	i.nPE=ChMessageInt_new(nodetab_cpus(nt));
+	if (arg_mpiexec)
+           nodetab_getinfo(nt)->ip = i.IP;   /* get IP */
 	i.IP=nodetab_ip(nt);
 #if CMK_USE_IBVERBS 
 	nodeinfo_arr[node] = i;
@@ -1520,24 +1548,46 @@ void req_ccs_connect(void)
   pe=ChMessageInt(h.hdr.pe);
   reqBytes=ChMessageInt(h.hdr.len);
 
-  if (pe<0 || pe>=nodetab_size) {
-	pe=0;
-	h.hdr.pe=ChMessageInt_new(pe);
+  if (pe == -1) {
+    /*Treat -1 as broadcast and sent to 0 as root of the spanning tree*/
+    pe = 0;
   }
-
+  if ((pe<=-nodetab_size || pe>=nodetab_size) && 0==replay_single) {
+    /*Treat out of bound values as errors. Helps detecting bugs*/
+    /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
+    /* TODO: We should somehow check boundaries also for bigemulator... */
+#if ! CMK_BLUEGENE_CHARM
+    if (pe==-nodetab_size) fprintf(stderr,"Invalid processor index in CCS request: are you trying to do a broadcast instead?");
+    else fprintf(stderr,"Invalid processor index in CCS request.");
+    CcsServer_sendReply(&h.hdr,0,0);
+    free(reqData);
+    return;
+#endif
+  }
+  else if (pe < -1) {
+    /*Treat negative values as multicast to a number of processors specified by -pe.
+      The pes to multicast to follows sits at the beginning of reqData*/
+    reqBytes -= pe * sizeof(ChMessageInt_t);
+    pe = ChMessageInt(*(ChMessageInt_t*)reqData);
+  }
+  
   if (! check_stdio_header(&h.hdr)) {
 
 #define LOOPBACK 0
 #if LOOPBACK /*Immediately reply "there's nothing!" (for performance testing)*/
   CcsServer_sendReply(&h.hdr,0,0);
 #else
-  /*Fill out the charmrun header & forward the CCS request*/
-  ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
-  
-  bufs[0]=&h; lens[0]=sizeof(h);
-  bufs[1]=reqData; lens[1]=reqBytes;
-  
-  skt_sendV(nodetab_ctrlfd(pe),2,bufs,lens);
+    int destpe = pe;
+#if CMK_BLUEGENE_CHARM
+    destpe = destpe % nodetab_size;
+#endif
+    if (replay_single) destpe = 0;
+    /*Fill out the charmrun header & forward the CCS request*/
+    ChMessageHeader_new("req_fw",sizeof(h.hdr)+reqBytes,&h.ch);  
+
+    bufs[0]=&h; lens[0]=sizeof(h);
+    bufs[1]=reqData; lens[1]=reqBytes;
+    skt_sendV(nodetab_ctrlfd(destpe),2,bufs,lens);
 
 #endif
   }
@@ -2447,7 +2497,10 @@ void req_poll()
   status=CMK_PIPE_CALL();
   DEBUGF(("Req_poll: Select returned %d...\n",status));
 
-	  if (status<0){ 
+  if (status==0) return;/*Nothing to do-- timeout*/
+
+  if (status<0){ 
+		if (errno == EINTR || errno == EAGAIN) return;
 		fflush(stdout);
 		fflush(stderr);
 		socket_error_in_poll(1359,"Node program terminated unexpectedly!\n");
@@ -2659,7 +2712,7 @@ int client_connect_problem(int code,const char *msg)
 	return -1;
 }
 
-		/** return 1 if connection is openned succesfully with client**/
+/** return 1 if connection is openned succesfully with client**/
 int errorcheck_one_client_connect(int client){
 #ifdef HSTART
 	/* Child charmruns are already connected - Do we need to conect again*/	
@@ -2672,10 +2725,12 @@ int errorcheck_one_client_connect(int client){
 	if (0==skt_select1(server_fd,arg_timeout*1000))
 		client_connect_problem(client,"Timeout waiting for node-program to connect");
 
-				
+		
 	req_clients[client]=skt_accept(server_fd,&clientIP,&clientPort);
+
 	if (req_clients[client]==SOCKET_ERROR) 
 		client_connect_problem(client,"Failure in node accept");
+
 	skt_tcp_no_nagle(req_clients[client]);
 
 	return 1;
@@ -2782,8 +2837,9 @@ void req_set_client_connect(int start,int end) {
 					finished[client-start]=1;
 				}
 			}
-		
-        /* test if done */
+
+
+		/* test if done */
 		done=1;
 		for(i=curclientstart-start;i<(end-start);i++)
 			if(finished[i]==0) {
@@ -2893,20 +2949,20 @@ void req_one_client_connect(int client)
 void exchange_qpdata_clients(){
 	int proc,i;
 	for( i=0;i<nodetab_rank0_size;i++){
+		int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
+		nodetab_table[nt]->qpData = malloc(sizeof(ChInfiAddr)*nodetab_rank0_size);
+	}
+	for(proc =0;proc< nodetab_rank0_size;proc++){
+		int count=0;
+		for(i=0;i<nodetab_rank0_size;i++){
+			if(i == proc){
+			}else{
 				int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
-				nodetab_table[nt]->qpData = malloc(sizeof(ChInfiAddr)*nodetab_rank0_size);
+				nodetab_table[nt]->qpData[proc] =  nodeinfo_arr[proc].qpList[count];
+	//			printf("Charmrun> nt %d proc %d lid 0x%x qpn 0x%x psn 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
+				count++;
 			}
-			for(proc =0;proc< nodetab_rank0_size;proc++){
-				int count=0;
-				for(i=0;i<nodetab_rank0_size;i++){
-					if(i == proc){
-					}else{
-						int nt=nodetab_rank0_table[i];/*Nodetable index for this node*/	
-						nodetab_table[nt]->qpData[proc] =  nodeinfo_arr[proc].qpList[count];
-			//			printf("Charmrun> nt %d proc %d lid 0x%x qpn 0x%x psn 0x%x\n",nt,proc,ChMessageInt(nodetab_table[nt]->qpData[proc].lid),ChMessageInt(nodetab_table[nt]->qpData[proc].qpn),ChMessageInt(nodetab_table[nt]->qpData[proc].psn));
-						count++;
-					}
-				}
+		}
 				free(nodeinfo_arr[proc].qpList);
 			}
 		};
@@ -3063,22 +3119,25 @@ void req_client_start_and_connect(void)
 	nodeinfo_allocate();
 	req_nClients=nodetab_rank0_size;
 	req_clients=(SOCKET *)malloc(req_nClients*sizeof(SOCKET));
-			
+	
 	skt_set_abort(client_connect_problem);
+
 	client=0;
 	while(client<req_nClients) { /* initiate a batch */
 		clientstart=client;
 
-				for(counter=0;counter<batch;counter++) { /* initiate batch number of nodes */
-					clientgroup=start_set_node_rsh(client);
-					client+=clientgroup;
-					if(client>=req_nClients) {
-						client=req_nClients;
-						break;
-					}
-				}
-
-
+		for(counter=0;counter<batch;counter++) { /* initiate batch number of nodes */
+			clientgroup=start_set_node_rsh(client);
+			client+=clientgroup;
+			if(client>=req_nClients) {
+				client=req_nClients;
+				break;
+			}
+		}
+#if CMK_USE_RSH
+		  /* ssh x11 forwarding will make sure ssh exit */
+		if (!arg_ssh_display) 
+#endif
 		finish_set_nodes(clientstart,client);
 
 #if CMK_IBVERBS_FAST_START
@@ -3439,7 +3498,7 @@ char *create_netstart(int node)
   static char dest[1024];
   int port=0;
   if (arg_mpiexec)
-    sprintf(dest,"$OMPI_COMM_WORLD_RANK %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
+    sprintf(dest,"$CmiMyNode %s %d %d %d",server_addr,server_port,getpid()&0x7FFF, port);
   else
     sprintf(dest,"%d %s %d %d %d",node,server_addr,server_port,getpid()&0x7FFF, port);
   return dest;
@@ -3851,28 +3910,28 @@ void start_nodes_local(char ** env)
 		  return pid;
 		}
 
-		void fprint_arg(FILE *f,char **argv)
-		{
-		  while (*argv) { 
-			fprintf(f," %s",*argv); 
-			argv++; 
-		  }
-		}
-		void rsh_Find(FILE *f,const char *program,const char *dest)
-		{
-			fprintf(f,"Find %s\n",program);
-			fprintf(f,"%s=$loc\n",dest);
-		}
-		void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
-		{
-		  char *netstart;
-		  char *arg_nodeprog_r,*arg_currdir_r;
-		  char *dbg=nodetab_debugger(nodeno);
-		  char *host=nodetab_name(nodeno);
-#define CLOSE_ALL " < /dev/null 1> /dev/null 2> /dev/null &"
+void fprint_arg(FILE *f,char **argv)
+{
+  while (*argv) { 
+  	fprintf(f," %s",*argv); 
+  	argv++; 
+  }
+}
+void rsh_Find(FILE *f,const char *program,const char *dest)
+{
+    fprintf(f,"Find %s\n",program);
+    fprintf(f,"%s=$loc\n",dest);
+}
+void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
+{
+  char *netstart;
+  char *arg_nodeprog_r,*arg_currdir_r;
+  char *dbg=nodetab_debugger(nodeno);
+  char *host=nodetab_name(nodeno);
 
   if (arg_mpiexec)
         fprintf(f, "#!/bin/sh\n");
+
   fprintf(f, /*Echo: prints out status message*/
   	"Echo() {\n"
   	"  echo 'Charmrun remote shell(%s.%d)>' $*\n"
@@ -3913,13 +3972,6 @@ void start_nodes_local(char ** env)
 */
   if (arg_display && !arg_ssh_display)
     fprintf(f,"DISPLAY='%s';export DISPLAY\n",arg_display);
-#ifdef HSTART
-	  if(arg_hierarchical_start && arg_child_charmrun)
-			  netstart = create_netstart(mynodes_start+rank0no);
-	  else
-#endif
-  netstart = create_netstart(rank0no);
-  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
 
 #ifdef HSTART
   if(arg_child_charmrun)
@@ -3928,14 +3980,26 @@ void start_nodes_local(char ** env)
 #endif
 		fprintf(f,"NETMAGIC=\"%d\";export NETMAGIC\n",getpid()&0x7FFF);
 
-  if (arg_mpiexec)
-    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK; export CmiMyNode\n");
+  if (arg_mpiexec) {
+    fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
+    fprintf(f,"export CmiMyNode\n");
+  }
 #ifdef HSTART
   else  if(arg_hierarchical_start && arg_child_charmrun)
 			 fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",mynodes_start+rank0no);
 #endif
-	else
-		  fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+  else
+    fprintf(f,"CmiMyNode='%d'; export CmiMyNode\n",rank0no);
+
+#ifdef HSTART
+  if(arg_hierarchical_start && arg_child_charmrun)
+			  netstart = create_netstart(mynodes_start+rank0no);
+  else
+#endif
+  netstart = create_netstart(rank0no);
+  fprintf(f,"NETSTART=\"%s\";export NETSTART\n",netstart);
 
   fprintf(f,"CmiMyNodeSize='%d'; export CmiMyNodeSize\n",nodetab_getnodeinfo(rank0no)->cpus);
 
@@ -3943,14 +4007,21 @@ void start_nodes_local(char ** env)
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",0);
   else
     fprintf(f,"CmiMyForks='%d'; export CmiMyForks\n",nodetab_getnodeinfo(rank0no)->forks);
-  if (arg_mpiexec)
-    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE; export CmiNumNodes\n");
+
+  if (arg_mpiexec) {
+    fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$MPIRUN_NPROCS\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$PMI_SIZE\n");
+    fprintf(f,"export CmiNumNodes\n");
+  }
 #ifdef HSTART
   else 	if(arg_hierarchical_start && arg_child_charmrun)
 		 fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size_total);
 #endif
+
   else
-  fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+    fprintf(f,"CmiNumNodes='%d'; export CmiNumNodes\n",nodetab_rank0_size);
+
 #if CONVERSE_VERSION_VMI
   /* VMI environment variable */
   fprintf (f, "VMI_PROCS='%d'; export VMI_PROCS\n", arg_requested_pes);
@@ -3970,7 +4041,7 @@ void start_nodes_local(char ** env)
 #if CMK_AIX && CMK_SMP
   fprintf(f,"MALLOCMULTIHEAP=1; export MALLOCMULTIHEAP\n");
 #endif
-
+  
   if (arg_verbose) {
     printf("Charmrun> Sending \"%s\" to client %d.\n", netstart, rank0no);
   }
@@ -3982,234 +4053,242 @@ void start_nodes_local(char ** env)
   
   /* find the current directory, relative version */
   arg_currdir_r = pathfix(arg_currdir_a, nodetab_pathfixes(nodeno));
-  if (arg_verbose) {
+  
+ if (arg_verbose) {
 	printf("Charmrun> find the node program \"%s\" at \"%s\" for %d.\n", arg_nodeprog_r, arg_currdir_r, nodeno);
   }
   if (arg_debug || arg_debug_no_pause || arg_in_xterm) {
 	rsh_Find(f,nodetab_xterm(nodeno),"F_XTERM");
-			if(!arg_ssh_display && !arg_debug_no_xrdb)
-			  rsh_Find(f,"xrdb","F_XRDB");
-			if(arg_verbose) fprintf(f,"Echo 'using xterm' $F_XTERM\n");
-		  }
+	if(!arg_ssh_display && !arg_debug_no_xrdb)
+	  rsh_Find(f,"xrdb","F_XRDB");
+	if(arg_verbose) fprintf(f,"Echo 'using xterm' $F_XTERM\n");
+  }
 
-		  if (arg_debug || arg_debug_no_pause)
-		  {/*Look through PATH for debugger*/
-			rsh_Find(f,dbg,"F_DBG");
-			if (arg_verbose) fprintf(f,"Echo 'using debugger' $F_DBG\n");
-		  }
+  if (arg_debug || arg_debug_no_pause)
+  {/*Look through PATH for debugger*/
+	rsh_Find(f,dbg,"F_DBG");
+	if (arg_verbose) fprintf(f,"Echo 'using debugger' $F_DBG\n");
+  }
 
-		   if (!arg_ssh_display && !arg_debug_no_xrdb && 
-			   (arg_debug || arg_debug_no_pause || arg_in_xterm)) {
-			 /*    if (arg_debug || arg_debug_no_pause || arg_in_xterm) {*/
-			fprintf(f,"$F_XRDB -query > /dev/null\n");
-			fprintf(f,"if test $? != 0\nthen\n");
-			fprintf(f,"  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
-			fprintf(f,"  Echo 'need to run xhost to authorize connections.'\n");
-			fprintf(f,"  Echo '(See manual for xhost for security issues)'\n");
-			fprintf(f,"  Echo 'Or try ++batch 1 ++ssh-display to rely on SSH X11 forwarding'\n");
-			fprintf(f,"  Exit 1\n");
-			fprintf(f,"fi\n");
-		  }
-		  
-		  fprintf(f,"if test ! -x \"%s\"\nthen\n",arg_nodeprog_r);
-		  fprintf(f,"  Echo 'Cannot locate this node-program: %s'\n",arg_nodeprog_r);
-		  fprintf(f,"  Exit 1\n");
-		  fprintf(f,"fi\n");
-		  
-		  fprintf(f,"cd \"%s\"\n",arg_currdir_r);
-		  fprintf(f,"if test $? = 1\nthen\n");
-		  fprintf(f,"  Echo 'Cannot propagate this current directory:'\n"); 
-		  fprintf(f,"  Echo '%s'\n",arg_currdir_r);
-		  fprintf(f,"  Exit 1\n");
-		  fprintf(f,"fi\n");
-		  
-		  if (strcmp(nodetab_setup(nodeno),"*")) {
-			fprintf(f,"%s\n",nodetab_setup(nodeno));
-			fprintf(f,"if test $? = 1\nthen\n");
-			fprintf(f,"  Echo 'this initialization command failed:'\n");
-			fprintf(f,"  Echo '\"%s\"'\n",nodetab_setup(nodeno));
-			fprintf(f,"  Echo 'edit your nodes file to fix it.'\n");
-			fprintf(f,"  Exit 1\n");
-			fprintf(f,"fi\n");
-		  }
+   if (!arg_ssh_display && !arg_debug_no_xrdb && 
+       (arg_debug || arg_debug_no_pause || arg_in_xterm)) {
+     /*    if (arg_debug || arg_debug_no_pause || arg_in_xterm) {*/
+    fprintf(f,"$F_XRDB -query > /dev/null\n");
+    fprintf(f,"if test $? != 0\nthen\n");
+    fprintf(f,"  Echo 'Cannot contact X Server '$DISPLAY'.  You probably'\n");
+    fprintf(f,"  Echo 'need to run xhost to authorize connections.'\n");
+    fprintf(f,"  Echo '(See manual for xhost for security issues)'\n");
+    fprintf(f,"  Echo 'Or try ++batch 1 ++ssh-display to rely on SSH X11 forwarding'\n");
+    fprintf(f,"  Exit 1\n");
+    fprintf(f,"fi\n");
+  }
+  
+  fprintf(f,"if test ! -x \"%s\"\nthen\n",arg_nodeprog_r);
+  fprintf(f,"  Echo 'Cannot locate this node-program: %s'\n",arg_nodeprog_r);
+  fprintf(f,"  Exit 1\n");
+  fprintf(f,"fi\n");
+  
+  fprintf(f,"cd \"%s\"\n",arg_currdir_r);
+  fprintf(f,"if test $? = 1\nthen\n");
+  fprintf(f,"  Echo 'Cannot propagate this current directory:'\n"); 
+  fprintf(f,"  Echo '%s'\n",arg_currdir_r);
+  fprintf(f,"  Exit 1\n");
+  fprintf(f,"fi\n");
+  
+  if (strcmp(nodetab_setup(nodeno),"*")) {
+    fprintf(f,"%s\n",nodetab_setup(nodeno));
+    fprintf(f,"if test $? = 1\nthen\n");
+    fprintf(f,"  Echo 'this initialization command failed:'\n");
+    fprintf(f,"  Echo '\"%s\"'\n",nodetab_setup(nodeno));
+    fprintf(f,"  Echo 'edit your nodes file to fix it.'\n");
+    fprintf(f,"  Exit 1\n");
+    fprintf(f,"fi\n");
+  }
 
-		  fprintf(f,"rm -f /tmp/charmrun_err.$$\n");
-		  if(arg_verbose) fprintf(f,"Echo 'starting node-program...'\n");  
-		  /* This is the start of the the run-nodeprogram script */
-		  fprintf(f,"(");
-		  
-		  if (arg_debug || arg_debug_no_pause ) {
-			 if ( strcmp(dbg, "gdb") == 0 || strcmp(dbg, "idb") == 0 ) {
-				   fprintf(f,"cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
-			   if ( strcmp(dbg, "idb") == 0 ) {
-					 fprintf(f,"set \\$cmdset=\"gdb\"\n");
-			   }
-			   fprintf(f,"shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
-				   fprintf(f,"handle SIGPIPE nostop noprint\n");
-				   fprintf(f,"handle SIGWINCH nostop noprint\n");
-				   fprintf(f,"handle SIGWAITING nostop noprint\n");
-			   if(arg_debug_commands)
-				 fprintf(f,"%s\n", arg_debug_commands);
-				   fprintf(f,"set args");
-				   fprint_arg(f,argv);
-				   fprintf(f,"\n");
-				   if (arg_debug_no_pause) fprintf(f,"run\n");
-				   fprintf(f,"END_OF_SCRIPT\n");
-			   if (arg_runscript)
-				 fprintf(f,"\"%s\" ",arg_runscript);
-				   fprintf(f,"$F_XTERM");
-				   fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-			   if ( strcmp(dbg, "idb") == 0 )
-					 fprintf(f," -e $F_DBG %s -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
-				   else 
-					 fprintf(f," -e $F_DBG %s -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
-				 } else if ( strcmp(dbg, "dbx") == 0 ) {
-				   fprintf(f,"cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
-				   fprintf(f,"sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
-				   fprintf(f,"dbxenv suppress_startup_message 5.0\n");
-				   fprintf(f,"ignore SIGPOLL\n");
-				   fprintf(f,"ignore SIGPIPE\n");
-				   fprintf(f,"ignore SIGWINCH\n");
-				   fprintf(f,"ignore SIGWAITING\n");
-			   if(arg_debug_commands)
-				 fprintf(f,"%s\n", arg_debug_commands);
-				   fprintf(f,"END_OF_SCRIPT\n");
-			   if (arg_runscript)
-				 fprintf(f,"\"%s\" ",arg_runscript);
-				   fprintf(f,"$F_XTERM");
-				   fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-				   fprintf(f," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
-			   if(arg_debug) {
-					  fprintf(f,"-c \'runargs ");
-					  fprint_arg(f,argv);
-					  fprintf(f,"\' ");
-			   }
-			   fprintf(f, "-s/tmp/charmrun_dbx.$$ %s",arg_nodeprog_r);
-			   if(arg_debug_no_pause) 
-					  fprint_arg(f,argv);
-				   fprintf(f,"\n");
-			 } else { 
-			  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
-				nodetab_debugger(nodeno));
-			 }
-		  } else if (arg_in_xterm) {
-			if(arg_verbose)
-			  fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
-					  nodeno, nodetab_xterm(nodeno));
-			fprintf(f,"cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
-			fprintf(f,"#!/bin/sh\n");
-			fprintf(f,"/bin/rm -f /tmp/charmrun_inx.$$\n");
-			fprintf(f,"%s", arg_nodeprog_r);
-			fprint_arg(f,argv);
-			fprintf(f,"\n");
-			fprintf(f,"echo 'program exited with code '\\$?\n");
-			fprintf(f,"read eoln\n");
-			fprintf(f,"END_OF_SCRIPT\n");
-			fprintf(f,"chmod 700 /tmp/charmrun_inx.$$\n");
-			if (arg_runscript)
-			   fprintf(f,"\"%s\" ",arg_runscript);
-			fprintf(f,"$F_XTERM -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
-			fprintf(f," -sl 5000");
-			fprintf(f," -e /tmp/charmrun_inx.$$\n");
-		  } else {
-			if (arg_runscript)
-			   fprintf(f,"\"%s\" ",arg_runscript);
-			fprintf(f,"\"%s\" ",arg_nodeprog_r);
-			fprint_arg(f,argv);
-			if (nodetab_nice(nodeno) != -100) {
-			  if(arg_verbose) fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
-			  fprintf(f," +nice %d ",nodetab_nice(nodeno));
-			}
-			fprintf(f,"\nres=$?\n");
-			/* If shared libraries fail to load, the program dies without
-			   calling charmrun back.  Since we *have* to close down stdin/out/err,
-			   we have to smuggle this failure information out via a file,
-			   /tmp/charmrun_err.<pid> */
-			fprintf(f,
-				"if [ $res -eq 127 ]\n"
-			"then\n"
-			"  ( \n" /* Re-run, spitting out errors from a subshell: */
-			"    \"%s\" \n"
-			"    ldd \"%s\"\n"
-			"  ) > /tmp/charmrun_err.$$ 2>&1 \n"
-			"fi\n",arg_nodeprog_r,arg_nodeprog_r);
-		  }
-		  
-		  /* End the node-program subshell. To minimize the number 
-			 of open ports on the front-end, we must close down rsh;
-			 to do this, we have to close stdin, stdout, stderr, and 
-			 run the subshell in the background. */
-		  fprintf(f,")");
-		  fprintf(f,CLOSE_ALL "\n");
-		  
-		  if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
-		  fprintf(f, /* Check for startup errors: */
-			 "sleep 1\n"
-			 "if [ -r /tmp/charmrun_err.$$ ]\n"
-			 "then\n"
-			 "  cat /tmp/charmrun_err.$$ \n"
-			 "  rm -f /tmp/charmrun_err.$$ \n"
-			 "  Exit 1\n"
-			 "fi\n");
-		  fprintf(f,"Exit 0\n");
-		}
+  fprintf(f,"rm -f /tmp/charmrun_err.$$\n");
+  if(arg_verbose) fprintf(f,"Echo 'starting node-program...'\n");  
+  /* This is the start of the the run-nodeprogram script */
+  fprintf(f,"(");
+  
+  if (arg_debug || arg_debug_no_pause ) {
+	 if ( strcmp(dbg, "gdb") == 0 || strcmp(dbg, "idb") == 0 ) {
+           fprintf(f,"cat > /tmp/charmrun_gdb.$$ << END_OF_SCRIPT\n");
+	   if ( strcmp(dbg, "idb") == 0 ) {
+             fprintf(f,"set \\$cmdset=\"gdb\"\n");
+	   }
+	   fprintf(f,"shell /bin/rm -f /tmp/charmrun_gdb.$$\n");
+           fprintf(f,"handle SIGPIPE nostop noprint\n");
+           fprintf(f,"handle SIGWINCH nostop noprint\n");
+           fprintf(f,"handle SIGWAITING nostop noprint\n");
+	   if(arg_debug_commands)
+	     fprintf(f,"%s\n", arg_debug_commands);
+           fprintf(f,"set args");
+           fprint_arg(f,argv);
+           fprintf(f,"\n");
+           if (arg_debug_no_pause) fprintf(f,"run\n");
+           fprintf(f,"END_OF_SCRIPT\n");
+	   if (arg_runscript)
+	     fprintf(f,"\"%s\" ",arg_runscript);
+           fprintf(f,"$F_XTERM");
+           fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+	   if ( strcmp(dbg, "idb") == 0 )
+             fprintf(f," -e $F_DBG %s -c /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+           else 
+             fprintf(f," -e $F_DBG %s -x /tmp/charmrun_gdb.$$ \n", arg_nodeprog_r);
+         } else if ( strcmp(dbg, "dbx") == 0 ) {
+           fprintf(f,"cat > /tmp/charmrun_dbx.$$ << END_OF_SCRIPT\n");
+           fprintf(f,"sh /bin/rm -f /tmp/charmrun_dbx.$$\n");
+           fprintf(f,"dbxenv suppress_startup_message 5.0\n");
+           fprintf(f,"ignore SIGPOLL\n");
+           fprintf(f,"ignore SIGPIPE\n");
+           fprintf(f,"ignore SIGWINCH\n");
+           fprintf(f,"ignore SIGWAITING\n");
+	   if(arg_debug_commands)
+	     fprintf(f,"%s\n", arg_debug_commands);
+           fprintf(f,"END_OF_SCRIPT\n");
+	   if (arg_runscript)
+	     fprintf(f,"\"%s\" ",arg_runscript);
+           fprintf(f,"$F_XTERM");
+           fprintf(f," -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+           fprintf(f," -e $F_DBG %s ",arg_debug_no_pause?"-r":"");
+	   if(arg_debug) {
+              fprintf(f,"-c \'runargs ");
+              fprint_arg(f,argv);
+              fprintf(f,"\' ");
+	   }
+	   fprintf(f, "-s/tmp/charmrun_dbx.$$ %s",arg_nodeprog_r);
+	   if(arg_debug_no_pause) 
+              fprint_arg(f,argv);
+           fprintf(f,"\n");
+	 } else { 
+	  fprintf(stderr, "Unknown debugger: %s.\n Exiting.\n", 
+	    nodetab_debugger(nodeno));
+	 }
+  } else if (arg_in_xterm) {
+    if(arg_verbose)
+      fprintf(stderr, "Charmrun> node %d: xterm is %s\n", 
+              nodeno, nodetab_xterm(nodeno));
+    fprintf(f,"cat > /tmp/charmrun_inx.$$ << END_OF_SCRIPT\n");
+    fprintf(f,"#!/bin/sh\n");
+    fprintf(f,"/bin/rm -f /tmp/charmrun_inx.$$\n");
+    fprintf(f,"%s", arg_nodeprog_r);
+    fprint_arg(f,argv);
+    fprintf(f,"\n");
+    fprintf(f,"echo 'program exited with code '\\$?\n");
+    fprintf(f,"read eoln\n");
+    fprintf(f,"END_OF_SCRIPT\n");
+    fprintf(f,"chmod 700 /tmp/charmrun_inx.$$\n");
+    if (arg_runscript)
+       fprintf(f,"\"%s\" ",arg_runscript);
+    fprintf(f,"$F_XTERM -title 'Node %d (%s)' ",nodeno,nodetab_name(nodeno));
+    fprintf(f," -sl 5000");
+    fprintf(f," -e /tmp/charmrun_inx.$$\n");
+  } else {
+    if (arg_runscript)
+       fprintf(f,"\"%s\" ",arg_runscript);
+    if (arg_no_va_rand) {
+      if(arg_verbose) fprintf(stderr, "Charmrun> setarch -R is used.\n");
+      fprintf(f,"setarch `uname -m` -R ");
+    }
+    fprintf(f,"\"%s\" ",arg_nodeprog_r);
+    fprint_arg(f,argv);
+    if (nodetab_nice(nodeno) != -100) {
+      if(arg_verbose) fprintf(stderr, "Charmrun> nice -n %d\n", nodetab_nice(nodeno));
+      fprintf(f," +nice %d ",nodetab_nice(nodeno));
+    }
+    fprintf(f,"\nres=$?\n");
+    /* If shared libraries fail to load, the program dies without
+       calling charmrun back.  Since we *have* to close down stdin/out/err,
+       we have to smuggle this failure information out via a file,
+       /tmp/charmrun_err.<pid> */
+    fprintf(f,
+    	"if [ $res -eq 127 ]\n"
+	"then\n"
+	"  ( \n" /* Re-run, spitting out errors from a subshell: */
+	"    \"%s\" \n"
+	"    ldd \"%s\"\n"
+	"  ) > /tmp/charmrun_err.$$ 2>&1 \n"
+	"fi\n",arg_nodeprog_r,arg_nodeprog_r);
+  }
+  
+  /* End the node-program subshell. To minimize the number 
+     of open ports on the front-end, we must close down rsh;
+     to do this, we have to close stdin, stdout, stderr, and 
+     run the subshell in the background. */
+  fprintf(f,")");
+  fprintf(f," < /dev/null 1> /dev/null 2> /dev/null");
+  if (!arg_mpiexec)
+      fprintf(f, " &");
+  fprintf(f, "\n");
+  
+  if (arg_verbose) fprintf(f,"Echo 'rsh phase successful.'\n");
+  fprintf(f, /* Check for startup errors: */
+     "sleep 1\n"
+     "if [ -r /tmp/charmrun_err.$$ ]\n"
+     "then\n"
+     "  cat /tmp/charmrun_err.$$ \n"
+     "  rm -f /tmp/charmrun_err.$$ \n"
+     "  Exit 1\n"
+     "fi\n");
+  fprintf(f,"Exit 0\n");
+}
 
 
-		/* use the command "size" to get information about the position of the ".data"
-		   and ".bss" segments inside the program memory */
-		void read_global_segments_size() {
-		  char **rshargv;
-		  int childPid;
+/* use the command "size" to get information about the position of the ".data"
+   and ".bss" segments inside the program memory */
+void read_global_segments_size() {
+  char **rshargv;
+  int childPid;
 
-		  /* find the node-program */
-		  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+  /* find the node-program */
+  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-		  rshargv = (char **)malloc(sizeof(char *)*6);
-		  rshargv[0]=nodetab_shell(0);
-		  rshargv[1]=nodetab_name(0);
-		  rshargv[2]="-l";
-		  rshargv[3]=nodetab_login(0);
-		  rshargv[4] = (char *)malloc(sizeof(char)*9+strlen(arg_nodeprog_r));
-		  sprintf(rshargv[4],"size -A %s",arg_nodeprog_r);
-		  rshargv[5]=0;
+  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv[0]=nodetab_shell(0);
+  rshargv[1]=nodetab_name(0);
+  rshargv[2]="-l";
+  rshargv[3]=nodetab_login(0);
+  rshargv[4] = (char *)malloc(sizeof(char)*9+strlen(arg_nodeprog_r));
+  sprintf(rshargv[4],"size -A %s",arg_nodeprog_r);
+  rshargv[5]=0;
 
-		  childPid = fork();
-		  if (childPid < 0) {
-			perror("ERROR> getting the size of the global variables segments"); exit(1);
-		  } else if (childPid == 0) {
-			/* child process */
-			dup2(2, 1);
-			/*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
-			execvp(rshargv[0], rshargv);
-			fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
-			exit(1);
-		  } else {
-			/* else we are in the parent */
-			free(rshargv[4]);
-			free(rshargv);
-			waitpid(childPid, NULL, 0);
-		  }
-		}
+  childPid = fork();
+  if (childPid < 0) {
+    perror("ERROR> getting the size of the global variables segments"); exit(1);
+  } else if (childPid == 0) {
+    /* child process */
+    dup2(2, 1);
+    /*printf("executing: \"%s\" \"%s\" \"%s\" \"%s\" \"%s\"\n",rshargv[0],rshargv[1],rshargv[2],rshargv[3],rshargv[4]);*/
+    execvp(rshargv[0], rshargv);
+    fprintf(stderr,"Charmrun> Couldn't find rsh program '%s'!\n",rshargv[0]);
+    exit(1);
+  } else {
+    /* else we are in the parent */
+    free(rshargv[4]);
+    free(rshargv);
+    waitpid(childPid, NULL, 0);
+  }
+}
 
-		/* open a rsh connection with processor 0 and open a gdb session for info */
-		void open_gdb_info() {
-		  char **rshargv;
-		  int fdin[2];
-		  int fdout[2];
-		  int fderr[2];
-		  int i;
+/* open a rsh connection with processor 0 and open a gdb session for info */
+void open_gdb_info() {
+  char **rshargv;
+  int fdin[2];
+  int fdout[2];
+  int fderr[2];
+  int i;
 
-		  /* find the node-program */
-		  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
+  /* find the node-program */
+  arg_nodeprog_r = pathextfix(arg_nodeprog_a, nodetab_pathfixes(0), nodetab_ext(0));
 
-		  rshargv = (char **)malloc(sizeof(char *)*6);
-		  rshargv[0]=nodetab_shell(0);
-		  rshargv[1]=nodetab_name(0);
-		  rshargv[2]="-l";
-		  rshargv[3]=nodetab_login(0);
-		  rshargv[4] = (char *)malloc(sizeof(char)*8+strlen(arg_nodeprog_r));
-		  sprintf(rshargv[4],"gdb -q %s",arg_nodeprog_r);
-		  rshargv[5]=0;
+  rshargv = (char **)malloc(sizeof(char *)*6);
+  rshargv[0]=nodetab_shell(0);
+  rshargv[1]=nodetab_name(0);
+  rshargv[2]="-l";
+  rshargv[3]=nodetab_login(0);
+  rshargv[4] = (char *)malloc(sizeof(char)*8+strlen(arg_nodeprog_r));
+  sprintf(rshargv[4],"gdb -q %s",arg_nodeprog_r);
+  rshargv[5]=0;
 
 		  pipe(fdin);
 		  pipe(fdout);
@@ -4307,9 +4386,9 @@ void start_nodes_local(char ** env)
 			 rsh_pids[rank0no] = rsh_fork(pe,startScript);
 		}
 
-		int start_set_node_rsh(int client) {
-			/* a search function could be inserted here instead of sequential lookup for more complex node lists (e.g. interleaving) */
-			int clientgroup;
+int start_set_node_rsh(int client) {
+	/* a search function could be inserted here instead of sequential lookup for more complex node lists (e.g. interleaving) */
+	int clientgroup;
 #if CMK_SMP || defined(_WIN32)
 	clientgroup=client+1; /* smp already handles this functionality */
 #else
@@ -4388,7 +4467,7 @@ int rsh_fork_one(const char *startScript)
     s = skipblanks(e); e = skipstuff(s);
   }
 
-  rshargv[num++]="-np";
+  rshargv[num++]="-n";
   sprintf(npes, "%d", nodetab_rank0_size);
   rshargv[num++]=npes;
   rshargv[num++]=(char*)startScript;

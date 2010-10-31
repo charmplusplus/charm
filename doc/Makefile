@@ -43,5 +43,5 @@ web: doc
 	mv $(WEBDIR)/html.new $(WEBDIR)/html
 
 clean:
-	for d in $(DIRS); do (cd $$d; $(LNCMD); $(MAKE) clean) || exit 1; done
+	for d in $(DIRS); do (cd $$d; $(RMCMD); $(MAKE) clean) || exit 1; done
 	rm -fr ps pdf html

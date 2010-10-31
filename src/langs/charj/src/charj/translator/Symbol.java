@@ -9,7 +9,7 @@ public class Symbol {
     public String name;
 
     /** Classes, methods, variables, and closures have types */
-    public ClassSymbol type;
+    public Type type;
 
     /** All symbols know what scope contains them. */
     public Scope scope;
@@ -30,15 +30,10 @@ public class Symbol {
     public Symbol(
             SymbolTable _symtab, 
             String _name, 
-            ClassSymbol _type) {
+            Type _type) {
         this(_symtab);
         name = _name;
         type = _type;
-    }
-
-    /** Just in case we need to do some name mangling */
-    public String getMangledName() {
-        return name;
     }
 
     public boolean debug() {
@@ -55,4 +50,6 @@ public class Symbol {
             info += scope;
         return "Symbol(" + info + ")";
     }
+
+
 }

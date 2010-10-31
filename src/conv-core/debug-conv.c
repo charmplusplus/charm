@@ -12,14 +12,24 @@ Orion Sky Lawlor, olawlor@acm.org, 4/10/2001
 #include "conv-ccs.h"
 #include <errno.h>
 
-CpvStaticDeclare(int, freezeModeFlag);
+CpvExtern(int, freezeModeFlag);
 CpvStaticDeclare(int, continueFlag);
 CpvStaticDeclare(int, stepFlag);
-CpvDeclare(void *, debugQueue);
+CpvExtern(void *, debugQueue);
+CpvDeclare(void*, conditionalQueue);
+int conditionalPipe[2] = {0, 0};
 int _debugHandlerIdx;
-CpvDeclare(int, skipBreakpoint); /* This is a counter of how many breakpoints we should skip */
 
 char ** memoryBackup;
+
+/** Specify if we are replaying the processor from message logs, thus disable delivering of messages */
+int _replaySystem = 0;
+int _conditionalDelivery = 0;
+
+#undef ConverseDeliver
+int ConverseDeliver(int pe) {
+  return !_replaySystem && (!_conditionalDelivery || pe==CmiMyPe());
+}
 
 #if ! CMK_HAS_NTOHL
 uint32_t ntohl(uint32_t netlong) {
@@ -189,62 +199,21 @@ static void CpdDebugCallMemStat(char *msg) {
   CmiFree(msg);
 }
 
-static void CpdDebugHandler(char *msg)
-{
-    char name[128];
-    sscanf(msg+CmiMsgHeaderSizeBytes, "%s", name);
-
-    if (strcmp(name, "freeze") == 0) {
-      CpdFreeze();
-    }
-    else if (strcmp(name, "unfreeze") == 0) {
-      CpdUnFreeze();
-    }
-    else if (strncmp(name, "step", strlen("step")) == 0){
-      /*CmiPrintf("step received\n");*/
-      CpvAccess(stepFlag) = 1;
-      CpdUnFreeze();
-    }
-    else if (strncmp(name, "continue", strlen("continue")) == 0){
-      /*CmiPrintf("continue received\n");*/
-      CpvAccess(continueFlag) = 1;
-      CpdUnFreeze();
-    }
-#if ! CMK_NO_SOCKETS
-    else if (strncmp(name, "status", strlen("status")) == 0) {
-      ChMessageInt_t reply[2];
-      reply[0] = ChMessageInt_new(CmiMyPe());
-      reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
-      CcsSendReply(2*sizeof(ChMessageInt_t), reply);
-    }
+static void CpdDebugHandlerStatus(char *msg) {
+#if ! CMK_NO_SOCKETS    
+  ChMessageInt_t reply[2];
+  reply[0] = ChMessageInt_new(CmiMyPe());
+  reply[1] = ChMessageInt_new(CpdIsFrozen() ? 0 : 1);
+  CcsSendReply(2*sizeof(ChMessageInt_t), reply);
 #endif
-    else{
-      CmiPrintf("bad debugger command:%s received,len=%ld\n",name,strlen(name));
-    }
-    CmiFree(msg);
+  CmiFree(msg);
 }
 
-
-/*
- Start the freeze-- call will not return until unfrozen
- via a CCS request.
- */
-void CpdFreeze(void)
-{
-  CpdNotify(CPD_FREEZE,getpid());
-  if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
-  CpvAccess(freezeModeFlag) = 1;
-  CpdFreezeModeScheduler();
+static void CpdDebugHandlerFreeze(char *msg) {
+  CpdFreeze();
+  CmiFree(msg);
 }
 
-void CpdUnFreeze(void)
-{
-  CpvAccess(freezeModeFlag) = 0;
-}
-
-int CpdIsFrozen(void) {
-  return CpvAccess(freezeModeFlag);
-}
 
 /* Deliver a single message in the queue while not unfreezing the program */
 void CpdNext(void) {
@@ -265,9 +234,13 @@ freeze mode-- only executes CCS requests.
 void CcsServerCheck(void);
 extern int _isCcsHandlerIdx(int idx);
 int (*CpdIsDebugMessage)(void *);
+void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 
 void CpdFreezeModeScheduler(void)
 {
+#if CMK_BLUEGENE_CHARM
+    CmiAbort("Cannot run CpdFreezeModeScheduler inside BigSim emulated environment");
+#else
 #if CMK_CCS_AVAILABLE
     void *msg;
     void *debugQ=CpvAccess(debugQueue);
@@ -279,7 +252,7 @@ void CpdFreezeModeScheduler(void)
 #if NODE_0_IS_CONVHOST
       if (CmiMyPe()==0) CcsServerCheck(); /*Make sure we can get CCS messages*/
 #endif
-      msg = CsdNextMessage(&state);
+      msg = CpdGetNextMessage(&state);
 
       if (msg!=NULL) {
         /*int hIdx=CmiGetHandler(msg);*/
@@ -294,8 +267,14 @@ void CpdFreezeModeScheduler(void)
 	    / * Debug messages should be handled immediately * /
 	    CmiHandleMessage(msg);
 	  } else */
-	  if (CpdIsDebugMessage(msg)) {
-	    CmiHandleMessage(msg);
+      if (conditionalPipe[1]!=0 && _conditionalDelivery==0) {
+        // Since we are conditionally delivering, forward all messages to the child
+        int bytes = SIZEFIELD(msg); // reqLen+((int)(reqData-((char*)hdr)))+CmiReservedHeaderSize;
+        write(conditionalPipe[1], &bytes, 4);
+        write(conditionalPipe[1], msg, bytes);
+      }
+      if (CpdIsDebugMessage(msg)) {
+        CmiHandleMessage(msg);
 	  }
 	  else
 	  /*An ordinary charm++ message-- queue it up*/
@@ -310,37 +289,44 @@ void CpdFreezeModeScheduler(void)
         CmiHandleMessage(queuedMsg);
     }
 #endif
+#endif
 }
 
 void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
+#if ! CMK_BLUEGENE_CHARM
   CpvInitialize(int, freezeModeFlag);
   CpvAccess(freezeModeFlag) = 0;
 
   CpvInitialize(void *, debugQueue);
   CpvAccess(debugQueue) = CdsFifo_Create();
+#endif
 
-  CcsRegisterHandler("ccs_debug", (CmiHandler)CpdDebugHandler);
-  CcsSetMergeFn("ccs_debug", CcsMerge_concat);
+  CpvInitialize(void *, conditionalQueue);
+  CpvAccess(conditionalQueue) = CdsFifo_Create();
+  
+  CcsRegisterHandler("debug/converse/freeze", (CmiHandler)CpdDebugHandlerFreeze);
+  CcsRegisterHandler("debug/converse/status", (CmiHandler)CpdDebugHandlerStatus);
+  CcsSetMergeFn("debug/converse/status", CcsMerge_concat);
 
-  CcsRegisterHandler("ccs_debug_allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
+  CcsRegisterHandler("debug/memory/allocationTree", (CmiHandler)CpdDebugCallAllocationTree);
   CpvInitialize(int, CpdDebugCallAllocationTree_Index);
   CpvAccess(CpdDebugCallAllocationTree_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallAllocationTree);
   
-  CcsRegisterHandler("ccs_debug_memStat", (CmiHandler)CpdDebugCallMemStat);
+  CcsRegisterHandler("debug/memory/stat", (CmiHandler)CpdDebugCallMemStat);
   CpvInitialize(int, CpdDebugCallMemStat_Index);
   CpvAccess(CpdDebugCallMemStat_Index) = CmiRegisterHandler((CmiHandler)CpdDebugCallMemStat);
 
-  CcsRegisterHandler("converse_memory_leak",(CmiHandler)CpdSearchLeaks);
+  CcsRegisterHandler("debug/memory/leak",(CmiHandler)CpdSearchLeaks);
   CpvInitialize(int, CpdSearchLeaks_Index);
   CpvAccess(CpdSearchLeaks_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaks);
   CpvInitialize(int, CpdSearchLeaksDone_Index);
   CpvAccess(CpdSearchLeaksDone_Index) = CmiRegisterHandler((CmiHandler)CpdSearchLeaksDone);
   
-  CcsRegisterHandler("converse_memory_mark",(CmiHandler)CpdMemoryMarkClean);
-  CcsSetMergeFn("converse_memory_mark", CcsMerge_concat);
+  CcsRegisterHandler("debug/memory/mark",(CmiHandler)CpdMemoryMarkClean);
+  CcsSetMergeFn("debug/memory/mark", CcsMerge_concat);
 
   _debugHandlerIdx = CmiRegisterHandler((CmiHandler)handleDebugMessage);
 #if 0
@@ -355,47 +341,3 @@ void CpdInit(void)
 
 }
 
-void PrintDebugStackTrace(void *);
-
-#include <stdarg.h>
-void CpdNotify(int type, ...) {
-  void *ptr; int integer, i;
-  int levels=64;
-  void *stackPtrs[64];
-  void *sl;
-  va_list list;
-  va_start(list, type);
-  switch (type) {
-  case CPD_ABORT:
-    CmiPrintf("CPD: %d Abort %s\n",CmiMyPe(), va_arg(list, char*));
-    break;
-  case CPD_SIGNAL:
-    CmiPrintf("CPD: %d Signal %d\n",CmiMyPe(), va_arg(list, int));
-    break;
-  case CPD_FREEZE:
-    CmiPrintf("CPD: %d Freeze %d\n",CmiMyPe(),getpid());
-    break;
-  case CPD_BREAKPOINT:
-    CmiPrintf("CPD: %d BP %s\n",CmiMyPe(), va_arg(list, char*));
-    break;
-  case CPD_CROSSCORRUPTION:
-    ptr = va_arg(list, void*);
-    integer = va_arg(list, int);
-    CmiPrintf("CPD: %d Cross %p %d ",CmiMyPe(), ptr, integer);
-    sl = MemoryToSlot(ptr);
-    if (sl != NULL) {
-      int stackLen; void **stackTrace;
-      stackLen = Slot_StackTrace(sl, &stackTrace);
-      CmiPrintf("%d %d ",Slot_ChareOwner(sl),stackLen);
-      for (i=0; i<stackLen; ++i) CmiPrintf("%p ",stackTrace[i]);
-    } else {
-      CmiPrintf("0 ");
-    }
-    CmiBacktraceRecord(stackPtrs,1,&levels);
-    CmiPrintf("%d ",levels);
-    for (i=0; i<levels; ++i) CmiPrintf("%p ",stackPtrs[i]);
-    CmiPrintf("\n");
-    break;
-  }
-  va_end(list);
-}

@@ -23,11 +23,11 @@ TheMain::TheMain(CkArgMsg *msg) {
   called = 0;
   arr = CProxy_Test::ckNew(numEl);
 
-  cinst = CkGetComlibInstance();
+//  cinst = CkGetComlibInstance();
   mainProxy = thishandle;
 
-  CharmStrategy *strategy = new PipeBroadcastStrategy(USE_HYPERCUBE, arr);
-  cinst.setStrategy(strategy);
+  PipeBroadcastStrategy *strategy = new PipeBroadcastStrategy(USE_HYPERCUBE, arr);
+  cinst = ComlibRegister(strategy);
   CkPrintf("Main: calling send on %d elements\n",numEl);
   arr.send();
   //arr[2].send();
@@ -50,8 +50,12 @@ void Test::send() {
   MyMess *mess = new (LENGTH,0) MyMess;
   mess->data[0] = CkMyPe();
   for (int i=1; i<LENGTH; ++i) mess->data[i] = i+1000;
-  CProxy_Test copy = thisArrayID;
-  ComlibDelegateProxy(&copy);
+ 
+  CProxy_Test copy = thisProxy;
+  // CProxy_Test copy = thisArrayID;
+  ComlibAssociateProxy(cinst, copy);
+  
+ // ComlibDelegateProxy(&copy);
   CkPrintf("[%d-%d] sending broadcast\n",CkMyPe(),thisIndex);
   copy.receive(mess);
 }

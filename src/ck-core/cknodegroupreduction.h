@@ -22,6 +22,11 @@ class countAdjustment {
 		void pup(PUP::er& p){ p|gcount; p|lcount; p|mainRecvd; }
 };
 
+/** @todo: Fwd decl for a temporary class. Remove after
+ * delegated cross-array reductions are implemented more optimally
+ */
+namespace ck { namespace impl { class XArraySectionReducer; } }
+
 class CkReductionMsg;
 //CkReduction is just a "namespace class" for the user-visible
 // parts of the reduction system.
@@ -99,6 +104,7 @@ private:
  	friend class CkNodeReductionMgr;
 	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
+    friend class ck::impl::XArraySectionReducer;
 //System-level interface
 	//This is the maximum number of possible reducers,
 	// including both builtin and user-defined types
@@ -145,8 +151,6 @@ public:
 	 * This manager will dispose of the callback when replaced or done.
 	 */
 	void ckSetReductionClient(CkCallback *cb);
-
-	void contributorDied(contributorInfo *ci);//Don't expect more contributions
 
 //Contribute-- the given msg can contain any data.  The reducerType
 // field of the message must be valid.
@@ -276,7 +280,8 @@ class NodeGroup : public CkNodeReductionMgr {
   public:
     CmiNodeLock __nodelock;
     NodeGroup();
-    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { }
+    NodeGroup(CkMigrateMessage* m):CkNodeReductionMgr(m) { __nodelock=CmiCreateLock(); }
+    
     ~NodeGroup();
     inline const CkGroupID &ckGetGroupID(void) const {return thisgroup;}
     inline CkGroupID CkGetNodeGroupID(void) const {return thisgroup;}

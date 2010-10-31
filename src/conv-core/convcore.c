@@ -588,6 +588,7 @@ int CmiIsFortranLibraryCall() {
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
+          || strncmp(trimmed, "_gfortran_", 10) == 0 
 	 )
           {  /* CmiPrintf("[%d] NAME:%s\n", CmiMyPe(), trimmed); */
              ret = 1; break; }
@@ -834,6 +835,16 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_GETRUSAGE
 
+#if CMK_SMP
+# if CMK_HAS_RUSAGE_THREAD
+#define RUSAGE_WHO        1   /* RUSAGE_THREAD, only in latest Linux kernels */
+#else
+#undef RUSAGE_WHO
+#endif
+#else
+#define RUSAGE_WHO        0
+#endif
+
 static double inittime_wallclock;
 CpvStaticDeclare(double, inittime_virtual);
 
@@ -857,10 +868,14 @@ void CmiTimerInit()
 
   gettimeofday(&tv,0);
   inittime_wallclock = (tv.tv_sec * 1.0) + (tv.tv_usec*0.000001);
-  getrusage(0, &ru); 
+#ifndef RUSAGE_WHO
+  CpvAccess(inittime_virtual) = inittime_wallclock;
+#else
+  getrusage(RUSAGE_WHO, &ru); 
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+#endif
 
 #if ! CMK_MEM_CHECKPOINT
   CmiBarrier();
@@ -870,14 +885,18 @@ void CmiTimerInit()
 
 double CmiCpuTimer()
 {
+#ifndef RUSAGE_WHO
+  return CmiWallTimer();
+#else
   struct rusage ru;
   double currenttime;
 
-  getrusage(0, &ru);
+  getrusage(RUSAGE_WHO, &ru);
   currenttime =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
   return currenttime - CpvAccess(inittime_virtual);
+#endif
 }
 
 static double lastT = -1.0;
@@ -889,7 +908,7 @@ double CmiWallTimer()
 
   gettimeofday(&tv,0);
   currenttime = (tv.tv_sec * 1.0) + (tv.tv_usec * 0.000001);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (lastT > 0.0 && currenttime < lastT) {
     currenttime = lastT;
   }
@@ -1405,7 +1424,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
@@ -1422,9 +1441,9 @@ void CmiHandleMessage(void *msg)
 
 	h=&CmiGetHandlerInfo(msg);
 	(h->hdlr)(msg,h->userPtr);
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	/* setMemoryStatus(0) */ /* charmdebug */
-	_LOG_E_HANDLER_END(handler); 	/* projector */
+	//_LOG_E_HANDLER_END(handler); 	/* projector */
 #endif
 }
 
@@ -1745,7 +1764,7 @@ void CthResumeNormalThread(CthThreadToken* token)
     free(token);
     return;
   }
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -1773,7 +1792,7 @@ void CthResumeSchedulingThread(CthThreadToken  *token)
     CpvAccess(CthSleepingStandins) = me;
   }
   CpvAccess(CthSchedulingThread) = t;
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     CthTraceResume(t);
@@ -2609,7 +2628,7 @@ void CmiFree(void *blk)
 {
   void *parentBlk=CmiAllocFindEnclosing(blk);
   int refCount=REFFIELD(parentBlk);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(refCount==0) /* Logic error: reference count shouldn't already have been zero */
     CmiAbort("CmiFree reference count was zero-- is this a duplicate free?");
 #endif
@@ -2701,7 +2720,7 @@ void CmiTmpFree(void *t) {
     CmiTmpBuf_t *b=&CpvAccess(CmiTmpBuf);
     /* t should point into our temporary buffer: figure out where */
     int cur=((const char *)t)-b->buf;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (cur<0 || cur>b->max)
       CmiAbort("CmiTmpFree: called with an invalid pointer");
 #endif
@@ -3069,6 +3088,9 @@ extern void CmiIsomallocInit(char **argv);
 void CmiIOInit(char **argv);
 #endif
 
+/* defined in cpuaffinity.c */
+extern void CmiInitCPUAffinityUtil();
+
 static void CmiProcessPriority(char **argv)
 {
   int dummy, nicelevel=-100;      /* process priority */
@@ -3208,6 +3230,7 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
 #endif
 
+  CmiInitCPUAffinityUtil();
   CmiArgInit(argv);
   CmiMemoryInit(argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
@@ -3231,20 +3254,20 @@ void ConverseCommonInit(char **argv)
    }
 #endif
 	
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceInit(argv);
 /*initTraceCore(argv);*/ /* projector */
 #endif
   CmiProcessPriority(argv);
 
+  CmiPersistentInit();
+  CmiIsomallocInit(argv);
+  CmiDeliversInit();
+  CsdInit(argv);
 #if CMK_CCS_AVAILABLE
   CcsInit(argv);
 #endif
-  CmiPersistentInit();
-  CmiIsomallocInit(argv);
   CpdInit();
-  CmiDeliversInit();
-  CsdInit(argv);
   CthSchedInit();
   CmiGroupInit();
   CmiMulticastInit();
@@ -3280,7 +3303,7 @@ void ConverseCommonExit(void)
 {
   CcsImpl_kill();
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
   traceClose();
 /*closeTraceCore();*/ /* projector */
 #endif
@@ -3461,5 +3484,11 @@ unsigned int CmiLog2(unsigned int val) {
   return log;
 }
 #endif
+
+/* for bigsim */
+int CmiMyRank_()
+{
+  return CmiMyRank();
+}
 
 /*@}*/

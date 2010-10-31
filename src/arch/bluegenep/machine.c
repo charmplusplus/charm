@@ -165,7 +165,7 @@ static void CmiStartThreads(char **argv) {
 //int received_broadcast;
 
 /*Add a message to this processor's receive queue, pe is a rank */
-static void CmiPushPE(int pe,void *msg) {
+void CmiPushPE(int pe,void *msg) {
     CmiState cs = CmiGetStateN(pe);
     MACHSTATE2(3,"Pushing message into rank %d's queue %p{",pe, cs->recv);
 #if CMK_IMMEDIATE_MSG
@@ -919,9 +919,6 @@ void ConverseRunPE(int everReturn) {
 
     CthInit(CmiMyArgv);
 
-    //printf ("Before Converse Common Init\n");
-    ConverseCommonInit(CmiMyArgv);
-
     /* initialize the network progress counter*/
     /* Network progress function is used to poll the network when for
        messages. This flushes receive buffers on some  implementations*/
@@ -933,6 +930,9 @@ void ConverseRunPE(int everReturn) {
 
     CpvInitialize(PCQueue, smsg_list_q);
     CpvAccess(smsg_list_q) = PCQueueCreate();
+
+    //printf ("Before Converse Common Init\n");
+    ConverseCommonInit(CmiMyArgv);
 
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 

@@ -16,4 +16,7 @@
 #define BIGSIM_OOC_PREFETCH                                0
 
 
-#define CMK_CHARE_USE_PTR                                  1
+/*#define CMK_CHARE_USE_PTR                                  1 */
+
+#undef CMK_WITH_CONTROLPOINT
+#define CMK_WITH_CONTROLPOINT                              0

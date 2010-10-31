@@ -74,7 +74,7 @@ static void BroadcastShutdown(void *null, double t)
   CmiSyncBroadcastAllAndFree(msgSize, sendmsg);
 
   CmiDeliverMsgs(-1);
-  CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+  CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
   CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
   CsdExitScheduler();
 /*
@@ -106,7 +106,7 @@ void BgShutdown()
     if(bgUseOutOfCore)
         deInitTblThreadInMem();
 
-    CmiPrintf("\nBG> BlueGene emulator shutdown gracefully!\n");
+    CmiPrintf("\nBG> BigSim emulator shutdown gracefully!\n");
     CmiPrintf("BG> Emulation took %f seconds!\n", CmiWallTimer()-cva(simState).simStartTime);
     ConverseExit();
     exit(0);

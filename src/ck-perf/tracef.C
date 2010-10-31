@@ -37,6 +37,8 @@ FDECL {
 #define ftraceBeginFunc		 FTN_NAME(FTRACEBEGINFUNC,ftracebeginfunc)
 #define ftraceEndFunc		 FTN_NAME(FTRACEENDFUNC,ftraceendfunc)
 
+#define fbgprintf		 FTN_NAME(FBGPRINTF, fbgprintf)
+
 void ftracebegin()
 {
           checkInit();
@@ -101,6 +103,17 @@ void ftraceEndFunc(int *idx){
 	traceEndFuncIndexProj(*idx);
 }
 
+#if CMK_BLUEGENE_CHARM
+void fbgprintf(char *str, int len)
+{
+  char *newstr = new char[len + 1];
+  _MEMCHECK(newstr);
+  strncpy(newstr, str, len);
+  newstr[len] = 0;
+  BgPrintf(newstr);
+  delete [] newstr;
+}
+#endif
 
 }  // FDECL
 

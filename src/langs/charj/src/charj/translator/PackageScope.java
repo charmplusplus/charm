@@ -3,6 +3,8 @@ package charj.translator;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 public class PackageScope extends SymbolWithScope {
 
@@ -24,26 +26,33 @@ public class PackageScope extends SymbolWithScope {
 
     /** See if type is already defined in this package.  If not, look
      *  for type on the disk in same package.  For example, first time
-     *  charj.lang.Chare fails to resolve.  Load from disk and put File
-     *  in package io which is in package charj.  Next time, File will
+     *  charj.lang.Chare fails to resolve.  Load from disk and put Chare
+     *  in package lang which is in package charj.  Next time, Chare will
      *  be found.
      */
-    public ClassSymbol resolveType(String type) {
-        if (debug()) System.out.println(
-                " PackageScope.resolveType(" + type + 
-                "): examine " + toString());
+    public ClassSymbol resolveType(List<TypeName> type) {
+        if (type == null) return null;
 
-        // break off leading package names and look them up,
-        // then look up the base class name within the appropriate package scope.
-        String[] nameParts = type.split("[.]", 2);
-        if (nameParts.length == 1) return (ClassSymbol)members.get(type);
-        PackageScope innerPackage = (PackageScope)members.get(nameParts[0]);
+        String typeStr = "";
+
+        if (debug()) { 
+            typeStr = TypeName.typeToString(type);
+            System.out.println(" PackageScope.resolveType(" + typeStr + 
+                                "): examine " + toString());
+        }
+
+        ClassSymbol cs = symtab.primitiveTypes.get(type);
+        if (cs != null) return cs;
+
+        if (type.size() == 1) return (ClassSymbol)members.get(type.get(0).name);
+        PackageScope innerPackage = (PackageScope)members.get(type.get(0).name);
         if (innerPackage == null) {
             if (debug()) System.out.println("Package lookup for " +
-                    nameParts[0] + "failed.\n");
+                                            type.get(0) + "failed.\n");
             return null;
         }
-        return innerPackage.resolveType(nameParts[1]);
+
+        return innerPackage.resolveType(TypeName.createTypeName(type.get(1).name));
     }
 
     public String getFullyQualifiedName() {

@@ -19,7 +19,7 @@ CpvDeclare(CmiNodeLock, cldLock);
 
 extern void LoadNotifyFn(int);
 
-char* _lbtopo = "torus2d";
+char* _lbtopo = "torus_nd_5";
 
 /* Estimator stuff.  Of any use? */
 /*
@@ -279,6 +279,14 @@ void CldModuleGeneralInit(char **argv)
   /* lock to protect token queue for immediate message and smp */
   CpvInitialize(CmiNodeLock, cldLock);
   CpvAccess(cldLock) = CmiCreateLock();
+
+  
+  if (CmiMyPe() == 0) {
+    char *stra = CldGetStrategy();
+    if (strcmp(stra, "rand") != 0) {
+      CmiPrintf("Charm++: %s seed load balancer.\n", stra);
+    }
+  } 
 }
 
 /* function can be called in an immediate handler at node level

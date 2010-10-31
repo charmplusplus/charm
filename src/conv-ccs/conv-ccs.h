@@ -17,6 +17,8 @@ but it can use the CcsSendReply function.
 #include "sockRoutines.h"
 #include "ccs-server.h" /*for CcsSecAttr*/
 
+#include "ckhashtable.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,9 +31,25 @@ extern int _ccsHandlerIdx;
 
 #if CMK_CCS_AVAILABLE
 
+typedef CkHashtable_c CcsHandlerTable;
+CpvExtern(CcsHandlerTable, ccsTab);
+
 typedef struct CcsDelayedReply_struct {
   CcsImplHeader *hdr;
 } CcsDelayedReply;
+
+typedef void (*CcsHandlerFn)(void *userPtr,int reqLen,const void *reqData);
+
+/* Includes all information stored about a single CCS handler. */
+typedef struct CcsHandlerRec {
+    const char *name; /*Name passed over socket*/
+    CmiHandler fnOld; /*Old converse-style handler, or NULL if new-style*/
+    CcsHandlerFn fn; /*New-style handler function, or NULL if old-style*/
+    void *userPtr;
+    CmiReduceMergeFn mergeFn; /*Merge function used for bcast requests*/
+    int nCalls; /* Number of times handler has been executed*/
+    CmiUInt2 redID; /*Reduction ID to be used with CmiListReduce*/
+} CcsHandlerRec;
 
 /**
  * Backward compatability routine: register a regular converse-style handler
@@ -40,11 +58,12 @@ typedef struct CcsDelayedReply_struct {
  */
 void CcsRegisterHandler(const char *ccs_handlername, CmiHandler fn);
 
+CcsHandlerRec *CcsGetHandler(const char *name);
+
 /**
  * Register a real Ccs handler function to receive these CCS requests. 
  * The requests will arrive as a flat, readonly buffer.
  */
-typedef void (*CcsHandlerFn)(void *userPtr,int reqLen,const void *reqData);
 void CcsRegisterHandlerFn(const char *ccs_handlername, CcsHandlerFn fn, void *userPtr);
 
 /**
@@ -69,11 +88,13 @@ SIMPLE_POLYMORPH_REDUCTION(min);
 #undef SIMPLE_REDUCTION
 #undef SIMPLE_POLYMORPH_REDUCTION
 
+void CcsReleaseMessages();
 void CcsInit(char **argv);
 int CcsEnabled(void);
 int CcsIsRemoteRequest(void);
 void CcsCallerId(skt_ip_t *pip, unsigned int *pport);
 void CcsSendReply(int replyLen, const void *replyData);
+void CcsSendReplyNoError(int replyLen, const void *replyData);
 CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData);
 void CcsNoReply();
@@ -81,6 +102,7 @@ void CcsNoDelayedReply(CcsDelayedReply d);
 
 #else
 typedef void *CcsDelayedReply;
+#define CcsReleaseMessages() /*empty*/
 #define CcsInit(argv) /*empty*/
 #define CcsRegisterHandler(x,y) 0
 #define CcsRegisterHandlerFn(x,y,p) 0
@@ -90,6 +112,7 @@ typedef void *CcsDelayedReply;
 #define CcsCallerId(x,y)  /*empty*/
 #define CcsDelayReply() 0
 #define CcsSendReply(s,r) /*empty*/
+#define CcsSendReplyNoError(s,r) /*empty*/
 #define CcsSendDelayedReply(d,s,r); 
 #define CcsNoReply() /*empty*/
 #define CcsNoDelayedReply(d) /*empty*/

@@ -49,8 +49,8 @@ OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""  
 OPTS_LDXX=""
-OPTS_PIC="$CMK_PIC"
-test -z "$OPTS_PIC" && OPTS_PIC='-fpic'
+OPTS_PIC=""
+USE_PIC="0"
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -74,9 +74,11 @@ DELETE=""
 MAINOBJ=""   
 GENCPM=""
 OPTIMIZE_MODE=""
+PRODUCTION_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
+GENDEPENDS="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -119,7 +121,6 @@ printUsage() {
     echo "        -c++-option <opt> -ld-option <opt> -ld++-option <opt>"
     echo "        -fmoddir <f90mod path>"
     echo "        -pg <opt> -build-shared -charm-shared -no-trace-mpi"
-    echo "        -gendeps"
     echo
     echo "  Cell specific flags:"
     echo "        -spu-cpp -spu-lib <libname>"
@@ -482,18 +483,21 @@ do
 	
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
 		;;
 
 	"-copyglobal"|"-copyglobals")
 		SWAPGLOBALS="2"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
+		;;
+
+	"-tlsglobal"|"-tlsglobals")
+		TLSGLOBALS="1"
+		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
+		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
+		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 		;;
 
 	"-verbose")
@@ -619,16 +623,16 @@ do
 # Run preprocessor as an extra step, continue after preprocessing
 		PREPROCESS="yes"
                 ;;
-	"-M"|"-P"|"-S")
+	"-P"|"-S")
 # Run preprocessor/assembler only
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		;;
-	"-gendeps")
-# Generate dependencies for consumption by make
+	"-M")
 		SKIPLINK="yes"
-        GENDEPS="yes"
-        ;;
+		OPTS="$OPTS $arg"
+		GENDEPENDS="yes"
+		;;
 	"-default-to-aout")
 		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
 		then
@@ -705,6 +709,13 @@ do
 
 	"-no-optimize")
 		OPTIMIZE_MODE=false
+		;;
+
+	"-production")
+		PRODUCTION_MODE=true
+		;;
+	"-no-production")
+		PRODUCTION_MODE=false
 		;;
 	
 	"-pg"|"-g"|-W*|-O*)
@@ -861,6 +872,15 @@ then
 	fi
 fi
 
+OPTS_PIC="$CMK_PIC"
+if [ "$USE_PIC" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $OPTS_PIC"
+       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
+       OPTS_F90="$OPTS_F90 $OPTS_PIC"
+       OPTS_LD="$OPTS_LD $OPTS_PIC"
+fi
+
 if [ "$BUILD_SHARE" = "1" ]
 then
 	# ignore BUILD_SHARE if the target is not .a or .so
@@ -976,9 +996,24 @@ then
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
 fi
 
+# Pick up per-architecture production mode settings
+if [ "$PRODUCTION_MODE" = "true" ]
+then
+    OPTS_CC="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_CC"
+    OPTS_CXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_CXX"
+    OPTS_F90="$CMK_PRODUCTION $CMK_F90_PRODUCTION $OPTS_F90"
+    OPTS_LD="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_LD"
+    OPTS_LDXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_LDXX"
+fi
+
 if [ -n "$XI_INTERNAL" ]
 then
     CMK_XIOPTS="$CMK_XIOPTS -intrinsic"
+fi
+
+if [ "$GENDEPENDS" = "yes" ]
+then
+    CMK_XIOPTS="$CMK_XIOPTS -M"
 fi
 
 if test "$CMK_WITH_TAU" = "true"
@@ -1165,18 +1200,7 @@ do
                 test "$LANGUAGE" = "f90charm" && XIOPTS="$XIOPTS -f90"
                 if [ -n "$PREPROCESS" ]
                 then
-		  Do $CMK_CPP_CHARM $FILE | Do $CHARMBIN/charmxi $XIOPTS
-                elif [ -n "$GENDEPS" ]
-                then
-		  Do $CHARMBIN/gendeps4ci $FILE && \
-          {
-            # Strictly, we should just generate dependencies.
-            # However x.decl.h from y.ci is not amenable to pattern rules in make.
-            # Hence generate compilation rules for the ci file and send it to stdout
-            printf '\n\t@echo Parsing interface definitions in $(<F)'
-            printf '\n\t@%s -c $<' $0
-            printf '\n\n'
-          }
+		  Do $CMK_CPP_CHARM $OPTS_CPP $FILE | Do $CHARMBIN/charmxi $XIOPTS
                 else
 		  Do $CHARMBIN/charmxi $XIOPTS $FILE
                 fi

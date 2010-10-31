@@ -81,6 +81,8 @@ then
   fi
 fi
 
+[ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
+
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"
 [ -z "$CMK_SEQ_LD" ] && CMK_SEQ_LD="$CMK_LD"

@@ -1,26 +1,38 @@
-CHARMDIR = /expand/home/jessie/PPL/git/charm/mpi-linux-x86_64
-#CHARMDIR = /Users/yanhuasun/PPL/charm/charm-6.1.2/multicore-darwin-x86_64
-CHARMC = $(CHARMDIR)/bin/charmc $(OPTS) 
+CHARMC = charmc $(OPTS) 
 default: all
-all: nqueen nqueen_prj nqueen_greedy nqueen_refine nqueen_spray nqueen_neighbor
+all: nqueen  nqueen_rand nqueen_rand.prj  nqueen_neighbor nqueen_neighbor.prj nqueen_workstealing nqueen_workstealing.prj
+#all: nqueen nqueen_prj nqueen_rand  nqueen_neighbor nqueen_neighbor.prj 
 
 nqueen : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -o nqueen main.o nqueen.o counter.o
 
-nqueen_spray : main.o nqueen.o counter.o
-	$(CHARMC) -language charm++ -balance spray -o nqueen_spray main.o nqueen.o counter.o
+nqueen_rand : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -balance rand -o nqueen_rand main.o nqueen.o counter.o
+
+nqueen_rand.prj : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -tracemode projections -balance rand -o nqueen_rand.prj main.o nqueen.o counter.o
 
 nqueen_neighbor : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -balance neighbor -o nqueen_neighbor main.o nqueen.o counter.o
 
 nqueen_prj : main.o nqueen.o counter.o
-	$(CHARMC) -language charm++ -tracemode projections -o nqueen_prj main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -tracemode projections -balance rand -o nqueen_prj main.o nqueen.o counter.o
 
-nqueen_greedy : main.o nqueen.o counter.o
-	$(CHARMC) -language charm++ -balancer GreedyCommLB  -o nqueen_greedy main.o nqueen.o counter.o
+nqueen_neighbor.prj : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -tracemode projections -balance neighbor -o nqueen_neighbor.prj main.o nqueen.o counter.o
 
-nqueen_refine : main.o nqueen.o counter.o
-	$(CHARMC) -language charm++ -balancer RefineLB  -o nqueen_refine main.o nqueen.o counter.o
+nqueen_workstealing : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++  -balance workstealing -o nqueen_workstealing main.o nqueen.o counter.o
+
+nqueen_workstealing.prj : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -tracemode projections -balance workstealing -o nqueen_workstealing.prj main.o nqueen.o counter.o
+
+nqueen_centralized.prj : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++ -tracemode projections -balance centralized -o nqueen_centralized.prj main.o nqueen.o counter.o
+
+nqueen_centralized : main.o nqueen.o counter.o
+	$(CHARMC) -language charm++  -balance centralized -o nqueen_centralized main.o nqueen.o counter.o
+
 main.o : main.C main.h counter.decl.h counter.def.h  main.decl.h main.def.h
 	$(CHARMC) -o main.o main.C
 
@@ -35,6 +47,9 @@ main.decl.h main.def.h : main.ci
 	
 counter.decl.h counter.def.h : counter.ci
 	$(CHARMC) counter.ci
+
+test:
+	 ./charmrun +p128 ./nqueen 17 5 +CPGatherAll +CPSaveData +CPDefaultValues grainsize=5 +CPDivideConquer +CPSamplePeriod 
 
 clean:
 	rm -f main.decl.h main.def.h main.o

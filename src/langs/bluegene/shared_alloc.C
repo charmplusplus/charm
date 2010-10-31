@@ -12,7 +12,7 @@ void *shalloc(size_t s, int i)
 {
   // Make space to record at least i allocations
   if(allocs.size() <= i)
-    allocs.resize(i+1, Alloc(0,0));
+    allocs.resize(i+1, Alloc((void*)0,0));
 
   // Ensure allocation i is initialized
   if(allocs[i].first == 0)

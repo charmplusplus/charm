@@ -93,6 +93,7 @@ int pup_isSizing(const pup_er p);
 int pup_isDeleting(const pup_er p);
 int pup_isUserlevel(const pup_er p);
 int pup_isRestarting(const pup_er p);
+char *pup_typeString(const pup_er p);
 
 /*Insert a synchronization into the data stream */
 void pup_syncComment(const pup_er p, unsigned int sync, char *message);

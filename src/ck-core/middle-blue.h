@@ -154,6 +154,11 @@ static inline void CksdScheduler(int ret) { BgScheduler(ret); }
 static inline void CksdExitScheduler() { BgExitScheduler(); }
 static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
 
+#ifdef __cplusplus
+extern "C"
+#endif
+void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
+
 }  /* end of namespace */
 
 #endif
@@ -178,7 +183,8 @@ static inline void CkDeliverMsgs(int nmsg)	{ BgDeliverMsgs(nmsg); }
 #define CmiMultipleSend			BgMultipleSend
 
 #undef CsdEnqueueLifo
-#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CkMyPe(),((envelope*)m)->getTotalsize(), (char*)(m));
+//#define CsdEnqueueLifo(m)  CmiSyncSendAndFree(CkMyPe(),((envelope*)m)->getTotalsize(), (char*)(m));
+#define CsdEnqueueLifo(m)    		BgEnqueue((char*)m)
 
 #undef CmiNodeAllBarrier
 #define CmiNodeAllBarrier()

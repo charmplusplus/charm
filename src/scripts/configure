@@ -1190,8 +1190,16 @@ if test -n "$ac_init_help"; then
 Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
+  --enable-error-checking enable error checking
   --enable-tracing        enable tracing modules
+  --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
+  --enable-controlpoint   enable control point
+
+Optional Packages:
+  --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
+  --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
+  --with-numa             support memory affinity with NUMA
 
 _ACEOF
 ac_status=$?
@@ -1619,7 +1627,9 @@ ac_config_headers="$ac_config_headers conv-autoconfig.h"
 CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
-#keep it a decimal
+# Decimal representation of Charm++ release line and API revision
+# Increment the last 2 digits when making an API change
+# Increase the first three after branching for a release
 VERSION=60301
 echo $VERSION > ../include/VERSION
 
@@ -1628,10 +1638,43 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+charmout="charmconfig.out"
+/bin/rm -rf $charmout
+
+Echo() {
+	echo $*
+	echo $* >> $charmout
+}
+
+# enable/disable error checking
+# Check whether --enable-error-checking was given.
+if test "${enable_error_checking+set}" = set; then
+  enableval=$enable_error_checking;
+else
+  enable_error_checking=yes
+fi
+
+
+if test "$enable_error_checking" = "no"
+then
+  Echo "Error checking is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_ERROR_CHECKING 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_ERROR_CHECKING 1
+_ACEOF
+
+fi
+
 # check enable/disable
 # Check whether --enable-tracing was given.
 if test "${enable_tracing+set}" = set; then
-  enableval=$enable_tracing; enable_tracing=$enableval
+  enableval=$enable_tracing;
 else
   enable_tracing=yes
 fi
@@ -1639,9 +1682,40 @@ fi
 
 if test "$enable_tracing" = "no"
 then
+  Echo "Charm tracing is disabled"
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_TRACE_DISABLED 1
+#define CMK_TRACE_ENABLED 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TRACE_ENABLED 1
+_ACEOF
+
+fi
+
+# Check whether --enable-charmdebug was given.
+if test "${enable_charmdebug+set}" = set; then
+  enableval=$enable_charmdebug;
+else
+  enable_charmdebug=yes
+fi
+
+
+if test "$enable_charmdebug" = "no"
+then
+  Echo "CharmDebug is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CHARMDEBUG 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CHARMDEBUG 1
 _ACEOF
 
 fi
@@ -1656,12 +1730,54 @@ fi
 
 if test "$enable_replay" = "no"
 then
+  Echo "Charm record/replay is disabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
 _ACEOF
 
 fi
+
+# Check whether --enable-controlpoint was given.
+if test "${enable_controlpoint+set}" = set; then
+  enableval=$enable_controlpoint; enable_controlpoint=$enableval
+else
+  enable_controlpoint=yes
+fi
+
+
+if test "$enable_controlpoint" = "yes"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 1
+_ACEOF
+
+else
+  Echo "Charm control point is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_CONTROLPOINT 0
+_ACEOF
+
+fi
+
+
+# Check whether --with-numa was given.
+if test "${with_numa+set}" = set; then
+  withval=$with_numa;
+else
+  with_numa=no
+fi
+
+
+WITH_NUMA=no
+if test "$with_numa" = "yes"
+then
+  Echo "Charm NUMA support is builtin"
+  WITH_NUMA=yes
+fi
+
 
 #
 { echo "$as_me:$LINENO: checking machine name" >&5
@@ -1679,9 +1795,6 @@ echo "${ECHO_T}$version" >&6; }
 
 t="test.cpp"
 tc="test.c"
-
-charmout="charmconfig.out"
-/bin/rm -rf $charmout
 
 # test result passed in $1
 # If the test suceeded, print $3 and set "pass"/clear "fail"
@@ -1876,8 +1989,51 @@ EOT
 test_finish() {
 	rm -f $t $tc testlink test.o	> /dev/null 2>&1
 	/bin/rm -f out
+	test $1 -eq 1 && echo "*** Please find detailed output in charmconfig.out ***"
 	exit $1
 }
+
+# detect certain architectures
+if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_POWER7 1
+_ACEOF
+
+fi
+
+# detect OS
+OSNAME=`uname -s`
+if test $OSNAME = "Linux"
+then
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_OS_IS_LINUX 1
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_OS_IS_LINUX 0
+_ACEOF
+
+fi
+
+# test cp -p
+{ echo "$as_me:$LINENO: checking \"cp command as\"" >&5
+echo $ECHO_N "checking \"cp command as\"... $ECHO_C" >&6; }
+CP="cp -p"
+touch test_file
+if ! $CP test_file test_file.cp 2>err
+then
+  CP="cp"
+fi
+rm -f test_file test_file.cp
+{ echo "$as_me:$LINENO: result: $CP" >&5
+echo "${ECHO_T}$CP" >&6; }
+add_flag CP=\""$CP"\" "cp command"
+
 
 # try to decide the version of glibc
 get_glibc_version() {
@@ -1958,6 +2114,7 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_SIZET_64BIT $strictpass
 _ACEOF
 
+in64bit=$strictpass
 
 
 #### check strings.h ####
@@ -2332,6 +2489,25 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if std::inserter is defined #####
+cat > $t <<EOT
+#include <list>
+#include <iterator>
+
+void foo()
+{
+  using namespace std;
+  list<int> L;
+  inserter ( L, L.end ( ) ) = 500;
+}
+EOT
+test_cxx "whether std::inserter is defined" "ok" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STD_INSERTER $pass
+_ACEOF
+
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
@@ -2444,6 +2620,50 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+### test if switching TLS register ###
+if test $in64bit = 1
+then
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf64_Addr m1, m2;
+  asm volatile ("movq %%fs:0x0, %0\n\t"
+                "movq %1, %%fs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (64-bit) is supported" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TLS_SWITCHING64 $strictpass
+_ACEOF
+
+else
+cat > $t <<EOT
+#include <elf.h>
+#include <stdlib.h>
+#include <malloc.h>
+
+void switchTLS() {
+  Elf32_Addr m1, m2;
+  asm volatile ("movl %%gs:0x0, %0\n\t"
+                "movl %1, %%gs:0x0\n\t"
+                : "=r"(m1)
+                : "r"(m2));
+}
+EOT
+test_cxx "whether switching TLS register (32-bit) is supported" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_TLS_SWITCHING32 $strictpass
+_ACEOF
+
+fi
+
 #### test if we can build MPI ####
 if test "$CMK_BUILD_MPI" = 1
 then
@@ -2467,7 +2687,7 @@ BUILD_MPI=$strictpass
 if test $BUILD_MPI -eq 0
 then
   echo "Error: Can not compile a MPI program"
-  exit 1
+  test_finish 1
 fi
 
 if test $BUILD_MPI -eq 1
@@ -2488,7 +2708,7 @@ then
                 add_flag CMK_SYSLIBS='"$CMK_SYSLIBS -lmpi"' "mpi lib"
         else
                 echo "Error: can not find mpi library"
-                exit 1
+                test_finish 1
         fi
       fi
     else
@@ -2520,6 +2740,24 @@ mv -f ../include/mpi.h.bak ../include/mpi.h 2>/dev/null
 fi
 
 ################### Syscalls and Libraries ###################
+
+#### test for getrusage with RUSAGE_THREAD ###
+cat > $tc <<EOT
+#include <sys/time.h>
+#define __USE_GNU   1
+#include <sys/resource.h>
+int main() {
+  struct rusage usage;
+  getrusage(RUSAGE_THREAD, &usage);
+  return 0;
+}
+EOT
+test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_RUSAGE_THREAD $pass
+_ACEOF
+
 
 #### test for log2 ###
 cat > $t <<EOT
@@ -2801,6 +3039,35 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+
+### check libnuma on Linux ####
+if test "$WITH_NUMA" = "yes"
+then
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <linux/mempolicy.h>
+#include <numaif.h>
+#include <numa.h>
+
+int main()
+{
+  if (get_mempolicy(NULL, NULL, 0, 0, 0) == 0) return 0;
+  return -1;
+}
+EOT
+test_linkc "whether libnuma exists" "yes" "no" "-lnuma"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_NUMACTRL $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        add_flag 'CMK_SYSLIBS="$CMK_SYSLIBS -lnuma"' "libnuma"
+fi
+fi
+
 #### check bindprocessors on AIX ####
 cat > $tc <<EOT
 #include <stdlib.h>
@@ -2917,6 +3184,36 @@ test_cxx "whether has socklen_t" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_SOCKLEN $pass
+_ACEOF
+
+
+### test getifaddrs ####
+cat > $tc <<EOT
+#include <netinet/in.h> /* for sockaddr_in */
+#include <ifaddrs.h> /* for getifaddrs */
+#include <net/if.h> /* for IFF_RUNNING */
+
+int main()
+{
+  struct ifaddrs *interfaces=0;
+  if( getifaddrs(&interfaces) == 0 ) {
+        struct ifaddrs *interface;
+        for( interface=interfaces; interface; interface=interface->ifa_next ) {
+            if( (interface->ifa_flags & IFF_UP) && ! (interface->ifa_flags & IFF_LOOPBACK) ) {
+                const struct sockaddr_in *addr = (const struct sockaddr_in*)interface->ifa_addr;
+                if( addr && addr->sin_family==AF_INET ) {
+                    break;
+                }
+            }
+        }
+        freeifaddrs(interfaces);
+  }
+}
+EOT
+test_linkc "whether getifaddrs call exists" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_GETIFADDRS $pass
 _ACEOF
 
 
@@ -3395,13 +3692,13 @@ echo $ECHO_N "checking subroutine name used by Fortran 90 compiler... $ECHO_C" >
 
 if test -r conftest.o
 then
-  if test "${fortran_postfix+set}" = set; then
+  if test "${_cv_fortran_postfix+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   NAME=`$CMK_NM conftest.o | grep "foo_foo__"`
   if test "$NAME" != ""
   then
-    fortran_postfix=TWOSCORE
+    _cv_fortran_postfix=TWOSCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_TWOSCORE 1
@@ -3411,7 +3708,7 @@ _ACEOF
     NAME=`$CMK_NM conftest.o | grep "foo_foo_"`
     if test "$NAME" != ""
     then
-      fortran_postfix=ONESCORE
+      _cv_fortran_postfix=ONESCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ONESCORE 1
@@ -3421,7 +3718,7 @@ _ACEOF
       NAME=`$CMK_NM conftest.o | grep "foo_foo"`
       if test "$NAME" != ""
       then
-        fortran_postfix=NOSCORE
+        _cv_fortran_postfix=NOSCORE
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_NOSCORE 1
@@ -3431,7 +3728,7 @@ _ACEOF
         NAME=`$CMK_NM conftest.o | grep "FOO_FOO"`
         if test "$NAME" != ""
         then
-          fortran_postfix=ALLCAPS
+          _cv_fortran_postfix=ALLCAPS
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_FORTRAN_USES_ALLCAPS 1
@@ -3449,8 +3746,8 @@ _ACEOF
 
 fi
 
-  { echo "$as_me:$LINENO: result: $fortran_postfix" >&5
-echo "${ECHO_T}$fortran_postfix" >&6; }
+  { echo "$as_me:$LINENO: result: $_cv_fortran_postfix" >&5
+echo "${ECHO_T}$_cv_fortran_postfix" >&6; }
 else
   { echo "$as_me:$LINENO: result: \"Fortran compiler not working\"" >&5
 echo "${ECHO_T}\"Fortran compiler not working\"" >&6; }
@@ -3495,24 +3792,6 @@ echo "${ECHO_T}\"$ext\"" >&6; }
         /bin/rm -f $name
   fi
   /bin/rm -f conftest.f90
-fi
-
-### Check that Linux's C library is recent enough to provide working pthreads
-if test "$base_version" = "net-linux" || test "$base_version" = "mpi-linux"
-then
-case $version in *linux*smp*|*linux*vmi*)
-    { echo "$as_me:$LINENO: checking glibc version" >&5
-echo $ECHO_N "checking glibc version... $ECHO_C" >&6; }
-    get_glibc_version
-    { echo "$as_me:$LINENO: result: $GLIBCVERSION" >&5
-echo "${ECHO_T}$GLIBCVERSION" >&6; }
-    if test 0 = `expr $GLIBCVERSION \> 2.2.92`
-    then
-       echo "Your version of GLIBC is ancient, and does not have sufficient "
-       echo "support for pthreads."
-       exit 1
-    fi
-esac
 fi
 
 ac_config_files="$ac_config_files libs/ck-libs/ampi/ampiCC libs/ck-libs/ampi/ampirun"

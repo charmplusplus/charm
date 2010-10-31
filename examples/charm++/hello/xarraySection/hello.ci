@@ -1,0 +1,13 @@
+mainmodule hello {
+  message pingMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void rednPong(CkReductionMsg *msg);
+  };
+
+  array [1D] Hello {
+    entry Hello(int aNum, CkGroupID mcastMgrGID);
+    entry void mcastPing(pingMsg *msg);
+  };
+};

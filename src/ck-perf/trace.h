@@ -123,6 +123,7 @@ class Trace {
       int ml,      // message size
       CmiObjId* idx)    // index
     { }
+    virtual void changeLastEntryTimestamp(double ts) {}
     virtual void endExecute(void) {}
     // begin/end idle time for this pe
     virtual void beginIdle(double curWallTime) {}
@@ -225,6 +226,7 @@ public:
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
     inline void endExecute(void) {ALLREVERSEDO(endExecute());}
+    inline void changeLastEntryTimestamp(double ts) {ALLDO(changeLastEntryTimestamp(ts));}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
     inline void beginPack(void) {ALLDO(beginPack());}
     inline void endPack(void) {ALLDO(endPack());}
@@ -284,7 +286,7 @@ public:
 
 CkpvExtern(TraceArray*, _traces);
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if CMK_BLUEGENE_CHARM
 extern void    resetVTime();
 #  define _TRACE_ONLY(code) do{ BgGetTime(); if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }  resetVTime(); } while(0)

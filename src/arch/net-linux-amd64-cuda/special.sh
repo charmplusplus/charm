@@ -22,5 +22,3 @@ export CHARMINC=../include
 #PPU_EMBEDSPU = $CMK_PPU_EMBEDSPU
 #SPERT_LIBS = $CMK_SPERT_LIBS
 #EOF
-
-cd hybridAPI && make install

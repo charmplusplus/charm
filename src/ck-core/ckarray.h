@@ -323,7 +323,7 @@ private:
 	CkArrayID _aid;
 public:
 	CProxy_ArrayBase() {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		_aid.setZero();
 #endif
 	}
@@ -333,7 +333,7 @@ public:
                 :CProxy(), _aid(aid) { }
 	CProxy_ArrayBase(const ArrayElement *e);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	inline void ckCheck(void) const{  //Make sure this proxy has a value
 	  if (_aid.isZero())
 		CkAbort("Error! This array proxy has not been initialized!");
@@ -360,27 +360,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxy_ArrayBase)
-#define CK_DISAMBIG_ARRAY(super) \
-	CK_DISAMBIG_CPROXY(super) \
-	inline void ckCheck(void) const {super::ckCheck();} \
-	inline operator CkArrayID () const {return ckGetArrayID();}\
-	inline static CkArrayID ckCreateEmptyArray(void)\
-	  { return super::ckCreateEmptyArray(); }\
-	inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)\
-	  { return super::ckCreateArray(m,ctor,opts); }\
-	inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx) \
-	  { super::ckInsertIdx(m,ctor,onPe,idx); }\
-	inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const \
-	  { super::ckBroadcast(m,ep,opts); } \
-	inline CkArrayID ckGetArrayID(void) const \
-	  { return super::ckGetArrayID();} \
-	inline CkArray *ckLocalBranch(void) const \
-	  { return super::ckLocalBranch(); } \
-	inline CkLocMgr *ckLocMgr(void) const \
-	  { return super::ckLocMgr(); } \
-	inline void doneInserting(void) { super::doneInserting(); }\
-	CK_REDUCTION_CLIENT_DISAMBIG(super) \
-
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -405,17 +384,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxyElement_ArrayBase)
-#define CK_DISAMBIG_ARRAY_ELEMENT(super) \
-	CK_DISAMBIG_ARRAY(super) \
-	inline void ckInsert(CkArrayMessage *m,int ctor,int onPe) \
-	  { super::ckInsert(m,ctor,onPe); }\
-	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const \
-	  { super::ckSend(m,ep,opts); }\
-	inline void *ckSendSync(CkArrayMessage *m, int ep) const \
-	  { return super::ckSendSync(m,ep); }\
-	inline const CkArrayIndex &ckGetIndex() const \
-	  { return super::ckGetIndex(); }\
-
 
 class CProxySection_ArrayBase:public CProxy_ArrayBase {
 private:
@@ -451,13 +419,19 @@ public:
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
     CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
+      if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
+      else if (_nsid > 1) {
       _sid = new CkSectionID[n];
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
+      } else _sid = NULL;
     }
 
     ~CProxySection_ArrayBase() {
@@ -482,6 +456,7 @@ public:
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) ;
 
 //	ArrayElement *ckLocal(void) const;
+    inline int ckGetNumSubSections() const { return _nsid; }
 	inline CkSectionInfo &ckGetSectionInfo() {return _sid->_cookie;}
 	inline CkSectionID *ckGetSectionIDs() {return _sid;}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
@@ -494,28 +469,6 @@ public:
 	void pup(PUP::er &p);
 };
 PUPmarshall(CProxySection_ArrayBase)
-#define CK_DISAMBIG_ARRAY_SECTION(super) \
-	CK_DISAMBIG_ARRAY(super) \
-	inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) \
-	  { super::ckSend(m,ep,opts); } \
-        inline CkSectionInfo &ckGetSectionInfo() \
-	  { return super::ckGetSectionInfo(); } \
-        inline CkSectionID *ckGetSectionIDs() \
-	  { return super::ckGetSectionIDs(); } \
-        inline CkSectionID &ckGetSectionID() \
-	  { return super::ckGetSectionID(); } \
-        inline CkSectionID &ckGetSectionID(int i) \
-	  { return super::ckGetSectionID(i); } \
-        inline CkArrayID ckGetArrayIDn(int i) const \
-          { return super::ckGetArrayIDn(i); }  \
-        inline CkArrayIndexMax *ckGetArrayElements() const \
-	  { return super::ckGetArrayElements(); } \
-        inline CkArrayIndexMax *ckGetArrayElements(int i) const \
-          { return super::ckGetArrayElements(i); } \
-        inline int ckGetNumElements() const \
-	  { return super::ckGetNumElements(); }  \
-        inline int ckGetNumElements(int i) const \
-          { return super::ckGetNumElements(i); }  \
 
 //Simple C-like API:
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);

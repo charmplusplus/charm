@@ -102,7 +102,9 @@
 #include <stdlib.h>
 #include <string.h>
 #if CMK_MEMORY_PROTECTABLE
+#if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
+#endif
 #endif
 #if CMK_BLUEGENEL
 #include "rts.h"	/*<- for rts_memory_alias */
@@ -138,6 +140,10 @@
 
 #endif
 
+#if CMK_THREADS_BUILD_TLS
+#include "cmitls.h"
+#endif
+
 /**************************** Shared Base Thread Class ***********************/
 /*
 	FAULT_EVAC
@@ -170,6 +176,10 @@ typedef struct CthThreadBase
   void      *stack; /*Pointer to thread stack*/
   int        stacksize; /*Size of thread stack (bytes)*/
   struct CthThreadListener *listener; /* pointer to the first of the listeners */
+
+#if CMK_THREADS_BUILD_TLS
+  tlsseg_t tlsseg;
+#endif
 
   int magic; /* magic number for checking corruption */
 
@@ -498,6 +508,10 @@ static void CthBaseInit(char **argv)
   
   CpvInitialize(int, Cth_serialNo);
   CpvAccess(Cth_serialNo) = 1;
+
+#if CMK_THREADS_BUILD_TLS
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
+#endif
 }
 
 int CthImplemented() { return 1; } 
@@ -597,6 +611,16 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 	}
 
 	pup_int(p, &t->magic);
+
+#if CMK_THREADS_BUILD_TLS
+        void* aux;
+        pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
+        aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
+        /* fixme: tls global variables handling needs isomalloc */
+        CmiIsomallocPup(p, &aux);
+        /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
+#endif
+
 }
 
 static void CthThreadFinished(CthThread t)
@@ -682,7 +706,7 @@ void CthSuspend(void)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if !CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceSuspend();
@@ -701,7 +725,7 @@ void CthAwaken(CthThread th)
     return;
   } */
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -722,7 +746,7 @@ void CthYield()
 void CthAwakenPrio(CthThread th, int s, int pb, unsigned int *prio)
 {
   if (B(th)->awakenfn == 0) CthNoStrategy();
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
   if(CpvAccess(traceOn))
     traceAwaken(th);
@@ -1481,8 +1505,8 @@ typedef void (*uJcontext_fn_t)(void);
 
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
-#include <uJcontext.h>
-#include <uJcontext.c>
+#include "uJcontext.h"
+#include "uJcontext.c"
 
 #endif
 
@@ -1555,11 +1579,20 @@ void CthFree(CthThread t)
   }
 }
 
+#if CMK_THREADS_BUILD_TLS
+void CthResume(CthThread) __attribute__((optimize(0)));
+#endif
+
 void CthResume(t)
 CthThread t;
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
+
+#if CMK_THREADS_BUILD_TLS
+  switchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
+#endif
+
   if (t != tc) { /* Actually switch threads */
     CthBaseResume(t);
     if (!tc->base.exiting) 
@@ -1581,7 +1614,7 @@ CthThread t;
 #if CMK_THREADS_USE_CONTEXT && CMK_64BIT /* makecontext only pass integer arguments */
 void CthStartThread(CmiUInt4 fn1, CmiUInt4 fn2, CmiUInt4 arg1, CmiUInt4 arg2)
 {
-  CmiUInt8 fn0 = (((CmiUInt8)fn1) << 32) | fn2;
+  CmiUInt8 fn0 =  (((CmiUInt8)fn1) << 32) | fn2;
   CmiUInt8 arg0 = (((CmiUInt8)arg1) << 32) | arg2;
   void *arg = (void *)arg0;
   qt_userf_t *fn = (qt_userf_t*)fn0;
@@ -1610,11 +1643,13 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 {
   CthThread result;
   char *stack, *ss_sp, *ss_end;
+
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
 #ifdef MINSIGSTKSZ
-  if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize);
+  /* if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize); */
+  if (size && size<MINSIGSTKSZ) size = MINSIGSTKSZ;
 #endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
@@ -1651,10 +1686,10 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   errno = 0;
 #if CMK_THREADS_USE_CONTEXT
   if (sizeof(void *) == 8) {
-    int fn1 = ((CmiUInt8)fn) >> 32;
-    int fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
-    int arg1 = ((CmiUInt8)arg) >> 32;
-    int arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
+    CmiUInt4 fn1 = ((CmiUInt8)fn) >> 32;
+    CmiUInt4 fn2 = (CmiUInt8)fn & 0xFFFFFFFF;
+    CmiUInt4 arg1 = ((CmiUInt8)arg) >> 32;
+    CmiUInt4 arg2 = (CmiUInt8)arg & 0xFFFFFFFF;
     makeJcontext(&result->context, (uJcontext_fn_t)CthStartThread, 4, fn1, fn2, arg1, arg2);
   }
   else
@@ -1665,6 +1700,11 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
     CmiAbort("CthCreateInner: makecontext failed.\n");
   }
   CthAliasEnable(B(CthCpvAccess(CthCurrent)));
+
+#if CMK_THREADS_BUILD_TLS
+  allocNewTLSSeg(&B(result)->tlsseg);
+#endif
+
   return result;  
 }
 
@@ -1837,11 +1877,20 @@ static void *CthBlockHelp(qt_t *sp, CthThread old, void *null)
   return (void *) 0;
 }
 
+#if CMK_THREADS_BUILD_TLS
+void CthResume(CthThread) __attribute__((optimize(0)));
+#endif
+
 void CthResume(t)
 CthThread t;
 {
   CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
+
+#if CMK_THREADS_BUILD_TLS
+  switchTLS(&B(tc)->tlsseg, &B(t)->tlsseg);
+#endif
+
   CthBaseResume(t);
   if (tc->base.exiting) {
     QT_ABORT((qt_helper_t*)CthAbortHelp, tc, 0, t->stackp);
@@ -1889,8 +1938,14 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
     result->protlen = CMK_MEMORY_PAGESIZE;
     CthMemoryProtect(stack, result->protect, result->protlen);
   }
+
+#if CMK_THREADS_BUILD_TLS
+  allocNewTLSSeg(&B(result)->tlsseg);
+#endif
+
   return result;
 }
+
 CthThread CthCreate(CthVoidFn fn, void *arg, int size)
 { return CthCreateInner(fn,arg,size,0);}
 

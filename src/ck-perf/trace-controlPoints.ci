@@ -9,7 +9,6 @@ module TraceControlPoints {
 
   group [migratable] TraceControlPointsBOC {
     entry TraceControlPointsBOC(void);
-    entry void printBGP_UPC_CountersBOC(void);
 				      };
 
 };

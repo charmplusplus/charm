@@ -57,7 +57,7 @@
 #include "converse.h"
 
 void * memory_stack_top; /*The higher end of the stack (approximation)*/
-int cpdInSystem=0;
+int cpdInSystem=1; /*Start inside the system (until we start executing user code)*/
 
 /*Choose the proper default configuration*/
 #if CMK_MEMORY_BUILD_DEFAULT
@@ -233,7 +233,9 @@ static void meta_free_hook(void* p, const void* c) {meta_free(p);}
   __memalign_hook = meta_memalign_hook; \
   __free_hook = meta_free_hook;
 
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 static void *(*old_malloc_hook) (size_t, const void*);
 static void *(*old_realloc_hook) (void*,size_t, const void*);
 static void *(*old_memalign_hook) (size_t,size_t, const void*);
@@ -305,6 +307,7 @@ void CmiMemoryInit(argv)
 {
   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
+  CmiArgGroup("Converse","Memory module");
   meta_init(argv);
 #endif
   CmiOutOfMemoryInit();
@@ -377,7 +380,9 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
 #else
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 #if CMK_C_INLINE
 inline
 #endif
@@ -558,6 +563,7 @@ The locking code is common to all implementations except OS-builtin.
 
 void CmiMemoryInit(char **argv)
 {
+  CmiArgGroup("Converse","Memory module");
   meta_init(argv);
   CmiOutOfMemoryInit();
 }

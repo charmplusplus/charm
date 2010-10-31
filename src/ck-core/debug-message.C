@@ -96,7 +96,19 @@ void envelope::pup(PUP::er &p) {
 	//puping converse hdr hopefully not go beyond boundry
 	p((char *)core,convHeaderSize);
 	p(ref);
-	p((char *)&attribs,sizeof(attribs));
+	//p((char *)&attribs,sizeof(attribs));
+	p(attribs.msgIdx);
+        p(attribs.mtype);
+        int d;
+        if (!p.isUnpacking()) d = attribs.queueing;
+        p|d;
+        if (p.isUnpacking()) attribs.queueing = d;
+        if (!p.isUnpacking()) d = attribs.isPacked;
+        p|d;
+        if (p.isUnpacking()) attribs.isPacked = d;
+        if (!p.isUnpacking()) d = attribs.isUsed;
+        p|d;
+        if (p.isUnpacking()) attribs.isUsed = d; 
 	p(epIdx);
 	p(pe);
 	p(event);
@@ -107,7 +119,7 @@ void envelope::pup(PUP::er &p) {
 		p((char *)&(type.chare.ptr),sizeof(void *));
 		p(type.chare.forAnyPe);
 		break;
-	case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
+	case NodeBocInitMsg: case BocInitMsg: case ForNodeBocMsg: case ForBocMsg:
 		p|type.group.g;
 		p|type.group.rednMgr;
 		p|type.group.epoch;

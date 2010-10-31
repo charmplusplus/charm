@@ -110,17 +110,17 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 #ifndef CMK_CHARE_USE_PTR
 	// save groups into Chares.dat
 	sprintf(fileName,"%s/Chares_%d.dat",dirname,CkMyPe());
-	FILE* fChares = fopen(fileName,"wb");
+	FILE* fChares = CmiFopen(fileName,"wb");
 	if(!fChares) CkAbort("Failed to create checkpoint file for chares!");
 	PUP::toDisk pChares(fChares);
 	CkPupChareData(pChares);
-	fclose(fChares);
+	CmiFclose(fChares);
 #endif
 
 	// save groups into Groups.dat
 	// content of the file: numGroups, GroupInfo[numGroups], _groupTable(PUP'ed), groups(PUP'ed)
 	sprintf(fileName,"%s/Groups_%d.dat",dirname,CkMyPe());
-	FILE* fGroups = fopen(fileName,"wb");
+	FILE* fGroups = CmiFopen(fileName,"wb");
 	if(!fGroups) CkAbort("Failed to create checkpoint file for group table!");
 	PUP::toDisk pGroups(fGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -128,13 +128,13 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 #else
     CkPupGroupData(pGroups);
 #endif
-	fclose(fGroups);
+	CmiFclose(fGroups);
 
 	// save nodegroups into NodeGroups.dat
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
 	if (CkMyRank() == 0) {
 	  sprintf(fileName,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
-	  FILE* fNodeGroups = fopen(fileName,"wb");
+	  FILE* fNodeGroups = CmiFopen(fileName,"wb");
 	  if(!fNodeGroups) 
 	    CkAbort("Failed to create checkpoint file for nodegroup table!");
 	  PUP::toDisk pNodeGroups(fNodeGroups);
@@ -143,16 +143,16 @@ void CkCheckpointMgr::Checkpoint(const char *dirname, CkCallback& cb){
 #else
       CkPupNodeGroupData(pNodeGroups);
 #endif
-	  fclose(fNodeGroups);
+	  CmiFclose(fNodeGroups);
   	}
 
 	//DEBCHK("[%d]CkCheckpointMgr::Checkpoint called dirname={%s}\n",CkMyPe(),dirname);
 	sprintf(fileName,"%s/arr_%d.dat",dirname, CkMyPe());
-	FILE *datFile=fopen(fileName,"wb");
+	FILE *datFile=CmiFopen(fileName,"wb");
 	if (datFile==NULL) CkAbort("Could not create data file");
 	PUP::toDisk  p(datFile);
 	CkPupArrayElementsData(p);
-	fclose(datFile);
+	CmiFclose(datFile);
 
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
 	system("sync");
@@ -218,20 +218,20 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 
 #ifndef CMK_CHARE_USE_PTR
 
-CpvExtern(CkVec<void *>, chare_objs);
-CpvExtern(CkVec<int>, chare_types);
-CpvExtern(CkVec<VidBlock *>, vidblocks);
+CkpvExtern(CkVec<void *>, chare_objs);
+CkpvExtern(CkVec<int>, chare_types);
+CkpvExtern(CkVec<VidBlock *>, vidblocks);
 
 // handle plain non-migratable chare
 void CkPupChareData(PUP::er &p)
 {
   int i, n;
-  if (!p.isUnpacking()) n = CpvAccess(chare_objs).size();
+  if (!p.isUnpacking()) n = CkpvAccess(chare_objs).size();
   p|n;
   for (i=0; i<n; i++) {
         int chare_type;
 	if (!p.isUnpacking()) {
-		chare_type = CpvAccess(chare_types)[i];
+		chare_type = CkpvAccess(chare_types)[i];
 	}
 	p | chare_type;
 	if (p.isUnpacking()) {
@@ -246,20 +246,20 @@ void CkPupChareData(PUP::er &p)
 		CkCreateLocalChare(migCtor, env);
 		CkFreeSysMsg(m);
 	}
-	Chare *obj = (Chare*)CpvAccess(chare_objs)[i];
+	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
 	obj->pup(p);
   }
 
-  if (!p.isUnpacking()) n = CpvAccess(vidblocks).size();
+  if (!p.isUnpacking()) n = CkpvAccess(vidblocks).size();
   p|n;
   for (i=0; i<n; i++) {
 	VidBlock *v;
 	if (p.isUnpacking()) {
 		v = new VidBlock();
-		CpvAccess(vidblocks).push_back(v);
+		CkpvAccess(vidblocks).push_back(v);
 	}
 	else
-		v = CpvAccess(vidblocks)[i];
+		v = CkpvAccess(vidblocks)[i];
 	v->pup(p);
   }
 }
@@ -596,23 +596,23 @@ static void checkpointOne(const char* dirname, CkCallback& cb){
 	
 	// save readonlys, and callback BTW
 	sprintf(filename,"%s/RO.dat",dirname);
-	FILE* fRO = fopen(filename,"wb");
+	FILE* fRO = CmiFopen(filename,"wb");
 	if(!fRO) CkAbort("Failed to create checkpoint file for readonly data!");
 	PUP::toDisk pRO(fRO);
 	int _numPes = CkNumPes();
 	pRO|_numPes;
 	CkPupROData(pRO);
 	pRO|cb;
-	fclose(fRO);
+	CmiFclose(fRO);
 
 	// save mainchares into MainChares.dat
 	{
 		sprintf(filename,"%s/MainChares.dat",dirname);
-		FILE* fMain = fopen(filename,"wb");
+		FILE* fMain = CmiFopen(filename,"wb");
 		if(!fMain) CkAbort("Failed to open checkpoint file for mainchare data!");
 		PUP::toDisk pMain(fMain);
 		CkPupMainChareData(pMain, NULL);
-		fclose(fMain);
+		CmiFclose(fMain);
 	}
 }
 
@@ -670,14 +670,14 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
 	// restore readonlys
 	sprintf(filename,"%s/RO.dat",dirname);
-	FILE* fRO = fopen(filename,"rb");
+	FILE* fRO = CmiFopen(filename,"rb");
 	if(!fRO) CkAbort("Failed to open checkpoint file for readonly data!");
 	int _numPes = -1;
 	PUP::fromDisk pRO(fRO);
 	pRO|_numPes;
 	CkPupROData(pRO);
 	pRO|cb;
-	fclose(fRO);
+	CmiFclose(fRO);
 	DEBCHK("[%d]CkRestartMain: readonlys restored\n",CkMyPe());
         _oldNumPes = _numPes;
 
@@ -685,11 +685,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
 	// restore mainchares
 	sprintf(filename,"%s/MainChares.dat",dirname);
-	FILE* fMain = fopen(filename,"rb");
+	FILE* fMain = CmiFopen(filename,"rb");
 	if(fMain && CkMyPe()==0){ // only main chares have been checkpointed, we restart on PE0
 		PUP::fromDisk pMain(fMain);
 		CkPupMainChareData(pMain, args);
-		fclose(fMain);
+		CmiFclose(fMain);
 		DEBCHK("[%d]CkRestartMain: mainchares restored\n",CkMyPe());
 		//bdcastRO(); // moved to CkPupMainChareData()
 	}
@@ -698,11 +698,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 	// restore chares only when number of pes is the same 
 	if(CkNumPes() == _numPes) {
 		sprintf(filename,"%s/Chares_%d.dat",dirname,CkMyPe());
-		FILE* fChares = fopen(filename,"rb");
+		FILE* fChares = CmiFopen(filename,"rb");
 		if(!fChares) CkAbort("Failed to open checkpoint file for chares!");
 		PUP::fromDisk pChares(fChares);
 		CkPupChareData(pChares);
-		fclose(fChares);
+		CmiFclose(fChares);
 		_chareRestored = 1;
 	}
 #endif
@@ -714,7 +714,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 		sprintf(filename,"%s/Groups_0.dat",dirname);
 	else
 		sprintf(filename,"%s/Groups_%d.dat",dirname,CkMyPe());
-	FILE* fGroups = fopen(filename,"rb");
+	FILE* fGroups = CmiFopen(filename,"rb");
 	if(!fGroups) CkAbort("Failed to open checkpoint file for group table!");
 	PUP::fromDisk pGroups(fGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -722,7 +722,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 #else
     CkPupGroupData(pGroups);
 #endif
-	fclose(fGroups);
+	CmiFclose(fGroups);
 
 	// restore nodegroups
 	// content of the file: numNodeGroups, GroupInfo[numNodeGroups], _nodeGroupTable(PUP'ed), nodegroups(PUP'ed)
@@ -731,7 +731,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 			sprintf(filename,"%s/NodeGroups_0.dat",dirname);
 		else
 			sprintf(filename,"%s/NodeGroups_%d.dat",dirname,CkMyNode());
-		FILE* fNodeGroups = fopen(filename,"rb");
+		FILE* fNodeGroups = CmiFopen(filename,"rb");
 		if(!fNodeGroups) CkAbort("Failed to open checkpoint file for nodegroup table!");
 		PUP::fromDisk pNodeGroups(fNodeGroups);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -739,7 +739,7 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 #else
         CkPupNodeGroupData(pNodeGroups);
 #endif
-		fclose(fNodeGroups);
+		CmiFclose(fNodeGroups);
 	}
 
 	// for each location, restore arrays
@@ -749,11 +749,11 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
           for (i=0; i<_numPes;i++) {
             if (i%CkNumPes() == CkMyPe()) {
 	      sprintf(filename,"%s/arr_%d.dat",dirname, i);
-	      FILE *datFile=fopen(filename,"rb");
+	      FILE *datFile=CmiFopen(filename,"rb");
 	      if (datFile==NULL) CkAbort("Could not read data file");
 	      PUP::fromDisk  p(datFile);
 	      CkPupArrayElementsData(p);
-	      fclose(datFile);
+	      CmiFclose(datFile);
             }
 	  }
 

@@ -19,39 +19,40 @@
 #include "ckfutures.h"
 #include "charisma.h"
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)
 #else
 #define _CHECK_VALID(p, msg) do { } while(0)
 #endif
 
 // Flag that tells the system if we are replaying using Record/Replay
-extern int _replaySystem;
+extern "C" int _replaySystem;
 
-#if CMK_REPLAYSYSTEM
+#if CMK_CHARMDEBUG
+extern "C" int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
-  if (_replaySystem) {
+  if (!ConverseDeliver(pe)) {
     CmiFree(msg);
     return;
   }
   CldEnqueue(pe, msg, infofn);
 }
 inline void _CldEnqueueMulti(int npes, int *pes, void *msg, int infofn) {
-  if (_replaySystem) {
+  if (!ConverseDeliver(-1)) {
     CmiFree(msg);
     return;
   }
   CldEnqueueMulti(npes, pes, msg, infofn);
 }
 inline void _CldEnqueueGroup(CmiGroup grp, void *msg, int infofn) {
-  if (_replaySystem) {
+  if (!ConverseDeliver(-1)) {
     CmiFree(msg);
     return;
   }
   CldEnqueueGroup(grp, msg, infofn);
 }
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
-  if (_replaySystem) {
+  if (!ConverseDeliver(node)) {
     CmiFree(msg);
     return;
   }
@@ -122,7 +123,7 @@ protected:
   FILE *f;
   CkMessageWatcher *next;
 public:
-    CkMessageWatcher() : next(NULL) { }
+    CkMessageWatcher() : f(NULL), next(NULL) { }
     virtual ~CkMessageWatcher();
 	/**
 	 * This message is about to be processed by Charm.
@@ -130,22 +131,23 @@ public:
 	 * The message is processed by the watcher starting from the innermost one
 	 * up to the outermost
 	 */
-	inline CmiBool processMessage(envelope *env,CkCoreState *ck) {
-	  CmiBool result = CmiTrue;
-	  if (next != NULL) result &= next->processMessage(env, ck);
-	  result &= process(env, ck);
-	  return result;
-	}
-	inline int processThread(CthThreadToken *token, CkCoreState *ck) {
-	   int result = 1;
-	   if (next != NULL) result &= next->processThread(token, ck);
-	   result &= process(token, ck);
-	   return result;
-	}
+#define PROCESS_MACRO(name,type) inline CmiBool process##name(type *input,CkCoreState *ck) { \
+  CmiBool result = CmiTrue; \
+    if (next != NULL) result &= next->process##name(input, ck); \
+    result &= process(input, ck); \
+    return result; \
+  }
+
+    PROCESS_MACRO(Message,envelope*);
+    PROCESS_MACRO(Thread,CthThreadToken);
+    PROCESS_MACRO(LBMessage,LBMigrateMsg*);
+
+#undef PROCESS_MACRO
 protected:
     /** These are used internally by this class to call the correct subclass method */
-	virtual CmiBool process(envelope *env,CkCoreState *ck) =0;
-	virtual int process(CthThreadToken *token, CkCoreState *ck) {return 1;}
+	virtual CmiBool process(envelope **env,CkCoreState *ck) =0;
+	virtual CmiBool process(CthThreadToken *token, CkCoreState *ck) {return CmiTrue;}
+	virtual CmiBool process(LBMigrateMsg **msg, CkCoreState *ck) {return CmiTrue;}
 public:
     inline void setNext(CkMessageWatcher *w) { next = w; }
 };
@@ -193,6 +195,7 @@ public:
 
 CkpvExtern(CkCoreState *, _coreState);
 
+void CpdHandleLBMessage(LBMigrateMsg **msg);
 void CkMessageWatcherInit(char **argv,CkCoreState *ck);
 
 extern void _processHandler(void *converseMsg,CkCoreState *ck);

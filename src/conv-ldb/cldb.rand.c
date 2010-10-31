@@ -76,7 +76,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   if (pe == CLD_ANYWHERE) {
     pe = (((CrnRand()+CmiMyPe())&0x7FFFFFFF)%CmiNumPes());
       /* optimizationfor SMP */
-#if CMK_SMP
+#if CMK_NODE_QUEUE_AVAILABLE
     if (CmiNodeOf(pe) == CmiMyNode()) {
       CldNodeEnqueue(CmiMyNode(), msg, infofn);
       return;
@@ -89,6 +89,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
   if (pe == CmiMyPe() && !CmiImmIsRunning()) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     /* CsdEnqueueGeneral is not thread or SIGIO safe */
+    //CmiPrintf("   myself processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   } else {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -100,7 +101,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
     CmiSetInfo(msg,infofn);
     if (pe==CLD_BROADCAST) { CmiSyncBroadcastAndFree(len, msg); }
     else if (pe==CLD_BROADCAST_ALL) { CmiSyncBroadcastAllAndFree(len, msg); }
-    else CmiSyncSendAndFree(pe, len, msg);
+    else {
+        //CmiPrintf("   processor %d ==> %d, length=%d Timer:%f , priori=%d \n", CmiMyPe(), pe, len, CmiWallTimer(), *prioptr);
+        CmiSyncSendAndFree(pe, len, msg);
+    }
   }
 }
 
@@ -142,3 +146,6 @@ void CldModuleInit(char **argv)
     CpvAccess(CldMessageChunks) = 0;
   CldModuleGeneralInit(argv);
 }
+
+void CldCallback()
+{}

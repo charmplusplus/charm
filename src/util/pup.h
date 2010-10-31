@@ -278,7 +278,7 @@ class er {
   /// Insert a synchronization marker and comment into the stream.
   ///  Only applies if this PUP::er wants comments.
   inline void syncComment(unsigned int sync,const char *message=0) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   	if (hasComments()) {
 		synchronize(sync);
 		if (message) comment(message);

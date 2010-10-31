@@ -12,6 +12,7 @@ Orion Sky Lawlor, olawlor@acm.org 9/29/2001
 #include "register.h"
 #include "ck.h"
 #include "trace.h"
+#include "TopoManager.h"
 
 #include<sstream>
 
@@ -238,26 +239,53 @@ public:
 };
 
 /** 
- * Class used to store the dimensions of the array and precalculate binSize for
- * the DefaultArrayMap -- ASB
+ * Class used to store the dimensions of the array and precalculate numChares,
+ * binSize and other values for the DefaultArrayMap -- ASB
  */
 class dimInfo {
 public:
   CkArrayIndexMax _nelems;
-  int _binSize;
+  int _binSize;			/* floor of numChares/numPes */
+  int _numChares;		/* initial total number of chares */
+  int _remChares;		/* numChares % numPes -- equals the number of
+				   processors in the first set */
+  int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
+				   chares in the first set */
 
   dimInfo(void) { }
 
-  dimInfo(CkArrayIndexMax& n, int bs) {
+  dimInfo(CkArrayIndexMax& n) {
     _nelems = n;
-    _binSize = bs;
+    compute_binsize();
   }
 
-  ~dimInfo() { }
+  ~dimInfo() {}
+  
+  int compute_binsize()
+  {
+    int numPes = CkNumPes();
+
+    if (_nelems.nInts == 1) {
+      _numChares = _nelems.data()[0];
+    } else if (_nelems.nInts == 2) {
+      _numChares = _nelems.data()[0] * _nelems.data()[1];
+    } else if (_nelems.nInts == 3) {
+      _numChares = _nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2];
+    }
+
+    _remChares = _numChares % numPes;
+    _binSize = (int)floor((double)_numChares/(double)numPes);
+    _numFirstSet = _remChares * (_binSize + 1);
+
+    return _binSize;
+  }
 
   void pup(PUP::er& p){
     p|_nelems;
     p|_binSize;
+    p|_numChares;
+    p|_remChares;
+    p|_numFirstSet;
   }
 };
 
@@ -268,7 +296,7 @@ public:
  */
 class DefaultArrayMap : public RRMap
 {
-private:
+public:
   CkPupPtrVec<dimInfo> arrs;
 
 public:
@@ -280,19 +308,9 @@ public:
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
-    int numPes=CkNumPes();
-    int binSize;
-    if (numElements.nInts == 1) {
-      binSize = (int)ceil((double)(numElements.data()[0])/(double)numPes);
-    } else if (numElements.nInts == 2) {
-      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1])/(double)numPes);
-    } else if (numElements.nInts == 3) {
-      binSize = (int)ceil((double)(numElements.data()[0]*numElements.data()[1]*numElements.data()[2])/(double)numPes);
-    }
-
     int idx = arrs.size();
     arrs.resize(idx+1);
-    arrs[idx] = new dimInfo(numElements, binSize);
+    arrs[idx] = new dimInfo(numElements);
     return idx;
   }
  
@@ -312,12 +330,94 @@ public:
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
 
-    return (flati/arrs[arrayHdl]->_binSize);
+    if(flati < arrs[arrayHdl]->_numFirstSet)
+      return (flati/(arrs[arrayHdl]->_binSize + 1));
+    else if (flati < arrs[arrayHdl]->_numChares)
+      return (arrs[arrayHdl]->_remChares + (flati - arrs[arrayHdl]->_numFirstSet) / (arrs[arrayHdl]->_binSize));
+    else
+      return (flati % CkNumPes());
   }
 
   void pup(PUP::er& p){
     RRMap::pup(p);
+    int npes = CkNumPes();
+    p|npes;
     p|arrs;
+    if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
+      for (int i=0; i<arrs.size(); i++)
+        arrs[i]->compute_binsize();
+    }
+  }
+};
+
+/**
+ * This map can be used for topology aware mapping when the mapping is provided
+ * through a file -- ASB
+ */
+class ReadFileMap : public DefaultArrayMap
+{
+private:
+  CkVec<int> mapping;
+
+public:
+  ReadFileMap(void) {
+    DEBC((AA"Creating ReadFileMap\n"AB));
+  }
+
+  ReadFileMap(CkMigrateMessage *m):DefaultArrayMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    if(mapping.size() == 0) {
+      int numChares;
+
+      if (arrs[idx]->_nelems.nInts == 1) {
+	numChares = arrs[idx]->_nelems.data()[0];
+      } else if (arrs[idx]->_nelems.nInts == 2) {
+	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1];
+      } else if (arrs[idx]->_nelems.nInts == 3) {
+	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1] * arrs[idx]->_nelems.data()[2];
+      } else {
+	CkAbort("CkArrayIndex has more than 3 integers!");
+      }
+
+      mapping.resize(numChares);
+      FILE *mapf = fopen("mapfile", "r");
+      TopoManager tmgr;
+      int x, y, z, t, rv;
+
+      for(int i=0; i<numChares; i++) {
+	rv = fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+	mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
+      }
+      fclose(mapf);
+    }
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    } else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+
+    return mapping[flati];
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+    p|mapping;
   }
 };
 
@@ -541,12 +641,6 @@ public:
     CkFreeMsg(ctorMsg);
   }
 };
-
-
-
-
-
-
 
 
 CkpvStaticDeclare(double*, rem);
@@ -1057,7 +1151,7 @@ void CkMigratableList::setSize(int s) {
 }
 
 void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (atIdx>=length())
 		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
 #endif
@@ -1262,7 +1356,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	startTiming();
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
@@ -1278,7 +1372,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	   CkDeliverMessageReadonly(epIdx,msg,obj);
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_END_EXECUTE();
@@ -1469,7 +1563,7 @@ public:
 		:CkLocRec_aging(Narr)
 		{
 			onPe=NonPe;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 			if (onPe==CkMyPe())
 				CkAbort("ERROR!  'remote' array element on this Pe!\n");
 #endif
@@ -2026,7 +2120,7 @@ void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 	delete rec;
 }
 void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
@@ -2034,7 +2128,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
         CmiImmediateLock(hashImmLock);
 	hash.remove(*(CkArrayIndexMax *)&idx);
         CmiImmediateUnlock(hashImmLock);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
@@ -2575,7 +2669,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
 	//immediately updated real migration
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
@@ -2728,7 +2822,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 
 //Look up array element in hash table.  Index out-of-bounds if not found.
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 //Assume the element will be found
 	return hash.getRef(*(CkArrayIndexMax *)&idx);
 #else

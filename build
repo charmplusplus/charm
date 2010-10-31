@@ -83,13 +83,17 @@ syntax() {
   echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
   echo "  --no-build-shared  don't build Charm++'s shared libraries"
   echo ''
+  echo 'Enable/disable features:'
+  src/scripts/configure --help | grep enable-
+  src/scripts/configure --help | grep with-
+  echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
+  echo ''
   echo 'Miscellaneous options:'
   echo '  --incdir=DIR       specify additional include path for compiler'
   echo '  --libdir=DIR	     specify additional lib path for compiler'
   echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
   echo '  -j[N]              parallel make, N is the number of paralle make jobs'
   echo "  --with-romio       build AMPI with ROMIO library"
-  echo "  --with-production  build Charm++ with all optimizations for maximum performance"
   echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
   echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
@@ -300,6 +304,14 @@ do
 		WITH_PRODUCTION="true" 
 		shift
 		;;
+    --with-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
+    --without-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
     --build-shared|-bs)
 		# obsolete, do nothing
 		shift
@@ -341,6 +353,10 @@ do
 		shift
 		;;
     --enable-*)
+		CONFIG_OPTS="$CONFIG_OPTS $1"
+		shift
+		;;
+    --disable-*)
 		CONFIG_OPTS="$CONFIG_OPTS $1"
 		shift
 		;;
@@ -443,6 +459,7 @@ fi
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
+rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
 
@@ -487,6 +504,7 @@ EOF
 fi
 
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
@@ -546,8 +564,8 @@ if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize $OPTS"
-    CONFIG_OPTS="--disable-tracing --disable-replay $CONFIG_OPTS"
+    OPTS="-optimize -production $OPTS"
+    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
 fi
 
 # build with Tau
@@ -588,6 +606,7 @@ echo $VERSION | sed -e 's@-.*@@' > $DESTINATION/tmp/.gdir
 if test $BUILD_EMULATOR = 1
 then
   PROGRAM="$PROGRAM bigsim"
+#  CONFIG_OPTS="--disable-charmdebug $CONFIG_OPTS"
 fi
 
 printError()

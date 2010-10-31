@@ -35,6 +35,12 @@ int  traceRegisterUserEvent(const char*, int e
 #endif
 );
 
+#if CMK_SMP_TRACE_COMMTHREAD
+void traceBeginCommOp(char *msg);
+void traceEndCommOp(char *msg);
+#endif
+void traceChangeLastTimestamp(double ts);
+
 /* Support for machine layers to register their user events to projections */
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
 
@@ -53,7 +59,7 @@ void traceEnd(void);
 void traceWriteSts(void);
 void traceFlushLog(void);
 
-#if ! CMK_TRACE_DISABLED
+#if CMK_TRACE_ENABLED
 CpvExtern(int, traceOn);
 #define traceIsOn()  (CpvAccess(traceOn))
 #else 

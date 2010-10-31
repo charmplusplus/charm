@@ -1,7 +1,6 @@
 #include <charm++.h>
 
 // This file is compiled twice to make a version that is capable of not needing the tracing to be turned on. 
-// The Makefile will have -DCP_DISABLE_TRACING
 
 #include "controlPoints.h"
 #include "trace-controlPoints.h"
@@ -11,8 +10,21 @@
 #include "trace-projections.h"
 #include <pathHistory.h>
 #include "cp_effects.h"
-
+#include <iostream>
+#include <math.h>
 #include <climits>
+
+#if CMK_WITH_CONTROLPOINT
+
+#define roundDouble(x)        ((long)(x+0.5))
+#define myAbs(x)   (((x)>=0.0)?(x):(-1.0*(x)))
+#define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
+
+inline double closestInRange(double v, double a, double b){
+  return (v<a) ? a : ((v>b)?b:v);
+}
+
+
 //  A framework for tuning "control points" exposed by an application. Tuning decisions are based upon observed performance measurements.
  
 
@@ -43,7 +55,7 @@ static void periodicProcessControlPoints(void* ptr, double currWallTime);
 /* readonly */ bool shouldGatherAll;
 /* readonly */ char CPDataFilename[512];
 
-
+extern bool enableCPTracing;
 
 /// The control point values to be used for the first few phases if the strategy doesn't choose to do something else.
 /// These probably come from the command line arguments, so are available only on PE 0
@@ -51,7 +63,7 @@ std::map<std::string, int> defaultControlPointValues;
 
 
 
-typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults}  tuningScheme;
+typedef enum tuningSchemeEnum {RandomSelection, SimulatedAnnealing, ExhaustiveSearch, CriticalPathAutoPrioritization, UseBestKnownTiming, UseSteering, MemoryAware, Simplex, DivideAndConquer, AlwaysDefaults, LDBPeriod, LDBPeriodLinear, LDBPeriodQuadratic, LDBPeriodOptimal}  tuningScheme;
 
 
 
@@ -86,6 +98,18 @@ void printTuningScheme(){
     break;
   case DivideAndConquer:
     CkPrintf("Tuning Scheme: Divide & Conquer Algorithm\n");
+    break;
+  case LDBPeriod:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering (Constant Prediction)\n");
+    break;
+  case LDBPeriodLinear:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering (Linear Prediction)\n");
+    break;
+  case LDBPeriodQuadratic:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering (Quadratic Prediction)\n");
+    break;
+  case LDBPeriodOptimal:
+    CkPrintf("Tuning Scheme: Load Balancing Period Steering (Optimal Prediction)\n");
     break;
   default:
     CkPrintf("Unknown tuning scheme\n");
@@ -171,7 +195,6 @@ CkReductionMsg *allMeasuresReduction(int nMsg,CkReductionMsg **msgs){
 /// If different seed, name, and random_seed values are provided, the returned values are pseudo-random
 unsigned int randInt(unsigned int num, const char* name, int seed=0){
   CkAssert(num > 0);
-  CkAssert(num < 1000);
 
   unsigned long hash = 0;
   unsigned int c;
@@ -213,8 +236,6 @@ controlPointManager::controlPointManager() {
     haveControlPointChangeCallback = false;
 //    CkPrintf("[%d] controlPointManager() Constructor Initializing control points, and loading data file\n", CkMyPe());
     
-    ControlPoint::initControlPointEffects();
-
     phase_id = 0;
 
     if(loadDataFileAtStartup){    
@@ -245,6 +266,21 @@ controlPointManager::controlPointManager() {
 //    CkPrintf("[%d] controlPointManager() Destructor\n", CkMyPe());
   }
 
+  void controlPointManager::pup(PUP::er &p)
+  {
+    CBase_controlPointManager::pup(p);
+      // FIXME: does not work when control point is actually used,
+      // just minimal pup so that it allows exit function to work (exitIfReady).
+    p|generatedPlanForStep;
+    p|exitWhenReady;
+    p|alreadyRequestedMemoryUsage;
+    p|alreadyRequestedIdleTime;
+    p|alreadyRequestedAll;
+    p|frameworkShouldAdvancePhase;
+    p|haveControlPointChangeCallback;
+    p|phase_id;
+  }
+  
 
   /// Loads the previous run data file
   void controlPointManager::loadDataFile(){
@@ -365,6 +401,12 @@ controlPointManager::controlPointManager() {
     controlPointChangeCallback = cb;
     haveControlPointChangeCallback = true;
   }
+
+
+/// A user can specify that the framework should advance the phases automatically. Useful for gather performance measurements without modifying a program.
+void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvancePhase){
+  frameworkShouldAdvancePhase = _frameworkShouldAdvancePhase;
+}
 
   /// Called periodically by the runtime to handle the control points
   /// Currently called on each PE
@@ -617,37 +659,34 @@ controlPointManager::controlPointManager() {
 
   /// Called by either the application or the Control Point Framework to advance to the next phase  
   void controlPointManager::gotoNextPhase(){
-    
-#ifndef CP_DISABLE_TRACING
-    CkPrintf("gotoNextPhase shouldGatherAll=%d\n", (int)shouldGatherAll);
+    CkPrintf("gotoNextPhase shouldGatherAll=%d enableCPTracing=%d\n", (int)shouldGatherAll, (int)enableCPTracing);
     fflush(stdout);
-
-    if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
-      alreadyRequestedAll = true;
-      CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
-      CkPrintf("Requesting all measurements\n");
-      thisProxy.requestAll(*cb);
-      delete cb;
-    
-    } else {
       
-      if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
-	alreadyRequestedMemoryUsage = true;
-	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
-	thisProxy.requestMemoryUsage(*cb);
+    if(enableCPTracing){
+      if(shouldGatherAll && CkMyPe() == 0 && !alreadyRequestedAll){
+	alreadyRequestedAll = true;
+	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherAll(NULL), 0, thisProxy);
+	CkPrintf("Requesting all measurements\n");
+	thisProxy.requestAll(*cb);
 	delete cb;
-      }
-      
-      if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
-	alreadyRequestedIdleTime = true;
-	CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
-	thisProxy.requestIdleTime(*cb);
-	delete cb;
+	
+      } else {
+	
+	if(shouldGatherMemoryUsage && CkMyPe() == 0 && !alreadyRequestedMemoryUsage){
+	  alreadyRequestedMemoryUsage = true;
+	  CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherMemoryUsage(NULL), 0, thisProxy);
+	  thisProxy.requestMemoryUsage(*cb);
+	  delete cb;
+	}
+	
+	if(shouldGatherUtilization && CkMyPe() == 0 && !alreadyRequestedIdleTime){
+	  alreadyRequestedIdleTime = true;
+	  CkCallback *cb = new CkCallback(CkIndex_controlPointManager::gatherIdleTime(NULL), 0, thisProxy);
+	  thisProxy.requestIdleTime(*cb);
+	  delete cb;
+	}
       }
     }
-    
-
-#endif
 
 
 
@@ -714,7 +753,8 @@ controlPointManager::controlPointManager() {
   
   /// Entry method called on all PEs to request CPU utilization statistics
   void controlPointManager::requestIdleTime(CkCallback cb){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+   
     double i = localControlPointTracingInstance()->idleRatio();
     double idle[3];
     idle[0] = i;
@@ -724,16 +764,14 @@ controlPointManager::controlPointManager() {
     //    CkPrintf("[%d] idleRatio=%f\n", CkMyPe(), i);
     
     localControlPointTracingInstance()->resetTimings();
-
+    
     contribute(3*sizeof(double),idle,idleTimeReductionType, cb);
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherIdleTime(CkReductionMsg *msg){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     int size=msg->getSize() / sizeof(double);
     CkAssert(size==3);
     double *r=(double *) msg->getData();
@@ -744,7 +782,7 @@ controlPointManager::controlPointManager() {
       prevPhase->idleTime.avg = r[1]/CkNumPes();
       prevPhase->idleTime.max = r[2];
       prevPhase->idleTime.print();
-      CkPrintf("Stored idle time min=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf in prevPhase=%p\n", prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, prevPhase);
     } else {
       CkPrintf("There is no previous phase to store the idle time measurements\n");
     }
@@ -752,9 +790,6 @@ controlPointManager::controlPointManager() {
     alreadyRequestedIdleTime = false;
     checkForShutdown();
     delete msg;
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
 
 
@@ -764,7 +799,8 @@ controlPointManager::controlPointManager() {
 
   /// Entry method called on all PEs to request CPU utilization statistics and memory usage
   void controlPointManager::requestAll(CkCallback cb){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     TraceControlPoints *t = localControlPointTracingInstance();
 
     double data[ALL_REDUCTION_SIZE];
@@ -798,14 +834,12 @@ controlPointManager::controlPointManager() {
     localControlPointTracingInstance()->resetAll();
 
     contribute(ALL_REDUCTION_SIZE*sizeof(double),data,allMeasuresReductionType, cb);
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
   
   /// All processors reduce their memory usages in requestIdleTime() to this method
   void controlPointManager::gatherAll(CkReductionMsg *msg){
-#ifndef CP_DISABLE_TRACING
+    CkAssert(enableCPTracing);
+
     CkAssert(msg->getSize()==ALL_REDUCTION_SIZE*sizeof(double));
     int size=msg->getSize() / sizeof(double);
     double *data=(double *) msg->getData();
@@ -831,7 +865,7 @@ controlPointManager::controlPointManager() {
       
       prevPhase->memoryUsageMB = mem[0];
       
-      CkPrintf("Stored idle time min=%lf, mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, (double)prevPhase->memoryUsageMB, prevPhase);
+      CkPrintf("Stored idle time min=%lf avg=%lf max=%lf  mem=%lf in prevPhase=%p\n", (double)prevPhase->idleTime.min, prevPhase->idleTime.avg, prevPhase->idleTime.max, (double)prevPhase->memoryUsageMB, prevPhase);
 
       double bytesPerInvoke2 = msgBytes[2] / msgBytes[0];
       double bytesPerInvoke3 = msgBytes[3] / msgBytes[1];
@@ -864,9 +898,6 @@ controlPointManager::controlPointManager() {
     alreadyRequestedAll = false;
     checkForShutdown();
     delete msg;
-#else
-    CkAbort("Should not get here\n");
-#endif
   }
 
 
@@ -881,10 +912,10 @@ controlPointManager::controlPointManager() {
 
   void controlPointManager::exitIfReady(){
      if( !alreadyRequestedMemoryUsage && !alreadyRequestedAll && !alreadyRequestedIdleTime && CkMyPe()==0){
-       CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
+       //  CkPrintf("controlPointManager::exitIfReady exiting immediately\n");
        doExitNow();
      } else {
-       CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
+       // CkPrintf("controlPointManager::exitIfReady Delaying exiting\n");
        exitWhenReady = true;
      }
   }
@@ -893,7 +924,7 @@ controlPointManager::controlPointManager() {
 
   void controlPointManager::doExitNow(){
 	  writeOutputToDisk();
-	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
+	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
 	  CkExit();
   }
 
@@ -997,6 +1028,11 @@ void gotoNextPhase(){
   controlPointManagerProxy.ckLocalBranch()->gotoNextPhase();
 }
 
+FDECL void FTN_NAME(GOTONEXTPHASE,gotonextphase)()
+{
+  gotoNextPhase();
+}
+
 
 /// A mainchare that is used just to create our controlPointManager group at startup
 class controlPointMain : public CBase_controlPointMain {
@@ -1014,16 +1050,20 @@ public:
 #endif
     
     
-    double period;
+    double period, periodms;
     bool haveSamplePeriod = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriod", &period,"The time between Control Point Framework samples (in seconds)");
+    bool haveSamplePeriodMs = CmiGetArgDoubleDesc(args->argv,"+CPSamplePeriodMs", &periodms,"The time between Control Point Framework samples (in milliseconds)");
     if(haveSamplePeriod){
-      CkPrintf("controlPointSamplePeriod = %ld sec\n", period);
-      controlPointSamplePeriod =  period * 1000; /**< A readonly */
+      CkPrintf("controlPointSamplePeriod = %lf sec\n", period);
+      controlPointSamplePeriod =  (int)(period * 1000); /**< A readonly */
+    } else if(haveSamplePeriodMs){
+      CkPrintf("controlPointSamplePeriodMs = %lf ms\n", periodms);
+      controlPointSamplePeriod = periodms; /**< A readonly */
     } else {
       controlPointSamplePeriod =  DEFAULT_CONTROL_POINT_SAMPLE_PERIOD;
     }
-    
-    
+
+  
     
     whichTuningScheme = RandomSelection;
 
@@ -1048,6 +1088,14 @@ public:
       whichTuningScheme = Simplex;
     } else if ( CmiGetArgFlagDesc(args->argv,"+CPDivideConquer", "A divide and conquer program specific steering scheme") ){
       whichTuningScheme = DivideAndConquer;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriod", "Adjust the load balancing period (Constant Predictor)") ){
+      whichTuningScheme = LDBPeriod;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodLinear", "Adjust the load balancing period (Linear Predictor)") ){
+      whichTuningScheme = LDBPeriodLinear;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodQuadratic", "Adjust the load balancing period (Quadratic Predictor)") ){
+      whichTuningScheme = LDBPeriodQuadratic;
+    } else if ( CmiGetArgFlagDesc(args->argv,"+CPLDBPeriodOptimal", "Adjust the load balancing period (Optimal Predictor)") ){
+      whichTuningScheme = LDBPeriodOptimal;
     }
 
     char *defValStr = NULL;
@@ -1131,6 +1179,14 @@ void registerCPChangeCallback(CkCallback cb, bool frameworkShouldAdvancePhase){
 }
 
 /// An interface callable by the application.
+void setFrameworkAdvancePhase(bool frameworkShouldAdvancePhase){
+  if(CkMyPe() == 0){
+    CkPrintf("Application has specified that framework should %sadvance phase\n", frameworkShouldAdvancePhase?"":"not ");
+    controlPointManagerProxy.ckLocalBranch()->setFrameworkAdvancePhase(frameworkShouldAdvancePhase);
+  }
+}
+
+/// An interface callable by the application.
 void registerControlPointTiming(double time){
   CkAssert(CkMyPe() == 0);
 #if DEBUGPRINT>0
@@ -1153,6 +1209,20 @@ void controlPointTimingStamp() {
     
   controlPointManagerProxy.ckLocalBranch()->setTiming(duration);
 }
+
+FDECL void FTN_NAME(CONTROLPOINTTIMINGSTAMP,controlpointtimingstamp)()
+{
+  controlPointTimingStamp();
+}
+
+
+FDECL void FTN_NAME(SETFRAMEWORKADVANCEPHASEF,setframeworkadvancephasef)(CMK_TYPEDEF_INT4 *value) 
+{
+  setFrameworkAdvancePhase(*value);
+}
+
+
+
 
 /// Shutdown the control point framework, writing data to disk if necessary
 extern "C" void controlPointShutdown(){
@@ -1314,6 +1384,364 @@ void controlPointManager::generatePlan() {
 	newControlPoints[name] =  best->controlPoints[name];
       }
     }
+  } else if( whichTuningScheme == LDBPeriod) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
+    
+    
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+    
+    
+    const std::vector<double> &times = twoAgoPhase->times;
+    const int oldNumTimings = times.size();
+
+
+    const std::vector<double> &timesNew = prevPhase->times;
+    const int newNumTimings = timesNew.size();
+
+
+    if(oldNumTimings > 4 && newNumTimings > 4){
+      
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      
+      double oldSum = 0;
+      
+      for(int i=2; i<oldNumTimings; i++){
+	oldSum += times[i];
+      }
+      
+      const double oldAvg = oldSum / (oldNumTimings-2);
+      
+      
+      
+      
+      // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
+      const double expectedTotalTime = oldAvg * newNumTimings;
+      
+      
+      // Measure actual time
+      double newSum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	newSum += timesNew[i];
+      }
+      
+      const double newAvg = newSum / (newNumTimings-2);
+      const double newTotalTimeExcludingLBSteps = newAvg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+      
+      const double benefit = expectedTotalTime - newTotalTimeExcludingLBSteps;
+      
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*newAvg;
+      
+      const double benefitAfterLB = benefit - lbcost;
+    
+    
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Constant Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, newTotalTimeExcludingLBSteps);
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+      
+	if(benefitAfterLB > 0){
+	  CkPrintf("Constant Model: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("Constant Model: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else
+	    newControlPoints[name] = ub;
+	}
+      }
+    }
+    
+    
+  }  else if( whichTuningScheme == LDBPeriodLinear) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
+
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+    
+    const std::vector<double> &times = twoAgoPhase->times;
+    const int oldNumTimings = times.size();
+
+    const std::vector<double> &timesNew = prevPhase->times;
+    const int newNumTimings = timesNew.size();
+    
+
+    if(oldNumTimings > 4 && newNumTimings > 4){
+
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      const int b1 = 2 + (oldNumTimings-2)/2;
+      double s1 = 0;
+      double s2 = 0;
+    
+      const double ldbStepsTime = times[0] + times[1];
+    
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<oldNumTimings; i++){
+	s2 += times[i];
+      }
+      
+      
+      // Compute the estimated time for the last phase's data
+    
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(oldNumTimings-b1);
+      const double aold = (a1+a2)/2.0;
+
+      const double expectedTotalTime = newNumTimings*(aold+(oldNumTimings+newNumTimings)*(a2-a1)/oldNumTimings);
+        
+    
+      // Measure actual time
+      double sum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	sum += timesNew[i];
+      }
+
+      const double avg = sum / ((double)(newNumTimings-2));
+      const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+
+      const double benefit = expectedTotalTime - actualTotalTime;
+
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
+
+      const double benefitAfterLB = benefit - lbcost;
+
+    
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Linear Model: lbcost = %f, expected = %f, actual = %f\n", lbcost, expectedTotalTime, actualTotalTime);
+    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+      
+	if(benefitAfterLB > 0){
+	  CkPrintf("Linear Model: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("Linear Model: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = ub;
+	}
+      }
+    }
+
+  }
+
+  else if( whichTuningScheme == LDBPeriodQuadratic) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
+
+
+    instrumentedPhase *twoAgoPhase = twoAgoPhaseData();
+    instrumentedPhase *prevPhase = previousPhaseData();
+        
+    const std::vector<double> &times = twoAgoPhase->times;
+    const int oldNumTimings = times.size();
+
+    const std::vector<double> &timesNew = prevPhase->times;
+    const int newNumTimings = timesNew.size();
+
+    
+    if(oldNumTimings > 4 && newNumTimings > 4){
+
+
+      // Build model of execution time based on two phases ago
+      // Compute the average times for each 1/3 of the steps, except for the 2 first steps where load balancing occurs
+      const int b1 = 2 + (oldNumTimings-2)/3;
+      const int b2 = 2 + (2*(oldNumTimings-2))/3;
+      double s1 = 0;
+      double s2 = 0;
+      double s3 = 0;
+
+      const double ldbStepsTime = times[0] + times[1];
+    
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<b2; i++){
+	s2 += times[i];
+      }
+      for(int i=b2; i<oldNumTimings; i++){
+	s3 += times[i];
+      }
+
+    
+      // Compute the estimated time for the last phase's data
+    
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(b2-b1);
+      const double a3 = s3 / (double)(oldNumTimings-b2);
+    
+      const double a = (a1-2.0*a2+a3)/2.0;
+      const double b = (a1-4.0*a2+3.0*a3)/2.0;
+      const double c = a3;
+    
+      // Computed as an integral from 0.5 to the number of bins of the same size as two ago phase + 0.5
+      const double x1 = (double)newNumTimings / (double)oldNumTimings * 3.0 + 0.5;  // should be 3.5 if ratio is same
+      const double x2 = 0.5;
+      const double expectedTotalTime = a*x1*x1*x1/3.0 + b*x1*x1/2.0 + c*x1 - (a*x2*x2*x2/3.0 + b*x2*x2/2.0 + c*x2);
+   
+    
+      // Measure actual time
+      double sum = 0.0;
+      for(int i=2; i<newNumTimings; ++i){
+	sum += timesNew[i];
+      }
+
+      const double avg = sum / ((double)(newNumTimings-2));
+      const double actualTotalTime = avg * ((double)newNumTimings); // excluding the load balancing abnormal steps
+
+      const double benefit = expectedTotalTime - actualTotalTime;
+
+      // Determine load balance cost
+      const double lbcost = timesNew[0] + timesNew[1] - 2.0*avg;
+
+      const double benefitAfterLB = benefit - lbcost;
+
+    
+      // Determine whether LB cost outweights the estimated benefit
+      CkPrintf("Quadratic Model: lbcost = %f, expected = %f, actual = %f, x1=%f, a1=%f, a2=%f, a3=%f, b1=%d, b2=%d, a=%f, b=%f, c=%f\n", lbcost, expectedTotalTime, actualTotalTime, x1, a1, a2, a3, b1, b2, a, b, c);
+    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+      
+	if(benefitAfterLB > 0){
+	  CkPrintf("QuadraticModel: Beneficial LB\n");
+	  int newval = newControlPoints[name] / 2;
+	  if(newval > lb)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = lb;
+	} else {
+	  CkPrintf("QuadraticModel: Detrimental LB\n");
+	  int newval = newControlPoints[name] * 2;
+	  if(newval < ub)
+	    newControlPoints[name] = newval;
+	  else 
+	    newControlPoints[name] = ub;
+	}
+      
+      }
+    }
+    
+
+  }  else if( whichTuningScheme == LDBPeriodOptimal) {
+    // Assume this is used in this manner:
+    //  1) go to next phase
+    //  2) request control point
+    //  3) load balancing
+    //  4) computation
+
+
+
+    instrumentedPhase *prevPhase = previousPhaseData();
+    
+    const std::vector<double> &times = prevPhase->times;
+    const int numTimings = times.size();
+    
+    if( numTimings > 4){
+
+      const int b1 = 2 + (numTimings-2)/2;
+      double s1 = 0;
+      double s2 = 0;
+    
+    
+      for(int i=2; i<b1; i++){
+	s1 += times[i];
+      }
+      for(int i=b1; i<numTimings; i++){
+	s2 += times[i];
+      }
+      
+    
+      const double a1 = s1 / (double)(b1-2);
+      const double a2 = s2 / (double)(numTimings-b1);
+      const double avg = (a1+a1) / 2.0;
+
+      const double m = (a2-a1)/((double)(numTimings-2)/2.0); // An approximation of the slope of the execution times    
+
+      const double ldbStepsTime = times[0] + times[1];
+      const double lbcost = ldbStepsTime - 2.0*avg; // An approximation of the 
+      
+
+      int newval = roundDouble(sqrt(2.0*lbcost/m));
+      
+      // We don't really know what to do if m<=0, so we'll just double the period
+      if(m<=0)
+	newval = 2*numTimings;     
+      
+      CkPrintf("Optimal Model (double when negative): lbcost = %f, m = %f, new ldbperiod should be %d\n", lbcost, m, newval);    
+    
+    
+      std::map<std::string, std::pair<int,int> >::const_iterator cpsIter;
+      for(cpsIter=controlPointSpace.begin(); cpsIter != controlPointSpace.end(); ++cpsIter){
+	// TODO: lookup only control points that are relevant instead of all of them
+	const std::string &name = cpsIter->first;
+	const std::pair<int,int> &bounds = cpsIter->second;
+	const int lb = bounds.first;
+	const int ub = bounds.second;
+	
+	if(newval < lb){
+	  newControlPoints[name] = lb;
+	} else if(newval > ub){
+	  newControlPoints[name] = ub;
+	} else {
+	  newControlPoints[name] = newval;
+	} 
+	
+      }
+      
+      
+    }
+    
+ 
 
   } else if ( whichTuningScheme == UseSteering ) {
 	  // -----------------------------------------------------------
@@ -1524,7 +1952,7 @@ void controlPointManager::generatePlan() {
       
       const int before = bestPhase->controlPoints[name];   
   
-      const int range = (maxValue-minValue+1)*(1.0-progress);
+      const int range = (int)((maxValue-minValue+1)*(1.0-progress));
 
       int high = min(before+range, maxValue);
       int low = max(before-range, minValue);
@@ -1590,40 +2018,29 @@ void controlPointManager::generatePlan() {
 					  
 					  // Initialize a new plan based on two phases ago
 					  std::map<std::string,int> aNewPlan = twoAgoPhase->controlPoints;
-					  bool newPlanExists = false;
 
 					  CkPrintf("Divide & Conquer Steering found knob to turn\n");
 					  fflush(stdout);
 
-
-
+					  int adjustByAmount = (int)(myAbs(idleTime-overheadTime)*5.0);
+					  
 					  if(info->first == ControlPoint::EFF_INC){
-						  const int minValue = controlPointSpace[cpName].first;
-						  const int maxValue = controlPointSpace[cpName].second;
-						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  const int newVal = twoAgoValue+1*direction;
-						  if(newVal <= maxValue && newVal >= minValue){
-						    aNewPlan[cpName] = newVal;
-						    newPlanExists = true;
-						  } else {
-						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
-						  }
+					    const int minValue = controlPointSpace[cpName].first;
+					    const int maxValue = controlPointSpace[cpName].second;
+					    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+					    const int newVal = closestInRange(twoAgoValue+adjustByAmount*direction, minValue, maxValue);					  
+					    CkAssert(newVal <= maxValue && newVal >= minValue);
+					    aNewPlan[cpName] = newVal;
 					  } else {
-						  const int minValue = controlPointSpace[cpName].first;
-						  const int maxValue = controlPointSpace[cpName].second;
-						  const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
-						  const int newVal = twoAgoValue-1*direction;
-						  if(newVal <= maxValue && newVal >= minValue){
-							  aNewPlan[cpName] = newVal;
-							  newPlanExists = true;
-						  } else {
-						    CkPrintf("Divide & Conquer Steering found that turning the knob exceeds the control point's range (newVal=%d)\n", newVal);
-						  }
+					    const int minValue = controlPointSpace[cpName].first;
+					    const int maxValue = controlPointSpace[cpName].second;
+					    const int twoAgoValue =  twoAgoPhase->controlPoints[cpName];
+					    const int newVal = closestInRange(twoAgoValue-adjustByAmount*direction, minValue, maxValue);
+					    CkAssert(newVal <= maxValue && newVal >= minValue);
+					    aNewPlan[cpName] = newVal;
 					  }
-
-					  if(newPlanExists){
-					    possibleNextStepPlans.push_back(aNewPlan);
-					  }
+					  
+					  possibleNextStepPlans.push_back(aNewPlan);
 				  }
 			  }
 		  }
@@ -1749,8 +2166,6 @@ void controlPointManager::generatePlan() {
 
 
 
-#define isInRange(v,a,b) ( ((v)<=(a)&&(v)>=(b)) || ((v)<=(b)&&(v)>=(a)) )
-
 
 /// Get control point value from range of integers [lb,ub]
 int controlPoint(const char *name, int lb, int ub){
@@ -1790,6 +2205,11 @@ int controlPoint(const char *name, int lb, int ub){
     
   }
 
+  if(!isInRange(result,ub,lb)){
+    std::cerr << "control point = " << result << " is out of range: " << lb << " " << ub << std::endl;
+    fflush(stdout);
+    fflush(stderr);
+  }
   CkAssert(isInRange(result,ub,lb));
   thisPhaseData->controlPoints[std::string(name)] = result; // was insert() 
 
@@ -1799,6 +2219,12 @@ int controlPoint(const char *name, int lb, int ub){
   //  thisPhaseData->print();
   
   return result;
+}
+
+
+FDECL int FTN_NAME(CONTROLPOINT, controlpoint)(CMK_TYPEDEF_INT4 *lb, CMK_TYPEDEF_INT4 *ub){
+  CkAssert(CkMyPe() == 0);
+  return controlPoint("FortranCP", *lb, *ub);
 }
 
 
@@ -2002,7 +2428,7 @@ void simplexScheme::adapt(std::map<std::string, std::pair<int,int> > & controlPo
 
 				double val = (cPhaseConfig[v] + best[v])/2.0;
 
-				newControlPoints[name] = keepInRange(val,lb,ub);
+				newControlPoints[name] = keepInRange((int)val,lb,ub);
 				CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 				v++;
 			}
@@ -2117,7 +2543,7 @@ void simplexScheme::doReflection(std::map<std::string, std::pair<int,int> > & co
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d Reflected worst %d %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2161,7 +2587,7 @@ void simplexScheme::doExpansion(std::map<std::string, std::pair<int,int> > & con
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Expanding %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
@@ -2202,12 +2628,12 @@ void simplexScheme::doContraction(std::map<std::string, std::pair<int,int> > & c
 		const std::pair<int,int> &bounds = cpsIter->second;
 		const int lb = bounds.first;
 		const int ub = bounds.second;
-		newControlPoints[name] = keepInRange(P2[v],lb,ub);
+		newControlPoints[name] = keepInRange((int)P2[v],lb,ub);
 		CkPrintf("Simplex Tuning: v=%d worstPhase=%d Contracting %s -> %f (ought to be %f )\n", (int)v, (int)worstPhase, (char*)name.c_str(), (double)newControlPoints[name], (double)P[v]);
 		v++;
 	}
-
-
+	
+	
 	// Transition to "contracting" state
 	simplexState = contracting;
 	CkPrintf("Simplex Tuning: Switched to state: contracting\n");
@@ -2301,8 +2727,6 @@ void ControlPointWriteOutputToDisk(){
 
 /*! @} */
 
-#ifdef CP_DISABLE_TRACING
-#include "ControlPointsNoTrace.def.h"
-#else
 #include "ControlPoints.def.h"
+
 #endif

@@ -1,11 +1,4 @@
- /*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
- /** \file CrayNid.c
+/** \file CrayNid.c
  *  Author: Abhinav S Bhatele
  *  Date created: October 10th, 2007  
  *  
@@ -28,23 +21,24 @@
 #endif
 
 /** \function getXTNodeID
- *  returns nodeID corresponding to the CkMyPe() passed to it
+ *  returns nodeID corresponding to the MPI rank (possibly obtained
+ *  from CmiMyNode()/CmiNodeOf(pe)) passed to it
  */
-int getXTNodeID(int mype, int numpes) {
+int getXTNodeID(int mpirank, int nummpiranks) {
   int nid = -1;
 
 #if XT3_TOPOLOGY
   cnos_nidpid_map_t *nidpid; 
   int ierr;
   
-  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
+  nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * nummpiranks);
 
   ierr = cnos_get_nidpid_map(&nidpid);
-  nid = nidpid[mype].nid;
+  nid = nidpid[mpirank].nid;
   /* free(nidpid); */
 
 #else	/* if it is a XT4/5 */
-  PMI_Portals_get_nid(mype, &nid);
+  PMI_Portals_get_nid(mpirank, &nid);
 #endif
 
   return nid;
@@ -62,7 +56,7 @@ int getXTNodeID(int mype, int numpes) {
 
   #elif XT5_TOPOLOGY
   #define MAXNID 17000
-  #define TDIM 8
+  #define TDIM 12
   #endif
 
 int *pid2nid;                   /* rank to node ID */
@@ -123,37 +117,21 @@ void pidtonid(int numpes) {
   }
   
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-  int i, j, nid;
+  int i, l, nid;
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 
   for(i=0; i<MAXNID; i++)
-    for(j=0; j<4; j++)
-      nid2pid[i][j] = -1;
+    for(l=0; l<TDIM; l++)
+      nid2pid[i][l] = -1;
 
   for (i=0; i<numpes; i++) {
     PMI_Portals_get_nid(i, &nid);
     pid2nid[i] = nid;
-    if (nid2pid[nid][0] == -1)
-      nid2pid[nid][0] = i;
-    else if (nid2pid[nid][1] == -1)
-      nid2pid[nid][1] = i;
-    else if (nid2pid[nid][2] == -1)
-      nid2pid[nid][2] = i;
-    else 
-  #if XT4_TOPOLOGY
-      nid2pid[nid][3] = i;
-  #elif XT5_TOPOLOGY
-    if (nid2pid[nid][3] == -1)
-      nid2pid[nid][3] = i;
-    else if (nid2pid[nid][4] == -1)
-      nid2pid[nid][4] = i;
-    else if (nid2pid[nid][5] == -1)
-      nid2pid[nid][5] = i;
-    else if (nid2pid[nid][6] == -1)
-      nid2pid[nid][6] = i;
-    else
-      nid2pid[nid][7] = i;
-  #endif
+
+    l = 0;
+    while(nid2pid[nid][l] != -1)
+      l++;
+    nid2pid[nid][l] = i;
   }
 #endif
 }

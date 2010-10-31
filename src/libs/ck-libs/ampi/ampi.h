@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 #ifndef _MPI_H
 #define _MPI_H
 
@@ -656,6 +650,13 @@ int AMPI_Type_get_contents(MPI_Datatype datatype, int max_integers, int max_addr
                           int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[],
                           MPI_Datatype array_of_datatypes[]);
 
+#if CMK_CUDA
+typedef struct workRequest workRequest;
+
+/* AMPI GPU Request interface */
+int AMPI_GPU_Iinvoke(workRequest *to_call, MPI_Request *request);
+int AMPI_GPU_Invoke(workRequest *to_call);
+#endif
 
 /*********************One sided communication routines *****************/ 
 /*  MPI_Win : an index into a list in ampiParent (just like MPI_Group) */
@@ -767,6 +768,10 @@ extern void traceEndFuncProj(char *);
 extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
+#if CMK_BLUEGENE_CHARM
+#define MPI_Set_startevent AMPI_Set_startevent
+int AMPI_Set_startevent(MPI_Comm comm);
+#endif
 
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage();

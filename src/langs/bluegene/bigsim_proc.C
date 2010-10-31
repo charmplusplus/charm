@@ -349,13 +349,19 @@ void workThreadInfo::run()
     //  register for charm++ applications threads
   CpvAccess(CthResumeBigSimThreadIdx) = BgRegisterHandler((BgHandler)CthResumeNormalThread);
 
-  if (cva(bgMach).record != -1 && (cva(bgMach).recordprocs.isEmpty() || cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID())))
+  if (cva(bgMach).record != -1 && ( cva(bgMach).recordprocs.isEmpty() && cva(bgMach).recordnodes.isEmpty() || (!cva(bgMach).recordprocs.isEmpty() && cva(bgMach).recordprocs.includes(BgGetGlobalWorkerThreadID()))) || (!cva(bgMach).recordnodes.isEmpty() && cva(bgMach).recordnodes.includes(BgMyNode())))
   {
-    watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"));
+    watcher = new BgMessageRecorder(openBinaryReplayFile(BgGetGlobalWorkerThreadID(), "wb"), cva(bgMach).recordnode!=-1);
   }
   if (cva(bgMach).replay != -1)
   {
-    watcher = new BgMessageReplay(openBinaryReplayFile(cva(bgMach).replay, "rb"));
+    watcher = new BgMessageReplay(openBinaryReplayFile(cva(bgMach).replay, "rb"), 0);
+  }
+  if (cva(bgMach).replaynode != -1)
+  {
+    int startpe, endpe;
+    BgRead_nodeinfo(cva(bgMach).replaynode, startpe, endpe);
+    watcher = new BgMessageReplay(openBinaryReplayFile(startpe+BgGetThreadID(), "rb"), 1);
   }
 
 //  InitHandlerTable();

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _AMPIIMPL_H
 #define _AMPIIMPL_H
 
@@ -12,6 +5,7 @@
 
 #include "ampi.h"
 #include "charm++.h"
+#include "ckliststring.h"
 
 #if AMPI_COMLIB
 //#warning COMPILING IN UNTESTED AMPI COMLIB SUPPORT
@@ -28,14 +22,15 @@
 #define AMPI_DEBUG /* empty */
 #endif
 
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
 
-static int msgLogRank;
+//static int msgLogRank;
+static CkListString msgLogRanks;
 static int msgLogWrite;
 static int msgLogRead;
 static char *msgLogFilename;
 
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
 #include <zlib.h>
 namespace PUP{
 class zdisk : public er {
@@ -81,7 +76,11 @@ class fromzDisk : public zdisk {
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
+#if CMK_CONVERSE_LAPI ||  CMK_BLUEGENE_CHARM
+#define AMPI_ALLTOALL_MEDIUM_MSG   4194304
+#else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
+#endif
 
 #if AMPI_COUNTER
 class AmpiCounters{
@@ -591,7 +590,8 @@ public:
 	virtual void free(void){ isvalid=false; }
 	inline bool isValid(void){ return isvalid; }
 
-	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq
+	/// Returns the type of request: 1-PersReq, 2-IReq, 3-ATAReq,
+	/// 4-SReq, 5-GPUReq
 	virtual int getType(void) =0;
 
 	virtual void pup(PUP::er &p) {
@@ -748,6 +748,19 @@ public:
 	virtual void print();
 };
 
+class GPUReq : public AmpiRequest {
+    bool isComplete;
+
+public:
+    GPUReq();
+    int getType() { return 5; }
+    CmiBool test(MPI_Status *sts);
+    void complete(MPI_Status *sts);
+    int wait(MPI_Status *sts);
+    void receive(ampi *ptr, AmpiMsg *msg);
+    void setComplete();
+};
+
 /// Special CkVec<AmpiRequest*> for AMPI. Most code copied from cklist.h
 class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
     AmpiRequest** block; //Elements of vector
@@ -819,7 +832,7 @@ class AmpiRequestList : private CkSTLHelper<AmpiRequest *> {
 
     inline void checkRequest(MPI_Request idx){
       if(!(idx==-1 || (idx < this->len && (block[idx])->isValid())))
-        CkAbort("Invalide MPI_Request\n");
+        CkAbort("Invalid MPI_Request\n");
     }
 
     //find an AmpiRequest by its pointer value
@@ -1375,17 +1388,17 @@ public:
     void freeInfo(MPI_Info info);
 
  public:
-#ifdef AMPIMSGLOG
+#if AMPIMSGLOG
     /* message logging */
     int pupBytes;
-#if CMK_PROJECTIONS_USE_ZLIB
+#if CMK_PROJECTIONS_USE_ZLIB && 0
     gzFile fMsgLog;
     PUP::tozDisk *toPUPer;
     PUP::fromzDisk *fromPUPer;
 #else
     FILE* fMsgLog;
-    PUP::tozDisk *toPUPer;
-    PUP::fromzDisk *fromPUPer;
+    PUP::toDisk *toPUPer;
+    PUP::fromDisk *fromPUPer;
 #endif
 #endif
     void init();
@@ -1410,6 +1423,7 @@ friend class SReq;
     groupStruct tmpVec; // stores temp group info
     CProxy_ampi remoteProxy; // valid only for intercommunicator
 
+#if AMPI_COMLIB
     /// A proxy used when delegating message sends to comlib
     CProxy_ampi comlibProxy;
     
@@ -1418,7 +1432,7 @@ friend class SReq;
     ComlibInstanceHandle ciBcast;
     ComlibInstanceHandle ciAllgather;
     ComlibInstanceHandle ciAlltoall;
-
+#endif
     
     int seqEntries; //Number of elements in below arrays
     AmpiSeqQ oorder;
@@ -1464,7 +1478,9 @@ friend class SReq;
     AmpiMsg *makeAmpiMsg(int destIdx,int t,int sRank,const void *buf,int count,
                          int type,MPI_Comm destcomm, int sync=0);
 
+#if AMPI_COMLIB
     inline void comlibsend(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm);
+#endif
     inline void send(int t, int s, const void* buf, int count, int type, int rank, MPI_Comm destcomm, int sync=0);
     static void sendraw(int t, int s, void* buf, int len, CkArrayID aid,
                         int idx);
@@ -1499,17 +1515,17 @@ friend class SReq;
     inline MPI_Comm getComm(void) const {return myComm.getComm();}
     inline CkVec<int> getIndices(void) const { return myComm.getindices(); }
     inline const CProxy_ampi &getProxy(void) const {return thisProxy;}
-    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline const CProxy_ampi &getRemoteProxy(void) const {return remoteProxy;}
     inline void setRemoteProxy(CProxy_ampi rproxy) { remoteProxy = rproxy; thread->resume(); }
     inline int getIndexForRank(int r) const {return myComm.getIndexForRank(r);}
     inline int getIndexForRemoteRank(int r) const {return myComm.getIndexForRemoteRank(r);}
+#if AMPI_COMLIB
+    inline const CProxy_ampi &getComlibProxy(void) const { return comlibProxy; }
     inline ComlibInstanceHandle getStreaming(void) { return ciStreaming; }
     inline ComlibInstanceHandle getBcast(void) { return ciBcast; }
     inline ComlibInstanceHandle getAllgather(void) { return ciAllgather; }
     inline ComlibInstanceHandle getAlltoall(void) { return ciAlltoall; }
 
-#if AMPI_COMLIB
     inline Strategy* getStreamingStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciStreaming); }
     inline Strategy* getBcastStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciBcast); }
     inline Strategy* getAllgatherStrategy(void) { return CkpvAccess(conv_com_object).getStrategy(ciAllgather); }

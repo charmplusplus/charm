@@ -11,7 +11,7 @@ class seq : public strat {
     CkAbort("ERROR: can't have sequential posers in parallel simulation!\n");
 #endif    
   }
-  void initSync() { parent->sync = CONSERVATIVE; }
+  inline void initSync() { parent->sync = CONSERVATIVE; }
   virtual void Step();
 };
 
