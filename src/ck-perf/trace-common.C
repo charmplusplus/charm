@@ -175,8 +175,10 @@ static void traceCommonInit(char **argv)
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
+  //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());  
+  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif	

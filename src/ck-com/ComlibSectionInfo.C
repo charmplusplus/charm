@@ -198,6 +198,7 @@ void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
 
     //Old section id, send the id with the message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)cmsg->getCharmMessage();
+    cbmsg->_cookie.pe = CkMyPe();
     cbmsg->_cookie.sInfo.cInfo.id = cur_sec_id;
     cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
 }
