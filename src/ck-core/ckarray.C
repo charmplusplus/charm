@@ -527,9 +527,7 @@ CkArray::CkArray(CkArrayOptions &opts,
     elements((ArrayElementList *)locMgr->addManager(thisgroup,this)),
     numInitial(opts.getNumInitial()), isInserting(CmiTrue)
 {
-//  moved to _ckArrayInit()
-//  CkpvInitialize(ArrayElement_initInfo,initInfo);
-  CcdCallOnConditionKeep(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this);
+  CcdCallOnConditionKeep(CcdPERIODIC_1minute, staticSpringCleaning, (void *)this);
 
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
@@ -872,7 +870,9 @@ CkArrayBroadcaster::CkArrayBroadcaster(void)
   bcastNo=oldBcastNo=0;
 }
 CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
-	:CkArrayListener(m) { bcastNo=-1; oldBcastNo=-1; }
+    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1)
+{ }
+
 void CkArrayBroadcaster::pup(PUP::er &p) {
   CkArrayListener::pup(p);
   /* Assumption: no migrants during checkpoint, so no need to
@@ -882,6 +882,7 @@ void CkArrayBroadcaster::pup(PUP::er &p) {
     oldBcastNo=bcastNo; /* because we threw away oldBcasts */
   }
 }
+
 CkArrayBroadcaster::~CkArrayBroadcaster()
 {
   CkArrayMessage *msg;
@@ -910,7 +911,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
         DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
-        return true;
+        return CmiTrue;
 #else
   return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
 #endif
@@ -1065,11 +1066,11 @@ void CkArray::recvBroadcast(CkMessage *m)
 	CK_MAGICNUMBER_CHECK
 	CkArrayMessage *msg=(CkArrayMessage *)m;
 	broadcaster->incoming(msg);
+
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _tempBroadcastCount=0;
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
-
 	//Run through the list of local elements
 	int idx=0;
 	ArrayElement *el;
