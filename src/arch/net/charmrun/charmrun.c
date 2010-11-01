@@ -1825,7 +1825,6 @@ int client;
 for (client=0;client<nodetab_rank0_size;client++)	{
 	SOCKET fd = req_clients[client];
 	ChMessageHeader hdr;
-	/* TODO: Need to see if it is correct to say nodetab_rank0_size*/
 	ChMessageInt_t nNodes=ChMessageInt_new(nodetab_Nodes);
 	ChMessageHeader_new("initnodetab",sizeof(ChMessageInt_t)+
 			    sizeof(ChNodeinfo)*nodetab_Nodes,&hdr);
