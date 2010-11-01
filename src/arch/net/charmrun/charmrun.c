@@ -799,7 +799,7 @@ void arg_init(int argc, char **argv)
   pparam_str(&arg_runscript,    0, "runscript", "script to run node-program with");
   pparam_flag(&arg_help,	0, "help", "print help messages");
   pparam_int(&arg_ppn,          0, "ppn",             "number of pes per node");
-
+  pparam_flag(&arg_no_va_rand,   0, "no-va-randomization",   "Disables randomization of the virtual address  space");
 #ifdef HSTART
   arg_argv = dupargv(argv);
 #endif
