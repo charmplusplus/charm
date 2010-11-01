@@ -10,31 +10,24 @@ class Main : public CBase_Main
 public:
   Main(CkArgMsg* m)
   {
-//		  CkExit();
-
     //Process command-line arguments
-   nElements=5;
-   if(m->argc >1 ) nElements=atoi(m->argv[1]);
-	   delete m;
+    nElements=5;
+    if(m->argc >1 ) nElements=atoi(m->argv[1]);
+    delete m;
 
     //Start the computation
-    CkPrintf("Running Hello on %d processors for %d elements\n", CkNumPes(),nElements);
-//	int N1,N2;
-//	CkScanf("%d %d",&N1, &N2);
+    CkPrintf("Running Hello on %d processors for %d elements\n",
+	     CkNumPes(),nElements);
+    mainProxy = thisProxy;
 
-//    CkPrintf("Read Values %d and  %d \n", N1,N2);
-//	CkError("Testing Error");
-//CkAssert(0);
-   mainProxy = thisProxy;
+    CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
 
-  CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
-
- arr[0].SayHi(17); 
+    arr[0].SayHi(17);
   };
 
   void done(void)
   {
-   CkPrintf("Everybody done\n");
+    CkPrintf("All done\n");
     CkExit();
   };
 };
@@ -45,14 +38,14 @@ class Hello : public CBase_Hello
 public:
   Hello()
   {
-//    CkPrintf("Hello %d created\n",thisIndex);
+    CkPrintf("Hello %d created\n",thisIndex);
   }
 
   Hello(CkMigrateMessage *m) {}
   
   void SayHi(int hiNo)
   {
-   // CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
+    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);
