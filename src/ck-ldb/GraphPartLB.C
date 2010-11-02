@@ -27,7 +27,14 @@ CmiBool GraphPartLB::QueryBalanceNow(int _step) {
 }
 
 void GraphPartLB::work(LDStats *stats) {
+  /** ========================== INITIALIZATION ============================= */
+  ProcArray *parr = new ProcArray(stats);
+  ObjGraph *ogr = new ObjGraph(stats);
 
+  /** ============================= STRATEGY ================================ */
+
+  /** ============================== CLEANUP ================================ */
+  ogr->convertDecisions(stats);
 }
 
 #include "GraphPartLB.def.h"
