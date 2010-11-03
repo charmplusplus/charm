@@ -582,6 +582,7 @@ void SumLogPool::shrink(void)
   for (int i=0; i<entries; i++)
   {
      pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
+     pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
      if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
@@ -613,7 +614,7 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),
+TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
 					binTime(0.0),binIdle(0.0),msgNum(0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -767,7 +768,7 @@ void TraceSummary::beginIdle(double currT)
 {
   // for consistency with current framework behavior, currT is ignored and
   // independent timing taken by trace-summary.
-  double t = TraceTimer();
+  double t = TraceTimer(currT);
   
   // mark the time of this idle period. Only the next endIdle should see
   // this value
@@ -785,7 +786,7 @@ void TraceSummary::beginIdle(double currT)
 void TraceSummary::endIdle(double currT)
 {
   // again, we ignore the reported currT (see beginIdle)
-  double t = TraceTimer();
+  double t = TraceTimer(currT);
   double t_idleStart = idleStart;
   double t_binStart = binStart;
 
