@@ -766,8 +766,6 @@ void TraceSummary::endExecute(void)
 
 void TraceSummary::beginIdle(double currT)
 {
-  // for consistency with current framework behavior, currT is ignored and
-  // independent timing taken by trace-summary.
   double t = TraceTimer(currT);
   
   // mark the time of this idle period. Only the next endIdle should see
@@ -785,7 +783,6 @@ void TraceSummary::beginIdle(double currT)
 
 void TraceSummary::endIdle(double currT)
 {
-  // again, we ignore the reported currT (see beginIdle)
   double t = TraceTimer(currT);
   double t_idleStart = idleStart;
   double t_binStart = binStart;
@@ -805,6 +802,8 @@ void TraceSummary::endIdle(double currT)
 
 void TraceSummary::traceBegin(void)
 {
+    // fake as a start of an event, assuming traceBegin is called inside an
+    // entry function.
   beginExecute(-1, -1, TRACEON_EP, -1, -1);
 }
 
