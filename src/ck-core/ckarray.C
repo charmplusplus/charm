@@ -907,11 +907,13 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (!stableLocations) {
-    DEBB((AA"Received broadcast %d\n"AB,bcastNo));
-    CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
-    oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
-  }
+  DEBB((AA"Received broadcast %d\n"AB,bcastNo));
+
+  if (stableLocations)
+    return;
+
+  CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
+  oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
 }
 
 /// Deliver a copy of the given broadcast to the given local element
