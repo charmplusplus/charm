@@ -910,8 +910,8 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   int epIdx=bcast->array_ep_bcast();
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
-        return CmiTrue;
+  DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
+  return CmiTrue;
 #else
   return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
 #endif
