@@ -1117,9 +1117,9 @@ void CkArray::recvBroadcast(CkMessage *m)
 	startVTimer();
 #endif
 
-	if (stableLocations) {
+	// CkArrayBroadcaster doesn't have msg buffered
+	if (stableLocations)
 	  delete msg;
-	}
 }
 
 #include "CkArray.def.h"
