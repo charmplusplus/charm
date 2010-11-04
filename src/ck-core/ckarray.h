@@ -646,7 +646,7 @@ public:
 
   void incoming(CkArrayMessage *msg);
 
-  CmiBool deliver(CkArrayMessage *bcast,ArrayElement *el);
+  CmiBool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
 
   void springCleaning(void);
 

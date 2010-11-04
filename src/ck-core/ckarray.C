@@ -917,7 +917,8 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 }
 
 /// Deliver a copy of the given broadcast to the given local element
-CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
+CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
+				    CmiBool doFree)
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
@@ -930,7 +931,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
   return CmiTrue;
 #else
-  return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
+  return el->ckInvokeEntry(epIdx, bcast, doFree);
 #endif
 }
 
@@ -956,7 +957,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 		if(msg == NULL)
         	continue;
       oldBcasts.enq(msg);
-      if (!deliver(msg,el))
+      if (!deliver(msg, el, CmiFalse))
 	return CmiFalse; //Element migrated away
     }
   }
@@ -1088,7 +1089,7 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0;
+	int idx=0, len = elements->length();
 	ArrayElement *el;
 #if CMK_BLUEGENE_CHARM
         void *root;
@@ -1106,7 +1107,9 @@ void CkArray::recvBroadcast(CkMessage *m)
                 logs.push_back(curlog);
   		startVTimer();
 #endif
-		broadcaster->deliver(msg,el);
+		CmiBool doFree = CmiFalse;
+		if (stableLocations && idx == len) doFree = CmiTrue;
+		broadcaster->deliver(msg, el, doFree);
 	}
 #endif
 
@@ -1117,8 +1120,9 @@ void CkArray::recvBroadcast(CkMessage *m)
 	startVTimer();
 #endif
 
-	// CkArrayBroadcaster doesn't have msg buffered
-	if (stableLocations)
+	// CkArrayBroadcaster doesn't have msg buffered, and there was
+	// no last delivery to transfer ownership
+	if (stableLocations && len == 0)
 	  delete msg;
 }
 
