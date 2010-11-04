@@ -622,76 +622,8 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
 
-///This arrayListener is in charge of delivering broadcasts to the array.
-class CkArrayBroadcaster : public CkArrayListener {
-  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
-public:
-  CkArrayBroadcaster(bool _stableLocations);
-  CkArrayBroadcaster(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  virtual ~CkArrayBroadcaster();
-  PUPable_decl(CkArrayBroadcaster);
-
-  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
-
-  ///Element was just created on this processor
-  /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementCreated(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  ///Element just arrived on this processor (so just called pup)
-  /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementArriving(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  void incoming(CkArrayMessage *msg);
-
-  CmiBool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
-
-  void springCleaning(void);
-
-  void flushState();
-private:
-  int bcastNo;//Number of broadcasts received (also serial number)
-  int oldBcastNo;//Above value last spring cleaning
-  //This queue stores old broadcasts (in case a migrant arrives
-  // and needs to be brought up to date)
-  CkQ<CkArrayMessage *> oldBcasts;
-  bool stableLocations;
-
-  CmiBool bringUpToDate(ArrayElement *el);
-};
-
-///This arrayListener is in charge of performing reductions on the array.
-class CkArrayReducer : public CkArrayListener {
-  CkGroupID mgrID;
-  CkReductionMgr *mgr;
-  typedef  contributorInfo *I;
-  inline contributorInfo *getData(ArrayElement *el)
-    {return (I)ckGetData(el);}
-public:
-  /// Attach this array to this CkReductionMgr
-  CkArrayReducer(CkGroupID mgrID_);
-  CkArrayReducer(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  virtual ~CkArrayReducer();
-  PUPable_decl(CkArrayReducer);
-
-  void ckBeginInserting(void) {mgr->creatingContributors();}
-  void ckEndInserting(void) {mgr->doneCreatingContributors();}
-
-  void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
-
-  void ckElementCreating(ArrayElement *elt)
-    {mgr->contributorCreated(getData(elt));}
-  void ckElementDied(ArrayElement *elt)
-    {mgr->contributorDied(getData(elt));}
-
-  void ckElementLeaving(ArrayElement *elt)
-    {mgr->contributorLeaving(getData(elt));}
-  CmiBool ckElementArriving(ArrayElement *elt)
-    {mgr->contributorArriving(getData(elt)); return CmiTrue; }
-};
+class CkArrayBroadcaster;
+class CkArrayReducer;
 
 void _ckArrayInit(void);
 
