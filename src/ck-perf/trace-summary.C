@@ -758,7 +758,7 @@ void TraceSummary::endExecute(void)
   }
   binTime += t - ts;
 
-  if (sumDetail)
+  if (sumDetail && execEp >= 0)
       _logPool->updateSummaryDetail(execEp, start, t);
 
   execEp = INVALIDEP;
