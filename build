@@ -484,6 +484,8 @@ then
 	echo "Copying $src/win32/createlink.exe to /bin directory"
 	cp $src/win32/createlink.exe /bin
         chmod +x $DESTINATION/tmp/system_ln
+	cp $src/win32/gathertree.local   $DESTINATION/tmp
+	cp $src/win32/gatherflat.local   $DESTINATION/tmp
 else
 	cat > $DESTINATION/tmp/system_ln <<EOF
 #!/bin/sh
