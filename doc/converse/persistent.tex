@@ -1,0 +1,43 @@
+%% Persistent communication in Converse
+%% Author: Xiang Ni
+
+\chapter{\converse{} Persistent Communication Interface}
+
+This chapter deals with persistent communication support in converse. It is used when point-to-point message communication is called repeatedly to avoid redundancy in setting up the message each time it is sent. In the message-driven model like charm, the sender will first notify the reciver that it will send message to it, the receiver will create handler to record the message size and malloc the address for the upcoming message and send that information back to the sender, then if the machine have one-sided hardware, it can directly put the message into the address on the reciver.
+
+\converse{} provides an implementation which wraps the functionality provided
+by different hardware and presents them as a uniform interface to the
+programmer. For machines which do not have a one-sided hardware at their
+disposal, these operations are emulated through converse messages.
+
+\converse{} provides the following types of operations to support persistent
+communication.
+
+
+\section{Create / Destroy Persistent Handler}
+The interface provides functions to crate and destroy handler on the processor for use of persistent communication.
+
+\function{Persistenthandle CmiCreatePersistent(int destPE, int maxBytes);}
+\index{CmiCreatePersistent}
+\desc{This function creates a persistent communication handler with dest PE and maximum bytes for this persistent communication. Machine layer will send message to destPE and setup a persistent communication. A buffer of size maxBytes is allocated in the destination PE.}
+
+\function{PersistentReq CmiCreateReceiverPersistent(int maxBytes);}
+\function{PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);}
+\index{CmiCreateReceivePersistent}
+\desc{Alternatively, a receiver can initiate the setting up of persistent communication. At receiver side, user calls CmiCreateReceiverPersistent() which returns a temporary handle type - PersistentRecvHandle. Send this handle to the sender side and the sender should call CmiRegisterReceivePersistent() to setup the persistent communication. The function returns a PersistentHandle which can then be used for the persistent communication.}
+
+\function{void CmiDestroyPersistent(PersistentHandle h);}
+\index{CmiDestroy}
+\desc{This function destroys a persistent communication specified by PersistentHandle h.}
+
+\function{void CmiDestroyAllPersistent();}
+\index{CmiDestroyAll}
+\desc{This function will destroy all persistent communication on the local processor.}
+
+
+\section{Persistent Operation}
+This section presents functions that uses persistent handler for communications.
+
+\function{void CmiUsePersistentHandle(PersistentHandle *p, int n)}
+\index{CmiUse}
+\desc{This function will ask Charm machine layer to use an array of PersistentHandle "p"(array size of n) for all the following communication. Calling with p=NULL will cancel the persistent communication. n=1 is for sending message to each Chare, n>1 is for message in multicast-one PersistentHandle for each PE.}
