@@ -396,9 +396,9 @@ void NborBaseLB::ResumeClients(int balancing)
 #endif
 }
 
-LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats, int n_nbrs)
 {
-  for(int j=0; j < count; j++) {
+  for(int j=0; j < n_nbrs; j++) {
     CkPrintf(
     "[%d] Proc %d Speed %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f obj=%f %f\n",
     CkMyPe(),stats[j].from_pe,stats[j].pe_speed,

@@ -463,42 +463,43 @@ void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_
 }
 
 
-void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
+void TopoCentLB :: work(LDStats *stats)
 {
   int proc;
   int obj;
   int dest;
   int i,j;
-	LDObjData *odata;
+  LDObjData *odata;
+  int n_pes = stats->nprocs();
 	
-	if (_lb_args.debug() >= 2) {
+  if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
   }
   
   // Make sure that there is at least one available processor.
-  for (proc = 0; proc < count; proc++) {
+  for (proc = 0; proc < n_pes; proc++) {
     if (stats->procs[proc].available) {
       break;
     }
   }
-	if (proc == count) {
+
+  if (proc == n_pes) {
     CmiAbort ("TopoCentLB: no available processors!");
   }
 
   
-  removeNonMigratable(stats,count);
+  removeNonMigratable(stats, n_pes);
+  int *newmap = new int[stats->n_objs];
 
-	int *newmap = new int[stats->n_objs];
 
-
-	if(make_mapping)
-		computePartitions(stats,count,newmap);
-	else{
-		//mapping taken from previous algo
-		for(i=0;i<stats->n_objs;i++){
+  if(make_mapping)
+    computePartitions(stats, n_pes, newmap);
+  else {
+    //mapping taken from previous algo
+    for(i=0;i<stats->n_objs;i++) {
       newmap[i]=stats->from_proc[i];
     }
-	}
+  }
 
   //Debugging Code
   if(_lb_args.debug() >=2){
@@ -507,9 +508,9 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		  CkPrintf(" %d,%d ",i,newmap[i]);
   }
 
-	int max_objs = findMaxObjs(newmap,stats->n_objs,count);
+	int max_objs = findMaxObjs(newmap,stats->n_objs, n_pes);
 	
-	partgraph = new PartGraph(count,max_objs);
+	partgraph = new PartGraph(n_pes, max_objs);
 
 	//Fill up the partition graph - first fill the nodes and then, the edges
 
@@ -520,7 +521,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 		n->num_objs++;
 	}
 
-	int *addedComm=new int[count];
+	int *addedComm=new int[n_pes];
   
   stats->makeCommHash();
   
@@ -531,8 +532,8 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   //Try putting random amount of communication on the partition graph edges to see if things work fine
   //This also checks the running time of the algorithm since number of edges is high than in a practical scenario
 	#ifdef RAND_COMM
-	for(i=0;i<count;i++){
-		for(j=i+1;j<count;j++){
+	for(i = 0; i < n_pes; i++) {
+		for(j = i+1; j < n_pes; j++) {
 			int val;
 			if(rand()%5==0)
 				val=0;
@@ -595,7 +596,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 			int nobjs;
     	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
       int senderID = stats->getHash(cdata.sender);
-			for(j=0;j<count;j++)
+			for(j = 0; j < n_pes; j++)
 				addedComm[j]=0;
 			for (j=0; j<nobjs; j++) {
       	int recverID = stats->getHash(objs[j]);
@@ -637,7 +638,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	}
 	#endif
 	
-	int *proc_mapping = new int[count];
+	int *proc_mapping = new int[n_pes];
 	
 	delete [] addedComm;
 		
@@ -663,7 +664,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
     CmiAbort(str);
   }
   
-	topo = topofn(count);
+	topo = topofn(n_pes);
 
   //Call the core routine to produce the partition processor mapping
 	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
@@ -672,14 +673,14 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
   //Debugging code: Result of mapping partition graph onto processor graph
 	if (_lb_args.debug()>1) {
 	  CkPrintf("Resultant mapping..(partition,processor)\n");
-	  for(i=0;i<count;i++)
+	  for(i = 0; i < n_pes; i++)
 		  CkPrintf("%d,%d\n",i,proc_mapping[i]);
   }
 
   //Store the result in the load balancing database
 	int pe;
 	PartGraph::Node* n;
-	for(i=0;i<count;i++){
+	for(i = 0; i < n_pes; i++){
 		pe = proc_mapping[i];
 		n = &partgraph->nodes[i];
 		for(j=0;j<n->num_objs;j++){
@@ -692,7 +693,7 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
 	delete[] newmap;
 	delete[] proc_mapping;
 	//Delete hopCount
-	for(i=0;i<count;i++)
+	for(i = 0; i < n_pes; i++)
 		delete[] hopCount[i];
 
 	delete[] hopCount;

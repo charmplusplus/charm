@@ -41,7 +41,7 @@ class TopoCentLB : public CentralLB
     TopoCentLB (CkMigrateMessage *m) : CentralLB (m) { };
     ~TopoCentLB();
     
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
 
     void pup (PUP::er &p) { CentralLB::pup(p); }
 

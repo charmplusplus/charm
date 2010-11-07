@@ -34,7 +34,7 @@ CmiBool BlockLB::QueryBalanceNow (int _step)
 /**************************************************************************
 **
 */
-void BlockLB::work (BaseLB::LDStats *stats, int count)
+void BlockLB::work (LDStats *stats)
 {
   int proc;
   int obj;
@@ -43,9 +43,9 @@ void BlockLB::work (BaseLB::LDStats *stats, int count)
 
 
   // Make sure that there is at least one available processor.
-	int validProcs=0;
-	int *mapValidToAbsolute = new int[count];
-  for (proc = 0; proc < count; proc++) {				
+  int validProcs=0;
+  int *mapValidToAbsolute = new int[stats->nprocs()];
+  for (proc = 0; proc < stats->nprocs(); proc++) {
     if (stats->procs[proc].available) {
 			mapValidToAbsolute[validProcs] = proc;
 			validProcs++;

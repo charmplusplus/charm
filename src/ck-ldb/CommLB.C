@@ -135,7 +135,7 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
   }
 }
 
-void CommLB::work(BaseLB::LDStats* stats, int count)
+void CommLB::work(LDStats* stats)
 {
   int pe,obj,com;
   double mean_load =0.0;
@@ -144,15 +144,15 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
   //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
   nobj = stats->n_objs;
-  npe = count;
+  npe = stats->nprocs();
 
   stats->makeCommHash();
 
-  alloc_array = new alloc_struct *[count+1];
+  alloc_array = new alloc_struct *[npe + 1];
 
   object_graph = new graph[nobj];
   
-  for(pe=0;pe <= count;pe++)
+  for(pe = 0; pe <= npe; pe++)
     alloc_array[pe] = new alloc_struct[nobj +1];
 
   init(alloc_array,object_graph,npe,nobj);
@@ -164,12 +164,12 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
       x = new ObjectRecord;
       x->id = obj;
       x->pos = obj;
-      x->load = objData.wallTime;
+      x->val = objData.wallTime;
       x->pe = onpe;
       maxh.insert(x);
       mean_load += objData.wallTime;
   }
-  mean_load /= count;
+  mean_load /= npe;
 
   int xcoord=0,ycoord=0;
 
@@ -216,14 +216,14 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
 	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
       }
       temp_cost = compute_cost(maxid,spe,id,out_msg,out_byte);
-      alloc(spe,maxid,x->load,out_msg,out_byte);
+      alloc(spe, maxid, x->val, out_msg, out_byte);
       continue;
     }
 
-    for(pe =0; pe < count; pe++)
+    for(pe =0; pe < npe; pe++)
       if((alloc_array[pe][nobj].load <= mean_load)||(id >= UPPER_FACTOR*nobj))
 	break;
-    CmiAssert(pe < count);
+    CmiAssert(pe < npe);
 
     temp_cost = compute_cost(maxid,pe,id,out_msg,out_byte);
     min_cost = temp_cost;
@@ -231,7 +231,7 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
     min_msg = out_msg;
     min_byte = out_byte;
     pe++;
-    for(; pe < count;pe++){
+    for(; pe < npe; pe++) {
       if((alloc_array[pe][nobj].load > mean_load) && (id < UPPER_FACTOR*nobj))
 	continue;
       temp_cost = compute_cost(maxid,pe,id,out_msg,out_byte);
@@ -244,7 +244,7 @@ void CommLB::work(BaseLB::LDStats* stats, int count)
     }
     CmiAssert(minpe < npe);
 
-    alloc(minpe,maxid,x->load,min_msg,min_byte);
+    alloc(minpe, maxid, x->val, min_msg, min_byte);
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);

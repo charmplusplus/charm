@@ -25,7 +25,7 @@ public:
   MetisLB(CkMigrateMessage *m):CentralLB(m) { lbname = "MetisLB"; }
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; }
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 };
 
 #define WEIGHTED 1

@@ -12,7 +12,6 @@ module CommonLBs {
   extern module OrbLB;
   extern module PhasebyArrayLB;
   extern module RandCentLB;
-  extern module RecBisectBfLB;
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RotateLB;
