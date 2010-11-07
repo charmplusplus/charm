@@ -869,7 +869,7 @@ void GridHybridLB::work (LDStats *stats)
   stats->makeCommHash ();
 
   // Initialize object variables for the number of PEs and number of objects.
-  Num_PEs = stats->n_pes;
+  Num_PEs = stats->nprocs();
   Num_Objects = stats->n_objs;
 
   if (_lb_args.debug() > 0) {

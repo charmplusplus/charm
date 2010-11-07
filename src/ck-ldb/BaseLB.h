@@ -69,7 +69,7 @@ public:
 
   /** Passed to the virtual functions Strategy(...) and work(...) */
   struct LDStats {
-    int n_pes;			// number of pes in the array "procs"
+    int count;			// number of procs in the array "procs"
     ProcStats *procs;		// processor statistics
 
     int n_objs;			// total number of objects in the vector "objData"
@@ -90,6 +90,8 @@ public:
 				// this LDStats may not be complete
 
     LDStats(int c=0, int complete_flag=1);
+    inline int nprocs() const { return count; }
+    inline int &nprocs() { return count; }
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
@@ -108,7 +110,7 @@ public:
       deleteCommHash();
     }
     void clearBgLoad() {
-      for (int i=0; i<n_pes; i++) procs[i].clearBgLoad();
+      for (int i=0; i<nprocs(); i++) procs[i].clearBgLoad();
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();

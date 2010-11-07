@@ -7,7 +7,7 @@
 LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
 {
    int i;
-   int n_pes = stats->n_pes;
+   int n_pes = stats->nprocs();
 
    processorInfo *processors = new processorInfo[n_pes];
 

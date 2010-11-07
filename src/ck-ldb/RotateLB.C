@@ -50,7 +50,7 @@ void RotateLB::work(LDStats *stats)
   int obj;
   int dest;
   LDObjData *odata;
-  int n_pes = stats->n_pes;
+  int n_pes = stats->nprocs();
 
   // Make sure that there is at least one available processor.
   for (proc = 0; proc < n_pes; proc++) {

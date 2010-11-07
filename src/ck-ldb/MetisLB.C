@@ -94,7 +94,7 @@ void MetisLB::work(LDStats* stats)
 
   stats->makeCommHash();
 
-  int n_pes = stats->n_pes;
+  int n_pes = stats->nprocs();
   int numobjs = stats->n_objs;
 
   removeNonMigratable(stats, n_pes);

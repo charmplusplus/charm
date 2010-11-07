@@ -15,9 +15,9 @@
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
   // fill the processor array
-  procs.resize(stats->n_pes);
+  procs.resize(stats->nprocs());
 
-  for(int pe = 0; pe < stats->n_pes; pe++) {
+  for(int pe = 0; pe < stats->nprocs(); pe++) {
     procs[pe].id        = stats->procs[pe].pe;
     procs[pe].overhead  = stats->procs[pe].bg_walltime;
     procs[pe].available = stats->procs[pe].available;

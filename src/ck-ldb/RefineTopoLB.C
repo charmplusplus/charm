@@ -43,7 +43,7 @@ CmiBool RefineTopoLB::QueryBalanceNow (int _step)
 void RefineTopoLB :: work(LDStats *stats)
 {
   int i, j;
-  int n_pes = stats->n_pes;
+  int n_pes = stats->nprocs();
 
   if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoLB Strategy...\n");

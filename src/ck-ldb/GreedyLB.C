@@ -187,7 +187,7 @@ GreedyLB::BuildCpuArray(BaseLB::LDStats* stats,
 void GreedyLB::work(LDStats* stats)
 {
   int  obj, heapSize, objCount;
-  int n_pes = stats->n_pes;
+  int n_pes = stats->nprocs();
 
   HeapData *cpuData = BuildCpuArray(stats, n_pes, &heapSize);
   HeapData *objData = BuildObjectArray(stats, n_pes, &objCount);

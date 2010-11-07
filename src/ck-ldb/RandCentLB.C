@@ -45,7 +45,7 @@ void RandCentLB::work(LDStats* stats)
 {
   if (_lb_args.debug()) CkPrintf("Calling RandCentLB strategy\n",CkMyPe());
 
-  int proc, n_pes = stats->n_pes;
+  int proc, n_pes = stats->nprocs();
 
   for (proc=0; proc<n_pes; proc++) {
     if (stats->procs[proc].available) break;

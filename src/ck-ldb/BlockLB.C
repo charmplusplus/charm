@@ -43,9 +43,9 @@ void BlockLB::work (LDStats *stats)
 
 
   // Make sure that there is at least one available processor.
-	int validProcs=0;
-	int *mapValidToAbsolute = new int[stats->n_pes];
-  for (proc = 0; proc < stats->n_pes; proc++) {
+  int validProcs=0;
+  int *mapValidToAbsolute = new int[stats->nprocs()];
+  for (proc = 0; proc < stats->nprocs(); proc++) {
     if (stats->procs[proc].available) {
 			mapValidToAbsolute[validProcs] = proc;
 			validProcs++;

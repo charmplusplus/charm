@@ -221,6 +221,7 @@ public:
 
   void preprocess(LDStats* stats);
   virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs);
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);

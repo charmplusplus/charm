@@ -366,7 +366,7 @@ void CentralLB::MissMigrate(int waitForBarrier)
 // not used when USE_REDUCTION = 1
 void CentralLB::buildStats()
 {
-    statsData->n_pes = stats_msg_count;
+    statsData->nprocs() = stats_msg_count;
     // allocate space
     statsData->objData.resize(statsData->n_objs);
     statsData->from_proc.resize(statsData->n_objs);
@@ -507,7 +507,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
  
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
-    statsData->n_pes = stats_msg_count;
+    statsData->nprocs() = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
   }
 #endif
@@ -589,7 +589,7 @@ void CentralLB::LoadBalance()
 #endif
   
   double strat_start_time = CkWallTimer();
-  LBMigrateMsg* migrateMsg = Strategy(statsData);
+  LBMigrateMsg* migrateMsg = Strategy(statsData, statsData->nprocs());
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	migrateMsg->step = step();
 #endif
@@ -1062,6 +1062,12 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 #else
   return NULL;
 #endif
+}
+
+// keep for legacy code
+LBMigrateMsg* CentralLB::Strategy(LDStats* stats, int nprocs)
+{
+  Strategy(stats);
 }
 
 void CentralLB::work(LDStats* stats)

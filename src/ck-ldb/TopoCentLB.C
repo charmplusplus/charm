@@ -470,7 +470,7 @@ void TopoCentLB :: work(LDStats *stats)
   int dest;
   int i,j;
   LDObjData *odata;
-  int n_pes = stats->n_pes;
+  int n_pes = stats->nprocs();
 	
   if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
