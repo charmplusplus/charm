@@ -48,6 +48,7 @@ extern void free_nomigrate(void *mem);
 void CmiPoolAllocInit(int numBins)
 {
   int i;
+  if (CpvInitialized(bins)) return;
   CpvInitialize(char **, bins);
   CpvInitialize(int *, binLengths);
   CpvInitialize(int, maxBin);
