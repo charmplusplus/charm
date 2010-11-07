@@ -1067,7 +1067,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 // keep for legacy code
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats, int nprocs)
 {
-  Strategy(stats);
+  return Strategy(stats);
 }
 
 void CentralLB::work(LDStats* stats)

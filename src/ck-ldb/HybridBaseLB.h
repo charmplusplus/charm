@@ -350,7 +350,7 @@ protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
   virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs);
-  virtual LBMigrateMsg* Strategy(LDStats* stats) { Strategy(stats, stats->nprocs());}
+  virtual LBMigrateMsg* Strategy(LDStats* stats) { return Strategy(stats, stats->nprocs());}
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
 
