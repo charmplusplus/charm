@@ -85,7 +85,7 @@ USE_BUILD_OPTIONS=0
 
 COPY_EXIT="true"
 CHARM_SHARED="0"
-BUILD_SHARE="1"
+BUILD_SHARE="0"
 SWAPGLOBALS="0"
 
 TAU_MAKEFILE=Make.tau
@@ -695,11 +695,12 @@ do
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
 		;;
-	-build-shared|-bs)
+	-build-shared)
 		# used internally when building Charm++ to create lib_so
 		# obsolete, do nothing since BUILD_SHARE is on by default
+		BUILD_SHARE="1"
 		;;
-	-no-build-shared|-nobs)
+	-no-build-shared)
 		# used internally not to build Charm++ lib_so
 		BUILD_SHARE="0"
 		;;
@@ -864,11 +865,18 @@ Debugf "----------- Module dependency search complete ------------"
 ##############################################################################
 
 
+if [ x"$CMK_NO_BUILD_SHARED" = "xfalse" ]
+then
+ 	BUILD_SHARE="1"
+fi
+
 if [ "$BUILD_SHARE" = "1" ]
 then
 	if [ x"$CMK_NO_BUILD_SHARED" = "xtrue" -o -z "$CHARMLIBSO" ]
 	then
 		BUILD_SHARE="0"
+	else
+		USE_PIC="1"
 	fi
 fi
 
@@ -1293,7 +1301,7 @@ MakeSO() {
 	echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
 	echo "!!  lib compilation by providing --no-build-shared build option like: !!"
 	echo "!!     ./build charm++ net-linux --no-build-shared -O                 !!"
-	echo "!!  or reexecute this charmc command with -nobs compile option        !!"
+	echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	Abort "Command $soCmd returned error code $Do_res"
 	fi

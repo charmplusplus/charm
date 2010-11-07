@@ -260,8 +260,8 @@ test_linkso() {
         AC_MSG_CHECKING("$1")
 	echo $1 >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
@@ -1523,10 +1523,8 @@ EOT
 		test_linkso "whether can build shared library with MPI" "yes" "no" ""
 		BUILD_SHARED=$pass
 	fi
-	if test $BUILD_SHARED -eq 1
+	if test $BUILD_SHARED -eq 0
 	then
-		add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
-	else
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 	fi
 fi

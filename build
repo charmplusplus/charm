@@ -210,7 +210,7 @@ BASEDIR=
 LIBDIR=
 INCDIR=
 ARCH=
-BUILD_SHARED=
+BUILD_SHARED=""             # default no shared lib
 WITH_ROMIO=
 WITH_PRODUCTION=
 BUILD_EMULATOR=0
@@ -294,8 +294,14 @@ do
 		done
           	shift
  	  	;;
-    --no-build-shared|-nobs|--no-shared)
-		BUILD_SHARED="-nobs"; shift
+    --no-build-shared|--no-shared)
+		#BUILD_SHARED="-no-build-shared"; 
+		shift
+		;;
+    --build-shared)
+		# obsolete, do nothing
+		BUILD_SHARED="-build-shared"; 
+		shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -310,10 +316,6 @@ do
 		;;
     --without-*)
 		CONFIG_OPTS="$CONFIG_OPTS $1"
-		shift
-		;;
-    --build-shared|-bs)
-		# obsolete, do nothing
 		shift
 		;;
     --destination)
@@ -552,8 +554,10 @@ then
     done
 fi
 
-if test  -n "$BUILD_SHARED" 
+if test  "$BUILD_SHARED"  = "-build-shared"
 then
+    echo "CMK_NO_BUILD_SHARED=false" >> $ConvSh
+else
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
 fi
 
