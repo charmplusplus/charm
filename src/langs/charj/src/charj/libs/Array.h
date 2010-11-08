@@ -119,7 +119,7 @@ namespace CharjArray {
     }
 
     ~Array() {
-      delete block;
+      delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
