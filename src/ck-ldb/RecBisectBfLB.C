@@ -61,10 +61,11 @@ CmiBool RecBisectBfLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void RecBisectBfLB::work(BaseLB::LDStats* stats, 
-				       int numPartitions)
+void RecBisectBfLB::work(LDStats* stats)
 {
   int i;
+  int numPartitions = stats->n_pes;
+
   PartitionList *partitions;
 
   CkPrintf("[%d] RecBisectBfLB strategy\n",CkMyPe());
@@ -102,9 +103,8 @@ void RecBisectBfLB::work(BaseLB::LDStats* stats,
       //      CmiPrintf("%d ", partitions->partitions[i].nodeArray[j]);
       const int objref = partitions->partitions[i].nodeArray[j];
       ObjGraph::Node n = og.GraphNode(objref);
-      /*     CkPrintf("Moving %d(%d) from %d to %d\n",objref,
-	     stats[n.proc].objData[n.index].handle.id.id[0],n.proc,i);
-      */
+      //     CkPrintf("Moving %d(%d) from %d to %d\n",objref,
+      //	     stats[n.proc].objData[n.index].handle.id.id[0],n.proc,i);
       if (n.proc != i) {
 	CmiAssert(stats->from_proc[n.index] == n.proc);
         stats->to_proc[n.index] = i;

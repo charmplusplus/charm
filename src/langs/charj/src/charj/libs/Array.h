@@ -42,7 +42,7 @@ namespace CharjArray {
       ranges[1] = range2;
     }
 
-    int size() {
+    int size() const {
       int total = 0;
       for (int i = 0; i < dims; i++)
 	if (total == 0)
@@ -119,7 +119,7 @@ namespace CharjArray {
     }
 
     ~Array() {
-      delete block;
+      delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
@@ -138,11 +138,11 @@ namespace CharjArray {
       return new Array<type, dims, atype>(this, domain);
     }
 
-    int size() {
+    int size() const {
       return domain.size();
     }
 
-    int size(int dim) {
+    int size(int dim) const {
       return domain.ranges[dim].size;
     }
 

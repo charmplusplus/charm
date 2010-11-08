@@ -67,24 +67,31 @@ public:
     }
   };
 
-  struct LDStats {  // Passed to Strategy
-    ProcStats  *procs;
-    int count; 
-    
-    int   n_objs;
-    int   n_migrateobjs;
-    CkVec<LDObjData> objData;
-    int   n_comm;
-    CkVec<LDCommData> commData;
-    CkVec<int>  from_proc, to_proc;
+  /** Passed to the virtual functions Strategy(...) and work(...) */
+  struct LDStats {
+    int count;			// number of procs in the array "procs"
+    ProcStats *procs;		// processor statistics
 
-    int *objHash; 
+    int n_objs;			// total number of objects in the vector "objData"
+    int n_migrateobjs;		// total number of migratable objects
+    CkVec<LDObjData> objData;	// LDObjData and LDCommData defined in lbdb.h
+    CkVec<int> from_proc;	// current pe an object is on
+    CkVec<int> to_proc;		// new pe you want the object to be on
+
+    int n_comm;			// number of edges in the vector "commData"
+    CkVec<LDCommData> commData;	// communication data - edge list representation
+				// of the communication between objects
+
+    int *objHash;		// this a map from the hash for the 4 integer
+				// LDObjId to the index in the vector "objData"
     int  hashSize;
 
     int complete_flag;		// if this ocg is complete, eg in HybridLB,
 				// this LDStats may not be complete
 
     LDStats(int c=0, int complete_flag=1);
+    inline int nprocs() const { return count; }
+    inline int &nprocs() { return count; }
     void assign(int oid, int pe) { CmiAssert(procs[pe].available); to_proc[oid] = pe; }
       // build hash table
     void makeCommHash();
@@ -95,7 +102,7 @@ public:
     int getRecvHash(LDCommData &cData);
     void clearCommHash();
     void clear() {
-      n_objs = n_comm = n_migrateobjs = 0;
+      n_objs = n_migrateobjs = n_comm = 0;
       objData.free();
       commData.free();
       from_proc.free();
@@ -103,7 +110,7 @@ public:
       deleteCommHash();
     }
     void clearBgLoad() {
-      for (int i=0; i<count; i++) procs[i].clearBgLoad();
+      for (int i=0; i<nprocs(); i++) procs[i].clearBgLoad();
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();

@@ -75,7 +75,7 @@ public:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int n_nbrs);
 
   int NeighborIndex(int pe);   // return the neighbor array index
 

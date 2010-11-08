@@ -1,0 +1,16 @@
+#!/bin/bash
+[ ! -d $1 ] && exit 0;
+
+SYSLN='ln -s -f'
+
+[ $OS = 'Windows_NT' ] && SYSLN='ln -f'
+
+SRC=$1
+DST=$2
+
+[ ! -d $DST ] && mkdir $DST
+
+for file in `find $SRC -name CVS -prune -o -type f -print`
+do
+    $SYSLN $file $DST
+done

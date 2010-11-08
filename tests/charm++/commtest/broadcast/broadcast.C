@@ -34,24 +34,22 @@ public:
   	else numEl = 100;
 
 
-   // comm_debug = 1;
     delete m;
 
     mainProxy = thishandle;
 	
     broadcastProxy = CProxy_Broadcast::ckNew();
     
-   // ComlibAssociateProxy(stratBroadcast, broadcastProxy				);
-	
    // create broadcast strategy using the hypercube topology
-    BroadcastStrategy *strategy = new BroadcastStrategy(USE_TREE);
-  //  PipeBroadcastStrategy *strategy = new PipeBroadcastStrategy(broadcastProxy,USE_TREE);
+    BroadcastStrategy *strategy = new BroadcastStrategy(USE_HYPERCUBE);
+  // PipeBroadcastStrategy *strategy = new PipeBroadcastStrategy(broadcastProxy,USE_TREE);
     stratBroadcast = ComlibRegister(strategy);
 
 //	CkPrintf("Main: Sleeping %d \n", CkNumPes());
 //	usleep(50*1000*1000);
-//	broadcastProxy.TestBroadcast();
-	broadcastProxy.IntermediateCall();
+	broadcastProxy.TestBroadcast();
+//	broadcastProxy.IntermediateCall();
+//	thisProxy.Intermediate1();
 	CkPrintf("Main: Started %d \n", CkNumPes());
   }
 
@@ -62,7 +60,23 @@ public:
 	broadcastProxy.TestBroadcast();
 	}
   }
-  
+   void Intermediate1(){
+    
+	CProxy_Broadcast commBroadcastProxy = broadcastProxy;
+
+	sleep(300);
+   	ComlibAssociateProxy(stratBroadcast, commBroadcastProxy);
+    CkPrintf("Associated proxy to commlib  \n");
+
+	char msg[] = "|This is a short broadcast message|";
+    broadcastMessage* b = new(strlen(msg)+1,0) broadcastMessage;
+	
+    memcpy(b->msg, msg, strlen(msg)+1);
+    b->length = strlen(msg);
+
+	commBroadcastProxy.receive(b);
+  }
+ 
 
   void exit() {
     nDone++;
@@ -80,27 +94,22 @@ public:
 
   Broadcast() {
 
-//	usleep(50*1000*1000);
     CkPrintf("element %d \n", CkMyPe());
     localProxy = thisProxy;
-//   ComlibAssociateProxy(stratBroadcast, localProxy);
   }
 
   Broadcast(CkMigrateMessage *m) {}
     
   void TestBroadcast() {
 
-  
 //	usleep(50*1000*1000);
 	  if (CkMyPe() == 0) {
    	  ComlibAssociateProxy(stratBroadcast, localProxy);
-   //   CkPrintf("Registered element %d of %d \n", CkMyPe(), CkNumPes());
       char msg[] = "|This is a short broadcast message|";
       broadcastMessage* b = new(strlen(msg)+1,0) broadcastMessage;
 	
       memcpy(b->msg, msg, strlen(msg)+1);
       b->length = strlen(msg);
-//	usleep(50*1000*1000);
       localProxy.receive(b);
     }
 	
@@ -108,9 +117,8 @@ public:
 
   void receive(broadcastMessage* m) {
 
-   // CkPrintf("Received using commlib %d of %d \n", CkMyPe(), CkNumPes());
     CkPrintf("Message: %s arrived at element %d\n", m->msg, CkMyPe());
-   // assert(strcmp(m->msg,"|This is a short broadcast message|") == 0);
+    assert(strcmp(m->msg,"|This is a short broadcast message|") == 0);
     mainProxy.exit();
   
   }

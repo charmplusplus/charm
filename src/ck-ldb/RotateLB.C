@@ -44,21 +44,21 @@ CmiBool RotateLB::QueryBalanceNow (int _step)
 /**************************************************************************
 **
 */
-void RotateLB::work (BaseLB::LDStats *stats, int count)
+void RotateLB::work(LDStats *stats)
 {
   int proc;
   int obj;
   int dest;
   LDObjData *odata;
-
+  int n_pes = stats->nprocs();
 
   // Make sure that there is at least one available processor.
-  for (proc = 0; proc < count; proc++) {
+  for (proc = 0; proc < n_pes; proc++) {
     if (stats->procs[proc].available) {
       break;
     }
   }
-  if (proc == count) {
+  if (proc == n_pes) {
     CmiAbort ("RotateLB: no available processors!");
   }
 
@@ -66,10 +66,10 @@ void RotateLB::work (BaseLB::LDStats *stats, int count)
   for (obj = 0; obj < stats->n_objs; obj++) {
     odata = &(stats->objData[obj]);
     if (odata->migratable) {
-      dest = ((stats->from_proc[obj] + 1) % count);
+      dest = ((stats->from_proc[obj] + 1) % n_pes);
       while ((!stats->procs[dest].available) &&
 	     (dest != stats->from_proc[obj])) {
-	dest = ((dest + 1) % count);
+	dest = ((dest + 1) % n_pes);
       }
       if (dest != stats->from_proc[obj]) {
 	stats->to_proc[obj] = dest;

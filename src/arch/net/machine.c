@@ -686,6 +686,8 @@ static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd=-1;
+/* Magic number to be used for sanity check in messege header */
+static int 				Cmi_net_magic;
 
 static int    Cmi_netpoll;
 static int    Cmi_asyncio;
@@ -716,7 +718,16 @@ static void parse_forks(void) {
   }
 }
 #endif
-
+static void parse_magic(void)
+{
+	char* nm;	
+	int nread;
+  nm = getenv("NETMAGIC");
+  if (nm!=0) 
+  {/*Read values set by Charmrun*/
+        nread = sscanf(nm, "%d",&Cmi_net_magic);
+	}
+}
 static void parse_netstart(void)
 {
   char *ns;
@@ -2771,6 +2782,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
+  parse_magic();
 #if ! CMK_SMP && ! defined(_WIN32)
   /* only get forks in non-smp mode */
   parse_forks();
