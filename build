@@ -299,7 +299,6 @@ do
 		shift
 		;;
     --build-shared)
-		# obsolete, do nothing
 		BUILD_SHARED="-build-shared"; 
 		shift
 		;;

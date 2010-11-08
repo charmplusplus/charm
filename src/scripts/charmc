@@ -697,7 +697,6 @@ do
 		;;
 	-build-shared)
 		# used internally when building Charm++ to create lib_so
-		# obsolete, do nothing since BUILD_SHARE is on by default
 		BUILD_SHARE="1"
 		;;
 	-no-build-shared)
