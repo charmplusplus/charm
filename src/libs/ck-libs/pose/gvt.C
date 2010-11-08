@@ -28,10 +28,9 @@ PVT::PVT()
 #endif
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
-  if(pose_config.stats)
-    {
-      localStats->TimerStart(GVT_TIMER);
-    }
+  if(pose_config.stats) {
+    localStats->TimerStart(GVT_TIMER);
+  }
 #endif
 #ifdef MEM_TEMPORAL
   localTimePool = (TimePool *)CkLocalBranch(TempMemID);
@@ -298,10 +297,18 @@ void PVT::setGVT(GVTMsg *m)
     eventMsg *dummyMsg = new eventMsg();
     p[CkMyPe()].resumeAfterCheckpoint(dummyMsg);
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 /// ENTRY: begin checkpoint now that quiescence has been reached
 void PVT::beginCheckpoint(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   CkFreeMsg(m);
   if (parCheckpointInProgress) {  // ensure this only happens once
     CkPrintf("POSE: quiescence detected\n");
@@ -310,19 +317,38 @@ void PVT::beginCheckpoint(eventMsg *m) {
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 void PVT::beginLoadbalancing(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   CkFreeMsg(m);
   if (parLBInProgress) {  // ensure this only happens once
     CProxy_PVT p(ThePVT);
     p.callAtSync();
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
-void PVT::callAtSync()
-{
+void PVT::callAtSync() {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   objs.callAtSync();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 void PVT::doneLB() {
@@ -340,6 +366,10 @@ void PVT::doneLB() {
 
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
 void PVT::resumeAfterCheckpoint(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   if (parCheckpointInProgress) {
     CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parCheckpointInProgress = 0;
@@ -360,6 +390,10 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
 }
 
 void PVT::resumeAfterLB(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   if (parLBInProgress) {
     CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parLBInProgress = 0;
