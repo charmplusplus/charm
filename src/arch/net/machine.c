@@ -2953,7 +2953,7 @@ int PumpPersistent()
     if (size > 0)
     {
       char *msg = slot->messagePtr[0];
-/*CmiPrintf("size: %d msg:%p %p\n", size, msg, slot->messagePtr);*/
+/*CmiPrintf("[%d] size: %d msg:%p %p\n", CmiMyPe(), size, msg, slot->messagePtr);*/
 
 #if 0
       void *dupmsg;
@@ -3007,6 +3007,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     memset(buf, 0, maxBytes+sizeof(int)*2);
     slot->messagePtr[i] = buf;
     slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
+    *(slot->recvSizePtr[0]) = 0;
   }
   slot->sizeMax = maxBytes;
 }
