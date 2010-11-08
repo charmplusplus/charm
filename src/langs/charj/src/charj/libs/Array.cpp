@@ -111,6 +111,12 @@ public:
   }
 };
 
+static void print_result(ArrayTest *test)
+{
+  bool status = test->test();
+  cout << test->testName() << (status ? " PASSED" : " FAILED") << endl;
+}
+
 int main(void) {
   list<ArrayTest*> tests;
   Array1DUnit a1;
@@ -121,15 +127,7 @@ int main(void) {
   tests.push_back(&a2);
   tests.push_back(&a3);
 
-  for (list<ArrayTest*>::iterator iter = tests.begin();
-       iter != tests.end();
-       ++iter) {
-    bool status = (*iter)->test();
-    if (status)
-      cout << (*iter)->testName() << " PASSED" << endl;
-    else
-      cout << (*iter)->testName() << " FAILED" << endl;
-  }
+  for_each(tests.begin(), tests.end(), print_result);
 
 #if 0
   Array<int>* newTest = new Array<int>(Domain<1>(Range(10)));
