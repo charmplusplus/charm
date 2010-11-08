@@ -21,12 +21,14 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#define SPLIT_MULTICAST 0
+#define SPLIT_MULTICAST  0 
 // each multicast message is split into SPLIT_NUM fragments
-#define SPLIT_NUM 2
+#define SPLIT_NUM 20
+#define SPLIT_SIZE (250000)
 
+#define SPLIT_THRESHOLD (1000000)
 // maximum number of fragments into which a message can be broken
-#define MAXFRAGS 5
+#define MAXFRAGS 20
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndexMax>   arrayIndexList;
@@ -476,6 +478,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     entry->pe = CkMyPe();
     entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
+
     DEBUGF(("[%d] setup: %p redNo: %d => %d with %d elems\n", CkMyPe(), entry, entry->red.redNo, msg->redNo, msg->nIdx));
     entry->red.redNo = msg->redNo;
 
@@ -519,7 +522,9 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
         int *peListPtr = mySubTreePEs.getVec();
         topo::SpanningTreeVertex *nextGenInfo;
         nextGenInfo = topo::buildSpanningTreeGeneration(peListPtr,peListPtr + mySubTreePEs.size(),numchild);
-        numchild    = nextGenInfo->childIndex.size();
+        //CkAssert(nextGenInfo->childIndex.size() == numchild);
+	numchild = nextGenInfo->childIndex.size();
+	entry->numChild = numchild;
 
         // Distribute the section members across the number of direct children (branches)
         // Direct children are simply the first section member in each of the branch lists
@@ -755,9 +760,19 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   register envelope *env = UsrToEnv(m);
   CkPackMessage(&env);
   int totalsize = env->getTotalsize();
-  int packetSize = totalsize/SPLIT_NUM;
-  if (totalsize%SPLIT_NUM) packetSize ++;
-  int totalcount = SPLIT_NUM;
+  int packetSize = 0;
+  int totalcount = 0;
+  if(totalsize < SPLIT_THRESHOLD){
+    packetSize = totalsize;
+    totalcount = 1;
+  }else{
+    packetSize = SPLIT_SIZE;
+    totalcount = totalsize/SPLIT_SIZE;
+    if(totalcount%SPLIT_SIZE) totalcount++; 
+    //packetSize = totalsize/SPLIT_NUM;
+    //if (totalsize%SPLIT_NUM) packetSize ++;
+    //totalcount = SPLIT_NUM;
+  }
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   int sizesofar = 0;
   char *data = (char*) env;
