@@ -129,6 +129,61 @@ struct Slicing : public ArrayTest {
   }
 };
 
+template <typename T>
+struct VectorTest : public ArrayTest {
+  string testName() {
+    return "vector math test";
+  }
+
+  bool test() {
+    const static int N = 5;
+    Vector<T> ones(N), zeroes(N), inc(N);
+    for (int i = 0; i < N; ++i) {
+      zeroes[i] = 0;
+      ones[i] = 1;
+      inc[i] = i+1;
+    }
+
+    if (dot(&ones,&ones) != ones.size())
+      return false;
+
+    if (dot(&ones,&zeroes) != 0)
+      return false;
+
+    if (dot(&inc, &ones) != N*(N+1)/2)
+      return false;
+
+    return true;
+  }
+};
+
+template <typename T, class atype>
+struct MatrixTest : public ArrayTest {
+  string testName() {
+    return "Matrix test";
+  }
+
+  bool test() {
+    const static int N = 5;
+    Matrix<T, atype> zeroes(N), ones(N);
+    const Matrix<T, atype> &ident = *(Matrix<T, atype>::ident(N));
+    Vector<T> v0(N), v1(N);
+
+    for (int i = 0; i < N; ++i) {
+      v1[i] = 1;
+      for (int j = 0; j < N; ++j) {
+	ones.access(i,j) = 1;
+
+	if ((ident.access(i,j) == 1) != (i == j))
+	  return false;
+      }
+
+    }
+
+    return true;
+  }
+};
+
 static void print_result(ArrayTest *test)
 {
   bool status = test->test();
@@ -141,11 +196,19 @@ int main(void) {
   Array2DUnitLinear a2;
   Array2DUnitRowMajor a3;
   Slicing s;
+  VectorTest<int> v;
+  VectorTest<float> f;
+  VectorTest<double> d;
+  MatrixTest<double, RowMajor<2> > m;
 
   tests.push_back(&a1);
   tests.push_back(&a2);
   tests.push_back(&a3);
   tests.push_back(&s);
+  tests.push_back(&v);
+  tests.push_back(&f);
+  tests.push_back(&d);
+  tests.push_back(&m);
 
   for_each(tests.begin(), tests.end(), print_result);
 

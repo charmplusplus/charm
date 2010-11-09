@@ -133,7 +133,15 @@ namespace CharjArray {
       return block[atype::access(i, domain)];
     }
 
+    const type& operator[] (const int i) const {
+      return block[atype::access(i, domain)];
+    }
+
     type& access(const int i, const int j) {
+      return block[atype::access(i, j, domain)];
+    }
+
+    const type& access(const int i, const int j) const {
       return block[atype::access(i, j, domain)];
     }
 
@@ -151,6 +159,55 @@ namespace CharjArray {
 
     void pup(PUP::er& p) { }
   };
+
+  /**
+     A local Matrix class for various sorts of linear-algebra work.
+
+     Indexed from 0, to reflect the C-heritage of Charj.
+   */
+  template <typename V, class atype = RowMajor<2> >
+  class Matrix : public Array<V, 2, atype>
+  {
+  public:
+    Matrix() { }
+    /// A square matrix
+    Matrix(unsigned int n) : Array<V,2,atype>(Domain<2>(n,n)) { }
+
+    /// A identity matrix
+    static Matrix* ident(int n)
+    {
+      Matrix *ret = new Matrix(n);
+
+      for (int i = 0; i < n; ++i)
+	ret->access(i,i) = 1;
+
+      return ret;
+    }
+  };
+
+  template <typename T, class atype = RowMajor<1> >
+  class Vector : public Array<T, 1, atype>
+  {
+  public:
+    Vector() { }
+    Vector(unsigned int n) : Array<T, 1, atype>(Range(n)) { }
+  };
+
+  /// Compute the inner (dot) product v1^T * v2
+  // To compute v1^H * v2, call as dot(v1.C(), v2)
+  template<typename T, class atype1, class atype2>
+  T dot(const Vector<T, atype1> *pv1, const Vector<T, atype2> *pv2)
+  {
+    const Vector<T, atype1> &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    // XXX: This default initialization worries me some, since it
+    // won't necessarily be an additive identity for all T. - Phil
+    T ret = T();
+    int size = v1.size();
+    for (int i = 0; i < size; ++i)
+      ret += v1[i] * v2[i];
+    return ret;
+  }
 }
 
 #endif
