@@ -159,6 +159,11 @@ namespace CharjArray {
     }
 
     void pup(PUP::er& p) { }
+
+    void fill(const type &t) {
+      for (int i = 0; i < domain.size(); ++i)
+	block[i] = t;
+    }
   };
 
   /**
@@ -178,6 +183,7 @@ namespace CharjArray {
     static Matrix* ident(int n)
     {
       Matrix *ret = new Matrix(n);
+      ret->fill(0);
 
       for (int i = 0; i < n; ++i)
 	ret->access(i,i) = 1;

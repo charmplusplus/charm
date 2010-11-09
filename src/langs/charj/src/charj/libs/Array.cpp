@@ -179,10 +179,18 @@ struct MatrixTest : public ArrayTest {
     const Matrix<T, atype> &ident = *(Matrix<T, atype>::ident(N));
     Vector<T> v0(N), v1(N);
 
+    v0.fill(0);
+    v1.fill(1);
+    zeroes.fill(0);
+    ones.fill(1);
+
     for (int i = 0; i < N; ++i) {
-      v1[i] = 1;
+      if(v1[i] != 1 || v0[i] != 0)
+	return false;
+
       for (int j = 0; j < N; ++j) {
-	ones.access(i,j) = 1;
+	if(ones.access(i,j) != 1 || zeroes.access(i,j) != 0)
+	  return false;
 
 	if ((ident.access(i,j) == 1) != (i == j))
 	  return false;
