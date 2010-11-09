@@ -44,11 +44,14 @@ namespace CharjArray {
 
     int size() const {
       int total = 0;
+
       for (int i = 0; i < dims; i++)
 	if (total == 0)
 	  total = ranges[i].size;
 	else
 	  total *= ranges[i].size;
+
+      return total;
     }
   };
 
