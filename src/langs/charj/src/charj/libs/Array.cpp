@@ -111,6 +111,24 @@ public:
   }
 };
 
+struct Slicing : public ArrayTest {
+  string testName() {
+    return "array slicing";
+  }
+
+  bool test() {
+    const static int N = 5;
+    Array<int> a = Domain<1>(N);
+    for(int i = 0; i < N; ++i)
+      a[i] = i;
+    Array<int> &b = *(a[Domain<1>(3,4)]);
+    if (b[0] != 3) {
+      return false;
+    }
+    return true;
+  }
+};
+
 static void print_result(ArrayTest *test)
 {
   bool status = test->test();
@@ -122,10 +140,12 @@ int main(void) {
   Array1DUnit a1;
   Array2DUnitLinear a2;
   Array2DUnitRowMajor a3;
+  Slicing s;
 
   tests.push_back(&a1);
   tests.push_back(&a2);
   tests.push_back(&a3);
+  tests.push_back(&s);
 
   for_each(tests.begin(), tests.end(), print_result);
 
