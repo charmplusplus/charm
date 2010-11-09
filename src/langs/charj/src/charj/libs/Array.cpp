@@ -153,6 +153,11 @@ struct VectorTest : public ArrayTest {
     if (dot(&inc, &ones) != N*(N+1)/2)
       return false;
 
+    if (ones == zeroes || ones == inc || zeroes == inc)
+      return false;
+    if (ones != ones || zeroes != zeroes || inc != inc)
+      return false;
+
     return true;
   }
 };
@@ -195,8 +200,12 @@ struct MatrixTest : public ArrayTest {
 	if ((ident.access(i,j) == 1) != (i == j))
 	  return false;
       }
-
     }
+
+    if (zeroes == ones || zeroes == ident || ones == ident)
+      return false;
+    if (ones != ones || zeroes != zeroes || ident != ident)
+      return false;
 
     return true;
   }

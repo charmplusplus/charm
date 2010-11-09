@@ -164,6 +164,24 @@ namespace CharjArray {
       for (int i = 0; i < domain.size(); ++i)
 	block[i] = t;
     }
+
+    /// Do these arrays have the same shape and contents?
+    bool operator==(const Array &rhs) const
+    {
+      for (int i = 0; i < dims; ++i)
+	if (this->size(i) != rhs.size(i))
+	  return false;
+
+      for (int i = 0; i < this->size(); ++i)
+	if (this->block[i] != rhs.block[i])
+	  return false;
+
+      return true;
+    }
+    bool operator!=(const Array &rhs) const
+    {
+      return !(*this == rhs);
+    }
   };
 
   /**
