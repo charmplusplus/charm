@@ -157,6 +157,16 @@ struct VectorTest : public ArrayTest {
   }
 };
 
+template <>
+string VectorTest<float>::testName() {
+  return "CBLAS float test";
+}
+
+template <>
+string VectorTest<double>::testName() {
+  return "CBLAS double test";
+}
+
 template <typename T, class atype>
 struct MatrixTest : public ArrayTest {
   string testName() {

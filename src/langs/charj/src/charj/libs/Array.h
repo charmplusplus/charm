@@ -7,6 +7,7 @@
 #include <cassert>
 #include <iostream>
 #include <charm++.h>
+#include <cblas.h>
 
 namespace CharjArray {
   class Range {
@@ -207,6 +208,22 @@ namespace CharjArray {
     for (int i = 0; i < size; ++i)
       ret += v1[i] * v2[i];
     return ret;
+  }
+  template <>
+  float dot<float, RowMajor<1>, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv1,
+					      const Vector<float, RowMajor<1> > *pv2)
+  {
+    const Vector<float, RowMajor<1> > &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    return cblas_sdot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
+  }
+  template <>
+  double dot<double, RowMajor<1>, RowMajor<1> >(const Vector<double, RowMajor<1> > *pv1,
+						const Vector<double, RowMajor<1> > *pv2)
+  {
+    const Vector<double, RowMajor<1> > &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    return cblas_ddot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
   }
 }
 
