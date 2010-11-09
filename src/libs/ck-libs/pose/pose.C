@@ -1,4 +1,5 @@
 /// Global POSE data and functions; includes and dependencies handled here
+#include <unistd.h>
 #include "pose.h"
 #include "pose.def.h"
 
