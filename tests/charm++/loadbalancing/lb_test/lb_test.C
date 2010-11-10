@@ -29,6 +29,7 @@ Load-balancing test program:
 #include "HybridLB.h"
 #include "HbmLB.h"
 #include "GraphPartLB.h"
+#include "GraphBFTLB.h"
 
 #include "lb_test.decl.h"
 
@@ -137,9 +138,12 @@ static const struct {
   {"hbm",
    "HbmLB - HBM strategy",
    CreateHbmLB},
-  {"graph",
+  {"graphpart",
    "GraphPartLB - graph partitioning",
    CreateGraphPartLB},
+  {"graphbft",
+   "GraphBFTLB - breadth first traversal",
+   CreateGraphBFTLB},
 
   {NULL,NULL,NULL}
 };
