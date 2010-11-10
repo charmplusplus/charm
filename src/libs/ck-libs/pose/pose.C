@@ -1,5 +1,9 @@
 /// Global POSE data and functions; includes and dependencies handled here
-#include <unistd.h>
+
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+#include "unistd.h"
+#endif
+
 #include "pose.h"
 #include "pose.def.h"
 
