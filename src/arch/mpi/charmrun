@@ -26,7 +26,12 @@ do
 		shift
 		;;
 	+p*)
-		pes=`echo $1 | awk '{print substr($1,3)}'`
+		if [ $1 = "+pemap" ];
+		then
+			args=$args" "$1
+		else
+			pes=`echo $1 | awk '{print substr($1,3)}'`
+		fi
 		;;
         -machinefile)
 		machinefile=$2
