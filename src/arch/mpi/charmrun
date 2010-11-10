@@ -25,13 +25,12 @@ do
 		pes=$2
 		shift
 		;;
+	+pemap)
+		args=$args" "$1" "$2
+		shift
+		;;
 	+p*)
-		if [ $1 = "+pemap" ];
-		then
-			args=$args" "$1
-		else
-			pes=`echo $1 | awk '{print substr($1,3)}'`
-		fi
+		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;
         -machinefile)
 		machinefile=$2
