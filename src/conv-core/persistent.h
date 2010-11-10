@@ -34,6 +34,8 @@
 
 *****************************************************************************/
 
+#include "conv-config.h"
+
 #ifndef __PERSISTENT_H__
 #define __PERSISTENT_H__
 

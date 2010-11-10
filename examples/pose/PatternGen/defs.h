@@ -5,7 +5,7 @@
 #include <math.h>
 #include <time.h>
 
-#define NUM_AVAILABLE_PATTERNS 2
+#define NUM_AVAILABLE_PATTERNS 4
 
 // set to "if (1) CkPrintf" to turn on debug print statements
 #define dbPrintf if (0) CkPrintf
@@ -22,5 +22,15 @@
 #define P1_MESSAGES_PER_ITER 5
 #define P1_SHORT_DELAY 200
 #define P1_LARGE_DELAY 1000000
+
+// for pattern 2
+#define P2_MESSAGES_TO_SEND 100
+#define P2_MSG_TRANSIT_TIME 200
+#define P2_ELAPSE_TIME 800
+
+// for pattern 3
+#define P3_MESSAGES_TO_SEND 100
+#define P3_MSG_TRANSIT_TIME 1000
+#define P3_ELAPSE_TIME 800
 
 #endif  // _DEFS_H

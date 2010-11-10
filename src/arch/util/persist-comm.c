@@ -152,6 +152,11 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   PersistentHandle h = getFreeSendSlot();
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
+
+  if (CmiMyPe() == destPE) {
+    CmiAbort("CmiCreatePersistent Error: setting up persistent communication to the same processor is not allowed.");
+  }
+
   slot->used = 1;
   slot->destPE = destPE;
   slot->sizeMax = maxBytes;
@@ -364,10 +369,13 @@ void CmiPersistentInit()
 
 void CmiUsePersistentHandle(PersistentHandle *p, int n)
 {
-#ifndef CMK_OPTIMIZE
+  if (n==1 && *p == NULL) { p = NULL; n = 0; }
+#if  CMK_ERROR_CHECKING
+  {
   int i;
   for (i=0; i<n; i++)
     if (p[i] == NULL) CmiAbort("CmiUsePersistentHandle: invalid PersistentHandle.\n");
+  }
 #endif
   phs = p;
   phsSize = n;

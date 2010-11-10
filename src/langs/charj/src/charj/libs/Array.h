@@ -15,7 +15,7 @@ namespace CharjArray {
     Range() {}
     Range(int size_) : size(size_), start(0), stop(size) {}
     Range(int start_, int stop_) :
-      start(start_), stop(stop_), size(stop_ - start_) {
+    size(stop_ - start_), start(start_), stop(stop_) {
       assert(stop >= start);
     }
   };
@@ -44,11 +44,14 @@ namespace CharjArray {
 
     int size() const {
       int total = 0;
+
       for (int i = 0; i < dims; i++)
 	if (total == 0)
 	  total = ranges[i].size;
 	else
 	  total *= ranges[i].size;
+
+      return total;
     }
   };
 

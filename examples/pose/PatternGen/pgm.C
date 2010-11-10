@@ -9,12 +9,18 @@ main::main(CkArgMsg *m) {
   int numWorkers, patternNum;
 
   if ((m->argc < 3) || (strcmp(m->argv[1], "-help") == 0)) {
-    CkPrintf("Usage: pgm <#workerObjs> <pattern#> [<pattern parameters>]\n");
+    CkPrintf("\nUsage: pgm <#workerObjs> <pattern#> [<pattern parameters>]\n");
     CkPrintf("\n");
     CkPrintf("Pattern 0: Simple ring test\n");
     CkPrintf("   Pattern parameters: none\n");
     CkPrintf("Pattern 1: Short communcation bursts (~100 GVT ticks apart), long message send (~1M ticks), repeat\n");
     CkPrintf("   Pattern parameters: none\n");
+    CkPrintf("Pattern 2: Simultaneous ring with elapse statements\n");
+    CkPrintf("   Pattern parameters: none\n");
+    CkPrintf("Pattern 3: Simultaneous ring without elapse statements\n");
+    CkPrintf("   Pattern parameters: none\n");
+    CkPrintf("\n");
+    CkPrintf("For more details on the patterns, see the README file.\n\n");
     CkExit();
   }
 
