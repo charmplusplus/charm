@@ -76,13 +76,19 @@ namespace impl {
 			}
 		}
 		int totalNodes = nodesMap.size();
+		//check whether the building of this tree is for procs on remote SMP nodes.
+		//NOW: just use the condition whether the "parent" nid is same with (firstVtx+1)
+		int pnid = CmiNodeOf(topo::getProcID(*firstVtx));
+		int fnid = CmiNodeOf(topo::getProcID(*(firstVtx+1)));
+		int forRemoteNodes = (pnid != fnid);
 	#else
 		//in non-SMP case, just to fake there's no SMP nodes so the work flow of spanning tree 
 		//creation is correct
 		int totalNodes = 0;
+		int forRemoteNodes=0;
 	#endif
 		
-		if(totalNodes <= 1){
+		if(totalNodes <= 1 && !forRemoteNodes){
 			/// Compute the number of vertices in each branch
 			const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
 			int numInSubTree = numDescendants / maxBranches;
