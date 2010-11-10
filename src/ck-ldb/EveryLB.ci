@@ -6,6 +6,7 @@ module EveryLB {
   extern module CommLB;
   extern module DummyLB;
   extern module GraphPartLB;
+  extern module GraphBFTLB;
   extern module GreedyAgentLB;
   extern module GreedyCommLB;
   extern module GreedyLB;

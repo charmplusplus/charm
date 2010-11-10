@@ -22,6 +22,7 @@ ControlPointsNoTrace.decl.h ControlPointsNoTrace.def.h: controlPointsNoTrace.ci.
 DummyLB.decl.h DummyLB.def.h: DummyLB.ci.stamp
 EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp
 f90main.decl.h f90main.def.h: f90main.ci.stamp
+GraphBFTLB.decl.h GraphBFTLB.def.h: GraphBFTLB.ci.stamp
 GraphPartLB.decl.h GraphPartLB.def.h: GraphPartLB.ci.stamp
 GreedyAgentLB.decl.h GreedyAgentLB.def.h: GreedyAgentLB.ci.stamp
 GreedyCommLB.decl.h GreedyCommLB.def.h: GreedyCommLB.ci.stamp
