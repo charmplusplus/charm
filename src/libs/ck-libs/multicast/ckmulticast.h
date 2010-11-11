@@ -17,30 +17,6 @@ PUPbytes(mCastEntryPtr)
 
 #include "CkMulticast.decl.h"
 
-#if 0
-class CkMcastReductionMsg: public CMessage_CkMcastReductionMsg {
-friend class CkMulticastMgr;
-public:
-  int dataSize;
-  char *data;
-  CkSectionInfo sid;
-private:
-  CkReduction::reducerType reducer;
-  char flag;  // 1: come from array elem 2: come from BOC
-  int redNo;
-  int gcounter;
-  int userFlag; // user set for use by client 
-  char rebuilt;
-  CkCallback callback;   /**< user callback */
-public:
-  static CkMcastReductionMsg* buildNew(int NdataSize,void *srcData,
-		  CkReduction::reducerType reducer=CkReduction::invalid);
-  void setCallback(CkCallback &cb) { callback = cb; }
-  inline int getSize(void) const {return dataSize;}
-  inline void *getData(void) {return data;}
-};
-#endif
-
 typedef void (*redClientFn)(CkSectionInfo sid, void *param,int dataSize,void *data);
 
 /// Retrieve section info from a multicast msg. Part of API
@@ -147,8 +123,7 @@ class CkMulticastMgr: public CkDelegateMgr
         void sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts);
         /// Mark old cookie spanning tree as old and build a new one
         void resetCookie(CkSectionInfo sid);
-        enum {MAXREDUCERS=256};
-        // static CkReduction::reducerFn reducerTable[MAXREDUCERS];
+        ///
         void releaseBufferedReduceMsgs(mCastEntryPtr entry);
         /// Release buffered redn msgs from later reductions which arrived early (out of order)
         void releaseFutureReduceMsgs(mCastEntryPtr entry);
