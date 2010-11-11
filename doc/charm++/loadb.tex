@@ -691,7 +691,7 @@ mainmodule lbexample {
 #define LB_INTERVAL 5
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
 private:
   int count;
@@ -699,7 +699,7 @@ public:
   Main(CkArgMsg* m)
   {
     /*....Initialization....*/
-    mainProxy = thishandle;
+    mainProxy = thisProxy;
     CProxy_LBExample arr = CProxy_LBExample::ckNew(nElements);
     arr.doWork();
   };
