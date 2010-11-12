@@ -20,9 +20,14 @@
 class ProcInfo {
   friend class ProcArray;
 
+  public:
+    inline double getTotalLoad() { return totalLoad; }
+    inline void setTotalLoad(double _tload) { totalLoad = _tload; }
+
   private:
     int id;		// CkMyPe of the processor
     double overhead;	// previously called background load (bg_walltime)
+    double totalLoad;	// includes object_load + overhead
     bool available;	// if the processor is available
 };
 
@@ -30,10 +35,14 @@ class ProcArray {
   public:
     ProcArray(BaseLB::LDStats *stats);
     ~ProcArray() { }
+    inline double getAverageLoad() { return avgLoad; }
+    void resetTotalLoad();
 
-  private:
     // vector containing the list of processors
     std::vector<ProcInfo> procs;
+
+  private:
+    double avgLoad;
 };
 
 class Edge {
@@ -44,6 +53,7 @@ class Edge {
       bytes(_bytes) {
     }
     ~Edge() { }
+    inline int getNeighborId() { return id; }
 
   private:
     int id;		// id of the neighbor
@@ -55,15 +65,20 @@ class Edge {
 class Vertex {
   friend class ObjGraph;
 
+  public:
+    inline double getObjLoad() { return compLoad; }
+    inline double getNewPe() { return newPe; }
+    inline void setNewPe(int _newpe) { newPe = _newpe; }
+
+    // undirected edges from this vertex to other vertices
+    std::vector<Edge> edgeList;
+
   private:
     int id;		// index in the LDStats array
     double compLoad;	// computational load (walltime in LDStats)
     bool migratable;	// migratable or non-migratable
     int currPe;		// current processor assignment
     int newPe;		// new processor assignment after load balancing
-
-    // undirected edges from this vertex to other vertices
-    std::vector<Edge> edgeList;
 };
 
 
@@ -71,9 +86,8 @@ class ObjGraph {
   public:
     ObjGraph(BaseLB::LDStats *stats);
     ~ObjGraph() { }
-
     void convertDecisions(BaseLB::LDStats *stats);
-  private:
+
     // all vertices in the graph. Each vertex corresponds to a chare
     std::vector<Vertex> vertices;
 };

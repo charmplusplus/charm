@@ -70,7 +70,7 @@ mainmodule Hello \{
 // File: pgm.h
 #include "Hello.decl.h" // Note: not pgm.decl.h
 
-class HelloMain: public Chare \{
+class HelloMain : public CBase_HelloMain \{
   public:
     HelloMain(CkArgMsg *);
     void PrintDone(void);
@@ -92,7 +92,7 @@ CProxy_HelloMain mainProxy;
 HelloMain::HelloMain(CkArgMsg *msg) \{
   delete msg;
   count = 0;
-  mainProxy=thishandle;
+  mainProxy = thisProxy;
   CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
 \}
 

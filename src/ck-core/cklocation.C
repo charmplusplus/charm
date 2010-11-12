@@ -254,8 +254,7 @@ public:
 
   dimInfo(void) { }
 
-  dimInfo(CkArrayIndexMax& n) {
-    _nelems = n;
+  dimInfo(CkArrayIndexMax& n) : _nelems(n), _numChares(0) {
     compute_binsize();
   }
 

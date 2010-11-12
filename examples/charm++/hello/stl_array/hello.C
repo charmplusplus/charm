@@ -13,7 +13,7 @@ typedef std::pair<int,std::string> fooPair;
 /*readonly*/ int nElements;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
 public:
   Main(CkArgMsg* m)
@@ -28,7 +28,7 @@ public:
     //Start the computation
     CkPrintf("Running Hello on %d processors for %d elements\n",
 	     CkNumPes(),nElements);
-    mainProxy = thishandle;
+    mainProxy = thisProxy;
 
     CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
 

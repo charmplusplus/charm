@@ -1,0 +1,8 @@
+module GraphBFTLB {
+  extern module CentralLB;
+  initnode void lbinit (void);
+
+  group [migratable] GraphBFTLB : CentralLB {
+    entry void GraphBFTLB(const CkLBOptions &);
+  };
+};

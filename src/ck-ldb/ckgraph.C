@@ -14,14 +14,28 @@
 #include "ckgraph.h"
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
-  // fill the processor array
-  procs.resize(stats->nprocs());
+  int numPes = stats->nprocs();
 
-  for(int pe = 0; pe < stats->nprocs(); pe++) {
+  // fill the processor array
+  procs.resize(numPes);
+
+  for(int pe = 0; pe < numPes; pe++) {
     procs[pe].id        = stats->procs[pe].pe;
     procs[pe].overhead  = stats->procs[pe].bg_walltime;
+    procs[pe].totalLoad = stats->procs[pe].total_walltime;
     procs[pe].available = stats->procs[pe].available;
   }
+
+  avgLoad = 0.0;
+
+  for(int pe = 0; pe < numPes; pe++)
+    avgLoad += procs[pe].totalLoad;
+  avgLoad /= numPes;
+}
+
+void ProcArray::resetTotalLoad() {
+  for(int pe = 0; pe < procs.size(); pe++)
+    procs[pe].totalLoad = procs[pe].overhead;
 }
 
 ObjGraph::ObjGraph(BaseLB::LDStats *stats) {

@@ -176,6 +176,16 @@ int CmiFclose(FILE *fp)
 {
         int status = 0;
         while (1) {
+          status = fflush(fp);
+          if (status != 0 && errno==EINTR) {
+            printf("Warning: CmiFclose flush retrying ...\n");
+            continue;
+          }
+          else
+            break;
+        }
+        if (status != 0) return status;
+        while (1) {
           status = fclose(fp);
           if (status != 0 && errno==EINTR) {
             printf("Warning: CmiFclose retrying ...\n");
