@@ -64,6 +64,9 @@ namespace impl {
         /// Return data holds the parent vertex info [and child info, if there are any]
         SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
 
+	//Containing no actual nodes to be built
+	if(firstVtx+1 == beyondLastVtx) return parent;
+
 	//key is the node id, and the mapped value is the local index
 	std::map<int, int> nodesMap;
 	#if CMK_SMP	
