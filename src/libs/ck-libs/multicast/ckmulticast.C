@@ -162,7 +162,7 @@ class mCastEntry
         inline int notReady() { return (flag == COOKIE_NOTREADY); }
         /// Mark this (branch of the) tree as ready for use
         inline void setReady() { flag=COOKIE_READY; }
-        /// Increment the reduction number for all the section members on this PE
+        /// Increment the reduction number across the whole linked list of cookies
         inline void incReduceNo() {
             red.redNo ++;
             for (mCastEntry *next = newc; next; next=next->newc) 
@@ -1108,7 +1108,7 @@ CkReductionMsg* CkMulticastMgr::combineFrags (CkSectionInfo& id,
 
 void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
                                      mCastEntry* entry, reductionInfo& redInfo,
-                                     int& updateReduceNo, int currentTreeUp) {
+                                     int currentTreeUp) {
 
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
     reductionMsgs& rmsgs = redInfo.msgs[index];
@@ -1147,15 +1147,6 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     for (i=0; i<rmsgs.length(); i++)
         if (rmsgs[i]!=newmsg) delete rmsgs[i];
     rmsgs.length() = 0;
-
-    // If all the fragments for the current reduction have been processed
-    if (redInfo.npProcessed == nFrags)
-        entry->incReduceNo();
-
-    // If migration happened, and my sub-tree reconstructed itself,
-    // share the current reduction number with myself and all my children
-    if (updateReduceNo)
-        mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
 
     // If I am not the tree root
     if (entry->hasParent()) {
@@ -1328,9 +1319,20 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     {
         const int nFrags = msg->nFrags;
         /// Reduce this fragment
-        reduceFragment (index, id, entry, redInfo, updateReduceNo, currentTreeUp);
-        /// Reset counters if you have processed all fragments
+        reduceFragment (index, id, entry, redInfo, currentTreeUp);
+
+        // If migration happened, and my sub-tree reconstructed itself,
+        // share the current reduction number with myself and all my children
+        if (updateReduceNo)
+            mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
+
+        /// If all the fragments for the current reduction have been processed
         if (redInfo.npProcessed == nFrags) {
+
+            /// Increment the reduction number in all of this section's cookies
+            entry->incReduceNo();
+
+            /// Reset bookkeeping counters
             for (i=0; i<nFrags; i++) {
                 redInfo.lcount [i] = 0;
                 redInfo.ccount [i] = 0;

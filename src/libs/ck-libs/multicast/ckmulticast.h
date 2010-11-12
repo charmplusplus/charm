@@ -130,7 +130,7 @@ class CkMulticastMgr: public CkDelegateMgr
         ///
         inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag=-1);
         /// Reduce one fragment of a reduction msg and handle appropriately (transmit up the tree, buffer, combine etc)
-        void reduceFragment (int index, CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo, int& updateReduceNo, int currentTreeUp);
+        void reduceFragment (int index, CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo, int currentTreeUp);
         /// At the tree root: Combine all msg fragments for final delivery to the client
         CkReductionMsg* combineFrags (CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo);
 };
