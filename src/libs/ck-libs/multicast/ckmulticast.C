@@ -38,24 +38,42 @@ typedef CkQ<int>                 PieceSize;
 typedef CkVec<LDObjid>          ObjKeyList;
 typedef unsigned char            byte;
 
+/** Information about the status of reductions proceeding along a given section
+ *
+ * An instance of this class is stored in every mCastEntry object making it possible
+ * to track redn operations on a per section basis all along the spanning tree.
+ */
 class reductionInfo {
-public:
-  int            lcount [MAXFRAGS]; /**< local elem collected */
-  int            ccount [MAXFRAGS]; /**< children node collected */
-  int            gcount [MAXFRAGS]; /**< total elem collected */
-  int            npProcessed;
-  CkCallback*    storedCallback;    /**< user callback */
-  redClientFn    storedClient;      /**< reduction client function */
-  void*          storedClientParam; /**< user provided data */
-  int            redNo;             /**< reduction sequence number */
-  reductionMsgs  msgs [MAXFRAGS];   /**< messages for this reduction */
-  reductionMsgs  futureMsgs;        /**< messages of future reductions */
-public:
-  reductionInfo(): storedCallback(NULL), storedClientParam(NULL), redNo(0),
-                   npProcessed(0) {
-    for (int i=0; i<MAXFRAGS; i++) 
-      lcount [i] = ccount [i] = gcount [i] = 0;
-  }
+    public:
+        /// Number of local array elements which have contributed a given fragment
+        int lcount [MAXFRAGS];
+        /// Number of child vertices (NOT array elements) that have contributed a given fragment
+        int ccount [MAXFRAGS];
+        /// The total number of array elements that have contributed so far to a given fragment
+        int gcount [MAXFRAGS];
+        /// The number of fragments processed so far
+        int npProcessed;
+        /// User callback
+        CkCallback *storedCallback;
+        /// User reduction client function
+        redClientFn storedClient;
+        /// User provided data for the redn client function
+        void *storedClientParam;
+        /// Reduction sequence number
+        int redNo;
+        /// Messages for this reduction
+        reductionMsgs  msgs [MAXFRAGS];
+        /// Messages of future reductions
+        reductionMsgs futureMsgs;
+
+    public:
+        reductionInfo(): storedCallback(NULL),
+                         storedClientParam(NULL),
+                         redNo(0),
+                         npProcessed(0) {
+            for (int i=0; i<MAXFRAGS; i++)
+                lcount [i] = ccount [i] = gcount [i] = 0;
+        }
 };
 
 /// cookie status
@@ -1195,7 +1213,14 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
 
 
 
-//
+/**
+ * Called from:
+ *   - contribute(): calls PE specified in the cookie
+ *   - reduceFragment(): calls parent PE
+ *   - recvRedMsg(): calls root PE (if tree is obsolete)
+ *   - releaseFutureRedMsgs: calls this PE
+ *   - releaseBufferedRedMsgs: calls root PE
+ */
 void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 {
     int i;
