@@ -89,8 +89,10 @@ callback parameter will be the only input parameter:
 \end{alltt}
 
 If no member passes a callback to \kw{contribute}, the reduction will use
-the default callback. You set the default callback for an array or group
-using the \kw{ckSetReductionClient} proxy call on processor zero.
+the default callback. Programmers can set the default callback for an array or group
+using the \kw{ckSetReductionClient} proxy call on processor zero, or
+by passing the callback to {\tt CkArrayOptions::setReductionClient()}
+before creating the array, as described in section~\ref{CkArrayOptions}.
 Again, a \kw{CkReductionMsg} message will be passed to this callback,
 which must delete the message when done.
 
