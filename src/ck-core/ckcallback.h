@@ -89,7 +89,7 @@ public:
 	
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
-public:
+
 	CkCallback(void) {
 #if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));

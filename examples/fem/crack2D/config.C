@@ -4,12 +4,8 @@
 
 #include "converse.h"
 
-#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
-#  include <fstream.h>
-#else /* ISO C++ */
-#  include <fstream>
-   using namespace std;
-#endif
+#include <fstream>
+using namespace std;
 
 #include <stddef.h>
 #include "crack.h"

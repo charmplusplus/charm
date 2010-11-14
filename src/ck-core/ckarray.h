@@ -39,7 +39,7 @@ CpvExtern (int ,serializer);
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
-extern CmiBool _isAnytimeMigration;
+extern bool _isAnytimeMigration;
 
 /**
 \addtogroup CkArray
@@ -242,6 +242,10 @@ class CkArrayOptions {
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
+
+	/// Set various safe defaults for all the constructors
+	void init();
+
  public:
  //Used by external world:
 	CkArrayOptions(void); ///< Default: empty array
