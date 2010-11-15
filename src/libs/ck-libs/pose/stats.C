@@ -129,7 +129,7 @@ void globalStat::localStatReport(localStatSummary *m)
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
     if(pose_config.dop){
-      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%d\n",
+      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%lld\n",
 	     maxGRT, maxGVT);
       DOPcalc(maxGVT, maxGRT);
     }
@@ -147,15 +147,15 @@ void globalStat::localStatReport(localStatSummary *m)
 }
 
 
-void globalStat::DOPcalc(int gvt, double grt)
+void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
 {
-  int vinStart, vinEnd, gvtp = gvt + 1, i;
+  CmiInt8 i, j;
+  POSE_TimeType vinStart, vinEnd, gvtp = gvt + 1;
   double rinStart, rinEnd;
   FILE *fp;
   char filename[20], line[80];
   unsigned short int *gvtDOP, *grtDOP;
-  unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, j, 
-    usStart, usEnd;
+  unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, usStart, usEnd;
   int modelPEs=0, simulationPEs=0;
 
   CkPrintf("Generating DOP measures...\n");
@@ -169,11 +169,15 @@ void globalStat::DOPcalc(int gvt, double grt)
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
       POSE_exit();
+      return;
     }
     CkPrintf("Reading file %s...\n", filename);
     while (fgets(line, 80, fp)) {
-      if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, 
-		 &vinStart, &vinEnd) == 4) {
+#if USE_LONG_TIMESTAMPS
+      if (sscanf(line, "%lf %lf %lld %lld\n", &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
+#else
+      if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
+#endif
 	usStart = (unsigned long int)(rinStart * 1000000.0);
 	usEnd = (unsigned long int)(rinEnd * 1000000.0);
 	for (j=usStart; j<usEnd; j++) grtDOP[j]++;
@@ -185,7 +189,7 @@ void globalStat::DOPcalc(int gvt, double grt)
     }
     fclose(fp);
   }
-  int avgPEs = 0;
+  CmiInt8 avgPEs = 0LL;
   int zed = 0;
   fp = fopen("dop_mod.out", "w");
   for (i=0; i<gvtp; i++) {

@@ -32,7 +32,8 @@ public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, fcTime, 
     commTime, maxDo, minDo, maxGRT;
   long cpBytes;
-  int pe, dos, undos, commits, loops, gvts, maxChkPts, maxGVT;
+  int pe, dos, undos, commits, loops, gvts, maxChkPts;
+  POSE_TimeType maxGVT;
 };
 
 /// Group to gather stats on a each PE separately
@@ -51,7 +52,7 @@ private:
     lbTime, fcTime, commTime, maxDo, minDo; 
   /// Maximum values for GVT and real time taken by events
   /* For degree of parallelism calculations */
-  int maxGVT;
+  POSE_TimeType maxGVT;
   double maxGRT;
 public:
   /// Basic Constructor
@@ -95,7 +96,7 @@ public:
   /// Query which timer is active
   inline int TimerRunning() { return (whichStat); }
   /// Set maximum times
-  inline void SetMaximums(int gvt, double grt) { 
+  inline void SetMaximums(POSE_TimeType gvt, double grt) { 
     if (gvt > maxGVT) maxGVT = gvt; 
     if (grt > maxGRT) maxGRT = grt;
   }
@@ -110,8 +111,8 @@ private:
     maxTime;
   double minDo, maxDo, avgDo, GvtTime, maxGRT;
   long cpBytes;
-  int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, 
-    maxChkPts, maxGVT;
+  int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, maxChkPts;
+  POSE_TimeType maxGVT;
 public:
   /// Basic Constructor
   globalStat(void);
@@ -119,7 +120,7 @@ public:
   globalStat(CkMigrateMessage *msg) { };
   /// Receive, calculate and print statistics
   void localStatReport(localStatSummary *m); 
-  void DOPcalc(int gvt, double grt);
+  void DOPcalc(POSE_TimeType gvt, double grt);
 };
 PUPbytes(globalStat)
 
