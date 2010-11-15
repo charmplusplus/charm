@@ -324,6 +324,9 @@ void ArrayElement::recvBroadcast(CkMessage *m){
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.
+
+This does not get called for arrays with stable locations (all
+insertions done at creation, migration only at discrete points).
 */
 
 inline void CkArray::springCleaning(void)
@@ -534,7 +537,9 @@ CkArray::CkArray(CkArrayOptions &opts,
     stableLocations(opts.staticInsertion && !opts.anytimeMigration),
     numInitial(opts.getNumInitial()), isInserting(CmiTrue)
 {
-  CcdCallOnConditionKeep(CcdPERIODIC_1minute, staticSpringCleaning, (void *)this);
+  if (!stableLocations)
+      CcdCallOnConditionKeep(CcdPERIODIC_1minute,
+			     staticSpringCleaning, (void *)this);
 
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
@@ -902,11 +907,13 @@ CkArrayBroadcaster::~CkArrayBroadcaster()
 void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 {
   bcastNo++;
-  if (!stableLocations) {
-    DEBB((AA"Received broadcast %d\n"AB,bcastNo));
-    CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
-    oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
-  }
+  DEBB((AA"Received broadcast %d\n"AB,bcastNo));
+
+  if (stableLocations)
+    return;
+
+  CmiMemoryMarkBlock(((char *)UsrToEnv(msg))-sizeof(CmiChunkHeader));
+  oldBcasts.enq((CkArrayMessage *)msg);//Stash the message for later use
 }
 
 /// Deliver a copy of the given broadcast to the given local element
@@ -960,7 +967,6 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 
 void CkArrayBroadcaster::springCleaning(void)
 {
-  if (stableLocations) return;
   //Remove old broadcast messages
   int nDelete=oldBcasts.length()-(bcastNo-oldBcastNo);
   if (nDelete>0) {
@@ -1111,9 +1117,9 @@ void CkArray::recvBroadcast(CkMessage *m)
 	startVTimer();
 #endif
 
-	if (stableLocations) {
+	// CkArrayBroadcaster doesn't have msg buffered
+	if (stableLocations)
 	  delete msg;
-	}
 }
 
 #include "CkArray.def.h"
