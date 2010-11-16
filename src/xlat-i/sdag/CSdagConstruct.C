@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 #include <string.h>
 #include <stdlib.h>
 #include "sdag-globals.h"
@@ -12,6 +6,26 @@
 #include "EToken.h"
 
 namespace xi {
+
+SdagConstruct *buildAtomic(const char* code,
+			   SdagConstruct *pub_list,
+			   const char *trace_name)
+{
+  char *tmp = strdup(code);
+  RemoveSdagComments(tmp);
+  SdagConstruct *ret = new SdagConstruct(SATOMIC, new XStr(tmp), pub_list, 0,0,0,0, 0 );
+  free(tmp);
+
+  if (trace_name)
+  {
+    tmp = strdup(trace_name);
+    tmp[strlen(tmp)-1]=0;
+    ret->traceName = new XStr(tmp+1);
+    free(tmp);
+  }
+
+  return ret;
+}
 
 void SdagConstruct::numberNodes(void)
 {

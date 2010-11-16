@@ -748,10 +748,10 @@ static const yytype_uint16 yyrline[] =
      865,   872,   878,   887,   894,   900,   906,   914,   916,   920,
      922,   926,   928,   932,   934,   939,   940,   945,   946,   948,
      952,   954,   958,   960,   965,   966,   970,   972,   976,   979,
-     982,   997,  1011,  1013,  1015,  1017,  1019,  1022,  1025,  1028,
-    1031,  1033,  1035,  1037,  1039,  1041,  1051,  1052,  1054,  1057,
-    1059,  1063,  1067,  1071,  1079,  1087,  1089,  1093,  1096,  1100,
-    1104
+     982,   986,  1000,  1002,  1004,  1006,  1008,  1011,  1014,  1017,
+    1020,  1022,  1024,  1026,  1028,  1030,  1034,  1035,  1037,  1040,
+    1042,  1046,  1050,  1054,  1062,  1070,  1072,  1076,  1079,  1083,
+    1087
 };
 #endif
 
@@ -3469,23 +3469,12 @@ yyreduce:
   case 250:
 #line 983 "xi-grammar.y"
     {
-		   char *tmp = strdup((yyvsp[(4) - (6)].strval));
-		   RemoveSdagComments(tmp);
-		   (yyval.sc) = new SdagConstruct(SATOMIC, new XStr(tmp), (yyvsp[(6) - (6)].sc), 0,0,0,0, 0 );
-		   free(tmp);
-
-		   if ((yyvsp[(2) - (6)].strval))
-		   {
-		       tmp = strdup((yyvsp[(2) - (6)].strval));
-		       tmp[strlen(tmp)-1]=0;
-		       (yyval.sc)->traceName = new XStr(tmp+1);
-		       free(tmp);
-		   }
+		   (yyval.sc) = buildAtomic((yyvsp[(4) - (6)].strval), (yyvsp[(6) - (6)].sc), (yyvsp[(2) - (6)].strval));
 		 }
     break;
 
   case 251:
-#line 998 "xi-grammar.y"
+#line 987 "xi-grammar.y"
     {  
 		   in_braces = 0;
 		   if (((yyvsp[(4) - (8)].plist)->isVoid() == 0) && ((yyvsp[(4) - (8)].plist)->isMessage() == 0))
@@ -3502,121 +3491,116 @@ yyreduce:
     break;
 
   case 252:
-#line 1012 "xi-grammar.y"
+#line 1001 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0,0,0,0,0,(yyvsp[(2) - (4)].entrylist)); }
     break;
 
   case 253:
-#line 1014 "xi-grammar.y"
+#line 1003 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(3) - (3)].sc), (yyvsp[(2) - (3)].entrylist)); }
     break;
 
   case 254:
-#line 1016 "xi-grammar.y"
+#line 1005 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(4) - (5)].sc), (yyvsp[(2) - (5)].entrylist)); }
     break;
 
   case 255:
-#line 1018 "xi-grammar.y"
+#line 1007 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SOVERLAP,0, 0,0,0,0,(yyvsp[(3) - (4)].sc), 0); }
     break;
 
   case 256:
-#line 1020 "xi-grammar.y"
+#line 1009 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (11)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(5) - (11)].strval)),
 		             new SdagConstruct(SINT_EXPR, (yyvsp[(7) - (11)].strval)), 0, (yyvsp[(10) - (11)].sc), 0); }
     break;
 
   case 257:
-#line 1023 "xi-grammar.y"
+#line 1012 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (9)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(5) - (9)].strval)), 
 		         new SdagConstruct(SINT_EXPR, (yyvsp[(7) - (9)].strval)), 0, (yyvsp[(9) - (9)].sc), 0); }
     break;
 
   case 258:
-#line 1026 "xi-grammar.y"
+#line 1015 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[(3) - (12)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(6) - (12)].strval)), 
 		             new SdagConstruct(SINT_EXPR, (yyvsp[(8) - (12)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(10) - (12)].strval)), (yyvsp[(12) - (12)].sc), 0); }
     break;
 
   case 259:
-#line 1029 "xi-grammar.y"
+#line 1018 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[(3) - (14)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(6) - (14)].strval)), 
 		                 new SdagConstruct(SINT_EXPR, (yyvsp[(8) - (14)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(10) - (14)].strval)), (yyvsp[(13) - (14)].sc), 0); }
     break;
 
   case 260:
-#line 1032 "xi-grammar.y"
+#line 1021 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (6)].strval)), (yyvsp[(6) - (6)].sc),0,0,(yyvsp[(5) - (6)].sc),0); }
     break;
 
   case 261:
-#line 1034 "xi-grammar.y"
+#line 1023 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (8)].strval)), (yyvsp[(8) - (8)].sc),0,0,(yyvsp[(6) - (8)].sc),0); }
     break;
 
   case 262:
-#line 1036 "xi-grammar.y"
+#line 1025 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (5)].strval)), 0,0,0,(yyvsp[(5) - (5)].sc),0); }
     break;
 
   case 263:
-#line 1038 "xi-grammar.y"
+#line 1027 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (7)].strval)), 0,0,0,(yyvsp[(6) - (7)].sc),0); }
     break;
 
   case 264:
-#line 1040 "xi-grammar.y"
+#line 1029 "xi-grammar.y"
     { (yyval.sc) = (yyvsp[(2) - (3)].sc); }
     break;
 
   case 265:
-#line 1042 "xi-grammar.y"
-    {
-		     char *tmp = strdup((yyvsp[(2) - (3)].strval));
-		     RemoveSdagComments(tmp);
-		     (yyval.sc) = new SdagConstruct(SATOMIC, new XStr(tmp), NULL, 0,0,0,0, 0 );
-		     free(tmp);
-                 }
+#line 1031 "xi-grammar.y"
+    { (yyval.sc) = buildAtomic((yyvsp[(2) - (3)].strval), NULL, NULL); }
     break;
 
   case 266:
-#line 1051 "xi-grammar.y"
+#line 1034 "xi-grammar.y"
     { (yyval.sc) = 0; }
     break;
 
   case 267:
-#line 1053 "xi-grammar.y"
+#line 1036 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[(2) - (2)].sc),0); }
     break;
 
   case 268:
-#line 1055 "xi-grammar.y"
+#line 1038 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[(3) - (4)].sc),0); }
     break;
 
   case 269:
-#line 1058 "xi-grammar.y"
+#line 1041 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, (yyvsp[(1) - (1)].strval))); }
     break;
 
   case 270:
-#line 1060 "xi-grammar.y"
+#line 1043 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, (yyvsp[(1) - (3)].strval)), (yyvsp[(3) - (3)].sc));  }
     break;
 
   case 271:
-#line 1064 "xi-grammar.y"
+#line 1047 "xi-grammar.y"
     { in_int_expr = 0; (yyval.intval) = 0; }
     break;
 
   case 272:
-#line 1068 "xi-grammar.y"
+#line 1051 "xi-grammar.y"
     { in_int_expr = 1; (yyval.intval) = 0; }
     break;
 
   case 273:
-#line 1072 "xi-grammar.y"
+#line 1055 "xi-grammar.y"
     { 
 		  if ((yyvsp[(2) - (2)].plist) != 0)
 		     (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[(1) - (2)].strval), (yyvsp[(2) - (2)].plist), 0, 0, 0, 0); 
@@ -3627,7 +3611,7 @@ yyreduce:
     break;
 
   case 274:
-#line 1080 "xi-grammar.y"
+#line 1063 "xi-grammar.y"
     { if ((yyvsp[(5) - (5)].plist) != 0)
 		    (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[(1) - (5)].strval), (yyvsp[(5) - (5)].plist), 0, 0, (yyvsp[(3) - (5)].strval), 0); 
 		  else
@@ -3636,38 +3620,38 @@ yyreduce:
     break;
 
   case 275:
-#line 1088 "xi-grammar.y"
+#line 1071 "xi-grammar.y"
     { (yyval.entrylist) = new EntryList((yyvsp[(1) - (1)].entry)); }
     break;
 
   case 276:
-#line 1090 "xi-grammar.y"
+#line 1073 "xi-grammar.y"
     { (yyval.entrylist) = new EntryList((yyvsp[(1) - (3)].entry),(yyvsp[(3) - (3)].entrylist)); }
     break;
 
   case 277:
-#line 1094 "xi-grammar.y"
+#line 1077 "xi-grammar.y"
     { in_bracket=1; }
     break;
 
   case 278:
-#line 1097 "xi-grammar.y"
+#line 1080 "xi-grammar.y"
     { in_bracket=0; }
     break;
 
   case 279:
-#line 1101 "xi-grammar.y"
+#line 1084 "xi-grammar.y"
     { if (!macroDefined((yyvsp[(2) - (2)].strval), 1)) in_comment = 1; }
     break;
 
   case 280:
-#line 1105 "xi-grammar.y"
+#line 1088 "xi-grammar.y"
     { if (!macroDefined((yyvsp[(2) - (2)].strval), 0)) in_comment = 1; }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 3671 "y.tab.c"
+#line 3655 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -3881,7 +3865,7 @@ yyreturn:
 }
 
 
-#line 1108 "xi-grammar.y"
+#line 1091 "xi-grammar.y"
 
 void yyerror(const char *mesg)
 {

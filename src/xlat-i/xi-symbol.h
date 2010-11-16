@@ -1372,6 +1372,10 @@ public:
 
 };
 
+SdagConstruct *buildAtomic(const char* code,
+			   SdagConstruct *pub_list,
+			   const char *trace_name);
+
 extern void RemoveSdagComments(char *);
 
 }
