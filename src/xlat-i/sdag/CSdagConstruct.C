@@ -1594,10 +1594,14 @@ void SdagConstruct::generateTrace()
   default:
     break;
   }
+
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTrace();
   }
+  if (con1) con1->generateTrace();
+  if (con2) con2->generateTrace();
+  if (con3) con3->generateTrace();
 }
 
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
@@ -1668,10 +1672,14 @@ void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
        << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar()
        << "::__idx, 0);\n";
   }
+
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateRegisterEp(op);
   }
+  if (con1) con1->generateRegisterEp(op);
+  if (con2) con2->generateRegisterEp(op);
+  if (con3) con3->generateRegisterEp(op);
 }
 
 void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
@@ -1683,6 +1691,9 @@ void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTraceEpDecl(op);
   }
+  if (con1) con1->generateTraceEpDecl(op);
+  if (con2) con2->generateTraceEpDecl(op);
+  if (con3) con3->generateTraceEpDecl(op);
 }
 
 
@@ -1696,6 +1707,9 @@ void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTraceEpDef(op);
   }
+  if (con1) con1->generateTraceEpDef(op);
+  if (con2) con2->generateTraceEpDef(op);
+  if (con3) con3->generateTraceEpDef(op);
 }
 
 
