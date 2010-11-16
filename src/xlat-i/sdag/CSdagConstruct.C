@@ -1660,8 +1660,6 @@ void SdagConstruct::generateListEventBracket(XStr& op, int eventType){
 void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
 {
   if (traceName) {
-    //   op << "    __idx_" << traceName->charstar() << 
-    //     " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, 0);\n";
     op << "    __idx_" << traceName->charstar() <<
       " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar() << "::__idx, 0);\n";
 
