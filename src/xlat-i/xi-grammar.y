@@ -998,7 +998,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
 		| WHEN SEntryList '{' '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0,0,0,0,0,$2); }
+		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  $2); }
 		| WHEN SEntryList SingleConstruct
 		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $3, $2); }
 		| WHEN SEntryList '{' Slist '}'
