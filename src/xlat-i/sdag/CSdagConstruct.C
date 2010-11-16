@@ -1627,19 +1627,19 @@ void SdagConstruct::generateEndExec(XStr& op){
 void SdagConstruct::generateBeginTime(XStr& op)
 {
   //Record begin time for tracing
-  op<< "    double __begintime = CkVTimer(); \n";
+  op << "    double __begintime = CkVTimer(); \n";
 }
 
 void SdagConstruct::generateTlineEndCall(XStr& op)
 {
   //Trace this event
-  op<<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
+  op <<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
 }
 
 void SdagConstruct::generateEndSeq(XStr& op)
 {
-  op<<  "    void* _bgParentLog = NULL;\n";
-  op<<  "    CkElapse(0.01e-6);\n";
+  op <<  "    void* _bgParentLog = NULL;\n";
+  op <<  "    CkElapse(0.01e-6);\n";
   //op<<  "    BgElapse(1e-6);\n";
   generateTlineEndCall(op);
   generateTraceEndCall(op);
@@ -1649,20 +1649,24 @@ void SdagConstruct::generateEndSeq(XStr& op)
 void SdagConstruct::generateEventBracket(XStr& op, int eventType)
 {
   //Trace this event
-  op<<"     _TRACE_BG_USER_EVENT_BRACKET(\""<<nameStr<<"\", __begintime, CkVTimer(),&_bgParentLog); \n"; 
+  op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
+     << "\", __begintime, CkVTimer(),&_bgParentLog); \n";
 }
 
-void SdagConstruct::generateListEventBracket(XStr& op, int eventType){
-
-  op<<"    _TRACE_BGLIST_USER_EVENT_BRACKET(\""<<nameStr<<"\",__begintime,CkVTimer(),&_bgParentLog, "<<label->charstar()<<"_bgLogList);\n";
+void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
+{
+  op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
+     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label->charstar()
+     << "_bgLogList);\n";
 }
 
 void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
 {
   if (traceName) {
-    op << "    __idx_" << traceName->charstar() <<
-      " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar() << "::__idx, 0);\n";
-
+    op << "    __idx_" << traceName->charstar()
+       << " = CkRegisterEp(\"" << traceName->charstar()
+       << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar()
+       << "::__idx, 0);\n";
   }
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
@@ -1685,7 +1689,8 @@ void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
 void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
 {
   if (traceName) {
-    op << "  int " << CParsedFile::className->charstar() << "::__idx_" << traceName->charstar() << "=0;\\\n"; 
+    op << "  int " << CParsedFile::className->charstar()
+       << "::__idx_" << traceName->charstar() << "=0;\\\n";
   }
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
