@@ -123,12 +123,10 @@ Worker_sim.C Worker_sim.h Worker_sim.ci: Worker.C Worker.h Worker.ci
 	$(CHARMBIN)/etrans.pl $(ETRANS_OPTS) Worker
 
 test: $(PGM)
-	./pgm 20 200 MEDIUM -gm 10
+	./pgm 16 0
 
 partest: $(PGM)
-	./charmrun +p4 ./pgm 20 200 MEDIUM -gm 1
-	./charmrun +p4 ./pgm +restart __pose_chkpt_files/
+	./charmrun +p4 ./pgm 16 0
 
 seqtest: $(PGM).seq
-	./pgm.seq 20 800 MEDIUM -gm 1
-	./pgm.seq +restart __pose_chkpt_files/
+	./pgm.seq 16 0

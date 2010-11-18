@@ -25,10 +25,6 @@ class eventQueue {
   unsigned int eventCount;
   /// Timestamp of the last event inserted in the queue
   POSE_TimeType tsOfLastInserted;
-  /// Output file name for stats for DOP calculation
-  char filename[20];
-  /// Output file pointer for stats for DOP calculation
-  FILE *fp;
   /// Coarse memory usage
   unsigned int mem_usage;
   /// Keep track of last logged VT for this object so no duplicates are logged

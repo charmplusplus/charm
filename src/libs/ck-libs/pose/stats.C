@@ -11,6 +11,15 @@ extern void POSE_exit();
 /// Send local stats to global collector
 void localStat::SendStats()
 {
+  // This ensures everything is flushed to the file
+  fclose(dopFilePtr);
+  // Right now, SendStats is called only at the end of the
+  // simulation.  This is here in case that changes for some reason.
+  dopFilePtr = fopen(dopFileName, "a");
+  if (dopFilePtr == NULL) {
+    CkPrintf("WARNING: unable to open DOP file %s for append...this probably doesn't matter, though, as long as this is at the end of the simulation\n", 
+	     dopFileName);
+  }
   CProxy_globalStat gstat(theGlobalStats);
   localStatSummary *m = new localStatSummary;
   m->doTime = totalTime;
