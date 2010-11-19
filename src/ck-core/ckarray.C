@@ -89,6 +89,77 @@ bool _isAnytimeMigration;
 #   define DEBUG(x)
 #endif
 
+///This arrayListener is in charge of delivering broadcasts to the array.
+class CkArrayBroadcaster : public CkArrayListener {
+  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
+public:
+  CkArrayBroadcaster(bool _stableLocations);
+  CkArrayBroadcaster(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  virtual ~CkArrayBroadcaster();
+  PUPable_decl(CkArrayBroadcaster);
+
+  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
+
+  ///Element was just created on this processor
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementCreated(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  ///Element just arrived on this processor (so just called pup)
+  /// Return false if the element migrated away or deleted itself.
+  virtual CmiBool ckElementArriving(ArrayElement *elt)
+    { return bringUpToDate(elt); }
+
+  void incoming(CkArrayMessage *msg);
+
+  CmiBool deliver(CkArrayMessage *bcast, ArrayElement *el, bool doFree);
+
+  void springCleaning(void);
+
+  void flushState();
+private:
+  int bcastNo;//Number of broadcasts received (also serial number)
+  int oldBcastNo;//Above value last spring cleaning
+  //This queue stores old broadcasts (in case a migrant arrives
+  // and needs to be brought up to date)
+  CkQ<CkArrayMessage *> oldBcasts;
+  bool stableLocations;
+
+  CmiBool bringUpToDate(ArrayElement *el);
+};
+
+///This arrayListener is in charge of performing reductions on the array.
+class CkArrayReducer : public CkArrayListener {
+  CkGroupID mgrID;
+  CkReductionMgr *mgr;
+  typedef  contributorInfo *I;
+  inline contributorInfo *getData(ArrayElement *el)
+    {return (I)ckGetData(el);}
+public:
+  /// Attach this array to this CkReductionMgr
+  CkArrayReducer(CkGroupID mgrID_);
+  CkArrayReducer(CkMigrateMessage *m);
+  virtual void pup(PUP::er &p);
+  virtual ~CkArrayReducer();
+  PUPable_decl(CkArrayReducer);
+
+  void ckBeginInserting(void) {mgr->creatingContributors();}
+  void ckEndInserting(void) {mgr->doneCreatingContributors();}
+
+  void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
+
+  void ckElementCreating(ArrayElement *elt)
+    {mgr->contributorCreated(getData(elt));}
+  void ckElementDied(ArrayElement *elt)
+    {mgr->contributorDied(getData(elt));}
+
+  void ckElementLeaving(ArrayElement *elt)
+    {mgr->contributorLeaving(getData(elt));}
+  CmiBool ckElementArriving(ArrayElement *elt)
+    {mgr->contributorArriving(getData(elt)); return CmiTrue; }
+};
+
 /*
 void 
 CProxyElement_ArrayBase::ckSendWrapper(void *me, void *m, int ep, int opts){
@@ -383,6 +454,14 @@ void CkArrayOptions::init()
     anytimeMigration = _isAnytimeMigration;
     staticInsertion = false;
     reductionClient.type = CkCallback::invalid;
+}
+
+CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
+{
+    staticInsertion = b;
+    if (b && map == _defaultArrayMapID)
+	map = _fastArrayMapID;
+    return *this;
 }
 
 /// Bind our elements to this array
@@ -917,7 +996,8 @@ void CkArrayBroadcaster::incoming(CkArrayMessage *msg)
 }
 
 /// Deliver a copy of the given broadcast to the given local element
-CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
+CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
+				    CmiBool doFree)
 {
   int &elBcastNo=getData(el);
   // if this array element already received this message, skip it
@@ -930,7 +1010,7 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast,ArrayElement *el)
   DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
   return CmiTrue;
 #else
-  return el->ckInvokeEntry(epIdx,bcast,CmiFalse);
+  return el->ckInvokeEntry(epIdx, bcast, doFree);
 #endif
 }
 
@@ -956,7 +1036,7 @@ CmiBool CkArrayBroadcaster::bringUpToDate(ArrayElement *el)
 		if(msg == NULL)
         	continue;
       oldBcasts.enq(msg);
-      if (!deliver(msg,el))
+      if (!deliver(msg, el, CmiFalse))
 	return CmiFalse; //Element migrated away
     }
   }
@@ -1088,7 +1168,7 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0;
+	int idx=0, len = elements->length();
 	ArrayElement *el;
 #if CMK_BLUEGENE_CHARM
         void *root;
@@ -1106,7 +1186,9 @@ void CkArray::recvBroadcast(CkMessage *m)
                 logs.push_back(curlog);
   		startVTimer();
 #endif
-		broadcaster->deliver(msg,el);
+		CmiBool doFree = CmiFalse;
+		if (stableLocations && idx == len) doFree = CmiTrue;
+		broadcaster->deliver(msg, el, doFree);
 	}
 #endif
 
@@ -1117,8 +1199,9 @@ void CkArray::recvBroadcast(CkMessage *m)
 	startVTimer();
 #endif
 
-	// CkArrayBroadcaster doesn't have msg buffered
-	if (stableLocations)
+	// CkArrayBroadcaster doesn't have msg buffered, and there was
+	// no last delivery to transfer ownership
+	if (stableLocations && len == 0)
 	  delete msg;
 }
 

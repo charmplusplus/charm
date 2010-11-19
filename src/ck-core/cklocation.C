@@ -203,6 +203,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 }
 
 CkGroupID _defaultArrayMapID;
+CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {
@@ -308,7 +309,7 @@ public:
     DEBC((AA"Creating DefaultArrayMap\n"AB));
   }
 
-  DefaultArrayMap(CkMigrateMessage *m):RRMap(m){}
+  DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
@@ -335,7 +336,7 @@ public:
     }
 
     if(flati < amaps[arrayHdl]->_numFirstSet)
-      return (flati/(amaps[arrayHdl]->_binSize + 1));
+      return (flati / (amaps[arrayHdl]->_binSize + 1));
     else if (flati < amaps[arrayHdl]->_numChares)
       return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSize));
     else
@@ -355,6 +356,54 @@ public:
 };
 
 /**
+ *  A fast map for chare arrays which do static insertions and promise NOT
+ *  to do late insertions -- ASB
+ */
+class FastArrayMap : public DefaultArrayMap
+{
+public:
+  FastArrayMap(void) {
+    DEBC((AA"Creating FastArrayMap\n"AB));
+  }
+
+  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    } else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+
+    /** binSize calculated in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    return (flati / (amaps[arrayHdl]->_binSize + 1));
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+  }
+};
+
+
+/**
  * This map can be used for topology aware mapping when the mapping is provided
  * through a file -- ASB
  */
@@ -368,7 +417,7 @@ public:
     DEBC((AA"Creating ReadFileMap\n"AB));
   }
 
-  ReadFileMap(CkMigrateMessage *m):DefaultArrayMap(m){}
+  ReadFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
@@ -819,6 +868,7 @@ class CkMapsInit : public Chare
 public:
 	CkMapsInit(CkArgMsg *msg) {
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
 		delete msg;
 	}
 
