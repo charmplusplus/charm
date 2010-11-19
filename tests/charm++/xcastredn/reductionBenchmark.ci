@@ -29,6 +29,7 @@ mainmodule reductionBenchmark {
     {
         entry TestController(CkArgMsg *msg);
         entry void receiveReduction(CkReductionMsg *msg);
+        entry void finishInit();
         entry void startTest();
     };
 

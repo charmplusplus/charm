@@ -131,10 +131,8 @@ TestController::TestController(CkArgMsg *m)
         out<<std::setw(cfg.fieldWidth-3)<<(float)i/1024<<std::setw(3)<<" KB";
     out<<"\n"<<std::setw(commNameLen)<<commName[curCommType];
 
-    /// Wait for quiescence and then start the timing tests
-    CkCallback *trigger = new CkCallback(CkIndex_TestController::startTest(), thisProxy);
-    CkCallback filler(qFiller, (void*)trigger);
-    CkStartQD(filler);
+    /// Allow comlib (and other library mainchares?) to complete their initialization
+    thisProxy.finishInit();
 }
 
 
@@ -158,15 +156,27 @@ CProxySection_MyChareArray TestController::createSection(const bool isSectionCon
 
 
 
-void TestController::startTest()
+void TestController::finishInit()
 {
-    sendMulticast(curCommType, curMsgSize);
     /* The comlib mainchare can be instantiated after the user mainchare
      * Hence, strategy association should happen outside of user mainchare
      */
     Strategy *comStrat = new MultiRingMulticastStrategy();
     ComlibDoneCreating();
     ComlibAssociateProxy(comStrat, arraySections[1]);
+
+    /// Wait for quiescence and then start the timing tests
+    CkCallback *trigger = new CkCallback(CkIndex_TestController::startTest(), thisProxy);
+    CkCallback filler(qFiller, (void*)trigger);
+    CkStartQD(filler);
+}
+
+
+
+
+void TestController::startTest()
+{
+    sendMulticast(curCommType, curMsgSize);
 }
 
 
