@@ -543,7 +543,7 @@ class toProjectionsGZFile : public PUP::er {
 
 
 
-
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput();
 
@@ -552,6 +552,11 @@ void enableTraceLogOutput();
 
 /// Force the log file to be flushed
 void flushTraceLog();
+#else
+static inline void disableTraceLogOutput() { }
+static inline void enableTraceLogOutput() { }
+static inline void flushTraceLog() { }
+#endif
 
 #endif
 
