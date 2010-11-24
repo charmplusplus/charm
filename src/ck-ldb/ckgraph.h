@@ -22,6 +22,7 @@ class ProcInfo {
 
   public:
     inline double getTotalLoad() { return totalLoad; }
+    inline double getOverhead() { return overhead; }
     inline void setTotalLoad(double _tload) { totalLoad = _tload; }
 
   private:
@@ -67,7 +68,8 @@ class Vertex {
 
   public:
     inline double getObjLoad() { return compLoad; }
-    inline double getNewPe() { return newPe; }
+    inline int getCurrentPe() { return currPe; }
+    inline int getNewPe() { return newPe; }
     inline void setNewPe(int _newpe) { newPe = _newpe; }
 
     // undirected edges from this vertex to other vertices
