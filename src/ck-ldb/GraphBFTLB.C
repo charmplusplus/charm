@@ -34,6 +34,11 @@ void GraphBFTLB::work(LDStats *stats) {
 
   /** ============================= STRATEGY ================================ */
   double avgLoad = parr->getAverageLoad();
+  int numPes = parr->procs.size();
+
+  // CkPrintf("Average Load %g\n\n", avgLoad);
+  // for(int i=0; i<numPes; i++)
+  //  CkPrintf("PE [%d] %g %g\n", i, parr->procs[i].getTotalLoad(), parr->procs[i].getOverhead());
   parr->resetTotalLoad();
 
   int start = 0, nextPe = 0;
@@ -41,9 +46,12 @@ void GraphBFTLB::work(LDStats *stats) {
 
   // start at vertex with id 0
   vertexq.push(start);
-  while(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad() > avgLoad)
+  if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad() > avgLoad) {
     nextPe++;
+    avgLoad += (avgLoad - parr->procs[nextPe].getTotalLoad())/(numPes-nextPe);
+  }
   ogr->vertices[start].setNewPe(nextPe);
+  // CkPrintf("[%d] %d %d %g %g %g\n", start, ogr->vertices[start].getCurrentPe(), ogr->vertices[start].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getObjLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
   parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
 
   int i, nbr;
@@ -59,9 +67,12 @@ void GraphBFTLB::work(LDStats *stats) {
       if(ogr->vertices[nbr].getNewPe() == -1) {
 	vertexq.push(nbr);
 
-	while(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getObjLoad() > avgLoad)
+	if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getObjLoad() > avgLoad) {
 	  nextPe++;
+	  avgLoad += (avgLoad - parr->procs[nextPe].getTotalLoad())/(numPes-nextPe);
+	}
 	ogr->vertices[nbr].setNewPe(nextPe);
+	// CkPrintf("[%d] %d %d %g %g %g\n", nbr, ogr->vertices[nbr].getCurrentPe(), ogr->vertices[nbr].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getObjLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
 	parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getObjLoad());
       }
     } // end of for loop
