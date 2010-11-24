@@ -108,7 +108,8 @@
      READWRITE = 324,
      WRITEONLY = 325,
      ACCELBLOCK = 326,
-     MEMCRITICAL = 327
+     MEMCRITICAL = 327,
+     REDUCTIONTARGET = 328
    };
 #endif
 /* Tokens.  */
@@ -182,6 +183,7 @@
 #define WRITEONLY 325
 #define ACCELBLOCK 326
 #define MEMCRITICAL 327
+#define REDUCTIONTARGET 328
 
 
 
@@ -226,8 +228,8 @@ typedef union YYSTYPE
   XStr* xstrptr;
   AccelBlock* accelBlock;
 }
-/* Line 1489 of yacc.c.  */
-#line 231 "y.tab.h"
+/* Line 1529 of yacc.c.  */
+#line 233 "y.tab.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1

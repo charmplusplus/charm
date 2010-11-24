@@ -102,6 +102,7 @@ void splitScopedName(const char* name, const char** scope, const char** basename
 %token WRITEONLY
 %token ACCELBLOCK
 %token MEMCRITICAL
+%token REDUCTIONTARGET
 
 %type <modlist>		ModuleEList File
 %type <module>		Module
@@ -767,6 +768,8 @@ EAttrib		: THREADED
                 { $$ = SPYTHON; }
 		| MEMCRITICAL
 		{ $$ = SMEM; }
+        | REDUCTIONTARGET
+        { $$ = SREDUCE; }
 		;
 
 DefaultParameter: LITERAL

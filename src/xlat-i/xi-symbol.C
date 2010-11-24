@@ -3079,6 +3079,9 @@ void Entry::genChareDecl(XStr& str)
   } else {
     // entry method declaration
     str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
+    if (isReductionTarget()) {
+        str << "    " << "void _" << name << "_redn_wrapper(CkReductionMsg* m);\n";
+    }
   }
 }
 
@@ -3115,6 +3118,10 @@ void Entry::genChareDefs(XStr& str)
       str << "  else CkSendMsg("<<params<<opts<<");\n";
     }
     str << "}\n";
+  }
+  if (isReductionTarget()) {
+      str << makeDecl(retStr, 1) << "::" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n";
+      str << "}\n\n";
   }
 }
 
