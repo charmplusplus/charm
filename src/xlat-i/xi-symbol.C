@@ -2894,8 +2894,6 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   if (constructAppend != 0) {
     constructs->append(constructAppend);
   }
-  else
-    constructAppend = 0;
   elist = el;
 }
 

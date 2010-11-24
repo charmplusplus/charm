@@ -50,7 +50,7 @@ void allocNewTLSSeg(tlsseg_t* t) {
     memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
     t->memseg = (Addr)( ((void*)(t->memseg)) + t->size );
-    //printf("2 ALIGN %d MEM %p SIZE %d\n", t->align, t->memseg, t->size);
+    /* printf("[%d] 2 ALIGN %d MEM %p SIZE %d\n", CmiMyPe(), t->align, t->memseg, t->size); */
   } else {
     t->memseg = (Addr)NULL;
     t->size = 0;

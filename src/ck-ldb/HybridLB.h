@@ -36,7 +36,7 @@ protected:
 
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual void work(LDStats* stats,int count);
+  virtual void work(LDStats* stats);
 
 };
 

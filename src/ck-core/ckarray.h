@@ -39,7 +39,7 @@ CpvExtern (int ,serializer);
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
-extern CmiBool _isAnytimeMigration;
+extern bool _isAnytimeMigration;
 
 /**
 \addtogroup CkArray
@@ -238,10 +238,19 @@ class CkVerboseListener : public CkArrayListener {
 /*********************** CkArrayOptions *******************************/
 /// Arguments for array creation:
 class CkArrayOptions {
+	friend class CkArray;
+
 	CkArrayIndexMax numInitial;///< Number of elements to create
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
+	CkCallback reductionClient; // Default target of reductions
+	bool anytimeMigration; // Elements are allowed to move freely
+	bool staticInsertion; // Elements are only inserted at construction
+
+	/// Set various safe defaults for all the constructors
+	void init();
+
  public:
  //Used by external world:
 	CkArrayOptions(void); ///< Default: empty array
@@ -291,6 +300,11 @@ class CkArrayOptions {
 
 	/// Add an array listener component to this array (keeps the new'd listener)
 	CkArrayOptions &addListener(CkArrayListener *listener);
+
+	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
+	CkArrayOptions &setStaticInsertion(bool b);
+	CkArrayOptions &setReductionClient(CkCallback cb)
+	{ reductionClient = cb; return *this; }
 
   //Used by the array manager:
 	const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
@@ -608,75 +622,8 @@ typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 #include "CkArray.decl.h"
 #include "CkArrayReductionMgr.decl.h"
 
-///This arrayListener is in charge of delivering broadcasts to the array.
-class CkArrayBroadcaster : public CkArrayListener {
-  inline int &getData(ArrayElement *el) {return *ckGetData(el);}
-public:
-  CkArrayBroadcaster(void);
-  CkArrayBroadcaster(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  virtual ~CkArrayBroadcaster();
-  PUPable_decl(CkArrayBroadcaster);
-
-  virtual void ckElementStamp(int *eltInfo) {*eltInfo=bcastNo;}
-
-  ///Element was just created on this processor
-  /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementCreated(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  ///Element just arrived on this processor (so just called pup)
-  /// Return false if the element migrated away or deleted itself.
-  virtual CmiBool ckElementArriving(ArrayElement *elt)
-    { return bringUpToDate(elt); }
-
-  void incoming(CkArrayMessage *msg);
-
-  CmiBool deliver(CkArrayMessage *bcast,ArrayElement *el);
-
-  void springCleaning(void);
-
-  void flushState();
-private:
-  int bcastNo;//Number of broadcasts received (also serial number)
-  int oldBcastNo;//Above value last spring cleaning
-  //This queue stores old broadcasts (in case a migrant arrives
-  // and needs to be brought up to date)
-  CkQ<CkArrayMessage *> oldBcasts;
-
-  CmiBool bringUpToDate(ArrayElement *el);
-};
-
-///This arrayListener is in charge of performing reductions on the array.
-class CkArrayReducer : public CkArrayListener {
-  CkGroupID mgrID;
-  CkReductionMgr *mgr;
-  typedef  contributorInfo *I;
-  inline contributorInfo *getData(ArrayElement *el)
-    {return (I)ckGetData(el);}
-public:
-  /// Attach this array to this CkReductionMgr
-  CkArrayReducer(CkGroupID mgrID_);
-  CkArrayReducer(CkMigrateMessage *m);
-  virtual void pup(PUP::er &p);
-  virtual ~CkArrayReducer();
-  PUPable_decl(CkArrayReducer);
-
-  void ckBeginInserting(void) {mgr->creatingContributors();}
-  void ckEndInserting(void) {mgr->doneCreatingContributors();}
-
-  void ckElementStamp(int *eltInfo) {mgr->contributorStamped((I)eltInfo);}
-
-  void ckElementCreating(ArrayElement *elt)
-    {mgr->contributorCreated(getData(elt));}
-  void ckElementDied(ArrayElement *elt)
-    {mgr->contributorDied(getData(elt));}
-
-  void ckElementLeaving(ArrayElement *elt)
-    {mgr->contributorLeaving(getData(elt));}
-  CmiBool ckElementArriving(ArrayElement *elt)
-    {mgr->contributorArriving(getData(elt)); return CmiTrue; }
-};
+class CkArrayBroadcaster;
+class CkArrayReducer;
 
 void _ckArrayInit(void);
 
@@ -693,6 +640,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
+  bool stableLocations;
 
 public:
 //Array Creation:

@@ -1,11 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/src/ck-perf/trace-projections.C,v $
- * $Author: gioachin $
- * $Date: 2009-08-20 01:09:41 $
- * $Revision: 2.134 $
- *****************************************************************************/
-
-
 /**
  * \addtogroup CkPerf
 */
@@ -64,6 +56,9 @@ public:
 };
 CkpvStaticDeclare(CkVec<UsrEvent *>*, usrEvents);
 
+// When tracing is disabled, these are defined as empty static inlines
+// in the header, to minimize overhead
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput()
 { 
@@ -81,6 +76,7 @@ void flushTraceLog()
 {
   CkpvAccess(_trace)->traceFlushLog();
 }
+#endif
 
 #if ! CMK_TRACE_ENABLED
 static int warned=0;

@@ -33,7 +33,7 @@ public:
   RefineCommLB(CkMigrateMessage *m):RefineLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 
 protected:
 };

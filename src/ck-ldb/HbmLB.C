@@ -563,7 +563,7 @@ void HbmLB::reportLBQulity(double mload, double mCpuLoad, double totalload, int 
   }
 }
 
-void HbmLB::work(LDStats* stats,int count)
+void HbmLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   CkPrintf("[%d] HbmLB::work called!\n", CkMyPe());

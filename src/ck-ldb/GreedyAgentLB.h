@@ -29,7 +29,7 @@ public:
 
   GreedyAgentLB(const CkLBOptions &);
   GreedyAgentLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyAgentLB"; }
-  void work(LDStats* stats,int count);
+  void work(LDStats* stats);
 private:
 	TopologyAgent				*topologyAgent;
 	enum           HeapCmp {GT = '>', LT = '<'};

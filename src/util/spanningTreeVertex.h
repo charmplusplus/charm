@@ -57,7 +57,8 @@ class SpanningTreeVertex
     }
 };
 
-
+inline int getProcID(const vtxType vtx) { return vtx; }
+inline int getProcID(const SpanningTreeVertex &vtx) { return vtx.id; }
 
 /// Return the number of hops (on the machine network) between two vertices in the tree
 inline int numHops(const SpanningTreeVertex &vtx1, const SpanningTreeVertex &vtx2)

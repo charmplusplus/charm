@@ -41,7 +41,7 @@ protected:
 public:
   RefineLB(const CkLBOptions &);
   RefineLB(CkMigrateMessage *m):CentralLB(m) { lbname = (char *)"RefineLB"; }
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; }
 

@@ -1,4 +1,9 @@
 /// Global POSE data and functions; includes and dependencies handled here
+
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+#include "unistd.h"
+#endif
+
 #include "pose.h"
 #include "pose.def.h"
 
@@ -55,6 +60,18 @@ void POSE_init(int IDflag, int ET) // can specify both
   }
   if (pose_config.checkpoint_time_interval) {
     CkPrintf("POSE checkpointing interval set to %d seconds\n", pose_config.checkpoint_time_interval);
+  }
+  if (pose_config.dop) {
+    CkPrintf("POSE DOP analysis enabled...deleting dop log files...\n");
+    char fName[32];
+    for (int i = 0; i < CkNumPes(); i++) {
+      sprintf(fName, "dop%d.log", i);
+      unlink(fName);
+    }
+    sprintf(fName, "dop_mod.out");
+    unlink(fName);
+    sprintf(fName, "dop_sim.out");
+    unlink(fName);
   }
   POSE_inactDetect = IDflag;
   POSE_endtime = ET;

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/src/ck-perf/trace-projections.h,v $
- * $Author: gioachin $
- * $Date: 2009-08-20 01:09:41 $
- * $Revision: 2.78 $
- *****************************************************************************/
-
 /**
  * \addtogroup CkPerf
 */
@@ -550,7 +543,7 @@ class toProjectionsGZFile : public PUP::er {
 
 
 
-
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput();
 
@@ -559,6 +552,11 @@ void enableTraceLogOutput();
 
 /// Force the log file to be flushed
 void flushTraceLog();
+#else
+static inline void disableTraceLogOutput() { }
+static inline void enableTraceLogOutput() { }
+static inline void flushTraceLog() { }
+#endif
 
 #endif
 

@@ -307,9 +307,9 @@ static inline void _parseCommandLineOpts(char **argv)
 
 #endif	
 	/* Anytime migration flag */
-	_isAnytimeMigration = CmiTrue;
+	_isAnytimeMigration = true;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
-	  _isAnytimeMigration = CmiFalse;
+	  _isAnytimeMigration = false;
 	}
 
 

@@ -17,7 +17,7 @@ Load-balancing test program:
 #include "CentralLB.h"
 #include "DummyLB.h"
 #include "RandCentLB.h"
-#include "RecBisectBfLB.h"
+//#include "RecBisectBfLB.h"
 #include "RefineLB.h"
 #include "RefineCommLB.h"
 #include "GreedyCommLB.h"
@@ -28,6 +28,8 @@ Load-balancing test program:
 #include "OrbLB.h"
 #include "HybridLB.h"
 #include "HbmLB.h"
+#include "GraphPartLB.h"
+#include "GraphBFTLB.h"
 
 #include "lb_test.decl.h"
 
@@ -127,15 +129,21 @@ static const struct {
   {"comm",
    "comm - Greedy with communication",
    CreateGreedyCommLB},
-  {"recbf",
+  /*{"recbf",
    "recbf - Recursive partitioning with Breadth first enumeration, with 2 nuclei",
-   CreateRecBisectBfLB},
+   CreateRecBisectBfLB},*/
   {"hybrid",
    "hybrid - Hybrid strategy",
    CreateHybridLB},
   {"hbm",
    "HbmLB - HBM strategy",
    CreateHbmLB},
+  {"graphpart",
+   "GraphPartLB - graph partitioning",
+   CreateGraphPartLB},
+  {"graphbft",
+   "GraphBFTLB - breadth first traversal",
+   CreateGraphBFTLB},
 
   {NULL,NULL,NULL}
 };

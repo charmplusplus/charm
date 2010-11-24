@@ -6,6 +6,7 @@ module EveryLB {
   extern module CommLB;
   extern module DummyLB;
   extern module GraphPartLB;
+  extern module GraphBFTLB;
   extern module GreedyAgentLB;
   extern module GreedyCommLB;
   extern module GreedyLB;
@@ -14,6 +15,7 @@ module EveryLB {
   extern module GridHybridLB;
   extern module GridHybridSeedLB;
   extern module GridMetisLB;
+  extern module TeamLB;
   extern module HbmLB;
   extern module HybridLB;
   extern module MetisLB;
@@ -22,7 +24,6 @@ module EveryLB {
   extern module OrbLB;
   extern module PhasebyArrayLB;
   extern module RandCentLB;
-  extern module RecBisectBfLB;
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RefineKLB;

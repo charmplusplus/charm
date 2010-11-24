@@ -8,9 +8,11 @@
 /**
  *  \addtogroup CkLdb
  */
+
 /*@{*/
 
 #include "GraphPartLB.h"
+#include "ckgraph.h"
 
 CreateLBFunc_Def(GraphPartLB, "Algorithm which uses graph partitioning for communication aware load balancing")
 
@@ -24,8 +26,15 @@ CmiBool GraphPartLB::QueryBalanceNow(int _step) {
   return CmiTrue;
 }
 
-void GraphPartLB::work(BaseLB::LDStats *stats, int count) {
+void GraphPartLB::work(LDStats *stats) {
+  /** ========================== INITIALIZATION ============================= */
+  ProcArray *parr = new ProcArray(stats);
+  ObjGraph *ogr = new ObjGraph(stats);
 
+  /** ============================= STRATEGY ================================ */
+
+  /** ============================== CLEANUP ================================ */
+  ogr->convertDecisions(stats);
 }
 
 #include "GraphPartLB.def.h"

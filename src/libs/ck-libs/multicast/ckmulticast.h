@@ -17,31 +17,10 @@ PUPbytes(mCastEntryPtr)
 
 #include "CkMulticast.decl.h"
 
-#if 0
-class CkMcastReductionMsg: public CMessage_CkMcastReductionMsg {
-friend class CkMulticastMgr;
-public:
-  int dataSize;
-  char *data;
-  CkSectionInfo sid;
-private:
-  CkReduction::reducerType reducer;
-  char flag;  // 1: come from array elem 2: come from BOC
-  int redNo;
-  int gcounter;
-  int userFlag; // user set for use by client 
-  char rebuilt;
-  CkCallback callback;   /**< user callback */
-public:
-  static CkMcastReductionMsg* buildNew(int NdataSize,void *srcData,
-		  CkReduction::reducerType reducer=CkReduction::invalid);
-  void setCallback(CkCallback &cb) { callback = cb; }
-  inline int getSize(void) const {return dataSize;}
-  inline void *getData(void) {return data;}
-};
-#endif
-
 typedef void (*redClientFn)(CkSectionInfo sid, void *param,int dataSize,void *data);
+
+/// Retrieve section info from a multicast msg. Part of API
+extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 
 
 
@@ -109,9 +88,9 @@ class CkMulticastMgr: public CkDelegateMgr
         /// entry
         void recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
         // ------------------------- Reductions ------------------------
-        /// entry
+        /// entry Accept a redn msg from a child in the spanning tree
         void recvRedMsg(CkReductionMsg *msg);
-        /// entry
+        /// entry Update the current completed redn num to input value
         void updateRedNo(mCastEntryPtr, int red);
         /// Configure a client to accept the reduction result
         void setReductionClient(CProxySection_ArrayElement &, redClientFn fn,void *param=NULL);
@@ -134,7 +113,6 @@ class CkMulticastMgr: public CkDelegateMgr
         void SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, int opts);
         /// Retire and rebuild the spanning tree when one of the intermediate vertices migrates
         void rebuild(CkSectionInfo &);
-        // typedef CkMcastReductionMsg *(*reducerFn)(int nMsg,CkMcastReductionMsg **msgs);
 
     private:
         /// Fill the SectionInfo cookie in the SectionID obj with relevant info
@@ -145,19 +123,16 @@ class CkMulticastMgr: public CkDelegateMgr
         void sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts);
         /// Mark old cookie spanning tree as old and build a new one
         void resetCookie(CkSectionInfo sid);
-        enum {MAXREDUCERS=256};
-        // static CkReduction::reducerFn reducerTable[MAXREDUCERS];
+        ///
         void releaseBufferedReduceMsgs(mCastEntryPtr entry);
+        /// Release buffered redn msgs from later reductions which arrived early (out of order)
         void releaseFutureReduceMsgs(mCastEntryPtr entry);
+        ///
         inline CkReductionMsg *buildContributeMsg(int dataSize,void *data,CkReduction::reducerType type, CkSectionInfo &id, CkCallback &cb, int userFlag=-1);
-        void reduceFragment (int index, CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo,
-                         int& updateReduceNo, int currentTreeUp);
+        /// Reduce one fragment of a reduction msg and handle appropriately (transmit up the tree, buffer, combine etc)
+        void reduceFragment (int index, CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo, int currentTreeUp);
+        /// At the tree root: Combine all msg fragments for final delivery to the client
         CkReductionMsg* combineFrags (CkSectionInfo& id, mCastEntry* entry, reductionInfo& redInfo);
 };
-
-
-
-
-extern void CkGetSectionInfo(CkSectionInfo &id, void *msg);
 
 #endif

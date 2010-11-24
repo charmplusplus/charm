@@ -750,10 +750,10 @@ static const yytype_uint16 yyrline[] =
      867,   868,   875,   881,   890,   897,   903,   909,   917,   919,
      923,   925,   929,   931,   935,   937,   942,   943,   948,   949,
      951,   955,   957,   961,   963,   968,   969,   973,   975,   979,
-     982,   985,  1000,  1014,  1016,  1018,  1020,  1022,  1025,  1028,
-    1031,  1034,  1036,  1038,  1040,  1042,  1044,  1054,  1055,  1057,
-    1060,  1062,  1066,  1070,  1074,  1082,  1090,  1092,  1096,  1099,
-    1103,  1107
+     982,   985,   989,  1003,  1005,  1007,  1009,  1011,  1014,  1017,
+    1020,  1023,  1025,  1027,  1029,  1031,  1033,  1037,  1038,  1040,
+    1043,  1045,  1049,  1053,  1057,  1065,  1073,  1075,  1079,  1082,
+    1086,  1090
 };
 #endif
 
@@ -3476,23 +3476,12 @@ yyreduce:
   case 251:
 #line 986 "xi-grammar.y"
     {
-		   char *tmp = strdup((yyvsp[(4) - (6)].strval));
-		   RemoveSdagComments(tmp);
-		   (yyval.sc) = new SdagConstruct(SATOMIC, new XStr(tmp), (yyvsp[(6) - (6)].sc), 0,0,0,0, 0 );
-		   free(tmp);
-
-		   if ((yyvsp[(2) - (6)].strval))
-		   {
-		       tmp = strdup((yyvsp[(2) - (6)].strval));
-		       tmp[strlen(tmp)-1]=0;
-		       (yyval.sc)->traceName = new XStr(tmp+1);
-		       free(tmp);
-		   }
+		   (yyval.sc) = buildAtomic((yyvsp[(4) - (6)].strval), (yyvsp[(6) - (6)].sc), (yyvsp[(2) - (6)].strval));
 		 }
     break;
 
   case 252:
-#line 1001 "xi-grammar.y"
+#line 990 "xi-grammar.y"
     {  
 		   in_braces = 0;
 		   if (((yyvsp[(4) - (8)].plist)->isVoid() == 0) && ((yyvsp[(4) - (8)].plist)->isMessage() == 0))
@@ -3509,121 +3498,116 @@ yyreduce:
     break;
 
   case 253:
-#line 1015 "xi-grammar.y"
-    { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0,0,0,0,0,(yyvsp[(2) - (4)].entrylist)); }
+#line 1004 "xi-grammar.y"
+    { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  (yyvsp[(2) - (4)].entrylist)); }
     break;
 
   case 254:
-#line 1017 "xi-grammar.y"
+#line 1006 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(3) - (3)].sc), (yyvsp[(2) - (3)].entrylist)); }
     break;
 
   case 255:
-#line 1019 "xi-grammar.y"
+#line 1008 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(4) - (5)].sc), (yyvsp[(2) - (5)].entrylist)); }
     break;
 
   case 256:
-#line 1021 "xi-grammar.y"
+#line 1010 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SOVERLAP,0, 0,0,0,0,(yyvsp[(3) - (4)].sc), 0); }
     break;
 
   case 257:
-#line 1023 "xi-grammar.y"
+#line 1012 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (11)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(5) - (11)].strval)),
 		             new SdagConstruct(SINT_EXPR, (yyvsp[(7) - (11)].strval)), 0, (yyvsp[(10) - (11)].sc), 0); }
     break;
 
   case 258:
-#line 1026 "xi-grammar.y"
+#line 1015 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFOR, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (9)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(5) - (9)].strval)), 
 		         new SdagConstruct(SINT_EXPR, (yyvsp[(7) - (9)].strval)), 0, (yyvsp[(9) - (9)].sc), 0); }
     break;
 
   case 259:
-#line 1029 "xi-grammar.y"
+#line 1018 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[(3) - (12)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(6) - (12)].strval)), 
 		             new SdagConstruct(SINT_EXPR, (yyvsp[(8) - (12)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(10) - (12)].strval)), (yyvsp[(12) - (12)].sc), 0); }
     break;
 
   case 260:
-#line 1032 "xi-grammar.y"
+#line 1021 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORALL, 0, new SdagConstruct(SIDENT, (yyvsp[(3) - (14)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(6) - (14)].strval)), 
 		                 new SdagConstruct(SINT_EXPR, (yyvsp[(8) - (14)].strval)), new SdagConstruct(SINT_EXPR, (yyvsp[(10) - (14)].strval)), (yyvsp[(13) - (14)].sc), 0); }
     break;
 
   case 261:
-#line 1035 "xi-grammar.y"
+#line 1024 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (6)].strval)), (yyvsp[(6) - (6)].sc),0,0,(yyvsp[(5) - (6)].sc),0); }
     break;
 
   case 262:
-#line 1037 "xi-grammar.y"
+#line 1026 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (8)].strval)), (yyvsp[(8) - (8)].sc),0,0,(yyvsp[(6) - (8)].sc),0); }
     break;
 
   case 263:
-#line 1039 "xi-grammar.y"
+#line 1028 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SIF, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (5)].strval)), 0,0,0,(yyvsp[(5) - (5)].sc),0); }
     break;
 
   case 264:
-#line 1041 "xi-grammar.y"
+#line 1030 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SWHILE, 0, new SdagConstruct(SINT_EXPR, (yyvsp[(3) - (7)].strval)), 0,0,0,(yyvsp[(6) - (7)].sc),0); }
     break;
 
   case 265:
-#line 1043 "xi-grammar.y"
+#line 1032 "xi-grammar.y"
     { (yyval.sc) = (yyvsp[(2) - (3)].sc); }
     break;
 
   case 266:
-#line 1045 "xi-grammar.y"
-    {
-		     char *tmp = strdup((yyvsp[(2) - (3)].strval));
-		     RemoveSdagComments(tmp);
-		     (yyval.sc) = new SdagConstruct(SATOMIC, new XStr(tmp), NULL, 0,0,0,0, 0 );
-		     free(tmp);
-                 }
+#line 1034 "xi-grammar.y"
+    { (yyval.sc) = buildAtomic((yyvsp[(2) - (3)].strval), NULL, NULL); }
     break;
 
   case 267:
-#line 1054 "xi-grammar.y"
+#line 1037 "xi-grammar.y"
     { (yyval.sc) = 0; }
     break;
 
   case 268:
-#line 1056 "xi-grammar.y"
+#line 1039 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[(2) - (2)].sc),0); }
     break;
 
   case 269:
-#line 1058 "xi-grammar.y"
+#line 1041 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SELSE, 0,0,0,0,0, (yyvsp[(3) - (4)].sc),0); }
     break;
 
   case 270:
-#line 1061 "xi-grammar.y"
+#line 1044 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, (yyvsp[(1) - (1)].strval))); }
     break;
 
   case 271:
-#line 1063 "xi-grammar.y"
+#line 1046 "xi-grammar.y"
     { (yyval.sc) = new SdagConstruct(SFORWARD, new SdagConstruct(SIDENT, (yyvsp[(1) - (3)].strval)), (yyvsp[(3) - (3)].sc));  }
     break;
 
   case 272:
-#line 1067 "xi-grammar.y"
+#line 1050 "xi-grammar.y"
     { in_int_expr = 0; (yyval.intval) = 0; }
     break;
 
   case 273:
-#line 1071 "xi-grammar.y"
+#line 1054 "xi-grammar.y"
     { in_int_expr = 1; (yyval.intval) = 0; }
     break;
 
   case 274:
-#line 1075 "xi-grammar.y"
+#line 1058 "xi-grammar.y"
     { 
 		  if ((yyvsp[(2) - (2)].plist) != 0)
 		     (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[(1) - (2)].strval), (yyvsp[(2) - (2)].plist), 0, 0, 0, 0); 
@@ -3634,7 +3618,7 @@ yyreduce:
     break;
 
   case 275:
-#line 1083 "xi-grammar.y"
+#line 1066 "xi-grammar.y"
     { if ((yyvsp[(5) - (5)].plist) != 0)
 		    (yyval.entry) = new Entry(lineno, 0, 0, (yyvsp[(1) - (5)].strval), (yyvsp[(5) - (5)].plist), 0, 0, (yyvsp[(3) - (5)].strval), 0); 
 		  else
@@ -3643,38 +3627,38 @@ yyreduce:
     break;
 
   case 276:
-#line 1091 "xi-grammar.y"
+#line 1074 "xi-grammar.y"
     { (yyval.entrylist) = new EntryList((yyvsp[(1) - (1)].entry)); }
     break;
 
   case 277:
-#line 1093 "xi-grammar.y"
+#line 1076 "xi-grammar.y"
     { (yyval.entrylist) = new EntryList((yyvsp[(1) - (3)].entry),(yyvsp[(3) - (3)].entrylist)); }
     break;
 
   case 278:
-#line 1097 "xi-grammar.y"
+#line 1080 "xi-grammar.y"
     { in_bracket=1; }
     break;
 
   case 279:
-#line 1100 "xi-grammar.y"
+#line 1083 "xi-grammar.y"
     { in_bracket=0; }
     break;
 
   case 280:
-#line 1104 "xi-grammar.y"
+#line 1087 "xi-grammar.y"
     { if (!macroDefined((yyvsp[(2) - (2)].strval), 1)) in_comment = 1; }
     break;
 
   case 281:
-#line 1108 "xi-grammar.y"
+#line 1091 "xi-grammar.y"
     { if (!macroDefined((yyvsp[(2) - (2)].strval), 0)) in_comment = 1; }
     break;
 
 
 /* Line 1267 of yacc.c.  */
-#line 3678 "y.tab.c"
+#line 3662 "y.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -3888,7 +3872,7 @@ yyreturn:
 }
 
 
-#line 1111 "xi-grammar.y"
+#line 1094 "xi-grammar.y"
 
 void yyerror(const char *mesg)
 {

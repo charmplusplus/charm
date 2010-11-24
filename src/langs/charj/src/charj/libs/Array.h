@@ -15,7 +15,7 @@ namespace CharjArray {
     Range() {}
     Range(int size_) : size(size_), start(0), stop(size) {}
     Range(int start_, int stop_) :
-      start(start_), stop(stop_), size(stop_ - start_) {
+    size(stop_ - start_), start(start_), stop(stop_) {
       assert(stop >= start);
     }
   };
@@ -42,13 +42,16 @@ namespace CharjArray {
       ranges[1] = range2;
     }
 
-    int size() {
+    int size() const {
       int total = 0;
+
       for (int i = 0; i < dims; i++)
 	if (total == 0)
 	  total = ranges[i].size;
 	else
 	  total *= ranges[i].size;
+
+      return total;
     }
   };
 
@@ -119,7 +122,7 @@ namespace CharjArray {
     }
 
     ~Array() {
-      delete block;
+      delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
@@ -138,11 +141,11 @@ namespace CharjArray {
       return new Array<type, dims, atype>(this, domain);
     }
 
-    int size() {
+    int size() const {
       return domain.size();
     }
 
-    int size(int dim) {
+    int size(int dim) const {
       return domain.ranges[dim].size;
     }
 

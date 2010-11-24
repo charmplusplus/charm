@@ -7,12 +7,8 @@ Utilities for efficiently determining object intersections,
 given a giant list of objects.
 */
 #include <stdio.h>
-#if CMK_STL_USE_DOT_H
-#include <iostream.h>
-#else
 #include <iostream>
 using namespace std;
-#endif
 #include "collide_serial.h"
 #include "charm.h" /* for CkAbort */
 

@@ -75,10 +75,10 @@ load balancer {\em fooLB} to illustrate the steps).
 \item Create files named {\em fooLB.ci, fooLB.h and fooLB.C}. One can choose to
 copy and rename the files RotateLB.* and rename the class name in those files.
 
-\item Implement the {\em fooLB} class method --- {\bf
-fooLB::work(CentralLB::LDStats* stats, int count)} This method takes the load
-balancing database ({\em stats}) as an input, and output the new mapping of
-objects to processors in {\em stats->to\_proc} array.
+\item Implement the {\em fooLB} class method --- {\bf fooLB::work(LDStats*
+stats)} This method takes the load balancing database ({\em stats}) as an
+input, and output the new mapping of objects to processors in {\em
+stats->to\_proc} array.
 
 \item Build charm for your platform (This will create the required links in the tmp directory).
 

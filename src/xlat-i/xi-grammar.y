@@ -984,18 +984,7 @@ OptTraceName	: LITERAL
 
 SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPubList 
                  {
-		   char *tmp = strdup($4);
-		   RemoveSdagComments(tmp);
-		   $$ = new SdagConstruct(SATOMIC, new XStr(tmp), $6, 0,0,0,0, 0 );
-		   free(tmp);
-
-		   if ($2)
-		   {
-		       tmp = strdup($2);
-		       tmp[strlen(tmp)-1]=0;
-		       $$->traceName = new XStr(tmp+1);
-		       free(tmp);
-		   }
+		   $$ = buildAtomic($4, $6, $2);
 		 }
 		| CONNECT '(' IDENT EParameters ')' ParamBraceStart CCode '}'
 		{  
@@ -1012,7 +1001,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
 		| WHEN SEntryList '{' '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0,0,0,0,0,$2); }
+		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  $2); }
 		| WHEN SEntryList SingleConstruct
 		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $3, $2); }
 		| WHEN SEntryList '{' Slist '}'
@@ -1042,13 +1031,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| FORWARD ForwardList ';'
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
-                 {
-		     char *tmp = strdup($2);
-		     RemoveSdagComments(tmp);
-		     $$ = new SdagConstruct(SATOMIC, new XStr(tmp), NULL, 0,0,0,0, 0 );
-		     free(tmp);
-                 }
-	 	;	
+		{ $$ = buildAtomic($2, NULL, NULL); }
 
 HasElse		: /* Empty */
 		{ $$ = 0; }

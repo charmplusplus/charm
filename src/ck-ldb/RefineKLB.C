@@ -28,28 +28,30 @@ RefineKLB::RefineKLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RefineKLB created\n",CkMyPe());
 }
 
-void RefineKLB::work(BaseLB::LDStats* stats, int count)
+void RefineKLB::work(LDStats* stats)
 {
   int obj;
+  int n_pes = stats->nprocs();
+
   //  CkPrintf("[%d] RefineKLB strategy\n",CkMyPe());
 
-  // RemoveNonMigratable(stats, count);
+  // RemoveNonMigratable(stats, n_pes);
 
   // get original object mapping
-  int* from_procs = RefinerApprox::AllocProcs(count, stats);
+  int* from_procs = RefinerApprox::AllocProcs(n_pes, stats);
   for(obj=0;obj<stats->n_objs;obj++)  {
     int pe = stats->from_proc[obj];
     from_procs[obj] = pe;
   }
 
   // Get a new buffer to refine into
-  int* to_procs = RefinerApprox::AllocProcs(count,stats);
+  int* to_procs = RefinerApprox::AllocProcs(n_pes, stats);
 
   RefinerApprox refiner(1.003);  // overload tolerance=1.003
 
   if(_lb_args.percentMovesAllowed()>0 && _USE_APPROX_ALGO_)
   {
-    refiner.Refine(count,stats,from_procs,to_procs,_lb_args.percentMovesAllowed());
+    refiner.Refine(n_pes, stats, from_procs, to_procs, _lb_args.percentMovesAllowed());
   }
   else
   {
@@ -79,7 +81,7 @@ void RefineKLB::work(BaseLB::LDStats* stats, int count)
   if(availableMoves>0 && _USE_RESIDUAL_MOVES_)
   {
     int *to_procs2=new int[stats->n_objs];
-    performGreedyMoves(count,stats,to_procs,to_procs2,availableMoves);
+    performGreedyMoves(n_pes, stats, to_procs, to_procs2, availableMoves);
 
     int nmoves2=0;
     for(obj=0;obj<stats->n_objs;obj++)

@@ -32,10 +32,11 @@ public:
   double doTime, rbTime, gvtTime, simTime, cpTime, canTime, lbTime, fcTime, 
     commTime, maxDo, minDo, maxGRT;
   long cpBytes;
-  int pe, dos, undos, commits, loops, gvts, maxChkPts, maxGVT;
+  int pe, dos, undos, commits, loops, gvts, maxChkPts;
+  POSE_TimeType maxGVT;
 };
 
-/// Group to gather stats on a each PE separately
+/// Group to gather stats on each PE separately
 class localStat : public Group {
 private:
   /// Current active timer
@@ -51,8 +52,12 @@ private:
     lbTime, fcTime, commTime, maxDo, minDo; 
   /// Maximum values for GVT and real time taken by events
   /* For degree of parallelism calculations */
-  int maxGVT;
+  POSE_TimeType maxGVT;
   double maxGRT;
+  /// Output file name for stats for DOP calculation
+  char dopFileName[20];
+  /// Output file pointer for DOP calculation
+  FILE *dopFilePtr;
 public:
   /// Basic Constructor
   localStat(void) : whichStat(0),rollbacks(0),dos(0),undos(0),commits(0),loops(0),gvts(0),cpBytes(0),chkPts(0),maxChkPts(0),   maxGVT (0),
@@ -63,41 +68,69 @@ public:
 #ifdef VERBOSE_DEBUG
     CkPrintf("[%d] constructing localStat\n",CkMyPe());
 #endif
+    if (pose_config.dop) {
+      sprintf(dopFileName, "dop%d.log", CkMyPe());
+      dopFilePtr = fopen(dopFileName, "w");
+      if (dopFilePtr == NULL) {
+	CkPrintf("ERROR: unable to open DOP file %s for writing\n", dopFileName);
+	CkAbort("Error opening file");
+      }
+    }
   }
   /// Migration constructor
   localStat(CkMigrateMessage *msg) : Group(msg) { };
+  /// Destructor
+  ~localStat() {
+    fclose(dopFilePtr);
+  }
   /// Start the specified timer
-  void TimerStart(int timer);  
+  void TimerStart(int timer);
   /// Stop the currently active timer
-  void TimerStop();            
+  void TimerStop();
   /// Switch to different timer, stopping active timer
-  void SwitchTimer(int timer); 
+  void SwitchTimer(int timer);
   /// Increment event forward execution count
-  inline void Do() { dos++; }         
+  inline void Do() { dos++; }
   /// Increment event rollback count
-  inline void Undo() { undos++; }    
+  inline void Undo() { undos++; }
   /// Increment commit count
-  inline void Commit() { commits++; }    
+  inline void Commit() { commits++; }
   /// Increment event loop count
-  inline void Loop() { loops++; }    
-  /// Increment GVT estimation count     
-  inline void GvtInc() { gvts++; }   
+  inline void Loop() { loops++; }
+  /// Increment GVT estimation count
+  inline void GvtInc() { gvts++; }
   /// Increment rollback count
-  inline void Rollback() { rollbacks++; }  
+  inline void Rollback() { rollbacks++; }
   /// Increment checkpoint count and adjust max
   inline void Checkpoint() { chkPts++; if (chkPts > maxChkPts) maxChkPts = chkPts; }
   /// Decrement checkpoint count
   inline void Reclaim() { chkPts--; }
   /// Add to checkpointed bytes count
-  inline void CPbytes(int n) { cpBytes += n; }  
+  inline void CPbytes(int n) { cpBytes += n; }
   /// Send local stats to global collector
   void SendStats();
   /// Query which timer is active
   inline int TimerRunning() { return (whichStat); }
   /// Set maximum times
-  inline void SetMaximums(int gvt, double grt) { 
-    if (gvt > maxGVT) maxGVT = gvt; 
+  inline void SetMaximums(POSE_TimeType gvt, double grt) {
+    if (gvt > maxGVT) maxGVT = gvt;
     if (grt > maxGRT) maxGRT = grt;
+  }
+  /// Write data to this PE's DOP log file
+  inline void WriteDopData(double srt, double ert, POSE_TimeType svt, POSE_TimeType evt) {
+#if USE_LONG_TIMESTAMPS
+    // fprintf returns the number of characters written, or a negative
+    // number if something went wrong
+    if (fprintf(dopFilePtr, "%f %f %lld %lld\n", srt, ert, svt, evt) <= 0) {
+      CkPrintf("WARNING: DOP data not written to %s\n", dopFileName);
+    }
+#else
+    // fprintf returns the number of characters written, or a negative
+    // number if something went wrong
+    if (fprintf(dopFilePtr, "%f %f %d %d\n", srt, ert, svt, evt) <= 0) {
+      CkPrintf("WARNING: DOP data not written to %s\n", dopFileName);
+    }
+#endif
   }
 };
 PUPbytes(localStat)
@@ -105,13 +138,12 @@ PUPbytes(localStat)
 /// Entity to gather stats from each PE and prepare final report
 class globalStat : public Chare {
 private:
-  double doAvg, doMax, rbAvg, rbMax, gvtAvg, gvtMax, simAvg, simMax, 
-    cpAvg, cpMax, canAvg, canMax, lbAvg, lbMax, fcAvg, fcMax, commAvg, commMax,
-    maxTime;
+  double doAvg, doMax, rbAvg, rbMax, gvtAvg, gvtMax, simAvg, simMax, cpAvg, 
+    cpMax, canAvg, canMax, lbAvg, lbMax, fcAvg, fcMax, commAvg, commMax, maxTime;
   double minDo, maxDo, avgDo, GvtTime, maxGRT;
   long cpBytes;
-  int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, 
-    maxChkPts, maxGVT;
+  int reporting, totalDos, totalUndos, totalCommits, totalLoops, totalGvts, maxChkPts;
+  POSE_TimeType maxGVT;
 public:
   /// Basic Constructor
   globalStat(void);
@@ -119,7 +151,7 @@ public:
   globalStat(CkMigrateMessage *msg) { };
   /// Receive, calculate and print statistics
   void localStatReport(localStatSummary *m); 
-  void DOPcalc(int gvt, double grt);
+  void DOPcalc(POSE_TimeType gvt, double grt);
 };
 PUPbytes(globalStat)
 

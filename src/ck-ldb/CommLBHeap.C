@@ -6,20 +6,17 @@
 #include "CommLBHeap.h"
 #include "charm++.h"
 
-ObjectHeap::ObjectHeap(int sz)
-{
+ObjectHeap::ObjectHeap(int sz) {
   size = sz;
   h = new hRecord[sz];
   count = 0;
 }
 
-int ObjectHeap::numElements()
-{
+int ObjectHeap::numElements() {
   return count;
 }
 
-int ObjectHeap::insert(ObjectRecord *x)
-{
+int ObjectHeap::insert(ObjectRecord *x) {
   h[count].info = x;
   h[count].deleted  = 0;
   int current = count;
@@ -32,7 +29,7 @@ int ObjectHeap::insert(ObjectRecord *x)
   int parent = (current - 1)/2;
   while (current != 0)
     {
-      if (h[current].info->load > h[parent].info->load)
+      if (h[current].info->val > h[parent].info->val)
 	{
 	  swap(current, parent);
 	  current = parent;
@@ -44,8 +41,7 @@ int ObjectHeap::insert(ObjectRecord *x)
   return 0;
 }
 
-ObjectRecord *ObjectHeap::deleteMax()
-{
+ObjectRecord *ObjectHeap::deleteMax() {
   if (count == 0) return 0;
   ObjectRecord *tmp = h[0].info;
   int best;
@@ -62,12 +58,12 @@ ObjectRecord *ObjectHeap::deleteMax()
 	best = c1;
       else
 	{
-	  if (h[c1].info->load > h[c2].info->load)
+	  if (h[c1].info->val > h[c2].info->val)
 	    best = c1;
 	  else
 	    best = c2;
 	}
-      if (h[best].info->load > h[current].info->load)
+      if (h[best].info->val > h[current].info->val)
 	{
 	  swap(best, current);
 	  current = best;
@@ -80,15 +76,14 @@ ObjectRecord *ObjectHeap::deleteMax()
   return tmp;
 }
 
-
-ObjectRecord *ObjectHeap::iterator(hIterator *iter){
+ObjectRecord *ObjectHeap::iterator(hIterator *iter) {
   iter->next = 1;
   if (count == 0)
     return 0;
   return h[0].info;
 }
 
-ObjectRecord *ObjectHeap::next(hIterator *iter){
+ObjectRecord *ObjectHeap::next(hIterator *iter) {
   if (iter->next >= count)
     return 0;
   iter->next += 1;

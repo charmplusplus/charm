@@ -12,11 +12,7 @@ Orion Sky Lawlor, olawlor@acm.org, 2003/07/23
 #define __CHARM_RTH_H
 
 #include "pup.h"
-#if CMK_STL_DONT_USE_DOT_H
 #include <new> /* for in-place operator new */
-#else
-#include <new.h>   // for in-place new operator
-#endif
 
 /** All the local variables for RTH routines
    are stored in subclasses of this type.  Keeping

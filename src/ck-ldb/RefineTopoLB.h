@@ -17,14 +17,14 @@ class RefineTopoLB : public TopoLB
     RefineTopoLB (const CkLBOptions &opt);
     RefineTopoLB (CkMigrateMessage *m) : TopoLB (m) { };
   
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { TopoLB::pup(p); }
     	
     //LBTopolog *topo;
   
   protected:
-    double getCpartHopBytes(int cpart,int proc, int count);
-    double findSwapGain(int cpart1, int cpart2,int count);
+    double getCpartHopBytes(int cpart, int proc, int count);
+    double findSwapGain(int cpart1, int cpart2, int n_pes);
     //double getInterMedHopBytes(CentralLB::LDStats *stats,int count, int *newmap);
     CmiBool QueryBalanceNow (int step);
     void updateCommUA(int count);

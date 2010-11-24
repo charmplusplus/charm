@@ -163,6 +163,7 @@ static int skt_should_retry(void)
 	return 1;/*Otherwise, we recognized it*/
 }
 
+
 /* fd must be tcp socket */
 int skt_tcp_no_nagle(SOCKET fd)
 {

@@ -1,5 +1,5 @@
 BIN=../../bin
-CHARMC=$(BIN)/charmc $(OPTS) -I..
+CHARMC=$(BIN)/charmc $(OPTS) -lm -I..
 
 SHELL=/bin/sh
 
@@ -11,11 +11,11 @@ all: charmrun-notify charmrun-silent charmd charmd_faceless
 
 charmrun-silent: charmrun.c $(INCLUDED)
 	$(CHARMC) -c -seq -DSILENT charmrun.c -o charmrun-silent.o
-	$(CHARMC) -cp $(BIN) -seq -o charmrun-silent charmrun-silent.o
+	$(CHARMC) -cp $(BIN) -seq -o charmrun-silent charmrun-silent.o 
 
 charmrun-notify: charmrun.c $(INCLUDED)
 	$(CHARMC) -c -seq -DNOTIFY charmrun.c
-	$(CHARMC) -cp $(BIN) -seq -o charmrun-notify charmrun.o
+	$(CHARMC) -cp $(BIN) -seq -o charmrun-notify charmrun.o 
 	(cd ..; CHARMINC=.; . ./conv-config.sh; cp ../bin/charmrun-notify$$CMK_POST_EXE ../bin/charmrun$$CMK_POST_EXE)
 
 charmd: daemon.c daemon.h ../sockRoutines-seq.o

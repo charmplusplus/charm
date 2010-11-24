@@ -70,6 +70,7 @@ public:
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
+extern CkGroupID _fastArrayMapID;
 class CkLocMgr;
 class CkArrMgr;
 
@@ -347,6 +348,7 @@ public:
 public:
   void ckFinishConstruction(void) { }
 #endif
+
 #if CMK_OUT_OF_CORE
 private:
   friend class CkLocMgr;
@@ -356,9 +358,8 @@ private:
   int prefetchObjID; //From CooRegisterObject
   CmiBool isInCore; //If true, the object is present in memory
 #endif
-	/*
-		FAULT_EVAC
-	*/
+
+  // FAULT_EVAC
   void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   CmiBool isAsyncEvacuate(){return asyncEvacuate;};

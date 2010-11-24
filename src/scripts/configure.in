@@ -9,7 +9,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 # Decimal representation of Charm++ release line and API revision
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
-VERSION=60301
+VERSION=60303
 echo $VERSION > ../include/VERSION
 AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version number])
 
@@ -260,8 +260,8 @@ test_linkso() {
         AC_MSG_CHECKING("$1")
 	echo $1 >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
@@ -597,30 +597,6 @@ void foo()
 EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
-
-##### check if the stl headers use .h #####
-cat > $t <<EOT
-#include <iostream>
-void foo(void) { std::cout<<"Hello, world"<<std::endl; }
-EOT
-test_cxx "whether including STL <foo> works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail, [including STL <foo> does not works])
-AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass, [including STL <foo> works])
-
-#### check if std::vector works ######
-cat > $t <<EOT
-#include <vector>
-
-int foo(void) {
-  std::vector<int> v;      
-  v.push_back(2); v.push_back(3);
-  std::vector<int>::iterator it=v.begin();
-  it++;
-  return *it;
-}
-EOT
-test_cxx "whether the std:: names for STL work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass, [whether the std:: names for STL work])
 
 #### check if namespaces can be defined #####
 cat > $t <<EOT
@@ -1523,10 +1499,8 @@ EOT
 		test_linkso "whether can build shared library with MPI" "yes" "no" ""
 		BUILD_SHARED=$pass
 	fi
-	if test $BUILD_SHARED -eq 1
+	if test $BUILD_SHARED -eq 0
 	then
-		add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
-	else
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 	fi
 fi
