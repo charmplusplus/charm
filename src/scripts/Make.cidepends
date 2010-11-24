@@ -32,6 +32,7 @@ GridCommRefineLB.decl.h GridCommRefineLB.def.h: GridCommRefineLB.ci.stamp
 GridHybridLB.decl.h GridHybridLB.def.h: GridHybridLB.ci.stamp
 GridHybridSeedLB.decl.h GridHybridSeedLB.def.h: GridHybridSeedLB.ci.stamp
 GridMetisLB.decl.h GridMetisLB.def.h: GridMetisLB.ci.stamp
+TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
 HbmLB.decl.h HbmLB.def.h: HbmLB.ci.stamp
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 HybridLB.decl.h HybridLB.def.h: HybridLB.ci.stamp

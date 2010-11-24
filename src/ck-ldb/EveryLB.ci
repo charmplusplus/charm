@@ -15,6 +15,7 @@ module EveryLB {
   extern module GridHybridLB;
   extern module GridHybridSeedLB;
   extern module GridMetisLB;
+  extern module TeamLB;
   extern module HbmLB;
   extern module HybridLB;
   extern module MetisLB;

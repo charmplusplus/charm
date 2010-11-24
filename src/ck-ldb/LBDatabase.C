@@ -244,6 +244,11 @@ void _loadbalancerInit()
     _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
   					     "Turn on LB debugging printouts");
 
+  // getting the size of the team with +teamSize
+  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(), 
+                                          "Team size"))
+    _lb_args.teamSize() = 1;
+
   // ask to print summary/quality of load balancer
   _lb_args.printSummary() = CmiGetArgFlagDesc(argv, "+LBPrintSummary",
 		"Print load balancing result summary");

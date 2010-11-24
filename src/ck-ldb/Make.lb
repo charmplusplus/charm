@@ -17,6 +17,7 @@ ALL_LDBS=\
    $(L)/libmoduleGridHybridLB.a \
    $(L)/libmoduleGridHybridSeedLB.a \
    $(L)/libmoduleGridMetisLB.a \
+   $(L)/libmoduleTeamLB.a \
    $(L)/libmoduleHbmLB.a \
    $(L)/libmoduleHybridLB.a \
    $(L)/libmoduleMetisLB.a \
@@ -118,6 +119,12 @@ $(L)/libmoduleGridMetisLB.a: GridMetisLB.o
 	$(CHARMC) -o $(L)/libmoduleGridMetisLB.a GridMetisLB.o 
 	cp -f libmoduleGridMetisLB.dep $(L)/
 LBHEADERS += GridMetisLB.h GridMetisLB.decl.h
+
+
+$(L)/libmoduleTeamLB.a: TeamLB.o 
+	$(CHARMC) -o $(L)/libmoduleTeamLB.a TeamLB.o 
+	cp -f libmoduleTeamLB.dep $(L)/
+LBHEADERS += TeamLB.h TeamLB.decl.h
 
 
 $(L)/libmoduleHbmLB.a: HbmLB.o 
@@ -232,6 +239,7 @@ ALL_LB_OBJS=EveryLB.o \
     GridHybridLB.o \
     GridHybridSeedLB.o \
     GridMetisLB.o \
+    TeamLB.o \
     HbmLB.o \
     HybridLB.o \
     MetisLB.o \
@@ -265,6 +273,7 @@ EVERYLB_DEPS=EveryLB.o \
     GridHybridLB.o \
     GridHybridSeedLB.o \
     GridMetisLB.o \
+    TeamLB.o \
     HbmLB.o \
     HybridLB.o \
     MetisLB.o \
