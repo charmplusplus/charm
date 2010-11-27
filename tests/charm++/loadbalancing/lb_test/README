@@ -1,19 +1,13 @@
-Information on the Load Balancing Framework
-         Test Program
+================================================================================
+		      Load Balancing Framework Test Program
+================================================================================
 
-This program tests out the various strategies
-used for load balancing.  The basic configuration
-is a ring of Array elements who do some computation, 
-then send a "compute" message to the next
-element of the ring.  Computation proceeds
-in parallel across all members of the ring
-(main() calls each element's "compute" to
-start everything going).
+This program can be used to test various strategies for load balancing. The
+basic configuration is an array of elements which do some computation, and then
+send a "compute" message to ther neighbors. Three different topologies are
+possible which test different communication patterns: 1D linear ring, 2D
+stencil or mesh and a random irregular graph.
 
-Note:
-	To compile this program, you'll need
-to link with the Metis library, on NCSA machines
-at ~milind/libmetis.a.  The only way I know
-to do that is to use charmc -verbose to get the
-command line, then paste ~milind/libmetis.a 
-in at the end.
+================================================================================
+Updated on 2010-11-26					      by Abhinav Bhatele
+================================================================================
