@@ -50,16 +50,17 @@ class Edge {
   friend class ObjGraph;
 
   public:
-    Edge(int _id, int _msgs, double _bytes) : id(_id), msgs(_msgs),
+    Edge(int _id, int _msgs, int _bytes) : id(_id), msgs(_msgs),
       bytes(_bytes) {
     }
     ~Edge() { }
     inline int getNeighborId() { return id; }
+    inline int getNumBytes() { return bytes; }
 
   private:
     int id;		// id of the neighbor
     int msgs;		// number of messages exchanged
-    double bytes;	// total number of bytes exchanged
+    int bytes;		// total number of bytes exchanged
 };
 
 
