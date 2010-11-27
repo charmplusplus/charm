@@ -1,8 +1,8 @@
 # Makefile for load-banacing test program
 
 OPTS	= -O3
-LBLIB	= -module EveryLB #-L$(HOME)/work/scotch_5.1.10b/lib/ -lscotch -lscotcherr
 CHARMC	= ../../../../bin/charmc $(OPTS)
+LBLIB	= -module CommonLBs #-L$(HOME)/work/scotch/scotch_5.1.10b/lib/ -lscotch -lscotcherr -L$(HOME)/work/metis-4.0/ -lmetis
 
 OBJS	= lb_test.o Topo.o
 
