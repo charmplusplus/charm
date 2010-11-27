@@ -53,7 +53,7 @@ void ScotchLB::work(LDStats *stats) {
     }
   }
 
-  /* neighbor list */
+  /* adjacency list */
   SCOTCH_Num *verttab = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * (vertnbr+1));
   /* loads of vertices */
   SCOTCH_Num *velotab = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
@@ -74,7 +74,6 @@ void ScotchLB::work(LDStats *stats) {
     }
   }
   verttab[i] = edgeNum;
-  CkPrintf("%d %d\n", edgeNum, edgenbr);
   CkAssert(edgeNum == edgenbr);
 
   SCOTCH_Graph graph;		// Graph to partition
@@ -93,7 +92,7 @@ void ScotchLB::work(LDStats *stats) {
 
   SCOTCH_Num *pemap = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
 
-  SCOTCH_graphPart(&graph, CkNumPes(), &strat, pemap);
+  SCOTCH_graphPart(&graph, parr->procs.size(), &strat, pemap);
 
   SCOTCH_graphExit (&graph);
   SCOTCH_stratExit (&strat);
