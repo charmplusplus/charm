@@ -1,35 +1,20 @@
-/*
-Load-balancing test program:
-  Orion Sky Lawlor, 10/19/1999
-
-  Added more complex comm patterns
-  Robert Brunner, 11/3/1999
-
-  updated by
-  Gengbin Zheng
-*/
+/** \file lb_test.C
+ *  Load-balancing test program:
+ *  Orion Sky Lawlor, 1999/10/19
+ *
+ *  Added more complex comm patterns
+ *  Robert Brunner, 1999/11/03
+ *
+ *  Updated by Gengbin Zheng
+ *
+ *  Cleaned up to be up to date with current load balancing framework
+ *  Abhinav Bhatele, 2010/11/26
+ */
 
 #include <stdio.h>
 #include <math.h>
 #include "charm++.h"
-#include "LBDatabase.h"
 #include "Topo.h"
-#include "CentralLB.h"
-#include "DummyLB.h"
-#include "RandCentLB.h"
-//#include "RecBisectBfLB.h"
-#include "RefineLB.h"
-#include "RefineCommLB.h"
-#include "GreedyCommLB.h"
-#include "MetisLB.h"
-#include "GreedyLB.h"
-#include "NeighborLB.h"
-#include "WSLB.h"
-#include "OrbLB.h"
-#include "HybridLB.h"
-#include "HbmLB.h"
-#include "GraphPartLB.h"
-#include "GraphBFTLB.h"
 
 #include "lb_test.decl.h"
 
@@ -90,64 +75,6 @@ private:
   void arg_error(char* argv0);
 };
 
-static const struct {
-  const char *name;//Name of strategy (on command line)
-  const char *description;//Text description of strategy
-  LBCreateFn create;//Strategy routine
-} StratTable[]={
-  {"none",
-   "none - The null load balancer, collect data, print data",
-   CreateCentralLB},
-  {"dummy",
-   "dummy - The null load balancer, collect data, do nothing",
-   CreateDummyLB},
-  {"neighbor",
-   "neighbor - The neighborhood load balancer",
-   CreateNeighborLB},
-  {"workstation",
-   "workstation - Like neighbor, but for workstation performance",
-   CreateWSLB},
-  {"random",
-   "random - Assign objects to processors randomly",
-   CreateRandCentLB},
-  {"greedy",
-   "greedy - (Greedy) Use the greedy algorithm to place heaviest object on the "
-   "least-loaded processor until done",
-   CreateGreedyLB},
-  {"metis",
-   "metis - Use Metis(tm) to partition object graph",
-   CreateMetisLB},
-  {"refine",
-   "refine - Move a very few objects away from most heavily-loaded processor",
-   CreateRefineLB},
-  {"refinecomm",
-   "refinecomm - Move a very few objects away from most heavily-loaded processor, taking communicaiton into account",
-   CreateRefineCommLB},
-  {"orb",
-   "orb - Orthogonal Recursive Bisection to partition according to coordinates",
-   CreateOrbLB},
-  {"comm",
-   "comm - Greedy with communication",
-   CreateGreedyCommLB},
-  /*{"recbf",
-   "recbf - Recursive partitioning with Breadth first enumeration, with 2 nuclei",
-   CreateRecBisectBfLB},*/
-  {"hybrid",
-   "hybrid - Hybrid strategy",
-   CreateHybridLB},
-  {"hbm",
-   "HbmLB - HBM strategy",
-   CreateHbmLB},
-  {"graphpart",
-   "GraphPartLB - graph partitioning",
-   CreateGraphPartLB},
-  {"graphbft",
-   "GraphBFTLB - breadth first traversal",
-   CreateGraphBFTLB},
-
-  {NULL,NULL,NULL}
-};
-
 static void programBegin(void *dummy,int size,void *data)
 {
   //Start everybody computing
@@ -192,23 +119,8 @@ main::main(CkArgMsg *m)
   else arg_error(m->argv[0]);
 
   if (m->argc > cur_arg)
-    strategy=m->argv[cur_arg++];
-  else arg_error(m->argv[0]);
-
-  if (m->argc > cur_arg)
     topology=m->argv[cur_arg++];
   else arg_error(m->argv[0]);
-
-  //Look up the user's strategy in table
-  stratNo=0;
-  while (StratTable[stratNo].name!=NULL) {
-    if (0==strcasecmp(strategy,StratTable[stratNo].name)) {
-      //We found the user's chosen strategy!
-      StratTable[stratNo].create();//Create this strategy
-      break;
-    }
-    stratNo++;
-  }
 
   CkPrintf("%d processors\n",CkNumPes());
   CkPrintf("%d elements\n",element_count);
@@ -219,11 +131,6 @@ main::main(CkArgMsg *m)
 
   mid = thishandle;
 
-
-  if (StratTable[stratNo].name==NULL)
-    //The user's strategy name wasn't in the table-- bad!
-    CkAbort("ERROR! Strategy not found!  \n");
-	
   topoid = Topo::Create(element_count,topology,min_us,max_us);
   if (topoid.isZero())
     CkAbort("ERROR! Topology not found!  \n");
@@ -242,13 +149,7 @@ void main::arg_error(char* argv0)
 {
   CkPrintf("Usage: %s \n"
     "<elements> <steps> <print-freq> <lb-freq> <min-dur us> <max-dur us>\n"
-    "<strategy> <topology>\n"
-    "<strategy> is the load-balancing strategy:\n",argv0);
-  int stratNo=0;
-  while (StratTable[stratNo].name!=NULL) {
-    CkPrintf("  %s\n",StratTable[stratNo].description);
-    stratNo++;
-  }
+    "<topology>\n", argv0);
 
   int topoNo = 0;
   CkPrintf("<topology> is the object connection topology:\n");
@@ -258,7 +159,7 @@ void main::arg_error(char* argv0)
   }
 
   CmiPrintf("\n"
-	   " The program creates a ring of element_count array elements,\n"
+	   "The program creates a ring of element_count array elements,\n"
 	   "which all compute and send to their neighbor cycle_count.\n"
 	   "Computation proceeds across the entire ring simultaniously.\n"
 	   "Orion Sky Lawlor, olawlor@acm.org, PPL, 10/14/1999\n");
