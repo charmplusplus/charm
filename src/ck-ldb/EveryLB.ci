@@ -17,7 +17,6 @@ module EveryLB {
   extern module GridMetisLB;
   extern module HbmLB;
   extern module HybridLB;
-  extern module MetisLB;
   extern module NeighborCommLB;
   extern module NeighborLB;
   extern module OrbLB;
