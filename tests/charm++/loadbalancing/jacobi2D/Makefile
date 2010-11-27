@@ -6,7 +6,7 @@ FNAME	= Jacobi2D
 all: pgm
 
 pgm:  $(FNAME).o
-	$(CHARMC) $(FNAME).o -o pgm -language charm++
+	$(CHARMC) $(FNAME).o -o pgm -language charm++ $(LBLIB)
 
 $(FNAME).o : $(FNAME).C $(FNAME).h $(FNAME).ci
 	$(CHARMC) -c $(FNAME).ci $(FNAME).C
