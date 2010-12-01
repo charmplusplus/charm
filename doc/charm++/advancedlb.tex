@@ -58,33 +58,77 @@ This function served as a callback that is called on each chare object when
 load balancer framework. {\em setObjTime()} described above can be used for
 this.
 
-\subsubsection{Write a Measurement-based Object Migration Strategy}
-\label{writelb}
+\subsubsection{Writing a communication-aware load balancing strategy}
 
-Charm++ programmers can pick load balancing strategy from Charm++'s built-in
-strategies(see ~\ref{lbStrategy}) for the best performance based on the 
-characteristics of their applications, they can also choose to write their 
-own load balancing strategies.
+Charm++ programmers can choose an existing load balancing strategy from
+Charm++'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
+based on the characteristics of their applications. However, they can also
+choose to write their own load balancing strategies.
 
-Charm++ load balancing framework provides a simple scheme to incorporate new 
-load balancing strategies. To write a new load balancing strategy
-involves the following steps (We use an example of writing a centralized
-load balancer {\em fooLB} to illustrate the steps).
+The Charm++ load balancing framework provides a simple scheme to incorporate
+new load balancing strategies. The programmer needs to write their strategy for
+load balancing based on a instrumented ProcArray and ObjGraph provided by the
+load balancing framework. This strategy is to be incorporated within this
+function:
+
+\begin{alltt}
+void FooLB::work(LDStats *stats) \{
+  /** ========================== INITIALIZATION ============================= */
+  ProcArray *parr = new ProcArray(stats);
+  ObjGraph *ogr = new ObjGraph(stats);
+
+  /** ============================= STRATEGY ================================ */
+  /// The strategy goes here
+  /// The strategy goes here
+  /// The strategy goes here
+  /// The strategy goes here
+  /// The strategy goes here
+
+  /** ============================== CLEANUP ================================ */
+  ogr->convertDecisions(stats);
+\}
+\end{alltt}
+
+Figure~\ref{fig:ckgraph} explains the two data structures available to the
+strategy: ProcArray and ObjGraph. Using these, the strategy should assign new
+processors for objects it wants to be migrated through the setNewPe() method.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=6.0in]{fig/ckgraph}
+\caption{ProcArray and ObjGraph data structures to be used when writing a load
+balancing strategy}
+\label{fig:ckgraph}
+\end{figure}
+
+Incorporating this strategy into the Charm++ build framework is explained in
+the next section.
+
+\subsubsection{Adding a load balancer to Charm++}
+
+Let us assume that we are writing a new centralized load balancer called FooLB.
+The next few steps explain the addition of the load balancer to the Charm++
+build system:
 
 \begin{enumerate}
-\item Create files named {\em fooLB.ci, fooLB.h and fooLB.C}. One can choose to
-copy and rename the files RotateLB.* and rename the class name in those files.
+\item Create files named {\em FooLB.ci, FooLB.h and FooLB.C}. One can choose to
+copy and rename the files GraphPartLB.* and rename the class name in those
+files.
 
-\item Implement the {\em fooLB} class method --- {\bf fooLB::work(LDStats*
-stats)} This method takes the load balancing database ({\em stats}) as an
-input, and output the new mapping of objects to processors in {\em
-stats->to\_proc} array.
+\item Implement the strategy in the {\em FooLB} class method --- {\bf
+FooLB::work(LDStats* stats)} as described in the previous section.
+%This method takes the load balancing database ({\em stats}) as an input, and
+%output the new mapping of objects to processors in {\em stats->to\_proc}
+%array.
 
-\item Build charm for your platform (This will create the required links in the tmp directory).
+\item Build charm for your platform (This will create the required links in the
+tmp directory).
 
-\item To compile the strategy files, first add {\em fooLB} into the load
-balancer list in charm/tmp/Makefile\_lb.sh. Run the script in charm/tmp, which
-creates the new Makefile named ``Make.lb''.
+\item To compile the strategy files, first add {\em FooLB} into the load
+balancer list in charm/tmp/Makefile\_lb.sh. If FooLB will require some
+libraries at link time, you also need to create the dependency file called
+libmoduleFooLB.dep. Run the script in charm/tmp, which creates the new Makefile
+named ``Make.lb''.
 
 \item Run ``make depends'' to update dependence rule of Charm++ files.  And run
 ``make charm++'' to compile Charm++ which includes the new load balancing

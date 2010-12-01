@@ -15,10 +15,8 @@ module EveryLB {
   extern module GridHybridLB;
   extern module GridHybridSeedLB;
   extern module GridMetisLB;
-  extern module TeamLB;
   extern module HbmLB;
   extern module HybridLB;
-  extern module MetisLB;
   extern module NeighborCommLB;
   extern module NeighborLB;
   extern module OrbLB;
@@ -29,6 +27,7 @@ module EveryLB {
   extern module RefineKLB;
   extern module RefineTopoLB;
   extern module RotateLB;
+  extern module TeamLB;
   extern module TopoCentLB;
   extern module TopoLB;
   extern module WSLB;

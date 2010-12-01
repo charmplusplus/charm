@@ -1,15 +1,15 @@
 # Makefile for load-banacing test program
 
-OPTS	=
-LBLIB	= -module EveryLB
+OPTS	= -O3
 CHARMC	= ../../../../bin/charmc $(OPTS)
+LBLIB	= -module CommonLBs #-L$(HOME)/work/scotch/scotch_5.1.10b/lib/ -lscotch -lscotcherr -L$(HOME)/work/metis-4.0/ -lmetis
 
 OBJS	= lb_test.o Topo.o
 
 all:	lb_test
 
 lb_test: $(OBJS)
-	$(CHARMC) -language charm++ -o lb_test $(OBJS) $(LBLIB) 
+	$(CHARMC) -language charm++ -o lb_test $(OBJS) $(LBLIB)
 
 lb_test.decl.h lb_test.def.h: lb_test.ci
 	$(CHARMC) lb_test.ci 
@@ -24,13 +24,13 @@ Topo.o: Topo.C Topo.h Topo.decl.h
 	$(CHARMC) -c Topo.C
 
 test:  lb_test
-	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 comm ring +LBDebug 1 $(TESTOPTS)
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1
 
 bgtest:  lb_test
-	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 comm ring +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
 
 bgdump:
-	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 dummy mesh2d +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 mesh2d +balancer DummyLB +LBDebug 1 +LBSameCpus +LBNoBackground +bgconfig ./bg_config +LBDump 1 +LBDumpFile lb_test.dump
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o lb_test charmrun lb_test.exe lb_test.pdb lb_test.ilk

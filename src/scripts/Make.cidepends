@@ -32,7 +32,6 @@ GridCommRefineLB.decl.h GridCommRefineLB.def.h: GridCommRefineLB.ci.stamp
 GridHybridLB.decl.h GridHybridLB.def.h: GridHybridLB.ci.stamp
 GridHybridSeedLB.decl.h GridHybridSeedLB.def.h: GridHybridSeedLB.ci.stamp
 GridMetisLB.decl.h GridMetisLB.def.h: GridMetisLB.ci.stamp
-TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
 HbmLB.decl.h HbmLB.def.h: HbmLB.ci.stamp
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 HybridLB.decl.h HybridLB.def.h: HybridLB.ci.stamp
@@ -52,6 +51,8 @@ RefineKLB.decl.h RefineKLB.def.h: RefineKLB.ci.stamp
 RefineLB.decl.h RefineLB.def.h: RefineLB.ci.stamp
 RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp
+ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
+TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp
 TopoCentLB.decl.h TopoCentLB.def.h: TopoCentLB.ci.stamp
 TopoLB.decl.h TopoLB.def.h: TopoLB.ci.stamp
