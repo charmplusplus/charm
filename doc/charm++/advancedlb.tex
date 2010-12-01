@@ -83,8 +83,10 @@ stats->to\_proc} array.
 \item Build charm for your platform (This will create the required links in the tmp directory).
 
 \item To compile the strategy files, first add {\em fooLB} into the load
-balancer list in charm/tmp/Makefile\_lb.sh. Run the script in charm/tmp, which
-creates the new Makefile named ``Make.lb''.
+balancer list in charm/tmp/Makefile\_lb.sh. If fooLB will require some
+libraries at link time, you also need to create the dependency file called
+libmodulefooLB.dep. Run the script in charm/tmp, which creates the new Makefile
+named ``Make.lb''.
 
 \item Run ``make depends'' to update dependence rule of Charm++ files.  And run
 ``make charm++'' to compile Charm++ which includes the new load balancing
