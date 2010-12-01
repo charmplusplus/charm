@@ -88,7 +88,6 @@ cat >> $out <<EOB
 
 \$(L)/libmoduleEveryLB.a: \$(EVERYLB_DEPS)
 	\$(CHARMC) -o \$(L)/libmoduleEveryLB.a \$(EVERYLB_DEPS)
-	cp libmoduleEveryLB.dep \$(L)/
 
 \$(L)/libmoduleCommonLBs.a: \$(COMMONLBS_DEPS)
 	\$(CHARMC) -o \$(L)/libmoduleCommonLBs.a \$(COMMONLBS_DEPS)
