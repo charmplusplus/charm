@@ -46,13 +46,13 @@ void GraphBFTLB::work(LDStats *stats) {
 
   // start at vertex with id 0
   vertexq.push(start);
-  if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad() > avgLoad) {
+  if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getVertexLoad() > avgLoad) {
     nextPe++;
     avgLoad += (avgLoad - parr->procs[nextPe].getTotalLoad())/(numPes-nextPe);
   }
   ogr->vertices[start].setNewPe(nextPe);
-  // CkPrintf("[%d] %d %d %g %g %g\n", start, ogr->vertices[start].getCurrentPe(), ogr->vertices[start].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getObjLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
-  parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
+  // CkPrintf("[%d] %d %d %g %g %g\n", start, ogr->vertices[start].getCurrentPe(), ogr->vertices[start].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getVertexLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getVertexLoad());
+  parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getVertexLoad());
 
   int i, nbr;
   // breadth first traversal
@@ -67,13 +67,13 @@ void GraphBFTLB::work(LDStats *stats) {
       if(ogr->vertices[nbr].getNewPe() == -1) {
 	vertexq.push(nbr);
 
-	if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getObjLoad() > avgLoad) {
+	if(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getVertexLoad() > avgLoad) {
 	  nextPe++;
 	  avgLoad += (avgLoad - parr->procs[nextPe].getTotalLoad())/(numPes-nextPe);
 	}
 	ogr->vertices[nbr].setNewPe(nextPe);
-	// CkPrintf("[%d] %d %d %g %g %g\n", nbr, ogr->vertices[nbr].getCurrentPe(), ogr->vertices[nbr].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getObjLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getObjLoad());
-	parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getObjLoad());
+	// CkPrintf("[%d] %d %d %g %g %g\n", nbr, ogr->vertices[nbr].getCurrentPe(), ogr->vertices[nbr].getNewPe(), parr->procs[nextPe].getTotalLoad(), ogr->vertices[start].getVertexLoad(), parr->procs[nextPe].getTotalLoad() + ogr->vertices[start].getVertexLoad());
+	parr->procs[nextPe].setTotalLoad(parr->procs[nextPe].getTotalLoad() + ogr->vertices[nbr].getVertexLoad());
       }
     } // end of for loop
   } // end of while loop

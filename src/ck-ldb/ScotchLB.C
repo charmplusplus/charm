@@ -44,8 +44,8 @@ void ScotchLB::work(LDStats *stats) {
   /** both object load and number of bytes exchanged are normalized to an
    *  integer between 0 and 256 */
   for(i = baseval; i < vertnbr; i++) {
-    if(ogr->vertices[i].getObjLoad() > maxLoad)
-      maxLoad = ogr->vertices[i].getObjLoad();
+    if(ogr->vertices[i].getVertexLoad() > maxLoad)
+      maxLoad = ogr->vertices[i].getVertexLoad();
     edgenbr += ogr->vertices[i].edgeList.size();
     for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
       if(ogr->vertices[i].edgeList[j].getNumBytes() > maxBytes)
@@ -66,7 +66,7 @@ void ScotchLB::work(LDStats *stats) {
 
   for(i = baseval; i < vertnbr; i++) {
     verttab[i] = edgeNum;
-    velotab[i] = (int)( (ogr->vertices[i].getObjLoad() * 128) /maxLoad );
+    velotab[i] = (int)( (ogr->vertices[i].getVertexLoad() * 128) /maxLoad );
     for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
       edgetab[edgeNum] = ogr->vertices[i].edgeList[j].getNeighborId();
       edlotab[edgeNum] = (int)( (ogr->vertices[i].edgeList[j].getNumBytes() * 128) / maxBytes );

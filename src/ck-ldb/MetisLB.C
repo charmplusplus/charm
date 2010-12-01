@@ -63,8 +63,8 @@ void MetisLB::work(LDStats* stats)
   /** both object load and number of bytes exchanged are normalized to an
    *  integer between 0 and 256 */
   for(i = 0; i < numVertices; i++) {
-    if(ogr->vertices[i].getObjLoad() > maxLoad)
-      maxLoad = ogr->vertices[i].getObjLoad();
+    if(ogr->vertices[i].getVertexLoad() > maxLoad)
+      maxLoad = ogr->vertices[i].getVertexLoad();
     numEdges += ogr->vertices[i].edgeList.size();
     for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
       if(ogr->vertices[i].edgeList[j].getNumBytes() > maxBytes)
@@ -85,7 +85,7 @@ void MetisLB::work(LDStats* stats)
 
   for(i = 0; i < numVertices; i++) {
     xadj[i] = edgeNum;
-    vwgt[i] = (int)( (ogr->vertices[i].getObjLoad() * 128) /maxLoad );
+    vwgt[i] = (int)( (ogr->vertices[i].getVertexLoad() * 128) /maxLoad );
     for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].edgeList[j].getNeighborId();
       adjwgt[edgeNum] = (int)( (ogr->vertices[i].edgeList[j].getNumBytes() * 128) / maxBytes );

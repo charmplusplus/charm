@@ -24,6 +24,7 @@ class ProcInfo {
     inline double getTotalLoad() { return totalLoad; }
     inline double getOverhead() { return overhead; }
     inline void setTotalLoad(double _tload) { totalLoad = _tload; }
+    inline bool isAvailable() { return available; }
 
   private:
     int id;		// CkMyPe of the processor
@@ -58,7 +59,8 @@ class Edge {
     inline int getNumBytes() { return bytes; }
 
   private:
-    int id;		// id of the neighbor
+    int id;		// id of the neighbor = index of the neighbor vertex
+			// in the vector 'vertices'
     int msgs;		// number of messages exchanged
     int bytes;		// total number of bytes exchanged
 };
@@ -68,10 +70,12 @@ class Vertex {
   friend class ObjGraph;
 
   public:
-    inline double getObjLoad() { return compLoad; }
+    inline int getVertexId() { return id; }
+    inline double getVertexLoad() { return compLoad; }
     inline int getCurrentPe() { return currPe; }
     inline int getNewPe() { return newPe; }
     inline void setNewPe(int _newpe) { newPe = _newpe; }
+    inline bool isMigratable() { return migratable; }
 
     // undirected edges from this vertex to other vertices
     std::vector<Edge> edgeList;
