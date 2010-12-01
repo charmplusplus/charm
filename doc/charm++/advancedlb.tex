@@ -72,7 +72,7 @@ load balancing framework. This strategy is to be incorporated within this
 function:
 
 \begin{alltt}
-void FooLB::work(LDStats *stats) {
+void FooLB::work(LDStats *stats) \{
   /** ========================== INITIALIZATION ============================= */
   ProcArray *parr = new ProcArray(stats);
   ObjGraph *ogr = new ObjGraph(stats);
@@ -86,7 +86,7 @@ void FooLB::work(LDStats *stats) {
 
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
-}
+\}
 \end{alltt}
 
 Figure~\ref{fig:ckgraph} explains the two data structures available to the
@@ -105,7 +105,6 @@ Incorporating this strategy into the Charm++ build framework is explained in
 the next section.
 
 \subsubsection{Adding a load balancer to Charm++}
-\label{writelb}
 
 Let us assume that we are writing a new centralized load balancer called FooLB.
 The next few steps explain the addition of the load balancer to the Charm++
