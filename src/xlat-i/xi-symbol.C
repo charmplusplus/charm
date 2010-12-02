@@ -3118,6 +3118,7 @@ void Entry::genChareDefs(XStr& str)
     str << "}\n";
   }
   if (isReductionTarget()) {
+      XStr retStr;
       str << makeDecl(retStr, 1) << "::" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n";
       str << "}\n\n";
   }
