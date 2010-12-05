@@ -73,24 +73,25 @@ public:
 	class Handle
 	{
     public:
-        inline unsigned int length() const { return msa.length(); }
+        inline unsigned int length() const { return msa->length(); }
 
 	protected:
-        MSA1D &msa;
+        MSA1D *msa;
         bool valid;
 
         friend class MSA1D;
 
         void inline checkInvalidate(MSA1D *m) 
         {
-            if (m != &msa || !valid)
+            if (m != msa || !valid)
                 throw MSA_InvalidHandle();
             valid = false;
         }
 
-        Handle(MSA1D &msa_) 
+        Handle(MSA1D *msa_) 
             : msa(msa_), valid(true) 
         { }
+        Handle() : msa(NULL), valid(false) {}
         void checkValid()
         {
             if (!valid)
@@ -106,7 +107,7 @@ public:
     {
     protected:
         friend class MSA1D;
-        Read(MSA1D &msa_)
+        Read(MSA1D *msa_)
             :  Handle(msa_) { }
         using Handle::checkValid;
         using Handle::checkInvalidate;
@@ -115,29 +116,30 @@ public:
         inline const ENTRY& get(unsigned int idx)
         {
             checkValid();
-            return Handle::msa.get(idx); 
+            return Handle::msa->get(idx); 
         }
         inline const ENTRY& operator[](unsigned int idx) { return get(idx); }
         inline const ENTRY& operator()(unsigned int idx) { return get(idx); }
         inline const ENTRY& get2(unsigned int idx)
         {
             checkValid();
-            return Handle::msa.get2(idx);
+            return Handle::msa->get2(idx);
         }
+        Read() {}
     };
 
     class Write : public Handle
     {
     protected:
         friend class MSA1D;
-        Write(MSA1D &msa_)
+        Write(MSA1D *msa_)
             : Handle(msa_) { }
 
     public:
         inline Writable<ENTRY> set(unsigned int idx)
         {
             Handle::checkValid();
-            return Writable<ENTRY>(Handle::msa.set(idx));
+            return Writable<ENTRY>(Handle::msa->set(idx));
         }
         inline Writable<ENTRY> operator()(unsigned int idx)
             { return set(idx); }
@@ -147,19 +149,19 @@ public:
     {
     protected:
         friend class MSA1D;
-        Accum(MSA1D &msa_)
+        Accum(MSA1D *msa_)
             : Handle(msa_) { }
         using Handle::checkInvalidate;
     public:
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int idx)
         { 
             Handle::checkValid();
-            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa->accumulate(idx));
         }
         inline void accumulate(unsigned int idx, const ENTRY& ent)
         {
             Handle::checkValid();
-            Handle::msa.accumulate(idx, ent);
+            Handle::msa->accumulate(idx, ent);
         }
 
         void contribute(unsigned int idx, const ENTRY *begin, const ENTRY *end)
@@ -167,7 +169,7 @@ public:
             Handle::checkValid();
             for (const ENTRY *e = begin; e != end; ++e, ++idx)
                 {
-                    Handle::msa.accumulate(idx, *e);
+                    Handle::msa->accumulate(idx, *e);
                 }
         }
 
@@ -487,21 +489,23 @@ public:
 	class Handle
 	{
 	protected:
-        MSA2D &msa;
+        MSA2D *msa;
         bool valid;
 
         friend class MSA2D;
 
         inline void checkInvalidate(MSA2D *m)
         {
-            if (&msa != m || !valid)
+            if (*msa != m || !valid)
                 throw MSA_InvalidHandle();
             valid = false;
         }
 
-        Handle(MSA2D &msa_) 
+        Handle(MSA2D *msa_) 
             : msa(msa_), valid(true) 
         { }
+        Handle() : msa(NULL), valid(false) {}
+
         inline void checkValid()
         {
             if (!valid)
@@ -516,19 +520,19 @@ public:
     {
     private:
         friend class MSA2D;
-        Read(MSA2D &msa_)
+        Read(MSA2D *msa_)
             :  Handle(msa_) { }
 
     public: 
         inline const ENTRY& get(unsigned int row, unsigned int col)
         {
             Handle::checkValid();
-            return Handle::msa.get(row, col);
+            return Handle::msa->get(row, col);
         }
         inline const ENTRY& get2(unsigned int row, unsigned int col)
         {
             Handle::checkValid();
-            return Handle::msa.get2(row, col);
+            return Handle::msa->get2(row, col);
         }
 
         inline const ENTRY& operator() (unsigned int row, unsigned int col)
@@ -536,20 +540,21 @@ public:
                 return get(row,col);
             }
 
+        Read() { }
     };
 
     class Write : public Handle
     {
     private:
         friend class MSA2D;
-        Write(MSA2D &msa_)
+        Write(MSA2D *msa_)
             :  Handle(msa_) { }
 
     public: 
         inline Writable<ENTRY> set(unsigned int row, unsigned int col)
         {
             Handle::checkValid();
-            return Writable<ENTRY>(Handle::msa.set(row, col));
+            return Writable<ENTRY>(Handle::msa->set(row, col));
         }
 
         inline Writable<ENTRY> operator()(unsigned int row, unsigned int col)
@@ -560,24 +565,24 @@ public:
     {
     protected:
         friend class MSA2D;
-        Accum(MSA2D &msa_)
+        Accum(MSA2D *msa_)
             : Handle(msa_) { }
         using Handle::checkInvalidate;
     public:
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int idx)
         {
             Handle::checkValid();
-            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(idx));
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa->accumulate(idx));
         }
         inline Accumulable<ENTRY, ENTRY_OPS_CLASS> accumulate(unsigned int x, unsigned int y)
         {
             Handle::checkValid();
-            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa.accumulate(Handle::msa.getIndex(x, y)));
+            return Accumulable<ENTRY, ENTRY_OPS_CLASS>(Handle::msa->accumulate(Handle::msa->getIndex(x, y)));
         }
         inline void accumulate(unsigned int idx, const ENTRY& ent)
         {
             Handle::checkValid();
-            Handle::msa.accumulate(idx, ent);
+            Handle::msa->accumulate(idx, ent);
         }
 
         void contribute(unsigned int idx, const ENTRY *begin, const ENTRY *end)
@@ -585,7 +590,7 @@ public:
             Handle::checkValid();
             for (const ENTRY *e = begin; e != end; ++e, ++idx)
                 {
-                    Handle::msa.accumulate(idx, *e);
+                    Handle::msa->accumulate(idx, *e);
                 }
         }
 
