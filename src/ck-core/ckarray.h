@@ -49,10 +49,29 @@ All these classes are defined in ckarray.C.
 */
 /*@{*/
 
+typedef int CkIndex1D;
+typedef struct {int x,y;} CkIndex2D;
+inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
+typedef struct {int x,y,z;} CkIndex3D;
+inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
+typedef struct {short int w,x,y,z;} CkIndex4D;
+inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
+typedef struct {short int v,w,x,y,z;} CkIndex5D;
+inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
+typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
+inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
+typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
+inline void operator|(PUP::er &p,CkIndexMax &i) {
+  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
+    p|i.data[j];
+  }
+}
+
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
 public:
 	CkArrayIndex1D() { nInts=1; dimension=1; }
+	// CkIndex1D is an int, so that conversion is automatic
 	CkArrayIndex1D(int i0) {
 		index[0]=i0;nInts=1;dimension=1;
 	}
@@ -71,6 +90,9 @@ public:
 	CkArrayIndex2D(int i0,int i1) {
 		index[0]=i0;index[1]=i1;nInts=2;dimension=2;
 	}
+	CkArrayIndex2D(CkIndex2D idx) {
+	    index[0]=idx.x; index[1] = idx.y; nInts = 2; dimension = 2;
+	}
 	CkArrayIndex2D &operator=(const CkArrayIndex2D &that)  {
 		CmiAssert(that.nInts == 2);
 		CmiAssert(that.dimension == 2);
@@ -85,6 +107,9 @@ public:
 	CkArrayIndex3D() { nInts=3; dimension=3; }
 	CkArrayIndex3D(int i0,int i1,int i2) {
 		index[0]=i0;index[1]=i1;index[2]=i2;nInts=3;dimension=3;
+	}
+	CkArrayIndex3D(CkIndex3D idx) {
+		index[0]=idx.x;index[1]=idx.y;index[2]=idx.z;nInts=3;dimension=3;
 	}
 	CkArrayIndex3D &operator=(const CkArrayIndex3D &that)  {
 		CmiAssert(that.nInts == 3);
@@ -101,6 +126,13 @@ public:
 	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;nInts=2;dimension=4;
 	}
+	CkArrayIndex4D(CkIndex4D idx) {
+	    indexShorts[0]=idx.w;
+	    indexShorts[1]=idx.x;
+	    indexShorts[2]=idx.y;
+	    indexShorts[3]=idx.z;
+	    nInts=2;dimension=4;
+	}
 	CkArrayIndex4D &operator=(const CkArrayIndex4D &that)  {
 		CmiAssert(that.nInts == 2);
 		CmiAssert(that.dimension == 4);
@@ -116,6 +148,14 @@ public:
 	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;indexShorts[4]=i4;nInts=3;dimension=5;
         }
+	CkArrayIndex5D(CkIndex5D idx) {
+	    indexShorts[0]=idx.v;
+	    indexShorts[1]=idx.w;
+	    indexShorts[2]=idx.x;
+	    indexShorts[3]=idx.y;
+	    indexShorts[4]=idx.z;
+	    nInts=3;dimension=5;
+	}
 	CkArrayIndex5D &operator=(const CkArrayIndex5D &that)  {
 		CmiAssert(that.nInts == 3);
 		CmiAssert(that.dimension == 5);
@@ -130,6 +170,15 @@ public:
 	CkArrayIndex6D(){ nInts=3; dimension=6; }
 	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;indexShorts[4]=i4;indexShorts[5]=i5;nInts=3;dimension=6;
+	}
+	CkArrayIndex6D(CkIndex6D idx) {
+	    indexShorts[0]=idx.x1;
+	    indexShorts[1]=idx.y1;
+	    indexShorts[2]=idx.z1;
+	    indexShorts[3]=idx.x2;
+	    indexShorts[4]=idx.y2;
+	    indexShorts[5]=idx.z2;
+	    nInts=3;dimension=6;
 	}
 	CkArrayIndex6D &operator=(const CkArrayIndex6D &that)  {
 		CmiAssert(that.nInts == 3);
@@ -585,24 +634,6 @@ public:
   const T thisIndex;/// Object array index
 };
 
-typedef int CkIndex1D;
-typedef struct {int x,y;} CkIndex2D;
-inline void operator|(PUP::er &p,CkIndex2D &i) {p(i.x); p(i.y);}
-typedef struct {int x,y,z;} CkIndex3D;
-inline void operator|(PUP::er &p,CkIndex3D &i) {p(i.x); p(i.y); p(i.z);}
-typedef struct {short int w,x,y,z;} CkIndex4D;
-inline void operator|(PUP::er &p,CkIndex4D &i) {p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int v,w,x,y,z;} CkIndex5D;
-inline void operator|(PUP::er &p,CkIndex5D &i) {p(i.v); p(i.w); p(i.x); p(i.y); p(i.z);}
-typedef struct {short int x1,y1,z1,x2,y2,z2;} CkIndex6D;
-inline void operator|(PUP::er &p,CkIndex6D &i) {p(i.x1); p(i.y1); p(i.z1); p(i.x2); p(i.y2); p(i.z2);}
-typedef struct {int data[CK_ARRAYINDEX_MAXLEN];} CkIndexMax;
-inline void operator|(PUP::er &p,CkIndexMax &i) {
-  for (int j=0;j<CK_ARRAYINDEX_MAXLEN;j++) {
-    p|i.data[j];
-  }
-}
-
 typedef ArrayElementT<CkIndex1D> ArrayElement1D;
 typedef ArrayElementT<CkIndex2D> ArrayElement2D;
 typedef ArrayElementT<CkIndex3D> ArrayElement3D;
@@ -610,6 +641,7 @@ typedef ArrayElementT<CkIndex4D> ArrayElement4D;
 typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
+
 /*@}*/
 
 

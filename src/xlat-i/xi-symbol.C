@@ -1465,31 +1465,40 @@ Array::genSubDecls(XStr& str)
   //Add specialized indexing for these common types
     if (indexSuffix==(const char*)"1D")
     {
-    str <<
-    "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
-    "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
+    str << "    " << etype << " operator [] (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
+	<< "    " << etype <<" operator () (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex2D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex3D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"4D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex4D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"5D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex5D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"6D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex6D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(idx), CK_DELCTOR_CALL);}\n";
     }
     str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
