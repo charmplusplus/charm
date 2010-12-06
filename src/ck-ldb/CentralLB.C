@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -589,7 +582,7 @@ void CentralLB::LoadBalance()
 #endif
   
   double strat_start_time = CkWallTimer();
-  LBMigrateMsg* migrateMsg = Strategy(statsData, statsData->nprocs());
+  LBMigrateMsg* migrateMsg = Strategy(statsData);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	migrateMsg->step = step();
 #endif
@@ -1062,12 +1055,6 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 #else
   return NULL;
 #endif
-}
-
-// keep for legacy code
-LBMigrateMsg* CentralLB::Strategy(LDStats* stats, int nprocs)
-{
-  return Strategy(stats);
 }
 
 void CentralLB::work(LDStats* stats)

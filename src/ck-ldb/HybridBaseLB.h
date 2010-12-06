@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -349,15 +342,17 @@ private:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs);
-  virtual LBMigrateMsg* Strategy(LDStats* stats) { return Strategy(stats, stats->nprocs());}
+  virtual LBMigrateMsg* Strategy(LDStats* stats);
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
-
   // helper function
-  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count);
-
+  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo, int count);
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
+
+  // Not to be used -- maintained for legacy applications
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
+    return Strategy(stats);
+  }
 
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index

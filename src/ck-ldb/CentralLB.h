@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -221,10 +214,14 @@ public:
 
   void preprocess(LDStats* stats);
   virtual LBMigrateMsg* Strategy(LDStats* stats);
-  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs);
   virtual void work(LDStats* stats);
   virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
+
+  // Not to be used -- maintained for legacy applications
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
+    return Strategy(stats);
+  }
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -475,7 +468,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
     thisProxy.ReceiveVectorMigration(migrateMsg, nclients, lData->children);
   }
   else {
-    LBMigrateMsg* migrateMsg = Strategy(statsData, statsData->nprocs());
+    LBMigrateMsg* migrateMsg = Strategy(statsData);
     strat_end_time = CkWallTimer();
 
     // send to children 
@@ -513,7 +506,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   }
 }
 
-LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats, int nprocs)
+LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
   work(stats);
