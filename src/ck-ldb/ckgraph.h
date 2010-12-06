@@ -56,6 +56,7 @@ class Edge {
     }
     ~Edge() { }
     inline int getNeighborId() { return id; }
+    inline int getNumMsgs() { return msgs; }
     inline int getNumBytes() { return bytes; }
 
   private:
