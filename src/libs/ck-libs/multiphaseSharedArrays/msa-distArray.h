@@ -766,8 +766,10 @@ namespace MSA
 template<class ENTRY, class ENTRY_OPS_CLASS, unsigned int ENTRIES_PER_PAGE>
 class MSA3D
 {
+    /// Inclusive lower and upper bounds on entry indices
+    int xa, xb, ya, yb, za, zb;
+    /// Size of the array in each dimension
     unsigned dim_x, dim_y, dim_z;
-
 
 public:
     typedef MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CacheGroup_t;
@@ -904,13 +906,13 @@ public:
             CkAssert(y1 <= y2);
             CkAssert(z1 <= z2);
 
-            CkAssert(x1 >= 0);
-            CkAssert(y1 >= 0);
-            CkAssert(z1 >= 0);
+            CkAssert(x1 >= Handle::msa->xa);
+            CkAssert(y1 >= Handle::msa->ya);
+            CkAssert(z1 >= Handle::msa->za);
 
-            CkAssert(x2 < Handle::msa->dim_x);
-            CkAssert(y2 < Handle::msa->dim_y);
-            CkAssert(z2 < Handle::msa->dim_z);
+            CkAssert(x2 <= Handle::msa->xb);
+            CkAssert(y2 <= Handle::msa->yb);
+            CkAssert(z2 <= Handle::msa->zb);
 
             unsigned i = 0;
 
@@ -949,13 +951,13 @@ public:
             CkAssert(y1 <= y2);
             CkAssert(z1 <= z2);
 
-            CkAssert(x1 >= 0);
-            CkAssert(y1 >= 0);
-            CkAssert(z1 >= 0);
+            CkAssert(x1 >= Handle::msa->xa);
+            CkAssert(y1 >= Handle::msa->ya);
+            CkAssert(z1 >= Handle::msa->za);
 
-            CkAssert(x2 < Handle::msa->dim_x);
-            CkAssert(y2 < Handle::msa->dim_y);
-            CkAssert(z2 < Handle::msa->dim_z);
+            CkAssert(x2 <= Handle::msa->xb);
+            CkAssert(y2 <= Handle::msa->yb);
+            CkAssert(z2 <= Handle::msa->zb);
 
             unsigned i = 0;
 
@@ -1002,13 +1004,13 @@ public:
             CkAssert(y1 <= y2);
             CkAssert(z1 <= z2);
 
-            CkAssert(x1 >= 0);
-            CkAssert(y1 >= 0);
-            CkAssert(z1 >= 0);
+            CkAssert(x1 >= Handle::msa->xa);
+            CkAssert(y1 >= Handle::msa->ya);
+            CkAssert(z1 >= Handle::msa->za);
 
-            CkAssert(x2 < Handle::msa->dim_x);
-            CkAssert(y2 < Handle::msa->dim_y);
-            CkAssert(z2 < Handle::msa->dim_z);
+            CkAssert(x2 <= Handle::msa->xb);
+            CkAssert(y2 <= Handle::msa->yb);
+            CkAssert(z2 <= Handle::msa->zb);
 
             unsigned i = 0;
 
@@ -1056,6 +1058,9 @@ public:
     {}
 
     virtual void pup(PUP::er &p){
+        p|xa; p|xb;
+        p|ya; p|yb;
+        p|za; p|zb;
         p|dim_x;
         p|dim_y;
         p|dim_z;
@@ -1067,12 +1072,36 @@ public:
     /**
       Create a completely new MSA array.  This call creates the
       corresponding groups, so only call it once per array.
+
+      Valid indices lie in [0,x-1]*[0,y-1]*[0,z-1]
     */
     inline MSA3D(unsigned x, unsigned y, unsigned z, unsigned int num_wrkrs, 
                  unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
-        : dim_x(x), dim_y(y), dim_z(z), initHandleGiven(false)
+        : xa(0), ya(0), za(0), xb(x-1), yb(y-1), zb(z-1), dim_x(x), dim_y(y), dim_z(z),
+          initHandleGiven(false)
     {
         unsigned nEntries = x*y*z;
+        unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
+        CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
+        cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
+        pageArray.setCacheProxy(cg);
+        //pageArray.ckSetReductionClient(new CkCallback(CkIndex_MSA_CacheGroup<ENTRY, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cg));
+        cache = cg.ckLocalBranch();
+    }
+
+    /**
+      Create a completely new MSA array.  This call creates the
+      corresponding groups, so only call it once per array.
+
+      Valid indices lie in [xa,xb]*[ya,yb]*[za,zb]
+    */
+    inline MSA3D(int xa_, int xb_, int ya_, int yb_, int za_, int zb_,
+                 unsigned int num_wrkrs, unsigned int maxBytes=MSA_DEFAULT_MAX_BYTES)
+        : xa(xa_), xb(xb_), ya(ya_), yb(yb_), za(za_), zb(zb_),
+          dim_x(xb-xa+1), dim_y(yb-ya+1), dim_z(zb-za+1),
+          initHandleGiven(false)
+    {
+        unsigned nEntries = dim_x*dim_y*dim_z;
         unsigned int nPages = (nEntries + ENTRIES_PER_PAGE - 1)/ENTRIES_PER_PAGE;
         CProxy_PageArray_t pageArray = CProxy_PageArray_t::ckNew(nPages);
         cg = CProxy_CacheGroup_t::ckNew(nPages, pageArray, maxBytes, nEntries, num_wrkrs);
@@ -1112,6 +1141,9 @@ public:
 
     inline unsigned int index(unsigned x, unsigned y, unsigned z)
     {
+        x -= xa;
+        y -= ya;
+        z -= za;
         CkAssert(x < dim_x);
         CkAssert(y < dim_y);
         CkAssert(z < dim_z);
