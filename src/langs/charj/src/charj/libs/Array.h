@@ -301,6 +301,64 @@ namespace CharjArray {
       ret = max(ret, v[i]);
     return ret;
   }
+
+  /// Scale a vector by some constant
+  template<typename T, typename U, class atype>
+    void scale(const T &t, Vector<U, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      v[i] = t * v[i];
+  }
+  template<>
+    void scale<float, float, RowMajor<1> >(const float &t,
+					   Vector<float, RowMajor<1> > *pv)
+  {
+    Vector<float, RowMajor<1> > &v = *pv;
+    cblas_sscal(v.size(), t, &(v[0]), 1);
+  }
+  template<>
+    void scale<double, double, RowMajor<1> >(const double &t,
+					     Vector<double, RowMajor<1> > *pv)
+  {
+    Vector<double, RowMajor<1> > &v = *pv;
+    cblas_dscal(v.size(), t, &(v[0]), 1);
+  }
+
+  /// Add one vector to a scaled version of another
+  template<typename T, typename U, class atype>
+    void axpy(const T &a, const Vector<U, atype> *px, Vector<U, atype> *py)
+  {
+    Vector<T, atype> &x = *px;
+    const Vector<T, atype> &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    for (int i = 0; i < size; ++i)
+      x[i] = a * x[i] + y[i];
+  }
+  template<>
+    void axpy<float, float, RowMajor<1> >(const float &a,
+					  const Vector<float, RowMajor<1> > *px,
+					  Vector<float, RowMajor<1> > *py)
+  {
+    const Vector<float, RowMajor<1> > &x = *px;
+    Vector<float, RowMajor<1> > &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    cblas_saxpy(size, a, &(x[0]), 1, &(y[0]), 1);
+  }
+  template<>
+    void axpy<double, double, RowMajor<1> >(const double &a,
+					  const Vector<double, RowMajor<1> > *px,
+					  Vector<double, RowMajor<1> > *py)
+  {
+    const Vector<double, RowMajor<1> > &x = *px;
+    Vector<double, RowMajor<1> > &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    cblas_daxpy(size, a, &(x[0]), 1, &(y[0]), 1);
+  }
 }
 
 #endif
