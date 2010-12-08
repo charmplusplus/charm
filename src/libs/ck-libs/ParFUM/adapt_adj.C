@@ -691,8 +691,7 @@ void makeAdjacencyRequests(
 				   adjRequestList[countChunk].elemType,
 				   adjRequestList[countChunk].nodeSetID);
 #endif
-                            requestTable.accumulate(
-                                    chunk,adjRequestList[countChunk]);
+                            requestTable(chunk) += adjRequestList[countChunk];
                             countChunk++;
                         }
                         delete [] adjRequestList;
@@ -815,7 +814,7 @@ void replyAdjacencyRequests(
             reply.replyingElem.localID = matchingElemID;
             reply.replyingElem.elemType = elemType;
             //Write into the replyTable
-            replyTable.accumulate(receivedRequest.chunkID,reply);
+            replyTable(receivedRequest.chunkID) += reply;
         } else {
             //we have no matching nodeset for this request.. hopefully some
             //other chunk does; we can ignore this request
