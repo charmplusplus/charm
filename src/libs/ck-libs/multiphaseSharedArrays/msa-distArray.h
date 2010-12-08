@@ -17,7 +17,7 @@ template <typename ENTRY>
 class Writable
 {
     ENTRY &e;
-    
+
 public:
     Writable(ENTRY &e_) : e(e_) {}
     inline const ENTRY& operator= (const ENTRY& rhs) { e = rhs; return rhs; }
@@ -28,17 +28,15 @@ class Accumulable
 {
     typedef typename MSA::T ENTRY;
     ENTRY &e;
-    
+
 public:
     Accumulable(ENTRY &e_) : e(e_) {}
     template<typename T>
-    void operator+=(const T &rhs_)
-    { MSA::OPS::accumulate(e, rhs_); }
+    inline void operator+=(const T &rhs)
+    { MSA::OPS::accumulate(e, rhs); }
     template<typename T>
-    void accumulate(const T& rhs)
-        {
-            MSA::OPS::accumulate(e, rhs);
-        }
+    inline void accumulate(const T& rhs)
+    { MSA::OPS::accumulate(e, rhs); }
 };
 
 template<class MSA> class MSARead;
@@ -50,13 +48,16 @@ class MSAHandle
 {
 protected:
     MSA *msa;
+#if CMK_ERROR_CHECKING
     bool valid;
+#endif
 
-    void inline checkInvalidate()
+    inline void checkInvalidate()
     {
-        if (!valid)
-            throw MSA_InvalidHandle();
+#if CMK_ERROR_CHECKING
+        checkValid();
         valid = false;
+#endif
     }
 
     MSAHandle(MSA *msa_)
@@ -64,12 +65,14 @@ protected:
     { }
     inline void checkValid()
     {
+#if CMK_ERROR_CHECKING
         if (!valid)
             throw MSA_InvalidHandle();
+#endif
     }
 
 public:
-    inline void syncRelease()
+    void syncRelease()
     {
         checkInvalidate();
         if (msa->active)
@@ -79,41 +82,41 @@ public:
         msa->active = false;
     }
 
-    inline void syncDone()
+    void syncDone()
     {
         checkInvalidate();
         msa->sync();
     }
 
-    inline MSARead<MSA> syncToRead()
+    MSARead<MSA> syncToRead()
     {
         checkInvalidate();
         msa->sync();
         return MSARead<MSA>(msa);
     }
 
-    inline MSAWrite<MSA> syncToWrite()
+    MSAWrite<MSA> syncToWrite()
     {
         checkInvalidate();
         msa->sync();
         return MSAWrite<MSA>(msa);
     }
 
-    inline MSAWrite<MSA> syncToReWrite()
+    MSAWrite<MSA> syncToReWrite()
     {
         checkInvalidate();
         msa->sync(DEFAULT_SYNC_SINGLE, MSA_CLEAR_ALL);
         return MSAWrite<MSA>(msa);
     }
 
-    inline MSAAccum<MSA> syncToAccum()
+    MSAAccum<MSA> syncToAccum()
     {
         checkInvalidate();
         msa->sync();
         return MSAAccum<MSA>(msa);
     }
 
-    inline MSAAccum<MSA> syncToEAccum()
+    MSAAccum<MSA> syncToEAccum()
     {
         checkInvalidate();
         msa->sync(DEFAULT_SYNC_SINGLE, MSA_CLEAR_ALL);
