@@ -9,6 +9,8 @@ options {
 
 @header {
 package charj.translator;
+import java.util.HashSet;
+
 }
 
 @members {
@@ -261,20 +263,28 @@ type returns [Type namedType]
 }
 @after {
     // TODO: Special case for Arrays, change this?
-    if (typeName.size() > 0 && typeName.get(0).name.equals("Array") &&
+    String name = typeName.get(0).name;
+    HashSet<String> s = new HashSet();
+    s.add("Array"); s.add("Matrix"); s.add("Vector");
+    if (typeName.size() > 0 && s.contains(name) &&
             $namedType == null) {
 
         int numDims = 1;
-        ClassSymbol cs = new ClassSymbol(symtab, "Array");
+        ClassSymbol cs = new ClassSymbol(symtab, name);
         cs.templateArgs = typeName.get(0).parameters;
 
-        if (cs.templateArgs != null &&
+        if (name.equals("Array") &&
+            cs.templateArgs != null &&
             cs.templateArgs.size() > 1) {
             if (cs.templateArgs.get(1) instanceof LiteralType) {
                 numDims = Integer.valueOf(
                     ((LiteralType)cs.templateArgs.get(1)).literal);
             }
-        }
+        } else if (name.equals("Vector"))
+            numDims = 1;
+        else if (name.equals("Matrix"))
+            numDims = 2;
+
         $namedType = new PointerType(symtab, cs);
     }
 }
