@@ -51,6 +51,9 @@ public mainchare ArrayTest {
 
     delete foobar;
 
+    Vector<int> baz = new Vector<int>(10);
+    Matrix<double> I = new Matrix<double>(10);
+
     CkExit();
   }
 }

@@ -72,6 +72,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.usings.add("CharjArray::Array");
         this.usings.add("CharjArray::Domain");
         this.usings.add("CharjArray::Range");
+        this.usings.add("CharjArray::Matrix");
+        this.usings.add("CharjArray::Vector");
     }
 
     public Scope getEnclosingScope() {
