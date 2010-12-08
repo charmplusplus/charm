@@ -1,7 +1,8 @@
 // -*- mode: c++; tab-width: 4 -*-
 #include "msa/msa.h"
 
-typedef MSA2D<double, DefaultEntry<double>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
+
+typedef MSA::MSA2D<double, DefaultEntry<double>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
 #include "t3.decl.h"
 
@@ -157,9 +158,9 @@ public:
     void Start()
     {
         arr1.enroll(numWorkers); // barrier
-		MSA2DRM::Write &w = arr1.getInitialWrite();
+		MSA2DRM::Write w = arr1.getInitialWrite();
         FillArray(w);
-		MSA2DRM::Read &r = arr1.syncToRead(w);
+		MSA2DRM::Read r = w.syncToRead();
         TestResults(r);  // test before doing a reduction
         Contribute();
     }
