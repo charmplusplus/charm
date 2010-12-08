@@ -2,6 +2,7 @@
 #include <iostream>
 #include <list>
 #include <string>
+#include <limits>
 
 using namespace std;
 using namespace CharjArray;
@@ -153,11 +154,30 @@ struct VectorTest : public ArrayTest {
     if (dot(&inc, &ones) != N*(N+1)/2)
       return false;
 
+    if (norm1(&zeroes) != 0 || norm1(&ones) != N || norm1(&inc) != N*(N+1)/2)
+      return false;
+
+    if (!norm2test(zeroes, ones))
+      return false;
+
+    if (normI(&zeroes) != 0 || normI(&ones) != 1 || normI(&inc) != N)
+      return false;
+
     if (ones == zeroes || ones == inc || zeroes == inc)
       return false;
     if (ones != ones || zeroes != zeroes || inc != inc)
       return false;
 
+    return true;
+  }
+
+  bool norm2test(const Vector<T> &zeroes, const Vector<T> &ones) {
+    T norm = norm2(&ones);
+    T deltaY = norm*norm - dot(&ones, &ones);
+    // XXX: Dirty hack, no good for ints
+    if (norm2(&zeroes) != 0 || deltaY > 10*numeric_limits<T>::epsilon()) {
+      return false;
+    }
     return true;
   }
 };

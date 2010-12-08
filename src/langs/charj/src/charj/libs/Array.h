@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cassert>
 #include <iostream>
+#include <algorithm>
 #include <charm++.h>
 #include <cblas.h>
 
@@ -248,6 +249,57 @@ namespace CharjArray {
     const Vector<double, RowMajor<1> > &v1 = *pv1, &v2 = *pv2;
     assert(v1.size() == v2.size());
     return cblas_ddot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
+  }
+
+  /// Computer the 1-norm of the given vector
+  template<typename T, class atype>
+    T norm1(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    // XXX: See comment about additive identity in dot(), above
+    T ret = T();
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      ret += v[i];
+    return ret;
+  }
+
+  /// Compute the Euclidean (2) norm of the given vector
+  template<typename T, class atype>
+    T norm2(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    // XXX: See comment about additive identity in dot(), above
+    T ret = T();
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      ret += v[i] * v[i];
+    return sqrt(ret);
+  }
+  template<>
+    float norm2<float, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv)
+  {
+    const Vector<float, RowMajor<1> > &v = *pv;
+    return cblas_snrm2(v.size(), &(v[0]), 1);
+  }
+  template<>
+    double norm2<double, RowMajor<1> >(const Vector<double, RowMajor<1> > *pv)
+  {
+    const Vector<double, RowMajor<1> > &v = *pv;
+    return cblas_dnrm2(v.size(), &(v[0]), 1);
+  }
+
+  /// Compute the infinity (max) norm of the given vector
+  // Will fail on zero-length vectors
+  template<typename T, class atype>
+    T normI(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    T ret = v[0];
+    int size = v.size();
+    for (int i = 1; i < size; ++i)
+      ret = max(ret, v[i]);
+    return ret;
   }
 }
 
