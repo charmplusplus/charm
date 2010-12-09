@@ -177,22 +177,44 @@ class <ident> {
 <endif>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds, inits) ::=
+classDeclaration_cc(sym, ident, ext, csds, pupInits, pupers, inits) ::=
 <<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupInits = pupInits, pupers = pupers, inits = inits)>
 >>
 
-classDeclaration_cc_cont(pds, sym, ident, ext, csds, inits) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, pupInits, pupers, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupInits = pupInits, pupers = pupers, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
+
+<if(pupInits)>
+void <sym.name>::pupInitMethod()
+{
+    <pupInits; separator="\n">
+}
+<endif>
+
+void <sym.name>::pup(PUP::er &p)
+{
+<if(pupInits)>
+    if(p.isUnpacking())
+        pupInitMethod();
+
+<endif>
+    <pupers; separator="\n">
+<if(sym.hasSDAG)>
+    __sdag_pup(p);
+
+<endif>
+}
+
 
 <if(!sym.hasDefaultCtor)>
 <sym.name>::<ident>()
