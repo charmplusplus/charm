@@ -100,8 +100,9 @@ varDeclaration
             }
 
             if (!inMethod && currentClass != null) {
-                currentClass.varsToPup.add($IDENT);
-                currentClass.pupInitializers.add(new VariableInitializer($expr, $IDENT));
+				currentClass.varsToPup.add($IDENT);
+				if(!($IDENT.symbolType instanceof ProxyType || $IDENT.symbolType instanceof ProxySectionType))
+					currentClass.pupInitializers.add(new VariableInitializer($expr, $IDENT));
             }
         }
     ;
