@@ -11,14 +11,16 @@ extern void POSE_exit();
 /// Send local stats to global collector
 void localStat::SendStats()
 {
-  // This ensures everything is flushed to the file
-  fclose(dopFilePtr);
-  // Right now, SendStats is called only at the end of the
-  // simulation.  This is here in case that changes for some reason.
-  dopFilePtr = fopen(dopFileName, "a");
-  if (dopFilePtr == NULL) {
-    CkPrintf("WARNING: unable to open DOP file %s for append...this probably doesn't matter, though, as long as this is at the end of the simulation\n", 
-	     dopFileName);
+  if (pose_config.dop) {
+    // This ensures everything is flushed to the file
+    fclose(dopFilePtr);
+    // Right now, SendStats is called only at the end of the
+    // simulation.  This is here in case that changes for some reason.
+    dopFilePtr = fopen(dopFileName, "a");
+    if (dopFilePtr == NULL) {
+      CkPrintf("WARNING: unable to open DOP file %s for append...this probably doesn't matter, though, as long as this is at the end of the simulation\n", 
+	       dopFileName);
+    }
   }
   CProxy_globalStat gstat(theGlobalStats);
   localStatSummary *m = new localStatSummary;
@@ -138,9 +140,18 @@ void globalStat::localStatReport(localStatSummary *m)
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
     if(pose_config.dop){
-      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%lld\n",
-	     maxGRT, maxGVT);
-      DOPcalc(maxGVT, maxGRT);
+      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%lld\n", maxGRT, maxGVT);
+      if (pose_config.dopSkipCalcs) {
+	CkPrintf("\n");
+	CkPrintf("WARNING: Skipping DOP calculations.  Not writing dop_mod.out or dop_sim.out files.\n");
+	CkPrintf("Save the following parameters for use with the DOPCalc tool in the\n");
+	CkPrintf("BigNetSim/trunk/tools/DOPCalc directory of the BigNetSim svn repository:\n");
+	CkPrintf("   #PEs=%d, maxGRT=%f, maxGVT=%lld, and the starting virtual time\n", CkNumPes(), maxGRT, maxGVT);
+	CkPrintf("   of the simulation (which should be 0 unless there are skip points)\n");
+	CkPrintf("\n");
+      } else {
+	DOPcalc(maxGVT, maxGRT);
+      }
     }
 
     POSE_exit();

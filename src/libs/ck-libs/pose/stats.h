@@ -81,7 +81,9 @@ public:
   localStat(CkMigrateMessage *msg) : Group(msg) { };
   /// Destructor
   ~localStat() {
-    fclose(dopFilePtr);
+    if (pose_config.dop) {
+      fclose(dopFilePtr);
+    }
   }
   /// Start the specified timer
   void TimerStart(int timer);

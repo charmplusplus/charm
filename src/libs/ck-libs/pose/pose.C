@@ -325,8 +325,22 @@ void POSEreadCmdLine()
   pose_config.trace=CmiGetArgFlagDesc(argv, "+trace_pose",
                         "Traces key POSE operations like Forward Execution, Rollback, Cancellation, Fossil Collection, etc. via user events for display in projections");
 
+  /* DOP command-line parameter truth table:
+     |---- Input ---|   |------------ Output --------------|
+     dop dopSkipCalcs   DOP logs written DOP calcs performed
+     --- ------------   ---------------- -------------------
+      F       F                 No                No
+      F       T                 Yes               No
+      T       F                 Yes               Yes
+      T       T                 Yes               No
+  */
   pose_config.dop=CmiGetArgFlagDesc(argv, "+dop_pose",
                         "Critical path analysis by measuring degree of parallelism");
+  pose_config.dopSkipCalcs=CmiGetArgFlagDesc(argv, "+dop_pose_skip_calcs",
+                        "Records degree of parallelism logs but doesn't perform end-of-simulation calculations");
+  if (pose_config.dopSkipCalcs) {
+    pose_config.dop = true;
+  }
 
   CmiGetArgIntDesc(argv, "+memman_pose", &pose_config.max_usage , "Coarse memory management: Restricts forward execution of objects with over <max_usage>/<checkpoint store_rate> checkpoints; default to 10");
   /*

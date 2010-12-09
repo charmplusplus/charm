@@ -105,6 +105,7 @@ class POSE_Config
   int end_proj;
   bool trace;
   bool dop;
+  bool dopSkipCalcs;
   int max_usage;
   bool msg_pool;
   int msg_pool_size;
@@ -145,6 +146,7 @@ class POSE_Config
 #else
     dop(false),
 #endif
+    dopSkipCalcs(false),
     max_usage(MAX_USAGE),
 /** MSG POOLING AND COMMLIB OPTIONS NOT SUPPORTED YET **/
 #ifdef MSG_RECYCLING
