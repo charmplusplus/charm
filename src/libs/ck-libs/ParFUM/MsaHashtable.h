@@ -25,6 +25,7 @@ public:
 	    using MSA::MSARead<MSA1DHASH>::get;
 
 		friend class MsaHashtable;
+		friend class MsaHashtable::Add;
 		void print();
 		Add syncToAdd();
 
@@ -36,6 +37,7 @@ public:
 	{
 	    using MSA::MSAAccum<MSA1DHASH>::accumulate;
 	    friend class MsaHashtable;
+	    friend class MsaHashtable::Read;
 	Add(MSA1DHASH *m) : MSA::MSAAccum<MSA1DHASH>(m) { }
 	public:
 		int addTuple(int *tuple, int nodesPerTuple, int chunk, int elementNo);
