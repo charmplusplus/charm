@@ -8,8 +8,6 @@ CHARMLIB=$(CHARM)/lib
 CHARMC=$(CHARM)/bin/charmc $(OPTS)
 POSEINCDIR = $(CHARMINC)/pose
 
-include $(CHARM)/tmp/charm.mk
-
 # POSE object definitions - DO NOT MODIFY
 #***********************************
 OBJECTS=	eventID.o stats.o srtable.o cancel.o memory_temporal.o \
@@ -68,6 +66,7 @@ clean:
 CIDEPENDFILE = Make.cidepends
 DEPENDFILE = Make.depends
 
+include $(CHARM)/tmp/charm.mk
 include $(CIDEPENDFILE)
 include $(DEPENDFILE)
 
