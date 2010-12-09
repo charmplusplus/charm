@@ -163,7 +163,8 @@ typeDeclaration
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                needsPupInit={pupInits.size() > 0})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
