@@ -27,7 +27,6 @@ module EveryLB {
   extern module RefineKLB;
   extern module RefineTopoLB;
   extern module RotateLB;
-  extern module TeamLB;
   extern module TopoCentLB;
   extern module TopoLB;
   extern module WSLB;
