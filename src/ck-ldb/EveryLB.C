@@ -6,7 +6,6 @@
 /*
  Startup routine for use when you include all the load balancers.
 */
-#include <charm++.h>
 #include <LBDatabase.h>
 #include "EveryLB.decl.h"
 

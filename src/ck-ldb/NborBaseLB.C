@@ -10,7 +10,6 @@
 */
 /*@{*/
 
-#include "charm++.h"
 #include "BaseLB.h"
 #include "NborBaseLB.h"
 #include "LBDBManager.h"

@@ -1,18 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
 #include <math.h>
-#include "charm++.h"
-#include "BaseLB.h"
 #include "HbmLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -15,10 +9,7 @@
   * support nonmigratable attrib
 */
 
-#include <charm++.h>
 #include <LBSimulation.h>
-
-#include "cklists.h"
 #include "GreedyAgentLB.h"
 
 #define LOAD_OFFSET 0.05

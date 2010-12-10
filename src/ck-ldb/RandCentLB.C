@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -15,10 +8,6 @@ Status:
   * support nonmigratable attrib
   * support processor avail bitvector
 */
-
-#include <charm++.h>
-
-#include "cklists.h"
 
 #include "RandCentLB.h"
 

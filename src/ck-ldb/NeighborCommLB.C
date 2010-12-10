@@ -10,10 +10,6 @@
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
 #include "ckheap.h"
 #include "NeighborCommLB.h"
 #include "topology.h"

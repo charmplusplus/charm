@@ -4,9 +4,6 @@
 #include <limits.h>
 #include <stdio.h>
 
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDCOMMREFINELB_TOLERANCE 1.10

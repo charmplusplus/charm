@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,8 +6,6 @@
 #ifndef HYBRIDLB_H
 #define HYBRIDLB_H
 
-#include "charm++.h"
-#include "BaseLB.h"
 #include "CentralLB.h"
 #include "HybridBaseLB.h"
 #include "HybridLB.decl.h"

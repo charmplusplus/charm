@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -16,7 +9,6 @@
   The test applies greedy strategy
 */
 
-#include "charm++.h"
 #include "HybridLB.h"
 #include "LBDBManager.h"
 

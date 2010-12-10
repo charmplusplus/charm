@@ -9,11 +9,7 @@
 ** Charm++ program.
 */
 
-#include "charm++.h"
-#include "cklists.h"
-
 #include "RotateLB.decl.h"
-
 #include "RotateLB.h"
 
 

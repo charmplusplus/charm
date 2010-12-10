@@ -3,8 +3,6 @@
 */
 /*@{*/
 
-#include "charm++.h"
-#include "BaseLB.h"
 #include "HybridBaseLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"

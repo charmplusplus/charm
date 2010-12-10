@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -15,8 +8,6 @@ Status:
   * support nonmigratable attrib
   * does not support processor avail bitvector
 */
-
-#include <charm++.h>
 
 #include "ComboCentLB.h"
 

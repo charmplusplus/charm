@@ -14,10 +14,7 @@ Status:
   by Gengbin Zheng, 7/28/2003
 */
 
-#include <charm++.h>
 #include <stdio.h>
-
-#include "cklists.h"
 #include "GreedyCommLB.h"
 #include "manager.h"
 

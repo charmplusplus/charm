@@ -1,4 +1,3 @@
-
 /**
  * \addtogroup CkLdb
    Load balancer that use Orthogonal Recursive Bisection(ORB) to partition
@@ -11,10 +10,6 @@
    3/26/2010:        added support for avail_vector
 */
 /*@{*/
-
-#include <charm++.h>
-
-#include "cklists.h"
 
 #include "OrbLB.h"
 

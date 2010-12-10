@@ -1,20 +1,10 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
 #include "RefineKLB.h"
+
 #define _USE_APPROX_ALGO_ 1
 #define _USE_RESIDUAL_MOVES_ 1
 //#include "heap.h"

@@ -3,8 +3,8 @@
 */
 /*@{*/
 
-#include "CommLBHeap.h"
 #include "charm++.h"
+#include "CommLBHeap.h"
 
 ObjectHeap::ObjectHeap(int sz) {
   size = sz;

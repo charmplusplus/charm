@@ -14,11 +14,7 @@
 
 */
 
-#include <charm++.h>
 #include <stdio.h>
-
-#include "cklists.h"
-
 #include "CommLB.h"
 
 #define alpha 35e-6

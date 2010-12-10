@@ -2,10 +2,6 @@
 #define _GRIDHYBRIDLB_H_
 
 #include <stdio.h>
-
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDHYBRIDLB_MODE 0

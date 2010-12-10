@@ -4,12 +4,9 @@ This is a topology-aware load balancer.
 Author: Tarun Agarwal (tarun)
 Date: 04/27/2005
 ***************************************************************************/
+
 #include <math.h>
 #include <stdlib.h>
-#include "charm++.h"
-#include "cklists.h"
-#include "CentralLB.h"
-
 #include "RefineTopoLB.decl.h"
 
 #include "RefineTopoLB.h"
