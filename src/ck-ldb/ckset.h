@@ -8,7 +8,6 @@
 
 class InfoRecord;
 
-
 class listNode {
 public:
 listNode *next;

@@ -3,6 +3,8 @@
 */
 /*@{*/
 
+#include "elements.h"
+#include "ckheap.h"
 #include "RefineCommLB.h"
 
 CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")

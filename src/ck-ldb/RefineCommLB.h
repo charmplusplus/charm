@@ -14,9 +14,6 @@
 class minheap;
 class maxheap;
 
-#include "elements.h"
-#include "ckheap.h"
-
 void CreateRefineCommLB();
 BaseLB *AllocateRefineCommLB();
 

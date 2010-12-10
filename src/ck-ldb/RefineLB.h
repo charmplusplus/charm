@@ -13,9 +13,6 @@
 class minheap;
 class maxheap;
 
-#include "elements.h"
-#include "ckheap.h"
-
 void CreateRefineLB();
 BaseLB *AllocateRefineLB();
 

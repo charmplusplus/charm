@@ -3,6 +3,8 @@
 */
 /*@{*/
 
+#include "elements.h"
+#include "ckheap.h"
 #include "RefineLB.h"
 
 CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average")

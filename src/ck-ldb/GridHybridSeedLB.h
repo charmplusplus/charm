@@ -1,7 +1,6 @@
 #ifndef _GRIDHYBRIDSEEDLB_H_
 #define _GRIDHYBRIDSEEDLB_H_
 
-#include <stdio.h>
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDHYBRIDSEEDLB_MODE 0

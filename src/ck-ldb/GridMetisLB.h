@@ -1,7 +1,6 @@
 #ifndef _GRIDMETISLB_H_
 #define _GRIDMETISLB_H_
 
-#include <stdio.h>
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDMETISLB_MODE 0

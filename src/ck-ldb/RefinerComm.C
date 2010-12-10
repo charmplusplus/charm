@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -14,6 +7,8 @@
  be rewritten to use this, so there is no code duplication
 */
 
+#include "elements.h"
+#include "ckheap.h"
 #include "RefinerComm.h"
 
 

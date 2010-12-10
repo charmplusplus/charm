@@ -5,6 +5,8 @@
 
 class minheap;
 class maxHeap;
+
+#include "elements.h"
 #include "ckheap.h"
 
 // Heap of pointers. The field to be compared is:

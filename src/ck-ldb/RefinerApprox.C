@@ -1,4 +1,7 @@
+#include "elements.h"
+#include "ckheap.h"
 #include "RefinerApprox.h"
+
 int _lb_debug=0;
 
 void RefinerApprox::create(int count, CentralLB::LDStats* stats, int* procs)

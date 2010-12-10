@@ -8,13 +8,10 @@
 
 #include "CentralLB.h"
 #include "RefinerApprox.h"
+#include "RefineKLB.decl.h"
 
 class minheap;
 class maxheap;
-#include "RefineKLB.decl.h"
-
-#include "elements.h"
-#include "ckheap.h"
 
 void CreateRefineKLB();
 BaseLB *AllocateRefineKLB();

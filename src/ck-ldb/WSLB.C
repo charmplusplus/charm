@@ -7,6 +7,7 @@
 #include <unistd.h>
 #endif
 
+#include "elements.h"
 #include "ckheap.h"
 #include "WSLB.h"
 #include "LBDBManager.h"

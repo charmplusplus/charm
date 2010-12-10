@@ -1,15 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
+#include "elements.h"
 #include "ckheap.h"
 #include "NeighborCommLB.h"
 #include "topology.h"

@@ -1,7 +1,6 @@
 #ifndef _GRIDHYBRIDLB_H_
 #define _GRIDHYBRIDLB_H_
 
-#include <stdio.h>
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDHYBRIDLB_MODE 0

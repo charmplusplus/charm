@@ -3,6 +3,7 @@
 */
 /*@{*/
 
+#include "elements.h"
 #include "ckheap.h"
 #include "NeighborLB.h"
 

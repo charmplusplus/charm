@@ -14,7 +14,6 @@
 
 */
 
-#include <stdio.h>
 #include "CommLB.h"
 
 #define alpha 35e-6

@@ -3,6 +3,8 @@
 */
 /*@{*/
 
+#include "elements.h"
+#include "ckheap.h"
 #include "RefineKLB.h"
 
 #define _USE_APPROX_ALGO_ 1

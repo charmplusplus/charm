@@ -14,7 +14,8 @@ Status:
   by Gengbin Zheng, 7/28/2003
 */
 
-#include <stdio.h>
+#include "elements.h"
+#include "ckheap.h"
 #include "GreedyCommLB.h"
 #include "manager.h"
 

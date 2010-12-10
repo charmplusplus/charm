@@ -2,8 +2,6 @@
 #define _GRIDCOMMREFINELB_H_
 
 #include <limits.h>
-#include <stdio.h>
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDCOMMREFINELB_TOLERANCE 1.10
