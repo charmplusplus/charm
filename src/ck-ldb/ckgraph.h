@@ -21,6 +21,7 @@ class ProcInfo {
   friend class ProcArray;
 
   public:
+    inline int getProcId() { return id; }
     inline double getTotalLoad() { return totalLoad; }
     inline double getOverhead() { return overhead; }
     inline void setTotalLoad(double _tload) { totalLoad = _tload; }
