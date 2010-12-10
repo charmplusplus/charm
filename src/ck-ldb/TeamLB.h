@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -20,18 +13,19 @@ void CreateTeamLB();
 BaseLB * AllocateTeamLB();
 
 class TeamLB : public CentralLB {
-public:
-  TeamLB(const CkLBOptions &);
-  TeamLB(CkMigrateMessage *m):CentralLB(m) { lbname = "TeamLB"; }
-private:
-	int teamSize;
-	int numberTeams;
-  CmiBool QueryBalanceNow(int step) { return CmiTrue; }
-  void work(LDStats* stats);
-};
+  public:
+    TeamLB(const CkLBOptions &);
+    TeamLB(CkMigrateMessage *m):CentralLB(m) { lbname = "TeamLB"; }
 
-#define WEIGHTED 1
-#define MULTI_CONSTRAINT 2
+    void work(LDStats* stats);
+    void pup(PUP::er &p) { CentralLB::pup(p); }
+
+  private:
+    int teamSize;
+    int numberTeams;
+
+    CmiBool QueryBalanceNow(int step) { return CmiTrue; }
+};
 
 #endif /* _TEAMLB_H_ */
 
