@@ -61,14 +61,14 @@ void GreedyLB::work(LDStats* stats)
   int vert;
 
   // max heap of objects
-  sort(ogr->vertices.begin(), ogr->vertices.end(), ObjLoadGreater());
+  std::sort(ogr->vertices.begin(), ogr->vertices.end(), ObjLoadGreater());
   // min heap of processors
-  make_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+  std::make_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
 
   for(vert = 0; vert < ogr->vertices.size(); vert++) {
     // Pop the least loaded processor
     ProcInfo p = parr->procs.front();
-    pop_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::pop_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
     parr->procs.pop_back();
 
     // Increment the load of the least loaded processor by the load of the
@@ -78,7 +78,7 @@ void GreedyLB::work(LDStats* stats)
 
     // Insert the least loaded processor with load updated back into the heap
     parr->procs.push_back(p);
-    push_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    std::push_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
   }
 
   /** ============================== CLEANUP ================================ */
