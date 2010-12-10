@@ -24,7 +24,7 @@ Topo.o: Topo.C Topo.h Topo.decl.h
 	$(CHARMC) -c Topo.C
 
 test:  lb_test
-	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1
+	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 $(TESTOPTS)
 
 bgtest:  lb_test
 	./charmrun +p4 ./lb_test 100 100 10 40 10 1000 ring +balancer CommLB +LBDebug 1 +x2 +y2 +z1 +cth1 +wth1
