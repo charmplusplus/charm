@@ -148,6 +148,7 @@ typeDeclaration
             currentClass = (ClassSymbol)$IDENT.def;
 
             inits = currentClass.generateInits(currentClass.initializers);
+            pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -155,12 +156,15 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
+                pupInits={pupInits},
+                pupers={currentClass.generatePUPers()},
                 inits={inits})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                needsPupInit={pupInits.size() > 0})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(

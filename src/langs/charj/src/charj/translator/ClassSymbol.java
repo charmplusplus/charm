@@ -11,6 +11,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<VariableInitializer> initializers = new ArrayList<VariableInitializer>();
     public List<VariableInitializer> pupInitializers = new ArrayList<VariableInitializer>();
     public List<CharjAST> varsToPup = new ArrayList<CharjAST>();
+    public List<CharjAST> objToPup = new ArrayList<CharjAST>();
 	public List<ArraySectionInitializer> sectionInitializers = new ArrayList<ArraySectionInitializer>();
 
     Map<String, PackageScope> imports =
