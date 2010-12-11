@@ -29,6 +29,16 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 
 /*************** Simple classes ***************/
 
+// Non-const version is required for puping std::pair
+template <class A,class B>
+inline void operator|(PUP::er &p,typename std::pair<A,B> &v)
+{
+  p.syncComment(PUP::sync_index);
+  p|v.first;
+  p.syncComment(PUP::sync_item);
+  p|v.second;
+}
+// Const version is required for puping std::map
 template <class A,class B> 
 inline void operator|(PUP::er &p,typename std::pair<const A,B> &v)
 {
