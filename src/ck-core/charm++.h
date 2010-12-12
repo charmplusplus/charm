@@ -106,7 +106,8 @@ public:
                               prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -119,7 +120,8 @@ public:
 		prioStore=integerPrio;
 	}
 	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -132,7 +134,8 @@ public:
 	}
 	inline void setPriority(const CkBitVector &cbv) {
 		if ( cbv.data != NULL ) {
-			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                             queueingtype != CK_QUEUEING_ILIFO ) {
 				delete [] prioPtr;
 				prioBits = 0;
 			}
