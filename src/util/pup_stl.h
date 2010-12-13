@@ -19,6 +19,7 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 /*It's kind of annoying that we have to drag all these headers in
   just so the std:: parameter declarations will compile.
  */
+#include <set>
 #include <vector>
 #include <list>
 #include <map>
@@ -99,13 +100,14 @@ inline int PUP_stl_container_size(PUP::er &p,container &c) {
 }
 
 //Impl. util: pup each current item of a container (no allocation)
-template <class container>
+template <class container, class dtype>
 inline void PUP_stl_container_items(PUP::er &p,container &c) {
   for (typename container::iterator it=c.begin();
        it!=c.end();
        ++it) {
     p.syncComment(PUP::sync_item);
-    p|*it;  
+    // Cast away the constness (needed for std::set)
+    p|*(dtype *)&(*it);
   }
 }
 
@@ -123,7 +125,7 @@ inline void PUP_stl_container(PUP::er &p,container &c) {
       c.push_back(n);
     } 
   }
-  else PUP_stl_container_items(p,c);
+  else PUP_stl_container_items<container, dtype>(p,c);
   p.syncComment(PUP::sync_end_array);
 }
 //Map objects don't have a "push_back", while vector and list
@@ -140,7 +142,7 @@ inline void PUP_stl_map(PUP::er &p,container &c) {
       c.insert(n);
     } 
   }
-  else PUP_stl_container_items(p,c);
+  else PUP_stl_container_items<container, dtype>(p,c);
   p.syncComment(PUP::sync_end_list);
 }
 
@@ -157,6 +159,8 @@ inline void operator|(PUP::er &p,typename std::map<V,T,Cmp> &m)
 template <class V,class T,class Cmp> 
 inline void operator|(PUP::er &p,typename std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
-
+template <class T>
+inline void operator|(PUP::er &p,typename std::set<T> &m)
+  { PUP_stl_map<std::set<T>,T >(p,m); }
 
 #endif
