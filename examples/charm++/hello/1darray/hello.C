@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "pup_stl.h"
 #include "hello.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
@@ -25,7 +26,7 @@ public:
     arr[0].SayHi(17);
   };
 
-  void done(void)
+  void done(std::map<int, int> x)
   {
     CkPrintf("All done\n");
     CkExit();
@@ -51,7 +52,7 @@ public:
       thisProxy[thisIndex+1].SayHi(hiNo+1);
     else 
       //We've been around once-- we're done.
-      mainProxy.done();
+      mainProxy.done(std::make_pair(1, 1));
   }
 };
 

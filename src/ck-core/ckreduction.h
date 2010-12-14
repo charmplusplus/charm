@@ -406,6 +406,13 @@ class Group : public CkReductionMgr
 };
 
 
+template <typename T>
+class Reducer {
+    T operator()(T*, size_t);
+
+};
+
+
 
 
 

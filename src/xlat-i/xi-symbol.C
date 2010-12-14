@@ -3086,9 +3086,6 @@ void Entry::genChareDecl(XStr& str)
   } else {
     // entry method declaration
     str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
-    if (isReductionTarget()) {
-        str << "    " << "void _" << name << "_redn_wrapper(CkReductionMsg* m);\n";
-    }
   }
 }
 
@@ -3127,9 +3124,13 @@ void Entry::genChareDefs(XStr& str)
     str << "}\n";
   }
   if (isReductionTarget()) {
-      XStr retStr;
-      str << makeDecl(retStr, 1) << "::" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n";
-      str << "}\n\n";
+      XStr retStr; retStr<<retType;
+      str << retType << " " << indexName(); //makeDecl(retStr, 1)
+      str << "::_" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n"
+          << "  char* impl_buf = (char*)m->getData();\n";
+      XStr precall;
+      genCall(str, precall);
+      str << "  delete m;\n}\n\n";
   }
 }
 
@@ -4244,6 +4245,9 @@ void Entry::genIndexDecls(XStr& str)
   }
   if (param->isMarshalled()) {
     str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
+  }
+  if (isReductionTarget()) {
+    str << "    static void _" << name << "_redn_wrapper(CkReductionMsg* m);\n";
   }
 }
 
