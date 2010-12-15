@@ -51,7 +51,7 @@ public:
   int iterations;
   double maxdifference;
   Main(CkArgMsg* m) {
-    if ( (m->argc <= 3) && (m->argc != 5) && m->argc!=4 && m->argc!=6) {
+    if ( (m->argc < 3) || (m->argc > 6)) {
       CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
       CkPrintf("OR %s [array_size] [block_size] maxiterations\n", m->argv[0]);
       CkPrintf("OR %s [array_size_X] [array_size_Y] [block_size_X] [block_size_Y] \n", m->argv[0]);
@@ -64,9 +64,9 @@ public:
     // store the main proxy
     mainProxy = thisProxy;
 	
-    if(m->argc < 4) {
+    if(m->argc <= 4) {
       arrayDimX = arrayDimY = atoi(m->argv[1]);
-      blockDimX = blockDimY  = atoi(m->argv[2]); 
+      blockDimX = blockDimY = atoi(m->argv[2]);
     }
     else if (m->argc >= 5) {
       arrayDimX = atoi(m->argv[1]);
