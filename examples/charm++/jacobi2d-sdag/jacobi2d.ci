@@ -14,6 +14,7 @@ mainmodule jacobi2d {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void report(CkReductionMsg *m);
+    entry void iterationsDone(CkReductionMsg *m);
     entry void done(CkReductionMsg *m);
     entry void warmupIter(CkReductionMsg *m);
   };

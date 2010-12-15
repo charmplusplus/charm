@@ -37,7 +37,7 @@ static unsigned long next = 1;
 #define TOP			3
 #define BOTTOM			4
 #define DIVIDEBY5       	0.2
-#define THRESHHOLD               0.001
+const double THRESHHOLD =  0.001;
 
 double startTime;
 double endTime;
@@ -93,6 +93,8 @@ public:
     CkPrintf("Running Jacobi on %d processors with (%d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y);
     CkPrintf("Array Dimensions: %d %d\n", arrayDimX, arrayDimY);
     CkPrintf("Block Dimensions: %d %d\n", blockDimX, blockDimY);
+    CkPrintf("max iterations %d\n", maxiterations);
+    CkPrintf("Threshhold %.10g\n", THRESHHOLD);
       
     // NOTE: boundary conditions must be set based on values
       
@@ -121,8 +123,11 @@ public:
     iterations++;
     maxdifference=((double *) msg->getData())[0];
     delete msg;
-    if ( maxdifference <= THRESHHOLD) 
-      done(true);
+    if ( maxdifference - THRESHHOLD<0) 
+      {
+	CkPrintf("boo Difference %.10g Satisfied Threshhold %.10g in %d Iterations\n", maxdifference,THRESHHOLD,iterations);
+	done(true);
+      }
   }
 
   // when iteration count met
@@ -132,10 +137,10 @@ public:
     done(false);
   }
 
-  void done(bool success )
+  void done(bool success)
     {
       if(success)
-	CkPrintf("Difference %lf Satisfied in %d Iterations\n", maxdifference,iterations);
+	CkPrintf("Difference %.10g Satisfied Threshhold %.10g in %d Iterations\n", maxdifference,THRESHHOLD,iterations);
       else
 	CkPrintf("Completed %d Iterations , Difference %lf fails threshhold\n", iterations,maxdifference);
       endTime = CmiWallTimer();
@@ -332,7 +337,7 @@ class Jacobi: public CBase_Jacobi {
     if (iterations <= WARM_ITER)
       contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::warmupIter(NULL), mainProxy));
     else if(iterations >= maxiterations)
-      contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::done(NULL), mainProxy));
+      contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::iterationsDone(NULL), mainProxy));
     else
       {  // nonblocking report 
 	contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::report(NULL), mainProxy));
