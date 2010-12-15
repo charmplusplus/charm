@@ -14,7 +14,6 @@ mainmodule jacobi2d {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void report(CkReductionMsg *m);
-    entry void iterationsDone(CkReductionMsg *m);
     entry void done(CkReductionMsg *m);
     entry void warmupIter(CkReductionMsg *m);
   };
@@ -25,7 +24,7 @@ mainmodule jacobi2d {
     entry void receiveGhosts(int iter, int dir, int size,
                              double ghosts[size]);
 
-    entry void doStep() {
+    entry void doStep(CkCallback cb, int numSteps) {
       atomic "begin_iteration" {
 	begin_iteration();
       }
@@ -39,7 +38,7 @@ mainmodule jacobi2d {
           }
       }
       atomic "doWork" {
-	check_and_compute();
+	check_and_compute(cb, numSteps);
       }
     };
   };

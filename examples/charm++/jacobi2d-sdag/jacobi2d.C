@@ -102,43 +102,36 @@ public:
     array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
       
     // initiate computation
-    array.doStep();
+    array.doStep(CkCallback(CkIndex_Main::warmupIter(NULL), thisProxy), 1);
   }
-
-
 
   // Start timer after a few iterations for performance stability
   void warmupIter(CkReductionMsg *msg) {
     iterations++;
-    if (iterations == WARM_ITER)
+    if (iterations == WARM_ITER) {
       startTime = CmiWallTimer();
-    array.doStep();
+      array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy),
+		   maxiterations);
+    } else {
+      array.doStep(CkCallback(CkIndex_Main::warmupIter(NULL), thisProxy),
+		   1);
+    }
     delete msg;
   }
 
   // Each worker reports back to here when it completes an iteration
   // Asynchronous check on threshhold satisfaction
   void report(CkReductionMsg *msg) {
-
     iterations++;
     maxdifference=((double *) msg->getData())[0];
     delete msg;
     if ( maxdifference - THRESHHOLD<0) 
-      {
-	CkPrintf("boo Difference %.10g Satisfied Threshhold %.10g in %d Iterations\n", maxdifference,THRESHHOLD,iterations);
-	done(true);
-      }
+      done(true);
+    if (iterations > maxiterations)
+      done(false);
   }
 
-  // when iteration count met
-  void iterationsDone(CkReductionMsg *msg) {
-    iterations++;
-    delete msg;
-    done(false);
-  }
-
-  void done(bool success)
-    {
+  void done(bool success) {
       if(success)
 	CkPrintf("Difference %.10g Satisfied Threshhold %.10g in %d Iterations\n", maxdifference,THRESHHOLD,iterations);
       else
@@ -146,8 +139,7 @@ public:
       endTime = CmiWallTimer();
       CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(maxiterations-1-WARM_ITER));
       CkExit();
-    }
-
+  }
 };
 
 /** \class Jacobi
@@ -326,7 +318,7 @@ class Jacobi: public CBase_Jacobi {
   }
 
 
-  void check_and_compute() {
+  void check_and_compute(CkCallback cb, int numSteps) {
     compute_kernel();
 
     double *tmp;
@@ -334,15 +326,10 @@ class Jacobi: public CBase_Jacobi {
     temperature = new_temperature;
     new_temperature = tmp;
     constrainBC();
-    if (iterations <= WARM_ITER)
-      contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::warmupIter(NULL), mainProxy));
-    else if(iterations >= maxiterations)
-      contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::iterationsDone(NULL), mainProxy));
-    else
-      {  // nonblocking report 
-	contribute(sizeof(double), &maxdifference, CkReduction::max_double, CkCallback(CkIndex_Main::report(NULL), mainProxy));
-	doStep();
-      }
+
+    contribute(sizeof(double), &maxdifference, CkReduction::max_double, cb);
+    if (numSteps > 1)
+      doStep(cb, numSteps-1);
   }
 
 
