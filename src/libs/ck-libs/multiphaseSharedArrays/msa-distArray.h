@@ -48,9 +48,7 @@ class MSAHandle
 {
 protected:
     MSA *msa;
-#if CMK_ERROR_CHECKING
     bool valid;
-#endif
 
     inline void checkInvalidate()
     {
