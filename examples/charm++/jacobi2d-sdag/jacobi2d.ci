@@ -9,11 +9,13 @@ mainmodule jacobi2d {
   readonly int num_chare_x;
   readonly int num_chare_y;
 
-  readonly int globalBarrier;
+  readonly int maxiterations;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report();
+    entry void report(CkReductionMsg *m);
+    entry void done(CkReductionMsg *m);
+    entry void warmupIter(CkReductionMsg *m);
   };
 
   array [2D] Jacobi {
@@ -26,7 +28,7 @@ mainmodule jacobi2d {
       atomic "begin_iteration" {
 	begin_iteration();
       }
-      for(imsg = 0; imsg < 4; imsg++) {
+      for(imsg = 0; imsg < numExpected; imsg++) {
 	// "iterations" keeps track of messages across steps
 	when
           receiveGhosts[iterations] (int iter, int dir, int size,
