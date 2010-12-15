@@ -13,9 +13,35 @@ mainmodule jacobi2d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void run() {
+      while (iterations < WARM_ITER) {
+	atomic {
+	  array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy), 1);
+	}
+	when report(CkReductionMsg *msg) atomic {
+	  iterations++;
+	  delete msg;
+	}
+      }
+      atomic "start_timed_portion" {
+	startTime = CmiWallTimer();
+	array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy),
+		     maxiterations);
+      }
+      while (iterations < maxiterations) {
+	// Each worker reports back to here when it completes an iteration
+	// Asynchronous check on threshhold satisfaction
+	when report(CkReductionMsg *msg) atomic {
+	  iterations++;
+	  maxdifference=((double *) msg->getData())[0];
+	  delete msg;
+	  if (maxdifference - THRESHHOLD < 0)
+	    done(true);
+	}
+      }
+      atomic { done(false); }
+    };
     entry void report(CkReductionMsg *m);
-    entry void done(CkReductionMsg *m);
-    entry void warmupIter(CkReductionMsg *m);
   };
 
   array [2D] Jacobi {

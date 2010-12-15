@@ -50,7 +50,9 @@ public:
   CProxy_Jacobi array;
   int iterations;
   double maxdifference;
+  Main_SDAG_CODE;
   Main(CkArgMsg* m) {
+    __sdag_init();
     if ( (m->argc < 3) || (m->argc > 6)) {
       CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
       CkPrintf("OR %s [array_size] [block_size] maxiterations\n", m->argv[0]);
@@ -100,35 +102,9 @@ public:
       
     // make proxy and populate array in one call
     array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y);
-      
+
     // initiate computation
-    array.doStep(CkCallback(CkIndex_Main::warmupIter(NULL), thisProxy), 1);
-  }
-
-  // Start timer after a few iterations for performance stability
-  void warmupIter(CkReductionMsg *msg) {
-    iterations++;
-    if (iterations == WARM_ITER) {
-      startTime = CmiWallTimer();
-      array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy),
-		   maxiterations);
-    } else {
-      array.doStep(CkCallback(CkIndex_Main::warmupIter(NULL), thisProxy),
-		   1);
-    }
-    delete msg;
-  }
-
-  // Each worker reports back to here when it completes an iteration
-  // Asynchronous check on threshhold satisfaction
-  void report(CkReductionMsg *msg) {
-    iterations++;
-    maxdifference=((double *) msg->getData())[0];
-    delete msg;
-    if ( maxdifference - THRESHHOLD<0) 
-      done(true);
-    if (iterations > maxiterations)
-      done(false);
+    thisProxy.run();
   }
 
   void done(bool success) {
