@@ -919,9 +919,6 @@ void ConverseRunPE(int everReturn) {
 
     CthInit(CmiMyArgv);
 
-    //printf ("Before Converse Common Init\n");
-    ConverseCommonInit(CmiMyArgv);
-
     /* initialize the network progress counter*/
     /* Network progress function is used to poll the network when for
        messages. This flushes receive buffers on some  implementations*/
@@ -933,6 +930,9 @@ void ConverseRunPE(int everReturn) {
 
     CpvInitialize(PCQueue, smsg_list_q);
     CpvAccess(smsg_list_q) = PCQueueCreate();
+
+    //printf ("Before Converse Common Init\n");
+    ConverseCommonInit(CmiMyArgv);
 
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdle,NULL);
 

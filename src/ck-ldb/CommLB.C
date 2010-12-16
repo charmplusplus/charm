@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -21,12 +14,7 @@
 
 */
 
-#include <charm++.h>
-#include <stdio.h>
-
-#include "cklists.h"
-
-#include "Comm1LB.h"
+#include "CommLB.h"
 
 #define alpha 35e-6
 #define beeta 8.5e-9
@@ -35,22 +23,22 @@
 #define UPPER_FACTOR 0.67
 #define MAX_WEIGHT 5.0
 
-CreateLBFunc_Def(Comm1LB, "another variation of CommLB")
+CreateLBFunc_Def(CommLB, "another variation of CommLB")
 
-Comm1LB::Comm1LB(const CkLBOptions &opt): CentralLB(opt)
+CommLB::CommLB(const CkLBOptions &opt): CentralLB(opt)
 {
   if (CkMyPe() == 0)
-    CkPrintf("[%d] Comm1LB created\n",CkMyPe());
-  lbname = "Comm1LB";
+    CkPrintf("[%d] CommLB created\n",CkMyPe());
+  lbname = "CommLB";
 }
 
-CmiBool Comm1LB::QueryBalanceNow(int _step)
+CmiBool CommLB::QueryBalanceNow(int _step)
 {
   //  CkPrintf("[%d] Balancing on step %d\n",CkMyPe(),_step);
   return CmiTrue;
 }
 
-void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
+void CommLB::alloc(int pe , int id, double load, int nmsg, int nbyte){
   alloc_array[npe][id].load = 1.0;
   alloc_array[pe][id].load = load;
   alloc_array[pe][id].nmsg = nmsg;
@@ -60,7 +48,7 @@ void Comm1LB::alloc(int pe , int id, double load, int nmsg, int nbyte){
   alloc_array[pe][nobj].nbyte += nbyte;
 }
 
-double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_data){
+double CommLB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com_data){
   int j;
   double total_cost, com_cost, weight=0.0;
   graph * ptr;
@@ -95,7 +83,7 @@ double Comm1LB::compute_cost(int id, int pe, int n_alloc, int &com_msg, int &com
   return total_cost;
 }
 
-void Comm1LB::add_graph(int x, int y, int data, int nmsg){
+void CommLB::add_graph(int x, int y, int data, int nmsg){
   graph * ptr, *temp;
 
 //  CkPrintf("Add graph : %d,%d", data, nmsg);
@@ -142,24 +130,24 @@ void init(alloc_struct **a, graph * object_graph, int l, int b){
   }
 }
 
-void Comm1LB::work(BaseLB::LDStats* stats, int count)
+void CommLB::work(LDStats* stats)
 {
   int pe,obj,com;
   double mean_load =0.0;
   ObjectRecord *x;
 
-  //  CkPrintf("[%d] Comm1LB strategy\n",CkMyPe());
+  //  CkPrintf("[%d] CommLB strategy\n",CkMyPe());
 
   nobj = stats->n_objs;
-  npe = count;
+  npe = stats->nprocs();
 
   stats->makeCommHash();
 
-  alloc_array = new alloc_struct *[count+1];
+  alloc_array = new alloc_struct *[npe + 1];
 
   object_graph = new graph[nobj];
   
-  for(pe=0;pe <= count;pe++)
+  for(pe = 0; pe <= npe; pe++)
     alloc_array[pe] = new alloc_struct[nobj +1];
 
   init(alloc_array,object_graph,npe,nobj);
@@ -171,12 +159,12 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
       x = new ObjectRecord;
       x->id = obj;
       x->pos = obj;
-      x->load = objData.wallTime;
+      x->val = objData.wallTime;
       x->pe = onpe;
       maxh.insert(x);
       mean_load += objData.wallTime;
   }
-  mean_load /= count;
+  mean_load /= npe;
 
   int xcoord=0,ycoord=0;
 
@@ -223,14 +211,14 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
 	  CmiAbort("Load balancer is not be able to move a nonmigratable object out of an unavailable processor.\n");
       }
       temp_cost = compute_cost(maxid,spe,id,out_msg,out_byte);
-      alloc(spe,maxid,x->load,out_msg,out_byte);
+      alloc(spe, maxid, x->val, out_msg, out_byte);
       continue;
     }
 
-    for(pe =0; pe < count; pe++)
+    for(pe =0; pe < npe; pe++)
       if((alloc_array[pe][nobj].load <= mean_load)||(id >= UPPER_FACTOR*nobj))
 	break;
-    CmiAssert(pe < count);
+    CmiAssert(pe < npe);
 
     temp_cost = compute_cost(maxid,pe,id,out_msg,out_byte);
     min_cost = temp_cost;
@@ -238,7 +226,7 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
     min_msg = out_msg;
     min_byte = out_byte;
     pe++;
-    for(; pe < count;pe++){
+    for(; pe < npe; pe++) {
       if((alloc_array[pe][nobj].load > mean_load) && (id < UPPER_FACTOR*nobj))
 	continue;
       temp_cost = compute_cost(maxid,pe,id,out_msg,out_byte);
@@ -251,7 +239,7 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
     }
     CmiAssert(minpe < npe);
 
-    alloc(minpe,maxid,x->load,min_msg,min_byte);
+    alloc(minpe, maxid, x->val, min_msg, min_byte);
 
     if(minpe != spe){
       //      CkPrintf("**Moving from %d to %d\n",spe,minpe);
@@ -261,7 +249,7 @@ void Comm1LB::work(BaseLB::LDStats* stats, int count)
   }
 }
 
-#include "Comm1LB.def.h"
+#include "CommLB.def.h"
 
 /*@}*/
 

@@ -89,16 +89,16 @@ public:
 	
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
-public:
+
 	CkCallback(void) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=invalid;
 	}
 	//This is how you create ignore, ckExit, and resumeThreads:
 	CkCallback(callbackType t) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
 	  bzero(this, sizeof(CkCallback));
 #endif
 	  if (t==resumeThread) impl_thread_init();
@@ -107,7 +107,7 @@ public:
 
     // Call a C function on the current PE
 	CkCallback(Ck1CallbackFn fn) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=call1Fn;
@@ -116,7 +116,7 @@ public:
 
     // Call a C function on the current PE
 	CkCallback(CkCallbackFn fn,void *param) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=callCFn;
@@ -125,7 +125,7 @@ public:
 
     // Call a chare entry method
 	CkCallback(int ep,const CkChareID &id,CmiBool doInline=CmiFalse) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendChare:sendChare;
@@ -137,7 +137,7 @@ public:
 
     // Bcast to a group or nodegroup
 	CkCallback(int ep,const CkGroupID &id, int isNodeGroup=0) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=isNodeGroup?bcastNodeGroup:bcastGroup;
@@ -149,7 +149,7 @@ public:
 
     // Send to group/nodegroup element
 	CkCallback(int ep,int onPE,const CkGroupID &id,CmiBool doInline=CmiFalse, int isNodeGroup=0) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?(isNodeGroup?isendNodeGroup:isendGroup):(isNodeGroup?sendNodeGroup:sendGroup); 
@@ -161,7 +161,7 @@ public:
 	
     // Bcast to array
 	CkCallback(int ep,const CkArrayID &id) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=bcastArray;
@@ -170,7 +170,7 @@ public:
 
     // Send to array element
 	CkCallback(int ep,const CkArrayIndex &idx,const CkArrayID &id,CmiBool doInline=CmiFalse) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
@@ -193,7 +193,7 @@ public:
  	CkCallback(ArrayElement *p, int ep,CmiBool doInline=CmiFalse);
 
 	CkCallback(const CcsDelayedReply &reply) {
-#ifndef CMK_OPTIMIZE
+#if CMK_REPLAYSYSTEM
       bzero(this, sizeof(CkCallback));
 #endif
       type=replyCCS;

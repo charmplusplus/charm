@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 
@@ -14,8 +7,6 @@ load balancer around.
 */
 /*@{*/
 
-#include <charm++.h>
-#include <BaseLB.h>
 #include "NullLB.h"
 #include "ck.h"
 

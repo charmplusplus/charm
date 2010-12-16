@@ -80,13 +80,29 @@ public class SymbolTable {
         defaultPkg.define("CkNumPes", new MethodSymbol(this, "CkNumPes"));
         defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
         defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
-        defaultPkg.define("CmiWallTimer", new MethodSymbol(this, "CmiWallTimer"));
+        defaultPkg.define("CkWallTimer", new MethodSymbol(this, "CkWallTimer"));
     }
 
     public ClassSymbol resolveBuiltinType(String type) {
         ClassSymbol ptype = primitiveTypes.get(type);
         if (ptype != null) return ptype;
-        return (ClassSymbol)objectRoot.resolveType(type);
+        return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
+    }
+
+    public ClassSymbol resolveBuiltinLitType(String type, String literal) {
+        ClassSymbol ptype = primitiveTypes.get(type);
+        if (ptype != null) {
+            LiteralType t = new LiteralType(this, ptype);
+            t.literal = literal;
+            return (ClassSymbol)t;
+        }
+        return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
+    }
+
+    public ClassSymbol resolveBuiltinType(String type, String lit) {
+        ClassSymbol ptype = primitiveTypes.get(type);
+        if (ptype != null) return ptype;
+        return (ClassSymbol)objectRoot.resolveType(TypeName.createTypeName(type));
     }
 
     public ClassSymbol getEnclosingClass(Scope scope) {

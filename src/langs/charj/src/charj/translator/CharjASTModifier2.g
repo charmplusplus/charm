@@ -45,14 +45,27 @@ package charj.translator;
             return false;
         return true;
     }
-}
 
+	String getQualIdText(CharjAST qid)
+	{
+		StringBuilder sb = new StringBuilder();
+
+		sb.append(qid.getChild(0).getText());
+
+		for(int i = 1; i < qid.getChildren().size(); i++)
+			sb.append("::" + qid.getChild(i).getText());
+
+		return sb.toString();
+	}
+}
+	
 // Starting point for parsing a Charj file.
 charjSource[SymbolTable _symtab] returns [ClassSymbol cs]
     :   ^(CHARJ_SOURCE 
         (packageDeclaration)? 
         (importDeclaration
         | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | externDeclaration
         | readonlyDeclaration)*)
     ;
 
@@ -69,8 +82,12 @@ readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
     ;
 
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
+    ;
+
 typeDeclaration returns [ClassSymbol sym]
-    :   ^(TYPE classType IDENT
+    :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
             (^('extends' parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
     |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
@@ -98,7 +115,12 @@ classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
             type IDENT formalParameterList domainExpression? b=block)
     |   ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
-            type IDENT entryFormalParameterList domainExpression? b=block)
+            type IDENT entryFormalParameterList domainExpression? b=block?)
+        -> {$b.sdag}? ^(SDAG_FUNCTION_DECL modifierList? genericTypeParameterList?
+                type IDENT entryFormalParameterList domainExpression? block?)
+        -> ^(ENTRY_FUNCTION_DECL modifierList? genericTypeParameterList?
+            type IDENT entryFormalParameterList domainExpression? block?)
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
             //^(VAR_DECLARATOR_LIST field[$simpleType.type]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
@@ -150,7 +172,7 @@ templateArg
     ;
 
 templateArgList
-    :   templateArg (','! templateArg)*
+    :   templateArg templateArg*
     ;
 
 templateInstantiation
@@ -211,6 +233,7 @@ accessModifier
 
 charjModifier
     :   ENTRY
+    |   SDAGENTRY
     |   TRACED
     ;
 
@@ -231,6 +254,19 @@ type
     |   VOID
     ;
 
+nonArraySectionObjectType returns [Type type]
+@after
+{
+	$type = $start.symbolType;
+}
+	:	simpleType
+	|   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+	|   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	VOID
+	;	
+
 simpleType returns [ClassSymbol type]
     :   ^(SIMPLE_TYPE primitiveType domainExpression?)
     ;
@@ -240,6 +276,7 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
 entryArgObjectType returns [ClassSymbol type]
@@ -304,13 +341,15 @@ qualifiedIdentifier
     |   ^(DOT qualifiedIdentifier IDENT)
     ;
     
-block
-    :   ^(BLOCK (blockStatement)*)
+block returns [boolean sdag]
+@init { $sdag = false; }
+    :   ^(BLOCK (blockStatement { $sdag |= $blockStatement.sdag; })*)
     ;
-    
-blockStatement
+
+blockStatement returns [boolean sdag]
+@init { $sdag = false; }
     :   localVariableDeclaration
-    |   statement
+    |   statement { $sdag = $statement.sdag; }
     ;
     
 localVariableDeclaration
@@ -318,18 +357,54 @@ localVariableDeclaration
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList)
     ;
 
-statement
-    : nonBlockStatement
-    | block
+statement returns [boolean sdag]
+@init { $sdag = false; }
+    : nonBlockStatement { $sdag = $nonBlockStatement.sdag; }
+    | sdagStatement { $sdag = true; }
+    | block { $sdag = $block.sdag; }
     ;
 
-nonBlockStatement
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
+    ;
+
+sdagStatement
+    :   ^(OVERLAP block)
+    |   ^(WHEN (IDENT expression? formalParameterList)* block)
+    ;
+
+nonBlockStatement returns [boolean sdag]
+@init { $sdag = false; }
     :   ^(ASSERT expression expression?)
-    |   ^(IF parenthesizedExpression block block?)
-    |   ^(FOR forInit? FOR_EXPR expression? FOR_UPDATE expression* block)
-    |   ^(FOR_EACH localModifierList? type IDENT expression block) 
-    |   ^(WHILE parenthesizedExpression block)
-    |   ^(DO block parenthesizedExpression)
+    |   ^(IF parenthesizedExpression (i=block { $sdag |= $i.sdag; }) (e=block { $sdag |= $e.sdag; })?)
+        -> {$sdag}? ^(SDAG_IF parenthesizedExpression $i $e?)
+        -> ^(IF parenthesizedExpression $i $e?)
+    |   ^(FOR forInit? FOR_EXPR (e1=expression)? FOR_UPDATE (e2+=expression)* block {
+            $sdag = $block.sdag;
+        })
+        -> {$sdag}? ^(SDAG_FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
+        -> ^(FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
+    |   ^(FOR_EACH localModifierList? type IDENT expression block { $sdag = $block.sdag; })
+    |   ^(WHILE parenthesizedExpression block { $sdag = $block.sdag; })
+        -> {$sdag}? ^(SDAG_WHILE parenthesizedExpression block)
+        -> ^(WHILE parenthesizedExpression block)
+    |   ^(DO block parenthesizedExpression { $sdag = $block.sdag; })
+        -> {$sdag}? ^(SDAG_DO block parenthesizedExpression)
+        -> ^(DO block parenthesizedExpression)
     |   ^(SWITCH parenthesizedExpression switchCaseLabel*)
     |   ^(RETURN expression?)
     |   ^(THROW expression)
@@ -412,36 +487,71 @@ expr
     |   primaryExpression
     ;
     
-primaryExpression
-    :   ^(DOT primaryExpression
-                (   IDENT
-                |   THIS
-                |   SUPER
+primaryExpression returns [Type type]
+    :   ^(DOT pe=primaryExpression
+                (   IDENT { $type = $IDENT.symbolType; }
+                |   THIS  { $type = $IDENT.symbolType; }
+                |   SUPER { $type = $IDENT.symbolType; }
                 )
         )
-    |   ^(ARROW primaryExpression
-                (   IDENT
-                |   THIS
-                |   SUPER
-                )
-        )
+		-> { $pe.type instanceof PointerType }? ^(ARROW primaryExpression IDENT? THIS? SUPER?)
+		->										^(DOT primaryExpression IDENT? THIS? SUPER?)
     |   parenthesizedExpression
     |   IDENT
+		{
+			$type = $IDENT.symbolType;
+		}
     |   CHELPER
-    |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
-    |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
+    |   ^(METHOD_CALL pe=primaryExpression genericTypeArgumentList? arguments) 
+		{
+			$type = $METHOD_CALL.symbolType;
+		}
+    |   ^(ENTRY_METHOD_CALL pe=primaryExpression genericTypeArgumentList? entryArguments)
+		{
+			$type = $ENTRY_METHOD_CALL.symbolType;
+		}
     |   explicitConstructorCall
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+		{
+			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
+		}
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression domainExpression)
+		{
+			$type = $ARRAY_ELEMENT_ACCESS.symbolType; // TODO this is not correct, as it's always null
+			if($pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1)
+			{
+				System.out.println("creating a new ArraySectionInitializer");
+				ArraySectionInitializer asi = new ArraySectionInitializer($domainExpression.ranges, ((ProxyType)$pe.type).baseType.getTypeName());
+				currentClass.sectionInitializers.add(asi);
+				System.out.println(asi);
+			}
+		}
+			->	{ $pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1 }? ^(METHOD_CALL IDENT["arraySectionInitializer" + (ArraySectionInitializer.getCount() - 1)] ^(ARGUMENT_LIST ^(EXPR primaryExpression)))
+			-> 																			 		 ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
-    |   THIS
+		{
+			$type = $newExpression.type;
+		}
+	|	THIS
+		{
+			$type = $THIS.symbolType;
+		}
     |   arrayTypeDeclarator
     |   SUPER
+		{
+			$type = $SUPER.symbolType;
+		}
     |   GETNUMPES
     |   GETNUMNODES
     |   GETMYPE
     |   GETMYNODE
     |   GETMYRANK
+	|	THISINDEX
+	|	THISPROXY
+		{
+			$type = $THISPROXY.symbolType;
+		}
     |   domainExpression
     ;
     
@@ -454,13 +564,16 @@ arrayTypeDeclarator
     :   ^(ARRAY_DECLARATOR (arrayTypeDeclarator | qualifiedIdentifier | primitiveType))
     ;
 
-newExpression
+newExpression returns [Type type]
     :   ^(NEW_EXPRESSION arguments? domainExpression)
-    |   ^(NEW type arguments)
+    |   ^(NEW nonArraySectionObjectType arguments)
+		{
+			$type = $nonArraySectionObjectType.type;
+		}
     ;
 
-arguments
-    :   ^(ARGUMENT_LIST expression*)
+arguments returns [Object expr]
+    :   ^(ARGUMENT_LIST expression*) 
     ;
 
 entryArguments
@@ -572,21 +685,29 @@ literal
     |   NULL 
     ;
 
-rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
+rangeItem returns [Object item]
+    :   DECIMAL_LITERAL { $item = $DECIMAL_LITERAL; }
+    |   IDENT			{ $item = $IDENT; }
     ;
 
-rangeExpression
-    :   ^(RANGE_EXPRESSION rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+rangeExpression returns [ArrayList<Object> range]
+@init
+{
+	$range = new ArrayList<Object>();
+}
+    :   ^(RANGE_EXPRESSION rangeItem)								{ $range.add($rangeItem.item); }	
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem)				{ $range.add($i1.item); $range.add($i2.item); }
+    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem i3=rangeItem)	{ $range.add($i1.item); $range.add($i2.item); $range.add($i3.item); }
     ;
 
-rangeList
-    :   rangeExpression+
+rangeList returns [ArrayList<ArrayList<Object>> ranges]
+@init
+{
+	$ranges = new ArrayList<ArrayList<Object>>();
+}
+    :   (rangeExpression { $ranges.add($rangeExpression.range); })+
     ;
 
-domainExpression
-    :   ^(DOMAIN_EXPRESSION rangeList)
+domainExpression returns [ArrayList<ArrayList<Object>> ranges]
+    :   ^(DOMAIN_EXPRESSION rangeList)	{ $ranges = $rangeList.ranges; }
     ;

@@ -19,6 +19,7 @@
 #include <catamount/dclock.h>
 #endif
 
+
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
 #  warning "   Try doing an 'rm charm/include/mpi.h' and building again."
@@ -153,7 +154,6 @@ static int checksum_flag = 0;
 #define MPI_POST_RECV_SIZE 200
 #endif
 /* #undef  MPI_POST_RECV_DEBUG  */
-#error "The following variables are never CpvInitialize'd. If you want to use POST_RECV, fix this first."
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
 CpvDeclare(MPI_Request*, CmiPostedRecvRequests); /* An array of request handles for posted recvs */
@@ -749,7 +749,7 @@ int PumpMsgs(void)
     recd = 1;
     MPI_Get_count(&sts, MPI_BYTE, &nbytes);
     msg = (char *) CmiAlloc(nbytes);
-
+    
     START_EVENT();
 
     if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, MPI_COMM_WORLD,&sts))
@@ -760,14 +760,13 @@ int PumpMsgs(void)
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
-	char tmp[80];
-	int srcNode = sts.MPI_SOURCE;
-	int srcProc1 = CmiNodeFirst(srcNode);
-	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
-	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+        traceBeginCommOp(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
+	traceEndCommOp(msg);
+	char tmp[32];
+	sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
-#endif
-	
+#endif	
 	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
@@ -848,14 +847,13 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
    memcpy(msg, buf, nbytes);
 
 #if CMK_SMP_TRACE_COMMTHREAD
-	char tmp[80];
-	int srcNode = sts.MPI_SOURCE;
-	int srcProc1 = CmiNodeFirst(srcNode);
-	int srcProc2 = srcProc1+CmiMyNodeSize()-1;
-	sprintf(tmp, "MPI_Recv: from node %d(%d-%d) to proc %d", srcNode, srcProc1, srcProc2, CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+        traceBeginCommOp(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
+	traceEndCommOp(msg);
+	char tmp[32];
+	sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
-
   
 #if CMK_NODE_QUEUE_AVAILABLE
    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
@@ -1208,7 +1206,10 @@ static int SendMsgBuf()
 #endif
 	
 #if CMK_SMP_TRACE_COMMTHREAD
-		char tmp[60];
+		traceBeginCommOp(msg);
+		traceChangeLastTimestamp(CpvAccess(projTraceStart));
+		traceEndCommOp(msg);
+		char tmp[64];
 		sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
 		traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
@@ -1982,6 +1983,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   }
 
 #if MPI_POST_RECV_COUNT > 0
+
+  CpvInitialize(unsigned long long, Cmi_posted_recv_total);
+  CpvInitialize(unsigned long long, Cmi_unposted_recv_total);
+  CpvInitialize(MPI_Request*, CmiPostedRecvRequests); 
+  CpvInitialize(char*,CmiPostedRecvBuffers);
 
     /* Post some extra recvs to help out with incoming messages */
     /* On some MPIs the messages are unexpected and thus slow */

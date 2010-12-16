@@ -7,7 +7,7 @@
 class QueenState: public CMessage_QueenState {
 
 public:
-    int aQueenBitRes;//[MAX_BOARDSIZE];
+    int aQueenBitRes;
     int aQueenBitCol;//[MAX_BOARDSIZE];
     int aQueenBitPosDiag;//[MAX_BOARDSIZE];
     int aQueenBitNegDiag;//[MAX_BOARDSIZE];

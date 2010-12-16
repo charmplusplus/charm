@@ -18,6 +18,7 @@ options {
 tokens {
 
     ENTRY                   = 'entry'           ;
+    SDAGENTRY               = 'sdagentry'       ;
     TRACED                  = 'traced'          ;
     PUBLIC                  = 'public'          ;
     PROTECTED               = 'protected'       ;
@@ -32,7 +33,9 @@ tokens {
     CHAR                    = 'char'            ;
     BYTE                    = 'byte'            ;
     SHORT                   = 'short'           ;
+    IN                      = 'in'              ;
     INT                     = 'int'             ;
+    LET                     = 'let'             ;
     LONG                    = 'long'            ;
     FLOAT                   = 'float'           ;
     DOUBLE                  = 'double'          ;
@@ -54,6 +57,9 @@ tokens {
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
 
+    OVERLAP                 = 'overlap'         ;
+    WHEN                    = 'when'            ;
+
     PRINT                   = 'print'           ;
     PRINTLN                 = 'println'         ;
     EXIT                    = 'exit'            ;
@@ -63,6 +69,9 @@ tokens {
     GETMYNODE               = 'getMyNode'       ;
     GETNUMPES               = 'getNumPes'       ;
     GETNUMNODES             = 'getNumNodes'     ;
+
+    THISINDEX		    = 'thisIndex'	;
+    THISPROXY		    = 'thisProxy'	;
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -160,6 +169,7 @@ tokens {
     ARRAY_ELEMENT_ACCESS;
     ARRAY_INITIALIZER;
     BLOCK;
+    DIVCON_BLOCK;
     CAST_EXPR;
     CATCH_CLAUSE_LIST;
     CLASS_CONSTRUCTOR_CALL;
@@ -179,11 +189,13 @@ tokens {
     FORMAL_PARAM_STD_DECL;
     FORMAL_PARAM_VARARG_DECL;
     FUNCTION_METHOD_DECL;
+    DIVCON_METHOD_DECL;
     GENERIC_TYPE_ARG_LIST;
     GENERIC_TYPE_PARAM_LIST;
     INTERFACE_TOP_LEVEL_SCOPE;
     IMPLEMENTS_CLAUSE;
     LABELED_STATEMENT;
+    LET_ASSIGNMENT;
     CHARJ_SOURCE;
     METHOD_CALL;
     ENTRY_METHOD_CALL;
@@ -196,6 +208,10 @@ tokens {
     PRE_INC;
     QUALIFIED_TYPE_IDENT;
     RANGE_EXPRESSION;
+    SDAG_IF;
+    SDAG_DO;
+    SDAG_FOR;
+    SDAG_WHILE;
     STATIC_ARRAY_CREATOR;
     SUPER_CONSTRUCTOR_CALL;
     TEMPLATE_INST;
@@ -206,6 +222,9 @@ tokens {
     REFERENCE_TYPE;
     POINTER_TYPE;
     PROXY_TYPE;
+	ARRAY_SECTION_TYPE;
+	ARRAY_SECTION;
+	ARRAY_SECTION_INIT;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -217,6 +236,7 @@ tokens {
     OTHER_MODIFIER_LIST;
     POINTER_DEREFERENCE;
     ENTRY_FUNCTION_DECL;
+    SDAG_FUNCTION_DECL;
     ENTRY_CONSTRUCTOR_DECL;
 }
 
@@ -248,6 +268,7 @@ compilationUnit
 topLevelDeclaration
     :   importDeclaration
     |   readonlyDeclaration
+    |   externDeclaration
     |   typeDeclaration
     ;
 
@@ -262,6 +283,10 @@ importDeclaration
 
 readonlyDeclaration
     :   READONLY^ localVariableDeclaration ';'!
+    ;
+
+externDeclaration
+    :   EXTERN^ qualifiedIdentifier ';'!
     ;
 
 typeDeclaration
@@ -329,23 +354,37 @@ typeList
     ;
 
 classScopeDeclaration
-    :   modifierList?
-        (   genericTypeParameterList?
-            (   type IDENT formalParameterList (block | ';')
-                ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
-                    formalParameterList block?)
-            /*|   'void' IDENT formalParameterList (block | ';')
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList block?)*/
-            |   ident=IDENT formalParameterList block
-                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
-                        formalParameterList block)
-            )
-        |   simpleType classFieldDeclaratorList ';'
-            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
-        |   objectType classFieldDeclaratorList ';'
-            ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
-        )
+    :   functionMethodDeclaration
+	|	constructorDeclaration
+	|	divconMethodDeclaration
+	|	primitiveVariableDeclaration
+	|	objectVariableDeclaration
     ;
+
+functionMethodDeclaration
+	:	modifierList? genericTypeParameterList? type IDENT formalParameterList (';' | block)
+		->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList block?)
+	;
+
+constructorDeclaration
+	:	modifierList? genericTypeParameterList? ident=IDENT formalParameterList block
+		->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT formalParameterList block)
+	;
+
+divconMethodDeclaration
+	:	modifierList? type IDENT formalParameterList divconBlock
+		->  ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
+	;
+
+primitiveVariableDeclaration
+	:	modifierList? simpleType classFieldDeclaratorList ';'
+		->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
+	;
+
+objectVariableDeclaration
+	:	modifierList? objectType classFieldDeclaratorList ';'
+		->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
+	;
 
 interfaceScopeDeclaration
     :   modifierList?
@@ -353,8 +392,6 @@ interfaceScopeDeclaration
             (   type IDENT formalParameterList ';'
                 ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
                         type IDENT formalParameterList)
-            /*|   'void' IDENT formalParameterList ';'
-                ->  ^(VOID_METHOD_DECL modifierList? genericTypeParameterList? IDENT formalParameterList)*/
             )
         |   simpleType interfaceFieldDeclaratorList ';'
             ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
@@ -383,7 +420,6 @@ interfaceFieldDeclarator
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
-
 variableDeclaratorId
     :   IDENT^ domainExpression?
     ;
@@ -392,16 +428,6 @@ variableInitializer
     :   arrayInitializer
     |   expression
     ;
-
-/*arrayDeclarator
-    :   '[' ']'
-        ->  ARRAY_DECLARATOR
-    ;
-
-arrayDeclaratorList
-    :   arrayDeclarator+
-        ->  ^(ARRAY_DECLARATOR_LIST arrayDeclarator+)   
-    ;*/
 
 arrayInitializer
     :   lc='{' (variableInitializer (',' variableInitializer)* ','?)? '}'
@@ -457,6 +483,7 @@ modifier
     :   PUBLIC
     |   PROTECTED
     |   ENTRY
+    |   SDAGENTRY
     |   TRACED
     |   PRIVATE
     |   ABSTRACT
@@ -486,6 +513,8 @@ constructorType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
+	|	MOD qualifiedTypeIdent AT domainExpression
+		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
     ;
 
 simpleType
@@ -498,6 +527,8 @@ objectType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	qualifiedTypeIdent '[' MOD ']' AT
+		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent)
     ;
 
 qualifiedTypeIdent
@@ -580,17 +611,59 @@ blockStatement
     ;
 
 localVariableDeclaration
-    :   localModifierList? simpleType classFieldDeclaratorList
+    :	primitiveVarDeclaration
+	|   objectVarDeclaration
+	;
+
+primitiveVarDeclaration
+	:	localModifierList? simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType classFieldDeclaratorList)
-    |   localModifierList? objectType classFieldDeclaratorList
+	;
+
+objectVarDeclaration
+	:	localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
-    ;
+	;
 
 statement
     :   nonBlockStatement
+    |   sdagStatement
     |   block
     ;
-        
+
+sdagStatement
+    :   OVERLAP block
+        -> ^(OVERLAP block)
+    |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
+        -> ^(WHEN (IDENT expression? formalParameterList)* block)
+    ;
+
+divconBlock
+    :   divconExpr
+        ->  ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   IDENT '=' expression
+        -> ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment (','! divconAssignment)*
+    ;
+
+divconExpr
+    :   IF parenthesizedExpression ifExpr=divconExpr
+        (   ELSE elseExpr=divconExpr
+            ->  ^(IF parenthesizedExpression $ifExpr $elseExpr)
+        |
+            ->  ^(IF parenthesizedExpression $ifExpr)
+        )
+    |   LET ^divconAssignmentList IN divconExpr
+    |   expression ';'!
+    |   '{'! divconExpr '}'!
+    ;
+
 nonBlockStatement
     :   'assert' expr1=expression 
         (   ':' expr2=expression ';'
@@ -640,7 +713,6 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
-
     ;           
         
 
@@ -841,6 +913,8 @@ postfixedExpression
             ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
         |   '[' expression ']'
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
+        |   domainExpression
+            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression domainExpression)
         )*
         // At the end there may follow a post increment/decrement.
         (   op='++'-> ^(POST_INC[$op, "POST_INC"] $postfixedExpression)
@@ -890,6 +964,8 @@ primaryExpression
         -> GETMYNODE
     |   GETNUMNODES '(' ')'
         -> GETNUMNODES
+	|	THISINDEX
+	|	THISPROXY
     ;
     
 qualifiedIdentExpression
@@ -920,13 +996,13 @@ qualifiedIdentExpression
     ;
 
 newExpression
-    :   n=NEW
+    :   NEW
         (
             domainExpression arguments?
             ->  ^(NEW_EXPRESSION arguments? domainExpression)
         |   constructorType arguments
             -> ^(NEW constructorType arguments)
-        )
+		)
     ;
     
 /*newArrayConstruction

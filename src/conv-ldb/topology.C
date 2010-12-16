@@ -771,7 +771,7 @@ public:
     delete[] TempCo;
   }
   virtual int max_neighbors() {
-    return dimension*2 + ppn - 1;
+    return dimension*2;
   }
   virtual void neighbors(int mype, int* _n, int &nb) {
     nb = 0;
@@ -1138,7 +1138,11 @@ public:
 
     void neighbors(int mype, int* na, int &nb)
     {
+#if CMK_NODE_QUEUE_AVAILABLE
+        gengraph(CmiNumNodes(), dimension, 234, na, &nb, 0);
+#else
         gengraph(CmiNumPes(), dimension, 234, na, &nb, 0);
+#endif
     }
 
 };

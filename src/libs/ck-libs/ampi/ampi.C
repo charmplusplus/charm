@@ -1144,7 +1144,9 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
   posted_ireqs = CmmNew();
   nbcasts = 0;
 
+#if AMPI_COMLIB
   comlibProxy = thisProxy; // Will later be associated with comlib
+#endif
   
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
@@ -1162,8 +1164,14 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s)
 
 ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStreaming_,
     		ComlibInstanceHandle ciBcast_,ComlibInstanceHandle ciAllgather_,ComlibInstanceHandle ciAlltoall_)
-   :parentProxy(parent_),ciStreaming(ciStreaming_),ciBcast(ciBcast_),ciAllgather(ciAllgather_),ciAlltoall(ciAlltoall_)
+   :parentProxy(parent_)
 {
+#if AMPI_COMLIB
+  ciStreaming = ciStreaming_;
+  ciBcast = ciBcast_;
+  ciAllgather = ciAllgather_;
+  ciAlltoall = ciAlltoall_;
+
   init();
 
   myComm=s; myComm.setArrayID(thisArrayID);
@@ -1184,6 +1192,7 @@ ampi::ampi(CkArrayID parent_,const ampiCommStruct &s, ComlibInstanceHandle ciStr
 
   seqEntries=parent->ckGetArraySize();
   oorder.init (seqEntries);
+#endif
 }
 
 ampi::ampi(CkMigrateMessage *msg):CBase_ampi(msg)
@@ -1274,13 +1283,13 @@ void ampi::pup(PUP::er &p)
   p|tmpVec;
   p|remoteProxy;
   p|resumeOnRecv;
+#if AMPI_COMLIB
   p|comlibProxy;
   p|ciStreaming;
   p|ciBcast;
   p|ciAllgather;
   p|ciAlltoall;
 
-#if AMPI_COMLIB
   if(p.isUnpacking()){
 //    ciStreaming.setSourcePe();
 //    ciBcast.setSourcePe();
@@ -1838,11 +1847,13 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   return msg;
 }
 
+#if AMPI_COMLIB
 void
 ampi::comlibsend(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm)
 {
   delesend(t,sRank,buf,count,type,rank,destcomm,comlibProxy);
 }
+#endif
 
 void
 ampi::send(int t, int sRank, const void* buf, int count, int type,  int rank, MPI_Comm destcomm, int sync)
@@ -2108,7 +2119,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, 0);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, MPI_COMM_WORLD);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -5753,6 +5764,42 @@ CDECL
 int AMPI_System(const char *cmd) {
 	return TCHARM_System(cmd);
 }
+
+#if CMK_BLUEGENE_CHARM
+
+extern "C" void startCFnCall(void *param,void *msg)
+{
+  BgSetStartEvent();
+  ampi *ptr = (ampi*)param;
+  ampi::bcastraw(NULL, 0, ptr->getProxy());
+  delete (CkReductionMsg*)msg;
+}
+
+CDECL
+int AMPI_Set_startevent(MPI_Comm comm)
+{
+  AMPIAPI("AMPI_BgSetStartEvent");
+  CmiAssert(comm == MPI_COMM_WORLD);
+
+  ampi *ptr = getAmpiInstance(comm);
+
+  CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
+
+  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, MPI_SUM);
+  if (CkMyPe() == 0) {
+    CkCallback allreduceCB(startCFnCall, ptr);
+    msg->setCallback(allreduceCB);
+  }
+  ptr->contribute(msg);
+
+  /*HACK: Use recv() to block until the reduction data comes back*/
+  if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
+    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
+
+    printf("AMPI_Set_startevent done %d\n", CkMyPe());
+  return 0;
+}
+#endif
 
 #if CMK_CUDA
 GPUReq::GPUReq()

@@ -25,6 +25,10 @@ do
 		pes=$2
 		shift
 		;;
+	+pemap)
+		args=$args" "$1" "$2
+		shift
+		;;
 	+p*)
 		pes=`echo $1 | awk '{print substr($1,3)}'`
 		;;

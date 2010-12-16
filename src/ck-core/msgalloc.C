@@ -97,6 +97,9 @@ void  CkSetQueueing(void *msg, int strategy)
 extern "C"
 void* CkPriorityPtr(void *msg)
 {
+#if CMK_ERROR_CHECKING
+  if (UsrToEnv(msg)->getPriobits() == 0) CkAbort("Trying to access priority bits, but none was allocated");
+#endif
   return UsrToEnv(msg)->getPrioPtr();
 }
 

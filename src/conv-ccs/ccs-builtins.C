@@ -406,7 +406,7 @@ static void CpdListInit(void) {
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
   CcsRegisterHandler("ccs_list_items.fmt",(CmiHandler)CpdList_ccs_list_items_fmt);
   CcsRegisterHandler("ccs_list_items.set",(CmiHandler)CpdList_ccs_list_items_set);
-  CcsRegisterHandler("ccs_machine_architecture",(CmiHandler)CpdMachineArchitecture);
+  CcsRegisterHandler("debug/converse/arch",(CmiHandler)CpdMachineArchitecture);
 }
 
 #if CMK_WEB_MODE

@@ -11,6 +11,7 @@ typedef double     RealType;
 #endif
 
 #include <cmath>
+#include <ostream>
 
 struct ckcomplex {
     RealType  re;
@@ -88,6 +89,11 @@ struct ckcomplex {
     
     inline void operator delete[] (void *buf){
         free(buf);
+    }
+
+    inline friend std::ostream& operator<< (std::ostream &out, const ckcomplex &aNum) {
+        out<<"("<<aNum.re<<","<<aNum.im<<")";
+        return out;
     }
 };
 

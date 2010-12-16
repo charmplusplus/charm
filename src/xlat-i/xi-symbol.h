@@ -904,10 +904,11 @@ class Message : public TEntity {
 #define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
 #define SPYTHON       0x1000
 #define SINLINE       0x2000 //<- inline message
-#define SIGET   0x4000 
+#define SIGET         0x4000 
 #define SLOCAL        0x8000 //<- local message
-#define SACCEL  0x10000
-#define SMEM  0x20000
+#define SACCEL        0x10000
+#define SMEM          0x20000
+#define SREDUCE       0x40000 // <- reduction target
 
 /* An entry construct */
 class Entry : public Member {
@@ -1027,6 +1028,7 @@ class Entry : public Member {
     int isAccel(void) { return (attribs & SACCEL); }
 
     int isMemCritical(void) { return (attribs & SMEM); }
+    int isReductionTarget(void) { return (attribs & SREDUCE); }
 
     void print(XStr& str);
     void genIndexDecls(XStr& str);
@@ -1371,6 +1373,10 @@ public:
   static void generateDummyBeginExecute(XStr& op);
 
 };
+
+SdagConstruct *buildAtomic(const char* code,
+			   SdagConstruct *pub_list,
+			   const char *trace_name);
 
 extern void RemoveSdagComments(char *);
 

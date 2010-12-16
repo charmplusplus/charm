@@ -23,6 +23,7 @@ public class MethodSymbol
     public boolean isStatic = false;
     public boolean isCtor = false;
     public boolean isTraced = false;
+    public boolean hasSDAG = false;
 
     public MethodSymbol(SymbolTable symtab) {
         super(symtab);
@@ -117,10 +118,10 @@ public class MethodSymbol
                 "<if(locals)>{<locals; separator=\",\">}<endif>",
                 AngleBracketTemplateLexer.class);
         st.setAttribute("entry", isEntry);
-        st.setAttribute("parent", enclosingScope.getScopeName());
+        st.setAttribute("parent", enclosingScope != null ? enclosingScope.getScopeName() : null);
         st.setAttribute("name", name);
         st.setAttribute("args", orderedArgs);
-        st.setAttribute("locals", locals!=null?locals.getMembers():null);
+        st.setAttribute("locals", locals != null ? locals.getMembers() : null);
         return st.toString();
     }
 

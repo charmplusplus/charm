@@ -1,33 +1,20 @@
-/*
-Load-balancing test program:
-  Orion Sky Lawlor, 10/19/1999
-
-  Added more complex comm patterns
-  Robert Brunner, 11/3/1999
-
-  updated by
-  Gengbin Zheng
-*/
+/** \file lb_test.C
+ *  Load-balancing test program:
+ *  Orion Sky Lawlor, 1999/10/19
+ *
+ *  Added more complex comm patterns
+ *  Robert Brunner, 1999/11/03
+ *
+ *  Updated by Gengbin Zheng
+ *
+ *  Cleaned up to be up to date with current load balancing framework
+ *  Abhinav Bhatele, 2010/11/26
+ */
 
 #include <stdio.h>
 #include <math.h>
 #include "charm++.h"
-#include "LBDatabase.h"
 #include "Topo.h"
-#include "CentralLB.h"
-#include "DummyLB.h"
-#include "RandCentLB.h"
-#include "RecBisectBfLB.h"
-#include "RefineLB.h"
-#include "RefineCommLB.h"
-#include "GreedyCommLB.h"
-#include "MetisLB.h"
-#include "GreedyLB.h"
-#include "NeighborLB.h"
-#include "WSLB.h"
-#include "OrbLB.h"
-#include "HybridLB.h"
-#include "HbmLB.h"
 
 #include "lb_test.decl.h"
 
@@ -35,16 +22,16 @@ Load-balancing test program:
 #define strcasecmp stricmp
 #endif
 
-CkChareID mid;//Main ID
-CkGroupID topoid;
-CProxy_Lb_array hproxy;//Array ID
-int n_loadbalance;
+/*readonly*/ CProxy_main mainProxy;
+/*readonly*/ CkGroupID topoid;
+/*readonly*/ CProxy_Lb_array lbproxy;
+/*readonly*/ int element_count;
+/*readonly*/ int step_count, print_count;
+/*readonly*/ int min_us, max_us;
+/*readonly*/ int n_loadbalance;
 
 #define N_LOADBALANCE 500 /*Times around ring until we load balance*/
-
 #define DEBUGF(x)       // CmiPrintf x
-int cycle_count,element_count,step_count,print_count;
-int min_us,max_us;
 
 int specialTracing = 0;
 
@@ -67,19 +54,10 @@ public:
 
 class main : public CBase_main {
 public:
-  int nDone;
-
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m);
 
   void maindone(void) {
-#if 0
-    nDone++;
-    if (nDone==element_count) {
-      CkPrintf("All done\n");
-      CkExit();
-    }
-#endif
     CkPrintf("All done\n");
     CkExit();
   };
@@ -88,75 +66,15 @@ private:
   void arg_error(char* argv0);
 };
 
-static const struct {
-  const char *name;//Name of strategy (on command line)
-  const char *description;//Text description of strategy
-  LBCreateFn create;//Strategy routine
-} StratTable[]={
-  {"none",
-   "none - The null load balancer, collect data, print data",
-   CreateCentralLB},
-  {"dummy",
-   "dummy - The null load balancer, collect data, do nothing",
-   CreateDummyLB},
-  {"neighbor",
-   "neighbor - The neighborhood load balancer",
-   CreateNeighborLB},
-  {"workstation",
-   "workstation - Like neighbor, but for workstation performance",
-   CreateWSLB},
-  {"random",
-   "random - Assign objects to processors randomly",
-   CreateRandCentLB},
-  {"greedy",
-   "greedy - (Greedy) Use the greedy algorithm to place heaviest object on the "
-   "least-loaded processor until done",
-   CreateGreedyLB},
-  {"metis",
-   "metis - Use Metis(tm) to partition object graph",
-   CreateMetisLB},
-  {"refine",
-   "refine - Move a very few objects away from most heavily-loaded processor",
-   CreateRefineLB},
-  {"refinecomm",
-   "refinecomm - Move a very few objects away from most heavily-loaded processor, taking communicaiton into account",
-   CreateRefineCommLB},
-  {"orb",
-   "orb - Orthogonal Recursive Bisection to partition according to coordinates",
-   CreateOrbLB},
-  {"comm",
-   "comm - Greedy with communication",
-   CreateGreedyCommLB},
-  {"recbf",
-   "recbf - Recursive partitioning with Breadth first enumeration, with 2 nuclei",
-   CreateRecBisectBfLB},
-  {"hybrid",
-   "hybrid - Hybrid strategy",
-   CreateHybridLB},
-  {"hbm",
-   "HbmLB - HBM strategy",
-   CreateHbmLB},
-
-  {NULL,NULL,NULL}
-};
-
 static void programBegin(void *dummy,int size,void *data)
 {
-  //Start everybody computing
-/*
-  for (int i=0;i<element_count;i++)
-    hproxy[i].ForwardMessages();
-*/
-  hproxy.ForwardMessages();
+  // Start computing
+  lbproxy.ForwardMessages();
 }
 
 main::main(CkArgMsg *m) 
 {
-  char *strategy;//String name for strategy routine
-  char *topology;//String name for communication topology
-  int stratNo;
-  nDone=0;
-
+  char *topology;	// String name for communication topology
   int cur_arg = 1;
 
   if (m->argc > cur_arg)
@@ -184,63 +102,29 @@ main::main(CkArgMsg *m)
   else arg_error(m->argv[0]);
 
   if (m->argc > cur_arg)
-    strategy=m->argv[cur_arg++];
-  else arg_error(m->argv[0]);
-
-  if (m->argc > cur_arg)
     topology=m->argv[cur_arg++];
   else arg_error(m->argv[0]);
 
-  //Look up the user's strategy in table
-  stratNo=0;
-  while (StratTable[stratNo].name!=NULL) {
-    if (0==strcasecmp(strategy,StratTable[stratNo].name)) {
-      //We found the user's chosen strategy!
-      StratTable[stratNo].create();//Create this strategy
-      break;
-    }
-    stratNo++;
-  }
+  CkPrintf("Running lb_test on %d processors with %d elements\n", CkNumPes(), element_count);
+  CkPrintf("Print every %d steps\n", print_count);
+  CkPrintf("Sync every %d steps\n", n_loadbalance);
+  CkPrintf("First node busywaits %d usec; last node busywaits %d usec\n\n", min_us, max_us);
 
-  CkPrintf("%d processors\n",CkNumPes());
-  CkPrintf("%d elements\n",element_count);
-  CkPrintf("Print every %d steps\n",print_count);
-  CkPrintf("Sync every %d steps\n",n_loadbalance);
-  CkPrintf("First node busywaits %d usec; last node busywaits %d usec\n",
-	   min_us,max_us);
+  mainProxy = thisProxy;
 
-  mid = thishandle;
-
-
-  if (StratTable[stratNo].name==NULL)
-    //The user's strategy name wasn't in the table-- bad!
-    CkAbort("ERROR! Strategy not found!  \n");
-	
   topoid = Topo::Create(element_count,topology,min_us,max_us);
   if (topoid.isZero())
     CkAbort("ERROR! Topology not found!  \n");
 
-  hproxy = CProxy_Lb_array::ckNew(element_count);
-  hproxy.setReductionClient(programBegin, NULL);
-
-/*
-  //Start everybody computing
-  for (int i=0;i<element_count;i++)
-    hproxy[i].ForwardMessages();
-*/
+  lbproxy = CProxy_Lb_array::ckNew(element_count);
+  lbproxy.setReductionClient(programBegin, NULL);
 }
 
 void main::arg_error(char* argv0)
 {
   CkPrintf("Usage: %s \n"
     "<elements> <steps> <print-freq> <lb-freq> <min-dur us> <max-dur us>\n"
-    "<strategy> <topology>\n"
-    "<strategy> is the load-balancing strategy:\n",argv0);
-  int stratNo=0;
-  while (StratTable[stratNo].name!=NULL) {
-    CkPrintf("  %s\n",StratTable[stratNo].description);
-    stratNo++;
-  }
+    "<topology>\n", argv0);
 
   int topoNo = 0;
   CkPrintf("<topology> is the object connection topology:\n");
@@ -250,8 +134,8 @@ void main::arg_error(char* argv0)
   }
 
   CmiPrintf("\n"
-	   " The program creates a ring of element_count array elements,\n"
-	   "which all compute and send to their neighbor cycle_count.\n"
+	   "The program creates a ring of element_count array elements,\n"
+	   "which all compute and send to their neighbor.\n"
 	   "Computation proceeds across the entire ring simultaniously.\n"
 	   "Orion Sky Lawlor, olawlor@acm.org, PPL, 10/14/1999\n");
   CmiAbort("Abort!");
@@ -260,9 +144,9 @@ void main::arg_error(char* argv0)
 class Lb_array : public CBase_Lb_array {
 public:
   Lb_array(void) {
-    //    CkPrintf("Element %d created\n",thisIndex);
+    // CkPrintf("Element %d created\n", thisIndex);
 
-    //Find out who to send to, and how many to receive
+    // Find out who to send to, and how many to receive
     TopoMap = CProxy_Topo::ckLocalBranch(topoid);
     send_count = TopoMap->SendCount(thisIndex);
     send_to = new Topo::MsgInfo[send_count];
@@ -272,17 +156,17 @@ public:
     // Benchmark the work function
     work_per_sec = CalibrateWork();
 
-    //Create massive load imbalance by making load
+    // Create massive load imbalance by making load
     // linear in processor number.
     usec = (int)TopoMap->Work(thisIndex);
     DEBUGF(("Element %d working for %d ms\n",thisIndex,usec));
 
-    //msec=meanms+(devms-meanms)*thisIndex/(element_count-1);
+    // msec=meanms+(devms-meanms)*thisIndex/(element_count-1);
 
     // Initialize some more variables
     nTimes=0;
     sendTime=0;
-//    lastTime=CmiWallTimer();
+    // lastTime=CmiWallTimer();
     n_received = 0;
     resumed = 1;
     busywork = (int)(usec*1e-6*work_per_sec);
@@ -300,7 +184,7 @@ public:
   Lb_array(CkMigrateMessage *m) {
     DEBUGF(("Migrated element %d to processor %d\n",thisIndex,CkMyPe()));
     TopoMap = CProxy_Topo::ckLocalBranch(topoid);
-    //Find out who to send to, and how many to receive
+    // Find out who to send to, and how many to receive
     send_count = TopoMap->SendCount(thisIndex);
     send_to = new Topo::MsgInfo[send_count];
     TopoMap->SendTo(thisIndex,send_to);
@@ -311,17 +195,19 @@ public:
 
   virtual void pup(PUP::er &p)
   {
-	ArrayElement1D::pup(p);//<- pack our superclass
-	p(nTimes);p(sendTime);
-	p(usec);//p(lastTime);
-	p(work_per_sec);
-	p(busywork);
-	p(n_received);
-	p(future_receives,future_bufsz);
+     ArrayElement1D::pup(p);		// pack our superclass
+     p(nTimes);
+     p(sendTime);
+     p(usec);
+     // p(lastTime);
+     p(work_per_sec);
+     p(busywork);
+     p(n_received);
+     p(future_receives,future_bufsz);
   }
 
   void Compute(HiMsg *m) { 
-    //Perform computation
+    // Perform computation
     if (m->refnum > nTimes) {
       // CkPrintf("[%d] Future message received %d %d\n", thisIndex,nTimes,m->refnum);
       int future_indx = m->refnum - nTimes - 1;
@@ -340,18 +226,17 @@ public:
     } else {
       n_received++;
 
-      //      CkPrintf("[%d] %d n_received=%d of %d\n",
-      //      	       CkMyPe(),thisIndex,n_received,recv_count);
+      // CkPrintf("[%d] %d n_received=%d of %d\n",
+      //   	       CkMyPe(),thisIndex,n_received,recv_count);
       if (n_received == recv_count) {
-	//	CkPrintf("[%d] %d computing %d\n",CkMyPe(),thisIndex,nTimes);
+	// CkPrintf("[%d] %d computing %d\n",CkMyPe(),thisIndex,nTimes);
 
-	if (nTimes && nTimes % print_count == 0) {
-	  //Write out the current time
-	  if (thisIndex==1) {
+	if (nTimes && (nTimes % print_count == 0) ) {
+	  // Write out the current time
+	  if (thisIndex == 1) {
 	    double now = CmiWallTimer();
-	    CkPrintf("GREP00\t%d\t%lf\t%lf\n",
-		     nTimes,now,now-lastTime);
-	    lastTime=now;
+	    CkPrintf("TIME PER STEP\t%d\t%lf\t%lf\n", nTimes, now, now-lastTime);
+	    lastTime = now;
 	  }
 	}
 
@@ -365,7 +250,7 @@ public:
 
 	nTimes++;//Increment our "times around"	
 
-	double startTime=CmiWallTimer();
+	double startTime = CmiWallTimer();
 	// First check contents of message
 	//     int chksum = 0;
 	//     for(int i=0; i < m->length; i++)
@@ -379,16 +264,16 @@ public:
 	
 	int loadbalancing = 0;
 	if (nTimes == step_count) {
-	  //We're done-- send a message to main telling it to die
-          CkCallback cb(CkIndex_main::maindone(), mid);
+	  // We're done-- send a message to main telling it to die
+          CkCallback cb(CkIndex_main::maindone(), mainProxy);
           contribute(0, NULL, CkReduction::sum_int, cb);
 	} else if (nTimes % n_loadbalance == 0) {
           if (specialTracing) {
             if (nTimes/n_loadbalance == 1) traceBegin();
             if (nTimes/n_loadbalance == 3) traceEnd();
           }
-	  //We're not done yet...
-	  //Either load balance, or send a message to the next guy
+	  // We're not done yet...
+	  // Either load balance, or send a message to the next guy
 	  DEBUGF(("Element %d AtSync on PE %d\n",thisIndex,CkMyPe()));
 #if 0
 	  AtSync();
@@ -425,8 +310,8 @@ public:
     thisProxy[thisIndex].ForwardMessages();
   }
 
-  void ForwardMessages(void) { //Pass it on
-    if (sendTime == 0) lastTime = CmiWallTimer();
+  void ForwardMessages(void) { // Pass it on
+    if(sendTime == 0) lastTime = CmiWallTimer();
 
     if (resumed != 1)
       CkPrintf("[%d] %d forwarding %d %d %d\n",CkMyPe(),thisIndex,
@@ -510,11 +395,11 @@ public:
   enum { future_bufsz = 50 };
 
 private:
-  int nTimes;//Number of times I've been called
-  int sendTime;//Step number for sending (in case I finish receiving
-               //before sending
-  int usec;//Milliseconds to "compute"
-  double lastTime;//Last time recorded
+  int nTimes;		// Number of times I've been called
+  int sendTime;		// Step number for sending (in case I finish receiving
+			// before sending
+  int usec;		// Milliseconds to "compute"
+  double lastTime;	// Last time recorded
   int work_per_sec;
   int busywork;
   int result;

@@ -82,6 +82,8 @@ class ConvComlibManager {
   friend void *comlibReceiveTableHandler(void *msg);
  public:
   inline int getNumStrats() {return nstrats;}
+  inline void incrementNumStrats() {nstrats++;}
+  inline void decrementNumStrats() {nstrats--;}
   inline Strategy *getStrategy(int loc) {return strategyTable[loc].strategy;}
   inline int isReady(int loc) {return strategyTable[loc].isReady;}
   inline int isNew(int loc) {return strategyTable[loc].isNew;}

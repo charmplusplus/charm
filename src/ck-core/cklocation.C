@@ -1,13 +1,13 @@
-/**
-\file
-\addtogroup CkArrayImpl
+/** \file cklocation.C
+ *  \addtogroup CkArrayImpl
+ *
+ *  The location manager keeps track of an indexed set of migratable objects.
+ *  It is used by the array manager to locate array elements, interact with the
+ *  load balancer, and perform migrations.
+ *
+ *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
+ */
 
-The location manager keeps track of an indexed set of migratable
-objects.  It is used by the array manager to locate array elements,
-interact with the load balancer, and perform migrations.
-
-Orion Sky Lawlor, olawlor@acm.org 9/29/2001
-*/
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
@@ -203,6 +203,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 }
 
 CkGroupID _defaultArrayMapID;
+CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {
@@ -239,39 +240,55 @@ public:
 };
 
 /** 
- * Class used to store the dimensions of the array and precalculate binSize for
- * the DefaultArrayMap -- ASB
+ * Class used to store the dimensions of the array and precalculate numChares,
+ * binSize and other values for the DefaultArrayMap -- ASB
  */
-class dimInfo {
+class arrayMapInfo {
 public:
   CkArrayIndexMax _nelems;
-  int _binSize;
+  int _binSize;			/* floor of numChares/numPes */
+  int _numChares;		/* initial total number of chares */
+  int _remChares;		/* numChares % numPes -- equals the number of
+				   processors in the first set */
+  int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
+				   chares in the first set */
 
-  dimInfo(void) { }
+  /** All processors are divided into two sets. Processors in the first set
+   *  have one chare more than the processors in the second set. */
 
-  dimInfo(CkArrayIndexMax& n) {
-    _nelems = n;
+  arrayMapInfo(void) { }
+
+  arrayMapInfo(CkArrayIndexMax& n) : _nelems(n), _numChares(0) {
     compute_binsize();
   }
 
-  ~dimInfo() {}
+  ~arrayMapInfo() {}
   
   int compute_binsize()
   {
     int numPes = CkNumPes();
+
     if (_nelems.nInts == 1) {
-      _binSize = (int)ceil((double)(_nelems.data()[0])/(double)numPes);
+      _numChares = _nelems.data()[0];
     } else if (_nelems.nInts == 2) {
-      _binSize = (int)ceil((double)(_nelems.data()[0] * _nelems.data()[1])/(double)numPes);
+      _numChares = _nelems.data()[0] * _nelems.data()[1];
     } else if (_nelems.nInts == 3) {
-      _binSize = (int)ceil((double)(_nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2])/(double)numPes);
+      _numChares = _nelems.data()[0] * _nelems.data()[1] * _nelems.data()[2];
     }
+
+    _remChares = _numChares % numPes;
+    _binSize = (int)floor((double)_numChares/(double)numPes);
+    _numFirstSet = _remChares * (_binSize + 1);
+
     return _binSize;
   }
 
   void pup(PUP::er& p){
     p|_nelems;
     p|_binSize;
+    p|_numChares;
+    p|_remChares;
+    p|_numFirstSet;
   }
 };
 
@@ -283,53 +300,108 @@ public:
 class DefaultArrayMap : public RRMap
 {
 public:
-  CkPupPtrVec<dimInfo> arrs;
+  /** This array stores information about different chare arrays in a Charm
+   *  program (dimensions, binsize, numChares etc ... ) */
+  CkPupPtrVec<arrayMapInfo> amaps;
 
 public:
   DefaultArrayMap(void) {
     DEBC((AA"Creating DefaultArrayMap\n"AB));
   }
 
-  DefaultArrayMap(CkMigrateMessage *m):RRMap(m){}
+  DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
-    int idx = arrs.size();
-    arrs.resize(idx+1);
-    arrs[idx] = new dimInfo(numElements);
+    int idx = amaps.size();
+    amaps.resize(idx+1);
+    amaps[idx] = new arrayMapInfo(numElements);
     return idx;
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati;
-    if (arrs[arrayHdl]->_nelems.nInts == 0) {
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
     }
 
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
 
-    return (flati/arrs[arrayHdl]->_binSize);
+    if(flati < amaps[arrayHdl]->_numFirstSet)
+      return (flati / (amaps[arrayHdl]->_binSize + 1));
+    else if (flati < amaps[arrayHdl]->_numChares)
+      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSize));
+    else
+      return (flati % CkNumPes());
   }
 
   void pup(PUP::er& p){
     RRMap::pup(p);
     int npes = CkNumPes();
     p|npes;
-    p|arrs;
+    p|amaps;
     if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
-      for (int i=0; i<arrs.size(); i++)
-        arrs[i]->compute_binsize();
+      for (int i=0; i<amaps.size(); i++)
+        amaps[i]->compute_binsize();
     }
   }
 };
+
+/**
+ *  A fast map for chare arrays which do static insertions and promise NOT
+ *  to do late insertions -- ASB
+ */
+class FastArrayMap : public DefaultArrayMap
+{
+public:
+  FastArrayMap(void) {
+    DEBC((AA"Creating FastArrayMap\n"AB));
+  }
+
+  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    } else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+
+    /** binSize calculated in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    return (flati / (amaps[arrayHdl]->_binSize + 1));
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+  }
+};
+
 
 /**
  * This map can be used for topology aware mapping when the mapping is provided
@@ -345,7 +417,7 @@ public:
     DEBC((AA"Creating ReadFileMap\n"AB));
   }
 
-  ReadFileMap(CkMigrateMessage *m):DefaultArrayMap(m){}
+  ReadFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
   int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
   {
@@ -355,12 +427,12 @@ public:
     if(mapping.size() == 0) {
       int numChares;
 
-      if (arrs[idx]->_nelems.nInts == 1) {
-	numChares = arrs[idx]->_nelems.data()[0];
-      } else if (arrs[idx]->_nelems.nInts == 2) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1];
-      } else if (arrs[idx]->_nelems.nInts == 3) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1] * arrs[idx]->_nelems.data()[2];
+      if (amaps[idx]->_nelems.nInts == 1) {
+	numChares = amaps[idx]->_nelems.data()[0];
+      } else if (amaps[idx]->_nelems.nInts == 2) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1];
+      } else if (amaps[idx]->_nelems.nInts == 3) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1] * amaps[idx]->_nelems.data()[2];
       } else {
 	CkAbort("CkArrayIndex has more than 3 integers!");
       }
@@ -386,9 +458,9 @@ public:
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
@@ -796,6 +868,7 @@ class CkMapsInit : public Chare
 public:
 	CkMapsInit(CkArgMsg *msg) {
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
 		delete msg;
 	}
 
@@ -1132,7 +1205,7 @@ void CkMigratableList::setSize(int s) {
 }
 
 void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (atIdx>=length())
 		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
 #endif
@@ -1337,7 +1410,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	startTiming();
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
@@ -1353,7 +1426,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	   CkDeliverMessageReadonly(epIdx,msg,obj);
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_END_EXECUTE();
@@ -1544,7 +1617,7 @@ public:
 		:CkLocRec_aging(Narr)
 		{
 			onPe=NonPe;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 			if (onPe==CkMyPe())
 				CkAbort("ERROR!  'remote' array element on this Pe!\n");
 #endif
@@ -2101,7 +2174,7 @@ void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 	delete rec;
 }
 void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
@@ -2109,7 +2182,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
         CmiImmediateLock(hashImmLock);
 	hash.remove(*(CkArrayIndexMax *)&idx);
         CmiImmediateUnlock(hashImmLock);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
@@ -2650,7 +2723,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
 	//immediately updated real migration
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
@@ -2803,7 +2876,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 
 //Look up array element in hash table.  Index out-of-bounds if not found.
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 //Assume the element will be found
 	return hash.getRef(*(CkArrayIndexMax *)&idx);
 #else

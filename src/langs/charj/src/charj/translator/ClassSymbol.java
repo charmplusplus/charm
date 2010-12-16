@@ -7,10 +7,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public ClassSymbol superClass;
     public List<String> interfaceImpls;
-    public List<String> templateArgs;
-    public List<VariableInitializer> initializers;
-    public List<VariableInitializer> pupInitializers;
-    public List<CharjAST> varsToPup;
+    public List<Type> templateArgs;
+    public List<VariableInitializer> initializers = new ArrayList<VariableInitializer>();
+    public List<VariableInitializer> pupInitializers = new ArrayList<VariableInitializer>();
+    public List<CharjAST> varsToPup = new ArrayList<CharjAST>();
+    public List<CharjAST> objToPup = new ArrayList<CharjAST>();
+	public List<ArraySectionInitializer> sectionInitializers = new ArrayList<ArraySectionInitializer>();
 
     Map<String, PackageScope> imports =
         new LinkedHashMap<String, PackageScope>();
@@ -22,6 +24,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
     public Map<String, VariableSymbol> fields = new LinkedHashMap<String, VariableSymbol>();
     public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
+
+    public Map<String, String> sdag_local_names = new LinkedHashMap<String, String>();
+    public Map<String, String> sdag_local_typenames = new LinkedHashMap<String, String>();
 
     public boolean hasCopyCtor = false;
     public boolean isPrimitive = false;
@@ -41,9 +46,6 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
             importPackage(pkg);
         }
-	initializers = new ArrayList<VariableInitializer>();
-        pupInitializers = new ArrayList<VariableInitializer>();
-        varsToPup = new ArrayList<CharjAST>();
     }
 
     public ClassSymbol(
@@ -55,9 +57,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.superClass = superClass;
         this.scope = scope;
         this.type = this;
-	this.initializers = new ArrayList<VariableInitializer>();
-        this.pupInitializers = new ArrayList<VariableInitializer>();
-
+	
         // manually add automatic class methods and symbols here
         this.includes.add("charm++.h");
         this.includes.add("string");
@@ -73,6 +73,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.usings.add("CharjArray::Array");
         this.usings.add("CharjArray::Domain");
         this.usings.add("CharjArray::Range");
+        this.usings.add("CharjArray::Matrix");
+        this.usings.add("CharjArray::Vector");
     }
 
     public Scope getEnclosingScope() {
@@ -137,19 +139,26 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
      *  packges, walk through imported packages again, trying to load from
      *  disk.
      */
-    public Type resolveType(String type) {
-        if (debug()) System.out.println(
-                "ClassSymbol.resolveType(" + type + "): context is " + name +
-                ":" + members.keySet());
+    public Type resolveType(List<TypeName> type) {
+        String typeStr = "";
+        
+        if (debug()) {
+            typeStr = TypeName.typeToString(type);
+            System.out.println("ClassSymbol.resolveType(" + typeStr + 
+                               "): context is " + name + ":" + 
+                               members.keySet());
+        }
 
-        if (type == null) {
+        if (type == null || type.size() == 0) {
             return null;
         }
 
-        if ( name.equals(type) ) {
-            if ( debug() ) System.out.println(
-                    "ClassSymbol.resolveType(" + type +
-                    "): surrounding class " + name + ":" + members.keySet());
+        // Assume that the first part of the type is in position 0
+        if ( name.equals(type.get(0).name) ) {
+            if (debug()) 
+                System.out.println("ClassSymbol.resolveType(" + typeStr +
+                                   "): surrounding class " + name + ":" + 
+                                   members.keySet());
             return this;
         }
 
@@ -162,12 +171,12 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         // look for type in classes already defined in imported packages
         for (String packageName : imports.keySet()) {
             if ( debug() ) System.out.println( "Looking for type " +
-                    type + " in package " + packageName);
+                    typeStr + " in package " + packageName);
             PackageScope pkg = resolvePackage(packageName);
             ClassSymbol cs = pkg.resolveType(type);
             if ( cs != null) { // stop looking, found it
                 if ( debug() ) System.out.println(
-                        "ClassSymbol.resolveType(" + type +
+                        "ClassSymbol.resolveType(" + typeStr +
                         "): found in context " + name + ":" +
                         members.keySet());
                 return cs;
@@ -175,7 +184,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         }
 
         if ( debug() ) System.out.println(
-                "ClassSymbol.resolveType(" + type +
+                "ClassSymbol.resolveType(" + typeStr +
                 "): not in context " + name + ":" + members.keySet());
         return null;
     }
@@ -217,7 +226,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public String toString() {
         if (isPrimitive) return name;
-        else return getFullyQualifiedName() + members;
+        else return getFullyQualifiedName() + members + (templateArgs != null ? templateArgs : "");
     }
 
     public String getFullyQualifiedName() {
@@ -310,6 +319,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return name;
     }
 
+    public String getTranslatedTypeName() {
+        return getTypeName();
+    }
+
     private boolean requiresInit() {
         for (CharjAST varAst : varsToPup) {
             if (varAst.def instanceof VariableSymbol &&
@@ -323,7 +336,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<String> generateInits(List<VariableInitializer> inits) {
         List<String> strInits = new ArrayList<String>();
         for (VariableInitializer init : inits) {
-            strInits.add(init.emit());
+            if (init.init != null)
+                strInits.add(init.emit());
         }
         return strInits;
     }
@@ -336,5 +350,31 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             }
         }
         return PUPers;
+    }
+
+    public boolean getHasSDAG() {
+        List<String> inits = new ArrayList<String>();
+        for (Map.Entry<String, MethodSymbol> e : methods.entrySet()) {
+            if (e.getValue().hasSDAG) return true;
+        }
+        return false;
+    }
+
+    public void addSDAGLocal(String typename, String name, String mangledName) {
+        sdag_local_names.put(name, mangledName);
+        sdag_local_typenames.put(name, typename);
+    }
+
+    public String getSDAGLocalName(String name) {
+        String result = sdag_local_names.get(name);
+        return result == null ? name : result;
+    }
+
+    public List<String> getSDAGLocalTypeDefinitions() {
+        List<String> defs = new ArrayList<String>();
+        for (Map.Entry<String, String> def : sdag_local_typenames.entrySet()) {
+            defs.add(def.getValue() + " " + sdag_local_names.get(def.getKey()) + ";");
+        }
+        return defs;
     }
 }

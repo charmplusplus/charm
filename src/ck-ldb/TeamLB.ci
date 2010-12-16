@@ -1,0 +1,8 @@
+module TeamLB {
+  extern module CentralLB;
+  initnode void lbinit(void);
+
+  group [migratable] TeamLB : CentralLB {
+    entry void TeamLB(const CkLBOptions &);
+  };
+};

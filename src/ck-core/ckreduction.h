@@ -258,6 +258,7 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class CkNodeReductionMgr;
 	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
+    friend class ck::impl::XArraySectionReducer;
 public:
 
 //Publically-accessible fields:

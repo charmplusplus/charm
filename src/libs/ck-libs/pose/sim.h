@@ -226,7 +226,17 @@ class sim : public CBase_sim {
   double st, et, ct;
 #ifndef CMK_OPTIMIZE
   /// The local statistics collector
-  localStat *localStats; 
+  localStat *localStats;
+  /// Used to manually override the value of evt for DOP calculations
+  /* To override the ending virtual time of an entry method when doing
+     DOP analysis, add this code to the entry method:
+  #ifndef CMK_OPTIMIZE
+    if ((pose_config.stats) && (pose_config.dop)) {
+      parent->dop_override_evt = ovt + (POSE_TimeType)time_that_would_have_been_elapsed;
+    }
+  #endif
+  */
+  POSE_TimeType dop_override_evt;
 #endif
   /// The local load balancer
   LBgroup *localLBG;

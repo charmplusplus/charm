@@ -42,7 +42,7 @@ enterClass
     :   ^(TYPE classType IDENT
         (^('extends' .*))?
         (^('implements' .*))?
-        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION |
+        (^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL | PRIMITIVE_VAR_DECLARATION | DIVCON_METHOD_DECL |
             OBJECT_VAR_DECLARATION | CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL) .*))*)
         {
             currentClass = (ClassSymbol)$IDENT.def.type;
@@ -100,8 +100,9 @@ varDeclaration
             }
 
             if (!inMethod && currentClass != null) {
-                currentClass.varsToPup.add($IDENT);
-                currentClass.pupInitializers.add(new VariableInitializer($expr, $IDENT));
+				currentClass.varsToPup.add($IDENT);
+				if(!($IDENT.symbolType instanceof ProxyType || $IDENT.symbolType instanceof ProxySectionType))
+					currentClass.pupInitializers.add(new VariableInitializer($expr, $IDENT));
             }
         }
     ;

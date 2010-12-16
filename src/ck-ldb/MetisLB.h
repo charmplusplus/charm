@@ -1,9 +1,6 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
+/** \file MetisLB.h
+ *
+ */
 
 /**
  * \addtogroup CkLdb
@@ -16,6 +13,9 @@
 #include "CentralLB.h"
 #include "MetisLB.decl.h"
 
+#define WEIGHTED 1
+#define MULTI_CONSTRAINT 2
+
 void CreateMetisLB();
 BaseLB * AllocateMetisLB();
 
@@ -25,11 +25,8 @@ public:
   MetisLB(CkMigrateMessage *m):CentralLB(m) { lbname = "MetisLB"; }
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; }
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 };
-
-#define WEIGHTED 1
-#define MULTI_CONSTRAINT 2
 
 #endif /* _METISLB_H_ */
 

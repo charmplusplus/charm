@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,9 +6,8 @@
 #ifndef  WIN32
 #include <unistd.h>
 #endif
-#include "charm++.h"
-#include <BaseLB.h>
-#include <cklists.h>
+
+#include "elements.h"
 #include "ckheap.h"
 #include "WSLB.h"
 #include "LBDBManager.h"

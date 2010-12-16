@@ -16,6 +16,8 @@ virtual functions are defined here.
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+
 #include "charm.h"
 #include "pup.h"
 #include "ckhashtable.h"
@@ -135,9 +137,69 @@ void PUP::fromMem::bytes(void *p,int n,size_t itemSize,dataType t)
 	buf+=n;
 }
 
+// dealing with short write
+size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f)
+{
+        size_t nwritten = 0;
+        const char *buf = (const char *)ptr;
+        while (nwritten < nmemb) {
+          size_t ncur = fwrite(buf+nwritten*size,size,nmemb-nwritten,f);
+          if (ncur <= 0) {
+            if  (errno == EINTR)
+              printf("Warning: CmiFwrite retrying ...\n");
+            else
+              break;
+          }
+          else
+            nwritten += ncur;
+        }
+        return nwritten;
+}
+
+FILE *CmiFopen(const char *path, const char *mode)
+{
+        FILE *fp = NULL;
+        while (1) {
+          fp = fopen(path, mode);
+          if (fp == 0 && errno==EINTR) {
+            printf("Warning: CmiFopen retrying ...\n");
+            continue;
+          }
+          else
+            break;
+        }
+        return fp;
+}
+
+// more robust fclose that handling interrupt
+int CmiFclose(FILE *fp)
+{
+        int status = 0;
+        while (1) {
+          status = fflush(fp);
+          if (status != 0 && errno==EINTR) {
+            printf("Warning: CmiFclose flush retrying ...\n");
+            continue;
+          }
+          else
+            break;
+        }
+        if (status != 0) return status;
+        while (1) {
+          status = fclose(fp);
+          if (status != 0 && errno==EINTR) {
+            printf("Warning: CmiFclose retrying ...\n");
+            continue;
+          }
+          else
+            break;
+        }
+        return status;
+}
+
 /*Disk PUP::er's*/
 void PUP::toDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
-{/* CkPrintf("writing %d bytes\n",itemSize*n); */ fwrite(p,itemSize,n,F);}
+{/* CkPrintf("writing %d bytes\n",itemSize*n); */ CmiFwrite(p,itemSize,n,F);}
 void PUP::fromDisk::bytes(void *p,int n,size_t itemSize,dataType /*t*/)
 {/* CkPrintf("reading %d bytes\n",itemSize*n); */ fread(p,itemSize,n,F);}
 

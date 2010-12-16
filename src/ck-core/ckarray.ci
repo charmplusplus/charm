@@ -6,7 +6,7 @@ module CkArray {
   readonly CmiBool _isAnytimeMigration;
   
   group [migratable] CkArray : CkReductionMgr {
-	entry CkArray(CkArrayOptions i,CkMarshalledMessage ctorMsg,CkNodeGroupID nodereductionProxy);
+	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
 	//Insertion
 	entry void insertElement(CkMessage *);
 	entry void remoteDoneInserting(void);

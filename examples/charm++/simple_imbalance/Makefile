@@ -8,7 +8,7 @@ LB_Test: $(OBJS)
 	$(CHARMC) -language charm++ -o LB_Test $(OBJS)
 
 LB_Test_LB: $(OBJS)
-	$(CHARMC) -language charm++ -o LB_Test_LB -module EveryLB $(OBJS)
+	$(CHARMC) -language charm++ -o LB_Test_LB -module CommonLBs $(OBJS)
 
 LB_Test.decl.h: LB_Test.ci
 	$(CHARMC)  LB_Test.ci

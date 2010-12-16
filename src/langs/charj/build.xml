@@ -27,87 +27,12 @@
     </path>
     <property name="classpath" value="project.class.path.3.2"/>
 
-    <!-- antlr options -->
-    <property name="profile" value="false" />
-    <property name="report" value="false" />
-    <property name="multithreaded" value="true" />
-    <property name="debug" value="false" />
-
-    <target name="init">
-        <tstamp />
-        <!-- Create the build directory structure used by compile -->
-        <copy todir="${buildsrc}">
-            <fileset dir="${src}"/>
-        </copy>
-        <mkdir dir="${classes}" />
-        <mkdir dir="${classes}/META-INF" />
-        <mkdir dir="${buildlib}" />
-        <mkdir dir="${doc}" />
-    </target>
-
-    <macrodef name="antlr3">
-        <attribute name="grammar.name"/>
-        <attribute name="grammar.path"/>
-        <sequential>
-            <echo message="antlr @{grammar.name}" />
-            <antlr:antlr3 xmlns:antlr="antlib:org/apache/tools/ant/antlr"
-                target="@{grammar.path}/@{grammar.name}"
-                outputdirectory="@{grammar.path}"
-                libdirectory="@{grammar.path}"
-                multithreaded="${multithreaded}"
-                report="${report}"
-                debug="${debug}"
-                profile="${profile}">
-                <jvmarg value="-Xmx512M"/>
-                <classpath refid="${classpath}"/>
-            </antlr:antlr3>
-        </sequential>
-    </macrodef>
-
-    <target name="Charj" depends="init">
-        <antlr3 grammar.name="Charj.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="CharjASTModifier" depends="Charj">
-        <antlr3 grammar.name="CharjASTModifier.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="SymbolDefiner" depends="Charj">
-        <antlr3 grammar.name="SymbolDefiner.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-    
-    <target name="SymbolResolver" depends="Charj">
-        <antlr3 grammar.name="SymbolResolver.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="InitPUPCollector" depends="Charj">
-        <antlr3 grammar.name="InitPUPCollector.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="CharjASTModifier2" depends="Charj">
-        <antlr3 grammar.name="CharjASTModifier2.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="CharjSemantics" depends="Charj">
-        <antlr3 grammar.name="CharjSemantics.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="CharjEmitter" depends="CharjSemantics,CharjASTModifier,CharjASTModifier2,SymbolDefiner,SymbolResolver,InitPUPCollector">
-        <antlr3 grammar.name="CharjEmitter.g"
-            grammar.path="${buildsrc}/charj/translator"/>
-    </target>
-
-    <target name="compile" depends="CharjEmitter" description="compile">
+    <target name="compile"
+        description="compile">
         <javac debug="true" srcdir="${buildsrc}" destdir="${classes}"
-               target="1.5" listfiles="Yes" deprecation="Yes">
-               <classpath refid="${classpath}"/>
+            target="1.5" listfiles="Yes" deprecation="Yes"
+            includeantruntime="false">
+            <classpath refid="${classpath}"/>
         </javac>
     </target>
 

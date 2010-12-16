@@ -91,6 +91,7 @@ scope ScopeStack; // default scope
         (packageDeclaration)? 
         (importDeclaration
         | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | externDeclaration
         | readonlyDeclaration)*)
     ;
 
@@ -120,6 +121,10 @@ importDeclaration
 
 readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
     ;
 
 typeDeclaration returns [ClassSymbol sym]
@@ -172,6 +177,7 @@ scope ScopeStack;
             ty=type IDENT formalParameterList a=arrayDeclaratorList? b=block)
         {
         }
+    |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType
             ^(VAR_DECLARATOR_LIST field[$simpleType.type, false]+))
     |   ^(OBJECT_VAR_DECLARATION modifierList? objectType
@@ -408,6 +414,25 @@ localVariableDeclaration
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType variableDeclaratorList[true])
         {
         }
+    ;
+
+
+divconBlock
+    :   ^(DIVCON_BLOCK divconExpr)
+    ;
+
+divconAssignment
+    :   ^(LET_ASSIGNMENT IDENT expression)
+    ;
+
+divconAssignmentList
+    :   divconAssignment+
+    ;
+
+divconExpr
+    :   ^(IF parenthesizedExpression divconExpr divconExpr?)
+    |   ^(LET divconAssignmentList IN divconExpr)
+    |   expression
     ;
 
 statement

@@ -31,6 +31,10 @@ module CkLocation {
     entry DefaultArrayMap(void);
   };
 
+  group [migratable] FastArrayMap : DefaultArrayMap {
+    entry FastArrayMap(void);
+  };
+
   group [migratable] ReadFileMap : DefaultArrayMap {
     entry ReadFileMap(void);
   };

@@ -15,6 +15,7 @@ public:
 };
 
 enum TopoType { TopoRing, TopoMesh2D, TopoRandGraph, TopoError=-1 };
+
 static const struct { 
   const char* name;
   const char* desc;

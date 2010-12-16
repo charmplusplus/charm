@@ -1,0 +1,37 @@
+PatternGen
+----------
+This POSE application was created as a tool for generating simple traffic patterns.  It consists of an array of Worker posers that send and receive work messages.  The number of Workers and the specific pattern are choosen via command-line parameters.  The program is launched and the command-line parsed in pgm.C.  Worker.h and Worker.C define the Worker posers, and defs.h contains pattern constants and important #includes.
+
+
+Command line usage
+------------------
+
+./pgm <#workerObjs> <pattern#> [<pattern parameters>]
+
+In addition, running with -help lists the available patterns and usage:
+
+./pgm -help
+
+
+Steps for adding a pattern
+--------------------------
+1. Add new case statements to the switches in Worker::Worker, Worker::sendMessage, and Worker::recvMessage in Worker.C.
+2. In defs.h, increment NUM_AVAILABLE_PATTERNS and add any new constants needed for the new pattern.
+3. If necessary, add any new helper functions or entry methods to Worker.h and Worker.C, making sure new entry methods are declared in Worker.ci.
+4. If necessary, add new event message classes to Worker.h and declare in Worker.ci.
+5. If necessary, add parsing of new command-line parameters in main::main in pgm.C.
+6. Describe the new pattern briefly in the -help text in pgm.C, and provide more details below.
+
+
+Available patterns
+------------------
+Pattern 0: This is a simple ring pattern.  Worker 0 sends a message to Worker 1, Worker 1 sends to Worker 2 (once Worker 0's message is received), etc., until Worker N sends to Worker 0.  If only 1 Worker is created, it will keep sending to itself.  Constants in defs.h define how many messages are sent, the transit time for each message, and how much time is elapsed between receiving a message and sending the next.
+
+Pattern 1: In this pattern, each Worker begins by invoking its helper entry method, Worker::pattern1Iter.  This method sends one message to a Worker (via Worker::sendMessage) and then one message to itself with a short transit time (~200 GVT ticks) to initiate another send.  This repeats P1_MESSAGES_PER_ITER times (defined in defs.h).  This is then followed by sending a message to itself with a very long transit time (~1,000,000 GVT ticks).  This entire process is repeated for several iterations.  Note that there is no dependency between the recipt of a work message by Worker::recvMessage and when the next work message is sent--this is solely determined by the delay between the receipt of messages by Worker::pattern1Iter.
+
+Pattern 2: This is a simultaneous ring pattern (every Worker sends to the next Worker in the ring at the same time).  After a message is received, a number of GVT ticks are elapsed, and then another message is sent.  See the note on patterns 2 and 3.
+
+Pattern 3: This is a simultaneous ring pattern (every Worker sends to the next Worker in the ring at the same time).  After a message is received, the next message is sent without elapsing any virtual time.  See the note on patterns 2 and 3.
+
+Note on patterns 2 and 3: These patterns were intended to be used for POSE DOP analysis testing.  The timing is meant to be equivalent, and using +dop_pose +stats_pose should yield the same results for both patterns, as long as the parameters in defs.h are such that the P#_MESSAGES_TO_SEND are equal, P#_ELAPSE_TIME are equal, and P2_MESSAGES_TO_SEND + P2_ELAPSE_TIME = P3_MSG_TRANSIT_TIME.
+

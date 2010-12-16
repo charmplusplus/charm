@@ -3,11 +3,6 @@
 
 #include <limits.h>
 #include <math.h>
-#include <stdio.h>
-
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDCOMMLB_MODE 0
@@ -61,7 +56,7 @@ class GridCommLB : public CentralLB
     GridCommLB (CkMigrateMessage *msg);
 
     CmiBool QueryBalanceNow (int step);
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:

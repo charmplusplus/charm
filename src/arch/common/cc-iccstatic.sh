@@ -1,9 +1,25 @@
+# test version
+ICC_ver=`icc -v 2>&1 | grep Version`
+ICC_ver=`echo $ICC_ver | awk '{ print $2; }' | awk 'BEGIN {FS="."}; { print $1; }'`
+test -z "$ICC_ver" && echo "ICC compiler not found!" && exit 1
+#echo version:$ICC_ver
+
+if test $ICC_ver  -ge 10
+then
+  ICCOPTS="-static-intel"
+elif test $ICC_ver -eq 9
+then
+  ICCOPTS="-i-static"
+else
+  ICCOPTS="-static-libcxa"
+fi
+
 CMK_CPP_C='icc -E '
 CMK_CC='icc '
 CMK_CXX='icpc '
 CMK_CXXPP='icpc -E '
-CMK_LD='icc -static-libcxa '
-CMK_LDXX='icpc -static-libcxa '
+CMK_LD="icc $ICCOPTS"
+CMK_LDXX="icpc $ICCOPTS"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_CF90='ifc -auto '
 CMK_CF90_FIXED="$CMK_CF90 -132 -FI "

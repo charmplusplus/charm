@@ -41,6 +41,7 @@ private:
   int _lb_traceComm;		// stats collection for comm
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
+  int _lb_teamSize;		// specifies the team size for TeamLB
 public:
   CkLBArgs() {
 #if CMK_BLUEGENE_CHARM
@@ -54,9 +55,11 @@ public:
     _lb_percentMovesAllowed=100;
     _lb_loop = 0;
     _lb_central_pe = 0;
+	_lb_teamSize = 1;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
+  inline int & teamSize() {return _lb_teamSize; }
   inline int & printSummary() { return _lb_printsumamry; }
   inline int & lbversion() { return _lb_version; }
   inline int & loop() { return _lb_loop; }
@@ -345,6 +348,10 @@ private:
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
+
+public:
+  BaseLB** getLoadBalancers() {return loadbalancers.getVec();}
+  int getNLoadBalancers() {return nloadbalancers;}
 
 public:
   static int manualOn;

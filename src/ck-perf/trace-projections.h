@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/src/ck-perf/trace-projections.h,v $
- * $Author: gioachin $
- * $Date: 2009-08-20 01:09:41 $
- * $Revision: 2.78 $
- *****************************************************************************/
-
 /**
  * \addtogroup CkPerf
 */
@@ -345,7 +338,7 @@ class LogPool {
     void setWriteData(bool b){
       writeData = b;
     }
-
+    void modLastEntryTimestamp(double ts);
 };
 
 /*
@@ -466,6 +459,7 @@ class TraceProjections : public Trace {
     void beginExecute(envelope *e);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
+    void changeLastEntryTimestamp(double ts);
     void beginExecuteLocal(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
     void endExecuteLocal(void);
@@ -549,7 +543,7 @@ class toProjectionsGZFile : public PUP::er {
 
 
 
-
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput();
 
@@ -558,6 +552,11 @@ void enableTraceLogOutput();
 
 /// Force the log file to be flushed
 void flushTraceLog();
+#else
+static inline void disableTraceLogOutput() { }
+static inline void enableTraceLogOutput() { }
+static inline void flushTraceLog() { }
+#endif
 
 #endif
 

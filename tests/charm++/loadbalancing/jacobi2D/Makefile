@@ -1,10 +1,12 @@
-CHARMC=../../../../bin/charmc $(OPTS)
-FNAME=Jacobi2D
+OPTS	= -O3
+CHARMC	= ../../../../bin/charmc $(OPTS)
+LBLIB	= -module CommonLBs #-L$(HOME)/work/scotch/scotch_5.1.10b/lib/ -lscotch -lscotcherr -L$(HOME)/work/metis-4.0/ -lmetis
+FNAME	= Jacobi2D
 
 all: pgm
 
 pgm:  $(FNAME).o
-	$(CHARMC) $(FNAME).o -o pgm -language charm++ -module EveryLB
+	$(CHARMC) $(FNAME).o -o pgm -language charm++ $(LBLIB)
 
 $(FNAME).o : $(FNAME).C $(FNAME).h $(FNAME).ci
 	$(CHARMC) -c $(FNAME).ci $(FNAME).C

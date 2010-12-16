@@ -276,6 +276,17 @@ will be significantly more efficient in the number of messages
 required than inserting each element individually which will require
 one message send per element.
 
+\kw{CkArrayOptions} contains a few flags that the runtime can use to
+optimize handling of a given array. If the array elements will only
+migrate at controlled points (such as periodic load balancing with
+{\tt AtASync()}), this is signalled to the runtime by calling {\tt
+  opts.setAnytimeMigration(false)}\footnote{At present, this optimizes
+broadcasts to not save old messages for immigrating chares.}. If all
+array elements will be inserted by bulk creation or by {\tt
+  fooArray[x].insert()} calls, signal this by calling {\tt
+  opts.setStaticInsertion(true)} \footnote{This can enable a slightly
+  faster default mapping scheme.}.
+
 \subsubsection{Advanced Array Creation: Map Object}
 
 \index{array map}

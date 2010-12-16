@@ -79,18 +79,26 @@ readonlys_h(pds, ros) ::=
 <endif>
 >>
 
-readonlys_cc(pds, ros, basename) ::=
+
+readonlys_cc_inner(pds, ros, basename) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <readonlys_cc(pds = rest(pds), ros = ros, basename = basename)>
+    <readonlys_cc_inner(pds = rest(pds), ros = ros, basename = basename)>
 } // namespace <first(pds)>
-#include "<basename>_readonly.def.h"
 <else>
 <ros; separator="\n">
 <endif>
+>>
+
+
+readonlys_cc(pds, ros, basename) ::=
+<<
+<readonlys_cc_inner(pds = pds, ros = ros, basename = basename)>
+#include "<basename>_readonly.def.h"
 
 >>
+
 
 importDeclaration_cc_h(inc_id, use_id) ::=
 <<
@@ -133,18 +141,18 @@ chare_epilogue_h(sym) ::=
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h(sym, ident, ext, csds, tident) ::=
+classDeclaration_h(sym, ident, ext, csds, tident, needsPupInit) ::=
 <<
 <type_preamble_h(sym)>
 <if(tident)>
-<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident)>
+<templateDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, tident = tident, needsPupInit = needsPupInit)>
 <else>
-<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds)>
+<classDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit)>
 <endif>
 <type_epilogue_h(sym)>
 >>
 
-classDeclaration_h_cont(pds, sym, ident, ext, csds) ::=
+classDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
@@ -156,7 +164,10 @@ class <ident> : public <ext> {
 <else>
 class <ident> {
 <endif>
-
+    <if(needsPupInit)>
+    private: void pupInitMethod();
+    <endif>
+    public: void pup(PUP::er& p);
     <csds; separator="\n\n">
     <if(!sym.hasDefaultCtor)>
     public: <ident>();
@@ -164,32 +175,49 @@ class <ident> {
     protected: void constructorHelper();
     static bool _trace_registered;
     void _initTrace();
+	<sym.sectionInitializers : { private: CProxySection_<it.classType> <it.methodName>(CProxy_<it.classType>); }>
 };
 <endif>
 >>
 
-templateDeclaration_h(pds, sym, ident, ext, csds, tident, inits) ::=
+classDeclaration_cc(sym, ident, ext, csds, pupInits, pupers, inits) ::=
 <<
-template \<class <tident; separator=", class ">\>
-<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, inits=inits)>
+<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupInits = pupInits, pupers = pupers, inits = inits)>
 >>
 
-classDeclaration_cc(sym, ident, ext, csds, inits) ::=
-<<
-<classDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
->>
-
-classDeclaration_cc_cont(pds, sym, ident, ext, csds, inits) ::=
+classDeclaration_cc_cont(pds, sym, ident, ext, csds, pupInits, pupers, inits) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, inits = inits)>
+    <classDeclaration_cc_cont(pds = rest(pds), sym = sym, ident = ident, ext = ext, csds = csds, pupInits = pupInits, pupers = pupers, inits = inits)>
 } // namespace <first(pds)>
 <else>
 #if _CHARJ_TRACE_ALL_METHODS || _CHARJ_TRACE_TRACED_METHODS
 #include \<trace-projections.h\>
 #endif
 <csds; separator="\n\n">
+
+<if(pupInits)>
+void <sym.name>::pupInitMethod()
+{
+    <pupInits; separator="\n">
+}
+<endif>
+
+void <sym.name>::pup(PUP::er &p)
+{
+<if(pupInits)>
+    if(p.isUnpacking())
+        pupInitMethod();
+
+<endif>
+    <pupers; separator="\n">
+<if(sym.hasSDAG)>
+    __sdag_pup(p);
+
+<endif>
+}
+
 
 <if(!sym.hasDefaultCtor)>
 <sym.name>::<ident>()
@@ -211,9 +239,22 @@ void <sym.name>::_initTrace() {
     _trace_registered = true;
     #endif
 }
+
+<sym.sectionInitializers : { init | <sectionInitializer_cc(classSym = sym, initSym = init)> }; separator="\n">
+
 <endif>
 >>
 
+sectionInitializer_cc(classSym, initSym) ::=
+<<
+CProxySection_<initSym.classType> <classSym.name>::<initSym.methodName>(CProxy_<initSym.classType> proxyObject)
+{
+	CkVec\<CkArrayIndex<initSym.dimensions>D\> elems;
+	<initSym.forLoop>
+	return CProxySection_<initSym.classType>::ckNew(proxyObject, elems.getVec(), elems.size());
+}
+
+>>
 
 chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
 <<
@@ -249,6 +290,10 @@ void <sym.name>::pup(PUP::er &p)
 
 <endif>
     <pupers; separator="\n">
+<if(sym.hasSDAG)>
+    __sdag_pup(p);
+
+<endif>
 }
 
 <if(!sym.hasDefaultCtor)>
@@ -268,6 +313,10 @@ void <sym.name>::pup(PUP::er &p)
 void <sym.name>::constructorHelper()
 {
     <inits; separator="\n">
+<if(sym.hasSDAG)>
+    __sdag_init();
+
+<endif>
 }
 
 <if(needsMigration)>
@@ -285,6 +334,9 @@ void <sym.name>::_initTrace() {
     _trace_registered = true;
     #endif
 }
+
+<sym.sectionInitializers : { init | <sectionInitializer_cc(classSym = sym, initSym = init)> }>
+
 <endif>
 >>
 
@@ -305,6 +357,7 @@ chareDeclaration_h_cont(pds, sym, ident, ext, csds, needsPupInit, needsMigration
 <else>
 <if(ext)>/* superclass: <ext> */<endif>
 class <ident>: public CBase_<ident> {
+    <if(sym.hasSDAG)><ident>_SDAG_CODE<endif>
     <csds; separator="\n">
     <if(needsPupInit)>
     private: void pupInitMethod();
@@ -323,6 +376,9 @@ class <ident>: public CBase_<ident> {
     <endif>
     static bool _trace_registered;
     void _initTrace();
+	<sym.sectionInitializers : 
+	{private: CProxySection_<it.classType> <it.methodName>(CProxy_<it.classType>);}; separator="\n">
+    <sym.SDAGLocalTypeDefinitions; separator="\n">
 };
 <endif>
 >>
@@ -356,11 +412,16 @@ chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
 <endif>
 >>
 
+templateDeclaration_h(pds, sym, ident, ext, csds, tident, inits) ::=
+<<
+template \<class <tident; separator=", class ">\>
+<classDeclaration_h_cont(pds=pds, sym=sym, ident=ident, ext=ext, csds=csds, inits=inits)>
+>>
+
 funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <modl><ty><gtpl> <id><fpl><adl>;
 >>
-
 
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
@@ -368,18 +429,40 @@ funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
+funcMethodDecl_sdag_ci(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl><if(!block)>;<else>
+{
+    /* FIXME: macros aren't allowed in sdag code, so tracing doesn't work right
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    */
+    <block>
+    /*
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
+    */
+};
+<endif>
+>>
+
+
 funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
+<if(block)>
 <modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
 {
     #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     int _charj_method_trace_timer = CkWallTimer();
     #endif
     <block>
-    #if _CHARJ_TRACE_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
     traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
     #endif
 }
+<endif>
 >>
 
 
@@ -407,8 +490,16 @@ block_cc(bsl) ::=
 {
     <bsl; separator="\n">
 }
+
 >>
 
+block_atomic(s) ::=
+<<
+atomic {
+    <s; separator="\n">
+}
+
+>>
 
 embed_cc(str, blk) ::=
 <<
@@ -429,6 +520,10 @@ var_decl_list(var_decls) ::=
 <var_decls; separator=", ">
 >>
 
+var_decl_list_sdag_ci(var_decls) ::=
+<<
+<var_decls; separator="\n">
+>>
 
 var_decl_cc(id, initializer) ::=
 <<
@@ -443,6 +538,13 @@ var_decl_h(id, initializer) ::=
 var_decl_ci(id, initializer) ::=
 <<
 <id><if(initializer)> = <initializer><endif>
+>>
+
+var_decl_sdag_ci(id, initializer) ::=
+<<
+<if(initializer)>
+<id> = <initializer>;
+<endif>
 >>
 
 var_decl_id(id, domainExp) ::=
@@ -477,11 +579,21 @@ local_var_decl(modList, type, declList, domainExps) ::=
 <if(modList)><modList> <endif><type> <declList>;
 >>
 
+local_var_decl_sdag_ci(declList) ::=
+<<
+<declList>
+>>
+
 local_mod_list(mods) ::= 
 <<
 <mods; separator=" ">
 >>
 
+array_section_creation(type, originalProxy, initCode) ::=
+<<
+<initCode>
+<type>::ckNew(<originalProxy>, elems0.getVec(), elems.size());
+>>
 
 simple_type(typeID, arrDeclList) ::=
 <<

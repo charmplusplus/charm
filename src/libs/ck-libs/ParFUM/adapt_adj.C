@@ -280,7 +280,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
     MPI_Bcast_pup(*requestTable,0,MPI_COMM_WORLD);
     requestTable->enroll(numChunks);
-    MSA1DREQLIST::Accum &requestTableAcc = requestTable->getInitialAccum();
+    MSA1DREQLIST::Accum requestTableAcc = requestTable->getInitialAccum();
 
     makeAdjacencyRequests(
             numNodes,
@@ -291,7 +291,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             myRank,
             elemType);
 
-    MSA1DREQLIST::Read &reqTableRead = requestTable->syncToRead(requestTableAcc);
+    MSA1DREQLIST::Read reqTableRead = requestTableAcc.syncToRead();
     //printf("[%d] All face requests made \n",myRank);
 
     MSA1DREPLYLIST *replyTable;
@@ -302,7 +302,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
     }
     MPI_Bcast_pup(*replyTable,0,MPI_COMM_WORLD);
     replyTable->enroll(numChunks);
-    MSA1DREPLYLIST::Accum &replyAcc = replyTable->getInitialAccum();
+    MSA1DREPLYLIST::Accum replyAcc = replyTable->getInitialAccum();
 
     replyAdjacencyRequests(
             reqTableRead.get(myRank).vec,
@@ -317,8 +317,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
             elemType,
             false);
 
-    requestTable->syncToRead(reqTableRead);
-    replyTable->syncToRead(replyAcc);
+    reqTableRead.syncDone();
+    replyAcc.syncDone();
 
 //    // Once the replies are back, loop through each reply and update the
 //    // adjacencies for each element in the reply
@@ -350,7 +350,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
         }
         MPI_Bcast_pup(*edgeRequestTable,0,MPI_COMM_WORLD);
         edgeRequestTable->enroll(numChunks);
-	MSA1DREQLIST::Accum &edgeRequestTableAcc = requestTable->getInitialAccum();
+	MSA1DREQLIST::Accum edgeRequestTableAcc = requestTable->getInitialAccum();
 
         makeAdjacencyRequests(
                 numNodes,
@@ -361,7 +361,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
                 myRank,
                 elemType);
 
-	MSA1DREQLIST::Read &edgeReqRead = edgeRequestTable->syncToRead(edgeRequestTableAcc);
+	MSA1DREQLIST::Read edgeReqRead = edgeRequestTableAcc.syncToRead();
         //printf("[%d] All edge requests made \n",myRank);
 
         if (myRank == 0) {
@@ -371,7 +371,7 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
         }
         MPI_Bcast_pup(*edgeReplyTable,0,MPI_COMM_WORLD);
         edgeReplyTable->enroll(numChunks);
-	MSA1DREPLYLIST::Accum &edgeReplyAcc = edgeReplyTable->getInitialAccum();
+	MSA1DREPLYLIST::Accum edgeReplyAcc = edgeReplyTable->getInitialAccum();
 
         replyAdjacencyRequests(
                 edgeReqRead.get(myRank).vec,
@@ -386,8 +386,8 @@ void CreateAdaptAdjacencies(int meshid, int elemType)
                 elemType,
                 true);
 
-        edgeRequestTable->syncToRead(edgeReqRead);
-        edgeReplyTable->syncToRead(edgeReplyAcc);
+        edgeReqRead.syncDone();
+        edgeReplyAcc.syncDone();
 
 //        // Once the replies are back, loop through each reply and update the
 //        // adjacencies for each element in the reply
@@ -691,8 +691,7 @@ void makeAdjacencyRequests(
 				   adjRequestList[countChunk].elemType,
 				   adjRequestList[countChunk].nodeSetID);
 #endif
-                            requestTable.accumulate(
-                                    chunk,adjRequestList[countChunk]);
+                            requestTable(chunk) += adjRequestList[countChunk];
                             countChunk++;
                         }
                         delete [] adjRequestList;
@@ -815,7 +814,7 @@ void replyAdjacencyRequests(
             reply.replyingElem.localID = matchingElemID;
             reply.replyingElem.elemType = elemType;
             //Write into the replyTable
-            replyTable.accumulate(receivedRequest.chunkID,reply);
+            replyTable(receivedRequest.chunkID) += reply;
         } else {
             //we have no matching nodeset for this request.. hopefully some
             //other chunk does; we can ignore this request

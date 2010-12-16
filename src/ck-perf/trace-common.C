@@ -175,8 +175,10 @@ static void traceCommonInit(char **argv)
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
+  //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());  
+  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif	
@@ -660,6 +662,32 @@ void traceEndFuncProj(char *name){
 extern "C" 
 void traceEndFuncIndexProj(int idx){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
+}
+
+#if CMK_SMP_TRACE_COMMTHREAD
+extern "C"
+void traceBeginCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->beginExecute((envelope *)msg);
+#endif
+}
+
+extern "C"
+void traceEndCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->endExecute();
+#endif
+}
+#endif
+
+extern "C"
+void traceChangeLastTimestamp(double ts){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->changeLastEntryTimestamp(ts);
+#endif
 }
 
 /*@}*/

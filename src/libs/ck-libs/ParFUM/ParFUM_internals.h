@@ -50,6 +50,21 @@
 
 #include "ParFUM_Adapt.decl.h"
 
+#if defined(WIN32)
+#include <iterator>
+#endif
+
+#if ! CMK_HAS_STD_INSERTER
+#include <list>
+namespace std {
+template<class Container, class Iterator>
+   insert_iterator<Container> inserter(
+      Container& _Cont, 
+      Iterator _It
+   );
+};
+#endif
+
 #if defined(WIN32) && defined(max)
 #undef max
 #endif
@@ -2452,17 +2467,17 @@ public:
   }
 };
 
-typedef MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
+typedef MSA::MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
-typedef MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
+typedef MSA::MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
 
 typedef UniqElemList<int> IntList;
-typedef MSA1D<IntList, DefaultListEntry<IntList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINTLIST;
+typedef MSA::MSA1D<IntList, DefaultListEntry<IntList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINTLIST;
 
 typedef UniqElemList<NodeElem> NodeList;
-typedef MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DNODELIST;
+typedef MSA::MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DNODELIST;
 
-typedef MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
+typedef MSA::MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
 
 

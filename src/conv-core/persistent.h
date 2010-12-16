@@ -34,8 +34,14 @@
 
 *****************************************************************************/
 
+#include "conv-config.h"
+
 #ifndef __PERSISTENT_H__
 #define __PERSISTENT_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef void * PersistentHandle;
 
@@ -68,6 +74,10 @@ typedef int PersistentRecvHandle;
 #define CmiUsePersistentHandle(x,y)
 #define CmiDestoryAllPersistent()
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

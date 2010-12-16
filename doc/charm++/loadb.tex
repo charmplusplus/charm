@@ -346,8 +346,9 @@ Below are the descriptions about the compiler and run-time options:
   links module NeighborLB, GreedyCommLB etc into an application, but these 
 load balancers will remain inactive at execution time unless overriden by 
 other runtime options.
-\item {\em -module EveryLB} \\
-  links special module EveryLB which includes all the charmpp{} built-in load balancers.
+\item {\em -module CommonLBs} \\
+  links a special module CommonLBs which includes some commonly used charmpp{}
+built-in load balancers.
 \item {\em -balancer GreedyCommLB} \\
   links load balancer GreedyCommLB and invokes this load balancer at runtime. One can specify multiple load balancers for example: \\
    {\em -balancer GreedyCommLB -balancer RefineLB}   \\
@@ -356,16 +357,16 @@ other runtime options.
    One can choose to create a new combo load balancer made of multiple load balancers. The above example specifies {\em one} load balancer which first applies GreedyLB algorithm followed by RefineLB algorithm.
 \end{itemize}
 
-The list of existing load balancers are in section \ref{lbStrategy}.
-Note: you can have multiple -module *LB options. LB modules are
-linked into a program, but they are not activated automatically at runtime.
-Using -balancer at compile time in order to activate load balancers automatically at run time. 
-Having -balancer A implies -module A, so you don't have to write -module A again, although it does not hurt.
-Using EveryLB is a convenient way to link against all existing load balancers. 
-One of the load balancers called MetisLB requires the METIS library 
-which is located at: charm/src/libs/ck-libs/parmetis/METISLib/. 
-You need to compile METIS library by "make METIS" under charm/tmp after you
-compile Charm++.
+The list of existing load balancers are in section \ref{lbStrategy}. Note: you
+can have multiple -module *LB options. LB modules are linked into a program,
+but they are not activated automatically at runtime.  Using -balancer at
+compile time in order to activate load balancers automatically at run time.
+Having -balancer A implies -module A, so you don't have to write -module A
+again, although it does not hurt.  Using CommonLBs is a convenient way to link
+against the commonly used existing load balancers.  One of the load balancers
+called MetisLB requires the METIS library which is located at:
+charm/src/libs/ck-libs/parmetis/METISLib/.  You need to compile METIS library
+by "make METIS" under charm/tmp after you compile Charm++.
 
 \item {\bf run-time options:}
 
@@ -690,7 +691,7 @@ mainmodule lbexample {
 #define LB_INTERVAL 5
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
 private:
   int count;
@@ -698,7 +699,7 @@ public:
   Main(CkArgMsg* m)
   {
     /*....Initialization....*/
-    mainProxy = thishandle;
+    mainProxy = thisProxy;
     CProxy_LBExample arr = CProxy_LBExample::ckNew(nElements);
     arr.doWork();
   };

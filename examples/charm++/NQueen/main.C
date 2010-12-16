@@ -5,6 +5,7 @@
  * Copyright by PPL
  * problem report sun51@uiuc.edu
 */
+
 #include "main.decl.h"
 #include "main.h"
 #include "nqueen.h"
@@ -52,7 +53,6 @@ Main::Main(CkArgMsg* msg)
         qmsg->aQueenBitCol = 0|lsb;
         qmsg->aQueenBitNegDiag = (0|lsb) >> 1;
         qmsg->aQueenBitPosDiag = (0|lsb) << 1;
-        //qmsg->bitfield = mask & ~(qmsg->aQueenBitCol[numrows] | qmsg->aQueenBitNegDiag[numrows] | qmsg->aQueenBitPosDiag[numrows]);
         qmsg->numrows = 1; 
         //CkSetQueueing(qmsg, CK_QUEUEING_ILIFO);
         CProxy_NQueen::ckNew(qmsg);
@@ -64,6 +64,8 @@ Main::Main(CkArgMsg* msg)
         bitfield = 1 << (numQueens >> 1);
         numrows = 1; /* prob. already 0 */
         /* The first row just has one queen (in the middle column).*/
+        //aQueenBitRes[0] = bitfield;
+        //aQueenBitCol[0] = aQueenBitPosDiag[0] = aQueenBitNegDiag[0] = 0;
         col = bitfield;
         /* Now do the next row.  Only set bits in half of it, because we'll
          * * * *                flip the results over the "Y-axis".  */
@@ -87,7 +89,7 @@ Main::Main(CkArgMsg* msg)
             bitfield &= ~lsb;
         }
     }
-    starttimer = CkTimer();
+    starttimer = CmiWallTimer();//CkTimer();
     counterGroup = counterInit();
     CkStartQD(CkIndex_Main::Quiescence1((DUMMYMSG *)0), &mainhandle);
 }
@@ -97,9 +99,9 @@ Main::Main(CkMigrateMessage* msg) {}
 void Main::Quiescence1(DUMMYMSG *msg)
 {
     int numSolutions = CProxy_counter(counterGroup).ckLocalBranch()->getTotalCount();
-    double endtimer = CkTimer();
-    CkPrintf("There are %d Solutions to %d queens. Time=%f\n",
-        2*numSolutions, numQueens, endtimer-starttimer);
+    double endtimer = CmiWallTimer();
+    CkPrintf("There are %d Solutions to %d queens. Time=%f End time=%f\n",
+        2*numSolutions, numQueens, endtimer-starttimer, CmiWallTimer());
     CkExit();
 }
 

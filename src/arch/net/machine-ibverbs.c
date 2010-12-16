@@ -23,7 +23,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 #include <getopt.h>
 #include <time.h>
 

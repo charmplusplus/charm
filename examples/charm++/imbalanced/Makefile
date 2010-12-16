@@ -12,7 +12,7 @@ LB_Bench_Proj: $(OBJS)
 	$(CHARMC) -language charm++ -o LB_Bench_Proj $(PROJ) $(OBJS)
 
 LB_Bench_Proj_LB: $(OBJS)
-	$(CHARMC) -language charm++ -o LB_Bench_Proj_LB -module EveryLB -balancer GreedyLB  -balancer RefineLB $(PROJ) $(OBJS)
+	$(CHARMC) -language charm++ -o LB_Bench_Proj_LB -module CommonLBs $(PROJ) $(OBJS)
 
 LB_Bench.decl.h: LB_Bench.ci
 	$(CHARMC)  LB_Bench.ci

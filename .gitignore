@@ -6,6 +6,7 @@
 # Ignore files generated from ci file parsing
 *.decl.h
 *.def.h
+*.ci.stamp
 
 # Ignore build artifacts created in the top-level directory
 smart-build.log
@@ -29,4 +30,5 @@ tmp
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
 charmrun
 pgm
+lb_test
 *.swp

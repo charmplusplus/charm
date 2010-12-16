@@ -52,7 +52,8 @@ NQueen::NQueen(QueenState *m)
         }else
         {
             //sequential solve
-            thisProxy.sequentialSolve(new_msg);
+            //thisProxy.sequentialSolve(new_msg);
+            sequentialSolve(new_msg);
         }
     }
     //CkPrintf(" level = %d\n", current_row+1);

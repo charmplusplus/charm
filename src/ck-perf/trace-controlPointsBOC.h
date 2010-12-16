@@ -19,7 +19,7 @@ class TraceControlPointsInit : public Chare {
   TraceControlPointsInit(CkArgMsg*) {
     traceControlPointsGID = CProxy_TraceControlPointsBOC::ckNew();
     CProxy_TraceControlPointsBOC controlPointsProxy(traceControlPointsGID);
-    CkPrintf("Initializing counters on pe %d\n", CkMyPe());
+    //CkPrintf("Initializing counters on pe %d\n", CkMyPe());
    
   }
   TraceControlPointsInit(CkMigrateMessage *m):Chare(m) {}
@@ -34,9 +34,6 @@ public:
   void pup(PUP::er &p)
   {
     CBase_TraceControlPointsBOC::pup(p);
-    if(p.isUnpacking()){
-      CkPrintf("Group TraceControlPointsBOC is not yet capable of migration.\n");
-    }
   }
 
  TraceControlPointsBOC(CkMigrateMessage *m) : CBase_TraceControlPointsBOC(m) {};

@@ -210,7 +210,7 @@ BASEDIR=
 LIBDIR=
 INCDIR=
 ARCH=
-BUILD_SHARED=
+BUILD_SHARED=""             # default no shared lib
 WITH_ROMIO=
 WITH_PRODUCTION=
 BUILD_EMULATOR=0
@@ -294,8 +294,13 @@ do
 		done
           	shift
  	  	;;
-    --no-build-shared|-nobs|--no-shared)
-		BUILD_SHARED="-nobs"; shift
+    --no-build-shared|--no-shared)
+		#BUILD_SHARED="-no-build-shared"; 
+		shift
+		;;
+    --build-shared)
+		BUILD_SHARED="-build-shared"; 
+		shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -310,10 +315,6 @@ do
 		;;
     --without-*)
 		CONFIG_OPTS="$CONFIG_OPTS $1"
-		shift
-		;;
-    --build-shared|-bs)
-		# obsolete, do nothing
 		shift
 		;;
     --destination)
@@ -459,6 +460,7 @@ fi
 Echo "Copying src/scripts/Makefile to $DESTINATION/tmp"
 rm -f $DESTINATION/tmp/Makefile
 rm -f $DESTINATION/tmp/Make.depends
+rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
 
@@ -483,6 +485,8 @@ then
 	echo "Copying $src/win32/createlink.exe to /bin directory"
 	cp $src/win32/createlink.exe /bin
         chmod +x $DESTINATION/tmp/system_ln
+	cp $src/win32/gathertree.local   $DESTINATION/tmp
+	cp $src/win32/gatherflat.local   $DESTINATION/tmp
 else
 	cat > $DESTINATION/tmp/system_ln <<EOF
 #!/bin/sh
@@ -503,6 +507,7 @@ EOF
 fi
 
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
 $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
@@ -548,8 +553,10 @@ then
     done
 fi
 
-if test  -n "$BUILD_SHARED" 
+if test  "$BUILD_SHARED"  = "-build-shared"
 then
+    echo "CMK_NO_BUILD_SHARED=false" >> $ConvSh
+else
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
 fi
 
@@ -562,7 +569,7 @@ if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize $OPTS"
+    OPTS="-optimize -production $OPTS"
     CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
 fi
 

@@ -191,8 +191,8 @@ void CmiOutOfMemory(int nBytes)
 { /* We're out of memory: free up the liferaft memory and abort */
   char errMsg[200];
   if (memory_lifeRaft) free(memory_lifeRaft);
-  if (nBytes>0) sprintf(errMsg,"Could not malloc() %d bytes--are we out of memory?",nBytes);
-  else sprintf(errMsg,"Could not malloc()--are we out of memory?");
+  if (nBytes>0) sprintf(errMsg,"Could not malloc() %d bytes--are we out of memory? (used :%.3fMB)",nBytes,CmiMemoryUsage()/1000000.0);
+  else sprintf(errMsg,"Could not malloc()--are we out of memory? (used: %.3fMB)", CmiMemoryUsage()/1000000.0);
   CmiAbort(errMsg);
 }
 
@@ -233,7 +233,9 @@ static void meta_free_hook(void* p, const void* c) {meta_free(p);}
   __memalign_hook = meta_memalign_hook; \
   __free_hook = meta_free_hook;
 
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 static void *(*old_malloc_hook) (size_t, const void*);
 static void *(*old_realloc_hook) (void*,size_t, const void*);
 static void *(*old_memalign_hook) (size_t,size_t, const void*);
@@ -378,7 +380,9 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageMallinfo(){ return 0;}	
 #else
+#if CMK_HAS_MALLOC_H
 #include <malloc.h>
+#endif
 #if CMK_C_INLINE
 inline
 #endif

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -15,8 +8,6 @@ Status:
   * support nonmigratable attrib
   * does not support processor avail bitvector
 */
-
-#include <charm++.h>
 
 #include "ComboCentLB.h"
 
@@ -47,7 +38,7 @@ ComboCentLB::ComboCentLB(const CkLBOptions &opt): CentralLB(opt)
   }
 }
 
-void ComboCentLB::work(BaseLB::LDStats* stats, int count)
+void ComboCentLB::work(LDStats* stats)
 {
   int nlbs = clbs.length();
   int n_objs = stats->n_objs;
@@ -58,7 +49,7 @@ void ComboCentLB::work(BaseLB::LDStats* stats, int count)
   for (obj=0; obj<n_objs; obj++) from_orig[obj] = stats->from_proc[obj];
 
   for (int i=0; i<nlbs; i++) {
-    clbs[i]->work(stats, count);
+    clbs[i]->work(stats);
     if (i!=nlbs-1) {
       for (obj=0; obj<stats->n_objs; obj++) 
         stats->from_proc[obj] = stats->to_proc[obj];

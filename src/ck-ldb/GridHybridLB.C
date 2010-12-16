@@ -856,7 +856,7 @@ void GridHybridLB::Assign_Object_To_PE (int target_object, int target_pe)
 ** The Charm++ load balancing framework invokes this method to cause the
 ** load balancer to migrate objects to "better" PEs.
 */
-void GridHybridLB::work (CentralLB::LDStats *stats, int count)
+void GridHybridLB::work (LDStats *stats)
 {
   int i;
 
@@ -869,7 +869,7 @@ void GridHybridLB::work (CentralLB::LDStats *stats, int count)
   stats->makeCommHash ();
 
   // Initialize object variables for the number of PEs and number of objects.
-  Num_PEs = count;
+  Num_PEs = stats->nprocs();
   Num_Objects = stats->n_objs;
 
   if (_lb_args.debug() > 0) {

@@ -102,7 +102,9 @@
 #include <stdlib.h>
 #include <string.h>
 #if CMK_MEMORY_PROTECTABLE
+#if CMK_HAS_MALLOC_H
 #include <malloc.h> /*<- for memalign*/
+#endif
 #endif
 #if CMK_BLUEGENEL
 #include "rts.h"	/*<- for rts_memory_alias */
@@ -506,6 +508,10 @@ static void CthBaseInit(char **argv)
   
   CpvInitialize(int, Cth_serialNo);
   CpvAccess(Cth_serialNo) = 1;
+
+#if CMK_THREADS_BUILD_TLS
+  CmiThreadIs_flag |= CMI_THREAD_IS_TLS;
+#endif
 }
 
 int CthImplemented() { return 1; } 
@@ -610,10 +616,9 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
         void* aux;
         pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
         aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
-        // fixme: tls global variables handling needs isomalloc
+        /* fixme: tls global variables handling needs isomalloc */
         CmiIsomallocPup(p, &aux);
-        //if (pup_isUnpacking(p))
-        //  printf("unpacking %p\n", t->tlsseg.memseg);
+        /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
 #endif
 
 }
@@ -1500,8 +1505,8 @@ typedef void (*uJcontext_fn_t)(void);
 
 #else /* CMK_THREADS_USE_JCONTEXT */
 /* Orion's setjmp-based context routines: */
-#include <uJcontext.h>
-#include <uJcontext.c>
+#include "uJcontext.h"
+#include "uJcontext.c"
 
 #endif
 
@@ -1643,7 +1648,8 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   _MEMCHECK(result);
   CthThreadInit(result);
 #ifdef MINSIGSTKSZ
-  if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize);
+  /* if (size<MINSIGSTKSZ) size = CthCpvAccess(_defaultStackSize); */
+  if (size && size<MINSIGSTKSZ) size = MINSIGSTKSZ;
 #endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;

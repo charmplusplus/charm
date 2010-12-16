@@ -1,19 +1,10 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
+#include "elements.h"
+#include "ckheap.h"
 #include "RefineCommLB.h"
 
 CreateLBFunc_Def(RefineCommLB, "Average load among processors by moving objects away from overloaded processor, communication aware")
@@ -30,27 +21,29 @@ CmiBool RefineCommLB::QueryBalanceNow(int _step)
   return CmiTrue;
 }
 
-void RefineCommLB::work(BaseLB::LDStats* stats, int count)
+void RefineCommLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int obj;
+  int n_pes = stats->nprocs();
+
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
-  // RemoveNonMigratable(stats, count);
+  // RemoveNonMigratable(stats, n_pes);
 
   // get original object mapping
-  int* from_procs = RefinerComm::AllocProcs(count, stats);
+  int* from_procs = RefinerComm::AllocProcs(n_pes, stats);
   for(obj=0;obj<stats->n_objs;obj++)  {
     int pe = stats->from_proc[obj];
     from_procs[obj] = pe;
   }
 
   // Get a new buffer to refine into
-  int* to_procs = RefinerComm::AllocProcs(count,stats);
+  int* to_procs = RefinerComm::AllocProcs(n_pes, stats);
 
   RefinerComm refiner(1.003);  // overload tolerance=1.05
 
-  refiner.Refine(count,stats,from_procs,to_procs);
+  refiner.Refine(n_pes, stats, from_procs, to_procs);
 
   // Save output
   for(obj=0;obj<stats->n_objs;obj++) {

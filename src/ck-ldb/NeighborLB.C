@@ -1,19 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
+#include "elements.h"
 #include "ckheap.h"
 #include "NeighborLB.h"
 
@@ -26,7 +16,7 @@ NeighborLB::NeighborLB(const CkLBOptions &opt):NborBaseLB(opt)
     CkPrintf("[%d] NeighborLB created\n",CkMyPe());
 }
 
-LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
+LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)
 {
 #if CMK_LBDB_ON
   //  CkPrintf("[%d] Strategy starting\n",CkMyPe());
@@ -35,7 +25,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
   double myload = myStats.total_walltime - myStats.idletime;
   double avgload = myload;
   int i;
-  for(i=0; i < count; i++) {
+  for(i=0; i < n_nbrs; i++) {
     // Scale times we need appropriately for relative proc speeds
     const double scale =  ((double)myStats.pe_speed) 
       / stats[i].pe_speed;
@@ -45,7 +35,7 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
 
     avgload += (stats[i].total_walltime - stats[i].idletime);
   }
-  avgload /= (count+1);
+  avgload /= (n_nbrs + 1);
 
   CkVec<MigrateInfo*> migrateInfo;
 
@@ -61,8 +51,8 @@ LBMigrateMsg* NeighborLB::Strategy(NborBaseLB::LDStats* stats, int count)
     //     above average
 
     // Build heaps
-    minHeap procs(count);
-    for(i=0; i < count; i++) {
+    minHeap procs(n_nbrs);
+    for(i=0; i < n_nbrs; i++) {
       InfoRecord* item = new InfoRecord;
       item->load = stats[i].total_walltime - stats[i].idletime;
       item->Id =  stats[i].from_pe;
