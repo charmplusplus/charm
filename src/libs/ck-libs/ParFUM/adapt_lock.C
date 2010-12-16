@@ -6,8 +6,7 @@
 #include "ParFUM.h"
 #include "ParFUM_internals.h"
 
-#define DEBUG_LOCKS
-
+//#define DEBUG_LOCKS
 //#define DEBUG_1
 #define ERVAL -1000000000  //might cause a problem if there are 100million nodes
 #define ERVAL1 -1000000001
@@ -17,6 +16,9 @@
  * nodes which specifies if locks for each nodes has been acquired or not
  */
 int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lockwnodes, int numWNodes) {
+#ifdef CPSD
+    return true;
+#endif
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
   for(int i=0; i<numNodes; i++) gotlocks[i] = 0;
@@ -98,6 +100,9 @@ int FEM_AdaptL::lockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lo
 /** Same as above, instead it unlocks the nodes
  */
 int FEM_AdaptL::unlockNodes(int *gotlocks, int *lockrnodes, int numRNodes, int *lockwnodes, int numWNodes) {
+#ifdef CPSD
+    return true;
+#endif
   bool donelocks = false;
   int numNodes = numRNodes + numWNodes;
   int *ungetlocks = (int*)malloc(numNodes*sizeof(int));
@@ -193,7 +198,7 @@ int FEM_AdaptL::edge_flip(int n1, int n2) {
       numtries++;
       if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
-	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
+	  CkPrintf("[%d]Warning: Possibly a livelock in edge_flip %d & %d, supporting %d, %d\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
 	CthYield();
@@ -242,17 +247,14 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
   for(int i=0; i<numNodes; i++) {
     gotlocks[i] = -1;
   }
-  while(!done) {
 #ifdef CPSD
-      int gotlock = 1;
+  isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
 #else
+  while(!done) {
     int gotlock = lockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-#endif
     isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
     if(isEdge == -1) {
-#ifndef CPSD
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-#endif
 #ifdef DEBUG_1
       CkPrintf("[%d]Warning: Bisect %d->%d not done as it is no longer a valid edge\n",theMod->idx,n1,n2);
 #endif
@@ -262,9 +264,7 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       done = true;
     }
     else {
-#ifndef CPSD
       unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
-#endif
       locknodes[2] = n3;
       locknodes[3] = n4;
       numtries++;
@@ -280,11 +280,11 @@ int FEM_AdaptL::edge_bisect(int n1, int n2) {
       CthYield();
     }
   }
+#endif
   int ret = edge_bisect_help(e1, e2, n1, n2, e1_n1, e1_n2, e1_n3, e2_n1, e2_n2, e2_n3, n3, n4);
 #ifndef CPSD
   unlockNodes(gotlocks, locknodes, 0, locknodes, numNodes);
 #endif
-
   return ret;
 }
 
@@ -368,7 +368,7 @@ int FEM_AdaptL::vertex_remove(int n1, int n2) {
       numtries++;
       if(numtries>=13+(7*theMod->idx)%43) {
 	if(!warned) {
-	  //CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
+	  CkPrintf("[%d]Warning: Possibly a livelock in vertex_remove %d & %d, supporting %d, %d and %d\n",theMod->idx,n1,n2,n3,n4,n5);
 	  warned = true;
 	}
 	numtries = 0;
@@ -622,7 +622,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
 	}
       }
       if(numtries>=50) {
-	//CkPrintf("Possibly a livelock in cloud nodes edge_contract\n");
+	CkPrintf("Possibly a livelock in cloud nodes edge_contract\n");
 	//it is ok to skip an edge_contract, if the lock is too difficult to get
 	isEdge = findAdjData(n1, n2, &e1, &e2, &e1_n1, &e1_n2, &e1_n3, &e2_n1, &e2_n2, &e2_n3,&n3, &n4);
 	if(isEdge!=-1) {
@@ -646,7 +646,7 @@ int FEM_AdaptL::edge_contraction(int n1, int n2) {
       numtries++;
       if(numtries>=50) {
 	if(!warned) {
-	  //CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
+	  CkPrintf("[%d]Warning: Possibly a livelock in edge_contract %d & %d, supporting %d, %d. Avoiding this contract operation.\n",theMod->idx,n1,n2,n3,n4);
 	  warned = true;
 	}
         //it is ok to skip an edge_contract, if the lock is too difficult to get
@@ -1199,7 +1199,7 @@ int FEM_AdaptL::edge_contraction_help(int *e1P, int *e2P, int n1, int n2, int e1
 	    unlockNodes(gotlocks1, lockw, 0, lockw, size);
 	    free(gotlocks1);
 	    free(lockw);
-	    //CkPrintf("Possibly a livelock in edge_contract_help\n");
+	    CkPrintf("Possibly a livelock in edge_contract_help\n");
 	    delete [] eConn;
 	    if(nesize!=0) delete[] nbrElems;
 	    free(gotlocks);
