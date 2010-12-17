@@ -65,6 +65,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
       to = stats->getHash(commData.receiver.get_destObj());
 
       vertices[from].sendToList.push_back(Edge(to, commData.messages, commData.bytes));
+      vertices[to].recvFromList.push_back(Edge(from, commData.messages, commData.bytes));
     }
   } // end for
 }
