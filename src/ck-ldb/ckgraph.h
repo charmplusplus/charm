@@ -80,7 +80,7 @@ class Vertex {
     inline bool isMigratable() { return migratable; }
 
     // undirected edges from this vertex to other vertices
-    std::vector<Edge> edgeList;
+    std::vector<Edge> sendToList;
 
   private:
     int id;		// index in the LDStats array

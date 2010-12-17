@@ -60,10 +60,10 @@ void GraphBFTLB::work(LDStats *stats) {
     start = vertexq.front();
     vertexq.pop();
 
-    for(i = 0; i < ogr->vertices[start].edgeList.size(); i++) {
+    for(i = 0; i < ogr->vertices[start].sendToList.size(); i++) {
       // look at all neighbors of a node in the queue and map them while
       // inserting them in the queue (so we can look at their neighbors next)
-      nbr = ogr->vertices[start].edgeList[i].getNeighborId();
+      nbr = ogr->vertices[start].sendToList[i].getNeighborId();
       if(ogr->vertices[nbr].getNewPe() == -1) {
 	vertexq.push(nbr);
 
