@@ -2,8 +2,6 @@
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
  *
- *  This does a topological placement for a 3d jacobi.
- *
  *	
  *	      *****************
  *	   *		   *  *
@@ -25,8 +23,6 @@
 
 #include "jacobi3d.decl.h"
 #include "TopoManager.h"
-
-// See README for documentation
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
@@ -56,7 +52,6 @@ int myrand(int numpes) {
 #define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
 
-//#define USE_3D_ARRAYS		0
 #define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
 
 #define MAX_ITER		26
@@ -124,39 +119,7 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-#if USE_TOPOMAP
-      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
-      CkPrintf("Topology Mapping is being done ... \n");
-      CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-      opts.setMap(map);
-      array = CProxy_Jacobi::ckNew(opts);
-#else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
-#endif
-
-      TopoManager tmgr;
-      CkArray *jarr = array.ckLocalBranch();
-      int jmap[num_chare_x][num_chare_y][num_chare_z];
-
-      int hops=0, p;
-      for(int i=0; i<num_chare_x; i++)
-	for(int j=0; j<num_chare_y; j++)
-	  for(int k=0; k<num_chare_z; k++) {
-	    jmap[i][j][k] = jarr->procNum(CkArrayIndex3D(i, j, k));
-	  }
-
-      for(int i=0; i<num_chare_x; i++)
-	for(int j=0; j<num_chare_y; j++)
-	  for(int k=0; k<num_chare_z; k++) {
-	    p = jmap[i][j][k];
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i+1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i-1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j+1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j-1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k+1)]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
-	  }
-      CkPrintf("Total Hops: %d\n", hops);
 
       //Start the computation
       array.doStep();
@@ -391,100 +354,6 @@ class Jacobi: public CBase_Jacobi {
 	  temperature[index(i, j, 1)] = 255.0;
     }
 
-};
-
-/** \class JacobiMap
- *
- */
-
-class JacobiMap : public CkArrayMap {
-  public:
-    int X, Y, Z;
-    int *mapping;
-
-    JacobiMap(int x, int y, int z) {
-      X = x; Y = y; Z = z;
-      mapping = new int[X*Y*Z];
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-
-      TopoManager tmgr;
-      int dimNX, dimNY, dimNZ, dimNT;
-
-      dimNX = tmgr.getDimNX();
-      dimNY = tmgr.getDimNY();
-      dimNZ = tmgr.getDimNZ();
-      dimNT = tmgr.getDimNT();
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-      int numCharesPerPe = X*Y*Z/CkNumPes();
-
-      int numCharesPerPeX = X / dimNX;
-      int numCharesPerPeY = Y / dimNY;
-      int numCharesPerPeZ = Z / dimNZ;
-      int pe = 0, pes = CkNumPes();
-
-#if USE_BLOCK_RNDMAP
-      int used[pes];
-      for(int i=0; i<pes; i++)
-	used[i] = 0;
-#endif
-
-      if(dimNT < 2) {	// one core per node
-	if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-	for(int i=0; i<dimNX; i++)
-	  for(int j=0; j<dimNY; j++)
-	    for(int k=0; k<dimNZ; k++)
-	    {
-#if USE_BLOCK_RNDMAP
-	      pe = myrand(pes); 
-	      while(used[pe]!=0) {
-		pe = myrand(pes); 
-	      }
-	      used[pe] = 1;
-#endif
-
-	      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
-		for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-#if USE_TOPOMAP
-		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
-#elif USE_BLOCK_RNDMAP
-		    mapping[ci*Y*Z + cj*Z + ck] = pe;
-#endif
-		  }
-	    }
-      } else {		// multiple cores per node
-	// In this case, we split the chares in the X dimension among the
-	// cores on the same node. The strange thing I figured out is that
-	// doing this in the Z dimension is not as good.
-	numCharesPerPeX /= dimNT;
-	if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
-
-	for(int i=0; i<dimNX; i++)
-	  for(int j=0; j<dimNY; j++)
-	    for(int k=0; k<dimNZ; k++)
-	      for(int l=0; l<dimNT; l++)
-		for(int ci=(dimNT*i+l)*numCharesPerPeX; ci<(dimNT*i+l+1)*numCharesPerPeX; ci++)
-		  for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		    for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		      mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
-		    }
-      } // end of if
-
-      if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
-    }
-
-    ~JacobiMap() { 
-      delete [] mapping;
-    }
-
-    int procNum(int, const CkArrayIndex &idx) {
-      int *index = (int *)idx.data();
-      return mapping[index[0]*Y*Z + index[1]*Z + index[2]]; 
-    }
 };
 
 #include "jacobi3d.def.h"
