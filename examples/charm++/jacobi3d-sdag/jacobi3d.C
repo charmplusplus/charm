@@ -238,12 +238,12 @@ class Jacobi: public CBase_Jacobi {
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
 	  .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost);
-      // Send my top face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-	  .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
       // Send my bottom face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
 	  .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+      // Send my top face
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
+	  .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
 	  .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost);
@@ -266,13 +266,13 @@ class Jacobi: public CBase_Jacobi {
 	      temperature[index(blockDimX+1, j+1, k+1)] = gh[k*height+j];
 	    }
 	  break;
-	case TOP:
+	case BOTTOM:
 	  for(int k=0; k<width; ++k)
 	    for(int i=0; i<height; ++i) {
 	      temperature[index(i+1, 0, k+1)] = gh[k*height+i];
 	    }
 	  break;
-	case BOTTOM:
+	case TOP:
 	  for(int k=0; k<width; ++k)
 	    for(int i=0; i<height; ++i) {
 	      temperature[index(i+1, blockDimY+1, k+1)] = gh[k*height+i];
@@ -281,13 +281,13 @@ class Jacobi: public CBase_Jacobi {
 	case FRONT:
 	  for(int j=0; j<width; ++j)
 	    for(int i=0; i<height; ++i) {
-	      temperature[index(i+1, j+1, blockDimZ+1)] = gh[j*height+i];
+	      temperature[index(i+1, j+1, 0)] = gh[j*height+i];
 	    }
 	  break;
 	case BACK:
 	  for(int j=0; j<width; ++j)
 	    for(int i=0; i<height; ++i) {
-	      temperature[index(i+1, j+1, 0)] = gh[j*height+i];
+	      temperature[index(i+1, j+1, blockDimZ+1)] = gh[j*height+i];
 	    }
 	  break;
 	default:

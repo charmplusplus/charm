@@ -272,8 +272,10 @@ class Jacobi: public CBase_Jacobi {
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-          CkPrintf("Start of iteration %d\n", iterations);
-          BgPrintf("BgPrint> Start of iteration at %f\n");
+        CkPrintf("Start of iteration %d\n", iterations);
+#if CMK_BLUEGENE_CHARM
+        BgPrintf("BgPrint> Start of iteration at %f\n");
+#endif
       }
       iterations++;
 
@@ -296,28 +298,28 @@ class Jacobi: public CBase_Jacobi {
 	for(int k=0; k<blockDimZ; ++k) {
 	  leftMsg->gh[k*blockDimY+j] = temperature[index(1, j+1, k+1)];
 	  rightMsg->gh[k*blockDimY+j] = temperature[index(blockDimX, j+1, k+1)];
-      }
+	}
 
       for(int i=0; i<blockDimX; ++i) 
 	for(int k=0; k<blockDimZ; ++k) {
 	  topMsg->gh[k*blockDimX+i] = temperature[index(i+1, 1, k+1)];
 	  bottomMsg->gh[k*blockDimX+i] = temperature[index(i+1, blockDimY, k+1)];
-      }
+	}
 
       for(int i=0; i<blockDimX; ++i) 
 	for(int j=0; j<blockDimY; ++j) {
 	  frontMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
 	  backMsg->gh[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
-      }
+	}
 
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z).receiveGhosts(leftMsg);
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z).receiveGhosts(rightMsg);
-      // Send my top face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z).receiveGhosts(topMsg);
       // Send my bottom face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z).receiveGhosts(bottomMsg);
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z).receiveGhosts(bottomMsg);
+      // Send my top face
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z).receiveGhosts(topMsg);
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1)).receiveGhosts(frontMsg);
       // Send my back face
@@ -333,37 +335,37 @@ class Jacobi: public CBase_Jacobi {
 	  for(int j=0; j<height; ++j) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(0, j+1, k+1)] = gmsg->gh[k*height+j];
-	  }
+	    }
 	  break;
 	case RIGHT:
 	  for(int j=0; j<height; ++j) 
 	    for(int k=0; k<width; ++k) {
 	      temperature[index(blockDimX+1, j+1, k+1)] = gmsg->gh[k*height+j];
-	  }
-	  break;
-	case TOP:
-	  for(int i=0; i<height; ++i) 
-	    for(int k=0; k<width; ++k) {
-	      temperature[index(i+1, 0, k+1)] = gmsg->gh[k*height+i];
-	  }
+	    }
 	  break;
 	case BOTTOM:
 	  for(int i=0; i<height; ++i) 
 	    for(int k=0; k<width; ++k) {
+	      temperature[index(i+1, 0, k+1)] = gmsg->gh[k*height+i];
+	    }
+	  break;
+	case TOP:
+	  for(int i=0; i<height; ++i) 
+	    for(int k=0; k<width; ++k) {
 	      temperature[index(i+1, blockDimY+1, k+1)] = gmsg->gh[k*height+i];
-	  }
+	    }
 	  break;
 	case FRONT:
 	  for(int i=0; i<height; ++i) 
 	    for(int j=0; j<width; ++j) {
-	      temperature[index(i+1, j+1, blockDimZ+1)] = gmsg->gh[j*height+i];
-	  }
+	      temperature[index(i+1, j+1, 0)] = gmsg->gh[j*height+i];
+	    }
 	  break;
 	case BACK:
 	  for(int i=0; i<height; ++i) 
 	    for(int j=0; j<width; ++j) {
-	      temperature[index(i+1, j+1, 0)] = gmsg->gh[j*height+i];
-	  }
+	      temperature[index(i+1, j+1, blockDimZ+1)] = gmsg->gh[j*height+i];
+	    }
 	  break;
 	default:
           CkAbort("ERROR\n");
