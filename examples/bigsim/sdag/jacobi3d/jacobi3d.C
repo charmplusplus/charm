@@ -41,8 +41,6 @@
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
 
-/*readonly*/ int globalBarrier;
-
 static unsigned long next = 1;
 
 int myrand(int numpes) {
