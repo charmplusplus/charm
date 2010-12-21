@@ -34,7 +34,7 @@ void FEM_remove_node(FEM_Mesh *m, int node);
 ///Add an element on this mesh with this connectivity
 int FEM_add_element(FEM_Mesh *m, int* conn, int conn_size, int elem_type=0, int chunkNo=-1);
 ///Remove an element on this mesh
-int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1);
+int FEM_remove_element(FEM_Mesh *m, int element, int elem_type=0, int permanent=-1, bool aggressive_node_removal=false);
 ///Purge the element from this mesh (invalidate entry)
 int FEM_purge_element(FEM_Mesh *m, int element, int elem_type=0);
 
@@ -287,6 +287,7 @@ class removeElemMsg : public CMessage_removeElemMsg {
   int elementid;
   int elemtype;
   int permanent;
+  bool aggressive_node_removal;
 };
 
 ///A message to verify if the IDXL entries for a node/element on one chunk is consistent with another chunk

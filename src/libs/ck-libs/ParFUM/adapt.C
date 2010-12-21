@@ -837,15 +837,20 @@ int FEM_Adapt::vertex_split_help(int n, int n1, int n2, int e1, int e3)
 // ======================  END vertex_split ===================
 
 
-int FEM_AdaptL::eatIntoElement(int e)
+int FEM_AdaptL::eatIntoElement(int e, bool aggressive_node_removal)
 {
-    return theMod->fmUtil->eatIntoElement(e);
+    return theMod->fmUtil->eatIntoElement(e, aggressive_node_removal);
 }
 
 
 void FEM_AdaptL::residualLockTest()
 {
     theMod->fmUtil->residualLockTest(theMod->fmMesh);
+}
+
+
+void FEM_AdaptL::unlockAll() {
+    theMod->fmUtil->unlockAll(theMod->fmMesh);
 }
 
 

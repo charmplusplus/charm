@@ -79,8 +79,9 @@ class Vertex {
     inline void setNewPe(int _newpe) { newPe = _newpe; }
     inline bool isMigratable() { return migratable; }
 
-    // undirected edges from this vertex to other vertices
-    std::vector<Edge> edgeList;
+    // list of vertices this vertex sends messages to and receives from
+    std::vector<Edge> sendToList;
+    std::vector<Edge> recvFromList;
 
   private:
     int id;		// index in the LDStats array

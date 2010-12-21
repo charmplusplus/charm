@@ -2842,7 +2842,7 @@ class FEM_MUtil {
   ///Add the element with this conn (indices, typeOfIndices) on this chunk (called from remote chunk)
   void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int *indices, int *typeOfIndex, int connSize);
   ///Remove this element on this chunk (called from remote chunk)
-  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
+  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent, bool aggressive_node_removal=false);
   ///Remove this ghost element on this chunk, also delete some ghost nodes and elements
   void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices, int numGhostRNIndex, int *ghostRNIndices, int numGhostREIndex, int *ghostREIndices, int numSharedIndex, int *sharedIndices);
 
@@ -2851,7 +2851,7 @@ class FEM_MUtil {
   ///Add this node to the shared Idxl list (called from remote chunk)
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   ///Acquire the element specified by this ghost index
-  int eatIntoElement(int localIdx);
+  int eatIntoElement(int localIdx, bool aggressive_node_removal=false);
 
   ///Does this chunk know about this node index (on any idxl list with 'chk')
   bool knowsAbtNode(int chk, int nodeId);
@@ -2900,6 +2900,8 @@ class FEM_MUtil {
   void verifyIdxlListRemote(FEM_Mesh *m, int fromChk, int fsize, int type);
   ///Test that there are no remaining acquired locks on this mesh
   int residualLockTest(FEM_Mesh *m);
+  /// Release all currently held locks on this partition
+  void unlockAll(FEM_Mesh* m);
 };
 
 

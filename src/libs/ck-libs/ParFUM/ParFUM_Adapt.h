@@ -160,9 +160,11 @@ class FEM_AdaptL : public FEM_Adapt {
 				    int e2_n3, int n3, int n4);
 
   /// Acquire an element in our ghost layer, turning it into a local element
-  int eatIntoElement(int e);
+  int eatIntoElement(int e, bool aggressive_node_removal=false);
   /// Test the adaptivity system to see if any nodes are locked
   void residualLockTest();
+  /// Release all currently held locks on this partition
+  void unlockAll();
   /// Test the mesh for corruption in connectivity/adjacency
   void structureTest();
 };

@@ -12,8 +12,6 @@ mainmodule jacobi3d {
   readonly int num_chare_y;
   readonly int num_chare_z;
 
-  readonly int globalBarrier;
-
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void report();
@@ -42,10 +40,6 @@ mainmodule jacobi3d {
 	check_and_compute();
       }
     };
-  };
-
-  group JacobiMap : CkArrayMap {
-    entry JacobiMap(int x, int y, int z);
   };
 
 };

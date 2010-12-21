@@ -626,10 +626,11 @@ void FEM_MUtil::addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int *i
 
 /** Remove this element, permanent specifies if this element is permanently removed
  */
-void FEM_MUtil::removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent) {
+void FEM_MUtil::removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent,
+        bool aggressive_node_removal) {
   const IDXL_List ll = m->elem[elemtype].ghostSend.addList(chk);
   int localIdx = ll[elementid];
-  FEM_remove_element(m, localIdx, elemtype, permanent);
+  FEM_remove_element(m, localIdx, elemtype, permanent, aggressive_node_removal);
   return;
 }
 
@@ -913,13 +914,14 @@ void FEM_MUtil::addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx) {
     Add a new element with this connectivity ON THIS CHUNK
     Update the lock on any node which changes owners
  */
-int FEM_MUtil::eatIntoElement(int localIdx) {
+int FEM_MUtil::eatIntoElement(int localIdx, bool aggressive_node_removal) {
   CkAssert(FEM_Is_ghost_index(localIdx));
   int nodesPerEl = mmod->fmMesh->elem[0].getConn().width();
   int *adjnodes = new int[nodesPerEl];
   int *oldnodes = new int[nodesPerEl];
   int elemtype = 0;
   mmod->fmMesh->e2n_getAll(localIdx, adjnodes, elemtype);
+  CkPrintf("Chunk %d eating elem %d(%d,%d,%d) %d\n",idx,localIdx,adjnodes[0],adjnodes[1],adjnodes[2], aggressive_node_removal);
 #ifdef DEBUG_1
   CkPrintf("Chunk %d eating elem %d(%d,%d,%d)\n",idx,localIdx,adjnodes[0],adjnodes[1],adjnodes[2]);
 #endif
@@ -937,7 +939,7 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #ifdef DEBUG_1
   CkPrintf("eatIntoElement::remove\n");
 #endif
-  FEM_remove_element(mmod->fmMesh,localIdx,elemtype,idx);
+  FEM_remove_element(mmod->fmMesh,localIdx,elemtype,idx,aggressive_node_removal);
 #ifdef DEBUG_1
   CkPrintf("eatIntoElement::done removing\n");
 #endif
@@ -965,14 +967,14 @@ int FEM_MUtil::eatIntoElement(int localIdx) {
 #endif
   copyElemData(0,localIdx,newEl); //special copy across chunk
   FEM_purge_element(mmod->fmMesh,localIdx,elemtype);
-#ifndef CPSD
+//#ifndef CPSD
   for(int i=0; i<nodesPerEl; i++) {
     if(adjnodes[i]!=oldnodes[i]) {
       //correct the lock
       FEM_Modify_LockUpdate(mmod->fmMesh,adjnodes[i]);
     }
   }
-#endif
+//#endif
   free(adjnodes);
   free(oldnodes);
   return newEl;
@@ -1380,302 +1382,302 @@ void FEM_MUtil::FEM_Print_coords(FEM_Mesh *m, int nodeid) {
     Validity of nodes/elements
 */
 void FEM_MUtil::StructureTest(FEM_Mesh *m) {
-  int noNodes = m->node.size();
-  int noEle = m->elem[0].size();
-  int noGhostEle = m->elem[0].ghost->size();
-  int noGhostNodes = m->node.ghost->size();
-  int wdt = m->elem[0].getConn().width();
-  int *e2n = (int*)malloc(wdt*sizeof(int));
-  for(int i=0; i<noEle; i++) {
-    if(m->elem[0].is_valid(i)) {
-      m->e2n_getAll(i,e2n,0);
-      //must have all different connections
-      if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
-	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
-	CkAssert(false);
-      }
-      //local elem must have all local node connectivity 
-      if(e2n[0]<0 || e2n[1]<0 || e2n[2]<0) {
-	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
-	CkAssert(false);
-      }
-      for(int j=0; j<3; j++) {
-	//all nodes must be valid and all local elems should have local connectivity
-	CkAssert(m->node.is_valid(e2n[j]));
-      }
-      int e2e[3];
-      m->e2e_getAll(i,e2e,0);
-      if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
-	CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
-	CkAssert(false);
-      }
+    int noNodes = m->node.size();
+    int noEle = m->elem[0].size();
+    int noGhostEle = m->elem[0].ghost->size();
+    int noGhostNodes = m->node.ghost->size();
+    int wdt = m->elem[0].getConn().width();
+    int *e2n = (int*)malloc(wdt*sizeof(int));
+    for(int i=0; i<noEle; i++) {
+        if(m->elem[0].is_valid(i)) {
+            m->e2n_getAll(i,e2n,0);
+            //must have all different connections
+            if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
+                CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
+                CkAssert(false);
+            }
+            //local elem must have all local node connectivity 
+            if(e2n[0]<0 || e2n[1]<0 || e2n[2]<0) {
+                CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",i,e2n[0],e2n[1],e2n[2]);
+                CkAssert(false);
+            }
+            for(int j=0; j<3; j++) {
+                //all nodes must be valid and all local elems should have local connectivity
+                CkAssert(m->node.is_valid(e2n[j]));
+            }
+            int e2e[3];
+            m->e2e_getAll(i,e2e,0);
+            if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
+                CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
+                CkAssert(false);
+            }
+        }
     }
-  }
-  for(int i=0; i<noGhostEle; i++) {
-    if(m->elem[0].ghost->is_valid(i)) {
-      int ghostIndex = FEM_To_ghost_index(i);
-      m->e2n_getAll(ghostIndex,e2n,0);
-      if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
-	//must have all different connections
-	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
-	CkAssert(false);
-      }
-      if(!(e2n[0]>=0 || e2n[1]>=0 || e2n[2]>=0)) {
-	//must have at least one local node
-	CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
-	CkAssert(false);
-      }
-      for(int j=0; j<3; j++) {
-	//all nodes must be valid
-	if(e2n[j]>=0) CkAssert(m->node.is_valid(e2n[j]));
-	else CkAssert(m->node.ghost->is_valid(FEM_From_ghost_index(e2n[j])));
-      }
-      int e2e[3];
-      m->e2e_getAll(ghostIndex,e2e,0);
-      if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
-	CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
-	CkAssert(false);
-      }
+    for(int i=0; i<noGhostEle; i++) {
+        if(m->elem[0].ghost->is_valid(i)) {
+            int ghostIndex = FEM_To_ghost_index(i);
+            m->e2n_getAll(ghostIndex,e2n,0);
+            if(e2n[0]==e2n[1] || e2n[1]==e2n[2] || e2n[2]==e2n[0]) {
+                //must have all different connections
+                CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
+                CkAssert(false);
+            }
+            if(!(e2n[0]>=0 || e2n[1]>=0 || e2n[2]>=0)) {
+                //must have at least one local node
+                CkPrintf("ERROR: element %d, has connectivity (%d,%d,%d)\n",ghostIndex,e2n[0],e2n[1],e2n[2]);
+                CkAssert(false);
+            }
+            for(int j=0; j<3; j++) {
+                //all nodes must be valid
+                if(e2n[j]>=0) CkAssert(m->node.is_valid(e2n[j]));
+                else CkAssert(m->node.ghost->is_valid(FEM_From_ghost_index(e2n[j])));
+            }
+            int e2e[3];
+            m->e2e_getAll(ghostIndex,e2e,0);
+            if((e2e[0]==e2e[1]) && (e2e[0]==e2e[2]) && (e2e[0]!=-1)) {
+                CkPrintf("ERROR: element %d, has e2e (%d,%d,%d)\n",i,e2e[0],e2e[1],e2e[2]);
+                CkAssert(false);
+            }
+        }
     }
-  }
-  int *n2e, n2esize=0;
-  int *n2n, n2nsize=0;
-  for(int i=0; i<noNodes; i++) {
-    if(m->node.is_valid(i)) {
-      m->n2e_getAll(i,n2e,n2esize);
-      m->n2n_getAll(i,n2n,n2nsize);
-      if(n2esize>n2nsize) {
-	FEM_Print_coords(m,i);
-	FEM_Print_n2e(m,i);
-	FEM_Print_n2n(m,i);
-	CkPrintf("ERROR: local node %d, with inconsistent adjacency list\n",i);
-	CkAssert(false);
-      }
+    int *n2e, n2esize=0;
+    int *n2n, n2nsize=0;
+    for(int i=0; i<noNodes; i++) {
+        if(m->node.is_valid(i)) {
+            m->n2e_getAll(i,n2e,n2esize);
+            m->n2n_getAll(i,n2n,n2nsize);
+            if(n2esize>n2nsize) {
+                FEM_Print_coords(m,i);
+                FEM_Print_n2e(m,i);
+                FEM_Print_n2n(m,i);
+                CkPrintf("ERROR: local node %d, with inconsistent adjacency list\n",i);
+                CkAssert(false);
+            }
+        }
+        else {
+            continue;
+        }
+        if(n2esize > 0) {
+            for(int j=0; j<n2esize; j++) {
+                CkAssert(n2e[j]!=-1);
+                if(FEM_Is_ghost_index(n2e[j])) CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
+                else CkAssert(m->elem[0].is_valid(n2e[j])==1);
+            }
+            m->e2n_getAll(n2e[0],e2n,0);
+            //any local/shared node should have at least one local element connected to it
+            bool done = false;
+            for(int j=0; j<n2esize; j++) {
+                if(n2e[j] >= 0) {
+                    done = true; 
+                    break;
+                }
+            }
+            if(!done) {
+                FEM_Print_coords(m,i);
+                FEM_Print_n2e(m,i);
+                FEM_Print_n2n(m,i);
+                CkPrintf("ERROR: isolated local node %d, with no local element connectivity\n",i);
+                CkAssert(false);
+            }
+            //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
+            int testnode = i;
+            int startnode = (e2n[0]==testnode) ? e2n[1] : e2n[0];
+            int othernode = (e2n[2]==testnode) ? e2n[1] : e2n[2];
+            int previousnode = startnode;
+            int nextnode = -1;
+            int numdeadends = 0;
+            int numunused = n2esize-1;
+            n2e[0] = -1;
+            for(int j=0; j<n2esize-1; j++) {
+                nextnode = -1;
+                for(int k=1; k<n2esize; k++) {
+                    if(n2e[k]==-1) continue;
+                    m->e2n_getAll(n2e[k],e2n,0);
+                    if(e2n[0]==previousnode || e2n[1]==previousnode || e2n[2]==previousnode) {
+                        nextnode = (e2n[0]==previousnode) ? ((e2n[1]==testnode)? e2n[2]:e2n[1]) : ((e2n[1]==previousnode)? ((e2n[0]==testnode)? e2n[2]:e2n[0]):((e2n[1]==testnode)? e2n[0]:e2n[1]));
+                        previousnode = nextnode;
+                        n2e[k] = -1;
+                        numunused--;
+                    }
+                }
+                if(nextnode==othernode && othernode!=-1) {
+                    //it has reached a full circle
+                    break;
+                }
+                else if(nextnode==-1) {
+                    //this is one edge, start travelling along the other end
+                    numdeadends++;
+                    previousnode = othernode;
+                    othernode = -1;
+                }
+                if(numdeadends>2 && numunused!=0) {
+                    FEM_Print_coords(m,i);
+                    FEM_Print_n2e(m,i);
+                    FEM_Print_n2n(m,i);
+                    CkPrintf("ERROR: cloud connectivity of node %d is discontinuous\n",i);
+                    CkAssert(false);
+                }
+            }
+            if(n2esize>0) delete[] n2e; n2esize=0;
+            //reconstruct n2n from n2e & e2n
+            int n2n1size = 0;
+            int *n2n1 = (int*)malloc(n2nsize*sizeof(int));
+            int n2n1Count = 0;
+            m->n2e_getAll(i,n2e,n2esize);
+            for(int j=0; j<n2esize; j++) {
+                CkAssert(n2e[j]!=-1);
+                //each of these elems should have me in its e2n
+                int e2n1[3];
+                m->e2n_getAll(n2e[j],e2n1,0);
+                if(e2n1[0]!=i && e2n1[1]!=i && e2n1[2]!=i) {
+                    FEM_Print_coords(m,i);
+                    FEM_Print_n2e(m,i);
+                    FEM_Print_e2n(m,n2e[j]);
+                    CkPrintf("ERROR: ghost elem %d & ghost node %d have inconsistent adjacency list\n",n2e[j],i);
+                    CkAssert(false);
+                }
+                for(int k=0; k<3;k++) {
+                    if(e2n1[k] == i) continue;
+                    bool flag1 = true;
+                    for(int l=0; l<n2n1Count; l++) {
+                        if(e2n1[k] == n2n1[l]) flag1 = false;
+                    }
+                    if(flag1 && n2n1Count<n2nsize) { //this is not in the list
+                        n2n1[n2n1Count] = e2n1[k];
+                        n2n1Count++;
+                    }
+                }
+            }
+            //verify if n2n1 has the same nodes as n2n
+            bool flag2 = true;
+            if(n2n1Count!=n2nsize) flag2 = false;
+            for(int j=0; j<n2n1Count; j++) {
+                bool flag1 = false;
+                for(int k=0; k<n2nsize; k++) {
+                    if(n2n[k]==n2n1[j]) flag1 = true;
+                }
+                if(!flag1) {
+                    flag2 = false;
+                    break;
+                }
+            }
+            if(!flag2) {
+                FEM_Print_coords(m,i);
+                FEM_Print_n2n(m,i);
+                for(int l=0; l<n2esize; l++) FEM_Print_e2n(m,n2e[l]);
+                CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",i);
+                CkAssert(false);
+            }
+
+            delete [] n2n1;
+            if(n2esize>0) delete [] n2e; n2esize=0;
+            if(n2nsize>0) delete [] n2n; n2nsize=0;
+        }
     }
-    else {
-      continue;
+    if(n2esize>0) delete [] n2e; n2esize=0;
+    if(n2nsize>0) delete [] n2n; n2nsize=0;
+    for(int i=0; i<noGhostNodes; i++) {
+        int ghostidx = FEM_To_ghost_index(i);
+        if(m->node.ghost->is_valid(i)) {
+            m->n2e_getAll(ghostidx,n2e,n2esize);
+            m->n2n_getAll(ghostidx,n2n,n2nsize);
+            bool done = false;
+            for(int k=0;k<n2nsize;k++) {
+                if(n2n[k]>=0) {
+                    done = true;
+                    break;
+                }
+            }
+            if(n2esize>n2nsize || !done) {
+                FEM_Print_coords(m,ghostidx);
+                FEM_Print_n2e(m,ghostidx);
+                FEM_Print_n2n(m,ghostidx);
+                CkPrintf("ERROR: ghost node %d, with inconsistent adjacency list\n",ghostidx);
+                CkAssert(false);
+            }
+            if(n2esize > 0) {
+                //reconstruct n2n from n2e & e2n
+                int n2n1size = 0;
+                int *n2n1 = (int*)malloc(n2nsize*sizeof(int));
+                int n2n1Count = 0;
+                for(int j=0; j<n2esize; j++) {
+                    CkAssert(n2e[j]!=-1);
+                    if(FEM_Is_ghost_index(n2e[j])) {
+                        CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
+                    }
+                    else {
+                        CkAssert(m->elem[0].is_valid(n2e[j])==1);
+                    }
+                    //each of these elems should have me in its e2n
+                    int e2n1[3];
+                    m->e2n_getAll(n2e[j],e2n1,0);
+                    if(e2n1[0]!=ghostidx && e2n1[1]!=ghostidx && e2n1[2]!=ghostidx) {
+                        FEM_Print_coords(m,ghostidx);
+                        FEM_Print_n2e(m,ghostidx);
+                        FEM_Print_e2n(m,n2e[j]);
+                        CkPrintf("ERROR: ghost elem %d & ghost node %d have inconsistent adjacency list\n",n2e[j],ghostidx);
+                        CkAssert(false);
+                    }
+                    for(int k=0; k<3;k++) {
+                        if(e2n1[k] == ghostidx) continue;
+                        bool flag1 = true;
+                        for(int l=0; l<n2n1Count; l++) {
+                            if(e2n1[k] == n2n1[l]) flag1 = false;
+                        }
+                        if(flag1 && n2n1Count<n2nsize) { //this is not in the list
+                            n2n1[n2n1Count] = e2n1[k];
+                            n2n1Count++;
+                        }
+                    }
+                }
+                //verify if n2n1 has the same nodes as n2n
+                bool flag2 = true;
+                if(n2n1Count!=n2nsize) flag2 = false;
+                for(int j=0; j<n2n1Count; j++) {
+                    bool flag1 = false;
+                    for(int k=0; k<n2nsize; k++) {
+                        if(n2n[k]==n2n1[j]) flag1 = true;
+                    }
+                    if(!flag1) {
+                        flag2 = false;
+                        break;
+                    }
+                }
+                if(!flag2) {
+                    FEM_Print_coords(m,ghostidx);
+                    FEM_Print_n2n(m,ghostidx);
+                    for(int l=0; l<n2esize; l++) FEM_Print_e2n(m,n2e[l]);
+                    CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",ghostidx);
+                    CkAssert(false);
+                }
+                delete[] n2n1;
+                delete[] n2e;
+            }
+            if(n2nsize > 0) {
+                for(int j=0; j<n2nsize; j++) {
+                    CkAssert(n2n[j]!=-1);
+                }
+                delete[] n2n;
+            }
+            //verify that it is coming correctly from all chunks as a ghost
+            const IDXL_Rec *irec = m->node.ghost->ghostRecv.getRec(i);
+            //go to a chunk which owns it & verify that these are the only chunks that own it
+            int remChk = irec->getChk(0);
+            int sharedIdx = irec->getIdx(0);
+            int numsh = irec->getShared();
+            verifyghostsendMsg *vmsg = new(numsh,0)verifyghostsendMsg();
+            vmsg->fromChk = idx;
+            vmsg->sharedIdx = sharedIdx;
+            vmsg->numchks = numsh;
+            for(int k=0; k<numsh; k++) vmsg->chunks[k] = irec->getChk(k);
+            meshMod[remChk].verifyghostsend(vmsg);
+        }
+        else {
+            continue;
+        }
     }
-    if(n2esize > 0) {
-      for(int j=0; j<n2esize; j++) {
-	CkAssert(n2e[j]!=-1);
-	if(FEM_Is_ghost_index(n2e[j])) CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
-	else CkAssert(m->elem[0].is_valid(n2e[j])==1);
-      }
-      m->e2n_getAll(n2e[0],e2n,0);
-      //any local/shared node should have at least one local element connected to it
-      bool done = false;
-      for(int j=0; j<n2esize; j++) {
-	if(n2e[j] >= 0) {
-	  done = true; 
-	  break;
-	}
-      }
-      if(!done) {
-	FEM_Print_coords(m,i);
-	FEM_Print_n2e(m,i);
-	FEM_Print_n2n(m,i);
-	CkPrintf("ERROR: isolated local node %d, with no local element connectivity\n",i);
-	CkAssert(false);
-      }
-      //ensure that there is a cloud of connectivity, no disconnected elements, other than boundaries
-      int testnode = i;
-      int startnode = (e2n[0]==testnode) ? e2n[1] : e2n[0];
-      int othernode = (e2n[2]==testnode) ? e2n[1] : e2n[2];
-      int previousnode = startnode;
-      int nextnode = -1;
-      int numdeadends = 0;
-      int numunused = n2esize-1;
-      n2e[0] = -1;
-      for(int j=0; j<n2esize-1; j++) {
-	nextnode = -1;
-	for(int k=1; k<n2esize; k++) {
-	  if(n2e[k]==-1) continue;
-	  m->e2n_getAll(n2e[k],e2n,0);
-	  if(e2n[0]==previousnode || e2n[1]==previousnode || e2n[2]==previousnode) {
-	    nextnode = (e2n[0]==previousnode) ? ((e2n[1]==testnode)? e2n[2]:e2n[1]) : ((e2n[1]==previousnode)? ((e2n[0]==testnode)? e2n[2]:e2n[0]):((e2n[1]==testnode)? e2n[0]:e2n[1]));
-	    previousnode = nextnode;
-	    n2e[k] = -1;
-	    numunused--;
-	  }
-	}
-	if(nextnode==othernode && othernode!=-1) {
-	  //it has reached a full circle
-	  break;
-	}
-	else if(nextnode==-1) {
-	  //this is one edge, start travelling along the other end
-	  numdeadends++;
-	  previousnode = othernode;
-	  othernode = -1;
-	}
-	if(numdeadends>2 && numunused!=0) {
-	  FEM_Print_coords(m,i);
-	  FEM_Print_n2e(m,i);
-	  FEM_Print_n2n(m,i);
-	  CkPrintf("ERROR: cloud connectivity of node %d is discontinuous\n",i);
-	  CkAssert(false);
-	}
-      }
-      if(n2esize>0) delete[] n2e; n2esize=0;
-      //reconstruct n2n from n2e & e2n
-      int n2n1size = 0;
-      int *n2n1 = (int*)malloc(n2nsize*sizeof(int));
-      int n2n1Count = 0;
-      m->n2e_getAll(i,n2e,n2esize);
-      for(int j=0; j<n2esize; j++) {
-	CkAssert(n2e[j]!=-1);
-	//each of these elems should have me in its e2n
-	int e2n1[3];
-	m->e2n_getAll(n2e[j],e2n1,0);
-	if(e2n1[0]!=i && e2n1[1]!=i && e2n1[2]!=i) {
-	  FEM_Print_coords(m,i);
-	  FEM_Print_n2e(m,i);
-	  FEM_Print_e2n(m,n2e[j]);
-	  CkPrintf("ERROR: ghost elem %d & ghost node %d have inconsistent adjacency list\n",n2e[j],i);
-	  CkAssert(false);
-	}
-	for(int k=0; k<3;k++) {
-	  if(e2n1[k] == i) continue;
-	  bool flag1 = true;
-	  for(int l=0; l<n2n1Count; l++) {
-	    if(e2n1[k] == n2n1[l]) flag1 = false;
-	  }
-	  if(flag1 && n2n1Count<n2nsize) { //this is not in the list
-	    n2n1[n2n1Count] = e2n1[k];
-	    n2n1Count++;
-	  }
-	}
-      }
-      //verify if n2n1 has the same nodes as n2n
-      bool flag2 = true;
-      if(n2n1Count!=n2nsize) flag2 = false;
-      for(int j=0; j<n2n1Count; j++) {
-	bool flag1 = false;
-	for(int k=0; k<n2nsize; k++) {
-	  if(n2n[k]==n2n1[j]) flag1 = true;
-	}
-	if(!flag1) {
-	  flag2 = false;
-	  break;
-	}
-      }
-      if(!flag2) {
-	FEM_Print_coords(m,i);
-	FEM_Print_n2n(m,i);
-	for(int l=0; l<n2esize; l++) FEM_Print_e2n(m,n2e[l]);
-	CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",i);
-	CkAssert(false);
-      }
-      
-      delete [] n2n1;
-      if(n2esize>0) delete [] n2e; n2esize=0;
-      if(n2nsize>0) delete [] n2n; n2nsize=0;
-    }
-  }
-  if(n2esize>0) delete [] n2e; n2esize=0;
-  if(n2nsize>0) delete [] n2n; n2nsize=0;
-  for(int i=0; i<noGhostNodes; i++) {
-    int ghostidx = FEM_To_ghost_index(i);
-    if(m->node.ghost->is_valid(i)) {
-      m->n2e_getAll(ghostidx,n2e,n2esize);
-      m->n2n_getAll(ghostidx,n2n,n2nsize);
-      bool done = false;
-      for(int k=0;k<n2nsize;k++) {
-	if(n2n[k]>=0) {
-	  done = true;
-	  break;
-	}
-      }
-      if(n2esize>n2nsize || !done) {
-	FEM_Print_coords(m,ghostidx);
-	FEM_Print_n2e(m,ghostidx);
-	FEM_Print_n2n(m,ghostidx);
-	CkPrintf("ERROR: ghost node %d, with inconsistent adjacency list\n",ghostidx);
-	CkAssert(false);
-      }
-      if(n2esize > 0) {
-	//reconstruct n2n from n2e & e2n
-	int n2n1size = 0;
-	int *n2n1 = (int*)malloc(n2nsize*sizeof(int));
-	int n2n1Count = 0;
-	for(int j=0; j<n2esize; j++) {
-	  CkAssert(n2e[j]!=-1);
-	  if(FEM_Is_ghost_index(n2e[j])) {
-	    CkAssert(m->elem[0].ghost->is_valid(FEM_From_ghost_index(n2e[j]))==1);
-	  }
-	  else {
-	    CkAssert(m->elem[0].is_valid(n2e[j])==1);
-	  }
-	  //each of these elems should have me in its e2n
-	  int e2n1[3];
-	  m->e2n_getAll(n2e[j],e2n1,0);
-	  if(e2n1[0]!=ghostidx && e2n1[1]!=ghostidx && e2n1[2]!=ghostidx) {
-	    FEM_Print_coords(m,ghostidx);
-	    FEM_Print_n2e(m,ghostidx);
-	    FEM_Print_e2n(m,n2e[j]);
-	    CkPrintf("ERROR: ghost elem %d & ghost node %d have inconsistent adjacency list\n",n2e[j],ghostidx);
-	    CkAssert(false);
-	  }
-	  for(int k=0; k<3;k++) {
-	    if(e2n1[k] == ghostidx) continue;
-	    bool flag1 = true;
-	    for(int l=0; l<n2n1Count; l++) {
-	      if(e2n1[k] == n2n1[l]) flag1 = false;
-	    }
-	    if(flag1 && n2n1Count<n2nsize) { //this is not in the list
-	      n2n1[n2n1Count] = e2n1[k];
-	      n2n1Count++;
-	    }
-	  }
-	}
-	//verify if n2n1 has the same nodes as n2n
-	bool flag2 = true;
-	if(n2n1Count!=n2nsize) flag2 = false;
-	for(int j=0; j<n2n1Count; j++) {
-	  bool flag1 = false;
-	  for(int k=0; k<n2nsize; k++) {
-	    if(n2n[k]==n2n1[j]) flag1 = true;
-	  }
-	  if(!flag1) {
-	    flag2 = false;
-	    break;
-	  }
-	}
-	if(!flag2) {
-	  FEM_Print_coords(m,ghostidx);
-	  FEM_Print_n2n(m,ghostidx);
-	  for(int l=0; l<n2esize; l++) FEM_Print_e2n(m,n2e[l]);
-	  CkPrintf("ERROR: ghost node %d has inconsistent adjacency list\n",ghostidx);
-	  CkAssert(false);
-	}
-	delete[] n2n1;
-	delete[] n2e;
-      }
-      if(n2nsize > 0) {
-	for(int j=0; j<n2nsize; j++) {
-	  CkAssert(n2n[j]!=-1);
-	}
-	delete[] n2n;
-      }
-      //verify that it is coming correctly from all chunks as a ghost
-      const IDXL_Rec *irec = m->node.ghost->ghostRecv.getRec(i);
-      //go to a chunk which owns it & verify that these are the only chunks that own it
-      int remChk = irec->getChk(0);
-      int sharedIdx = irec->getIdx(0);
-      int numsh = irec->getShared();
-      verifyghostsendMsg *vmsg = new(numsh,0)verifyghostsendMsg();
-      vmsg->fromChk = idx;
-      vmsg->sharedIdx = sharedIdx;
-      vmsg->numchks = numsh;
-      for(int k=0; k<numsh; k++) vmsg->chunks[k] = irec->getChk(k);
-      meshMod[remChk].verifyghostsend(vmsg);
-    }
-    else {
-      continue;
-    }
-  }
-  free(e2n);
-  return;
+    free(e2n);
+    return;
 }
 
 /** The area test verifies that the area of no element is less than the SLIVERAREA
@@ -1792,7 +1794,10 @@ int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
   int noNodes = m->node.size();
   for(int i=0; i<noNodes; i++) {
     if(m->node.is_valid(i)) {
-      CkAssert(!mmod->fmLockN[i].haslocks());
+      if (mmod->fmLockN[i].haslocks()) {
+          CkPrintf("[%d] Node %d has a residual lock\n", FEM_My_partition(), i);
+          CkAssert(false);
+      }
     }
   }
   for(int i=0; i<mmod->numChunks; i++) {
@@ -1800,3 +1805,22 @@ int FEM_MUtil::residualLockTest(FEM_Mesh *m) {
   }
   return 1;
 }
+
+/**
+ * Remove all extant node locks in the mesh. Probably only useful for debugging
+ * and very special cases.
+ */
+void FEM_MUtil::unlockAll(FEM_Mesh *m) {
+  int noNodes = m->node.size();
+  for(int i=0; i<noNodes; i++) {
+    if(m->node.is_valid(i)) {
+      if (mmod->fmLockN[i].haslocks()) {
+          mmod->fmLockN[i].reset(i, mmod);
+      }
+    }
+  }
+  for(int i=0; i<mmod->numChunks; i++) {
+    mmod->fmIdxlLock[i] = false;
+  }
+}
+
