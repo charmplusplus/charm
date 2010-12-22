@@ -331,9 +331,12 @@ public:
       flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else {
+    }
+#if CMK_ERROR_CHECKING
+    else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
+#endif
 
     if(flati < amaps[arrayHdl]->_numFirstSet)
       return (flati / (amaps[arrayHdl]->_binSize + 1));
@@ -388,9 +391,12 @@ public:
       flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else {
+    }
+#if CMK_ERROR_CHECKING
+    else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
+#endif
 
     /** binSize calculated in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
