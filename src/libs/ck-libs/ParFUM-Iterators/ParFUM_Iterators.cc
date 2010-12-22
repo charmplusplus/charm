@@ -45,9 +45,11 @@ int lib_FP_Type_Size()
 void mesh_set_device(MeshModel* m, MeshDevice d)
 {
   m->target_device = d;
+#if CUDA
   if(d == DeviceGPU){
     CkAssert(m->allocatedForCUDADevice);
   }
+#endif
 }
 
 
@@ -306,6 +308,7 @@ void meshModel_Create_Driver(MeshDevice target_device, int elem_attr_sz,
 
 
 
+#ifdef CUDA
 //  MeshDevice target_device
 void allocateModelForCUDADevice(MeshModel* model){
 
@@ -384,9 +387,6 @@ void allocateModelForCUDADevice(MeshModel* model){
 }
 
 
-
-
-
 //  Copy data from GPU and deallocate its memory
 void deallocateModelForCUDADevice(MeshModel* model){
 
@@ -445,6 +445,7 @@ void deallocateModelForCUDADevice(MeshModel* model){
     }
   }
 }
+#endif
 
 
 
