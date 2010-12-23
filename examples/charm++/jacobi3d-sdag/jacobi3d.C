@@ -250,6 +250,13 @@ class Jacobi: public CBase_Jacobi {
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
 	  .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost);
+
+      delete[] leftGhost;
+      delete[] rightGhost;
+      delete[] bottomGhost;
+      delete[] topGhost;
+      delete[] frontGhost;
+      delete[] backGhost;
     }
 
     void processGhosts(int dir, int height, int width, double gh[]) {
