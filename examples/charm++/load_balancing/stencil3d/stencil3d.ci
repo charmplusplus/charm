@@ -1,0 +1,46 @@
+mainmodule stencil3d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report();
+  };
+
+  array [3D] Stencil {
+    entry Stencil(void);
+    entry void begin_iteration(void);
+    entry void receiveGhosts(int iter, int dir, int height, int width,
+                             double ghosts[height*width]);
+
+    entry void doStep() {
+      atomic "begin_iteration" {
+	begin_iteration();
+      }
+      for(imsg = 0; imsg < 6; imsg++) {
+	// "iterations" keeps track of messages across steps
+	when receiveGhosts[iterations] (int iter, int dir, int height, 
+                                     int width, double ghosts[height*width])
+	  atomic "process ghosts" {
+            processGhosts(dir, height, width, ghosts);
+          }
+      }
+      atomic "doWork" {
+	check_and_compute();
+      }
+    };
+
+    entry void startBalancing();
+  };
+
+};
