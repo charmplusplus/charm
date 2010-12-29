@@ -75,7 +75,6 @@ double endTime;
 class Main : public CBase_Main {
   public:
     CProxy_Stencil array;
-    int iterations;
 
     Main(CkArgMsg* m) {
       if ( (m->argc != 3) && (m->argc != 7) ) {
@@ -83,9 +82,6 @@ class Main : public CBase_Main {
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
         CkAbort("Abort");
       }
-
-      // set iteration counter to zero
-      iterations = 0;
 
       // store the main proxy
       mainProxy = thisProxy;
@@ -130,20 +126,7 @@ class Main : public CBase_Main {
 
     // Each worker reports back to here when it completes an iteration
     void report() {
-      iterations++;
-      endTime = CmiWallTimer();
-      CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
-
-      if(iterations % LBPERIOD == 0)
-	array.startBalancing();
-      else {
-	if(iterations == MAX_ITER) {
-	  CkExit();
-	} else {
-	  startTime = CmiWallTimer();
-	  array.doStep();
-	}
-      }
+      CkExit();
     }
 };
 
@@ -318,7 +301,20 @@ class Stencil: public CBase_Stencil {
 
       constrainBC();
 
-      contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+      if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+	endTime = CmiWallTimer();
+	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
+      }
+
+      if(iterations == MAX_ITER)
+	contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+      else {
+	startTime = CmiWallTimer();
+	if(iterations % LBPERIOD == 0)
+	  AtSync();
+	else
+	  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Stencil::doStep(), thisProxy));
+      }
     }
 
     // Check to see if we have received all neighbor values yet
@@ -351,10 +347,6 @@ class Stencil: public CBase_Stencil {
       for(int j=1; j<blockDimY+1; ++j)
 	for(int i=1; i<blockDimX+1; ++i)
 	  temperature[index(i, j, 1)] = 255.0;
-    }
-
-    void startBalancing() {
-      AtSync();
     }
 
     void ResumeFromSync() {

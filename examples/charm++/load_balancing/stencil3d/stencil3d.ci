@@ -39,8 +39,6 @@ mainmodule stencil3d {
 	check_and_compute();
       }
     };
-
-    entry void startBalancing();
   };
 
 };
