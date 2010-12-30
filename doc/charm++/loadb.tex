@@ -160,118 +160,81 @@ description of available load balancing strategies).
 There are three different ways to use load balancing for chare arrays to meet
 different needs of the applications. These methods are different in how and
 when a load balancing phase starts. The three methods are: {\bf periodic load
-balancing mode}, {\bf automatic with sync mode} and {\bf manual mode}.
+balancing mode}, {\bf at sync mode} and {\bf manual mode}.
 
-In {\em periodic load balancing mode}, a user just needs to specify how
-often he wants the load balancing to occur, using +LBPeriod runtime
-option to specify a time interval. 
+In {\em periodic load balancing mode}, a user just needs to specify how often
+he wants the load balancing to occur, using +LBPeriod runtime option to specify
+a time interval.
 
-In {\em sync mode}, users can tell load balancer explicitly when is a good 
-time to trigger load balancing by inserting a function call in the user
-code.
+In {\em sync mode}, users can tell the load balancer explicitly when is a good
+time to trigger load balancing by inserting a function call (AtSync) in the
+user code.
 
-
-%In this mode, load balancer works in parallel with 
-%the application so application doesn't need to stop waiting for load 
-%balancing to complete. However, in most cases, 
-%application does not want load balancing to occur arbitrarily because it 
-%has better idea about when a load balancing should 
-%happen\footnote{For example, in the application with multiple iterations, 
-%load balancing should happens in every a few iterations}. 
-%{\em Automatic with sync} mode is designed for this 
-%scenario. In this mode, user inserts {\em AtSync()} calls at certain points 
-%in application where he thinks the load balancing is desired. 
-%Load balancing is then triggered after all the local array elements on 
-%the processor reach the sync point\footnote{It is implemented as a local 
-%barrier of all the array elements on one processor}. 
-%However, {\em AtSync()} is not a blocking call, 
-%load balancing does not force the application to block until it  
-%finishes. When load balancing finishes, load balancer notifies every array
-%element by calling {\em ResumeFromSync()}
-%\footnote{{\em ResumeFromSync()} is a virtual function of array element
-%base class which can be redefined in application.}. In many applications,
-%it is often desirable that application waits for load balancing complete since
-%there may be migration occurs when load balancing and application may want to
-%respond to the migration. Thus, one of the commonly applied strategy is 
-%that array elements stop sending message after {\em AtSync()} is called, 
-%and resume work after load balancer calls back {\em ResumeFromSync()}.
-
-In the above two load balancing modes, users don't need 
-to worry about how to start load balancing. 
-However, in one scenario, the above automatic load balancers will fail to
-work - array elements are created by dynamic insertion.
-This is because the above two load balancing modes require an application
-to have fixed number of objects at the time of load balancing.
-The array manager needs to maintain a head count of local array elements
-for the local barrier.
-In this case, users have to use the {\em manual mode} to trigger 
-load balancer themselves. The API is described below.
-
-%A few notes about {\em ResumeFromSync()}\footnote{It used to 
-%only work in automatic with sync mode.}. It can be used in all above three
-%load balancing modes. For an array element(whether it is migrated or not), 
-%it is more like getting a notification from load
-%balancer about the completeness of load balancing phase.
-%Users can choose to handle it by writing their own
-%code for {\em ResumeFromSync()}, or just ignore it. The proper use of both 
-%{\em AtSync()} and {\em ResumeFromSync()} gives you the effect of 
-%load balancing barrier. 
+In the above two load balancing modes, users do not need to worry about how to
+start load balancing.  However, in one scenario, the above automatic load
+balancers will fail to work - when array elements are created by dynamic insertion.
+This is because the above two load balancing modes require an application to
+have fixed number of objects at the time of load balancing.  The array manager
+needs to maintain a head count of local array elements for the local barrier.
+In this case, users have to use the {\em manual mode} to trigger load balancer
+themselves.
 
 The detailed APIs of these three methods are described as follows:
+%
 \begin{enumerate}
-
-\item {\bf periodical load balancing mode}: By default, the array elements 
-may be asked to migrate at any time provided that they are not in 
-the middle of executing an entry method. 
-The array element's variable \kw{usesAtSync} being CmiFalse attributes
-to this default behavior. In the default setting, load balancing happens
-whenever the array elements are ready with interval of 1 second. It is 
-desirable for the application to set a larger interval using +LBPeriod
-runtime option. For example "+LBPeriod 5" to start load balancing roughly
-every 5 seconds.
-
-\item {\bf automatic with Sync}: Using the AtSync method, elements can 
-only be migrated at certain points in the execution when user calls 
-\kw{AtSync()}. 
-For the AtSync method, set \kw{usesAtSync} to CmiTrue in your 
-array element constructor.  When an element is ready to migrate,
-call \kw{AtSync()}~\footnote{AtSync() is a member function of class ArrayElement}.  
-When all local elements call \kw{AtSync}, the load balancer is triggered.  
-Once all migrations are completed, the load balancer calls the 
-virtual function \kw{ArrayElement::ResumeFromSync()} on each of the
-array elements.  
+%
+\item {\bf Periodical load balancing mode}: In the default setting, load
+balancing happens whenever the array elements are ready, with an interval of 1
+second. It is desirable for the application to set a larger interval using
++LBPeriod runtime option. For example "+LBPeriod 5" can be used to start load
+balancing roughly every 5 seconds. By default, array elements may be asked to
+migrate at any time provided that they are not in the middle of executing an
+entry method. The array element's variable \kw{usesAtSync} being CmiFalse
+attributes to this default behavior.
+%
+\item {\bf At sync mode}: Using this method, elements can only be migrated at
+certain points in the execution when user calls \kw{AtSync()}. For using the at
+sync mode, one should set \kw{usesAtSync} to CmiTrue in the array element
+constructor.  When an element is ready to migrate, call
+\kw{AtSync()}~\footnote{AtSync() is a member function of class ArrayElement}.
+When all local elements call \kw{AtSync}, the load balancer is triggered.  Once
+all migrations are completed, the load balancer calls the virtual function
+\kw{ArrayElement::ResumeFromSync()} on each of the array elements. This
+function can be redefined in the application.
 
 Note that {\em AtSync()} is not a blocking call, it just gives a hint to load
-balancing that it is time for load balancing. During the time between 
-{\em AtSync} and {\em ResumeFromSync}, the object may be migrated. 
-One can choose to let objects continue working with incoming messages,
-however keep in mind the object may suddenly show up in another processor
-and make sure no operations that could possibly prevent migration 
-be performed. The most commonly used approach is to force the object to 
-be idle until load balancing finishes, the object can start working again
-when \kw{ResumeFromSync()} is called.
+balancing that it is time for load balancing. During the time between {\em
+AtSync} and {\em ResumeFromSync}, the object may be migrated. One can choose
+to let objects continue working with incoming messages, however keep in mind
+the object may suddenly show up in another processor and make sure no
+operations that could possibly prevent migration be performed. This is the automatic way of doing load balancing where the application does not need to define ResumeFromSync().
 
+The more commonly used approach is to force the object to be idle until load
+balancing finishes. The user places an AtSync call at the end of some iteration
+and when all elements reach that call load balancing is triggered. The objects
+can start executing again when \kw{ResumeFromSync()} is called. In this case,
+the user redefines ResumeFromSync() to trigger the next iteration of the
+application. This manual way of using the at sync mode results in a barrier at
+load balancing (see example here~\ref{lbexample}).
+%
 \item {\bf manual mode}: The load balancer can be programmed to be started
-manually. To switch to the manual mode, you should call
-{\em TurnManualLBOn()} on every processor to prevent load balancer from 
-starting automatically. {\em TurnManualLBOn()} should be called as 
-early as possible in the program. It could be called at the initialization 
-part of the program, 
-for example from a global variable constructor, or in an initcall~\ref{initcall}.
-It can also be called in the constructor of a static array and
-definitely before the {\em doneInserting} call for a dynamic array.  
-It can be called multiple times on one 
-processor, but only the last one takes effect.
+manually. To switch to the manual mode, you should call {\em TurnManualLBOn()}
+on every processor to prevent load balancer from starting automatically. {\em
+TurnManualLBOn()} should be called as early as possible in the program. It
+could be called at the initialization part of the program, for example from a
+global variable constructor, or in an initcall~\ref{initcall}.  It can also be
+called in the constructor of a static array and definitely before the {\em
+doneInserting} call for a dynamic array.  It can be called multiple times on
+one processor, but only the last one takes effect.
 
-The function call {\em StartLB()} starts load balancing immediately. 
-This call should be made at only one place on only one processor.
-This function is also not blocking, the object will continue to process
-messages and the load balancing when triggered
-happens at the background.
+The function call {\em StartLB()} starts load balancing immediately. This call
+should be made at only one place on only one processor. This function is also
+not blocking, the object will continue to process messages and the load
+balancing when triggered happens at the background.
 
-{\em TurnManualLBOff()} turns off manual load balancing and 
-switches back to the automatic Load balancing mode.
-
+{\em TurnManualLBOff()} turns off manual load balancing and switches back to
+the automatic Load balancing mode.
+%
 \end{enumerate}
 
 \subsubsection{Migrating objects}
