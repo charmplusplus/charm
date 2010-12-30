@@ -214,7 +214,7 @@ and when all elements reach that call load balancing is triggered. The objects
 can start executing again when \kw{ResumeFromSync()} is called. In this case,
 the user redefines ResumeFromSync() to trigger the next iteration of the
 application. This manual way of using the at sync mode results in a barrier at
-load balancing.
+load balancing (see example here~\ref{lbexample}).
 
 \item {\bf manual mode}: The load balancer can be programmed to be started
 manually. To switch to the manual mode, you should call {\em TurnManualLBOn()}
