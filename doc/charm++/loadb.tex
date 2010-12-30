@@ -450,10 +450,10 @@ As an example, we can collect the data for a 1000 processor run of a program usi
 ./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
 \end{alltt}
 This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
-\begin{verbatim}
+\begin{alltt}
 ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 
                +LBDumpFile dump.dat [+LBSimProcs 900]
-\end{verbatim}
+\end{alltt}
 
 \subsubsection{Future load predictor}
 
@@ -625,11 +625,12 @@ name used above. Now one can use {\bf -balance foo} as compile time option
 to {\bf charmc} to link with the {\em foo} seed load balancer.
 
 \subsubsection{Simple Load Balancer Usage Example - Automatic with Sync LB}
-
 \label{lbexample}
-A simple example of how to use a load balancer in sync mode in one's application is presented below.
 
-\begin{verbatim}
+A simple example of how to use a load balancer in sync mode in one's
+application is presented below.
+
+\begin{alltt}
 /*** lbexample.ci ***/
 mainmodule lbexample {
   readonly CProxy_Main mainProxy;
@@ -645,9 +646,11 @@ mainmodule lbexample {
     entry void doWork();
   };
 };
-\end{verbatim}
-----------------------------------------------------------------------------------------------------------
-\begin{verbatim}
+\end{alltt}
+
+--------------------------------------------------------------------------------
+
+\begin{alltt}
 /*** lbexample.C ***/
 #include <stdio.h>
 #include "lbexample.decl.h"
@@ -676,7 +679,7 @@ public:
   {
     count++;
     if(count==nElements){
-      CkPrintf("All done\n");
+      CkPrintf("All done");
       CkExit();
     }
   };
@@ -713,7 +716,7 @@ public:
     if(workcnt==MAX_WORK_CNT)
       mainProxy.done();
     
-    if(workcnt%LB_INTERVAL==0)
+    if(workcnt\%LB_INTERVAL==0)
       AtSync();
     else
       doWork();
@@ -725,4 +728,4 @@ public:
 };
 
 #include "lbexample.def.h"
-\end{verbatim}
+\end{alltt}
