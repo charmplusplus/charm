@@ -217,7 +217,7 @@ the user redefines ResumeFromSync() to trigger the next iteration of the
 application. This manual way of using the at sync mode results in a barrier at
 load balancing (see example here~\ref{lbexample}).
 %
-\item {\bf manual mode}: The load balancer can be programmed to be started
+\item {\bf Manual mode}: The load balancer can be programmed to be started
 manually. To switch to the manual mode, you should call {\em TurnManualLBOn()}
 on every processor to prevent load balancer from starting automatically. {\em
 TurnManualLBOn()} should be called as early as possible in the program. It
@@ -451,8 +451,7 @@ As an example, we can collect the data for a 1000 processor run of a program usi
 \end{alltt}
 This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
 \begin{alltt}
-./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 
-               +LBDumpFile dump.dat [+LBSimProcs 900]
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat [+LBSimProcs 900]
 \end{alltt}
 
 \subsubsection{Future load predictor}
@@ -464,7 +463,7 @@ function to the load balancer to predict what will be the future workload, given
 the past, instrumented one. As said, the user might provide a specific class
 which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
 Here is the abstract class:
-\begin{verbatim}
+\begin{alltt}
 class LBPredictorFunction {
 public:
   int num_params;
@@ -472,10 +471,10 @@ public:
   virtual void initialize_params(double *x);
 
   virtual double predict(double x, double *params) =0;
-  virtual void print(double *params) {PredictorPrintf("LB: unknown model\n");};
+  virtual void print(double *params) {PredictorPrintf("LB: unknown model");};
   virtual void function(double x, double *param, double &y, double *dyda) =0;
 };
-\end{verbatim}
+\end{alltt}
 \begin{itemize}
 \item {\tt initialize\_params} by default initializes the parameters randomly. If the user
 knows how they should be, this function can be reimplemented.
