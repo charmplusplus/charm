@@ -3,7 +3,8 @@
  *  Date Created: December 28th, 2010
  *
  *  This example is written to be used with periodic measurement-based load
- *  balancers at sync.
+ *  balancers at sync. The load of some chares changes across iterations and
+ *  depends on the index of the chare.
  *
  *
  *
@@ -56,8 +57,9 @@ int myrand(int numpes) {
 
 #define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
-#define MAX_ITER	26
+#define MAX_ITER	100
 #define LBPERIOD	5
+#define CHANGELOAD	30
 #define LEFT		1
 #define RIGHT		2
 #define TOP		3
@@ -147,7 +149,7 @@ class Stencil: public CBase_Stencil {
     // Constructor, initialize values
     Stencil() {
       __sdag_init();
-      usesAtSync=CmiTrue;
+      usesAtSync = CmiTrue;
 
       int i, j, k;
       // allocate a three dimensional array
@@ -320,19 +322,33 @@ class Stencil: public CBase_Stencil {
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
-#pragma unroll    
-      for(int k=1; k<blockDimZ+1; ++k)
-	for(int j=1; j<blockDimY+1; ++j)
-	  for(int i=1; i<blockDimX+1; ++i) {
-	    // update my value based on the surrounding values
-	    new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
-					    +  temperature[index(i+1, j, k)]
-					    +  temperature[index(i, j-1, k)]
-					    +  temperature[index(i, j+1, k)]
-					    +  temperature[index(i, j, k-1)]
-					    +  temperature[index(i, j, k+1)]
-					    +  temperature[index(i, j, k)] ) * DIVIDEBY7;
-	  } // end for
+      int itno = (int)ceil((double)iterations/(double)CHANGELOAD) * 5;
+      int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
+      int numChares = num_chare_x * num_chare_y * num_chare_z;
+      double work = 100.0;
+
+      if(index >= numChares*0.2 && index <=numChares*0.8) {
+	work = work * ((double)index/(double)numChares) + (double)itno;
+	// CkPrintf("[%d][%d][%d] %d %d %f\n", thisIndex.x, thisIndex.y, thisIndex.z, index, itno, work);
+      } else
+	work = 10.0;
+
+#pragma unroll
+      for(int w=0; w<work; w++) {
+	for(int k=1; k<blockDimZ+1; ++k)
+	  for(int j=1; j<blockDimY+1; ++j)
+	    for(int i=1; i<blockDimX+1; ++i) {
+	      // update my value based on the surrounding values
+	      new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)]
+					      +  temperature[index(i+1, j, k)]
+					      +  temperature[index(i, j-1, k)]
+					      +  temperature[index(i, j+1, k)]
+					      +  temperature[index(i, j, k-1)]
+					      +  temperature[index(i, j, k+1)]
+					      +  temperature[index(i, j, k)] )
+					      *  DIVIDEBY7;
+	    } // end for
+      }
     }
 
     // Enforce some boundary conditions
