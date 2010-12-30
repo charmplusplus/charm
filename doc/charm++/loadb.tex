@@ -5,7 +5,7 @@
 
 %(This introduction added on 11/12/2003)
 
-Charm++ supports Load Balancing, enabled by the fact there are a large
+Charm++ supports load balancing, enabled by the fact there are a large
 number of chares or chare-array-elements typically available to map to
 existing processors, and that they can be migrated at runtime.
 
@@ -43,7 +43,7 @@ processor. The seed balancer will handle such work as it arises.
 \label{lbFramework}
 \label{migrationlb}
 
-In \charmpp{}, objects(except groups, nodegroups) can migrate from 
+In \charmpp{}, objects (except groups, nodegroups) can migrate from 
 processor to processor at run-time. Object migration can potentially 
 improve the performance of the parallel program by migrating objects from 
 overloaded processors to underloaded ones. 
@@ -68,15 +68,18 @@ measurement-based load balancing without application-specific knowledge.
 
 Here are the two terms often used in \charmpp{} load balancing framework:
 \begin{itemize}
-\item \kw{Load balancing database} provides the interface of almost all
-   load balancing calls. On each processor, it stores the load
-   balancing instrumented data and coordinates the load balancing manager and
-   balancer. it is implemented as a Chare Group called {\kw LBDatabase}.
-\item \kw{Load balancer or strategy} takes the load balancing database
-   and produces the new mapping of the objects. In \charmpp{}, it is
-   implemented as Chare Group inherited from BaseLB. Two kinds of schemes are
-   implemented, they are (a) centralized load balancers and (b)
-   distributed load balancers.
+%
+\item \kw{Load balancing database} provides the interface of almost all load
+balancing calls. On each processor, it stores the load balancing instrumented
+data and coordinates the load balancing manager and balancer. it is implemented
+as a Chare Group called \kw{LBDatabase}.
+%
+\item \kw{Load balancer or strategy} takes the load balancing database and
+produces the new mapping of the objects. In \charmpp{}, it is implemented as
+Chare Group inherited from BaseLB. Three kinds of schemes are implemented: (a)
+centralized load balancers, (b) fully distributed load balancers and (c)
+hierarchical load balancers.
+%
 \end{itemize}
 
 \subsubsection{Available Load Balancing Strategies}
@@ -84,7 +87,7 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 \label{lbStrategy}
 
 Load balancing can be performed in either a centralized, fully distributed
-or hierarchical (or hybrid) fashion.
+or hierarchical fashion.
 
 In centralized approaches, the entire machine's load and communication
 structure are accumulated to a single point, typically processor 0, followed by
@@ -99,17 +102,17 @@ neighboring processors. There is no global synchronization. However,
 they will not, in general, provide an immediate restoration for load balance -
 the process is iterated until the load balance can be achieved.
 
-
 In hierarchical approaches, processors are divided into independent autonomous
 sets of processor groups and these groups are organized in hierarchies,
-therefore decentralizing the load balancing task. Hybrid strategies are used to
-load balancing load on processors inside each processor group, and processors
-across groups in a hierarchical fashion. 
+therefore decentralizing the load balancing task. Different strategies can be
+used to load balancing load on processors inside each processor group, and
+processors across groups in a hierarchical fashion.
 
-Listed below are some of the available nontrivial centralized load balancers and their brief descriptions:
+Listed below are some of the available non-trivial centralized load balancers
+and their brief descriptions:
 \begin{itemize}
 \item {\bf RandCentLB}:   Randomly assigns objects to processors;
-\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
+%\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
 \item {\bf MetisLB}:      Use Metis(tm) to partitioning object communication graph;
 \item {\bf GreedyLB}:   Use greedy algorithm, always pick the heaviest object to the least loaded processor.
 \item {\bf GreedyCommLB}:       Greedy algorithm which also takes communication graph into account;
@@ -126,9 +129,15 @@ Listed below are the distributed load balancers:
 \item {\bf WSLB}:   A load balancer for workstation clusters, which can detect load changes on desktops (and other timeshared processors) and adjust load without interferes with other's use of the desktop.
 \end{itemize}
 
-User can choose any load balancing strategy he or she thinks is good for the
-application.  The compiler and run-time options are described in section
-\ref{lbOption}.
+An example of a hierarchical strategy can be found in:
+\begin{itemize}
+\item {\bf HybridLB}: This calls GreedyLB at the lower level and RefineLB at
+the root.
+\end{itemize}
+
+Users can choose any load balancing strategy they think is good for their
+application. The compiler and run-time options are described in
+section~\ref{lbOption}.
 
 %In some cases, one may need to create and invoke multiple load balancing
 %strategies/algorithms at the different phases. \charmpp{} now supports
@@ -137,25 +146,21 @@ application.  The compiler and run-time options are described in section
 %step, and use RefineLB for the later load balancing steps.
 
 \subsubsection{Load Balancing Chare Arrays}
-
 \label{lbarray}
 
-Load balancing framework is well integrated with Chare array implementation - 
-when a chare array is created, it automatically registers its elements 
-with the load balancing framework. The instrumentation of compute time (wall/cpu time) 
-and communication pattern are done automatically and APIs are provided 
-for users to trigger the load balancing. 
+The load balancing framework is well integrated with chare array implementation
+-- when a chare array is created, it automatically registers its elements with
+the load balancing framework. The instrumentation of compute time (wall/cpu
+time) and communication pattern are done automatically and APIs are provided
+for users to trigger the load balancing.  To use the load balancer, you must
+make your array elements migratable (see migration section above) and choose a
+\kw{load balancing strategy} (see the section \ref{lbStrategy} for a
+description of available load balancing strategies).
 
-To use the load balancer, you must make your array elements migratable
-(see migration section above) and choose a \kw{load balancing strategy} 
-(see the section \ref{lbStrategy} for a description
-of available load balancing strategies).
-
-We implemented three methods to use load balancing for chare arrays
-to meet different needs of the applications. These methods
-are different in how and when a load balancing phase starts.
-The three methods are: {\bf periodic load balancing mode}, 
-{\bf automatic with Sync mode} and {\bf manual mode}.
+There are three different ways to use load balancing for chare arrays to meet
+different needs of the applications. These methods are different in how and
+when a load balancing phase starts. The three methods are: {\bf periodic load
+balancing mode}, {\bf automatic with sync mode} and {\bf manual mode}.
 
 In {\em periodic load balancing mode}, a user just needs to specify how
 often he wants the load balancing to occur, using +LBPeriod runtime
