@@ -24,5 +24,8 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o stencil3d stencil3d.prj charmrun *~
 
 test: stencil3d
-	./charmrun +p4 ./stencil3d 32 16 +balancer GreedyLB
-	./charmrun +p4 ./stencil3d 32 16 +balancer RefineLB
+	./charmrun +p4 ./stencil3d 32 16 +balancer GreedyLB $(TESTOPTS)
+	./charmrun +p4 ./stencil3d 32 16 +balancer RefineLB $(TESTOPTS)
+
+bgtest: stencil3d
+	./charmrun +p4 ./stencil3d 32 16 +balancer CommLB +x2 +y2 +z1 +cth1 +wth1
