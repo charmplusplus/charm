@@ -1,4 +1,4 @@
-DIRS	= stencil3d
+DIRS	= stencil3d kNeighbor
 
 all:
 	for d in $(DIRS); do \
