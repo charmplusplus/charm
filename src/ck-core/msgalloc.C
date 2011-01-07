@@ -8,6 +8,8 @@
 #include "ck.h"
 #include "queueing.h"
 
+CkpvDeclare(size_t *, _offsets);
+
 extern "C"
 void *CkAllocSysMsg(void)
 {

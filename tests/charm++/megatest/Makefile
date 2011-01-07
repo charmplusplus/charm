@@ -6,6 +6,7 @@ OBJS=megatest.o \
      groupring.o \
      nodering.o \
      varsizetest.o \
+     varsizetest2.o \
      varraystest.o \
      groupcast.o \
      groupmulti.o \
@@ -75,7 +76,7 @@ CIFILES =  \
       fib.def.h        megatest.def.h       priotest.def.h   tempotest.def.h  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
-      groupsectiontest.def.h multisectiontest.def.h inlineem.def.h \
+      groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
       groupmulti.def.h #priolongtest.def.h
 
 .SUFFIXES:
