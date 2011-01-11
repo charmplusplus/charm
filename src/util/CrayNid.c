@@ -7,6 +7,7 @@
  *  can be called from C++ files
  */
 
+#include <stdlib.h>
 #include "converse.h"
 
 #if CMK_CRAYXT
@@ -38,7 +39,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   /* free(nidpid); */
 
 #else	/* if it is a XT4/5 */
-  PMI_Portals_get_nid(mpirank, &nid);
+  PMI_Get_nid(mpirank, &nid);
 #endif
 
   return nid;
@@ -125,7 +126,7 @@ void pidtonid(int numpes) {
       nid2pid[i][l] = -1;
 
   for (i=0; i<numpes; i++) {
-    PMI_Portals_get_nid(i, &nid);
+    PMI_Get_nid(i, &nid);
     pid2nid[i] = nid;
 
     l = 0;
