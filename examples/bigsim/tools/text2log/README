@@ -1,0 +1,7 @@
+This tool converts a set of ASCII log#.txt files to binary bgTrace files.  Run the tool with -help for more info.
+
+While text2log does a lot of checks to ensure the output trace files are valid and can be run in BigNetSim, it may miss a few obscure cases, such as with certain parts of stand-alone events.
+
+Examples can be found in the examples.tgz tarball.  The log#.txt files are the input, the bgTrace* files are the binary output traces, and the detail* files are ASCII dumps of the bgTrace files using the LogAnalyzer tool from the BigNetSim archive.
+
+The eventTemplates.txt file contains simple fill-in-the-blank templates for events and messages that can be easily copied and pasted to create new log#.txt files.
