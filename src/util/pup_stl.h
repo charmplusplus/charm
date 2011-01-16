@@ -155,7 +155,8 @@ inline void operator|(PUP::er &p,typename std::list<T> &v)
 
 template <class V,class T,class Cmp> 
 inline void operator|(PUP::er &p,typename std::map<V,T,Cmp> &m)
-  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }
+  //{ PUP_stl_map<std::map<V,T,Cmp>,std::pair<const V,T> >(p,m); }    // 'const' confuses old version of a SUN CC compiler
+  { PUP_stl_map<std::map<V,T,Cmp>,std::pair<V,T> >(p,m); }
 template <class V,class T,class Cmp> 
 inline void operator|(PUP::er &p,typename std::multimap<V,T,Cmp> &m)
   { PUP_stl_map<std::multimap<V,T,Cmp>,std::pair<const V,T> >(p,m); }
