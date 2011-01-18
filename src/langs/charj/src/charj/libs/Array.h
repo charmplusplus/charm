@@ -8,7 +8,9 @@
 #include <iostream>
 #include <algorithm>
 #include <charm++.h>
+#if CMK_HAS_CBLAS
 #include <cblas.h>
+#endif
 
 namespace CharjArray {
   class Range {
@@ -234,6 +236,7 @@ namespace CharjArray {
       ret += v1[i] * v2[i];
     return ret;
   }
+#if CMK_HAS_CBLAS
   template <>
   float dot<float, RowMajor<1>, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv1,
 					      const Vector<float, RowMajor<1> > *pv2)
@@ -250,6 +253,7 @@ namespace CharjArray {
     assert(v1.size() == v2.size());
     return cblas_ddot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
   }
+#endif
 
   /// Computer the 1-norm of the given vector
   template<typename T, class atype>
@@ -276,6 +280,7 @@ namespace CharjArray {
       ret += v[i] * v[i];
     return sqrt(ret);
   }
+#if CMK_HAS_CBLAS
   template<>
     float norm2<float, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv)
   {
@@ -288,6 +293,7 @@ namespace CharjArray {
     const Vector<double, RowMajor<1> > &v = *pv;
     return cblas_dnrm2(v.size(), &(v[0]), 1);
   }
+#endif
 
   /// Compute the infinity (max) norm of the given vector
   // Will fail on zero-length vectors
@@ -311,6 +317,7 @@ namespace CharjArray {
     for (int i = 0; i < size; ++i)
       v[i] = t * v[i];
   }
+#if CMK_HAS_CBLAS
   template<>
     void scale<float, float, RowMajor<1> >(const float &t,
 					   Vector<float, RowMajor<1> > *pv)
@@ -325,6 +332,7 @@ namespace CharjArray {
     Vector<double, RowMajor<1> > &v = *pv;
     cblas_dscal(v.size(), t, &(v[0]), 1);
   }
+#endif
 
   /// Add one vector to a scaled version of another
   template<typename T, typename U, class atype>
@@ -337,6 +345,7 @@ namespace CharjArray {
     for (int i = 0; i < size; ++i)
       x[i] = a * x[i] + y[i];
   }
+#if CMK_HAS_CBLAS
   template<>
     void axpy<float, float, RowMajor<1> >(const float &a,
 					  const Vector<float, RowMajor<1> > *px,
@@ -359,6 +368,7 @@ namespace CharjArray {
     assert(size == y.size());
     cblas_daxpy(size, a, &(x[0]), 1, &(y[0]), 1);
   }
+#endif
 }
 
 #endif
