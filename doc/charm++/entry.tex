@@ -89,7 +89,7 @@ that skip Charm++'s priority-based message queue. It is useful for messages that
 require prompt processing however in the situation when immediate message does
 not apply. Compared with immediate message, it provides a more general solution
 that works for all Charm++ objects, i.e. Chare, Group, NodeGroup and Chare
-Array. However, skipscheduler message still needs to be scheduled in low level
+Array. However, expedited message still needs to be scheduled in low level
 Converse message queue and be processed in the order of arrival. It may still
 suffer from long running entry methods.
 
