@@ -1,20 +1,17 @@
-CPP=g++
-COPTS=-ansi -pedantic -g
+CHARMC:=../../../../../../bin/charmc
+CXX:=$(CHARMC)
+CC:=$(CHARMC)
+LD:=$(CHARMC)
+CXXFLAGS=-ansi -pedantic -g
+LDFLAGS=-seq -language c++ -lcblas
 ALL=Array
 
 all: $(ALL)
 
+test: Array
+	./Array
+
 clobber:
 	rm -rf \#*\# *~ *.o $(ALL)
 
-Array: Array.o
-	$(CPP) $(COPTS) $^ -o $@
-
-Test: Array.o Test.o
-	$(CPP) $(COPTS) $^ -o $@
-
-Array.o: Array.cpp Array.h
-Test.o: Array.o Test.cpp
-
-.cpp.o:
-	$(CPP) $(COPTS) -c $< -o $@
+Array.o: Array.h

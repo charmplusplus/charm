@@ -1,7 +1,7 @@
 package tests.unit;
 
 public class Foo {
-    public Foo(int _x) { property = _x; }
+    //public Foo(int _x) { property = _x; }
     public int property;
 }
 
@@ -18,13 +18,15 @@ public class SimpleClass {
         m.property++;
         m.property = 0;
         m.foo.property++;
-        Foo n = new Foo(m.foo.property);
-        this.method(m.property);
-        method(n.property);
-        delete n;
+        method1(m.property, m.foo);
+        //Foo n = new Foo(m.foo.property);
+        //this.method(m.property);
+        //method(n.property);
+        //delete n;
     }
 
-    void method(int x) { }
+    void method1(int x) { }
+    void method2(int x, Foo f) { }
 
     Bar get_m() {
         return m;

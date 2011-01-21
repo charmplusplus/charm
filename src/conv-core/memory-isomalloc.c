@@ -73,9 +73,13 @@ static void meta_init(char **argv)
 static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
+#if CMK_TLS_THREAD
+        int _isomalloc_thread = isomalloc_thread;
+        if (CmiThreadIs(CMI_THREAD_IS_TLS)) _isomalloc_thread = 1;
+#endif
 	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
 #if CMK_TLS_THREAD
-             && isomalloc_thread
+             && _isomalloc_thread
 #endif
            )
 	{ /*Isomalloc a new block and link it in*/

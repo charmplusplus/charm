@@ -4,12 +4,9 @@ This is a topology-aware load balancer.
 Author: Tarun Agarwal (tarun)
 Date: 04/27/2005
 ***************************************************************************/
+
 #include <math.h>
 #include <stdlib.h>
-#include "charm++.h"
-#include "cklists.h"
-#include "CentralLB.h"
-
 #include "RefineTopoLB.decl.h"
 
 #include "RefineTopoLB.h"
@@ -40,33 +37,31 @@ CmiBool RefineTopoLB::QueryBalanceNow (int _step)
   return CmiTrue;
 }
 
-void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
+void RefineTopoLB :: work(LDStats *stats)
 {
   int i, j;
-  if (_lb_args.debug() >= 2) 
-  {
+  int n_pes = stats->nprocs();
+
+  if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoLB Strategy...\n");
   }
   
   /****Make sure that there is at least one available processor.***/
   int proc;
-  for (proc = 0; proc < count; proc++) 
-  {
+  for (proc = 0; proc < n_pes; proc++) {
     if (stats->procs[proc].available)  
       break;
   }
 	
-  if (proc == count) 
-  {
+  if (proc == n_pes) {
     CmiAbort ("TopoLB: no available processors!");
   }
  
-  removeNonMigratable(stats,count);
+  removeNonMigratable(stats, n_pes);
 
-  if(_lb_debug_on)
-  {
-    CkPrintf("Num of procs: %d\n",count);
-    CkPrintf("Num of objs:  %d\n",stats->n_objs);
+  if(_lb_debug_on) {
+    CkPrintf("Num of procs: %d\n", n_pes);
+    CkPrintf("Num of objs:  %d\n", stats->n_objs);
   }
 
   /**************Initialize Topology ****************************/
@@ -80,14 +75,14 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     sprintf(str, "TopoLB> Fatal error: Unknown topology: %s", _lbtopo);
     CmiAbort(str);
   }
-  topo = topofn(count);
+  topo = topofn(n_pes);
   /**************************************************************/
   if(_lb_debug_on)
     CkPrintf("before computing partitions...\n");
   
   int *newmap = new int[stats->n_objs];
   if(_make_new_grouping_)
-    computePartitions(stats,count,newmap);
+    computePartitions(stats, n_pes, newmap);
   else
   {
     for(int i=0;i<stats->n_objs;i++)
@@ -98,41 +93,41 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   /***************** Fill Data Structures *************************/
   if(_lb_debug_on)
     CkPrintf("before allocating dataStructures...\n");
-  allocateDataStructures(count);
+  allocateDataStructures(n_pes);
   if(_lb_debug_on)
     CkPrintf("before initizlizing dataStructures...\n");
-  initDataStructures(stats,count,newmap);
+  initDataStructures(stats, n_pes, newmap);
   if(_lb_debug_on)
     CkPrintf("After initizlizing dataStructures...\n");
 
-  for(i=0;i<count;i++)
+  for(i = 0; i < n_pes; i++)
     assign[i]=i;
   
 
 
   if(_lb_debug_on)
-    printDataStructures(count, stats->n_objs,newmap);
+    printDataStructures(n_pes, stats->n_objs,newmap);
   /***************** Perform RefineMent *************************/
-  bool *swapdone=new bool[count];
-  for(i=0;i<count;i++)
+  bool *swapdone=new bool[n_pes];
+  for(i = 0; i < n_pes; i++)
     swapdone[i]=false;
 
     
-  //double hbval=getHopBytes(stats,count,stats->from_proc);
-  //double hbval=getHopBytesNew(NULL,count);
+  //double hbval=getHopBytes(stats, n_pes, stats->from_proc);
+  //double hbval=getHopBytesNew(NULL, n_pes);
  // CkPrintf(" Before Mapping Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval,hbval/total_comm);
   //Perform ith swap
   double totalGain=0;
-  for(i=0;i<count;i++)
+  for(i = 0; i < n_pes; i++)
   {
     //select the cpart which is most communicating and hasn't been moved yet
     if(_USE_MAX_HOPBYTES_)
     {
-      updateCommUA(count);
+      updateCommUA(n_pes);
     }
     int cpart=-1;
     double maxComm=-1;
-    for(j=0;j<count;j++)
+    for(j = 0; j < n_pes; j++)
     {
       if(swapdone[j]) continue;
       if(commUA[j]>maxComm)
@@ -147,15 +142,15 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     int swapcpart=-1;
     double gainMax=-1;
     double gain=-1;;
-    //double orig_value=getHopBytesNew(assign,count);
-    for(j=0;j<count;j++)
+    //double orig_value=getHopBytesNew(assign, n_pes);
+    for(j = 0; j < n_pes; j++)
     {
       if(j==cpart)
         continue;
 
-      gain=findSwapGain(j,cpart,count);
+      gain=findSwapGain(j, cpart, n_pes);
 
-      //CkPrintf("%lf : %lf\n",gain,findSwapGain(j,cpart,count));
+      //CkPrintf("%lf : %lf\n",gain,findSwapGain(j, cpart, n_pes));
       if(gain>gainMax && gain>0)
       {
         gainMax=gain;
@@ -176,8 +171,8 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
     assign[swapcpart]=temp;
     swapdone[cpart]=true;
   
-    //CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getHopBytesNew(stats,count,newmap));
-    //CkPrintf(" %lf  getHopBytesNew(stats,count,newmap);
+    //CkPrintf("Gain: %lf  Total_Gain: %lf HopBytes: %lf\n ",gainMax,totalGain,getHopBytesNew(stats, n_pes, newmap));
+    //CkPrintf(" %lf  getHopBytesNew(stats, n_pes, newmap);
     //CkPrintf("Swap# %d:  %d and %d\n",i+1,cpart,swapcpart);
   }
   /******************* Assign mapping and print Stats*********/
@@ -187,27 +182,27 @@ void RefineTopoLB :: work(CentralLB::LDStats *stats,int count)
   }
   if(_lb_debug2_on)
   {
-    //double hbval=getHopBytes(stats,count,stats->from_proc);
-    double hbval1=getHopBytesNew(NULL,count);
+    //double hbval=getHopBytes(stats, n_pes, stats->from_proc);
+    double hbval1=getHopBytesNew(NULL, n_pes);
     CkPrintf(" Original   hopBytes : %lf  Avg comm hops: %lf\n", hbval1,hbval1/total_comm);
-    double hbval2=getHopBytesNew(assign,count);
+    double hbval2=getHopBytesNew(assign, n_pes);
     CkPrintf(" Resulting  hopBytes : %lf  Avg comm hops: %lf\n", hbval2,hbval2/total_comm);
     CkPrintf(" Percentage gain %.2lf\n",(hbval1-hbval2)*100/hbval1);
     CkPrintf("\n");
   }
-  freeDataStructures(count);
+  freeDataStructures(n_pes);
   delete[] newmap;
   delete[] swapdone;
 }
 
-double RefineTopoLB::findSwapGain(int cpart1, int cpart2,int count)
+double RefineTopoLB::findSwapGain(int cpart1, int cpart2, int n_pes)
 {
   double oldvalue=0;
   int proc1=assign[cpart1];
   int proc2=assign[cpart2];
   int proci=-1;
 
-  for(int i=0;i<count;i++)
+  for(int i = 0; i < n_pes; i++)
   {
     proci=assign[i];
     if(i!=cpart1 && i!=cpart2)

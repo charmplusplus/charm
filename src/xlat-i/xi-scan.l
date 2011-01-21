@@ -144,6 +144,7 @@ struct rwtable rwtable[] = {
   "writeonly",  WRITEONLY,
   "accelblock", ACCELBLOCK,
   "memcritical", MEMCRITICAL,
+  "reductiontarget", REDUCTIONTARGET,
   "",		0
 };
 

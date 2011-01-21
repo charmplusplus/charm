@@ -582,6 +582,7 @@ void SumLogPool::shrink(void)
   for (int i=0; i<entries; i++)
   {
      pool[i].time() = pool[i*2].time() + pool[i*2+1].time();
+     pool[i].getIdleTime() = pool[i*2].getIdleTime() + pool[i*2+1].getIdleTime();
      if (sumDetail)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
@@ -613,7 +614,7 @@ void BinEntry::write(FILE* fp)
   writeU(fp, getU());
 }
 
-TraceSummary::TraceSummary(char **argv):binStart(0.0),
+TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
 					binTime(0.0),binIdle(0.0),msgNum(0)
 {
   if (CkpvAccess(traceOnPe) == 0) return;
@@ -726,18 +727,20 @@ void TraceSummary::endExecute(void)
   double ts = start;
   double nts = binStart;
 
+/*
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
     // END_PROCESSING event without seeing a preceeding BEGIN_PROCESSING
     return;
   }
+*/
 
   if (execEp == INVALIDEP) {
     TRACE_WARN("Warning: TraceSummary END_PROCESSING without BEGIN_PROCESSING!\n");
     return;
   }
 
-  if (execEp != -1)
+  if (execEp >= 0)
   {
     _logPool->setEp(execEp, t-ts);
   }
@@ -755,7 +758,7 @@ void TraceSummary::endExecute(void)
   }
   binTime += t - ts;
 
-  if (sumDetail)
+  if (sumDetail && execEp >= 0)
       _logPool->updateSummaryDetail(execEp, start, t);
 
   execEp = INVALIDEP;
@@ -763,9 +766,7 @@ void TraceSummary::endExecute(void)
 
 void TraceSummary::beginIdle(double currT)
 {
-  // for consistency with current framework behavior, currT is ignored and
-  // independent timing taken by trace-summary.
-  double t = TraceTimer();
+  double t = TraceTimer(currT);
   
   // mark the time of this idle period. Only the next endIdle should see
   // this value
@@ -782,8 +783,7 @@ void TraceSummary::beginIdle(double currT)
 
 void TraceSummary::endIdle(double currT)
 {
-  // again, we ignore the reported currT (see beginIdle)
-  double t = TraceTimer();
+  double t = TraceTimer(currT);
   double t_idleStart = idleStart;
   double t_binStart = binStart;
 
@@ -798,6 +798,18 @@ void TraceSummary::endIdle(double currT)
     t_idleStart = t_binStart;
   }
   binIdle += t - t_idleStart;
+}
+
+void TraceSummary::traceBegin(void)
+{
+    // fake as a start of an event, assuming traceBegin is called inside an
+    // entry function.
+  beginExecute(-1, -1, TRACEON_EP, -1, -1);
+}
+
+void TraceSummary::traceEnd(void)
+{
+  endExecute();
 }
 
 void TraceSummary::beginPack(void)

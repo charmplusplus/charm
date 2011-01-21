@@ -42,8 +42,9 @@ charjSource
     :   ^(CHARJ_SOURCE 
         packageDeclaration?
         importDeclaration*
-        readonlyDeclaration*
-        typeDeclaration*)
+        (externDeclaration
+        |readonlyDeclaration
+        |typeDeclaration)*)
     ;
 
 packageDeclaration
@@ -56,6 +57,10 @@ importDeclaration
 
 readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
     ;
 
 typeOfType returns [boolean array_type]
@@ -99,11 +104,11 @@ classScopeDeclaration
             ty=type IDENT f=formalParameterList a=domainExpression? 
             b=block?)
 		-> {$m.tree==null}?	^(FUNCTION_METHOD_DECL ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST PRIVATE["private"]) LOCAL_MODIFIER_LIST CHARJ_MODIFIER_LIST OTHER_MODIFIER_LIST)
-								genericTypeParameterList type IDENT formalParameterList domainExpression? block?)
+								genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> {$m.isEntry}? ^(ENTRY_FUNCTION_DECL modifierList? 
-            genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
+				genericTypeParameterList? type IDENT formalParameterList domainExpression? block?)
         -> ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList domainExpression? block?)
+				type IDENT formalParameterList domainExpression? block?)
     |   ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
     |   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
         -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
@@ -443,11 +448,6 @@ primaryExpression
                 |   SUPER
                 )
         )
-        ->   ^(ARROW primaryExpression
-                   IDENT?
-                   THIS?
-                   SUPER?
-             )
     |   parenthesizedExpression
     |   IDENT
     |   ^(METHOD_CALL primaryExpression templateInstantiation? arguments)

@@ -1,7 +1,7 @@
 // -*- mode: c++; tab-width: 4 -*-
 #include "msa/msa.h"
 class Double;
-typedef MSA2D<Double, DefaultEntry<Double,true>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
+typedef MSA::MSA2D<Double, DefaultEntry<Double,true>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
 #include "t3.decl.h"
 
@@ -279,7 +279,7 @@ class TestArray : public CBase_TestArray
 {
 protected:
     MSA2DRM arr1;       // row major
-	MSA2DRM::Read *r2;
+	MSA2DRM::Read r2;
 
     unsigned int rows1, cols1, numWorkers;
 
@@ -298,13 +298,13 @@ protected:
 
     void FindProduct(MSA2DRM::Accum &a)
     {
-        a.accumulate(arr1.getIndex(0,0), 2.0 + thisIndex);
-        a.accumulate(arr1.getIndex(0,0), 100.0 + thisIndex);
+        a(arr1.getIndex(0,0)) += 2.0 + thisIndex;
+        a(arr1.getIndex(0,0)) += 100.0 + thisIndex;
     }
 
     void TestResults()
     {
-		MSA2DRM::Read &rh = *r2;
+		MSA2DRM::Read rh = r2;
         int error1 = 0, error2 = 0, error3=0;
 
         // verify the results
@@ -352,12 +352,12 @@ public:
     {
         arr1.enroll(numWorkers); // barrier
         if(do_message) ckout << "w" << thisIndex << ": filling" << endl;
-		MSA2DRM::Write &w = arr1.getInitialWrite();
+		MSA2DRM::Write w = arr1.getInitialWrite();
         FillArray(w);
-		r2 = &arr1.syncToRead(w);
+		r2 = w.syncToRead();
         if(do_message)
 			ckout << "w" << thisIndex << ":value "
-				  << r2->get(XVAL,YVAL) << "," << r2->get(XVAL,YVAL+1)  << endl;
+				  << r2.get(XVAL,YVAL) << "," << r2.get(XVAL,YVAL+1)  << endl;
 //         (arr1.getCacheGroup()).emitBufferValue(6, 0);
         if(do_message)
 			ckout << "w" << thisIndex << ": syncing" << endl;
@@ -372,17 +372,17 @@ public:
         if(do_message) ckout << thisIndex << ": testing after fillarray, sync, and redn" << endl;
         TestResults();
 
-		MSA2DRM::Accum &a = arr1.syncToAccum(*r2);
+		MSA2DRM::Accum a = r2.syncToAccum();
 
         if(do_message) ckout << thisIndex << ": producting" << endl;
         FindProduct(a);
 
-		r2 = &arr1.syncToRead(a);
+		r2 = a.syncToRead();
 //         if(do_message) ckout << thisIndex << ": tetsing after product" << endl;
 //      TestResults();
 
         // Print out the accumulated element.
-        ckout << "p" << CkMyPe() << "w" << thisIndex << ":" << r2->get(0,0) << endl;
+        ckout << "p" << CkMyPe() << "w" << thisIndex << ":" << r2.get(0,0) << endl;
 
         Contribute();
     }

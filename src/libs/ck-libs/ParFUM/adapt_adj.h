@@ -203,10 +203,10 @@ class adjReply {
 
 
 typedef ElemList<adjRequest> AdjRequestList;
-typedef MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
+typedef MSA::MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
 
 typedef ElemList<adjReply> AdjReplyList;
-typedef MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREPLYLIST;
+typedef MSA::MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREPLYLIST;
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);

@@ -268,6 +268,7 @@ compilationUnit
 topLevelDeclaration
     :   importDeclaration
     |   readonlyDeclaration
+    |   externDeclaration
     |   typeDeclaration
     ;
 
@@ -282,6 +283,10 @@ importDeclaration
 
 readonlyDeclaration
     :   READONLY^ localVariableDeclaration ';'!
+    ;
+
+externDeclaration
+    :   EXTERN^ qualifiedIdentifier ';'!
     ;
 
 typeDeclaration
@@ -349,23 +354,37 @@ typeList
     ;
 
 classScopeDeclaration
-    :   modifierList?
-        (   genericTypeParameterList?
-            (   type IDENT formalParameterList (';' | block)
-                ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT
-                    formalParameterList block?)
-            |   ident=IDENT formalParameterList block
-                ->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT
-                        formalParameterList block)
-            )
-        |   type IDENT formalParameterList divconBlock
-            ->  ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
-        |   simpleType classFieldDeclaratorList ';'
-            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
-        |   objectType classFieldDeclaratorList ';'
-            ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
-        )
+    :   functionMethodDeclaration
+	|	constructorDeclaration
+	|	divconMethodDeclaration
+	|	primitiveVariableDeclaration
+	|	objectVariableDeclaration
     ;
+
+functionMethodDeclaration
+	:	modifierList? genericTypeParameterList? type IDENT formalParameterList (';' | block)
+		->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList block?)
+	;
+
+constructorDeclaration
+	:	modifierList? genericTypeParameterList? ident=IDENT formalParameterList block
+		->  ^(CONSTRUCTOR_DECL[$ident, "CONSTRUCTOR_DECL"] modifierList? genericTypeParameterList? IDENT formalParameterList block)
+	;
+
+divconMethodDeclaration
+	:	modifierList? type IDENT formalParameterList divconBlock
+		->  ^(DIVCON_METHOD_DECL modifierList? type IDENT formalParameterList divconBlock)
+	;
+
+primitiveVariableDeclaration
+	:	modifierList? simpleType classFieldDeclaratorList ';'
+		->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
+	;
+
+objectVariableDeclaration
+	:	modifierList? objectType classFieldDeclaratorList ';'
+		->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
+	;
 
 interfaceScopeDeclaration
     :   modifierList?
@@ -508,7 +527,7 @@ objectType
         ->  ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   qualifiedTypeIdent domainExpression?
         ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
-	|	MOD qualifiedTypeIdent AT
+	|	qualifiedTypeIdent '[' MOD ']' AT
 		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent)
     ;
 
@@ -592,11 +611,19 @@ blockStatement
     ;
 
 localVariableDeclaration
-    :   localModifierList? simpleType classFieldDeclaratorList
+    :	primitiveVarDeclaration
+	|   objectVarDeclaration
+	;
+
+primitiveVarDeclaration
+	:	localModifierList? simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType classFieldDeclaratorList)
-    |   localModifierList? objectType classFieldDeclaratorList
+	;
+
+objectVarDeclaration
+	:	localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
-    ;
+	;
 
 statement
     :   nonBlockStatement

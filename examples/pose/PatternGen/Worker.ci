@@ -1,0 +1,9 @@
+message WorkerInitMsg;
+message WorkMsg;
+
+poser Worker : sim adapt4 chpt {
+  entry Worker(WorkerInitMsg *);
+  // Event methods
+  entry [event] void recvMessage(WorkMsg *);
+  entry [event] void pattern1Iter(WorkMsg *);
+};

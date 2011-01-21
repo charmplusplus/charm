@@ -372,6 +372,8 @@ int n;
   machine_exit(1);
 }
 
+CpvExtern(int, freezeModeFlag);
+
 static void KillOnAllSigs(int sigNo)
 {
   const char *sig="unknown signal";
@@ -382,8 +384,15 @@ static void KillOnAllSigs(int sigNo)
   already_in_signal_handler=1;
 
   if (CpvAccess(cmiArgDebugFlag)) {
+    int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
+#if ! CMK_BLUEGENE_CHARM
+    CcsSendReplyNoError(4,&reply);/*Send an empty reply if not*/
+    CpvAccess(freezeModeFlag) = 1;
+    CpdFreezeModeScheduler();
+#else
     CpdFreeze();
+#endif
   }
   
   CmiDestoryLocks();		/* destory locks */
@@ -677,6 +686,8 @@ static skt_ip_t   Cmi_charmrun_IP; /*Address of charmrun machine*/
 static int        Cmi_charmrun_port;
 static int        Cmi_charmrun_pid;
 static int        Cmi_charmrun_fd=-1;
+/* Magic number to be used for sanity check in messege header */
+static int 				Cmi_net_magic;
 
 static int    Cmi_netpoll;
 static int    Cmi_asyncio;
@@ -707,7 +718,16 @@ static void parse_forks(void) {
   }
 }
 #endif
-
+static void parse_magic(void)
+{
+	char* nm;	
+	int nread;
+  nm = getenv("NETMAGIC");
+  if (nm!=0) 
+  {/*Read values set by Charmrun*/
+        nread = sscanf(nm, "%d",&Cmi_net_magic);
+	}
+}
 static void parse_netstart(void)
 {
   char *ns;
@@ -2762,6 +2782,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   skt_set_abort(net_default_skt_abort);
   atexit(machine_atexit_check);
   parse_netstart();
+  parse_magic();
 #if ! CMK_SMP && ! defined(_WIN32)
   /* only get forks in non-smp mode */
   parse_forks();
@@ -2851,13 +2872,15 @@ static void sendPerMsgHandler(char *msg)
 {
   int msgSize;
   void *destAddr, *destSizeAddr;
+  int ep;
 
   msgSize = CmiMsgHeaderGetLength(msg);
-  msgSize -= 2*sizeof(void *);
-  destAddr = *(void **)(msg + msgSize);
-  destSizeAddr = *(void **)(msg + msgSize + sizeof(void*));
+  msgSize -= (2*sizeof(void *)+sizeof(int));
+  ep = *(int*)(msg+msgSize);
+  destAddr = *(void **)(msg + msgSize + sizeof(int));
+  destSizeAddr = *(void **)(msg + msgSize + sizeof(int) + sizeof(void*));
 /*CmiPrintf("msgSize:%d destAddr:%p, destSizeAddr:%p\n", msgSize, destAddr, destSizeAddr);*/
-  CmiSetHandler(msg, CmiGetXHandler(msg));
+  CmiSetHandler(msg, ep);
   *((int *)destSizeAddr) = msgSize;
   memcpy(destAddr, msg, msgSize);
 }
@@ -2876,20 +2899,22 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 /*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destpe=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), slot->destPE, slot->destAddress, size);*/
 
   if (slot->destAddress[0]) {
-    int newsize = size + sizeof(void *)*2;
+    int oldep = CmiGetHandler(m);
+    int newsize = size + sizeof(void *)*2 + sizeof(int);
     char *newmsg = (char*)CmiAlloc(newsize);
     memcpy(newmsg, m, size);
-    memcpy(newmsg+size, &slot->destAddress[0], sizeof(void *));
-    memcpy(newmsg+size+sizeof(void*), &slot->destSizeAddress[0], sizeof(void *));
+    memcpy(newmsg+size, &oldep, sizeof(int));
+    memcpy(newmsg+size+sizeof(int), &slot->destAddress[0], sizeof(void *));
+    memcpy(newmsg+size+sizeof(int)+sizeof(void*), &slot->destSizeAddress[0], sizeof(void *));
     CmiFree(m);
-    CmiMsgHeaderSetLength(newmsg, size + sizeof(void *)*2);
-    CmiSetXHandler(newmsg, CmiGetHandler(newmsg));
+    CmiMsgHeaderSetLength(newmsg, newsize);
     CmiSetHandler(newmsg, persistentSendMsgHandlerIdx);
     phs = NULL; phsSize = 0;
     CmiSyncSendAndFree(slot->destPE, newsize, newmsg);
   }
   else {
 #if 1
+    /* buffer until ready */
     if (slot->messageBuf != NULL) {
       CmiPrintf("Unexpected message in buffer on %d\n", CmiMyPe());
       CmiAbort("");
@@ -2932,7 +2957,7 @@ int PumpPersistent()
     if (size > 0)
     {
       char *msg = slot->messagePtr[0];
-/*CmiPrintf("size: %d msg:%p %p\n", size, msg, slot->messagePtr);*/
+/*CmiPrintf("[%d] size: %d rank:%d msg:%p %p\n", CmiMyPe(), size, CMI_DEST_RANK(msg), msg, slot->messagePtr);*/
 
 #if 0
       void *dupmsg;
@@ -2986,6 +3011,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     memset(buf, 0, maxBytes+sizeof(int)*2);
     slot->messagePtr[i] = buf;
     slot->recvSizePtr[i] = (unsigned int*)CmiAlloc(sizeof(unsigned int));
+    *(slot->recvSizePtr[0]) = 0;
   }
   slot->sizeMax = maxBytes;
 }

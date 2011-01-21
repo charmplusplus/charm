@@ -16,7 +16,7 @@
 /*************************************************************************
 * The following macro returns a random number in the specified range
 **************************************************************************/
-#if defined(__VC__) || defined(__CYGWIN__) || defined(WIN32) 
+#if defined(__VC__) || defined(__CYGWIN__) || defined(WIN32) || defined(_WINDOWS)
 #define RandomInRange(u) ((rand()>>3)%(u))
 #else
 #define RandomInRange(u) ((int)(1.0*(u)*rand()/(RAND_MAX+1.0)))

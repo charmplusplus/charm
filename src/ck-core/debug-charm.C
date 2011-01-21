@@ -1035,30 +1035,29 @@ extern "C" {
 
 void CpdCharmInit()
 {
-  CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
-  //CpdListRegister(new CpdListAccessor_c("converse/memory/leak",cpd_memory_length,0,cpd_memory_leak,0));
-  CpdListRegister(new CpdListAccessor_c("converse/memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
+  CpdListRegister(new CpdListAccessor_c("memory/list",cpd_memory_length,0,cpd_memory_pup,0));
+  CpdListRegister(new CpdListAccessor_c("memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
 
   //CpdBreakPointInit();
-  CcsRegisterHandler("ccs_set_break_point",(CmiHandler)CpdSetBreakPoint);
-  CcsSetMergeFn("ccs_set_break_point",CcsMerge_logical_and);
-  CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
-  CcsSetMergeFn("ccs_remove_break_point",CcsMerge_logical_and);
-  CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
-  CcsSetMergeFn("ccs_remove_all_break_points",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
-  CcsSetMergeFn("ccs_continue_break_point",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
-  CcsSetMergeFn("ccs_single_step",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
-  CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
+  CcsRegisterHandler("debug/charm/bp/set",(CmiHandler)CpdSetBreakPoint);
+  CcsSetMergeFn("debug/charm/bp/set",CcsMerge_logical_and);
+  CcsRegisterHandler("debug/charm/bp/remove",(CmiHandler)CpdRemoveBreakPoint);
+  CcsSetMergeFn("debug/charm/bp/remove",CcsMerge_logical_and);
+  CcsRegisterHandler("debug/charm/bp/removeall",(CmiHandler)CpdRemoveAllBreakPoints);
+  CcsSetMergeFn("debug/charm/bp/removeall",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/charm/continue",(CmiHandler)CpdContinueFromBreakPoint);
+  CcsSetMergeFn("debug/charm/continue",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/charm/next",(CmiHandler)CpdDeliverSingleMessage);
+  CcsSetMergeFn("debug/charm/next",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/converse/quit",(CmiHandler)CpdQuitDebug);
+  CcsSetMergeFn("debug/converse/quit",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/converse/startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
-  CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
-  CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
-  CcsRegisterHandler("endConditional",(CmiHandler)CpdEndConditionalDelivery);
-  CcsRegisterHandler("commitConditional",(CmiHandler)CpdCommitConditionalDelivery);
+  CcsRegisterHandler("debug/charm/deliver",(CmiHandler)CpdDeliverMessage);
+  CcsRegisterHandler("debug/provisional/deliver",(CmiHandler)CpdDeliverMessageConditionally);
+  CcsRegisterHandler("debug/provisional/rollback",(CmiHandler)CpdEndConditionalDelivery);
+  CcsRegisterHandler("debug/provisional/commit",(CmiHandler)CpdCommitConditionalDelivery);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());

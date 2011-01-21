@@ -1,18 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
 #include <math.h>
-#include "charm++.h"
-#include "BaseLB.h"
 #include "HbmLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"
@@ -563,7 +554,7 @@ void HbmLB::reportLBQulity(double mload, double mCpuLoad, double totalload, int 
   }
 }
 
-void HbmLB::work(LDStats* stats,int count)
+void HbmLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   CkPrintf("[%d] HbmLB::work called!\n", CkMyPe());

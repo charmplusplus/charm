@@ -814,6 +814,7 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("$count) {\n");
 	    $first = 0;
 	    $outChandle->print("#ifndef CMK_OPTIMIZE\n");
+	    $outChandle->print("  dop_override_evt = (POSE_TimeType)-1;\n");
 	    $outChandle->print("  if(pose_config.stats)\n");
 	    $outChandle->print("    if (!CpvAccess(stateRecovery)) {localStats->Do();\n");
 	    $outChandle->print("    if(pose_config.dop)\n");
@@ -829,7 +830,11 @@ foreach my $incfile ($inC,@otherfiles)
 	    $outChandle->print("      et = CmiWallTimer();\n");
 	    $outChandle->print("      eq->currentPtr->ert = eq->currentPtr->srt + (et-st);\n");
 	    $outChandle->print("      ((state_$key *) objID)->ort = eq->currentPtr->ert+0.000001;\n");
-	    $outChandle->print("      eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
+	    $outChandle->print("      if (dop_override_evt >= (POSE_TimeType)0) {\n");
+	    $outChandle->print("        eq->currentPtr->evt = dop_override_evt;\n");
+	    $outChandle->print("      } else {\n");
+	    $outChandle->print("        eq->currentPtr->evt = ((state_$key *) objID)->OVT();\n");
+	    $outChandle->print("      }\n");
 	    $outChandle->print("    }\n");
 	    $outChandle->print("    localStats->SwitchTimer(SIM_TIMER);}\n");
 	    $outChandle->print("#endif\n");

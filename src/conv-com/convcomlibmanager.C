@@ -148,11 +148,13 @@ void *comlibReceiveTableHandler(void *msg) {
       // delete the old strategy. Since it is requested, it is safe
       delete current;
       current = NULL;
+      CkpvAccess(conv_com_object).decrementNumStrats(); 
     }
     if (current == NULL) {
       // if current is NULL either the strategy has never been set yet, or we
       // are replacing it
       CkpvAccess(conv_com_object).setStrategy(sw.position[i], sw.strategy[i]);
+      CkpvAccess(conv_com_object).incrementNumStrats(); 
     } else {
       // let's delete the incoming strategy since it is not used
       delete sw.strategy[i];

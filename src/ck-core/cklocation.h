@@ -70,6 +70,7 @@ public:
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
+extern CkGroupID _fastArrayMapID;
 class CkLocMgr;
 class CkArrMgr;
 
@@ -347,6 +348,7 @@ public:
 public:
   void ckFinishConstruction(void) { }
 #endif
+
 #if CMK_OUT_OF_CORE
 private:
   friend class CkLocMgr;
@@ -356,9 +358,8 @@ private:
   int prefetchObjID; //From CooRegisterObject
   CmiBool isInCore; //If true, the object is present in memory
 #endif
-	/*
-		FAULT_EVAC
-	*/
+
+  // FAULT_EVAC
   void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   CmiBool isAsyncEvacuate(){return asyncEvacuate;};
@@ -429,7 +430,7 @@ class CkMagicNumber : public CkMagicNumber_impl {
 	inline void check(const char *file,int line,void *obj) const {
 		if (magic!=good) badMagicNumber(good,file,line,obj);
 	}
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #   define CK_MAGICNUMBER_CHECK magic.check(__FILE__,__LINE__,this);
 #else
 #   define CK_MAGICNUMBER_CHECK /*empty, for speed*/
@@ -570,7 +571,7 @@ public:
 //Interface used by CkLocRec_local
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif

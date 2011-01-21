@@ -4,7 +4,8 @@ mainmodule hello {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void done(void);
+    entry void done(std::map<int, int> x);
+    //entry void done(std::vector<int> x);
   };
 
   array [1D] Hello {

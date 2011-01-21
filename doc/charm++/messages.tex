@@ -530,22 +530,22 @@ priority field is specified in bits, it is always padded to an integral number
 of {\tt int}s.  A pointer to the priority part of the message buffer can be
 obtained with this call:
 
-\function{unsigned int *CkPriorityPtr(MsgType msg)}
+\function{void *CkPriorityPtr(MsgType msg)}
 \index{CkPriorityPtr}
 \index{priority pointer}
 
-There are two kinds of priorities which can be attached to a message:
-{\sl integer priorities}\index{integer priorities} and {\sl bitvector
+There are two kinds of priorities which can be attached to a message: {\sl
+integer priorities}\index{integer priorities} and {\sl bitvector
 priorities}\index{bitvector priorities}.  Integer priorities are quite
-straightforward.  One allocates a message, setting aside enough space
-(in bits) in the message to hold the priority, which is an integer.
-One then stores the priority in the message.  Finally, one informs the
-system that the message contains an integer priority using
-\kw{CkSetQueueing}:
+straightforward.  One allocates a message with an extra integer parameter to
+``new'' (see the first line of the example below), which sets aside enough
+space (in bits) in the message to hold the priority.  One then stores the
+priority in the message.  Finally, one informs the system that the message
+contains an integer priority using \kw{CkSetQueueing}:
 
 \begin{alltt}
   MsgType *msg = new (8*sizeof(int)) MsgType;
-  *CkPriorityPtr(msg) = prio;
+  *(int*)CkPriorityPtr(msg) = prio;
   CkSetQueueing(msg, CK_QUEUEING_IFIFO);
 \end{alltt}
 

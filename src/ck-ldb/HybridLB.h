@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,8 +6,6 @@
 #ifndef HYBRIDLB_H
 #define HYBRIDLB_H
 
-#include "charm++.h"
-#include "BaseLB.h"
 #include "CentralLB.h"
 #include "HybridBaseLB.h"
 #include "HybridLB.decl.h"
@@ -36,7 +27,7 @@ protected:
 
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual void work(LDStats* stats,int count);
+  virtual void work(LDStats* stats);
 
 };
 

@@ -13,7 +13,7 @@ template<class StateType> class chpt : public rep {
   chpt() : sinceLast(pose_config.store_rate){ }
   /// Destructor
   virtual ~chpt() { }
-  void registerTimestamp(int idx, eventMsg *m, int offset);
+  void registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset);
   /// Checkpoint the state
   void checkpoint(StateType *data);          
   /// Restore the state from a checkpoint
@@ -30,7 +30,7 @@ template<class StateType> class chpt : public rep {
 
 /// Timestamps event message, sets priority, and records in spawned list
 template<class StateType> 
-inline void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, int offset)
+inline void chpt<StateType>::registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset)
 {
   m->Timestamp(ovt+offset);
   m->setPriority(ovt+offset-POSE_TimeMax);

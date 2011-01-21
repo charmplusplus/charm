@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -31,7 +24,7 @@ private:
 	CmiBool QueryBalanceNow(int step);
 	void copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
 	void updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats);
-	void work(BaseLB::LDStats* stats, int count);
+	void work(LDStats* stats);
 };
 
 #endif /* _PHASEBYARRAYLB_H_ */

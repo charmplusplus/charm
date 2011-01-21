@@ -12,26 +12,29 @@ mainmodule streaming {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void finishTimeoutTest(void);
-    entry void finishMaxCountTest(void);
-    entry void finishMaxMsgSizeTest(void);
-    entry void finishArrayStreaming(void);
-    entry void finishMigrate(void);		
+    entry void finishStartup();
+    entry void finishTimeoutTest();
+    entry void finishMaxCountTest();
+    entry void finishMaxMsgSizeTest();
+    entry void finishArrayStreaming();
+    entry void finishMigrate();		
   };
 
   array[1D] StreamingArray {
-    entry StreamingArray(void);			
-    entry void testStreamingTimeout(void);
+    entry StreamingArray();			
+    entry void simpleTest(); 
+    entry void simpleReceive(streamingMessage *m); 
+    entry void testStreamingTimeout();
     entry void receiveAfterTimeout(streamingMessage *m);
-    entry void testStreamingMaxCount(void);
+    entry void testStreamingMaxCount();
     entry void receiveWithoutTimeout(streamingMessage *m);
     entry void receiveGroupAfterTimeout(streamingMessage *m);
-    entry void testStreamingMaxMsgSize(void);
+    entry void testStreamingMaxMsgSize();
     entry void receiveLargeMessage(streamingMessage *m);
-    entry void testStreamingMaxBufSize(void);
+    entry void testStreamingMaxBufSize();
     entry void receiveAfterMaxBufSizeReached(streamingMessage *m);
     entry void receiveAndIgnore(streamingMessage *m);
-    entry void migrate(void);
+    entry void migrate();
   };
 
 };

@@ -84,9 +84,10 @@ charjSource[SymbolTable symtab, OutputMode m]
     this.mode_ = m;
 }
     :   ^(CHARJ_SOURCE (p=packageDeclaration)? 
-        (i+=importDeclaration)*
-        (r+=readonlyDeclaration)*
-        (t+=typeDeclaration)*)
+        ((i+=importDeclaration)
+        |(r+=readonlyDeclaration)
+        |externDeclaration
+        |(t+=typeDeclaration))*)
         -> {emitCC()}? charjSource_cc(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         -> {emitCI()}? charjSource_ci(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
         -> {emitH()}? charjSource_h(basename={basename()}, pd={$p.names}, imports={$i}, types={$t}, ros={$r}, debug={debug()})
@@ -111,6 +112,11 @@ readonlyDeclaration
         -> {emitCI()}? template(bn={basename()}, v={$lvd.st}) "readonly <v>"
         -> {emitH()}? template(v={$lvd.st}) "extern <v>"
         -> {emitCC()}? {$lvd.st;}
+        ->
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
         ->
     ;
     
@@ -142,6 +148,7 @@ typeDeclaration
             currentClass = (ClassSymbol)$IDENT.def;
 
             inits = currentClass.generateInits(currentClass.initializers);
+            pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
         (csds+=classScopeDeclaration)*)
         -> {emitCC()}? classDeclaration_cc(
@@ -149,12 +156,15 @@ typeDeclaration
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
                 csds={$csds},
+                pupInits={pupInits},
+                pupers={currentClass.generatePUPers()},
                 inits={inits})
         -> {emitH()}?  classDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                needsPupInit={pupInits.size() > 0})
         ->
     |   ^('template' (i0+=IDENT*) ^('class' i1=IDENT (^('extends' su=type))? (^('implements' type+))? (csds+=classScopeDeclaration)*))
         -> {emitH()}? templateDeclaration_h(
@@ -250,22 +260,12 @@ classScopeDeclaration
         -> {emitCI()}? // do nothing, since it's not an entry method
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=domainExpression[null]?) 
-        -> {emitCI()}?  funcMethodDecl_ci(
-                modl={$m.st}, 
-                gtpl={$g.st}, 
-                ty={$ty.st},
-                id={$IDENT.text}, 
-                fpl={$f.st}, 
-                block={null})
-        ->
-    |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
             ty=type IDENT f=formalParameterList a=domainExpression[null]? 
             {
                 currentMethod = (MethodSymbol)$IDENT.def;
                 sdagMethod = currentMethod.hasSDAG;
             }
-            b=block) 
+            b=block?) 
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
@@ -381,6 +381,8 @@ interfaceScopeDeclaration
 
 variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_list_sdag_ci(var_decls={$var_decls})
         -> var_decl_list(var_decls={$var_decls})
     ;
 
@@ -388,6 +390,8 @@ variableDeclarator[StringTemplate obtype]
     :   ^(VAR_DECLARATOR id=variableDeclaratorId initializer=variableInitializer[obtype]?)
         -> {emitCC()}? var_decl_cc(id={$id.st}, initializer={$initializer.st})
         -> {emitH()}?  var_decl_h(id={$id.st}, initializer={$initializer.st})
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                var_decl_sdag_ci(id={currentClass.getSDAGLocalName($id.st.toString())}, initializer={$initializer.st})
         -> {emitCI()}? var_decl_ci(id={$id.st}, initializer={$initializer.st})
         ->
     ; 
@@ -587,8 +591,8 @@ nonProxyType
 proxyType
     :   ^(PROXY_TYPE qualifiedTypeIdent domainExpression[null]?)
         -> proxy_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
-	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?) // TODO array sections
-		-> template() "not implemented yet"
+	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression[null]?)
+		-> template(type={$qualifiedTypeIdent.st}) "CProxySection_<type>"
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -666,6 +670,8 @@ formalParameterVarargDecl
     
 qualifiedIdentifier
     :   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($text)}) "<t>"
         -> template(t={$text}) "<t>"
     |   ^(DOT qualifiedIdentifier IDENT)
         -> template(t={$text}) "<t>"
@@ -697,7 +703,7 @@ sdagBlock
 sdagBasicBlock
     :   sdagStatement
         -> {$sdagStatement.st}
-    |   (s+=statement)+
+    |   (s+=blockStatement)+
         -> block_atomic(s={$s})
     ;
     
@@ -711,11 +717,15 @@ blockStatement
 
 localVariableDeclaration
     :   ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType vdl=variableDeclaratorList[null])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$simpleType.st},
             declList={$vdl.st})
     |   ^(OBJECT_VAR_DECLARATION localModifierList? objectType vdl=variableDeclaratorList[$objectType.st])
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+                local_var_decl_sdag_ci(declList={$vdl.st})
         -> local_var_decl(
             modList={$localModifierList.st},
             type={$objectType.st},
@@ -957,6 +967,8 @@ primaryExpression
     |   parenthesizedExpression
         -> {$parenthesizedExpression.st}
     |   IDENT
+        -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
+           template(t={currentClass.getSDAGLocalName($IDENT.text)}) "<t>"
         -> {%{$IDENT.text}}
     |   CHELPER
         -> {%{"constructorHelper"}}

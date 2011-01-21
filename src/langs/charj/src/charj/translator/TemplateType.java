@@ -23,4 +23,10 @@ public class TemplateType extends Symbol implements Type {
 
         return baseType.getTypeName() + "<" + sb.toString() + ">";
     }
+
+	// TODO dummy implementation so as to compile
+	public String getTranslatedTypeName()
+	{
+		return getTypeName();
+	}
 }

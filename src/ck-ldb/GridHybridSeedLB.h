@@ -1,11 +1,6 @@
 #ifndef _GRIDHYBRIDSEEDLB_H_
 #define _GRIDHYBRIDSEEDLB_H_
 
-#include <stdio.h>
-
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDHYBRIDSEEDLB_MODE 0
@@ -93,7 +88,7 @@ class GridHybridSeedLB : public CentralLB
     GridHybridSeedLB (CkMigrateMessage *msg);
 
     CmiBool QueryBalanceNow (int step);
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:

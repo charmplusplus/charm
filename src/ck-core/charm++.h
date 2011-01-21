@@ -18,6 +18,12 @@ public: static int __idx;
 };
 #define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
 
+#ifdef __GNUC__
+#define UNUSED __attribute__ ((unused))
+#else
+#define UNUSED
+#endif
+
 #include "pup.h"
 #include "cklists.h"
 #include "ckbitvector.h"
@@ -100,7 +106,8 @@ public:
                               prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -113,7 +120,8 @@ public:
 		prioStore=integerPrio;
 	}
 	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -126,7 +134,8 @@ public:
 	}
 	inline void setPriority(const CkBitVector &cbv) {
 		if ( cbv.data != NULL ) {
-			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                             queueingtype != CK_QUEUEING_ILIFO ) {
 				delete [] prioPtr;
 				prioBits = 0;
 			}
@@ -1220,7 +1229,8 @@ static const char *idx2str(const CkArrayIndex &ind) {
   return retBuf;
 }
 
-static const char *idx2str(const ArrayElement *el) {
+static const char *idx2str(const ArrayElement *el) UNUSED;
+static const char *idx2str(const ArrayElement* el) {
   return idx2str(el->thisIndexMax);
 }
 

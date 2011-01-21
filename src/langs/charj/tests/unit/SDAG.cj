@@ -9,6 +9,11 @@ public mainchare Main {
     }
 }
 
+public class Foo {
+    public Foo() {}
+    public int m;
+}
+
 public chare SDAG_Test{
 
     public entry SDAG_Test() {
@@ -22,6 +27,11 @@ public chare SDAG_Test{
     public entry void third(int t);
 
     public entry void test1() {
+        int xx, yy = 1;
+        int zz = yy;
+        Main@ main_proxy;
+        Foo moo_instance = new Foo();
+
         x(0);
         overlap { 
             when first(int f) { x(f); }
@@ -30,9 +40,9 @@ public chare SDAG_Test{
         x(1);
         x(2);
         for (int i=0; i<10; ++i) {
-            x(3);
+            x(i);
             for (int j=0; j<10; ++j) {
-                x(4);
+                x(i+j);
                 x(5);
             }
             for (int j=0; j<10; ++j) {

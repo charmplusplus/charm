@@ -2,11 +2,6 @@
 #define _GRIDCOMMREFINELB_H_
 
 #include <limits.h>
-#include <stdio.h>
-
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDCOMMREFINELB_TOLERANCE 1.10
@@ -54,7 +49,7 @@ class GridCommRefineLB : public CentralLB
     GridCommRefineLB (CkMigrateMessage *msg);
 
     CmiBool QueryBalanceNow (int step);
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:

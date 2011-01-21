@@ -588,6 +588,7 @@ int CmiIsFortranLibraryCall() {
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
+          || strncmp(trimmed, "_gfortran_", 10) == 0 
 	 )
           {  /* CmiPrintf("[%d] NAME:%s\n", CmiMyPe(), trimmed); */
              ret = 1; break; }
@@ -3087,6 +3088,9 @@ extern void CmiIsomallocInit(char **argv);
 void CmiIOInit(char **argv);
 #endif
 
+/* defined in cpuaffinity.c */
+extern void CmiInitCPUAffinityUtil();
+
 static void CmiProcessPriority(char **argv)
 {
   int dummy, nicelevel=-100;      /* process priority */
@@ -3226,6 +3230,7 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
 #endif
 
+  CmiInitCPUAffinityUtil();
   CmiArgInit(argv);
   CmiMemoryInit(argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN

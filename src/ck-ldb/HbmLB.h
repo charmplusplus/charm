@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,8 +6,6 @@
 #ifndef HBMLB_H
 #define HBMLB_H
 
-#include "charm++.h"
-#include "BaseLB.h"
 #include "CentralLB.h"
 #include "HbmLB.decl.h"
 
@@ -123,8 +114,8 @@ private:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  //virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-  virtual void work(LDStats* stats,int count);
+  //virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual void work(LDStats* stats);
 
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index

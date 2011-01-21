@@ -6,10 +6,12 @@ AC_CONFIG_HEADER(conv-autoconfig.h)
 CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
-#keep it a decimal
-VERSION=60301
+# Decimal representation of Charm++ release line and API revision
+# Increment the last 2 digits when making an API change
+# Increase the first three after branching for a release
+VERSION=60303
 echo $VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
+AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
@@ -44,7 +46,7 @@ then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
 else
-  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [disable tracing])
+  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
 fi
 
 AC_ARG_ENABLE([charmdebug],
@@ -78,8 +80,10 @@ AC_ARG_ENABLE([controlpoint],
             [enable_controlpoint=$enableval],
             [enable_controlpoint=yes])
 
-if test "$enable_controlpoint" = "no"
+if test "$enable_controlpoint" = "yes"
 then
+  AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 1, [enable controlpoint])
+else
   Echo "Charm control point is disabled"
   AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
 fi
@@ -256,8 +260,8 @@ test_linkso() {
         AC_MSG_CHECKING("$1")
 	echo $1 >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
@@ -303,6 +307,15 @@ test_finish() {
 if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
 then
   AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
+fi
+
+# detect OS
+OSNAME=`uname -s`
+if test $OSNAME = "Linux"
+then
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 1, [OS is Linux])
+else
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 0, [OS is Linux])
 fi
 
 # test cp -p
@@ -585,30 +598,6 @@ EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
 
-##### check if the stl headers use .h #####
-cat > $t <<EOT
-#include <iostream>
-void foo(void) { std::cout<<"Hello, world"<<std::endl; }
-EOT
-test_cxx "whether including STL <foo> works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail, [including STL <foo> does not works])
-AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass, [including STL <foo> works])
-
-#### check if std::vector works ######
-cat > $t <<EOT
-#include <vector>
-
-int foo(void) {
-  std::vector<int> v;      
-  v.push_back(2); v.push_back(3);
-  std::vector<int>::iterator it=v.begin();
-  it++;
-  return *it;
-}
-EOT
-test_cxx "whether the std:: names for STL work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass, [whether the std:: names for STL work])
-
 #### check if namespaces can be defined #####
 cat > $t <<EOT
 namespace foo {
@@ -659,6 +648,21 @@ int foo()
 EOT
 test_cxx "whether std::distance is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_DISTANCE, $pass, [whether std::distance works])
+
+#### check if std::inserter is defined #####
+cat > $t <<EOT
+#include <list>
+#include <iterator>
+
+void foo()
+{
+  using namespace std;
+  list<int> L;
+  inserter ( L, L.end ( ) ) = 500;
+}
+EOT
+test_cxx "whether std::inserter is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
 
 
 #### test if we can have multiple delete like this ####
@@ -1495,10 +1499,8 @@ EOT
 		test_linkso "whether can build shared library with MPI" "yes" "no" ""
 		BUILD_SHARED=$pass
 	fi
-	if test $BUILD_SHARED -eq 1
+	if test $BUILD_SHARED -eq 0
 	then
-		add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
-	else
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 	fi
 fi

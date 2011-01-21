@@ -196,7 +196,7 @@ bool ComlibManager::shouldBufferMessagesNow(int instid){
 void ComlibManager::sendBufferedMessagesAllStrategies(){
   int nstrats = converseManager->getNumStrats();
   for(int i=0;i<nstrats;i++){
-    sendBufferedMessages(i);
+    sendBufferedMessages(i+1);
   }
 }
 

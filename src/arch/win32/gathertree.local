@@ -1,0 +1,25 @@
+#!/bin/bash
+
+[ ! -d $1 ] && exit 0
+[ ! -d $2 ] && mkdir $2
+
+SYSLN='ln -s -f'
+[ $OS = Windows_NT ] && SYSLN='ln -f'
+
+pushd $1 > /dev/null
+SRC=`pwd`
+popd > /dev/null
+
+pushd $2 > /dev/null
+DST=`pwd`
+popd > /dev/null
+
+cd $SRC
+for file in `find . -name CVS -prune -o -print`
+do
+	if [ -d $file ]; then
+		mkdir -p $DST/$file
+	elif [ -f $file ]; then
+		$SYSLN $SRC/$file $DST/$file
+	fi
+done

@@ -4,15 +4,7 @@
 /// Basic Constructor
 eventQueue::eventQueue()
 {
-  if(pose_config.dop){
-    sprintf(filename, "dop%d.log", CkMyPe());
-    fp = fopen(filename, "a");
-    if (fp == NULL) {
-      CkPrintf("ERROR: unable to open DOP file %s for append\n");
-      CkAbort("Error opening file");
-    }
-    lastLoggedVT = 0;
-  }
+  lastLoggedVT = 0;
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
   largest = POSE_UnsetTS;
@@ -153,34 +145,24 @@ void eventQueue::InsertEventDeterministic(Event *e)
 #endif
 }
 
-void eventQueue::CommitStatsHelper(Event *commitPtr)
-{
+void eventQueue::CommitStatsHelper(Event *commitPtr) {
 #ifndef CMK_OPTIMIZE
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-  if(pose_config.stats){
+  if (pose_config.stats) {
     localStats->Commit();
   }
 
-  if(pose_config.dop)
-    {
-      fpos_t fptr;
-      // if more than one event occurs at the same virtual time on this object, 
-      // only count the first event
-      if (lastLoggedVT >= commitPtr->svt)
-	commitPtr->svt = commitPtr->evt = -1;
-      else lastLoggedVT = commitPtr->evt;
-#if USE_LONG_TIMESTAMPS
-      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, 
-		      commitPtr->svt, commitPtr->evt))
-	fsetpos(fp, &fptr);
-#else
-      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, 
-		      commitPtr->svt, commitPtr->evt))
-	fsetpos(fp, &fptr);
-#endif
-      fgetpos(fp, &fptr);
-      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+  if (pose_config.dop) {
+    // if more than one event occurs at the same virtual time on this object, 
+    // only count the first event
+    if (lastLoggedVT >= commitPtr->svt) {
+      commitPtr->svt = commitPtr->evt = -1;
+    } else {
+      lastLoggedVT = commitPtr->evt;
     }
+    localStats->WriteDopData(commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt);
+    localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+  }
 #endif
 }
 

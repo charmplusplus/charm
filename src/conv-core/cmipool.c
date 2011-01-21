@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$ 
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /* adapted by Eric Bohm from Sanjay Kale's pplKalloc */
 
@@ -19,14 +13,14 @@
 
 #include "cmipool.h"
 
-CpvDeclare(char **, bins);
-CpvDeclare(int *, binLengths);
-CpvDeclare(int, maxBin);
-CpvDeclare(int, numKallocs);
-CpvDeclare(int, numMallocs);
-CpvDeclare(int, numOallocs);
-CpvDeclare(int, numFrees);
-CpvDeclare(int, numOFrees);
+CpvStaticDeclare(char **, bins);
+CpvStaticDeclare(int *, binLengths);
+CpvStaticDeclare(int, maxBin);
+CpvStaticDeclare(int, numKallocs);
+CpvStaticDeclare(int, numMallocs);
+CpvStaticDeclare(int, numOallocs);
+CpvStaticDeclare(int, numFrees);
+CpvStaticDeclare(int, numOFrees);
 
 /* Each block has a 8 byte header.
    This contains the pointer to the next  block, when 
@@ -48,6 +42,7 @@ extern void free_nomigrate(void *mem);
 void CmiPoolAllocInit(int numBins)
 {
   int i;
+  if (CpvInitialized(bins)) return;
   CpvInitialize(char **, bins);
   CpvInitialize(int *, binLengths);
   CpvInitialize(int, maxBin);
@@ -62,7 +57,7 @@ void CmiPoolAllocInit(int numBins)
   for (i=0; i<numBins; i++) CpvAccess(bins)[i] = NULL;
   for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
 
-    CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
+  CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
 }
 
 #ifdef CMK_OPTIMIZE

@@ -1,19 +1,10 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
+#include "elements.h"
+#include "ckheap.h"
 #include "RefineLB.h"
 
 CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach average")
@@ -25,26 +16,28 @@ RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
     CkPrintf("[%d] RefineLB created\n",CkMyPe());
 }
 
-void RefineLB::work(BaseLB::LDStats* stats, int count)
+void RefineLB::work(LDStats* stats)
 {
   int obj;
+  int n_pes = stats->nprocs();
+
   //  CkPrintf("[%d] RefineLB strategy\n",CkMyPe());
 
-  // RemoveNonMigratable(stats, count);
+  // RemoveNonMigratable(stats, n_pes);
 
   // get original object mapping
-  int* from_procs = Refiner::AllocProcs(count, stats);
+  int* from_procs = Refiner::AllocProcs(n_pes, stats);
   for(obj=0;obj<stats->n_objs;obj++)  {
     int pe = stats->from_proc[obj];
     from_procs[obj] = pe;
   }
 
   // Get a new buffer to refine into
-  int* to_procs = Refiner::AllocProcs(count,stats);
+  int* to_procs = Refiner::AllocProcs(n_pes, stats);
 
   Refiner refiner(1.003);  // overload tolerance=1.05
 
-  refiner.Refine(count,stats,from_procs,to_procs);
+  refiner.Refine(n_pes, stats, from_procs, to_procs);
 
   // Save output
   for(obj=0;obj<stats->n_objs;obj++) {

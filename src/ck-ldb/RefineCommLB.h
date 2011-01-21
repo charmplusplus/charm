@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -21,9 +14,6 @@
 class minheap;
 class maxheap;
 
-#include "elements.h"
-#include "ckheap.h"
-
 void CreateRefineCommLB();
 BaseLB *AllocateRefineCommLB();
 
@@ -33,7 +23,7 @@ public:
   RefineCommLB(CkMigrateMessage *m):RefineLB(m) {}
 private:
   CmiBool QueryBalanceNow(int step);
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 
 protected:
 };

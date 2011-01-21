@@ -431,9 +431,9 @@ print << "EOF";
 	
 Choose a set of compiler flags [1-5]
 	1) none
-	2) debug                      -g -O0
-	3) optimized [default]        -O2
-	4) optimized no projections   -O2 -DCMK_OPTIMIZE
+	2) debug mode                        -g -O0
+	3) production build [default]        --with-production
+	4) production build w/ projections   --with-production --enable-tracing
 	5) custom
 	
 EOF
@@ -448,10 +448,10 @@ while($line = <>){
 		$compiler_flags = "-g -O0";
 		last;
 	} elsif($line eq "4" ){
- 		$compiler_flags = "-O2 -DCMK_OPTIMIZE";
+ 		$compiler_flags = "--with-production --enable-tracing";
 		last;
 	} elsif($line eq "3" || $line eq ""){ 
-                $compiler_flags = "-O2"; 
+                $compiler_flags = "--with-production";
                 last; 
         }  elsif($line eq "5"){
 

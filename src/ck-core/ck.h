@@ -19,7 +19,7 @@
 #include "ckfutures.h"
 #include "charisma.h"
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)
 #else
 #define _CHECK_VALID(p, msg) do { } while(0)

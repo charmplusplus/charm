@@ -1,9 +1,0 @@
-module Comm1LB {
-
-extern module CentralLB;
-initnode void lbinit(void);
-group [migratable] Comm1LB : CentralLB {
-  entry void Comm1LB(CkLBOptions &);  
-};
-
-};

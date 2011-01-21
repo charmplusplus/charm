@@ -1465,31 +1465,40 @@ Array::genSubDecls(XStr& str)
   //Add specialized indexing for these common types
     if (indexSuffix==(const char*)"1D")
     {
-    str <<
-    "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
-    "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
+    str << "    " << etype << " operator [] (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
+	<< "    " << etype <<" operator () (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex2D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex3D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"4D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex4D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"5D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex5D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"6D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex6D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(idx), CK_DELCTOR_CALL);}\n";
     }
     str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
@@ -2894,8 +2903,6 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   if (constructAppend != 0) {
     constructs->append(constructAppend);
   }
-  else
-    constructAppend = 0;
   elist = el;
 }
 
@@ -3116,6 +3123,15 @@ void Entry::genChareDefs(XStr& str)
     }
     str << "}\n";
   }
+  if (isReductionTarget()) {
+      XStr retStr; retStr<<retType;
+      str << retType << " " << indexName(); //makeDecl(retStr, 1)
+      str << "::_" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n"
+          << "  char* impl_buf = (char*)m->getData();\n";
+      XStr precall;
+      genCall(str, precall);
+      str << "  delete m;\n}\n\n";
+  }
 }
 
 void Entry::genChareStaticConstructorDecl(XStr& str)
@@ -3201,17 +3217,19 @@ void Entry::genArrayDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
       str << "  "<<container->baseName()<<" *obj = ckLocal();\n";
-      str << "#ifndef CMK_OPTIMIZE\n";
+      str << "#if CMK_ERROR_CHECKING\n";
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+      if (!isNoTrace())
+	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg," << epIdx()
+	      << ",CkMyPe(), 0, ((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
@@ -3397,12 +3415,12 @@ void Entry::genGroupDefs(XStr& str)
 "    the_lbdb->ObjectStop(objHandle);\n"
 "  }\n"
 "#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n"
@@ -4227,6 +4245,9 @@ void Entry::genIndexDecls(XStr& str)
   }
   if (param->isMarshalled()) {
     str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
+  }
+  if (isReductionTarget()) {
+    str << "    static void _" << name << "_redn_wrapper(CkReductionMsg* m);\n";
   }
 }
 

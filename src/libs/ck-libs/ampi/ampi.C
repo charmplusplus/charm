@@ -2119,7 +2119,7 @@ ampi::bcast(int root, void* buf, int count, int type,MPI_Comm destcomm)
 void
 ampi::bcastraw(void* buf, int len, CkArrayID aid)
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, 0);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(-1, MPI_BCAST_TAG, -1, 0, len, MPI_COMM_WORLD);
   memcpy(msg->data, buf, len);
   CProxy_ampi pa(aid);
   pa.generic(msg);
@@ -5764,6 +5764,42 @@ CDECL
 int AMPI_System(const char *cmd) {
 	return TCHARM_System(cmd);
 }
+
+#if CMK_BLUEGENE_CHARM
+
+extern "C" void startCFnCall(void *param,void *msg)
+{
+  BgSetStartEvent();
+  ampi *ptr = (ampi*)param;
+  ampi::bcastraw(NULL, 0, ptr->getProxy());
+  delete (CkReductionMsg*)msg;
+}
+
+CDECL
+int AMPI_Set_startevent(MPI_Comm comm)
+{
+  AMPIAPI("AMPI_BgSetStartEvent");
+  CmiAssert(comm == MPI_COMM_WORLD);
+
+  ampi *ptr = getAmpiInstance(comm);
+
+  CkDDT_DataType *ddt_type = ptr->getDDT()->getType(MPI_INT);
+
+  CkReductionMsg *msg=makeRednMsg(ddt_type, NULL, 0, MPI_INT, MPI_SUM);
+  if (CkMyPe() == 0) {
+    CkCallback allreduceCB(startCFnCall, ptr);
+    msg->setCallback(allreduceCB);
+  }
+  ptr->contribute(msg);
+
+  /*HACK: Use recv() to block until the reduction data comes back*/
+  if(-1==ptr->recv(MPI_BCAST_TAG, -1, NULL, 0, MPI_INT, MPI_COMM_WORLD))
+    CkAbort("AMPI> MPI_Allreduce called with different values on different processors!");
+
+    printf("AMPI_Set_startevent done %d\n", CkMyPe());
+  return 0;
+}
+#endif
 
 #if CMK_CUDA
 GPUReq::GPUReq()

@@ -1,0 +1,8 @@
+mainmodule Pgm {
+  extern module Worker;
+  readonly CkChareID mainhandle;
+  
+  mainchare main {
+    entry main();
+  };
+};

@@ -1,6 +1,6 @@
 /* conv-autoconfig.h.in.  Generated from configure.in by autoheader.  */
 
-/* Charm++ version number */
+/* Charm++ Release/API version number */
 #undef CHARM_VERSION
 
 /* whether C++ bool works */
@@ -177,6 +177,9 @@
 /* whether std::distance works */
 #undef CMK_HAS_STD_DISTANCE
 
+/* whether std::inserter works */
+#undef CMK_HAS_STD_INSERTER
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 
@@ -213,6 +216,9 @@
 /* whether namespaces work */
 #undef CMK_NAMESPACES_BROKEN
 
+/* OS is Linux */
+#undef CMK_OS_IS_LINUX
+
 /* whether is power7 */
 #undef CMK_POWER7
 
@@ -237,12 +243,6 @@
 /* whether size_t 64bit */
 #undef CMK_SIZET_64BIT
 
-/* including STL <foo> works */
-#undef CMK_STL_DONT_USE_DOT_H
-
-/* including STL <foo> does not works */
-#undef CMK_STL_USE_DOT_H
-
 /* Allows switching TLS in 32-bit. */
 #undef CMK_TLS_SWITCHING32
 
@@ -252,7 +252,7 @@
 /* Allows __thread. */
 #undef CMK_TLS_THREAD
 
-/* disable tracing */
+/* enable tracing */
 #undef CMK_TRACE_ENABLED
 
 /* whether glibc backtrace works */
@@ -266,9 +266,6 @@
 
 /* whether the poll syscall exists */
 #undef CMK_USE_POLL
-
-/* whether the std:: names for STL work */
-#undef CMK_USE_STL
 
 /* disable controlpoint */
 #undef CMK_WITH_CONTROLPOINT
@@ -287,6 +284,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION

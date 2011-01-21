@@ -1,4 +1,7 @@
 #!/bin/sh
+
+[ -x ./gathertree.local ]  && exec ./gathertree.local $@
+
 if [ "x$SYSTEMLN" = "x" ]; then SYSTEMLN="./system_ln"; fi
 
 SRC=$1

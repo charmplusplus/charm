@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file BGPTorus.h
  *  Author: Abhinav S Bhatele
  *  Date created: May 21st, 2007  
@@ -49,8 +42,8 @@ class BGPTorusManager {
       hw_NY = bgp_hwt.ySize;
       hw_NZ = bgp_hwt.zSize;
     
-      procsPerNode = bgp_hwt.tSize;  
-      int numPes = CmiNumPes();      
+      procsPerNode = bgp_hwt.tSize;
+      int numPes = CmiNumPes();
       thdsPerProc = CmiMyNodeSize();
       
       hw_NT = procsPerNode*thdsPerProc;      

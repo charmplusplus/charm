@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -211,7 +204,7 @@ public:
   // END IMPLEMENTATION FOR FUTURE PREDICTOR
 
   LBMigrateMsg* callStrategy(LDStats* stats,int count){
-    return Strategy(stats,count);
+    return Strategy(stats);
   };
 
   int cur_ld_balancer;
@@ -219,11 +212,17 @@ public:
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
-  void preprocess(LDStats* stats,int count);
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-  virtual void work(LDStats* stats,int count);
-  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  void preprocess(LDStats* stats);
+  virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual void work(LDStats* stats);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
+
+  // Not to be used -- maintained for legacy applications
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
+    return Strategy(stats);
+  }
+
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  

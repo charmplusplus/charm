@@ -1,16 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
-/**
-***  Copyright (c) 1995, 1996, 1997, 1998, 1999, 2000 by
-***  The Board of Trustees of the University of Illinois.
-***  All rights reserved.
-**/
-
 /**
  * \addtogroup CkLdb
 */
@@ -19,7 +6,7 @@
 #ifndef _HEAP_H_
 #define _HEAP_H_
 
-#include "elements.h"
+class InfoRecord;
 
 class heapRecord
 { public:

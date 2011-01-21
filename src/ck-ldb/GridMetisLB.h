@@ -1,11 +1,6 @@
 #ifndef _GRIDMETISLB_H_
 #define _GRIDMETISLB_H_
 
-#include <stdio.h>
-
-#include "charm++.h"
-#include "cklists.h"
-
 #include "CentralLB.h"
 
 #define CK_LDB_GRIDMETISLB_MODE 0
@@ -86,7 +81,7 @@ class GridMetisLB : public CentralLB
     GridMetisLB (CkMigrateMessage *msg);
 
     CmiBool QueryBalanceNow (int step);
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
     void pup (PUP::er &p) { CentralLB::pup (p); }
 
   private:

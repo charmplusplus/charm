@@ -1,9 +1,10 @@
 mainmodule lb_test {
   extern module Topo;
 
-  readonly CkChareID mid;
+  readonly CProxy_main mainProxy;
   readonly CkGroupID topoid;
-  readonly CProxy_Lb_array hproxy;
+  readonly CProxy_Lb_array lbproxy;
+
   readonly int element_count;
   readonly int step_count;
   readonly int print_count;
