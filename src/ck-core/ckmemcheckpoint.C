@@ -1187,7 +1187,7 @@ void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   crashed_node = node;
-  CmiAssert(CmiMyPe() != crashed_node);
+  CmiAssert(CmiMyNode() != crashed_node);
   CkMemCheckPT::inRestarting = 1;
 
 #ifdef CMK_SMP
