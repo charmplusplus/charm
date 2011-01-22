@@ -10,22 +10,27 @@ typedef struct {
 /* is equivalent to DCQUAD, but without including dmcf.h */
 #endif
 
+
 /* handle type definition */
+/* sender is the one who initiates the request.
+   recver is the one who receives the request.
+   Put: sender=source recver=target of the one-sided buffer operation
+   Get: sender=target recver=source of the one-sided buffer operation
+*/
 struct infiDirectUserHandle{
-	int handle;
-	int senderNode;
-	int recverNode;
-	void *recverBuf;
-	int recverBufSize;
+    int handle;
+    int senderNode;
+    int recverNode;
+    void *recverBuf;
+    int recverBufSize;
 #ifdef CMK_BLUEGENEP
     void *senderBuf;
     void (*callbackFnPtr)(void *);
     void *callbackData;
-    /*DCMF_Request_t *DCMF_rq_t;*/
-    void  *DCMF_rq_trecv;
-#endif
-#ifdef CMK_BLUEGENEP
-	void *DCMF_rq_tsend;
+    void *DCMF_rq_trecv;
+    void *DCMF_rq_tsend;
+    cmkquad DCMF_recverMemregion[2];/* DCMF_MEMREGION_NQUADS==1, 2 is overkill*/
+    cmkquad DCMF_senderMemregion[2];
 #else
 	char recverKey[64];
 #endif

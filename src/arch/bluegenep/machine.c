@@ -242,9 +242,11 @@ DCMF_Protocol_t  cmi_dcmf_eager_registration __attribute__((__aligned__(16)));
 DCMF_Protocol_t  cmi_dcmf_rzv_registration   __attribute__((__aligned__(16)));
 DCMF_Protocol_t  cmi_dcmf_multicast_registration   __attribute__((__aligned__(16)));
 
-#define BGP_USE_RDMA 1
-/*#define CMI_DIRECT_DEBUG 1*/
-#ifdef BGP_USE_RDMA
+
+//#define BGP_USE_AM_DIRECT 1
+#define BGP_USE_RDMA_DIRECT 1
+//#define CMI_DIRECT_DEBUG 1
+#ifdef BGP_USE_AM_DIRECT
 
 
 DCMF_Protocol_t  cmi_dcmf_direct_registration __attribute__((__aligned__(16)));
@@ -316,6 +318,73 @@ DCMF_Request_t * direct_first_pkt_recv_done (void              * clientdata,
 
 
 #endif
+
+#ifdef BGP_USE_RDMA_DIRECT
+static struct DCMF_Callback_t dcmf_rdma_cb_ack;
+
+
+DCMF_Protocol_t  cmi_dcmf_direct_put_registration __attribute__((__aligned__(16)));
+
+DCMF_Protocol_t  cmi_dcmf_direct_rdma_registration __attribute__((__aligned__(16)));
+/** The receive side of a DCMF_Put notification implemented in DCMF_Send */
+
+typedef struct {
+  void (*callbackFnPtr)(void *);
+    void *callbackData;
+} dcmfDirectRDMAMsgHeader;
+
+
+
+#if (DCMF_VERSION_MAJOR >= 2)
+void direct_send_rdma_done_cb(void*nothing, DCMF_Error_t *err) 
+#else 
+  void direct_send_rdma_done_cb(void*nothing) 
+#endif
+{
+#if CMI_DIRECT_DEBUG
+  CmiPrintf("[%d] RDMA send_rdma_done_cb result %d\n", CmiMyPe());
+#endif
+
+
+}
+
+DCMF_Callback_t  directcb;
+
+void     direct_short_rdma_pkt_recv (void             * clientdata,
+                                const DCQuad     * info,
+                                unsigned           count,
+                                unsigned           senderrank,
+                                const char       * buffer,
+                                const unsigned     sndlen) {
+#if CMI_DIRECT_DEBUG
+    CmiPrintf("[%d] RDMA direct_short_rdma_pkt_recv\n", CmiMyPe());
+#endif
+    dcmfDirectRDMAMsgHeader *msgHead=  (dcmfDirectRDMAMsgHeader *) info;
+    (*(msgHead->callbackFnPtr))(msgHead->callbackData);
+}
+
+
+#if (DCMF_VERSION_MAJOR >= 2)
+typedef void (*cbhdlr) (void *, DCMF_Error_t *);
+#else
+typedef void (*cbhdlr) (void *);
+#endif
+
+DCMF_Request_t * direct_first_rdma_pkt_recv_done (void              * clientdata,
+        const DCQuad      * info,
+        unsigned            count,
+        unsigned            senderrank,
+        const unsigned      sndlen,
+        unsigned          * rcvlen,
+        char             ** buffer,
+        DCMF_Callback_t   * cb
+                                            ) {
+    CmiAbort("direct_first_rdma_pkt_recv should not be called");
+}
+
+
+#endif
+
 
 typedef struct msg_list {
     char              * msg;
@@ -786,7 +855,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     DCMF_Send_register (&cmi_dcmf_eager_registration, &eager_config);
     DCMF_Send_register (&cmi_dcmf_rzv_registration,   &rzv_config);
 
-#ifdef BGP_USE_RDMA
+#ifdef BGP_USE_AM_DIRECT
     DCMF_Send_Configuration_t direct_config;
     direct_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
     direct_config.cb_recv_short = direct_short_pkt_recv;
@@ -801,6 +870,25 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     directcb.clientdata=NULL;
 #endif
 
+#ifdef BGP_USE_RDMA_DIRECT
+    /* notification protocol */
+    DCMF_Send_Configuration_t direct_rdma_config;
+    direct_rdma_config.protocol      = DCMF_DEFAULT_SEND_PROTOCOL;
+    direct_rdma_config.cb_recv_short = direct_short_rdma_pkt_recv;
+    direct_rdma_config.cb_recv       = direct_first_rdma_pkt_recv_done;
+#if (DCMF_VERSION_MAJOR >= 3)
+    direct_rdma_config.network  = DCMF_DEFAULT_NETWORK;
+#elif (DCMF_VERSION_MAJOR == 2)
+    direct_rdma_config.network  = DCMF_DefaultNetwork;
+#endif
+    DCMF_Send_register (&cmi_dcmf_direct_rdma_registration,   &direct_rdma_config);
+    directcb.function=direct_send_rdma_done_cb;
+    directcb.clientdata=NULL;
+    /* put protocol */
+   DCMF_Put_Configuration_t put_configuration = { DCMF_DEFAULT_PUT_PROTOCOL };
+   DCMF_Put_register (&cmi_dcmf_direct_put_registration, &put_configuration);
+    
+#endif
     //fprintf(stderr, "Initializing Eager Protocol\n");
 
     _Cmi_numnodes = DCMF_Messager_size();
@@ -1993,7 +2081,7 @@ side
 
 
 
-#ifdef BGP_USE_RDMA
+#ifdef BGP_USE_AM_DIRECT
 
 #include "cmidirect.h"
 
@@ -2109,5 +2197,179 @@ void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle) {
     /* no op on BGP */
 }
 
-#endif /* BGP_USE_RDMA*/
+#endif /* BGP_USE_AM_DIRECT*/
+
+#ifdef BGP_USE_RDMA_DIRECT
+
+#include "cmidirect.h"
+
+/* 
+   Notification protocol passes callback function and data in a single
+   quadword.  This occurs in a message triggered by the sender side ack
+   callback and therefore has higher latency than polling, but is guaranteed
+   to be semantically correct.  The latency for a single packet that isn't
+   hitting charm/converse should be pretty minimal, but you could run into
+   sender side progress issues.  The alternative of polling on the out of band
+   byte scheme creates correctness issues in that the data really has to be
+   out of band and you rely on the buffer being written in order.  It also has
+   annoying polling issues.  A third scheme could add a second put to a
+   control region to poll upon and force sequential consistency between
+   puts. Its not really clear that this would be faster or avoid the progress
+   issue since you run into the same issues to enforce that sequential
+   consistency.
+
+   EJB   2011/1/20
+*/
+
+
+/* local function to use the ack as our signal to send a remote notify */
+static void CmiNotifyRemoteRDMA(void *handle, struct DCMF_Error_t *error)
+{
+    struct infiDirectUserHandle *userHandle= (struct infiDirectUserHandle *) handle;
+    dcmfDirectRDMAMsgHeader msgHead;
+    msgHead.callbackFnPtr=userHandle->callbackFnPtr;
+    msgHead.callbackData=userHandle->callbackData;
+#if CMK_SMP
+    DCMF_CriticalSection_enter (0);
+#endif
+#if CMI_DIRECT_DEBUG
+    CmiPrintf("[%d] RDMA notify put addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p \n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+    DCMF_Result res=DCMF_Send (&cmi_dcmf_direct_rdma_registration,
+	       (DCMF_Request_t *) userHandle->DCMF_rq_tsend,
+	       directcb, DCMF_MATCH_CONSISTENCY, userHandle->recverNode,
+	       sizeof(msgHead), &msgHead,
+	       (struct DCQuad *) &(msgHead), 1);
+//    CmiAssert(res==DCMF_SUCCESS);
+#if CMK_SMP
+    DCMF_CriticalSection_exit (0);
+#endif    
+}
+
+/**
+ To be called on the receiver to create a handle and return its number
+**/
+
+
+struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue) {
+    /* one-sided primitives require registration of memory */
+    struct infiDirectUserHandle userHandle;
+    size_t numbytesRegistered=0;
+    DCMF_Result regresult=DCMF_Memregion_create( (DCMF_Memregion_t*) &userHandle.DCMF_recverMemregion,
+						 &numbytesRegistered,
+						 recvBufSize,
+						 recvBuf,
+						 0);
+    CmiAssert(numbytesRegistered==recvBufSize);
+    CmiAssert(regresult==DCMF_SUCCESS);
+    
+
+    userHandle.handle=1; /* doesn't matter on BG/P*/
+    userHandle.senderNode=senderNode;
+    userHandle.recverNode=_Cmi_mynode;
+    userHandle.recverBufSize=recvBufSize;
+    userHandle.recverBuf=recvBuf;
+    userHandle.initialValue=initialValue;
+    userHandle.callbackFnPtr=callbackFnPtr;
+    userHandle.callbackData=callbackData;
+    userHandle.DCMF_rq_trecv=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+#if CMI_DIRECT_DEBUG
+    CmiPrintf("[%d] RDMA create addr %p %d callback %p callbackdata %p\n",CmiMyPe(),userHandle.recverBuf,userHandle.recverBufSize, userHandle.callbackFnPtr, userHandle.callbackData);
+#endif
+    return userHandle;
+}
+
+/****
+ To be called on the sender to attach the sender's buffer to this handle
+******/
+
+void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize) {
+    dcmf_rdma_cb_ack.function=CmiNotifyRemoteRDMA;
+    dcmf_rdma_cb_ack.clientdata=(void *) userHandle; 	
+
+    /* one-sided primitives would require registration of memory */
+    userHandle->senderBuf=sendBuf;
+    CmiAssert(sendBufSize==userHandle->recverBufSize);
+    userHandle->DCMF_rq_tsend =ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+    size_t numbytesRegistered=0;
+    DCMF_Result regresult=DCMF_Memregion_create( (DCMF_Memregion_t*) &userHandle->DCMF_senderMemregion,
+						 &numbytesRegistered,
+						 sendBufSize,
+						 sendBuf,
+						 0);
+    CmiAssert(numbytesRegistered==sendBufSize);
+    CmiAssert(regresult==DCMF_SUCCESS);
+
+#if CMI_DIRECT_DEBUG
+    CmiPrintf("[%d] RDMA assoc addr %p %d to receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,sendBufSize, userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+
+}
+
+
+/****
+To be called on the sender to do the actual data transfer
+******/
+void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
+    /** invoke a DCMF_Pur with the direct callback */
+
+    CmiAssert(userHandle->recverBuf!=NULL);
+    CmiAssert(userHandle->senderBuf!=NULL);
+    CmiAssert(userHandle->recverBufSize>0);
+    if (userHandle->recverNode== _Cmi_mynode) {     /* local copy */
+#if CMI_DIRECT_DEBUG
+        CmiPrintf("[%d] RDMA local put addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+
+        CmiMemcpy(userHandle->recverBuf,userHandle->senderBuf,userHandle->recverBufSize);
+        (*(userHandle->callbackFnPtr))(userHandle->callbackData);
+    } else {
+        dcmfDirectRDMAMsgHeader msgHead;
+	/*   msgHead.recverBuf=userHandle->recverBuf;*/
+        msgHead.callbackFnPtr=userHandle->callbackFnPtr;
+        msgHead.callbackData=userHandle->callbackData;
+/*        msgHead.DCMF_rq_t=(DCMF_Request_t *) userHandle->DCMF_rq_trecv;*/
+#if CMK_SMP
+        DCMF_CriticalSection_enter (0);
+#endif
+#if CMI_DIRECT_DEBUG
+        CmiPrintf("[%d] RDMA put addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+	DCMF_Result 
+	    Res= DCMF_Put(&cmi_dcmf_direct_put_registration,
+			  (DCMF_Request_t *) userHandle->DCMF_rq_tsend,
+			  directcb, DCMF_RELAXED_CONSISTENCY, 
+			  userHandle->recverNode,
+			  userHandle->recverBufSize,
+			  (DCMF_Memregion_t*) userHandle->DCMF_senderMemregion,
+			  (DCMF_Memregion_t*) userHandle->DCMF_recverMemregion,
+			  0, /* offsets are zero */
+			  0, 
+			  dcmf_rdma_cb_ack
+			  );
+	CmiAssert(Res==DCMF_SUCCESS); 
+
+
+#if CMK_SMP
+        DCMF_CriticalSection_exit (0);
+#endif
+    }
+}
+
+/**** Should not be called the first time *********/
+void CmiDirect_ready(struct infiDirectUserHandle *userHandle) {
+    /* no op on BGP */
+}
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyPollQ(struct infiDirectUserHandle *userHandle) {
+    /* no op on BGP */
+}
+
+/**** Should not be called the first time *********/
+void CmiDirect_readyMark(struct infiDirectUserHandle *userHandle) {
+    /* no op on BGP */
+}
+
+#endif /* BGP_USE_RDMA_DIRECT*/
 
