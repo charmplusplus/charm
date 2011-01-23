@@ -60,9 +60,7 @@ thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
 \index{entry method}entry methods of its node group are executing in the same
 node.  If one exclusive method of a node group is executing on node 0, and
 another one is scheduled to run on that same node, the second exclusive method
-will wait for the first to finish before it executes.  To make an \index{entry
-method}entry method exclusive, add the keyword \kw{exclusive} to that
-entry method's attribute list.
+will wait for the first to finish before it executes.
 
 \index{nokeep}\item[nokeep] entry methods tells Charm++ that messages passed to
 these user entry methods will not be kept by the calls. Charm++ runtime
