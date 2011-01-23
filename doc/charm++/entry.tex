@@ -44,10 +44,10 @@ an entry method:
 \kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
-\index{threaded}\item[threaded] \index{entry method}entry methods are simply entry
-methods which are run in their own nonpreemptible threads.  To make an
-\index{entry method}entry method threaded, one simply adds the keyword
-\kw{threaded} to the attribute list of that entry method.
+\index{threaded}\item[threaded] \index{entry method}entry methods are
+entry methods which are run in their own nonpreemptible threads. These
+entry methods may perform blocking operations, such as calls to a
+\kw{sync} entry method, or explicitly suspend themselves.
 
 \index{sync}\item[sync] \index{entry method}entry methods are special in that calls to
 sync entry methods are blocking - they do not return control to the caller
