@@ -52,9 +52,8 @@ entry methods may perform blocking operations, such as calls to a
 \index{sync}\item[sync] \index{entry method}entry methods are special in that calls to
 sync entry methods are blocking - they do not return control to the caller
 until the method is finished executing completely.  Sync methods may have
-return values; however, they may only return messages.  To make an \index{entry
-method}entry method a sync entry method, add the keyword \kw{sync} to the
-attribute list of that entry method.
+return values; however, they may only return messages. Callers must run in a
+thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
 
 \index{exclusive}\item[exclusive] entry methods, which exist only on node groups, are
 \index{entry method}entry methods that do not execute while other exclusive
