@@ -76,15 +76,11 @@ node may execute any other {\em exclusive} method of that
 execute other {\em non-exclusive} methods of that nodegroup
 \index{branch}branch, however.
 
-The local \index{branch}branch of a \kw{nodegroup} can be accessed using
-\kw{CkLocalNodeBranch()} function. Thus data members could be accessed/modified
-or methods could be invoked on a \index{branch}branch of a \kw{nodegroup} using
-this function. Note that such accesses are {\em not} thread-safe by default.
-Concurrent invocation of a method on a \index{nodegroup}nodegroup by different
-processors within a node may result in unpredictable runtime behavior.  One way
-to avoid this is to use node-level locks (described in Converse manual.)
-
-\kw{CkLocalNodeBranch} returns a generic ({\tt void *}) pointer, similar to
-\kw{CkLocalBranch}.  Also, the static method \kw{ckLocalNodeBranch} of the
-proxy class of appropriate \index{nodegroup}nodegroup can be called to get the
-correct type of pointer.
+The local \index{branch}branch of a \kw{nodegroup} \uw{NG}, and hence
+its member fields and methods, can be accessed through the method
+\kw{NG* CProxy\_NG::ckLocalBranch()} of its proxy. Note that such
+accesses are {\em not} thread-safe by default.  Concurrent invocation
+of a method on a \index{nodegroup}nodegroup by different processors
+within a node may result in unpredictable runtime behavior.  One way
+to avoid this is to use node-level locks (described in Converse
+manual.)
