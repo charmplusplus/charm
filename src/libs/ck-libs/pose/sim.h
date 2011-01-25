@@ -221,7 +221,7 @@ class sim : public CBase_sim {
   int *srVector;    
   /// Most recent GVT estimate
   POSE_TimeType lastGVT;
-  /// Relative start time, start time, end time and current time
+  /// Relative start time, end time, and current time
   /** Used to calculate degree of parallelism */
   double st, et, ct;
 #ifndef CMK_OPTIMIZE
@@ -275,6 +275,10 @@ class sim : public CBase_sim {
   void SeqResumeAfterCheckpoint();
   /// Implement this for posers that will need to execute events when POSE reaches quiescence
   void invokeStopEvent() {}
+  /// Set simulationStartGVT in the rep
+  void setSimulationStartGVT(POSE_TimeType startGVT) {
+    objID->setSimulationStartGVT(startGVT);
+  }
   /// Return this poser's unique index on PVT branch
   inline int PVTindex() { return myPVTidx; }
   /// Test active flag
