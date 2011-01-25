@@ -1187,8 +1187,13 @@ void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   crashed_node = node;
-  CmiAssert(CmiMyPe() != crashed_node);
+  CmiAssert(CmiMyNode() != crashed_node);
   CkMemCheckPT::inRestarting = 1;
+
+#ifdef CMK_SMP
+	// @TODO: this code is temporary. It just makes the SMP charmrun to restart without problems.
+	return;
+#endif
 
     // this may be in interrupt handler, send a message to reset QD
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
@@ -1256,7 +1261,7 @@ void readKillFile(){
         int proc;
         double sec;
         while(fscanf(fp,"%d %lf",&proc,&sec)==2){
-                if(proc == CkMyPe()){
+                if(proc == CkMyNode() && CkMyRank() == 0){
                         killTime = CmiWallTimer()+sec;
                         printf("[%d] To be killed after %.6lf s (MEMCKPT) \n",CkMyPe(),sec);
                         CcdCallFnAfter(killLocal,NULL,sec*1000);

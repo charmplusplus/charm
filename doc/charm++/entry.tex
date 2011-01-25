@@ -44,26 +44,23 @@ an entry method:
 \kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
-\index{threaded}\item[threaded] \index{entry method}entry methods are simply entry
-methods which are run in their own nonpremptible threads.  To make an
-\index{entry method}entry method threaded, one simply adds the keyword
-\kw{threaded} to the attribute list of that entry method.
+\index{threaded}\item[threaded] \index{entry method}entry methods are
+entry methods which are run in their own nonpreemptible threads. These
+entry methods may perform blocking operations, such as calls to a
+\kw{sync} entry method, or explicitly suspend themselves.
 
 \index{sync}\item[sync] \index{entry method}entry methods are special in that calls to
 sync entry methods are blocking - they do not return control to the caller
 until the method is finished executing completely.  Sync methods may have
-return values; however, they may only return messages.  To make an \index{entry
-method}entry method a sync entry method, add the keyword \kw{sync} to the
-attribute list of that entry method.
+return values; however, they may only return messages. Callers must run in a
+thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
 
 \index{exclusive}\item[exclusive] entry methods, which exist only on node groups, are
 \index{entry method}entry methods that do not execute while other exclusive
 \index{entry method}entry methods of its node group are executing in the same
 node.  If one exclusive method of a node group is executing on node 0, and
 another one is scheduled to run on that same node, the second exclusive method
-will wait for the first to finish before it executes.  To make an \index{entry
-method}entry method exclusive, add the keyword \kw{exclusive} to that
-entry method's attribute list.
+will wait for the first to finish before it executes.
 
 \index{nokeep}\item[nokeep] entry methods tells Charm++ that messages passed to
 these user entry methods will not be kept by the calls. Charm++ runtime
@@ -89,7 +86,7 @@ that skip Charm++'s priority-based message queue. It is useful for messages that
 require prompt processing however in the situation when immediate message does
 not apply. Compared with immediate message, it provides a more general solution
 that works for all Charm++ objects, i.e. Chare, Group, NodeGroup and Chare
-Array. However, skipscheduler message still needs to be scheduled in low level
+Array. However, expedited message still needs to be scheduled in low level
 Converse message queue and be processed in the order of arrival. It may still
 suffer from long running entry methods.
 
