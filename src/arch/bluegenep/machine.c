@@ -243,8 +243,8 @@ DCMF_Protocol_t  cmi_dcmf_rzv_registration   __attribute__((__aligned__(16)));
 DCMF_Protocol_t  cmi_dcmf_multicast_registration   __attribute__((__aligned__(16)));
 
 
-//#define BGP_USE_AM_DIRECT 1
-#define BGP_USE_RDMA_DIRECT 1
+#define BGP_USE_AM_DIRECT 1
+//#define BGP_USE_RDMA_DIRECT 1
 //#define CMI_DIRECT_DEBUG 1
 #ifdef BGP_USE_AM_DIRECT
 
@@ -2117,7 +2117,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
     userHandle.initialValue=initialValue;
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
-    userHandle.DCMF_rq_trecv=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+    userHandle.DCMF_rq_trecv=(DCMF_Request_t *) ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA create addr %p %d callback %p callbackdata %p\n",CmiMyPe(),userHandle.recverBuf,userHandle.recverBufSize, userHandle.callbackFnPtr, userHandle.callbackData);
 #endif
@@ -2135,7 +2135,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
     /* with two-sided primitives we just record the sender buf in the handle */
     userHandle->senderBuf=sendBuf;
     CmiAssert(sendBufSize==userHandle->recverBufSize);
-    userHandle->DCMF_rq_tsend =ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+    userHandle->DCMF_rq_tsend = (DCMF_Request_t *) ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA assoc addr %p %d to receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,sendBufSize, userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
 #endif
@@ -2183,6 +2183,38 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
 #endif
     }
 }
+
+void CmiDirect_get(struct infiDirectUserHandle *userHandle) {
+    CmiAbort("Not Implemented, switch to #define BGP_USE_RDMA_DIRECT");
+}
+
+/**** up to the user to safely call this */
+void CmiDirect_deassocLocalBuffer(struct infiDirectUserHandle *userHandle)
+{
+    CmiAssert(userHandle->senderNode==_Cmi_mynode);
+#if CMK_SMP
+    DCMF_CriticalSection_enter (0);
+#endif
+    CmiFree(userHandle->DCMF_rq_tsend);
+#if CMK_SMP
+    DCMF_CriticalSection_exit (0);
+#endif
+
+}
+
+/**** up to the user to safely call this */
+void CmiDirect_destroyHandle(struct infiDirectUserHandle *userHandle){
+    CmiAssert(userHandle->recverNode==_Cmi_mynode);
+#if CMK_SMP
+    DCMF_CriticalSection_enter (0);
+#endif
+    CmiFree(userHandle->DCMF_rq_trecv);
+
+#if CMK_SMP
+    DCMF_CriticalSection_exit (0);
+#endif
+}
+
 
 /**** Should not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle) {
