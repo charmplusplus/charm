@@ -88,13 +88,13 @@ class rep
   }
   /// Timestamps event message, sets priority, and records in spawned list
   virtual void registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset);
-  /// Assignment operator
-  /** Derived classes must provide assignment */
   /// Set simulationStartGVT
   void setSimulationStartGVT(POSE_TimeType startGVT) {
     CkAssert(startGVT >= 0);
     simulationStartGVT = startGVT;
   }
+  /// Assignment operator
+  /** Derived classes must provide assignment */
   inline virtual rep& operator=(const rep& obj) { 
     ovt = obj.ovt; 
     ort = obj.ort;
