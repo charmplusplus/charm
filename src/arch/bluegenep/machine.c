@@ -325,6 +325,8 @@ static struct DCMF_Callback_t dcmf_rdma_cb_ack;
 
 DCMF_Protocol_t  cmi_dcmf_direct_put_registration __attribute__((__aligned__(16)));
 
+DCMF_Protocol_t  cmi_dcmf_direct_get_registration __attribute__((__aligned__(16)));
+
 DCMF_Protocol_t  cmi_dcmf_direct_rdma_registration __attribute__((__aligned__(16)));
 /** The receive side of a DCMF_Put notification implemented in DCMF_Send */
 
@@ -887,6 +889,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     /* put protocol */
    DCMF_Put_Configuration_t put_configuration = { DCMF_DEFAULT_PUT_PROTOCOL };
    DCMF_Put_register (&cmi_dcmf_direct_put_registration, &put_configuration);
+   DCMF_Get_Configuration_t get_configuration = { DCMF_DEFAULT_GET_PROTOCOL };
+   DCMF_Get_register (&cmi_dcmf_direct_get_registration, &get_configuration);
     
 #endif
     //fprintf(stderr, "Initializing Eager Protocol\n");
@@ -2103,8 +2107,6 @@ side
  To be called on the receiver to create a handle and return its number
 **/
 struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue) {
-    /* one-sided primitives would require registration of memory */
-
     /* with two-sided primitives we just bundle the buffer and callback info into the handle so the sender can remind us about it later. */
     struct infiDirectUserHandle userHandle;
     userHandle.handle=1; /* doesn't matter on BG/P*/
@@ -2236,9 +2238,11 @@ static void CmiNotifyRemoteRDMA(void *handle, struct DCMF_Error_t *error)
     CmiPrintf("[%d] RDMA notify put addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p \n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
 #endif
     DCMF_Result res=DCMF_Send (&cmi_dcmf_direct_rdma_registration,
-	       (DCMF_Request_t *) userHandle->DCMF_rq_tsend,
+	       userHandle->DCMF_rq_tsend,
 	       directcb, DCMF_MATCH_CONSISTENCY, userHandle->recverNode,
-	       sizeof(msgHead), &msgHead,
+	       sizeof(dcmfDirectRDMAMsgHeader), 
+
+			       userHandle->DCMF_notify_buf,
 	       (struct DCQuad *) &(msgHead), 1);
 //    CmiAssert(res==DCMF_SUCCESS);
 #if CMK_SMP
@@ -2255,7 +2259,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
     /* one-sided primitives require registration of memory */
     struct infiDirectUserHandle userHandle;
     size_t numbytesRegistered=0;
-    DCMF_Result regresult=DCMF_Memregion_create( (DCMF_Memregion_t*) &userHandle.DCMF_recverMemregion,
+    DCMF_Result regresult=DCMF_Memregion_create( &userHandle.DCMF_recverMemregion,
 						 &numbytesRegistered,
 						 recvBufSize,
 						 recvBuf,
@@ -2272,7 +2276,7 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
     userHandle.initialValue=initialValue;
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
-    userHandle.DCMF_rq_trecv=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+    userHandle.DCMF_rq_trecv=(DCMF_Request_t *) ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
 #if CMI_DIRECT_DEBUG
     CmiPrintf("[%d] RDMA create addr %p %d callback %p callbackdata %p\n",CmiMyPe(),userHandle.recverBuf,userHandle.recverBufSize, userHandle.callbackFnPtr, userHandle.callbackData);
 #endif
@@ -2284,15 +2288,15 @@ struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf,
 ******/
 
 void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *sendBuf,int sendBufSize) {
-    dcmf_rdma_cb_ack.function=CmiNotifyRemoteRDMA;
-    dcmf_rdma_cb_ack.clientdata=(void *) userHandle; 	
-
     /* one-sided primitives would require registration of memory */
     userHandle->senderBuf=sendBuf;
     CmiAssert(sendBufSize==userHandle->recverBufSize);
-    userHandle->DCMF_rq_tsend =ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
-    size_t numbytesRegistered=0;
-    DCMF_Result regresult=DCMF_Memregion_create( (DCMF_Memregion_t*) &userHandle->DCMF_senderMemregion,
+    userHandle->DCMF_rq_tsend =(DCMF_Request_t *) ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+16));
+    size_t numbytesRegistered=0;  // set as return value from create
+    userHandle->DCMF_notify_buf=ALIGN_16(CmiAlloc(sizeof(DCMF_Request_t)+32));
+    userHandle->DCMF_notify_cb.function=CmiNotifyRemoteRDMA; 
+    userHandle->DCMF_notify_cb.clientdata=userHandle;
+    DCMF_Result regresult=DCMF_Memregion_create( &userHandle->DCMF_senderMemregion,
 						 &numbytesRegistered,
 						 sendBufSize,
 						 sendBuf,
@@ -2311,7 +2315,7 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 To be called on the sender to do the actual data transfer
 ******/
 void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
-    /** invoke a DCMF_Pur with the direct callback */
+    /** invoke a DCMF_Put with the direct callback */
 
     CmiAssert(userHandle->recverBuf!=NULL);
     CmiAssert(userHandle->senderBuf!=NULL);
@@ -2324,11 +2328,6 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
         CmiMemcpy(userHandle->recverBuf,userHandle->senderBuf,userHandle->recverBufSize);
         (*(userHandle->callbackFnPtr))(userHandle->callbackData);
     } else {
-        dcmfDirectRDMAMsgHeader msgHead;
-	/*   msgHead.recverBuf=userHandle->recverBuf;*/
-        msgHead.callbackFnPtr=userHandle->callbackFnPtr;
-        msgHead.callbackData=userHandle->callbackData;
-/*        msgHead.DCMF_rq_t=(DCMF_Request_t *) userHandle->DCMF_rq_trecv;*/
 #if CMK_SMP
         DCMF_CriticalSection_enter (0);
 #endif
@@ -2337,15 +2336,59 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
 #endif
 	DCMF_Result 
 	    Res= DCMF_Put(&cmi_dcmf_direct_put_registration,
-			  (DCMF_Request_t *) userHandle->DCMF_rq_tsend,
+			  userHandle->DCMF_rq_tsend,
 			  directcb, DCMF_RELAXED_CONSISTENCY, 
 			  userHandle->recverNode,
 			  userHandle->recverBufSize,
-			  (DCMF_Memregion_t*) userHandle->DCMF_senderMemregion,
-			  (DCMF_Memregion_t*) userHandle->DCMF_recverMemregion,
+			  &userHandle->DCMF_senderMemregion,
+			  &userHandle->DCMF_recverMemregion,
 			  0, /* offsets are zero */
 			  0, 
-			  dcmf_rdma_cb_ack
+			  userHandle->DCMF_notify_cb
+			  );
+	CmiAssert(Res==DCMF_SUCCESS); 
+#if CMK_SMP
+        DCMF_CriticalSection_exit (0);
+#endif
+    }
+}
+
+/****
+To be called on the receiver to initiate the actual data transfer
+******/
+void CmiDirect_get(struct infiDirectUserHandle *userHandle) {
+    /** invoke a DCMF_Get with the direct callback */
+
+    CmiAssert(userHandle->recverBuf!=NULL);
+    CmiAssert(userHandle->senderBuf!=NULL);
+    CmiAssert(userHandle->recverBufSize>0);
+    if (userHandle->recverNode== _Cmi_mynode) {     /* local copy */
+#if CMI_DIRECT_DEBUG
+        CmiPrintf("[%d] RDMA local get addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+
+        CmiMemcpy(userHandle->senderBuf,userHandle->recverBuf,userHandle->recverBufSize);
+        (*(userHandle->callbackFnPtr))(userHandle->callbackData);
+    } else {
+        struct DCMF_Callback_t done_cb;
+	done_cb.function=userHandle->callbackFnPtr;
+	done_cb.clientdata=userHandle->callbackData;
+#if CMK_SMP
+        DCMF_CriticalSection_enter (0);
+#endif
+#if CMI_DIRECT_DEBUG
+        CmiPrintf("[%d] RDMA get addr %p %d to recverNode %d receiver addr %p callback %p callbackdata %p\n",CmiMyPe(),userHandle->senderBuf,userHandle->recverBufSize, userHandle->recverNode,userHandle->recverBuf, userHandle->callbackFnPtr, userHandle->callbackData);
+#endif
+	DCMF_Result 
+	    Res= DCMF_Get(&cmi_dcmf_direct_get_registration,
+			  (DCMF_Request_t *) userHandle->DCMF_rq_tsend,
+			  done_cb, DCMF_RELAXED_CONSISTENCY, 
+			  userHandle->recverNode,
+			  userHandle->recverBufSize,
+			  & userHandle->DCMF_recverMemregion,
+			  & userHandle->DCMF_senderMemregion,
+			  0, /* offsets are zero */
+			  0
 			  );
 	CmiAssert(Res==DCMF_SUCCESS); 
 
@@ -2355,6 +2398,40 @@ void CmiDirect_put(struct infiDirectUserHandle *userHandle) {
 #endif
     }
 }
+
+/**** up to the user to safely call this */
+void CmiDirect_deassocLocalBuffer(struct infiDirectUserHandle *userHandle)
+{
+    CmiAssert(userHandle->senderNode==_Cmi_mynode);
+#if CMK_SMP
+    DCMF_CriticalSection_enter (0);
+#endif
+
+    DCMF_Memregion_destroy((DCMF_Memregion_t*) userHandle->DCMF_senderMemregion);
+    CmiFree(userHandle->DCMF_notify_buf);
+    CmiFree(userHandle->DCMF_rq_tsend);
+#if CMK_SMP
+    DCMF_CriticalSection_exit (0);
+#endif
+
+}
+
+/**** up to the user to safely call this */
+void CmiDirect_destroyHandle(struct infiDirectUserHandle *userHandle){
+    CmiAssert(userHandle->recverNode==_Cmi_mynode);
+#if CMK_SMP
+    DCMF_CriticalSection_enter (0);
+#endif
+
+    DCMF_Memregion_destroy((DCMF_Memregion_t*) userHandle->DCMF_recverMemregion);
+    CmiFree(userHandle->DCMF_rq_trecv);
+
+#if CMK_SMP
+    DCMF_CriticalSection_exit (0);
+#endif
+}
+
+
 
 /**** Should not be called the first time *********/
 void CmiDirect_ready(struct infiDirectUserHandle *userHandle) {
