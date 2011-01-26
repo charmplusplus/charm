@@ -35,6 +35,9 @@ class rep
   unsigned short int prand48_seed[3];
   /// Flag indicating this object uses anti-methods rather than checkpoints
   int anti_methods;
+  /// Starting GVT of the simulation
+  /** Initialize to -1, which is the "unset" value */
+  POSE_TimeType simulationStartGVT;
 #ifdef MEM_TEMPORAL
   TimePool *localTimePool;
 #endif
@@ -42,6 +45,7 @@ class rep
   rep() { 
     ovt = 0; ort = 0.0; parent = NULL; myStrat = NULL; 
     anti_methods = 0;
+    simulationStartGVT = (POSE_TimeType)-1;
   #ifndef SEQUENTIAL_POSE
   #ifdef POSE_COMM_ON    
     POSE_Objects = POSE_Objects_RO;
@@ -55,10 +59,11 @@ class rep
   /// Initializing Constructor
   rep(POSE_TimeType init_ovt) { 
     ovt = init_ovt; ort = 0.0; anti_methods = 0;
-      }
+    simulationStartGVT = (POSE_TimeType)-1;
+  }
   /// Destructor
   virtual ~rep() {
-     }
+  }
   /// Initializer called from poser wrapper constructor
   void init(eventMsg *m);
   /// Return the OVT
@@ -83,6 +88,11 @@ class rep
   }
   /// Timestamps event message, sets priority, and records in spawned list
   virtual void registerTimestamp(int idx, eventMsg *m, POSE_TimeType offset);
+  /// Set simulationStartGVT
+  void setSimulationStartGVT(POSE_TimeType startGVT) {
+    CkAssert(startGVT >= 0);
+    simulationStartGVT = startGVT;
+  }
   /// Assignment operator
   /** Derived classes must provide assignment */
   inline virtual rep& operator=(const rep& obj) { 
@@ -94,6 +104,7 @@ class rep
     prand48_seed[0]=obj.prand48_seed[0];
     prand48_seed[1]=obj.prand48_seed[1];
     prand48_seed[2]=obj.prand48_seed[2];
+    simulationStartGVT = obj.simulationStartGVT;
     return *this;
   }
   /// Dump all data fields
@@ -105,7 +116,7 @@ class rep
   /// Pack/unpack/sizing operator
   /** Derived classes must provide pup */
   virtual void pup(PUP::er &p) { 
-    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand_seed); p(prand48_seed,3);
+    p(ovt); p(ort); p(myHandle); p(anti_methods); p(prand_seed); p(prand48_seed,3); p(simulationStartGVT);
   }
 #ifdef SEQUENTIAL_POSE
   inline void checkpoint(rep *) { }

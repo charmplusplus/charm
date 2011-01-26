@@ -28,5 +28,6 @@ module sim {
     entry void SeqBeginCheckpoint();
     entry void SeqResumeAfterCheckpoint();
     entry void invokeStopEvent();
+    entry void setSimulationStartGVT(POSE_TimeType);
   };
 };
