@@ -379,6 +379,11 @@ then
 	test_finish 1
 fi
 
+AC_MSG_CHECKING("Native C++ compiler as")
+AC_MSG_RESULT("$CMK_NATIVE_CXX")
+AC_MSG_CHECKING("Sequential C++ compiler as")
+AC_MSG_RESULT("$CMK_SEQ_CXX")
+
 if test "$base_version" = "net-linux" 
 then
   test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
