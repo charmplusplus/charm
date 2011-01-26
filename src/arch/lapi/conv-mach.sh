@@ -26,7 +26,7 @@ CMK_LD="mpcc_r -q32 -brtl "
 CMK_LDXX="mpCC_r -q32 -brtl "
 if test $isAIX = true
 then
-CMK_QT='aix'
+CMK_QT='aix-light'
 CMK_LIBS="-lckqt -lhC -llapi_r"
 else
 CMK_QT='generic'

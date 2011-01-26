@@ -1,0 +1,20 @@
+CC=../../bin/charmc -I. -ma $(OPTS)
+
+all: qt stp testpgm
+
+qt: md/setjmp_d.h qt.c md/setjmp64_.c
+	rm -f qtmd.h
+	ln -s md/setjmp_d.h qtmd.h
+	$(CC) -c -o qt.o qt.c
+	$(CC) -c -o qtmds.o md/setjmp64_.c
+	$(CC) -o libqt.a qt.o qtmds.o
+	$(CC) -shared -o libqt.so qt.o qtmds.o
+
+stp:
+	$(CC) -c stp.c
+	ar q libstp.a stp.o
+
+testpgm:
+	$(CC) -c meas.c
+	$(CC) -c -o qtmdb.o md/setjmp_b.c
+	$(CC) -o run meas.o qtmdb.o libstp.a libqt.a
