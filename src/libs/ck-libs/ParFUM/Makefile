@@ -68,7 +68,7 @@ headers: $(HEADDEP)
 
 
 MsaHashtable.o: MsaHashtable.C $(HEADDEP)
-	$(MPICC) -c MsaHashtable.C $(INCS)
+	$(MPICC) -DFOR_SUN_CC_ONLY -c MsaHashtable.C $(INCS)
 
 mesh_modify.o: mesh_modify.C $(HEADDEP)
 	$(MPICC) -c mesh_modify.C $(INCS)
@@ -98,7 +98,7 @@ call_init.o: call_init.c $(HEADDEP)
 	$(CHARMC) -c call_init.c $(INCS)
 
 parallel_part.o: parallel_part.C $(HEADDEP) MsaHashtable.h
-	$(MPICC) -c parallel_part.C $(INCS)
+	$(MPICC) -DFOR_SUN_CC_ONLY -c parallel_part.C $(INCS)
 
 mesh_adjacency.o: mesh_adjacency.C $(HEADDEP)
 	$(MPICC) -c mesh_adjacency.C $(INCS)

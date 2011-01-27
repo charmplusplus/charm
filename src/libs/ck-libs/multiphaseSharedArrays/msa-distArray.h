@@ -166,12 +166,14 @@ public:
         return msa->get2(x);
     }
 
+#ifndef FOR_SUN_CC_ONLY
     // 2D Array access
     inline const ENTRY& get(int x, int y)
     {
         checkValid();
         return msa->get(x, y);
     }
+#endif
     inline const ENTRY& operator()(int x, int y) { return get(x, y); }
     inline const ENTRY& get2(int x, int y)
     {
@@ -179,12 +181,14 @@ public:
         return msa->get2(x, y);
     }
 
+#ifndef FOR_SUN_CC_ONLY
     // 3D Array Access
     inline const ENTRY& get(int x, int y, int z)
     {
         checkValid();
         return msa->get(x, y, z);
     }
+#endif
     inline const ENTRY& operator()(int x, int y, int z) { return get(x, y, z); }
     inline const ENTRY& get2(int x, int y, int z)
     {
@@ -317,24 +321,29 @@ public:
     inline Accumulable<MSA> operator() (int x)
     { return accumulate(x); }
 
+#ifndef FOR_SUN_CC_ONLY
     // 2D Array Access
     inline Accumulable<MSA> accumulate(int x, int y)
     {
         checkValid();
         return Accumulable<MSA>(msa->accumulate(x,y));
     }
+#endif
     inline Accumulable<MSA> operator() (int x, int y)
     { return accumulate(x,y); }
 
+#ifndef FOR_SUN_CC_ONLY
     // 3D Array Access
     inline Accumulable<MSA> accumulate(int x, int y, int z)
     {
         checkValid();
         return Accumulable<MSA>(msa->accumulate(x,y,z));
     }
+#endif
     inline Accumulable<MSA> operator() (int x, int y, int z)
     { return accumulate(x,y,z); }
 
+#ifndef FOR_SUN_CC_ONLY
     void accumulate(int x1, int y1, int z1, int x2, int y2, int z2, const ENTRY *buf)
     {
         checkValid();
@@ -357,6 +366,7 @@ public:
                 for (int iz = z1; iz <= z2; ++iz)
                     msa->accumulate(ix, iy, iz, buf[i++]);
     }
+#endif
 };
 
 
