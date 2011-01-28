@@ -1,6 +1,4 @@
 
-package tests;
-
 readonly Main@ main;
 
 public mainchare Main {
@@ -9,7 +7,7 @@ public mainchare Main {
     public entry Main(CkArgMsg m) {
         if (m.argc < 2) n = 16;
         else n = atoi(m.argv[1]);
-        main = thishandle;
+        main = thisProxy;
         Fib@ fib = new Fib@(true, n, thishandle);
     }
 
@@ -40,8 +38,8 @@ public chare Fib {
             partialResult = seq_fib(n);
             passUp();
         } else {
-            Fib@ child1 = new Fib@(false, n-1, thishandle);
-            Fib@ child2 = new Fib@(false, n-2, thishandle);
+            Fib@ child1 = new Fib@(false, n-1, thisProxy);
+            Fib@ child2 = new Fib@(false, n-2, thisProxy);
             partialResult = 0;
             pendingChildren = 2;
         }

@@ -1,0 +1,15 @@
+mainmodule TypedReduction {
+    mainchare Driver {
+        entry Driver(CkArgMsg*);
+        entry void untyped_done(CkReductionMsg* msg);
+        entry [reductiontarget] void typed_done(int x);
+        entry [reductiontarget] void typed_array_done(int results[n], int n);
+        entry [reductiontarget] void typed_array_done2(int x, int y, int z);
+    }
+
+    array [1d] Worker {
+        entry Worker(void);
+        entry void reduce(void);
+        entry void reduce_array(void);
+    }
+}

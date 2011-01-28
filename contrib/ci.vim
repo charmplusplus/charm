@@ -31,7 +31,7 @@ syn keyword cppOperator		and bitor or xor compl bitand and_eq or_eq xor_eq not n
 syn match cppCast		"\<\(const\|static\|dynamic\|reinterpret\)_cast\s*<"me=e-1
 syn match cppCast		"\<\(const\|static\|dynamic\|reinterpret\)_cast\s*$"
 syn keyword cppStorageClass	mutable
-syn keyword cppStorageClass	threaded sync exclusive nokeep notrace immediate expedited inline local python accel readwrite writeonly accelblock memcritical packed varsize initproc initnode initcall stacksize createhere createhome
+syn keyword cppStorageClass	threaded sync exclusive nokeep notrace immediate expedited inline local python accel readwrite writeonly accelblock memcritical packed varsize initproc initnode initcall stacksize createhere createhome reductiontarget
 syn keyword cppStructure	class typename template namespace message conditional
 syn keyword cppStructure        mainmodule mainchare module chare array group nodegroup
 syn keyword cppNumber		NPOS

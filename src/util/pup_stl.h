@@ -29,7 +29,6 @@ Orion Sky Lawlor, olawlor@acm.org, 7/22/2002
 #include "pup.h"
 
 /*************** Simple classes ***************/
-
 // Non-const version is required for puping std::pair
 template <class A,class B>
 inline void operator|(PUP::er &p,typename std::pair<A,B> &v)
