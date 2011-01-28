@@ -406,7 +406,4 @@ class Group : public CkReductionMgr
 };
 
 
-
-
-
 #endif //_CKREDUCTION_H

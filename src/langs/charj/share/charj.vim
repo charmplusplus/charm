@@ -35,7 +35,7 @@ syn keyword javaExternal	native package
 syn match javaExternal		"\<import\>\(\s\+static\>\)\?"
 syn keyword javaError		goto const
 syn keyword javaConditional	if else switch
-syn keyword javaRepeat		while for do overlap when forall
+syn keyword javaRepeat		while for do overlap when forall let in
 syn keyword javaBoolean		true false
 syn keyword javaConstant	null
 syn keyword javaTypedef		this super thisHandle thisIndex thisProxy thishandle
@@ -46,7 +46,7 @@ syn keyword javaStatement	return
 syn keyword javaStorageClass	static synchronized transient volatile final strictfp serializable readonly
 syn keyword javaExceptions	throw try catch finally
 syn keyword javaAssert		assert
-syn keyword javaMethodDecl	synchronized throws traced chare chare_array group nodegroup
+syn keyword javaMethodDecl	synchronized throws traced chare chare_array group nodegroup mainchare
 syn keyword javaClassDecl	extends implements interface
 " to differentiate the keyword class from MyClass.class we use a match here
 syn match   javaTypedef		"\.\s*\<class\>"ms=s+1
@@ -58,7 +58,7 @@ syn match   javaClassDecl	"@interface\>"
 syn keyword javaBranch		break continue nextgroup=javaUserLabelRef skipwhite
 syn match   javaUserLabelRef	"\k\+" contained
 syn match   javaVarArg		"\.\.\."
-syn keyword javaScopeDecl	public protected private abstract entry traced
+syn keyword javaScopeDecl	public protected private abstract entry traced sdagentry divcon
 
 if exists("java_highlight_java_lang_ids")
   let java_highlight_all=1
