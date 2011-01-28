@@ -161,9 +161,9 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 #endif
 #endif
 
-CMK_TYPEDEF_UINT8 memory_allocated = 0;
-CMK_TYPEDEF_UINT8 memory_allocated_max = 0; /* High-Water Mark */
-CMK_TYPEDEF_UINT8 memory_allocated_min = 0; /* Low-Water Mark */
+CMK_TYPEDEF_UINT8 _memory_allocated = 0;
+CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
+CMK_TYPEDEF_UINT8 _memory_allocated_min = 0; /* Low-Water Mark */
 
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
@@ -659,27 +659,27 @@ void free_reentrant(void *mem)
 /** Return number of bytes currently allocated, if possible. */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage()
 {
-  return memory_allocated;
+  return _memory_allocated;
 }
 
 /** Return number of maximum number of bytes allocated since the last call to CmiResetMaxMemory(), if possible. */
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
 {
-  return memory_allocated_max;
+  return _memory_allocated_max;
 }
 
 /** Reset the mechanism that records the highest seen (high watermark) memory usage. */
 void CmiResetMaxMemory() {
-  memory_allocated_max=memory_allocated;
+  _memory_allocated_max=_memory_allocated;
 }
 
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
 {
-  return memory_allocated_min;
+  return _memory_allocated_min;
 }
 
 void CmiResetMinMemory() {
-  memory_allocated_min=memory_allocated;
+  _memory_allocated_min=_memory_allocated;
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/
