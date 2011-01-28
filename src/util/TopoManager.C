@@ -225,6 +225,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
   return bgptm.coordinatesToRank(x, y, z);
 #elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
   CmiAbort("This function should not be called on Cray XT machines\n");
+  return -1;
 #else
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;

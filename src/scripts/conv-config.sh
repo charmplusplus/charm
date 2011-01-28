@@ -77,7 +77,12 @@ then
   QT=`echo $CMK_QT | sed -e 's/64$//'`
   if test $QT = $CMK_QT
   then
-    CMK_QT="${CMK_QT}64"
+    if echo $CMK_QT | grep '-' > /dev/null 2> /dev/null
+    then
+      CMK_QT=`echo $CMK_QT | sed -e 's/-/64-/'`
+    else
+      CMK_QT="${CMK_QT}64"
+    fi
   fi
 fi
 

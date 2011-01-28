@@ -19,17 +19,16 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
   // fill the processor array
   procs.resize(numPes);
 
+  // Loop through the LDStats structure, copying data into this array and calculating
+  //   the average 'totalLoad' of all the PEs
+  avgLoad = 0.0;
   for(int pe = 0; pe < numPes; pe++) {
     procs[pe].id        = stats->procs[pe].pe;
     procs[pe].overhead  = stats->procs[pe].bg_walltime;
     procs[pe].totalLoad = stats->procs[pe].total_walltime - stats->procs[pe].idletime;
     procs[pe].available = stats->procs[pe].available;
-  }
-
-  avgLoad = 0.0;
-
-  for(int pe = 0; pe < numPes; pe++)
     avgLoad += procs[pe].totalLoad;
+  }
   avgLoad /= numPes;
 }
 

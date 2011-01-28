@@ -246,7 +246,8 @@ public:
 class arrayMapInfo {
 public:
   CkArrayIndexMax _nelems;
-  int _binSize;			/* floor of numChares/numPes */
+  int _binSizeFloor;		/* floor of numChares/numPes */
+  int _binSizeCeil;		/* ceiling of numChares/numPes */
   int _numChares;		/* initial total number of chares */
   int _remChares;		/* numChares % numPes -- equals the number of
 				   processors in the first set */
@@ -264,7 +265,7 @@ public:
 
   ~arrayMapInfo() {}
   
-  int compute_binsize()
+  void compute_binsize()
   {
     int numPes = CkNumPes();
 
@@ -277,15 +278,15 @@ public:
     }
 
     _remChares = _numChares % numPes;
-    _binSize = (int)floor((double)_numChares/(double)numPes);
-    _numFirstSet = _remChares * (_binSize + 1);
-
-    return _binSize;
+    _binSizeFloor = (int)floor((double)_numChares/(double)numPes);
+    _binSizeCeil = (int)ceil((double)_numChares/(double)numPes);
+    _numFirstSet = _remChares * (_binSizeFloor + 1);
   }
 
   void pup(PUP::er& p){
     p|_nelems;
-    p|_binSize;
+    p|_binSizeFloor;
+    p|_binSizeCeil;
     p|_numChares;
     p|_remChares;
     p|_numFirstSet;
@@ -331,14 +332,17 @@ public:
       flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else {
+    }
+#if CMK_ERROR_CHECKING
+    else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
+#endif
 
     if(flati < amaps[arrayHdl]->_numFirstSet)
-      return (flati / (amaps[arrayHdl]->_binSize + 1));
+      return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
     else if (flati < amaps[arrayHdl]->_numChares)
-      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSize));
+      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSizeFloor));
     else
       return (flati % CkNumPes());
   }
@@ -388,13 +392,16 @@ public:
       flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
       flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else {
+    }
+#if CMK_ERROR_CHECKING
+    else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
+#endif
 
-    /** binSize calculated in DefaultArrayMap is the floor of numChares/numPes
+    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
      *  but for this FastArrayMap, we need the ceiling */
-    return (flati / (amaps[arrayHdl]->_binSize + 1));
+    return (flati / amaps[arrayHdl]->_binSizeCeil);
   }
 
   void pup(PUP::er& p){

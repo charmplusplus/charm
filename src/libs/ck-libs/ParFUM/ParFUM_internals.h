@@ -2053,6 +2053,9 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 
 //#define PARALLEL_DEBUG
 
+#ifdef DEBUG
+#undef DEBUG
+#endif
 #ifdef PARALLEL_DEBUG
 #define DEBUG(x) x
 #else

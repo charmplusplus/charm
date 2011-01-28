@@ -8,41 +8,40 @@
 
 // convenience typedefs and consts to facilitate float vs double usage
 #define USE_DOUBLE 0
+
 #if USE_DOUBLE
-typedef double  MD_FLOAT;
-#define  MD_VEC veclf
-const double zero=0.0;
-const double one=1.0;
-const double two=2.0;
-#define myvec_numElems veclf_numElems;
-#define vextract_MDF vextractlf
-#define vsub_MDF vsublf
-#define vadd_MDF vaddlf
-#define vmadd_MDF vmaddlf
-#define vmul_MDF vmullf
-#define vspread_MDF vspreadlf
-#define vrecip_MDF vreciplf
-#define vsqrt_MDF vsqrtlf
-#define visfinite_MDF visfinitelf
+  typedef double  MD_FLOAT;
+  #define  MD_VEC simdia_veclf
+  const double zero=0.0;
+  const double one=1.0;
+  const double two=2.0;
+  #define myvec_numElems simdia_veclf_numElems;
+  #define vextract_MDF simdia_vextractlf
+  #define vsub_MDF simdia_vsublf
+  #define vadd_MDF simdia_vaddlf
+  #define vmadd_MDF simdia_vmaddlf
+  #define vmul_MDF simdia_vmullf
+  #define vspread_MDF simdia_vspreadlf
+  #define vrecip_MDF simdia_vreciplf
+  #define vsqrt_MDF simdia_vsqrtlf
+  #define visfinite_MDF simdia_visfinitelf
 #else
-typedef float  MD_FLOAT;
-#define  MD_VEC vecf
-#define myvec_numElems vecf_numElems;
-const float zero=0.0f;
-const float one=1.0f;
-const float two=2.0f;
-
-#define vextract_MDF vextractf
-#define vsub_MDF vsubf
-#define vadd_MDF vaddf
-#define vmadd_MDF vmaddf
-#define vmul_MDF vmulf
-#define vspread_MDF vspreadf
-#define vrecip_MDF vrecipf
-#define vsqrt_MDF vsqrtf
-#define visfinite_MDF visfinitef
+  typedef float  MD_FLOAT;
+  #define  MD_VEC simdia_vecf
+  #define myvec_numElems simdia_vecf_numElems;
+  const float zero=0.0f;
+  const float one=1.0f;
+  const float two=2.0f;
+  #define vextract_MDF simdia_vextractf
+  #define vsub_MDF simdia_vsubf
+  #define vadd_MDF simdia_vaddf
+  #define vmadd_MDF simdia_vmaddf
+  #define vmul_MDF simdia_vmulf
+  #define vspread_MDF simdia_vspreadf
+  #define vrecip_MDF simdia_vrecipf
+  #define vsqrt_MDF simdia_vsqrtf
+  #define visfinite_MDF simdia_visfinitef
 #endif
-
 
 #define DEFAULT_NUM_PARTICLES_PER_PATCH  (128)
 

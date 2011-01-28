@@ -20,6 +20,7 @@ g++)   CMK_AMD64="-m64 -fPIC" ;;
 icpc)  CMK_AMD64="-m64";;
 pgCC)  CMK_AMD64="-DCMK_CC_PGCC=1" ;;
 esac
+CMK_REAL_C_COMPILER=`$MPICC -show 2>/dev/null | cut -d' ' -f1 `
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="$MPICC -E"
@@ -29,10 +30,11 @@ CMK_CXXPP="$MPICXX -E $CMK_AMD64 "
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
-CMK_NATIVE_CC="$CMK_CC"
-CMK_NATIVE_LD="$CMK_LD"
-CMK_NATIVE_CXX="$CMK_CXX"
-CMK_NATIVE_LDXX="$CMK_LDXX"
+CMK_NATIVE_CC="$CMK_REAL_C_COMPILER $CMK_AMD64 "
+CMK_NATIVE_LD="$CMK_REAL_C_COMPILER $CMK_AMD64 "
+CMK_NATIVE_CXX="$CMK_REAL_COMPILER $CMK_AMD64 "
+CMK_NATIVE_LDXX="$CMK_REAL_COMPILER $CMK_AMD64 "
+CMK_NATIVE_LIBS=""
 
 # fortran compiler 
 # for Intel Fortran compiler 8.0 and higher which is renamed to ifort from ifc

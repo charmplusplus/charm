@@ -1,8 +1,13 @@
-/** \file jacobi3d.C
+/** \file stencil3d.C
  *  Author: Abhinav S Bhatele
- *  Date Created: June 01st, 2009
+ *  Date Created: December 28th, 2010
  *
- *	
+ *  This example is written to be used with periodic measurement-based load
+ *  balancers at sync. The load of some chares changes across iterations and
+ *  depends on the index of the chare.
+ *
+ *
+ *
  *	      *****************
  *	   *		   *  *
  *   ^	*****************     *
@@ -21,7 +26,7 @@
  *   Z: front, back --> wrap_z
  */
 
-#include "jacobi3d.decl.h"
+#include "stencil3d.decl.h"
 #include "TopoManager.h"
 
 /*readonly*/ CProxy_Main mainProxy;
@@ -52,15 +57,16 @@ int myrand(int numpes) {
 
 #define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
-#define MAX_ITER		26
-#define WARM_ITER		5
-#define LEFT			1
-#define RIGHT			2
-#define TOP			3
-#define BOTTOM			4
-#define FRONT			5
-#define BACK			6
-#define DIVIDEBY7       	0.14285714285714285714
+#define MAX_ITER	100
+#define LBPERIOD	5
+#define CHANGELOAD	30
+#define LEFT		1
+#define RIGHT		2
+#define TOP		3
+#define BOTTOM		4
+#define FRONT		5
+#define BACK		6
+#define DIVIDEBY7      	0.14285714285714285714
 
 double startTime;
 double endTime;
@@ -70,8 +76,7 @@ double endTime;
  */
 class Main : public CBase_Main {
   public:
-    CProxy_Jacobi array;
-    int iterations;
+    CProxy_Stencil array;
 
     Main(CkArgMsg* m) {
       if ( (m->argc != 3) && (m->argc != 7) ) {
@@ -79,9 +84,6 @@ class Main : public CBase_Main {
         CkPrintf("OR %s [array_size_X] [array_size_Y] [array_size_Z] [block_size_X] [block_size_Y] [block_size_Z]\n", m->argv[0]);
         CkAbort("Abort");
       }
-
-      // set iteration counter to zero
-      iterations = 0;
 
       // store the main proxy
       mainProxy = thisProxy;
@@ -111,41 +113,31 @@ class Main : public CBase_Main {
       num_chare_z = arrayDimZ / blockDimZ;
 
       // print info
-      CkPrintf("\nSTENCIL COMPUTATION WITH NO BARRIERS\n");
-      CkPrintf("Running Jacobi on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
+      CkPrintf("\nSTENCIL COMPUTATION WITH BARRIERS\n");
+      CkPrintf("Running Stencil on %d processors with (%d, %d, %d) chares\n", CkNumPes(), num_chare_x, num_chare_y, num_chare_z);
       CkPrintf("Array Dimensions: %d %d %d\n", arrayDimX, arrayDimY, arrayDimZ);
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-      array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
+      array = CProxy_Stencil::ckNew(num_chare_x, num_chare_y, num_chare_z);
 
       //Start the computation
+      startTime = CmiWallTimer();
       array.doStep();
     }
 
     // Each worker reports back to here when it completes an iteration
     void report() {
-      iterations++;
-      if (iterations <= WARM_ITER) {
-	if (iterations == WARM_ITER)
-	  startTime = CmiWallTimer();
-	array.doStep();
-      }
-      else {
-	CkPrintf("Completed %d iterations\n", MAX_ITER-1);
-	endTime = CmiWallTimer();
-	CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
-        CkExit();
-      }
+      CkExit();
     }
 };
 
-/** \class Jacobi
+/** \class Stencil
  *
  */
 
-class Jacobi: public CBase_Jacobi {
-  Jacobi_SDAG_CODE
+class Stencil: public CBase_Stencil {
+  Stencil_SDAG_CODE
 
   public:
     int iterations;
@@ -155,9 +147,9 @@ class Jacobi: public CBase_Jacobi {
     double *new_temperature;
 
     // Constructor, initialize values
-    Jacobi() {
+    Stencil() {
       __sdag_init();
-      usesAtSync=CmiTrue;
+      usesAtSync = CmiTrue;
 
       int i, j, k;
       // allocate a three dimensional array
@@ -174,36 +166,31 @@ class Jacobi: public CBase_Jacobi {
       constrainBC();
     }
 
-  void pup(PUP::er &p)
-  {
-    CBase_Jacobi::pup(p);
-    __sdag_pup(p);
-    p|iterations;
-    p|imsg;
+    void pup(PUP::er &p)
+    {
+      CBase_Stencil::pup(p);
+      __sdag_pup(p);
+      p|iterations;
+      p|imsg;
 
-    size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
-    if (p.isUnpacking()) {
+      size_t size = (blockDimX+2) * (blockDimY+2) * (blockDimZ+2);
+      if (p.isUnpacking()) {
 	temperature = new double[size];
 	new_temperature = new double[size];
       }
-    p(temperature, size);
-    p(new_temperature, size);
-  }
+      p(temperature, size);
+      p(new_temperature, size);
+    }
 
-  Jacobi(CkMigrateMessage* m) {__sdag_init();}
+    Stencil(CkMigrateMessage* m) { __sdag_init(); }
 
-    ~Jacobi() { 
+    ~Stencil() { 
       delete [] temperature; 
       delete [] new_temperature; 
     }
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
-      AtSync();
-      if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
-          CkPrintf("Start of iteration %d\n", iterations);
-          //BgPrintf("BgPrint> Start of iteration at %f\n");
-      }
       iterations++;
 
       // Copy different faces into messages
@@ -316,28 +303,52 @@ class Jacobi: public CBase_Jacobi {
 
       constrainBC();
 
-      if (iterations <= WARM_ITER || iterations >= MAX_ITER)
+      if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+	endTime = CmiWallTimer();
+	CkPrintf("[%d] Time per iteration: %f %f\n", iterations, (endTime - startTime), endTime);
+      }
+
+      if(iterations == MAX_ITER)
 	contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
-      else
-	doStep();
+      else {
+	startTime = CmiWallTimer();
+	if(iterations % LBPERIOD == 0)
+	  AtSync();
+	else
+	  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Stencil::doStep(), thisProxy));
+      }
     }
 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
-#pragma unroll    
-      for(int k=1; k<blockDimZ+1; ++k)
-	for(int j=1; j<blockDimY+1; ++j)
-	  for(int i=1; i<blockDimX+1; ++i) {
-	    // update my value based on the surrounding values
-	    new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
-					    +  temperature[index(i+1, j, k)]
-					    +  temperature[index(i, j-1, k)]
-					    +  temperature[index(i, j+1, k)]
-					    +  temperature[index(i, j, k-1)]
-					    +  temperature[index(i, j, k+1)]
-					    +  temperature[index(i, j, k)] ) * DIVIDEBY7;
-	  } // end for
+      int itno = (int)ceil((double)iterations/(double)CHANGELOAD) * 5;
+      int index = thisIndex.x + thisIndex.y*num_chare_x + thisIndex.z*num_chare_x*num_chare_y;
+      int numChares = num_chare_x * num_chare_y * num_chare_z;
+      double work = 100.0;
+
+      if(index >= numChares*0.2 && index <=numChares*0.8) {
+	work = work * ((double)index/(double)numChares) + (double)itno;
+	// CkPrintf("[%d][%d][%d] %d %d %f\n", thisIndex.x, thisIndex.y, thisIndex.z, index, itno, work);
+      } else
+	work = 10.0;
+
+#pragma unroll
+      for(int w=0; w<work; w++) {
+	for(int k=1; k<blockDimZ+1; ++k)
+	  for(int j=1; j<blockDimY+1; ++j)
+	    for(int i=1; i<blockDimX+1; ++i) {
+	      // update my value based on the surrounding values
+	      new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)]
+					      +  temperature[index(i+1, j, k)]
+					      +  temperature[index(i, j-1, k)]
+					      +  temperature[index(i, j+1, k)]
+					      +  temperature[index(i, j, k-1)]
+					      +  temperature[index(i, j, k+1)]
+					      +  temperature[index(i, j, k)] )
+					      *  DIVIDEBY7;
+	    } // end for
+      }
     }
 
     // Enforce some boundary conditions
@@ -354,6 +365,9 @@ class Jacobi: public CBase_Jacobi {
 	  temperature[index(i, j, 1)] = 255.0;
     }
 
+    void ResumeFromSync() {
+      doStep();
+    }
 };
 
-#include "jacobi3d.def.h"
+#include "stencil3d.def.h"

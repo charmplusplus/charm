@@ -1,4 +1,4 @@
-DIRS= lb_test jacobi2D
+DIRS= lb_test
 
 all:
 	for d in $(DIRS); do \

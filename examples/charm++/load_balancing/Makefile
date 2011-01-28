@@ -1,7 +1,6 @@
-DIRS	= hello integrate integrate2 integrateArray piArray queens RedExample \
-	  ring rings speeds load_balancing
+DIRS	= stencil3d kNeighbor
 
-all: 
+all:
 	for d in $(DIRS); do \
 		(cd $$d; $(MAKE) all OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done

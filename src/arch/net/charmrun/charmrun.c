@@ -1686,17 +1686,18 @@ int req_reply_child(SOCKET fd, char *type,
 		return status;
 }
 #endif
-/* This is the only place where charmrun talks back to anyone. 
-*/
+/**
+ * @brief This is the only place where charmrun talks back to anyone. 
+ */
 int req_reply(SOCKET fd, char *type, 
 	      const char *data, int dataLen)
 {
-  ChMessageHeader msg;
-  if (fd == INVALID_SOCKET) return REQ_FAILED;
-  ChMessageHeader_new(type,dataLen,&msg);
-  skt_sendN(fd,(const char *)&msg,sizeof(msg));
-  skt_sendN(fd,data,dataLen);
-  return REQ_OK;
+	ChMessageHeader msg;
+	if (fd == INVALID_SOCKET) return REQ_FAILED;
+	ChMessageHeader_new(type,dataLen,&msg);
+	skt_sendN(fd,(const char *)&msg,sizeof(msg));
+	skt_sendN(fd,data,dataLen);
+	return REQ_OK;
 }
 
 /* Request handlers:
@@ -1731,9 +1732,10 @@ int req_handle_initnode(ChMessage *msg,SOCKET fd)
   return REQ_OK;
 }
 
-/*Get the array of node numbers, IPs, and ports.
-This is used by the node-programs to talk to one another.
-*/
+/**
+ * @brief Gets the array of node numbers, IPs, and ports. This is used by the node-programs 
+ * to talk to one another.
+ */
 int req_handle_initnodetab(ChMessage *msg,SOCKET fd)
 {
 	ChMessageHeader hdr;
@@ -2006,7 +2008,7 @@ int req_handle_scanf(ChMessage *msg,SOCKET fd)
 #ifdef __FAULT__	
 void restart_node(int crashed_node);
 void reconnect_crashed_client(int socket_index,int crashed_node);
-void anounce_crash(int socket_index,int crashed_node);
+void announce_crash(int socket_index,int crashed_node);
 
 static int _last_crash = 0;			/* last crashed pe number */
 static int _crash_socket_index = 0;		/* last restart socket */
@@ -2020,6 +2022,10 @@ static int numCrashes=0;  /*number of crashes*/
 static SOCKET last_crashed_fd=-1;
 #endif
 
+/**
+ * @brief Handles an ACK after a crash. Once it has received all the pending acks, it sends the nodetab
+ * table to the crashed node.
+ */
 int req_handle_crashack(ChMessage *msg,SOCKET fd)
 {
 	static int count = 0;
@@ -2043,19 +2049,16 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
     else
 			
 #endif
-		  if (count == req_nClients-1) {
-			/* only after everybody else update its nodetab, can this
-			   restarted process continue */
-			printf("Charmrun> continue node: %d\n", _last_crash);
-			req_handle_initnodetab(NULL,req_clients[_crash_socket_index]);
-			
-			
-			_last_crash = 0;
-			count = 0;
+	if (count == req_nClients-1) {
+		// only after everybody else update its nodetab, can this restarted process continue 
+		printf("Charmrun> continue node: %d\n", _last_crash);
+		req_handle_initnodetab(NULL,req_clients[_crash_socket_index]);	
+		_last_crash = 0;
+		count = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	last_crashed_fd=-1;
+			last_crashed_fd=-1;
 #endif
-  }
+	}
 }
 
 #ifdef HSTART
@@ -2111,7 +2114,7 @@ int req_handle_crashack(ChMessage *msg,SOCKET fd)
 			}
 			
 			/*Anounce crash to all child charmruns*/
-			anounce_crash(nodetab_rank0_size+1,crashed_node );
+			announce_crash(nodetab_rank0_size+1,crashed_node );
 
 		}
 
@@ -2158,7 +2161,7 @@ void error_in_req_serve_client(SOCKET fd){
 	crashed_node = i;
 	
 	/** should also send a message to all the other processors telling them that this guy has crashed*/
-	/*anounce_crash(socket_index,crashed_node);*/
+	/*announce_crash(socket_index,crashed_node);*/
 	restart_node(crashed_node);
 
 	fprintf(stdout,"charmrun says Processor %d failed on Node %d\n",crashed_pe,crashed_node);
@@ -2341,16 +2344,14 @@ void req_forward_client()
 	}
 #ifdef __FAULT__
 	if(strcmp(cmd, "initnodetab") ==0){
-	
 		if(_last_crash ==0 ) 
-				cur_restart_phase++;
+			cur_restart_phase++;
 		int i;
 		for (i=0;i<req_nClients;i++)
 			if(_last_crash==0 || i !=_crash_socket_index)
-      if (REQ_OK != req_reply(req_clients[i],cmd,msg.data,ChMessageInt(msg.header.len)))
-	   {
-		abort();
-      }
+				if (REQ_OK != req_reply(req_clients[i],cmd,msg.data,ChMessageInt(msg.header.len))){
+					abort();
+				}
 		return;
 	}
 
@@ -4634,6 +4635,9 @@ int cur_restart_phase = 1;
 void refill_nodetab_entry(int crashed_node);
 nodetab_host *replacement_host(int pe);
 
+/**
+ * @brief Relaunches a program on the crashed node.
+ */
 void restart_node(int crashed_node){
 	int pe = nodetab_rank0_table[crashed_node];
 	FILE *f;
@@ -4729,6 +4733,11 @@ nodetab_host *replacement_host(int pe){
 }
 #endif
 
+/**
+ * @brief Reconnects a crashed node. It waits for the I-tuple from the just relaunched program. It also:
+ * i) Broadcast the nodetabtable to every other node.
+ * ii) Announces the crash to every other node.
+ */
 void reconnect_crashed_client(int socket_index,int crashed_node){
 	int i;
 	unsigned int clientPort;
@@ -4765,6 +4774,7 @@ void reconnect_crashed_client(int socket_index,int crashed_node){
   	  	  fprintf(stderr,"Charmrun: possibly because: %s.\n", msg.data);
 		}
 fprintf(stdout,"socket_index %d crashed_node %d reconnected fd %d  \n",socket_index,crashed_node,req_clients[socket_index]);
+
 		/** update the nodetab entry corresponding to
 		this node, skip the restarted one */
 		in = (ChSingleNodeinfo *)msg.data;
@@ -4776,7 +4786,7 @@ fprintf(stdout,"socket_index %d crashed_node %d reconnected fd %d  \n",socket_in
 		}
 
 		/* tell every one there is a crash */
-		anounce_crash(socket_index,crashed_node);
+		announce_crash(socket_index,crashed_node);
  		if (_last_crash != 0) {
           	  fprintf(stderr, "ERROR> Charmrun detected multiple crashes.\n");
                	  exit(1);
@@ -4792,7 +4802,11 @@ fprintf(stdout,"socket_index %d crashed_node %d reconnected fd %d  \n",socket_in
 	}	
 }
 
-void anounce_crash(int socket_index,int crashed_node){
+/**
+ * @brief Sends a message announcing the crash to every other node. This message will be used to
+ * trigger fault tolerance methods.
+ */
+void announce_crash(int socket_index,int crashed_node){
 	int i;
 	ChMessageHeader hdr;
 	ChMessageInt_t crashNo=ChMessageInt_new(crashed_node);
