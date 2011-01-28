@@ -57,8 +57,7 @@ TODO:
 #define CK_NO_PROC_POOL				1
 
 #define STREAMING_INFORMHOME                    1
-
-int crashed_node = -1;
+CpvDeclare(int, _crashedNode);
 
 // static, so that it is accessible from Converse part
 int CkMemCheckPT::inRestarting = 0;
@@ -88,7 +87,7 @@ CpvDeclare(CkProcCheckPTMessage*, procChkptBuf);
 
 // compute the backup processor
 // FIXME: avoid crashed processors
-inline int ChkptOnPe(int pe) { return (pe+1)%CkNumPes(); }
+inline int ChkptOnPe(int pe) { return (pe+CmiMyNodeSize())%CkNumPes(); }
 
 inline int CkMemCheckPT::BuddyPE(int pe)
 {
@@ -885,7 +884,8 @@ void CkMemCheckPT::recoverArrayElements()
   CKLOCMGR_LOOP(mgr->doneInserting(););
 
   inRestarting = 0;
-  crashed_node = -1;
+ // _crashedNode = -1;
+CpvAccess(_crashedNode) = -1;
 
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
@@ -1099,29 +1099,44 @@ static void askProcDataHandler(char *msg)
 // called on PE 0
 void qd_callback(void *m)
 {
-   CmiPrintf("[%d] callback after QD for crashed node: %d. \n", CkMyPe(), crashed_node);
+   CmiPrintf("[%d] callback after QD for crashed node: %d. \n", CkMyPe(), CpvAccess(_crashedNode));
    CkFreeMsg(m);
+#ifdef CMK_SMP
+   for(int i=0;i<CmiMyNodeSize();i++){
    char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
-   *(int *)(msg+CmiMsgHeaderSizeBytes) = crashed_node;
+   *(int *)(msg+CmiMsgHeaderSizeBytes) =CpvAccess(_crashedNode);
+   	CmiSetHandler(msg, askProcDataHandlerIdx);
+   	int pe = ChkptOnPe(CpvAccess(_crashedNode)*CmiMyNodeSize()+i);    // FIXME ?
+   	CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+   }
+   return;
+#endif
+   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
+   *(int *)(msg+CmiMsgHeaderSizeBytes) = CpvAccess(_crashedNode);
    // cur_restart_phase = RESTART_PHASE_MAX;             // big enough to get it processed, moved to machine.c
    CmiSetHandler(msg, askProcDataHandlerIdx);
-   int pe = ChkptOnPe(crashed_node);    // FIXME ?
+   int pe = ChkptOnPe(CpvAccess(_crashedNode));
    CmiSyncSendAndFree(pe, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+
 }
 
-// on crashed PE
+// on crashed node
 void CkMemRestart(const char *dummy, CkArgMsg *args)
 {
 #if CMK_MEM_CHECKPOINT
-   _diePE = CkMyPe();
+   _diePE = CmiMyNode();
    CkMemCheckPT::startTime = restartT = CmiWallTimer();
    CmiPrintf("[%d] I am restarting  cur_restart_phase:%d at time: %f\n",CmiMyPe(), cur_restart_phase, CkMemCheckPT::startTime);
    CkMemCheckPT::inRestarting = 1;
-   crashed_node = CkMyPe();
 
-   _discard_charm_message();
+  CpvAccess( _crashedNode )= CmiMyNode();
+	
+  _discard_charm_message();
+ if(CmiMyRank()==0){
+   CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
    CkCallback cb(qd_callback);
    CkStartQD(cb);
+ }
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
 #endif
@@ -1133,7 +1148,7 @@ extern "C"
 int CkInRestarting()
 {
 #if CMK_MEM_CHECKPOINT
-  if (crashed_node!=-1) return 1;
+  if (CpvAccess( _crashedNode)!=-1) return 1;
   // gzheng
   //if (cur_restart_phase == RESTART_PHASE_MAX || cur_restart_phase == 0) return 1;
   //return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->inRestarting;
@@ -1155,6 +1170,11 @@ void init_memcheckpt(char **argv)
     if (CmiGetArgFlagDesc(argv, "+ftc_disk", "Double-disk Checkpointing")) {
       arg_where = CkCheckPoint_inDISK;
     }
+
+	// initiliazing _crashedNode variable
+	CpvInitialize(int, _crashedNode);
+	CpvAccess(_crashedNode) = -1;
+
 }
 #endif
 
@@ -1186,19 +1206,24 @@ extern "C"
 void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
-  crashed_node = node;
-  CmiAssert(CmiMyNode() != crashed_node);
+  CpvAccess( _crashedNode) = node;
+  CmiAssert(CmiMyNode() !=CpvAccess( _crashedNode));
   CkMemCheckPT::inRestarting = 1;
 
 #ifdef CMK_SMP
-	// @TODO: this code is temporary. It just makes the SMP charmrun to restart without problems.
-	return;
-#endif
-
+//	CkPrintf("%d %d notify crash\n",CkMyPe(), CmiMyNode());	
+  for(int i=0;i<CkMyNodeSize();i++){
+  	char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
+  	CmiSetHandler(msg, notifyHandlerIdx);
+  	CmiSyncSendAndFree(CkMyNode()*CkMyNodeSize()+i, CmiMsgHeaderSizeBytes, (char *)msg);
+  }
+ return;
+#else 
     // this may be in interrupt handler, send a message to reset QD
   char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(msg, notifyHandlerIdx);
   CmiSyncSendAndFree(CkMyPe(), CmiMsgHeaderSizeBytes, (char *)msg);
+#endif
 #endif
 }
 
