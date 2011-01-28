@@ -3126,11 +3126,12 @@ void Entry::genChareDefs(XStr& str)
   if (isReductionTarget()) {
       XStr retStr; retStr<<retType;
       str << retType << " " << indexName(); //makeDecl(retStr, 1)
-      str << "::_" << name << "_redn_wrapper(CkReductionMsg* m)\n{\n"
-          << "  char* impl_buf = (char*)m->getData();\n";
+      str << "::_" << name << "_redn_wrapper(void* impl_msg, " 
+          << container->baseName() << "* impl_obj)\n{\n"
+          << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
       XStr precall;
-      genCall(str, precall);
-      str << "  delete m;\n}\n\n";
+      genCall(str, precall, true);
+      str << "\n}\n\n";
   }
 }
 
@@ -4233,6 +4234,14 @@ void Entry::genIndexDecls(XStr& str)
     #endif
   }
 
+  if (isReductionTarget()) {
+      str << "    static int __idx_" << name << "_redn_wrapper;\n"
+          << "    static int " << name << "_redn_wrapper"
+          << "(CkReductionMsg* impl_msg) { return __idx_" << name << "_redn_wrapper; }\n"
+          << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
+          << container->baseName() <<"* impl_obj);\n";
+  }
+
   // call function declaration
   str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
     container->baseName()<<"* impl_obj);\n";
@@ -4245,9 +4254,6 @@ void Entry::genIndexDecls(XStr& str)
   }
   if (param->isMarshalled()) {
     str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
-  }
-  if (isReductionTarget()) {
-    str << "    static void _" << name << "_redn_wrapper(CkReductionMsg* m);\n";
   }
 }
 
@@ -4424,7 +4430,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
@@ -4436,9 +4442,11 @@ void Entry::genCall(XStr& str, const XStr &preCall)
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
   	if(param->isCkMigMsgPtr()) isMigMain = true;
 	else isArgcArgv = true;
+  } else {
+    //Normal case: Unmarshall variables
+    if (redn_wrapper) param->beginRednWrapperUnmarshall(str);
+    else param->beginUnmarshall(str);
   }
-  else //Normal case: Unmarshall variables
-	param->beginUnmarshall(str);
 
   str << preCall;
   if (!isConstructor() && fortranMode) {
@@ -4502,9 +4510,9 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 
     if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
         str<<"(m->argc,m->argv);\n";
-	str<<"  delete m;\n";
+        str<<"  delete m;\n";
     }else if(isMigMain){
-	str<<"((CkMigrateMessage*)impl_msg);\n";
+        str<<"((CkMigrateMessage*)impl_msg);\n";
     }
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
@@ -4533,6 +4541,9 @@ void Entry::genDefs(XStr& str)
 
   //Define storage for entry point number
   str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
+  if (isReductionTarget()) {
+      str << " int " << indexName() << "::__idx_" << name <<"_redn_wrapper=0;\n";
+  }
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -4726,6 +4737,12 @@ void Entry::genReg(XStr& str)
   else if (param->isMessage() && !attribs&SMIGRATE) {
       str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
       str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
+  }
+  if (isReductionTarget()) {
+      str << "  " << "__idx_" << name << "_redn_wrapper = CkRegisterEp(\""
+          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\",\n"
+          << "     (CkCallFnPtr)_" << name << "_redn_wrapper, "
+          << "CMessage_CkReductionMsg::__idx, __idx, 0);";
   }
 }
 
@@ -5044,19 +5061,59 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
+void ParamList::beginRednWrapperUnmarshall(XStr &str)
+{
+    if (isMarshalled())
+    {
+        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
+        str<<"  PUP::fromMem implP(impl_buf);\n";
+        if (next != NULL && next->next == NULL) {
+            if (isArray()) {
+                Type* dt = next->param->type->deref();
+                str << "  " << dt << " " << next->param->name << "; "
+                    << next->param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << dt << ");\n";
+                dt = param->type->deref();
+                str << "  " << dt << "* " << param->name << "; "
+                    << param->name << " = (" << dt << "*)impl_buf;\n";
+            } else if (next->isArray()) {
+                Type* dt = param->type->deref();
+                str << "  " << dt << " " << param->name << "; "
+                    << param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << dt << ");\n";
+                dt = next->param->type->deref();
+                str << "  " << dt << "* " << next->param->name << "; "
+                    << next->param->name << " = (" << dt << "*)impl_buf;\n";
+            } else {
+                callEach(&Parameter::beginUnmarshall,str);
+            }
+        } else {
+            str << "/* non two-param case */\n";
+            callEach(&Parameter::beginUnmarshall,str);
+            str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+            str<<"  /*Unmarshall arrays:*/\n";
+            callEach(&Parameter::unmarshallArrayData,str);
+        }
+    } else if (isVoid()) {
+        str<<"  CkFreeSysMsg(impl_msg);\n";
+    }
+}
+
 /** unmarshalling: unpack fields from flat buffer **/
 void ParamList::beginUnmarshall(XStr &str)
 {
-    	if (isMarshalled())
-    	{
-    		str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
-    		str<<"  PUP::fromMem implP(impl_buf);\n";
-    		callEach(&Parameter::beginUnmarshall,str);
-    		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-		str<<"  /*Unmarshall arrays:*/\n";
-		callEach(&Parameter::unmarshallArrayData,str);
-    	}
-	else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
+    if (isMarshalled())
+    {
+        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
+        str<<"  PUP::fromMem implP(impl_buf);\n";
+        callEach(&Parameter::beginUnmarshall,str);
+        str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+        str<<"  /*Unmarshall arrays:*/\n";
+        callEach(&Parameter::unmarshallArrayData,str);
+    }
+    else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
 }
 void Parameter::beginUnmarshall(XStr &str)
 { //First pass: unpack pup'd entries

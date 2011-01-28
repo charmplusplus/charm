@@ -372,6 +372,7 @@ class ParamList {
     int hasConditional();
     void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
+    void beginRednWrapperUnmarshall(XStr &str);
     void unmarshall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
@@ -924,7 +925,7 @@ class Entry : public Member {
 
 //    friend class CParsedFile;
     int hasCallMarshall;
-    void genCall(XStr &dest,const XStr &preCall);
+    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
 
     XStr epStr(void);
     XStr epIdx(int fromProxy=1);
