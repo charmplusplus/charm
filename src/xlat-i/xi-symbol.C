@@ -2058,7 +2058,7 @@ Message::genDefs(XStr& str)
     str << "}\n";
 
     str << tspec << ptype << "::" << proxyPrefix() << type << "() {\n";
-    str << mtype << " *newmsg = reinterpret_cast<" << mtype << " *>(this);\n";
+    str << mtype << " *newmsg = (" << mtype << " *)this;\n";
     for(i=0, count=0, ml=mvlist; i<num; i++,ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
