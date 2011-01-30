@@ -16,7 +16,7 @@ void Driver::untyped_done(CkReductionMsg* m) {
     delete m;
 
     CkCallback *cb = new CkCallback(
-            CkIndex_Driver::typed_done_redn_wrapper(NULL), thisProxy);
+            CkReductionTarget(Driver, typed_done), thisProxy);
     w.ckSetReductionClient(cb);
     w.reduce();
 }

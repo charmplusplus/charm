@@ -929,6 +929,8 @@ void _initCharm(int unused_argc, char **argv)
 
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
+	CkpvInitialize(size_t *, _offsets);
+	CkpvAccess(_offsets) = new size_t[32];
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
 	CkpvInitialize(void*, _currentChare);

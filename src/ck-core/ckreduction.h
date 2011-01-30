@@ -347,6 +347,9 @@ private:
 	const CkCallback &cb,int userFlag=-1); \
   void contribute(CkReductionMsg *msg);\*/
 
+#define CkReductionTarget(me, method) \
+    CkIndex_##me::method##_redn_wrapper(NULL)
+
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
 	int userFlag)\
