@@ -25,7 +25,7 @@ void Driver::typed_done(int result)
 {
     CkPrintf("Typed Sum: %d\n", result);
     CkCallback *cb = new CkCallback(
-            CkIndex_Driver::typed_array_done_redn_wrapper(NULL), thisProxy);
+            CkReductionTarget(Driver, typed_array_done), thisProxy);
     w.ckSetReductionClient(cb);
     w.reduce_array();
 }
@@ -36,7 +36,7 @@ void Driver::typed_array_done(int* results, int n)
     for (int i=0; i<n; ++i) CkPrintf("%d ", results[i]);
     CkPrintf("]\n");
     CkCallback *cb = new CkCallback(
-            CkIndex_Driver::typed_array_done2_redn_wrapper(NULL), thisProxy);
+            CkReductionTarget(Driver, typed_array_done2), thisProxy);
     w.ckSetReductionClient(cb);
     w.reduce_array();
 }
