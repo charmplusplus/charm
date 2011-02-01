@@ -86,7 +86,7 @@ class Main: public CBase_Main {
       mainProxy = thisProxy;
       CkPrintf("\nStarting kNeighbor ...\n");
 
-      if (m->argc!=4 && m->argc!=5) {
+      if (m->argc!=4 || m->argc!=5) {
         CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq]\n", m->argv[0]);
         delete m;
         CkExit();

@@ -2345,7 +2345,7 @@ void req_forward_client()
 #ifdef __FAULT__
 	if(strcmp(cmd, "initnodetab") ==0){
 		if(_last_crash ==0 ) 
-			cur_restart_phase++;
+			current_restart_phase++;
 		int i;
 		for (i=0;i<req_nClients;i++)
 			if(_last_crash==0 || i !=_crash_socket_index)
@@ -4630,7 +4630,7 @@ void start_nodes_local(char ** env)
 
 #ifdef __FAULT__
 
-int cur_restart_phase = 1;
+int current_restart_phase = 1;
 
 void refill_nodetab_entry(int crashed_node);
 nodetab_host *replacement_host(int pe);
@@ -4665,7 +4665,7 @@ void restart_node(int crashed_node){
 		i++;
 	}
 	restart_argv[i] = "+restartaftercrash";
-        sprintf(phase_str,"%d", ++cur_restart_phase);
+        sprintf(phase_str,"%d", ++current_restart_phase);
 	restart_argv[i+1]=phase_str;
 	restart_argv[i+2]=NULL;
 

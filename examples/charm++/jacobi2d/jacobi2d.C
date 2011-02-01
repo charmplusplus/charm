@@ -27,7 +27,8 @@ int num_rows;
 int num_cols;
 
 //allowed variation between temp and new_temp
-float epsilon=1./1000;
+//float epsilon=1./1000;
+float epsilon=0;
 
 //temperatures on the various boundries
 float left = 1;

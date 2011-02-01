@@ -5,7 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
-#define  DEBUGP(x)    // CmiPrintf x;
+#define  DEBUGP(x)     CmiPrintf x;
 
 #include "ck.h"
 
