@@ -62,6 +62,8 @@ public:
 	static int __idx;
 };
 
+CkpvExtern(size_t *, _offsets);
+
 /// CkArgMsg is passed to the mainchare's constructor.
 class CkArgMsg : public CkMessage {
 public:

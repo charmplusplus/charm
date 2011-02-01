@@ -60,6 +60,8 @@ static __thread int isomalloc_thread = 0;
 #endif
 #endif
 
+static int meta_inited = 0;
+
 static void meta_init(char **argv)
 {
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
@@ -68,6 +70,8 @@ static void meta_init(char **argv)
 #if CMK_TLS_THREAD
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
+   CmiNodeAllBarrier();
+   meta_inited = 1;
 }
 
 static void *meta_malloc(size_t size)
@@ -77,7 +81,7 @@ static void *meta_malloc(size_t size)
         int _isomalloc_thread = isomalloc_thread;
         if (CmiThreadIs(CMI_THREAD_IS_TLS)) _isomalloc_thread = 1;
 #endif
-	if (CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
+	if (meta_inited && CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
 #if CMK_TLS_THREAD
              && _isomalloc_thread
 #endif

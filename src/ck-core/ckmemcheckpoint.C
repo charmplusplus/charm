@@ -1015,7 +1015,7 @@ static void restartBcastHandler(char *msg)
   //if (CkMyPe() != _diePE) cur_restart_phase ++;
 
   if (CkMyPe()==_diePE)
-    CkPrintf("[%d] restartBcastHandler cur_restart_phase=%d _diePE:%d at %f.\n", CkMyPe(), cur_restart_phase, _diePE, CkWallTimer());
+    CkPrintf("[%d] restartBcastHandler cur_restart_phase=%d _diePE:%d at %f.\n", CkMyPe(), CpvAccess(_curRestartPhase), _diePE, CkWallTimer());
 
   // reset QD counters
 /*  gzheng
@@ -1047,8 +1047,8 @@ static void recoverProcDataHandler(char *msg)
    envelope *env = (envelope *)msg;
    CkUnpackMessage(&env);
    CkProcCheckPTMessage* procMsg = (CkProcCheckPTMessage *)(EnvToUsr(env));
-   cur_restart_phase = procMsg->cur_restart_phase;
-   CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), cur_restart_phase, CkWallTimer());
+   CpvAccess(_curRestartPhase) = procMsg->cur_restart_phase;
+   CmiPrintf("[%d] ----- recoverProcDataHandler  cur_restart_phase:%d at time: %f\n", CkMyPe(), CpvAccess(_curRestartPhase), CkWallTimer());
    //cur_restart_phase ++;
      // gzheng ?
    //CpvAccess(_qd)->flushStates();
@@ -1080,14 +1080,14 @@ static void askProcDataHandler(char *msg)
 {
 #if CMK_MEM_CHECKPOINT
     int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
-    CkPrintf("[%d] restartBcastHandler called with '%d' cur_restart_phase:%d at time %f.\n",CmiMyPe(),diePe, cur_restart_phase, CkWallTimer());
+    CkPrintf("[%d] restartBcastHandler called with '%d' cur_restart_phase:%d at time %f.\n",CmiMyPe(),diePe, CpvAccess(_curRestartPhase), CkWallTimer());
     if (CpvAccess(procChkptBuf) == NULL) 
       CkPrintf("[%d] no checkpoint found for processor %d. This could be due to a crash before the first checkpointing.\n", CkMyPe(), diePe);
     CmiAssert(CpvAccess(procChkptBuf)!=NULL);
     envelope *env = (envelope *)(UsrToEnv(CpvAccess(procChkptBuf)));
     CmiAssert(CpvAccess(procChkptBuf)->pe == diePe);
 
-    CpvAccess(procChkptBuf)->cur_restart_phase = cur_restart_phase;
+    CpvAccess(procChkptBuf)->cur_restart_phase = CpvAccess(_curRestartPhase);
 
     CkPackMessage(&env);
     CmiSetHandler(env, recoverProcDataHandlerIdx);
@@ -1126,16 +1126,17 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
 #if CMK_MEM_CHECKPOINT
    _diePE = CmiMyNode();
    CkMemCheckPT::startTime = restartT = CmiWallTimer();
-   CmiPrintf("[%d] I am restarting  cur_restart_phase:%d at time: %f\n",CmiMyPe(), cur_restart_phase, CkMemCheckPT::startTime);
+   CmiPrintf("[%d] I am restarting  cur_restart_phase:%d at time: %f\n",CmiMyPe(), CpvAccess(_curRestartPhase), CkMemCheckPT::startTime);
    CkMemCheckPT::inRestarting = 1;
 
   CpvAccess( _crashedNode )= CmiMyNode();
 	
   _discard_charm_message();
- if(CmiMyRank()==0){
-   CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
+  
+if(CmiMyRank()==0){
    CkCallback cb(qd_callback);
    CkStartQD(cb);
+   CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
  }
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
@@ -1196,7 +1197,7 @@ static void notifyHandler(char *msg)
 #if CMK_MEM_CHECKPOINT
   CmiFree(msg);
       /* immediately increase restart phase to filter old messages */
-  cur_restart_phase ++;
+  CpvAccess(_curRestartPhase) ++;
   CpvAccess(_qd)->flushStates();
   _discard_charm_message();
 #endif
@@ -1207,11 +1208,15 @@ void notify_crash(int node)
 {
 #ifdef CMK_MEM_CHECKPOINT
   CpvAccess( _crashedNode) = node;
+#ifdef CMK_SMP
+  for(int i=0;i<CkMyNodeSize();i++){
+  	CpvAccessOther(_crashedNode,i)=node;
+  }
+#endif
   CmiAssert(CmiMyNode() !=CpvAccess( _crashedNode));
   CkMemCheckPT::inRestarting = 1;
 
 #ifdef CMK_SMP
-//	CkPrintf("%d %d notify crash\n",CkMyPe(), CmiMyNode());	
   for(int i=0;i<CkMyNodeSize();i++){
   	char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   	CmiSetHandler(msg, notifyHandlerIdx);

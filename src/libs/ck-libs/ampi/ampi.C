@@ -4734,8 +4734,11 @@ int AMPI_Comm_split(int src,int color,int key,int *dest)
 {
   AMPIAPI("AMPI_Comm_split");
 
-  getAmpiInstance(src)->split(color,key,dest, 0);
-  AMPI_Barrier(src);  // to prevent race condition in the new comm
+  if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
+  else {
+    getAmpiInstance(src)->split(color,key,dest, 0);
+    AMPI_Barrier(src);  // to prevent race condition in the new comm
+  }
 
 #if AMPIMSGLOG
   ampiParent* pptr = getAmpiParent();
