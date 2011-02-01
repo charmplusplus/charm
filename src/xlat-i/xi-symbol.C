@@ -1903,7 +1903,7 @@ Message::genAllocDecl(XStr &str)
   mtype << type;
   if(templat) templat->genVars(mtype);
   str << CIMsgClassAnsi;
-  str << "    CMessage_" << mtype << "() {};\n";
+  str << "    CMessage_" << mtype << "();\n";
   str << "    static void *pack(" << mtype << " *p);\n";
   str << "    static " << mtype << "* unpack(void* p);\n";
   num = numArrays();
@@ -2042,30 +2042,33 @@ Message::genDefs(XStr& str)
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
-    str << "  size_t offsets[" << numArray+1 << "];\n";
-    str << "  offsets[0] = ALIGN8(sz);\n";
+    str << "  CkpvAccess(_offsets)[0] = ALIGN8(sz);\n";
     for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
         str << "  if(sizes==0)\n";
-        str << "    offsets[" << count+1 << "] = offsets[0];\n";
+        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
         str << "  else\n";
-        str << "    offsets[" << count+1 << "] = offsets[" << count << "] + ";
+        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
         str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
         count ++;
       }
     }
-    str << "  " << mtype << " *newmsg = (" << mtype << " *) ";
-    str << "CkAllocMsg(msgnum, offsets[" << numArray << "], pb);\n";
+    str << "  return CkAllocMsg(msgnum, CkpvAccess(_offsets)[" << numArray << "], pb);\n";
+    str << "}\n";
+
+    str << tspec << ptype << "::" << proxyPrefix() << type << "() {\n";
+    str << mtype << " *newmsg = (" << mtype << " *)this;\n";
     for(i=0, count=0, ml=mvlist; i<num; i++,ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
         str << "  newmsg->" << mv->name << " = (" << mv->type << " *) ";
-        str << "((char *)newmsg + offsets[" << count << "]);\n";
+        str << "((char *)newmsg + CkpvAccess(_offsets)[" << count << "]);\n";
         count ++;
       }
     }
-    str << "  return (void *) newmsg;\n}\n";
+    str << "}\n";
+
     int numCond = numConditional();
     str << tspec << "void " << ptype << "::dealloc(void *p) {\n";
     if (numCond > 0) {

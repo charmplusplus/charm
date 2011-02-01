@@ -20,9 +20,15 @@ This is slightly hacked as:
 #define memalign mm_memalign
 #define valloc   mm_valloc
 
-extern CMK_TYPEDEF_UINT8 memory_allocated;
-extern CMK_TYPEDEF_UINT8 memory_allocated_max;
-extern CMK_TYPEDEF_UINT8 memory_allocated_min;
+extern CMK_TYPEDEF_UINT8 _memory_allocated;
+extern CMK_TYPEDEF_UINT8 _memory_allocated_max;
+extern CMK_TYPEDEF_UINT8 _memory_allocated_min;
+
+#define UPDATE_MEMUSAGE  \
+  if(_memory_allocated > _memory_allocated_max) \
+    _memory_allocated_max=_memory_allocated; \
+  if(_memory_allocated < _memory_allocated_min) \
+    _memory_allocated_min=_memory_allocated;
 
 #define HAVE_MMAP CMK_HAS_MMAP
 #ifndef __USE_GNU
@@ -3335,12 +3341,9 @@ public_mALLOc(size_t bytes)
 	 ar_ptr == arena_for_chunk(mem2chunk(victim)));
 
   if (victim!=NULL) {
-  memory_allocated += chunksize(mem2chunk(victim));
+  _memory_allocated += chunksize(mem2chunk(victim));
   
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
   }
 
   return victim;
@@ -3363,7 +3366,7 @@ public_fREe(Void_t* mem)
     return;
 
   p = mem2chunk(mem);
-  memory_allocated -= chunksize(p);
+  _memory_allocated -= chunksize(p);
 
 #if HAVE_MMAP
   if (chunk_is_mmapped(p))                       /* release mmapped memory. */
@@ -3417,13 +3420,10 @@ public_rEALLOc(Void_t* oldmem, size_t bytes)
 
   checked_request2size(bytes, nb);
 
-  memory_allocated -= oldsize;
-  memory_allocated += nb;
+  _memory_allocated -= oldsize;
+  _memory_allocated += nb;
    
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
   
 #if HAVE_MMAP
   if (chunk_is_mmapped(oldp))
@@ -3514,12 +3514,9 @@ public_mEMALIGn(size_t alignment, size_t bytes)
   }
   assert(!p || chunk_is_mmapped(mem2chunk(p)) ||
 	 ar_ptr == arena_for_chunk(mem2chunk(p)));
-  memory_allocated += chunksize(mem2chunk(p));
+  _memory_allocated += chunksize(mem2chunk(p));
 
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
   
   return p;
 }
@@ -3537,12 +3534,9 @@ public_vALLOc(size_t bytes)
     return 0;
   p = _int_valloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
-  memory_allocated += chunksize(mem2chunk(p));
+  _memory_allocated += chunksize(mem2chunk(p));
 
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
 
   return p;
 }
@@ -3558,12 +3552,9 @@ public_pVALLOc(size_t bytes)
   arena_get(ar_ptr, bytes + 2*mp_.pagesize + MINSIZE);
   p = _int_pvalloc(ar_ptr, bytes);
   (void)mutex_unlock(&ar_ptr->mutex);
-  memory_allocated += chunksize(mem2chunk(p));
+  _memory_allocated += chunksize(mem2chunk(p));
 
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
   
   return p;
 }
@@ -3652,12 +3643,9 @@ public_cALLOc(size_t n, size_t elem_size)
     if (mem == 0) return 0;
   }
   p = mem2chunk(mem);
-  memory_allocated += chunksize(p);
+  _memory_allocated += chunksize(p);
 
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
 
   /* Two optional cases in which clearing not necessary */
 #if HAVE_MMAP
@@ -3718,11 +3706,10 @@ public_iCALLOc(size_t n, size_t elem_size, Void_t** chunks)
 
   m = _int_icalloc(ar_ptr, n, elem_size, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
-  memory_allocated += chunksize(mem2chunk(m));
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  _memory_allocated += chunksize(mem2chunk(m));
+
+  UPDATE_MEMUSAGE
+
   return m;
 }
 
@@ -3738,12 +3725,9 @@ public_iCOMALLOc(size_t n, size_t sizes[], Void_t** chunks)
 
   m = _int_icomalloc(ar_ptr, n, sizes, chunks);
   (void)mutex_unlock(&ar_ptr->mutex);
-  memory_allocated += chunksize(mem2chunk(m));
+  _memory_allocated += chunksize(mem2chunk(m));
   
-  if(memory_allocated > memory_allocated_max)
-    memory_allocated_max=memory_allocated;
-  if(memory_allocated < memory_allocated_min)
-    memory_allocated_min=memory_allocated;
+  UPDATE_MEMUSAGE
   
   return m;
 }
