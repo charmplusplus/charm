@@ -33,9 +33,9 @@ public:
     t3(CkArgMsg* m)
     {
         // Usage: t3 [number_of_worker_threads [max_bytes]]
-        /*if(m->argc >1 ) NUM_WORKERS=atoi(m->argv[1]);
-        if(m->argc >2 ) bytes=atoi(m->argv[2]);
-        delete m;*/
+        if(m->argc >1 ) NUM_WORKERS=atoi(m->argv[1]);
+        if(m->argc >2 ) bytes=atoi(m->argv[1]);
+        delete m;
         reallyDone = 0;
 
         // Actually build the shared array.
@@ -64,8 +64,7 @@ public:
               << NUM_WORKERS << TAB
               << bytes << TAB
               << ((g_prefetch == 0) ? "N" : ((g_prefetch == 1) ? "Y" : "U")) << TAB
-              <<g_prefetch<<TAB
-			  << end_time - start_time
+              << end_time - start_time
               << endl;
         } else {
 

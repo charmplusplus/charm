@@ -129,8 +129,8 @@ extern void CldModuleInit(char **);
 
 #include "quiescence.h"
 
-//int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
-CpvDeclare(int,_curRestartPhase);
+int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
+
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
@@ -3229,8 +3229,7 @@ void ConverseCommonInit(char **argv)
 #if CMK_CCS_AVAILABLE
   CpvInitialize(int, cmiArgDebugFlag);
 #endif
-  CpvInitialize(int,_curRestartPhase);
-  CpvAccess(_curRestartPhase)=1;
+
   CmiInitCPUAffinityUtil();
   CmiArgInit(argv);
   CmiMemoryInit(argv);

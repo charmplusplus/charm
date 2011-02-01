@@ -3,7 +3,7 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;
-int change=1;
+
 /*mainchare*/
 class Main : public CBase_Main
 {
@@ -21,7 +21,7 @@ public:
     mainProxy = thisProxy;
 
     CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
-	change=1;
+
     arr[0].SayHi(17);
   };
 
@@ -45,8 +45,7 @@ public:
   
   void SayHi(int hiNo)
   {
-	  change++;
-    CkPrintf("Hi[%d] from element %d %d\n",hiNo,thisIndex,change);
+    CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
     if (thisIndex < nElements-1)
       //Pass the hello on:
       thisProxy[thisIndex+1].SayHi(hiNo+1);
