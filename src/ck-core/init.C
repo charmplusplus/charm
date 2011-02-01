@@ -248,7 +248,7 @@ static inline void _parseCommandLineOpts(char **argv)
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
-  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&cur_restart_phase,"restarting this processor after a crash")){	
+  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&CpvAccess(_curRestartPhase),"restarting this processor after a crash")){	
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
