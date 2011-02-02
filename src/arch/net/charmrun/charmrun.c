@@ -3985,6 +3985,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_ID\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && (Echo Could not detect rank from environment ; Exit 1\n");
     fprintf(f,"export CmiMyNode\n");
   }
 #ifdef HSTART
