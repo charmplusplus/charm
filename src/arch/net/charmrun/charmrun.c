@@ -3984,6 +3984,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     fprintf(f,"CmiMyNode=$OMPI_COMM_WORLD_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_ID\n");
     fprintf(f,"export CmiMyNode\n");
   }
 #ifdef HSTART
