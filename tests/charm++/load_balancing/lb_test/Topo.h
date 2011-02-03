@@ -14,7 +14,7 @@ public:
   int max_us;
 };
 
-enum TopoType { TopoRing, TopoMesh2D, TopoRandGraph, TopoError=-1 };
+enum TopoType { TopoRing, TopoMesh2D, TopoMesh3D, TopoRandGraph, TopoError=-1 };
 
 static const struct { 
   const char* name;
@@ -27,6 +27,9 @@ static const struct {
   { "Mesh2D", 
     "mesh2d - construct a 2D mesh, with holes", 
     TopoMesh2D },
+  { "Mesh3D", 
+    "mesh3d - construct a 3D mesh, with holes", 
+    TopoMesh3D },
   { "RandGraph", 
     "randgraph - construct a graph, with 25% of links used",
     TopoRandGraph },
@@ -59,6 +62,7 @@ private:
   void FindComputeTimes();
   void ConstructRing();
   void ConstructMesh2D();
+  void ConstructMesh3D();
   void ConstructRandGraph();
   float gasdev();
 

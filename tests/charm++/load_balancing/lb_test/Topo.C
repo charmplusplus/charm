@@ -70,17 +70,20 @@ Topo::Topo(TopoInitMsg* _m)
   // Re-seed, so we can change the graph independent of computation
   srand(seed);
 
-  switch (topo) {
-  case TopoRing:
-    ConstructRing();
-    break;
-  case  TopoMesh2D:
-    ConstructMesh2D();
-    break;
-  case  TopoRandGraph:
-    ConstructRandGraph();
-    break;
-  };
+	switch (topo) {
+	case TopoRing:
+		ConstructRing();
+		break;
+	case  TopoMesh2D:
+		ConstructMesh2D();
+		break;
+	case TopoMesh3D:
+		ConstructMesh3D();
+		break;
+	case TopoRandGraph:
+		ConstructRandGraph();
+		break;
+	};
 
   delete _m;
 }
@@ -204,6 +207,70 @@ void Topo::ConstructMesh2D()
       elemlist[dest].receiving++;
     }
   }
+}
+
+/**
+ * Builds a 3D mesh by creating the smallest cube containing all the objects.
+ * The cube might have "holes" depending on the number of objects. We avoid
+ * communication with non-existent elements.
+ */
+void Topo::ConstructMesh3D()
+{
+	// variable to store the length of one side of the cube
+	int length, i;
+
+	// computing the size of one side of the cube
+	length = (int)ceil(pow((double)elements,(double)1/3));
+
+	if (CkMyPe() == 0)
+    	CkPrintf("Building a %d x %d x %d mesh, with %d missing elements\n",
+	    	 length,length,length,length*length*length-elements);
+
+	// initializing elemlist array, each element will potentially 
+	// communicate with other 6 neighbors
+	for(i=0;i<elements;i++) {
+    	elemlist[i].receivefrom = new MsgInfo[6];
+    	elemlist[i].sendto = new MsgInfo[6];
+    	elemlist[i].receiving = elemlist[i].sending = 0;
+	}
+
+	// filling up neihgbor list for each element
+	for(i=0; i<elements; i++) {
+		
+		// transforming linear index into (x,y,z) coordinates
+		const int x = i % length;
+		const int y = ((i - x) % (length*length)) / length;
+		const int z = (i - y*length -x) / (length*length);
+		const int to_x[6] = { x-1, x+1,   x,   x,   x,   x };
+		const int to_y[6] = {   y,   y, y-1, y+1,   y,   y };
+		const int to_z[6] = {   z,   z,   z,   z, z-1, z+1 };
+
+		//DEBUG CkPrintf("[%d] Element %d -> (%d,%d,%d)\n",CkMyPe(),i,x,y,z);
+
+		//  adding each neighbor to list
+		for(int nbor = 0; nbor < 6; nbor++) {
+			int dest_x = to_x[nbor];
+			int dest_y = to_y[nbor];
+			int dest_z = to_z[nbor];
+			if (dest_x >= length || dest_x < 0 || dest_y >= length || dest_y < 0 || dest_z >= length || dest_z < 0 )
+				continue;
+
+			int dest = dest_z * length*length + dest_y*length + dest_x;
+			if (dest >= elements || dest < 0) 
+				continue;
+
+ 			//DEBUG CkPrintf("[%d]Element %d (%d,%d,%d) is sending to element %d (%d,%d,%d)\n",
+ 				//DEBUG CkMyPe(),i,x,y,z,dest,dest_x,dest_y,dest_z);
+
+			elemlist[i].sendto[elemlist[i].sending].obj = dest;
+			elemlist[i].sendto[elemlist[i].sending].bytes = N_BYTES;
+			elemlist[i].sending++;
+
+			elemlist[dest].receivefrom[elemlist[dest].receiving].obj = i;
+			elemlist[dest].receivefrom[elemlist[dest].receiving].bytes = N_BYTES;
+			elemlist[dest].receiving++;
+		}
+	}
 }
 
 void Topo::ConstructRandGraph()
