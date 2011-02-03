@@ -217,10 +217,10 @@ extern "C" void driver(void)
 #endif
     }
     /* perform migration-based load balancing */
-    if (t > 1024 and t % 2048 == 0)
+    if (t > 1024 && t % 2048 == 0)
       FEM_Migrate();
 
-    if (t > 1024 and t % 2048 == 0) { // Publish data to the net
+    if (t > 1024 && t % 2048 == 0) { // Publish data to the net
       NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_POINTAT);
 
       NetFEM_Nodes(n,nnodes,(double *)g.coord,"Position (m)");
