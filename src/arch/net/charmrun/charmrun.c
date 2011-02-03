@@ -3985,7 +3985,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$MPIRUN_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_RANK\n");
     fprintf(f,"test -z \"$CmiMyNode\" && CmiMyNode=$PMI_ID\n");
-    fprintf(f,"test -z \"$CmiMyNode\" && (Echo Could not detect rank from environment ; Exit 1\n");
+    fprintf(f,"test -z \"$CmiMyNode\" && (Echo Could not detect rank from environment ; Exit 1)\n");
     fprintf(f,"export CmiMyNode\n");
   }
 #ifdef HSTART
@@ -4014,7 +4014,7 @@ void rsh_script(FILE *f, int nodeno, int rank0no, char **argv, int restart)
     fprintf(f,"CmiNumNodes=$OMPI_COMM_WORLD_SIZE\n");
     fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$MPIRUN_NPROCS\n");
     fprintf(f,"test -z \"$CmiNumNodes\" && CmiNumNodes=$PMI_SIZE\n");
-    fprintf(f,"test -z \"$CmiNumNodes\" && (Echo Could not detect node count from environment ; Exit 1\n");
+    fprintf(f,"test -z \"$CmiNumNodes\" && (Echo Could not detect node count from environment ; Exit 1)\n");
     fprintf(f,"export CmiNumNodes\n");
   }
 #ifdef HSTART
