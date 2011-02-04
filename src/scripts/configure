@@ -2995,21 +2995,15 @@ _ACEOF
 
 ### test sched_setaffinity ####
 cat > $tc <<EOT
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-
 #define _GNU_SOURCE
 #include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 
 int main()
 {
-  unsigned long mask = 0xffffffff;
-  unsigned int len = sizeof(mask);
-
-  if (sched_setaffinity(0, len, &mask) < 0) {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0) {
     return -1;
   }
   return 0;
