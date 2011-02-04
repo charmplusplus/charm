@@ -108,6 +108,11 @@ public:
     while (groupsize && CkNumPes() / groupsize < 2) {
       groupsize /= 2;
     }
+    while ( CkNumPes() % groupsize ) --groupsize;
+    if ( groupsize == 1 ) {
+      ++groupsize;
+      while ( CkNumPes() % groupsize ) ++groupsize;
+    }
     span[0] = groupsize;
     CmiAssert(span[0]>1);
     span[1] = (CkNumPes()+span[0]-1)/span[0];
