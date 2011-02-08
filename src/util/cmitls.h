@@ -10,7 +10,7 @@
 #include <malloc.h>
 #endif
 
-#if ( __LP64__ || _LP64 )
+#if ( defined(__LP64__) || defined(_LP64) )
 #define ELF64
 #else
 #define ELF32
