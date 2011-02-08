@@ -38,8 +38,10 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   nid = nidpid[mpirank].nid;
   /* free(nidpid); */
 
-#else	/* if it is a XT4/5 */
+#elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 */
   PMI_Get_nid(mpirank, &nid);
+#else
+#error "Cannot get topology on a Cray build. Load modules xt-mpt >= 5.0.0 and xt-asyncpe >= 4.0 and rebuild"
 #endif
 
   return nid;

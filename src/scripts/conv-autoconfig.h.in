@@ -138,6 +138,9 @@
 /* whether NUMA control related functions exist */
 #undef CMK_HAS_NUMACTRL
 
+/* whether PMI_Get_nid exists */
+#undef CMK_HAS_PMI_GET_NID
+
 /* whether has popen */
 #undef CMK_HAS_POPEN
 

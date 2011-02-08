@@ -1466,6 +1466,21 @@ then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
 
+#### test if Cray topology will work ####
+cat > $tc <<EOT
+#include <stdio.h>
+#include <pmi.h>
+
+int main() {
+    int nid;
+    PMI_Get_nid(0, &nid);
+
+    return 0;
+}
+EOT
+test_linkc "whether PMI_Get_nid exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PMI_GET_NID, $pass, [whether PMI_Get_nid exists])
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 #include "stdlib.h"
