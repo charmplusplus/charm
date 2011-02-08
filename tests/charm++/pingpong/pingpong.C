@@ -23,16 +23,16 @@ class Fancy
   char _str[12];
   public:
     Fancy() { _str[0] = '\0'; }
-    Fancy(char *str) {
+    Fancy(const char *str) {
       strncpy(_str, str, 12);
     }
-    int equals(char *str) const { return !strcmp(str, _str); }
+    int equals(const char *str) const { return !strcmp(str, _str); }
 };
 
 class CkArrayIndexFancy : public CkArrayIndex {
   Fancy *f;
   public:
-    CkArrayIndexFancy(char *str) 
+    CkArrayIndexFancy(const char *str) 
     {
         /// Use placement new to ensure that the custom index object is placed in the memory reserved for it in the base class
         f = new (index) Fancy(str);
