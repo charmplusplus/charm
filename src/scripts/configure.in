@@ -1466,9 +1466,8 @@ then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
 
-#### test if Cray topology will work ####
+#### test if Cray node topology will work ####
 cat > $tc <<EOT
-#include <stdio.h>
 #include <pmi.h>
 
 int main() {
