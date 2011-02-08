@@ -2,21 +2,11 @@
 
 module EveryLB {
   extern module BlockLB;
-  extern module ComboCentLB;
   extern module CommLB;
   extern module DummyLB;
-  extern module GraphPartLB;
-  extern module GraphBFTLB;
   extern module GreedyAgentLB;
   extern module GreedyCommLB;
   extern module GreedyLB;
-  extern module GridCommLB;
-  extern module GridCommRefineLB;
-  extern module GridHybridLB;
-  extern module GridHybridSeedLB;
-  extern module GridMetisLB;
-  extern module HbmLB;
-  extern module HybridLB;
   extern module NeighborCommLB;
   extern module NeighborLB;
   extern module OrbLB;
@@ -24,9 +14,19 @@ module EveryLB {
   extern module RandCentLB;
   extern module RefineLB;
   extern module RefineCommLB;
+  extern module RotateLB;
+  extern module ComboCentLB;
+  extern module GraphPartLB;
+  extern module GraphBFTLB;
+  extern module GridCommLB;
+  extern module GridCommRefineLB;
+  extern module GridHybridLB;
+  extern module GridHybridSeedLB;
+  extern module GridMetisLB;
+  extern module HbmLB;
+  extern module HybridLB;
   extern module RefineKLB;
   extern module RefineTopoLB;
-  extern module RotateLB;
   extern module TopoCentLB;
   extern module TopoLB;
   extern module WSLB;
