@@ -126,6 +126,7 @@ typedef int MPI_Fint;
 #define MPI_ANY_TAG      (-1)
 #define MPI_REQUEST_NULL (-1)
 #define MPI_GROUP_NULL   (-1)
+#define MPI_GROUP_EMPTY  0
 #define MPI_COMM_NULL    (-1)
 #define MPI_TYPE_NULL    (-1)
 #define MPI_PROC_NULL    (-2)

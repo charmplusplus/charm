@@ -836,6 +836,9 @@ void ampiParent::prepareCtv(void) {
 }
 
 void ampiParent::init(){
+  CkAssert(groups.size() == 0);
+  groups.push_back(new groupStruct);
+
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(thisIndex)){
     char fname[128];
