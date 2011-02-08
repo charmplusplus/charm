@@ -51,6 +51,10 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
 #if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
 
+#if !CMK_HAS_RCALIB
+#error "The Cray rca library is not available. Try 'module load rca' and rebuild"
+#endif
+
 #include <rca_lib.h>
 
   #if XT4_TOPOLOGY

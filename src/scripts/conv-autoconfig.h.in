@@ -150,6 +150,9 @@
 /* whether Python is installed */
 #undef CMK_HAS_PYTHON
 
+/* whether Cray rca library is available */
+#undef CMK_HAS_RCALIB
+
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
 

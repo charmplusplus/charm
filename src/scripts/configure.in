@@ -1480,6 +1480,20 @@ EOT
 test_linkc "whether PMI_Get_nid exists" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_PMI_GET_NID, $pass, [whether PMI_Get_nid exists])
 
+#### test if Cray mesh topology will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_meshcoord(0, &xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
+AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 #include "stdlib.h"

@@ -3534,6 +3534,24 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if Cray mesh topology will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_meshcoord(0, &xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_RCALIB $pass
+_ACEOF
+
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 #include "stdlib.h"
