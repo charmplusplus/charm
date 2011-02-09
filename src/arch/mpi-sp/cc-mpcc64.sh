@@ -5,16 +5,16 @@ then
 fi
 
 CMK_CC='mpcc_r -q64 -qcpluscmt -qhalt=e '
-CMK_CXX='mpCC_r -q64 -qstaticinline -qhalt=e '
+CMK_CXX='mpCC_r -q64 -qhalt=e '
 CMK_LD="mpcc_r -q64 -brtl"
 CMK_LDXX="mpCC_r -q64 -brtl"
 CMK_NATIVE_CC='xlc_r -q64'
 CMK_NATIVE_LD='xlc_r -q64'
-CMK_NATIVE_CXX='xlC_r -qstaticinline -q64'
+CMK_NATIVE_CXX='xlC_r -q64'
 CMK_NATIVE_LDXX='xlC_r -q64'
 CMK_SEQ_CC='xlc_r -q64'
 CMK_SEQ_LD='xlc_r -q64'
-CMK_SEQ_CXX='xlC_r -qstaticinline -q64'
+CMK_SEQ_CXX='xlC_r -q64'
 CMK_SEQ_LDXX='xlC_r -q64'
 CMK_CF77='mpxlf_r -q64 '
 CMK_CF90='mpxlf90_r -q64 -qsuffix=f=f90' 

@@ -3,7 +3,7 @@ CMK_CPP_C='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_LDRO='ld -r -o '
 CMK_LDRO_WORKS=0
 CMK_CC='mpcc_r -qcpluscmt -qhalt=e '
-CMK_CXX='mpCC_r -qstaticinline -qhalt=e '
+CMK_CXX='mpCC_r -qhalt=e '
 CMK_CXXPP='xlC -E '
 CMK_LD="mpcc_r -brtl "
 CMK_LDXX="mpCC_r -brtl "
@@ -25,7 +25,7 @@ CMK_XIOPTS=''
 
 CMK_NATIVE_CC='xlc_r'
 CMK_NATIVE_LD='xlc_r'
-CMK_NATIVE_CXX='xlC_r -qstaticinline '
+CMK_NATIVE_CXX='xlC_r '
 CMK_NATIVE_LDXX='xlC_r'
 CMK_NATIVE_LIBS=''
 
