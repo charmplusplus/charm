@@ -12,7 +12,7 @@ machinefile=""
 while [ $# -gt 0 ]
 do
 	case $1 in
-	+ppn)
+	+ppn|++ppn)
 		args=$args" +ppn "$2
 		ppn=$2
 		shift
@@ -20,6 +20,10 @@ do
 	+ppn*)
 		args=$args" "$1
 		ppn=`echo $1 | awk '{print substr($1,5)}'`
+		;;
+	++ppn*)
+		args=$args" "$1
+		ppn=`echo $1 | awk '{print substr($1,6)}'`
 		;;
 	+p)
 		pes=$2
