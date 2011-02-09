@@ -3237,9 +3237,9 @@ void ConverseCommonInit(char **argv)
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
-#if CONVERSE_POOL
+/* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
-#endif
+/* #endif */
   CmiTmpInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
