@@ -10,7 +10,10 @@ CMK_CC="cc $CMK_DEFS "
 CMK_CXX="CC  $CMK_DEFS "
 CMK_LD="$CMK_CC $CMK_LD_DEFS"
 CMK_LDXX="$CMK_CXX $CMK_LD_DEFS"
-CMK_LIBS="-lckqt -lrca"
+# Swap these and set XT[45]_TOPOLOGY in conv-mach.h if doing topo work
+# on a Cray XT of known dimensions. See src/util/CrayNid.c for details
+#CMK_LIBS="-lckqt -lrca"
+CMK_LIBS="-lckqt"
 
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 
