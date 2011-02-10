@@ -12,7 +12,7 @@ module ControlPoints {
   readonly bool shouldFilterOutputData;
   readonly bool writeDataFileAtShutdown;
 
-  initproc void registerCPReductions(void);	
+  initnode void registerCPReductions(void);	
 
 
  message controlPointMsg { 
