@@ -45,6 +45,7 @@ OrbLB.decl.h OrbLB.def.h: OrbLB.ci.stamp
 PathHistory.decl.h PathHistory.def.h: pathHistory.ci.stamp
 PhasebyArrayLB.decl.h PhasebyArrayLB.def.h: PhasebyArrayLB.ci.stamp
 RandCentLB.decl.h RandCentLB.def.h: RandCentLB.ci.stamp
+RecBipartLB.decl.h RecBipartLB.def.h: RecBipartLB.ci.stamp
 RecBisectBfLB.decl.h RecBisectBfLB.def.h: RecBisectBfLB.ci.stamp
 RefineCommLB.decl.h RefineCommLB.def.h: RefineCommLB.ci.stamp
 RefineKLB.decl.h RefineKLB.def.h: RefineKLB.ci.stamp
