@@ -440,19 +440,22 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
+		/*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
+		while (CMK_TAG(Cpv_inited_,v)==0) CMK_CPV_IS_SMP;\
+               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
+               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
                if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
 		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
 		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
 		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
 	       } \
-	       CMK_TAG(Cpv_inited_,v)=1; \
+               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
+               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
+               CMK_TAG(Cpv_inited_,v)=1; \
        } \
-    } while(0); \
-    CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t);\
-    CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v) 
-#define CpvInitialized(v) (0!=CMK_TAG(Cpv_inited_,v))
+    } while(0);
+#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
 #define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 
