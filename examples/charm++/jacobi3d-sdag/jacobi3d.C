@@ -157,7 +157,6 @@ class Jacobi: public CBase_Jacobi {
     // Constructor, initialize values
     Jacobi() {
       __sdag_init();
-      usesAtSync=CmiTrue;
 
       int i, j, k;
       // allocate a three dimensional array
@@ -199,7 +198,6 @@ class Jacobi: public CBase_Jacobi {
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
-      AtSync();
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
           CkPrintf("Start of iteration %d\n", iterations);
           //BgPrintf("BgPrint> Start of iteration at %f\n");

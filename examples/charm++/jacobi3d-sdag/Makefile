@@ -6,7 +6,7 @@ OBJS = jacobi3d.o
 all: jacobi3d
 
 jacobi3d: $(OBJS)
-	$(CHARMC) -language charm++ -module RefineLB -o jacobi3d $(OBJS)
+	$(CHARMC) -language charm++ -o jacobi3d $(OBJS)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)
