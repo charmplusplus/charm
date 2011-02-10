@@ -440,8 +440,8 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		/*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
-		while (CMK_TAG(Cpv_inited_,v)==0) CMK_CPV_IS_SMP;\
+	       /*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
+	       while (CMK_TAG(Cpv_inited_,v)==0) CMK_CPV_IS_SMP;\
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
@@ -454,7 +454,7 @@ for each processor in the node.
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
                CMK_TAG(Cpv_inited_,v)=1; \
        } \
-    } while(0);
+    } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
 #define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
