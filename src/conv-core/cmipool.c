@@ -42,6 +42,7 @@ extern void free_nomigrate(void *mem);
 void CmiPoolAllocInit(int numBins)
 {
   int i;
+  if (CpvInitialized(bins)) return;
   CpvInitialize(char **, bins);
   CpvInitialize(int *, binLengths);
   CpvInitialize(int, maxBin);
@@ -50,7 +51,6 @@ void CmiPoolAllocInit(int numBins)
   CpvInitialize(int, numOFrees);
   CpvInitialize(int, numFrees);
 
-  if (CpvAccess(bins) == NULL) {
   CpvAccess(bins) = (char **) malloc_nomigrate(  numBins*sizeof(char *));
   CpvAccess(binLengths) = (int *) malloc_nomigrate(  numBins*sizeof(int));
   CpvAccess(maxBin) = numBins -1;
@@ -58,7 +58,6 @@ void CmiPoolAllocInit(int numBins)
   for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
 
   CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
-  }
 }
 
 #ifdef CMK_OPTIMIZE
