@@ -35,11 +35,12 @@
   the correspondent method in a remote processor. This is done through the
   converse header (which has few common fields, but is architecture dependent).
 
-  In converse the CsdScheduleForever() routine will run an infinite while loop that 
-  looks for available messages to processes from the message queue. Messages in the 
-  queue are dequeued by the CsdNextMessage() routine. When a 
-  message is taken from the queue it is then passed into CmiHandleMessage() which
-  calls the handler associated with the message.
+  In converse the CsdScheduleForever() routine will run an infinite while loop that
+  looks for available messages to process from the unprocessed message queues. The
+  details of the queues and the order in which they are emptied is hidden behind
+  CsdNextMessage(), which is used to dequeue the next message for processing by the
+  converse scheduler. When a message is taken from the queue it is then passed into
+  CmiHandleMessage() which calls the handler associated with the message.
 
   Incoming messages that are destined for Charm++ will be passed to the 
   \ref CharmScheduler "charm scheduling routines".
@@ -1480,7 +1481,56 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 }
 
 
-/** Dequeue and return the next message from the message queue. */
+/** Dequeue and return the next message from the unprocessed message queues.
+ *
+ * This function encapsulates the multiple queues that exist for holding unprocessed
+ * messages and the rules for the order in which to check them. There are five (5)
+ * different Qs that converse uses to store and retrieve unprocessed messages. These
+ * are:
+ *     Q Purpose                  Type      internal DeQ logic
+ * -----------------------------------------------------------
+ * - PE offnode                   pcQ             FIFO
+ * - PE onnode                    CkQ             FIFO
+ * - Node offnode                 pcQ             FIFO
+ * - Node onnode                  prioQ           prio-based
+ * - Scheduler                    prioQ           prio-based
+ *
+ * The PE queues hold messages that are destined for a specific PE. There is one such
+ * queue for every PE within a charm node. The node queues hold messages that are
+ * destined to that node. There is only one of each node queue within a charm node.
+ * Finally there is also a charm++ message queue for each PE.
+ *
+ * The offnode queues are meant for holding messages that arrive from outside the
+ * node. The onnode queues hold messages that are generated within the same charm
+ * node.
+ *
+ * The PE and node level offnode queues are accessed via functions CmiGetNonLocal()
+ * and CmiGetNonLocalNodeQ(). These are implemented separately by each machine layer
+ * and hide the implementation specifics for each layer.
+ *
+ * The PE onnode queue is implemented as a FIFO CkQ and is initialized via a call to
+ * CdsFifo_Create(). The node local queue and the scheduler queue are both priority
+ * queues. They are initialized via calls to CqsCreate() which gives each of them
+ * three separate internal queues for different priority ranges (-ve, 0 and +ve).
+ * Access to these queues is via pointers stored in the struct CsdSchedulerState that
+ * is passed into this function.
+ *
+ * The order in which these queues are checked is described below. The function
+ * proceeds to the next queue in the list only if it does not find any messages in
+ * the current queue. The first message that is found is returned, terminating the
+ * call.
+ * (1) offnode queue for this PE
+ * (2) onnode queue for this PE
+ * (3) offnode queue for this node
+ * (4) highest priority msg from onnode queue or scheduler queue
+ *
+ * @note: Across most (all?) machine layers, the two GetNonLocal functions simply
+ * access (after observing adequate locking rigor) structs representing the scheduler
+ * state, to dequeue from the queues stored within them. The structs (CmiStateStruct
+ * and CmiNodeStateStruct) implement these queues as \ref Machine "pc (producer-consumer)
+ * queues". The functions also perform other necessary actions like PumpMsgs() etc.
+ *
+ */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((*(s->localCounter))-- >0)
