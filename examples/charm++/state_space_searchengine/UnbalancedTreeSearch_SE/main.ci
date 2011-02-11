@@ -1,0 +1,22 @@
+mainmodule main
+{
+    readonly int initial_grainsize;
+    readonly int     type;
+    readonly double     b_0;
+    readonly int        rootId;
+    readonly int        nonLeafBF;
+    readonly double     nonLeafProb;
+    readonly int        gen_mx;
+    readonly int shape_fn;
+    readonly double     shiftDepth;         
+
+    /* Benchmark parameters */
+    readonly int    computeGranularity;
+    readonly int    debug;
+    readonly int    verbose;
+
+    mainchare Main
+	{
+		entry Main(CkArgMsg *m);
+	}
+}

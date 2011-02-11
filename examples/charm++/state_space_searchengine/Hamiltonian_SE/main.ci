@@ -1,0 +1,11 @@
+mainmodule main
+{
+	extern module searchEngine;
+    readonly int verticesNum;
+    readonly CkVec<int> inputGraph;
+    readonly int initial_grainsize;
+    mainchare Main
+	{
+		entry Main(CkArgMsg *m);
+	}
+}

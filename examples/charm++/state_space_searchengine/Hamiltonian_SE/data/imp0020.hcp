@@ -1,0 +1,39 @@
+NAME : imp0020
+COMMENT : Hamiltonian cycle problem (Erbacci) 
+TYPE : HCP
+DIMENSION : 20
+EDGE_DATA_FORMAT : EDGE_LIST
+EDGE_DATA_SECTION
+     1      2
+     1      15
+     1      16
+     2      12
+     2      3
+     3      4
+     3      8
+		 4	17
+		 4	5
+		 5	15
+		 5	6
+		 6	7
+		 6	11
+		 7	18
+		 7	8
+		 8	9
+		 9	14
+		 9	10
+		 10	11
+		 10	19
+		 11	12
+		 12	13
+		 13	14
+		 13	20
+		 14	15
+		 16	17
+		 17	18
+		 18	19
+		 19	20
+		 20	16
+-1
+EOF
+

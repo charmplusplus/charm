@@ -1,0 +1,59 @@
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl
+END
+template.mk
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/template.mk
+END
+Map.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/Map.h
+END
+Vec.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/Vec.h
+END
+BasicHeap.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/BasicHeap.h
+END
+BoxedVec.h
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/BoxedVec.h
+END
+minisatHeap.h
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/minisatHeap.h
+END
+Alg.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/Alg.h
+END
+Queue.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/Queue.h
+END
+Sort.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/fa10-cs598lvk-3sat/!svn/ver/35/3SAT/trunk/src/minisat/mtl/Sort.h
+END
