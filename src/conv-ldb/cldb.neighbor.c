@@ -590,7 +590,7 @@ void CldGraphModuleInit(char **argv)
   if (_lbsteal) {
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdVoidFn) CldBeginIdle, NULL);
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
       (CcdVoidFn) CldStillIdle, NULL);
     if (CmiMyPe() == 0) 

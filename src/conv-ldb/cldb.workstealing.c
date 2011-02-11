@@ -42,17 +42,9 @@ char *CldGetStrategy(void)
 }
 
 /* since I am idle, ask for work from neighbors */
+
+
 static void CldBeginIdle(void *dummy)
-{
-  CpvAccess(CldData)->lastCheck = CmiWallTimer();
-}
-
-static void CldEndIdle(void *dummy)
-{
-  CpvAccess(CldData)->lastCheck = -1;
-}
-
-static void CldStillIdle(void *dummy, double curT)
 {
   int i;
   double startT;
@@ -61,29 +53,25 @@ static void CldStillIdle(void *dummy, double curT)
   CldProcInfo  cldData = CpvAccess(CldData);
   int  victim;
   int mype;
-
-  double now = curT;
-  double lt = cldData->lastCheck;
-  /* only ask for work every 20ms */
-  if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
-  cldData->lastCheck = now;
+  int numpes;
 
   myload = CldLoad();
   if (myload > 0) return;
 
-  msg.from_pe = CmiMyPe();
   mype = CmiMyPe();
-
+  msg.from_pe = mype;
+  numpes = CmiNumPes();
   do{
-      victim = (((CrnRand()+mype)&0x7FFFFFFF)%CmiNumPes());
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
   }while(victim == mype);
 
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
+#if IDLE_IMMEDIATE
   /* fixme */
-  //CmiBecomeImmediate(&msg);
+  CmiBecomeImmediate(&msg);
+#endif
   msg.to_rank = CmiRankOf(victim);
   CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
-  cldData->sent = 1;
 
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
@@ -103,7 +91,7 @@ static void CldAskLoadHandler(requestmsg *msg)
   sendLoad = myload / 2; 
   receiver = msg->from_pe;
   /* only give you work if I have more than 1 */
-  if (sendLoad>0) {
+  if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
       rank = CmiMyRank();
       if (msg->to_rank != -1) rank = msg->to_rank;
@@ -296,9 +284,7 @@ void CldGraphModuleInit(char **argv)
 #if 1
   /* register idle handlers - when idle, keep asking work from neighbors */
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
+      (CcdVoidFn) CldBeginIdle, NULL);
     if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
 #endif

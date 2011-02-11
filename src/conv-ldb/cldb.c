@@ -176,7 +176,7 @@ void CldPutToken(char *msg)
 }
 
 
-static void * _CldGetTokenMsg(CldProcInfo proc)
+static inline void * _CldGetTokenMsg(CldProcInfo proc)
 {
   CldToken tok;
   void *msg;
@@ -205,7 +205,7 @@ void CldGetToken(char **msg)
 
 /* called at node level */
 /* get token from processor of rank pe */
-static void CldGetTokenFromRank(char **msg, int rank)
+static inline void CldGetTokenFromRank(char **msg, int rank)
 {
   CldProcInfo proc = CpvAccessOther(CldProc, rank);
   CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
@@ -300,9 +300,6 @@ void CldMultipleSend(int pe, int numToSend, int rank, int immed)
   unsigned int *prioptr;
   CldInfoFn ifn;
   CldPackFn pfn;
-
-  if (numToSend == 0)
-    return;
 
   msgs = (char **)calloc(numToSend, sizeof(char *));
   msgSizes = (int *)calloc(numToSend, sizeof(int));
