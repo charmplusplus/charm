@@ -1,7 +1,6 @@
-CHARMC = charmc $(OPTS) 
+CHARMC = ../../../bin/charmc -O3 $(OPTS) 
 default: all
-all: nqueen  nqueen_rand nqueen_rand.prj  nqueen_neighbor nqueen_neighbor.prj nqueen_workstealing nqueen_workstealing.prj
-#all: nqueen nqueen_prj nqueen_rand  nqueen_neighbor nqueen_neighbor.prj 
+all: nqueen nqueen_neighbor nqueen_workstealing
 
 nqueen : main.o nqueen.o counter.o
 	$(CHARMC) -language charm++ -o nqueen main.o nqueen.o counter.o
@@ -54,7 +53,7 @@ test:
 clean:
 	rm -f main.decl.h main.def.h main.o
 	rm -f counter.decl.h counter.def.h nqueen.o
-	rm -f nqueen nqueen_refine nqueen_greedy nqueen_prj nqueen_rand nqueen_spray nqueen_neighbor charmrun
+	rm -f nqueen nqueen_refine nqueen_greedy nqueen_prj nqueen_rand nqueen_spray nqueen_neighbor charmrun nqueen_*
 	rm *.o *.def.h *.decl.h
 	rm *.log *.sts *.projrc
 
