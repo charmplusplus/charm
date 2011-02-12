@@ -7,7 +7,7 @@ mainmodule kNeighbor {
   message toNeighborMsg {
     int data[];
   };
-  
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void nextStep_plain(double);

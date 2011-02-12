@@ -9,12 +9,8 @@
 
 #define STRIDEK		1
 #define CALCPERSTEP	100
-#define WRAPAROUND	1
-#define ALLCROSSNODE	0
 
 #define DEBUG		0
-#define REUSE_ITER_MSG	0
-#define TOUCH_MSGDATA	0
 
 #define WORKSIZECNT	1
 #define MSGSIZECNT	1
@@ -40,9 +36,6 @@ class toNeighborMsg: public CMessage_toNeighborMsg {
   public:
     toNeighborMsg() {};
     toNeighborMsg(int s): size(s) {  
-#if TOUCH_MSGDATA
-      init();
-#endif
     }
 
     void setMsgSrc(int X, int id) {
@@ -50,17 +43,6 @@ class toNeighborMsg: public CMessage_toNeighborMsg {
       nID = id;
     }
 
-    void init() {
-      for (int i=0; i<size; i++)
-        data[i] = i;
-    }
-
-    int sum() {
-      int s=0;
-      for (int i=0; i<size; i++)
-        s += data[i];
-      return s;
-    }
 };
 
 class Main: public CBase_Main {
@@ -73,7 +55,7 @@ class Main: public CBase_Main {
     int currentStep;
     int currentMsgSize;
 
-    int elementsRecved;
+    int numElemsRcvd;
     double totalTime;
     double maxTime;
     double minTime;
@@ -87,9 +69,9 @@ class Main: public CBase_Main {
       CkPrintf("\nStarting kNeighbor ...\n");
 
       if (m->argc!=4 && m->argc!=5) {
-        CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq]\n", m->argv[0]);
-        delete m;
-        CkExit();
+	CkPrintf("Usage: %s <#elements> <#iterations> <msg size> [ldb freq]\n", m->argv[0]);
+	delete m;
+	CkExit();
       }
 
       num_chares = atoi(m->argv[1]);
@@ -101,17 +83,15 @@ class Main: public CBase_Main {
       numSteps = atoi(m->argv[2]);
       currentMsgSize = atoi(m->argv[3]);
 
-      gLBFreq = 100000;        
+      gLBFreq = 100000;
       if(m->argc==5) {
 	gLBFreq = atoi(m->argv[4]);
       }
 
 #if TURN_ON_LDB
-      printf("Setting load-balancing freq to every %d steps\n", gLBFreq);  
+      printf("Setting load-balancing freq to every %d steps\n", gLBFreq);
 #endif
-#if REUSE_ITER_MSG
       gMsgSize = currentMsgSize;
-#endif
 
       currentStep = -1;
       timeRec = new double[numSteps];
@@ -135,7 +115,7 @@ class Main: public CBase_Main {
 	//CkExit();
       }
 
-      elementsRecved = 0;
+      numElemsRcvd = 0;
       totalTime = 0.0;
       maxTime = 0.0;
       minTime = 3600.0;
@@ -149,28 +129,18 @@ class Main: public CBase_Main {
       }
 
       gStarttime = CmiWallTimer();
-#if REUSE_ITER_MSG
       for (int i=0; i<num_chares; i++)
 	array[i].commWithNeighbors();
-#else
-      for (int i=0; i<num_chares; i++)
-	array[i].commWithNeighbors(currentMsgSize);
-#endif	
       //array.commWithNeighbors(currentMsgSize);
     }
-    
+
     void resumeIter() {
 #if DEBUG
       CkPrintf("Resume iteration at step %d\n", currentStep);
 #endif
       gStarttime = CmiWallTimer();
-#if REUSE_ITER_MSG
       for (int i=0; i<num_chares; i++)
 	array[i].commWithNeighbors();
-#else
-      for (int i=0; i<num_chares; i++)
-	array[i].commWithNeighbors(currentMsgSize);
-#endif
     }
 
     void terminate(CkReductionMsg *msg) {
@@ -194,17 +164,17 @@ class Main: public CBase_Main {
     }
 
     void nextStep_plain(double iterTime) {
-      elementsRecved++;
+      numElemsRcvd++;
       totalTime += iterTime;
       maxTime = maxTime>iterTime?maxTime:iterTime;
       minTime = minTime<iterTime?minTime:iterTime;
 
-      if (elementsRecved == num_chares) {
-	  double wholeStepTime = CmiWallTimer() - gStarttime;
-	  timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
-	  //CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
+      if (numElemsRcvd == num_chares) {
+	double wholeStepTime = CmiWallTimer() - gStarttime;
+	timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
+	//CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
 
-	  beginIteration();
+	beginIteration();
       }
     }
 
@@ -240,16 +210,13 @@ class Block: public CBase_Block {
     int internalStepCnt;
     int sum;
 
-#if REUSE_ITER_MSG
     toNeighborMsg **iterMsg;
-#endif
 
   public:
     Block() {
       //srand(thisIndex.x+thisIndex.y);
       usesAtSync = CmiTrue;
 
-#if WRAPAROUND
       numNeighbors = 2*STRIDEK;
       neighbors = new int[numNeighbors];
       recvTimes = new double[numNeighbors];
@@ -266,40 +233,13 @@ class Block: public CBase_Block {
 	while (tmpnei>=num_chares) tmpnei -= num_chares;
 	neighbors[nidx] = tmpnei;
       }
-#elif ALLCROSSNODE
-      if(CkNumNodes()==1){
-	if(thisIndex==0){
-	  CkPrintf("This version has to run with more than 2 nodes!\n");
-	  CkExit();
-	}
-	return;
-      }
-      numNeighbors = CkNumNodes()-1;
-      neighbors = new int[numNeighbors];
-      recvTimes = new double[numNeighbors];
-      for(int i=0; i<numNeighbors; i++){
-	neighbors[i] = (thisIndex+(i+1)*CmiMyNodeSize())%CkNumPes();
-      }
-#else
-      //calculate the neighbors this element has
-      numNeighbors = 0;
-      numNeighbors += thisIndex - MAX(0, thisIndex-STRIDEK); //left
-      numNeighbors += MIN(num_chares-1, thisIndex+STRIDEK)-thisIndex; //right
-      neighbors = new int[numNeighbors];
-      recvTimes = new double[numNeighbors];
-      int nidx=0;
-      for (int i=MAX(0, thisIndex-STRIDEK); i<thisIndex; i++, nidx++) neighbors[nidx]=i;
-      for (int i=thisIndex+1; i<=MIN(num_chares-1, thisIndex+STRIDEK); i++, nidx++) neighbors[nidx] = i;
-#endif
 
       for (int i=0; i<numNeighbors; i++)
 	recvTimes[i] = 0.0;
 
-#if REUSE_ITER_MSG
       iterMsg = new toNeighborMsg *[numNeighbors];
       for (int i=0; i<numNeighbors; i++)
-	iterMsg[i] = NULL;	
-#endif
+	iterMsg[i] = NULL;
 
 #if DEBUG
       CkPrintf("Neighbors of %d: ", thisIndex);
@@ -314,11 +254,9 @@ class Block: public CBase_Block {
     ~Block() {
       delete [] neighbors;
       delete [] recvTimes;
-#if REUSE_ITER_MSG
       delete [] iterMsg;
-#endif
     }
-    
+
     void pup(PUP::er &p){
       ArrayElement1D::pup(p); //pack our superclass
       p(workSizeArr, WORKSIZECNT);
@@ -337,13 +275,11 @@ class Block: public CBase_Block {
       p(curIterWorkSize);
       p(internalStepCnt);
       p(sum);
-#if REUSE_ITER_MSG
       if(p.isUnpacking()) iterMsg = new toNeighborMsg *[numNeighbors];
       for(int i=0; i<numNeighbors; i++){
 	if(p.isUnpacking()) iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
 	CkPupMessage(p, (void **)&iterMsg[i]);
       }
-#endif			
     }
 
     Block(CkMigrateMessage *m) {}
@@ -387,11 +323,7 @@ class Block: public CBase_Block {
       for (int i=0; i<numNeighbors; i++) {
 	//double memtimer = CmiWallTimer();
 
-#if REUSE_ITER_MSG
 	toNeighborMsg *msg = iterMsg[i];
-#else
-	toNeighborMsg *msg = new(msgSize/4, 0) toNeighborMsg(msgSize/4);
-#endif
 
 #if DEBUG
 	CkPrintf("[%d]: send msg to neighbor[%d]=%d\n", thisIndex, i, neighbors[i]);
@@ -426,12 +358,10 @@ class Block: public CBase_Block {
       curIterWorkSize = workSizeArr[random%WORKSIZECNT];
       random++;
 
-#if REUSE_ITER_MSG
       if(iterMsg[0]==NULL) { //indicating the messages have not been created
 	for(int i=0; i<numNeighbors; i++)
 	  iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
       }
-#endif
 
       startTime = CmiWallTimer();
       startInternalIteration();
@@ -444,11 +374,7 @@ class Block: public CBase_Block {
       CkPrintf("[%d]: receive ack from neighbor[%d]=%d\n", thisIndex, fromNID, neighbors[fromNID]);
 #endif
 
-#if REUSE_ITER_MSG
       iterMsg[fromNID] = m;
-#else
-      delete m;
-#endif
       //recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
       //get one step time and send it back to mainProxy
@@ -474,9 +400,6 @@ class Block: public CBase_Block {
       CkPrintf("[%d]: recv msg from %d as its %dth neighbor\n", thisIndex, m->fromX, m->nID);
 #endif
 
-#if TOUCH_MSGDATA
-      sum = m->sum();
-#endif
       thisProxy(m->fromX).recvReplies(m);
     }
 
