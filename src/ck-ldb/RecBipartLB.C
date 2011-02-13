@@ -22,8 +22,7 @@
 
 #include "RecBipartLB.h"
 #include "ckgraph.h"
-#include <limits.h>
-#include <math.h>
+#include <limits>
 #include <queue>
 #include <vector>
 
@@ -368,7 +367,7 @@ void adjustqueues(ObjGraph *ogr, BQueue *que1, BQueue *que2, vector <Vertex *> &
   int ei=-1;
   Edge *edge;
   int edgecut=0;
-  que2->setMingain(INT_MAX);
+  que2->setMingain(std::numeric_limits<int>::max());
   que2->setVertextoswap(-1);
   que2->setSwapid(-1);
 
@@ -471,7 +470,7 @@ void adjustgain(ObjGraph *ogr,vector<Vertex *> &partition, BQueue *que)
 {
   int i;
   int bdry=que->getBoundary();
-  que->setMingain(INT_MAX);
+  que->setMingain(std::numeric_limits<int>::max());
   que->setVertextoswap(-1);
   que->setSwapid(-1);
 
