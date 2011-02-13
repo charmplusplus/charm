@@ -16,12 +16,12 @@
 
 
 typedef struct CldProcInfo_s {
-  double lastCheck;
-  int    sent;			/* flag to disable idle work request */
+  //double lastCheck;
+  //int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
-  double lastBalanceTime;
+  //double lastBalanceTime;
 } *CldProcInfo;
 
 int _stealonly1 = 0;
@@ -32,8 +32,8 @@ CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 
 void LoadNotifyFn(int l)
 {
-  CldProcInfo  cldData = CpvAccess(CldData);
-  cldData->sent = 0;
+  //CldProcInfo  cldData = CpvAccess(CldData);
+  //cldData->sent = 0;
 }
 
 char *CldGetStrategy(void)
@@ -56,7 +56,7 @@ static void CldBeginIdle(void *dummy)
   int numpes;
 
   myload = CldLoad();
-  if (myload > 0) return;
+  //if (myload > 0) return; // I do not think this will be true when a processor is idle. overhead code
 
   mype = CmiMyPe();
   msg.from_pe = mype;
@@ -72,7 +72,8 @@ static void CldBeginIdle(void *dummy)
 #endif
   msg.to_rank = CmiRankOf(victim);
   CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
-
+  
+  //cldData->sent = 1;
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
 #endif
@@ -126,9 +127,9 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   r_msg.from_pe = mype;
   CmiSetHandler(&r_msg, CpvAccess(CldAskLoadHandlerIndex));
   CmiSyncSend(victim, sizeof(requestmsg),(char *)&r_msg);
-  cldData->sent = 1;
+  //cldData->sent = 1;
 
-  cldData->lastCheck = CmiWallTimer();
+  //cldData->lastCheck = CmiWallTimer();
 
   CmiFree(msg);
 
@@ -260,8 +261,8 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldBalanceHandlerIndex);
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
-  CpvAccess(CldData)->lastCheck = -1;
-  CpvAccess(CldData)->sent = 0;
+  //CpvAccess(CldData)->lastCheck = -1;
+  //CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
