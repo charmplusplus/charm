@@ -13,7 +13,6 @@
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
-#include <math.h>
 #include "lbdb.h"
 #include "LBDBManager.h"
 #include "lbdb++.h"
