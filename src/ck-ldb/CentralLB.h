@@ -6,7 +6,6 @@
 #ifndef CENTRALLB_H
 #define CENTRALLB_H
 
-#include <math.h>
 #include "BaseLB.h"
 #include "CentralLB.decl.h"
 
