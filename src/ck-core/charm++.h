@@ -157,7 +157,7 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
-	inline void setGroupDepID(CkGroupID &gid) { depGroupID = gid; }
+	inline void setGroupDepID(const CkGroupID &gid) { depGroupID = gid; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
