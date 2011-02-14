@@ -1,6 +1,7 @@
 /** \file kNeighbor.C
- *  Author: Chao Mei
+ *  Author: Chao Mei (chaomei2@illinois.edu)
  *
+ *  Heavily modified by Abhinav Bhatele (bhatele@illinois.edu) 2011/02/13
  */
 
 #include "kNeighbor.decl.h"
@@ -8,12 +9,10 @@
 #include <stdlib.h>
 
 #define STRIDEK		1
-#define CALCPERSTEP	100
+#define CALCPERSTEP	10
 
 #define DEBUG		0
 
-#define WORKSIZECNT	1
-#define MSGSIZECNT	1
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int num_chares;
@@ -48,8 +47,6 @@ class toNeighborMsg: public CMessage_toNeighborMsg {
 class Main: public CBase_Main {
   public:
     CProxy_Block array;
-
-    //static int msgSizeArr[MSGSIZECNT];
 
     int numSteps;
     int currentStep;
@@ -106,13 +103,12 @@ class Main: public CBase_Main {
     void beginIteration() {
       currentStep++;
       if (currentStep == numSteps) {
-	CkPrintf("kNeighbor program finished!\n");
+	CkPrintf("kNeighbor program finished!\n\n");
 	//CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
 	//array.ckSetReductionClient(cb);
 	//array.printSts(numSteps);
 	terminate(NULL);
 	return;
-	//CkExit();
       }
 
       numElemsRcvd = 0;
@@ -120,8 +116,6 @@ class Main: public CBase_Main {
       maxTime = 0.0;
       minTime = 3600.0;
 
-      //int msgSize = msgSizeArr[currentStep%MSGSIZECNT];
-      //int msgSize = msgSizeArr[rand()%MSGSIZECNT];
       //currentMsgSize = msgSize;
       if(currentStep!=0 && (currentStep % gLBFreq == 0)) {
 	array.pauseForLB();
@@ -163,41 +157,22 @@ class Main: public CBase_Main {
       CkExit();
     }
 
-    void nextStep_plain(double iterTime) {
-      numElemsRcvd++;
-      totalTime += iterTime;
-      maxTime = maxTime>iterTime?maxTime:iterTime;
-      minTime = minTime<iterTime?minTime:iterTime;
-
-      if (numElemsRcvd == num_chares) {
-	double wholeStepTime = CmiWallTimer() - gStarttime;
-	timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
-	//CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
-
-	beginIteration();
-      }
-    }
-
     void nextStep(CkReductionMsg  *msg) {
       maxTime = *((double *)msg->getData());
       delete msg;
       double wholeStepTime = CmiWallTimer() - gStarttime;
       timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
-      //CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
+      if(currentStep % CALCPERSTEP == 0)
+      CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
       beginIteration();
     }
 
 };
 
-//int Main::msgSizeArr[MSGSIZECNT] = {16, 32, 128, 256, 512, 1024, 2048, 4096};
-//int Main::msgSizeArr[MSGSIZECNT] = {10000};
 
 //no wrap around for sending messages to neighbors
 class Block: public CBase_Block {
   public:
-    /** actual work size is of workSize^3 */
-    static int workSizeArr[WORKSIZECNT];
-
     int numNeighbors;
     int neighborsRecved;
     int *neighbors;
@@ -206,7 +181,6 @@ class Block: public CBase_Block {
 
     int random;
     int curIterMsgSize;
-    int curIterWorkSize;
     int internalStepCnt;
     int sum;
 
@@ -259,7 +233,6 @@ class Block: public CBase_Block {
 
     void pup(PUP::er &p){
       ArrayElement1D::pup(p); //pack our superclass
-      p(workSizeArr, WORKSIZECNT);
       p(numNeighbors);
       p(neighborsRecved);
 
@@ -272,7 +245,6 @@ class Block: public CBase_Block {
       p(startTime);
       p(random);
       p(curIterMsgSize);
-      p(curIterWorkSize);
       p(internalStepCnt);
       p(sum);
       if(p.isUnpacking()) iterMsg = new toNeighborMsg *[numNeighbors];
@@ -310,12 +282,12 @@ class Block: public CBase_Block {
 
       neighborsRecved = 0;
       /* 1: pick a work size and do some computation */
-      int sum=0;
-      int N=curIterWorkSize;
+      int sum = 0;
+      int N = thisIndex*thisIndex / num_chares;
       for (int i=0; i<N; i++)
 	for (int j=0; j<N; j++)
-	  for (int k=0; k<N; k++)
-	    sum += (thisIndex*i+thisIndex*j+k)%WORKSIZECNT;
+	    sum += (thisIndex * i + j);
+
       /* 2. send msg to K neighbors */
       int msgSize = curIterMsgSize;
 
@@ -343,7 +315,6 @@ class Block: public CBase_Block {
       curIterMsgSize = msgSize;
       //currently the work size is only changed every big steps (which
       //are initiated by the main proxy
-      curIterWorkSize = workSizeArr[random%WORKSIZECNT];
       random++;
 
       startTime = CmiWallTimer();
@@ -355,7 +326,6 @@ class Block: public CBase_Block {
       curIterMsgSize = gMsgSize;
       //currently the work size is only changed every big steps (which
       //are initiated by the main proxy
-      curIterWorkSize = workSizeArr[random%WORKSIZECNT];
       random++;
 
       if(iterMsg[0]==NULL) { //indicating the messages have not been created
@@ -410,8 +380,5 @@ class Block: public CBase_Block {
       return (a<b)?a:b;
     }
 };
-
-//int Block::workSizeArr[WORKSIZECNT] = {20, 60, 120, 180, 240};
-int Block::workSizeArr[WORKSIZECNT] = {20};
 
 #include "kNeighbor.def.h"

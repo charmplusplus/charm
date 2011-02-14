@@ -10,7 +10,6 @@ mainmodule kNeighbor {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void nextStep_plain(double);
     entry void nextStep(CkReductionMsg *);
     entry void terminate(CkReductionMsg *);
     entry void resumeIter();
