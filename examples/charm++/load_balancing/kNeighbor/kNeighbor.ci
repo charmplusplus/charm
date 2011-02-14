@@ -18,10 +18,8 @@ mainmodule kNeighbor {
   array [1D] Block {
     entry Block();
     entry void commWithNeighbors();
-    entry void commWithNeighbors(int);
     entry void recvReplies(toNeighborMsg *);
     entry void recvMsgs(toNeighborMsg *);
-    entry void printSts(int);
     entry void pauseForLB();
   };
 

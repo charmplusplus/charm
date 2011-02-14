@@ -106,7 +106,6 @@ class Main: public CBase_Main {
 	CkPrintf("kNeighbor program finished!\n\n");
 	//CkCallback *cb = new CkCallback(CkIndex_Main::terminate(NULL), thisProxy);
 	//array.ckSetReductionClient(cb);
-	//array.printSts(numSteps);
 	terminate(NULL);
 	return;
       }
@@ -125,7 +124,6 @@ class Main: public CBase_Main {
       gStarttime = CmiWallTimer();
       for (int i=0; i<num_chares; i++)
 	array[i].commWithNeighbors();
-      //array.commWithNeighbors(currentMsgSize);
     }
 
     void resumeIter() {
@@ -163,7 +161,7 @@ class Main: public CBase_Main {
       double wholeStepTime = CmiWallTimer() - gStarttime;
       timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
       if(currentStep % CALCPERSTEP == 0)
-      CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
+	CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
       beginIteration();
     }
 
@@ -174,7 +172,7 @@ class Main: public CBase_Main {
 class Block: public CBase_Block {
   public:
     int numNeighbors;
-    int neighborsRecved;
+    int numNborsRcvd;
     int *neighbors;
     double *recvTimes;
     double startTime;
@@ -234,7 +232,7 @@ class Block: public CBase_Block {
     void pup(PUP::er &p){
       ArrayElement1D::pup(p); //pack our superclass
       p(numNeighbors);
-      p(neighborsRecved);
+      p(numNborsRcvd);
 
       if(p.isUnpacking()) {
 	neighbors = new int[numNeighbors];
@@ -268,25 +266,19 @@ class Block: public CBase_Block {
       contribute(0, NULL, CkReduction::sum_int, cb);
     }
 
-    void printSts(int totalSteps){
-      /*for(int i=0; i<numNeighbors; i++){
-	CkPrintf("Elem[%d]: avg RTT from neighbor %d (actual elem id %d): %lf\n", thisIndex, i, neighbors[i], recvTimes[i]/totalSteps);
-	}*/
-      contribute(0,0,CkReduction::max_int);
-    }
-
     void startInternalIteration() {
 #if DEBUG
       CkPrintf("[%d]: Start internal iteration \n", thisIndex);
 #endif
 
-      neighborsRecved = 0;
+      numNborsRcvd = 0;
       /* 1: pick a work size and do some computation */
       int sum = 0;
-      int N = thisIndex*thisIndex / num_chares;
+      int N = thisIndex*thisIndex % num_chares;
       for (int i=0; i<N; i++)
-	for (int j=0; j<N; j++)
-	    sum += (thisIndex * i + j);
+	for (int j=0; j<N; j++) {
+	  sum += (thisIndex * i + j);
+	}
 
       /* 2. send msg to K neighbors */
       int msgSize = curIterMsgSize;
@@ -308,17 +300,6 @@ class Block: public CBase_Block {
 	//	CkPrintf("At current step %d to neighbor %d, msg creation time: %f, entrymethod fire time: %f\n", internalStepCnt, neighbors[i], entrytimer-memtimer, entrylasttimer-entrytimer);
 	//}
       }
-    }
-
-    void commWithNeighbors(int msgSize) {
-      internalStepCnt = 0;
-      curIterMsgSize = msgSize;
-      //currently the work size is only changed every big steps (which
-      //are initiated by the main proxy
-      random++;
-
-      startTime = CmiWallTimer();
-      startInternalIteration();
     }
 
     void commWithNeighbors() {
@@ -348,8 +329,8 @@ class Block: public CBase_Block {
       //recvTimes[fromNID] += (CmiWallTimer() - startTime);
 
       //get one step time and send it back to mainProxy
-      neighborsRecved++;
-      if (neighborsRecved == numNeighbors) {
+      numNborsRcvd++;
+      if (numNborsRcvd == numNeighbors) {
 	internalStepCnt++;
 	if (internalStepCnt==CALCPERSTEP) {
 	  double iterCommTime = CmiWallTimer() - startTime;
