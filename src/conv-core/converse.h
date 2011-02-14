@@ -345,6 +345,9 @@ extern void         CmiDestroyLock(CmiNodeLock lock);
 
 #if CMK_SHARED_VARS_NT_THREADS /*Used only by win32 versions*/
 
+/* Avoid definition of unexpected min(a,b) and max(a,b) macros, per
+   http://support.microsoft.com/kb/143208 */
+#define NOMINMAX
 #include <windows.h>
 
 extern int _Cmi_numpes;
