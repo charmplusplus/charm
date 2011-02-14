@@ -518,7 +518,9 @@ CkArrayID CProxy_ArrayBase::ckCreateArray(CkArrayMessage *m,int ctor,
 #if !CMK_LBDB_ON
     CkGroupID _lbdb;
 #endif
-    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial());
+    CkEntryOptions  e_opts;
+    e_opts.setGroupDepID(opts.getMap());       // group creation dependence
+    locMgr = CProxy_CkLocMgr::ckNew(opts.getMap(),_lbdb,opts.getNumInitial(),&e_opts);
     opts.setLocationManager(locMgr);
   }
   //Create the array manager
