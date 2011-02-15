@@ -1,12 +1,9 @@
 #ifndef __CkDDT_H_
 #define __CkDDT_H_
 
-#include <string.h>
-#include <stdio.h>
-#include "charm++.h"
+#include "pup.h"
 
 #define CkDDT_MAXTYPE         100
-#define DDTDEBUG /* CkPrintf */
 
 #define CkDDT_TYPE_NULL      -1
 #define CkDDT_DOUBLE          0
