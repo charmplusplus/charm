@@ -65,10 +65,10 @@ void TeamLB::work(LDStats* stats)
   for(i = 0; i < numVertices; i++) {
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
-    numEdges += ogr->vertices[i].edgeList.size();
-    for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
-      if(ogr->vertices[i].edgeList[j].getNumBytes() > maxBytes)
-        maxBytes = ogr->vertices[i].edgeList[j].getNumBytes();
+    numEdges += ogr->vertices[i].sendToList.size();
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      if(ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes)
+        maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
     }
   }
 
@@ -86,9 +86,9 @@ void TeamLB::work(LDStats* stats)
   for(i = 0; i < numVertices; i++) {
     xadj[i] = edgeNum;
     vwgt[i] = (int)( (ogr->vertices[i].getVertexLoad() * 128) /maxLoad );
-    for(j = 0; j < ogr->vertices[i].edgeList.size(); j++) {
-      adjncy[edgeNum] = ogr->vertices[i].edgeList[j].getNeighborId();
-      adjwgt[edgeNum] = (int)( (ogr->vertices[i].edgeList[j].getNumBytes() * 128) / maxBytes );
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      adjncy[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
+      adjwgt[edgeNum] = (int)( (ogr->vertices[i].sendToList[j].getNumBytes() * 128) / maxBytes );
       edgeNum++;
     }
   }
