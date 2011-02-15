@@ -45,7 +45,9 @@ fi
 
 #CL command-line options for -O and -g mode
 CL_CMD="$VCC_DIR/BIN/CL.EXE"
-CL_COMMON=' /nologo /W1 /EHsc /DWIN32 /D_WINDOWS /Zp4'
+# Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
+# macros,per http://support.microsoft.com/kb/143208
+CL_COMMON=' /nologo /W1 /EHsc /DWIN32 /D_WINDOWS /Zp4 /DNOMINMAX'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
 CL_DEF=$CL_COMMON" /MT"

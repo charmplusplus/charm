@@ -49,7 +49,9 @@ fi
 #CL command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
 CL_CMD="CL.EXE"
-CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS'
+# Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
+# macros,per http://support.microsoft.com/kb/143208
+CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS /DNOMINMAX'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
