@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 #define STRIDEK		1
-#define CALCPERSTEP	10
+#define CALCPERSTEP	100
 
 #define DEBUG		0
 
@@ -160,7 +160,7 @@ class Main: public CBase_Main {
       delete msg;
       double wholeStepTime = CmiWallTimer() - gStarttime;
       timeRec[currentStep] = wholeStepTime/CALCPERSTEP;
-      if(currentStep % CALCPERSTEP == 0)
+      if(currentStep % 10 == 0)
 	CkPrintf("Step %d with msg size %d finished: max=%f, total=%f\n", currentStep, currentMsgSize, maxTime/CALCPERSTEP, wholeStepTime/CALCPERSTEP);
       beginIteration();
     }
@@ -273,8 +273,7 @@ class Block: public CBase_Block {
 
       numNborsRcvd = 0;
       /* 1: pick a work size and do some computation */
-      int sum = 0;
-      int N = thisIndex*thisIndex % num_chares;
+      int N = (thisIndex * thisIndex / num_chares) * 100;
       for (int i=0; i<N; i++)
 	for (int j=0; j<N; j++) {
 	  sum += (thisIndex * i + j);
