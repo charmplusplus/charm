@@ -524,25 +524,6 @@ extern int _mpi_nworlds;
 #define MPI_SCAN_TAG 	MPI_TAG_UB_VALUE+15
 #define MPI_ATA_TAG	MPI_TAG_UB_VALUE+16
 
-#if 0
-// This is currently not used.
-class BlockMap : public CkArrayMap {
- public:
-  BlockMap(void) {}
-  BlockMap(CkMigrateMessage *m) {}
-  int registerArray(CkArrayMapRegisterMessage *m) {
-    delete m;
-    return 0;
-  }
-  int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
-    int elem=*(int *)idx.data();
-    int penum =  (elem/(32/CkNumPes()));
-    CkPrintf("%d mapped to %d proc\n", elem, penum);
-    return penum;
-  }
-};
-#endif
-
 #define MyAlign8(x) (((x)+7)&(~7))
 
 /**
