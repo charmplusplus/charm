@@ -480,6 +480,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
   CmiNodeAllBarrier();
   return;
+#elif CMK_BLUEGENEQ
+  return;
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();

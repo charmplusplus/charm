@@ -3,7 +3,7 @@
 
 #define BLUEGENE_TIMING     	1
 
-#if CMK_HAS_VALUES_H
+#if (CMK_HAS_VALUES_H && (!CMK_BLUEGENEQ))
 #   include <values.h>
 #   define INVALIDTIME  MAXDOUBLE
 #   define CMK_MAXINT   MAXINT
