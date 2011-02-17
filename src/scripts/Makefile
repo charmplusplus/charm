@@ -495,7 +495,7 @@ persist-comm.o: persist-comm.c persist_impl.h $(CVHEADERS)
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
-	
+
 crc32.o: crc32.c crc32.h
 	$(CHARMC) -optimize -o crc32.o crc32.c
 
@@ -1040,7 +1040,7 @@ depends: cidepends
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;
-	
+
 
 dependsCaseSensitive: cidepends
 	$(MAKE) basics
