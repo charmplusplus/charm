@@ -664,7 +664,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o  
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
-	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o WSLB.o \
+	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
            ckgraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
