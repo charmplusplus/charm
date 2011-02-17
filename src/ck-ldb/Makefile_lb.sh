@@ -18,7 +18,7 @@ done
 echo "   manager.o" >> $out
 echo >> $out
 
-for bal in $ALL_LDBS 
+for bal in $ALL_LDBS $UNCOMMON_LDBS
 do 
 	dep=""
 	[ -r libmodule$bal.dep ] && dep="cp -f libmodule$bal.dep "'$'"(L)/"
@@ -63,7 +63,7 @@ echo "};" >> CommonLBs.ci
 echo "# used for make depends" >> $out
 echo "ALL_LB_OBJS=EveryLB.o \\" >> $out
 echo "    CommonLBs.o \\" >> $out
-for bal in $ALL_LDBS
+for bal in $ALL_LDBS $UNCOMMON_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
