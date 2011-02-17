@@ -1675,6 +1675,7 @@ _ACEOF
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
+MAKEFILE_EXT=Make.extlib
 
 Echo() {
 	echo $*
@@ -1812,7 +1813,6 @@ then
   Echo "Charm NUMA support is builtin"
   WITH_NUMA=yes
 fi
-
 
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking machine name" >&5
