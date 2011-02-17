@@ -688,6 +688,19 @@ void TraceSummary::beginExecute(envelope *e)
   }  
 }
 
+void TraceSummary::beginExecute(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+    //This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int num = _entryTable.size();
+    int ep = e->getEpIdx();
+    if(ep<0 || ep>=num) return;
+    if(_entryTable[ep]->traceEnabled)
+        beginExecute(-1,-1,e->getEpIdx(),-1);
+#endif
+}
+
 void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
 {
   if (execEp != INVALIDEP) {
@@ -762,6 +775,19 @@ void TraceSummary::endExecute(void)
       _logPool->updateSummaryDetail(execEp, start, t);
 
   execEp = INVALIDEP;
+}
+
+void TraceSummary::endExecute(char *msg){
+#if CMK_SMP_TRACE_COMMTHREAD
+    //This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int num = _entryTable.size();
+    int ep = e->getEpIdx();
+    if(ep<0 || ep>=num) return;
+    if(_entryTable[ep]->traceEnabled){
+        endExecute();
+    }
+#endif    
 }
 
 void TraceSummary::beginIdle(double currT)

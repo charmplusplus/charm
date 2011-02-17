@@ -454,14 +454,17 @@ class TraceProjections : public Trace {
     void userSuppliedNote(char* note);
     void memoryUsage(double m);
     void creation(envelope *e, int epIdx, int num=1);
+    void creation(char *m);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e);
+    void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void changeLastEntryTimestamp(double ts);
     void beginExecuteLocal(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
+    void endExecute(char *msg);
     void endExecuteLocal(void);
     void messageRecv(char *env, int pe);
     void beginIdle(double curWallTime);

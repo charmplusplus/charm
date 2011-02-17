@@ -669,7 +669,7 @@ extern "C"
 void traceBeginCommOp(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
-    CkpvAccess(_traces)->beginExecute((envelope *)msg);
+    CkpvAccess(_traces)->beginExecute(msg);
 #endif
 }
 
@@ -677,7 +677,15 @@ extern "C"
 void traceEndCommOp(char *msg){
 #if CMK_TRACE_ENABLED
   if (CpvAccess(traceOn) && CkpvAccess(_traces))
-    CkpvAccess(_traces)->endExecute();
+    CkpvAccess(_traces)->endExecute(msg);
+#endif
+}
+
+extern "C"
+void traceSendMsgComm(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->creation(msg);
 #endif
 }
 #endif

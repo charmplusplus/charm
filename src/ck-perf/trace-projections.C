@@ -1244,6 +1244,21 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   }
 }
 
+void TraceProjections::creation(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+	//This function is only called from a comm thread
+	//in SMP mode. So, it is possible the msg is not
+	//a charm msg that contains an envelope, ep idx.
+	envelope *e = (envelope *)msg;
+	int ep = e->getEpIdx();
+	int num = _entryTable.size();
+	if(ep<num && ep>=0 && _entryTable[ep]->traceEnabled)
+		creation(e, ep, 1);
+#endif
+}
+
+
 /* **CW** Non-disruptive attempt to add destination PE knowledge to
    Communication Library-specific Multicasts via new event 
    CREATION_MULTICAST.
@@ -1324,6 +1339,18 @@ void TraceProjections::beginExecute(envelope *e)
   }
 }
 
+void TraceProjections::beginExecute(char *msg){
+#if CMK_SMP_TRACE_COMMTHREAD
+	//This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int num = _entryTable.size();
+    int ep = e->getEpIdx();
+    if(ep<0 || ep>=num) return;
+    if(_entryTable[ep]->traceEnabled)
+		beginExecute(e);
+#endif
+}
+
 void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
 				    int mlen, CmiObjId *idx)
 {
@@ -1371,6 +1398,19 @@ void TraceProjections::endExecute(void)
       beginExecuteLocal(ne.event, ne.msgType, ne.ep, ne.srcPe, ne.ml, ne.idx);
     }
   }
+}
+
+void TraceProjections::endExecute(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+	//This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int num = _entryTable.size();
+    int ep = e->getEpIdx();
+    if(ep<0 || ep>=num) return;
+    if(_entryTable[ep]->traceEnabled)
+		endExecute();
+#endif	
 }
 
 void TraceProjections::endExecuteLocal(void)

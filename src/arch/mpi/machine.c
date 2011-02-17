@@ -1206,12 +1206,20 @@ static int SendMsgBuf()
 #endif
 	
 #if CMK_SMP_TRACE_COMMTHREAD
-		traceBeginCommOp(msg);
-		traceChangeLastTimestamp(CpvAccess(projTraceStart));
-		traceEndCommOp(msg);
-		char tmp[64];
-		sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
-		traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
+	traceBeginCommOp(msg);
+	/* traceSendMsgComm must execute after traceBeginCommOp because
+         * we pretend we execute an entry method, and inside this we
+         * pretend we will send another message. Otherwise how could
+         * a message creation just before an entry method invocation?
+         * If such logic is broken, the projections will not trace
+         * messages correctly! -Chao Mei
+         */
+	traceSendMsgComm(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
+	traceEndCommOp(msg);
+	char tmp[64];
+	sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
+	traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 		
 		

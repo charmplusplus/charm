@@ -265,9 +265,11 @@ class TraceSummary : public Trace {
     void creation(envelope *e, int epIdx, int num=1) {}
 
     void beginExecute(envelope *e);
+    void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
     void endExecute(void);
+    void endExecute(char *msg);
     void beginIdle(double currT);
     void endIdle(double currT);
     void traceBegin(void);

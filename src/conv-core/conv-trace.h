@@ -38,6 +38,7 @@ int  traceRegisterUserEvent(const char*, int e
 #if CMK_SMP_TRACE_COMMTHREAD
 void traceBeginCommOp(char *msg);
 void traceEndCommOp(char *msg);
+void traceSendMsgComm(char *msg);
 #endif
 void traceChangeLastTimestamp(double ts);
 
