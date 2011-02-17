@@ -512,6 +512,7 @@ $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
 touch $DESTINATION/tmp/Makefile.machine
+touch $DESTINATION/tmp/Make.extlib
 
 ConvUsr="$DESTINATION/tmp/conv-mach-pre.sh"
 Echo "Generating $ConvUsr"
