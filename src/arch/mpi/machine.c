@@ -57,6 +57,7 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 
 #if CMK_SMP_TRACE_COMMTHREAD
+#define CMI_MPI_TRACE_MOREDETAILED 0
 #undef CMI_MPI_TRACE_USEREVENTS
 #define CMI_MPI_TRACE_USEREVENTS 1
 #endif
@@ -763,9 +764,11 @@ int PumpMsgs(void)
         traceBeginCommOp(msg);
 	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	traceEndCommOp(msg);
+	#if CMI_MPI_TRACE_MOREDETAILED
 	char tmp[32];
 	sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
+	#endif
 #endif	
 	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
@@ -850,9 +853,11 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
         traceBeginCommOp(msg);
 	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	traceEndCommOp(msg);
+	#if CMI_MPI_TRACE_MOREDETAILED
 	char tmp[32];
 	sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
+	#endif
 #endif
   
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1217,9 +1222,11 @@ static int SendMsgBuf()
 	traceSendMsgComm(msg);
 	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	traceEndCommOp(msg);
+	#if CMI_MPI_TRACE_MOREDETAILED
 	char tmp[64];
 	sprintf(tmp, "MPI_Isend: from proc %d to proc %d", msg_tmp->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
+	#endif
 #endif
 		
 		
