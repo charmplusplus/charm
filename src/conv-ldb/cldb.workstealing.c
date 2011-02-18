@@ -286,13 +286,12 @@ void CldGraphModuleInit(char **argv)
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
 
-#if 1
   /* register idle handlers - when idle, keep asking work from neighbors */
+  if(CmiNumPes() > 1)
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-    if (CmiMyPe() == 0) 
+  if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
-#endif
 }
 
 
