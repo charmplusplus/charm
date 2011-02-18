@@ -1212,6 +1212,7 @@ static int SendMsgBuf()
 	
 #if CMK_SMP_TRACE_COMMTHREAD
 	traceBeginCommOp(msg);
+	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	/* traceSendMsgComm must execute after traceBeginCommOp because
          * we pretend we execute an entry method, and inside this we
          * pretend we will send another message. Otherwise how could
@@ -1220,7 +1221,6 @@ static int SendMsgBuf()
          * messages correctly! -Chao Mei
          */
 	traceSendMsgComm(msg);
-	traceChangeLastTimestamp(CpvAccess(projTraceStart));
 	traceEndCommOp(msg);
 	#if CMI_MPI_TRACE_MOREDETAILED
 	char tmp[64];
