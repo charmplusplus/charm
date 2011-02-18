@@ -172,6 +172,21 @@ static inline void _handlePhase2(QdState *state, QdMsg *msg)
 static void _callWhenIdle(QdMsg *msg)
 {
   DEBUGP(("[%d] callWhenIdle msg:%p \n", CmiMyPe(), msg));
+  CcdCancelCallOnCondition(CcdUSER, msg->cond2);
+  QdState *state = CpvAccess(_qd);
+  switch(msg->getPhase()) {
+    case 0 : _handlePhase0(state, msg); break;
+    case 1 : _handlePhase1(state, msg); break;
+    case 2 : _handlePhase2(state, msg); break;
+    default: CmiAbort("Internal QD Error. Contact Developers.!\n");
+  }
+}
+
+// allow qd callback to be called by a user condition (CcdUSER)
+static void _callWhenIdle2(QdMsg *msg)
+{
+  DEBUGP(("[%d] callWhenIdle2 msg:%p \n", CmiMyPe(), msg));
+  CcdCancelCallOnCondition(CcdPROCESSOR_STILL_IDLE, msg->cond1);
   QdState *state = CpvAccess(_qd);
   switch(msg->getPhase()) {
     case 0 : _handlePhase0(state, msg); break;
@@ -194,8 +209,12 @@ void _qdHandler(envelope *env)
   DEBUGP(("[%d] _qdHandler msg:%p \n", CmiMyPe(), msg));
   if (_dummy_dq > 0)
     CcdCallFnAfter((CcdVoidFn)_invokeQD,(void *)msg, _dummy_dq*1000); // in ms
-  else
-    CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
+  else {
+    int cond1 = CcdCallOnCondition(CcdPROCESSOR_STILL_IDLE, (CcdVoidFn)_callWhenIdle, (void*) msg);
+    int cond2 = CcdCallOnCondition(CcdUSER, (CcdVoidFn)_callWhenIdle2, (void*) msg);
+    msg->cond1 = cond1;
+    msg->cond2 = cond2;
+  }
 }
 
 // when a message is sent from an immediate handler from comm thread or 
