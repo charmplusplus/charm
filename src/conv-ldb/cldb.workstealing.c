@@ -123,7 +123,7 @@ void  CldAckNoTaskHandler(requestmsg *msg)
 
   do{
       victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
-  }while(victim == mype || victim == notaskpe);
+  }while(victim == mype);
 
   /* fixme */
   //CmiBecomeImmediate(&msg);
