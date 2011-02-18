@@ -1,6 +1,10 @@
 #include "ddt.h"
 #include <algorithm>
-#include <limits.h>
+#include <limits>
+
+using std::numeric_limits;
+
+#define DDTDEBUG /* CmiPrintf */
 
 CkDDT_DataType*
 CkDDT::getType(int nIndex)
@@ -374,7 +378,7 @@ CkDDT_DataType::serialize(char* userdata, char* buffer, int num, int dir)
   } else if (dir==(-1)){
     memcpy(userdata, buffer, num*size );
   } else {
-    CkAbort("CkDDT: Invalid dir in serialize.\n");
+    CmiAbort("CkDDT: Invalid dir in serialize.\n");
   }
   return size ;
 }
@@ -455,7 +459,7 @@ int CkDDT_DataType::getEnvelope(int *ni, int *na, int *nd, int *combiner){
 }
 
 int CkDDT_DataType::getContents(int ni, int na, int nd, int i[], int a[], int d[]){
-  CkPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
+  CmiPrintf("CkDDT_DataType::getContents: Shouldn't call getContents on primitive datatypes!\n");
   return -1;
 }
 
@@ -681,8 +685,9 @@ int CkDDT_HVector::getContents(int ni, int na, int nd, int i[], int a[], int d[]
 
 CkDDT_Indexed::CkDDT_Indexed(int nCount, int* arrBlock, int* arrDisp, int bindex,
                          CkDDT_DataType* base)
-    : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, INT_MAX, INT_MIN, 0,
-            base->getSize(), base->getExtent(), base, bindex),
+    : CkDDT_DataType(CkDDT_INDEXED, 0, 0, nCount, numeric_limits<int>::max(),
+		     numeric_limits<int>::min(), 0, base->getSize(), base->getExtent(),
+		     base, bindex),
     arrayBlockLength(new int[nCount]), arrayDisplacements(new int[nCount])
 {
     for(int i=0; i<count; i++) {
@@ -762,20 +767,16 @@ int CkDDT_Indexed::getContents(int ni, int na, int nd, int i[], int a[], int d[]
   return 0;
 }
 
-#ifndef WIN32
-#define max  std::max
-#endif
-
 CkDDT_HIndexed::CkDDT_HIndexed(int nCount, int* arrBlock, int* arrDisp,  int bindex,
                            CkDDT_DataType* base)
     : CkDDT_Indexed(nCount, arrBlock, arrDisp, bindex, base)
 {
   datatype = CkDDT_HINDEXED;
   size = 0;
-  ub = INT_MIN;
+  ub = numeric_limits<int>::min();
   for (int i = 0; i<count; i++) {
       size += (arrBlock[i] * baseSize);
-      ub = max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
+      ub = std::max(arrBlock[i]*baseExtent + baseType->getLB() + arrayDisplacements[i], ub);
   }
 
   lb = baseType->getLB() + *std::min_element(arrDisp, arrDisp+nCount+1);
@@ -827,8 +828,8 @@ int CkDDT_HIndexed::getContents(int ni, int na, int nd, int i[], int a[], int d[
 
 CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
                        int* arrDisp, int *bindex, CkDDT_DataType** arrBase)
-    : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, INT_MAX, INT_MIN,
-            0, 0, 0, NULL, 0),
+    : CkDDT_DataType(CkDDT_STRUCT, 0, 0, nCount, numeric_limits<int>::max(),
+		     numeric_limits<int>::min(), 0, 0, 0, NULL, 0),
     arrayBlockLength(new int[nCount]), arrayDisplacements(new int[nCount]),
     index(new int[nCount]), arrayDataType(new CkDDT_DataType*[nCount])
 {

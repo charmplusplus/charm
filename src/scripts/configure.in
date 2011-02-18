@@ -15,6 +15,7 @@ AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version numbe
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
+MAKEFILE_EXT=Make.extlib
 
 Echo() {
 	echo $* 
@@ -100,7 +101,6 @@ then
   Echo "Charm NUMA support is builtin"
   WITH_NUMA=yes
 fi
-          
 
 #
 AC_MSG_CHECKING(machine name)

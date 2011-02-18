@@ -1076,71 +1076,62 @@ double CmiTimer()
 
 void CmiTimerInit() {}
 
-#if 0
-#include "common/bgp_personality.h"
-#include <spi/bgp_SPI.h>
+#include "dcmf.h"
 
-#define SPRN_TBRL 0x10C  /* Time Base Read Lower Register (user & sup R/O) */
-#define SPRN_TBRU 0x10D  /* Time Base Read Upper Register (user & sup R/O) */
-#define SPRN_PIR  0x11E  /* CPU id */
-
-static inline unsigned long long BGPTimebase(void)
-{
-  unsigned volatile u1, u2, lo;
-  union
-  {
-    struct { unsigned hi, lo; } w;
-    unsigned long long d;
-  } result;
-                                                                         
-  do {
-    asm volatile ("mfspr %0,%1" : "=r" (u1) : "i" (SPRN_TBRU));
-    asm volatile ("mfspr %0,%1" : "=r" (lo) : "i" (SPRN_TBRL));
-    asm volatile ("mfspr %0,%1" : "=r" (u2) : "i" (SPRN_TBRU));
-  } while (u1!=u2);
-                                                                         
-  result.w.lo = lo;
-  result.w.hi = u2;
-  return result.d;
+double CmiWallTimer () {
+  return DCMF_Timer();
 }
 
-static unsigned long long inittime_wallclock = 0;
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+  return CmiWallTimer();
+}
+#endif
+
+
+#if CMK_TIMER_USE_BLUEGENEQ  /* This module just compiles with GCC charm. */
+
+CpvStaticDeclare(unsigned long, inittime);
 CpvStaticDeclare(double, clocktick);
 
 int CmiTimerIsSynchronized()
 {
-  return 0;
+  return 1;
 }
+
+#include "hwi/include/bqc/A2_inlines.h"
+#include "spi/include/kernel/process.h"
 
 void CmiTimerInit()
 {
-  _BGP_Personality_t dst;
   CpvInitialize(double, clocktick);
-  int size = sizeof(_BGP_Personality_t);
-  rts_get_personality(&dst, size);
+  CpvInitialize(unsigned long, inittime);
 
-  CpvAccess(clocktick) = 1.0 / (dst.Kernel_Config.FreqMHz * 1e6);
+  Personality_t  pers;
+  Kernel_GetPersonality(&pers, sizeof(pers));
+  uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
+  CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
+
+  fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);
 
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
 
-  inittime_wallclock = BGPTimebase (); 
+  CpvAccess(inittime) = GetTimeBase (); 
 }
 
 double CmiWallTimer()
 {
   unsigned long long currenttime;
-  currenttime = BGPTimebase();
-  return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
-}
-#endif
-
-#include "dcmf.h"
-
-double CmiWallTimer () {
-  return DCMF_Timer();
+  currenttime = GetTimeBase();
+  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
 double CmiCpuTimer()

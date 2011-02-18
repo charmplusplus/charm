@@ -5,7 +5,7 @@
 #include "queueing.h"
 #include "cldb.h"
 
-#define IDLE_IMMEDIATE 		1
+#define IDLE_IMMEDIATE 		0
 #define TRACE_USEREVENTS        0
 
 #define PERIOD 10                /* default: 30 */
@@ -43,7 +43,6 @@ char *CldGetStrategy(void)
 
 /* since I am idle, ask for work from neighbors */
 
-
 static void CldBeginIdle(void *dummy)
 {
   int i;
@@ -54,6 +53,8 @@ static void CldBeginIdle(void *dummy)
   int  victim;
   int mype;
   int numpes;
+
+  CcdRaiseCondition(CcdUSER);
 
   myload = CldLoad();
   //if (myload > 0) return; // I do not think this will be true when a processor is idle. overhead code
@@ -85,7 +86,6 @@ static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
   int myload = CldLoad();
-  double now = CmiWallTimer();
   CldProcInfo  cldData = CpvAccess(CldData);
 
   int sendLoad;
@@ -103,6 +103,8 @@ static void CldAskLoadHandler(requestmsg *msg)
       r_msg.from_pe = CmiMyPe();
       r_msg.to_rank = CmiMyRank();
 
+      CcdRaiseCondition(CcdUSER);
+
       CmiSetHandler(&r_msg, CpvAccess(CldAckNoTaskHandlerIndex));
       CmiSyncSend(receiver, sizeof(requestmsg),(char *)&r_msg);
     /* send ack indicating there is no task */
@@ -112,28 +114,30 @@ static void CldAskLoadHandler(requestmsg *msg)
 
 void  CldAckNoTaskHandler(requestmsg *msg)
 {
-    int victim; 
-    requestmsg r_msg;
-    int notaskpe = msg->from_pe;
-    CldProcInfo  cldData = CpvAccess(CldData);
-    int mype = CmiMyPe();
+  int victim; 
+  int notaskpe = msg->from_pe;
+  CldProcInfo  cldData = CpvAccess(CldData);
+  int mype = CmiMyPe();
+
+  CcdRaiseCondition(CcdUSER);
+
   do{
       victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
-  }while(victim == mype || victim == notaskpe);
+  }while(victim == mype);
 
   /* fixme */
   //CmiBecomeImmediate(&msg);
-  r_msg.to_rank = CmiRankOf(victim);
-  r_msg.from_pe = mype;
-  CmiSetHandler(&r_msg, CpvAccess(CldAskLoadHandlerIndex));
-  CmiSyncSend(victim, sizeof(requestmsg),(char *)&r_msg);
+  /* reuse msg */
+  msg->to_rank = CmiRankOf(victim);
+  msg->from_pe = mype;
+  CmiSetHandler(msg, CpvAccess(CldAskLoadHandlerIndex));
+  CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
   //cldData->sent = 1;
 
   //cldData->lastCheck = CmiWallTimer();
 
-  CmiFree(msg);
-
 }
+
 void CldHandler(void *msg)
 {
   CldInfoFn ifn; CldPackFn pfn;
@@ -282,13 +286,12 @@ void CldGraphModuleInit(char **argv)
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
 
-#if 1
   /* register idle handlers - when idle, keep asking work from neighbors */
+  if(CmiNumPes() > 1)
   CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-    if (CmiMyPe() == 0) 
+  if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
-#endif
 }
 
 

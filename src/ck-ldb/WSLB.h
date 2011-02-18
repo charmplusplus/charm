@@ -9,8 +9,8 @@
 
 /*@{*/
 
-#ifndef NEIGHBORLB_H
-#define NEIGHBORLB_H
+#ifndef _WSLB_H_
+#define _WSLB_H_
 
 #include "BaseLB.h"
 #include "WSLB.decl.h"
@@ -136,7 +136,7 @@ public:
 }; 
 
 
-#endif /* NEIGHBORLB_H */
+#endif /* _WSLB_H_ */
 
 
 /*@}*/
