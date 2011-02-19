@@ -16,12 +16,9 @@
 
 
 typedef struct CldProcInfo_s {
-  //double lastCheck;
-  //int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
-  //double lastBalanceTime;
 } *CldProcInfo;
 
 int _stealonly1 = 0;
@@ -32,8 +29,6 @@ CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 
 void LoadNotifyFn(int l)
 {
-  //CldProcInfo  cldData = CpvAccess(CldData);
-  //cldData->sent = 0;
 }
 
 char *CldGetStrategy(void)
@@ -49,7 +44,6 @@ static void CldBeginIdle(void *dummy)
   double startT;
   requestmsg msg;
   int myload;
-  CldProcInfo  cldData = CpvAccess(CldData);
   int  victim;
   int mype;
   int numpes;
@@ -57,7 +51,6 @@ static void CldBeginIdle(void *dummy)
   CcdRaiseCondition(CcdUSER);
 
   myload = CldLoad();
-  //if (myload > 0) return; // I do not think this will be true when a processor is idle. overhead code
 
   mype = CmiMyPe();
   msg.from_pe = mype;
@@ -74,7 +67,6 @@ static void CldBeginIdle(void *dummy)
   msg.to_rank = CmiRankOf(victim);
   CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
   
-  //cldData->sent = 1;
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
 #endif
@@ -86,7 +78,6 @@ static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
   int myload = CldLoad();
-  CldProcInfo  cldData = CpvAccess(CldData);
 
   int sendLoad;
   sendLoad = myload / 2; 
@@ -116,7 +107,6 @@ void  CldAckNoTaskHandler(requestmsg *msg)
 {
   int victim; 
   int notaskpe = msg->from_pe;
-  CldProcInfo  cldData = CpvAccess(CldData);
   int mype = CmiMyPe();
 
   CcdRaiseCondition(CcdUSER);
@@ -125,16 +115,11 @@ void  CldAckNoTaskHandler(requestmsg *msg)
       victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
   }while(victim == mype);
 
-  /* fixme */
-  //CmiBecomeImmediate(&msg);
   /* reuse msg */
   msg->to_rank = CmiRankOf(victim);
   msg->from_pe = mype;
   CmiSetHandler(msg, CpvAccess(CldAskLoadHandlerIndex));
   CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
-  //cldData->sent = 1;
-
-  //cldData->lastCheck = CmiWallTimer();
 
 }
 
@@ -146,7 +131,6 @@ void CldHandler(void *msg)
   CldRestoreHandler(msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  /*CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr); */
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
@@ -208,7 +192,6 @@ void CldEnqueue(int pe, void *msg, int infofn)
   } 
   else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    //CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   }
   else {
@@ -265,8 +248,6 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldBalanceHandlerIndex);
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
-  //CpvAccess(CldData)->lastCheck = -1;
-  //CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
@@ -306,7 +287,6 @@ void CldModuleInit(char **argv)
   CpvAccess(CldMessageChunks) = 0;
 
   CldModuleGeneralInit(argv);
-  CldGraphModuleInit(argv);
 
   CpvAccess(CldLoadNotify) = 1;
 }

@@ -15,7 +15,7 @@ cpu affinity.
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)   /* CmiPrintf x;  */
+#define DEBUGP(x)    /* CmiPrintf x;  */
 CpvDeclare(int, myCPUAffToCore);
 #if CMK_OS_IS_LINUX
 /* 
@@ -573,6 +573,7 @@ void CmiInitCPUAffinity(char **argv)
   {
 #if CMK_CRAYXT
     ret = getXTNodeID(CmiMyNode(), CmiNumNodes());
+    //printf("NODEID: %d %d. \n", CmiMyNode(), ret);
     memcpy(&myip, &ret, sizeof(int));
 #elif CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
