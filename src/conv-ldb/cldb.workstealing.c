@@ -287,6 +287,7 @@ void CldModuleInit(char **argv)
   CpvAccess(CldMessageChunks) = 0;
 
   CldModuleGeneralInit(argv);
+  CldGraphModuleInit(argv);
 
   CpvAccess(CldLoadNotify) = 1;
 }

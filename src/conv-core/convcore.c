@@ -3272,7 +3272,6 @@ void ConverseCommonInit(char **argv)
 #endif
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;
-  CmiInitCPUAffinityUtil();
   CmiArgInit(argv);
   CmiMemoryInit(argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
@@ -3284,6 +3283,7 @@ void ConverseCommonInit(char **argv)
   CmiTmpInit(argv);
   CmiTimerInit();
   CstatsInit(argv);
+  CmiInitCPUAffinityUtil();
 
   CcdModuleInit(argv);
   CmiHandlerInit();
