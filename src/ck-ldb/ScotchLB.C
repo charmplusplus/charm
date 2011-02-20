@@ -39,18 +39,24 @@ void ScotchLB::work(LDStats *stats) {
   SCOTCH_Num edgenbr = 0;			// number of edges
 
   double maxLoad = 0.0;
-  int maxBytes = 0, i, j;
+  int i, j, k, vert;
 
-  /** both object load and number of bytes exchanged are normalized to an
-   *  integer between 0 and 256 */
+  /** remove duplicate edges from recvFrom */
+  for(i = baseval; i < vertnbr; i++) {
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      vert = ogr->vertices[i].sendToList[j].getNeighborId();
+      for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
+	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert)
+	  ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
+      }
+    }
+  }
+
+  /** the object load is normalized to an integer between 0 and 256 */
   for(i = baseval; i < vertnbr; i++) {
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
-    edgenbr += ogr->vertices[i].sendToList.size();
-    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      if(ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes)
-	maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
-    }
+    edgenbr += ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
   }
 
   /* adjacency list */
@@ -63,13 +69,19 @@ void ScotchLB::work(LDStats *stats) {
   SCOTCH_Num *edlotab = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * edgenbr);
 
   int edgeNum = 0;
+  double ratio = 256.0/maxLoad;
 
   for(i = baseval; i < vertnbr; i++) {
     verttab[i] = edgeNum;
-    velotab[i] = (int)( (ogr->vertices[i].getVertexLoad() * 128) /maxLoad );
+    velotab[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       edgetab[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      edlotab[edgeNum] = (int)( (ogr->vertices[i].sendToList[j].getNumBytes() * 128) / maxBytes );
+      edlotab[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
+      edgeNum++;
+    }
+    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
+      edgetab[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
+      edlotab[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
       edgeNum++;
     }
   }
@@ -88,7 +100,7 @@ void ScotchLB::work(LDStats *stats) {
 
   // SCOTCH_stratGraphMap (&strat, "m{type=h,vert=80,low=r{job=t,map=t,poli=S,sep=h{pass=10}},asc=b{bnd=d{dif=1,rem=1,pass=40},org=}f{bal=0.01,move=80}}");
 
-  SCOTCH_stratGraphMap (&strat, "r{job=t,map=t,poli=S,sep=(m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=1f{bal=0.001,move=80},org=f{bal=0.001,move=80}}}|m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=1f{bal=0.001,move=80},org=f{bal=0.001,move=80}}})}");
+  SCOTCH_stratGraphMap (&strat, "r{job=t,map=t,poli=S,sep=(m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=f{bal=0.001,move=80},org=f{bal=0.001,move=80}}}|m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=f{bal=0.001,move=80},org=f{bal=0.001,move=80}}})}");
 
   SCOTCH_Num *pemap = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
 

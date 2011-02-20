@@ -58,18 +58,24 @@ void MetisLB::work(LDStats* stats)
   int numEdges = 0;				// number of edges
 
   double maxLoad = 0.0;
-  int maxBytes = 0, i, j;
+  int i, j, k, vert;
 
-  /** both object load and number of bytes exchanged are normalized to an
-   *  integer between 0 and 256 */
+  /** remove duplicate edges from recvFrom */
+  for(i = 0; i < numVertices; i++) {
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      vert = ogr->vertices[i].sendToList[j].getNeighborId();
+      for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
+	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert)
+	  ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
+      }
+    }
+  }
+
+  /** the object load is normalized to an integer between 0 and 256 */
   for(i = 0; i < numVertices; i++) {
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
-    numEdges += ogr->vertices[i].sendToList.size();
-    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
-      if(ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes)
-        maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
-    }
+    numEdges = numEdges + ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
   }
 
   /* adjacency list */
@@ -82,13 +88,19 @@ void MetisLB::work(LDStats* stats)
   idxtype *adjwgt = new idxtype[numEdges];
 
   int edgeNum = 0;
+  double ratio = 256.0/maxLoad;
 
   for(i = 0; i < numVertices; i++) {
     xadj[i] = edgeNum;
-    vwgt[i] = (int)( (ogr->vertices[i].getVertexLoad() * 128) /maxLoad );
+    vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      adjwgt[edgeNum] = (int)( (ogr->vertices[i].sendToList[j].getNumBytes() * 128) / maxBytes );
+      adjwgt[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
+      edgeNum++;
+    }
+    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
+      adjncy[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
+      adjwgt[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
       edgeNum++;
     }
   }
