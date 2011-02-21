@@ -605,6 +605,7 @@ enable_charmdebug
 enable_replay
 enable_controlpoint
 with_numa
+with_metis
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1227,6 +1228,8 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-numa             support memory affinity with NUMA
+  --with-metis            support the METIS graph partitioner and associated
+                          load balancer
 
 Report bugs to the package provider.
 _ACEOF
@@ -3515,6 +3518,42 @@ if test $pass -eq 1
 then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
+
+#### Pick up METIS if the user asks for it ####
+
+
+# Check whether --with-metis was given.
+if test "${with_metis+set}" = set; then :
+  withval=$with_metis;
+else
+  with_metis=no
+fi
+
+
+WITH_METIS=no
+if test "$with_metis" != "no"
+then
+  Echo "Compiling Charm with support for METIS"
+  WITH_METIS=yes
+  echo 'charm++: $(L)/libmoduleMetisLB.a $(L)/libmoduleTeamLB.a' >> $MAKEFILE_EXT
+  add_flag 'CMK_LIBS="$CMK_LIBS -lmetis"' "libmetis"
+  if test "$with_metis" != "yes"
+  then
+    add_flag "CMK_METIS=$with_metis" "Where to find METIS"
+    add_flag 'CMK_LIBDIR="$CMK_LIBDIR -L$CMK_METIS"' "Library path for METIS"
+    if test -r $with_metis/Lib/metis.h
+    then
+      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/Lib"' "Include path for METIS 4"
+    elif test -r $with_metis/../../include/metis.h
+    then
+      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/../../include"' "Include path for METIS 5"
+    else
+      echo "I can't find metis.h, since the path you specified (which should point to the directory containing libmetis.a) is not laid out as I expect for version 4 or 5."
+      test_finish 1
+    fi
+  fi
+fi
+
 
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
