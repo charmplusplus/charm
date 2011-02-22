@@ -174,7 +174,7 @@ void GridCommRefineLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   // Also add background CPU time to each PE's scaled load.
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
-    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    (&PE_Data[i])->scaled_load += stats->procs[i].bg_walltime;
   }
 }
 
