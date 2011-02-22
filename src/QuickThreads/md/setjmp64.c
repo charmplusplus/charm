@@ -33,12 +33,13 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 #define MAXTABLE 1000
 
 #if CMK_SMP && CMK_TLS_THREAD
-static __thread void * pbuf[MAXTABLE] = {0};
-static __thread int    pcounter = 1;
+#define TLS_SPECIFIER         __thread
 #else
-static void * pbuf[MAXTABLE] = {0};
-static int    pcounter = 1;
+#define TLS_SPECIFIER
 #endif
+
+static TLS_SPECIFIER void * pbuf[MAXTABLE] = {0};
+static TLS_SPECIFIER int    pcounter = 1;
 
 
 static int push_buf(void *ptr)
