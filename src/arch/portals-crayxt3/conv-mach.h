@@ -93,7 +93,7 @@
 #define CMK_DEBUG_MODE                                     0
 
 #define CMK_LBDB_ON					   1
-#define CMK_LBDB_CPUTIMER                                  0
+#define CMK_LB_CPUTIMER					   0
 
 #define CMK_NO_SOCKETS                                     1
 
