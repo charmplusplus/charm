@@ -274,10 +274,12 @@ public:
   int from_pe;
   int pe_speed;
   double total_walltime;
-  double total_cputime;
   double idletime;
   double bg_walltime;
+#if CMK_LB_CPUTIMER
+  double total_cputime;
   double bg_cputime;
+#endif
   int n_objs;
   LDObjData *objData;
   int n_comm;
@@ -291,11 +293,12 @@ public:
 
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg(): from_pe(0), pe_speed(0), 
-                 total_walltime(0.0), total_cputime(0.0),
-                 idletime(0.0), bg_walltime(0.0), bg_cputime(0.0),
-                 n_objs(0), objData(NULL), n_comm(0), commData(NULL), 
-                 avail_vector(NULL), next_lb(0)  {}
+  CLBStatsMsg(): from_pe(0), pe_speed(0), total_walltime(0.0), idletime(0.0),
+		 bg_walltime(0.0), n_objs(0), objData(NULL), n_comm(0),
+#if CMK_LB_CPUTIMER
+		 total_cputime(0.0), bg_cputime(0.0),
+#endif
+		 commData(NULL), avail_vector(NULL), next_lb(0) {}
   ~CLBStatsMsg();
   void pup(PUP::er &p);
 }; 

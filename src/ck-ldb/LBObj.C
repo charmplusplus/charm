@@ -28,8 +28,10 @@ void LBObj::Clear(void)
 //  data.id = myid;
 //  data.omHandle = parentOM;
 //  data.omID = parentDB->LbOM(parentOM)->id();
-  data.cpuTime = 0.;
   data.wallTime = 0.;
+#if CMK_LB_CPUTIMER
+  data.cpuTime = 0.;
+#endif
 #if ! COMPRESS_LDB
   data.minWall = 1e6;
   data.maxWall = 0.;
@@ -40,7 +42,9 @@ void LBObj::IncrementTime(double walltime, double cputime)
 {
   parentDB->MeasuredObjTime(walltime,cputime);
   data.wallTime += walltime;
+#if CMK_LB_CPUTIMER
   data.cpuTime += cputime;
+#endif
 #if ! COMPRESS_LDB
   if (walltime < data.minWall) data.minWall = walltime;
   if (walltime > data.maxWall) data.maxWall = walltime;

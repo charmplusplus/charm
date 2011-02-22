@@ -116,8 +116,10 @@ typedef struct {
 
 typedef struct {
   LDObjHandle handle;
-  floatType cpuTime;
   floatType wallTime;
+#if CMK_LB_CPUTIMER
+  floatType cpuTime;
+#endif
 #if ! COMPRESS_LDB
   floatType minWall, maxWall;
 #endif
@@ -399,8 +401,10 @@ PUPmarshall(LDObjHandle)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
-  p|cpuTime;
   p|wallTime;
+#if CMK_LB_CPUTIMER
+  p|cpuTime;
+#endif
 #if ! COMPRESS_LDB
   p|minWall;
   p|maxWall;

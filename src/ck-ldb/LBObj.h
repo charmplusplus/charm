@@ -35,8 +35,12 @@ public:
     parentDB = _parentDB;
 //    migratable = _migratable;
 //    registered = CmiTrue;
-    startWTime = startCTime = -1.0;
-    lastCpuTime = lastWallTime = .0;
+    startWTime = -1.0;
+    lastWallTime = .0;
+#if CMK_LB_CPUTIMER
+    startCTime = -1.0;
+    lastCpuTime = .0;
+#endif
   }
 
   ~LBObj() { };
@@ -69,22 +73,20 @@ public:
   void IncrementTime(double walltime, double cputime);
   inline void StartTimer(void) {
 	startWTime = CkWallTimer();
-#if CMK_LBDB_CPUTIMER
+#if CMK_LB_CPUTIMER
 	startCTime = CkCpuTimer();
-#else
-	startCTime = startWTime;
 #endif
   }
   inline void StopTimer(double* walltime, double* cputime) {
 	if (startWTime >= 0.0) {	// in case startOn in middle of entry
           const double endWTime = CkWallTimer();
 	  *walltime = endWTime - startWTime;
-#if CMK_LBDB_CPUTIMER
+#if CMK_LB_CPUTIMER
           const double endCTime = CkCpuTimer();
-#else
-          const double endCTime = endWTime;
-#endif
 	  *cputime = endCTime - startCTime;
+#else
+	  *cputime = *walltime;
+#endif
 	}
         else {
           *walltime = *cputime = 0.0;
@@ -92,14 +94,20 @@ public:
   }
 
   inline void getTime(double *w, double *c) {
-    *w=data.wallTime; 
-    *c=data.cpuTime;
+    *w = data.wallTime;
+#if CMK_LB_CPUTIMER
+    *c = data.cpuTime;
+#else
+    *c = *w;
+#endif
   }
 
   inline void setTiming(double cputime)
   {
     data.wallTime = cputime;
+#if CMK_LB_CPUTIMER
     data.cpuTime = cputime;
+#endif
   }
 
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
@@ -107,7 +115,14 @@ public:
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
   inline void UseAsyncMigrate(CmiBool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
-  inline void lastKnownLoad(double *w, double *c) {*c=lastCpuTime; *w=lastWallTime; }
+  inline void lastKnownLoad(double *w, double *c) {
+    *w = lastWallTime;
+#if CMK_LB_CPUTIMER
+    *c = lastCpuTime;
+#else
+    *c = *w;
+#endif
+  }
   inline void *getUserData() { return  userData; }
 private:
 
@@ -118,9 +133,11 @@ private:
   LDObjData data;
 //  CmiBool registered;
   double startWTime;
+  double lastWallTime;
+#if CMK_LB_CPUTIMER
   double startCTime;
   double lastCpuTime;
-  double lastWallTime;
+#endif
 //  CmiBool migratable;   // temp
 };
 

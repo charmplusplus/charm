@@ -325,8 +325,10 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
     for (int i=0; i<stats->n_objs; ++i) {
       if (predicted_model->model_valid[i]) {
 	param = predicted_model->parameters[i];
-	stats->objData[i].cpuTime = predicted_model->predictor->predict(stats->objData[i].cpuTime, param);
 	stats->objData[i].wallTime = predicted_model->predictor->predict(stats->objData[i].wallTime, param);
+#if CMK_LB_CPUTIMER
+	stats->objData[i].cpuTime = predicted_model->predictor->predict(stats->objData[i].cpuTime, param);
+#endif
       }
     }
 

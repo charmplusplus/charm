@@ -303,10 +303,13 @@ void BaseLB::LDStats::print()
   for(int pe=0; pe < nprocs(); pe++) {
     struct ProcStats &proc = procs[pe];
 
-    CkPrintf(
-      "Proc %d(%d) Sp %d Total(wall,cpu) = (%f %f) Idle = %f Bg = (%f %f) nObjs = %d\n",
-      pe,proc.pe,proc.pe_speed,proc.total_walltime,proc.total_cputime,
-      proc.idletime,proc.bg_walltime,proc.bg_cputime,proc.n_objs);
+    CkPrintf("Proc %d (%d) Speed %d Total = %f Idle = %f Bg = %f nObjs = %d",
+      pe, proc.pe, proc.pe_speed, proc.total_walltime, proc.idletime,
+      proc.bg_walltime, proc.n_objs);
+#if CMK_LB_CPUTIMER
+    CkPrintf(" CPU Total %f Bg %f", proc.total_cputime, proc.bg_cputime);
+#endif
+    CkPrintf("\n");
   }
 
   CkPrintf("------------- Object Data: %d objects -------------\n", n_objs);
@@ -317,7 +320,9 @@ void BaseLB::LDStats::print()
 ], odata.objID().id[2], odata.objID().id[3]);
       CkPrintf("  OM id = %d\t",odata.omID().id);
       CkPrintf("   Mig. = %d\n",odata.migratable);
+#if CMK_LB_CPUTIMER
       CkPrintf("    CPU = %f\t",odata.cpuTime);
+#endif
       CkPrintf("   Wall = %f\n",odata.wallTime);
   }
 

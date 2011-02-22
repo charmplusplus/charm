@@ -194,8 +194,13 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
   msg->from_pe = CkMyPe();
 
   // Get stats
+#if CMK_LB_CPUTIMER
   theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
                    &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
+#else
+  theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
+                   &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
+#endif
 //  msg->pe_speed = myspeed;
   // number of pes
   msg->pe_speed = 1;
@@ -279,10 +284,12 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
   struct ProcStats &procStat = statsData->procs[neighborIdx];
   procStat.pe = pe;	// real PE
   procStat.total_walltime = m->total_walltime;
-  procStat.total_cputime = m->total_cputime;
   procStat.idletime = m->idletime;
   procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+  procStat.total_cputime = m->total_cputime;
   procStat.bg_cputime = m->bg_cputime;
+#endif
   procStat.pe_speed = m->pe_speed;		// important
   procStat.available = CmiTrue;
   procStat.n_objs = m->n_objs;
@@ -345,8 +352,10 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 {
 #if CMK_LBDB_ON
   int i;
-  double obj_walltime, obj_cputime;
-  double obj_nmwalltime, obj_nmcputime;
+  double obj_walltime, obj_nmwalltime;
+#if CMK_LB_CPUTIMER 
+  double obj_cputime, obj_nmcputime;
+#endif
 
   LDStats *statsData = levelData[atlevel]->statsData;
   CmiAssert(statsData);
@@ -360,16 +369,22 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   if ((statsStrategy == SHRINK || statsStrategy == SHRINK_NULL) && atlevel == tree->numLevels()-2) 
   {
     shrink = 1;
-    obj_walltime = obj_cputime = 0.0;
-    obj_nmwalltime = obj_nmcputime = 0.0;
+    obj_walltime = obj_nmwalltime = 0.0;
+#if CMK_LB_CPUTIMER
+    obj_cputime = obj_nmcputime = 0.0;
+#endif
     for (i=0; i<osz; i++)  {
       if (statsData->objData[i].migratable) {
         obj_walltime += statsData->objData[i].wallTime;
+#if CMK_LB_CPUTIMER
         obj_cputime += statsData->objData[i].cpuTime;
+#endif
       }
       else {
         obj_nmwalltime += statsData->objData[i].wallTime;
+#if CMK_LB_CPUTIMER
         obj_nmcputime += statsData->objData[i].cpuTime;
+#endif
       }
     }
       // skip obj and comm data
@@ -383,19 +398,23 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   // Get stats
   cmsg->pe_speed = 0;
   cmsg->total_walltime = 0.0;
-  cmsg->total_cputime = 0.0;
   cmsg->idletime = 0.0;
   cmsg->bg_walltime = 0.0;
+#if CMK_LB_CPUTIMER
+  cmsg->total_cputime = 0.0;
   cmsg->bg_cputime = 0.0;
+#endif
 
   for (int pe=0; pe<statsData->nprocs(); pe++) {
         struct ProcStats &procStat = statsData->procs[pe];
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;
-        cmsg->total_cputime += procStat.total_cputime;
         cmsg->idletime += procStat.idletime;
         cmsg->bg_walltime += procStat.bg_walltime;
+#if CMK_LB_CPUTIMER
+        cmsg->total_cputime += procStat.total_cputime;
         cmsg->bg_cputime += procStat.bg_cputime;
+#endif
   }
 /*
   cmsg->idletime = 0.0;
@@ -420,9 +439,11 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 
   if (shrink) {
     cmsg->total_walltime = obj_walltime;
-    cmsg->total_cputime = obj_cputime;
     cmsg->bg_walltime += obj_nmwalltime;
+#if CMK_LB_CPUTIMER
+    cmsg->total_cputime = obj_cputime;
     cmsg->bg_cputime += obj_nmcputime;
+#endif
   }
 
   return cmsg;
