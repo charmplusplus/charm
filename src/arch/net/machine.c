@@ -2529,7 +2529,7 @@ static void ConverseRunPE(int everReturn)
   /* better to show the status here */
   if (CmiMyPe() == 0) {
     if (Cmi_netpoll == 1) {
-      CmiPrintf("Charm++: scheduler running in netpoll mode.\n");
+      CmiPrintf("Charm++> scheduler running in netpoll mode.\n");
     }
 #if CMK_SHARED_VARS_UNAVAILABLE
     else {
