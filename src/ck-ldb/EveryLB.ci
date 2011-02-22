@@ -30,7 +30,6 @@ module EveryLB {
   extern module RefineTopoLB;
   extern module TopoCentLB;
   extern module TopoLB;
-  extern module WSLB;
 
   initnode void initEveryLB(void);
 };
