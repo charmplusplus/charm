@@ -22,7 +22,7 @@ class LBDatabase;//Forward declaration
 //typedef float floatType;
 typedef double floatType;
 
-//#define COMPRESS_LDB                       1
+#define COMPRESS_LDB	1
 
 extern int _lb_version;
 
