@@ -124,9 +124,10 @@ FooLB::work(LDStats* stats)} as described in the previous section.
 \item Build charm for your platform (This will create the required links in the
 tmp directory).
 
-\item To compile the strategy files, first add {\em FooLB} into the load
-balancer list in charm/tmp/Makefile\_lb.sh. If FooLB will require some
-libraries at link time, you also need to create the dependency file called
+\item To compile the strategy files, first add {\em FooLB} in the ALL\_LDBS
+list in charm/tmp/Makefile\_lb.sh. Also comment out the line containing
+UNCOMMON\_LDBS in Makefile\_lb.sh.  If FooLB will require some libraries at
+link time, you also need to create the dependency file called
 libmoduleFooLB.dep. Run the script in charm/tmp, which creates the new Makefile
 named ``Make.lb''.
 
