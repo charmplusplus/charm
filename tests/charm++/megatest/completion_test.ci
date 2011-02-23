@@ -1,0 +1,64 @@
+module completion_test {
+
+  extern module completion;
+  
+  chare completion_tester {
+    entry completion_tester();
+
+    entry void run_test(void) {
+      //First test: no producers, nothing produced
+      atomic {
+	  CkPrintf("Starting test\n");
+      	detector = CProxy_CompletionDetector::ckNew();
+	  CkPrintf("Created detector, starting first detection\n");
+      	detector.start_detection(0,
+      				 CkCallback(CkIndex_completion_tester::start_test(0),
+      					    thisProxy),
+      				 CkCallback(CkIndex_completion_tester::finish_test(0),
+      					    thisProxy), 0);
+      }
+      when start_test(CkReductionMsg *m) atomic { CkPrintf("Started first test\n"); }
+      when finish_test(CkReductionMsg *m) atomic {
+      	// Just ourself as a producer, produce nothing
+      	detector.start_detection(1,
+      				 CkCallback(CkIndex_completion_tester::start_test(0),
+      					    thisProxy),
+      				 CkCallback(CkIndex_completion_tester::finish_test(0),
+      					    thisProxy), 0);
+      }
+      when start_test(CkReductionMsg *m) atomic { detector.ckLocalBranch()->done(); }
+      when finish_test(CkReductionMsg *m) atomic {
+	  CkPrintf("Finished second test\n");
+      	detector.start_detection(1,
+      				 CkCallback(CkIndex_completion_tester::start_test(0),
+      					    thisProxy),
+      				 CkCallback(CkIndex_completion_tester::finish_test(0),
+      					    thisProxy), 0);
+	detector.ckLocalBranch()->produce();
+      }
+      when start_test(CkReductionMsg *m) atomic {
+	  CkPrintf("Started third test\n");
+	  detector.ckLocalBranch()->done();
+	  detector.ckLocalBranch()->consume();
+      }
+      when finish_test(CkReductionMsg *m) atomic {
+	  int num = 10;
+	  CProxy_completion_array::ckNew(detector, num, num);
+	  detector.start_detection(num, CkCallback(),
+				   CkCallback(CkIndex_completion_tester::finish_test(0),
+					      thisProxy), 0);
+      }
+      when finish_test(CkReductionMsg *m) atomic {
+      	megatest_finish();
+      }
+    };
+
+    // SDAG Entry methods
+    entry void start_test(CkReductionMsg *m);
+    entry void finish_test(CkReductionMsg *m);
+  };
+
+  array [1D] completion_array {
+      entry completion_array(CProxy_CompletionDetector detector, int n);
+  };
+};

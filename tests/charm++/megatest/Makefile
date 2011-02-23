@@ -32,6 +32,7 @@ OBJS=megatest.o \
      immediatering.o \
      callback.o \
      inlineem.o \
+     completion_test.o
 
 
 #     priolongtest.o \
@@ -77,7 +78,7 @@ CIFILES =  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h #priolongtest.def.h
+      groupmulti.def.h completion_test.def.h #priolongtest.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
@@ -85,7 +86,7 @@ CIFILES =  \
 all: pgm
 
 pgm: $(OBJS)
-	$(CHARMC) -o pgm  $(OBJS) -language charm++
+	$(CHARMC) -o pgm  $(OBJS) -language charm++ -module completion
 
 .ci.decl.h:
 	$(CHARMC) -c $<
