@@ -26,6 +26,7 @@ int _stealonly1 = 0;
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
+CpvStaticDeclare(int, isStealing);
 
 void LoadNotifyFn(int l)
 {
@@ -49,6 +50,9 @@ static void CldBeginIdle(void *dummy)
   int numpes;
 
   CcdRaiseCondition(CcdUSER);
+
+  if (CpvAccess(isStealing)) return;    /* already stealing, return */
+  CpvAccess(isStealing) = 1;
 
   myload = CldLoad();
 
@@ -121,6 +125,7 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   CmiSetHandler(msg, CpvAccess(CldAskLoadHandlerIndex));
   CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
 
+  CpvAccess(isStealing) = 1;
 }
 
 void CldHandler(void *msg)
@@ -138,6 +143,7 @@ void CldBalanceHandler(void *msg)
 {
   CldRestoreHandler(msg);
   CldPutToken(msg);
+  CpvAccess(isStealing) = 0;
 }
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
@@ -290,6 +296,9 @@ void CldModuleInit(char **argv)
   CldGraphModuleInit(argv);
 
   CpvAccess(CldLoadNotify) = 1;
+
+  CpvInitialize(int, isStealing);
+  CpvAccess(isStealing) = 0;
 }
 
 void CldCallback()
