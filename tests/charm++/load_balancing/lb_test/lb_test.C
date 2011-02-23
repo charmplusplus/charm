@@ -204,6 +204,13 @@ public:
      p(busywork);
      p(n_received);
      p(future_receives,future_bufsz);
+
+    if(p.isSizing()) {
+      PUP::sizer *sizep = (PUP::sizer *)&p;
+      int pupsize = sizep->size();
+      // if(thisIndex == 0)
+      // CkPrintf("PUP::sizer shows a size of %d bytes\n", pupsize);
+    }
   }
 
   void Compute(HiMsg *m) { 
