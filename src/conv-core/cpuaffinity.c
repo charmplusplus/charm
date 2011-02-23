@@ -622,20 +622,24 @@ void CmiInitCPUAffinity(char **argv)
 void CmiInitCPUAffinityUtil(){
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;
+    CpvInitialize(void *, myProcStatFP);
 #if CMK_OS_IS_LINUX
-    char fname[128];
+    char fname[64];
+    CmiLock(_smp_mutex);
 #if CMK_SMP
     sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));
 #else
     sprintf(fname, "/proc/%d/stat", getpid());
-#endif	
-    CpvInitialize(void *, myProcStatFP);
+#endif
     CpvAccess(myProcStatFP) = (void *)fopen(fname, "r");
+    CmiUnlock(_smp_mutex);
 /*
     if(CmiMyPe()==0 && CpvAccess(myProcStatFP) == NULL){
         CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
     }
 */
+#else
+    CpvAccess(myProcStatFP) = NULL;
 #endif
 }
 
