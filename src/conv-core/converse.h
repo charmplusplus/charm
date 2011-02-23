@@ -465,9 +465,13 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
+                CmiMemoryReadFence(); \
+		while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CmiMemoryReadFence(); } \
        } else { \
-	       CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               CmiMemoryWriteFence();   \
+               CMK_TAG(Cpv_,v)=tmp;   \
+	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
