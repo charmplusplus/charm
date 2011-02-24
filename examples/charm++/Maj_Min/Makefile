@@ -1,6 +1,7 @@
 #CHARMC=/expand/home/sarood/Work/charm/bin/charmc  $(OPTS)
 #CHARMC=/expand/home/sarood/Work/charmOrg/bin/charmc  $(OPTS)
-CHARMC=/expand/home/sarood/Work/201012_TempAwareLDB/charm/bin/charmc  $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
+#CHARMC=/expand/home/sarood/Work/201012_TempAwareLDB/charm/bin/charmc  $(OPTS)
 #CHARMC=/expand/home/sarood/201012_TempAwareLDB/charm/bin/charmc  $(OPTS)
 
 
