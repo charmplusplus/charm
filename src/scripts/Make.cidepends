@@ -54,6 +54,7 @@ RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
+TempAwareGreedyLB.decl.h TempAwareGreedyLB.def.h: TempAwareGreedyLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp
 TopoCentLB.decl.h TopoCentLB.def.h: TopoCentLB.ci.stamp
 TopoLB.decl.h TopoLB.def.h: TopoLB.ci.stamp

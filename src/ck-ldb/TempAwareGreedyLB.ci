@@ -1,0 +1,9 @@
+module TempAwareGreedyLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] TempAwareGreedyLB : CentralLB {
+  entry void TempAwareGreedyLB(const CkLBOptions &);  
+};
+
+};

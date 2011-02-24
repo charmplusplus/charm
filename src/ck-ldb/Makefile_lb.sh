@@ -1,6 +1,6 @@
 #!/bin/sh
-UNCOMMON_LDBS="MetisLB ScotchLB TeamLB"
-COMMON_LDBS="BlockLB CommLB DummyLB GreedyAgentLB GreedyCommLB GreedyLB NeighborCommLB NeighborLB OrbLB PhasebyArrayLB RandCentLB RecBipartLB RefineLB RefineCommLB RotateLB"
+#UNCOMMON_LDBS="MetisLB ScotchLB TeamLB"
+COMMON_LDBS="BlockLB CommLB DummyLB GreedyAgentLB GreedyCommLB TempAwareGreedyLB GreedyLB NeighborCommLB NeighborLB OrbLB PhasebyArrayLB RandCentLB RecBipartLB RefineLB RefineCommLB RotateLB"
 OTHER_LDBS="ComboCentLB GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB GridHybridLB GridHybridSeedLB GridMetisLB HbmLB HybridLB RefineKLB RefineTopoLB TopoCentLB TopoLB WSLB"
 ALL_LDBS="$COMMON_LDBS $OTHER_LDBS"
 
