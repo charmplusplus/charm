@@ -622,8 +622,8 @@ void CmiInitCPUAffinity(char **argv)
 void CmiInitCPUAffinityUtil(){
     CpvInitialize(int, myCPUAffToCore);
     CpvAccess(myCPUAffToCore) = -1;
-    CpvInitialize(void *, myProcStatFP);
 #if CMK_OS_IS_LINUX
+    CpvInitialize(void *, myProcStatFP);
     char fname[64];
     CmiLock(_smp_mutex);
 #if CMK_SMP
@@ -638,8 +638,6 @@ void CmiInitCPUAffinityUtil(){
         CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
     }
 */
-#else
-    CpvAccess(myProcStatFP) = NULL;
 #endif
 }
 
