@@ -49,7 +49,7 @@ static void CldBeginIdle(void *dummy)
   int mype;
   int numpes;
 
-  CcdRaiseCondition(CcdUSER);
+  /* CcdRaiseCondition(CcdUSER); */
 
   if (CpvAccess(isStealing)) return;    /* already stealing, return */
   CpvAccess(isStealing) = 1;
@@ -94,17 +94,15 @@ static void CldAskLoadHandler(requestmsg *msg)
       CldMultipleSend(receiver, sendLoad, rank, 0);
   }else
   {
-      requestmsg r_msg;
-      r_msg.from_pe = CmiMyPe();
-      r_msg.to_rank = CmiMyRank();
+      msg->from_pe = CmiMyPe();
+      msg->to_rank = CmiMyRank();
 
-      CcdRaiseCondition(CcdUSER);
+      /* CcdRaiseCondition(CcdUSER); */
 
-      CmiSetHandler(&r_msg, CpvAccess(CldAckNoTaskHandlerIndex));
-      CmiSyncSend(receiver, sizeof(requestmsg),(char *)&r_msg);
+      CmiSetHandler(msg, CpvAccess(CldAckNoTaskHandlerIndex));
+      CmiSyncSendAndFree(receiver, sizeof(requestmsg),(char *)msg);
     /* send ack indicating there is no task */
   }
-  CmiFree(msg);
 }
 
 void  CldAckNoTaskHandler(requestmsg *msg)
@@ -113,7 +111,7 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   int notaskpe = msg->from_pe;
   int mype = CmiMyPe();
 
-  CcdRaiseCondition(CcdUSER);
+  /* CcdRaiseCondition(CcdUSER); */
 
   do{
       victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
