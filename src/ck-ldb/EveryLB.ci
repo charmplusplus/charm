@@ -6,7 +6,6 @@ module EveryLB {
   extern module DummyLB;
   extern module GreedyAgentLB;
   extern module GreedyCommLB;
-  extern module TempAwareGreedyLB;
   extern module GreedyLB;
   extern module NeighborCommLB;
   extern module NeighborLB;
