@@ -516,6 +516,15 @@ static void CldComputeNeighborData()
   free(pes);
 }
 
+static void topo_callback()
+{
+  CldComputeNeighborData();
+#if CMK_MULTICORE
+  CmiNodeBarrier();
+#endif
+  CldBalancePeriod(NULL, CmiWallTimer());
+}
+
 void CldGraphModuleInit(char **argv)
 {
   CpvInitialize(CldProcInfo, CldData);
@@ -577,11 +586,14 @@ void CldGraphModuleInit(char **argv)
     else fclose(fp);
     CldReadNeighborData();
 #endif
+/* 
     CldComputeNeighborData();
-    #if CMK_MULTICORE
+#if CMK_MULTICORE
     CmiNodeBarrier();
 #endif
     CldBalancePeriod(NULL, CmiWallTimer());
+*/
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)topo_callback, NULL);
 
   }
 
