@@ -439,7 +439,7 @@ for each processor in the node.
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
-               CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, CmiMyNodeSize()); \
+               CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, 1+CmiMyNodeSize()); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
                CmiMemoryWriteFence();   \
                CMK_TAG(Cpv_inited_,v)=1; \
