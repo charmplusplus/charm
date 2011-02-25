@@ -311,18 +311,22 @@ Below are the descriptions about the compiler and run-time options:
 
 \begin{itemize}
 \item {\em -module NeighborLB -module GreedyCommLB ...}  \\
-  links module NeighborLB, GreedyCommLB etc into an application, but these 
-load balancers will remain inactive at execution time unless overriden by 
-other runtime options.
+  links the modules NeighborLB, GreedyCommLB etc into an application, but these
+load balancers will remain inactive at execution time unless overriden by other
+runtime options.
 \item {\em -module CommonLBs} \\
   links a special module CommonLBs which includes some commonly used charmpp{}
 built-in load balancers.
 \item {\em -balancer GreedyCommLB} \\
-  links load balancer GreedyCommLB and invokes this load balancer at runtime. One can specify multiple load balancers for example: \\
-   {\em -balancer GreedyCommLB -balancer RefineLB}   \\
-   This will start first load balancing step with GreedyCommLB, and second load balancing step with RefineLB, and same RefineLB in the subsequent load balancing steps.
+  links the load balancer GreedyCommLB and invokes this load balancer at
+runtime.
+\item {\em -balancer GreedyCommLB -balancer RefineLB} \\
+  invokes GreedyCommLB at the first load balancing step and RefineLB in all
+subsequent load balancing steps.
 \item {\em -balancer ComboCentLB:GreedyLB,RefineLB}  \\
-   One can choose to create a new combo load balancer made of multiple load balancers. The above example specifies {\em one} load balancer which first applies GreedyLB algorithm followed by RefineLB algorithm.
+  One can choose to create a new combination load balancer made of multiple
+load balancers. In the above example, GreedyLB and RefineLB strategies are
+applied one after the other in each load balancing step.
 \end{itemize}
 
 The list of existing load balancers are in section \ref{lbStrategy}. Note: you
@@ -338,15 +342,19 @@ by "make METIS" under charm/tmp after you compile Charm++.
 
 \item {\bf run-time options:}
 
-Run-time options are doing the same thing as compile time options, but they can override the compile time options.
+Run-time options are similar to the compile time options as described above,
+but they can override compile time options.
 
 \begin{itemize}
 \item {\em +balancer help} \\
-  displays all available balancers already linked in.
+  displays all available balancers that have been linked in.
 \item {\em +balancer GreedyCommLB} \\
-  activates GreedyCommLB. Multiple load balancers can be activated at the runtime to work in sequence. (same as compile time options described above)
+  invoked GreedyCommLB
+\item {\em +balancer GreedyCommLB +balancer RefineLB} \\
+  invokes GreedyCommLB at the first load balancing step and RefineLB in all
+subsequent load balancing steps.
 \item {\em +balancer ComboCentLB:GreedyLB,RefineLB}  \\
-  same as the example in +balancer compile time option.
+  same as the example in the -balancer compile time option.
 \end{itemize}
 
 Note: +balancer option works only if you have already linked the load balancers module at compile time. 

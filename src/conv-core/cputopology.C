@@ -160,8 +160,10 @@ public:
           numNodes++; 
         }
     }
-    if (numNodes == 0) 
+    if (numNodes == 0)  {
       numNodes = CmiNumNodes();
+      numPes = CmiNumPes();
+    }
     else {
         // re-number nodeIDs, which may be necessary e.g. on BlueGene/P
       for (i=0; i<numPes; i++) nodeIDs[i] = nodemap[nodeIDs[i]];
@@ -415,7 +417,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 
   if (!obtain_flag) {
-    cpuTopo.sort();
+    if (CmiMyRank() == 0) cpuTopo.sort();
+    CmiNodeAllBarrier();
     return;
   }
   else if (CmiMyPe() == 0) {
