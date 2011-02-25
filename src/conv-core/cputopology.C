@@ -561,6 +561,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #endif   /* __BLUEGENE__ */
 
   // now every one should have the node info
+  CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks
 }
 
 #else           /* not supporting cpu topology */

@@ -1509,6 +1509,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
+#define CcdTOPOLOGY_AVAIL  31
 #define CcdSIGUSR1 32+1
 #define CcdSIGUSR2 32+2
 
