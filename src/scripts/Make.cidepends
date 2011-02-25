@@ -41,6 +41,7 @@ NborBaseLB.decl.h NborBaseLB.def.h: NborBaseLB.ci.stamp
 NeighborCommLB.decl.h NeighborCommLB.def.h: NeighborCommLB.ci.stamp
 NeighborLB.decl.h NeighborLB.def.h: NeighborLB.ci.stamp
 NullLB.decl.h NullLB.def.h: NullLB.ci.stamp
+NumaLB.decl.h NumaLB.def.h: NumaLB.ci.stamp
 OrbLB.decl.h OrbLB.def.h: OrbLB.ci.stamp
 PathHistory.decl.h PathHistory.def.h: pathHistory.ci.stamp
 PhasebyArrayLB.decl.h PhasebyArrayLB.def.h: PhasebyArrayLB.ci.stamp
@@ -54,6 +55,7 @@ RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
+TempAwareGreedyLB.decl.h TempAwareGreedyLB.def.h: TempAwareGreedyLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp
 TopoCentLB.decl.h TopoCentLB.def.h: TopoCentLB.ci.stamp
 TopoLB.decl.h TopoLB.def.h: TopoLB.ci.stamp

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -288,25 +281,27 @@ void _loadbalancerInit()
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
-      CmiPrintf("LB> Load balancer running with verbose mode level %d, period time: %gs, alpha: %es beta: %es.\n", _lb_args.debug(), _lb_args.lbperiod(), _lb_args.alpha(), _lb_args.beeta());
-      CkPrintf("LB> Topology %s\n", _lbtopo);
+      CmiPrintf("CharmLB> Verbose level %d, load balancing period: %g seconds\n", _lb_args.debug(), _lb_args.lbperiod());
+    }
+    if (_lb_args.debug() > 1) {
+      CmiPrintf("CharmLB> Topology %s alpha: %es beta: %es.\n", _lbtopo, _lb_args.alpha(), _lb_args.beeta());
     }
     if (_lb_args.printSummary())
-      CmiPrintf("LB> Load balancer print summary of load balancing result.\n");
+      CmiPrintf("CharmLB> Load balancer print summary of load balancing result.\n");
     if (_lb_args.ignoreBgLoad())
-      CmiPrintf("LB> Load balancer ignores processor background load.\n");
+      CmiPrintf("CharmLB> Load balancer ignores processor background load.\n");
     if (_lb_args.samePeSpeed())
-      CmiPrintf("LB> Load balancer assumes all CPUs are same.\n");
+      CmiPrintf("CharmLB> Load balancer assumes all CPUs are same.\n");
     if (_lb_args.useCpuTime())
-      CmiPrintf("LB> Load balancer uses CPU time instead of wallclock time.\n");
+      CmiPrintf("CharmLB> Load balancer uses CPU time instead of wallclock time.\n");
     if (LBSimulation::doSimulation)
-      CmiPrintf("LB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
+      CmiPrintf("CharmLB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn()==0)
-      CkPrintf("LB> Load balancing instrumentation is off.\n");
+      CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
     if (_lb_args.traceComm()==0)
-      CkPrintf("LB> Load balancing instrumentation for communication is off.\n");
+      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
-      CkPrintf("LB> Load balancing strategy ignores non-migtabale objects.\n");
+      CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
 }
 

@@ -2,40 +2,32 @@ CDIR =../../../..
 INCDIR=$(CDIR)/include
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-LIB = libmoduleCkMulticast.a
-LIBOBJ = ckmulticast.o
+LIB = libmodulecompletion.a
+LIBOBJ = completion.o
 
-HEADERS = $(INCDIR)/CkMulticast.decl.h \
-          $(INCDIR)/CkMulticast.def.h \
-          $(INCDIR)/ckmulticast.h
+HEADERS = $(INCDIR)/completion.decl.h \
+          $(INCDIR)/completion.def.h \
+          $(INCDIR)/completion.h
 LIBDEST =  $(CDIR)/lib/$(LIB)
 
-CIFILES = ckmulticast.ci
+CIFILES = completion.ci
 
 all: $(LIBDEST) $(HEADERS)
 
-#$(INCDIR)/%: %
-#	cp $< $@
-
-#$(HEADERS): CkMulticast.decl.h ckmulticast.h 
-#	/bin/cp CkMulticast.decl.h $(CDIR)/include
-#	/bin/cp CkMulticast.def.h $(CDIR)/include
-#	/bin/cp ckmulticast.h $(CDIR)/include
-
-$(INCDIR)/CkMulticast.decl.h: CkMulticast.decl.h
-	/bin/cp CkMulticast.decl.h $(CDIR)/include
-$(INCDIR)/CkMulticast.def.h: CkMulticast.def.h
-	/bin/cp CkMulticast.def.h $(CDIR)/include
-$(INCDIR)/ckmulticast.h: ckmulticast.h
-	/bin/cp ckmulticast.h $(CDIR)/include
+$(INCDIR)/completion.decl.h: completion.decl.h
+	/bin/cp completion.decl.h $(CDIR)/include
+$(INCDIR)/completion.def.h: completion.def.h
+	/bin/cp completion.def.h $(CDIR)/include
+$(INCDIR)/completion.h: completion.h
+	/bin/cp completion.h $(CDIR)/include
 
 $(LIBDEST): $(LIBOBJ)
 	$(CHARMC) -o $(LIBDEST) $(LIBOBJ) 
 
-CkMulticast.def.h: CkMulticast.decl.h
+completion.def.h: completion.decl.h
 
-CkMulticast.decl.h : ckmulticast.ci $(CDIR)/bin/charmxi
-	$(CHARMC) -c ckmulticast.ci
+completion.decl.h : completion.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c completion.ci
 
 clean:
 	rm -f conv-host *.o *.decl.h *.def.h core  $(LIB)
@@ -44,7 +36,7 @@ include Make.depends
 
 DEPENDFILE = Make.depends
 
-depends:  $(CIFILES) CkMulticast.def.h
+depends:  completion.decl.h
 	echo "Creating " $(DEPENDFILE) " ..."; 	\
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \

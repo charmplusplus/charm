@@ -84,6 +84,7 @@ typedef struct _LDObjid {
 
 /* LDObjKey uniquely identify one object */
 typedef struct _LDObjKey {
+  /// Id of the location manager for this object
   LDOMid omId;
   LDObjid objId;
 public:

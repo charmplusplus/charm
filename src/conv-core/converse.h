@@ -413,38 +413,35 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
-#define CMK_MAX_PTHREADS     128
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
+                        t ** CMK_TAG(Cpv_addr_,v);
 #define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
                         extern int CMK_TAG(Cpv_inited_,v);  \
-                        extern t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
+                        extern t ** CMK_TAG(Cpv_addr_,v)
 #ifdef __cplusplus
 #define CpvCExtern(t,v) extern "C"  __thread t* CMK_TAG(Cpv_,v);  \
                         extern "C" int CMK_TAG(Cpv_inited_,v);  \
-                        extern "C" t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
+                        extern "C" t ** CMK_TAG(Cpv_addr_,v)
 #else
 #define CpvCExtern(t,v)    CpvExtern(t,v)
 #endif
 #define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         static int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        static t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
+                        static t ** CMK_TAG(Cpv_addr_,v)
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
 	       /*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
-	       while (CMK_TAG(Cpv_inited_,v)==0) CMK_CPV_IS_SMP;\
+               CmiMemoryReadFence(); \
+	       while (CMK_TAG(Cpv_inited_,v)==0) { CMK_CPV_IS_SMP; CmiMemoryReadFence(); } \
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
-               if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
-		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
-		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
-		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
-	       } \
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
+               CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, 1+CmiMyNodeSize()); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
+               CmiMemoryWriteFence();   \
                CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0)
@@ -465,9 +462,13 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
+                CmiMemoryReadFence(); \
+		while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CmiMemoryReadFence(); } \
        } else { \
-	       CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               CmiMemoryWriteFence();   \
+               CMK_TAG(Cpv_,v)=tmp;   \
+	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
@@ -1505,6 +1506,7 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
+#define CcdTOPOLOGY_AVAIL  31
 #define CcdSIGUSR1 32+1
 #define CcdSIGUSR2 32+2
 

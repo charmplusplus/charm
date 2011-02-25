@@ -27,7 +27,6 @@ added by Ryan Mokos in July 2008.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-#define CMK_MMAP_PROBE    0
 #define CMK_THREADS_DEBUG 0
 
 /* 0: use the old isomalloc implementation (array)
@@ -52,12 +51,12 @@ added by Ryan Mokos in July 2008.
 #endif
 
 static int _sync_iso = 0;
+static int _mmap_probe = 0;
 
 static int read_randomflag(void)
 {
   FILE *fp;
   int random_flag;
-  CmiLock(_smp_mutex);
   fp = fopen("/proc/sys/kernel/randomize_va_space", "r");
   if (fp != NULL) {
     fscanf(fp, "%d", &random_flag);
@@ -74,7 +73,6 @@ static int read_randomflag(void)
   else {
     random_flag = -1;
   }
-  CmiUnlock(_smp_mutex);
   return random_flag;
 }
 
@@ -1670,7 +1668,7 @@ const static memRange_t gig=1024u*1024u*1024u; /*One gigabyte*/
 static int bad_location(char *loc) {
   void *addr;
   addr=call_mmap_fixed(loc,slotsize);
-  if (addr==NULL) {
+  if (addr==NULL || addr!=loc) {
 #if CMK_THREADS_DEBUG
     CmiPrintf("[%d] Skipping unmappable space at %p\n",CmiMyPe(),loc);
 #endif
@@ -1689,6 +1687,7 @@ static memRange_t divide_range(memRange_t len,int n) {
 static int partially_good(char *start,memRange_t len,int n) {
   int i;
   memRange_t quant=divide_range(len,n);
+  CmiAssert (quant > 0);
   for (i=0;i<n;i++)
     if (!bad_location(start+i*quant)) return 1; /* it's got some good parts */
   return 0; /* all locations are bad */
@@ -1699,6 +1698,10 @@ static int partially_good(char *start,memRange_t len,int n) {
 static int good_range(char *start,memRange_t len,int n) {
   int i;
   memRange_t quant=divide_range(len,n);
+#if CMK_THREADS_DEBUG
+  CmiPrintf("good_range: %lld, %d\n", quant, n);
+#endif
+  CmiAssert (quant > 0);
   for (i=0;i<n;i++)
     if (bad_location(start+i*quant)) return 0; /* it's got some bad parts */
   /* It's all good: */
@@ -1812,37 +1815,44 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     size_t mmapAnyLen = 1*meg;
     char *mmapAny = (char*) call_mmap_anywhere(mmapAnyLen);
 
-    int i,nRegions=9;
+    int i,nRegions=0;
     memRegion_t regions[10]; /*used portions of address space*/
     memRegion_t freeRegion; /*Largest unused block of address space*/
 
+    /* printf("%p %p %p %p %p %p %p %p \n", staticData, code, threadData, codeDll, heapLil, heapBig, stack, mmapAny); */
+
 /*Mark off regions of virtual address space as ususable*/
-    regions[0].type="NULL";
-    regions[0].start=NULL; regions[0].len=16u*meg;
+    regions[nRegions].type="NULL";
+    regions[nRegions].start=NULL; 
+#if CMK_POWER7 && CMK_64BIT
+    regions[nRegions++].len=2u*gig;   /* on bluedrop, don't mess with the lower memory region */
+#else
+    regions[nRegions++].len=16u*meg;
+#endif
     
-    regions[1].type="Static program data";
-    regions[1].start=staticData; regions[1].len=256u*meg;
+    regions[nRegions].type="Static program data";
+    regions[nRegions].start=staticData; regions[nRegions++].len=256u*meg;
     
-    regions[2].type="Program executable code";
-    regions[2].start=code; regions[2].len=256u*meg;
+    regions[nRegions].type="Program executable code";
+    regions[nRegions].start=code; regions[nRegions++].len=256u*meg;
     
-    regions[3].type="Heap (small blocks)";
-    regions[3].start=heapLil; regions[3].len=1u*gig;
+    regions[nRegions].type="Heap (small blocks)";
+    regions[nRegions].start=heapLil; regions[nRegions++].len=1u*gig;
     
-    regions[4].type="Heap (large blocks)";
-    regions[4].start=heapBig; regions[4].len=1u*gig;
+    regions[nRegions].type="Heap (large blocks)";
+    regions[nRegions].start=heapBig; regions[nRegions++].len=1u*gig;
     
-    regions[5].type="Stack space";
-    regions[5].start=stack; regions[5].len=256u*meg;
+    regions[nRegions].type="Stack space";
+    regions[nRegions].start=stack; regions[nRegions++].len=256u*meg;
 
-    regions[6].type="Program dynamically linked code";
-    regions[6].start=codeDll; regions[6].len=256u*meg; 
+    regions[nRegions].type="Program dynamically linked code";
+    regions[nRegions].start=codeDll; regions[nRegions++].len=256u*meg; 
 
-    regions[7].type="Result of a non-fixed call to mmap";
-    regions[7].start=mmapAny; regions[7].len=1u*gig; 
+    regions[nRegions].type="Result of a non-fixed call to mmap";
+    regions[nRegions].start=mmapAny; regions[nRegions++].len=2u*gig; 
 
-    regions[8].type="Thread private data";
-    regions[8].start=threadData; regions[8].len=256u*meg; 
+    regions[nRegions].type="Thread private data";
+    regions[nRegions].start=threadData; regions[nRegions++].len=256u*meg; 
 
     _MEMCHECK(heapBig); free(heapBig);
     _MEMCHECK(heapLil); free(heapLil); 
@@ -1879,7 +1889,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     }
 }
 
-#if CMK_MMAP_PROBE
+/* probe method */
 static int try_largest_mmap_region(memRegion_t *destRegion)
 {
   void *bad_alloc=(void*)(-1); /* mmap error return address */
@@ -1936,7 +1946,6 @@ system(s);
 #endif
   return 1;
 }
-#endif
 
 #ifndef CMK_CPV_IS_SMP
 #define CMK_CPV_IS_SMP
@@ -1958,6 +1967,7 @@ static void init_ranges(char **argv)
     pagesize = CMK_MEMORY_PAGESIZE;
   slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
 #if CMK_THREADS_DEBUG
+  if (CmiMyPe() == 0)
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
 
@@ -1969,12 +1979,15 @@ static void init_ranges(char **argv)
       freeRegion.start=CMK_MMAP_START_ADDRESS;
       freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
 #endif
-#if CMK_MMAP_PROBE
-      if (freeRegion.len==0u) 
-        if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
-#else
-      if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
-#endif
+
+      if (freeRegion.len==0u)  {
+        if (_mmap_probe == 1) {
+          if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
+        }
+        else {
+          if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
+        }
+      }
       
 #if 0
       /*Make sure our largest slot number doesn't overflow an int:*/
@@ -2015,7 +2028,7 @@ static void init_ranges(char **argv)
 
             if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
 
-            sprintf(fname,".isomalloc.%d", CmiMyNode());
+            sprintf(fname,"/tmp/.isomalloc.%d.%d", getpid(), CmiMyNode());
 
               /* remove file before writing for safe */
             unlink(fname);
@@ -2115,8 +2128,9 @@ static void init_ranges(char **argv)
   /*SMP Mode: wait here for rank 0 to initialize numslots before calculating myss*/
   CmiNodeAllBarrier(); 
   
+  CpvInitialize(slotset *, myss);
+  CpvAccess(myss) = NULL;
   if (isomallocStart!=NULL) {
-    CpvInitialize(slotset *, myss);
     CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
   }
 }
@@ -2355,6 +2369,19 @@ void CmiIsomallocInit(char **argv)
 #if CMK_NO_ISO_MALLOC
   disable_isomalloc("isomalloc disabled by conv-mach");
 #else
+  if (CmiGetArgFlagDesc(argv,"+noisomalloc","disable isomalloc")) {
+    disable_isomalloc("isomalloc disabled by user.");
+    return;
+  }
+#if CMK_MMAP_PROBE
+  _mmap_probe = 1;
+#elif CMK_MMAP_TEST
+  _mmap_probe = 0;
+#endif
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_probe","call mmap to probe the largest available isomalloc region"))
+    _mmap_probe = 1;
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_test","mmap test common areas for the largest available isomalloc region"))
+    _mmap_probe = 0;
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
   init_comm(argv);
@@ -2362,8 +2389,8 @@ void CmiIsomallocInit(char **argv)
     disable_isomalloc("mmap() does not work");
   }
   else {
-    if (read_randomflag() == 1) {    /* randomization stack pointer */
-      if (CmiMyPe() == 0) {
+    if (CmiMyPe() == 0) {
+      if (read_randomflag() == 1) {    /* randomization stack pointer */
         if (_sync_iso == 1)
           printf("Warning> Randomization of stack pointer is turned on in kernel.\n");
         else

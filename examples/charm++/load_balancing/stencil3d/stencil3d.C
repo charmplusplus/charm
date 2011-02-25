@@ -311,7 +311,8 @@ class Stencil: public CBase_Stencil {
       if(iterations == MAX_ITER)
 	contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
       else {
-	startTime = CmiWallTimer();
+	if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
+	  startTime = CmiWallTimer();
 	if(iterations % LBPERIOD == 0)
 	  AtSync();
 	else

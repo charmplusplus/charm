@@ -3126,16 +3126,6 @@ void Entry::genChareDefs(XStr& str)
     }
     str << "}\n";
   }
-  if (isReductionTarget()) {
-      XStr retStr; retStr<<retType;
-      str << retType << " " << indexName(); //makeDecl(retStr, 1)
-      str << "::_" << name << "_redn_wrapper(void* impl_msg, " 
-          << container->baseName() << "* impl_obj)\n{\n"
-          << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
-      XStr precall;
-      genCall(str, precall, true);
-      str << "\n}\n\n";
-  }
 }
 
 void Entry::genChareStaticConstructorDecl(XStr& str)
@@ -4538,6 +4528,20 @@ void Entry::genDefs(XStr& str)
     genArrayDefs(str);
   } else
     genChareDefs(str);
+
+  if (container->isChare() || container->isForElement()) {
+      if (isReductionTarget()) {
+          XStr retStr; retStr<<retType;
+          str << retType << " " << indexName(); //makeDecl(retStr, 1)
+          str << "::_" << name << "_redn_wrapper(void* impl_msg, "
+              << container->baseName() << "* impl_obj)\n{\n"
+              << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
+          XStr precall;
+          genCall(str, precall, true);
+          str << "\n}\n\n";
+      }
+  }
+
 
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
