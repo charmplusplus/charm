@@ -2373,8 +2373,15 @@ void CmiIsomallocInit(char **argv)
     disable_isomalloc("isomalloc disabled by user.");
     return;
   }
-  if (CmiGetArgFlagDesc(argv,"+isomalloc_probe","mmap probe isomalloc region"))
+#if CMK_MMAP_PROBE
+  _mmap_probe = 1;
+#elif CMK_MMAP_TEST
+  _mmap_probe = 0;
+#endif
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_probe","call mmap to probe the largest available isomalloc region"))
     _mmap_probe = 1;
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_test","mmap test common areas for the largest available isomalloc region"))
+    _mmap_probe = 0;
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
   init_comm(argv);
