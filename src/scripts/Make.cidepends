@@ -41,7 +41,6 @@ NborBaseLB.decl.h NborBaseLB.def.h: NborBaseLB.ci.stamp
 NeighborCommLB.decl.h NeighborCommLB.def.h: NeighborCommLB.ci.stamp
 NeighborLB.decl.h NeighborLB.def.h: NeighborLB.ci.stamp
 NullLB.decl.h NullLB.def.h: NullLB.ci.stamp
-NumaLB.decl.h NumaLB.def.h: NumaLB.ci.stamp
 OrbLB.decl.h OrbLB.def.h: OrbLB.ci.stamp
 PathHistory.decl.h PathHistory.def.h: pathHistory.ci.stamp
 PhasebyArrayLB.decl.h PhasebyArrayLB.def.h: PhasebyArrayLB.ci.stamp
