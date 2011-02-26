@@ -2034,7 +2034,7 @@ static void init_ranges(char **argv)
 
             if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
 
-            sprintf(fname,"/tmp/.isomalloc.%d", CmiMyNode());
+            sprintf(fname,".isomalloc.%d", CmiMyNode());
 
               /* remove file before writing for safe */
             unlink(fname);
@@ -2065,7 +2065,7 @@ static void init_ranges(char **argv)
               int try_count;
               char fname[128];
               if (i==CmiMyNode()) continue;
-              sprintf(fname,"/tmp/.isomalloc.%d", i);
+              sprintf(fname,".isomalloc.%d", i);
               try_count = 0;
               while ((fd = open(fname, O_RDONLY)) == -1 && try_count<10000)
               {
