@@ -2862,6 +2862,22 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for _setjmp/_longjmp ###
+cat > $t <<EOT
+#include <setjmp.h>
+int main() {
+  jmp_buf buf;
+  _setjmp(buf);
+  _longjmp(buf, 0);
+}
+EOT
+test_link "whether has _setjmp/_longjmp" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_UNDERSCORE_SETJMP $pass
+_ACEOF
+
+
 #### test for mstats ###
 cat > $t <<EOT
 #include <malloc.h>

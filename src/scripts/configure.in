@@ -944,6 +944,18 @@ EOT
 test_link "whether has sbrk" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SBRK, $pass, [whether has sbrk])
 
+#### test for _setjmp/_longjmp ###
+cat > $t <<EOT
+#include <setjmp.h>
+int main() {
+  jmp_buf buf;
+  _setjmp(buf);
+  _longjmp(buf, 0);
+}
+EOT
+test_link "whether has _setjmp/_longjmp" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_UNDERSCORE_SETJMP, $pass, [whether has _setjmp/_longjmp])
+
 #### test for mstats ###
 cat > $t <<EOT
 #include <malloc.h>

@@ -198,6 +198,9 @@
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO
 
+/* whether has _setjmp/_longjmp */
+#undef CMK_HAS_UNDERSCORE_SETJMP
+
 /* whether has usleep */
 #undef CMK_HAS_USLEEP
 
