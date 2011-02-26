@@ -186,7 +186,7 @@ The detailed APIs of these three methods are described as follows:
 \item {\bf Periodical load balancing mode}: In the default setting, load
 balancing happens whenever the array elements are ready, with an interval of 1
 second. It is desirable for the application to set a larger interval using
-+LBPeriod runtime option. For example "+LBPeriod 5" can be used to start load
++LBPeriod runtime option. For example "+LBPeriod 5.0" can be used to start load
 balancing roughly every 5 seconds. By default, array elements may be asked to
 migrate at any time provided that they are not in the middle of executing an
 entry method. The array element's variable \kw{usesAtSync} being CmiFalse
@@ -201,6 +201,12 @@ When all local elements call \kw{AtSync}, the load balancer is triggered.  Once
 all migrations are completed, the load balancer calls the virtual function
 \kw{ArrayElement::ResumeFromSync()} on each of the array elements. This
 function can be redefined in the application.
+
+Note that the minimum time for \kw{AtSync()} load balancing to occur
+is controlled by the LBPeriod.  Unusually high frequency load
+balancing (more frequent than 500ms) will perform better if this value
+is set via +LBPeriod or \kw{SetLBPeriod()} to a number shorter than your load
+balancing interval.
 
 Note that {\em AtSync()} is not a blocking call, it just gives a hint to load
 balancing that it is time for load balancing. During the time between {\em
