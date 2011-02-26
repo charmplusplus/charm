@@ -9,10 +9,10 @@ stencil3d: $(OBJS)
 	$(CHARMC) -language charm++ -module CommonLBs -o stencil3d $(OBJS)
 
 projections: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode projections -lz -o stencil3d.prj $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -tracemode projections -lz -o stencil3d.prj $(OBJS)
 
 summary: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode summary -lz -o stencil3d.sum $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -tracemode summary -lz -o stencil3d.sum $(OBJS)
 
 stencil3d.decl.h: stencil3d.ci
 	$(CHARMC)  stencil3d.ci
