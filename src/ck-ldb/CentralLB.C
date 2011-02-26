@@ -487,10 +487,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
       struct ProcStats &procStat = statsData->procs[pe];
       procStat.pe = pe;
       procStat.total_walltime = m->total_walltime;
-      procStat.total_cputime = m->total_cputime;
       procStat.idletime = m->idletime;
       procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+      procStat.total_cputime = m->total_cputime;
       procStat.bg_cputime = m->bg_cputime;
+#endif
       procStat.pe_speed = m->pe_speed;
       //procStat.utilization = 1.0;
       procStat.available = CmiTrue;
