@@ -1900,6 +1900,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   int retry = 0;
   if (sizeof(size_t) >= 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
+#if CMK_HAS_MMAP
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
  	             MAP_PRIVATE
 #if CMK_HAS_MMAP_ANON
@@ -1909,12 +1910,17 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
                      |MAP_NORESERVE
 #endif
                      ,-1,0);
-	if (range==bad_alloc) { /* mmap failed */
+#else
+        range = bad_alloc;
+#endif
+        if (range == bad_alloc) {  /* mmap failed */
 #if CMK_THREADS_DEBUG
                 /* CmiPrintf("[%d] test failed at size: %llu error: %d\n", CmiMyPe(), size, errno);  */
 #endif
+#if CMK_HAS_USLEEP
                 if (retry++ < 5) { usleep(rand()%10000); continue; }
                 else retry = 0;
+#endif
 		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
 	}
@@ -1922,7 +1928,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 #if CMK_THREADS_DEBUG
                CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
 #endif
-		munmap(range,size); /* needed/wanted? */
+		call_munmap(range,size); /* needed/wanted? */
 		if (size > good_size) {
 		  good_range = range;
 		  good_size = size;
@@ -2028,7 +2034,7 @@ static void init_ranges(char **argv)
 
             if (CmiMyNode()==0) printf("Charm++> synchronizing isomalloc memory region...\n");
 
-            sprintf(fname,"/tmp/.isomalloc.%d.%d", getpid(), CmiMyNode());
+            sprintf(fname,"/tmp/.isomalloc.%d", CmiMyNode());
 
               /* remove file before writing for safe */
             unlink(fname);
@@ -2059,7 +2065,7 @@ static void init_ranges(char **argv)
               int try_count;
               char fname[128];
               if (i==CmiMyNode()) continue;
-              sprintf(fname,".isomalloc.%d", i);
+              sprintf(fname,"/tmp/.isomalloc.%d", i);
               try_count = 0;
               while ((fd = open(fname, O_RDONLY)) == -1 && try_count<10000)
               {
