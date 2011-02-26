@@ -314,7 +314,11 @@ class Stencil: public CBase_Stencil {
 	if(thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
 	  startTime = CmiWallTimer();
 	if(iterations % LBPERIOD == 0)
-	  AtSync();
+	  {
+	    // auto tune the LBPeriod to half as long as it takes to run the iters between LB steps
+	    LBSetPeriod((endTime-startTime)*LBPERIOD/2.0);
+	    AtSync();
+	  }
 	else
 	  contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Stencil::doStep(), thisProxy));
       }
