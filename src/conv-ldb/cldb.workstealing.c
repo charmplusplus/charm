@@ -22,24 +22,35 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 int _stealonly1 = 0;
+int workstealingproactive = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 CpvStaticDeclare(int, isStealing);
 
-void LoadNotifyFn(int l)
-{
-}
 
 char *CldGetStrategy(void)
 {
   return "work stealing";
 }
 
+void LoadNotifyFn(int l)
+{
+    if(workstealingproactive)
+    {
+        if(CldLoad() < 3)
+            StealLoad();
+    }
+}
 /* since I am idle, ask for work from neighbors */
 
 static void CldBeginIdle(void *dummy)
+{
+    StealLoad();
+
+}
+static inline void StealLoad()
 {
   int i;
   double startT;
@@ -270,6 +281,8 @@ void CldGraphModuleInit(char **argv)
   if (CmiMyRank() == CmiMyNodeSize())  return;
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
+  
+  workstealingproactive= CmiGetArgFlagDesc(argv, "+workstealingproactive", "Charm++> Work Stealing, steal before going idle(threshold = 3)");
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
