@@ -29,6 +29,7 @@ class TraceSimple : public Trace {
   
   // "creation" of message(s) - message Sends
   void creation(envelope *, int epIdx, int num=1);
+  void creation(char *msg) {}
   void creationMulticast(envelope *, int epIdx, int num=1, int *pelist=NULL);
   void creationDone(int num=1);
   
@@ -39,6 +40,7 @@ class TraceSimple : public Trace {
   // NOTE: begin/endPack and begin/endUnpack can be called in between
   //       a beginExecute and its corresponding endExecute.
   void beginExecute(envelope *);
+  void beginExecute(char *) {}
   void beginExecute(CmiObjId *tid);
   void beginExecute(
 		    int event,   // event type defined in trace-common.h

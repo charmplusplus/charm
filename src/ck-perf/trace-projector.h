@@ -26,6 +26,7 @@ class TraceProjector : public Trace {
     void userBracketEvent(int e, double bt, double et);
     void creation(envelope *e, int ep, int num=1);
     void beginExecute(envelope *e);
+    void beginExecute(char *) {}
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
