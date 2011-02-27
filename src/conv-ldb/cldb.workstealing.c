@@ -35,22 +35,8 @@ char *CldGetStrategy(void)
   return "work stealing";
 }
 
-void LoadNotifyFn(int l)
-{
-    if(workstealingproactive)
-    {
-        if(CldLoad() < 3)
-            StealLoad();
-    }
-}
-/* since I am idle, ask for work from neighbors */
 
-static void CldBeginIdle(void *dummy)
-{
-    StealLoad();
-
-}
-static inline void StealLoad()
+static void StealLoad()
 {
   int i;
   double startT;
@@ -87,6 +73,21 @@ static inline void StealLoad()
 #endif
 }
 
+void LoadNotifyFn(int l)
+{
+    if(workstealingproactive)
+    {
+        if(CldLoad() < 3)
+            StealLoad();
+    }
+}
+/* since I am idle, ask for work from neighbors */
+
+static void CldBeginIdle(void *dummy)
+{
+    StealLoad();
+
+}
 /* immediate message handler, work at node level */
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
@@ -290,6 +291,8 @@ void CldGraphModuleInit(char **argv)
       (CcdVoidFn) CldBeginIdle, NULL);
   if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
+  if(workstealingproactive && CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work when load is fewer than 3. \n");
 }
 
 
