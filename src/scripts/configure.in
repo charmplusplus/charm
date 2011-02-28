@@ -409,6 +409,24 @@ fi
 
 # Perform the tests
 
+AC_ARG_WITH([refnum-type],
+            [AS_HELP_STRING([--with-refnum-type=type],
+                            [size of the envelope refnum field])],
+            [], [with_refnum_type=no])
+
+if test "$with_refnum_type" = "no" -o "$with_refnum_type" = "short"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned short"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned short, [envelope refnum field set to UShort])
+elif test "$with_refnum_type" = "int"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned int"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned int, [envelope refnum field set to UInt])
+else
+  Echo "Invalid size specified for refnum field"
+  test_finish 1
+fi
+
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>

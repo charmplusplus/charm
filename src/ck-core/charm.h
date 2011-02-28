@@ -293,8 +293,8 @@ extern int  CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid);
 extern void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
 extern void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
 
-extern void CkSetRefNum(void *msg, int ref);
-extern int  CkGetRefNum(void *msg);
+extern void CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref);
+extern CMK_REFNUM_TYPE  CkGetRefNum(void *msg);
 extern int  CkGetSrcPe(void *msg);
 extern int  CkGetSrcNode(void *msg);
 

@@ -240,6 +240,9 @@
 /* Python version */
 #undef CMK_PYTHON_VERSION
 
+/* envelope refnum field set to UInt */
+#undef CMK_REFNUM_TYPE
+
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
 
