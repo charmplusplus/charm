@@ -506,7 +506,11 @@ EOF
   $DESTINATION/tmp/system_ln $DESTINATION/include/VERSION VERSION
 fi
 
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
+$DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
+$DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
 touch $DESTINATION/tmp/Makefile.machine
 touch $DESTINATION/tmp/Make.extlib
 
@@ -623,11 +627,11 @@ printError()
 
 echo 'BUILDOPTS="'$OPTS'"'  >> $ConvSh
 
-Echo "Performing '$MAKE $MAKEOPTS -I../../src/scripts -I../../src/ck-ldb basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
+Echo "Performing '$MAKE $MAKEOPTS basics OPTS="$OPTS" QUIET="$QUIET" CONFIG_OPTS="$CONFIG_OPTS"' in $DESTINATION/tmp"
 cd $DESTINATION/tmp 
 echo "CONFIG_OPTS=\"$CONFIG_OPTS\"" > config_opts.sh
 chmod +x config_opts.sh
-$MAKE $MAKEOPTS  -I../../src/scripts -I../../src/ck-ldb basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
+$MAKE $MAKEOPTS basics OPTS="$OPTS $BUILD_SHARED" QUIET="$QUIET"
 MAKEEXIT=$?
 [ $MAKEEXIT -ne 0 ] && printError
 
