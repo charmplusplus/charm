@@ -463,6 +463,7 @@ rm -f $DESTINATION/tmp/Make.depends
 rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
+rm -f $DESTINATION/tmp/Make.extlib
 
 
 # Create the bin, lib, include, etc. links:
