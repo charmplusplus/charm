@@ -72,7 +72,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 void ObjGraph::convertDecisions(BaseLB::LDStats *stats) {
   for(int vert = 0; vert < stats->n_objs; vert++) {
     if(vertices[vert].newPe != -1) {
-      stats->to_proc[vert] = vertices[vert].newPe;
+      stats->to_proc[vertices[vert].id] = vertices[vert].newPe;
     }
   }
 }
