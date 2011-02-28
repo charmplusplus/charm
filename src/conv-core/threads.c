@@ -523,7 +523,7 @@ CthThread CthSelf()
 
 void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if ((CthThread)t==CthCpvAccess(CthCurrent))
 		CmiAbort("CthPupBase: Cannot pack running thread!");
 #endif
@@ -701,7 +701,7 @@ void CthSuspend(void)
   if(cur->scheduled > 0)
     cur->scheduled--;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(cur->scheduled<0)
     CmiAbort("A thread's scheduler should not be less than 0!\n");
 #endif    
@@ -1793,7 +1793,7 @@ Qt setjmp, with stackprotect: 68.6 us
 Written by Josh Yelon around 1995
 */
 
-#if defined(CMK_OPTIMIZE) || (!CMK_MEMORY_PROTECTABLE)
+#if !CMK_ERROR_CHECKING || (!CMK_MEMORY_PROTECTABLE)
 #  define CMK_STACKPROTECT 0
 
 #  define CthMemAlign(x,n) 0
