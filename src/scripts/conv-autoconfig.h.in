@@ -279,6 +279,9 @@
 /* disable controlpoint */
 #undef CMK_WITH_CONTROLPOINT
 
+/* enable statistics collection */
+#undef CMK_WITH_STATS
+
 /* whether __int64 works */
 #undef CMK___int64_DEFINED
 

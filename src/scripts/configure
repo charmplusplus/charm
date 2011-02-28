@@ -600,6 +600,7 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_error_checking
+enable_stats
 enable_tracing
 enable_charmdebug
 enable_replay
@@ -1219,6 +1220,7 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-error-checking enable error checking
+  --enable-stats          enable statistics collection
   --enable-tracing        enable tracing modules
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
@@ -1706,6 +1708,31 @@ else
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_ERROR_CHECKING 1
+_ACEOF
+
+fi
+
+# enable/disable statistics collection
+# Check whether --enable-stats was given.
+if test "${enable_stats+set}" = set; then :
+  enableval=$enable_stats;
+else
+  enable_stats=yes
+fi
+
+
+if test "$enable_stats" = "no"
+then
+  Echo "Statistics collection is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_STATS 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_WITH_STATS 1
 _ACEOF
 
 fi

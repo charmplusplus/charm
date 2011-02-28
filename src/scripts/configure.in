@@ -36,6 +36,20 @@ else
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
+# enable/disable statistics collection
+AC_ARG_ENABLE([stats],
+            [AS_HELP_STRING([--enable-stats],
+              [enable statistics collection])], ,
+            [enable_stats=yes])
+
+if test "$enable_stats" = "no"
+then
+  Echo "Statistics collection is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 0, [disable statistics collection])
+else
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 1, [enable statistics collection])
+fi
+
 # check enable/disable
 AC_ARG_ENABLE([tracing],
             [AS_HELP_STRING([--enable-tracing],
