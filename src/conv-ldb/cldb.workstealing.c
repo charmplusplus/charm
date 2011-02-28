@@ -125,9 +125,12 @@ void  CldAckNoTaskHandler(requestmsg *msg)
 
   /* CcdRaiseCondition(CcdUSER); */
 
+  if (CmiMyPe()==2) victim = 2-mype;
+  else
   do{
-      victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
-  }while(victim == mype);
+      /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
+      victim = (((CrnRand())&0x7FFFFFFF)%CmiNumPes());
+  }while(victim == mype || victim == notaskpe);
 
   /* reuse msg */
   msg->to_rank = CmiRankOf(victim);
@@ -287,7 +290,7 @@ void CldGraphModuleInit(char **argv)
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
   if (CmiMyPe() == 0) 
       CmiPrintf("Charm++> Work stealing is enabled. \n");
