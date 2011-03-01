@@ -116,6 +116,20 @@ then
   WITH_NUMA=yes
 fi
 
+AC_ARG_WITH([lbtime-type],
+            [AS_HELP_STRING([--with-lbtime-type=type],
+                            [load balancing timer type])],
+            [], [with_lbtime_type=float])
+
+if test "$with_lbtime_type" = "float" -o "$with_lbtime_type" = "double"
+then
+  Echo "Setting load balancing timer type as '$with_lbtime_type'"
+  AC_DEFINE_UNQUOTED(CMK_LBTIME_TYPE, $with_lbtime_type, [Setting load balancing timer type])
+else
+  Echo "Invalid type specified for load balancing timer type"
+  test_finish 1
+fi
+
 #
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
@@ -293,7 +307,7 @@ test_linkso() {
 # $2 is description
 add_flag() {
         key=`echo $1 | cut -d'=' -f1`
-        last=`grep $key ../include/conv-mach-opt.sh 2>/dev/null | tail -1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1" 
 	then
@@ -303,11 +317,16 @@ add_flag() {
         then
 	  cat >> ../include/conv-mach-opt.sh << EOT
 
-# Option added by configure script's $2 section
-$1
-
+$1   # Option added by configure script's $2 section
 EOT
 	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
 }
 
 test_finish() {
@@ -403,6 +422,7 @@ then
   test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
   if test $pass -eq 1
   then
+        remove_flag CMK_LDXX
 	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
   fi
 fi

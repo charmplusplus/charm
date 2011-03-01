@@ -207,6 +207,9 @@
 /* whether has values.h */
 #undef CMK_HAS_VALUES_H
 
+/* Setting load balancing timer type */
+#undef CMK_LBTIME_TYPE
+
 /* whether long double works */
 #undef CMK_LONG_DOUBLE_DEFINED
 
