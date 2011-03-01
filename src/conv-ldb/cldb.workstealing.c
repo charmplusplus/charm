@@ -59,6 +59,7 @@ static void StealLoad()
   do{
       victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
   }while(victim == mype);
+if (mype == 2) CmiPrintf("steal from %d\n", victim);
 
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
 #if IDLE_IMMEDIATE
@@ -125,7 +126,7 @@ void  CldAckNoTaskHandler(requestmsg *msg)
 
   /* CcdRaiseCondition(CcdUSER); */
 
-  if (CmiMyPe()==2) victim = 2-mype;
+  if (CmiNumPes()==2) victim = 2-mype;
   else
   do{
       /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
