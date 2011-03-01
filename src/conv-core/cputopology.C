@@ -482,9 +482,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-  return;
 #elif CMK_BLUEGENEQ
-  return;
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
@@ -514,7 +512,6 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-  return;
 #else
     /* get my ip address */
   if (CmiMyRank() == 0)
