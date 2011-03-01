@@ -571,7 +571,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       info.getInfo(statsData, clients, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
@@ -615,7 +615,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);

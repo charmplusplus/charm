@@ -697,13 +697,13 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
     const int objCount = myLBDB->getObjCount();
     CkPrintf("LBDB info: objCount=%d objs contains %d LBObj* \n", objCount, objs.length());
     
-    floatType maxObjWallTime = -1.0;
+    LBRealType maxObjWallTime = -1.0;
     
     for(int i=0;i<objs.length();i++){
       LBObj* o = objs[i];
       const LDObjData d = o->ObjData();
-      floatType cpuTime = d.cpuTime;
-      floatType wallTime = d.wallTime;
+      LBRealType cpuTime = d.cpuTime;
+      LBRealType wallTime = d.wallTime;
       // can also get object handles from the LDObjData struct
       CkPrintf("[%d] LBDB Object[%d]: cpuTime=%f wallTime=%f\n", CkMyPe(), i, cpuTime, wallTime);
       if(wallTime > maxObjWallTime){

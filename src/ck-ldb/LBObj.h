@@ -70,14 +70,14 @@ public:
 
   void Clear(void);
 
-  void IncrementTime(double walltime, double cputime);
+  void IncrementTime(LBRealType walltime, LBRealType cputime);
   inline void StartTimer(void) {
 	startWTime = CkWallTimer();
 #if CMK_LB_CPUTIMER
 	startCTime = CkCpuTimer();
 #endif
   }
-  inline void StopTimer(double* walltime, double* cputime) {
+  inline void StopTimer(LBRealType* walltime, LBRealType* cputime) {
 	if (startWTime >= 0.0) {	// in case startOn in middle of entry
           const double endWTime = CkWallTimer();
 	  *walltime = endWTime - startWTime;
@@ -93,7 +93,7 @@ public:
         }
   }
 
-  inline void getTime(double *w, double *c) {
+  inline void getTime(LBRealType *w, LBRealType *c) {
     *w = data.wallTime;
 #if CMK_LB_CPUTIMER
     *c = data.cpuTime;
@@ -102,7 +102,7 @@ public:
 #endif
   }
 
-  inline void setTiming(double cputime)
+  inline void setTiming(LBRealType cputime)
   {
     data.wallTime = cputime;
 #if CMK_LB_CPUTIMER
@@ -115,7 +115,7 @@ public:
   inline void SetMigratable(CmiBool mig) { data.migratable = mig; }
   inline void UseAsyncMigrate(CmiBool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };
-  inline void lastKnownLoad(double *w, double *c) {
+  inline void lastKnownLoad(LBRealType *w, LBRealType *c) {
     *w = lastWallTime;
 #if CMK_LB_CPUTIMER
     *c = lastCpuTime;
@@ -132,11 +132,11 @@ private:
 //  LDObjHandle myhandle;
   LDObjData data;
 //  CmiBool registered;
-  double startWTime;
-  double lastWallTime;
+  LBRealType startWTime;
+  LBRealType lastWallTime;
 #if CMK_LB_CPUTIMER
-  double startCTime;
-  double lastCpuTime;
+  LBRealType startCTime;
+  LBRealType lastCpuTime;
 #endif
 //  CmiBool migratable;   // temp
 };

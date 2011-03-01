@@ -309,7 +309,7 @@ int LBDatabase::manualOn = 0;
 char *LBDatabase::avail_vector = NULL;
 CmiNodeLock avail_vector_lock;
 
-static double * _expectedLoad = NULL;
+static LBRealType * _expectedLoad = NULL;
 
 void LBDatabase::initnodeFn()
 {
@@ -320,7 +320,7 @@ void LBDatabase::initnodeFn()
       avail_vector[proc] = 1;
   avail_vector_lock = CmiCreateLock();
 
-  _expectedLoad = new double[num_proc];
+  _expectedLoad = new LBRealType[num_proc];
   for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
 }
 

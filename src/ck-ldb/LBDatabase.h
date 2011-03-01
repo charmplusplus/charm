@@ -203,11 +203,11 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
-  inline void GetObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+  inline void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDGetObjLoad(h,&walltime,&cputime);
   };
 
-  inline void QueryKnownObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+  inline void QueryKnownObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDQueryKnownObjLoad(h,&walltime,&cputime);
   };
 
@@ -355,12 +355,12 @@ public:
   int & new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo {
-    double *expectedLoad;
+    LBRealType *expectedLoad;
     LastLBInfo();
   };
   LastLBInfo lastLBInfo;
-  inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
-  inline double* expectedLoad() { return lastLBInfo.expectedLoad; }
+  inline LBRealType myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
+  inline LBRealType* expectedLoad() { return lastLBInfo.expectedLoad; }
   inline int useMem() { return LDMemusage(myLDHandle); }
 
   int getLoadbalancerTicket();

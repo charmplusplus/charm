@@ -38,7 +38,7 @@ void LBObj::Clear(void)
 #endif
 }
 
-void LBObj::IncrementTime(double walltime, double cputime)
+void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 {
   parentDB->MeasuredObjTime(walltime,cputime);
   data.wallTime += walltime;
