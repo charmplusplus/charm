@@ -321,6 +321,7 @@ dirs+sources:
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
+	-./system_ln  ../tmp/conv-mach-opt.sh ../include
 	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
