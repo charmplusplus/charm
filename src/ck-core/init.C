@@ -180,7 +180,7 @@ static InitCallTable _initCallTable;
 #define _STATS_ON(x) (x) = 1
 #else
 #define _STATS_ON(x) \
-          CmiPrintf("stats unavailable in optimized version. ignoring...\n");
+          if (CkMyPe()==0) CmiPrintf("stats unavailable in optimized version. ignoring...\n");
 #endif
 
 // fault tolerance
