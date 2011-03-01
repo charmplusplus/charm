@@ -22,7 +22,7 @@ class LBDatabase;//Forward declaration
 //typedef float floatType;
 // type defined by build option
 #ifndef CMK_LBTIME_TYPE
-#define CMK_LBTIME_TYPE float
+#define CMK_LBTIME_TYPE double
 #endif
 typedef CMK_LBTIME_TYPE LBRealType;
 

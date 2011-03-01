@@ -1853,7 +1853,7 @@ fi
 if test "${with_lbtime_type+set}" = set; then :
   withval=$with_lbtime_type;
 else
-  with_lbtime_type=float
+  with_lbtime_type=double
 fi
 
 

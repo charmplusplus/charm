@@ -119,7 +119,7 @@ fi
 AC_ARG_WITH([lbtime-type],
             [AS_HELP_STRING([--with-lbtime-type=type],
                             [load balancing timer type])],
-            [], [with_lbtime_type=float])
+            [], [with_lbtime_type=double])
 
 if test "$with_lbtime_type" = "float" -o "$with_lbtime_type" = "double"
 then
