@@ -55,7 +55,7 @@ CpvDeclare(void *, myProcStatFP);
 #endif
 
 
-#define MAX_EXCLUDE      32
+#define MAX_EXCLUDE      64
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
@@ -493,13 +493,19 @@ void CmiInitCPUAffinity(char **argv)
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
-  while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
+  while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
+    affinity_flag = 1;
+  }
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   if (pemap!=NULL && excludecount>0)
     CmiAbort("Charm++> +pemap can not be used with +excludecore.\n");
+
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+
+  if (pemap!=NULL || commap!=NULL) affinity_flag = 1;
+
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
 
