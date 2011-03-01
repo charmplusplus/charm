@@ -124,12 +124,12 @@ private:
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	CMK_REFNUM_TYPE userFlag=-1); \
+	CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=-1); \
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(CkReductionMsg *msg); \
-  void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=-1);\
-  void contribute(CMK_REFNUM_TYPE userFlag=-1);\
+  void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
+  void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
 
 
 
