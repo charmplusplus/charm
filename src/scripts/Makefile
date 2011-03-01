@@ -65,7 +65,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: multicast pythonCCS
+default_libs: completion multicast pythonCCS
 
 ChaNGa: charm++ cache liveViz
 
@@ -80,6 +80,9 @@ multicast: charmxi
 
 pythonCCS: charmxi
 	cd libs/ck-libs/pythonCCS && $(MAKE)
+
+completion: charmxi
+	cd libs/ck-libs/completion && $(MAKE)
 
 translators: charmxi conv-cpm
 
