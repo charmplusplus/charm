@@ -78,16 +78,16 @@ static void CldStillIdle(void *dummy, double curT)
 
   msg.from_pe = CmiMyPe();
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
-#if ! IDLE_IMMEDIATE
-  msg.to_rank = -1;
-  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
-#else
+#if CMK_IMMEDIATE_MSG && IDLE_IMMEDIATE
   /* fixme */
   CmiBecomeImmediate(&msg);
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     msg.to_rank = CmiRankOf(CpvAccess(neighbors)[i].pe);
     CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
   }
+#else
+  msg.to_rank = -1;
+  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
 #endif
   cldData->sent = 1;
 
@@ -110,7 +110,7 @@ static void CldAskLoadHandler(requestmsg *msg)
     receiver = msg->from_pe;
     rank = CmiMyRank();
     if (msg->to_rank != -1) rank = msg->to_rank;
-#if IDLE_IMMEDIATE
+#if CMK_IMMEDIATE_MSG && IDLE_IMMEDIATE
     /* try the lock */
     if (CmiTryLock(CpvAccessOther(cldLock, rank))) {
       CmiDelayImmediate();		/* postpone immediate message */
