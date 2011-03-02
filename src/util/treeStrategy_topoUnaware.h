@@ -66,19 +66,23 @@ namespace impl {
 
 	//Containing no actual nodes to be built
 	if(firstVtx+1 == beyondLastVtx) return parent;
-
-	//key is the node id, and the mapped value is the local index
-	std::map<int, int> nodesMap;
+	
+	//store the sequence of local indices for each different node ids
+	std::vector<int> nodesSeq; 
 	#if CMK_SMP	
+		//key is the node id, and the mapped value is the local index
+		std::map<int, int> nodesMap;
 		int localIndex = 1; //relative to the root
 		for(Iterator vtx=firstVtx+1; vtx!=beyondLastVtx; vtx++, localIndex++){
 			int nid = CmiNodeOf(topo::getProcID(*vtx));
 			if(nodesMap.find(nid) == nodesMap.end()){
 				//encounter a new node id
 				nodesMap[nid] = localIndex;
+				nodesSeq.push_back(localIndex);
 			}
 		}
-		int totalNodes = nodesMap.size();
+		nodesMap.clear();
+		int totalNodes = nodesSeq.size();
 		//check whether the building of this tree is for procs on remote SMP nodes.
 		//NOW: just use the condition whether the "parent" nid is same with (firstVtx+1)
 		int pnid = CmiNodeOf(topo::getProcID(*firstVtx));
@@ -105,12 +109,6 @@ namespace impl {
 				if (remainder-- > 0) indx++;
 			}	
 		}else{
-			int *nidLocalIdx = new int[totalNodes];
-			std::map<int, int>::iterator it;		
-			int lIdx;
-			for(it=nodesMap.begin(), lIdx=0; it!=nodesMap.end(); it++, lIdx++)
-				nidLocalIdx[lIdx] = (*it).second;
-			
 			/// Compute the number of vertices in each branch
 			const int numDescendants = totalNodes;
 			int numInSubTree = numDescendants / maxBranches;
@@ -119,12 +117,12 @@ namespace impl {
 			/// Push the appropriate relative distances (from the tree root) into the container of child indices
 			for (int i=0, indx=0; (i<maxBranches && indx<numDescendants); i++, indx += numInSubTree)
 			{
-				parent->childIndex.push_back(nidLocalIdx[indx]);
+				parent->childIndex.push_back(nodesSeq[indx]);
 				/// Distribute any remainder vertices as evenly as possible amongst all the branches 
 				if (remainder-- > 0) indx++;
 			}
-			delete [] nidLocalIdx;
 		}
+	nodesSeq.clear();
         /// Return the output structure
         return parent;
     }	
