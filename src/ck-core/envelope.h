@@ -212,8 +212,8 @@ private:
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
-    UInt   getRef(void) const { return ref; }
-    void   setRef(const UShort r) { ref = r; }
+    CMK_REFNUM_TYPE   getRef(void) const { return ref; }
+    void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
     UChar  getQueueing(void) const { return attribs.queueing; }
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
