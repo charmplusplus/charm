@@ -194,6 +194,7 @@ void CldSendLoad()
 int CldMinAvg()
 {
   int sum=0, i;
+  int myload;
 
   int nNeighbors = CpvAccess(numNeighbors);
   if (CpvAccess(start) == -1)
@@ -219,7 +220,7 @@ int CldMinAvg()
     }
   }
   CpvAccess(start) = (CpvAccess(start)+2) % nNeighbors;
-  int myload = CldCountTokens();
+  myload = CldCountTokens();
   sum += myload;
   if (myload < CpvAccess(MinLoad)) {
     CpvAccess(MinLoad) = myload;
@@ -309,10 +310,10 @@ void CldLoadResponseHandler(loadmsg *msg)
       CpvAccess(neighbors)[msg->toindex].load = msg->load;
       if (CpvAccess(neighbors)[msg->toindex].index == -1) CpvAccess(neighbors)[msg->toindex].index = msg->fromindex;
       if (CpvAccess(neighbors)[msg->toindex].msg == NULL) {
-        CpvAccess(neighbors)[msg->toindex].msg = msg;
         int tmp = msg->fromindex;
         msg->fromindex = msg->toindex;
         msg->toindex = tmp;
+        CpvAccess(neighbors)[msg->toindex].msg = msg;
       }
       else
         CmiFree(msg);
