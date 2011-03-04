@@ -36,6 +36,20 @@ else
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
+# enable/disable statistics collection
+AC_ARG_ENABLE([stats],
+            [AS_HELP_STRING([--enable-stats],
+              [enable statistics collection])], ,
+            [enable_stats=yes])
+
+if test "$enable_stats" = "no"
+then
+  Echo "Statistics collection is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 0, [disable statistics collection])
+else
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 1, [enable statistics collection])
+fi
+
 # check enable/disable
 AC_ARG_ENABLE([tracing],
             [AS_HELP_STRING([--enable-tracing],
@@ -100,6 +114,20 @@ if test "$with_numa" = "yes"
 then
   Echo "Charm NUMA support is builtin"
   WITH_NUMA=yes
+fi
+
+AC_ARG_WITH([lbtime-type],
+            [AS_HELP_STRING([--with-lbtime-type=type],
+                            [load balancing timer type])],
+            [], [with_lbtime_type=double])
+
+if test "$with_lbtime_type" = "float" -o "$with_lbtime_type" = "double"
+then
+  Echo "Setting load balancing timer type as '$with_lbtime_type'"
+  AC_DEFINE_UNQUOTED(CMK_LBTIME_TYPE, $with_lbtime_type, [Setting load balancing timer type])
+else
+  Echo "Invalid type specified for load balancing timer type"
+  test_finish 1
 fi
 
 #
@@ -279,7 +307,7 @@ test_linkso() {
 # $2 is description
 add_flag() {
         key=`echo $1 | cut -d'=' -f1`
-        last=`grep $key ../include/conv-mach-opt.sh 2>/dev/null | tail -1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1" 
 	then
@@ -289,11 +317,16 @@ add_flag() {
         then
 	  cat >> ../include/conv-mach-opt.sh << EOT
 
-# Option added by configure script's $2 section
-$1
-
+$1   # Option added by configure script's $2 section
 EOT
 	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
 }
 
 test_finish() {
@@ -389,11 +422,30 @@ then
   test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
   if test $pass -eq 1
   then
+        remove_flag CMK_LDXX
 	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
   fi
 fi
 
 # Perform the tests
+
+AC_ARG_WITH([refnum-type],
+            [AS_HELP_STRING([--with-refnum-type=type],
+                            [size of the envelope refnum field])],
+            [], [with_refnum_type=no])
+
+if test "$with_refnum_type" = "no" -o "$with_refnum_type" = "short"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned short"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned short, [envelope refnum field set to UShort])
+elif test "$with_refnum_type" = "int"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned int"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned int, [envelope refnum field set to UInt])
+else
+  Echo "Invalid size specified for refnum field"
+  test_finish 1
+fi
 
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
@@ -943,6 +995,18 @@ int main() {
 EOT
 test_link "whether has sbrk" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SBRK, $pass, [whether has sbrk])
+
+#### test for _setjmp/_longjmp ###
+cat > $t <<EOT
+#include <setjmp.h>
+int main() {
+  jmp_buf buf;
+  _setjmp(buf);
+  _longjmp(buf, 0);
+}
+EOT
+test_link "whether has _setjmp/_longjmp" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_UNDERSCORE_SETJMP, $pass, [whether has _setjmp/_longjmp])
 
 #### test for mstats ###
 cat > $t <<EOT

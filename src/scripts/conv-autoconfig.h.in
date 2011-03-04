@@ -198,11 +198,17 @@
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO
 
+/* whether has _setjmp/_longjmp */
+#undef CMK_HAS_UNDERSCORE_SETJMP
+
 /* whether has usleep */
 #undef CMK_HAS_USLEEP
 
 /* whether has values.h */
 #undef CMK_HAS_VALUES_H
+
+/* Setting load balancing timer type */
+#undef CMK_LBTIME_TYPE
 
 /* whether long double works */
 #undef CMK_LONG_DOUBLE_DEFINED
@@ -236,6 +242,9 @@
 
 /* Python version */
 #undef CMK_PYTHON_VERSION
+
+/* envelope refnum field set to UInt */
+#undef CMK_REFNUM_TYPE
 
 /* disable replay */
 #undef CMK_REPLAYSYSTEM
@@ -275,6 +284,9 @@
 
 /* disable controlpoint */
 #undef CMK_WITH_CONTROLPOINT
+
+/* enable statistics collection */
+#undef CMK_WITH_STATS
 
 /* whether __int64 works */
 #undef CMK___int64_DEFINED

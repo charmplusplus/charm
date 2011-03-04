@@ -27,7 +27,6 @@ added by Ryan Mokos in July 2008.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-#define CMK_MMAP_PROBE    0
 #define CMK_THREADS_DEBUG 0
 
 /* 0: use the old isomalloc implementation (array)
@@ -52,6 +51,7 @@ added by Ryan Mokos in July 2008.
 #endif
 
 static int _sync_iso = 0;
+static int _mmap_probe = 0;
 
 static int read_randomflag(void)
 {
@@ -1698,6 +1698,9 @@ static int partially_good(char *start,memRange_t len,int n) {
 static int good_range(char *start,memRange_t len,int n) {
   int i;
   memRange_t quant=divide_range(len,n);
+#if CMK_THREADS_DEBUG
+  CmiPrintf("good_range: %lld, %d\n", quant, n);
+#endif
   CmiAssert (quant > 0);
   for (i=0;i<n;i++)
     if (bad_location(start+i*quant)) return 0; /* it's got some bad parts */
@@ -1886,7 +1889,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     }
 }
 
-#if CMK_MMAP_PROBE
+/* probe method */
 static int try_largest_mmap_region(memRegion_t *destRegion)
 {
   void *bad_alloc=(void*)(-1); /* mmap error return address */
@@ -1897,6 +1900,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   int retry = 0;
   if (sizeof(size_t) >= 8) size = size>>2;  /* 25% of machine address space! */
   while (1) { /* test out an allocation of this size */
+#if CMK_HAS_MMAP
 	range=mmap(NULL,size,PROT_READ|PROT_WRITE,
  	             MAP_PRIVATE
 #if CMK_HAS_MMAP_ANON
@@ -1906,12 +1910,17 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
                      |MAP_NORESERVE
 #endif
                      ,-1,0);
-	if (range==bad_alloc) { /* mmap failed */
+#else
+        range = bad_alloc;
+#endif
+        if (range == bad_alloc) {  /* mmap failed */
 #if CMK_THREADS_DEBUG
                 /* CmiPrintf("[%d] test failed at size: %llu error: %d\n", CmiMyPe(), size, errno);  */
 #endif
+#if CMK_HAS_USLEEP
                 if (retry++ < 5) { usleep(rand()%10000); continue; }
                 else retry = 0;
+#endif
 		size=(double)size/shrink; /* shrink request */
 		if (size<=0) return 0; /* mmap doesn't work */
 	}
@@ -1919,7 +1928,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 #if CMK_THREADS_DEBUG
                CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
 #endif
-		munmap(range,size); /* needed/wanted? */
+		call_munmap(range,size); /* needed/wanted? */
 		if (size > good_size) {
 		  good_range = range;
 		  good_size = size;
@@ -1943,7 +1952,6 @@ system(s);
 #endif
   return 1;
 }
-#endif
 
 #ifndef CMK_CPV_IS_SMP
 #define CMK_CPV_IS_SMP
@@ -1965,6 +1973,7 @@ static void init_ranges(char **argv)
     pagesize = CMK_MEMORY_PAGESIZE;
   slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
 #if CMK_THREADS_DEBUG
+  if (CmiMyPe() == 0)
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
 
@@ -1976,12 +1985,15 @@ static void init_ranges(char **argv)
       freeRegion.start=CMK_MMAP_START_ADDRESS;
       freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
 #endif
-#if CMK_MMAP_PROBE
-      if (freeRegion.len==0u) 
-        if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
-#else
-      if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
-#endif
+
+      if (freeRegion.len==0u)  {
+        if (_mmap_probe == 1) {
+          if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
+        }
+        else {
+          if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
+        }
+      }
       
 #if 0
       /*Make sure our largest slot number doesn't overflow an int:*/
@@ -2363,6 +2375,19 @@ void CmiIsomallocInit(char **argv)
 #if CMK_NO_ISO_MALLOC
   disable_isomalloc("isomalloc disabled by conv-mach");
 #else
+  if (CmiGetArgFlagDesc(argv,"+noisomalloc","disable isomalloc")) {
+    disable_isomalloc("isomalloc disabled by user.");
+    return;
+  }
+#if CMK_MMAP_PROBE
+  _mmap_probe = 1;
+#elif CMK_MMAP_TEST
+  _mmap_probe = 0;
+#endif
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_probe","call mmap to probe the largest available isomalloc region"))
+    _mmap_probe = 1;
+  if (CmiGetArgFlagDesc(argv,"+isomalloc_test","mmap test common areas for the largest available isomalloc region"))
+    _mmap_probe = 0;
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
   init_comm(argv);
@@ -2370,11 +2395,13 @@ void CmiIsomallocInit(char **argv)
     disable_isomalloc("mmap() does not work");
   }
   else {
-    if (CmiMyPe() == 0 && read_randomflag() == 1) {    /* randomization stack pointer */
-      if (_sync_iso == 1)
+    if (CmiMyPe() == 0) {
+      if (read_randomflag() == 1) {    /* randomization stack pointer */
+        if (_sync_iso == 1)
           printf("Warning> Randomization of stack pointer is turned on in kernel.\n");
-      else
+        else
           printf("Warning> Randomization of stack pointer is turned on in kernel, thread migration may not work! Run 'echo 0 > /proc/sys/kernel/randomize_va_space' as root to disable it, or try run with '+isomalloc_sync'.  \n");
+      }
     }
     init_ranges(argv);
   }

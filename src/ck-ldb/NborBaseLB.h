@@ -45,12 +45,14 @@ public:
   struct LDStats {  // Passed to Strategy
     int from_pe;
     double total_walltime;
-    double total_cputime;
     double idletime;
     double bg_walltime;
-    double bg_cputime;
     double obj_walltime;
+#if CMK_LB_CPUTIMER
+    double total_cputime;
+    double bg_cputime;
     double obj_cputime;
+#endif
     int pe_speed;
     CmiBool available;
     CmiBool move;
@@ -61,7 +63,10 @@ public:
     LDCommData* commData;
 
     inline void clearBgLoad() {
-      bg_walltime = bg_cputime = idletime = 0.0;
+      bg_walltime = idletime = 0.0;
+#if CMK_LB_CPUTIMER
+      bg_cputime = 0.0;
+#endif
     }
   };
 
@@ -97,12 +102,14 @@ public:
   int serial;
   int pe_speed;
   double total_walltime;
-  double total_cputime;
   double idletime;
   double bg_walltime;
-  double bg_cputime;
   double obj_walltime;   // may not needed
+#if CMK_LB_CPUTIMER
+  double total_cputime;
+  double bg_cputime;
   double obj_cputime;   // may not needed
+#endif
   int n_objs;
   LDObjData *objData;
   int n_comm;

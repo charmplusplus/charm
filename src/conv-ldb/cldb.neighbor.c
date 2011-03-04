@@ -6,11 +6,15 @@
 #include "cldb.h"
 #include "topology.h"
 
+#define USE_MULTICAST           0
 #define IDLE_IMMEDIATE 		1
 #define TRACE_USEREVENTS        0
 
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
+
+static int  LBPeriod = PERIOD;                 /* time to call load balancing */
+static int  overload_threshold = MAXOVERLOAD;
 
 typedef struct CldProcInfo_s {
   double lastCheck;
@@ -69,21 +73,21 @@ static void CldStillIdle(void *dummy, double curT)
   if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
   cldData->lastCheck = now;
 
-  myload = CldLoad();
+  myload = CldCountTokens();
   if (myload > 0) return;
 
   msg.from_pe = CmiMyPe();
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
-#if ! IDLE_IMMEDIATE
-  msg.to_rank = -1;
-  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
-#else
+#if CMK_IMMEDIATE_MSG && IDLE_IMMEDIATE
   /* fixme */
   CmiBecomeImmediate(&msg);
   for (i=0; i<CpvAccess(numNeighbors); i++) {
     msg.to_rank = CmiRankOf(CpvAccess(neighbors)[i].pe);
     CmiSyncNodeSend(CmiNodeOf(CpvAccess(neighbors)[i].pe),sizeof(requestmsg),(char *)&msg);
   }
+#else
+  msg.to_rank = -1;
+  CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(requestmsg), &msg);
 #endif
   cldData->sent = 1;
 
@@ -97,7 +101,7 @@ static void CldStillIdle(void *dummy, double curT)
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
-  int myload = CldLoad();
+  int myload = CldCountTokens();
   double now = CmiWallTimer();
 
   /* only give you work if I have more than 1 */
@@ -106,7 +110,7 @@ static void CldAskLoadHandler(requestmsg *msg)
     receiver = msg->from_pe;
     rank = CmiMyRank();
     if (msg->to_rank != -1) rank = msg->to_rank;
-#if IDLE_IMMEDIATE
+#if CMK_IMMEDIATE_MSG && IDLE_IMMEDIATE
     /* try the lock */
     if (CmiTryLock(CpvAccessOther(cldLock, rank))) {
       CmiDelayImmediate();		/* postpone immediate message */
@@ -120,7 +124,7 @@ static void CldAskLoadHandler(requestmsg *msg)
     for (i=0; i<CpvAccess(numNeighbors); i++) 
       if (CpvAccess(neighbors)[i].pe == receiver) break;
     
-    if(i<CpvAccess(numNeighbors)) {CmiFree(msg); return;}
+    if(i<CpvAccess(numNeighbors)) {CmiFree(msg); return;}   /* ? */
     CpvAccess(neighbors)[i].load += sendLoad;
     CldMultipleSend(receiver, sendLoad, rank, 0);
 #if 0
@@ -142,7 +146,7 @@ void CldSendLoad()
 {
 #if CMK_MULTICORE
   /* directly send load to neighbors */
-  double myload = CldLoad();
+  double myload = CldCountTokens();
   int nNeighbors = CpvAccess(numNeighbors);
   int i;
   for (i=0; i<nNeighbors; i++) {
@@ -157,19 +161,40 @@ void CldSendLoad()
       }
   }
 #else
+#if USE_MULTICAST
   loadmsg msg;
 
   msg.pe = CmiMyPe();
-  msg.load = CldLoad();
+  msg.load = CldCountTokens();
   CmiSetHandler(&msg, CpvAccess(CldLoadResponseHandlerIndex));
   CmiSyncMulticast(CpvAccess(neighborGroup), sizeof(loadmsg), &msg);
   CpvAccess(CldLoadBalanceMessages) += CpvAccess(numNeighbors);
+#else
+  int i;
+  int mype = CmiMyPe();
+  int myload = CldCountTokens();
+  for(i=0; i<CpvAccess(numNeighbors); i++) {
+    loadmsg *msg = CpvAccess(neighbors)[i].msg;
+    if (msg == NULL) {
+      msg = CmiAlloc(sizeof(loadmsg));
+      CmiSetHandler(msg, CpvAccess(CldLoadResponseHandlerIndex));
+      msg->fromindex = i;
+      msg->toindex = CpvAccess(neighbors)[i].index;
+    }
+    else  
+      CpvAccess(neighbors)[i].msg = NULL;
+    msg->pe = mype;
+    msg->load = myload;
+    CmiSyncSendAndFree(CpvAccess(neighbors)[i].pe, sizeof(loadmsg), msg);
+  }
+#endif
 #endif
 }
 
 int CldMinAvg()
 {
   int sum=0, i;
+  int myload;
 
   int nNeighbors = CpvAccess(numNeighbors);
   if (CpvAccess(start) == -1)
@@ -195,9 +220,10 @@ int CldMinAvg()
     }
   }
   CpvAccess(start) = (CpvAccess(start)+2) % nNeighbors;
-  sum += CldLoad();
-  if (CldLoad() < CpvAccess(MinLoad)) {
-    CpvAccess(MinLoad) = CldLoad();
+  myload = CldCountTokens();
+  sum += myload;
+  if (myload < CpvAccess(MinLoad)) {
+    CpvAccess(MinLoad) = myload;
     CpvAccess(MinProc) = CmiMyPe();
   }
   i = (int)(1.0 + (((float)sum) /((float)(nNeighbors+1))));
@@ -215,11 +241,14 @@ void CldBalance(void *dummy, double curT)
 
 /*CmiPrintf("[%d] CldBalance %f\n", CmiMyPe(), startT);*/
   avgLoad = CldMinAvg();
+/*
   overload = CldLoad() - avgLoad;
   if (overload > CldCountTokens())
     overload = CldCountTokens();
+*/
+  overload = CldCountTokens() - avgLoad;
 
-  if (overload > MAXOVERLOAD) {
+  if (overload > overload_threshold) {
     int nNeighbors = CpvAccess(numNeighbors);
     for (i=0; i<nNeighbors; i++)
       if (CpvAccess(neighbors)[i].load < avgLoad) {
@@ -261,7 +290,7 @@ void CldBalance(void *dummy, double curT)
 void CldBalancePeriod(void *dummy, double curT)
 {
     CldBalance(NULL, curT);
-    CcdCallFnAfterOnPE((CcdVoidFn)CldBalancePeriod, NULL, PERIOD, CmiMyPe());
+    CcdCallFnAfterOnPE((CcdVoidFn)CldBalancePeriod, NULL, LBPeriod, CmiMyPe());
 }
 
 
@@ -269,12 +298,42 @@ void CldLoadResponseHandler(loadmsg *msg)
 {
   int i;
 
+#if USE_MULTICAST
   for(i=0; i<CpvAccess(numNeighbors); i++)
     if (CpvAccess(neighbors)[i].pe == msg->pe) {
       CpvAccess(neighbors)[i].load = msg->load;
       break;
     }
   CmiFree(msg);
+#else
+  if (msg->toindex != -1) {
+      CpvAccess(neighbors)[msg->toindex].load = msg->load;
+      if (CpvAccess(neighbors)[msg->toindex].index == -1) CpvAccess(neighbors)[msg->toindex].index = msg->fromindex;
+      if (CpvAccess(neighbors)[msg->toindex].msg == NULL) {
+        int tmp = msg->fromindex;
+        msg->fromindex = msg->toindex;
+        msg->toindex = tmp;
+        CpvAccess(neighbors)[msg->toindex].msg = msg;
+      }
+      else
+        CmiFree(msg);
+  }
+  else
+  for(i=0; i<CpvAccess(numNeighbors); i++)
+    if (CpvAccess(neighbors)[i].pe == msg->pe) {
+      CpvAccess(neighbors)[i].load = msg->load;
+      if (CpvAccess(neighbors)[i].index == -1) CpvAccess(neighbors)[i].index = msg->fromindex;
+      if (CpvAccess(neighbors)[i].msg == NULL) {
+        CpvAccess(neighbors)[i].msg = msg;
+        msg->toindex = msg->fromindex;
+        msg->fromindex = i;
+      }
+      else
+        CmiFree(msg);
+      break;
+    }
+  /* CmiFree(msg); */
+#endif
 }
 
 void CldBalanceHandler(void *msg)
@@ -340,7 +399,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
 
   if ((pe == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
     avg = CldMinAvg();
-    if (CldLoad() < avg)
+    if (CldCountTokens() < avg)
       pe = CmiMyPe();
     else
       pe = CpvAccess(MinProc);
@@ -399,7 +458,7 @@ void CldNodeEnqueue(int node, void *msg, int infofn)
   CldPackFn pfn;
   if ((node == CLD_ANYWHERE) && (CmiNumPes() > 1)) {
     avg = CldMinAvg();
-    if (CldLoad() < avg)
+    if (CldCountTokens() < avg)
       pe = CmiMyPe();
     else
       pe = CpvAccess(MinProc);
@@ -472,7 +531,7 @@ void CldReadNeighborData()
 
 static void CldComputeNeighborData()
 {
-  int i, npe;
+  int i, npes;
   int *pes;
   LBtopoFn topofn;
   void *topo;
@@ -486,15 +545,15 @@ static void CldComputeNeighborData()
     CmiAbort(str);
   }
   topo = topofn(CmiNumPes());
-  npe = getTopoMaxNeighbors(topo);
-  pes = (int *)malloc(npe*sizeof(int));
-  getTopoNeighbors(topo, CmiMyPe(), pes, &npe);
+  npes = getTopoMaxNeighbors(topo);
+  pes = (int *)malloc(npes*sizeof(int));
+  getTopoNeighbors(topo, CmiMyPe(), pes, &npes);
 #if 0
   {
   char buf[512], *ptr;
-  sprintf(buf, "Neighors for PE %d (%d): ", CmiMyPe(), npe);
+  sprintf(buf, "Neighors for PE %d (%d): ", CmiMyPe(), npes);
   ptr = buf + strlen(buf);
-  for (i=0; i<npe; i++) {
+  for (i=0; i<npes; i++) {
     CmiAssert(pes[i] < CmiNumPes() && pes[i] != CmiMyPe());
     sprintf(ptr, " %d ", pes[i]);
     ptr += strlen(ptr);
@@ -504,16 +563,28 @@ static void CldComputeNeighborData()
   }
 #endif
 
-  CpvAccess(numNeighbors) = npe;
+  CpvAccess(numNeighbors) = npes;
   CpvAccess(neighbors) = 
-    (struct CldNeighborData *)calloc(CpvAccess(numNeighbors), 
-				     sizeof(struct CldNeighborData));
-  for (i=0; i<CpvAccess(numNeighbors); i++) {
+    (struct CldNeighborData *)calloc(npes, sizeof(struct CldNeighborData));
+  for (i=0; i<npes; i++) {
     CpvAccess(neighbors)[i].pe = pes[i];
     CpvAccess(neighbors)[i].load = 0;
+#if ! USE_MULTICAST
+    CpvAccess(neighbors)[i].msg = 0;
+    CpvAccess(neighbors)[i].index = -1;
+#endif
   }
-  CpvAccess(neighborGroup) = CmiEstablishGroup(CpvAccess(numNeighbors), pes);
+  CpvAccess(neighborGroup) = CmiEstablishGroup(npes, pes);
   free(pes);
+}
+
+static void topo_callback()
+{
+  CldComputeNeighborData();
+#if CMK_MULTICORE
+  CmiNodeBarrier();
+#endif
+  CldBalancePeriod(NULL, CmiWallTimer());
 }
 
 void CldGraphModuleInit(char **argv)
@@ -577,12 +648,24 @@ void CldGraphModuleInit(char **argv)
     else fclose(fp);
     CldReadNeighborData();
 #endif
+/* 
     CldComputeNeighborData();
-    #if CMK_MULTICORE
+#if CMK_MULTICORE
     CmiNodeBarrier();
 #endif
     CldBalancePeriod(NULL, CmiWallTimer());
+*/
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)topo_callback, NULL);
 
+  }
+
+  if (CmiGetArgIntDesc(argv, "+cldb_neighbor_period", &LBPeriod, "time interval to do neighbor seed lb")) {
+    CmiAssert(LBPeriod>0);
+    if (CmiMyPe() == 0) CmiPrintf("Seed LB> neighbor load balancing period is %d\n", LBPeriod);
+  }
+  if (CmiGetArgIntDesc(argv, "+cldb_neighbor_overload", &overload_threshold, "neighbor seed lb's overload threshold")) {
+    CmiAssert(overload_threshold>0);
+    if (CmiMyPe() == 0) CmiPrintf("Seed LB> neighbor overload threshold is %d\n", overload_threshold);
   }
 
 #if 1

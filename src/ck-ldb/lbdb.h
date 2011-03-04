@@ -20,9 +20,13 @@
 class LBDatabase;//Forward declaration
 
 //typedef float floatType;
-typedef double floatType;
+// type defined by build option
+#ifndef CMK_LBTIME_TYPE
+#define CMK_LBTIME_TYPE double
+#endif
+typedef CMK_LBTIME_TYPE LBRealType;
 
-//#define COMPRESS_LDB                       1
+#define COMPRESS_LDB	1
 
 extern int _lb_version;
 
@@ -117,10 +121,12 @@ typedef struct {
 
 typedef struct {
   LDObjHandle handle;
-  floatType cpuTime;
-  floatType wallTime;
+  LBRealType wallTime;
+#if CMK_LB_CPUTIMER
+  LBRealType cpuTime;
+#endif
 #if ! COMPRESS_LDB
-  floatType minWall, maxWall;
+  LBRealType minWall, maxWall;
 #endif
   CmiBool migratable;
   CmiBool asyncArrival;
@@ -248,7 +254,7 @@ void LDUnregisterObj(LDObjHandle h);
 const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
-void LDObjTime(LDObjHandle &h, double walltime, double cputime);
+void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
 int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
@@ -288,8 +294,8 @@ void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
 int  CLDCollectingStats(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
-void LDGetObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
-void LDQueryKnownObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
+void LDGetObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
+void LDQueryKnownObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
 
 int LDGetObjDataSz(LDHandle _lbdb);
 void LDGetObjData(LDHandle _lbdb, LDObjData *data);
@@ -400,8 +406,10 @@ PUPmarshall(LDObjHandle)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
-  p|cpuTime;
   p|wallTime;
+#if CMK_LB_CPUTIMER
+  p|cpuTime;
+#endif
 #if ! COMPRESS_LDB
   p|minWall;
   p|maxWall;

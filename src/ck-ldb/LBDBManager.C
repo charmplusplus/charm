@@ -59,7 +59,10 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     omCount = objCount = oms_registering = 0;
     obj_running = CmiFalse;
     commTable = new LBCommTable;
-    obj_walltime = obj_cputime = 0;
+    obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+    obj_cputime = 0;
+#endif
     startLBFn_count = 0;
     predictCBFn = NULL;
     batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
@@ -245,18 +248,25 @@ void LBDB::ClearLoads(void)
     LBObj *obj = objs[i]; 
     if (obj)
     {
-      if (obj->data.cpuTime>.0) {
-        obj->lastCpuTime = obj->data.cpuTime;
+      if (obj->data.wallTime>.0) {
         obj->lastWallTime = obj->data.wallTime;
+#if CMK_LB_CPUTIMER
+        obj->lastCpuTime = obj->data.cpuTime;
+#endif
       }
-      obj->data.wallTime = 
-	obj->data.cpuTime = 0.;
+      obj->data.wallTime = 0.;
+#if CMK_LB_CPUTIMER
+      obj->data.cpuTime = 0.;
+#endif
     }
   }
   delete commTable;
   commTable = new LBCommTable;
   machineUtil.Clear();
-  obj_walltime = obj_cputime = 0;
+  obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+  obj_cputime = 0;
+#endif
 }
 
 int LBDB::ObjDataCount()
@@ -393,19 +403,22 @@ void LBDB::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredic
   predictCBFn->data = data;
 }
 
-void LBDB::BackgroundLoad(double* walltime, double* cputime)
+void LBDB::BackgroundLoad(double* bg_walltime, double* bg_cputime)
 {
-  double totalwall;
-  double totalcpu;
-  TotalTime(&totalwall,&totalcpu);
+  double total_walltime;
+  double total_cputime;
+  TotalTime(&total_walltime, &total_cputime);
 
-  double idle;
-  IdleTime(&idle);
-  
-  //*walltime = totalwall - idle - obj_walltime;
-  *walltime = totalwall - idle - obj_cputime;
-  *cputime = totalcpu - obj_cputime;
-  if (*walltime < 0) *walltime = 0.;
+  double idletime;
+  IdleTime(&idletime);
+
+  *bg_walltime = total_walltime - idletime - obj_walltime;
+  if (*bg_walltime < 0) *bg_walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *bg_cputime = total_cputime - obj_cputime;
+#else
+  *bg_cputime = *bg_walltime;
+#endif
 }
 
 void LBDB::GetTime(double *total_walltime,double *total_cputime,
@@ -415,10 +428,13 @@ void LBDB::GetTime(double *total_walltime,double *total_cputime,
 
   IdleTime(idletime);
   
-  //*bg_walltime = *total_walltime - *idletime - obj_walltime;
-  *bg_walltime = *total_walltime - *idletime - obj_cputime;
-  *bg_cputime = *total_cputime - obj_cputime;
+  *bg_walltime = *total_walltime - *idletime - obj_walltime;
   if (*bg_walltime < 0) *bg_walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *bg_cputime = *total_cputime - obj_cputime;
+#else
+  *bg_cputime = *bg_walltime;
+#endif
   //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
 }
 

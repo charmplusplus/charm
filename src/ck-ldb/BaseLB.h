@@ -39,26 +39,39 @@ public:
     /// walltime and cputime may be different on shared compute nodes
     /// it is advisable to use walltime in most cases
     double total_walltime;
-    double total_cputime;
     /// time for which the processor is sitting idle
     double idletime;
     /// bg_walltime called background load (overhead in ckgraph.h) is a
     /// derived quantity: total_walltime - idletime - object load (obj_walltime)
     double bg_walltime;
+#if CMK_LB_CPUTIMER
+    double total_cputime;
     double bg_cputime;
+#endif
     // double utilization;
     int pe;			// processor id
     CmiBool available;
-    ProcStats(): n_objs(0), pe_speed(1), 
-                 total_walltime(0.0), total_cputime(0.0), idletime(0.0),
-	   	 bg_walltime(0.0), bg_cputime(0.0), 
-                 pe(-1), available(CmiTrue)  {}
+    ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
+#if CMK_LB_CPUTIMER
+		 total_cputime(0.0), bg_cputime(0.0),
+#endif
+	   	 bg_walltime(0.0), pe(-1), available(CmiTrue) {}
     inline void clearBgLoad() {
-    	idletime = bg_walltime = bg_cputime = 0.0;
+      idletime = bg_walltime = 
+#if CMK_LB_CPUTIMER
+      bg_cputime = 
+#endif
+      0.0;
     }
     inline void pup(PUP::er &p) {
-      p|total_walltime;  p|total_cputime; p|idletime;
-      p|bg_walltime; p|bg_cputime; p|pe_speed;
+      p|total_walltime;
+      p|idletime;
+      p|bg_walltime;
+#if CMK_LB_CPUTIMER
+      p|total_cputime;
+      p|bg_cputime;
+#endif
+      p|pe_speed;
       if (_lb_args.lbversion() < 1 && p.isUnpacking()) {
          double dummy;  p|dummy;    // for old format with utilization
       }

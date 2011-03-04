@@ -25,11 +25,13 @@ public:
 private:
   enum { off, on } state;
   double total_walltime;
-  double total_cputime;
   double total_idletime;
   double start_totalwall;
-  double start_totalcpu;
   double start_idle;
+#if CMK_LB_CPUTIMER
+  double total_cputime;
+  double start_totalcpu;
+#endif
 
   int cancel_idleStart, cancel_idleEnd;
 

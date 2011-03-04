@@ -205,8 +205,14 @@ public:
        { if (useBarrier) localBarrier.AtBarrier(h); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
-  inline void MeasuredObjTime(double wtime, double ctime) 
-       { if (statsAreOn) { obj_walltime += wtime; obj_cputime += ctime; } };
+  inline void MeasuredObjTime(double wtime, double ctime) {
+    if (statsAreOn) {
+      obj_walltime += wtime;
+#if CMK_LB_CPUTIMER
+      obj_cputime += ctime;
+#endif
+    }
+  };
 
   //This class controls the builtin-atsync frequency
   class batsyncer {
@@ -271,7 +277,9 @@ private:
 
   LBMachineUtil machineUtil;
   double obj_walltime;
+#if CMK_LB_CPUTIMER
   double obj_cputime;
+#endif
 
   StartLBCBList  startLBFnList;
   int            startLBFn_count;

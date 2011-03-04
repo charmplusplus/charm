@@ -436,13 +436,13 @@ void CUDACallbackManager(void *fn) {
 #endif
 
 extern "C"
-void CkSetRefNum(void *msg, int ref)
+void CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref)
 {
   UsrToEnv(msg)->setRef(ref);
 }
 
 extern "C"
-int CkGetRefNum(void *msg)
+CMK_REFNUM_TYPE CkGetRefNum(void *msg)
 {
   return UsrToEnv(msg)->getRef();
 }

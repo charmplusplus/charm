@@ -22,24 +22,21 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 int _stealonly1 = 0;
+int workstealingproactive = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
 CpvStaticDeclare(int, isStealing);
 
-void LoadNotifyFn(int l)
-{
-}
 
 char *CldGetStrategy(void)
 {
   return "work stealing";
 }
 
-/* since I am idle, ask for work from neighbors */
 
-static void CldBeginIdle(void *dummy)
+static void StealLoad()
 {
   int i;
   double startT;
@@ -49,12 +46,15 @@ static void CldBeginIdle(void *dummy)
   int mype;
   int numpes;
 
-  CcdRaiseCondition(CcdUSER);
+  /* CcdRaiseCondition(CcdUSER); */
 
   if (CpvAccess(isStealing)) return;    /* already stealing, return */
-  CpvAccess(isStealing) = 1;
 
-  myload = CldLoad();
+  //myload = CldLoad();
+  myload = CldCountTokens();
+  if(myload>0) return;
+
+  CpvAccess(isStealing) = 1;
 
   mype = CmiMyPe();
   msg.from_pe = mype;
@@ -76,12 +76,28 @@ static void CldBeginIdle(void *dummy)
 #endif
 }
 
+void LoadNotifyFn(int l)
+{
+    if(workstealingproactive)
+    {
+        if(CldCountTokens() < 3)
+            StealLoad();
+    }
+}
+/* since I am idle, ask for work from neighbors */
+
+static void CldBeginIdle(void *dummy)
+{
+    StealLoad();
+}
+
 /* immediate message handler, work at node level */
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
-  int myload = CldLoad();
+  //int myload = CldLoad();
+  int myload = CldCountTokens();
 
   int sendLoad;
   sendLoad = myload / 2; 
@@ -94,17 +110,15 @@ static void CldAskLoadHandler(requestmsg *msg)
       CldMultipleSend(receiver, sendLoad, rank, 0);
   }else
   {
-      requestmsg r_msg;
-      r_msg.from_pe = CmiMyPe();
-      r_msg.to_rank = CmiMyRank();
+      msg->from_pe = CmiMyPe();
+      msg->to_rank = CmiMyRank();
 
-      CcdRaiseCondition(CcdUSER);
+      /* CcdRaiseCondition(CcdUSER); */
 
-      CmiSetHandler(&r_msg, CpvAccess(CldAckNoTaskHandlerIndex));
-      CmiSyncSend(receiver, sizeof(requestmsg),(char *)&r_msg);
+      CmiSetHandler(msg, CpvAccess(CldAckNoTaskHandlerIndex));
+      CmiSyncSendAndFree(receiver, sizeof(requestmsg),(char *)msg);
     /* send ack indicating there is no task */
   }
-  CmiFree(msg);
 }
 
 void  CldAckNoTaskHandler(requestmsg *msg)
@@ -112,11 +126,13 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   int victim; 
   int notaskpe = msg->from_pe;
   int mype = CmiMyPe();
+  int numpes = CmiNumPes();
 
-  CcdRaiseCondition(CcdUSER);
+  /* CcdRaiseCondition(CcdUSER); */
 
   do{
-      victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
+      /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
   }while(victim == mype);
 
   /* reuse msg */
@@ -272,13 +288,15 @@ void CldGraphModuleInit(char **argv)
   if (CmiMyRank() == CmiMyNodeSize())  return;
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
+  
+  workstealingproactive= CmiGetArgFlagDesc(argv, "+workstealingproactive", "Charm++> Work Stealing, steal before going idle(threshold = 3)");
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-  if (CmiMyPe() == 0) 
-      CmiPrintf("Charm++> Work stealing is enabled. \n");
+  if(workstealingproactive && CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work when load is fewer than 3. \n");
 }
 
 

@@ -328,7 +328,11 @@ void OrbLB::work(LDStats* stats)
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
     computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
+#if CMK_LB_CPUTIMER
     computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;
+#else
+    computeLoad[objIdx].load = odata.wallTime;
+#endif
     computeLoad[objIdx].refno = 0;
     computeLoad[objIdx].partition = NULL;
     for (int k=XDIR; k<=ZDIR; k++) {

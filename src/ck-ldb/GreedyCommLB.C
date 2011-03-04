@@ -161,7 +161,7 @@ void GreedyCommLB::work(LDStats* stats)
     processors = new processorInfo[npe];
     for (int p=0; p<npe; p++) {
       processors[p].Id = p;
-      processors[p].backgroundLoad = stats->procs[p].bg_cputime;
+      processors[p].backgroundLoad = stats->procs[p].bg_walltime;
       processors[p].computeLoad = 0;
       processors[p].pe_speed = stats->procs[p].pe_speed;
       if (!stats->procs[p].available) {

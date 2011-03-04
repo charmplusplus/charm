@@ -159,8 +159,8 @@ bool _lb_debug2=0;
       for(i=0;i<myStats.n_objs;i++) {
         char temp[1000];
         char* now=temp;
-        sprintf(now, "[%d] Objs [%d] Load = %lf /%lf Comm Amount = %lf  ", 
-          CkMyPe(), i, myStats.objData[i].cpuTime, myStats.objData[i].wallTime, commamount[i] );
+        sprintf(now, "[%d] Objs [%d] Load = %lf Comm Amount = %lf  ", 
+          CkMyPe(), i, myStats.objData[i].wallTime, commamount[i] );
         now += strlen(now);
         sprintf(now, "Comm Center = [");
         now += strlen(now);

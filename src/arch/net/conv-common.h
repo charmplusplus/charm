@@ -46,6 +46,6 @@
 #define NODE_0_IS_CONVHOST                                 0
 
 /* call cpu timer for LB */
-#define CMK_LBDB_CPUTIMER				   1
+#define CMK_LB_CPUTIMER					   0
 
 

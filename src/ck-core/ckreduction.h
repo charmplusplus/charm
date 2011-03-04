@@ -277,8 +277,8 @@ public:
 	inline CkReduction::reducerType getReducer(void){return reducer;}
 	inline int getRedNo(void){return redNo;}
 
-	inline int getUserFlag(void) const {return userFlag;}
-	inline void setUserFlag(int f) { userFlag=f;}
+	inline CMK_REFNUM_TYPE getUserFlag(void) const {return userFlag;}
+	inline void setUserFlag(CMK_REFNUM_TYPE f) { userFlag=f;}
 
 	inline void setCallback(const CkCallback &cb) { callback=cb; }
 
@@ -300,7 +300,7 @@ public:
 private:
 	int dataSize;//Length of array below, in bytes
 	void *data;//Reduction data
-	int userFlag; //Some sort of identifying flag, for client use
+	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
 	CkCallback callback; //What to do when done
 	CkCallback secondaryCallback; // the group callback is piggybacked on the nodegrp reduction
 	bool migratableContributor; // are the contributors migratable
@@ -342,9 +342,9 @@ private:
 //  Data is copied, not deleted.
 /*#define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	int userFlag=-1); \
+	CMK_REFNUM_TYPE userFlag=-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	const CkCallback &cb,int userFlag=-1); \
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=-1); \
   void contribute(CkReductionMsg *msg);\*/
 
 #define CkReductionTarget(me, method) \
@@ -352,7 +352,7 @@ private:
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
-	int userFlag)\
+	CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
@@ -360,7 +360,7 @@ void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,
 	myRednMgr->contribute(&myRednInfo,msg);\
 }\
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
-	const CkCallback &cb,int userFlag)\
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
@@ -373,7 +373,7 @@ void me::contribute(CkReductionMsg *msg) \
 	msg->setMigratableContributor(migratable);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 	}\
-void me::contribute(const CkCallback &cb,int userFlag)\
+void me::contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
     msg->setUserFlag(userFlag);\
@@ -381,7 +381,7 @@ void me::contribute(const CkCallback &cb,int userFlag)\
     msg->setMigratableContributor(migratable);\
     myRednMgr->contribute(&myRednInfo,msg);\
 }\
-void me::contribute(int userFlag)\
+void me::contribute(CMK_REFNUM_TYPE userFlag)\
 {\
     CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
     msg->setUserFlag(userFlag);\

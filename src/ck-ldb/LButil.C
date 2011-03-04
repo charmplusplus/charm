@@ -13,7 +13,7 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
 
    for(i=0; i < n_pes; i++) {
     processors[i].Id = i;
-    processors[i].backgroundLoad = stats->procs[i].bg_cputime;
+    processors[i].backgroundLoad = stats->procs[i].bg_walltime;
     processors[i].computeLoad = stats->procs[i].total_walltime;
     processors[i].load = processors[i].computeLoad + processors[i].backgroundLoad;
     processors[i].pe_speed = stats->procs[i].pe_speed;

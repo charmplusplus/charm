@@ -22,6 +22,14 @@
 /* Enable this define to get lots of debugging printouts */
 #define VERBOSE(x) /* x */
 
+#if CMK_HAS_UNDERSCORE_SETJMP
+#define SETJMP    _setjmp
+#define LONGJMP   _longjmp
+#else
+#define SETJMP     setjmp
+#define LONGJMP    longjmp
+#endif
+
 /* Return an approximation of the top of the stack */
 static void *getStack(void) {
 	int x; void *p=&x;
@@ -69,7 +77,7 @@ int setJcontext (const uJcontext_t *u)
 	
 	if (mu->_uc_fn==NULL)
 	{ /* Start running an existing thread */
-		longjmp(mu->_uc_jmp_buf,0);
+		LONGJMP(mu->_uc_jmp_buf,0);
 		threadFatal("Fatal error performing longjmp"); 
 	}
 	else /* mu->_uc_fn != NULL, so thread hasn't started yet */
@@ -158,7 +166,7 @@ int swapJcontext (uJcontext_t *o,
 {
 	register uJcontext_t *mu=(uJcontext_t *)u;
 	VERBOSE( printf("swapJcontext(%p,%p)",o,u); printStack(); )
-	if (0==setjmp(o->_uc_jmp_buf))
+	if (0==SETJMP(o->_uc_jmp_buf))
 		setJcontext(mu); /* direct path-- switch to new thread */
 	else { /* old thread resuming-- */
 		VERBOSE( printf("swapJcontext returning to %p",mu); printStack(); )

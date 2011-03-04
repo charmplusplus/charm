@@ -176,11 +176,11 @@ static int   _exitStarted = 0;
 
 static InitCallTable _initCallTable;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 #define _STATS_ON(x) (x) = 1
 #else
 #define _STATS_ON(x) \
-          CmiPrintf("stats unavailable in optimized version. ignoring...\n");
+          if (CkMyPe()==0) CmiPrintf("stats unavailable in optimized version. ignoring...\n");
 #endif
 
 // fault tolerance
@@ -364,7 +364,7 @@ static void _discardHandler(envelope *env)
   CmiFree(env);
 }
 
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 static inline void _printStats(void)
 {
   DEBUGF(("[%d] _printStats\n", CkMyPe()));
@@ -415,7 +415,7 @@ static inline void _printStats(void) {}
 static inline void _sendStats(void)
 {
   DEBUGF(("[%d] _sendStats\n", CkMyPe()));
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
   envelope *env = UsrToEnv(CkpvAccess(_myStats));
 #else
   envelope *env = _allocEnv(StatMsg);
@@ -525,7 +525,7 @@ static void _exitHandler(envelope *env)
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
 #endif
       _numStatsRecd++;

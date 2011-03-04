@@ -715,6 +715,8 @@ LBTOPO_MACRO(LBTopo_torus_nd_10)
 //  TORUS ND  and SMP Awareness
 //  added by Yanhua Sun 
 
+//#define YHDEBUG
+
 template <int dimension>
 class LBTopo_torus_nd_smp: public LBTopology {
 private:
@@ -748,8 +750,8 @@ public:
     CmiAssert(dimension>=1 && dimension<=32);
     CmiAssert(p>=1);
 
-    int ppn = CmiNumPesOnPhysicalNode(0);
-    int NumOfNodes = CmiNumPhysicalNodes();
+    ppn = CmiNumPesOnPhysicalNode(0);
+    NumOfNodes = CmiNumPhysicalNodes();
 
     Cardinality = new int[dimension];
     TempCo = new int[dimension];
@@ -771,7 +773,7 @@ public:
     delete[] TempCo;
   }
   virtual int max_neighbors() {
-    return dimension*2;
+    return (dimension+ppn)*2;
   }
   virtual void neighbors(int mype, int* _n, int &nb) {
     nb = 0;
@@ -782,7 +784,7 @@ public:
     int _ppn_ = CmiNumPesOnPhysicalNode(node);
     CmiGetPesOnPhysicalNode(node, &nodePeList, &numpes); 
 #ifdef YHDEBUG
-    CmiPrintf(" 22222222222222ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", _ppn_, NumOfNodes, rank, node, numpes);
+    CmiPrintf(" PE[%d] ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", mype, _ppn_, NumOfNodes, rank, node, numpes);
 #endif   
     for(int i=0; i<numpes; i++)
     {
@@ -806,7 +808,7 @@ public:
     }
 
 #ifdef YHDEBUG
-  CmiPrintf(" Yes my neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", nb, _ppn_, NumOfNodes, rank, node, numpes);
+  CmiPrintf(" [%d] neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", mype, nb, _ppn_, NumOfNodes, rank, node, numpes);
 #endif
   }
   virtual int get_dimension() {

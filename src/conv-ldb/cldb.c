@@ -292,7 +292,7 @@ void CldModuleGeneralInit(char **argv)
   if (CmiMyPe() == 0) {
     char *stra = CldGetStrategy();
     if (strcmp(stra, "rand") != 0) {
-      CmiPrintf("Charm++: %s seed load balancer.\n", stra);
+      CmiPrintf("Charm++> %s seed load balancer.\n", stra);
     }
   } 
 }

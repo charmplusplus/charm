@@ -44,7 +44,7 @@ include Make.depends
 
 DEPENDFILE = Make.depends
 
-depends:  $(CIFILES)
+depends:  $(CIFILES) CkMulticast.def.h
 	echo "Creating " $(DEPENDFILE) " ..."; 	\
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \

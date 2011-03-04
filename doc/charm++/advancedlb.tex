@@ -153,11 +153,11 @@ The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 \begin{verbatim}
 
   struct ProcStats {  // per processor
-    double total_walltime;
-    double total_cputime;
-    double idletime;
-    double bg_walltime;
-    double bg_cputime;
+    LBRealType total_walltime;
+    LBRealType total_cputime;
+    LBRealType idletime;
+    LBRealType bg_walltime;
+    LBRealType bg_cputime;
     int pe_speed;
     double utilization;
     CmiBool available;
@@ -181,6 +181,7 @@ The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 \end{verbatim}
 
 \begin{enumerate}
+\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float if wanted at Charm++ compile time. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
 \item {\em procs} array defines processor attributes and usage data for each
 processor;
 \item {\em objData} array records per object information, {\em LDObjData} is defined in {\em lbdb.h};

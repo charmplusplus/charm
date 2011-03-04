@@ -259,8 +259,14 @@ void CentralLB::BuildStatsMsg()
   theLbdb->IdleTime(&msg->idletime);
   theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
 */
+#if CMK_LB_CPUTIMER
   theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
 		   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
+#else
+  theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
+		   &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
+#endif
+
   msg->pe_speed = myspeed;
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
@@ -403,10 +409,12 @@ void CentralLB::depositData(CLBStatsMsg *m)
   struct ProcStats &procStat = statsData->procs[pe];
   procStat.pe = pe;
   procStat.total_walltime = m->total_walltime;
-  procStat.total_cputime = m->total_cputime;
   procStat.idletime = m->idletime;
   procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+  procStat.total_cputime = m->total_cputime;
   procStat.bg_cputime = m->bg_cputime;
+#endif
   procStat.pe_speed = m->pe_speed;
   //procStat.utilization = 1.0;
   procStat.available = CmiTrue;
@@ -479,10 +487,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
       struct ProcStats &procStat = statsData->procs[pe];
       procStat.pe = pe;
       procStat.total_walltime = m->total_walltime;
-      procStat.total_cputime = m->total_cputime;
       procStat.idletime = m->idletime;
       procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+      procStat.total_cputime = m->total_cputime;
       procStat.bg_cputime = m->bg_cputime;
+#endif
       procStat.pe_speed = m->pe_speed;
       //procStat.utilization = 1.0;
       procStat.available = CmiTrue;
@@ -561,7 +571,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       info.getInfo(statsData, clients, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
@@ -605,7 +615,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
@@ -689,7 +699,9 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
     }
     else {
       stats->procs[stats->from_proc[i]].bg_walltime += odata.wallTime;
+#if CMK_LB_CPUTIMER
       stats->procs[stats->from_proc[i]].bg_cputime += odata.cpuTime;
+#endif
     }
   }
   CmiAssert(stats->n_migrateobjs == n_objs);
@@ -1371,9 +1383,13 @@ void CLBStatsMsg::pup(PUP::er &p) {
   int i;
   p|from_pe;
   p|pe_speed;
-  p|total_walltime; p|total_cputime;
+  p|total_walltime;
   p|idletime;
-  p|bg_walltime;   p|bg_cputime;
+  p|bg_walltime;
+#if CMK_LB_CPUTIMER
+  p|total_cputime;
+  p|bg_cputime;
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | step;
 #endif

@@ -205,3 +205,8 @@ inlineem.o: \
 	megatest.h \
 	inlineem.def.h
 	$(CHARMC) -o inlineem.o inlineem.C
+completion_test.o: \
+	completion_test.C \
+	completion_test.decl.h \
+	completion_test.def.h
+	$(CHARMC) -o completion_test.o completion_test.C

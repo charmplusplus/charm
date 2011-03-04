@@ -81,7 +81,7 @@ class Stats {
 
 CkpvExtern(Stats*, _myStats);
 
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 #define _STATS_RECORD_CREATE_CHARE_1() \
           CkpvAccess(_myStats)->recordCreateChare()
 #define _STATS_RECORD_CREATE_CHARE_N(x) \

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /**
  @defgroup CkEnvelope
  \brief  Charm++ message header.
@@ -194,9 +188,9 @@ public:
 #endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
-    UShort ref;            ///< Used by futures
+    CMK_REFNUM_TYPE ref;            ///< Used by futures
     s_attribs attribs;
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(CMK_REFNUM_TYPE)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;   ///< Number of bits of priority data after user data
@@ -212,8 +206,8 @@ private:
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
-    UInt   getRef(void) const { return ref; }
-    void   setRef(const UShort r) { ref = r; }
+    CMK_REFNUM_TYPE   getRef(void) const { return ref; }
+    void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
     UChar  getQueueing(void) const { return attribs.queueing; }
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }

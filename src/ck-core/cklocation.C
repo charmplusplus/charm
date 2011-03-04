@@ -1303,7 +1303,7 @@ void CkLocRec_local::setObjTime(double cputime) {
 	the_lbdb->EstObjLoad(ldHandle, cputime);
 }
 double CkLocRec_local::getObjTime() {
-        double walltime, cputime;
+        LBRealType walltime, cputime;
         the_lbdb->GetObjLoad(ldHandle, walltime, cputime);
         return walltime;
 }

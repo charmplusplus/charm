@@ -19,8 +19,6 @@ class QdMsg {
     } u;
     CkCallback cb;
   public:
-    short cond1, cond2;
-  public:
     int getPhase(void) { return phase; }
     void setPhase(int p) { phase = p; }
     CkCallback getCb(void) { CkAssert(phase==0); return cb; }
