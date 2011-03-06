@@ -3386,10 +3386,28 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cxx "whether get_myaddress() exists" "yes" "no" ""
+test_cxx "whether has get_myaddress" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_GET_MYADDRESS $pass
+_ACEOF
+
+
+#### check if mprotect exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/mman.h>
+
+void foo(void *a,int l,int fd) {
+     void *pg = NULL;
+     size_t pagesize = 4096;
+     mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
+}
+EOT
+test_cxx "whether has mprotect" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MPROTECT $pass
 _ACEOF
 
 

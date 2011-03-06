@@ -99,7 +99,7 @@
 /* whether getpid exists */
 #undef CMK_HAS_GETPID
 
-/* whether get_myaddress() exists */
+/* whether has get_myaddress */
 #undef CMK_HAS_GET_MYADDRESS
 
 /* whether iterator_traits works */
@@ -125,6 +125,9 @@
 
 /* whether mmap() accepts MAP_NORESERVE */
 #undef CMK_HAS_MMAP_NORESERVE
+
+/* whether has mprotect */
+#undef CMK_HAS_MPROTECT
 
 /* whether has mstats */
 #undef CMK_HAS_MSTATS

@@ -1344,8 +1344,22 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cxx "whether get_myaddress() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether get_myaddress() exists])
+test_cxx "whether has get_myaddress" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether has get_myaddress])
+
+#### check if mprotect exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/mman.h>
+
+void foo(void *a,int l,int fd) {
+     void *pg = NULL;
+     size_t pagesize = 4096;
+     mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
+}
+EOT
+test_cxx "whether has mprotect" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MPROTECT, $pass, [whether has mprotect])
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
