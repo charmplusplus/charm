@@ -813,8 +813,6 @@ void SdagConstruct::generateWhen(XStr& op)
     e = el->entry;
     if (e->paramIsMarshalled() == 1) {
         op << "       delete " << e->getEntryName() << "_msg;\n";
-    } else if (e->param->isMessage() == 1) {
-	op << "       CmiFree(UsrToEnv(" << e->param->param->getGivenName() << "));\n";
     }
     el = el->next;
   }
@@ -980,6 +978,18 @@ void SdagConstruct::generateWhen(XStr& op)
   generateCall(op, *stateVars); 
   
   op << ");\n";
+
+  el = elist;
+  while (el) {
+    e = el->entry;
+    if (e->param->isMessage() == 1) {
+      sv = e->stateVars->begin();
+      op << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
+    }
+
+    el = el->next;
+  }
+
   // end actual code
   op << "  }\n\n";
 }
