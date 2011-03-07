@@ -283,8 +283,8 @@ CtgGlobalList::CtgGlobalList() {
 
     int padding = 0;
 
-#if UNPROTECT_GOT & CMK_HAS_MPROTECT
-    int pagesize = CMK_MEMORY_PAGESIZE;
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
+    size_t pagesize = CMK_MEMORY_PAGESIZE;
 #if CMK_HAS_GETPAGESIZE
     pagesize = getpagesize();
 #endif
@@ -336,7 +336,7 @@ CtgGlobalList::CtgGlobalList() {
 	if ((void *)*gGot != (void *)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
 
-#if UNPROTECT_GOT & CMK_HAS_MPROTECT
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
 	static void *last = NULL;
         void *pg = (void*)(((size_t)gGot) & ~(pagesize-1));
         if (pg != last) {
