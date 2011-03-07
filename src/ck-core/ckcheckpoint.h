@@ -72,7 +72,7 @@ void CkPupProcessorData(PUP::er &p);
 void CkRemoveArrayElements();
 //void CkTestArrayElements();
 
-void CkStartCheckpoint(char* dirname,const CkCallback& cb);
+void CkStartCheckpoint(const char* dirname,const CkCallback& cb);
 void CkRestartMain(const char* dirname, CkArgMsg *args);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int  CkCountArrayElements();

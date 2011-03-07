@@ -645,12 +645,12 @@ void CkTestArrayElements()
 }
 */
 
-void CkStartCheckpoint(char* dirname,const CkCallback& cb)
+void CkStartCheckpoint(const char* dirname,const CkCallback& cb)
 {
 	CkPrintf("[%d] Checkpoint starting in %s\n", CkMyPe(), dirname);
 	
 	// hand over to checkpoint managers for per-processor checkpointing
-	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint((char *)dirname, cb);
+	CProxy_CkCheckpointMgr(_sysChkptMgr).Checkpoint(dirname, cb);
 }
 
 /**
