@@ -1,5 +1,5 @@
 #CMK_DEFS="$CMK_DEFS -DHAVE_USR_INCLUDE_MALLOC_H=1 "
-CMK_AMD64="-m64"
+CMK_AMD64="-m64 -fno-stack-protector"
 
 CMK_PIC="-fPIC"
 CMK_CPP_CHARM="/lib/cpp -P"
