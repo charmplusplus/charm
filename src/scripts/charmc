@@ -1593,7 +1593,11 @@ then
 fi
 if [ "$TLSGLOBALS"  = "1" ]
 then
-  THREAD=${THREAD}-tls
+    # make sure we don't add an extra -tls
+  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
+  then
+    THREAD=${THREAD}-tls
+  fi
 fi
 THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
 
