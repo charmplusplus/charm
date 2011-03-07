@@ -1,17 +1,17 @@
 CMK_DEFS="$CMK_DEFS -D_REENTRANT -m64"
-CMK_LIBS="-lpthread $CMK_LIBS "
+CMK_PIC="-fPIC"
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="gcc -E $CMK_DEFS "
-CMK_CC="gcc -fPIC $CMK_DEFS "
-CMK_CXX="g++ -fPIC $CMK_DEFS "
+CMK_CC="gcc $CMK_DEFS "
+CMK_CXX="g++ $CMK_DEFS "
 CMK_CXXPP="$CMK_CXX -x c++ -E $CMK_DEFS "
 CMK_XIOPTS=""
 CMK_LD="$CMK_CC $CMK_DEFS "
 CMK_LDXX="$CMK_CXX $CMK_DEFS "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBS="$CMK_LIBS -lckqt"
+CMK_LIBS="-lpthread $CMK_LIBS -lckqt"
 CMK_RANLIB="ranlib"
 
 # native compiler for compiling charmxi, etc
