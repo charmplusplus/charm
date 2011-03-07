@@ -971,9 +971,11 @@ void SdagConstruct::generateWhen(XStr& op)
 #endif
   // actual code here 
   if(nextBeginOrEnd == 1)
-   op << "    " << next->label->charstar() << "(";
+   op << "    " << next->label->charstar();
   else 
-   op << "    " << next->label->charstar() << "_end(";
+    op << "    " << next->label->charstar() << "_end";
+
+  op << "(";
 
   generateCall(op, *stateVars); 
   
