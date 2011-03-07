@@ -2202,6 +2202,16 @@ then
   fi
 fi
 
+if test "$base_version" = "net-linux"  -o "$base_version" = "net-linux-x86_64"
+then
+  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+  if test $pass -eq 1
+  then
+	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "net-linux compiler"
+	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "net-linux compiler"
+  fi
+fi
+
 # Perform the tests
 
 
