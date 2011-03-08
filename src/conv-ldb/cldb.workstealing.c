@@ -49,9 +49,12 @@ static void StealLoad()
   /* CcdRaiseCondition(CcdUSER); */
 
   if (CpvAccess(isStealing)) return;    /* already stealing, return */
-  CpvAccess(isStealing) = 1;
 
-  myload = CldLoad();
+  //myload = CldLoad();
+  myload = CldCountTokens();
+  if(myload>0) return;
+
+  CpvAccess(isStealing) = 1;
 
   mype = CmiMyPe();
   msg.from_pe = mype;
@@ -77,7 +80,7 @@ void LoadNotifyFn(int l)
 {
     if(workstealingproactive)
     {
-        if(CldLoad() < 3)
+        if(CldCountTokens() < 3)
             StealLoad();
     }
 }
@@ -86,14 +89,15 @@ void LoadNotifyFn(int l)
 static void CldBeginIdle(void *dummy)
 {
     StealLoad();
-
 }
+
 /* immediate message handler, work at node level */
 /* send some work to requested proc */
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
-  int myload = CldLoad();
+  //int myload = CldLoad();
+  int myload = CldCountTokens();
 
   int sendLoad;
   sendLoad = myload / 2; 
@@ -122,15 +126,14 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   int victim; 
   int notaskpe = msg->from_pe;
   int mype = CmiMyPe();
+  int numpes = CmiNumPes();
 
   /* CcdRaiseCondition(CcdUSER); */
 
-  if (CmiMyPe()==2) victim = 2-mype;
-  else
   do{
       /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
-      victim = (((CrnRand())&0x7FFFFFFF)%CmiNumPes());
-  }while(victim == mype || victim == notaskpe);
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
+  }while(victim == mype);
 
   /* reuse msg */
   msg->to_rank = CmiRankOf(victim);
@@ -292,8 +295,6 @@ void CldGraphModuleInit(char **argv)
   if(CmiNumPes() > 1)
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-  if (CmiMyPe() == 0) 
-      CmiPrintf("Charm++> Work stealing is enabled. \n");
   if(workstealingproactive && CmiMyPe() == 0)
       CmiPrintf("Charm++> Steal work when load is fewer than 3. \n");
 }

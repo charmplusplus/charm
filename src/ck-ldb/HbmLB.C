@@ -517,7 +517,7 @@ void HbmLB::ResumeClients(int balancing)
       LBInfo info(count);
       LDStats *stats = &myStats;
       info.getInfo(stats, count, 0);	// no comm cost
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       stats->computeNonlocalComm(nmsgs, nbytes);

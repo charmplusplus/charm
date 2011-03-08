@@ -606,6 +606,7 @@ enable_charmdebug
 enable_replay
 enable_controlpoint
 with_numa
+with_lbtime_type
 with_refnum_type
 with_metis
 '
@@ -1231,6 +1232,7 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-numa             support memory affinity with NUMA
+  --with-lbtime-type=type load balancing timer type
   --with-refnum-type=type size of the envelope refnum field
   --with-metis            support the METIS graph partitioner and associated
                           load balancer
@@ -1846,6 +1848,28 @@ then
   WITH_NUMA=yes
 fi
 
+
+# Check whether --with-lbtime-type was given.
+if test "${with_lbtime_type+set}" = set; then :
+  withval=$with_lbtime_type;
+else
+  with_lbtime_type=double
+fi
+
+
+if test "$with_lbtime_type" = "float" -o "$with_lbtime_type" = "double"
+then
+  Echo "Setting load balancing timer type as '$with_lbtime_type'"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_LBTIME_TYPE $with_lbtime_type
+_ACEOF
+
+else
+  Echo "Invalid type specified for load balancing timer type"
+  test_finish 1
+fi
+
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking machine name" >&5
 $as_echo_n "checking machine name... " >&6; }
@@ -2036,7 +2060,7 @@ $as_echo_n "checking \"$1\"... " >&6; }
 # $2 is description
 add_flag() {
         key=`echo $1 | cut -d'=' -f1`
-        last=`grep $key ../include/conv-mach-opt.sh 2>/dev/null | tail -1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
         skip=0
 	if test -n "$last" -a  "$last" = "$1"
 	then
@@ -2046,11 +2070,16 @@ add_flag() {
         then
 	  cat >> ../include/conv-mach-opt.sh << EOT
 
-# Option added by configure script's $2 section
-$1
-
+$1   # Option added by configure script's $2 section
 EOT
 	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
 }
 
 test_finish() {
@@ -2168,7 +2197,18 @@ then
   test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
   if test $pass -eq 1
   then
+        remove_flag CMK_LDXX
 	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
+  fi
+fi
+
+if echo "$base_version" | grep "linux" > /dev/null 2> /dev/null
+then
+  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+  if test $pass -eq 1
+  then
+	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "linux compiler"
+	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
   fi
 fi
 
@@ -3356,10 +3396,28 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cxx "whether get_myaddress() exists" "yes" "no" ""
+test_cxx "whether has get_myaddress" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_GET_MYADDRESS $pass
+_ACEOF
+
+
+#### check if mprotect exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/mman.h>
+
+void foo(void *a,int l,int fd) {
+     void *pg = NULL;
+     size_t pagesize = 4096;
+     mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
+}
+EOT
+test_cxx "whether has mprotect" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_MPROTECT $pass
 _ACEOF
 
 

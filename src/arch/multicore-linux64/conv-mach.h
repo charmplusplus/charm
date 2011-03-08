@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
@@ -44,8 +38,8 @@
 #define CMK_THREADS_ARE_WIN32_FIBERS                       0
 
 #define CMK_SIGNAL_NOT_NEEDED                              0
-#define CMK_SIGNAL_USE_SIGACTION                           1
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION                           0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0

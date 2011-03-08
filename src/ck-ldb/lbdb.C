@@ -76,21 +76,21 @@ extern "C" const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
 }
 
 extern "C" void LDObjTime(LDObjHandle &_h,
-			    double walltime, double cputime)
+			    LBRealType walltime, LBRealType cputime)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->IncrementTime(walltime,cputime);
 }
   
-extern "C" void LDGetObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
+extern "C" void LDGetObjLoad(LDObjHandle &_h, LBRealType *wallT, LBRealType *cpuT)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->getTime(wallT, cpuT);
 }
 
-extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
+extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, LBRealType *wallT, LBRealType *cpuT)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
@@ -225,7 +225,7 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
   LBObj *const obj = db->LbObj(_h);
 
   if (db->StatsOn()) {
-    double walltime, cputime;
+    LBRealType walltime, cputime;
     obj->StopTimer(&walltime,&cputime);
     obj->IncrementTime(walltime,cputime);
   }

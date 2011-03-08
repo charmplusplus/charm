@@ -28,10 +28,10 @@ int _lb_version = LB_FORMAT_VERSION;	     /// data file version
 
 LBInfo::LBInfo(int count): numPes(count), minObjLoad(0.0), maxObjLoad(0.0)
 {
-  peLoads = new double[numPes]; 
-  objLoads = new double[numPes]; 
-  comLoads = new double[numPes]; 
-  bgLoads = new double[numPes]; 
+  peLoads = new LBRealType[numPes]; 
+  objLoads = new LBRealType[numPes]; 
+  comLoads = new LBRealType[numPes]; 
+  bgLoads = new LBRealType[numPes]; 
   clear();
 }
 
@@ -220,14 +220,14 @@ void LBInfo::print()
   CmiPrintf("Non-local comm: %d msgs %lld bytes\n", msgCount, msgBytes);
 }
 
-void LBInfo::getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad)
+void LBInfo::getSummary(LBRealType &maxLoad, LBRealType &maxCpuLoad, LBRealType &totalLoad)
 {
   totalLoad = maxLoad = peLoads[0];
   maxCpuLoad = objLoads[0];
   for (int i = 1; i < numPes; i++) {
-    double load = peLoads[i];
+    LBRealType load = peLoads[i];
     if (load>maxLoad) maxLoad=load;
-    double cpuload = objLoads[i];
+    LBRealType cpuload = objLoads[i];
     if (cpuload>maxCpuLoad) maxCpuLoad=cpuload;
     totalLoad += load;
   }
@@ -279,8 +279,8 @@ void LBSimulation::PrintDecisions(LBMigrateMsg *m, char *simFileName,
 
 void LBSimulation::PrintDifferences(LBSimulation *realSim, BaseLB::LDStats *stats)
 {
-  double *peLoads = lbinfo.peLoads;
-  double *realPeLoads = realSim->lbinfo.peLoads;
+  LBRealType *peLoads = lbinfo.peLoads;
+  LBRealType *realPeLoads = realSim->lbinfo.peLoads;
 
   // the number of procs during the simulation and the real execution must be checked by the caller!
   int i;

@@ -65,7 +65,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: multicast pythonCCS
+default_libs: completion multicast pythonCCS
 
 ChaNGa: charm++ cache liveViz
 
@@ -80,6 +80,9 @@ multicast: charmxi
 
 pythonCCS: charmxi
 	cd libs/ck-libs/pythonCCS && $(MAKE)
+
+completion: charmxi
+	cd libs/ck-libs/completion && $(MAKE)
 
 translators: charmxi conv-cpm
 
@@ -321,6 +324,7 @@ dirs+sources:
 	rm -rf ../include ; mkdir ../include
 	-./system_ln  ../tmp/conv-*.*h ../include
 	-./system_ln  ../tmp/cc-*.*h ../include
+	-./system_ln  ../tmp/conv-mach-opt.sh ../include
 	if [ -x ./special.sh ] ; then ./special.sh ; fi
 	if [ ! -f conv-common.h ] ; then ( touch conv-common.h ) ; fi
 	touch dirs+sources
@@ -347,9 +351,10 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-os-lock.o \
 	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o \
 	  $(L)/libmemory-hooks-charmdebug.o
-THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-qt.o 	\
-	  $(L)/libthreads-context.o $(L)/libthreads-uJcontext.o \
-	  $(L)/libthreads-context-tls.o  $(L)/libthreads-qt-tls.o  \
+THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-default-tls.o  \
+          $(L)/libthreads-qt.o 	$(L)/libthreads-qt-tls.o  \
+	  $(L)/libthreads-context.o $(L)/libthreads-context-tls.o  \
+	  $(L)/libthreads-uJcontext.o  $(L)/libthreads-uJcontext-tls.o \
 	  $(L)/libthreads-pthreads.o $(L)/libthreads-fibers.o \
 	  $(L)/libthreads-stackcopy.o $(L)/libthreads-memoryalias.o \
           $(L)/libthreads-qt-memoryalias.o	\
@@ -605,6 +610,9 @@ LIBTHREADSDEPS = threads.c $(CVHEADERS) QUICK_THREADS
 $(L)/libthreads-default.o: $(LIBTHREADSDEPS)
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -IQuickThreads -I. threads.c
 
+$(L)/libthreads-default-tls.o: $(LIBTHREADSDEPS)
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_DEFAULT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads -I. threads.c 2> /dev/null || touch $@
+
 $(L)/libthreads-qt.o: $(LIBTHREADSDEPS) 
 	$(CHARMC) -o $@ -DCMK_THREADS_BUILD_QT=1 -IQuickThreads threads.c
 
@@ -619,6 +627,9 @@ $(L)/libthreads-context-tls.o: $(LIBTHREADSDEPS)
 
 $(L)/libthreads-uJcontext.o: $(LIBTHREADSDEPS) uJcontext.c
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -IQuickThreads -I. threads.c || touch $@
+
+$(L)/libthreads-uJcontext-tls.o: $(LIBTHREADSDEPS) uJcontext.c
+	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_JCONTEXT=1 -DCMK_THREADS_BUILD_TLS=1 -IQuickThreads -I. threads.c || touch $@
 
 $(L)/libthreads-pthreads.o: $(LIBTHREADSDEPS) 
 	-$(CHARMC) -o $@ -DCMK_THREADS_BUILD_PTHREADS=1 -IQuickThreads threads.c || touch $@

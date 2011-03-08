@@ -22,18 +22,18 @@ typedef LBMigrateMsg  CLBMigrateMsg;
 class LBInfo
 {
 public:
-  double *peLoads; 	// total load: object + background
-  double *objLoads; 	// total obj load
-  double *comLoads; 	// total comm load
-  double *bgLoads; 	// background load
+  LBRealType *peLoads; 	// total load: object + background
+  LBRealType *objLoads; 	// total obj load
+  LBRealType *comLoads; 	// total comm load
+  LBRealType *bgLoads; 	// background load
   int    numPes;
   int    msgCount;	// total non-local communication
   CmiUInt8  msgBytes;	// total non-local communication
-  double minObjLoad, maxObjLoad;
+  LBRealType minObjLoad, maxObjLoad;
   LBInfo(): peLoads(NULL), objLoads(NULL), comLoads(NULL), 
             bgLoads(NULL), numPes(0), msgCount(0),
             msgBytes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
-  LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), 
+  LBInfo(LBRealType *pl, int count): peLoads(pl), objLoads(NULL), 
             comLoads(NULL), bgLoads(NULL), numPes(count), msgCount(0),
             msgBytes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
   LBInfo(int count);
@@ -41,7 +41,7 @@ public:
   void getInfo(BaseLB::LDStats* stats, int count, int considerComm);
   void clear();
   void print();
-  void getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad);
+  void getSummary(LBRealType &maxLoad, LBRealType &maxCpuLoad, LBRealType &totalLoad);
 };
 
 /** added by Abhinav

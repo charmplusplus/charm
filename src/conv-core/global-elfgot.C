@@ -59,10 +59,13 @@ A more readable summary is at:
 
 #define DEBUG_GOT_MANAGER 0
 
-#define UNPROTECT_GOT     0
+#define UNPROTECT_GOT     1
 
-#if UNPROTECT_GOT
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
 #include <sys/mman.h>
+#if CMK_HAS_GETPAGESIZE
+#include <unistd.h>
+#endif
 #endif
 
 #ifdef __INTEL_COMPILER
@@ -127,7 +130,7 @@ static void readBlacklist()
   printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
     char name[512];
-    fscanf(bl, "%s\n", &name);
+    fscanf(bl, "%s\n", name);
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);
@@ -280,6 +283,13 @@ CtgGlobalList::CtgGlobalList() {
 
     int padding = 0;
 
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
+    size_t pagesize = CMK_MEMORY_PAGESIZE;
+#if CMK_HAS_GETPAGESIZE
+    pagesize = getpagesize();
+#endif
+#endif
+
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
         type = ELFXX_R_TYPE(relt[count].r_info);
@@ -326,11 +336,11 @@ CtgGlobalList::CtgGlobalList() {
 	if ((void *)*gGot != (void *)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
 
-#if UNPROTECT_GOT
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
 	static void *last = NULL;
-        void *pg = (void*)(((size_t)gGot) & ~(CMK_MEMORY_PAGESIZE-1));
+        void *pg = (void*)(((size_t)gGot) & ~(pagesize-1));
         if (pg != last) {
-            mprotect(pg, CMK_MEMORY_PAGESIZE, PROT_READ | PROT_WRITE);
+            mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
             last = pg;
         }
 #endif

@@ -15,6 +15,7 @@
 #undef CkMyNode
 #undef CkNumNodes
 #undef CkMyNodeSize
+#undef CkNodeOf
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -147,6 +148,7 @@ static inline int CkNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
 static inline int CkMyRank() { return BgGetThreadID(); }
 static inline int BgNodeRank() { return BgMyRank()*BgGetNumWorkThread()+BgGetThreadID(); }
 static inline int CkMyNode() { return BgMyNode(); }
+static inline int CkNodeOf(int pe) { return pe / BgGetNumWorkThread(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
 static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
 
