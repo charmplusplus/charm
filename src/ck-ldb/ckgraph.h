@@ -59,6 +59,7 @@ class Edge {
     inline int getNeighborId() { return id; }
     inline int getNumMsgs() { return msgs; }
     inline int getNumBytes() { return bytes; }
+    inline void setNumBytes(int _bytes) { bytes = _bytes; }
 
   private:
     int id;		// id of the neighbor = index of the neighbor vertex
