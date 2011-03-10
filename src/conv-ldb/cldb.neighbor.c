@@ -310,10 +310,11 @@ void CldLoadResponseHandler(loadmsg *msg)
       CpvAccess(neighbors)[msg->toindex].load = msg->load;
       if (CpvAccess(neighbors)[msg->toindex].index == -1) CpvAccess(neighbors)[msg->toindex].index = msg->fromindex;
       if (CpvAccess(neighbors)[msg->toindex].msg == NULL) {
-        int tmp = msg->fromindex;
+        int tmp;
+        CpvAccess(neighbors)[msg->toindex].msg = msg;
+        tmp = msg->fromindex;
         msg->fromindex = msg->toindex;
         msg->toindex = tmp;
-        CpvAccess(neighbors)[msg->toindex].msg = msg;
       }
       else
         CmiFree(msg);
