@@ -19,6 +19,23 @@ memory does not take any (RAM, swap or disk) space.
 of the available virtual address space, and satisfies all new allocations
 from that space.  Migrating structures use whatever space they started with.
 
+  The b-tree implementation has two data structures that are maintained
+simultaneously and in conjunction with each other: a b-tree of nodes
+containing slotblocks used for quickly finding a particular slotblock;
+and an array of doubly-linked lists containing the same slotblocks,
+ordered according to the number of free slots in each slotblock, which
+is used for quickly finding a block of free slots of a desired size.
+The slotset contains pointers to both structures.
+print_btree_top_down() and print_list_array() are very useful
+functions for viewing the current structure of the tree and lists.
+
+  Each doubly-linked list has slotblocks containing between 2^(n-1)+1
+and 2^n free slots, where n is the array index (i.e., bin number).
+For example, list_array[0] points to a double-linked list of
+slotblocks with 1 free slot, list_array[1] points to a double-linked
+list of slotblocks with 2 free slots, list_array[2] to slotblocks with
+3-4 free slots, list_array[3] to slotblocks with 5-8 free slots, etc.
+
 Written for migratable threads by Milind Bhandarkar around August 2000;
 generalized by Orion Lawlor November 2001.  B-tree implementation
 added by Ryan Mokos in July 2008.
@@ -639,8 +656,9 @@ static btreenode *btree_insert(slotset *ss, btreenode *node,
 static void btree_delete_int(slotset *ss, btreenode *node, 
 			     CmiInt8 startslot, slotblock *sb) {
 
-  int index, inc;
-  int i;
+  int i, index, inc;
+  int def_child;
+  int num_left, num_right, left_pos, right_pos;
 
   /* If sb is not NULL, we're sending sb down the tree to a leaf to be
      swapped with the next larger startslot so it can be deleted from
@@ -695,7 +713,6 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 			   startslot, &(node->blocks[index]));
 	  break;
 	} else {                                          /* is a leaf */
-	  int i;
 	  /* delete the slotblock */
 	  list_delete(ss, &(node->blocks[index]));
 	  for (i = index; i < (node->num_blocks - 1); i++) {
@@ -737,13 +754,11 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 
   }
 
-  {   /* BLOCK
-     At this point, the desired slotblock has been removed, and we're
+  /* At this point, the desired slotblock has been removed, and we're
      going back up the tree.  We must check for deficient nodes that
      require the rotating or combining of elements to maintain a
      balanced b-tree. */
-  int i;
-  int def_child = -1;
+  def_child = -1;
 
   /* check if one of the child nodes is deficient  */
   if (node->child[index]->num_blocks < TREE_NODE_MID) {
@@ -856,7 +871,6 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	node->child[def_child+1]->child[i] = 
 	  node->child[def_child+1]->child[i+1];
       }
-    }    /* BLOCK */
     }
 
     /* otherwise, merge the deficient node, parent, and the parent's
@@ -876,13 +890,12 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	&(node->child[index]->blocks[i]);
       node->child[index]->num_blocks++;
 
-      {   /* BLOCK */
       /* move the elements and children of the right child node to the */
       /* left child node */
-      int num_left  = node->child[index]->num_blocks;
-      int num_right = node->child[index+1]->num_blocks;
-      int left_pos;
-      int right_pos = 0;
+      num_left  = node->child[index]->num_blocks;
+      num_right = node->child[index+1]->num_blocks;
+      left_pos;
+      right_pos = 0;
       for (left_pos = num_left; left_pos < num_left + num_right; left_pos++) {
 	node->child[index]->blocks[left_pos].startslot = 
 	  node->child[index+1]->blocks[right_pos].startslot;
@@ -915,7 +928,7 @@ static void btree_delete_int(slotset *ss, btreenode *node,
 	node->blocks[i].listblock->sb = &(node->blocks[i]);
 	node->child[i+1]              = node->child[i+2];
       }
-      }  /* BLOCK */
+
     }
 
   }
