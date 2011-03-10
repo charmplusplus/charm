@@ -1,6 +1,6 @@
 isAIX=true
 
-CMK_CPP_CHARM='/usr/lib/cpp'
+CMK_CPP_CHARM='/usr/lib/cpp -P -D_NO_PROTO '
 CMK_CPP_C='xlc -q32 -E'
 CMK_CC='xlc_r -q32 -qcpluscmt -qhalt=e '
 CMK_CXX='xlC_r -q32 -qhalt=e '
