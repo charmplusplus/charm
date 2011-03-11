@@ -41,7 +41,6 @@ static void StealLoad()
   int i;
   double startT;
   requestmsg msg;
-  int myload;
   int  victim;
   int mype;
   int numpes;
@@ -51,8 +50,8 @@ static void StealLoad()
   if (CpvAccess(isStealing)) return;    /* already stealing, return */
 
   //myload = CldLoad();
-  myload = CldCountTokens();
-  if(myload>0) return;
+  //myload = CldCountTokens();
+  //if(myload>0) return;
 
   CpvAccess(isStealing) = 1;
 
@@ -80,7 +79,7 @@ void LoadNotifyFn(int l)
 {
     if(workstealingproactive)
     {
-        if(CldCountTokens() < 3)
+        if(CldCountTokens() <= LOADTHRESH)
             StealLoad();
     }
 }
@@ -88,7 +87,7 @@ void LoadNotifyFn(int l)
 
 static void CldBeginIdle(void *dummy)
 {
-    StealLoad();
+    if (CldCountTokens() == 0) StealLoad();
 }
 
 /* immediate message handler, work at node level */
@@ -96,18 +95,19 @@ static void CldBeginIdle(void *dummy)
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
+  int sendLoad;
   //int myload = CldLoad();
   int myload = CldCountTokens();
 
-  int sendLoad;
-  sendLoad = myload / 2; 
   receiver = msg->from_pe;
   /* only give you work if I have more than 1 */
   if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
+      else sendLoad = myload / 2; 
       rank = CmiMyRank();
       if (msg->to_rank != -1) rank = msg->to_rank;
       CldMultipleSend(receiver, sendLoad, rank, 0);
+      CmiFree(msg);
   }else
   {
       msg->from_pe = CmiMyPe();
@@ -124,7 +124,7 @@ static void CldAskLoadHandler(requestmsg *msg)
 void  CldAckNoTaskHandler(requestmsg *msg)
 {
   int victim; 
-  int notaskpe = msg->from_pe;
+  /* int notaskpe = msg->from_pe; */
   int mype = CmiMyPe();
   int numpes = CmiNumPes();
 
@@ -159,7 +159,7 @@ void CldBalanceHandler(void *msg)
 {
   CldRestoreHandler(msg);
   CldPutToken(msg);
-  CpvAccess(isStealing) = 0;
+  CpvAccess(isStealing) = 0;      /* fixme: this may not be right */
 }
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
