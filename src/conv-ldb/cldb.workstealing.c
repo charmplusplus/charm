@@ -12,9 +12,9 @@
 #define MSGDELAY 10
 #define MAXOVERLOAD 1
 
-#define LOADTHRESH       3
+#define LOADTHRESH       0
 
-
+static int WS_Threshold = LOADTHRESH;
 typedef struct CldProcInfo_s {
   int    balanceEvt;		/* user event for balancing */
   int    idleEvt;		/* user event for idle balancing */
@@ -22,7 +22,6 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 int _stealonly1 = 0;
-int workstealingproactive = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
@@ -77,11 +76,8 @@ static void StealLoad()
 
 void LoadNotifyFn(int l)
 {
-    if(workstealingproactive)
-    {
-        if(CldCountTokens() <= LOADTHRESH)
-            StealLoad();
-    }
+    if(CldCountTokens() <= WS_Threshold)
+        StealLoad();
 }
 /* since I am idle, ask for work from neighbors */
 
@@ -103,10 +99,11 @@ static void CldAskLoadHandler(requestmsg *msg)
   /* only give you work if I have more than 1 */
   if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
-      else sendLoad = myload / 2; 
+      else sendLoad = (myload-LOADTHRESH) / 2; 
       rank = CmiMyRank();
       if (msg->to_rank != -1) rank = msg->to_rank;
-      CldMultipleSend(receiver, sendLoad, rank, 0);
+      if(sendLoad > 0)
+          CldMultipleSend(receiver, sendLoad, rank, 0);
       CmiFree(msg);
   }else
   {
@@ -288,15 +285,18 @@ void CldGraphModuleInit(char **argv)
   if (CmiMyRank() == CmiMyNodeSize())  return;
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
-  
-  workstealingproactive= CmiGetArgFlagDesc(argv, "+workstealingproactive", "Charm++> Work Stealing, steal before going idle(threshold = 3)");
+ 
+  if(CmiGetArgIntDesc(argv, "+WSThreshold", &WS_Threshold, "The number of minimum load before stealing"))
+  {
+      CmiAssert(WS_Threshold>=0);
+  }
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-  if(workstealingproactive && CmiMyPe() == 0)
-      CmiPrintf("Charm++> Steal work when load is fewer than 3. \n");
+  if(WS_Threshold&& CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
 }
 
 
