@@ -2205,7 +2205,7 @@ fi
 if echo "$base_version" | grep "linux" > /dev/null 2> /dev/null
 then
   test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
-  if test $pass -eq 1
+  if test $strictpass -eq 1
   then
 	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "linux compiler"
 	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
