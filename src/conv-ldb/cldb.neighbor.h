@@ -13,7 +13,8 @@ typedef struct loadmsg_s {
   char header[CmiMsgHeaderSizeBytes];
   int pe, load;
 #if ! USE_MULTICAST
-  int fromindex, toindex;
+  short fromindex, toindex;
+  struct loadmsg_s  *next;
 #endif
 } loadmsg;
 
@@ -28,7 +29,6 @@ typedef struct CldNeighborData
 {
   int pe, load;
 #if ! USE_MULTICAST
-  loadmsg *msg;
   int index;                 // my index on this neighbor
 #endif
 } *CldNeighborData;
