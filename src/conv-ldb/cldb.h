@@ -20,6 +20,7 @@ void CldSetPEBitVector(const char *);
 int  CldLoad(void);
 int  CldLoadRank(int rank);
 int  CldCountTokens(void);
+int  CldCountTokensRank(int rank);
 void CldPutToken(char *);
 void CldRestoreHandler(char *);
 void CldSwitchHandler(char *, int);

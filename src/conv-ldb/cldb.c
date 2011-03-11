@@ -128,6 +128,11 @@ static void CldTokenHandler(CldToken tok)
   CmiFree(tok);
 }
 
+int CldCountTokensRank(int rank)
+{
+  return CpvAccessOther(CldProc, rank)->load;
+}
+
 int CldCountTokens(void)
 {
   return (CpvAccess(CldProc)->load);
