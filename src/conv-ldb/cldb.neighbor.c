@@ -40,7 +40,11 @@ CpvStaticDeclare(int, start);
 #if ! USE_MULTICAST
 CpvStaticDeclare(loadmsg *, msgpool);
 
-static loadmsg *getPool(){
+static
+#if CMK_C_INLINE
+inline 
+#endif
+loadmsg *getPool(){
   loadmsg *msg;
   if (CpvAccess(msgpool)!=NULL)  {
     msg = CpvAccess(msgpool);
@@ -53,7 +57,11 @@ static loadmsg *getPool(){
   return msg;
 }
 
-static void putPool(loadmsg *msg)
+static
+#if CMK_C_INLINE
+inline 
+#endif
+void putPool(loadmsg *msg)
 {
   msg->next = CpvAccess(msgpool);
   CpvAccess(msgpool) = msg;
