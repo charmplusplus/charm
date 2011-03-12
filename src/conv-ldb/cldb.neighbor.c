@@ -8,7 +8,7 @@
 
 #define USE_MULTICAST           0
 #define IDLE_IMMEDIATE 		1
-#define TRACE_USEREVENTS        0
+#define TRACE_USEREVENTS        1
 
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
@@ -20,6 +20,7 @@ typedef struct CldProcInfo_s {
   double lastCheck;
   int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
+  int    updateLoadEvt; 
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
@@ -323,7 +324,10 @@ void CldBalancePeriod(void *dummy, double curT)
 void CldLoadResponseHandler(loadmsg *msg)
 {
   int i;
-
+  
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  double startT = CmiWallTimer();
+#endif
 #if USE_MULTICAST
   for(i=0; i<CpvAccess(numNeighbors); i++)
     if (CpvAccess(neighbors)[i].pe == msg->pe) {
@@ -345,6 +349,9 @@ void CldLoadResponseHandler(loadmsg *msg)
     if (CpvAccess(neighbors)[index].index == -1) CpvAccess(neighbors)[index].index = msg->fromindex;
   }
   putPool(msg);
+#endif
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->updateLoadEvt, startT, CmiWallTimer());
 #endif
 }
 
@@ -618,6 +625,7 @@ void CldGraphModuleInit(char **argv)
   CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
+  CpvAccess(CldData)->updateLoadEvt = traceRegisterUserEvent("UpdateLoad", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
   CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
 #endif
