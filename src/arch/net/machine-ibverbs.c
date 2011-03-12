@@ -1249,6 +1249,7 @@ static inline  void CommunicationServer_nolock(int toBuffer) {
 	
 //	checkAllQps();
 //	_count--;
+
 	MACHSTATE(2,"} CommServer_nolock ne");
 	
 }
@@ -1459,6 +1460,9 @@ static void ServiceCharmrun_nolock()
 
 static void CommunicationServer(int sleepTime, int where){
 	if( where == COMM_SERVER_FROM_INTERRUPT){
+#if CMK_IMMEDIATE_MSG
+		CmiHandleImmediate();
+#endif
 		return;
 	}
 #if CMK_SMP
@@ -1475,6 +1479,13 @@ static void CommunicationServer(int sleepTime, int where){
 	CommunicationServer_nolock(0);
 #if CMK_SMP
 	CmiCommUnlock();
+#endif
+
+	/* when called by communication thread or in interrupt */
+#if CMK_IMMEDIATE_MSG
+	if (where == COMM_SERVER_FROM_SMP) {
+		CmiHandleImmediate();
+	}
 #endif
 }
 
@@ -2392,7 +2403,7 @@ static inline void *getInfiCmiChunk(int dataSize){
         // poolIdx = floor(log2(dataSize/firstBinSize))+1
         int ratio = dataSize/firstBinSize;
         int poolIdx=0;
-        void *res;
+        char *res;
 #if CMK_IBVERBS_STATS
 	if(numAlloc>10000 && numAlloc%1000==0)
 	  {
@@ -2425,7 +2436,7 @@ static inline void *getInfiCmiChunk(int dataSize){
                         count = blockAllocRatio;
                 }
                 res = malloc((allocSize+sizeof(infiCmiChunkHeader))*count);
-                hdr = res;
+                hdr = (infiCmiChunkHeader *)res;
 
                 key = ibv_reg_mr(context->pd,res,(allocSize+sizeof(infiCmiChunkHeader))*count,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
                 CmiAssert(key != NULL);
@@ -2488,7 +2499,7 @@ static inline void *getInfiCmiChunk(int dataSize){
 
 
 void * infi_CmiAlloc(int size){
-	void *res;
+	char *res;
 #if CMK_IBVERBS_STATS
 	numAlloc++;
 #endif
@@ -2504,7 +2515,7 @@ void * infi_CmiAlloc(int size){
 /*(	if(size-sizeof(CmiChunkHeader) > firstBinSize){*/
 		MACHSTATE1(1,"infi_CmiAlloc for dataSize %d",size-sizeof(CmiChunkHeader));
 
-		res = getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
+		res = (char*)getInfiCmiChunk(size-sizeof(CmiChunkHeader));	
 		res -= sizeof(CmiChunkHeader);
 #if CMK_SMP	
 	CmiMemUnlock();
@@ -2646,7 +2657,7 @@ void infi_CmiFree(void *ptr){
 		infiCmiChunkMetaData *metaData;
 		int poolIdx;
 		//there is a infiniband specific header
-		freePtr = ptr - sizeof(infiCmiChunkHeader);
+		freePtr = (char*)ptr - sizeof(infiCmiChunkHeader);
 		metaData = METADATAFIELD(ptr);
 		poolIdx = metaData->poolIdx;
 		if(poolIdx == INFIMULTIPOOL){
@@ -2939,7 +2950,8 @@ void CmiDirect_assocLocalBuffer(struct infiDirectUserHandle *userHandle,void *se
 #if CMI_DIRECT_DEBUG
 	CmiPrintf("[%d] RDMA assoc addr %p %d remote addr %p \n",CmiMyPe(),table->handles[idx].buf,sendBufSize,userHandle->recverBuf);
 #endif
-	table->handles[idx].callbackFnPtr = table->handles[idx].callbackData = NULL;
+	table->handles[idx].callbackFnPtr = NULL;
+	table->handles[idx].callbackData = NULL;
 	table->handles[idx].key =  ibv_reg_mr(context->pd, sendBuf, sendBufSize,IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
 	CmiAssert(table->handles[idx].key != NULL);
 #if CMK_IBVERBS_STATS

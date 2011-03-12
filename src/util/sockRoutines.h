@@ -189,6 +189,8 @@ int skt_sendN(SOCKET hSocket,const void *pBuff,int nBytes);
 int skt_recvN(SOCKET hSocket,      void *pBuff,int nBytes);
 int skt_sendV(SOCKET fd,int nBuffers,const void **buffers,int *lengths);
 
+int skt_tcp_no_nagle(SOCKET fd);
+
 #ifdef __cplusplus
 }
 #endif

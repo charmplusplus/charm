@@ -16,8 +16,10 @@
 #define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_JCONTEXT                           1
 
+/*
 #undef CMK_IMMEDIATE_MSG
 #define CMK_IMMEDIATE_MSG       0
+*/
 
 #undef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE 0

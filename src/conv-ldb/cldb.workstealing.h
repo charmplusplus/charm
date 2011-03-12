@@ -14,6 +14,7 @@
 typedef struct requestmsg_s {
   char header[CmiMsgHeaderSizeBytes];
   int from_pe;
-  int to_rank;
+/*  int to_rank;  */
+  int to_pe;
 } requestmsg;
 
