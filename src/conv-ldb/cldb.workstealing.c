@@ -5,19 +5,19 @@
 #include "queueing.h"
 #include "cldb.h"
 
-#define TRACE_USEREVENTS        0
-#define LOADTHRESH       0
+#define TRACE_USEREVENTS        1
+#define LOADTHRESH              3
 
-static int WS_Threshold = LOADTHRESH;
 typedef struct CldProcInfo_s {
   int    askEvt;		/* user event for askLoad */
   int    askNoEvt;		/* user event for askNoLoad */
   int    idleEvt;		/* user event for idle balancing */
 } *CldProcInfo;
 
-int _stealonly1 = 0;
-int _steal_immediate = 0;
-int workstealingproactive = 0;
+static int WS_Threshold = -1;
+static int _stealonly1 = 0;
+static int _steal_immediate = 0;
+static int workstealingproactive = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
@@ -79,6 +79,7 @@ void LoadNotifyFn(int l)
 static void CldBeginIdle(void *dummy)
 {
     //if (CldCountTokens() == 0) StealLoad();
+    CmiAssert(CldCountTokens()==0);
     StealLoad();
 }
 
@@ -87,16 +88,14 @@ static void CldBeginIdle(void *dummy)
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
-  int sendLoad;
+  int myload, sendLoad;
   double now;
   /* int myload = CldLoad(); */
-  int myload = CldCountTokens();
 
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
   now = CmiWallTimer();
 #endif
 
-  //int myload = CldLoad();
   /* rank = msg->to_rank; */
   CmiAssert(msg->to_pe!=-1);
   rank = CmiRankOf(msg->to_pe);
@@ -107,21 +106,19 @@ static void CldAskLoadHandler(requestmsg *msg)
   /* only give you work if I have more than 1 */
   if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
-      else sendLoad = myload / 2; 
+      else sendLoad = myload/2; 
       if(sendLoad > 0)
           CldMultipleSend(receiver, sendLoad, rank, 0);
       CmiFree(msg);
   }else
-  {
+  {     /* send ack indicating there is no task */
+      int pe = msg->to_pe;
       msg->to_pe = msg->from_pe;
-      msg->from_pe = CmiMyPe();
+      msg->from_pe = pe;
       /*msg->to_rank = CmiMyRank(); */
-
-      /* CcdRaiseCondition(CcdUSER); */
 
       CmiSetHandler(msg, CpvAccess(CldAckNoTaskHandlerIndex));
       CmiSyncSendAndFree(receiver, sizeof(requestmsg),(char *)msg);
-    /* send ack indicating there is no task */
   }
 
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
@@ -144,7 +141,7 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   do{
       /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
       victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
-  }while(victim == mype);
+  } while(victim == mype);
 
   /* reuse msg */
 #if CMK_IMMEDIATE_MSG
@@ -315,14 +312,18 @@ void CldGraphModuleInit(char **argv)
       CmiAssert(WS_Threshold>=0);
   }
 
-  _steal_immediate = CmiGetArgFlagDesc(argv, "+workstealing-immediate", "Charm++> Work Stealing, steal using immediate messages");
+  _steal_immediate = CmiGetArgFlagDesc(argv, "+WSImmediate", "Charm++> Work Stealing, steal using immediate messages");
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
       (CcdVoidFn) CldBeginIdle, NULL);
-  if(WS_Threshold&& CmiMyPe() == 0)
+  if(WS_Threshold >= 0 && CmiMyPe() == 0)
       CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
+#if CMK_IMMEDIATE_MSG
+  if(_steal_immediate && CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work using immediate messages. \n", WS_Threshold);
+#endif
 }
 
 
