@@ -16,9 +16,9 @@
 
 static int WS_Threshold = LOADTHRESH;
 typedef struct CldProcInfo_s {
-  int    balanceEvt;		/* user event for balancing */
+  int    askEvt;		/* user event for askLoad */
+  int    askNoEvt;		/* user event for askNoLoad */
   int    idleEvt;		/* user event for idle balancing */
-  int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
 
 int _stealonly1 = 0;
@@ -38,7 +38,7 @@ char *CldGetStrategy(void)
 static void StealLoad()
 {
   int i;
-  double startT;
+  double now;
   requestmsg msg;
   int  victim;
   int mype;
@@ -48,11 +48,11 @@ static void StealLoad()
 
   if (CpvAccess(isStealing)) return;    /* already stealing, return */
 
-  //myload = CldLoad();
-  //myload = CldCountTokens();
-  //if(myload>0) return;
-
   CpvAccess(isStealing) = 1;
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
 
   mype = CmiMyPe();
   msg.from_pe = mype;
@@ -70,7 +70,7 @@ static void StealLoad()
   CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
   
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
-  traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
+  traceUserBracketEvent(CpvAccess(CldData)->idleEvt, now, CmiWallTimer());
 #endif
 }
 
@@ -92,8 +92,13 @@ static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
   int sendLoad;
-  //int myload = CldLoad();
+  double now;
+  /* int myload = CldLoad(); */
   int myload = CldCountTokens();
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
 
   receiver = msg->from_pe;
   /* only give you work if I have more than 1 */
@@ -116,16 +121,24 @@ static void CldAskLoadHandler(requestmsg *msg)
       CmiSyncSendAndFree(receiver, sizeof(requestmsg),(char *)msg);
     /* send ack indicating there is no task */
   }
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->askEvt, now, CmiWallTimer());
+#endif
 }
 
 void  CldAckNoTaskHandler(requestmsg *msg)
 {
+  double now;
   int victim; 
   /* int notaskpe = msg->from_pe; */
   int mype = CmiMyPe();
   int numpes = CmiNumPes();
 
-  /* CcdRaiseCondition(CcdUSER); */
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
+
 
   do{
       /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
@@ -139,6 +152,10 @@ void  CldAckNoTaskHandler(requestmsg *msg)
   CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
 
   CpvAccess(isStealing) = 1;
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->askNoEvt, now, CmiWallTimer());
+#endif
 }
 
 void CldHandler(void *msg)
@@ -268,9 +285,9 @@ void CldGraphModuleInit(char **argv)
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
 #if CMK_TRACE_ENABLED
-  CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
-  CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
-  CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
+  CpvAccess(CldData)->askEvt = traceRegisterUserEvent("CldAskLoad", -1);
+  CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("StealLoad", -1);
+  CpvAccess(CldData)->askNoEvt = traceRegisterUserEvent("CldAckNoTask", -1);
 #endif
 
   CpvAccess(CldBalanceHandlerIndex) = 
