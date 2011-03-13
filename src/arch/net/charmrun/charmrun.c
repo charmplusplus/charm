@@ -4596,7 +4596,7 @@ void start_nodes_local(char ** env)
 
   /* copy environ and expanded to hold NETSTART and CmiNumNodes */ 
   for (envc=0; env[envc]; envc++);
-  envp = (char **)malloc((envc+2+extra)*sizeof(void *));
+  envp = (char **)malloc((envc+2+extra+1)*sizeof(void *));
   for (i=0; i<envc; i++) envp[i] = env[i];
   envp[envc] = (char *)malloc(256);
   envp[envc+1] = (char *)malloc(256);
