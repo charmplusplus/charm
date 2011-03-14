@@ -88,7 +88,7 @@ host localhost
    This will run only one copy of program locally.
 
 4. If you have any problem with it, please check the FAQ below for help.
-   Let me know if it works or not by sending email to (charm@cs.uiuc.edu).
+   Let me know if it works or not by sending email to (charm@cs.illinois.edu).
 
 
 
@@ -109,7 +109,7 @@ host localhost
    (It may not be the latest stable version though)
    1. login the cvs server:
 
-      cvs -d :pserver:checkout@thrift.cs.uiuc.edu:/expand6/cvsroot login
+      cvs -d :pserver:checkout@thrift.cs.illinois.edu:/expand6/cvsroot login
 
       when CVS passwd is prompted, just type <Enter>.
    2. checkout charm

@@ -20,7 +20,7 @@ What you need to do is as following:
 
 1. login the cvs server:
 
-      cvs -d :pserver:checkout@charm.cs.uiuc.edu:/cvsroot login
+      cvs -d :pserver:checkout@charm.cs.illinois.edu:/cvsroot login
 
       when CVS password is prompted, just press enter.
 2. checkout charm:
@@ -363,11 +363,11 @@ FOR MORE INFORMATION
 
 The Charm++ web page, with documentation, more programs,
 and the latest version of Charm++, is at
-	http://charm.cs.uiuc.edu/
+	http://charm.cs.illinois.edu/
 
 The Charm++ mailing list, for questions, comments, suggestions, 
 improvements, or bug reports is
-	charm@cs.uiuc.edu
+	charm@cs.illinois.edu
 
 
 AUTHORS

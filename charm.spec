@@ -18,9 +18,9 @@ Release: 12
 Copyright: GPL
 Group: Applications/System
 BuildRoot: /var/tmp/%{name}-root
-Source: http://charm.cs.uiuc.edu/distrib/Charm-%{version}-%{release}.tar.bz2
-URL: http://charm.cs.uiuc.edu
-Vendor: PPL <ppl@uiuc.edu>
+Source: http://charm.cs.illinois.edu/distrib/Charm-%{version}-%{release}.tar.bz2
+URL: http://charm.cs.illinois.edu
+Vendor: PPL <charm@cs.illinois.edu>
 
 %description
 Charm++ RPM for Linux
