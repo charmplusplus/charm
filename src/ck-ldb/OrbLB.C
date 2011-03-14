@@ -320,14 +320,16 @@ void OrbLB::work(LDStats* stats)
 
   // v[0] = XDIR  v[1] = YDIR v[2] = ZDIR
   // vArray[XDIR] is an array holding the x vector for all computes
+  LBDatabase *lbdb = LBDatabase::Object();
   int objIdx = 0;
   for (i=0; i<stats->n_objs; i++) {
     LDObjData &odata = stats->objData[i];
     if (odata.migratable == 0) continue;
     computeLoad[objIdx].id = objIdx;
-    computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
-    computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
-    computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
+    computeLoad[objIdx].v[XDIR] = lbdb->getLBDB()->DimInfo(odata.handle, 0); // odata.objID().id[0];
+    computeLoad[objIdx].v[YDIR] = lbdb->getLBDB()->DimInfo(odata.handle, 1); // odata.objID().id[1];
+    computeLoad[objIdx].v[ZDIR] = lbdb->getLBDB()->DimInfo(odata.handle, 2); // odata.objID().id[2];
+    // CkPrintf("[%d] %d %d %d\n", i, computeLoad[objIdx].v[XDIR], computeLoad[objIdx].v[YDIR], computeLoad[objIdx].v[ZDIR]);
 #if CMK_LB_CPUTIMER
     computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;
 #else

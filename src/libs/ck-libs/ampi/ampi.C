@@ -523,7 +523,7 @@ static void ampiProcInit(void){
   }
 #endif
 
-  // initBigSimTrace(1,outtiming);
+   initBigSimTrace(1,1);
 }
 
 #if AMPIMSGLOG

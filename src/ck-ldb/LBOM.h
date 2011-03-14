@@ -42,6 +42,7 @@ private:
 
   void DepositHandle(LDOMHandle _h) { myhandle = _h; };
   void Migrate(LDObjHandle _h, int dest) { callbacks.migrate(_h,dest); };
+  int DimInfo(const LDObjHandle &_h, int dim) { callbacks.dimInfo(_h,dim); };
   CmiBool RegisteringObjs() { return registering_objs; };
   void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
 

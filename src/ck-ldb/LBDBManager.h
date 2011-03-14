@@ -152,6 +152,8 @@ public:
        { migrateCBList[handle]->on = 0; }
   void RemoveNotifyMigrated(int handle);
 
+  int  DimInfo(const LDObjHandle &h, int dim);
+
   inline void TurnManualLBOn() 
        { useBarrier = CmiFalse; }
   inline void TurnManualLBOff() 
