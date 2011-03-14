@@ -7,7 +7,7 @@ CMK_CXX_OPTIMIZE='-O3 -qstrict -Q! '
 CMK_LD="$CMK_CC "
 CMK_LDXX="$CMK_CXX "
 
-CMK_QT="aix64-light"
+CMK_QT="aix"
 
 CMK_NATIVE_CC='xlc_r -q64'
 CMK_NATIVE_LD='xlc_r -q64'

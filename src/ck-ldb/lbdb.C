@@ -499,13 +499,6 @@ extern "C" void LDQueryEstLoad(LDHandle bdb)
 {
 }
 
-extern "C" int LDDimInfo(const LDObjHandle &_h, int dim)
-{
-  LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
-
-  return db->DimInfo(_h,dim);
-}
-
 extern "C" int LDMemusage(LDHandle _db) 
 {
   LBDB *const db = (LBDB*)(_db.handle);

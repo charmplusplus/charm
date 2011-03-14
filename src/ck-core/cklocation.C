@@ -64,13 +64,12 @@ the same size as ArrayIndices.
 LDObjid idx2LDObjid(const CkArrayIndex &idx)
 {
   LDObjid r;
-  int i=0;
+  int i;
   const int *data=idx.data();
-  if (OBJ_ID_SZ>idx.nInts) {
-    r.id[0] = idx.dimension;
+  if (OBJ_ID_SZ>=idx.nInts) {
     for (i=0;i<idx.nInts;i++)
-      r.id[i+1]=data[i];
-    for (i=idx.nInts+1;i<OBJ_ID_SZ;i++)
+      r.id[i]=data[i];
+    for (i=idx.nInts;i<OBJ_ID_SZ;i++)
       r.id[i]=0;
   } else {
     //Must hash array index into LBObjid
@@ -83,17 +82,6 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
           circleShift(data[i],21-9*i*(j+1));
   }
   return r;
-}
-
-int LDObjid2idx(const LDObjHandle &h, int dim)
-{
-  const LDObjid &r = h.objID();
-  int ndims = r.id[0];
-  CkAssert(dim>=0 && dim<ndims);
-  if (ndims <= 3)
-    return r.id[dim+1];
-  else
-    return 0;              // fixme
 }
 #endif
 
@@ -2953,7 +2941,6 @@ void CkLocMgr::initLB(CkGroupID lbdbID_)
 	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
 	myCallbacks.setStats = NULL;
 	myCallbacks.queryEstLoad = NULL;
-	myCallbacks.dimInfo = LDObjid2idx;
 	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 
 	// Tell the lbdb that I'm registering objects

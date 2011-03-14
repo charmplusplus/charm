@@ -305,7 +305,6 @@ public:
 
   inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
   inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
-  inline int DimInfo(const LDObjHandle &h, int dim) { return LDDimInfo(h,dim); };
 
   inline void Migrated(LDObjHandle h, int waitBarrier=1) { LDMigrated(h, waitBarrier); };
 

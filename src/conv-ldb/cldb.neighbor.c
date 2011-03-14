@@ -284,21 +284,20 @@ void CldBalance(void *dummy, double curT)
           maxUnderAvg = avgLoad - CpvAccess(neighbors)[i].load;
         numUnderAvg++;
       }
-    if (numUnderAvg > 0)  {
-      int myrank = CmiMyRank();
+    if (numUnderAvg > 0)
       for (i=0; ((i<nNeighbors) && (overload>0)); i++) {
-        j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
-        if (CpvAccess(neighbors)[j].load < avgLoad) {
-          numToMove = (avgLoad - CpvAccess(neighbors)[j].load);
+          j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
+          if (CpvAccess(neighbors)[j].load < avgLoad) {
+              numToMove = (avgLoad - CpvAccess(neighbors)[j].load);
           if (numToMove > overload)
-              numToMove = overload;
+            numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
 #if CMK_MULTICORE
-          CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove, myrank);
+          CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove);
 #else
           CldMultipleSend(CpvAccess(neighbors)[j].pe, 
-			  numToMove, myrank, 
+			  numToMove, CmiMyRank(), 
 #if CMK_SMP
 			  0
 #else
@@ -308,7 +307,6 @@ void CldBalance(void *dummy, double curT)
 #endif
         }
       }
-    }             /* end of numUnderAvg > 0 */
   }
   CldSendLoad();
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS

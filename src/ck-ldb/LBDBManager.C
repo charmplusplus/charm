@@ -356,12 +356,6 @@ void LBDB::RemoveNotifyMigrated(int handle)
   delete callbk;
 }
 
-int LBDB::DimInfo(const LDObjHandle &h, int dim)
-{
-  LBOM* om = oms[h.omhandle.handle];
-  return om->DimInfo(h, dim);
-}
-
 int LBDB::AddStartLBFn(LDStartLBFn fn, void* data)
 {
   // Save startLB function

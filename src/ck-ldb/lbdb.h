@@ -226,15 +226,11 @@ void LBCollectStatsOff(void);
 typedef void (*LDMigrateFn)(LDObjHandle handle, int dest);
 typedef void (*LDStatsFn)(LDOMHandle h, int state);
 typedef void (*LDQueryEstLoadFn)(LDOMHandle h);
-typedef void (*LDStatsFn)(LDOMHandle h, int state);
-typedef int (*LDDimInfoFn)(const LDObjHandle &h, int dim);
 
-typedef struct _LDCallbacks {
+typedef struct {
   LDMigrateFn migrate;
   LDStatsFn setStats;
   LDQueryEstLoadFn queryEstLoad;
-  LDDimInfoFn  dimInfo;
-  _LDCallbacks(): migrate(NULL), setStats(NULL), queryEstLoad(NULL), dimInfo(NULL) {} 
 } LDCallbacks;
 
 /*
@@ -298,7 +294,6 @@ void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
 int  CLDCollectingStats(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
-int  LDDimInfo(const LDObjHandle &_h, int dim);
 void LDGetObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
 void LDQueryKnownObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
 
