@@ -108,11 +108,7 @@ static void CldAskLoadHandler(requestmsg *msg)
       if(_stealonly1) sendLoad = 1;
       else sendLoad = myload/2; 
       if(sendLoad > 0)
-#if ! CMK_USE_IBVERBS
           CldMultipleSend(receiver, sendLoad, rank, 0);
-#else
-          CldSimpleMultipleSend(receiver, sendLoad, rank);
-#endif
       CmiFree(msg);
   }else
   {     /* send ack indicating there is no task */
