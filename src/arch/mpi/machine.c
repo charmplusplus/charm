@@ -92,12 +92,8 @@ CpvStaticDeclare(double, projTraceStart);
     This will use the fourth short in message as an indicator of spanning tree
   root.
 */
-#if CMK_SMP
-#define CMK_BROADCAST_SPANNING_TREE    0
-#else
 #define CMK_BROADCAST_SPANNING_TREE    1
 #define CMK_BROADCAST_HYPERCUBE        0
-#endif
 
 #define BROADCAST_SPANNING_FACTOR      4
 /* The number of children used when a msg is broadcast inside a node */
