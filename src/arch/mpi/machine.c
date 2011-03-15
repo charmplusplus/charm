@@ -100,6 +100,8 @@ CpvStaticDeclare(double, projTraceStart);
 #endif
 
 #define BROADCAST_SPANNING_FACTOR      4
+/* The number of children used when a msg is broadcast inside a node */
+#define BROADCAST_SPANNING_INTRA_FACTOR      8
 
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
 #define CMI_GET_CYCLE(msg)               ((CmiMsgHeaderBasic *)msg)->root
@@ -782,13 +784,6 @@ int PumpMsgs(void)
     }
 #endif
 
-#if CMK_NODE_QUEUE_AVAILABLE
-    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      CmiPushNode(msg);
-    else
-#endif
-      CmiPushPE(CMI_DEST_RANK(msg), msg);
-
 #if CMK_BROADCAST_SPANNING_TREE
     if (CMI_BROADCAST_ROOT(msg))
       SendSpanningChildren(nbytes, msg);
@@ -796,6 +791,20 @@ int PumpMsgs(void)
     if (CMI_GET_CYCLE(msg))
       SendHypercube(nbytes, msg);
 #endif
+	
+	/* In SMP mode, this push operation needs to be executed
+     * after forwarding broadcast messages. If it is executed
+     * earlier, then during the bcast msg forwarding period,	
+	 * the msg could be already freed on the worker thread.
+	 * As a result, the forwarded message could be wrong! 
+	 * --Chao Mei
+	 */
+#if CMK_NODE_QUEUE_AVAILABLE
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+      CmiPushNode(msg);
+    else
+#endif
+	CmiPushPE(CMI_DEST_RANK(msg), msg);	
 	
 #if CMI_EXERT_RECV_CAP
 	recvCnt++;
@@ -862,13 +871,6 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 	#endif
 #endif
-  
-#if CMK_NODE_QUEUE_AVAILABLE
-   if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
-      CmiPushNode(msg);
-   else
-#endif
-      CmiPushPE(CMI_DEST_RANK(msg), msg);
 
 #if CMK_BROADCAST_SPANNING_TREE
    if (CMI_BROADCAST_ROOT(msg))
@@ -877,6 +879,20 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
    if (CMI_GET_CYCLE(msg))
       SendHypercube(nbytes, msg);
 #endif
+  
+	/* In SMP mode, this push operation needs to be executed
+     * after forwarding broadcast messages. If it is executed
+     * earlier, then during the bcast msg forwarding period,	
+	 * the msg could be already freed on the worker thread.
+	 * As a result, the forwarded message could be wrong! 
+	 * --Chao Mei
+	 */  
+#if CMK_NODE_QUEUE_AVAILABLE
+   if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+      CmiPushNode(msg);
+   else
+#endif
+      CmiPushPE(CMI_DEST_RANK(msg), msg);
 }
 
 /********************* MESSAGE RECEIVE FUNCTIONS ******************/
@@ -1393,10 +1409,39 @@ void SendSpanningChildren(int size, char *msg)
 {
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
-  int i;
-
+  int startnode;
+  int i, exceptRank;
+	
+#if CMK_SMP
+   /* first send msgs to other nodes */  
+  startnode = CmiNodeOf(startpe);  
+  CmiAssert(startnode >=0 &&  startnode<CmiNumNodes());
+  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
+    int nd = CmiMyNode()-startnode;
+    if (nd<0) nd+=CmiNumNodes();
+    nd = BROADCAST_SPANNING_FACTOR*nd + i;
+    if (nd > CmiNumNodes() - 1) break;
+    nd += startnode;
+    nd = nd%CmiNumNodes();
+    CmiAssert(nd>=0 && nd!=CmiMyNode());	
+	/* always send to the first rank of other nodes */
+	char *newmsg = CmiCopyMsg(msg, size);
+	CMI_DEST_RANK(newmsg) = 0;
+    EnqueueMsg(newmsg, size, nd);
+  }	
+   /* second send msgs to my peers on this node */
+  /* FIXME: now it's just a flat p2p send!! When node size is large,
+   * it should also be sent in a tree
+   */
+   exceptRank = CMI_DEST_RANK(msg);
+   for(i=0; i<exceptRank; i++){
+	   CmiPushPE(i, CmiCopyMsg(msg, size));
+   }
+   for(i=exceptRank+1; i<CmiMyNodeSize(); i++){
+	   CmiPushPE(i, CmiCopyMsg(msg, size));
+   }
+#else
   CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
-
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
     int p = cs->pe-startpe;
     if (p<0) p+=_Cmi_numpes;
@@ -1407,6 +1452,7 @@ void SendSpanningChildren(int size, char *msg)
     CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);
     CmiSyncSendFn1(p, size, msg);
   }
+#endif
 }
 
 #include <math.h>
@@ -1416,8 +1462,37 @@ void SendHypercube(int size, char *msg)
 {
   CmiState cs = CmiGetState();
   int curcycle = CMI_GET_CYCLE(msg);
-  int i;
+  int i, exceptRank;
 
+#if CMK_SMP
+   /* first send msgs to other nodes */  
+  double logp = CmiNumNodes();
+  logp = log(logp)/log(2.0);
+  logp = ceil(logp);
+
+  for (i = curcycle; i < logp; i++) {
+    int nd = CmiMyNode() ^ (1 << i);
+
+    if(nd < CmiNumNodes()) {
+      CMI_SET_CYCLE(msg, i + 1);
+	  /* always send to the first rank of other nodes */
+	  char *newmsg = CmiCopyMsg(msg, size);
+	  CMI_DEST_RANK(newmsg) = 0;
+      EnqueueMsg(newmsg, size, nd);       
+    }
+  }	
+   /* second send msgs to my peers on this node */
+   /* FIXME: now it's just a flat p2p send!! When node size is large,
+    * it should also be sent in a tree
+    */
+   exceptRank = CMI_DEST_RANK(msg);
+   for(i=0; i<exceptRank; i++){
+	   CmiPushPE(i, CmiCopyMsg(msg, size));
+   }
+   for(i=exceptRank+1; i<CmiMyNodeSize(); i++){
+	   CmiPushPE(i, CmiCopyMsg(msg, size));
+   }
+#else
   double logp = CmiNumPes();
   logp = log(logp)/log(2.0);
   logp = ceil(logp);
@@ -1436,11 +1511,18 @@ void SendHypercube(int size, char *msg)
       CmiSyncSendFn1(p, size, msg);
     }
   }
+#endif  
 }
 
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
 {
   CmiState cs = CmiGetState();
+
+#if CMK_SMP	
+  /* record the rank to avoid re-sending the msg in SendSpanningChildren */
+  CMI_DEST_RANK(msg) = CmiMyRank();
+#endif
+	
 #if CMK_BROADCAST_SPANNING_TREE
   CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendSpanningChildren(size, msg);
@@ -1487,6 +1569,11 @@ void CmiFreeBroadcastFn(int size, char *msg)
 void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 {
 
+#if CMK_SMP	
+  /* record the rank to avoid re-sending the msg in SendSpanningChildren */
+  CMI_DEST_RANK(msg) = CmiMyRank();
+#endif
+
 #if CMK_BROADCAST_SPANNING_TREE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
@@ -1523,6 +1610,10 @@ CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg)
 
 void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 {
+#if CMK_SMP	
+  /* record the rank to avoid re-sending the msg in SendSpanningChildren */
+  CMI_DEST_RANK(msg) = CmiMyRank();
+#endif
 
 #if CMK_BROADCAST_SPANNING_TREE
   CmiState cs = CmiGetState();
@@ -1578,6 +1669,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int dstNode, int size, char *msg)
   SMSG_LIST *msg_tmp;
   char *dupmsg;
 
+  CMI_SET_BROADCAST_ROOT(msg, 0);
   CMI_DEST_RANK(msg) = DGRAM_NODEMESSAGE;
   switch (dstNode) {
   case NODE_BROADCAST_ALL:
