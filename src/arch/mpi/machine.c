@@ -124,16 +124,8 @@ static int checksum_flag = 0;
 #define CMI_CHECK_CHECKSUM(msg, len)
 #endif
 
-#if CMK_BROADCAST_SPANNING_TREE
-#  define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-#else
-#  define CMI_SET_BROADCAST_ROOT(msg, root)
-#endif
-
-#if CMK_BROADCAST_HYPERCUBE
-#  define CMI_SET_CYCLE(msg, cycle)  CMI_GET_CYCLE(msg) = (cycle);
-#else
-#  define CMI_SET_CYCLE(msg, cycle)
+#if CMK_BROADCAST_SPANNING_TREE || CMK_BROADCAST_HYPERCUBE
+#define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
 #endif
 
 
@@ -782,7 +774,7 @@ int PumpMsgs(void)
     if (CMI_BROADCAST_ROOT(msg))
       SendSpanningChildren(nbytes, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-    if (CMI_GET_CYCLE(msg))
+    if (CMI_BROADCAST_ROOT(msg))
       SendHypercube(nbytes, msg);
 #endif
 	
@@ -870,7 +862,7 @@ CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to c
    if (CMI_BROADCAST_ROOT(msg))
       SendSpanningChildren(nbytes, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-   if (CMI_GET_CYCLE(msg))
+   if (CMI_BROADCAST_ROOT(msg))
       SendHypercube(nbytes, msg);
 #endif
   
@@ -1453,25 +1445,36 @@ void SendSpanningChildren(int size, char *msg)
 void SendHypercube(int size, char *msg)
 {
   CmiState cs = CmiGetState();
-  int curcycle = CMI_GET_CYCLE(msg);
-  int i, exceptRank;
+  int startpe = CMI_BROADCAST_ROOT(msg)-1;
+  int i, exceptRank, curcycle, tmp, diff;
+  int dims=0;
 
 #if CMK_SMP
    /* first send msgs to other nodes */  
-  double logp = CmiNumNodes();
-  logp = log(logp)/log(2.0);
-  logp = ceil(logp);
+  int startnode = CmiNodeOf(startpe);
+  diff = CmiMyNode()-startnode;
 
-  for (i = curcycle; i < logp; i++) {
-    int nd = CmiMyNode() ^ (1 << i);
+  if(diff < 0) diff += CmiNumNodes();
 
-    if(nd < CmiNumNodes()) {
-      CMI_SET_CYCLE(msg, i + 1);
-	  /* always send to the first rank of other nodes */
-	  char *newmsg = CmiCopyMsg(msg, size);
-	  CMI_DEST_RANK(newmsg) = 0;
-      EnqueueMsg(newmsg, size, nd);       
-    }
+  curcycle=0;
+  tmp = diff;
+  while(tmp>0){
+    curcycle++;
+    tmp = tmp >> 1;
+  }
+  tmp = CmiNumNodes();
+  while(tmp>0){
+    dims++;
+    tmp = tmp >> 1;
+  }
+  for (i = curcycle; i < dims; i++) {
+    int nd = diff + (1 << i);
+	if(nd >= CmiNumNodes()) break;
+	nd = (nd+startnode)%CmiNumNodes();
+    /* always send to the first rank of other nodes */
+    char *newmsg = CmiCopyMsg(msg, size);
+    CMI_DEST_RANK(newmsg) = 0;
+    EnqueueMsg(newmsg, size, nd);
   }	
    /* second send msgs to my peers on this node */
    /* FIXME: now it's just a flat p2p send!! When node size is large,
@@ -1485,24 +1488,25 @@ void SendHypercube(int size, char *msg)
 	   CmiPushPE(i, CmiCopyMsg(msg, size));
    }
 #else
-  double logp = CmiNumPes();
-  logp = log(logp)/log(2.0);
-  logp = ceil(logp);
-
-  /*  CmiPrintf("In hypercube\n"); */
-
-  /* assert(startpe>=0 && startpe<_Cmi_numpes); */
-
-  for (i = curcycle; i < logp; i++) {
-    int p = cs->pe ^ (1 << i);
-
-    /*   CmiPrintf("p = %d, logp = %5.1f\n", p, logp);*/
-
-    if(p < CmiNumPes()) {
-      CMI_SET_CYCLE(msg, i + 1);
-      CmiSyncSendFn1(p, size, msg);
-    }
-  }
+   diff = CmiMyPe()-startpe;
+   if(diff < 0) diff += CmiNumPes();
+   curcycle = 0;
+   tmp = diff;
+   while(tmp>0){
+    curcycle++;
+    tmp = tmp >> 1;
+   }
+   tmp = CmiNumPes();
+   while(tmp>0){
+    dims++;
+    tmp = tmp >> 1;
+   }
+  for (i = curcycle; i < dims; i++) {
+    int p = diff + (1 << i);
+    if(p >= CmiNumPes()) break;
+    p = (p+startpe)%CmiNumPes();
+    CmiSyncSendFn1(p, size, msg);
+  }	
 #endif  
 }
 
@@ -1520,7 +1524,7 @@ void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
   SendSpanningChildren(size, msg);
 
 #elif CMK_BROADCAST_HYPERCUBE
-  CMI_SET_CYCLE(msg, 0);
+  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendHypercube(size, msg);
 
 #else
@@ -1575,7 +1579,7 @@ void CmiSyncBroadcastAllFn(int size, char *msg)        /* All including me */
 #elif CMK_BROADCAST_HYPERCUBE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_CYCLE(msg, 0);
+  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendHypercube(size, msg);
 
 #else
@@ -1616,7 +1620,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg)  /* All including me */
 #elif CMK_BROADCAST_HYPERCUBE
   CmiState cs = CmiGetState();
   CmiSyncSendFn(cs->pe, size,msg) ;
-  CMI_SET_CYCLE(msg, 0);
+  CMI_SET_BROADCAST_ROOT(msg, cs->pe+1);
   SendHypercube(size, msg);
 
 #else
