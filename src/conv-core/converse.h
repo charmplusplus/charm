@@ -99,80 +99,6 @@ void setMemoryOwnedBy(void *p, int id);
 #define setMemoryOwnedBy(p, id) /* empty */
 #endif
 
-/******** Memory Fence ********/
-
-#if  CMK_SMP
-#if CMK_GCC_X86_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
-#if 1
-#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
-#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
-#else
-/* this might be slightly faster, but does not compile with -O3 on net-darwin-x86_64 */
-#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
-#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
-#endif
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
-        "movl $1, %1\n\t" \
-        "lock xaddl %1, %0" \
-        : "=m"(input), "=r"(output) : "m"(input) : "memory")
-#elif CMK_GCC_IA64_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
-#define CmiMemoryAtomicIncrement(someInt)  { int someInt_private; \
-  __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
-#define CmiMemoryAtomicDecrement(someInt)  { uint64_t someInt_private; \
-  __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
-#elif CMK_PPC_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
-#define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
-     __asm__ __volatile__ (      \
-        "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
-        "addi   %1,%1,1\n\t" /* add incr to it */        \
-        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
-        "bne- loop%="       /* start-over on failure */ \
-        : "=m"(someInt), "=&r"(someInt_private)      \
-        : "r" (&someInt), "m"(someInt)       \
-        : "memory"  \
-     ); }
-#define CmiMemoryAtomicDecrement(someInt)   { int someInt_private; \
-     __asm__ __volatile__ (      \
-        "loop%=:\n\t"       /* repeat until this succeeds */    \
-        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
-        "subi   %1,%1,1\n\t" /* add incr to it */        \
-        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
-        "bne- loop%="       /* start-over on failure */ \
-        : "=m"(someInt), "=&r"(someInt_private)      \
-        : "r" (&someInt), "m"(someInt)       \
-        : "memory"  \
-     ); }
-#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__ ( \
-        "loop%=:  lwarx %1, 0, %2\n\t" \
-        "addi %1, %1, 1\n\t" \
-        "stwcx. %1, 0, %2\n\t" \
-        "bne- loop%=" \
-        : "=m"(input), "=&r"(output) : "r"(&input), "m"(input) : "memory")
-#else
-#define CMK_NO_ASM_AVAILABLE    1
-extern CmiNodeLock cmiMemoryLock;
-#define CmiMemoryReadFence()               { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryWriteFence()              { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicIncrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicDecrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
-#define CmiMemoryAtomicFetchAndInc(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
-#endif
-#else
-#define CmiMemoryReadFence()
-#define CmiMemoryWriteFence()
-#define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
-#define CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
-#define CmiMemoryAtomicFetchAndInc(input,output) output=input; input=output+1;
-#endif
-
 /******************************************************************************
  *
  * Deal with Shared Memory
@@ -1752,6 +1678,80 @@ extern int _immRunning;
 #  define CmiBecomeImmediate(msg) /* empty */
 #  define CmiIsImmediate(msg)   (0)
 #  define CmiImmIsRunning()       (0)
+#endif
+
+/******** Memory Fence ********/
+
+#if  CMK_SMP
+#if CMK_GCC_X86_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("lfence" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sfence" ::: "memory")
+#if 1
+#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
+#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl (%0)" :: "r" (&(someInt)))
+#else
+/* this might be slightly faster, but does not compile with -O3 on net-darwin-x86_64 */
+#define CmiMemoryAtomicIncrement(someInt)  __asm__ __volatile__("lock incl %0" :: "m" (someInt))
+#define CmiMemoryAtomicDecrement(someInt)  __asm__ __volatile__("lock decl %0" :: "m" (someInt))
+#endif
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__( \
+        "movl $1, %1\n\t" \
+        "lock xaddl %1, %0" \
+        : "=m"(input), "=r"(output) : "m"(input) : "memory")
+#elif CMK_GCC_IA64_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("mf" ::: "memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("mf" ::: "memory")
+#define CmiMemoryAtomicIncrement(someInt)  { int someInt_private; \
+  __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
+#define CmiMemoryAtomicDecrement(someInt)  { uint64_t someInt_private; \
+  __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
+#elif CMK_PPC_ASM
+#define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
+#define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
+     __asm__ __volatile__ (      \
+        "loop%=:\n\t"       /* repeat until this succeeds */    \
+        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
+        "addi   %1,%1,1\n\t" /* add incr to it */        \
+        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
+        "bne- loop%="       /* start-over on failure */ \
+        : "=m"(someInt), "=&r"(someInt_private)      \
+        : "r" (&someInt), "m"(someInt)       \
+        : "memory"  \
+     ); }
+#define CmiMemoryAtomicDecrement(someInt)   { int someInt_private; \
+     __asm__ __volatile__ (      \
+        "loop%=:\n\t"       /* repeat until this succeeds */    \
+        "lwarx  %1,0,%2\n\t" /* reserve the operand */   \
+        "subi   %1,%1,1\n\t" /* add incr to it */        \
+        "stwcx. %1,0,%2\n\t" /* put the sum back, and release it */      \
+        "bne- loop%="       /* start-over on failure */ \
+        : "=m"(someInt), "=&r"(someInt_private)      \
+        : "r" (&someInt), "m"(someInt)       \
+        : "memory"  \
+     ); }
+#define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__ ( \
+        "loop%=:  lwarx %1, 0, %2\n\t" \
+        "addi %1, %1, 1\n\t" \
+        "stwcx. %1, 0, %2\n\t" \
+        "bne- loop%=" \
+        : "=m"(input), "=&r"(output) : "r"(&input), "m"(input) : "memory")
+#else
+#define CMK_NO_ASM_AVAILABLE    1
+extern CmiNodeLock cmiMemoryLock;
+#define CmiMemoryReadFence()               { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryWriteFence()              { CmiLock(cmiMemoryLock); CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicIncrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt+1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicDecrement(someInt)  { CmiLock(cmiMemoryLock); someInt=someInt-1; CmiUnlock(cmiMemoryLock); }
+#define CmiMemoryAtomicFetchAndInc(input,output) { CmiLock(cmiMemoryLock); output=input; input=output+1; CmiUnlock(cmiMemoryLock); }
+#endif
+#else
+#define CmiMemoryReadFence()
+#define CmiMemoryWriteFence()
+#define CmiMemoryAtomicIncrement(someInt)  someInt=someInt+1
+#define CmiMemoryAtomicDecrement(someInt)  someInt=someInt-1
+#define CmiMemoryAtomicFetchAndInc(input,output) output=input; input=output+1;
 #endif
 
 /******** Performance Counters ********/
