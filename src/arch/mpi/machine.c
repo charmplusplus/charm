@@ -1393,12 +1393,10 @@ void SendSpanningChildren(int size, char *msg)
 {
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
-  int startnode;
+  int startnode = CmiNodeOf(startpe);
   int i, exceptRank;
 	
-#if CMK_SMP
-   /* first send msgs to other nodes */  
-  startnode = CmiNodeOf(startpe);  
+   /* first send msgs to other nodes */
   CmiAssert(startnode >=0 &&  startnode<CmiNumNodes());
   for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
     int nd = CmiMyNode()-startnode;
@@ -1408,11 +1406,16 @@ void SendSpanningChildren(int size, char *msg)
     nd += startnode;
     nd = nd%CmiNumNodes();
     CmiAssert(nd>=0 && nd!=CmiMyNode());	
+	#if CMK_SMP
 	/* always send to the first rank of other nodes */
 	char *newmsg = CmiCopyMsg(msg, size);
 	CMI_DEST_RANK(newmsg) = 0;
     EnqueueMsg(newmsg, size, nd);
-  }	
+	#else
+	CmiSyncSendFn1(nd, size, msg);
+	#endif
+  }
+#if CMK_SMP  
    /* second send msgs to my peers on this node */
   /* FIXME: now it's just a flat p2p send!! When node size is large,
    * it should also be sent in a tree
@@ -1424,18 +1427,6 @@ void SendSpanningChildren(int size, char *msg)
    for(i=exceptRank+1; i<CmiMyNodeSize(); i++){
 	   CmiPushPE(i, CmiCopyMsg(msg, size));
    }
-#else
-  CmiAssert(startpe>=0 && startpe<_Cmi_numpes);
-  for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-    int p = cs->pe-startpe;
-    if (p<0) p+=_Cmi_numpes;
-    p = BROADCAST_SPANNING_FACTOR*p + i;
-    if (p > _Cmi_numpes - 1) break;
-    p += startpe;
-    p = p%_Cmi_numpes;
-    CmiAssert(p>=0 && p<_Cmi_numpes && p!=cs->pe);	
-    CmiSyncSendFn1(p, size, msg);
-  }
 #endif
 }
 
