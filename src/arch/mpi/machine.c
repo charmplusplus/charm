@@ -126,6 +126,8 @@ static int checksum_flag = 0;
 
 #if CMK_BROADCAST_SPANNING_TREE || CMK_BROADCAST_HYPERCUBE
 #define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
+#else
+#define CMI_SET_BROADCAST_ROOT(msg, root) 
 #endif
 
 
