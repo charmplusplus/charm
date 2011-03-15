@@ -1446,36 +1446,46 @@ void SendHypercube(int size, char *msg)
 {
   CmiState cs = CmiGetState();
   int startpe = CMI_BROADCAST_ROOT(msg)-1;
-  int i, exceptRank, curcycle, tmp, diff;
+  int startnode = CmiNodeOf(startpe);
+  int i, exceptRank, cnt, tmp, relPE;
   int dims=0;
 
-#if CMK_SMP
+  /* dims = ceil(log2(CmiNumNodes)) except when #nodes is 1*/
+  tmp = CmiNumNodes()-1;
+  while(tmp>0){
+	  dims++;
+	  tmp = tmp >> 1;
+  }
+  if(CmiNumNodes()==1) dims=1;
+  
    /* first send msgs to other nodes */  
-  int startnode = CmiNodeOf(startpe);
-  diff = CmiMyNode()-startnode;
-
-  if(diff < 0) diff += CmiNumNodes();
-
-  curcycle=0;
-  tmp = diff;
-  while(tmp>0){
-    curcycle++;
+  relPE = CmiMyNode()-startnode;
+  if(relPE < 0) relPE += CmiNumNodes();
+  cnt=0;
+  tmp = relPE;
+  /* count how many zeros (in binary format) relPE has */
+  for(i=0; i<dims; i++, cnt++){
+    if(tmp & 1 == 1) break;
     tmp = tmp >> 1;
   }
-  tmp = CmiNumNodes();
-  while(tmp>0){
-    dims++;
-    tmp = tmp >> 1;
-  }
-  for (i = curcycle; i < dims; i++) {
-    int nd = diff + (1 << i);
-	if(nd >= CmiNumNodes()) break;
+  
+  /*CmiPrintf("ND[%d]: SendHypercube with spe=%d, snd=%d, relpe=%d, cnt=%d\n", CmiMyNode(), startpe, startnode, relPE, cnt);*/
+  for (i = cnt-1; i >= 0; i--) {
+    int nd = relPE + (1 << i);
+	if(nd >= CmiNumNodes()) continue;
 	nd = (nd+startnode)%CmiNumNodes();
+	/*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
+#if CMK_SMP
     /* always send to the first rank of other nodes */
     char *newmsg = CmiCopyMsg(msg, size);
     CMI_DEST_RANK(newmsg) = 0;
     EnqueueMsg(newmsg, size, nd);
-  }	
+#else
+	CmiSyncSendFn1(nd, size, msg);
+#endif
+  }
+  
+#if CMK_SMP
    /* second send msgs to my peers on this node */
    /* FIXME: now it's just a flat p2p send!! When node size is large,
     * it should also be sent in a tree
@@ -1487,27 +1497,7 @@ void SendHypercube(int size, char *msg)
    for(i=exceptRank+1; i<CmiMyNodeSize(); i++){
 	   CmiPushPE(i, CmiCopyMsg(msg, size));
    }
-#else
-   diff = CmiMyPe()-startpe;
-   if(diff < 0) diff += CmiNumPes();
-   curcycle = 0;
-   tmp = diff;
-   while(tmp>0){
-    curcycle++;
-    tmp = tmp >> 1;
-   }
-   tmp = CmiNumPes();
-   while(tmp>0){
-    dims++;
-    tmp = tmp >> 1;
-   }
-  for (i = curcycle; i < dims; i++) {
-    int p = diff + (1 << i);
-    if(p >= CmiNumPes()) break;
-    p = (p+startpe)%CmiNumPes();
-    CmiSyncSendFn1(p, size, msg);
-  }	
-#endif  
+#endif
 }
 
 void CmiSyncBroadcastFn(int size, char *msg)     /* ALL_EXCEPT_ME  */
