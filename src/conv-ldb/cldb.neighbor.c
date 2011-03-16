@@ -294,7 +294,7 @@ void CldBalance(void *dummy, double curT)
               numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
-#if CMK_MULTICORE | CMK_USE_IBVERBS
+#if CMK_MULTICORE || CMK_USE_IBVERBS
           CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove, myrank);
 #else
           CldMultipleSend(CpvAccess(neighbors)[j].pe, 
