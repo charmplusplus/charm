@@ -61,6 +61,7 @@ Orion Sky Lawlor, olawlor@acm.org
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
+bool _isNotifyChildInRed;
 
 #define ARRAY_DEBUG_OUTPUT 0
 
@@ -454,6 +455,7 @@ void CkArrayOptions::init()
     anytimeMigration = _isAnytimeMigration;
     staticInsertion = false;
     reductionClient.type = CkCallback::invalid;
+    disableNotifyChildInRed = !_isNotifyChildInRed;
 }
 
 CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
@@ -486,6 +488,7 @@ void CkArrayOptions::pup(PUP::er &p) {
 	p|arrayListeners;
 	p|reductionClient;
 	p|anytimeMigration;
+	p|disableNotifyChildInRed;
 	p|staticInsertion;
 }
 
@@ -621,7 +624,11 @@ CkArray::CkArray(CkArrayOptions &opts,
   if (!stableLocations)
       CcdCallOnConditionKeep(CcdPERIODIC_1minute,
 			     staticSpringCleaning, (void *)this);
-
+  
+  //set the field in one my parent class (CkReductionMgr)
+  if(opts.disableNotifyChildInRed)
+	  disableNotifyChildrenStart = CmiTrue; 
+  
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
   broadcaster=new CkArrayBroadcaster(stableLocations);

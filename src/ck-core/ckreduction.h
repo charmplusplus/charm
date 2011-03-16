@@ -229,6 +229,10 @@ private:
 	//Shift the list of countAdjustments down
 	void shiftAdjVec(void);
 
+protected:
+	//whether to notify children that reduction starts
+	CmiBool disableNotifyChildrenStart;
+
 //Checkpointing utilities
 public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
