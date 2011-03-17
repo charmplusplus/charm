@@ -7,13 +7,6 @@
  *  Current we have functionality for Blue Gene, Cray XT, BigSim and 
  *  non-topo machines.
  *
- *  Any published work which utilizes this API should include the following
- *  reference:
- *
- *  "Abhinav Bhatele, Eric Bohm, Laxmikant V. Kale, A Case Study of
- *  Communication Optimizations on 3D Mesh Interconnects, Proceedings of
- *  Euro-Par (Topic 13 - High Performance Networks), LNCS 5704, pp. 1015-1028,
- *  2009"
  */
 
 #ifndef _TOPO_MANAGER_H_
