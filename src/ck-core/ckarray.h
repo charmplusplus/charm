@@ -41,6 +41,12 @@ CpvExtern (int ,serializer);
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
 extern bool _isAnytimeMigration;
 
+/** This flag is true when users are sure there is at least one charm array element
+ *  per processor. In such case, when doing reduction on the array, the children
+ *  don't need to be notified that reduction starts
+ */
+extern bool _isNotifyChildInRed;
+
 /**
 \addtogroup CkArray
 \brief Migratable Chare Arrays: user-visible classes.
@@ -295,6 +301,7 @@ class CkArrayOptions {
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
 	CkCallback reductionClient; // Default target of reductions
 	bool anytimeMigration; // Elements are allowed to move freely
+	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
 	bool staticInsertion; // Elements are only inserted at construction
 
 	/// Set various safe defaults for all the constructors
