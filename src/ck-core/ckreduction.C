@@ -1350,6 +1350,11 @@ static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
 	return NULL;
 }
 
+static CkReductionMsg *nop(int nMsg,CkReductionMsg **msg)
+{
+  return CkReductionMsg::buildNew(0,NULL, CkReduction::invalid, msg[0]);
+}
+
 #define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 {\
@@ -1542,6 +1547,7 @@ int CkReduction::nReducers=CkReduction::lastSystemReducer;
 
 CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
+    ::nop,
   //Compute the sum the numbers passed by each element.
     ::sum_int,::sum_float,::sum_double,
 
