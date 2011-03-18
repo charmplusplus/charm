@@ -108,7 +108,7 @@ CpvStaticDeclare(double, projTraceStart);
 /* FIXME: need a random number that everyone agrees ! */
 #define CHARM_MAGIC_NUMBER		 126
 
-#if !CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
 #define CMI_SET_CHECKSUM(msg, len)	\
 	if (checksum_flag)  {	\
@@ -765,12 +765,14 @@ int PumpMsgs(void)
 	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
+#if CMK_ERROR_CHECKING
     if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
       CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
       CmiFree(msg);
       CmiAbort("Abort!\n");
       continue;
     }
+#endif
 	
 #if CMK_BROADCAST_SPANNING_TREE
     if (CMI_BROADCAST_ROOT(msg))
@@ -1194,7 +1196,9 @@ static int SendMsgBuf()
 	PumpMsgs();
       }
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
+#if CMK_ERROR_CHECKING
       CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+#endif
       CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
@@ -1324,7 +1328,9 @@ CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
 	CmiReleaseSentMessages();
 	PumpMsgs();
   }
+#if CMK_ERROR_CHECKING
   CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
+#endif
   CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
