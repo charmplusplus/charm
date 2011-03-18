@@ -21,8 +21,8 @@ clean:
 	rm -f *.decl.h *.def.h conv-host *.o charmrun *~ kNeighbor kNeighbor.prj
 
 test: all
-	./charmrun +p4 ./kNeighbor 15 100 1024 10 +balancer GreedyLB $(TESTOPTS)
+	./charmrun +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +LBDebug 1 $(TESTOPTS)
 
 bgtest: all
-	./charmrun +p4 ./kNeighbor 20 100 1024 10 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1
+	./charmrun +p4 ./kNeighbor 4 50 128 10 +balancer GreedyLB +x2 +y2 +z1 +cth1 +wth1 +LBDebug 1 $(TESTOPTS)
 
