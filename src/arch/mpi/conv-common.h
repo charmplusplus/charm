@@ -7,7 +7,11 @@
 
 #define CMK_HANDLE_SIGUSR                                  1
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, root, hdl,xhdl,info, stratid; unsigned char cksum, magic; CmiUInt2 redID;
+#if CMK_ERROR_CHECKING
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiUInt4 root; unsigned char cksum, magic;
+#else
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiUInt4 root; 
+#endif
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
 #define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS }
