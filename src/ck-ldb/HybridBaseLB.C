@@ -755,13 +755,13 @@ void HybridBaseLB::ObjsMigrated(LDObjData *datas, int m, LDCommData *cdata, int 
 void HybridBaseLB::VectorDone(int atlevel)
 {
   LevelData *lData = levelData[atlevel];
-  if (_lb_args.debug()>1)
-    CkPrintf("[%d] VectorDone %d at %f.\n", CkMyPe(), lData->vector_expected, CkWallTimer());
   lData->vector_expected = -1;
   lData->vector_completed = 0;
     // update the migration expected
   lData->migrates_expected = vector_n_moves;
   vector_n_moves = 0;
+  if (_lb_args.debug()>1)
+    CkPrintf("[%d] VectorDone %d %d at %f.\n", CkMyPe(), lData->vector_expected, lData->migrates_expected, CkWallTimer());
 }
 
 // one processor is going to send "count" objects to this processor
@@ -868,7 +868,7 @@ void HybridBaseLB::StatsDone(int atlevel)
   thisProxy[lData->parent].NotifyObjectMigrationDone(atlevel);
 }
 
-// called one a parent node
+// called on a parent node
 void HybridBaseLB::NotifyObjectMigrationDone(int fromlevel)
 {
   int i;
