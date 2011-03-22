@@ -488,6 +488,7 @@ void CmiInitCPUAffinity(char **argv)
   hostnameMsg  *msg;
   char *pemap = NULL;
   char *commap = NULL;
+  char *pemapfile = NULL;
  
   int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
@@ -496,6 +497,20 @@ void CmiInitCPUAffinity(char **argv)
   while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
     affinity_flag = 1;
+  }
+
+  if (CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file")) {
+    char buf[128];
+    pemap = (char*)malloc(1024);
+    FILE *fp = fopen(pemapfile, "r");
+    if (fp == NULL) CmiAbort("pemapfile does not exist");
+    while (!feof(fp)) {
+      if (fgets(buf, 128, fp)) {
+        if (buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = 0;
+        strcat(pemap, buf);
+      }
+    }
+    CmiPrintf("read from file: %s: %s\n", pemapfile, pemap);
   }
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
@@ -658,12 +673,14 @@ int CmiPrintCPUAffinity()
 void CmiInitCPUAffinity(char **argv)
 {
   char *pemap = NULL;
+  char *pemapfile = NULL;
   char *commap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
