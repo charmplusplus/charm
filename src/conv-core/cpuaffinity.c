@@ -500,9 +500,10 @@ void CmiInitCPUAffinity(char **argv)
   }
 
   if (CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file")) {
+    FILE *fp;
     char buf[128];
     pemap = (char*)malloc(1024);
-    FILE *fp = fopen(pemapfile, "r");
+    fp = fopen(pemapfile, "r");
     if (fp == NULL) CmiAbort("pemapfile does not exist");
     while (!feof(fp)) {
       if (fgets(buf, 128, fp)) {
@@ -510,7 +511,7 @@ void CmiInitCPUAffinity(char **argv)
         strcat(pemap, buf);
       }
     }
-    if(CmiMyPe()==0) CmiPrintf("read from file: %s: %s\n", pemapfile, pemap);
+    if (CmiMyPe()==0) CmiPrintf("Charm++> read from pemap file '%s': %s\n", pemapfile, pemap);
   }
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
