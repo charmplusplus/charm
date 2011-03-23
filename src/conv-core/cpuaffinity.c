@@ -510,7 +510,7 @@ void CmiInitCPUAffinity(char **argv)
         strcat(pemap, buf);
       }
     }
-    CmiPrintf("read from file: %s: %s\n", pemapfile, pemap);
+    if(CmiMyPe()==0) CmiPrintf("read from file: %s: %s\n", pemapfile, pemap);
   }
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
