@@ -47,8 +47,8 @@ class CkQ : private CkSTLHelper<T>, private CkNoncopyable {
 	mask = 0x0f;
       }
       T *newblk = new T[newlen];
-      elementCopy(newblk,block+first,blklen-first);
-      elementCopy(newblk+blklen-first,block,first);
+      this->elementCopy(newblk,block+first,blklen-first);
+      this->elementCopy(newblk+blklen-first,block,first);
       delete[] block; block = newblk;
       blklen = newlen; first = 0;
     }
@@ -197,7 +197,7 @@ class CkVec : private CkSTLHelper<T> {
     }
     void copyFrom(const this_type &src) {
        makeBlock(src.blklen, src.len);
-       elementCopy(block,src.block,blklen);
+       this->elementCopy(block,src.block,blklen);
     }
   public:
     CkVec(): block(NULL), blklen(0), len(0) {}
@@ -233,7 +233,7 @@ class CkVec : private CkSTLHelper<T> {
       T *oldBlock=block; 
       makeBlock(newcapacity,len);
       if (newcapacity != blklen) return 0;
-      elementCopy(block,oldBlock,len);
+      this->elementCopy(block,oldBlock,len);
       delete[] oldBlock; //WARNING: leaks if element copy throws exception
       return 1;
     }
@@ -504,7 +504,7 @@ class CkPupAblePtrVec : public CkVec< CkZeroPtr<T, CkPupAblePtr<T> > > {
 	}
 	void copy_from(const this_type &t) {
 		for (size_t i=0;i<t.length();i++)
-			push_back((T *)t[i]->clone());
+			this->push_back((T *)t[i]->clone());
 	}
 	void destroy(void) {
 		for (size_t i=0;i<this->length();i++)
