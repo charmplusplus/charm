@@ -1364,23 +1364,31 @@ void SendHypercube(int size, char *msg, int srcPe, int *seqNoArr){
 #else
 void SendHypercube(int size, char *msg) {
 #endif
-    int i, dist;   
+    int i, tmp, cnt;   
     char *dupmsg;
-    int dims = CmiLog2(CmiNumNodes());
+    int dims = 0;
     int startproc = CMI_BROADCAST_ROOT(msg)-1;
     int startnode = CmiNodeOf(startproc);
     /* relative proc id to startnode */
     int rp = CmiMyNode() - startnode;    
     if(rp < 0) rp += CmiNumNodes();
-    dist = rp;
 
+	/* dims = ceil(log2(CmiNumNodes)) except when #nodes is 1 */
+	tmp = CmiNumNodes()-1;
+	for(tmp=CmiNumNodes()-1; tmp>0; tmp=tmp>>1) dims++;
+	if(CmiNumNodes()==1) dims=1;
+
+	cnt=0; tmp=rp;
+	for(i=0; i<dims; i++, cnt++){
+		if(tmp & 1 == 1) break;
+		tmp = tmp >> 1;
+	}
+	
     MACHSTATE3(3, "[%p] SendHypercube on proc=%d with start proc %d begin {",CmiGetState(), CmiMyPe(), startproc);    
-    for(i=0; i<dims; i++) { 
-        if((dist & 1) == 1) break;
-
+    for(i=cnt-1; i>=0; i--) { 
         /* destnode is still the relative node id from startnode */
         int destnode = rp + (1<<i);
-        if(destnode > CmiNumNodes()-1) break; 
+        if(destnode > CmiNumNodes()-1) continue; 
         
         destnode += startnode;
         destnode = destnode % CmiNumNodes();
@@ -1398,8 +1406,7 @@ void SendHypercube(int size, char *msg) {
         setNextMsgSeqNo(seqNoArr, CmiNodeFirst(destnode), CMI_MSG_SEQNO(dupmsg));
     #endif
         lapiSendFn(CmiNodeFirst(destnode), size, dupmsg, ReleaseMsg, dupmsg, 1);
-#endif        
-        dist = dist >> 1;    
+#endif
     }    
     MACHSTATE3(3, "[%p] SendHypercube on proc=%d with start proc %d end }",CmiGetState(), CmiMyPe(), startproc);    
 }
@@ -1591,20 +1598,29 @@ void SendSpanningChildrenNode(int size, char *msg){
 
 /* send msg along the hypercube in broadcast. (Chao Mei) */
 void SendHypercubeNode(int size, char *msg) {
-    int i, dist;   
+    int i, dist, tmp, cnt;   
     char *dupmsg;
-    int dims = CmiLog2(CmiNumNodes());
+    int dims = 0;
     int startnode = -CMI_BROADCAST_ROOT(msg)-1;
     int rp = CmiMyNode() - startnode;    
     if(rp < 0) rp += CmiNumNodes();
     dist = rp;
 
+	/* dims = ceil(log2(CmiNumNodes)) except when #nodes is 1 */	
+	tmp = CmiNumNodes()-1;
+	for(tmp=CmiNumNodes()-1; tmp>0; tmp=tmp>>1) dims++;
+	if(CmiNumNodes()==1) dims=1;
+	
+	cnt=0; tmp=rp;
+	for(i=0; i<dims; i++, cnt++){
+		if(tmp & 1 == 1) break;
+		tmp = tmp >> 1;
+	}
+	
     MACHSTATE3(3, "[%p] SendHypercubeNode on node=%d with start node %d begin {",CmiGetState(), CmiMyNode(), startnode);
-    for(i=0; i<dims; i++) { 
-        if((dist & 1) == 1) break;
-        
+    for(i=cnt-1; i>=0; i--) {         
         int destnode = rp + (1<<i);
-        if(destnode > CmiNumNodes()-1) break;
+        if(destnode > CmiNumNodes()-1) continue;
         
         destnode += startnode;
         destnode = destnode % CmiNumNodes();        
@@ -1617,8 +1633,7 @@ void SendHypercubeNode(int size, char *msg) {
 #else
         dupmsg = CopyMsg(msg, size);
         lapiSendFn(CmiNodeFirst(destnode), size, dupmsg, ReleaseMsg, dupmsg, 1);
-#endif        
-        dist = dist >> 1;    
+#endif 
     }
     MACHSTATE3(3, "[%p] SendHypercubeNode on node=%d with start node %d end }",CmiGetState(), CmiMyNode(), startnode);  
 }

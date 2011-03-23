@@ -133,7 +133,7 @@ syntax() {
   echo ''
   echo 'Thank you for using Charm++, please send questions or comments to '
   echo 'Parallel Programming Lab at University of Illinois at Urbana-Champaign'
-  echo '(email: charm@cs.uiuc.edu).'
+  echo '(email: charm@cs.illinois.edu).'
 
   else
   echo ''
@@ -622,8 +622,8 @@ printError()
 	Echo "-------------------------------------------------"
 	Echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
 	Echo "to resolve the problems yourself, visit"
-	Echo "    http://charm.cs.uiuc.edu/"
-	Echo "for more information. Otherwise, email the developers at charm@cs.uiuc.edu"
+	Echo "    http://charm.cs.illinois.edu/"
+	Echo "for more information. Otherwise, email the developers at charm@cs.illinois.edu"
 	exit $MAKEEXIT
 }
 

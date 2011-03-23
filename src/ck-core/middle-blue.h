@@ -16,6 +16,8 @@
 #undef CkNumNodes
 #undef CkMyNodeSize
 #undef CkNodeOf
+#undef CkNodeSize
+#undef CkNodeFirst
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -151,6 +153,8 @@ static inline int CkMyNode() { return BgMyNode(); }
 static inline int CkNodeOf(int pe) { return pe / BgGetNumWorkThread(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
 static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
+static inline int CkNodeSize(int node) { return BgGetNumWorkThread(); }
+static inline int CkNodeFirst(int node) { return BgGetNumWorkThread()*node; }
 
 static inline void CksdScheduler(int ret) { BgScheduler(ret); }
 static inline void CksdExitScheduler() { BgExitScheduler(); }

@@ -204,6 +204,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
     totalCount = 0;
     processorCount = 0;
 #endif
+  disableNotifyChildrenStart = CmiFalse;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
@@ -547,6 +548,8 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	return;
   }
 
+  if(disableNotifyChildrenStart) return;
+  
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
   if(CmiMyPe() == 0 && redNo == 0){
             for(int j=0;j<CkNumPes();j++){
@@ -976,7 +979,7 @@ void CkReductionMgr::pup(PUP::er &p)
   p(redNo);
   p(completedRedNo);
   p(inProgress); p(creating); p(startRequested);
-  p(nContrib); p(nRemote);
+  p(nContrib); p(nRemote); p(disableNotifyChildrenStart);
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
@@ -1347,6 +1350,11 @@ static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
 	return NULL;
 }
 
+static CkReductionMsg *nop(int nMsg,CkReductionMsg **msg)
+{
+  return CkReductionMsg::buildNew(0,NULL, CkReduction::invalid, msg[0]);
+}
+
 #define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 {\
@@ -1539,6 +1547,7 @@ int CkReduction::nReducers=CkReduction::lastSystemReducer;
 
 CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
+    ::nop,
   //Compute the sum the numbers passed by each element.
     ::sum_int,::sum_float,::sum_double,
 
@@ -1855,7 +1864,7 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
 	inProgress=CmiTrue;
 	//Sent start requests to our kids (in case they don't already know)
-
+	
 	for (int k=0;k<treeKids();k++)
 	{
 #ifdef BINOMIAL_TREE

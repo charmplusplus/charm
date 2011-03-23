@@ -1141,7 +1141,7 @@ static void CommunicationServer(int sleepTime) {
 #endif
     AdvanceCommunications();
 
-#if CMK_IMMEDIATE_MSG && CMK_SMP && !CMK_MULTICORE
+#if CMK_IMMEDIATE_MSG && CMK_SMP
     CmiHandleImmediate();
 #endif
 
@@ -1213,9 +1213,7 @@ static void CmiSendSelf(char *msg) {
         /* CmiBecomeNonImmediate(msg); */
         //printf("In SendSelf, N[%d]P[%d]R[%d] received an imm msg with hdl: %p\n", CmiMyNode(), CmiMyPe(), CmiMyRank(), CmiGetHandler(msg));
         CmiPushImmediateMsg(msg);
-#if CMK_MULTICORE
         CmiHandleImmediate();
-#endif
         return;
     }
 #endif
@@ -1661,7 +1659,7 @@ void AdvanceCommunications() {
     sendBroadcastMessagesNode();
 #endif
 
-#if CMK_IMMEDIATE_MSG && CMK_MULTICORE
+#if CMK_IMMEDIATE_MSG && !CMK_SMP
     CmiHandleImmediate();
 #endif
 }

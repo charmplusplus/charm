@@ -37,6 +37,7 @@ public:
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
+                nop,
 	//Compute the sum the numbers passed by each element.
 		sum_int,sum_float,sum_double,
 

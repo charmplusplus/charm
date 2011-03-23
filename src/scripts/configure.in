@@ -427,6 +427,16 @@ then
   fi
 fi
 
+if echo "$base_version" | grep "linux" > /dev/null 2> /dev/null
+then
+  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+  if test $strictpass -eq 1
+  then
+	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "linux compiler"
+	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
+  fi
+fi
+
 # Perform the tests
 
 AC_ARG_WITH([refnum-type],
@@ -1344,8 +1354,22 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cxx "whether get_myaddress() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether get_myaddress() exists])
+test_cxx "whether has get_myaddress" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether has get_myaddress])
+
+#### check if mprotect exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/mman.h>
+
+void foo(void *a,int l,int fd) {
+     void *pg = NULL;
+     size_t pagesize = 4096;
+     mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
+}
+EOT
+test_cxx "whether has mprotect" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MPROTECT, $pass, [whether has mprotect])
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT

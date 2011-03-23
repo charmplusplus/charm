@@ -801,7 +801,8 @@ public:
     {
         for(int j=0; j<dimension*2; j++)
         {
-            _n[nb] = (mype+1)%npes;//GetNeighborID(mype, j);
+            //_n[nb] = (mype+1)%npes;//GetNeighborID(mype, j);
+            _n[nb] = GetNeighborID(mype, j);
             /* the first processors in other nodes */
             if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
         }

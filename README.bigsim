@@ -3,7 +3,7 @@
 HOW TO INSTALL AND RUN EMULATION/SIMULATION WITH BIGSIM
 =======================================================
 
-Updated: February 2009 - Send questions to charm@cs.uiuc.edu
+Updated: February 2009 - Send questions to charm@cs.illinois.edu
 
 These are a few notes on how to get going with BigSim for emulation and
 simulation of MPI application codes. Part (A) covers BigSim installation, while
@@ -44,7 +44,7 @@ originally named BigNetSim (now called BigSimulator). Assuming that the
 'subversion' (svn) package is available, this package can be obtained from the
 Web with a subversion checkout such as
 
-   svn co https://charm.cs.uiuc.edu/svn/repos/BigNetSim/
+   svn co https://charm.cs.illinois.edu/svn/repos/BigNetSim/
 
 In the subdir 'trunk/' created by the checkout, the file Makefile.common must
 be edited so that 'CHARMBASE' points to the regular Charm++ installation.

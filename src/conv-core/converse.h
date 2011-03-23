@@ -412,6 +412,15 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
+/* buggy xlc compiler on bluegene/p does not like memory fence in Cpvs */
+#if CMK_BLUEGENEP && ( defined(__xlC__) || defined(__xlc__) )
+#define CpvMemoryReadFence()
+#define CpvMemoryWriteFence()
+#else
+#define CpvMemoryReadFence() CmiMemoryReadFence()
+#define CpvMemoryWriteFence() CmiMemoryWriteFence()
+#endif
+
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
@@ -433,15 +442,15 @@ for each processor in the node.
     do { \
        if (CmiMyRank()) { \
 	       /*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
-               CmiMemoryReadFence(); \
-	       while (CMK_TAG(Cpv_inited_,v)==0) { CMK_CPV_IS_SMP; CmiMemoryReadFence(); } \
+               CpvMemoryReadFence(); \
+	       while (CMK_TAG(Cpv_inited_,v)==0) { CMK_CPV_IS_SMP; CpvMemoryReadFence(); } \
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
                CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
                CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, 1+CmiMyNodeSize()); \
                CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
-               CmiMemoryWriteFence();   \
+               CpvMemoryWriteFence();   \
                CMK_TAG(Cpv_inited_,v)=1; \
        } \
     } while(0)
@@ -462,11 +471,11 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-                CmiMemoryReadFence(); \
-		while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CmiMemoryReadFence(); } \
+               CpvMemoryReadFence(); \
+		       while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CpvMemoryReadFence(); } \
        } else { \
                t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
-               CmiMemoryWriteFence();   \
+               CpvMemoryWriteFence();   \
                CMK_TAG(Cpv_,v)=tmp;   \
 	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \

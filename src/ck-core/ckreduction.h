@@ -22,7 +22,7 @@ The calls needed to use the reduction manager are:
 
 #include "CkArrayReductionMgr.decl.h"
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BLUEGENE_CHARM || CMK_MULTICORE || !CMK_SMP
 #define GROUP_LEVEL_REDUCTION           1
 #endif
 
@@ -228,6 +228,10 @@ private:
 	countAdjustment &adj(int number);
 	//Shift the list of countAdjustments down
 	void shiftAdjVec(void);
+
+protected:
+	//whether to notify children that reduction starts
+	CmiBool disableNotifyChildrenStart;
 
 //Checkpointing utilities
 public:

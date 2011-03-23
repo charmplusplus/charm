@@ -128,6 +128,11 @@ static void CldTokenHandler(CldToken tok)
   CmiFree(tok);
 }
 
+int CldCountTokensRank(int rank)
+{
+  return CpvAccessOther(CldProc, rank)->load;
+}
+
 int CldCountTokens(void)
 {
   return (CpvAccess(CldProc)->load);
@@ -360,7 +365,7 @@ void CldMultipleSend(int pe, int numToSend, int rank, int immed)
 }
 
 /* simple scheme - just send one by one. useful for multicore */
-void CldSimpleMultipleSend(int pe, int numToSend)
+void CldSimpleMultipleSend(int pe, int numToSend, int rank)
 {
   char *msg;
   int len, queueing, priobits, *msgSizes, i, numSent, done=0;
@@ -374,13 +379,13 @@ void CldSimpleMultipleSend(int pe, int numToSend)
   numSent = 0;
   while (!done) {
     for (i=0; i<numToSend; i++) {
-      CldGetToken(&msg);
+      CldGetTokenFromRank(&msg, rank);
       if (msg != 0) {
 	done = 1;
 	numToSend--;
 	ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
 	ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-	CldSwitchHandler(msg, CpvAccessOther(CldBalanceHandlerIndex, pe));
+	CldSwitchHandler(msg, CpvAccessOther(CldBalanceHandlerIndex, rank));
         CmiSyncSendAndFree(pe, len, msg);
         if (numToSend == 0) done = 1;
       }

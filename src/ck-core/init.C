@@ -311,6 +311,11 @@ static inline void _parseCommandLineOpts(char **argv)
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
 	  _isAnytimeMigration = false;
 	}
+	
+	_isNotifyChildInRed = true;
+	if (CmiGetArgFlagDesc(argv,"+noNotifyChildInReduction","The program has at least one element per processor for each charm array created")) {
+	  _isNotifyChildInRed = false;
+	}
 
 
 #if ! CMK_WITH_CONTROLPOINT

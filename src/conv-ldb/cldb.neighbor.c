@@ -8,7 +8,7 @@
 
 #define USE_MULTICAST           0
 #define IDLE_IMMEDIATE 		1
-#define TRACE_USEREVENTS        0
+#define TRACE_USEREVENTS        1
 
 #define PERIOD 20                /* default: 30 */
 #define MAXOVERLOAD 1
@@ -20,6 +20,7 @@ typedef struct CldProcInfo_s {
   double lastCheck;
   int    sent;			/* flag to disable idle work request */
   int    balanceEvt;		/* user event for balancing */
+  int    updateLoadEvt; 
   int    idleEvt;		/* user event for idle balancing */
   int    idleprocEvt;		/* user event for processing idle req */
 } *CldProcInfo;
@@ -36,6 +37,38 @@ CpvStaticDeclare(int, MinLoad);
 CpvStaticDeclare(int, MinProc);
 CpvStaticDeclare(int, Mindex);
 CpvStaticDeclare(int, start);
+
+#if ! USE_MULTICAST
+CpvStaticDeclare(loadmsg *, msgpool);
+
+static
+#if CMK_C_INLINE
+inline 
+#endif
+loadmsg *getPool(){
+  loadmsg *msg;
+  if (CpvAccess(msgpool)!=NULL)  {
+    msg = CpvAccess(msgpool);
+    CpvAccess(msgpool) = msg->next;
+  }
+  else {
+    msg = CmiAlloc(sizeof(loadmsg));
+    CmiSetHandler(msg, CpvAccess(CldLoadResponseHandlerIndex));
+  }
+  return msg;
+}
+
+static
+#if CMK_C_INLINE
+inline 
+#endif
+void putPool(loadmsg *msg)
+{
+  msg->next = CpvAccess(msgpool);
+  CpvAccess(msgpool) = msg;
+}
+
+#endif
 
 void LoadNotifyFn(int l)
 {
@@ -174,15 +207,9 @@ void CldSendLoad()
   int mype = CmiMyPe();
   int myload = CldCountTokens();
   for(i=0; i<CpvAccess(numNeighbors); i++) {
-    loadmsg *msg = CpvAccess(neighbors)[i].msg;
-    if (msg == NULL) {
-      msg = CmiAlloc(sizeof(loadmsg));
-      CmiSetHandler(msg, CpvAccess(CldLoadResponseHandlerIndex));
-      msg->fromindex = i;
-      msg->toindex = CpvAccess(neighbors)[i].index;
-    }
-    else  
-      CpvAccess(neighbors)[i].msg = NULL;
+    loadmsg *msg = getPool();
+    msg->fromindex = i;
+    msg->toindex = CpvAccess(neighbors)[i].index;
     msg->pe = mype;
     msg->load = myload;
     CmiSyncSendAndFree(CpvAccess(neighbors)[i].pe, sizeof(loadmsg), msg);
@@ -257,20 +284,21 @@ void CldBalance(void *dummy, double curT)
           maxUnderAvg = avgLoad - CpvAccess(neighbors)[i].load;
         numUnderAvg++;
       }
-    if (numUnderAvg > 0)
+    if (numUnderAvg > 0)  {
+      int myrank = CmiMyRank();
       for (i=0; ((i<nNeighbors) && (overload>0)); i++) {
-          j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
-          if (CpvAccess(neighbors)[j].load < avgLoad) {
-              numToMove = (avgLoad - CpvAccess(neighbors)[j].load);
+        j = (i+CpvAccess(Mindex))%CpvAccess(numNeighbors);
+        if (CpvAccess(neighbors)[j].load < avgLoad) {
+          numToMove = (avgLoad - CpvAccess(neighbors)[j].load);
           if (numToMove > overload)
-            numToMove = overload;
+              numToMove = overload;
           overload -= numToMove;
 	  CpvAccess(neighbors)[j].load += numToMove;
-#if CMK_MULTICORE
-          CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove);
+#if CMK_MULTICORE || CMK_USE_IBVERBS
+          CldSimpleMultipleSend(CpvAccess(neighbors)[j].pe, numToMove, myrank);
 #else
           CldMultipleSend(CpvAccess(neighbors)[j].pe, 
-			  numToMove, CmiMyRank(), 
+			  numToMove, myrank, 
 #if CMK_SMP
 			  0
 #else
@@ -280,6 +308,7 @@ void CldBalance(void *dummy, double curT)
 #endif
         }
       }
+    }             /* end of numUnderAvg > 0 */
   }
   CldSendLoad();
 #if CMK_TRACE_ENABLED && TRACE_USEREVENTS
@@ -297,7 +326,10 @@ void CldBalancePeriod(void *dummy, double curT)
 void CldLoadResponseHandler(loadmsg *msg)
 {
   int i;
-
+  
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  double startT = CmiWallTimer();
+#endif
 #if USE_MULTICAST
   for(i=0; i<CpvAccess(numNeighbors); i++)
     if (CpvAccess(neighbors)[i].pe == msg->pe) {
@@ -306,33 +338,22 @@ void CldLoadResponseHandler(loadmsg *msg)
     }
   CmiFree(msg);
 #else
-  if (msg->toindex != -1) {
-      CpvAccess(neighbors)[msg->toindex].load = msg->load;
-      if (CpvAccess(neighbors)[msg->toindex].index == -1) CpvAccess(neighbors)[msg->toindex].index = msg->fromindex;
-      if (CpvAccess(neighbors)[msg->toindex].msg == NULL) {
-        int tmp = msg->fromindex;
-        msg->fromindex = msg->toindex;
-        msg->toindex = tmp;
-        CpvAccess(neighbors)[msg->toindex].msg = msg;
+  int index = msg->toindex;
+  if (index == -1) {
+    for(i=0; i<CpvAccess(numNeighbors); i++)
+      if (CpvAccess(neighbors)[i].pe == msg->pe) {
+        index = i;
+        break;
       }
-      else
-        CmiFree(msg);
   }
-  else
-  for(i=0; i<CpvAccess(numNeighbors); i++)
-    if (CpvAccess(neighbors)[i].pe == msg->pe) {
-      CpvAccess(neighbors)[i].load = msg->load;
-      if (CpvAccess(neighbors)[i].index == -1) CpvAccess(neighbors)[i].index = msg->fromindex;
-      if (CpvAccess(neighbors)[i].msg == NULL) {
-        CpvAccess(neighbors)[i].msg = msg;
-        msg->toindex = msg->fromindex;
-        msg->fromindex = i;
-      }
-      else
-        CmiFree(msg);
-      break;
-    }
-  /* CmiFree(msg); */
+  if (index != -1) {    /* index can be -1, if neighbors table not init yet */
+    CpvAccess(neighbors)[index].load = msg->load;
+    if (CpvAccess(neighbors)[index].index == -1) CpvAccess(neighbors)[index].index = msg->fromindex;
+  }
+  putPool(msg);
+#endif
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->updateLoadEvt, startT, CmiWallTimer());
 #endif
 }
 
@@ -570,7 +591,6 @@ static void CldComputeNeighborData()
     CpvAccess(neighbors)[i].pe = pes[i];
     CpvAccess(neighbors)[i].load = 0;
 #if ! USE_MULTICAST
-    CpvAccess(neighbors)[i].msg = 0;
     CpvAccess(neighbors)[i].index = -1;
 #endif
   }
@@ -607,6 +627,7 @@ void CldGraphModuleInit(char **argv)
   CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
   CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
+  CpvAccess(CldData)->updateLoadEvt = traceRegisterUserEvent("UpdateLoad", -1);
   CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
   CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
 #endif
@@ -692,6 +713,9 @@ void CldModuleInit(char **argv)
   CpvAccess(CldHandlerIndex) = CmiRegisterHandler(CldHandler);
   CpvAccess(CldRelocatedMessages) = CpvAccess(CldLoadBalanceMessages) = 
   CpvAccess(CldMessageChunks) = 0;
+
+  CpvInitialize(loadmsg *, msgpool);
+  CpvAccess(msgpool) = NULL;
 
   CldModuleGeneralInit(argv);
   CldGraphModuleInit(argv);

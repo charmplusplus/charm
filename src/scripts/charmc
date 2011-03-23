@@ -87,6 +87,7 @@ COPY_EXIT="true"
 CHARM_SHARED="0"
 BUILD_SHARE="0"
 SWAPGLOBALS="0"
+TLSGLOBALS="0"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -1589,6 +1590,14 @@ esac
 if [ "$CHARM_SHARED" = "1" -a -n "$CMK_LD_SHARED_THREAD" -a "$THREAD" = "default" ]
 then
   THREAD=$CMK_LD_SHARED_THREAD
+fi
+if [ "$TLSGLOBALS"  = "1" ]
+then
+    # make sure we don't add an extra -tls
+  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
+  then
+    THREAD=${THREAD}-tls
+  fi
 fi
 THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
 

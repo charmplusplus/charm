@@ -46,8 +46,10 @@ void ScotchLB::work(LDStats *stats) {
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       vert = ogr->vertices[i].sendToList[j].getNeighborId();
       for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
-	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert)
-	  ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
+	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert) {
+          ogr->vertices[i].sendToList[j].setNumBytes(ogr->vertices[i].sendToList[j].getNumBytes() + ogr->vertices[i].recvFromList[k].getNumBytes());
+          ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
+        }
       }
     }
   }
@@ -108,12 +110,18 @@ void ScotchLB::work(LDStats *stats) {
 
   SCOTCH_graphExit (&graph);
   SCOTCH_stratExit (&strat);
+ 
+  free(verttab);
+  free(velotab);
+  free(edgetab);
+  free(edlotab);
 
   for(i = baseval; i < vertnbr; i++) {
     if(pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
 
+  free(pemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
 }

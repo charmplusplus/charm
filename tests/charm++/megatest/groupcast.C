@@ -39,7 +39,7 @@ void groupcast_group::doBroadcast(groupcast_BCMsg *bcm) {
   }
   delete bcm;
   CkCallback cb(CkIndex_groupcast_main::groupReady(),myMain);
-  contribute(0,0,CkReduction::sum_int,cb);
+  contribute(0,0,CkReduction::nop,cb);
 }
 
 MEGATEST_REGISTER_TEST(groupcast,"mjlang",1)

@@ -25,7 +25,7 @@ below), without a fee.
 
 2. Licensee may, at its own expense, create and freely distribute complimentary
 works that interoperate with the Software, directing others to the PPL server
-(http://charm.cs.uiuc.edu) to license and obtain the Software itself. Licensee
+(http://charm.cs.illinois.edu) to license and obtain the Software itself. Licensee
 may, at its own expense, modify the Software to make derivative works.  Except
 as explicitly provided below, this License shall apply to any derivative work
 as it does to the original Software distributed by Illinois.  Any derivative
@@ -106,7 +106,7 @@ Proceedings of the 10th International Parallel Processing Symposium, pp
 212-217, April 1996."
 
 Electronic documents will include a direct link to the official Charm++ page
-at http://charm.cs.uiuc.edu/
+at http://charm.cs.illinois.edu/
 
 7. Commercial use of the Software, or derivative works based thereon,  REQUIRES
 A COMMERCIAL LICENSE.  Should Licensee wish to make commercial use of the
