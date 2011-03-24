@@ -345,7 +345,7 @@ void BgTimeLog::addMsgBackwardDep(BgTimeLineRec &tlinerec, void* msg)
 void BgTimeLog::addBackwardDep(BgTimeLog* log)
 {
   //CmiAssert(recvTime < 0.);
-  if(log == NULL) return;
+  if(log == NULL || log == this) return;
   for (int i=0; i<backwardDeps.length(); i++)
     if (backwardDeps[i] == log) return;	// already exist
   backwardDeps.insertAtEnd(log);
