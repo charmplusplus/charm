@@ -26,7 +26,7 @@
 #define TDIM 4
 
 #elif XT5_TOPOLOGY
-#define MAXNID 17000
+#define MAXNID 22020
 #define XDIM 25
 #define YDIM 32
 #define ZDIM 24
