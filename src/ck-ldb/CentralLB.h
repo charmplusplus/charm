@@ -273,12 +273,12 @@ class CLBStatsMsg {
 public:
   int from_pe;
   int pe_speed;
-  double total_walltime;
-  double idletime;
-  double bg_walltime;
+  LBRealType total_walltime;
+  LBRealType idletime;
+  LBRealType bg_walltime;
 #if CMK_LB_CPUTIMER
-  double total_cputime;
-  double bg_cputime;
+  LBRealType total_cputime;
+  LBRealType bg_cputime;
 #endif
   int n_objs;
   LDObjData *objData;

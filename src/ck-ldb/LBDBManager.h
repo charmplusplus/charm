@@ -165,13 +165,13 @@ public:
   void RemoveStartLBFn(LDStartLBFn fn);
   void StartLB();
 
-  inline void IdleTime(double* walltime) 
+  inline void IdleTime(LBRealType* walltime) 
        { machineUtil.IdleTime(walltime); };
-  inline void TotalTime(double* walltime, double* cputime) 
+  inline void TotalTime(LBRealType* walltime, LBRealType* cputime) 
        { machineUtil.TotalTime(walltime,cputime); };
-  void BackgroundLoad(double* walltime, double* cputime);
-  void GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime);
+  void BackgroundLoad(LBRealType* walltime, LBRealType* cputime);
+  void GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime);
   void ClearLoads(void);
 
   /**

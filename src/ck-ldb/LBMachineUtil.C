@@ -130,7 +130,7 @@ void LBMachineUtil::Clear()
   start_idle = -1.;
 }
 
-void LBMachineUtil::TotalTime(double* walltime, double* cputime)
+void LBMachineUtil::TotalTime(LBRealType* walltime, LBRealType* cputime)
 {
   if (state == on) {
     const double cur_wall = CkWallTimer();

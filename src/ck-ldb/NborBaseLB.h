@@ -44,14 +44,14 @@ public:
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
-    double total_walltime;
-    double idletime;
-    double bg_walltime;
-    double obj_walltime;
+    LBRealType total_walltime;
+    LBRealType idletime;
+    LBRealType bg_walltime;
+    LBRealType obj_walltime;
 #if CMK_LB_CPUTIMER
-    double total_cputime;
-    double bg_cputime;
-    double obj_cputime;
+    LBRealType total_cputime;
+    LBRealType bg_cputime;
+    LBRealType obj_cputime;
 #endif
     int pe_speed;
     CmiBool available;

@@ -403,13 +403,13 @@ void LBDB::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredic
   predictCBFn->data = data;
 }
 
-void LBDB::BackgroundLoad(double* bg_walltime, double* bg_cputime)
+void LBDB::BackgroundLoad(LBRealType* bg_walltime, LBRealType* bg_cputime)
 {
-  double total_walltime;
-  double total_cputime;
+  LBRealType total_walltime;
+  LBRealType total_cputime;
   TotalTime(&total_walltime, &total_cputime);
 
-  double idletime;
+  LBRealType idletime;
   IdleTime(&idletime);
 
   *bg_walltime = total_walltime - idletime - obj_walltime;
@@ -421,8 +421,8 @@ void LBDB::BackgroundLoad(double* bg_walltime, double* bg_cputime)
 #endif
 }
 
-void LBDB::GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime)
+void LBDB::GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime)
 {
   TotalTime(total_walltime,total_cputime);
 
