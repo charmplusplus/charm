@@ -132,10 +132,10 @@ private:
 //  LDObjHandle myhandle;
   LDObjData data;
 //  CmiBool registered;
-  LBRealType startWTime;
+  double startWTime;             // needs double precision
   LBRealType lastWallTime;
 #if CMK_LB_CPUTIMER
-  LBRealType startCTime;
+  double startCTime;
   LBRealType lastCpuTime;
 #endif
 //  CmiBool migratable;   // temp
