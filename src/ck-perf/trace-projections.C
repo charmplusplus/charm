@@ -696,7 +696,7 @@ void LogPool::addUserSuppliedNote(char *note){
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
 #ifndef CMK_BLUEGENE_CHARM
-#if CMK_SMP_TRACE_COMMTHREAD && MPI_SMP_TRACE_COMMTHREAD_HACK
+#if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
   //entries

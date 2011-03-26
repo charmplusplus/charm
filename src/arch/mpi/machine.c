@@ -62,6 +62,12 @@ static void sleep(int secs) {Sleep(1000*secs);}
 #define CMI_MPI_TRACE_USEREVENTS 1
 #endif
 
+#define CMK_TRACE_COMMOVERHEAD 0
+#if CMK_TRACE_COMMOVERHEAD
+#undef CMI_MPI_TRACE_USEREVENTS
+#define CMI_MPI_TRACE_USEREVENTS 1
+#endif
+
 #include "machine.h"
 
 #include "pcqueue.h"
@@ -626,7 +632,7 @@ void CmiReleaseSentMessages(void)
   MACHSTATE1(2,"CmiReleaseSentMessages begin on %d {", CmiMyPe());
   while(msg_tmp!=0) {
     done =0;
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
     double startT = CmiWallTimer();
 #endif
     if(MPI_Test(&(msg_tmp->req), &done, &sts) != MPI_SUCCESS)
@@ -647,7 +653,7 @@ void CmiReleaseSentMessages(void)
       prev = msg_tmp;
       msg_tmp = msg_tmp->next;
     }
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
     traceUserSuppliedBracketedNote("MPI_Test: release a msg", 60, startT, CmiWallTimer());
 #endif
   }
@@ -727,7 +733,7 @@ int PumpMsgs(void)
     }
 #else
     /* Original version */
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
   double startT = CmiWallTimer(); 
 #endif
     res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, &flg, &sts);
@@ -735,7 +741,7 @@ int PumpMsgs(void)
       CmiAbort("MPI_Iprobe failed\n");
 
     if(!flg) break;
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
     traceUserSuppliedBracketedNote("MPI_Iprobe before a recv call", 70, startT, CmiWallTimer());
 #endif
 
@@ -761,7 +767,12 @@ int PumpMsgs(void)
 	sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
 	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 	#endif
-#endif	
+#elif CMK_TRACE_COMMOVERHEAD
+	char tmp[32];
+	sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
+	traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
+#endif
+	
 	
     MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
     CMI_CHECK_CHECKSUM(msg, nbytes);
@@ -1351,7 +1362,12 @@ CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
   START_EVENT();
   if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
     CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-  END_EVENT(40);
+  /*END_EVENT(40);*/
+  #if CMK_TRACE_COMMOVERHEAD
+	char tmp[64];
+	sprintf(tmp, "MPI_Isend: from proc %d to proc %d", CmiMyPe(), destPE);
+	traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
+  #endif
 #endif
 
   MsgQueueLen++;
