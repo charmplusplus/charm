@@ -15,6 +15,7 @@ ALL_LDBS=\
    $(L)/libmoduleRefineLB.a \
    $(L)/libmoduleRefineCommLB.a \
    $(L)/libmoduleRotateLB.a \
+   $(L)/libmoduleTreeMatchLB.a \
    $(L)/libmoduleComboCentLB.a \
    $(L)/libmoduleGraphPartLB.a \
    $(L)/libmoduleGraphBFTLB.a \
@@ -120,6 +121,12 @@ $(L)/libmoduleRotateLB.a: RotateLB.o
 	$(CHARMC) -o $(L)/libmoduleRotateLB.a RotateLB.o 
 	
 LBHEADERS += RotateLB.h RotateLB.decl.h
+
+
+$(L)/libmoduleTreeMatchLB.a: TreeMatchLB.o treematch.o treebucket.o treetimings.o treemapping.o
+	$(CHARMC) -o $(L)/libmoduleTreeMatchLB.a TreeMatchLB.o treematch.o treebucket.o treetimings.o treemapping.o
+	
+LBHEADERS += TreeMatchLB.h TreeMatchLB.decl.h
 
 
 $(L)/libmoduleComboCentLB.a: ComboCentLB.o 
@@ -253,6 +260,7 @@ ALL_LB_OBJS=EveryLB.o \
     RefineLB.o \
     RefineCommLB.o \
     RotateLB.o \
+    TreeMatchLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -272,7 +280,11 @@ ALL_LB_OBJS=EveryLB.o \
     ScotchLB.o \
     TeamLB.o \
     WSLB.o \
-    manager.o
+    manager.o  \
+    treematch.o  \
+    treetimings.o  \
+    treebucket.o \
+    treemapping.o
 # EveryLB dependecies
 EVERYLB_DEPS=EveryLB.o \
     BlockLB.o \
@@ -290,6 +302,7 @@ EVERYLB_DEPS=EveryLB.o \
     RefineLB.o \
     RefineCommLB.o \
     RotateLB.o \
+    TreeMatchLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -304,7 +317,11 @@ EVERYLB_DEPS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
-    manager.o
+    manager.o \
+    treematch.o  \
+    treetimings.o  \
+    treebucket.o \
+    treemapping.o
 # CommonLBs dependencies
 COMMONLBS_DEPS=CommonLBs.o \
     BlockLB.o \
@@ -322,7 +339,12 @@ COMMONLBS_DEPS=CommonLBs.o \
     RefineLB.o \
     RefineCommLB.o \
     RotateLB.o \
-    manager.o
+    TreeMatchLB.o \
+    manager.o \
+    treematch.o  \
+    treetimings.o  \
+    treebucket.o \
+    treemapping.o
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)
 	$(CHARMC) -o $(L)/libmoduleEveryLB.a $(EVERYLB_DEPS)
