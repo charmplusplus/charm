@@ -82,7 +82,7 @@ static void sleep(int secs) {Sleep(1000*secs);}
 #define MAX_QLEN 200
 #endif
 
-#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && ! CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && ! CMK_TRACE_IN_CHARM
 CpvStaticDeclare(double, projTraceStart);
 # define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
 # define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
@@ -1782,7 +1782,7 @@ void ConverseExit(void)
 }
 
 static void registerMPITraceEvents() {
-#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && !CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && !CMK_TRACE_IN_CHARM
     traceRegisterUserEvent("MPI_Barrier", 10);
     traceRegisterUserEvent("MPI_Send", 20);
     traceRegisterUserEvent("MPI_Recv", 30);
@@ -1911,7 +1911,7 @@ static void ConverseRunPE(int everReturn)
   ConverseCommonInit(CmiMyArgv);
   machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
-#if CMI_MPI_TRACE_USEREVENTS && !CMK_OPTIMIZE && !CMK_TRACE_IN_CHARM
+#if CMI_MPI_TRACE_USEREVENTS && !CMK_TRACE_IN_CHARM
   CpvInitialize(double, projTraceStart);
   /* only PE 0 needs to care about registration (to generate sts file). */
   if (CmiMyPe() == 0) {
