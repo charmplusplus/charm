@@ -13,6 +13,7 @@
 #include <charm++.h>
 extern "C"{
 #include "tm_tree.h"
+#include "tm_mapping.h"
 };
 #include "TreeMatchLB.h"
 
@@ -57,7 +58,7 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
   int i;
   int *permut_vec;
   int count = stats->nprocs();
-  double *obj_weight;
+  double *obj_weight,*comm_speed;
 
   nb_proc=count;
   nb_obj=stats->n_objs;
@@ -81,12 +82,12 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
     }
   }
 
-  for(i=0;i<n_objs;i++){
+  for(i=0;i<nb_obj;i++){
     LDObjData &oData = stats->objData[i];
     obj_weight[i] = oData.wallTime ;
   }
   
-  int depthxs;
+  int depth;
   comm_speed=get_comm_speed(&depth);
   TreeMatchMapping(nb_obj, nb_proc, comm_mat, obj_weight, comm_speed, depth, stats->to_proc.getVec());
   
