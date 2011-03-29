@@ -6,6 +6,13 @@
 #include <ctype.h>
 #include <math.h>
 #include <assert.h> 
+#ifdef _WIN32
+#include <windows.h>
+#include <winbase.h>
+#define random() rand()
+#define srandom(x)  srand(x)
+#define strsep     strtok
+#endif
 #include "tm_mapping.h"
 #include "tm_timings.h"
 #include "tm_tree.h"
