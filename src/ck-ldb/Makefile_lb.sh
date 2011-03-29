@@ -1,6 +1,6 @@
 #!/bin/sh
 UNCOMMON_LDBS="TempAwareGreedyLB MetisLB ScotchLB TeamLB WSLB"
-COMMON_LDBS="BlockLB CommLB DummyLB GreedyAgentLB GreedyCommLB GreedyLB NeighborCommLB NeighborLB OrbLB PhasebyArrayLB RandCentLB RecBipartLB RefineLB RefineCommLB RotateLB"
+COMMON_LDBS="BlockLB CommLB DummyLB GreedyAgentLB GreedyCommLB GreedyLB NeighborCommLB NeighborLB OrbLB PhasebyArrayLB RandCentLB RecBipartLB RefineLB RefineCommLB RotateLB TreeMatchLB"
 OTHER_LDBS="ComboCentLB GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB GridHybridLB GridHybridSeedLB GridMetisLB HbmLB HybridLB RefineKLB RefineTopoLB TopoCentLB TopoLB"
 ALL_LDBS="$COMMON_LDBS $OTHER_LDBS"
 
@@ -25,6 +25,7 @@ do
         [ $bal = 'GridCommRefineLB' ] && manager="manager.o"
         [ $bal = 'GridHybridLB' ] && manager="manager.o"
         [ $bal = 'GridHybridSeedLB' ] && manager="manager.o"
+        [ $bal = 'TreeMatchLB' ] && manager="tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o"
 	cat >> $out << EOB 
 
 \$(L)/libmodule$bal.a: $bal.o $manager
@@ -64,7 +65,11 @@ for bal in $ALL_LDBS $UNCOMMON_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
-echo "    manager.o" >> $out
+echo "    manager.o  \\" >> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 echo "# EveryLB dependecies" >> $out
 echo "EVERYLB_DEPS=EveryLB.o \\" >> $out
@@ -72,7 +77,11 @@ for bal in $ALL_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
-echo "    manager.o" >> $out
+echo "    manager.o \\" >> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 echo "# CommonLBs dependencies" >> $out
 echo "COMMONLBS_DEPS=CommonLBs.o \\" >> $out
@@ -80,7 +89,11 @@ for bal in $COMMON_LDBS
 do
 	echo "    $bal.o \\" >> $out
 done
-echo "    manager.o" >> $out
+echo "    manager.o" \\>> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 cat >> $out <<EOB
 

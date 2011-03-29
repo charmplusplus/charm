@@ -16,6 +16,7 @@ module EveryLB {
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RotateLB;
+  extern module TreeMatchLB;
   extern module ComboCentLB;
   extern module GraphPartLB;
   extern module GraphBFTLB;
