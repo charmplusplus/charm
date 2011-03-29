@@ -25,7 +25,7 @@ do
         [ $bal = 'GridCommRefineLB' ] && manager="manager.o"
         [ $bal = 'GridHybridLB' ] && manager="manager.o"
         [ $bal = 'GridHybridSeedLB' ] && manager="manager.o"
-        [ $bal = 'TreeMatchLB' ] && manager="treematch.o treebucket.o treetimings.o treemapping.o"
+        [ $bal = 'TreeMatchLB' ] && manager="tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o"
 	cat >> $out << EOB 
 
 \$(L)/libmodule$bal.a: $bal.o $manager
@@ -66,10 +66,10 @@ do
 	echo "    $bal.o \\" >> $out
 done
 echo "    manager.o  \\" >> $out
-echo "    treematch.o  \\" >> $out
-echo "    treetimings.o  \\" >> $out
-echo "    treebucket.o \\" >> $out
-echo "    treemapping.o" >> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 echo "# EveryLB dependecies" >> $out
 echo "EVERYLB_DEPS=EveryLB.o \\" >> $out
@@ -78,10 +78,10 @@ do
 	echo "    $bal.o \\" >> $out
 done
 echo "    manager.o \\" >> $out
-echo "    treematch.o  \\" >> $out
-echo "    treetimings.o  \\" >> $out
-echo "    treebucket.o \\" >> $out
-echo "    treemapping.o" >> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 echo "# CommonLBs dependencies" >> $out
 echo "COMMONLBS_DEPS=CommonLBs.o \\" >> $out
@@ -90,10 +90,10 @@ do
 	echo "    $bal.o \\" >> $out
 done
 echo "    manager.o" \\>> $out
-echo "    treematch.o  \\" >> $out
-echo "    treetimings.o  \\" >> $out
-echo "    treebucket.o \\" >> $out
-echo "    treemapping.o" >> $out
+echo "    tm_tree.o  \\" >> $out
+echo "    tm_timings.o  \\" >> $out
+echo "    tm_bucket.o \\" >> $out
+echo "    tm_mapping.o" >> $out
 
 cat >> $out <<EOB
 

@@ -123,8 +123,8 @@ $(L)/libmoduleRotateLB.a: RotateLB.o
 LBHEADERS += RotateLB.h RotateLB.decl.h
 
 
-$(L)/libmoduleTreeMatchLB.a: TreeMatchLB.o treematch.o treebucket.o treetimings.o treemapping.o
-	$(CHARMC) -o $(L)/libmoduleTreeMatchLB.a TreeMatchLB.o treematch.o treebucket.o treetimings.o treemapping.o
+$(L)/libmoduleTreeMatchLB.a: TreeMatchLB.o tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o
+	$(CHARMC) -o $(L)/libmoduleTreeMatchLB.a TreeMatchLB.o tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o
 	
 LBHEADERS += TreeMatchLB.h TreeMatchLB.decl.h
 
@@ -281,10 +281,10 @@ ALL_LB_OBJS=EveryLB.o \
     TeamLB.o \
     WSLB.o \
     manager.o  \
-    treematch.o  \
-    treetimings.o  \
-    treebucket.o \
-    treemapping.o
+    tm_tree.o  \
+    tm_timings.o  \
+    tm_bucket.o \
+    tm_mapping.o
 # EveryLB dependecies
 EVERYLB_DEPS=EveryLB.o \
     BlockLB.o \
@@ -318,10 +318,10 @@ EVERYLB_DEPS=EveryLB.o \
     TopoCentLB.o \
     TopoLB.o \
     manager.o \
-    treematch.o  \
-    treetimings.o  \
-    treebucket.o \
-    treemapping.o
+    tm_tree.o  \
+    tm_timings.o  \
+    tm_bucket.o \
+    tm_mapping.o
 # CommonLBs dependencies
 COMMONLBS_DEPS=CommonLBs.o \
     BlockLB.o \
@@ -341,10 +341,10 @@ COMMONLBS_DEPS=CommonLBs.o \
     RotateLB.o \
     TreeMatchLB.o \
     manager.o \
-    treematch.o  \
-    treetimings.o  \
-    treebucket.o \
-    treemapping.o
+    tm_tree.o  \
+    tm_timings.o  \
+    tm_bucket.o \
+    tm_mapping.o
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)
 	$(CHARMC) -o $(L)/libmoduleEveryLB.a $(EVERYLB_DEPS)
