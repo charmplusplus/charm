@@ -648,7 +648,7 @@ void  fast_group(double **tab,tree_t *tab_node,tree_t *parent,int id,int arity, 
 void fast_grouping(double **tab,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M,long int k){
   tree_t **cur_group;
   int l,i;
-  double best_val,val=0;;
+  double best_val,val=0;
   int nb_groups;
 
   cur_group=(tree_t**)malloc(sizeof(tree_t*)*arity);

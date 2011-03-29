@@ -1,3 +1,9 @@
+#ifdef _WIN32
+#include <windows.h>
+#include <winbase.h>
+#define random() rand()
+#define srandom(x)  srand(x)
+#endif
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
@@ -216,6 +222,7 @@ int is_power_of_2(int val){
 void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
   int *sample;
   int i,j,k,n;
+  int id;
   double *pivot;
   bucket_list_t bucket_list;
 
@@ -260,7 +267,7 @@ void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
   }
   */
   pivot=(double*)malloc(sizeof(double)*nb_buckets-1);
-  int id=2;
+  id=2;
   for(k=1;k<nb_buckets;k++){
     i=sample[2*(id-1)];
     j=sample[2*(id-1)+1];
