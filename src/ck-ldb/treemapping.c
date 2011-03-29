@@ -8,6 +8,13 @@
 #include <ctype.h>
 #include <math.h>
 #include <assert.h> 
+#ifdef _WIN32
+#include <windows.h>
+#include <winbase.h>
+#define random() rand()
+#define srandom(x)  srand(x)
+#define strsep     strtok
+#endif
 #include "treemapping.h"
  
 #define TEST_ERROR(n) {if(n!=0){fprintf(stderr,"Error %d Line %d\n",n,__LINE__);exit(-1);}}

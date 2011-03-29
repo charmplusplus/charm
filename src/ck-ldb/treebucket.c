@@ -1,3 +1,9 @@
+#ifdef _WIN32
+#include <windows.h>
+#include <winbase.h>
+#define random() rand()
+#define srandom(x)  srand(x)
+#endif
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
