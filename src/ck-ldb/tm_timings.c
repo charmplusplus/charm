@@ -1,4 +1,4 @@
-#include "treetimings.h"
+#include "tm_timings.h"
 
 static CLOCK_T time_tab[MAX_CLOCK];
 static int clock_num=-1;

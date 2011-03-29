@@ -1,6 +1,6 @@
-#include "treematch.h"
+#include "tm_tree.h"
 int  build_comm(char *filename,double ***pcomm);
-void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  int *sol);
+void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  double * obj_weigth, double *com_speed, int d, int *sol);
 double print_sol(int N,int *Value,double **comm, double **arch);
 
 /*Map topology to cores: 

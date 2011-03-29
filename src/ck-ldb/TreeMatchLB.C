@@ -12,7 +12,7 @@
 
 #include <charm++.h>
 extern "C"{
-#include "treemapping.h"
+#include "tm_tree.h"
 };
 #include "TreeMatchLB.h"
 
@@ -33,6 +33,23 @@ CmiBool TreeMatchLB::QueryBalanceNow(int _step)
 }
 
 
+double *get_comm_speed(int *depth){
+  double *res;
+  int i;
+  
+  *depth=5;
+
+  if(! (*depth))
+    return NULL;
+  
+  res=(double*)malloc(sizeof(double)*(*depth));
+  res[0]=1;
+
+  for(i=1;i<*depth;i++){
+    res[i]=res[i-1]*res[i-1];
+  }
+}
+
 void TreeMatchLB::work(BaseLB::LDStats* stats)
 {
   int nb_obj,nb_proc;
@@ -40,11 +57,14 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
   int i;
   int *permut_vec;
   int count = stats->nprocs();
+  double *obj_weight;
 
   nb_proc=count;
   nb_obj=stats->n_objs;
   
   stats->makeCommHash();
+  // allocate object weight matrix
+  obj_weight=(double*)malloc(sizeof(double)*nb_obj);
   // allocate communication matrix
   comm_mat=(double**)malloc(sizeof(double*)*nb_obj);
   for(i=0;i<nb_obj;i++){
@@ -56,18 +76,28 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
     if((!commData.from_proc())&&(commData.recv_type()==LD_OBJ_MSG)){
       int from = stats->getHash(commData.sender);
       int to = stats->getHash(commData.receiver.get_destObj());
-      comm_mat[from][to]=commData.bytes;
-      comm_mat[to][from]=commData.bytes;
+      comm_mat[from][to]+=commData.bytes;
+      comm_mat[to][from]+=commData.bytes;
     }
   }
+
+  for(i=0;i<n_objs;i++){
+    LDObjData &oData = stats->objData[i];
+    obj_weight[i] = oData.wallTime ;
+  }
   
-  TreeMatchMapping(nb_obj,nb_proc,comm_mat,stats->to_proc.getVec());
+  int depthxs;
+  comm_speed=get_comm_speed(&depth);
+  TreeMatchMapping(nb_obj, nb_proc, comm_mat, obj_weight, comm_speed, depth, stats->to_proc.getVec());
+  
 
   // free communication matrix;
   for(i=0;i<nb_obj;i++){
       free(comm_mat[i]);
   }
   free(comm_mat);
+  free(comm_speed);
+  free(obj_weight);
 }
 
 /*@}*/

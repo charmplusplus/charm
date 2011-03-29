@@ -27,7 +27,7 @@ typedef struct {
 
 
 tree_t * build_tree(double **tab,int N);
-tree_t * build_tree_from_topology(tm_topology_t *topology,double **tab,int N);
+tree_t * build_tree_from_topology(tm_topology_t *topology,double **tab,int N,double *obj_weight, double *comm_speed);
 void map_tree(tree_t *,tree_t*);
 void display_tab(double **tab,int N);
 double speed(int depth);

@@ -1,10 +1,10 @@
 #include <float.h>
-#include "treematch.h"
+#include "tm_tree.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include "treetimings.h"
-#include "treebucket.h"
+#include "tm_timings.h"
+#include "tm_bucket.h"
 #include <assert.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
