@@ -3,19 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
-#include "treetimings.h"
-#include "treematch.h"
 #include <ctype.h>
 #include <math.h>
 #include <assert.h> 
-#ifdef _WIN32
-#include <windows.h>
-#include <winbase.h>
-#define random() rand()
-#define srandom(x)  srand(x)
-#define strsep     strtok
-#endif
-#include "treemapping.h"
+#include "tm_mapping.h"
+#include "tm_timings.h"
+#include "tm_tree.h"
  
 #define TEST_ERROR(n) {if(n!=0){fprintf(stderr,"Error %d Line %d\n",n,__LINE__);exit(-1);}}
 #undef DEBUG
@@ -542,14 +535,14 @@ int decompose(int n,int optimize,int *tab){
 
 
   while(primes[i]&&(n!=1)){
-    printf("[%d] before=%d\n",primes[i],n);
+    //    printf("[%d] before=%d\n",primes[i],n);
     if(flag&&optimize&&(n%primes[i]!=0)){
       n+=primes[i]-n%primes[i];
       flag--;
       i=0;
       continue;
     }
-    printf("after=%d\n",n);
+    //printf("after=%d\n",n);
     if(n%primes[i]==0){
       tab[j++]=primes[i];
       n/=primes[i];
@@ -609,14 +602,36 @@ void   build_synthetic_proc_id(tm_topology_t *topology){
       topology->node_id[i][j]=j;
     n*=topology->arity[i]; 
   }
-
+  
 }
 
-void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  int *sol){
+void update_obj_weight(double **obj_weight,int old_size,int new_size){
+  double *old_tab,*new_tab;
+  int i;
+
+  old_tab=*obj_weight;
+  new_tab=(double*)malloc(sizeof(double)*new_size);
+  *obj_weight=new_tab;
+
+  for(i=0;i<new_size;i++){
+    if(i<old_size)
+      new_tab[i]=old_tab[i];
+    else
+      new_tab[i]=new_tab[i-1];
+  }
+  
+}
+
+
+
+/* d: size of comm_speed */
+void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_weight, double * comm_speed, int d, int *sol){
   tree_t *comm_tree;
   tm_topology_t *topology;
 
   int i;
+  TIC;
+  
   for(i=0;i<nb_obj;i++)
     sol[i]=i;
 
@@ -630,6 +645,8 @@ void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  int *sol){
   printf("Topology nb levels=%d\n",topology->nb_levels);
   build_synthetic_proc_id(topology);
 
+  if(topology->nb_levels>d)
+    update_obj_weight(&obj_weight,d,topology->nb_levels);
 
   //exit(-1);
   //topology_to_arch(topology);
@@ -641,13 +658,18 @@ void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  int *sol){
 
   //display_tab(comm_mat,N);
 
-  comm_tree=build_tree_from_topology(topology,comm_mat,nb_obj);
+  comm_tree=build_tree_from_topology(topology,comm_mat,nb_obj,obj_weight,comm_speed);
   map_topology(topology,comm_tree,nb_proc,1,sol,NULL);
 
 
+  if(topology->nb_levels>d)
+    free(obj_weight);
+
   free_topology(topology);
   free_tree(comm_tree);
-  printf("-------------- Mapping done!\n");
+
+  double duration=TOC;
+  printf("-------------- Mapping done in %.4fs!\n",duration);
 }
 
 void display_other_heuristics(tm_topology_t *topology,int N,double **comm,double **arch){
