@@ -1,11 +1,11 @@
 #include <float.h>
-#include "tm_tree.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
+#include "tm_tree.h"
 #include "tm_timings.h"
 #include "tm_bucket.h"
-#include <assert.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -85,10 +85,33 @@ void clone_tree(tree_t *new,tree_t *old){
 
 
 
-double **aggregate_tab(tree_t *new_tab_node,double **tab,int N,int M){
+double *aggregate_obj_weight(tree_t *new_tab_node, double *tab, int M){
+  int i,i1,id1;
+  double *res;
+  
+  if(!tab)
+    return NULL;
+  
+  res=(double*)malloc(M*sizeof(double));
+  
+  for(i=0;i<M;i++){
+    for(i1=0;i1<new_tab_node[i].arity;i1++){
+      id1=new_tab_node[i].child[i1]->id;
+      res[i]+=tab[id1];
+    }
+  }
+  
+  return res;
+
+}
+
+
+double **aggregate_com_mat(tree_t *new_tab_node, double **tab, int M){
   int i,j,i1,j1,id1,id2;
   double **res;
     
+  
+
   res=(double**)malloc(M*sizeof(double*));
   for(i=0;i<M;i++)
     res[i]=(double*)malloc(M*sizeof(double));
@@ -137,11 +160,11 @@ void display_tab(double **tab,int N){
   for(i=0;i<N;i++){
     line=0;
     for(j=0;j<N;j++){
-      printf("%8.2f ",tab[i][j]);
+      printf("%g ",tab[i][j]);
       line+=tab[i][j];
     }
     total+=line;
-    //printf(": %.2f",line);
+    //printf(": %g",line);
     printf("\n");
   }
   printf("Total: %.2f\n",total);
@@ -648,7 +671,7 @@ void  fast_group(double **tab,tree_t *tab_node,tree_t *parent,int id,int arity, 
 void fast_grouping(double **tab,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M,long int k){
   tree_t **cur_group;
   int l,i;
-  double best_val,val=0;
+  double best_val,val=0;;
   int nb_groups;
 
   cur_group=(tree_t**)malloc(sizeof(tree_t*)*arity);
@@ -759,21 +782,55 @@ TIC;
 
 
 
+double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm_speed, int N){
+  double **res,avg;
+  int i,j;
+
+  if(!obj_weight)
+    return comm_matrix;
+
+  res=(double**)malloc(N*sizeof(double*));
+  for(i=0;i<N;i++)
+    res[i]=(double*)malloc(N*sizeof(double));
+  
+  avg=0;
+  for(i=0;i<N;i++)
+    avg+=obj_weight[i];
+  avg/=N;
+
+  for(i=0;i<N;i++)
+    for(j=0;j<N;j++)
+      if(i==j)
+	res[i][j]=0;
+      else
+	res[i][j]=comm_matrix[i][j]/comm_speed-abs(avg-(obj_weight[i]+obj_weight[j])/2);
+
+  return res;
+  
+}
+
+
 
 /*
-  tab: comm_matrix at the considered level (use to evaluate a grouping)
+  comm_matrix: comm_matrix at the considered level (use to evaluate a grouping) of size N*N
   tab_node: array of the node to group
   new_tab_node: array of nodes at the next level (the parents of the node in tab_node once the grouping will be done). 
   arity: number of children of parent (i.e.) size of the group to compute
   N: size of tab and tab_node. i.e. number of nodes at the considered level
   M: size of new_tab_node (i.e) the number of parents
   Hence we have: M*arity=N
- */void group_nodes(double **tab,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M){
+*/void group_nodes(double **comm_matrix,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M, double* obj_weigth, double comm_speed){
   tree_t **cur_group;
   int j,l,n;
   group_list_t list,**best_selection,**tab_group;
   double best_val,last_best;
   int timeout;
+  double **tab; /*cost matrix taking into account the communiocation cost but also the weight of the object*/
+
+  TIC;
+
+  /* might return comm_matrix (if obj_weight==NULL): do not free this tab in this case*/ 
+  tab=build_cost_matrix(comm_matrix,obj_weigth,comm_speed,N);
 
 
   long int k=choose(N,arity);
@@ -892,14 +949,18 @@ TIC;
     free(cur_group);  
   }
 
-  printf("Grouping done!\n");
+  if(tab!=comm_matrix)
+    free_tab_double(tab,N);
+  
+  double duration=TOC;
+  printf("Grouping done in %.4fs!\n",duration);
 }
 
 
 
 
 
-void complete_tab(double ***tab,int N, int K){
+void complete_com_mat(double ***tab,int N, int K){
   double **old_tab,**new_tab;
   int M,i,j;
   if(K==0)
@@ -923,6 +984,39 @@ void complete_tab(double ***tab,int N, int K){
     }
   }
 }
+
+void complete_obj_weight(double **tab,int N, int K){
+  double *old_tab,*new_tab,avg;
+  int M,i;
+  if(K==0)
+    return;
+
+  old_tab=*tab;
+
+  if(!old_tab)
+    return;
+
+  
+  avg=0;
+  for(i=0;i<N;i++)
+    avg+=old_tab[i];
+  avg/=N;
+
+  
+  M=N+K;
+  new_tab=(double*)malloc(M*sizeof(double));
+  
+  *tab=new_tab;
+  for(i=0;i<M;i++){
+    if(i<N){
+      new_tab[i]=old_tab[i];
+    }else{
+      new_tab[i]=avg;
+    }
+  }
+}
+
+
 
 void create_dumb_tree(tree_t *node,int depth,tm_topology_t *topology){
   tree_t **list_child;
@@ -955,6 +1049,7 @@ void complete_tab_node(tree_t **tab,int N, int K,int depth,tm_topology_t *topolo
     return;
 
   old_tab=*tab;
+
   
   M=N+K;
   new_tab=(tree_t*)malloc(M*sizeof(tree_t));
@@ -991,19 +1086,20 @@ Then it calls recursivcely the function to prefrom the grouping at the above lev
 
 tab_node: array of nodes of the under level. 
 tab: local communication matrix 
-N: number of nodes.
+N: number of nodes. Order of com_mat, size of obj_weight 
 arity: arity of the nodes of the above level.
 depth: current depth of the algorithm
 toplogy: description of the hardware topology.  
 */
-tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,int depth,tm_topology_t *topology){
+tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,int depth,tm_topology_t *topology, double *obj_weight, double *comm_speed){
   int M; /*N/Arity: number the groups*/
   int K=0,i;
   tree_t *new_tab_node; /*array of node for this level (of size M): there will be linked to the nodes of tab_nodes*/
   double **new_com_mat; /*New communication matrix (after grouyping nodes together)*/
   tree_t *res; /*resulting tree*/
   int completed=0;
-
+  double speed; /* communication speed at this level*/
+  double *new_obj_weight;
   if((depth==0)){
     if((N==1)&&(depth==0))
       return &tab_node[0];
@@ -1014,13 +1110,15 @@ tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,i
   }
 
   
-  /* If the number of nodes does not devide teh aruty: we add K nodes  */
+  /* If the number of nodes does not devide the arity: we add K nodes  */
   if(N%arity!=0){
     K=arity*((N/arity)+1)-N;
     //printf("****N=%d arity=%d K=%d\n",N,arity,K);  
     //display_tab(tab,N);
-    /* add K rows and columns to tab*/
-    complete_tab(&com_mat,N,K);
+    /* add K rows and columns to comm_matrix*/
+    complete_com_mat(&com_mat,N,K);
+    /* add K element to the object weight*/
+    complete_obj_weight(&obj_weight,N,K);
     //display_tab(tab,N+K);
     /* add a dumb tree to the K new "virtual nodes"*/
     complete_tab_node(&tab_node,N,K,depth,topology);
@@ -1042,10 +1140,16 @@ tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,i
   }
 
   /*Core of the algorithm: perfrom the grouping*/
-  group_nodes(com_mat,tab_node,new_tab_node,arity,N,M);
+  if(comm_speed)
+    speed=comm_speed[depth];
+  else
+    speed=-1;
+  group_nodes(com_mat,tab_node,new_tab_node,arity,N,M,obj_weight,speed);
  
   /*based on that grouping aggregate the communication matrix*/
-  new_com_mat=aggregate_tab(new_tab_node,com_mat,N,M);
+  new_com_mat=aggregate_com_mat(new_tab_node,com_mat,M);
+  /*based on that grouping aggregate the object weight matrix*/
+  new_obj_weight=aggregate_obj_weight(new_tab_node,obj_weight,M);
 
   /* set ID of virtual nodes to -1*/
   for(i=N-K;i<N;i++)
@@ -1063,16 +1167,17 @@ tree_t *build_level_topology(tree_t *tab_node,double **com_mat,int N,int arity,i
   else
     arity=1;
   // assume all objects have the same arity
-  res = build_level_topology(new_tab_node,new_com_mat,M,arity,depth,topology);  
+  res = build_level_topology(new_tab_node,new_com_mat,M,arity,depth,topology,new_obj_weight,comm_speed);  
 
   set_deb_tab_child(res,tab_node,depth);
 
 
   if(completed){
     free_tab_double(com_mat,N);
+    free(obj_weight);
   }
   free_tab_double(new_com_mat,M);
-
+  free(new_obj_weight);
 
   return res;
 }
@@ -1092,7 +1197,7 @@ double speed(int depth){
   //return (long int)pow(100,depth);
 }
 
-tree_t * build_tree_from_topology(tm_topology_t *topology,double **tab,int N){
+tree_t * build_tree_from_topology(tm_topology_t *topology,double **tab,int N,double *obj_weight, double *comm_speed){
   int depth,i; 
   tree_t *res,*tab_node;
 
@@ -1105,7 +1210,7 @@ tree_t * build_tree_from_topology(tm_topology_t *topology,double **tab,int N){
   depth = topology->nb_levels -1;
   printf("nb_levels=%d\n",depth+1);
   // assume all objects have the same arity
-  res = build_level_topology(tab_node,tab,N,topology->arity[depth-1],depth,topology);
+  res = build_level_topology(tab_node,tab,N,topology->arity[depth-1],depth,topology, obj_weight, comm_speed);
   printf("Build tree done!\n");
   return res;
 }
