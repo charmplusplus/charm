@@ -6,6 +6,9 @@
 #include <ctype.h>
 #include <math.h>
 #include <assert.h> 
+#include "tm_mapping.h"
+#include "tm_timings.h"
+#include "tm_tree.h"
 #ifdef _WIN32
 #include <windows.h>
 #include <winbase.h>
@@ -13,9 +16,6 @@
 #define srandom(x)  srand(x)
 #define strsep     strtok
 #endif
-#include "tm_mapping.h"
-#include "tm_timings.h"
-#include "tm_tree.h"
  
 #define TEST_ERROR(n) {if(n!=0){fprintf(stderr,"Error %d Line %d\n",n,__LINE__);exit(-1);}}
 #undef DEBUG
@@ -612,21 +612,25 @@ void   build_synthetic_proc_id(tm_topology_t *topology){
   
 }
 
-void update_obj_weight(double **obj_weight,int old_size,int new_size){
+void update_comm_speed(double **comm_speed,int old_size,int new_size){
   double *old_tab,*new_tab;
   int i;
+  printf("comm speed [%p]: ",*comm_speed);
 
-  old_tab=*obj_weight;
+  old_tab=*comm_speed;
   new_tab=(double*)malloc(sizeof(double)*new_size);
-  *obj_weight=new_tab;
+  *comm_speed=new_tab;
 
   for(i=0;i<new_size;i++){
     if(i<old_size)
       new_tab[i]=old_tab[i];
     else
       new_tab[i]=new_tab[i-1];
+
+    printf("%f ",new_tab[i]);
   }
   
+  printf("\n");
 }
 
 
@@ -653,7 +657,7 @@ void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_w
   build_synthetic_proc_id(topology);
 
   if(topology->nb_levels>d)
-    update_obj_weight(&obj_weight,d,topology->nb_levels);
+    update_comm_speed(&comm_speed,d,topology->nb_levels);
 
   //exit(-1);
   //topology_to_arch(topology);
@@ -670,7 +674,7 @@ void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_w
 
 
   if(topology->nb_levels>d)
-    free(obj_weight);
+    free(comm_speed);
 
   free_topology(topology);
   free_tree(comm_tree);

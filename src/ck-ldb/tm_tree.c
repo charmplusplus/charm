@@ -837,7 +837,7 @@ double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm
   printf("Number of groups:%ld\n",k);
   
   if(k>30000){
-#ifdef DEBUG
+  #ifdef DEBUG
     printf("Fast Grouping...\n");
 #endif
 
@@ -963,8 +963,6 @@ double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm
 void complete_com_mat(double ***tab,int N, int K){
   double **old_tab,**new_tab;
   int M,i,j;
-  if(K==0)
-    return;
 
   old_tab=*tab;
   
@@ -988,8 +986,6 @@ void complete_com_mat(double ***tab,int N, int K){
 void complete_obj_weight(double **tab,int N, int K){
   double *old_tab,*new_tab,avg;
   int M,i;
-  if(K==0)
-    return;
 
   old_tab=*tab;
 

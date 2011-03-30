@@ -1,9 +1,3 @@
-#ifdef _WIN32
-#include <windows.h>
-#include <winbase.h>
-#define random() rand()
-#define srandom(x)  srand(x)
-#endif
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
@@ -11,6 +5,13 @@
 #include "tm_tree.h"
 #include "tm_bucket.h"
 #include "tm_timings.h" 
+#ifdef _WIN32
+#include <windows.h>
+#include <winbase.h>
+#define random() rand()
+#define srandom(x)  srand(x)
+#define strsep     strtok
+#endif
 
 #undef DEBUG
 bucket_list_t global_bl; 
@@ -239,7 +240,9 @@ void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
 
 
   n=pow(nb_buckets,2);
-  n=N;
+  printf("N=%d, n=%d\n",N,n);
+  
+  assert(n=N);
   sample=(int*)malloc(2*sizeof(int)*n);
   
   for(k=0;k<n;k++){
@@ -266,7 +269,7 @@ void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
   }
   */
   pivot=(double*)malloc(sizeof(double)*nb_buckets-1);
-  int id=2;
+  int id=1;
   for(k=1;k<nb_buckets;k++){
     i=sample[2*(id-1)];
     j=sample[2*(id-1)+1];
@@ -304,12 +307,18 @@ void next_bucket_elem(bucket_list_t bucket_list,int *i,int *j){
   int N;
   bucket_t *bucket=bucket_list->bucket_tab[bucket_list->cur_bucket];
 
+    //display_bucket_list(bucket_list);
+  //printf("nb_elem: %d, indice: %d, bucket_id: %d\n",(int)bucket->nb_elem,bucket_list->bucket_indice,bucket_list->cur_bucket);
 
   while(bucket->nb_elem<=bucket_list->bucket_indice){
-    bucket_list->bucket_indice=0;
-    bucket=bucket_list->bucket_tab[bucket_list->cur_bucket++];
 
-    printf("### From bucket %d to bucket %d\n",bucket_list->cur_bucket-1,bucket_list->cur_bucket);
+    bucket_list->bucket_indice=0;
+    bucket_list->cur_bucket++;
+    bucket=bucket_list->bucket_tab[bucket_list->cur_bucket];
+      
+    //printf("### From bucket %d to bucket %d\n",bucket_list->cur_bucket-1,bucket_list->cur_bucket);
+    //printf("nb_elem: %d, indice: %d, bucket_id: %d\n",(int)bucket->nb_elem,bucket_list->bucket_indice,bucket_list->cur_bucket);
+    //sleep(1);
   }
 
   if(!bucket->sorted){
