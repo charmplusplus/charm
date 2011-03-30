@@ -111,14 +111,20 @@ void check_bucket(bucket_t *b,double **tab,double inf, double sup,int N){
   }
 }
 
-void  display_bucket_list(bucket_list_t bucket_list){
+void  display_pivots(bucket_list_t bucket_list){
   int i;
-  double inf,sup;
 
   for(i=0;i<bucket_list->nb_buckets-1;i++){
     printf("pivot[%d]=%f\n",i,bucket_list->pivot[i]);
   }
   printf("\n");
+}
+
+void  display_bucket_list(bucket_list_t bucket_list){
+  int i;
+  double inf,sup;
+
+  display_pivots(bucket_list);
 
   for(i=0;i<bucket_list->nb_buckets;i++){
     inf=bucket_list->pivot[i];
@@ -246,9 +252,9 @@ void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
 
 
   n=pow(nb_buckets,2);
-  printf("N=%d, n=%d\n",N,n);
   
   assert(n=N);
+  printf("N=%d, n=%d\n",N,n);
   sample=(int*)malloc(2*sizeof(int)*n);
   
   for(k=0;k<n;k++){
@@ -267,13 +273,13 @@ void partial_sort(bucket_list_t *bl,double **tab,int N,int nb_buckets){
   
   global_bl=bucket_list;
   qsort(sample,n,2*sizeof(int),tab_cmp);
-
-  /*  for(k=0;k<N;k++){
-    i=sample[k]/N;
-    j=sample[k]%N;
+  /*
+  for(k=0;k<n;k++){
+    i=sample[2*k];
+    j=sample[2*k+1];
     printf("%f\n",tab[i][j]);
-  }
-  */
+    }*/
+  
   pivot=(double*)malloc(sizeof(double)*nb_buckets-1);
   id=1;
   for(k=1;k<nb_buckets;k++){
@@ -453,6 +459,9 @@ void bucket_grouping(double **tab,tree_t *tab_node, tree_t *new_tab_node, int ar
   partial_sort(&bucket_list,tab,N,8);
   duration=TOC;
   printf("Partial sorting=%fs\n",duration);  
+
+  display_pivots(bucket_list);
+
  
   TIC;
   l=0;

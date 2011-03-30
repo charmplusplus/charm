@@ -643,9 +643,12 @@ void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_w
   int i;
   TIC;
   
-  for(i=0;i<nb_obj;i++)
+  for(i=0;i<nb_obj;i++){
     sol[i]=i;
-
+    //    printf("%f ",obj_weight[i]);
+  }
+  //printf("\n");
+  
 
   //  return;
 
@@ -669,8 +672,12 @@ void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_w
 
   //display_tab(comm_mat,N);
 
+  TIC;
   comm_tree=build_tree_from_topology(topology,comm_mat,nb_obj,obj_weight,comm_speed);
+  printf("Tree buildinbg time=%f\n",TOC);
+  TIC;
   map_topology(topology,comm_tree,nb_proc,1,sol,NULL);
+  printf("Topology mapping time=%f\n",TOC);
 
 
   if(topology->nb_levels>d)
