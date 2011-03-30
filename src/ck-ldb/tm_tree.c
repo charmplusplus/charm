@@ -671,7 +671,7 @@ void  fast_group(double **tab,tree_t *tab_node,tree_t *parent,int id,int arity, 
 void fast_grouping(double **tab,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M,long int k){
   tree_t **cur_group;
   int l,i;
-  double best_val,val=0;;
+  double best_val,val=0;
   int nb_groups;
 
   cur_group=(tree_t**)malloc(sizeof(tree_t*)*arity);
@@ -822,10 +822,12 @@ double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm
 */void group_nodes(double **comm_matrix,tree_t *tab_node, tree_t *new_tab_node, int arity,int N, int M, double* obj_weigth, double comm_speed){
   tree_t **cur_group;
   int j,l,n;
+  long int k;
   group_list_t list,**best_selection,**tab_group;
   double best_val,last_best;
   int timeout;
   double **tab; /*cost matrix taking into account the communiocation cost but also the weight of the object*/
+  double duration;
 
   TIC;
 
@@ -833,7 +835,7 @@ double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm
   tab=build_cost_matrix(comm_matrix,obj_weigth,comm_speed,N);
 
 
-  long int k=choose(N,arity);
+  k=choose(N,arity);
   printf("Number of groups:%ld\n",k);
   
   if(k>30000){
@@ -952,7 +954,7 @@ double **build_cost_matrix(double **comm_matrix, double* obj_weight, double comm
   if(tab!=comm_matrix)
     free_tab_double(tab,N);
   
-  double duration=TOC;
+  duration=TOC;
   printf("Grouping done in %.4fs!\n",duration);
 }
 

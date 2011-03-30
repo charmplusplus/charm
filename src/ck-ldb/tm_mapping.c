@@ -14,7 +14,7 @@
 #include <winbase.h>
 #define random() rand()
 #define srandom(x)  srand(x)
-#define strsep     strtok
+#define strsep(x,y)     strtok(*x, y)
 #endif
  
 #define TEST_ERROR(n) {if(n!=0){fprintf(stderr,"Error %d Line %d\n",n,__LINE__);exit(-1);}}
@@ -639,6 +639,7 @@ void update_comm_speed(double **comm_speed,int old_size,int new_size){
 void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_weight, double * comm_speed, int d, int *sol){
   tree_t *comm_tree;
   tm_topology_t *topology;
+  double duration;
 
   int i;
   TIC;
@@ -679,7 +680,7 @@ void TreeMatchMapping(int nb_obj, int nb_proc, double **comm_mat,  double *obj_w
   free_topology(topology);
   free_tree(comm_tree);
 
-  double duration=TOC;
+  duration=TOC;
   printf("-------------- Mapping done in %.4fs!\n",duration);
 }
 
