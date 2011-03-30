@@ -654,7 +654,11 @@ void CmiReleaseSentMessages(void)
       msg_tmp = msg_tmp->next;
     }
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
-    traceUserSuppliedBracketedNote("MPI_Test: release a msg", 60, startT, CmiWallTimer());
+    {
+    double endT = CmiWallTimer();
+    /* only record the event if it takes more than 1ms */
+    if(endT-startT>=0.001) traceUserSuppliedBracketedNote("MPI_Test: release a msg", 60, startT, endT);
+    }
 #endif
   }
   end_sent = prev;
@@ -742,7 +746,11 @@ int PumpMsgs(void)
 
     if(!flg) break;
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
-    traceUserSuppliedBracketedNote("MPI_Iprobe before a recv call", 70, startT, CmiWallTimer());
+    {
+    double endT = CmiWallTimer();
+    /* only trace the probe that last longer than 1ms */
+    if(endT-startT>=0.001) traceUserSuppliedBracketedNote("MPI_Iprobe before a recv call", 70, startT, endT);
+    }
 #endif
 
     recd = 1;

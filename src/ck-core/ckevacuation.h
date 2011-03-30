@@ -18,7 +18,7 @@ struct evacMsg{
 CpvCExtern(char *,_validProcessors);
 extern int _ckEvacBcastIdx;
 extern int _ckAckEvacIdx;
-CpvExtern(char ,startedEvac);
+CkpvExtern(char ,startedEvac);
 extern int allowMessagesOnly;
 extern int evacuate; //Evacuate flag, set to 0 normally. set to 1 when the SIGUSR1 signal is received. after the startedEvac flag has been set it is set to 2
 
