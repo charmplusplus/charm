@@ -7,6 +7,10 @@
 #include "tm_timings.h"
 #include "tm_bucket.h"
 
+#if __CHARMC__
+#include "converse.h"
+#endif
+
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #undef DEBUG
@@ -681,7 +685,7 @@ void fast_grouping(double **tab,tree_t *tab_node, tree_t *new_tab_node, int arit
     //printf("k%d/%d, k=%ld\n",l,M,k);
     /* select the best greedy grouping among the 10 first one*/
     //fast_group(tab,tab_node,&new_tab_node[l],-1,arity,0,&best_val,cur_group,N,&nb_groups,MAX(2,(int)(50-log2(k))-M/10));
-    fast_group(tab,tab_node,&new_tab_node[l],-1,arity,0,&best_val,cur_group,N,&nb_groups,MAX(1,(int)(50-log2(k))-M/10));
+    fast_group(tab,tab_node,&new_tab_node[l],-1,arity,0,&best_val,cur_group,N,&nb_groups,MAX(1,(int)(50-CmiLog2(k))-M/10));
     val+=best_val;
     for(i=0;i<new_tab_node[l].arity;i++){
       new_tab_node[l].child[i]->parent=&new_tab_node[l];

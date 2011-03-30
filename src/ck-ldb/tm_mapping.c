@@ -14,7 +14,6 @@
 #include <winbase.h>
 #define random() rand()
 #define srandom(x)  srand(x)
-#define strsep(x,y)     strtok(*x, y)
 #endif
  
 #define TEST_ERROR(n) {if(n!=0){fprintf(stderr,"Error %d Line %d\n",n,__LINE__);exit(-1);}}
@@ -126,7 +125,7 @@ void init_comm(char *filename,int N,double **comm){
     char *l=line;
     j=0;
     //printf("%s|",line);
-    while((ptr=strsep(&l," \t"))){
+    while((ptr=strtok(l," \t"))){
       if((ptr[0]!='\n')&&(!isspace(ptr[0]))&&(*ptr)){
 	comm[i][j]=atof(ptr);
 	//printf ("comm[%d][%d]=%f|%s|\n",i,j,comm[i][j],ptr);

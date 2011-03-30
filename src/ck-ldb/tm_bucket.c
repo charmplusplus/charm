@@ -10,7 +10,10 @@
 #include <winbase.h>
 #define random() rand()
 #define srandom(x)  srand(x)
-#define strsep     strtok
+#endif
+
+#if __CHARMC__
+#include "converse.h"
 #endif
 
 #undef DEBUG
@@ -178,7 +181,7 @@ void  built_pivot_tree(bucket_list_t bucket_list){
   pivot=bucket_list->pivot;
   n=bucket_list->nb_buckets;
   pivot_tree=(double*)malloc(sizeof(double)*2*n);
-  bucket_list->max_depth=(int)log2(n);
+  bucket_list->max_depth=(int)CmiLog2(n);
 
   dfs(1,1,n-1,pivot,pivot_tree,0,bucket_list->max_depth);
 
