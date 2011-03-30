@@ -40,15 +40,13 @@ double *get_comm_speed(int *depth){
   
   *depth=5;
 
-  if(! (*depth))
-    return NULL;
-  
   res=(double*)malloc(sizeof(double)*(*depth));
   res[0]=1;
 
   for(i=1;i<*depth;i++){
-    res[i]=res[i-1]*res[i-1];
+    res[i]=res[i-1]*2;
   }
+  return res;
 }
 
 void TreeMatchLB::work(BaseLB::LDStats* stats)
