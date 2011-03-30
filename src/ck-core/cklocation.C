@@ -219,7 +219,7 @@ public:
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans= (i.data()[0])%CkNumPes();
-      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CpvAccess(startedEvac))){
+      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
         ans = (ans +1 )%CkNumPes();
       }
       return ans;
@@ -2709,7 +2709,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		Leave a record here mentioning the processor where it got sent
 	*/
 	
-	if(CpvAccess(startedEvac)){
+	if(CkpvAccess(startedEvac)){
 		int newhomePE = getNextPE(idx);
 		DEBM((AA"Migrated into failed processor index size %s resent to %d \n"AB,idx2str(idx),newhomePE));	
 		CkLocMgr *mgr = rec->getLocMgr();

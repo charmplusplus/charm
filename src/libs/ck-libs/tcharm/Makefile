@@ -34,6 +34,12 @@ $(DEST2): $(OBJS2) $(HEADERS)
 $(COMPATLIB): $(COMPAT) 
 	$(CHARMC) $(COMPAT) -o $@
 
+tcharm.decl.h : tcharm.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c tcharm.ci
+
+tcharmmain.decl.h : tcharmmain.ci $(CDIR)/bin/charmxi
+	$(CHARMC) -c tcharmmain.ci
+
 headers: $(HEADERS)
 
 clean: 
@@ -60,9 +66,5 @@ depends:  $(CIFILES)
               g++ -MM -Wno-deprecated -I$(CHARMINC) $$SRCFILE >> $(DEPENDFILE); \
               echo '	$$(CHARMC) -o '$$i $$SRCFILE >> $(DEPENDFILE) ; \
         done; \
-	for cifile in $(wildcard *.ci); do \
-              echo "checking generated modules for $$cifile" ; \
-              $(CHARMXI) -intrinsic -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(DEPENDFILE) ; \
-        done
 
 
