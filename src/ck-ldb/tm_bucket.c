@@ -14,6 +14,8 @@
 
 #if __CHARMC__
 #include "converse.h"
+#else
+#define CmiLog2  log2
 #endif
 
 #undef DEBUG

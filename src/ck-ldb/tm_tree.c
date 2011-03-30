@@ -9,6 +9,8 @@
 
 #if __CHARMC__
 #include "converse.h"
+#else
+#define CmiLog2 log2
 #endif
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
