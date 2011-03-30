@@ -3518,12 +3518,15 @@ int _BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
 int _BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
-unsigned int CmiLog2(unsigned int val) {
+unsigned int CmiILog2(unsigned int val) {
   unsigned int log = 0u;
   if ( val != 0u ) {
       while ( val > (1u<<log) ) { log++; }
   }
   return log;
+}
+double CmiLog2(double x) {
+  return log(x)/log(2);
 }
 #endif
 

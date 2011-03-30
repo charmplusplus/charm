@@ -1878,9 +1878,11 @@ typedef struct {
 
 
 #if CMK_HAS_LOG2
-#define CmiLog2  log2
+#define CmiLog2   log2
+#define CmiILog2  log2
 #else
-extern unsigned int CmiLog2(unsigned int);
+extern unsigned int CmiILog2(unsigned int);
+extern double CmiLog2(double);
 #endif
 
 #endif /* CONVERSE_H */
