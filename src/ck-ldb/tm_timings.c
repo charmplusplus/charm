@@ -13,15 +13,19 @@ void get_time(){
   CLOCK(time_tab[clock_num]);
 }
 
-double time_diff(CLOCK_T t1){
+double time_diff(){
   CLOCK_T t2;
   
+
   if(clock_num>MAX_CLOCK-1){
     clock_num--;
     return -1.0;
   }
 
   CLOCK(t2);
+  CLOCK_DISPLAY(time_tab[clock_num]);
+  CLOCK_DISPLAY(t2);
+
 
   return CLOCK_DIFF(t2,time_tab[clock_num--]);
 }
