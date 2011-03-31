@@ -264,6 +264,7 @@ extern unsigned char computeCheckSum(unsigned char *data, int len);
 
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
+static int _absoluteTime = 0;
 static double starttimer = 0;
 static int _is_global = 0;
 
@@ -283,8 +284,25 @@ int CmiTimerIsSynchronized()
   return _is_global;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{       
+  return _absoluteTime;
+}
+
+double CmiStartTimer()
 {
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return starttimer;
+}
+
+void CmiTimerInit(char **argv)
+{
+  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+
   _is_global = CmiTimerIsSynchronized();
 
   if (_is_global) {
@@ -331,17 +349,18 @@ double CmiTimer(void)
 #if 0 && CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
+
 #if CMK_TIMER_USE_XT3_DCLOCK
-  t = dclock() - starttimer;
+  t = dclock();
 #else
-  t = MPI_Wtime() - starttimer;
+  t = MPI_Wtime();
 #endif
 
 #if 0 && CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
 
-  return t;
+  return _absoluteTime?t: (t-starttimer);
 }
 
 double CmiWallTimer(void)
@@ -350,15 +369,18 @@ double CmiWallTimer(void)
 #if 0 && CMK_SMP
   if (timerLock) CmiLock(timerLock);
 #endif
+
 #if CMK_TIMER_USE_XT3_DCLOCK
-  t = dclock() - starttimer;
+  t = dclock();
 #else
-  t = MPI_Wtime() - starttimer;
+  t = MPI_Wtime();
 #endif
+
 #if 0 && CMK_SMP
   if (timerLock) CmiUnlock(timerLock);
 #endif
-  return t;
+
+  return _absoluteTime? t: (t-starttimer);
 }
 
 double CmiCpuTimer(void)

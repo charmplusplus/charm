@@ -1810,7 +1810,7 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
       findOutliers = true;
     }
   }
-  bool findStartTime = CmiGetArgFlagDesc(msg->argv,"+traceStartTime", "Find minimum trace start time.");
+  bool findStartTime = (CmiTimerAbsolute()==1);
   traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers, findStartTime);
   if (findOutliers) {
     kMeansGID = CProxy_KMeansBOC::ckNew(outlierAutomatic,
@@ -2710,7 +2710,7 @@ void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
   if (CkpvAccess(_trace) != NULL) {
-    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData() - CkpvAccess(_trace)->_logPool->globalStartTime;
     // CkPrintf("End time determined to be %lf us\n",
     //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
   }

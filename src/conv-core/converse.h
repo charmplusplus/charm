@@ -764,13 +764,17 @@ static __inline__ unsigned long long int rdtsc(void)
 #define CmiWallTimer() ((double)rdtsc()*(_cpu_speed_factor))
 #define CmiTimer CmiCpuTimer
 double   CmiStartTimer(void);
+double   CmiInitTime(void);
 #define CmiTimerIsSynchronized()	(0)
+#define CmiTimerAbsolute()              (0)
 
 #else
-void     CmiTimerInit();
+void     CmiTimerInit(char **argv);
+int      CmiTimerAbsolute();
+double   CmiStartTimer(void);
+double   CmiInitTime(void);
 double   CmiTimer(void);
 double   CmiWallTimer(void);
-#define  CmiStartTimer()                (0.0)
 int      CmiTimerIsSynchronized();
 #endif
 
