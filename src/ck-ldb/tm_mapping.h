@@ -21,3 +21,5 @@ void free_topology(tm_topology_t *topology);
 void display_other_heuristics(tm_topology_t *topology,int N,double **comm,double **arch);
 void print_1D_tab(int *tab,int N);
 void   build_synthetic_proc_id(tm_topology_t *topology);
+void display_topology(tm_topology_t *topology);
+tm_topology_t  *build_synthetic_topology(int *arity, int nb_levels, int *core_numbering, int nb_core_per_node);

@@ -39,6 +39,9 @@ int nb_nodes(tm_topology_t *topology){
 }
 
 
+
+
+
 void free_topology(tm_topology_t *topology){
    int i;
   for(i=0;i<topology->nb_levels;i++)
@@ -573,7 +576,7 @@ int decompose(int n,int optimize,int *tab){
 }
 
 
-tree_t *build_synthetic_topology(int *synt_tab,int id,int depth,int nb_levels){
+tree_t *build_synthetic_topology_old(int *synt_tab,int id,int depth,int nb_levels){
   tree_t *res,**child;
   int arity=synt_tab[0];
   int val,i; 
@@ -585,7 +588,7 @@ tree_t *build_synthetic_topology(int *synt_tab,int id,int depth,int nb_levels){
   else{
     child=(tree_t**)malloc(sizeof(tree_t*)*arity);
     for(i=0;i<arity;i++){
-      child[i]=build_synthetic_topology(synt_tab+1,i,depth+1,nb_levels);
+      child[i]=build_synthetic_topology_old(synt_tab+1,i,depth+1,nb_levels);
     child[i]->parent=res;
     val+=child[i]->val;
     }
@@ -593,6 +596,60 @@ tree_t *build_synthetic_topology(int *synt_tab,int id,int depth,int nb_levels){
   set_node(res,child,arity,NULL,id,val+speed(depth),child[0]);
   return res;
 }
+
+
+void display_topology(tm_topology_t *topology){
+  int i,j;
+  for(i=0;i<topology->nb_levels;i++){
+    printf("%d: ",i);
+    for(j=0;j<topology->nb_nodes[i];j++)
+      printf("%d ",topology->node_id[i][j]);
+    printf("\n");
+  }
+}
+
+/* 
+   Build a synthetic balanced topology
+
+   arity : array of arity of the first nb_level (of size nb_levels-1)
+   core_numbering: numbering of the core by the system. Array of size nb_core_per_node
+
+   nb_core_per_nodes: number of cores of a given node
+
+   The numbering of the cores is done in round robin fashion after a width traversal of the topology
+ */
+
+tm_topology_t  *build_synthetic_topology(int *arity, int nb_levels, int *core_numbering, int nb_core_per_nodes){
+  tm_topology_t *topology;
+  int i,j,n=1;
+  
+  topology=(tm_topology_t*)malloc(sizeof(tm_topology_t));
+  topology->arity=(int*)malloc(sizeof(int)*nb_levels);
+  memcpy(topology->arity,arity,sizeof(int)*nb_levels);
+  topology->nb_levels=nb_levels;
+
+  topology->node_id=(int**)malloc(sizeof(int*)*topology->nb_levels);
+  topology->nb_nodes=(int*)malloc(sizeof(int)*topology->nb_levels);
+
+
+  for(i=0;i<topology->nb_levels;i++){
+    topology->nb_nodes[i]=n;
+    topology->node_id[i]=(int*)malloc(sizeof(int)*n);
+    if(i<topology->nb_levels-1){
+      for(j=0;j<n;j++)
+	topology->node_id[i][j]=j;
+    }else{
+      for(j=0;j<n;j++)
+	topology->node_id[i][j]=core_numbering[j%nb_core_per_nodes]+(nb_core_per_nodes)*(j/nb_core_per_nodes);
+    }
+
+    n*=topology->arity[i]; 
+  }
+  return topology;
+  
+}
+
+
 
 
 void   build_synthetic_proc_id(tm_topology_t *topology){
@@ -608,7 +665,9 @@ void   build_synthetic_proc_id(tm_topology_t *topology){
       topology->node_id[i][j]=j;
     n*=topology->arity[i]; 
   }
-  
+ 
+
+ 
 }
 
 void update_comm_speed(double **comm_speed,int old_size,int new_size){
