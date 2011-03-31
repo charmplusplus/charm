@@ -224,6 +224,13 @@ class LogEntry {
 #if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
+
+    void setNewStartTime(double t) {
+      time -= t;
+      if (endTime>=t) endTime -= t;
+      if (recvTime>=t) recvTime -= t;
+    }
+
     void pup(PUP::er &p);
     ~LogEntry(){
       if (fName) delete [] fName;
@@ -268,6 +275,7 @@ class LogPool {
     // writing out logs.
     double prevTime;
     double timeErr;
+    double globalStartTime; // used at the end on Pe 0 only
     double globalEndTime; // used at the end on Pe 0 only
 
     int numPhases;
@@ -339,6 +347,10 @@ class LogPool {
       writeData = b;
     }
     void modLastEntryTimestamp(double ts);
+
+    void setNewStartTime() {
+      for(UInt i=0; i<numEntries; i++) pool[i].setNewStartTime(globalStartTime);
+    }
 };
 
 /*
