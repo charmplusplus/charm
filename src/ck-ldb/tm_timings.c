@@ -13,7 +13,7 @@ void get_time(){
   CLOCK(time_tab[clock_num]);
 }
 
-double time_diff(CLOCK_T t1){
+double time_diff(){
   CLOCK_T t2;
   
   if(clock_num>MAX_CLOCK-1){
