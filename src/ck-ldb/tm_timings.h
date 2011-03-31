@@ -1,5 +1,6 @@
 #ifndef TIMINGS_H
 #define TIMINGS_H
+#include <stdio.h>
 
 #ifndef _WIN32
 #include <sys/time.h>

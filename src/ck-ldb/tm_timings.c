@@ -10,11 +10,12 @@ void get_time(){
     return;
 
   
+
   CLOCK(time_tab[clock_num]);
 }
 
 double time_diff(){
-  CLOCK_T t2;
+  CLOCK_T t2,t1;
   
 
   if(clock_num>MAX_CLOCK-1){
@@ -23,9 +24,8 @@ double time_diff(){
   }
 
   CLOCK(t2);
-  CLOCK_DISPLAY(time_tab[clock_num]);
-  CLOCK_DISPLAY(t2);
+  t1=time_tab[clock_num--];
 
 
-  return CLOCK_DIFF(t2,time_tab[clock_num--]);
+  return CLOCK_DIFF(t2,t1);
 }
