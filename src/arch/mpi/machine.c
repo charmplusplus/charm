@@ -40,8 +40,26 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 #define MULTI_SENDQUEUE    0
 
+#if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
+#define CMK_SMP 1
+#endif
+
 #define CMI_EXERT_SEND_CAP 0
 #define CMI_EXERT_RECV_CAP 0
+
+#if CMK_SMP
+/* currently only considering the smp case */
+#define CMI_DYNAMIC_EXERT_CAP 1
+/* This macro defines the max number of msgs in the sender msg buffer 
+ * that is allowed for recving operation to continue
+ */
+#define CMI_DYNAMIC_OUTGOING_THRESHOLD 10
+#define CMI_DYNAMIC_SEND_CAPSIZE 10
+#define CMI_DYNAMIC_RECV_CAPSIZE 10
+/* initial values, -1 indiates there's no cap */
+static int dynamicSendCap = -1;
+static int dynamicRecvCap = -1;
+#endif
 
 #if CMI_EXERT_SEND_CAP
 #define SEND_CAP 3
@@ -49,10 +67,6 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 #if CMI_EXERT_RECV_CAP
 #define RECV_CAP 2
-#endif
-
-#if defined(CMK_SHARED_VARS_POSIX_THREADS_SMP)
-#define CMK_SMP 1
 #endif
 
 
@@ -694,7 +708,7 @@ int PumpMsgs(void)
   MPI_Status sts;
   int recd=0;
 
-#if CMI_EXERT_RECV_CAP
+#if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
   int recvCnt=0;
 #endif
 	
@@ -708,6 +722,8 @@ int PumpMsgs(void)
   while(1) {
 #if CMI_EXERT_RECV_CAP
 	if(recvCnt==RECV_CAP) break;
+#elif CMI_DYNAMIC_EXERT_CAP
+	if(recvCnt == dynamicRecvCap) break;
 #endif
 	  
     /* First check posted recvs then do  probe unmatched outstanding messages */
@@ -837,9 +853,15 @@ int PumpMsgs(void)
 #endif
 	CmiPushPE(CMI_DEST_RANK(msg), msg);	
 	
-#if CMI_EXERT_RECV_CAP
+#if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
 	recvCnt++;
+	/* check sendMsgBuf  to get the  number of messages that have not been sent */
+	/* MsgQueueLen indicates the number of messages that have not been released by MPI */
+	if(PCQueueLength(sendMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD){
+		dynamicRecvCap = CMI_DYNAMIC_RECV_CAPSIZE;
+	}
 #endif	
+	
   }
 
   
@@ -1209,7 +1231,7 @@ static int SendMsgBuf()
   int i;
   int sent = 0;
 
-#if CMI_EXERT_SEND_CAP
+#if CMI_EXERT_SEND_CAP || CMI_DYNAMIC_EXERT_CAP
 	int sentCnt = 0;
 #endif	
 	
@@ -1232,10 +1254,14 @@ static int SendMsgBuf()
       size = msg_tmp->size;
       msg = msg_tmp->msg;
       msg_tmp->next = 0;
+		
+#if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
       while (MsgQueueLen > request_max) {
-	CmiReleaseSentMessages();
-	PumpMsgs();
+		CmiReleaseSentMessages();
+		PumpMsgs();
       }
+#endif
+	  
       MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
 #if CMK_ERROR_CHECKING
       CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
@@ -1295,6 +1321,10 @@ static int SendMsgBuf()
 	  
 #if CMI_EXERT_SEND_CAP	  
 	  if(++sentCnt == SEND_CAP) break;
+#elif CMI_DYNAMIC_EXERT_CAP
+	  if(++sentCnt == dynamicSendCap) break;
+	  if(MsgQueueLen > CMI_DYNAMIC_OUTGOING_THRESHOLD)
+		  dynamicSendCap = CMI_DYNAMIC_SEND_CAPSIZE;
 #endif	  
 	  
 #if ! MULTI_SENDQUEUE
