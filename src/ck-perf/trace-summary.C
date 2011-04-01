@@ -619,6 +619,9 @@ TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
 {
   if (CkpvAccess(traceOnPe) == 0) return;
 
+    // use absolute time
+  if (CmiTimerAbsolute()) binStart = CmiInitTime();
+
   CkpvInitialize(int, binCount);
   CkpvInitialize(double, binSize);
   CkpvInitialize(double, version);
@@ -648,6 +651,8 @@ TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   // assume invalid entry point on start
   execEp=INVALIDEP;
+  inIdle = 0;
+  inExec = 0;
 }
 
 void TraceSummary::traceClearEps(void)
@@ -703,6 +708,12 @@ void TraceSummary::beginExecute(char *msg)
 
 void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx)
 {
+  if (execEp == TRACEON_EP) {
+    endExecute();
+  }
+  CmiAssert(inIdle == 0 && inExec == 0);
+  inExec = 1;
+
   if (execEp != INVALIDEP) {
     TRACE_WARN("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");
     return;
@@ -736,6 +747,9 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 
 void TraceSummary::endExecute(void)
 {
+  CmiAssert(inIdle == 0 && inExec == 1);
+  inExec = 0;
+
   double t = TraceTimer();
   double ts = start;
   double nts = binStart;
@@ -792,6 +806,12 @@ void TraceSummary::endExecute(char *msg){
 
 void TraceSummary::beginIdle(double currT)
 {
+  if (execEp == TRACEON_EP) {
+    endExecute();
+  }
+
+  CmiAssert(inIdle == 0 && inExec == 0);
+  inIdle = 1;
   double t = TraceTimer(currT);
   
   // mark the time of this idle period. Only the next endIdle should see
@@ -809,6 +829,8 @@ void TraceSummary::beginIdle(double currT)
 
 void TraceSummary::endIdle(double currT)
 {
+  CmiAssert(inIdle == 1 && inExec == 0);
+  inIdle = 0;
   double t = TraceTimer(currT);
   double t_idleStart = idleStart;
   double t_binStart = binStart;

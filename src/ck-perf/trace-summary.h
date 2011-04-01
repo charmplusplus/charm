@@ -260,6 +260,8 @@ class TraceSummary : public Trace {
     double start, packstart, unpackstart, idleStart;
     double binTime, binIdle;
     int msgNum; /* used to handle multiple endComputation calls?? */
+    int inIdle;
+    int inExec;
   public:
     TraceSummary(char **argv);
     void creation(envelope *e, int epIdx, int num=1) {}
