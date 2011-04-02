@@ -49,16 +49,17 @@ static void sleep(int secs) {Sleep(1000*secs);}
 
 #if CMK_SMP
 /* currently only considering the smp case */
-#define CMI_DYNAMIC_EXERT_CAP 1
+#define CMI_DYNAMIC_EXERT_CAP 0
 /* This macro defines the max number of msgs in the sender msg buffer 
  * that is allowed for recving operation to continue
  */
-#define CMI_DYNAMIC_OUTGOING_THRESHOLD 10
+#define CMI_DYNAMIC_OUTGOING_THRESHOLD 8
+#define CMI_DYNAMIC_MAXCAPSIZE 1000
 #define CMI_DYNAMIC_SEND_CAPSIZE 10
 #define CMI_DYNAMIC_RECV_CAPSIZE 10
 /* initial values, -1 indiates there's no cap */
-static int dynamicSendCap = -1;
-static int dynamicRecvCap = -1;
+static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
+static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 #endif
 
 #if CMI_EXERT_SEND_CAP
@@ -724,12 +725,15 @@ int PumpMsgs(void)
 
   MACHSTATE(2,"PumpMsgs begin {");
 
+#if CMI_DYNAMIC_EXERT_CAP
+  dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
+#endif
 	
   while(1) {
 #if CMI_EXERT_RECV_CAP
 	if(recvCnt==RECV_CAP) break;
 #elif CMI_DYNAMIC_EXERT_CAP
-	if(recvCnt == dynamicRecvCap) break;
+	if(recvCnt >= dynamicRecvCap) break;
 #endif
 	  
     /* First check posted recvs then do  probe unmatched outstanding messages */
@@ -1241,6 +1245,10 @@ static int SendMsgBuf()
 	int sentCnt = 0;
 #endif	
 	
+#if CMI_DYNAMIC_EXERT_CAP
+	dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
+#endif
+	
   MACHSTATE(2,"SendMsgBuf begin {");
 #if MULTI_SENDQUEUE
   for (i=0; i<_Cmi_mynodesize=1; i++)  /* subtle: including comm thread */
@@ -1328,7 +1336,7 @@ static int SendMsgBuf()
 #if CMI_EXERT_SEND_CAP	  
 	  if(++sentCnt == SEND_CAP) break;
 #elif CMI_DYNAMIC_EXERT_CAP
-	  if(++sentCnt == dynamicSendCap) break;
+	  if(++sentCnt >= dynamicSendCap) break;
 	  if(MsgQueueLen > CMI_DYNAMIC_OUTGOING_THRESHOLD)
 		  dynamicSendCap = CMI_DYNAMIC_SEND_CAPSIZE;
 #endif	  
