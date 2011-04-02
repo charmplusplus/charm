@@ -149,7 +149,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
 /* static void neighbour_init(int); */
 
-void CmiTimerInit(void);
+void CmiTimerInit(char **argv);
 
 static void threadInit(void *arg)
 {
@@ -168,7 +168,7 @@ static void threadInit(void *arg)
 
   CthInit(usrparam->argv);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
-  CmiTimerInit();
+  CmiTimerInit(usrparam->argv);
   /*  neighbour_init(_Cmi_mype); */
   usadd(arena);
   ConverseCommonInit(usrparam->argv);
@@ -402,7 +402,7 @@ void * McQueueRemoveFromFront(McQueue *queue)
 CpvStaticDeclare(double,inittime_wallclock);
 CpvStaticDeclare(double,inittime_virtual);
 
-void CmiTimerInit(void)
+void CmiTimerInit(char **argv)
 {
   struct timespec temp;
   CpvInitialize(double, inittime_wallclock);

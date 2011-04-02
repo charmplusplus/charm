@@ -212,7 +212,7 @@ static void PerrorExit(const char *msg)
 #if CMK_TIMER_USE_SPECIAL
 
 #include <sys/timers.h>
-void CmiTimerInit(void)
+void CmiTimerInit(char **argv)
 {
     starttimer =  elan_clock(elan_base->state); 
 }
@@ -1686,7 +1686,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
   //CmiPrintf("SMALL_MESSAGE_SIZE = %d\n", SMALL_MESSAGE_SIZE);
 
-  CmiTimerInit();
+  CmiTimerInit(argv);
   msgBuf = PCQueueCreate();
 
   CsvInitialize(CmiNodeState, NodeState);
