@@ -1129,6 +1129,21 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return 0.0;
+}
+
 void CmiTimerInit(char **argv) {}
 
 #include "dcmf.h"
