@@ -807,7 +807,7 @@ double CmiStartTimer()
 
 double CmiInitTime()
 {
-  return inittime_wallclock;
+  return CpvAccess(inittime_wallclock);
 }
 
 void CmiTimerInit(char **argv)
