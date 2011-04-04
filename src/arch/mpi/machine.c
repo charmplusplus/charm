@@ -55,8 +55,8 @@ static void sleep(int secs) {Sleep(1000*secs);}
  */
 #define CMI_DYNAMIC_OUTGOING_THRESHOLD 8
 #define CMI_DYNAMIC_MAXCAPSIZE 1000
-#define CMI_DYNAMIC_SEND_CAPSIZE 10
-#define CMI_DYNAMIC_RECV_CAPSIZE 10
+#define CMI_DYNAMIC_SEND_CAPSIZE 6
+#define CMI_DYNAMIC_RECV_CAPSIZE 6
 /* initial values, -1 indiates there's no cap */
 static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
@@ -867,7 +867,8 @@ int PumpMsgs(void)
 	recvCnt++;
 	/* check sendMsgBuf  to get the  number of messages that have not been sent */
 	/* MsgQueueLen indicates the number of messages that have not been released by MPI */
-	if(PCQueueLength(sendMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD){
+	if(PCQueueLength(sendMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD
+		|| MsgQueueLen > CMI_DYNAMIC_OUTGOING_THRESHOLD){
 		dynamicRecvCap = CMI_DYNAMIC_RECV_CAPSIZE;
 	}
 #endif	
