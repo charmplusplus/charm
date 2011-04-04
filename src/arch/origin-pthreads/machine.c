@@ -191,7 +191,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   threadInit(usrparam);
 }
 
-void CmiTimerInit(void);
+void CmiTimerInit(char **argv);
 
 static void *threadInit(void *arg)
 {
@@ -205,7 +205,7 @@ static void *threadInit(void *arg)
   ConverseCommonInit(usrparam->argv);
   CpvInitialize(void*, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
-  CmiTimerInit();
+  CmiTimerInit(usrparam->argv);
   if (Cmi_initret==0) {
     Cmi_startFn(Cmi_argc, usrparam->argv);
     if (Cmi_usched==0) CsdScheduler(-1);
@@ -381,7 +381,7 @@ void * McQueueRemoveFromFront(McQueue *queue)
 CpvStaticDeclare(double,inittime_wallclock);
 CpvStaticDeclare(double,inittime_virtual);
 
-void CmiTimerInit(void)
+void CmiTimerInit(char **argv)
 {
   struct timespec temp;
   CpvInitialize(double, inittime_wallclock);

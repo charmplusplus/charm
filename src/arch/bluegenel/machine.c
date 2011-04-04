@@ -205,7 +205,7 @@ int CmiTimerIsSynchronized(void)
   return _is_global;
 }
 
-void CmiTimerInit(void)
+void CmiTimerInit(char **argv)
 {
   _is_global = CmiTimerIsSynchronized();
 

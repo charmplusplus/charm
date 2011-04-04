@@ -795,6 +795,11 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
 double CmiStartTimer()
 {
   return 0.0;
@@ -802,7 +807,7 @@ double CmiStartTimer()
 
 double CmiInitTime()
 {
-  return inittime_wallclock;
+  return CpvAccess(inittime_wallclock);
 }
 
 void CmiTimerInit(char **argv)
@@ -1071,6 +1076,11 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
+int CmiTimerAbsolute()
+{
+  return 1;
+}
+
 double CmiStartTimer()
 {
   return 0.0;
@@ -1079,11 +1089,6 @@ double CmiStartTimer()
 double CmiInitTime()
 {
   return inittime_wallclock;
-}
-
-int CmiTimerAbsolute()
-{
-  return 1;
 }
 
 void CmiTimerInit(char **argv)
@@ -1124,6 +1129,21 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return 0.0;
+}
+
 void CmiTimerInit(char **argv) {}
 
 #include "dcmf.h"
@@ -1152,6 +1172,11 @@ CpvStaticDeclare(double, clocktick);
 int CmiTimerIsSynchronized()
 {
   return 1;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 #include "hwi/include/bqc/A2_inlines.h"
@@ -1215,6 +1240,11 @@ CpvStaticDeclare(double, inittime_virtual);
 double CmiStartTimer()
 {
   return 0.0;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiInitTime()
@@ -1300,6 +1330,11 @@ void CmiTimerInit(char **argv)
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
 }
 
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
 double CmiWallTimer()
 {
   long long now;
@@ -1352,6 +1387,11 @@ void CmiTimerInit(char **argv)
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiWallTimer()

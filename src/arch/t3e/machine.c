@@ -869,7 +869,7 @@ static double clocktick;
 static long inittime_wallclock;
 static long inittime_virtual;
 
-void CmiTimerInit()
+void CmiTimerInit(char **argv)
 {
   inittime_wallclock = _rtc();
   inittime_virtual = cpused();
