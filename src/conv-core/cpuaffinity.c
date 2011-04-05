@@ -590,14 +590,36 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
+#if CMK_CRAYXT
+  if (CmiMyRank() == 0)
+  {
+    int numPes = CmiNumPes();
+    int numNodes = CmiNumNodes();
+
+    int myid = getXTNodeID(CmiMyNode(), CmiNumNodes());
+    int myrank;
+    int pe = CmiMyPe();
+    pe --;
+    while (pe >= 0) {
+      if (getXTNodeID(CmiNodeOf(pe), numNodes) != myid) break;
+      pe --;
+    }
+    myrank = CmiMyPe() - pe - 1;
+
+    if (-1 != CmiSetCPUAffinity(myrank)) {
+      DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
+    }
+    else{
+      CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
+      CmiAbort("set cpu affinity abort!\n");
+    }
+  }
+  CmiNodeAllBarrier();
+#else
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_CRAYXT
-    ret = getXTNodeID(CmiMyNode(), CmiNumNodes());
-    //printf("NODEID: %d %d. \n", CmiMyNode(), ret);
-    memcpy(&myip, &ret, sizeof(int));
-#elif CMK_HAS_GETHOSTNAME
+#if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
 #else
     CmiAbort("Can not get unique name for the compute nodes. \n");
@@ -636,6 +658,7 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
+#endif
 
   if (show_affinity_flag) CmiPrintCPUAffinity();
 }
