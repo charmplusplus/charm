@@ -396,7 +396,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 
   int obtain_flag = 1;              // default on
-#if __FAULT__
+#if __FAULT_|| CMK_BLUEGENEQ
   obtain_flag = 0;
 #endif
   if(CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
@@ -419,9 +419,11 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
     CmiNodeAllBarrier();
+    CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks
     return;
   }
-  else if (CmiMyPe() == 0) {
+
+  if (CmiMyPe() == 0) {
 #if CMK_BLUEGENE_CHARM
     if (BgNodeRank() == 0)
 #endif
@@ -482,7 +484,6 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-#elif CMK_BLUEGENEQ
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
