@@ -111,7 +111,7 @@ extern void BgDelaySend(BgMsgEntry *msgEntry);
 
 class BgTimeLineRec;
 
-enum BgMPIOp { MPI_NONE = 0, MPI_BARRIER = 1, MPI_ALLREDUCE = 2 };
+enum BgMPIOp { MPI_NONE = 0, MPI_BARRIER = 1, MPI_ALLREDUCE = 2 , MPI_ALLTOALL = 3};
 
 #define BGLOG_NAMELEN   20
 

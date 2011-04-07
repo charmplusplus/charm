@@ -316,6 +316,17 @@ void BgTimeLog::write(FILE *fp)
     if (!objId.isNull())
       fprintf(fp," ObjID: %d %d %d %d\n", objId.id[0], objId.id[1], objId.id[2], objId.id[3]);
   }
+  if (bglog_version >= 6) {
+    if (mpiOp!=MPI_NONE) {
+      fprintf(fp, "MPI collective: ");
+      switch (mpiOp) {
+      case MPI_BARRIER:   fprintf(fp, "MPI Barrier"); break;
+      case MPI_ALLREDUCE: fprintf(fp, "MPI_Allreduce"); break;
+      case MPI_ALLTOALL:  fprintf(fp, "MPI_Alltoall"); break;
+      }
+      fprintf(fp, " mpiSize: %d\n", mpiSize);
+    }
+  }
   for (i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
   for (i=0; i<evts.length(); i++)
