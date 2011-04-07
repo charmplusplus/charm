@@ -158,7 +158,8 @@ BgTimeLog::BgTimeLog()
 
 BgTimeLog::BgTimeLog(BgTimeLog *log)
 {
-  strncpy(name,log->name,20);
+  strncpy(name,log->name,BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = log->ep;
   charm_ep = -1;
   startTime = log->startTime;
@@ -197,7 +198,8 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
 { 
   if(namestr == NULL)
     namestr = (char*)"dummyname1";
-  strncpy(name,namestr,20);
+  strncpy(name,namestr,BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = epc;
   charm_ep = -1;
   startTime = sTime;
@@ -217,7 +219,8 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr, double sTime, double eTime)
 {
   if(namestr == NULL)
     namestr = (char*)"dummyname2";
-  strncpy(name,namestr, 20);
+  strncpy(name,namestr, BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = epc;
   charm_ep = -1;
   startTime = sTime;
@@ -407,7 +410,7 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   if (bglog_version >= 4) p(charm_ep);
   p|recvTime; p|effRecvTime; p|startTime; p|execTime; p|endTime; 
-  p|flag; p(name,20);
+  p|flag; p(name,BGLOG_NAMELEN);
   if (bglog_version >= 3)
     p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
   else if (bglog_version == 2)

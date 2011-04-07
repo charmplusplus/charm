@@ -113,6 +113,8 @@ class BgTimeLineRec;
 
 enum BgMPIOp { MPI_NONE = 0, MPI_BARRIER = 1, MPI_ALLREDUCE = 2 };
 
+#define BGLOG_NAMELEN   20
+
 /**
   one time log for an handler function;
   it records a list of message sent events in an execution of handler
@@ -137,7 +139,7 @@ public:
   unsigned short mpiOp;
   short charm_ep;
 
-  char name[20];
+  char name[BGLOG_NAMELEN];
   char doCorrect;
   char flag;
 
