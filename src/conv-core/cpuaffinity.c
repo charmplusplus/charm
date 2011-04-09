@@ -578,7 +578,7 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL) {
     int mycore = search_pemap(pemap, CmiMyPe());
-    if(CmiMyNode()==0) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if(show_affinity_flag && CmiMyNode()==0) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
     if (mycore >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
@@ -586,7 +586,7 @@ void CmiInitCPUAffinity(char **argv)
     if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
-    if (show_affinity_flag) CmiPrintCPUAffinity();
+    /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
     return;
   }
 
