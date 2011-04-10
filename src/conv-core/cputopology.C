@@ -451,15 +451,6 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiBarrier();
 #endif
 
-  if (CmiMyPe() >= CmiNumPes()) {
-    CmiNodeAllBarrier();         // comm thread waiting
-#if CMK_MACHINE_PROGRESS_DEFINED
-#if ! CMK_CRAYXT
-    while (done < CmiMyNodeSize()) CmiNetworkProgress();
-#endif
-#endif
-    return;    /* comm thread return */
-  }
 
 #if 0
   if (gethostname(hostname, 999)!=0) {
@@ -513,7 +504,19 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
+
 #else
+
+  if (CmiMyPe() >= CmiNumPes()) {
+    CmiNodeAllBarrier();         // comm thread waiting
+#if CMK_MACHINE_PROGRESS_DEFINED
+#if ! CMK_CRAYXT
+    while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
+#endif
+    return;    /* comm thread return */
+  }
+
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
