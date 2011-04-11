@@ -18,7 +18,7 @@ public class SimpleClass {
         m.property++;
         m.property = 0;
         m.foo.property++;
-        method1(m.property, m.foo);
+        method2(m.property, m.foo);
         //Foo n = new Foo(m.foo.property);
         //this.method(m.property);
         //method(n.property);

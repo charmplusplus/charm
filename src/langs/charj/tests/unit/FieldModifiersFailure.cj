@@ -1,3 +1,4 @@
+// expect failure
 package tests.unit;
 
 public class FieldModifiers {
@@ -9,4 +10,8 @@ public class FieldModifiers {
     volatile int m;
     protected int n;
     final int r;
+// should fail
+    entry int o; 
+    abstract int p; 
+    transient int q;
 }

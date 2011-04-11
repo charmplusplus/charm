@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 tests=0
 passed_tests=0
+
+BASE_DIR=`pwd`
+CHARJC="$BASE_DIR/../bin/charjc"
 
 function test_file() {
     tests=`expr $tests + 1`
@@ -12,13 +15,13 @@ function test_file() {
         EXPECT="failure"
     fi
 
-    echo "Test $tests: $file" >> run_tests.log
+    echo "Test $tests: $file" >> $BASE_DIR/run_tests.log
     RESULT="success"
-    ../bin/charjc $file &> run_tests.log.tmp
+    $CHARJC $file &> run_tests.log.tmp
     if [ "$?" -ne "0" ]; then
         RESULT="failure"
     fi
-    cat run_tests.log.tmp >> run_tests.log
+    cat run_tests.log.tmp >> $BASE_DIR/run_tests.log
     rm run_tests.log.tmp
 
     PASS="FAIL"
@@ -27,14 +30,18 @@ function test_file() {
         passed_tests=`expr $passed_tests + 1`
     fi
     echo "$PASS" >> run_tests.log
-    printf "Testing %s, expected %s...%s\n" `basename $file` $EXPECT $PASS
+    printf "Testing %s...%s\n" `basename $file` $PASS
 }
 
 rm -f run_tests.log
 TESTDIRS="unit"
-TESTFILES=`find $TESTDIRS -name "*.cj"`
-for f in $TESTFILES; do
-    test_file "$f"
+for dir in $TESTDIRS; do
+    pushd $dir > /dev/null
+    rm -rf *.gen *.decl.h
+    for file in `find . -name "*.cj"`; do
+        test_file "$file"
+    done
+    popd > /dev/null
 done
 echo "Passed $passed_tests/$tests tests"
 
