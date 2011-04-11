@@ -50,7 +50,7 @@ static int allmsg, dontcare, msgtype;
 
 /**************************  TIMER FUNCTIONS **************************/
 
-void CmiTimerInit(void)
+void CmiTimerInit(char **argv)
 {
   timebasestruct_t time;
   read_real_time(&time, TIMEBASE_SZ);
@@ -302,7 +302,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
   for ( Cmi_dim=0,n=_Cmi_numpes; n>1; n/=2 )
     Cmi_dim++ ;
   /* CmiSpanTreeInit(); */
-  CmiTimerInit();
+  CmiTimerInit(argv);
   CpvInitialize(void *, CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = CdsFifo_Create();
   recdQueueInit();

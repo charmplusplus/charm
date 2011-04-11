@@ -286,20 +286,20 @@ public:
   inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
   inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
 
-  inline void BackgroundLoad(double *walltime, double *cputime) {
+  inline void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
     LDBackgroundLoad(myLDHandle,walltime,cputime);
   }
 
-  inline void IdleTime(double *walltime) {
+  inline void IdleTime(LBRealType *walltime) {
     LDIdleTime(myLDHandle,walltime);
   };
 
-  inline void TotalTime(double *walltime, double *cputime) {
+  inline void TotalTime(LBRealType *walltime, LBRealType *cputime) {
     LDTotalTime(myLDHandle,walltime,cputime);
   }
 
-  inline void GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime) {
+  inline void GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime) {
     LDGetTime(myLDHandle, total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
   }
 

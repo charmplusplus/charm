@@ -100,11 +100,10 @@ class ThreeLevelTree: public MyHierarchyTree {
 private:
   int toproot;
 public:
-  ThreeLevelTree() {
+  ThreeLevelTree(int groupsize=512) {
     myname = "ThreeLevelTree";
     span = new int[2];
     nLevels = 3;
-    int groupsize = 512;
     while (groupsize && CkNumPes() / groupsize < 2) {
       groupsize /= 2;
     }
@@ -239,9 +238,9 @@ public:
     nLevels = k;
     span = new int[nLevels-1];
     int P=CkNumPes();
-    G = exp(log(P*1.0)/(nLevels-1));
+    G = (int)(exp(log(P*1.0)/(nLevels-1))+0.5);
     if (pow(G*1.0, nLevels-1) != P) {
-      CkPrintf("KLevelTree: G=%d\n", G);
+      CkPrintf("KLevelTree failed: P=%d Level=%d G=%d\n", P, nLevels, G);
       CmiAbort("KLevelTree failed");
     }
     for (int i=0; i<nLevels-1; i++) span[i] = G;
@@ -363,6 +362,7 @@ protected:
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
   MyHierarchyTree  *tree;
+  int shrinklevel;
 
   class LevelData {
   public:

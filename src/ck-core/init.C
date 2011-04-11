@@ -165,7 +165,7 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 	FAULT_EVAC
 */
 CpvCExtern(char *, _validProcessors);
-CpvDeclare(char ,startedEvac);
+CkpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
 
@@ -956,8 +956,8 @@ void _initCharm(int unused_argc, char **argv)
 	*/
 #ifndef __BLUEGENE__
 	CpvInitialize(char *,_validProcessors);
-	CpvInitialize(char ,startedEvac);
 #endif
+	CkpvInitialize(char ,startedEvac);
 	CpvInitialize(int,serializer);
 
 	_initChareTables();            // for checkpointable plain chares
@@ -1191,10 +1191,10 @@ void _initCharm(int unused_argc, char **argv)
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
-	CpvAccess(startedEvac) = 0;
 	_ckEvacBcastIdx = CkRegisterHandler((CmiHandler)_ckEvacBcast);
 	_ckAckEvacIdx = CkRegisterHandler((CmiHandler)_ckAckEvac);
 #endif
+	CkpvAccess(startedEvac) = 0;
 	CpvAccess(serializer) = 0;
 
 	evacuate = 0;

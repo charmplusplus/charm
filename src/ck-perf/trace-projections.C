@@ -270,6 +270,7 @@ LogPool::LogPool(char *pgm) {
   // **CW** for simple delta encoding
   prevTime = 0.0;
   timeErr = 0.0;
+  globalStartTime = 0.0;
   globalEndTime = 0.0;
   headerWritten = 0;
   numPhases = 0;
@@ -577,7 +578,9 @@ void LogPool::writeRC(void)
     //CkPrintf("write RC is being executed\n");
 #ifdef PROJ_ANALYSIS  
     CkAssert(CkMyPe() == 0);
-    fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
+    fprintf(rcfp,"RC_GLOBAL_START_TIME %lld\n",
+  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalStartTime));
+    fprintf(rcfp,"RC_GLOBAL_END_TIME   %lld\n",
   	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
     /* //Yanhua comment it because isOutlierAutomatic is not a variable in trace
     if (CkpvAccess(_trace)->isOutlierAutomatic()) {
@@ -696,7 +699,7 @@ void LogPool::addUserSuppliedNote(char *note){
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
 #ifndef CMK_BLUEGENE_CHARM
-#if CMK_SMP_TRACE_COMMTHREAD && MPI_SMP_TRACE_COMMTHREAD_HACK
+#if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
   //entries
@@ -1807,7 +1810,8 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
       findOutliers = true;
     }
   }
-  traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers);
+  bool findStartTime = (CmiTimerAbsolute()==1);
+  traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers, findStartTime);
   if (findOutliers) {
     kMeansGID = CProxy_KMeansBOC::ckNew(outlierAutomatic,
 					numKSeeds,
@@ -1844,6 +1848,9 @@ void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
     kMeansProxy[CkMyPe()].startKMeansAnalysis();
   }
   parModulesRemaining++;
+  if (findStartTime) 
+  bocProxy[CkMyPe()].startTimeAnalysis();
+  else
   bocProxy[CkMyPe()].startEndTimeAnalysis();
 }
 
@@ -2662,6 +2669,28 @@ void KMeansBOC::phaseDone() {
   }
 }
 
+void TraceProjectionsBOC::startTimeAnalysis()
+{
+  double startTime = 0.0;
+  if (CkpvAccess(_trace)->_logPool->numEntries>0)
+     startTime = CkpvAccess(_trace)->_logPool->pool[0].time;
+  CkCallback cb(CkIndex_TraceProjectionsBOC::startTimeDone(NULL), thisProxy);
+  contribute(sizeof(double), &startTime, CkReduction::min_double, cb);  
+}
+
+void TraceProjectionsBOC::startTimeDone(CkReductionMsg *msg)
+{
+  // CkPrintf("[%d] TraceProjectionsBOC::startTimeDone time=\t%g parModulesRemaining:%d\n", CkMyPe(), CkWallTimer(), parModulesRemaining);
+
+  if (CkpvAccess(_trace) != NULL) {
+    CkpvAccess(_trace)->_logPool->globalStartTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->setNewStartTime();
+    //if (CkMyPe() == 0) CkPrintf("Start time determined to be %lf us\n", (CkpvAccess(_trace)->_logPool->globalStartTime)*1e06);
+  }
+  delete msg;
+  thisProxy[CkMyPe()].startEndTimeAnalysis();
+}
+
 void TraceProjectionsBOC::startEndTimeAnalysis()
 {
  //CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
@@ -2681,7 +2710,7 @@ void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
   if (CkpvAccess(_trace) != NULL) {
-    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData() - CkpvAccess(_trace)->_logPool->globalStartTime;
     // CkPrintf("End time determined to be %lf us\n",
     //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
   }

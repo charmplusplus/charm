@@ -129,6 +129,7 @@ class KMeansBOC : public CBase_KMeansBOC {
 class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
  private:
   bool findOutliers;
+  bool findStartTime;
 
   int parModulesRemaining;
 
@@ -137,10 +138,12 @@ class TraceProjectionsBOC : public CBase_TraceProjectionsBOC {
   double analysisStartTime;
   int endPe;                          // end PE which calls CkExit()
  public:
- TraceProjectionsBOC(bool _findOutliers) : findOutliers(_findOutliers), parModulesRemaining(0), endPe(-1) {};
+ TraceProjectionsBOC(bool _findOutliers, bool _findStartTime) : findOutliers(_findOutliers), findStartTime(_findStartTime), parModulesRemaining(0), endPe(-1) {};
  TraceProjectionsBOC(CkMigrateMessage *m):CBase_TraceProjectionsBOC(m), parModulesRemaining(0), endPe(-1) {};
 
   void traceProjectionsParallelShutdown(int);
+  void startTimeAnalysis();
+  void startTimeDone(CkReductionMsg *);
   void startEndTimeAnalysis();
   void endTimeDone(CkReductionMsg *);
   void kMeansDone(CkReductionMsg *);

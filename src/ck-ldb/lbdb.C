@@ -247,7 +247,7 @@ extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int 
 }
 
 extern "C" void LDBackgroundLoad(LDHandle _db,
-				 double* walltime, double* cputime)
+				 LBRealType* walltime, LBRealType* cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->BackgroundLoad(walltime,cputime);
@@ -255,7 +255,7 @@ extern "C" void LDBackgroundLoad(LDHandle _db,
   return;
 }
 
-extern "C" void LDIdleTime(LDHandle _db,double* walltime)
+extern "C" void LDIdleTime(LDHandle _db,LBRealType* walltime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->IdleTime(walltime);
@@ -263,7 +263,7 @@ extern "C" void LDIdleTime(LDHandle _db,double* walltime)
   return;
 }
 
-extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
+extern "C" void LDTotalTime(LDHandle _db,LBRealType* walltime, LBRealType* cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->TotalTime(walltime,cputime);
@@ -271,9 +271,9 @@ extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
   return;
 }
 
-extern "C" void LDGetTime(LDHandle _db, double *total_walltime,
-                   double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime)
+extern "C" void LDGetTime(LDHandle _db, LBRealType *total_walltime,
+                   LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);

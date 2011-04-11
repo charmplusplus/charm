@@ -1,20 +1,20 @@
 /* Hash Table routines
-Orion Sky Lawlor, olawlor@acm.org, 11/21/1999
+   Orion Sky Lawlor, olawlor@acm.org, 11/21/1999
 
-This file defines the interface for the C++ Hashtable
-class.  A Hashtable stores key/object pairs
-so that an arbitrary key can be accessed in 
-constant time.
+   This file defines the interface for the C++ Hashtable
+   class.  A Hashtable stores key/object pairs
+   so that an arbitrary key can be accessed in 
+   constant time.
 
-This is a complicated non-chaining Hashtable implementation.
-It dynamically rehashes when the table gets too full.  
-Both the key and object are treated as arbitrary fixed-length 
-runs of bytes.
+   This is a complicated non-chaining Hashtable implementation.
+   It dynamically rehashes when the table gets too full.  
+   Both the key and object are treated as arbitrary fixed-length 
+   runs of bytes.
 
-Key hashing and comparison are handled by function pointers,
-so the keys can be interpreted any way you like.  The default
-(and C interface way) is to treat them as runs of plain bytes.
-*/
+   Key hashing and comparison are handled by function pointers,
+   so the keys can be interpreted any way you like.  The default
+   (and C interface way) is to treat them as runs of plain bytes.
+   */
 
 #ifdef __cplusplus
 #include "pup.h"
@@ -29,54 +29,54 @@ extern "C" {
 
 #include <stddef.h>
 
-/*C Version of Hashtable header file: */
-typedef void *CkHashtable_c;
+    /*C Version of Hashtable header file: */
+    typedef void *CkHashtable_c;
 
-/*Create hashtable with a single integer as the key*/
-CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize);
-/*Create hashtable with a C string pointer as the key */
-CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize);
-/*Create hashtable with a C pointer as the key */
-CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize);
+    /*Create hashtable with a single integer as the key*/
+    CkHashtable_c CkCreateHashtable_int(int objBytes,int initSize);
+    /*Create hashtable with a C string pointer as the key */
+    CkHashtable_c CkCreateHashtable_string(int objBytes,int initSize);
+    /*Create hashtable with a C pointer as the key */
+    CkHashtable_c CkCreateHashtable_pointer(int objBytes,int initSize);
 
-void CkDeleteHashtable(CkHashtable_c h);
+    void CkDeleteHashtable(CkHashtable_c h);
 
-/*Return object storage for this (possibly new) key*/
-void *CkHashtablePut(CkHashtable_c h,const void *atKey);
+    /*Return object storage for this (possibly new) key*/
+    void *CkHashtablePut(CkHashtable_c h,const void *atKey);
 
-/*Return object storage for this (old) key-- */
-/*  returns NULL if key not found.*/
-void *CkHashtableGet(CkHashtable_c h,const void *fromKey);
+    /*Return object storage for this (old) key-- */
+    /*  returns NULL if key not found.*/
+    void *CkHashtableGet(CkHashtable_c h,const void *fromKey);
 
-/*Return the key associated with this object (previously returned with one of the above functions) */
-void *CkHashtableKeyFromObject(CkHashtable_c h,const void *object);
+    /*Return the key associated with this object (previously returned with one of the above functions) */
+    void *CkHashtableKeyFromObject(CkHashtable_c h,const void *object);
 
-/* Remove this key, rehashing as needed.
-   Returns the number of keys removed (always 0 or 1) */
-int CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
+    /* Remove this key, rehashing as needed.
+       Returns the number of keys removed (always 0 or 1) */
+    int CkHashtableRemove(CkHashtable_c h,const void *doomedKey);
 
-/*Number of elements stored in the hashtable */
-int CkHashtableSize(CkHashtable_c h);
+    /*Number of elements stored in the hashtable */
+    int CkHashtableSize(CkHashtable_c h);
 
-/*C Version of Hashtable iterator */
-typedef void *CkHashtableIterator_c;
+    /*C Version of Hashtable iterator */
+    typedef void *CkHashtableIterator_c;
 
-/*Return the iterator for the given hashtable. It is reset to the beginning
- ** WARNING!!! ** This is a newly allocated memory that must be freed by the
- user with CkHashtableDestroyIterator */
-CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h);
+    /*Return the iterator for the given hashtable. It is reset to the beginning
+     ** WARNING!!! ** This is a newly allocated memory that must be freed by the
+     user with CkHashtableDestroyIterator */
+    CkHashtableIterator_c CkHashtableGetIterator(CkHashtable_c h);
 
-/* Destroy the iterator allocated with CkHashtableGetIterator */
-void CkHashtableDestroyIterator(CkHashtableIterator_c it);
+    /* Destroy the iterator allocated with CkHashtableGetIterator */
+    void CkHashtableDestroyIterator(CkHashtableIterator_c it);
 
-/* Return the next element in the hash table given the iterator (NULL if not found) */
-void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **retKey);
+    /* Return the next element in the hash table given the iterator (NULL if not found) */
+    void *CkHashtableIteratorNext(CkHashtableIterator_c it, void **retKey);
 
-/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
-void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n);
+    /* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+    void CkHashtableIteratorSeek(CkHashtableIterator_c it, int n);
 
-/* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
-void CkHashtableIteratorSeekStart(CkHashtableIterator_c it);
+    /* Seek the iterator into the hashtable by 'n' slot (*not* objects) */
+    void CkHashtableIteratorSeekStart(CkHashtableIterator_c it);
 
 #endif /*__OSL_HASH_TABLE_C*/
 #ifdef __cplusplus
@@ -95,9 +95,9 @@ typedef unsigned int CkHashCode;
 //A circular-left-shift, useful for creating hash codes.
 inline CkHashCode circleShift(CkHashCode h,unsigned int by) 
 {
-	const unsigned int intBits=8*sizeof(CkHashCode);
-	by%=intBits;
-	return (h<<by)|(h>>(intBits-by));
+    const unsigned int intBits=8*sizeof(CkHashCode);
+    by%=intBits;
+    return (h<<by)|(h>>(intBits-by));
 }
 
 //Functions to map keys to hash codes.
@@ -105,11 +105,11 @@ typedef CkHashCode (*CkHashFunction)(const void *keyData,size_t keyLen);
 CkHashCode CkHashFunction_default(const void *keyData,size_t keyLen);
 CkHashCode CkHashFunction_string(const void *keyData,size_t keyLen);
 inline CkHashCode CkHashFunction_int(const void *keyData,size_t /*len*/)
-	{return *(int *)keyData;}
+{return *(int *)keyData;}
 inline CkHashCode CkHashFunction_pointer(const void *keyData,size_t /*len*/)
-	{if (sizeof(char*)==sizeof(int)) return *(int *)keyData;
-	else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] ^ ((int*)keyData)[1];
-	else *((char*)0) = 0;
+{if (sizeof(char*)==sizeof(int)) return *(int *)keyData;
+    else if (sizeof(char*)==2*sizeof(int)) return ((int*)keyData)[0] ^ ((int*)keyData)[1];
+    else CmiAbort("Invalid key data for hash code");
         return 0;
 	}
 

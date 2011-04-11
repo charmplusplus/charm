@@ -474,7 +474,7 @@ void threadInfo::broughtIntoMem(){
 #else
 	//not doing prefetch optimization for ooc emulation
 	_BgOutOfCoreFlag=2;
-	char *dirname = "/tmp/CORE";
+	const char *dirname = "/tmp/CORE";
 	//every body make dir in case it is local directory
 	//CmiMkdir(dirname);
 	char filename[128];
@@ -508,7 +508,7 @@ void threadInfo::takenOutofMem(){
     assert(isCoreOnDisk==0);
 
     _BgOutOfCoreFlag=1;
-    char *dirname = "/tmp/CORE";
+    const char *dirname = "/tmp/CORE";
     //every body make dir in case it is local directory
     CmiMkdir(dirname);
     char filename[128];

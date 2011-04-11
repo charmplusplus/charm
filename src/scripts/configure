@@ -1674,7 +1674,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 # Decimal representation of Charm++ release line and API revision
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
-VERSION=60303
+VERSION=60304
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
@@ -2250,11 +2250,11 @@ cat > $t <<EOT
 
 int foo()
 {
-int x[sizeof(void *) - 7]={0};
+int x[(int)(sizeof(void *) - 7)]={0};
 return x[0];
 }
 EOT
-test_cxx "whether compiler is 64bit" "yes" "no" ""
+test_cxx "whether compiler generates code for 64-bit" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_SIZET_64BIT $strictpass

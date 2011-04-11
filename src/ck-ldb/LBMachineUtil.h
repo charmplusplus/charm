@@ -19,17 +19,17 @@ public:
   void StatsOn();
   void StatsOff();
   void Clear();
-  void TotalTime(double* walltime, double* cputime);
-  void IdleTime(double* walltime) { *walltime = total_idletime; };
+  void TotalTime(LBRealType* walltime, LBRealType* cputime);
+  void IdleTime(LBRealType* walltime) { *walltime = total_idletime; };
 
 private:
   enum { off, on } state;
-  double total_walltime;
-  double total_idletime;
+  LBRealType total_walltime;
+  LBRealType total_idletime;
   double start_totalwall;
   double start_idle;
 #if CMK_LB_CPUTIMER
-  double total_cputime;
+  LBRealType total_cputime;
   double start_totalcpu;
 #endif
 

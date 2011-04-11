@@ -242,7 +242,7 @@ public:
 			delete[] allocTable;
 		}else{
 			for (int r=copyRows;r<max;r++)
-				setRow(r,fill);
+				this->setRow(r,fill);
 		}
 		allocTable = this->table;
 	}

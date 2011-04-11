@@ -508,7 +508,7 @@ void TCharm::evacuate(){
 		FAULT_EVAC
 	*/
 	//CkClearAllArrayElementsCPP();
-	if(CpvAccess(startedEvac)){
+	if(CkpvAccess(startedEvac)){
 		int nextPE = getNextPE(CkArrayIndex1D(thisIndex));
 //		resumeAfterMigration=true;
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);

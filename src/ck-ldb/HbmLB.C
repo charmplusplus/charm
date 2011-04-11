@@ -133,7 +133,7 @@ void HbmLB::ProcessAtSync()
   }
 
   // build LDStats
-  double total_walltime, total_cputime, idletime, bg_walltime, bg_cputime;
+  LBRealType total_walltime, total_cputime, idletime, bg_walltime, bg_cputime;
   theLbdb->TotalTime(&total_walltime,&total_cputime);
   theLbdb->IdleTime(&idletime);
   theLbdb->BackgroundLoad(&bg_walltime,&bg_cputime);

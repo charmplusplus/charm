@@ -128,7 +128,7 @@ void CkEvacuatedElement(){
 	if(!CpvAccess(_validProcessors)[CkMyPe()]){
 		return;
 	}
-	if(!CpvAccess(startedEvac)){
+	if(!CkpvAccess(startedEvac)){
 		return;
 	}
 	remainingElements=0;
@@ -183,7 +183,7 @@ void CkClearAllArrayElements(){
 	numEvacuated=0;
 //	evacTime = CmiWallTimer();
 	printf("[%d] <%.6lf> Start Evacuation \n",CkMyPe(),evacTime);
-	CpvAccess(startedEvac)=1;
+	CkpvAccess(startedEvac)=1;
 	//	Make sure the broadcase serializer changes
 	if(CkMyPe() == CpvAccess(serializer)){
 		CpvAccess(serializer) = getNextSerializer();

@@ -62,7 +62,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define TDIM 4
 
   #elif XT5_TOPOLOGY
-  #define MAXNID 17000
+  #define MAXNID 22020
   #define TDIM 12
   #endif
 

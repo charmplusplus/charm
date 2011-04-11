@@ -1192,11 +1192,14 @@ do
 	  	fi
         fi
 
-	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
-	then
+#	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
+#	then
+        case "$FILE_EXT" in
+        .c|.s|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO $BASE.f.o
-	fi
+        esac
+#	fi
 	if [ ! -z "$SKIPLINK" ] 
 	then
 		DESTO=""

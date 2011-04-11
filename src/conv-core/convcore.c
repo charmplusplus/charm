@@ -782,6 +782,8 @@ static void CmiHandlerInit()
  *
  *****************************************************************************/
 
+static int _absoluteTime = 0;
+
 #if CMK_TIMER_USE_TIMES
 
 CpvStaticDeclare(double, clocktick);
@@ -793,7 +795,22 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
   struct tms temp;
   CpvInitialize(double, clocktick);
@@ -854,11 +871,28 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return _absoluteTime;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   struct timeval tv;
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
+
+  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
 
 #if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
@@ -896,6 +930,7 @@ double CmiCpuTimer()
   currenttime =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  
   return currenttime - CpvAccess(inittime_virtual);
 #endif
 }
@@ -915,7 +950,7 @@ double CmiWallTimer()
   }
   lastT = currenttime;
 #endif
-  return currenttime - inittime_wallclock;
+  return _absoluteTime?currenttime:currenttime - inittime_wallclock;
 }
 
 double CmiTimer()
@@ -960,7 +995,12 @@ double  CmiStartTimer(void)
   return CpvAccess(inittime_walltime);
 }
 
-void CmiTimerInit()
+double CmiInitTime()
+{
+  return CpvAccess(inittime_walltime);
+}
+
+void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 
@@ -1036,7 +1076,22 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return 1;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   BGLPersonality dst;
   CpvInitialize(double, clocktick);
@@ -1074,7 +1129,22 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
-void CmiTimerInit() {}
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return 0.0;
+}
+
+void CmiTimerInit(char **argv) {}
 
 #include "dcmf.h"
 
@@ -1104,10 +1174,25 @@ int CmiTimerIsSynchronized()
   return 1;
 }
 
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
 #include "hwi/include/bqc/A2_inlines.h"
 #include "spi/include/kernel/process.h"
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime);
+}
+
+void CmiTimerInit(char **argv)
 {
   CpvInitialize(double, clocktick);
   CpvInitialize(unsigned long, inittime);
@@ -1152,7 +1237,22 @@ double CmiTimer()
 CpvStaticDeclare(double, inittime_wallclock);
 CpvStaticDeclare(double, inittime_virtual);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
 #ifdef __CYGWIN__
 	struct timeb tv;
@@ -1213,11 +1313,26 @@ double CmiTimer()
 static double clocktick;
 CpvStaticDeclare(long long, inittime_wallclock);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
   CpvInitialize(long long, inittime_wallclock);
   CpvAccess(inittime_wallclock) = _rtc();
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiWallTimer()
@@ -1248,7 +1363,17 @@ static timebasestruct_t inittime_wallclock;
 static double clocktick;
 CpvStaticDeclare(double, inittime_virtual);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 
@@ -1262,6 +1387,11 @@ void CmiTimerInit()
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiWallTimer()
@@ -3281,7 +3411,7 @@ void ConverseCommonInit(char **argv)
   CmiPoolAllocInit(30);  
 /* #endif */
   CmiTmpInit(argv);
-  CmiTimerInit();
+  CmiTimerInit(argv);
   CstatsInit(argv);
   CmiInitCPUAffinityUtil();
 
@@ -3518,12 +3648,15 @@ int _BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
 int _BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
-unsigned int CmiLog2(unsigned int val) {
+unsigned int CmiILog2(unsigned int val) {
   unsigned int log = 0u;
   if ( val != 0u ) {
       while ( val > (1u<<log) ) { log++; }
   }
   return log;
+}
+double CmiLog2(double x) {
+  return log(x)/log(2);
 }
 #endif
 

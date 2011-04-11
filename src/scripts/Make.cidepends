@@ -64,5 +64,6 @@ TraceSimple.decl.h TraceSimple.def.h: trace-simple.ci.stamp
 TraceSummary.decl.h TraceSummary.def.h: trace-summary.ci.stamp
 TraceTau.decl.h TraceTau.def.h: trace-Tau.ci.stamp
 TraceUtilization.decl.h TraceUtilization.def.h: trace-utilization.ci.stamp
+TreeMatchLB.decl.h TreeMatchLB.def.h: TreeMatchLB.ci.stamp
 waitqd.decl.h waitqd.def.h: waitqd.ci.stamp
 WSLB.decl.h WSLB.def.h: WSLB.ci.stamp

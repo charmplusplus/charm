@@ -26,7 +26,7 @@
 #define TDIM 4
 
 #elif XT5_TOPOLOGY
-#define MAXNID 17000
+#define MAXNID 22020
 #define XDIM 25
 #define YDIM 32
 #define ZDIM 24
@@ -121,8 +121,13 @@ class XTTorusManager {
       dimY = dimNY;
       dimZ = dimNZ;
 
+      // pick a random node (1) to find the number of cores per node being
+      // actually used - assumes same number of cores per node
+      lx = pid2coords[1].x;
+      ly = pid2coords[1].y;
+      lz = pid2coords[1].z;
       for(l=0; l<TDIM; l++) {
-	if(coords2pid[minX][minY][minZ][l] == -1)
+	if(coords2pid[lx][ly][lz][l] == -1)
 	  break;
       }
       dimNT = l;
