@@ -396,8 +396,8 @@ nonBlockStatement returns [boolean sdag]
     |   ^(FOR forInit? FOR_EXPR (e1=expression)? FOR_UPDATE (e2+=expression)* block {
             $sdag = $block.sdag;
         })
-        -> {$sdag}? ^(SDAG_FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
-        -> ^(FOR forInit? FOR_EXPR $e1 FOR_UPDATE $e2 block)
+        -> {$sdag}? ^(SDAG_FOR forInit? FOR_EXPR $e1? FOR_UPDATE $e2? block)
+        -> ^(FOR forInit? FOR_EXPR $e1? FOR_UPDATE $e2? block)
     |   ^(FOR_EACH localModifierList? type IDENT expression block { $sdag = $block.sdag; })
     |   ^(WHILE parenthesizedExpression block { $sdag = $block.sdag; })
         -> {$sdag}? ^(SDAG_WHILE parenthesizedExpression block)
