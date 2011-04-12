@@ -300,7 +300,7 @@ int CmiTimerIsSynchronized()
   if (flag) {
     _is_global = *(int*)v;
     if (_is_global && CmiMyPe() == 0)
-      printf("Charm++> MPI timer is synchronized!\n");
+      printf("Charm++> MPI timer is synchronized\n");
   }
   return _is_global;
 }
@@ -323,6 +323,8 @@ double CmiInitTime()
 void CmiTimerInit(char **argv)
 {
   _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+  if (_absoluteTime && CmiMyPe() == 0)
+      printf("Charm++> absolute MPI timer is used\n");
 
   _is_global = CmiTimerIsSynchronized();
 
