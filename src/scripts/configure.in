@@ -938,6 +938,22 @@ EOT
 test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_RUSAGE_THREAD, $pass, [whether getrusage accepts RUSAGE_THREAD])
 
+#### test for asctime ###
+
+cat > $tc <<EOT
+#include <time.h>
+int main() {
+  struct tm *local;
+  time_t t;
+  t = time(NULL);
+  local = localtime(&t);
+  asctime(local);
+  return 0;
+}
+EOT
+test_linkc "whether has asctime" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ASCTIME, $pass, [whether has asctime])
+
 #### test for log2 ###
 cat > $t <<EOT
 #include <math.h>

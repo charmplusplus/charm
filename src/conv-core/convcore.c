@@ -782,6 +782,27 @@ static void CmiHandlerInit()
  *
  *****************************************************************************/
 
+#if CMK_HAS_ASCTIME
+
+char *CmiPrintDate()
+{
+  struct tm *local;
+  time_t t;
+
+  t = time(NULL);
+  local = localtime(&t);
+  return asctime(local);
+}
+
+#else
+
+char *CmiPrintDate()
+{
+  return "N/A";
+}
+
+#endif
+
 static int _absoluteTime = 0;
 
 #if CMK_TIMER_USE_TIMES
