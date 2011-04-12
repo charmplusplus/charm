@@ -545,6 +545,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   msg->procs[0].ip = myip;
   msg->procs[0].ncores = CmiNumCores();
   msg->procs[0].rank = 0;
+  msg->procs[0].nodeID = 0;
   CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
 
     // blocking here

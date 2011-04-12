@@ -2869,6 +2869,26 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test for asctime ###
+
+cat > $tc <<EOT
+#include <time.h>
+int main() {
+  struct tm *local;
+  time_t t;
+  t = time(NULL);
+  local = localtime(&t);
+  asctime(local);
+  return 0;
+}
+EOT
+test_linkc "whether has asctime" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ASCTIME $pass
+_ACEOF
+
+
 #### test for log2 ###
 cat > $t <<EOT
 #include <math.h>

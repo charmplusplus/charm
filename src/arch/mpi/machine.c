@@ -300,7 +300,7 @@ int CmiTimerIsSynchronized()
   if (flag) {
     _is_global = *(int*)v;
     if (_is_global && CmiMyPe() == 0)
-      printf("Charm++> MPI timer is synchronized!\n");
+      printf("Charm++> MPI timer is synchronized\n");
   }
   return _is_global;
 }
@@ -323,6 +323,8 @@ double CmiInitTime()
 void CmiTimerInit(char **argv)
 {
   _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+  if (_absoluteTime && CmiMyPe() == 0)
+      printf("Charm++> absolute MPI timer is used\n");
 
   _is_global = CmiTimerIsSynchronized();
 
@@ -1505,14 +1507,14 @@ void SendSpanningChildren(int size, char *msg)
     nd += startnode;
     nd = nd%CmiNumNodes();
     CmiAssert(nd>=0 && nd!=CmiMyNode());	
-	#if CMK_SMP
-	/* always send to the first rank of other nodes */
-	char *newmsg = CmiCopyMsg(msg, size);
-	CMI_DEST_RANK(newmsg) = 0;
+#if CMK_SMP
+      /* always send to the first rank of other nodes */
+    char *newmsg = CmiCopyMsg(msg, size);
+    CMI_DEST_RANK(newmsg) = 0;
     EnqueueMsg(newmsg, size, nd);
-	#else
-	CmiSyncSendFn1(nd, size, msg);
-	#endif
+#else
+    CmiSyncSendFn1(nd, size, msg);
+#endif
   }
 #if CMK_SMP  
    /* second send msgs to my peers on this node */
