@@ -1507,14 +1507,14 @@ void SendSpanningChildren(int size, char *msg)
     nd += startnode;
     nd = nd%CmiNumNodes();
     CmiAssert(nd>=0 && nd!=CmiMyNode());	
-	#if CMK_SMP
-	/* always send to the first rank of other nodes */
-	char *newmsg = CmiCopyMsg(msg, size);
-	CMI_DEST_RANK(newmsg) = 0;
+#if CMK_SMP
+      /* always send to the first rank of other nodes */
+    char *newmsg = CmiCopyMsg(msg, size);
+    CMI_DEST_RANK(newmsg) = 0;
     EnqueueMsg(newmsg, size, nd);
-	#else
-	CmiSyncSendFn1(nd, size, msg);
-	#endif
+#else
+    CmiSyncSendFn1(nd, size, msg);
+#endif
   }
 #if CMK_SMP  
    /* second send msgs to my peers on this node */
