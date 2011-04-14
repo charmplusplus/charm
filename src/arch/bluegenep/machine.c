@@ -1768,7 +1768,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
         }
     }
 
-#if OPTIMIZED_MULTICAST
+#if OPTIMIZED_MULTICAST && CMK_SMP
 #warning "Using Optimized Multicast"
     if (npes > 1) {    
       int *newpelist = (int *) malloc (sizeof(int) * npes);
