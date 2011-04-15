@@ -78,7 +78,13 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
-  group1_created = 0;
+  group1_created = 0;             // base class need to call initTree()
+#endif
+}
+
+void HybridBaseLB::initTree()
+{
+#if CMK_LBDB_ON
 #if ! CMK_BLUEGENE_CHARM
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
