@@ -122,7 +122,7 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
   }
 }
 
-int BGMach::traceProejctions(int pe)
+int BGMach::traceProjections(int pe)
 {
   if (procList.isEmpty()) return 1;
   return procList.includes(pe);

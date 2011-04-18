@@ -1112,7 +1112,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
 
 int BgTraceProjectionOn(int pe)
 {
-  return cva(bgMach).traceProejctions(pe);
+  return cva(bgMach).traceProjections(pe);
 }
 
 /* return the total number of Blue gene nodes */
