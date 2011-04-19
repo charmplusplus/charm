@@ -2,7 +2,7 @@
  *  fill a description in
  */
 
-tree grammar CharjASTModifier;
+tree grammar CharjPreAnalysis;
 
 options {
     backtrack = true; 

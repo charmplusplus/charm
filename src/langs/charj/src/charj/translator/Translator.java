@@ -103,9 +103,9 @@ public class Translator {
         m_nodes.setTreeAdaptor(m_adaptor);
 
         // do AST rewriting and semantic checking
-        if (m_printAST) printAST("Before PreSemantics Pass", "before_presem.html");
-        preSemanticPass();
-        if (m_printAST) printAST("After PreSemantics Pass", "after_presem.html");
+        if (m_printAST) printAST("Before Preanalysis Pass", "before_preanalysis.html");
+        preAnalysisPass();
+        if (m_printAST) printAST("After Preanalysis Pass", "after_preanalysis.html");
 
         resolveTypes();
         if (m_printAST) printAST("After Type Resolution", "after_types.html");
@@ -113,8 +113,8 @@ public class Translator {
         initPupCollect();
         if (m_printAST) printAST("After Collector Pass", "after_collector.html");
 
-        postSemanticPass();
-        if (m_printAST) printAST("After PostSemantics Pass", "after_postsem.html");
+        postAnalysisPass();
+        if (m_printAST) printAST("After Postanalysis Pass", "after_postanalysis.html");
 
 		m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
@@ -142,25 +142,25 @@ public class Translator {
             ccHeader + ccOutput + footer;
     }
 
-    private void preSemanticPass() throws
+    private void preAnalysisPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
-        CharjASTModifier mod = new CharjASTModifier(m_nodes);
-        mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource().getTree();
+        CharjPreAnalysis pass = new CharjPreAnalysis(m_nodes);
+        pass.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)pass.charjSource().getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
     }
 
-    private void postSemanticPass() throws
+    private void postAnalysisPass() throws
         RecognitionException, IOException, InterruptedException
     {
         m_nodes.reset();
-        CharjASTModifier2 mod = new CharjASTModifier2(m_nodes);
-        mod.setTreeAdaptor(m_adaptor);
-        m_ast = (CommonTree)mod.charjSource(m_symtab).getTree();
+        CharjPostAnalysis pass = new CharjPostAnalysis(m_nodes);
+        pass.setTreeAdaptor(m_adaptor);
+        m_ast = (CommonTree)pass.charjSource(m_symtab).getTree();
         m_nodes = new CommonTreeNodeStream(m_ast);
         m_nodes.setTokenStream(m_tokens);
         m_nodes.setTreeAdaptor(m_adaptor);
