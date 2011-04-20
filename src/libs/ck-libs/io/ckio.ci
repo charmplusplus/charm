@@ -1,0 +1,9 @@
+module CkIO {
+  namespace Ck { namespace IO {
+      group Manager {
+	entry Manager();
+      };
+    }
+
+  }
+}
