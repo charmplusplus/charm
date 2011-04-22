@@ -77,7 +77,7 @@ private:
 	struct s_array { //(sendArray, bcastArray)
 		int ep; //Entry point to call
 		CkGroupID id; //Array ID to call it on
-		CkArrayIndexStruct idx; //Index to send to (if any)
+		CkArrayIndex idx; //Index to send to (if any)
 	} array;
 	struct s_ccsReply {
 		CcsDelayedReply reply;
@@ -174,7 +174,7 @@ public:
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
-	  d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=*(CkArrayIndexMax*)&idx;
+	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
 	}
 
     // Bcast to array
