@@ -224,7 +224,8 @@ public:
         };
 
         /// Zero out the index bits upon construction
-        CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+        //CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+        inline void init(void)  { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
 	int *data(void)             {return index; }
 	const int *data(void) const {return index; }
@@ -283,8 +284,8 @@ class CkArrayIndexMax : public CkArrayIndex {
 		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
 	}
 public:
-	CkArrayIndexMax(void) { nInts=0; dimension=0; }
-	CkArrayIndexMax(int i) { nInts=0; dimension=0; }   // used for CkVec
+	CkArrayIndexMax(void)  { init(); }
+	CkArrayIndexMax(int i) { init(); }
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
