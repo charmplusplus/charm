@@ -353,24 +353,6 @@ public:
 };
 PUPmarshall(CkArrayIndexMax)
 
-//A layout-compatible version of a CkArrayIndexMax.
-//  Needed, e.g., for use in unions where a constructor is forbidden.
-class CkArrayIndexStruct {
-public:
-	short int nInts;
-	short int dimension;
-	int index[CK_ARRAYINDEX_MAXLEN];
-	CkArrayIndexMax &asMax(void) 
-		{return *(CkArrayIndexMax *)this;}
-	const CkArrayIndexMax &asMax(void) const
-		{return *(const CkArrayIndexMax *)this;}
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
-};
-PUPmarshall(CkArrayIndexStruct)
 
 class CkArrayID {
 	CkGroupID _gid;
