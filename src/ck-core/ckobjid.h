@@ -11,7 +11,7 @@ union _ObjectID {
 	} group; //also used for NodeGroups
 	struct s_array{
 		CkGroupID id; //array id
-		CkArrayIndexStruct idx; //index
+		CkArrayIndex idx; //index
 	} array;
 };
 
@@ -39,8 +39,7 @@ public:
 		    ret += circleShift(data.group.id.idx,6);
 		    break;
 		case TypeArray:
-		    CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
-		    CkHashCode temp = i1.hash();
+		    CkHashCode temp = data.array.idx.hash();
 		    //ret = circleShift(ret,13);
 		    //ret += circleShift(temp,11);
 		    ret += temp;
@@ -71,10 +70,8 @@ public:
 				}
 				break;
 			case TypeArray:
-				CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
-				CkArrayIndex &i2 = (CkArrayIndex &)t.data.array.idx.asMax();
 				bool val;
-				if(data.array.id == t.data.array.id && i1.compare(i2)){
+				if(data.array.id == t.data.array.id && data.array.idx.compare(t.data.array.idx)){
 					val = true;
 				}else{
 					val = false;
