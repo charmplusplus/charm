@@ -1338,7 +1338,7 @@ public:
   SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
-  SdagConstruct(EToken t, const char *str) : type(t), con1(0), con2(0), con3(0), con4(0)
+ SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0)
 		{ text = new XStr(str); constructs = new TList<SdagConstruct*>(); 
                   publishesList = new TList<SdagConstruct*>(); }
                                              
