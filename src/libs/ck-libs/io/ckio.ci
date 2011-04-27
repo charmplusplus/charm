@@ -1,7 +1,79 @@
 module CkIO {
   namespace Ck { namespace IO {
+      message FileReadyMsg;
+
       group Manager {
 	entry Manager();
+
+	entry void prepareOutput_central(std::string name, size_t bytes,
+					 CkCallback ready, CkCallback complete,
+					 Options opts);
+	entry void prepareOutput_distrib(Token token, std::string name, size_t bytes,
+					 Options opts);
+	entry void prepareOutput_readied(CkReductionMsg *m);
+
+	/// Serialize setting up each file, so that all PEs have the same sequence
+	entry void run() {
+	  for (filesOpened = 0; true; filesOpened++) {
+	    if (CkMyPe() == 0)
+	      when prepareOutput_central(std::string name, size_t bytes,
+					 CkCallback ready, CkCallback complete,
+					 Options opts) atomic {
+		if (-1 == opts.peStripe)
+		  opts.peStripe = 16 * 1024 * 1024;
+		if (-1 == opts.writeStripe)
+		  opts.writeStripe = 4 * 1024 * 1024;
+
+		if (-1 == opts.activePEs) {
+		  size_t numStripes = (bytes + opts.peStripe - 1) / opts.peStripe;
+		  opts.activePEs = std::min((size_t)CkNumNodes(), numStripes);
+		}
+		if (-1 == opts.basePE)
+		  opts.basePE = 0;
+		if (-1 == opts.skipPEs)
+		  opts.skipPEs = CkNodeSize();
+
+		CkAssert(lastActivePE(opts) < CkNumPes());
+		CkAssert(opts.writeStripe <= opts.peStripe);
+		nextReady = ready;
+
+		thisProxy.prepareOutput_distrib(nextToken, name, bytes, opts);
+	      }
+
+	    when prepareOutput_distrib[filesOpened](Token token, std::string name, size_t bytes,
+						    Options opts) atomic {
+	      CkAssert(files.end() == files.find(token));
+
+	      files[token] = FileInfo(name, bytes, opts);
+
+	      // Open file if we're one of the active PEs
+	      // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
+	      if (((CkMyPe() - opts.basePE) % opts.skipPEs == 0 &&
+		   CkMyPe() < lastActivePE(opts)) ||
+		  true) {
+		int fd = open(name.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+		if (-1 == fd)
+		  CkAbort("Failed to open a file for parallel output");
+		files[token].fd = fd;
+	      }
+
+	      contribute(CkCallback(CkIndex_Manager::prepareOutput_readied(0),
+				    thisProxy[0]),
+			 filesOpened);
+	    }
+
+	    if (CkMyPe() == 0)
+	      when prepareOutput_readied[filesOpened](CkReductionMsg *m) atomic {
+		delete m;
+		FileReadyMsg *f = new FileReadyMsg(nextToken++);
+		nextReady.send(f);
+	      }
+	  }
+
+	};
+
+	entry void write_forwardData(Token token, const char data[bytes],
+				     size_t bytes, size_t offset);
       };
     }
 
