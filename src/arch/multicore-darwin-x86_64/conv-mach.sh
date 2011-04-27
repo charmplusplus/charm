@@ -3,8 +3,8 @@ CMK_DEFS=' -D_REENTRANT '
 
 CMK_CPP_CHARM="/usr/bin/cpp -P"
 CMK_CPP_C="gcc -arch x86_64 -E"
-CMK_CC="gcc -arch x86_64 -Wno-long-double -fPIC -dynamic -fno-common $CMK_DEFS "
-CMK_CXX="g++ -arch x86_64 -Wno-long-double -fPIC -dynamic -fno-common $CMK_DEFS "
+CMK_CC="gcc -arch x86_64 -fPIC -dynamic -fno-common $CMK_DEFS "
+CMK_CXX="g++ -arch x86_64 -fPIC -dynamic -fno-common $CMK_DEFS "
 CMK_CXXPP="g++ -arch x86_64 -x g++ -E "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress $CMK_DEFS "
 CMK_XIOPTS=""
