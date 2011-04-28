@@ -8,6 +8,7 @@
  *
  */
 
+#include "ck.h"
 #include "cuda-hybrid-api.h"
 #include "wrqueue.h"
 #include "stdio.h"
@@ -77,6 +78,8 @@ void enqueue(workRequestQueue *q, workRequest *wr) {
 
   q->size++; 
 
+  CpvAccess(_qd)->create();
+
 #ifdef GPU_WRQ_VERBOSE
   printf("(%d) ENQ size: %d\n", CmiMyPe(), q->size);
 #endif
@@ -95,6 +98,9 @@ void dequeue(workRequestQueue *q) {
 #ifdef GPU_WRQ_VERBOSE
   printf("(%d) DEQ size: %d\n", CmiMyPe(), q->size);
 #endif
+
+  CpvAccess(_qd)->process();
+
 }
 
 int deleteWRqueue(workRequestQueue *q) {
