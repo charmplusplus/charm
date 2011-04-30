@@ -62,7 +62,7 @@ public:
         p|x; p|y; p|z; p|numCth; p|numWth; 
 	p|stacksize; p|timingMethod; 
        }
-  int traceProejctions(int pe);
+  int traceProjections(int pe);
   void setNetworkModel(char *model);
   int inReplayMode() { return replay != -1 || replaynode != -1; }
 };

@@ -36,6 +36,8 @@ HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
   refine = (CentralLB *)AllocateRefineLB();
 //  greedy = (CentralLB *)AllocateMetisLB();
   greedy = (CentralLB *)AllocateGreedyLB();
+
+  initTree();
 #endif
 }
 

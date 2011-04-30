@@ -64,7 +64,7 @@ CsvDeclare(CmiNodeLock, node_bcastLock);
 /* FIXME: need a random number that everyone agrees ! */
 #define CHARM_MAGIC_NUMBER               126
 
-#if !CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 static int checksum_flag = 0;
 extern unsigned char computeCheckSum(unsigned char *data, int len);
 
@@ -938,7 +938,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 
     /* checksum flag */
     if (CmiGetArgFlag(argv,"+checksum")) {
-#if !CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
         checksum_flag = 1;
         if (_Cmi_mynode == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
 #else
@@ -1768,7 +1768,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
         }
     }
 
-#if OPTIMIZED_MULTICAST
+#if OPTIMIZED_MULTICAST && CMK_SMP
 #warning "Using Optimized Multicast"
     if (npes > 1) {    
       int *newpelist = (int *) malloc (sizeof(int) * npes);

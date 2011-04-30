@@ -1,5 +1,5 @@
-CUDA_DIR=/usr/local/cuda/cuda
-NVIDIA_CUDA_SDK=/usr/local/NVIDIA_CUDA_SDK
+CUDA_DIR=/usr/local/cuda
+NVIDIA_CUDA_SDK=/usr/local/NVIDIA_GPU_Computing_SDK/C
 CHARMDIR=../../
 CHARMC=$(CHARMDIR)/bin/charmc
 
@@ -26,7 +26,7 @@ hybridapi.o: cuda-hybrid-api.cu cuda-hybrid-api.h
 	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o hybridapi.o cuda-hybrid-api.cu
 
 wrqueue.o: wrqueue.cu wrqueue.h wr.h 
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu 
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o wrqueue.o wrqueue.cu
 
 clean:
 	rm -f *.o *.a 
