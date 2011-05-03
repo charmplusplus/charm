@@ -240,7 +240,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
    op << "  void " <<connectEntry->charstar() <<'(';
    ParamList *pl = param;
    XStr msgParams;
-   int i, numStars;
    int count;
    if (pl->isVoid() == 1) {
      op << "void) {\n"; 
@@ -338,7 +337,6 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  int i;
   TList <CStateVar*> *olistTempStateVars;
   TList<CStateVar*> *whensEntryMethodStateVars; 
   olistTempStateVars = new TList<CStateVar*>();
@@ -1424,7 +1422,6 @@ void SdagConstruct::generateAtomic(XStr& op)
 #if CMK_BLUEGENE_CHARM
   generateEndExec(op);
 #endif
-  SdagConstruct *cn;
   if(nextBeginOrEnd == 1)
     op << "    " << next->label->charstar() << "(";
   else
@@ -1595,7 +1592,7 @@ void SdagConstruct::generateTrace()
     if (traceName) {
       sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
       // remove blanks
-      for (int i=0; i<strlen(text); i++)
+      for (unsigned int i=0; i<strlen(text); i++)
         if (text[i]==' '||text[i]=='\t') text[i]='_';
     }
     else {
@@ -1664,6 +1661,7 @@ void SdagConstruct::generateEndSeq(XStr& op)
 
 void SdagConstruct::generateEventBracket(XStr& op, int eventType)
 {
+  (void) eventType;
   //Trace this event
   op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
      << "\", __begintime, CkVTimer(),&_bgParentLog); \n";
@@ -1671,6 +1669,7 @@ void SdagConstruct::generateEventBracket(XStr& op, int eventType)
 
 void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
 {
+  (void) eventType;
   op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
      << "\",__begintime,CkVTimer(),&_bgParentLog, " << label->charstar()
      << "_bgLogList);\n";
@@ -1728,7 +1727,7 @@ void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
 void RemoveSdagComments(char *str)
 {
   char *ptr = str;
-  while (ptr = strstr(ptr, "//")) {
+  while ((ptr = strstr(ptr, "//"))) {
     char *lend = strstr(ptr, "\n");
     if (lend==NULL) break;
     while (ptr != lend) *ptr++=' ';
