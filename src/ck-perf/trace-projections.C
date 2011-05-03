@@ -1025,10 +1025,23 @@ TraceProjections::TraceProjections(char **argv):
 
 #if CMK_HAS_COUNTER_PAPI
   // We initialize and create the event sets for use with PAPI here.
-  int papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
-  if (papiRetValue != PAPI_VER_CURRENT) {
-    CmiAbort("PAPI Library initialization failure!\n");
+  int papiRetValue;
+  if(CkMyRank()==0){
+    papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
+    if (papiRetValue != PAPI_VER_CURRENT) {
+      CmiAbort("PAPI Library initialization failure!\n");
+    }
+#if CMK_SMP
+    if(PAPI_thread_init(pthread_self) != PAPI_OK){
+      CmiAbort("PAPI could not be initialized in SMP mode!\n");
+    }
+#endif
   }
+
+#if CMK_SMP
+  //PAPI_thread_init has to finish before calling PAPI_create_eventset
+  CmiNodeAllBarrier();
+#endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
   papiEventSet = PAPI_NULL; 
   if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
