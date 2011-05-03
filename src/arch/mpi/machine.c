@@ -161,14 +161,17 @@ static int checksum_flag = 0;
     then a default value for MPI_POST_RECV_SIZE is used if not specified
     by the user.
 */
-#ifdef MPI_POST_RECV
+
+#define MPI_POST_RECV 0
+#if MPI_POST_RECV
 #define MPI_POST_RECV_COUNT 10
 #undef MPI_POST_RECV
 #endif
 #if MPI_POST_RECV_COUNT > 0
-#warning "Using MPI posted receives which have not yet been tested"
 #ifndef MPI_POST_RECV_SIZE
-#define MPI_POST_RECV_SIZE 200
+#define MPI_POST_RECV_LOWERSIZE 2000
+#define MPI_POST_RECV_UPPERSIZE 4000
+#define MPI_POST_RECV_SIZE MPI_POST_RECV_UPPERSIZE
 #endif
 /* #undef  MPI_POST_RECV_DEBUG  */
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
@@ -183,7 +186,7 @@ CpvDeclare(char*,CmiPostedRecvBuffers);
 #define TAG     1375
 
 #if MPI_POST_RECV_COUNT > 0
-#define POST_RECV_TAG TAG+1
+#define POST_RECV_TAG (TAG+1)
 #define BARRIER_ZERO_TAG TAG
 #else
 #define BARRIER_ZERO_TAG     1375
@@ -744,7 +747,7 @@ int PumpMsgs(void)
         if (MPI_SUCCESS != MPI_Get_count(&sts, MPI_BYTE, &nbytes))
             CmiAbort("PumpMsgs: MPI_Get_count failed!\n");
 
-	recd = 1;
+		recd = 1;
         msg = (char *) CmiAlloc(nbytes);
         memcpy(msg,&(CpvAccess(CmiPostedRecvBuffers)[completed_index*MPI_POST_RECV_SIZE]),nbytes);
         /* and repost the recv */
@@ -1068,6 +1071,9 @@ static void CommunicationServer(int sleepTime)
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyNode() == 0){
       CmiPrintf("End of program\n");
+	  #if MPI_POST_RECV_COUNT > 0
+        CmiPrintf("%llu posted receives,  %llu unposted receives\n", CpvAccess(Cmi_posted_recv_total), CpvAccess(Cmi_unposted_recv_total));
+	  #endif
     }
 #endif
     MACHSTATE(2, "} CommunicationServer EXIT");
@@ -1298,19 +1304,17 @@ static int SendMsgBuf()
       CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
-        if(size <= MPI_POST_RECV_SIZE){
-
+        if(size>=MPI_POST_RECV_LOWERSIZE && size <= MPI_POST_RECV_UPPERSIZE){
           START_EVENT();
           if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-
-          STOP_EVENT(40);
+          END_EVENT(40);
         }
         else {
             START_EVENT();
             if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
-            STOP_EVENT(40);
+            END_EVENT(40);
         }
 #else
         START_EVENT();
@@ -1434,8 +1438,7 @@ CmiCommHandle CmiAsyncSendFn_(int destPE, int size, char *msg)
   CMI_SET_CHECKSUM(msg, size);
 
 #if MPI_POST_RECV_COUNT > 0
-        if(size <= MPI_POST_RECV_SIZE){
-
+		if(size>=MPI_POST_RECV_LOWERSIZE && size <= MPI_POST_RECV_UPPERSIZE){
           START_EVENT();
           if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destPE,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
                 CmiAbort("CmiAsyncSendFn: MPI_Isend failed!\n");
@@ -1984,8 +1987,53 @@ static void ConverseRunPE(int everReturn)
   CmiState cs;
   char** CmiMyArgv;
 
-  CmiNodeAllBarrier();
+#if MPI_POST_RECV_COUNT > 0
+	int doInit = 1;
+	int i;
+	
+#if CMK_SMP
+	if (CmiMyRank() != CmiMyNodeSize()) doInit = 0;
+#endif
+	
+	/* Currently, in mpi smp, the main thread will be the comm thread, so
+     *	only the comm thread should post recvs. Cpvs, however, need to be
+	 * created on rank 0 (the ptrs to the actual cpv memory), while
+     * other ranks are busy waiting for this to finish.	So cpv initialize
+	 * routines have to be called on every ranks, although they are only
+	 * useful on comm thread (whose rank is not zero) -Chao Mei
+	 */
+	CpvInitialize(unsigned long long, Cmi_posted_recv_total);
+	CpvInitialize(unsigned long long, Cmi_unposted_recv_total);
+	CpvInitialize(MPI_Request*, CmiPostedRecvRequests); 
+	CpvInitialize(char*,CmiPostedRecvBuffers);
 
+	if(doInit){
+		/* Post some extra recvs to help out with incoming messages */
+		/* On some MPIs the messages are unexpected and thus slow */
+
+		/* An array of request handles for posted recvs */
+		CpvAccess(CmiPostedRecvRequests) = (MPI_Request*)malloc(sizeof(MPI_Request)*MPI_POST_RECV_COUNT);
+
+		/* An array of buffers for posted recvs */
+		CpvAccess(CmiPostedRecvBuffers) = (char*)malloc(MPI_POST_RECV_COUNT*MPI_POST_RECV_SIZE);
+
+		/* Post Recvs */
+		for(i=0; i<MPI_POST_RECV_COUNT; i++){
+			printf("Pre post recv %d\n", i);
+			if(MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[i*MPI_POST_RECV_SIZE])	,
+						MPI_POST_RECV_SIZE,
+						MPI_BYTE,
+						MPI_ANY_SOURCE,
+						POST_RECV_TAG,
+						MPI_COMM_WORLD,
+				&(CpvAccess(CmiPostedRecvRequests)[i])  ))
+					CmiAbort("MPI_Irecv failed\n");
+		}
+	}
+#endif
+	
+  CmiNodeAllBarrier();
+	
   cs = CmiGetState();
   CpvInitialize(void *,CmiLocalQueue);
   CpvAccess(CmiLocalQueue) = cs->localqueue;
@@ -2011,7 +2059,7 @@ static void ConverseRunPE(int everReturn)
   /* initialize the network progress counter*/
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/
-  CpvInitialize(int , networkProgressCount);
+  CpvInitialize(unsigned , networkProgressCount);
   CpvAccess(networkProgressCount) = 0;
 
 #if CMK_SMP
@@ -2185,38 +2233,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
   }
   }
-
-#if MPI_POST_RECV_COUNT > 0
-
-  CpvInitialize(unsigned long long, Cmi_posted_recv_total);
-  CpvInitialize(unsigned long long, Cmi_unposted_recv_total);
-  CpvInitialize(MPI_Request*, CmiPostedRecvRequests); 
-  CpvInitialize(char*,CmiPostedRecvBuffers);
-
-    /* Post some extra recvs to help out with incoming messages */
-    /* On some MPIs the messages are unexpected and thus slow */
-
-    /* An array of request handles for posted recvs */
-    CpvAccess(CmiPostedRecvRequests) = (MPI_Request*)malloc(sizeof(MPI_Request)*MPI_POST_RECV_COUNT);
-
-    /* An array of buffers for posted recvs */
-    CpvAccess(CmiPostedRecvBuffers) = (char*)malloc(MPI_POST_RECV_COUNT*MPI_POST_RECV_SIZE);
-
-    /* Post Recvs */
-    for(i=0; i<MPI_POST_RECV_COUNT; i++){
-        if(MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[i*MPI_POST_RECV_SIZE])	,
-                    MPI_POST_RECV_SIZE,
-                    MPI_BYTE,
-                    MPI_ANY_SOURCE,
-                    POST_RECV_TAG,
-                    MPI_COMM_WORLD,
-		    &(CpvAccess(CmiPostedRecvRequests)[i])  ))
-	  CmiAbort("MPI_Irecv failed\n");
-    }
-
-#endif
-
-
 
   /* CmiTimerInit(); */
 
