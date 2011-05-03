@@ -20,5 +20,14 @@ then
   fi
 fi
 
-
-CMK_LIBS="$CMK_LIBS -lpapi"
+if test -z "$PAPI_LIBDIR"
+then
+  #macros needs to be changed to point to the correct papi directory
+  PAPI_LIBDIR="$HOME/papi/lib"
+  PAPI_INCDIR="$HOME/papi/include"
+  CMK_INCDIR="$CMK_INCDIR -I$PAPI_INCDIR"
+  CMK_LIBDIR="-L $PAPI_LIBDIR"
+  CMK_LD="$CMK_LD -Wl,-rpath,$PAPI_LIBDIR"
+  CMK_LDXX="$CMK_LDXX -Wl,-rpath,$PAPI_LIBDIR" 
+  CMK_LIBS="$CMK_LIBS -lpapi"
+fi
