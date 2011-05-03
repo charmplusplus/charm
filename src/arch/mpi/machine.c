@@ -47,20 +47,17 @@ static void sleep(int secs) {Sleep(1000*secs);}
 #define CMI_EXERT_SEND_CAP 0
 #define CMI_EXERT_RECV_CAP 0
 
-#if CMK_SMP
-/* currently only considering the smp case */
 #define CMI_DYNAMIC_EXERT_CAP 0
 /* This macro defines the max number of msgs in the sender msg buffer 
  * that is allowed for recving operation to continue
  */
-#define CMI_DYNAMIC_OUTGOING_THRESHOLD 8
+#define CMI_DYNAMIC_OUTGOING_THRESHOLD 4
 #define CMI_DYNAMIC_MAXCAPSIZE 1000
-#define CMI_DYNAMIC_SEND_CAPSIZE 6
-#define CMI_DYNAMIC_RECV_CAPSIZE 6
+#define CMI_DYNAMIC_SEND_CAPSIZE 4
+#define CMI_DYNAMIC_RECV_CAPSIZE 3
 /* initial values, -1 indiates there's no cap */
 static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
-#endif
 
 #if CMI_EXERT_SEND_CAP
 #define SEND_CAP 3
@@ -865,14 +862,29 @@ int PumpMsgs(void)
 #endif
 	CmiPushPE(CMI_DEST_RANK(msg), msg);	
 	
-#if CMI_EXERT_RECV_CAP || CMI_DYNAMIC_EXERT_CAP
+#if CMI_EXERT_RECV_CAP
 	recvCnt++;
-	/* check sendMsgBuf  to get the  number of messages that have not been sent */
-	/* MsgQueueLen indicates the number of messages that have not been released by MPI */
+#elif CMI_DYNAMIC_EXERT_CAP
+	recvCnt++;
+#if CMK_SMP
+	/* check sendMsgBuf to get the  number of messages that have not been sent
+         * which is only available in SMP mode
+	 * MsgQueueLen indicates the number of messages that have not been released 
+         * by MPI 
+         */
 	if(PCQueueLength(sendMsgBuf) > CMI_DYNAMIC_OUTGOING_THRESHOLD
 		|| MsgQueueLen > CMI_DYNAMIC_OUTGOING_THRESHOLD){
 		dynamicRecvCap = CMI_DYNAMIC_RECV_CAPSIZE;
 	}
+#else
+	/* MsgQueueLen indicates the number of messages that have not been released 
+         * by MPI 
+         */
+	if(MsgQueueLen > CMI_DYNAMIC_OUTGOING_THRESHOLD){
+		dynamicRecvCap = CMI_DYNAMIC_RECV_CAPSIZE;
+	}
+#endif
+
 #endif	
 	
   }
