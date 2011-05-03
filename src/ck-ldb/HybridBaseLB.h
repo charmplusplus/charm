@@ -352,6 +352,8 @@ protected:
   // helper function
   LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo, int count);
   virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
+  void    printSummary(LDStats *stats, int count);
+  void    initTree();
 
   // Not to be used -- maintained for legacy applications
   virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {

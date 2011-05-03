@@ -7,6 +7,10 @@
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
 
+#if CMK_BLUEGENE_CHARM
+#include "bigsim_logs.h"
+#endif
+
 #define CART_TOPOL 1
 #define AMPI_PRINT_IDLE 0
 
@@ -2716,7 +2720,7 @@ int AMPI_Barrier(MPI_Comm comm)
 
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Barrier not allowed for Inter-communicator!");
 
-  TRACE_BG_AMPI_LOG(1, 0);
+  TRACE_BG_AMPI_LOG(MPI_BARRIER, 0);
 
   //HACK: Use collective operation as a barrier.
   AMPI_Allreduce(NULL,NULL,0,MPI_INT,MPI_SUM,comm);
@@ -2874,7 +2878,9 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
   
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
 
-  TRACE_BG_AMPI_LOG(2, count * ddt_type->getSize());
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, ddt_type->getSize(count));
+#endif
 
   if(comm==MPI_COMM_SELF) return copyDatatype(comm,type,count,inbuf,outbuf);
 
@@ -4361,6 +4367,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int rank = ptr->getRank(comm);
   int comm_size = size;
   MPI_Status status;
+
+#if CMK_BLUEGENE_CHARM
+  TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemsize);
+#endif
+
 
   if( itemsize <= AMPI_ALLTOALL_SHORT_MSG ){
     /* Short message. Use recursive doubling. Each process sends all

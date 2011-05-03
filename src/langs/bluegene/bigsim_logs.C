@@ -158,7 +158,8 @@ BgTimeLog::BgTimeLog()
 
 BgTimeLog::BgTimeLog(BgTimeLog *log)
 {
-  strncpy(name,log->name,20);
+  strncpy(name,log->name,BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = log->ep;
   charm_ep = -1;
   startTime = log->startTime;
@@ -197,7 +198,8 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr,double sTime)
 { 
   if(namestr == NULL)
     namestr = (char*)"dummyname1";
-  strncpy(name,namestr,20);
+  strncpy(name,namestr,BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = epc;
   charm_ep = -1;
   startTime = sTime;
@@ -217,7 +219,8 @@ BgTimeLog::BgTimeLog(int epc, const char* namestr, double sTime, double eTime)
 {
   if(namestr == NULL)
     namestr = (char*)"dummyname2";
-  strncpy(name,namestr, 20);
+  strncpy(name,namestr, BGLOG_NAMELEN-1);
+  name[BGLOG_NAMELEN-1] = 0;
   ep = epc;
   charm_ep = -1;
   startTime = sTime;
@@ -313,6 +316,17 @@ void BgTimeLog::write(FILE *fp)
     if (!objId.isNull())
       fprintf(fp," ObjID: %d %d %d %d\n", objId.id[0], objId.id[1], objId.id[2], objId.id[3]);
   }
+  if (bglog_version >= 6) {
+    if (mpiOp!=MPI_NONE) {
+      fprintf(fp, "MPI collective: ");
+      switch (mpiOp) {
+      case MPI_BARRIER:   fprintf(fp, "MPI Barrier"); break;
+      case MPI_ALLREDUCE: fprintf(fp, "MPI_Allreduce"); break;
+      case MPI_ALLTOALL:  fprintf(fp, "MPI_Alltoall"); break;
+      }
+      fprintf(fp, " mpiSize: %d\n", mpiSize);
+    }
+  }
   for (i=0; i<msgs.length(); i++)
     msgs[i]->write(fp);
   for (i=0; i<evts.length(); i++)
@@ -407,7 +421,7 @@ void BgTimeLog::pupCommon(PUP::er &p) {
 
   if (bglog_version >= 4) p(charm_ep);
   p|recvTime; p|effRecvTime; p|startTime; p|execTime; p|endTime; 
-  p|flag; p(name,20);
+  p|flag; p(name,BGLOG_NAMELEN);
   if (bglog_version >= 3)
     p((int *)&objId, sizeof(CmiObjId)/sizeof(int));
   else if (bglog_version == 2)

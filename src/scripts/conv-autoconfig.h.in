@@ -75,6 +75,9 @@
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
 
+/* whether has asctime */
+#undef CMK_HAS_ASCTIME
+
 /* whether the bindprocessor() exists */
 #undef CMK_HAS_BINDPROCESSOR
 

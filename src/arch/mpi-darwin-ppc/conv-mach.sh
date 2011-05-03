@@ -3,10 +3,10 @@
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="mpicc -E"
-OPTS_CC="$OPTS_CC -Wno-long-double -dynamic -fno-common "
+OPTS_CC="$OPTS_CC -dynamic -fno-common "
 CMK_CC="mpicc -fPIC "
-#CMK_CXX="/private/automount/home/gzheng/csar/genx/build_charm_mpi/mpicxx -Wno-long-double -fPIC -dynamic -fno-common "
-OPTS_CXX="$OPTS_CXX -Wno-long-double -dynamic -fno-common "
+#CMK_CXX="/private/automount/home/gzheng/csar/genx/build_charm_mpi/mpicxx -fPIC -dynamic -fno-common "
+OPTS_CXX="$OPTS_CXX -dynamic -fno-common "
 CMK_CXX="mpicxx -fPIC "
 CMK_CXXPP="mpicxx -E "
 OPTS_LD="$OPTS_LD -multiply_defined suppress -flat_namespace "

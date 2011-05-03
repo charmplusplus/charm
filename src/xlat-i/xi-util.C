@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include "xi-util.h"
 
 namespace xi {
@@ -59,7 +52,7 @@ XStr& XStr::operator << (int i) {
 void XStr::line_append(const char c)
 {
   XStr xs;
-  for(int i=0; i<len; i++) {
+  for(unsigned int i=0; i<len; i++) {
     if(s[i] == '\n')
       xs << c << "\n";
     else
@@ -74,7 +67,7 @@ void XStr::line_append_padding(const char c, int lineWidth)
   XStr xs;
   int count = 0;
 
-  for(int i=0; i<len; i++) {
+  for(unsigned int i=0; i<len; i++) {
     if(s[i] == '\n'){
       // found line ending
       while(count++ < lineWidth-1)
@@ -122,7 +115,7 @@ XStr::spew(const char*b, const char *a1, const char *a2, const char *a3,
 }
 
 void XStr::replace (const char a, const char b) {
-  for(int i=0; i<len; i++) {
+  for(unsigned int i=0; i<len; i++) {
     if (s[i] == a) s[i] = b;
   }
 }

@@ -5,6 +5,11 @@
 #include <string.h> /*<- for strlen */
 
 /* CkPrintf/CkAbort support: */
+extern "C" void CmiOutOfMemory(int nbytes) {
+       fprintf(stderr,"Fatal error> %d\n",nbytes);
+       abort();
+}
+
 extern "C" void CmiAbort(const char *why) {
         fprintf(stderr,"Fatal error> %s\n",why);
         abort();

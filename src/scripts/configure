@@ -1674,7 +1674,7 @@ test -r ./conv-config.sh && . ./conv-config.sh
 # Decimal representation of Charm++ release line and API revision
 # Increment the last 2 digits when making an API change
 # Increase the first three after branching for a release
-VERSION=60304
+VERSION=60305
 echo $VERSION > ../include/VERSION
 
 cat >>confdefs.h <<_ACEOF
@@ -2866,6 +2866,26 @@ test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RUSAGE_THREAD $pass
+_ACEOF
+
+
+#### test for asctime ###
+
+cat > $tc <<EOT
+#include <time.h>
+int main() {
+  struct tm *local;
+  time_t t;
+  t = time(NULL);
+  local = localtime(&t);
+  asctime(local);
+  return 0;
+}
+EOT
+test_linkc "whether has asctime" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_ASCTIME $pass
 _ACEOF
 
 

@@ -64,7 +64,7 @@ public:
       CmiAbort("Failed to generated trace param file!");
       // write out
     for (int i=0; i<events.size(); i++)
-      fprintf(fp, events[i]);
+      fprintf(fp, "%s", events[i]);
     fclose(fp);
     dumped = 1;
   }

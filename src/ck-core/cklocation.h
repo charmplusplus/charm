@@ -408,7 +408,7 @@ template <class T>
 class CkMigratableListT : public CkMigratableList {
 	typedef CkMigratableList super;
 public:
-	inline void put(T *v,int atIdx) {super::put((void *)v,atIdx);}
+	inline void put(T *v,int atIdx) {super::put((CkMigratable *)v,atIdx);}
 	inline T *get(int localIdx) {return (T *)super::get(localIdx);}
 	inline T *next(int &from) {return (T *)super::next(from);}
 };

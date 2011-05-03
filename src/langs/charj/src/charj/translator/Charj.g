@@ -17,6 +17,7 @@ options {
 
 tokens {
 
+    ASSERT                  = 'assert'          ;
     ENTRY                   = 'entry'           ;
     SDAGENTRY               = 'sdagentry'       ;
     TRACED                  = 'traced'          ;
@@ -665,11 +666,11 @@ divconExpr
     ;
 
 nonBlockStatement
-    :   'assert' expr1=expression 
+    :   ASSERT expr1=expression 
         (   ':' expr2=expression ';'
-            ->  ^('assert' $expr1 $expr2)
+            ->  ^(ASSERT $expr1 $expr2)
         |   ';'
-            ->  ^('assert' $expr1)
+            ->  ^(ASSERT $expr1)
         )
     |   IF parenthesizedExpression ifStat=block
         (   ELSE elseStat=block

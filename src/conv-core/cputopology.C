@@ -396,7 +396,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 
   int obtain_flag = 1;              // default on
-#if __FAULT__
+#if __FAULT_|| CMK_BLUEGENEQ
   obtain_flag = 0;
 #endif
   if(CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
@@ -419,9 +419,11 @@ extern "C" void CmiInitCPUTopology(char **argv)
   if (!obtain_flag) {
     if (CmiMyRank() == 0) cpuTopo.sort();
     CmiNodeAllBarrier();
+    CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks
     return;
   }
-  else if (CmiMyPe() == 0) {
+
+  if (CmiMyPe() == 0) {
 #if CMK_BLUEGENE_CHARM
     if (BgNodeRank() == 0)
 #endif
@@ -449,15 +451,6 @@ extern "C" void CmiInitCPUTopology(char **argv)
   CmiBarrier();
 #endif
 
-  if (CmiMyPe() >= CmiNumPes()) {
-    CmiNodeAllBarrier();         // comm thread waiting
-#if CMK_MACHINE_PROGRESS_DEFINED
-#if ! CMK_CRAYXT
-    while (done < CmiMyNodeSize()) CmiNetworkProgress();
-#endif
-#endif
-    return;    /* comm thread return */
-  }
 
 #if 0
   if (gethostname(hostname, 999)!=0) {
@@ -482,7 +475,6 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-#elif CMK_BLUEGENEQ
 #elif CMK_CRAYXT
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
@@ -512,7 +504,19 @@ extern "C" void CmiInitCPUTopology(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
+
 #else
+
+  if (CmiMyPe() >= CmiNumPes()) {
+    CmiNodeAllBarrier();         // comm thread waiting
+#if CMK_MACHINE_PROGRESS_DEFINED
+#if ! CMK_CRAYXT
+    while (done < CmiMyNodeSize()) CmiNetworkProgress();
+#endif
+#endif
+    return;    /* comm thread return */
+  }
+
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
@@ -541,6 +545,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
   msg->procs[0].ip = myip;
   msg->procs[0].ncores = CmiNumCores();
   msg->procs[0].rank = 0;
+  msg->procs[0].nodeID = 0;
   CmiReduce(msg, sizeof(hostnameMsg)+sizeof(_procInfo), combineMessage);
 
     // blocking here
