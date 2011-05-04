@@ -124,6 +124,10 @@ extern void CldModuleInit(char **);
 #include <sys/timeb.h>
 #endif
 
+#ifdef CMK_HAS_ASCTIME
+#include <time.h>
+#endif
+
 #ifdef CMK_CUDA
 #include "cuda-hybrid-api.h"
 #endif
