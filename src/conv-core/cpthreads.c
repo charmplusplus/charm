@@ -595,9 +595,10 @@ void Cpthread_start_main(mainfn fn, int argc, char **argv)
 {
   Cpthread_t pt;
   Cpthread_attr_t attrib;
+  CmiIntPtr pargc = argc;
   if (CmiMyRank()==0) {
     Cpthread_attr_init(&attrib);
     Cpthread_attr_setdetachstate(&attrib, 1);
-    Cpthread_create3(&pt, &attrib, (voidfn)fn, (void *)argc, argv, 0);
+    Cpthread_create3(&pt, &attrib, (voidfn)fn, (void *)pargc, argv, 0);
   }
 }
