@@ -192,6 +192,15 @@ CpvDeclare(char*,CmiPostedRecvBuffers);
 #define BARRIER_ZERO_TAG     1375
 #endif
 
+#define BLK_LEN  512
+
+#if CMK_NODE_QUEUE_AVAILABLE
+#define DGRAM_NODEMESSAGE   (0xFB)
+
+#define NODE_BROADCAST_OTHERS (-1)
+#define NODE_BROADCAST_ALL    (-2)
+#endif
+
 #include <signal.h>
 void (*signal_int)(int);
 
@@ -201,7 +210,6 @@ static int mpi_tag = TAG;
 */
 
 static int        _thread_provided = -1;
-int 		  _Cmi_numpes;
 int               _Cmi_mynode;    /* Which address space am I */
 int               _Cmi_mynodesize;/* Number of processors in my address space */
 int               _Cmi_numnodes;  /* Total number of address spaces */
@@ -215,15 +223,6 @@ CpvDeclare(unsigned , networkProgressCount);
 int networkProgressPeriod;
 
 int 		  idleblock = 0;
-
-#define BLK_LEN  512
-
-#if CMK_NODE_QUEUE_AVAILABLE
-#define DGRAM_NODEMESSAGE   (0xFB)
-
-#define NODE_BROADCAST_OTHERS (-1)
-#define NODE_BROADCAST_ALL    (-2)
-#endif
 
 #if 0
 static void **recdQueue_blk;
@@ -279,213 +278,7 @@ static void PerrorExit(const char *msg)
 
 extern unsigned char computeCheckSum(unsigned char *data, int len);
 
-/**************************  TIMER FUNCTIONS **************************/
 
-#if CMK_TIMER_USE_SPECIAL || CMK_TIMER_USE_XT3_DCLOCK
-
-/* MPI calls are not threadsafe, even the timer on some machines */
-static CmiNodeLock  timerLock = 0;
-static int _absoluteTime = 0;
-static double starttimer = 0;
-static int _is_global = 0;
-
-int CmiTimerIsSynchronized()
-{
-  int  flag;
-  void *v;
-
-  /*  check if it using synchronized timer */
-  if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
-    printf("MPI_WTIME_IS_GLOBAL not valid!\n");
-  if (flag) {
-    _is_global = *(int*)v;
-    if (_is_global && CmiMyPe() == 0)
-      printf("Charm++> MPI timer is synchronized\n");
-  }
-  return _is_global;
-}
-
-int CmiTimerAbsolute()
-{       
-  return _absoluteTime;
-}
-
-double CmiStartTimer()
-{
-  return 0.0;
-}
-
-double CmiInitTime()
-{
-  return starttimer;
-}
-
-void CmiTimerInit(char **argv)
-{
-  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
-  if (_absoluteTime && CmiMyPe() == 0)
-      printf("Charm++> absolute MPI timer is used\n");
-
-  _is_global = CmiTimerIsSynchronized();
-
-  if (_is_global) {
-    if (CmiMyRank() == 0) {
-      double minTimer;
-#if CMK_TIMER_USE_XT3_DCLOCK
-      starttimer = dclock();
-#else
-      starttimer = MPI_Wtime();
-#endif
-
-      MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
-                                  MPI_COMM_WORLD );
-      starttimer = minTimer;
-    }
-  }
-  else {  /* we don't have a synchronous timer, set our own start time */
-    CmiBarrier();
-    CmiBarrier();
-    CmiBarrier();
-#if CMK_TIMER_USE_XT3_DCLOCK
-    starttimer = dclock();
-#else
-    starttimer = MPI_Wtime();
-#endif
-  }
-
-#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
-  if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
-    timerLock = CmiCreateLock();
-#endif
-  CmiNodeAllBarrier();          /* for smp */
-}
-
-/**
- * Since the timerLock is never created, and is
- * always NULL, then all the if-condition inside
- * the timer functions could be disabled right
- * now in the case of SMP. --Chao Mei
- */
-double CmiTimer(void)
-{
-  double t;
-#if 0 && CMK_SMP
-  if (timerLock) CmiLock(timerLock);
-#endif
-
-#if CMK_TIMER_USE_XT3_DCLOCK
-  t = dclock();
-#else
-  t = MPI_Wtime();
-#endif
-
-#if 0 && CMK_SMP
-  if (timerLock) CmiUnlock(timerLock);
-#endif
-
-  return _absoluteTime?t: (t-starttimer);
-}
-
-double CmiWallTimer(void)
-{
-  double t;
-#if 0 && CMK_SMP
-  if (timerLock) CmiLock(timerLock);
-#endif
-
-#if CMK_TIMER_USE_XT3_DCLOCK
-  t = dclock();
-#else
-  t = MPI_Wtime();
-#endif
-
-#if 0 && CMK_SMP
-  if (timerLock) CmiUnlock(timerLock);
-#endif
-
-  return _absoluteTime? t: (t-starttimer);
-}
-
-double CmiCpuTimer(void)
-{
-  double t;
-#if 0 && CMK_SMP
-  if (timerLock) CmiLock(timerLock);
-#endif
-#if CMK_TIMER_USE_XT3_DCLOCK
-  t = dclock() - starttimer;
-#else
-  t = MPI_Wtime() - starttimer;
-#endif
-#if 0 && CMK_SMP
-  if (timerLock) CmiUnlock(timerLock);
-#endif
-  return t;
-}
-
-#endif
-
-/* must be called on all ranks including comm thread in SMP */
-int CmiBarrier()
-{
-#if CMK_SMP
-    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
-  CmiNodeAllBarrier();
-  if (CmiMyRank() == CmiMyNodeSize()) 
-#else
-  if (CmiMyRank() == 0) 
-#endif
-  {
-/**
- *  The call of CmiBarrier is usually before the initialization
- *  of trace module of Charm++, therefore, the START_EVENT
- *  and END_EVENT are disabled here. -Chao Mei
- */	
-    /*START_EVENT();*/
-
-    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
-        CmiAbort("Timernit: MPI_Barrier failed!\n");
-
-    /*END_EVENT(10);*/
-  }
-  CmiNodeAllBarrier();
-  return 0;
-}
-
-/* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
-int CmiBarrierZero()
-{
-  int i;
-#if CMK_SMP
-  if (CmiMyRank() == CmiMyNodeSize()) 
-#else
-  if (CmiMyRank() == 0) 
-#endif
-  {
-    char msg[1];
-    MPI_Status sts;
-    if (CmiMyNode() == 0)  {
-      for (i=0; i<CmiNumNodes()-1; i++) {
-         START_EVENT();
-
-         if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
-            CmiPrintf("MPI_Recv failed!\n");
-
-         END_EVENT(30);
-      }
-    }
-    else {
-      START_EVENT();
-
-      if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,MPI_COMM_WORLD))
-         printf("MPI_Send failed!\n");
-
-      END_EVENT(20);
-    }
-  }
-  CmiNodeAllBarrier();
-  return 0;
-}
 
 typedef struct ProcState {
 #if MULTI_SENDQUEUE
@@ -539,7 +332,20 @@ static void CmiStartThreads(char **argv)
   _Cmi_mype = Cmi_nodestart;
   _Cmi_myrank = 0;
 }
-#endif	/* non smp */
+#else	/* non smp */
+int CmiMyPe(void)
+{
+  return CmiGetState()->pe;
+}
+int CmiMyRank(void)
+{
+  return CmiGetState()->rank;
+}
+int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
+int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
+int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
+int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
+#endif
 
 /*Add a message to this processor's receive queue, pe is a rank */
 void CmiPushPE(int pe,void *msg)
@@ -593,29 +399,6 @@ static void CmiPushNode(void *msg)
 }
 #endif
 
-#ifndef CmiMyPe
-int CmiMyPe(void)
-{
-  return CmiGetState()->pe;
-}
-#endif
-
-#ifndef CmiMyRank
-int CmiMyRank(void)
-{
-  return CmiGetState()->rank;
-}
-#endif
-
-#ifndef CmiNodeFirst
-int CmiNodeFirst(int node) { return node*_Cmi_mynodesize; }
-int CmiNodeSize(int node)  { return _Cmi_mynodesize; }
-#endif
-
-#ifndef CmiNodeOf
-int CmiNodeOf(int pe)      { return (pe/_Cmi_mynodesize); }
-int CmiRankOf(int pe)      { return pe%_Cmi_mynodesize; }
-#endif
 
 static size_t CmiAllAsyncMsgsSent(void)
 {
@@ -2372,5 +2155,212 @@ void * recdQueueRemoveFromFront(void)
 }
 
 #endif
+
+/**************************  TIMER FUNCTIONS **************************/
+#if CMK_TIMER_USE_SPECIAL || CMK_TIMER_USE_XT3_DCLOCK
+
+/* MPI calls are not threadsafe, even the timer on some machines */
+static CmiNodeLock  timerLock = 0;
+static int _absoluteTime = 0;
+static double starttimer = 0;
+static int _is_global = 0;
+
+int CmiTimerIsSynchronized()
+{
+  int  flag;
+  void *v;
+
+  /*  check if it using synchronized timer */
+  if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
+    printf("MPI_WTIME_IS_GLOBAL not valid!\n");
+  if (flag) {
+    _is_global = *(int*)v;
+    if (_is_global && CmiMyPe() == 0)
+      printf("Charm++> MPI timer is synchronized\n");
+  }
+  return _is_global;
+}
+
+int CmiTimerAbsolute()
+{       
+  return _absoluteTime;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return starttimer;
+}
+
+void CmiTimerInit(char **argv)
+{
+  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+  if (_absoluteTime && CmiMyPe() == 0)
+      printf("Charm++> absolute MPI timer is used\n");
+
+  _is_global = CmiTimerIsSynchronized();
+
+  if (_is_global) {
+    if (CmiMyRank() == 0) {
+      double minTimer;
+#if CMK_TIMER_USE_XT3_DCLOCK
+      starttimer = dclock();
+#else
+      starttimer = MPI_Wtime();
+#endif
+
+      MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
+                                  MPI_COMM_WORLD );
+      starttimer = minTimer;
+    }
+  }
+  else {  /* we don't have a synchronous timer, set our own start time */
+    CmiBarrier();
+    CmiBarrier();
+    CmiBarrier();
+#if CMK_TIMER_USE_XT3_DCLOCK
+    starttimer = dclock();
+#else
+    starttimer = MPI_Wtime();
+#endif
+  }
+
+#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
+  if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
+    timerLock = CmiCreateLock();
+#endif
+  CmiNodeAllBarrier();          /* for smp */
+}
+
+/**
+ * Since the timerLock is never created, and is
+ * always NULL, then all the if-condition inside
+ * the timer functions could be disabled right
+ * now in the case of SMP. --Chao Mei
+ */
+double CmiTimer(void)
+{
+  double t;
+#if 0 && CMK_SMP
+  if (timerLock) CmiLock(timerLock);
+#endif
+
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock();
+#else
+  t = MPI_Wtime();
+#endif
+
+#if 0 && CMK_SMP
+  if (timerLock) CmiUnlock(timerLock);
+#endif
+
+  return _absoluteTime?t: (t-starttimer);
+}
+
+double CmiWallTimer(void)
+{
+  double t;
+#if 0 && CMK_SMP
+  if (timerLock) CmiLock(timerLock);
+#endif
+
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock();
+#else
+  t = MPI_Wtime();
+#endif
+
+#if 0 && CMK_SMP
+  if (timerLock) CmiUnlock(timerLock);
+#endif
+
+  return _absoluteTime? t: (t-starttimer);
+}
+
+double CmiCpuTimer(void)
+{
+  double t;
+#if 0 && CMK_SMP
+  if (timerLock) CmiLock(timerLock);
+#endif
+#if CMK_TIMER_USE_XT3_DCLOCK
+  t = dclock() - starttimer;
+#else
+  t = MPI_Wtime() - starttimer;
+#endif
+#if 0 && CMK_SMP
+  if (timerLock) CmiUnlock(timerLock);
+#endif
+  return t;
+}
+
+#endif
+
+/* must be called on all ranks including comm thread in SMP */
+int CmiBarrier()
+{
+#if CMK_SMP
+    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
+  CmiNodeAllBarrier();
+  if (CmiMyRank() == CmiMyNodeSize()) 
+#else
+  if (CmiMyRank() == 0) 
+#endif
+  {
+/**
+ *  The call of CmiBarrier is usually before the initialization
+ *  of trace module of Charm++, therefore, the START_EVENT
+ *  and END_EVENT are disabled here. -Chao Mei
+ */	
+    /*START_EVENT();*/
+
+    if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
+        CmiAbort("Timernit: MPI_Barrier failed!\n");
+
+    /*END_EVENT(10);*/
+  }
+  CmiNodeAllBarrier();
+  return 0;
+}
+
+/* CmiBarrierZero make sure node 0 is the last one exiting the barrier */
+int CmiBarrierZero()
+{
+  int i;
+#if CMK_SMP
+  if (CmiMyRank() == CmiMyNodeSize()) 
+#else
+  if (CmiMyRank() == 0) 
+#endif
+  {
+    char msg[1];
+    MPI_Status sts;
+    if (CmiMyNode() == 0)  {
+      for (i=0; i<CmiNumNodes()-1; i++) {
+         START_EVENT();
+
+         if (MPI_SUCCESS != MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,BARRIER_ZERO_TAG, MPI_COMM_WORLD,&sts))
+            CmiPrintf("MPI_Recv failed!\n");
+
+         END_EVENT(30);
+      }
+    }
+    else {
+      START_EVENT();
+
+      if (MPI_SUCCESS != MPI_Send((void *)msg,1,MPI_BYTE,0,BARRIER_ZERO_TAG,MPI_COMM_WORLD))
+         printf("MPI_Send failed!\n");
+
+      END_EVENT(20);
+    }
+  }
+  CmiNodeAllBarrier();
+  return 0;
+}
 
 /*@}*/
