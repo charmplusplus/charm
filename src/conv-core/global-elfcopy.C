@@ -178,7 +178,7 @@ printf("Loading globals from file \"%s\" ... \n", fname);
     while (!feof(gf)) 
     {
       char name[1024];
-      fscanf(gf, "%s\n", &name);
+      fscanf(gf, "%s\n", name);
       _namelist.push_back(strdup(name));
     }
     fclose(gf);
