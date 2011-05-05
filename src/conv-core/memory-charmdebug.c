@@ -1383,7 +1383,7 @@ void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
   char buf[100];
-  sprintf(buf,"slot size %d\n",sizeof(Slot));
+  sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
   status(buf);
   CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
   cpdInitializeMemory = 0;
