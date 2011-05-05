@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /** 
   @defgroup Converse
   \brief Converse--a parallel portability layer.
@@ -122,6 +116,10 @@ extern void CldModuleInit(char **);
 #include <time.h>
 #include <sys/types.h>
 #include <sys/timeb.h>
+#endif
+
+#ifdef CMK_HAS_ASCTIME
+#include <time.h>
 #endif
 
 #ifdef CMK_CUDA

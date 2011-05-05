@@ -180,6 +180,46 @@ void CldPutToken(char *msg)
   CmiUnlock(CpvAccess(cldLock));
 }
 
+void CldPutTokenPrio(char *msg)
+{
+  CldProcInfo proc = CpvAccess(CldProc);
+  CldInfoFn ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
+  CldToken tok, ptr;
+  int len, queueing, priobits; unsigned int *prioptr, ints;
+  CldPackFn pfn;
+
+  ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
+  ints = (priobits+CINTBITS-1)/CINTBITS;
+
+  CmiLock(CpvAccess(cldLock));
+  tok = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
+  tok->msg = msg;
+
+  /* find the right place */
+  ptr = proc->sentinel->succ;
+  while (ptr!=proc->sentinel) {
+    int len1, queueing1, priobits1; unsigned int *prioptr1, ints1;
+    CldPackFn pfn1;
+    ifn(ptr->msg, &pfn1, &len1, &queueing1, &priobits1, &prioptr1);
+    ints1 = (priobits1+CINTBITS-1)/CINTBITS;
+
+    if (!CqsPrioGT_(ints, prioptr, ints1, prioptr1)) { ptr=ptr->pred; break;}
+    ptr = ptr->succ;
+  }
+
+  /* add token to the doubly-linked circle */
+  tok->pred = ptr->pred;
+  tok->succ = ptr;
+  tok->pred->succ = tok;
+  tok->succ->pred = tok;
+  proc->load ++;
+  /* add token to the scheduler */
+  CmiSetHandler(tok, proc->tokenhandleridx);
+  /* not sigio or thread safe */
+  CsdEnqueueGeneral(tok, queueing, priobits, prioptr);
+  CmiUnlock(CpvAccess(cldLock));
+}
+
 
 static 
 #if CMK_C_INLINE
