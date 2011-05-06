@@ -653,7 +653,7 @@ PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *
   result->msgs  = (char**)((char*)result->sizes + (npacked+1)*sizeof(int) + sizeof(CmiChunkHeader));
 
   SIZEFIELD(result->sizes) = (npacked+1)*sizeof(int);
-  REFFIELD(result->sizes) = - (sizeof(struct ptvectorlist) + sizeof(CmiChunkHeader));
+  REFFIELD(result->sizes) = - (int)(sizeof(struct ptvectorlist) + sizeof(CmiChunkHeader));
   SIZEFIELD(result->msgs) = (npacked+1)*sizeof(int);
   REFFIELD(result->msgs) = - (sizeof(struct ptvectorlist) + (npacked+1)*sizeof(int) + 2*sizeof(CmiChunkHeader));
   CmiReference(result);
@@ -759,7 +759,7 @@ PTvectorlist PeTable :: ExtractAndVectorizeAll(comID id, int ufield) {
   result->msgs  = (char**)((char*)result->sizes + (nmsgs+1)*sizeof(int) + sizeof(CmiChunkHeader));
 
   SIZEFIELD(result->sizes) = (nmsgs+1)*sizeof(int);
-  REFFIELD(result->sizes) = - (sizeof(struct ptvectorlist) + sizeof(CmiChunkHeader));
+  REFFIELD(result->sizes) = - (int)(sizeof(struct ptvectorlist) + sizeof(CmiChunkHeader));
   SIZEFIELD(result->msgs) = (nmsgs+1)*sizeof(int);
   REFFIELD(result->msgs) = - (sizeof(struct ptvectorlist) + (nmsgs+1)*sizeof(int) + 2*sizeof(CmiChunkHeader));
   CmiReference(result);
