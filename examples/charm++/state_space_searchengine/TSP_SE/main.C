@@ -14,7 +14,7 @@ int  N, maxD;
 
 #undef M_PI
 #define M_PI 3.14159265358979323846264
-
+/*
 int geom_edgelen (int i, int j, CCdatagroup *dat)
 {
      double lati, latj, longi, longj;
@@ -33,7 +33,7 @@ int geom_edgelen (int i, int j, CCdatagroup *dat)
      q5 = cos(lati - latj) * q4 * q4 - cos(lati + latj) * q3 * q3;
      return (int) (6378388.0 * atan2(sqrt(q1*q1 + q2*q2), q5) + 1.0);
 }
-
+*/
 void readinput(char* filename)
 {
     FILE *file;
