@@ -22,6 +22,7 @@ int  CldLoadRank(int rank);
 int  CldCountTokens(void);
 int  CldCountTokensRank(int rank);
 void CldPutToken(char *);
+void CldPutTokenPrio(char *);
 void CldRestoreHandler(char *);
 void CldSwitchHandler(char *, int);
 void CldModuleGeneralInit();

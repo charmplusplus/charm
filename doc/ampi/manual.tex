@@ -19,12 +19,12 @@ version of AMPI is maintained by Chao Huang.
 This manual describes Adaptive MPI~(\ampi{}), which is an implementation of a
 significant subset\footnote{Currently, 110 MPI-1.1 Standard functions have 
 been implemented.} of MPI-1.1 Standard over \charmpp{}. \charmpp{} is a
-\CC{}-based parallel programming library developed by Prof. L. V. Kal\'{e} 
-and his students over the last 10 years at University of Illinois.
+\CC{}-based parallel programming library being developed by Prof. L. V. Kal\'{e} 
+and his students back from 1992 until now at University of Illinois.
 
 We first describe our philosophy behind this work (why we do what we do).
 Later we give a brief introduction to \charmpp{} and rationale for \ampi{}
-(tools of the trade). We describe \ampi{} in detail. Finally we summarize the
+(tools of the trade). We then describe \ampi{} in detail. Finally we summarize the
 changes required for original MPI codes to get them working with \ampi{}
 (current state of our work). Appendices contain the gory details of installing
 \ampi{}, building and running \ampi{} programs.
@@ -39,22 +39,22 @@ and efficiency of the programs. It becomes even more complex for multi-physics
 coupled simulations such as the solid propellant rocket simulation application.  
 Our philosophy is to lessen the burden of the application developers by
 providing advanced programming paradigms and versatile runtime systems that can
-handle many common performance concerns automatically and let the application
+handle many common programming and performance concerns automatically and let the application
 programmers focus on the actual application content.
 
-One such concern is that of load imbalance. In a dynamic simulation application
+Many of these concerns can be addressed using processor virtualization and over-decomposition philosophy of \charmpp{}. Thus, the developer only sees virtual processors and lets the runtime system deal with underlying physical processors. As an immediate and simple benefit, the programmer can use as many virtual processors ("MPI ranks") as the problem can be easily decomposed to them. For example, suppose the problem domain has $n*2^n$ parts that can be easily distributed but programming for general number of MPI processes is burdensome, then the developer can have $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
+
+Another benefit of virtualization is communication and computation overlap without programming effort. Techniques such as software pipelining require programming effort to achieve this goal and improve performance. However, one can use \ampi{} to have more virtual processors than physical processors to overlap communication and computation. In this manner, while some of the virtual processors of a physical one are waiting for a message to arrive, others can continue their execution. Thus, performance will be improved without any change to the source code.
+
+One important concern is that of load imbalance. In a dynamic simulation application
 such as rocket simulation, burning  solid fuel, sub-scaling for a certain part
 of the mesh, crack propagation, particle flows all contribute to load
 imbalance. Centralized load balancing strategy built into an application is
 impractical since each individual modules are developed almost independently by
-various developers. Thus, the runtime system support for load balancing becomes
+various developers. In addition, embedding a load balancing strategy in the code complicates it and programming effort increases significantly. Thus, the runtime system support for load balancing becomes
 even more critical.
 
-Automatic load balancing is infeasible for a program about which nothing is
-known. Other approaches to automatic load balancing therefore require the
-applications to provide hints about the load to the runtime system, or restrict
-load balance to a certain kind of algorithms such as Adaptive Mesh Refinement
-or  to certain architectures such as shared memory machines. Our approach is
+There are different load balancing strategies built into \charmpp{} that can be selected. Among those, some may fit better for an application depending on its characteristics. Moreover, one can write a new load balancer, best suited for an application, by the simple API provided inside \charmpp{} infrastructure. Our approach is
 based on actual measurement of load information at runtime, and on migrating
 computations from heavily loaded to lightly loaded processors.
 
@@ -63,8 +63,8 @@ pieces many more in number than available processors. This allows us to
 flexibly map and re-map these computational pieces to available processors.
 This approach is usually called ``multi-domain decomposition''.
 
-\charmpp{}, which we use as a runtime system layer for the work described here
-exemplifies our approach. It embeds an elaborate performance tracing mechanism,
+\charmpp{}, which we use as a runtime system layer for the work described here,
+simplifies our approach. It embeds an elaborate performance tracing mechanism,
 a suite of plug-in load balancing strategies, infrastructure for defining and
 migrating computational load, and is interoperable with other programming
 paradigms.

@@ -5,14 +5,14 @@ Manual Style^^J
 Written by Milind A. Bhandarkar, 12/00^^J}
 
 %%% Make it possible for both ps and pdf to be generated
-\newif\ifpdf
-\ifx\pdfoutput\undefined
-  \pdffalse
-\else
-  \pdfoutput=1
-  \pdftrue
-\fi
-
+%\newif\ifpdf
+%\ifx\pdfoutput\undefined
+%  \pdffalse
+%\else
+%  \pdfoutput=1
+%  \pdftrue
+%\fi
+\usepackage{ifpdf}
 \ifpdf
   \pdfcompresslevel=9
 \fi

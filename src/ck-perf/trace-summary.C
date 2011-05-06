@@ -470,7 +470,7 @@ void SumLogPool::write(void)
         fprintf(sdfp, "EPCallTimePerInterval ");
         last= getNumExecutions(0,0);
         count=0;
-        fprintf(sdfp, "%d", last);
+        fprintf(sdfp, "%ld", last);
         for(e=0; e<_numEntries; e++) {
             for(i=0; i<numBins; i++) {
 
@@ -480,7 +480,7 @@ void SumLogPool::write(void)
                 } else {
 
                     if (count > 1) fprintf(sdfp, "+%d", count);
-                    fprintf(sdfp, " %d", u);
+                    fprintf(sdfp, " %ld", u);
                     last = u;
                     count = 1;
                 }

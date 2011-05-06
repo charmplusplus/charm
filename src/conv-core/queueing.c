@@ -180,6 +180,22 @@ void CqsPrioqRehash(_prioq pq)
 }
 #endif
 
+int CqsPrioGT_(unsigned int ints1, unsigned int *data1, unsigned int ints2, unsigned int *data2)
+{
+  unsigned int val1;
+  unsigned int val2;
+  while (1) {
+    if (ints1==0) return 0;
+    if (ints2==0) return 1;
+    val1 = *data1++;
+    val2 = *data2++;
+    if (val1 < val2) return 0;
+    if (val1 > val2) return 1;
+    ints1--;
+    ints2--;
+  }
+}
+
 /**
  * Compare two priorities (treated as unsigned).
  * @return 1 if prio1 > prio2
