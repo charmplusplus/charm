@@ -10,7 +10,7 @@
 */
 /*@{*/
 
-#include "charm++.h"
+#include <charm++.h>
 extern "C"{
 #include "tm_tree.h"
 #include "tm_mapping.h"

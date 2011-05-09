@@ -2,7 +2,6 @@
 BaseLB.decl.h BaseLB.def.h: BaseLB.ci.stamp
 BlockLB.decl.h BlockLB.def.h: BlockLB.ci.stamp
 BlueGene.decl.h BlueGene.def.h: BlueGene.ci.stamp
-CCALB.decl.h CCALB.def.h: CCALB.ci.stamp
 CentralLB.decl.h CentralLB.def.h: CentralLB.ci.stamp
 charisma.decl.h charisma.def.h: charisma.ci.stamp
 CkArray.decl.h CkArray.def.h: ckarray.ci.stamp
@@ -16,7 +15,6 @@ CkMemCheckpoint.decl.h CkMemCheckpoint.def.h: ckmemcheckpoint.ci.stamp
 CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp
 ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp
 comlib.decl.h comlib.def.h: ComlibManager.ci.stamp
-CommAwareLB.decl.h CommAwareLB.def.h: CommAwareLB.ci.stamp
 CommLB.decl.h CommLB.def.h: CommLB.ci.stamp
 CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp

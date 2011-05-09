@@ -154,7 +154,7 @@ html-doc: basics
 doc: basics
 	cd ../doc ; make doc
 
-CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS) -I/expand/home/jessie/PPL/workshops/ldbContest/sebastien/scotch_5.3.0beta3/include
+CHARMC=../bin/charmc $(CHARMOPTS) $(OPTS)
 
 SEQCHARMC=../bin/charmc -seq $(CHARMOPTS)
 
@@ -1051,7 +1051,7 @@ depends: cidepends
 	      SRCFILE=`basename $$i .o`.C ; \
 	      [ ! -f $$SRCFILE ] && SRCFILE=`basename $$i .o`.c ;	\
               echo "checking dependencies for $$SRCFILE" ; \
-              if g++ -MM -Wno-deprecated -I. -I/expand/home/jessie/PPL/workshops/ldbContest/sebastien/scotch_5.3.0beta3/include -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
+              if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
         done;
 
