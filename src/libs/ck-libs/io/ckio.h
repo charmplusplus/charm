@@ -53,14 +53,15 @@ namespace Ck { namespace IO {
   struct FileInfo {
     std::string name;
     Options opts;
-    size_t bytes;
+    size_t bytes, total_written;
     int fd;
+    CkCallback complete;
 
     FileInfo(std::string name_, size_t bytes_, Options opts_)
-      : name(name_), opts(opts_), bytes(bytes_), fd(-1)
+    : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)
       { }
     FileInfo()
-      : bytes(-1), fd(-1)
+    : bytes(-1), total_written(-1), fd(-1)
       { }
   };
 
@@ -89,6 +90,7 @@ namespace Ck { namespace IO {
 
     /// Internal methods, used for interaction among IO managers across the system
     void write_forwardData(Token token, const char *data, size_t bytes, size_t offset);
+    void write_dataWritten(Token token, size_t bytes);
 
   private:
     int filesOpened;

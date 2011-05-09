@@ -38,13 +38,17 @@ module CkIO {
 		nextReady = ready;
 
 		thisProxy.prepareOutput_distrib(nextToken, name, bytes, opts);
+
+		files[nextToken] = FileInfo(name, bytes, opts);
+		files[nextToken].complete = complete;
 	      }
 
 	    when prepareOutput_distrib[filesOpened](Token token, std::string name, size_t bytes,
 						    Options opts) atomic {
-	      CkAssert(files.end() == files.find(token));
-
-	      files[token] = FileInfo(name, bytes, opts);
+	      if (CkMyPe() != 0) {
+		CkAssert(files.end() == files.find(token));
+		files[token] = FileInfo(name, bytes, opts);
+	      }
 
 	      // Open file if we're one of the active PEs
 	      // XXX: Or maybe wait until the first write-out, to smooth the metadata load?
@@ -74,6 +78,7 @@ module CkIO {
 
 	entry void write_forwardData(Token token, const char data[bytes],
 				     size_t bytes, size_t offset);
+	entry void write_dataWritten(Token token, size_t bytes);
       };
     }
 

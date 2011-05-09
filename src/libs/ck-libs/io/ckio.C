@@ -32,8 +32,10 @@ namespace Ck { namespace IO {
       CkAssert(offset + bytes <= files[token].bytes);
       // XXX: CkAssert(this is the right processor to receive this data)
 
-      while (bytes > 0) {
-	ssize_t ret = pwrite(files[token].fd, data, bytes, offset);
+      size_t bytes_left = bytes;
+
+      while (bytes_left > 0) {
+	ssize_t ret = pwrite(files[token].fd, data, bytes_left, offset);
 	if (ret < 0)
 	  if (errno == EINTR)
 	    continue;
@@ -41,10 +43,21 @@ namespace Ck { namespace IO {
 	    CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
 	    CkAbort("Giving up");
 	  }
-	bytes -= ret;
+	bytes_left -= ret;
 	data += ret;
 	offset += ret;
       }
+
+      thisProxy[0].write_dataWritten(token, bytes);
+    }
+
+    void Manager::write_dataWritten(Token token, size_t bytes) {
+      CkAssert(CkMyPe() == 0);
+
+      files[token].total_written += bytes;
+
+      if (files[token].total_written == files[token].bytes)
+	files[token].complete.send();
     }
 
     void Manager::prepareInput(const char *name, CkCallback ready, Options opts) {

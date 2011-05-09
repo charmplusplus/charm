@@ -14,15 +14,15 @@ public:
     Ck::IO::Options opts;
     opts.peStripe = 200;
     opts.writeStripe = 1;
-    iomgr->prepareOutput("test", 10*n, CkCallback(CkIndex_Main::ready(NULL), thisProxy),
-			 CkCallback(), opts);
+    iomgr->prepareOutput("test", 10*n,
+			 CkCallback(CkIndex_Main::ready(NULL), thisProxy),
+			 CkCallback(CkIndex_Main::test_written(), thisProxy),
+			 opts);
     CkPrintf("Main ran\n");
   }
 
   void ready(Ck::IO::FileReadyMsg *m) {
     testers = CProxy_test::ckNew(m->token, n);
-    CkCallback cb(CkIndex_Main::test_written(), thisProxy);
-    CkStartQD(cb);
     CkPrintf("Main saw file ready\n");
   }
 
