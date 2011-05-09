@@ -29,32 +29,98 @@ changes required for original MPI codes to get them working with \ampi{}
 (current state of our work). Appendices contain the gory details of installing
 \ampi{}, building and running \ampi{} programs.
 
-\subsection{Our Philosophy}
+\subsection{Overview}
 
 Developing parallel Computational Science and Engineering (CSE) applications is
 a complex task. One has to implement the right physics, develop or choose and
 code appropriate numerical methods, decide and implement the proper input and
 output data formats, perform visualizations, and be concerned with correctness
 and efficiency of the programs. It becomes even more complex for multi-physics
-coupled simulations such as the solid propellant rocket simulation application.  
+coupled simulations such as the solid propellant rocket simulation application. In addition, many applications
+ are dynamic and adaptively refined so load imbalance is a major challenge.
 Our philosophy is to lessen the burden of the application developers by
 providing advanced programming paradigms and versatile runtime systems that can
 handle many common programming and performance concerns automatically and let the application
 programmers focus on the actual application content.
 
-Many of these concerns can be addressed using processor virtualization and over-decomposition philosophy of \charmpp{}. Thus, the developer only sees virtual processors and lets the runtime system deal with underlying physical processors. As an immediate and simple benefit, the programmer can use as many virtual processors ("MPI ranks") as the problem can be easily decomposed to them. For example, suppose the problem domain has $n*2^n$ parts that can be easily distributed but programming for general number of MPI processes is burdensome, then the developer can have $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
+Many of these concerns can be addressed using processor virtualization and 
+over-decomposition philosophy of \charmpp{}. Thus, the developer only sees 
+virtual processors and lets the runtime system deal with underlying physical 
+processors. This is implemented in \ampi{} by mapping MPI ranks to \charmpp{} user-level
+ threads as illustrated in Figure\ref{fig_virt}. As an immediate and simple benefit, the programmer can use as 
+many virtual processors ("MPI ranks") as the problem can be easily decomposed
+ to them. For example, suppose the problem domain has $n*2^n$ parts that can be
+  easily distributed but programming for general number of MPI processes is burdensome, 
+  then the developer can have $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
+  
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/virtualization.png}
+\caption{MPI processes are implemented as user-level threads in \ampi{}}
+\label{fig_virt}
+\end{figure}
 
-Another benefit of virtualization is communication and computation overlap without programming effort. Techniques such as software pipelining require programming effort to achieve this goal and improve performance. However, one can use \ampi{} to have more virtual processors than physical processors to overlap communication and computation. In this manner, while some of the virtual processors of a physical one are waiting for a message to arrive, others can continue their execution. Thus, performance will be improved without any change to the source code.
+\ampi{}'s execution model consists of multiple user-level threads per process and,
+typically, there is one process per physical processor. \charmpp{} scheduler coordinates
+execution of these threads (also called Virtual Processors or VPs) and controls execution as shown in Figure \ref{fig_ratio}. These
+VPs can also migrate between processors because of load balancing or other reasons.
+The number of VPs per processor specifies the virtualization ratio (degree of over-decomposition). For example, in Figure \ref{fig_ratio} virtualization ratio is four (there are four VPs per each processor). Figure \ref{fig_prac} show how the problem domain is over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
 
-One important concern is that of load imbalance. In a dynamic simulation application
+\begin{figure}[h]
+\centering
+\includegraphics[width=1.8in]{figs/ratio.png}
+\caption{VPs are managed by \charmpp{} scheduler}
+\label{fig_ratio}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/prac.png}
+\caption{Problem domain is over-decomposed to more VPs}
+\label{fig_prac}
+\end{figure}
+
+Another benefit of virtualization is communication and computation overlap which 
+is automatically achieved without programming effort. Techniques such as software 
+pipelining require significant programming 
+effort to achieve this goal and improve performance. However, one can use \ampi{} to 
+have more virtual processors than physical processors to overlap communication and 
+computation. Each time a VP is blocked for communication, \charmpp{} scheduler
+ picks the next VP among those that are ready to execute. In this manner, while
+ some of the VPs of a physical processor are 
+waiting for a message to arrive, others can continue their execution. Thus, performance 
+will be improved without any change to the source code.
+
+A potential benefit is that of better cache utilization. With over-decomposition, a smaller subdomain is accessed by a VP repeatedly in different function calls before getting blocked by communication and switching to another VP. That smaller subdomain may fit into cache if over-decomposition is enough. This concept is illustrated in Figure \ref{fig_cache} where each \ampi{} subdomain (such as 12) is smaller than corresponding MPI subdomain (such as 3) and may fit into cache memory. Thus, there is a potential performance improvement without changing the source code.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/cache.png}
+\caption{Smaller subdomains may fit into cache and result in better performance}
+\label{fig_cache}
+\end{figure}
+
+One important concern is that of load imbalance. New generation parallel applications are 
+dynamically varying, meaning that processors' load is shifting during execution. In a dynamic simulation application
 such as rocket simulation, burning  solid fuel, sub-scaling for a certain part
 of the mesh, crack propagation, particle flows all contribute to load
 imbalance. Centralized load balancing strategy built into an application is
 impractical since each individual modules are developed almost independently by
-various developers. In addition, embedding a load balancing strategy in the code complicates it and programming effort increases significantly. Thus, the runtime system support for load balancing becomes
-even more critical.
+various developers. In addition, embedding a load balancing strategy in the code 
+complicates it and programming effort increases significantly. Thus, the runtime 
+system support for load balancing becomes even more critical. Figure \ref{fig_migrate} shows migration of a VP because of load imbalance. For instance, this domain may correspond to a weather forecast model where there is a tornado in top-left side, which requires more computation to simulate. \ampi{} will then migrate VP 13 to balance the division of work across processors and improve performance. Note that incorporating this sort of load balancing inside the application code may take a lot of effort and complicates the code.
 
-There are different load balancing strategies built into \charmpp{} that can be selected. Among those, some may fit better for an application depending on its characteristics. Moreover, one can write a new load balancer, best suited for an application, by the simple API provided inside \charmpp{} infrastructure. Our approach is
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/migrate.png}
+\caption{\ampi{} migrates VPs across processors for load balancing}
+\label{fig_migrate}
+\end{figure}
+
+There are different load balancing strategies built into \charmpp{} that can be 
+selected. Among those, some may fit better for an application depending on its 
+characteristics. Moreover, one can write a new load balancer, best suited for an 
+application, by the simple API provided inside \charmpp{} infrastructure. Our approach is
 based on actual measurement of load information at runtime, and on migrating
 computations from heavily loaded to lightly loaded processors.
 
