@@ -1,1 +1,1 @@
--lscotch -lscotcherr -lm
+-I/expand/home/jessie/PPL/workshops/ldbContest/sebastien/scotch_5.3.0beta3/include/ -L/expand/home/jessie/PPL/workshops/ldbContest/sebastien/scotch_5.3.0beta3/lib/ -lscotch -lscotcherr -lm

@@ -1,6 +1,11 @@
 // AUTOMATICALLY GENERATED FILE
 
 module EveryLB {
+  extern module CommAwareLB;
+  extern module CCALB;
+  extern module RecBipartLB;
+  extern module ScotchLB;
+  extern module TreeMatchLB;
   extern module BlockLB;
   extern module CommLB;
   extern module DummyLB;
@@ -12,25 +17,9 @@ module EveryLB {
   extern module OrbLB;
   extern module PhasebyArrayLB;
   extern module RandCentLB;
-  extern module RecBipartLB;
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RotateLB;
-  extern module TreeMatchLB;
-  extern module ComboCentLB;
-  extern module GraphPartLB;
-  extern module GraphBFTLB;
-  extern module GridCommLB;
-  extern module GridCommRefineLB;
-  extern module GridHybridLB;
-  extern module GridHybridSeedLB;
-  extern module GridMetisLB;
-  extern module HbmLB;
-  extern module HybridLB;
-  extern module RefineKLB;
-  extern module RefineTopoLB;
-  extern module TopoCentLB;
-  extern module TopoLB;
 
   initnode void initEveryLB(void);
 };

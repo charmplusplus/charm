@@ -12,11 +12,9 @@ module CommonLBs {
   extern module OrbLB;
   extern module PhasebyArrayLB;
   extern module RandCentLB;
-  extern module RecBipartLB;
   extern module RefineLB;
   extern module RefineCommLB;
   extern module RotateLB;
-  extern module TreeMatchLB;
 
   initnode void initCommonLBs(void);
 };

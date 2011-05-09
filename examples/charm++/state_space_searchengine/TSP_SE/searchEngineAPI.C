@@ -53,42 +53,28 @@ public:
         temp_graph.resize(N*N);
         for(int i=0; i<N*N; i++)
             temp_graph[i] = graph[i];
-        if(length == 1)
-        {
-            int v0=tour[0];
-            int v1=tour[1];
-            temp_graph[v0*N+v1]=maxD;
-            temp_graph[v1*N+v0]=maxD;
-        }
-        else if(length >= 2)
-        {
-            int v1;
-            for(int i=1; i<length-1; i++)
-            {
-                v1=tour[i];
-                for(int j=0; j<N; j++)
-                {
-                    temp_graph[v1*N+j] = maxD; //whole row
-                    temp_graph[j*N+v1]= maxD;  //whole column
-                }
-            }
-        }
+        
         double lower_sum = 0;
         for(int i=0; i<N; i++)
         {
-            if(i==0 || i== tour[length-1])
+            if(intour[i] == 2)
+                continue;
+            if(intour[i] == 1)
             {
-                lower_sum += *min_element(temp_graph.begin()+i*N, temp_graph.begin()+(i+1)*N);
+                int m_min=maxD;
+                for(int j=0; j<N; j++)
+                {
+                    if(intour[j] ==0 && graph[j]<m_min)
+                        m_min= graph[j];
+                }
+                lower_sum += m_min;
             }else
             {
-                if(intour[i])
-                    continue;
-                //find the minimum and second minimum element
                 int m_min, m2_min;
                 m_min = m2_min=temp_graph[i*N];
                 for(int j=1; j<N; j++)
                 {
-                    if(temp_graph[j]<m_min)
+                    if(graph[j]<m_min)
                     {
                         m2_min=m_min;
                         m_min=temp_graph[j];
@@ -125,7 +111,7 @@ inline double lowerBound( StateBase *s)
 inline void createInitialChildren(Solver *solver)
 {
 
-    TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+sizeof(int)*N, 0, 1);
+    TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+2*sizeof(int)*N, 0, 1);
     state->initialize();
     state->tour[0]=0;
     state->length=1;
@@ -142,7 +128,7 @@ inline void createInitialChildren(Solver *solver)
 inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
 {
 
-    TspBase *s = (TspBase*)alloca(sizeof(TspBase)+sizeof(int)*N);
+    TspBase *s = (TspBase*)alloca(sizeof(TspBase)+2*sizeof(int)*N);
     s->initialize();
     s->copy((TspBase*)_base);
     int childIndex = 0;
@@ -150,7 +136,7 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
     /* construct the current graph, remove all the edges already in the path */
     for(int j=0; j<N; j++)
     {
-        if(last == j || s->intour[j])
+        if(last == j || s->intour[j]==2)
             continue;
         if(s->length == N)
         {
@@ -167,6 +153,7 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
             NewTour->copy(s);
             NewTour->tour[s->length] = j;
             NewTour->intour[j]=1;
+            NewTour->intour[last]=2;
             NewTour->length = s->length + 1;
             NewTour->cost = s->cost + graph[last*N+j];
 #ifdef USEINTPRIORITY

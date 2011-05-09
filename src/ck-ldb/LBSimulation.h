@@ -7,7 +7,7 @@
 #ifndef SIMRESULTS_H
 #define SIMRESULTS_H
 
-#include <charm++.h>
+#include "charm++.h"
 #include "CentralLB.h"
 
 class LBSimulation

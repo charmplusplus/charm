@@ -9,7 +9,7 @@
   * support nonmigratable attrib
 */
 
-#include <LBSimulation.h>
+#include "LBSimulation.h"
 #include "GreedyAgentLB.h"
 
 #define LOAD_OFFSET 0.05
