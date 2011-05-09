@@ -65,7 +65,7 @@ $(FILE): $(TEX) $(FILE).aux
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)
-	latex $(FILE).tex
+	pdflatex $(FILE).tex
 
 index.tex: $(FILE).idx
 	makeindex -o index.tex $(FILE).idx

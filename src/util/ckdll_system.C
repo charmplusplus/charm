@@ -17,8 +17,8 @@ int CkSystem (const char *command) {
        return -1;
    if (pid == 0) { /*Child: exec the shell*/
                char *argv[4];
-               argv[0] = "sh";
-               argv[1] = "-c";
+               argv[0] = strdup("sh");
+               argv[1] = strdup("-c");
                argv[2] = (char *)command;
                argv[3] = 0;
                execv("/bin/sh", argv);
