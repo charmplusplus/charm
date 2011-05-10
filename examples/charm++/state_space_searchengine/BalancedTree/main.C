@@ -12,7 +12,7 @@ public:
     Main(CkArgMsg* msg )
     {
         branchfactor = 2;
-        CkPrintf("main initial_grainsize branchfactor depth\n");
+        CkPrintf("main initial_grainsize branchfactor depth target\n");
         if(msg->argc == 5)
         {
             initial_grainsize = atoi(msg->argv[1]);
