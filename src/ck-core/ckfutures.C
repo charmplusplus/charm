@@ -133,7 +133,9 @@ static void addedFutures(int lo, int hi)
   fs->freelist = lo;
 }
 
-static int createFuture(void)
+static 
+inline
+int createFuture(void)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut; int handle, origsize;
@@ -157,7 +159,16 @@ static int createFuture(void)
 }
 
 extern "C"
-void CkReleaseFuture(CkFutureID handle)
+CkFuture CkCreateFuture(void)
+{
+  CkFuture fut;
+  fut.id = createFuture();
+  fut.pe = CkMyPe();
+  return fut;
+}
+
+extern "C"
+void CkReleaseFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
@@ -166,7 +177,7 @@ void CkReleaseFuture(CkFutureID handle)
 }
 
 extern "C"
-int CkProbeFuture(CkFutureID handle)
+int CkProbeFutureID(CkFutureID handle)
 {
   FutureState *fs = &(CpvAccess(futurestate));
   Future *fut = (fs->array)+handle;
@@ -174,7 +185,7 @@ int CkProbeFuture(CkFutureID handle)
 }
 
 extern "C"
-void *CkWaitFuture(CkFutureID handle)
+void *CkWaitFutureID(CkFutureID handle)
 {
   CthThread self = CthSelf();
   FutureState *fs = &(CpvAccess(futurestate));
@@ -198,9 +209,27 @@ void *CkWaitFuture(CkFutureID handle)
 }
 
 extern "C"
+void CkReleaseFuture(CkFuture fut)
+{
+  CkReleaseFutureID(fut.id);
+}
+
+extern "C"
+int CkProbeFuture(CkFuture fut)
+{
+  return CkProbeFutureID(fut.id);
+}
+
+extern "C"
+void *CkWaitFuture(CkFuture fut)
+{
+  CkWaitFutureID(fut.id);
+}
+
+extern "C"
 void CkWaitVoidFuture(CkFutureID handle)
 {
-  CkFreeMsg(CkWaitFuture(handle));
+  CkFreeMsg(CkWaitFutureID(handle));
 }
 
 static void setFuture(CkFutureID handle, void *pointer)
@@ -329,8 +358,8 @@ extern "C" void *CkWaitReleaseFuture(CkFutureID futNum)
 #if IGET_FLOWCONTROL
   TheIGetControlClass.iget_resend(futNum);
 #endif
-  void *result=CkWaitFuture(futNum);
-  CkReleaseFuture(futNum);
+  void *result=CkWaitFutureID(futNum);
+  CkReleaseFutureID(futNum);
 #if IGET_FLOWCONTROL
   TheIGetControlClass.iget_free(1);
 //  TheIGetControlClass.iget_free(sizeof(result));
@@ -362,11 +391,17 @@ public:
 };
 
 extern "C" 
-void CkSendToFuture(CkFutureID futNum, void *m, int PE)
+void CkSendToFutureID(CkFutureID futNum, void *m, int PE)
 {
   UsrToEnv(m)->setRef(futNum);
   CProxy_FutureBOC fBOC(_fbocID);
   fBOC[PE].SetFuture((FutureInitMsg *)m);
+}
+
+extern "C"
+void  CkSendToFuture(CkFuture fut, void *msg)
+{
+  CkSendToFutureID(fut.id, msg, fut.pe);
 }
 
 extern "C"
@@ -418,6 +453,8 @@ void CkSemaDestroy(CkSemaID id)
 #endif
   CpvAccess(semapool)->release(id.idx);
 }
+
+PUPbytes(CkFuture);
 
 /*@}*/
 #include "CkFutures.def.h"
