@@ -162,7 +162,7 @@ int win_obj::lock(int requestRank, int pe_src, int ftHandle, int lock_type){
 
   int tmp = 0;
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
+  CkSendToFutureID(ftHandle, (void *)msg, pe_src);
   
   return WIN_SUCCESS;
 }
@@ -180,7 +180,7 @@ int win_obj::unlock(int requestRank, int pe_src, int ftHandle){
  
   int tmp = 0;
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, 0, 0, comm);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src); 
+  CkSendToFutureID(ftHandle, (void *)msg, pe_src); 
   
   return WIN_SUCCESS;
 }
@@ -250,7 +250,7 @@ ampi::winPut(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 
   // Wait on the Future object 
   AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
+  msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
   
   delete [] sorgaddr;
@@ -274,7 +274,7 @@ ampi::winRemotePut(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Datatype or
   int tmp = 0;
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
+  CkSendToFutureID(ftHandle, (void *)msg, pe_src);
 }
 
 int 
@@ -296,7 +296,7 @@ ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
 
   // Wait on the Future object 
   AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
+  msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
   
   // Process the reply message and copy the data into desired memory position 
@@ -335,7 +335,7 @@ ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int targ
   AMPI_DEBUG("    Rank[%d] copy win  [%d] \n", thisIndex, *(int*)msg->data);
 
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
+  CkSendToFutureID(ftHandle, (void *)msg, pe_src);
   delete [] stargaddr;
  } 
 
@@ -431,7 +431,7 @@ ampi::winAccumulate(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
             
   // Wait on the Future object 
   AMPI_DEBUG("    Future [%d] waiting\n", ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
+  msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    Future [%d] awaken\n", ftHandle);
   
   return MPI_SUCCESS; 
@@ -454,7 +454,7 @@ ampi::winRemoteAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, MPI_Data
   AmpiMsg *msg = new (tmp, 0) AmpiMsg(-1, -1, -1, thisIndex, 0,myComm.getComm());
 
   AMPI_DEBUG("    Rank[%d] Send to Future [%d] \n", thisIndex, ftHandle);
-  CkSendToFuture(ftHandle, (void *)msg, pe_src);
+  CkSendToFutureID(ftHandle, (void *)msg, pe_src);
 }
 
 int 
@@ -471,7 +471,7 @@ ampi::winLock(int lock_type, int rank, WinStruct win) {
 
   // Wait on the Future object 
   AMPI_DEBUG("    [%d] Lock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
+  msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    [%d] Lock: Future [%d] awaken\n", thisIndex, ftHandle);
   
   return MPI_SUCCESS;
@@ -510,7 +510,7 @@ ampi::winUnlock(int rank, WinStruct win) {
 
   // Wait on the Future object 
   AMPI_DEBUG("    [%d] Unlock: Future [%d] waiting\n", thisIndex, ftHandle);
-  msg = (AmpiMsg*)CkWaitFuture(ftHandle);
+  msg = (AmpiMsg*)CkWaitFutureID(ftHandle);
   AMPI_DEBUG("    [%d] Unlock: Future [%d] awaken\n", thisIndex, ftHandle);
   
   return MPI_SUCCESS;

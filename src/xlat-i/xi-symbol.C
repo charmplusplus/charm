@@ -4558,7 +4558,7 @@ void Entry::genDefs(XStr& str)
       preCall << "(void *) ";
     }
 
-    postCall << "  CkSendToFuture(impl_ref, impl_retMsg, impl_src);\n";
+    postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method
     if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);

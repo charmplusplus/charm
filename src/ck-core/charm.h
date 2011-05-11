@@ -321,6 +321,16 @@ These routines are implemented in ckfutures.C.
 */
 /*@{*/
 typedef int CkFutureID;
+typedef struct _CkFuture {
+  CkFutureID id;
+  int        pe;
+} CkFuture;
+extern CkFuture CkCreateFuture(void);
+extern void  CkSendToFuture(CkFuture fut, void *msg);
+extern void* CkWaitFuture(CkFuture futNum);
+extern void CkReleaseFuture(CkFuture futNum);
+extern int CkProbeFuture(CkFuture futNum);
+
 extern void* CkRemoteCall(int eIdx, void *msg,const CkChareID *chare);
 extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
 extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
@@ -330,11 +340,11 @@ extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID,
 extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, 
                                               CkGroupID gID, int node);
 
-extern void* CkWaitFuture(CkFutureID futNum);
+extern void* CkWaitFutureID(CkFutureID futNum);
 extern void CkWaitVoidFuture(CkFutureID futNum);
-extern void CkReleaseFuture(CkFutureID futNum);
-extern int CkProbeFuture(CkFutureID futNum);
-extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
+extern void CkReleaseFutureID(CkFutureID futNum);
+extern int CkProbeFutureID(CkFutureID futNum);
+extern void  CkSendToFutureID(CkFutureID futNum, void *msg, int pe);
 extern CkFutureID CkCreateAttachedFuture(void *msg);
 /* forward declare */
 struct CkArrayID;
