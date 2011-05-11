@@ -133,7 +133,10 @@ int megacon_skip(char *test)
   skip = CpvAccess(tests_to_skip);
   for (i=0; i<num_skip; i++) {
     if ((skip[i][0]=='-')&&(strcmp(skip[i]+1, test)==0))
-      return 1 - CpvAccess(test_negate_skip);
+      {
+	/*	CmiPrintf("skipping test %s\n",skip[i]);*/
+	return 1 - CpvAccess(test_negate_skip);
+      }
   }
   return CpvAccess(test_negate_skip);
 }
@@ -149,6 +152,7 @@ nextidx:
   if (idx < bank) {
     numacks = tests[idx].numacks;
     if (megacon_skip(tests[idx].name)) {
+      /*      CmiPrintf("skipping test %s\n",tests[idx].name);*/
       CpvAccess(next_test_index)++;
       goto nextidx;
     }
@@ -237,9 +241,10 @@ void megacon_init(int argc, char **argv)
     if (strcmp(argv[i],"-only")==0)
       CpvAccess(test_negate_skip)=1;
   CpvAccess(num_tests_to_skip) = argc;
-  if(CpvAccess(test_negate_skip)) {
+  /*  if(CpvAccess(test_negate_skip)) {
     CpvAccess(num_tests_to_skip)--;
   }
+  */
   CpvAccess(tests_to_skip) = argv;
   if (CmiMyPe()==0)
     megacon_next();
