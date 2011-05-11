@@ -223,7 +223,7 @@ int CkProbeFuture(CkFuture fut)
 extern "C"
 void *CkWaitFuture(CkFuture fut)
 {
-  CkWaitFutureID(fut.id);
+  return CkWaitFutureID(fut.id);
 }
 
 extern "C"
