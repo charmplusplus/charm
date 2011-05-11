@@ -203,13 +203,13 @@ void CldPutTokenPrio(char *msg)
     ifn(ptr->msg, &pfn1, &len1, &queueing1, &priobits1, &prioptr1);
     ints1 = (priobits1+CINTBITS-1)/CINTBITS;
 
-    if (!CqsPrioGT_(ints, prioptr, ints1, prioptr1)) { ptr=ptr->pred; break;}
+    if (!CqsPrioGT_(ints, prioptr, ints1, prioptr1)) { break;}
     ptr = ptr->succ;
   }
 
   /* add token to the doubly-linked circle */
-  tok->pred = ptr->pred;
   tok->succ = ptr;
+  tok->pred = ptr->pred;
   tok->pred->succ = tok;
   tok->succ->pred = tok;
   proc->load ++;
@@ -264,6 +264,39 @@ void CldGetTokenFromRank(char **msg, int rank)
   CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
   CmiLock(cldlock);
   *msg = _CldGetTokenMsg(proc);
+  if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
+  CmiUnlock(cldlock);
+}
+
+static 
+#if CMK_C_INLINE
+inline 
+#endif
+void * _CldGetTokenMsgAt(CldProcInfo proc, CldToken tok)
+{
+  void *msg;
+  
+  if (tok == proc->sentinel) return NULL;
+  tok->pred->succ = tok->succ;
+  tok->succ->pred = tok->pred;
+  proc->load --;
+  msg = tok->msg;
+  tok->msg = 0;
+  return msg;
+}
+
+/* called at node level */
+/* get token from processor of rank pe */
+static 
+#if CMK_C_INLINE
+inline 
+#endif
+void CldGetTokenFromRankAt(char **msg, int rank, CldToken tok)
+{
+  CldProcInfo proc = CpvAccessOther(CldProc, rank);
+  CmiNodeLock cldlock = CpvAccessOther(cldLock, rank);
+  CmiLock(cldlock);
+  *msg = _CldGetTokenMsgAt(proc, tok);
   if (*msg) CpvAccessOther(CldLoadOffset, rank)++;
   CmiUnlock(cldlock);
 }
@@ -399,6 +432,62 @@ void CldMultipleSend(int pe, int numToSend, int rank, int immed)
       CpvAccessOther(CldRelocatedMessages, rank)++;
       CpvAccessOther(CldMessageChunks, rank)++;
     }
+  }
+  free(msgs);
+  free(msgSizes);
+}
+
+/* function can be called in an immediate handler at node level
+   rank specify the rank of processor for the node to represent
+   This function can also send as immeidate messages
+*/
+void CldMultipleSendPrio(int pe, int numToSend, int rank, int immed)
+{
+  char **msgs;
+  int len, queueing, priobits, *msgSizes, i;
+  unsigned int *prioptr;
+  CldInfoFn ifn;
+  CldPackFn pfn;
+  CldToken tok;
+  CldProcInfo proc = CpvAccess(CldProc);
+  int count = 0;
+
+  if (numToSend ==0) return;
+  msgs = (char **)calloc(numToSend, sizeof(char *));
+  msgSizes = (int *)calloc(numToSend, sizeof(int));
+
+  tok = proc->sentinel->succ;
+  if (tok == proc->sentinel) return;
+  tok = tok->succ;
+  while (tok!=proc->sentinel) {
+    tok = tok->succ;
+    if (tok == proc->sentinel) break;
+    CldGetTokenFromRankAt(&msgs[count], rank, tok->pred);
+    if (msgs[i] != 0) {
+	ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msgs[i]));
+	ifn(msgs[count], &pfn, &len, &queueing, &priobits, &prioptr);
+	msgSizes[count] = len;
+	CldSwitchHandler(msgs[count], CpvAccessOther(CldBalanceHandlerIndex, rank));
+        if (immed) CmiBecomeImmediate(msgs[count]);
+        count ++;
+    }
+    tok = tok->succ;
+  }
+  if (count > 1) {
+      if (immed)
+        CmiMultipleIsend(pe, count, msgSizes, msgs);
+      else
+        CmiMultipleSend(pe, count, msgSizes, msgs);
+      for (i=0; i<count; i++)
+	CmiFree(msgs[i]);
+      CpvAccessOther(CldRelocatedMessages, rank) += count;
+      CpvAccessOther(CldMessageChunks, rank)++;
+  }
+  else if (count == 1) {
+      if (immed) CmiBecomeImmediate(msgs[0]);
+      CmiSyncSendAndFree(pe, msgSizes[0], msgs[0]);
+      CpvAccessOther(CldRelocatedMessages, rank)++;
+      CpvAccessOther(CldMessageChunks, rank)++;
   }
   free(msgs);
   free(msgSizes);
