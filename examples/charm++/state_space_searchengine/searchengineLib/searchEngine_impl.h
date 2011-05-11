@@ -166,7 +166,8 @@ public:
     void increment() {myCount++;}
 #ifdef BRANCHBOUND
     double getCost() {return minCost;}
-    void  updateCost(double c) { /*CkPrintf("before update best is:%f, new solution:%f\n", minCost, c);*/ if(c<minCost) minCost = c;}
+    void  updateCostLocal(double c) { /*CkPrintf("before update best is:%f, new solution:%f\n", minCost, c); */if(c<minCost) minCost = c;}
+    void  updateCost(double c) {}
 #endif
 #ifdef STATISTIC
     void inc_parallel_generate() {parallelnodes_generate++;}
@@ -227,7 +228,7 @@ inline void Solver::reportSolution()
 inline void Solver::updateCost(double c)
 {
     //CkPrintf("updating best solution:%.4f\n", c);
-    groupProxy.updateCost(c);
+    groupProxy.ckLocalBranch()->updateCostLocal(c);
 }
 #endif
 

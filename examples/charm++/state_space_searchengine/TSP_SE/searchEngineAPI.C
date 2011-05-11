@@ -17,8 +17,8 @@ using namespace std;
 
 
 /*readonly*/ extern int initial_grainsize;
-
-extern CkVec< int > graph; 
+#define MAX 100000
+extern CkVec< double > graph; 
 class TspBase: public StateBase
 {
 public:
@@ -49,35 +49,31 @@ public:
 
     double lowerbound()
     {
-        vector< int > temp_graph;
-        temp_graph.resize(N*N);
-        for(int i=0; i<N*N; i++)
-            temp_graph[i] = graph[i];
         
         double lower_sum = 0;
         for(int i=0; i<N; i++)
         {
             if(intour[i] == 2)
                 continue;
-            if(intour[i] == 1)
+            if(intour[i] == 1 && i!=0)
             {
-                int m_min=maxD;
+                double m_min=MAX;
                 for(int j=0; j<N; j++)
                 {
-                    if(intour[j] ==0 && graph[j]<m_min)
+                    if((intour[j] ==0 && graph[j]<m_min) || (length==N && intour[j]==1))
                         m_min= graph[j];
                 }
                 lower_sum += m_min;
             }else
             {
-                int m_min, m2_min;
-                m_min = m2_min=temp_graph[i*N];
-                for(int j=1; j<N; j++)
+                double m_min, m2_min;
+                m_min = m2_min=graph[i*N];
+                for(int j=i*N+1; j<i*N+N; j++)
                 {
                     if(graph[j]<m_min)
                     {
                         m2_min=m_min;
-                        m_min=temp_graph[j];
+                        m_min=graph[j];
                     }
                 }
                 lower_sum += m_min+m2_min;
@@ -91,9 +87,9 @@ public:
         CkPrintf(" length=%d, cost=%.4f\n[", length, cost);
         for(int i=0; i<length; i++)
         {
-            CkPrintf("%d  ", tour[i]);
+            CkPrintf("(%d,%d)", tour[i], intour[tour[i]]);
         }
-        CkPrintf("]\n");
+        CkPrintf("] lower bound=%f\n", lowerbound());
     }
 };
 
@@ -116,9 +112,8 @@ inline void createInitialChildren(Solver *solver)
     state->tour[0]=0;
     state->length=1;
     state->cost = 0;
-    for(int i=1; i<N; i++)
+    for(int i=0; i<N; i++)
         state->intour[i]=0;
-    state->intour[0] = 1;
 #ifdef USEINTPRIORITY
     solver->setPriority(state, (int)lowerBound(state));
 #endif
@@ -134,28 +129,31 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
     int childIndex = 0;
     int last = s->tour[s->length-1];
     /* construct the current graph, remove all the edges already in the path */
+    //s->printInfo();
     for(int j=0; j<N; j++)
     {
-        if(last == j || s->intour[j]==2)
+        //CkPrintf("last=%d,j=%d, intour=%d\n", last, j, s->intour[j]);
+        if(last == j || s->intour[j]==2 || (j==0&&s->length<N))
             continue;
         if(s->length == N)
         {
             if(j == 0)
             {
-                //s->printInfo();
+                s->printInfo();
                 solver->updateCost(s->cost+graph[last*N+j]);
                 //solver->reportSolution(); 
             }
         }else
         {
-            TspBase *NewTour  = (TspBase*)solver->registerState(sizeof(TspBase)+sizeof(int)*N, childIndex, N);
+            TspBase *NewTour  = (TspBase*)solver->registerState(sizeof(TspBase)+2*sizeof(int)*N, childIndex, N);
             NewTour->initialize();
             NewTour->copy(s);
             NewTour->tour[s->length] = j;
             NewTour->intour[j]=1;
-            NewTour->intour[last]=2;
+            NewTour->intour[last] = NewTour->intour[last]+1;
             NewTour->length = s->length + 1;
             NewTour->cost = s->cost + graph[last*N+j];
+            //NewTour->printInfo();
 #ifdef USEINTPRIORITY
             solver->setPriority(NewTour, (int)lowerBound(NewTour));
 #endif
