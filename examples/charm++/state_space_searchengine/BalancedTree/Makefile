@@ -4,7 +4,7 @@ override OPTS += -I../searchengineLib -L../searchengineLib
 include ../Makefile.common
 
 
-all: main  main.nb 
+all: main  main.nb  main.ws
 
 projections: main.prj  main.nb.prj
 
@@ -16,6 +16,9 @@ main.prj:  main.o
 
 main.nb: searchEngineAPI.o main.o 
 	$(CHARMC) -language charm++  main.o searchEngineAPI.o -o main.nb -balance neighbor -module searchEngine
+
+main.ws: searchEngineAPI.o main.o 
+	$(CHARMC) -language charm++  main.o searchEngineAPI.o -o main.ws -balance workstealing -module searchEngine
 
 main.nb.prj:  main.o 
 	$(CHARMC) -language charm++  -tracemode projections main.o searchEngineAPI.o -o main.nb.prj -balance neighbor -module searchEngine
