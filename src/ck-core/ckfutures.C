@@ -195,7 +195,7 @@ void *CkWaitFutureID(CkFutureID handle)
   if (!(fut->ready)) {
     CthSetNext(self, fut->waiters);
     fut->waiters = self;
-    while (!(fut->ready)) CthSuspend();
+    while (!(fut->ready)) { CthSuspend(); fut = (fs->array)+handle; }
   }
   fut = (fs->array)+handle;
   value = fut->value;
@@ -454,7 +454,6 @@ void CkSemaDestroy(CkSemaID id)
   CpvAccess(semapool)->release(id.idx);
 }
 
-PUPbytes(CkFuture);
 
 /*@}*/
 #include "CkFutures.def.h"
