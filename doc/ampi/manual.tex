@@ -1,5 +1,5 @@
 \documentclass[10pt]{article}
-\usepackage{../pplmanual}
+\usepackage{../pplmanual,pst-node}
 \input{../pplmanual}
 
 \title{Adaptive MPI Manual}
@@ -185,11 +185,11 @@ arrival of that message. The underlying runtime system of \charmpp{} is called
 schedule next (message-scheduling in \charmpp{} involves locating the object
 for which the message is intended, and executing the computation specified in
 the incoming message on that object). A parallel object in \charmpp{} is a
-\CC{} object on which a certain computations can be asked to performe from
+\CC{} object on which a certain computations can be asked to performed from
 remote processors.
 
 \charmpp{} programs exhibit latency tolerance since the scheduler always picks
-up the next available message rather than waiting for a particular messageto
+up the next available message rather than waiting for a particular message to
 arrive.  They also tend to be modular, because of their object-based nature.
 Most importantly, \charmpp{} programs can be \emph{dynamically load balanced},
 because the messages are directed at objects and not at processors; thus
@@ -199,7 +199,7 @@ we utilize for \ampi{}.
 
 Since many CSE applications are originally written using MPI, one would have to
 do a complete rewrite if they were to be converted to \charmpp{} to take
-advantage of dynamic load balancing. This is indeed impractical. However,
+advantage of dynamic load balancing and other \charmpp{} benefits. This is indeed impractical. However,
 \converse{} -- the runtime system of \charmpp{} -- came to our rescue here,
 since it supports interoperability between different parallel programming
 paradigms such as parallel objects and threads. Using this feature, we
@@ -208,7 +208,7 @@ standard over \charmpp{}.  \ampi{} is described in the next section.
 
 \section{AMPI}
 
-\ampi{} utilizes the dynamic load balancing capabilities of \charmpp{} by
+\ampi{} utilizes the dynamic load balancing and other capabilities of \charmpp{} by
 associating a ``user-level'' thread with each \charmpp{} migratable object.
 User's code runs inside this thread, so that it can issue blocking receive
 calls similar to MPI, and still present the underlying scheduler an opportunity
@@ -261,6 +261,13 @@ To convert an existing program to use AMPI, the main function or program may nee
 
 You must declare the main program as a subroutine called ``MPI\_MAIN''. Do not declare the main subroutine as a \textit{program} because it will never be called by the AMPI runtime.
 
+\begin{alltt}
+
+program pgm -> subroutine MPI_Main
+	...		    		      ...
+end program -> end subroutine
+\end{alltt}
+
 \subsubsection{C or C++}
 
 The main function can be left as is, if \texttt{mpi.h} is included before the main function. This header file has a preprocessor macro that renames main, and the renamed version is called by the AMPI runtime by each thread.
@@ -268,12 +275,29 @@ The main function can be left as is, if \texttt{mpi.h} is included before the ma
 
 \subsection{Global Variable Privatization}
 
-For dynamic load balancing to be effective, one needs to map multiple
-user-level threads onto a processor. Traditional MPI programs assume that the
+For the before-mentioned benefits to be effective, one needs to map multiple
+user-level threads onto each processor. 
+Traditional MPI programs assume that the
 entire processor is allocated to themselves, and that only one thread of
-control exists within the process's address space.  Thats where the need arises
+control exists within the process's address space. So, they may use global and static variables in the program.
+However, global and static variables are problematic for multi-threaded environments such as \ampi{} or OpenMP.
+This is because there is a single instance of those variables so they will be 
+shared among different threads in the single address space and a wrong result may be produced by the program.
+Figure \ref{fig_global} shows an example of a multi-threaded application with 
+two threads in a single process. $var$ is a global or static variable in this 
+example. Thread 1 assigns a value to it, then it gets blocked for communication 
+and another thread can continue. Thereby, thread 2 is scheduled next and 
+accesses $var$ which is wrong. Semantics of this program needs separate 
+instances of $var$ for each of the threads. Thats where the need arises
 to make some transformations to the original MPI program in order to run
 correctly with \ampi{}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/global.png}
+\caption{Global or static variables are an issue for \ampi{}}
+\label{fig_global}
+\end{figure}
 
 The basic transformation needed to port the MPI program to \ampi{} is
 privatization of global variables.\footnote{Typical Fortran MPI programs
@@ -311,14 +335,22 @@ global swapping and manual code modification.
 
 \subsubsection{Automatic Globals Swapping}
 Thanks to the ELF Object Format, we have successfully automated the procedure 
-of switching the set of user global variables when switching thread contexts. 
-The only thing that the user needs to do is to set flag {\tt -swapglobals} 
-at compile and link time. Currently this feature only works on x86 and x86\_64
- (i.e. amd64) platforms that fully support ELF. Thus it will not work on PPC or
-  Itanium, or on some microkernels such as Catamount.When this feature does
+of switching the set of user global variables when switching thread contexts.
+Executable and Linkable Format (ELF) is a common standard file format for Object Files in Unix-like operating systems.
+ELF maintains a Global Offset Table (GOT) for globals so it is possible to
+switch GOT contents at thread context-switch by the runtime system.
+
+
+The only thing that the user needs to do is to set flag {\tt -swapglobals}
+at compile and link time (e.g. ``ampicc Ðo prog prog.c -swapglobals"). It does not need 
+any change to the source code and works with any language (C, C++, Fortran, etc).
+However, it does not handle static variables and has a context switching overhead that grows with the number of global variables.
+Currently, this feature only works on x86 and x86\_64
+ (e.g. amd64) platforms that fully support ELF. Thus, it may not work on PPC or
+  Itanium, or on some microkernels such as Catamount. When this feature does
    not work for you,
-you are advised to make the modification manually, which is detailed in the
-following section.
+you can try other ways of handling global or static variables, which are detailed in the
+following sections.
 
 \subsubsection{Manual Change}
 We have employed a strategy of argument passing to do this privatization
@@ -466,7 +498,23 @@ For large shared data, it would be better to do heap allocation because in
 \ampi{}, the stack sizes are fixed at the beginning (can be specified from the
 command line) and stacks do not grow dynamically.
 
+\subsubsection{Source-to-source Transformation}
+Another approach is to do the changes described in the previous 
+scheme automatically. It means that we can use a tool to transform 
+the source code to move global or static variables in an object and pass them around.
+This approach is portable across systems and compilers and may also 
+improve locality and hence cache utilization. It also does not have the 
+context-switch overhead of swapping globals. However, it requires a new 
+implementation of the tool for each language. Currently, there is a tool called \emph{Photran}\footnote{http://www.eclipse.org/photran}
+for refactoring Fortran codes that can do this transformation. It is Eclipse-based and works by 
+constructing Abstract Syntax Trees (ASTs) of the program.
 
+\subsubsection{Thread Local Store}
+Thread Local Store (TLS) was originally employed in kernel threads to localize variables and thread safety.
+It can be used by annotating global/static variables with \emph{\_\_thread} in the source code.
+It handles both global and static variables and has no context-switching overhead. However, although it is popular, it  
+is not supported by all compilers. Currently, \charmpp{} supports it for x86/x86\_64 platforms. 
+A modified \emph{gfortran} is also available to use this feature.
 
 \subsection{Extensions for Migrations}
 
@@ -537,14 +585,14 @@ chunk-specific data that was registered with the system using
 \texttt{MPI\_Register}. This section explains how a subroutine should be
 written for performing pack/unpack.
 
-There are three steps to transporting the chunk's data to other processor.
+There are three steps for transporting the chunk's data to other processor.
 First, the system calls a subroutine to get the size of the buffer required to
 pack the chunk's data. This is called the ``sizing'' step. In the next step,
 which is called immediately afterward on the source processor, the system
 allocates the required buffer and calls the subroutine to pack the chunk's data
 into that buffer. This is called the ``packing'' step. This packed data is then
 sent as a message to the destination processor, where first a chunk is created
-(alongwith the thread) and a subroutine is called to unpack the chunk's data
+(along with the thread) and a subroutine is called to unpack the chunk's data
 from the buffer. This is called the ``unpacking'' step.
 
 Though the above description mentions three subroutines called by the \ampi{}
