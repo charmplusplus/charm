@@ -241,7 +241,7 @@ void megacon_init(int argc, char **argv)
     if (strcmp(argv[i],"-only")==0)
       CpvAccess(test_negate_skip)=1;
   CpvAccess(num_tests_to_skip) = argc;
-  /*  if(CpvAccess(test_negate_skip)) {
+  /*    if(CpvAccess(test_negate_skip)) {
     CpvAccess(num_tests_to_skip)--;
   }
   */
