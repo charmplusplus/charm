@@ -35,7 +35,7 @@ void multicast_recv(mesg m)
 
 void multicast_start_cycle(bchare c)
 {
-  struct mesg m; struct mesg *mp;
+  struct mesg m={{0},CmiMyPe(),c,0x12345678}; struct mesg *mp;
   switch (c->totalsent) {
   case 0:
     CmiSetHandler(&m, CpvAccess(multicast_recv_idx));

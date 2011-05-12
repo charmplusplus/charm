@@ -1262,6 +1262,7 @@ public:
   }
 };
 
+PUPbytes(CkFuture)
 
 #endif
 
