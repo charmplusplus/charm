@@ -968,7 +968,17 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 /**************************  TIMER FUNCTIONS **************************/
 
 /************Barrier Related Functions****************/
-
+/* Barrier related functions */
+/*TODO: does DCMF provide any Barrrier related functions ??? --Chao Mei */
+/* Barrier needs to be implemented!!! -Chao Mei */
+/* These two barriers are only needed by CmiTimerInit to synchronize all the
+   threads. They do not need to provide a general barrier. */
+int CmiBarrier() {
+    return 0;
+}
+int CmiBarrierZero() {
+    return 0;
+}
 
 #include "manytomany.c"
 
