@@ -308,6 +308,9 @@ static void MachineExitForDCMF();
 
 /* ### End of Idle-state Related Functions ### */
 
+void MachinePostNonLocalForDCMF();
+#define MachineSpecificPostNonLocal MachinePostNonLocalForDCMF
+
 /* =====End of Declarations of Machine Specific Functions===== */
 
 /**
@@ -683,6 +686,10 @@ static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
 #endif
 }
 /* ######End of functions related with communication progress ###### */
+
+void MachinePostNonLocalForDCMF(){
+    /* None here */
+}
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/
