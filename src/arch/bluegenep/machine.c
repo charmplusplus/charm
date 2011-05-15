@@ -456,7 +456,6 @@ void  machineMulticast(int npes, int *pelist, int size, char* msg) {
 #endif
 
     CMI_MSG_SIZE(msg) = size;
-    CMI_SET_BROADCAST_ROOT(msg,0);
 
     SMSG_LIST *msg_tmp = smsg_allocate(); //(SMSG_LIST *) malloc(sizeof(SMSG_LIST));
 
@@ -906,7 +905,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
 /* Currently disable optimized multicast for non-SMP as it fails
  * for hybrid ldb in NAMD as reported by Gengbin --Chao Mei
  */
-#if !CMK_SMP
+#if CMK_SMP
 #define OPTIMIZED_MULTICAST  0
 #else
 #define OPTIMIZED_MULTICAST  1
@@ -928,10 +927,10 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 
     int i;
 #if OPTIMIZED_MULTICAST
-    int *newpelist = pes;
+    int *newpelist = (int *)malloc(sizeof(int)*npes);
     int new_npes = npes;
+    memcpy(newpelist, pes, sizeof(int)*npes);
 #if CMK_SMP
-    newpelist = (int *)malloc(sizeof(int)*npes);
     new_npes = 0;
     for (i=0; i<npes; i++) {
         if (CmiNodeOf(pes[i]) == CmiMyNode()) {
@@ -947,10 +946,10 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 #endif
 
     CMI_SET_BROADCAST_ROOT(msg,0);
-    CMI_MSG_SIZE(msg) = size;
-#if CMK_ERROR_CHECKING
-    CMI_MAGIC(msg) = CHARM_MAGIC_NUMBER;
-    CMI_SET_CHECKSUM(msg, size);
+#if !CMK_SMP
+    CMI_DEST_RANK(msg) = 0;
+#else
+#error optimized multicast should not be enabled in SMP mode
 #endif
 
     CQdCreate(CpvAccess(cQdState), new_npes);
