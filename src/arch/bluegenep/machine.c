@@ -297,10 +297,10 @@ static void AdvanceCommunicationForDCMF();
 #define MachineSpecificAdvanceCommunication AdvanceCommunicationForDCMF
 
 static void DrainResourcesForDCMF();
-#define MachineSpecificDrainResources AdvanceCommunicationForDCMF
+#define MachineSpecificDrainResources DrainResourcesForDCMF
 
 static void MachineExitForDCMF();
-#define MachineSpecificExit AdvanceCommunicationForDCMF
+#define MachineSpecificExit MachineExitForDCMF
 
 /* ### End of Machine-running Related Functions ### */
 
@@ -687,7 +687,7 @@ static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
 }
 /* ######End of functions related with communication progress ###### */
 
-void MachinePostNonLocalForDCMF(){
+void MachinePostNonLocalForDCMF() {
     /* None here */
 }
 
