@@ -1004,7 +1004,17 @@ void *CmiGetNonLocal(void) {
     CmiState cs = CmiGetState();
     void *msg = NULL;
 
+#if !CMK_SMP || CMK_SMP_NO_COMMTHD
+    /**
+      * In SMP mode with comm thread, it's possible a normal
+      * msg is sent from an immediate msg which is executed
+      * on comm thread. In this case, the msg is sent to
+      * the network queue of the work thread. Therefore,
+      * even there's only one worker thread, the polling of
+      * network queue is still required. -Chao Mei
+      */
     if (CmiNumPes() == 1) return NULL;
+#endif
 
     MACHSTATE2(3, "[%p] CmiGetNonLocal begin %d{", cs, CmiMyPe());
     CmiIdleLock_checkMessage(&cs->idle);
