@@ -403,7 +403,7 @@ void subA();
 int main(int argc, char** argv)\{
   int i;
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, myrank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   for(i=0;i<100;i++)
     xyz[i] = i + myrank;
   subA();
@@ -509,13 +509,56 @@ implementation of the tool for each language. Currently, there is a tool called 
 for refactoring Fortran codes that can do this transformation. It is Eclipse-based and works by 
 constructing Abstract Syntax Trees (ASTs) of the program.
 
-\subsubsection{Thread Local Store}
+\subsubsection{TLS-Globals}
 Thread Local Store (TLS) was originally employed in kernel threads to localize variables and thread safety.
 It can be used by annotating global/static variables with \emph{\_\_thread} in the source code.
-It handles both global and static variables and has no context-switching overhead. However, although it is popular, it  
+Thus, those variables will have one instance per extant thread. This keyword is not an official
+extension of the C language, however compiler writers are encouraged to
+implement this feature. Currently, the ELF file format supports Thread Local
+Storage.
+
+It handles both global and static variables and has no context-switching
+ overhead. Context-switching is just changing the TLS segment register
+ to point to the thread's local copy. However, although it is popular, it  
 is not supported by all compilers. Currently, \charmpp{} supports it for x86/x86\_64 platforms. 
 A modified \emph{gfortran} is also available to use this feature.
+To use TLS-Globals, one has to add \emph{\_\_thread} before all the global variables. For the example
+above, the following changes to the code handles the global variables:
+\begin{alltt}
+__thread int myrank;
+__thread double xyz[100];
+\end{alltt}
 
+The runtime system also should know that TLS-Globals is used at compile time:
+
+\begin{alltt}
+ampiCC -o example example.C -tlsglobals
+\end{alltt}
+Table \ref{tab:portability} shows portability of different schemes.
+
+\begin{table*}[!t]
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c|c|c|c|}
+\hline
+Privatization
+Scheme     & X86 & IA64 & Opteron & Mac OS X & IBM SP & SUN & BG/P & Cray/XT & Windows \\
+		   \hline
+		   \hline
+		   Transformation  & Yes  & Yes   & Yes     & Yes     & Yes  & Yes  & Yes & Yes & Yes  \\
+			   \hline
+			   GOT-Globals  & Yes  & Yes  & Yes     & No       & No    & Maybe  & No  & No  & No \\
+				   \hline
+				   TLS-Globals  &  Yes & Maybe  & Yes     & No    & Maybe & Maybe & No  & Yes & Maybe  \\
+					   \hline
+					   \end{tabular}
+					   \caption{Portability of current implementations of three privatization schemes.
+						   ``Yes'' means we have implemented this technique.
+							   ``Maybe'' indicates there are no theoretical problems, but no implementation exists.
+							   ``No'' indicates the technique is impossible on this platform.}
+							   \label{tab:portability}
+							   \vspace{-1.0cm}
+							   \end{center}
+							   \end{table*}
 \subsection{Extensions for Migrations}
 
 For MPI chunks to migrate, we have added a few calls to \ampi{}. These include
