@@ -108,16 +108,15 @@ CpvStaticDeclare(double, projTraceStart);
  * is set then a default value for MPI_POST_RECV_SIZE is used
  * if not specified by the user.
  */
-#define MPI_POST_RECV 0
+#define MPI_POST_RECV 1
+
+/* Making those parameters configurable for testing them easily */
 
 #if MPI_POST_RECV
-#define MPI_POST_RECV_COUNT 10
-#endif
-
-#if MPI_POST_RECV_COUNT > 0
-#define MPI_POST_RECV_LOWERSIZE 2000
-#define MPI_POST_RECV_UPPERSIZE 4000
-#define MPI_POST_RECV_SIZE MPI_POST_RECV_UPPERSIZE
+static int MPI_POST_RECV_COUNT=10;
+static int MPI_POST_RECV_LOWERSIZE=2000;
+static int MPI_POST_RECV_UPPERSIZE=4000;
+static int MPI_POST_RECV_SIZE;
 
 CpvDeclare(unsigned long long, Cmi_posted_recv_total);
 CpvDeclare(unsigned long long, Cmi_unposted_recv_total);
@@ -127,7 +126,7 @@ CpvDeclare(char*,CmiPostedRecvBuffers);
 
 /* to avoid MPI's in order delivery, changing MPI Tag all the time */
 #define TAG     1375
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
 #define POST_RECV_TAG       (TAG+1)
 #define BARRIER_ZERO_TAG  TAG
 #else
@@ -325,7 +324,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 #endif
     CMI_SET_CHECKSUM(msg, size);
 
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
     if (size>=MPI_POST_RECV_LOWERSIZE && size <= MPI_POST_RECV_UPPERSIZE) {
         START_EVENT();
         if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,destNode,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
@@ -474,7 +473,7 @@ static int PumpMsgs(void) {
 #endif
 
         /* First check posted recvs then do  probe unmatched outstanding messages */
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
         int completed_index=-1;
         if (MPI_SUCCESS != MPI_Testany(MPI_POST_RECV_COUNT, CpvAccess(CmiPostedRecvRequests), &completed_index, &flg, &sts))
             CmiAbort("PumpMsgs: MPI_Testany failed!\n");
@@ -634,7 +633,7 @@ static void PumpMsgsBlocking(void) {
     }
 
 
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
 #warning "Using MPI posted receives and PumpMsgsBlocking() will break"
     CmiAbort("Unsupported use of PumpMsgsBlocking. This call should be extended to check posted recvs, cancel them all, and then wait on any incoming message, and then re-post the recvs");
 #endif
@@ -713,7 +712,7 @@ static int SendMsgBuf() {
 #endif
             CMI_SET_CHECKSUM(msg, size);
 
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
             if (size>=MPI_POST_RECV_LOWERSIZE && size <= MPI_POST_RECV_UPPERSIZE) {
                 START_EVENT();
                 if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,POST_RECV_TAG,MPI_COMM_WORLD,&(msg_tmp->req)))
@@ -937,7 +936,7 @@ void MachineExitForMPI(void) {
 #endif
 
     if (doPrint) {
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
         CmiPrintf("%llu posted receives,  %llu unposted receives\n", CpvAccess(Cmi_posted_recv_total), CpvAccess(Cmi_unposted_recv_total));
 #endif
     }
@@ -1115,6 +1114,19 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
     CmiGetArgInt(argv,"+requestmax",&request_max);
     /*printf("request max=%d\n", request_max);*/
 
+#if MPI_POST_RECV
+    CmiGetArgInt(argv, "+postRecvCnt", &MPI_POST_RECV_COUNT);
+    CmiGetArgInt(argv, "+postRecvLowerSize", &MPI_POST_RECV_LOWERSIZE);
+    CmiGetArgInt(argv, "+postRecvUpperSize", &MPI_POST_RECV_UPPERSIZE);
+    if (MPI_POST_RECV_COUNT<=0) MPI_POST_RECV_COUNT=1;
+    if (MPI_POST_RECV_LOWERSIZE>MPI_POST_RECV_UPPERSIZE) MPI_POST_RECV_UPPERSIZE = MPI_POST_RECV_LOWERSIZE;
+    MPI_POST_RECV_SIZE = MPI_POST_RECV_UPPERSIZE;
+    if (myNID==0) {
+        printf("Charm++: using post-recv scheme with %d pre-posted recvs ranging from %d to %d (bytes)\n",
+               MPI_POST_RECV_COUNT, MPI_POST_RECV_LOWERSIZE, MPI_POST_RECV_UPPERSIZE);
+    }
+#endif
+
     /* checksum flag */
     if (CmiGetArgFlag(argv,"+checksum")) {
 #if CMK_ERROR_CHECKING
@@ -1156,7 +1168,7 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
 }
 
 static void MachinePreCommonInitForMPI(int everReturn) {
-#if MPI_POST_RECV_COUNT > 0
+#if MPI_POST_RECV
     int doInit = 1;
     int i;
 
@@ -1188,7 +1200,6 @@ static void MachinePreCommonInitForMPI(int everReturn) {
 
         /* Post Recvs */
         for (i=0; i<MPI_POST_RECV_COUNT; i++) {
-            printf("Pre post recv %d\n", i);
             if (MPI_SUCCESS != MPI_Irecv(  &(CpvAccess(CmiPostedRecvBuffers)[i*MPI_POST_RECV_SIZE])	,
                                            MPI_POST_RECV_SIZE,
                                            MPI_BYTE,
