@@ -372,8 +372,10 @@ void LogPool::createSts(const char *fix)
     {
       stsfp = fopen(fname, "w");
     } while (!stsfp && (errno == EINTR || errno == EMFILE));
-  if(stsfp==0)
-    CmiAbort("Cannot open projections sts file for writing.\n");
+  if(stsfp==0){
+    CmiPrintf("Cannot open projections sts file for writing due to %s\n", strerror(errno));
+    CmiAbort("Error!!\n");
+  }
   delete[] fname;
 }  
 
