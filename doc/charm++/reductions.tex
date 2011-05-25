@@ -172,20 +172,21 @@ For example,
 the code for a typed reduction that yields an {\tt int}, would look like this:
 
 \begin{alltt}
-// In the .ci file...
-entry [reductiontarget] void done(int result);
+  // In the .ci file...
+  entry [reductiontarget] void done(int result);
 
+  // In some .cc file: 
   // Create a callback that invokes the typed reduction client
   CkCallback cb(CkReductionTarget(Driver,done), driverProxy);
 
   // Contribution to the reduction...
   contribute(sizeof(int), &intData, CkReduction::sum_int, cb);
 
-// Definition of the reduction client in the .cc file...
-void Driver::done(int result) 
-\{
-   CkPrintf("Reduction value: \%d", result);
-\}
+  // Definition of the reduction client...
+  void Driver::done(int result) 
+  \{
+    CkPrintf("Reduction value: \%d", result);
+  \}
 \end{alltt}
 
 This will also work for arrays of data elements, and for any user-defined type with a PUP method
