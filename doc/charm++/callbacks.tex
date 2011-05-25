@@ -229,38 +229,3 @@ incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory
 leaks and dangling pointers.
 
-%Threaded clients are a bit more complicated-- you need to suspend the
-%calling thread using ``thread\_delay'' which, after the corresponding
-%``send'', returns the sent message to its caller.  For example:
-
-%\begin{alltt}
-%//Main library entry point, called by threaded users:
-%myLibMsg *myThreadedLibrary(...library parameters...) 
-%\{
-%  CkCallback cb(CkCallback::resumeThread);
-%  myLibrary(...,cb); //Just call normal library with new cb
-%  return cb.thread\_delay(); //Will suspend until cb.send() is called
-%\}
-%\end{alltt}
-
-%``thread\_delay'' just immediately returns NULL for non-threaded callbacks,
-%so you can even combine the threaded and non-threaded interfaces
-%using C++'s default parameters.  For example:
-
-%\begin{alltt}
-%//Main library entry point, called by threaded users:
-%myLibMsg *myGenericLibrary(...library parameters...,
-%  CkCallback cb=CkCallback(CkCallback::resumeThread)) 
-%\{
-%  myLibrary(...,cb);
-%  //For threaded clients, suspends until cb.send, then returns message;
-%  // for non-threaded clients, just returns NULL:
-%  return cb.thread\_delay(); 
-%\}
-%\end{alltt}
-
-%When using CkCallbacks of type {\em CkCallback::resumeThread}, the user {\em
-%must} explicitely get the return value from the callback with ``thread\_delay''.
-%If the value is not needed, the user is responsible to delete it by using {\em
-%CkFreeMsg}.
-
