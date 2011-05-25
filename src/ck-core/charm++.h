@@ -562,10 +562,13 @@ class CkDelegateMgr;
 */
 class CProxy {
   private:
-    CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
+    CkGroupID delegatedGroupId;      
+    int isNodeGroup; 
+    mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
-    CProxy() :delegatedMgr(0), delegatedPtr(0) { }
+ CProxy() :delegatedMgr(0), delegatedPtr(0), isNodeGroup(0) 
+      {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
 #define CK_DELCTOR_ARGS dTo,dPtr
@@ -576,8 +579,11 @@ class CProxy {
 	:delegatedMgr(dTo)
         {
             delegatedPtr = NULL;
-            if(delegatedMgr != NULL && dPtr != NULL) 
-                delegatedPtr = dTo->ckCopyDelegateData(dPtr);            
+            if(delegatedMgr != NULL && dPtr != NULL) {
+                delegatedPtr = delegatedMgr->ckCopyDelegateData(dPtr);            
+		delegatedGroupId = delegatedMgr->CkGetGroupID();
+		isNodeGroup = delegatedMgr->isNodeGroup();
+	    }
         }
   public:
     /// Copy constructor.  Only needed for delegated proxies.
@@ -610,7 +616,23 @@ class CProxy {
     
     /// Return the delegator of this proxy, to which the proxies' messages
     ///  are actually sent.
-    inline CkDelegateMgr *ckDelegatedTo(void) const { return delegatedMgr; }
+    inline CkDelegateMgr *ckDelegatedTo(void) const { 
+
+      // needed if proxy was defined before group creation 
+      // (i.e. for delegated readonly proxies)
+      if (delegatedMgr == NULL && !delegatedGroupId.isZero()) {
+	if (isNodeGroup) {
+	  delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedGroupId);
+	}
+	else {
+	  delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedGroupId);
+	}
+      }
+
+      return delegatedMgr; 
+    }
+
+    
     
     /// Return the delegator's local data associated with this proxy.
     inline CkDelegateData *ckDelegatedPtr(void) const {return delegatedPtr;}

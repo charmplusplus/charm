@@ -32,6 +32,7 @@ class TableEntry {
       cIdx = cIdx_;
     }
     inline int getcIdx(void) const { return cIdx; }
+    inline int getmigCtor(void) const { return migCtor; }
 };
 
 template <class dtype>

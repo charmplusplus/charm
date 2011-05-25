@@ -292,20 +292,24 @@ void CProxy::ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr) {
 	ckUndelegate();
 	delegatedMgr = dTo;
 	delegatedPtr = dPtr;
+        delegatedGroupId = delegatedMgr->CkGetGroupID();
+        isNodeGroup = delegatedMgr->isNodeGroup();
 }
 void CProxy::ckUndelegate(void) {
 	delegatedMgr=NULL;
+        delegatedGroupId.setZero();
 	if (delegatedPtr) delegatedPtr->unref();
 	delegatedPtr=NULL;
 }
 
 /// Copy constructor
 CProxy::CProxy(const CProxy &src)
-    :delegatedMgr(src.delegatedMgr)
-{
+  :delegatedMgr(src.delegatedMgr), delegatedGroupId(src.delegatedGroupId), 
+   isNodeGroup(src.isNodeGroup) {
     delegatedPtr = NULL;
-    if(delegatedMgr != NULL && src.delegatedPtr != NULL)
+    if(delegatedMgr != NULL && src.delegatedPtr != NULL) {
         delegatedPtr = src.delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
+    }
 }
 
 /// Assignment operator
@@ -313,6 +317,8 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	CkDelegateData *oldPtr=delegatedPtr;
 	ckUndelegate();
 	delegatedMgr=src.delegatedMgr;
+        delegatedGroupId = src.delegatedGroupId; 
+        isNodeGroup = src.isNodeGroup;
 
         if(delegatedMgr != NULL && src.delegatedPtr != NULL)
             delegatedPtr = delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
@@ -325,29 +331,58 @@ CProxy& CProxy::operator=(const CProxy &src) {
 }
 
 void CProxy::pup(PUP::er &p) {
-      CkGroupID delegatedTo;
-      delegatedTo.setZero();
-      int isNodeGroup = 0;
-      if (!p.isUnpacking()) {
-        if (delegatedMgr) {
-          delegatedTo = delegatedMgr->CkGetGroupID();
- 	  isNodeGroup = delegatedMgr->isNodeGroup();
-        }
-      }
-      p|delegatedTo;
-      if (!delegatedTo.isZero()) {
-        p|isNodeGroup;
-        if (p.isUnpacking()) {
-	  if (isNodeGroup)
-		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
-	  else
-		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
-	}
+  if (!p.isUnpacking()) {
+    if (ckDelegatedTo() != NULL) {
+      delegatedGroupId = delegatedMgr->CkGetGroupID();
+      isNodeGroup = delegatedMgr->isNodeGroup();
+    }
+  }
+  p|delegatedGroupId;
+  if (!delegatedGroupId.isZero()) {
+    p|isNodeGroup;
+    if (p.isUnpacking()) {
+      delegatedMgr = ckDelegatedTo(); 
+    }
 
-        delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
-	if (p.isUnpacking() && delegatedPtr)
-            delegatedPtr->ref();
+    // if delegated manager has not been created, construct a dummy
+    // object on which to call DelegatePointerPup
+    if (delegatedMgr == NULL) {
+
+      int migCtor; 
+      if (isNodeGroup) {
+        CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+        migCtor = 
+          CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getmigCtor();
+        CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       }
+      else  {
+        CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+        migCtor = 
+          CkpvAccess(_groupTable)->find(delegatedGroupId).getmigCtor();
+        CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+      } 
+
+      // create a dummy object for calling DelegatePointerPup
+      int objId = _entryTable[migCtor]->chareIdx; 
+      int objSize = _chareTable[objId]->size; 
+      void *obj = malloc(objSize); 
+      _entryTable[migCtor]->call(NULL, obj); 
+      delegatedPtr = static_cast<CkDelegateMgr *> (obj)
+        ->DelegatePointerPup(p, delegatedPtr);           
+      free(obj);
+
+    }
+    else {
+
+      // delegated manager has been created, so we can use it
+      delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
+
+    }
+
+    if (p.isUnpacking() && delegatedPtr) {
+      delegatedPtr->ref();
+    }
+  }
 }
 
 /**** Array sections */
@@ -532,7 +567,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
-#endif
+#endif    
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
