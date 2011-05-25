@@ -69,6 +69,8 @@
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
 
+extern const char * const CmiCommitID;
+
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
@@ -3426,6 +3428,10 @@ void ConverseCommonInit(char **argv)
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
+
+  if (CmiMyPe() == 0)
+    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */

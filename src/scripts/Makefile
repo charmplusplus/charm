@@ -266,6 +266,15 @@ conv-autoconfig.h: configure config_opts.sh
 	@. ./config_opts.sh; echo ./configure $(QUIET) $$CONFIG_OPTS;  \
 	./configure $(QUIET) $$CONFIG_OPTS && touch conv-autoconfig.h
 
+.PHONY: clean veryclean VERSION.new
+
+VERSION: VERSION.new
+	./commitid.sh
+
+commitid.c: VERSION
+	echo "const char * const CmiCommitID = \"`cat VERSION`\";" > $@
+commitid.o: CC=$(CHARMC)
+
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
 	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
@@ -374,7 +383,7 @@ LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
 	global-nop.o cmipool.o cpuaffinity.o cputopology.o  \
-	cmitls.o memoryaffinity.o
+	cmitls.o memoryaffinity.o commitid.o
 
 #############################################
 #Comlib Core objects that go into libck.a
