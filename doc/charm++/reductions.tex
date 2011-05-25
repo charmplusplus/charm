@@ -16,40 +16,49 @@ void contribute(int nBytes,const void *data,CkReduction::reducerType type);
 This call contributes \kw{nBytes} bytes starting at \kw{data} to the
 reduction \kw{type} (see reduction types, below).  Unlike sending a
 message, you may use \kw{data} after the call to \kw{contribute}.  All
-members must call \kw{contribute}, and all must use the same
+members of the chare array or group must call \kw{contribute}, and all of them must use the same
 reduction type.  
 
-When you create a new member, it is expected
+When you create a new chare array element, it is expected
 to contribute to the next reduction not already in progress on that
 processor.  The
-reduction will complete properly even if members are migrated
+reduction will complete properly even if elements are migrated
 or deleted during the reduction. 
 
-For example, if we want to sum each member's single integer myInt, 
+For example, if we want to sum each array/group member's single integer myInt, 
 we would use:
 
 \begin{alltt}
-    //Inside any member method
+    // Inside any member method
     int myInt=get_myInt();
     contribute(sizeof(int),\&myInt,CkReduction::sum_int);
 \end{alltt}
 
 The built-in reduction types (see below) can also handle arrays of
-numbers.  For example, if each element of an array has a pair of
-doubles \uw{forces}[2] which need to be summed up (separately) across
-every element, from each element call:
+numbers.  For example, if each element of a chare array has a pair of
+doubles \uw{forces}[2], the corresponding elements of which are to be added across
+all elements, from each element call:
 
 \begin{alltt}
     double forces[2]=get_my_forces();
     contribute(2*sizeof(double),forces,CkReduction::sum_double);
 \end{alltt}
 
+This will result in a {\tt double} array of 2 elements, the first of which
+contains the sum of all \uw{forces}[0] values, with the second element 
+holding the sum of all \uw{forces}[1] values of the chare array elements.
+
 Note that since C++ arrays (like \uw{forces}[2]) are already pointers, we 
 don't use \&\uw{forces}.
 
-Sometimes it is not important the data to be reduced, but only the fact that all
-elements have reached a synchronization point. In this case a simpler version of
-contribute can be used:
+Reductions do not have to specify commutative-associative operations on data;
+they can also be used to signal the fact that all array/group members
+have reached a certain synchronization point. In this case, a simpler version
+of contribute may be used:
+
+%Sometimes it is not important the data to be reduced, but only the fact that all
+%elements have reached a synchronization point. In this case a simpler version of
+%contribute can be used:
 
 \begin{alltt}
     contribute();
@@ -77,7 +86,7 @@ If different \kw{contribute} calls pass different callbacks, some (unspecified,
 unreliable) callback will be chosen for use.
 \begin{alltt}
     double forces[2]=get_my_forces();
-    //When done, broadcast the CkReductionMsg to ``myReductionEntry''
+    // When done, broadcast the CkReductionMsg to ``myReductionEntry''
     CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
     contribute(2*sizeof(double), forces,CkReduction::sum_double, cb);
 \end{alltt}
@@ -85,11 +94,12 @@ unreliable) callback will be chosen for use.
 In the case of the reduced version used for synchronization purposes, the
 callback parameter will be the only input parameter:
 \begin{alltt}
-    contribute( CkCallback(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy) );
+    CkCallback cb(CkIndex_myArrayType::myReductionEntry(NULL), thisProxy);
+    contribute(cb);
 \end{alltt}
 
 If no member passes a callback to \kw{contribute}, the reduction will use
-the default callback. Programmers can set the default callback for an array or group
+the {\em default} callback. Programmers can set the default callback for an array or group
 using the \kw{ckSetReductionClient} proxy call on processor zero, or
 by passing the callback to {\tt CkArrayOptions::setReductionClient()}
 before creating the array, as described in section~\ref{CkArrayOptions}.
@@ -97,11 +107,11 @@ Again, a \kw{CkReductionMsg} message will be passed to this callback,
 which must delete the message when done.
 
 \begin{alltt}
-    //Somewhere on processor zero:
+    // Somewhere on processor zero:
     myProxy.ckSetReductionClient(new CkCallback(...));
 \end{alltt}
 
-So, for the previous reduction on chare array arr:
+So, for the previous reduction on chare array {\tt arr}:
 \begin{alltt}
     CkCallback *cb = new CkCallback(CkIndex_main::reportIn(NULL),  mainProxy);
     arr.ckSetReductionClient(cb);
@@ -116,7 +126,7 @@ void myReductionEntry(CkReductionMsg *msg)
   double *output=(double *) msg->getData();
   for(int i=0 ; i<reducedArrSize ; i++)
   \{
-   // do something with the reduction results in each output[i] array element
+   // Do something with the reduction results in each output[i] array element
    .
    .
    .
@@ -127,63 +137,73 @@ void myReductionEntry(CkReductionMsg *msg)
 
 (See \kw{pgms/charm++/RedExample} for a complete example).
 
-For backward compatability, rather than a general callback you can
-specify a peculiar kind of C function using \kw{ckSetReductionClient}
+For backward compatibility, in the place of a general callback, you can
+specify a particular kind of C function using \kw{ckSetReductionClient}
 or \kw{setReductionClient}.  This C function takes a user-defined
 parameter (passed to \kw{setReductionClient}) and the actual reduction data,
 which it must not deallocate.
 
 \begin{alltt}
-  //Somewhere on processor zero:
+  // Somewhere on processor zero (possibly in Main::Main, after creating 'myProxy'):
   myProxy.setReductionClient(myClient,(void *)NULL);
 
-void myClient(void *param,int dataSize,void *data)
-\{
-  double *forceSum=(double *)data;
-  cout<<``First force sum is ``<<forceSum[0]<<endl;
-  cout<<``Second force sum is ``<<forceSum[1]<<endl;
-\}
+  // Code for the C function that serves as reduction client:
+  void myClient(void *param,int dataSize,void *data)
+  \{
+    double *forceSum=(double *)data;
+    cout<<``First force sum is ``<<forceSum[0]<<endl;
+    cout<<``Second force sum is ``<<forceSum[1]<<endl;
+  \}
 \end{alltt}
 
 \subsubsection{Typed Reductions}
 
 \label{typed_reductions}
 
-Typically the entry method that is invoked when a reduction is completed
-takes a single argument of type CkReductionMsg. However, by giving an entry
-method the \kw{reductiontarget} attribute, you can instead use entry methods
-that take arguments of the same type that the reduction function yields.
-For example, for a reduction that yields an int, a typed reduction might look
-like this:
+Typically the client entry method of a reduction takes a single argument of
+type CkReductionMsg. However, by giving an entry method the
+\kw{reductiontarget} attribute in the {\tt .ci} file, you can instead use entry methods that take
+arguments of the same type as specified by the {\em contribute} call.  
+When creating a callback to the
+reduction target, the entry method index is generated by 
+{\tt CkReductionTarget(ChareClass, method\_name)} 
+instead of {\tt CkIndex\_ChareClass::method\_name(...)}.
+For example,
+the code for a typed reduction that yields an {\tt int}, would look like this:
 
 \begin{alltt}
-// in the .ci file...
+// In the .ci file...
 entry [reductiontarget] void done(int result);
 
-// in the .cc file...
-void Driver::done(int result) {
+  // Create a callback that invokes the typed reduction client
+  CkCallback cb(CkReductionTarget(Driver,done), driverProxy);
+
+  // Contribution to the reduction...
+  contribute(sizeof(int), &intData, CkReduction::sum_int, cb);
+
+// Definition of the reduction client in the .cc file...
+void Driver::done(int result) 
+\{
    CkPrintf("Reduction value: \%d", result);
-}
+\}
 \end{alltt}
 
-This will also work for arrays, and for any user-defined type with a PUP method
+This will also work for arrays of data elements, and for any user-defined type with a PUP method
 (see ~\ref{sec:pup}). If you know that the reduction will yield a particular
-number of elements, say 3 ints, you can also specify a reduction target which
-takes 3 ints and it will be invoked correctly. When creating a callback to the
-reduction target, the entry method index is generated by {\tt
-CkReductionTarget(chare\_name, method\_name)}.
+number of elements, say 3 {\tt int}s, you can also specify a reduction target which
+takes 3 {\tt int}s and it will be invoked correctly. 
 
 \subsubsection{Built-in Reduction Types}
 
 \label{builtin_reduction}
 
 \charmpp{} includes several built-in reduction types, used to combine 
-the separate contributions.  Any of them may be passed as an
-\kw{CkReduction::reducerType} type to \kw{contribute}.
+individual contributions.  Any of them may be passed as an argument of type
+\kw{CkReduction::reducerType} to \kw{contribute}.
 
-The first four reductions (sum, product, max, and min) work on int,
-float, or double data as indicated by the suffix.  The logical
-reductions (and, or) only work on integer data.  All the built-in
+The first four operations ({\tt sum}, {\tt product}, {\tt max}, and {\tt min}) work on {\tt int},
+{\tt float}, or {\tt double} data as indicated by the suffix.  The logical
+reductions ({\tt and}, {\tt or}) only work on integer data.  All the built-in
 reductions work on either single numbers (pass a pointer) or arrays-- just
 pass the correct number of bytes to \kw{contribute}.
 
@@ -220,14 +240,14 @@ or reductions.  To extract the data from each element, see the description
 below.
 
 \item \kw{CkReduction::concat}-- the result will be a byte-by-byte
-concatentation of all the contributed data.  There is no separation
-added between different contributions.
+concatentation of all the contributed data.  The contributed elements
+are not delimiter-separated. 
 
 \end{enumerate}
 
 
 \kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
-objects, one per contribution.  This class has definition:
+objects, one per contribution.  This class has the definition:
 
 \begin{alltt}
 class CkReduction::setElement 
@@ -254,15 +274,19 @@ To extract the contribution of each array element from a reduction set, use the
   \}
 \end{alltt}
 
-The reduction set order is undefined.  Add a source field to your
-contribution if you need to know which array element gave a particular
-contribution.  This will require you to do your own
-serialize/unserialize operation on your element structure if your
-reduction element data is complex.  Consider using the \kw{PUP}
+The reduction set order is undefined.  You should add a source field to the
+contributed elements if you need to know which array element gave a particular
+contribution.  Additionally, if the contributed elements are of a complex 
+data type, you will likely have to supply code for 
+%serialize/unserialize operation on your element structure if your
+%reduction element data is complex.  
+serializing/deserializing them.
+Consider using the \kw{PUP}
 interface see ~\ref{sec:pup} to simplify your object serialization
 needs.
 
-If your data is order dependant, or if your data is just too
+If the outcome of your reduction is dependent on the order in which 
+data elements are processed, or if your data is just too
 heterogenous to be handled elegantly by the predefined types and you
 don't want to undertake multiple reductions, it may be best to define
 your own reduction type.  See the next section
@@ -274,8 +298,9 @@ your own reduction type.  See the next section
 \label{new_type_reduction}
 
 It is possible to define a new type of reduction, performing a 
-user-defined operation on user-defined data.  A reduction function
-combines separate contributions (from this or other processors)
+user-defined operation on user-defined data.  This is done by 
+creating a {\em reduction function}, which 
+combines separate contributions 
 into a single combined value.
 
 The input to a reduction function is a list of \kw{CkReductionMsg}s.
@@ -291,7 +316,7 @@ CkReductionMsg *\uw{reductionFn}(int nMsg,CkReductionMsg **msgs);
 \end{alltt}
 
 For example, a reduction function to add up contributions 
-consisting of two machine short integers would be:
+consisting of two machine {\tt short int}s would be:
 
 \begin{alltt}
 CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
@@ -310,14 +335,15 @@ CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
 \}
 \end{alltt}
 
-You must register your reduction function with \charmpp{} 
+The reduction function must be registered with \charmpp{} 
 using \kw{CkReduction::addReducer} from
 an \kw{initcall} routine (see section~\ref{initcall} for details
 on the \kw{initcall} mechanism).   \kw{CkReduction::addReducer}
 returns a \kw{CkReduction::reducerType} which you can later 
 pass to \kw{contribute}.  Since \kw{initcall} routines are executed
 once on every node, you can safely store the \kw{CkReduction::reducerType}
-in a global or class-static variable.  For the example above:
+in a global or class-static variable.  For the example above, the reduction
+function is registered and used in the following manner:
 
 \begin{alltt}
 //In the .ci file:
@@ -330,12 +356,12 @@ in a global or class-static variable.  For the example above:
   sumTwoShortsType=CkReduction::addReducer(sumTwoShorts);
 \}
 
-//In some member:
+//In some member function, contribute data to the customized reduction:
   short data[2]=...;
   contribute(2*sizeof(short),data,sumTwoShortsType);
 \end{alltt}
 
 Note that you cannot call \kw{CkReduction::addReducer}
-from anywhere but in an \kw{initcall} routine.
+from anywhere but an \kw{initcall} routine.
 
 

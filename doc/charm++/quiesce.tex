@@ -26,10 +26,10 @@ corresponding to the \index{chare}chare containing that entry method.  The
 syntax of this call is as follows:
 
 \begin{alltt}
-\kw{myIdx}=CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
+\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-where \uw{ChareName} is the name of the chare containing
+where \uw{ChareClass} is the C++ class of the chare containing
 the desired entry method, \uw{EntryMethod} is the name of that entry method,
 and \uw{parameters} are the parameters taken by the method.
 These parameters are only used to resolve the proper \uw{EntryMethod};
