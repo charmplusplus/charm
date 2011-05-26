@@ -9,9 +9,10 @@ CpvDeclare(int, bigmsg_index);
 
 void Cpm_megacon_ack();
 
-void bigmsg_handler(int *msg)
+void bigmsg_handler(void *vmsg)
 {
   int i, next;
+  int *msg = vmsg;
   if (CmiMyPe()==0) {
     for (i=CmiMsgHeaderSizeInts; i<250000; i++) {
       if (msg[i] != i) {
