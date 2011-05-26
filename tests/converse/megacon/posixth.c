@@ -44,8 +44,8 @@ void posixth_add(Cpthread_mutex_t *mutex, int *var, int val)
 
 void *posixth_fib(void *np)
 {
-  Cpthread_t t1, t2; void *r1, *r2; int total;
-  int n = (size_t)np;
+  Cpthread_t t1, t2; void *r1, *r2;
+  CmiIntPtr n = (size_t)np, total;
   if (n<2) {
     if (CrnRand()&1) CthYield();
     posixth_add(&CpvAccess(leaves_mutex), &CpvAccess(leaves), 1);
