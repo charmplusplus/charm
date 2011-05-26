@@ -121,18 +121,13 @@ public:
   /// Write data to this PE's DOP log file
   inline void WriteDopData(double srt, double ert, POSE_TimeType svt, POSE_TimeType evt) {
 #if USE_LONG_TIMESTAMPS
-    // fprintf returns the number of characters written, or a negative
-    // number if something went wrong
-    if (fprintf(dopFilePtr, "%f %f %lld %lld\n", srt, ert, svt, evt) <= 0) {
-      CkPrintf("WARNING: DOP data not written to %s\n", dopFileName);
-    }
+    const char* format = "%f %f %lld %lld\n";
 #else
-    // fprintf returns the number of characters written, or a negative
-    // number if something went wrong
-    if (fprintf(dopFilePtr, "%f %f %d %d\n", srt, ert, svt, evt) <= 0) {
+    const char* format = "%f %f %d %d\n";
+#endif
+    if (fprintf(dopFilePtr, format, srt, ert, svt, evt) <= 0) {
       CkPrintf("WARNING: DOP data not written to %s\n", dopFileName);
     }
-#endif
   }
 };
 PUPbytes(localStat)
