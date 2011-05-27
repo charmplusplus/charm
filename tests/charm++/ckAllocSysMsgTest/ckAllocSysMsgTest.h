@@ -9,7 +9,7 @@ class main : public CBase_main
   void done();
  private:
   int reportedArr,reportedGrp, completeBatches, arrSize, nBatches, batchSize;
-
+  CProxy_RaceMeArr arrProxy;
 };
 
 class RaceMeArr : public CBase_RaceMeArr

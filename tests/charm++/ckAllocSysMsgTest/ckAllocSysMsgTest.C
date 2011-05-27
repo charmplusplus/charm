@@ -64,6 +64,8 @@ main::main(CkArgMsg *msg)
   mainProxy=thisProxy;
   if(period>0)
     CcdCallOnCondition(CcdPERIODIC_1minute,timeout,NULL);
+  arrProxy=CProxy_RaceMeArr::ckNew(arrSize,arrSize,arrSize, arrSize);
+  arrProxy.doneInserting();
   mainProxy.startBatching();
 }
 
@@ -72,8 +74,6 @@ void main::startBatching()
   CkPrintf("batch %d\n",completeBatches);
   for(int i=0;i<batchSize;i++)
     {
-      CProxy_RaceMeArr arrProxy=CProxy_RaceMeArr::ckNew(arrSize,arrSize,arrSize, arrSize);
-      arrProxy.doneInserting();
       CProxy_RaceMeGrp grpProxy=CProxy_RaceMeGrp::ckNew();
       arrProxy(0,0,0).recvMsg();
       grpProxy[0].recvMsg();
