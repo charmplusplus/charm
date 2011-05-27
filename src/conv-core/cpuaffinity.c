@@ -323,7 +323,7 @@ typedef struct _rankMsg {
 
 static rankMsg *rankmsg = NULL;
 static CmmTable hostTable;
-static CmiNodeLock affLock = NULL;
+static CmiNodeLock affLock = 0;
 
 /* called on PE 0 */
 static void cpuAffinityHandler(void *m)

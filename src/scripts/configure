@@ -3624,8 +3624,7 @@ cat > $t <<EOT
 #include <papi.h>
 
 int main() {
-    int Events[1] = { PAPI_TOT_CYC };
-    if (PAPI_start_counters(Events, 1) != PAPI_OK) return 1;
+    if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) return 1;
     return 0;
 }
 EOT

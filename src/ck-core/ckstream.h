@@ -35,9 +35,9 @@ class _CkOStream {
     _CkOStream& endl(void) {
       strcat(_obuf, "\n");
       if(_isErr)
-        CkError(_obuf);
+        CkError("%s", _obuf);
       else
-        CkPrintf(_obuf);
+        CkPrintf("%s", _obuf);
       _obuf[0] = '\0'; 
       _actlen=1;
       return *this;

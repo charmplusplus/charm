@@ -3,7 +3,7 @@
 \label{callbacks}
 
 A callback is a generic way to transfer control back to a client
-after a library has finished.  For example, after finishing a reduction,
+after a \charmpp{} library has finished.  For example, after finishing a reduction,
 you might want the results passed to some chare's entry method.
 To do this, you create an object of type \kw{CkCallback} with
 the chare's \kw{CkChareID} and entry method index, then pass the
@@ -17,7 +17,7 @@ callback object to the reduction library.
 You can create a \kw{CkCallback} object in a number of ways,
 depending on what you want to have happen when the callback is
 finally invoked.  The callback will be invoked with a \charmpp{}
-message; but the message type will depend on the library that 
+message; but the message type will depend on the \charmpp{} library that 
 actually invokes the callback.  Check the library documentation
 to see what kind of message the library will send to your callback.
 In any case, you are required to free the message passed to you via
@@ -56,7 +56,7 @@ so \uw{param} is allowed to point to heap-allocated data.  Of course, you
 are required to free any storage referenced by \uw{param}.
 
 \item \kw{CkCallback(CkCallback::ignore)} When invoked, the callback
-will do nothing.  This can be useful if the library requires a callback,
+will do nothing.  This can be useful if the \charmpp{} library requires a callback,
 but you don't care when it finishes, or will find out some other way.
 
 \item \kw{CkCallback(CkCallback::ckExit)} When invoked, the callback
@@ -73,8 +73,7 @@ Chare.  Note that a chare proxy will also work in place of a chare id:
 \item \kw{CkCallback(int ep,const CkArrayID \&id)} 
 When invoked,
 the callback will broadcast its message to the given entry method
-of the given array.  As usual, an array proxy will work just as well
-as an array id.
+of the given array.  An array proxy will work in the place of an array id.
 
 \item \kw{CkCallback(int ep,const CkArrayIndex \&idx,const CkArrayID \&id)}
 When invoked,
@@ -103,12 +102,12 @@ in the library section.
 
 \label{libraryInterface}
 
-Here, a ``library'' is simply any code which can be called from several
+Here, a ``library'' is simply any \charmpp{} code which can be called from several
 different places.  From the point of view of a library, a \kw{CkCallback}
 is a destination for the library's result.  \kw{CkCallback} objects can
 be freely copied, marshalled, or even sent in messages.
 
-Postponing threads for a moment, the only thing you can do 
+Postponing the discussion on threads for a moment, the only thing you can do 
 with a CkCallback is to move it around or send a message to it:
 
 \begin{alltt}
@@ -131,17 +130,19 @@ message is immediately sent to the user's client function or entry point,
 so you {\em do} need to document the type of message you will send to the 
 callback so the user knows what to expect.
 
-In alternative to ``send'', the callback can be used in a {\em contribute}
+As an alternative to ``send'', the callback can be used in a {\em contribute}
 collective operation. This will internally invoke the ``send'' method on the
 callback when the contribute operation has finished.
 
-Thread clients are a bit more complicated as they need to suspend while waiting
-for the operation invoked finishes. They will resume when the ``send'' method is
-invoked on the callback.
-In these situations, the class {\em CkCallbackResumeThread} is more useful. This
-class is a subclass of {\em CkCallback} with specific functionality for threads.
-This class automatically suspends the thread when its destructor is called. It
-can be used in situations when the return value is not needed, and only the
+Threaded entry methods can be suspended and resumed through the 
+%are a bit more complicated as they must be suspended while waiting
+%for the invoked operation to finish. 
+{\em CkCallbackResumeThread} class. {\em CkCallbackResumeThread}
+is derived from {\em CkCallback} and has specific functionality for threads.
+This class automatically suspends the thread when the destructor of the callback is called. 
+A suspended threaded client will resume when the ``send'' method is
+invoked on the associated callback.
+It can be used in situations when the return value is not needed, and only the
 synchronization is important. For example:
 
 \begin{alltt}
@@ -152,15 +153,16 @@ void mainControlFlow() \{
   doWork(...,CkCallbackResumeThread());
   // or send a broadcast to a chare collection
   myProxy.doWork(...,CkCallbackResumeThread());
-  // The thread is suspended until doWork calls send on the callback
+  // The thread is suspended until doWork calls 'send' on the callback
+  
   ...some more work...
 \}
 \end{alltt}
 
 Alternatively, if doWork returns a value of interest, this can be retrieved by
 passing a pointer to {\em CkCallbackResumeThread}. This pointer will be modified
-by {\em CkCallbackResume} thread to point to the incoming message. Notice that
-the input pointer has to be cast to {\em (void*\&)}.
+by {\em CkCallbackResumeThread} to point to the incoming message. Notice that
+the input pointer has to be cast to {\em (void*\&)}:
 
 \begin{alltt}
 // Call the "doWork" method and wait until it has completed
@@ -169,20 +171,21 @@ void mainControlFlow() \{
   MyMessage *mymsg;
   myProxy.doWork(...,CkCallbackResumeThread((void*\&)mymsg));
   // The thread is suspended until doWork calls send on the callback
+
   ...some more work using "mymsg"...
 \}
 \end{alltt}
 
 Notice that the instance of {\em CkCallbackResumeThread} is constructed
-on-the-fly as a parameter to the ``doWork'' call. This insures that the callback
-is destroyed as soon as the function returns, therefore suspending the thread.
+as an anonymous parameter to the ``doWork'' call. This insures that the callback
+is destroyed as soon as the function returns, thereby suspending the thread.
 
 It is also possible to allocate a {\em CkCallbackResumeThread} on the heap or on
-the stack. We suggest to avoid such usage, and favor the on-the-fly construction
-shown above. For completeness, we still report code for heap and stack
-allocation of CkCallbackResumeThread callbacks.
+the stack. We suggest that programmers avoid such usage, and favor the anonymous instance construction
+shown above. For completeness, we still present the code for heap and stack
+allocation of CkCallbackResumeThread callbacks below.
 
-For heap allocation, the user will have to explicitely call ``delete'' to
+For heap allocation, the user must explicitly ``delete'' the callback in order to
 suspend the thread.
 
 \begin{alltt}
@@ -194,14 +197,15 @@ void mainControlFlow() \{
   ...do not suspend yet, continue some more work...
   delete cb;
   // The thread suspends now
-  ...some more work using "mymsg"...
+
+  ...some more work after the thread resumes...
 \}
 \end{alltt}
 
-For callbacks allocated on the stack, its destructor will be called only at the
-end of the function, when the current stack goes out of scope. In this
-situation, the function ``thread\_delay'' can be called on the callback to
-force the thread to suspend. This works also for heap allocated callbacks.
+For a callback that is allocated on the stack, its destructor will be called only
+when the callback variable goes out of scope. In this
+situation, the function ``thread\_delay'' can be invoked on the callback to
+force the thread to suspend. This also works for heap allocated callbacks.
 
 \begin{alltt}
 // Call the "doWork" method and wait until it has completed
@@ -212,50 +216,16 @@ void mainControlFlow() \{
   ...do not suspend yet, continue some more work...
   cb.thread\_delay();
   // The thread suspends now
-  ...some more work using "mymsg"...
+
+  ...some more work after the thread is resumed...
 \}
 \end{alltt}
 
-{\em Notice}: a {\em CkCallbackResumeThread} can be used to suspend a thread
+{\em N.B.}: a {\em CkCallbackResumeThread} can be used to suspend a thread
 only once.
 
 {\em Deprecated usage}: in the past, ``thread\_delay'' was used to retrieve the
 incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory
-leaking and dangling pointers.
-
-%Threaded clients are a bit more complicated-- you need to suspend the
-%calling thread using ``thread\_delay'' which, after the corresponding
-%``send'', returns the sent message to its caller.  For example:
-
-%\begin{alltt}
-%//Main library entry point, called by threaded users:
-%myLibMsg *myThreadedLibrary(...library parameters...) 
-%\{
-%  CkCallback cb(CkCallback::resumeThread);
-%  myLibrary(...,cb); //Just call normal library with new cb
-%  return cb.thread\_delay(); //Will suspend until cb.send() is called
-%\}
-%\end{alltt}
-
-%``thread\_delay'' just immediately returns NULL for non-threaded callbacks,
-%so you can even combine the threaded and non-threaded interfaces
-%using C++'s default parameters.  For example:
-
-%\begin{alltt}
-%//Main library entry point, called by threaded users:
-%myLibMsg *myGenericLibrary(...library parameters...,
-%  CkCallback cb=CkCallback(CkCallback::resumeThread)) 
-%\{
-%  myLibrary(...,cb);
-%  //For threaded clients, suspends until cb.send, then returns message;
-%  // for non-threaded clients, just returns NULL:
-%  return cb.thread\_delay(); 
-%\}
-%\end{alltt}
-
-%When using CkCallbacks of type {\em CkCallback::resumeThread}, the user {\em
-%must} explicitely get the return value from the callback with ``thread\_delay''.
-%If the value is not needed, the user is responsible to delete it by using {\em
-%CkFreeMsg}.
+leaks and dangling pointers.
 

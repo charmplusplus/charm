@@ -126,9 +126,6 @@ public:
 	}
 };
 
-static void (*nbp)(void*) = NULL;
-static void (*nbi)(int&) = NULL;
-
 template<typename T, typename U, typename A>
 void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&),
 // Sun Studio 7 (C++ compiler version 5.4) can't handle this
@@ -238,16 +235,19 @@ std::string TParamList::to_string()
 void
 Type::genProxyName(XStr &str,forWhom forElement)
 {
+  (void)str; (void)forElement;
   die("type::genProxyName called (INTERNAL ERROR)");
 }
 void
 Type::genIndexName(XStr &str)
 {
+  (void)str;
   die("type::genIndexName called (INTERNAL ERROR)");
 }
 void
 Type::genMsgProxyName(XStr &str)
 {
+  (void)str;
   die("type::genMsgProxyName called (INTERNAL ERROR)");
 }
 
@@ -795,6 +795,7 @@ char *Chare::proxyPrefix(void)
 //Common multiple inheritance disambiguation code
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
+    (void)super;
     str<<"    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL) {\n";
     genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr);\n","");
     str<<"    }\n";
@@ -887,11 +888,6 @@ Chare::genRegisterMethodDef(XStr& str)
   str << "#endif\n";
 }
 
-//extern void sdag_trans(XStr& classname, CParsedFile *input, XStr& output);
-
-
-
-
 void
 Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
 {
@@ -902,10 +898,6 @@ Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
     if(list)
       list->genPub(declstr, defstr, defconstr, connectPresent);
   }
-}
-
-void
-Chare::genSubRegisterMethodDef(XStr& str) {
 }
 
 void
@@ -987,7 +979,6 @@ Chare::genDecls(XStr& str)
       classname << baseName(0);
       resetNumbers();
       myParsedFile->doProcess(classname, sdag_output);
-     // sdag_trans(classname, myParsedFile, sdag_output);
       str << sdag_output;
     }
   }
@@ -2233,11 +2224,6 @@ Template::genDefs(XStr& str)
     entity->genDefs(str);
 }
 
-void
-Template::genReg(XStr& str)
-{
-}
-
 int Template::genAccels_spe_c_funcBodies(XStr& str) {
   int rtn = 0;
   if (!external && entity) { rtn += entity->genAccels_spe_c_funcBodies(str); }
@@ -2932,7 +2918,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), name((char *)n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
+      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -3283,7 +3269,7 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
         }
       }
   }
-  else if (container->getForWhom()==forSection);
+  else if (container->getForWhom()==forSection) { }
 }
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
@@ -4572,7 +4558,7 @@ void Entry::genDefs(XStr& str)
       preCall << "(void *) ";
     }
 
-    postCall << "  CkSendToFuture(impl_ref, impl_retMsg, impl_src);\n";
+    postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method
     if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);
@@ -4590,8 +4576,6 @@ void Entry::genDefs(XStr& str)
   }
 
   if (!isConstructor() && fortranMode) { // Fortran90
-      const char* msg_name = param->getBaseName();
-
       str << "/* FORTRAN SECTION */\n";
 
       XStr dim; dim << ((Array*)container)->dim();
@@ -5186,7 +5170,7 @@ void Parameter::pupAllValues(XStr &str) {
 	  else str<<"  implDestP|"<<name<<";\n";
 	}
 }
-void ParamList::endUnmarshall(XStr &str)
+void ParamList::endUnmarshall(XStr &)
 {
 	/* Marshalled entry points now have the "SNOKEEP" attribute...
     	if (isMarshalled()) {
@@ -5208,10 +5192,6 @@ void InitCall::print(XStr& str)
 {
 	str<<"  initcall void "<<name<<"(void);\n";
 }
-void InitCall::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
-void InitCall::genDecls(XStr& str) {}
-void InitCall::genIndexDecls(XStr& str) {}
-void InitCall::genDefs(XStr& str) {}
 void InitCall::genReg(XStr& str)
 {
 	str<<"      _registerInitCall(";
@@ -5239,9 +5219,6 @@ void PUPableClass::print(XStr& str)
 	str << "  PUPable " << type <<";\n";
 	if (next) next->print(str);
 }
-void PUPableClass::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
-void PUPableClass::genDecls(XStr& str) {}
-void PUPableClass::genIndexDecls(XStr& str) {}
 void PUPableClass::genDefs(XStr& str)
 {
         if (type->isTemplated()) {
@@ -5278,13 +5255,9 @@ void IncludeFile::print(XStr& str)
 {
 	str<<"  include "<<name<<";\n";
 }
-void IncludeFile::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void IncludeFile::genDecls(XStr& str) {
 	str<<"#include "<<name<<"\n";
 }
-void IncludeFile::genIndexDecls(XStr& str) {}
-void IncludeFile::genDefs(XStr& str) {}
-void IncludeFile::genReg(XStr& str) {}
 
 
 /***************** normal extern C Class support **************/
@@ -5297,13 +5270,9 @@ void ClassDeclaration::print(XStr& str)
 {
 	str<<"  class "<<name<<";\n";
 }
-void ClassDeclaration::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void ClassDeclaration::genDecls(XStr& str) {
 	str<<"class "<<name<<";\n";
 }
-void ClassDeclaration::genIndexDecls(XStr& str) {}
-void ClassDeclaration::genDefs(XStr& str) {}
-void ClassDeclaration::genReg(XStr& str) {}
 
 
 /****************** Registration *****************/

@@ -7,14 +7,14 @@
 using namespace std;
 int initial_grainsize;
 
-CkVec< int > graph;
+CkVec< double> graph;
 
-int  N, maxD;
+int  N;
 
 
 #undef M_PI
 #define M_PI 3.14159265358979323846264
-
+/*
 int geom_edgelen (int i, int j, CCdatagroup *dat)
 {
      double lati, latj, longi, longj;
@@ -33,7 +33,7 @@ int geom_edgelen (int i, int j, CCdatagroup *dat)
      q5 = cos(lati - latj) * q4 * q4 - cos(lati + latj) * q3 * q3;
      return (int) (6378388.0 * atan2(sqrt(q1*q1 + q2*q2), q5) + 1.0);
 }
-
+*/
 void readinput(char* filename)
 {
     FILE *file;
@@ -78,7 +78,7 @@ void readinput(char* filename)
     for(int i=0; i<N; i++)
         for(int j=0; j<i; j++)
         {
-            int distance = (int) sqrt ((xcoord[i]-xcoord[j])*(xcoord[i]-xcoord[j]) + (ycoord[i]-ycoord[j])*(ycoord[i]-ycoord[j]));
+            double distance =  sqrt ((xcoord[i]-xcoord[j])*(xcoord[i]-xcoord[j]) + (ycoord[i]-ycoord[j])*(ycoord[i]-ycoord[j]));
             graph[i*N+j]= distance;
             graph[j*N+i]= distance;
         }
@@ -94,7 +94,7 @@ public:
         int arg_index = 1;
         if(m->argc<2)
         {
-            CkPrintf("Usage: tsp type(0-random graph, 1 inputfile) (Size of Problem) (Maximum Distance) grain\n");
+            CkPrintf("Usage: tsp type(0-random graph, 1 inputfile) (Size of Problem) initialgrain\n");
             delete m;
             CkExit();
         }
@@ -103,24 +103,16 @@ public:
         {
             // Input Problem parameters
             N = atoi(m->argv[2]);
-            maxD = atoi(m->argv[3]);
-            initial_grainsize = atoi(m->argv[4]);
+            initial_grainsize = atoi(m->argv[3]);
 
             graph.resize(N*N);
             // Allocate 2-D array for storing the distance
             // // Asymmetric Problem
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < i; j++) {
-                    int edge = (int)( 1.1 * abs( (rand() % maxD)) );
-                    if(edge >= maxD)
-                    { // no edge
-                        graph[i*N+j]= maxD;
-                        graph[j*N+i]= maxD;
-                    }else
-                    {
-                        graph[i*N+j] = edge;
-                        graph[j*N+i] = edge;
-                    }
+                    int edge = (int)( 1.1 * abs( (rand() % 1000)) );
+                    graph[i*N+j] = edge;
+                    graph[j*N+i] = edge;
                     CkPrintf("%d\t", graph[i*N+j]);
 				}
                 CkPrintf("\n");
@@ -132,7 +124,7 @@ public:
             initial_grainsize = atoi(m->argv[3]);
         }
 
-				CkPrintf("start\n");
+        CkPrintf("start\n");
         searchEngineProxy.start();
         delete m;
     }

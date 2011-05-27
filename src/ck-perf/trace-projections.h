@@ -16,6 +16,7 @@
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
+#define NUMPAPIEVENTS 2
 #endif
 
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -58,10 +59,9 @@ class LogEntry {
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
-    int numPapiEvents;
+    //int numPapiEvents;
 #if CMK_HAS_COUNTER_PAPI
-    int *papiIDs;
-    LONG_LONG_PAPI *papiValues;
+    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
     unsigned char type; 
     char *fName;
@@ -81,12 +81,12 @@ class LogEntry {
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
-      numPapiEvents = 0;
-      userSuppliedNote = NULL;
 #if CMK_HAS_COUNTER_PAPI
-      papiIDs = NULL;
-      papiValues = NULL;
+      //numPapiEvents = NUMPAPIEVENTS;
+#else
+      //numPapiEvents = 0;
 #endif
+      userSuppliedNote = NULL;
       fName = NULL;
       flen=0;
       pes=NULL;
@@ -183,10 +183,12 @@ class LogEntry {
       }	
     }
 
-
-
     // complementary function for adding papi data
-    void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
+    void addPapi(LONG_LONG_PAPI *papiVals){
+#if CMK_HAS_COUNTER_PAPI
+   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+#endif
+    }
    
     void setUserSuppliedData(int data){
       userSuppliedData = data;
@@ -323,8 +325,8 @@ class LogPool {
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
-    void addPapi(int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) {
-      pool[numEntries-1].addPapi(numPap, pap_ids, papVals);
+    void addPapi(LONG_LONG_PAPI *papVals) {
+      pool[numEntries-1].addPapi(papVals);
     }
 
 	/** add a record for a user supplied piece of data */
@@ -450,7 +452,7 @@ class TraceProjections : public Trace {
     int idxRegistered(int idx);    
 #if CMK_HAS_COUNTER_PAPI
     int papiEventSet;
-    LONG_LONG_PAPI *papiValues;
+    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
 
   public:

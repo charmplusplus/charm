@@ -31,12 +31,12 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
     BTreeStateBase base = *((BTreeStateBase*)_base);
     long long t = 1;
 
+    CkPrintf(" Processed :thisindex=%lld, depth=%d\n", base.index, base.depth);
     for(int i=0; i<target; i++)
          t = t << 1;
     for(int childIndex=0; childIndex<branchfactor; childIndex++)
     {
         long long thisindex = base.index * branchfactor + childIndex;
-        //CkPrintf(" t = %lld, based index=%lld _basedindex=%lld  thisindex=%lld, depth=%d\n", t, base.index, ((BTreeStateBase*)_base)->index, thisindex, base.depth);
         if(base.depth == depth-1)
         {
             if( t-1 == thisindex)

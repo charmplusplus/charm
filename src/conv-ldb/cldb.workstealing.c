@@ -15,6 +15,7 @@ typedef struct CldProcInfo_s {
 } *CldProcInfo;
 
 static int WS_Threshold = -1;
+static int _steal_prio = 0;
 static int _stealonly1 = 0;
 static int _steal_immediate = 0;
 static int workstealingproactive = 0;
@@ -107,12 +108,16 @@ static void CldAskLoadHandler(requestmsg *msg)
   if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
       else sendLoad = myload/2; 
-      if(sendLoad > 0)
+      if(sendLoad > 0) {
 #if ! CMK_USE_IBVERBS
+        if (_steal_prio)
+          CldMultipleSendPrio(receiver, sendLoad, rank, 0);
+        else
           CldMultipleSend(receiver, sendLoad, rank, 0);
 #else
           CldSimpleMultipleSend(receiver, sendLoad, rank);
 #endif
+      }
       CmiFree(msg);
   }else
   {     /* send ack indicating there is no task */
@@ -177,10 +182,16 @@ void CldHandler(void *msg)
   /* CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr); */
 }
 
+#define CldPUTTOKEN(msg)  \
+           if (_steal_prio)   \
+             CldPutTokenPrio(msg);   \
+           else            \
+             CldPutToken(msg);
+
 void CldBalanceHandler(void *msg)
 {
   CldRestoreHandler(msg);
-  CldPutToken(msg);
+  CldPUTTOKEN(msg);
   CpvAccess(isStealing) = 0;      /* fixme: this may not be right */
 }
 
@@ -232,7 +243,7 @@ void CldEnqueue(int pe, void *msg, int infofn)
     }
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CmiSetInfo(msg,infofn);
-    CldPutToken(msg);
+    CldPUTTOKEN(msg);
   } 
   else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
@@ -317,6 +328,8 @@ void CldGraphModuleInit(char **argv)
   }
 
   _steal_immediate = CmiGetArgFlagDesc(argv, "+WSImmediate", "Charm++> Work Stealing, steal using immediate messages");
+
+  _steal_prio = CmiGetArgFlagDesc(argv, "+WSPriority", "Charm++> Work Stealing, using priority");
 
   /* register idle handlers - when idle, keep asking work from neighbors */
   if(CmiNumPes() > 1)

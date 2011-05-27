@@ -17,18 +17,20 @@ using namespace std;
 
 
 /*readonly*/ extern int initial_grainsize;
-
-extern CkVec< int > graph; 
+#define MAX 100000
+extern CkVec< double > graph; 
 class TspBase: public StateBase
 {
 public:
 	int length; // length
 	double cost;
     int *tour;
+    int *intour;
 
     void initialize()
     {
         tour = (int*) ( (char*)this+sizeof(TspBase));
+        intour = (int*) ((char*) this+sizeof(TspBase)+sizeof(int)*N);
     }
     void copy(TspBase *parent)
     {
@@ -39,54 +41,45 @@ public:
         {
             tour[i] = parent->tour[i];
         }
-
+        for(int i=0; i<N; i++)
+        {
+            intour[i] = parent->intour[i];
+        }
     }
 
     double lowerbound()
     {
-        vector< int > temp_graph;
-        temp_graph.resize(N*N);
-        for(int i=0; i<N*N; i++)
-            temp_graph[i] = graph[i];
-
-        if(length >= 2)
-        {
-            int v1 = tour[0];
-            int v2 = tour[1];
-            temp_graph[v1*N+v2] = maxD;
-            temp_graph[v2*N+v1] = maxD;
-            for(int i=1; i<length-1; i++)
-            {
-                v1=tour[i];
-                v2 = tour[i+1];
-
-                for(int j=0; j<N; j++)
-                    temp_graph[v1*N+j] = maxD;
-                temp_graph[v2*N+v1]= maxD;
-            }
-        }
+        
         double lower_sum = 0;
         for(int i=0; i<N; i++)
         {
-            if(i==0 || i== tour[length-1])
+            if(intour[i] == 2)
+                continue;
+            if(intour[i] == 1 && i!=0)
             {
-                lower_sum += *min_element(temp_graph.begin()+i*N, temp_graph.begin()+(i+1)*N);
+                double m_min=MAX;
+                for(int j=0; j<N; j++)
+                {
+                    if((intour[j] ==0 && graph[j]<m_min) || (length==N && intour[j]==1))
+                        m_min= graph[j];
+                }
+                lower_sum += m_min;
             }else
             {
-                int j;
-                for( j=1; j<length-1; j++)
+                double m_min, m2_min;
+                m_min = m2_min=graph[i*N];
+                for(int j=i*N+1; j<i*N+N; j++)
                 {
-                    if(i == tour[j])
-                        break;
+                    if(graph[j]<m_min)
+                    {
+                        m2_min=m_min;
+                        m_min=graph[j];
+                    }
                 }
-                if(j < length-1)
-                    continue;
-                sort(temp_graph.begin()+i*N, temp_graph.begin()+(i+1)*N-1);
-
-                lower_sum += temp_graph[i*N] + temp_graph[i*N+1];
+                lower_sum += m_min+m2_min;
             }
         }
-        return (cost + lower_sum); 
+        return (cost + 0.5*lower_sum); 
     }
 
     void printInfo()
@@ -94,9 +87,9 @@ public:
         CkPrintf(" length=%d, cost=%.4f\n[", length, cost);
         for(int i=0; i<length; i++)
         {
-            CkPrintf("%d  ", tour[i]);
+            CkPrintf("(%d,%d)", tour[i], intour[tour[i]]);
         }
-        CkPrintf("]\n");
+        CkPrintf("] lower bound=%f\n", lowerbound());
     }
 };
 
@@ -114,11 +107,13 @@ inline double lowerBound( StateBase *s)
 inline void createInitialChildren(Solver *solver)
 {
 
-    TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+sizeof(int)*N, 0, 1);
+    TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+2*sizeof(int)*N, 0, 1);
     state->initialize();
     state->tour[0]=0;
     state->length=1;
     state->cost = 0;
+    for(int i=0; i<N; i++)
+        state->intour[i]=0;
 #ifdef USEINTPRIORITY
     solver->setPriority(state, (int)lowerBound(state));
 #endif
@@ -128,55 +123,37 @@ inline void createInitialChildren(Solver *solver)
 inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
 {
 
-    TspBase *s = (TspBase*)alloca(sizeof(TspBase)+sizeof(int)*N);
+    TspBase *s = (TspBase*)alloca(sizeof(TspBase)+2*sizeof(int)*N);
     s->initialize();
     s->copy((TspBase*)_base);
     int childIndex = 0;
     int last = s->tour[s->length-1];
     /* construct the current graph, remove all the edges already in the path */
-    vector< int > temp_graph;
-    temp_graph.resize(N*N);
-    for(int i=0; i<N*N; i++)
-        temp_graph[i] = graph[i];
-
-    if(s->length >= 2)
-    {
-        int v1 = s->tour[0];
-        int v2 = s->tour[1];
-        temp_graph[v1*N+v2] = maxD;
-        temp_graph[v2*N+v1] = maxD;
-        for(int i=1; i<s->length-1; i++)
-        {
-            v1=s->tour[i];
-            v2 = s->tour[i+1];
-
-            for(int j=0; j<N; j++)
-                temp_graph[v1*N+j] = maxD;
-            temp_graph[v2*N+v1]= maxD;
-        }
-    }
-    
+    //s->printInfo();
     for(int j=0; j<N; j++)
     {
-        if(last == j || temp_graph[last*N+j] == maxD)
+        //CkPrintf("last=%d,j=%d, intour=%d\n", last, j, s->intour[j]);
+        if(last == j || s->intour[j]==2 || (j==0&&s->length<N))
             continue;
         if(s->length == N)
         {
             if(j == 0)
             {
-                //s->printInfo();
-                solver->updateCost(s->cost+temp_graph[last*N+j]);
+                s->printInfo();
+                solver->updateCost(s->cost+graph[last*N+j]);
                 //solver->reportSolution(); 
             }
         }else
         {
-            TspBase *NewTour  = (TspBase*)solver->registerState(sizeof(TspBase)+sizeof(int)*N, childIndex, N);
+            TspBase *NewTour  = (TspBase*)solver->registerState(sizeof(TspBase)+2*sizeof(int)*N, childIndex, N);
             NewTour->initialize();
             NewTour->copy(s);
             NewTour->tour[s->length] = j;
+            NewTour->intour[j]=1;
+            NewTour->intour[last] = NewTour->intour[last]+1;
             NewTour->length = s->length + 1;
-            
-            NewTour->cost = s->cost + temp_graph[last*N+j];
+            NewTour->cost = s->cost + graph[last*N+j];
+            //NewTour->printInfo();
 #ifdef USEINTPRIORITY
             solver->setPriority(NewTour, (int)lowerBound(NewTour));
 #endif
