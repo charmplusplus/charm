@@ -267,7 +267,10 @@ private:
       return env;
     }
     void reset() {
+#if CMK_REPLAYSYSTEM
       setEvent(++CkpvAccess(envelopeEventID));
+#endif
+      type.group.dep.setZero();
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
