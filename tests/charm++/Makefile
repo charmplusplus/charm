@@ -1,4 +1,4 @@
-DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag
+DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest
 
 all:
 	for d in $(DIRS); do \
