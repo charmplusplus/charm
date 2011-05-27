@@ -184,7 +184,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   for (i=0; i<gvtp; i++) gvtDOP[i] = 0;
   for (i=0; i<grtp; i++) grtDOP[i] = 0;
   for (i=0; i<CkNumPes(); i++) { // read each processor's log
-    sprintf(filename, "dop%d.log\0", i);
+    sprintf(filename, "dop%ld.log\0", i);
     fp = fopen(filename, "r");
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
@@ -192,12 +192,13 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
       return;
     }
     CkPrintf("Reading file %s...\n", filename);
-    while (fgets(line, 80, fp)) {
 #if USE_LONG_TIMESTAMPS
-      if (sscanf(line, "%lf %lf %lld %lld\n", &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
+    const char* format = "%lf %lf %ld %ld\n";
 #else
-      if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
+    const char* format = "%lf %lf %d %d\n";
 #endif
+    while (fgets(line, 80, fp)) {
+      if (sscanf(line, format, &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
 	usStart = (unsigned long int)(rinStart * 1000000.0);
 	usEnd = (unsigned long int)(rinEnd * 1000000.0);
 	for (j=usStart; j<usEnd; j++) grtDOP[j]++;
@@ -214,7 +215,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   fp = fopen("dop_mod.out", "w");
   for (i=0; i<gvtp; i++) {
     if ((gvtDOP[i] != 0) || (zed == 0))
-      fprintf(fp, "%d %d\n", i, gvtDOP[i]);
+      fprintf(fp, "%ld %d\n", i, gvtDOP[i]);
     if (gvtDOP[i] == 0) zed = 1;
     else zed = 0;
     avgPEs += gvtDOP[i];
@@ -224,7 +225,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   fclose(fp);
   fp = fopen("dop_sim.out", "w");
   for (i=0; i<grtp; i++) {
-    fprintf(fp, "%d %d\n", i, grtDOP[i]);
+    fprintf(fp, "%ld %d\n", i, grtDOP[i]);
     if (grtDOP[i] > simulationPEs) simulationPEs = grtDOP[i];
   } 
   fclose(fp);

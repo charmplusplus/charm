@@ -121,7 +121,7 @@ public:
   /// Write data to this PE's DOP log file
   inline void WriteDopData(double srt, double ert, POSE_TimeType svt, POSE_TimeType evt) {
 #if USE_LONG_TIMESTAMPS
-    const char* format = "%f %f %lld %lld\n";
+    const char* format = "%f %f %ld %ld\n";
 #else
     const char* format = "%f %f %d %d\n";
 #endif
