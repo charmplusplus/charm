@@ -68,6 +68,50 @@ class Edge {
     int bytes;		// total number of bytes exchanged
 };
 
+class McastSrc {
+  friend class ObjGraph;
+
+  public:
+    McastSrc(int _numDest, int _msgs, int _bytes) : numDest(_numDest), msgs(_msgs),
+    bytes(_bytes) {
+    }
+
+    ~McastSrc() { }
+
+    inline int getNumMsgs() { return msgs; }
+    inline int getNumBytes() { return bytes; }
+    inline void setNumBytes(int _bytes) { bytes = _bytes; }
+
+    std::vector<int> destList;
+
+  private:
+    int numDest; //number of destination for this multicast
+    int msgs; // number of messages exchanged
+    int bytes; // total number of bytes exchanged
+};
+
+class McastDest {
+  friend class ObjGraph;
+
+  public:
+    McastDest(int _src, int _offset, int _msgs, int _bytes) : src(_src),
+    offset(_offset), msgs(_msgs), bytes(_bytes) {
+    }
+
+    ~McastDest() { }
+
+    inline int getSrc() { return src; }
+    inline int getOffset() { return offset; }
+    inline int getNumMsgs() { return msgs; }
+    inline int getNumBytes() { return bytes; }
+    inline void setNumBytes(int _bytes) { bytes = _bytes; }
+
+  private:
+    int src; // src of multicast being received
+    int offset; //multicast list which this message belongs to
+    int msgs; // number of messages exchanged
+    int bytes; // total number of bytes exchanged
+};
 
 class Vertex {
   friend class ObjGraph;
@@ -83,6 +127,8 @@ class Vertex {
     // list of vertices this vertex sends messages to and receives from
     std::vector<Edge> sendToList;
     std::vector<Edge> recvFromList;
+    std::vector<McastSrc> mcastToList;
+    std::vector<McastDest> mcastFromList;
 
   private:
     int id;		// index in the LDStats array
