@@ -69,6 +69,8 @@
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
 
+extern const char * const CmiCommitID;
+
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
