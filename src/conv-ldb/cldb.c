@@ -525,3 +525,8 @@ void CldSimpleMultipleSend(int pe, int numToSend, int rank)
     }
   }
 }
+
+void seedBalancerExit()
+{
+    CmiPrintf("Relocate message number is %d\n", CpvAccess(CldRelocatedMessages));
+}

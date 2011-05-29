@@ -69,8 +69,6 @@
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
 
-extern const char * const CmiCommitID;
-
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
 #endif
@@ -129,7 +127,7 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
-
+extern unsigned int    _printCS;
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -3428,10 +3426,6 @@ void ConverseCommonInit(char **argv)
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
-
-  if (CmiMyPe() == 0)
-    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
-
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */
@@ -3516,7 +3510,8 @@ void ConverseCommonExit(void)
 #if CMK_CUDA
   exitHybridAPI(); 
 #endif
-
+  if(_printCS)
+      seedBalancerExit();
   EmergencyExit();
 }
 
