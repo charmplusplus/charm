@@ -3426,6 +3426,8 @@ void ConverseCommonInit(char **argv)
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
+  if (CmiMyPe() == 0)
+      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */
