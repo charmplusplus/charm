@@ -210,6 +210,12 @@ a run of integers used to look up an object in a hash table.
 #endif
 
 
+/**
+ * Base class for array index objects used in charm.
+ *
+ * @warning: Do not instantiate! Always create and use a child class
+ * @warning: Do not add constructors / destructors. Class participates in unions
+ */
 class CkArrayIndex
 {
 public:
