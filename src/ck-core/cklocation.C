@@ -100,13 +100,6 @@ int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
 		compare(*(const CkArrayIndex *)k2);
 }
 
-void CkArrayIndex::pup(PUP::er &p) 
-{
-	p(nInts);
-	p(dimension);
-	p(data(),nInts);
-}
-
 /*********************** Array Messages ************************/
 CkArrayIndexMax &CkArrayMessage::array_index(void)
 {

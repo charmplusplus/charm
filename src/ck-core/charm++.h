@@ -243,7 +243,11 @@ public:
           else return 0;
         }
 
-	void pup(PUP::er &p);
+	void pup(PUP::er &p) {
+		p|nInts;
+		p|dimension;
+		for (int i=0;i<nInts;i++) p|index[i];
+	}
 
     //These routines allow CkArrayIndex to be used in
     //  a CkHashtableT
@@ -304,11 +308,6 @@ public:
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
         void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
 	/*
 	 * Code for the previous attempt to introduce CkArrayID into CmiObjId
 	 * 
