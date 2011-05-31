@@ -393,7 +393,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
     int arrID = env->getsetArrayMgr().idx;
     PUPn(arrID);
-    CkArrayIndexStruct &idx = *(CkArrayIndexStruct *)&env->getsetArrayIndex();
+    CkArrayIndex &idx = env->getsetArrayIndex();
     int nInts = idx.nInts;
     int dimension = idx.dimension;
     PUPn(nInts);

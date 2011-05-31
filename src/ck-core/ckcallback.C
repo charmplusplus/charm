@@ -140,7 +140,7 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
       type=doInline?isendArray:sendArray;
 	d.array.ep=ep; 
 	d.array.id=arrElt.ckGetArrayID(); 
-	d.array.idx.asMax()=arrElt.ckGetIndex();
+	d.array.idx = arrElt.ckGetIndex();
 }
 
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
@@ -150,7 +150,7 @@ CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
       type=doInline?isendArray:sendArray;
     d.array.ep=ep; 
 	d.array.id=p->ckGetArrayID(); 
-	d.array.idx.asMax()=p->ckGetArrayIndex();
+	d.array.idx = p->ckGetArrayIndex();
 }
 
 void CkCallback::send(int length,const void *data) const
@@ -219,11 +219,11 @@ void CkCallback::send(void *msg) const
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
-		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asMax());
+		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx);
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
-		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx.asMax());
+		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx);
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();

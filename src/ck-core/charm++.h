@@ -210,6 +210,12 @@ a run of integers used to look up an object in a hash table.
 #endif
 
 
+/**
+ * Base class for array index objects used in charm.
+ *
+ * @warning: Do not instantiate! Always create and use a child class
+ * @warning: Do not add constructors / destructors. Class participates in unions
+ */
 class CkArrayIndex
 {
 public:
@@ -224,7 +230,8 @@ public:
         };
 
         /// Zero out the index bits upon construction
-        CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+        //CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+        inline void init(void)  { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
 	int *data(void)             {return index; }
 	const int *data(void) const {return index; }
@@ -283,8 +290,8 @@ class CkArrayIndexMax : public CkArrayIndex {
 		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
 	}
 public:
-	CkArrayIndexMax(void) { nInts=0; dimension=0; }
-	CkArrayIndexMax(int i) { nInts=0; dimension=0; }   // used for CkVec
+	CkArrayIndexMax(void)  { init(); }
+	CkArrayIndexMax(int i) { init(); }
 	CkArrayIndexMax(const CkArrayIndex &that) 
 		{copyFrom(that);}
 	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
@@ -352,24 +359,6 @@ public:
 };
 PUPmarshall(CkArrayIndexMax)
 
-//A layout-compatible version of a CkArrayIndexMax.
-//  Needed, e.g., for use in unions where a constructor is forbidden.
-class CkArrayIndexStruct {
-public:
-	short int nInts;
-	short int dimension;
-	int index[CK_ARRAYINDEX_MAXLEN];
-	CkArrayIndexMax &asMax(void) 
-		{return *(CkArrayIndexMax *)this;}
-	const CkArrayIndexMax &asMax(void) const
-		{return *(const CkArrayIndexMax *)this;}
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
-};
-PUPmarshall(CkArrayIndexStruct)
 
 class CkArrayID {
 	CkGroupID _gid;
