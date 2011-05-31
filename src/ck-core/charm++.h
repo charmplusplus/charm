@@ -267,6 +267,34 @@ public:
                 if (index[i] != idx.index[i]) return CmiFalse;
           return CmiTrue;
         }
+
+    /**
+     * @note: input arrayID is ignored
+     * @todo: Chee Wai Lee had a FIXME note attached to this method because he
+     * felt it was a temporary solution
+     */
+	CmiObjId *getProjectionID(int arrayID)
+    {
+	  CmiObjId *ret = new CmiObjId;
+	    int i;
+	    const int *data=this->data();
+	    if (OBJ_ID_SZ>=this->nInts) {
+	      for (i=0;i<this->nInts;i++)
+		ret->id[i]=data[i];
+	      for (i=this->nInts;i<OBJ_ID_SZ;i++)
+		ret->id[i]=0;
+	    } else {
+	      //Must hash array index into LBObjid
+	      int j;
+	      for (j=0;j<OBJ_ID_SZ;j++)
+		ret->id[j]=data[j];
+	      for (i=0;i<this->nInts;i++)
+		for (j=0;j<OBJ_ID_SZ;j++)
+		  ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
+		    circleShift(data[i],21-9*i*(j+1));
+	    }
+	    return ret;
+	}
 };
 
 inline CkHashCode CkArrayIndex::hash(void) const
@@ -308,53 +336,6 @@ public:
 		{copyFrom(that); return *this;}
         void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
         void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
-	/*
-	 * Code for the previous attempt to introduce CkArrayID into CmiObjId
-	 * 
-	 * Turns out this:
-	 * i) does not appear to work right.
-	 * ii) does not result in the same ID as the ones used by the Load
-	 *     Balancer.
-	 *
-	 * FIXME **CWL** - temporary solution:
-	 * i) ignore the arrayID passed into the method.
-	 * ii) use exactly the same code as the 
-	 *     idx2LDObjid(const CkArrayIndex &idx) found in cklocation.C
-	 *     The only problem is that the code only exists when the
-	 *     CMK_LBDB_ON is set, so we cannot reuse the code and
-	 *     risk having to modify the code should idx2LDObjid be changed.
-	 *
-	CmiObjId *getProjectionID(int arrayID) { 
-	  CmiObjId *ret = new CmiObjId;
-	  for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) {
-	    ret->id[i] = index.data[i];
-	  }
-	  ret->id[CK_ARRAYINDEX_MAXLEN] = arrayID;
-	  return ret; 
-	}
-	*/
-	CmiObjId *getProjectionID(int arrayID) {
-	  CmiObjId *ret = new CmiObjId;
-	    int i;
-	    const int *data=this->data();
-	    if (OBJ_ID_SZ>=this->nInts) {
-	      for (i=0;i<this->nInts;i++)
-		ret->id[i]=data[i];
-	      for (i=this->nInts;i<OBJ_ID_SZ;i++)
-		ret->id[i]=0;
-	    } else {
-	      //Must hash array index into LBObjid
-	      int j;
-	      for (j=0;j<OBJ_ID_SZ;j++)
-		ret->id[j]=data[j];
-	      for (i=0;i<this->nInts;i++)
-		for (j=0;j<OBJ_ID_SZ;j++)
-		  ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
-		    circleShift(data[i],21-9*i*(j+1));
-	    }
-	    return ret;
-	}
-
 };
 PUPmarshall(CkArrayIndexMax)
 
