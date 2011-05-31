@@ -408,7 +408,7 @@ void sendTicketArrayRequest(envelope *env,int destPE,int _infoIdx){
 	CkObjID recver;
 	recver.type = TypeArray;
 	recver.data.array.id = env->getsetArrayMgr();
-	recver.data.array.idx.asMax() = *(&env->getsetArrayIndex());
+	recver.data.array.idx = *(&env->getsetArrayIndex());
 
 	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
 		char recverString[100],senderString[100];
@@ -878,7 +878,7 @@ inline bool _processTicketRequest(TicketRequest *ticketRequest,TicketReply *repl
 			if(estPE == CkMyPe() && recver.type == TypeArray){
 				CkArrayID aid(recver.data.array.id);		
 				CkLocMgr *locMgr = aid.ckLocalBranch()->getLocMgr();
-				DEBUG(printf("[%d] Object with delayed ticket request has home at %d\n",CkMyPe(),locMgr->homePe(recver.data.array.idx.asMax())));
+				DEBUG(printf("[%d] Object with delayed ticket request has home at %d\n",CkMyPe(),locMgr->homePe(recver.data.array.idx)));
 			}
 			TicketRequest *delayed = (TicketRequest*)CmiAlloc(sizeof(TicketRequest));
 			*delayed = *ticketRequest;
@@ -2436,7 +2436,7 @@ void updateHomePE(void *data,ChareMlogData *mlogData){
 	if(mlogData->objID.type == TypeArray){
 		//it is an array element
 		CkGroupID myGID = mlogData->objID.data.array.id;
-		CkArrayIndexMax myIdx =  mlogData->objID.data.array.idx.asMax();
+		CkArrayIndexMax myIdx =  mlogData->objID.data.array.idx;
 		CkArrayID aid(mlogData->objID.data.array.id);		
 		//check if the restarted processor is the home processor for this object
 		CkLocMgr *locMgr = aid.ckLocalBranch()->getLocMgr();
@@ -2655,7 +2655,7 @@ void _resendMessagesHandler(char *msg){
 				CkArrayID aid(d.listObjects[j].recver.data.array.id);		
 				CkLocMgr *locMgr = aid.ckLocalBranch()->getLocMgr();
 				if(retainedObjectList[i]->migRecord.gID == locMgr->getGroupID()){
-					if(retainedObjectList[i]->migRecord.idx == d.listObjects[j].recver.data.array.idx.asMax()){
+					if(retainedObjectList[i]->migRecord.idx == d.listObjects[j].recver.data.array.idx){
 						recreate = 0;
 						break;
 					}
@@ -3474,7 +3474,7 @@ void* CkObjID::getObject(){
 	
 					if(aid.ckLocalBranch() == NULL){ return NULL;}
 	
-					CProxyElement_ArrayBase aProxy(aid,data.array.idx.asMax());
+					CProxyElement_ArrayBase aProxy(aid,data.array.idx);
 	
 					return aProxy.ckLocal();
 				}
@@ -3498,7 +3498,7 @@ int CkObjID::guessPE(){
 					if(aid.ckLocalBranch() == NULL){
 						return -1;
 					}
-					return aid.ckLocalBranch()->lastKnown(data.array.idx.asMax());
+					return aid.ckLocalBranch()->lastKnown(data.array.idx);
 				}
 			default:
 				CkAssert(0);
@@ -3522,7 +3522,7 @@ char *CkObjID::toString(char *buf) const {
 			break;
 		case TypeArray:
 			{
-				const CkArrayIndexMax &idx = data.array.idx.asMax();
+				const CkArrayIndexMax &idx = data.array.idx;
 				const int *indexData = idx.data();
 				sprintf(buf,"Array |%d %d %d| id %d \0",indexData[0],indexData[1],indexData[2],data.array.id.idx);
 				break;
@@ -3548,14 +3548,14 @@ void CkObjID::updatePosition(int PE){
 						char str[100];
 						CkLocMgr *mgr = aid.ckLocalBranch()->getLocMgr();
 //						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
-						CkLocRec *rec = mgr->elementNrec(data.array.idx.asMax());
+						CkLocRec *rec = mgr->elementNrec(data.array.idx);
 						if(rec != NULL){
 							if(rec->type() == CkLocRec::local){
 								CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
 								return;
 							}
 						}
-						mgr->inform(data.array.idx.asMax(),PE);
+						mgr->inform(data.array.idx,PE);
 					}	
 				}
 

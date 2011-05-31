@@ -631,7 +631,7 @@ class ArrayElementT : public ArrayElement
 public:
   ArrayElementT(void): thisIndex(*(const T *)thisIndexMax.data()) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))     
-        mlogData->objID.data.array.idx.asMax()=thisIndexMax;
+        mlogData->objID.data.array.idx=thisIndexMax;
 #endif
 }
   ArrayElementT(CkMigrateMessage *msg)
