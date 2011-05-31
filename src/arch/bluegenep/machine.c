@@ -902,14 +902,11 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
     CmiFreeListSendFn(npes, pes, size, copymsg);
 }
 
-/* Currently disable optimized multicast for non-SMP as it fails
- * for hybrid ldb in NAMD as reported by Gengbin --Chao Mei
+/* This optimized multicast only helps NAMD when #atoms/CPU is
+ * less than 10 according to Sameer Kumar. So it is off in
+ * default.
  */
-#if CMK_SMP
 #define OPTIMIZED_MULTICAST  0
-#else
-#define OPTIMIZED_MULTICAST  1
-#endif
 
 #if OPTIMIZED_MULTICAST
 #warning "Using Optimized Multicast"
