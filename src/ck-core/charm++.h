@@ -251,6 +251,18 @@ public:
 	static CkHashCode staticHash(const void *a,size_t);
 	int compare(const CkArrayIndex &ind) const;
 	static int staticCompare(const void *a,const void *b,size_t);
+	void copyFrom(const CkArrayIndex &that)
+	{
+		nInts=that.nInts;
+		dimension=that.dimension;
+		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
+	}
+        CmiBool operator==(const CkArrayIndex& idx) const {
+          if (nInts != idx.nInts) return CmiFalse;
+          for (int i=0; i<nInts; i++)
+                if (index[i] != idx.index[i]) return CmiFalse;
+          return CmiTrue;
+        }
 };
 
 inline CkHashCode CkArrayIndex::hash(void) const
@@ -283,12 +295,6 @@ inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
 
 //This class is as large as any CkArrayIndex
 class CkArrayIndexMax : public CkArrayIndex {
-	void copyFrom(const CkArrayIndex &that)
-	{
-		nInts=that.nInts;
-		dimension=that.dimension;
-		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	}
 public:
 	CkArrayIndexMax(void)  { init(); }
 	CkArrayIndexMax(int i) { init(); }
@@ -350,12 +356,6 @@ public:
 	    return ret;
 	}
 
-        CmiBool operator==(const CkArrayIndexMax& idx) const {
-          if (nInts != idx.nInts) return CmiFalse;
-          for (int i=0; i<nInts; i++)
-                if (index[i] != idx.index[i]) return CmiFalse;
-          return CmiTrue;
-        }
 };
 PUPmarshall(CkArrayIndexMax)
 
