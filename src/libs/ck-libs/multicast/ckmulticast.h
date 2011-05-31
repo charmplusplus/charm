@@ -39,7 +39,7 @@ class CkMulticastMgr: public CkDelegateMgr
                 int  pe;
             public:
                 IndexPos() {}
-                IndexPos(int i): idx(i), pe(i) {}
+                IndexPos(int i): idx(), pe(i) {}
                 IndexPos(CkArrayIndexMax i, int p): idx(i), pe(p) {};
                 void pup(PUP::er &p){ p|idx; p|pe; }
         };

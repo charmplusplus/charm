@@ -426,7 +426,7 @@ CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch())
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
-	:numInitial(0),map(_defaultArrayMapID)
+	:numInitial(),map(_defaultArrayMapID)
 {
     init();
 }

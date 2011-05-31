@@ -298,6 +298,18 @@ public:
     void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
 };
 
+/**
+ * Support the large body of code that still uses the
+ * (now dead) CkArrayIndexMax class to manipulate array
+ * indices. All the functionality is now incorporated
+ * into the CkArrayIndex base class itself.
+ *
+ * It is recommended that newer code directly use the
+ * base class when there is need to handle an array
+ * index.
+ */
+typedef CkArrayIndex CkArrayIndexMax;
+
 inline CkHashCode CkArrayIndex::hash(void) const
 {
         register int i;
@@ -325,18 +337,6 @@ inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
 #endif
 }
 
-
-//This class is as large as any CkArrayIndex
-class CkArrayIndexMax : public CkArrayIndex {
-public:
-	CkArrayIndexMax(void)  { init(); }
-	CkArrayIndexMax(int i) { init(); }
-	CkArrayIndexMax(const CkArrayIndex &that) 
-		{copyFrom(that);}
-	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
-		{copyFrom(that); return *this;}
-};
-PUPmarshall(CkArrayIndexMax)
 
 
 class CkArrayID {
