@@ -439,8 +439,8 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
   }
   return newvec;
 }
-inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct vec2){
-  int* ret = new int[n];
+inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct
+vec2, int *ret){
   for(int i=0;i<n;i++){
     ret[i] = getPosOp(vec1[ranks1[i]],vec2);
   }
