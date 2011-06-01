@@ -319,14 +319,15 @@ class CkArrayIndex
 
 
 /**
- * Support the large body of code that still uses the
- * (now dead) CkArrayIndexMax class to manipulate array
- * indices. All the functionality is now incorporated
- * into the CkArrayIndex base class itself.
+ * Support applications and other charm codes that still use the (now dead)
+ * CkArrayIndexMax class to manipulate array indices. All the functionality is
+ * now incorporated into the CkArrayIndex base class itself.
  *
- * It is recommended that newer code directly use the
- * base class when there is need to handle an array
- * index.
+ * It is recommended that newer code directly use the base class when there is
+ * need to handle an array index.
+ *
+ * @todo: After at least one minor release announcing the deprecation,
+ * CkArrayIndexMax should no longer be supported.
  */
 typedef CkArrayIndex CkArrayIndexMax;
 
