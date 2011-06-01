@@ -218,7 +218,7 @@ a run of integers used to look up an object in a hash table.
  */
 class CkArrayIndex
 {
-public:
+    public:
         ///Length of index in *integers*
         short int nInts;
         ///Number of dimensions in this index, not valid for user-defined indices
@@ -229,76 +229,94 @@ public:
             short int indexShorts[2 * CK_ARRAYINDEX_MAXLEN];
         };
 
-        /// Zero out the index bits upon construction
-        //CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
+
+        /// Performs initialization. All child classes should call this in their constructors first
         inline void init(void)  { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
 
-	int *data(void)             {return index; }
-	const int *data(void) const {return index; }
+        /// Return a pointer to the actual index data
+        int *data(void)             {return index; }
+        /// Return a const pointer to the actual index data
+        const int *data(void) const {return index; }
 
-        int getCombinedCount(void) const {
-          if (dimension == 1) return data()[0];
-          else if (dimension == 2) return data()[0] * data()[1];
-          else if (dimension == 3) return data()[0] * data()[1] * data()[2];
-          else return 0;
+        /// Return the total number of elements (assuming a dense chare array)
+        int getCombinedCount(void) const
+        {
+            if      (dimension == 1) return data()[0];
+            else if (dimension == 2) return data()[0] * data()[1];
+            else if (dimension == 3) return data()[0] * data()[1] * data()[2];
+            else return 0;
         }
 
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
+        /// pup method for the index
+        void pup(PUP::er &p)
+        {
+            p|nInts;
+            p|dimension;
+            for (int i=0;i<nInts;i++) p|index[i];
+        }
 
-    //These routines allow CkArrayIndex to be used in
-    //  a CkHashtableT
-	inline CkHashCode hash(void) const
-    {
-        register int i;
-        register const int *d=data();
-        register CkHashCode ret=d[0];
-        for (i=1;i<nInts;i++)
-            ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
-        return ret;
-    }
-	static CkHashCode staticHash(const void *a,size_t) { return ((const CkArrayIndex *)a)->hash(); }
-	inline int compare(const CkArrayIndex &idx) const { return (idx == *this); }
-	static int staticCompare(const void *a,const void *b,size_t) { return (*(const CkArrayIndex *)a == *(const CkArrayIndex *)b); }
-        CmiBool operator==(const CkArrayIndex& idx) const {
-          if (nInts != idx.nInts) return CmiFalse;
-          for (int i=0; i<nInts; i++)
+        /// Used for debug prints elsewhere
+        void print() { CmiPrintf("%d: %d %d %d\n", nInts, index[0], index[1], index[2]); }
+
+        /// Equality comparison
+        CmiBool operator==(const CkArrayIndex& idx) const
+        {
+            if (nInts != idx.nInts) return CmiFalse;
+            for (int i=0; i<nInts; i++)
                 if (index[i] != idx.index[i]) return CmiFalse;
-          return CmiTrue;
+            return CmiTrue;
         }
 
-    /**
-     * @note: input arrayID is ignored
-     * @todo: Chee Wai Lee had a FIXME note attached to this method because he
-     * felt it was a temporary solution
-     */
-	CmiObjId *getProjectionID(int arrayID)
-    {
-	  CmiObjId *ret = new CmiObjId;
-	    int i;
-	    const int *data=this->data();
-	    if (OBJ_ID_SZ>=this->nInts) {
-	      for (i=0;i<this->nInts;i++)
-		ret->id[i]=data[i];
-	      for (i=this->nInts;i<OBJ_ID_SZ;i++)
-		ret->id[i]=0;
-	    } else {
-	      //Must hash array index into LBObjid
-	      int j;
-	      for (j=0;j<OBJ_ID_SZ;j++)
-		ret->id[j]=data[j];
-	      for (i=0;i<this->nInts;i++)
-		for (j=0;j<OBJ_ID_SZ;j++)
-		  ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
-		    circleShift(data[i],21-9*i*(j+1));
-	    }
-	    return ret;
-	}
-    void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
+        /// These routines allow CkArrayIndex to be used in a CkHashtableT
+        inline CkHashCode hash(void) const
+        {
+            register int i;
+            register const int *d=data();
+            register CkHashCode ret=d[0];
+            for (i=1;i<nInts;i++)
+                ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
+            return ret;
+        }
+        ///
+        static CkHashCode staticHash(const void *a,size_t) { return ((const CkArrayIndex *)a)->hash(); }
+        ///
+        inline int compare(const CkArrayIndex &idx) const { return (idx == *this); }
+        ///
+        static int staticCompare(const void *a,const void *b, size_t)
+        { return (*(const CkArrayIndex *)a == *(const CkArrayIndex *)b); }
+
+        /**
+         * @note: input arrayID is ignored
+         * @todo: Chee Wai Lee had a FIXME note attached to this method because he
+         * felt it was a temporary solution
+         */
+        CmiObjId *getProjectionID(int arrayID)
+        {
+            CmiObjId *ret = new CmiObjId;
+            int i;
+            const int *data=this->data();
+            if (OBJ_ID_SZ>=this->nInts)
+            {
+                for (i=0;i<this->nInts;i++)
+                    ret->id[i]=data[i];
+                for (i=this->nInts;i<OBJ_ID_SZ;i++)
+                    ret->id[i]=0;
+            }
+            else
+            {
+                //Must hash array index into LBObjid
+                int j;
+                for (j=0;j<OBJ_ID_SZ;j++)
+                    ret->id[j]=data[j];
+                for (i=0;i<this->nInts;i++)
+                    for (j=0;j<OBJ_ID_SZ;j++)
+                        ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
+                            circleShift(data[i],21-9*i*(j+1));
+            }
+            return ret;
+        }
 };
+
 
 /**
  * Support the large body of code that still uses the
