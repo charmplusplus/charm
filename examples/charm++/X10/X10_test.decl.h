@@ -274,12 +274,12 @@ PUPmarshall(CProxy_Places);
       for (int i=l; i<=u; i+=s) al.push_back(CkArrayIndex1D(i));
       return CkSectionID(aid, al.getVec(), al.size());
     } 
-    CProxySection_Places(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) 
+    CProxySection_Places(const CkArrayID &aid, CkArrayIndex *elems, int nElems, CK_DELCTOR_PARAM) 
         :CProxySection_ArrayElement(aid,elems,nElems,CK_DELCTOR_ARGS) {}
-    CProxySection_Places(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) 
+    CProxySection_Places(const CkArrayID &aid, CkArrayIndex *elems, int nElems) 
         :CProxySection_ArrayElement(aid,elems,nElems) {}
     CProxySection_Places(const CkSectionID &sid)       :CProxySection_ArrayElement(sid) {}
-    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) {
+    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int nElems) {
       return CkSectionID(aid, elems, nElems);
     } 
 /* DECLS: Places(CkMigrateMessage* impl_msg);

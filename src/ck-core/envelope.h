@@ -346,8 +346,8 @@ private:
     int getArrayIfNotThere(void) {return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) {type.array.ifNotThere=nt;}
     int *getsetArrayListenerData(void) {return type.array.listenerData;}
-    CkArrayIndexMax &getsetArrayIndex(void) 
-    	{return *(CkArrayIndexMax *)&type.array.index;}
+    CkArrayIndex &getsetArrayIndex(void) 
+    	{return *(CkArrayIndex *)&type.array.index;}
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

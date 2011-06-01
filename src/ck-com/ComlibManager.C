@@ -692,7 +692,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 
 	if (myInfo->isSourceArray()) {
 
-	  const CkVec<CkArrayIndexMax> & srcElements = myInfo->getSourceElements();
+	  const CkVec<CkArrayIndex> & srcElements = myInfo->getSourceElements();
 	  const int nelem = srcElements.size();
 	  const CkArrayID aid = myInfo->getSourceArrayID(); 
 	  const CkArray *a = (CkArray*)_localBranch(aid);
@@ -713,7 +713,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 	if (myInfo->isDestinationArray()) {
 // 	  CkAssert(myInfo->newDestinationListSize() == 0);
 
-	  const CkVec<CkArrayIndexMax> & destElements = myInfo->getDestinationElements();
+	  const CkVec<CkArrayIndex> & destElements = myInfo->getDestinationElements();
 	  const int nelem = destElements.size();
 	  const CkArrayID aid = myInfo->getDestinationArrayID();
 	  const CkArray *a = (CkArray*)_localBranch(aid);
@@ -752,7 +752,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
     known location for the element.
 
 */
-void ComlibManager::bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc) {
+void ComlibManager::bracketedDiscover(int instid, CkArrayID aid, CkArrayIndex &idx, int isSrc) {
 	ComlibManagerPrintf("[%d] bracketedDiscover\n", CkMyPe());
 	CkArray *a = (CkArray *)_localBranch(aid);
 	int pe = a->lastKnown(idx);
@@ -902,7 +902,7 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid);
 
  */
 void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg, 
-		const CkArrayIndexMax &idx, CkArrayID a){
+		const CkArrayIndex &idx, CkArrayID a){
 
 	CkAssert(pd != NULL);
 	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);

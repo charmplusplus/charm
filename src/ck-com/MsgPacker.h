@@ -24,7 +24,7 @@ class short_envelope {
     UShort epIdx;
     UShort size;  //Can only send messages up to 64KB :)    
     
-    CkArrayIndexMax idx;
+    CkArrayIndex idx;
     char *data;
 
     short_envelope();
@@ -114,7 +114,7 @@ inline void MsgPacker::deliver(CombinedMessage *cmb_msg){
     CkArray *a=(CkArray *)_localBranch(aid);
 
     ArrayElement *a_elem=NULL, *prev_elem=NULL;
-    CkArrayIndexMax prev_idx;
+    CkArrayIndex prev_idx;
     prev_idx.nInts = -1;
 
     for(int count = 0; count < nmsgs; count ++){

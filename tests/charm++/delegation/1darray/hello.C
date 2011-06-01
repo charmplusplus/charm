@@ -41,7 +41,7 @@ public:
 class DelegateMgr : public CkDelegateMgr {
 public:
 	DelegateMgr(void) {}
-	virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
+	virtual void ArraySend(int ep,void *m,const CkArrayIndex &idx,CkArrayID a)
 	{
 		CkArray *arrMgr=CProxy_CkArray(a).ckLocalBranch();
 		int onPE=arrMgr->lastKnown(idx);
@@ -57,7 +57,7 @@ public:
 			CkFreeMsg(m);
 		}
 	}
-	void forwardMsg(int ep,const CkArrayIndexMax &idx,
+	void forwardMsg(int ep,const CkArrayIndex &idx,
 			const CkArrayID &a,
 			int nBytes,char *env)
 	{

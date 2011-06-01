@@ -41,9 +41,9 @@ EachToManyMulticastStrategy::EachToManyMulticastStrategy(int substrategy,
 		CkArrayID src, 
 		CkArrayID dest, 
 		int nsrc, 
-		CkArrayIndexMax *srcelements, 
+		CkArrayIndex *srcelements, 
 		int ndest, 
-		CkArrayIndexMax *destelements)
+		CkArrayIndex *destelements)
 : RouterStrategy(substrategy), CharmStrategy() {
 	ComlibPrintf("[%d] EachToManyMulticast array constructor. nsrc=%d ndest=%d\n",CkMyPe(), nsrc, ndest);
 

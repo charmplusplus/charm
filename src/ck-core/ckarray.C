@@ -168,7 +168,7 @@ CProxyElement_ArrayBase::ckSendWrapper(void *me, void *m, int ep, int opts){
 }
 */
 void
-CProxyElement_ArrayBase::ckSendWrapper(CkArrayID _aid, CkArrayIndexMax _idx, void *m, int ep, int opts) {
+CProxyElement_ArrayBase::ckSendWrapper(CkArrayID _aid, CkArrayIndex _idx, void *m, int ep, int opts) {
 	CProxyElement_ArrayBase me = CProxyElement_ArrayBase(_aid,_idx);
 	((CProxyElement_ArrayBase)me).ckSend((CkArrayMessage*)m,ep,opts);
 }
@@ -230,7 +230,7 @@ class ArrayElement_initInfo {
 public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
-  CkArrayIndexMax numInitial;
+  CkArrayIndex numInitial;
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   CmiBool fromMigration;
 };
@@ -372,7 +372,7 @@ int ArrayElement::ckDebugChareID(char *str, int limit) {
   if (limit<21) return -1;
   str[0] = 2;
   *((int*)&str[1]) = ((CkGroupID)thisArrayID).idx;
-  *((CkArrayIndexMax*)&str[5]) = thisIndexMax;
+  *((CkArrayIndex*)&str[5]) = thisIndexMax;
   return 21;
 }
 

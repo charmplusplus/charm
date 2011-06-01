@@ -103,7 +103,7 @@ void Main::done() {
 
 
 Source::Source(int n, int *indices) {
-  CkArrayIndexMax *elems = (CkArrayIndexMax*) alloca(n * sizeof(CkArrayIndexMax));
+  CkArrayIndex *elems = (CkArrayIndex*) alloca(n * sizeof(CkArrayIndex));
   for (int i=0; i<n; ++i) elems[i] = CkArrayIndex1D(indices[i]);
 
   /* Create the ProxySections and associate them with the three different

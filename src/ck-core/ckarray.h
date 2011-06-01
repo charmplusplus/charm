@@ -295,7 +295,7 @@ class CkVerboseListener : public CkArrayListener {
 class CkArrayOptions {
 	friend class CkArray;
 
-	CkArrayIndexMax numInitial;///< Number of elements to create
+	CkArrayIndex numInitial;///< Number of elements to create
 	CkGroupID map;///< Array location map object
 	CkGroupID locMgr;///< Location manager to bind to
 	CkPupAblePtrVec<CkArrayListener> arrayListeners; //CkArrayListeners for this array
@@ -363,7 +363,7 @@ class CkArrayOptions {
 	{ reductionClient = cb; return *this; }
 
   //Used by the array manager:
-	const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
+	const CkArrayIndex &getNumInitial(void) const {return numInitial;}
 	const CkGroupID &getMap(void) const {return map;}
 	const CkGroupID &getLocationManager(void) const {return locMgr;}
 	int getListeners(void) const {return arrayListeners.size();}
@@ -433,7 +433,7 @@ PUPmarshall(CProxy_ArrayBase)
 
 class CProxyElement_ArrayBase:public CProxy_ArrayBase {
 private:
-	CkArrayIndexMax _idx;//<- our element's array index
+	CkArrayIndex _idx;//<- our element's array index
 public:
 	CProxyElement_ArrayBase() { }
 	CProxyElement_ArrayBase(const CkArrayID &aid,
@@ -446,7 +446,7 @@ public:
 	void ckInsert(CkArrayMessage *m,int ctor,int onPe);
 	void ckSend(CkArrayMessage *m, int ep, int opts = 0) const;
 //      static void ckSendWrapper(void *me, void *m, int ep, int opts = 0);
-      static void ckSendWrapper(CkArrayID _aid, CkArrayIndexMax _idx, void *m, int ep, int opts);
+      static void ckSendWrapper(CkArrayID _aid, CkArrayIndex _idx, void *m, int ep, int opts);
 	void *ckSendSync(CkArrayMessage *m, int ep) const;
 	const CkArrayIndex &ckGetIndex() const {return _idx;}
 
@@ -462,10 +462,10 @@ private:
 public:
 	CProxySection_ArrayBase(): _nsid(0), _sid(NULL) {}
 	CProxySection_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndexMax *elems, const int nElems)
+		const CkArrayIndex *elems, const int nElems)
 		:CProxy_ArrayBase(aid), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
 	CProxySection_ArrayBase(const CkArrayID &aid,
-		const CkArrayIndexMax *elems, const int nElems, CK_DELCTOR_PARAM)
+		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
 	CProxySection_ArrayBase(const CkSectionID &sid)
 		:CProxy_ArrayBase(sid._cookie.aid), _nsid(1) { _sid = new CkSectionID(sid); }
@@ -487,7 +487,7 @@ public:
         for (int i=0; i<_nsid; ++i) _sid[i] = cs._sid[i];
       } else _sid = NULL;
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems)
         :CProxy_ArrayBase(aid[0]), _nsid(n) {
       if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
       else if (_nsid > 1) {
@@ -495,7 +495,7 @@ public:
       for (int i=0; i<n; ++i) _sid[i] = CkSectionID(aid[i], elems[i], nElems[i]);
       } else _sid = NULL;
     }
-    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
+    CProxySection_ArrayBase(const int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems,CK_DELCTOR_PARAM)
         :CProxy_ArrayBase(aid[0],CK_DELCTOR_ARGS), _nsid(n) {
       if (_nsid == 1) _sid = new CkSectionID(aid[0], elems[0], nElems[0]);
       else if (_nsid > 1) {
@@ -532,8 +532,8 @@ public:
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
 	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
 	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.aid;}
-    inline CkArrayIndexMax *ckGetArrayElements() const {return _sid[0]._elems;}
-    inline CkArrayIndexMax *ckGetArrayElements(int i) const {return _sid[i]._elems;}
+    inline CkArrayIndex *ckGetArrayElements() const {return _sid[0]._elems;}
+    inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
     inline int ckGetNumElements() const { return _sid[0]._nElems; }
 	inline int ckGetNumElements(int i) const { return _sid[i]._nElems; }
 	void pup(PUP::er &p);
@@ -689,7 +689,7 @@ public:
 
 //Access & information routines
   inline CkLocMgr *getLocMgr(void) {return locMgr;}
-  inline const CkArrayIndexMax &getNumInitial(void) const {return numInitial;}
+  inline const CkArrayIndex &getNumInitial(void) const {return numInitial;}
   inline int homePe(const CkArrayIndex &idx) const {return locMgr->homePe(idx);}
   inline int procNum(const CkArrayIndex &idx) const {return locMgr->procNum(idx);}
 
@@ -742,7 +742,7 @@ public:
   virtual CmiBool isArrMgr(void) {return CmiTrue;}
 
 private:
-  CkArrayIndexMax numInitial;/// Number of initial array elements
+  CkArrayIndex numInitial;/// Number of initial array elements
   CmiBool isInserting;/// Are we currently inserting elements?
 
 /// Allocate space for a new array element

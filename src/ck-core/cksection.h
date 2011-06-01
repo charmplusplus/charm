@@ -169,7 +169,7 @@ class CkSectionID {
         /// Minimal section info
         CkSectionInfo _cookie;
         /// The list of array indices that are section members
-        CkArrayIndexMax *_elems;
+        CkArrayIndex *_elems;
         /// The number of section members
         int _nElems;
         /** A list of PEs that host section members

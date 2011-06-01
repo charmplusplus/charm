@@ -253,12 +253,12 @@ void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeG
   { CkBroadcastMsgNodeBranch(ep,m,g); }
 void CkDelegateMgr::NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
   { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
-void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
+void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
 	ap.ckInsert((CkArrayMessage *)m,ep,onPE);
 }
-void CkDelegateMgr::ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
+void CkDelegateMgr::ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
 	ap.ckSend((CkArrayMessage *)m,ep);
@@ -356,7 +356,7 @@ void CProxy::pup(PUP::er &p) {
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems): _nElems(nElems) { \
   _cookie.aid = aid;	\
   _cookie.get_pe() = CkMyPe();	\
-  _elems = new CkArrayIndexMax[nElems];	\
+  _elems = new CkArrayIndex[nElems];	\
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];	\
   pelist = NULL;	\
   npes  = 0;	\
@@ -381,7 +381,7 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
   _cookie = sid._cookie;
   _nElems = sid._nElems;
   if (_nElems > 0) {
-    _elems = new CkArrayIndexMax[_nElems];
+    _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
   } else _elems = NULL;
   npes = sid.npes;
@@ -396,7 +396,7 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   _cookie = sid._cookie;
   _nElems = sid._nElems;
   if (_nElems > 0) {
-    _elems = new CkArrayIndexMax[_nElems];
+    _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
   } else _elems = NULL;
   npes = sid.npes;
@@ -410,7 +410,7 @@ void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
     p(_nElems);
     if (_nElems > 0) {
-      if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
+      if (p.isUnpacking()) _elems = new CkArrayIndex[_nElems];
       for (int i=0; i< _nElems; i++) p | _elems[i];
       npes = 0;
       pelist = NULL;

@@ -54,7 +54,7 @@ private:
 public:
         ElementCheckpointer(CkLocMgr* mgr_, PUP::er &p_):locMgr(mgr_),p(p_){};
         void addLocation(CkLocation &loc) {
-                CkArrayIndexMax idx=loc.getIndex();
+                CkArrayIndex idx=loc.getIndex();
 		CkGroupID gID = locMgr->ckGetGroupID();
 		p|gID;	    // store loc mgr's GID as well for easier restore
                 p|idx;
@@ -522,7 +522,7 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	  //CkPrintf("total chare array cnts: %d\n", numElements);
 	  for (int i=0; i<numElements; i++) {
 		CkGroupID gID;
-		CkArrayIndexMax idx;
+		CkArrayIndex idx;
 		p|gID;
                 p|idx;
 		CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
