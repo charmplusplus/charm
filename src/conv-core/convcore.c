@@ -129,7 +129,6 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
-extern unsigned int    _printCS;
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -3514,8 +3513,7 @@ void ConverseCommonExit(void)
 #if CMK_CUDA
   exitHybridAPI(); 
 #endif
-  if(_printCS)
-      seedBalancerExit();
+  seedBalancerExit();
   EmergencyExit();
 }
 
