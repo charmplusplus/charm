@@ -81,14 +81,6 @@ public:
 	CkArrayIndex1D(int i0) {
 		index[0]=i0;nInts=1;dimension=1;
 	}
-	CkArrayIndex1D &operator=(const CkArrayIndex1D &that)  {
-		CmiAssert(that.nInts == 1);
-		CmiAssert(that.dimension == 1);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		index[0] = that.index[0];
-		return *this;
-	}
 };
 class CkArrayIndex2D : public CkArrayIndex {
 public:
@@ -99,14 +91,6 @@ public:
 	CkArrayIndex2D(CkIndex2D idx) {
 	    index[0]=idx.x; index[1] = idx.y; nInts = 2; dimension = 2;
 	}
-	CkArrayIndex2D &operator=(const CkArrayIndex2D &that)  {
-		CmiAssert(that.nInts == 2);
-		CmiAssert(that.dimension == 2);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		memcpy(index, that.index, sizeof(int)*2);
-		return *this;
-	}
 };
 class CkArrayIndex3D : public CkArrayIndex {
 public:
@@ -116,14 +100,6 @@ public:
 	}
 	CkArrayIndex3D(CkIndex3D idx) {
 		index[0]=idx.x;index[1]=idx.y;index[2]=idx.z;nInts=3;dimension=3;
-	}
-	CkArrayIndex3D &operator=(const CkArrayIndex3D &that)  {
-		CmiAssert(that.nInts == 3);
-		CmiAssert(that.dimension == 3);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		memcpy(index, that.index, sizeof(int)*3);
-		return *this;
 	}
 };
 class CkArrayIndex4D : public CkArrayIndex {
@@ -138,14 +114,6 @@ public:
 	    indexShorts[2]=idx.y;
 	    indexShorts[3]=idx.z;
 	    nInts=2;dimension=4;
-	}
-	CkArrayIndex4D &operator=(const CkArrayIndex4D &that)  {
-		CmiAssert(that.nInts == 2);
-		CmiAssert(that.dimension == 4);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		memcpy(indexShorts, that.indexShorts, sizeof(short int)*4);
-		return *this;
 	}
 };
 class CkArrayIndex5D : public CkArrayIndex {
@@ -162,14 +130,6 @@ public:
 	    indexShorts[4]=idx.z;
 	    nInts=3;dimension=5;
 	}
-	CkArrayIndex5D &operator=(const CkArrayIndex5D &that)  {
-		CmiAssert(that.nInts == 3);
-		CmiAssert(that.dimension == 5);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		memcpy(indexShorts, that.indexShorts, sizeof(short int)*5);;
-		return *this;
-	}
 };
 class CkArrayIndex6D : public CkArrayIndex {
 public:
@@ -185,14 +145,6 @@ public:
 	    indexShorts[4]=idx.y2;
 	    indexShorts[5]=idx.z2;
 	    nInts=3;dimension=6;
-	}
-	CkArrayIndex6D &operator=(const CkArrayIndex6D &that)  {
-		CmiAssert(that.nInts == 3);
-		CmiAssert(that.dimension == 6);
-		nInts = that.nInts;
-		dimension = that.dimension;
-		memcpy(indexShorts, that.indexShorts, sizeof(short int)*6);;
-		return *this;
 	}
 };
 
