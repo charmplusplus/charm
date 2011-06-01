@@ -255,12 +255,6 @@ public:
 	static CkHashCode staticHash(const void *a,size_t);
 	int compare(const CkArrayIndex &ind) const;
 	static int staticCompare(const void *a,const void *b,size_t);
-	void copyFrom(const CkArrayIndex &that)
-	{
-		nInts=that.nInts;
-		dimension=that.dimension;
-		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	}
         CmiBool operator==(const CkArrayIndex& idx) const {
           if (nInts != idx.nInts) return CmiFalse;
           for (int i=0; i<nInts; i++)
