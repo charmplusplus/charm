@@ -85,21 +85,6 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
 }
 #endif
 
-/************************* Array Index *********************
-Array Index class.  An array index is just a 
-a run of bytes used to look up an object in a hash table.
-*/
-typedef unsigned char uc;
-
-CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
-	{return ((const CkArrayIndex *)v)->hash();}
-
-int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
-{
-	return ((const CkArrayIndex *)k1)->
-		compare(*(const CkArrayIndex *)k2);
-}
-
 /*********************** Array Messages ************************/
 CkArrayIndexMax &CkArrayMessage::array_index(void)
 {

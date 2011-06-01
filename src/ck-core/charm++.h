@@ -251,10 +251,18 @@ public:
 
     //These routines allow CkArrayIndex to be used in
     //  a CkHashtableT
-	CkHashCode hash(void) const;
-	static CkHashCode staticHash(const void *a,size_t);
-	int compare(const CkArrayIndex &ind) const;
-	static int staticCompare(const void *a,const void *b,size_t);
+	inline CkHashCode hash(void) const
+    {
+        register int i;
+        register const int *d=data();
+        register CkHashCode ret=d[0];
+        for (i=1;i<nInts;i++)
+            ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
+        return ret;
+    }
+	static CkHashCode staticHash(const void *a,size_t) { return ((const CkArrayIndex *)a)->hash(); }
+	inline int compare(const CkArrayIndex &idx) const { return (idx == *this); }
+	static int staticCompare(const void *a,const void *b,size_t) { return (*(const CkArrayIndex *)a == *(const CkArrayIndex *)b); }
         CmiBool operator==(const CkArrayIndex& idx) const {
           if (nInts != idx.nInts) return CmiFalse;
           for (int i=0; i<nInts; i++)
@@ -303,33 +311,6 @@ public:
  * index.
  */
 typedef CkArrayIndex CkArrayIndexMax;
-
-inline CkHashCode CkArrayIndex::hash(void) const
-{
-        register int i;
-	register const int *d=data();
-	register CkHashCode ret=d[0];
-	for (i=1;i<nInts;i++)
-		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
-	return ret;
-}
-inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
-{
-	const CkArrayIndex &i1=*this;
-#if CMK_1D_ONLY
-	return i1.data()[0]==i2.data()[0];
-#else
-	const int *d1=i1.data();
-	const int *d2=i2.data();
-	int l=i1.nInts;
-	if (l!=i2.nInts) return 0;
-	for (int i=0;i<l;i++)
-		if (d1[i]!=d2[i])
-			return 0;
-	//If we got here, the two keys must have exactly the same data
-	return 1;
-#endif
-}
 
 
 
