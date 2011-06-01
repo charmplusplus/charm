@@ -237,9 +237,9 @@ public:
 	const int *data(void) const {return index; }
 
         int getCombinedCount(void) const {
-          if (nInts == 1) return data()[0];
-          else if (nInts == 2) return data()[0] * data()[1];
-          else if (nInts == 3) return data()[0] * data()[1] * data()[2];
+          if (dimension == 1) return data()[0];
+          else if (dimension == 2) return data()[0] * data()[1];
+          else if (dimension == 3) return data()[0] * data()[1] * data()[2];
           else return 0;
         }
 
