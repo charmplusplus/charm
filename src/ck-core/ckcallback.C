@@ -219,11 +219,11 @@ void CkCallback::send(void *msg) const
 		break;
 	case sendArray: //Send message to an array element
 		if (!msg) msg=CkAllocSysMsg();
-		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx);
+		CkSendMsgArray(d.array.ep,msg,d.array.id,d.array.idx.asChild());
 		break;
 	case isendArray: //inline send-to-array element
 		if (!msg) msg=CkAllocSysMsg();
-		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx);
+		CkSendMsgArrayInline(d.array.ep,msg,d.array.id,d.array.idx.asChild());
 		break;
 	case bcastGroup:
 		if (!msg) msg=CkAllocSysMsg();

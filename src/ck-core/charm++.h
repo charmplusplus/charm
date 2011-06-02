@@ -213,10 +213,15 @@ a run of integers used to look up an object in a hash table.
 /**
  * Base class for array index objects used in charm.
  *
+ * Should define *all* data members that make up an index object.
  * @warning: Do not instantiate! Always create and use a child class
  * @warning: Do not add constructors / destructors. Class participates in unions
+ *
+ * @note: Should be completely invisible to most client code except those that directly
+ * need to put index objects in unions. This happens only in a few entities in the charm
+ * codebase and should not happen at all in user codes.
  */
-class CkArrayIndex
+struct CkArrayIndexBase
 {
     public:
         ///Length of index in *integers*
@@ -229,10 +234,32 @@ class CkArrayIndex
             short int indexShorts[2 * CK_ARRAYINDEX_MAXLEN];
         };
 
+        /// Obtain usable object from base object. @warning: Dangerous pointer cast to child class!!!
+        inline CkArrayIndex& asChild() const { return *(CkArrayIndex*)this; }
 
-        /// Performs initialization. All child classes should call this in their constructors first
-        inline void init(void)  { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
+        /// Permit serialization
+        void pup(PUP::er &p)
+        {
+            p|nInts;
+            p|dimension;
+            for (int i=0;i<nInts;i++) p|index[i];
+        }
+};
 
+
+
+/**
+ * Actual array index class intended for regular use
+ *
+ * @warning: Put all data members in base class or they may not be transmitted
+ * in envelopes or callbacks (basically in any entity that stores indices in a
+ * union). Only add behaviors to this class.
+ */
+class CkArrayIndex: public CkArrayIndexBase
+{
+    public:
+        ///
+        CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
         /// Return a pointer to the actual index data
         int *data(void)             {return index; }
         /// Return a const pointer to the actual index data
@@ -245,14 +272,6 @@ class CkArrayIndex
             else if (dimension == 2) return data()[0] * data()[1];
             else if (dimension == 3) return data()[0] * data()[1] * data()[2];
             else return 0;
-        }
-
-        /// pup method for the index
-        void pup(PUP::er &p)
-        {
-            p|nInts;
-            p|dimension;
-            for (int i=0;i<nInts;i++) p|index[i];
         }
 
         /// Used for debug prints elsewhere

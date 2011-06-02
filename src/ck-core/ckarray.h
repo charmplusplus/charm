@@ -76,7 +76,7 @@ inline void operator|(PUP::er &p,CkIndexMax &i) {
 /// Simple ArrayIndex classes: the key is just integer indices.
 class CkArrayIndex1D : public CkArrayIndex {
 public:
-	CkArrayIndex1D() { init(); nInts=1; dimension=1; }
+	CkArrayIndex1D() { nInts=1; dimension=1; }
 	// CkIndex1D is an int, so that conversion is automatic
 	CkArrayIndex1D(int i0) {
 		index[0]=i0;nInts=1;dimension=1;
@@ -84,7 +84,7 @@ public:
 };
 class CkArrayIndex2D : public CkArrayIndex {
 public:
-	CkArrayIndex2D() { init(); nInts=2; dimension=2; }
+	CkArrayIndex2D() { nInts=2; dimension=2; }
 	CkArrayIndex2D(int i0,int i1) {
 		index[0]=i0;index[1]=i1;nInts=2;dimension=2;
 	}
@@ -94,7 +94,7 @@ public:
 };
 class CkArrayIndex3D : public CkArrayIndex {
 public:
-	CkArrayIndex3D() { init(); nInts=3; dimension=3; }
+	CkArrayIndex3D() { nInts=3; dimension=3; }
 	CkArrayIndex3D(int i0,int i1,int i2) {
 		index[0]=i0;index[1]=i1;index[2]=i2;nInts=3;dimension=3;
 	}
@@ -104,7 +104,7 @@ public:
 };
 class CkArrayIndex4D : public CkArrayIndex {
 public:
-	CkArrayIndex4D(){ init(); nInts=2; dimension=4; }
+	CkArrayIndex4D(){ nInts=2; dimension=4; }
 	CkArrayIndex4D(short int i0,short int i1,short int i2,short int i3) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;nInts=2;dimension=4;
 	}
@@ -118,7 +118,7 @@ public:
 };
 class CkArrayIndex5D : public CkArrayIndex {
 public:
-	CkArrayIndex5D(){ init(); nInts=3; dimension=5; }
+	CkArrayIndex5D(){ nInts=3; dimension=5; }
 	CkArrayIndex5D(short int i0,short int i1,short int i2,short int i3,short int i4) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;indexShorts[4]=i4;nInts=3;dimension=5;
         }
@@ -133,7 +133,7 @@ public:
 };
 class CkArrayIndex6D : public CkArrayIndex {
 public:
-	CkArrayIndex6D(){ init(); nInts=3; dimension=6; }
+	CkArrayIndex6D(){ nInts=3; dimension=6; }
 	CkArrayIndex6D(short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) {
 		indexShorts[0]=i0;indexShorts[1]=i1;indexShorts[2]=i2;indexShorts[3]=i3;indexShorts[4]=i4;indexShorts[5]=i5;nInts=3;dimension=6;
 	}

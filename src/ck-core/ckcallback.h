@@ -77,7 +77,7 @@ private:
 	struct s_array { //(sendArray, bcastArray)
 		int ep; //Entry point to call
 		CkGroupID id; //Array ID to call it on
-		CkArrayIndex idx; //Index to send to (if any)
+		CkArrayIndexBase idx; //Index to send to (if any)
 	} array;
 	struct s_ccsReply {
 		CcsDelayedReply reply;
