@@ -23,7 +23,7 @@ class TspBase: public StateBase
 {
 public:
 	int length; // length
-	double cost;
+    double cost;
     double lowerBoundValue;
     int *tour;
     int *intour; //whether a node is in tour or not
@@ -114,7 +114,7 @@ inline double lowerBound( StateBase *s)
 inline void createInitialChildren(Solver *solver)
 {
 
-    se_statesize = sizeof(TspBase)+2*sizeof(int)*N;
+//    se_statesize = sizeof(TspBase)+2*sizeof(int)*N;
     TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+2*sizeof(int)*N, 0, 1);
     state->initialize();
     state->tour[0]=0;
@@ -126,6 +126,7 @@ inline void createInitialChildren(Solver *solver)
 #ifdef USEINTPRIORITY
     solver->setPriority(state, (int)lowerBound(state));
 #endif
+    CmiAssert(state->length>0);
     solver->process(state);
 }
 
@@ -137,6 +138,8 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
     ((TspBase*)_base)->initialize();
     s->copy((TspBase*)_base);
     int childIndex = 0;
+    CmiAssert(((TspBase*)_base)->length>0);
+    CmiAssert(s->length>0);
     int last = s->tour[s->length-1];
     int childNum = 0;
     //CkPrintf("lower bound=%f\n", s->getLowerBound());
@@ -172,6 +175,7 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
 #ifdef USEINTPRIORITY
             solver->setPriority(NewTour, (int)lowerBound(NewTour));
 #endif
+            CmiAssert(NewTour->length>0);
             solver->process(NewTour);
         }
     }
@@ -185,6 +189,11 @@ int parallelLevel()
 int searchDepthLimit()
 {
     return 1;
+}
+
+void set_statesize(int N)
+{
+        se_statesize = sizeof(TspBase)+2*sizeof(int)*N;
 }
 
     SE_Register(TspBase, createInitialChildren, createChildren, parallelLevel, searchDepthLimit, lowerBound);

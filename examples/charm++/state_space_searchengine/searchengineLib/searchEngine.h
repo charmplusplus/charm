@@ -90,7 +90,7 @@ extern int se_statesize;
       SE_register(f1, f2, f3, f4, f5);   \
     }  \
     void createMultipleChildren(SearchGroup* myGroup, StateBase *parent, SequentialSolver* solver, bool parallel) {  \
-       StateBase *state;  \
+       StateBase *_state;  \
        double avgentrytime = 0;  \
        int processed_nodes = 1; \
        double instrument_start; \
@@ -101,7 +101,7 @@ extern int se_statesize;
         if(lb<minCost)  \
             f2(parent, solver, false);  \
         accumulate_time = avgentrytime  = CkWallTimer() - instrument_start;  \
-        while((state=solver->dequeue()) != NULL) \
+        while((_state=solver->dequeue()) != NULL) \
         {  \
             minCost = myGroup->getCost(); \
             lb = f5(parent); \
@@ -111,7 +111,7 @@ extern int se_statesize;
             {  \
                 avgentrytime  = (CkWallTimer() - instrument_start)/20;  \
             }  \
-            f2(state, solver, parallel); \
+            f2(_state, solver, parallel); \
             accumulate_time += avgentrytime; \
             if(accumulate_time > ENTRYGRAIN)  \
             {  solver-> dequeue_multiple(avgentrytime, processed_nodes);} \

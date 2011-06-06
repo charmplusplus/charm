@@ -165,6 +165,8 @@ void readinput(char* filename)
 }
  
 
+extern void set_statesize(int);
+
 class Main
 {
 public:
@@ -192,6 +194,8 @@ public:
             readinput_2(m->argv[2]);
         }
         initial_grainsize = atoi(m->argv[3]);
+
+        set_statesize(N);
 
         CkPrintf("start\n");
         searchEngineProxy.start();
