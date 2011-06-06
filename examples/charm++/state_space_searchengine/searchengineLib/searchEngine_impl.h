@@ -7,7 +7,6 @@
 #ifndef __SEARCHENGINE_IMPL_
 #define __SEARCHENGINE_IMPL_
 
-#include "searchEngine.h"
 
 
 #ifdef BRANCHBOUND
@@ -166,8 +165,8 @@ public:
     void increment() {myCount++;}
 #ifdef BRANCHBOUND
     double getCost() {return minCost;}
-    void  updateCostLocal(double c) { /*CkPrintf("before update best is:%f, new solution:%f\n", minCost, c); */if(c<minCost) minCost = c;}
-    void  updateCost(double c) {}
+    //void  updateCostLocal(double c) { /*CkPrintf("before update best is:%f, new solution:%f\n", minCost, c); */if(c<minCost) minCost = c;}
+    void  updateCost(double c);
 #endif
 #ifdef STATISTIC
     void inc_parallel_generate() {parallelnodes_generate++;}
@@ -228,7 +227,7 @@ inline void Solver::reportSolution()
 inline void Solver::updateCost(double c)
 {
     //CkPrintf("updating best solution:%.4f\n", c);
-    groupProxy.ckLocalBranch()->updateCostLocal(c);
+    groupProxy.updateCost(c);
 }
 #endif
 
@@ -312,6 +311,13 @@ public:
     inline void process(StateBase* s)
     {
         //SearchNodeMsg *msg = *(SearchNodeMsg**)((char*)s - 2*sizeof(void*));
+#ifdef BRANCHBOUND
+        if(_lowerBoundFn(s) >= groupProxy.ckLocalBranch()->getCost())
+        {
+            deleteState(s);
+            return;
+        }
+#endif
         SearchNodeMsg *msg = *((SearchNodeMsg**)s - 2);
         CProxy_SearchNode::ckNew(msg, NULL, -1);
 #ifdef STATISTIC
@@ -536,7 +542,7 @@ public:
 
     inline void setParentInfo(SearchNodeMsg *msg, int l)
     {
-#ifdef USEBITPRIORITY
+#if defined(USEBITPRIORITY) || defined(USEINTPRIORITY)
         parentBits = UsrToEnv(msg)->getPriobits();
         parentPtr = (unsigned int *)(CkPriorityPtr(msg));
 #endif
@@ -564,9 +570,7 @@ public:
         return (StateBase *)stack.push(size);
     }
 
-    inline void process(StateBase *state){}
-
-    /* pop up the top one since it is always a stack */
+       /* pop up the top one since it is always a stack */
     inline void deleteState(StateBase* s)
     {
         StateBase *state = stack.pop();
@@ -577,6 +581,14 @@ public:
             groupProxy.ckLocalBranch()->decrease_sequential_generate();
 #endif
         }
+    }
+    inline void process(StateBase *s)
+    {
+#ifdef BRANCHBOUND
+        if(_lowerBoundFn(s) >= groupProxy.ckLocalBranch()->getCost())
+            deleteState(s);
+        // sort again 
+#endif
     }
 
     inline void reportSolution()

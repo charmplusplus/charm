@@ -2,7 +2,6 @@
  * exampleTsp.C
  *
  *  Created on: Mar 4, 2010
- *      Author: gagan
  */
 
 #include "searchEngine.h"
@@ -15,6 +14,7 @@
 #include <algorithm>
 using namespace std;
 
+extern int se_statesize;
 
 /*readonly*/ extern int initial_grainsize;
 #define MAX 100000
@@ -24,8 +24,9 @@ class TspBase: public StateBase
 public:
 	int length; // length
 	double cost;
+    double lowerBoundValue;
     int *tour;
-    int *intour;
+    int *intour; //whether a node is in tour or not
 
     void initialize()
     {
@@ -36,7 +37,7 @@ public:
     {
         length = parent->length;
         cost = parent->cost;
-
+        lowerBoundValue = parent->lowerBoundValue;
         for(int i=0;i<length; i++)
         {
             tour[i] = parent->tour[i];
@@ -79,17 +80,23 @@ public:
                 lower_sum += m_min+m2_min;
             }
         }
-        return (cost + 0.5*lower_sum); 
+        lowerBoundValue = (cost + 0.5*lower_sum);
+        return lowerBoundValue; 
+    }
+
+    double getLowerBound()
+    {
+        return lowerBoundValue;
     }
 
     void printInfo()
     {
-        CkPrintf(" length=%d, cost=%.4f\n[", length, cost);
+        CkPrintf("\n length=%d, lowerBound=%f", length, lowerBoundValue);
         for(int i=0; i<length; i++)
         {
-            CkPrintf("(%d,%d)", tour[i], intour[tour[i]]);
+            CkPrintf("(%d, value=%f", tour[i], graph[tour[i]*N+tour[(i+1)%N]]);
+            CkPrintf("%d)", intour[tour[i]]);
         }
-        CkPrintf("] lower bound=%f\n", lowerbound());
     }
 };
 
@@ -101,12 +108,13 @@ inline double cost( StateBase *s )
 
 inline double lowerBound( StateBase *s)
 {
-    return ((TspBase*)s)->lowerbound();
+    return ((TspBase*)s)->getLowerBound();
 }
 
 inline void createInitialChildren(Solver *solver)
 {
 
+    se_statesize = sizeof(TspBase)+2*sizeof(int)*N;
     TspBase *state = (TspBase*)solver->registerRootState(sizeof(TspBase)+2*sizeof(int)*N, 0, 1);
     state->initialize();
     state->tour[0]=0;
@@ -114,6 +122,7 @@ inline void createInitialChildren(Solver *solver)
     state->cost = 0;
     for(int i=0; i<N; i++)
         state->intour[i]=0;
+    state->lowerbound();
 #ifdef USEINTPRIORITY
     solver->setPriority(state, (int)lowerBound(state));
 #endif
@@ -125,9 +134,12 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
 
     TspBase *s = (TspBase*)alloca(sizeof(TspBase)+2*sizeof(int)*N);
     s->initialize();
+    ((TspBase*)_base)->initialize();
     s->copy((TspBase*)_base);
     int childIndex = 0;
     int last = s->tour[s->length-1];
+    int childNum = 0;
+    //CkPrintf("lower bound=%f\n", s->getLowerBound());
     /* construct the current graph, remove all the edges already in the path */
     //s->printInfo();
     for(int j=0; j<N; j++)
@@ -139,12 +151,14 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
         {
             if(j == 0)
             {
-                s->printInfo();
+                //s->printInfo();
+                //CkPrintf(" cost=%f\n", s->cost+graph[last*N+j]);
                 solver->updateCost(s->cost+graph[last*N+j]);
                 //solver->reportSolution(); 
             }
         }else
         {
+            childNum++;
             TspBase *NewTour  = (TspBase*)solver->registerState(sizeof(TspBase)+2*sizeof(int)*N, childIndex, N);
             NewTour->initialize();
             NewTour->copy(s);
@@ -153,14 +167,15 @@ inline void createChildren( StateBase *_base , Solver* solver, bool parallel)
             NewTour->intour[last] = NewTour->intour[last]+1;
             NewTour->length = s->length + 1;
             NewTour->cost = s->cost + graph[last*N+j];
+            NewTour->lowerbound();
             //NewTour->printInfo();
 #ifdef USEINTPRIORITY
             solver->setPriority(NewTour, (int)lowerBound(NewTour));
 #endif
-            if(parallel)
-                solver->process(NewTour);
+            solver->process(NewTour);
         }
     }
+    //CkPrintf(" %d children created\n", childNum);
 }
 int parallelLevel()
 {
