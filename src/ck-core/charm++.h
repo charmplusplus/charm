@@ -258,7 +258,7 @@ struct CkArrayIndexBase
 class CkArrayIndex: public CkArrayIndexBase
 {
     public:
-        ///
+        /// Default
         CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
         /// Return a pointer to the actual index data
         int *data(void)             {return index; }
@@ -333,6 +333,34 @@ class CkArrayIndex: public CkArrayIndexBase
                             circleShift(data[i],21-9*i*(j+1));
             }
             return ret;
+        }
+
+    protected:
+        inline void init(const short num, const short dims, const int x, const int y=0, const int z=0)
+        {
+            nInts = num;
+            dimension = dims;
+            index[0] = x;
+            index[1] = y;
+            index[2] = z;
+            for (int i=3; i < CK_ARRAYINDEX_MAXLEN; i++)
+                index[i] = 0;
+        }
+
+        inline void init(const short num, const short dims,
+                         const short u, const short v, const short w,
+                         const short x, const short y=0, const short z=0)
+        {
+            nInts = num;
+            dimension = dims;
+            indexShorts[0] = u;
+            indexShorts[1] = v;
+            indexShorts[2] = w;
+            indexShorts[3] = x;
+            indexShorts[4] = y;
+            indexShorts[5] = z;
+            for (int i=6; i < 2 * CK_ARRAYINDEX_MAXLEN; i++)
+                indexShorts[i] = 0;
         }
 };
 
