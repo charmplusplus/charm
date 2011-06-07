@@ -473,6 +473,7 @@ static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
 static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_SPANNING_TREE
     int i, oldRank;
+    char *newmsg;
 
     oldRank = CMI_DEST_RANK(msg);
     /* doing this is to avoid the multiple assignment in the following for loop */
@@ -491,7 +492,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiReference(msg);
         CmiMachineSpecificSendFunc(nd, size, msg, P2P_SYNC);
 #else
-        char *newmsg = CopyMsg(msg, size);
+        newmsg = CopyMsg(msg, size);
         CmiMachineSpecificSendFunc(nd, size, newmsg, P2P_SYNC);
 #endif
     }
