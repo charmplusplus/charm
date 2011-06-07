@@ -833,9 +833,9 @@ static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNode
 #if !CMK_SMP_NO_COMMTHD
     actualNodeSize++; //considering the extra comm thread
 #endif
-
+    int i;
     procState = (ProcState *)CmiAlloc((actualNodeSize) * sizeof(ProcState));
-    for (int i=0; i<actualNodeSize; i++) {
+    for (i=0; i<actualNodeSize; i++) {
         /*    procState[i].sendMsgBuf = PCQueueCreate();   */
         procState[i].recvLock = CmiCreateLock();
         procState[i].bcastLock = CmiCreateLock();
@@ -906,6 +906,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
  * less than 10 according to Sameer Kumar. So it is off in
  * default.
  */
+#undef OPTIMIZED_MULTICAST
 #define OPTIMIZED_MULTICAST  0
 
 #if OPTIMIZED_MULTICAST
