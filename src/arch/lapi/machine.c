@@ -326,7 +326,7 @@ static CmiCommHandle MachineSendFuncForLAPI(int destNode, int size, char *msg, i
 #define CmiMachineSpecificSendFunc MachineSendFuncForLAPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForLAPI(int argc, char **argv, int *numNodes, int *myNodeID);
+static void MachineInitForLAPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
 #define MachineSpecificInit MachineInitForLAPI
 
 static void MachinePreCommonInitForLAPI(int everReturn);
@@ -831,9 +831,10 @@ void MachineExitForLAPI(void) {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForLAPI(int argc, char **argv, int *numNodes, int *myNodeID) {
+static void MachineInitForLAPI(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     lapi_info_t info;
+    char **largv = *argv;
 
     memset(&info,0,sizeof(info));
 
@@ -856,8 +857,8 @@ static void MachineInitForLAPI(int argc, char **argv, int *numNodes, int *myNode
 
     /* Make polling as the default mode as real apps have better perf */
     CsvAccess(lapiInterruptMode) = 0;
-    if (CmiGetArgFlag(argv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
-    if (CmiGetArgFlag(argv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;
+    if (CmiGetArgFlag(largv,"+poll")) CsvAccess(lapiInterruptMode) = 0;
+    if (CmiGetArgFlag(largv,"+nopoll")) CsvAccess(lapiInterruptMode) = 1;
 
     check_lapi(LAPI_Senv,(lapiContext, ERROR_CHK, lapiDebugMode));
     check_lapi(LAPI_Senv,(lapiContext, INTERRUPT_SET, CsvAccess(lapiInterruptMode)));
@@ -874,9 +875,9 @@ static void MachineInitForLAPI(int argc, char **argv, int *numNodes, int *myNode
      */
     check_lapi(LAPI_Addr_set,(lapiContext,(void *)PumpMsgsBegin,lapiHeaderHandler));
 
-    if (CmiGetArgFlag(argv,"++debug")) {  /*Pause so user has a chance to start and attach debugger*/
+    if (CmiGetArgFlag(largv,"++debug")) {  /*Pause so user has a chance to start and attach debugger*/
         printf("CHARMDEBUG> Processor %d has PID %d\n",*myNodeID,getpid());
-        if (!CmiGetArgFlag(argv,"++debug-no-pause"))
+        if (!CmiGetArgFlag(largv,"++debug-no-pause"))
             sleep(30);
     }
 

@@ -283,7 +283,7 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 /* ### End of Communication-Op Related Functions ### */
 
 /* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNodeID);
+static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNodeID);
 #define MachineSpecificInit MachineInitForDCMF
 
 static void MachinePreCommonInitForDCMF(int everReturn);
@@ -720,7 +720,7 @@ static void MachineExitForDCMF() {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNodeID) {
+static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     DCMF_Messager_initialize();
 
@@ -842,7 +842,7 @@ static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNode
     }
 
     /* checksum flag */
-    if (CmiGetArgFlag(argv,"+checksum")) {
+    if (CmiGetArgFlag(*argv,"+checksum")) {
 #if CMK_ERROR_CHECKING
         checksum_flag = 1;
         if (*myNodeID == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
