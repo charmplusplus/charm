@@ -234,7 +234,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 #define CmiMachineSpecificSendFunc MachineSpecificSendForMPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeID);
+static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
 #define MachineSpecificInit MachineInitForMPI
 
 static void MachinePreCommonInitForMPI(int everReturn);
@@ -1011,19 +1011,21 @@ static char *thread_level_tostring(int thread_level) {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeID) {
+static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int n,i;
     int ver, subver;
     int provided;
     int thread_level;
     int myNID;
+    int largc=*argc;
+    char** largv=*argv;
 
 #if MACHINE_DEBUG
     debugLog=NULL;
 #endif
 #if CMK_USE_HP_MAIN_FIX
 #if FOR_CPLUS
-    _main(argc,argv);
+    _main(largc,largv);
 #endif
 #endif
 
@@ -1033,13 +1035,15 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
 #else
     thread_level = MPI_THREAD_SINGLE;
 #endif
-    MPI_Init_thread(&argc, &argv, thread_level, &provided);
+    MPI_Init_thread(argc, argv, thread_level, &provided);
     _thread_provided = provided;
 #else
-    MPI_Init(&argc, &argv);
+    MPI_Init(argc, argv);
     thread_level = 0;
     provided = -1;
 #endif
+    largc = *argc;
+    largv = *argv;
     MPI_Comm_size(MPI_COMM_WORLD, numNodes);
     MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
 
@@ -1050,7 +1054,7 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
         printf("Charm++> Running on MPI version: %d.%d multi-thread support: %s (max supported: %s)\n", ver, subver, thread_level_tostring(thread_level), thread_level_tostring(provided));
     }
 
-    idleblock = CmiGetArgFlag(argv, "+idleblocking");
+    idleblock = CmiGetArgFlag(largv, "+idleblocking");
     if (idleblock && _Cmi_mynode == 0) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
@@ -1070,7 +1074,7 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
 #endif
-    if (CmiGetArgFlag(argv,"+no_outstanding_sends")) {
+    if (CmiGetArgFlag(largv,"+no_outstanding_sends")) {
         no_outstanding_sends = 1;
         if (myNID == 0)
             printf("Charm++: Will%s consume outstanding sends in scheduler loop\n",
@@ -1078,13 +1082,13 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
     }
 
     request_max=MAX_QLEN;
-    CmiGetArgInt(argv,"+requestmax",&request_max);
+    CmiGetArgInt(largv,"+requestmax",&request_max);
     /*printf("request max=%d\n", request_max);*/
 
 #if MPI_POST_RECV
-    CmiGetArgInt(argv, "+postRecvCnt", &MPI_POST_RECV_COUNT);
-    CmiGetArgInt(argv, "+postRecvLowerSize", &MPI_POST_RECV_LOWERSIZE);
-    CmiGetArgInt(argv, "+postRecvUpperSize", &MPI_POST_RECV_UPPERSIZE);
+    CmiGetArgInt(largv, "+postRecvCnt", &MPI_POST_RECV_COUNT);
+    CmiGetArgInt(largv, "+postRecvLowerSize", &MPI_POST_RECV_LOWERSIZE);
+    CmiGetArgInt(largv, "+postRecvUpperSize", &MPI_POST_RECV_UPPERSIZE);
     if (MPI_POST_RECV_COUNT<=0) MPI_POST_RECV_COUNT=1;
     if (MPI_POST_RECV_LOWERSIZE>MPI_POST_RECV_UPPERSIZE) MPI_POST_RECV_UPPERSIZE = MPI_POST_RECV_LOWERSIZE;
     MPI_POST_RECV_SIZE = MPI_POST_RECV_UPPERSIZE;
@@ -1095,9 +1099,9 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
 #endif
 
 #if CMI_DYNAMIC_EXERT_CAP
-    CmiGetArgInt(argv, "+dynCapThreshold", &CMI_DYNAMIC_OUTGOING_THRESHOLD);
-    CmiGetArgInt(argv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
-    CmiGetArgInt(argv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
+    CmiGetArgInt(largv, "+dynCapThreshold", &CMI_DYNAMIC_OUTGOING_THRESHOLD);
+    CmiGetArgInt(largv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
+    CmiGetArgInt(largv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
     if (myNID==0) {
         printf("Charm++: using dynamic flow control with outgoing threshold %d, send cap %d, recv cap %d\n",
                CMI_DYNAMIC_OUTGOING_THRESHOLD, CMI_DYNAMIC_SEND_CAPSIZE, CMI_DYNAMIC_RECV_CAPSIZE);
@@ -1105,7 +1109,7 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
 #endif
 
     /* checksum flag */
-    if (CmiGetArgFlag(argv,"+checksum")) {
+    if (CmiGetArgFlag(largv,"+checksum")) {
 #if CMK_ERROR_CHECKING
         checksum_flag = 1;
         if (myNID == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
@@ -1115,8 +1119,8 @@ static void MachineInitForMPI(int argc, char **argv, int *numNodes, int *myNodeI
     }
 
     {
-        int debug = CmiGetArgFlag(argv,"++debug");
-        int debug_no_pause = CmiGetArgFlag(argv,"++debug-no-pause");
+        int debug = CmiGetArgFlag(largv,"++debug");
+        int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
         if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
 #if CMK_HAS_GETPID
             printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());

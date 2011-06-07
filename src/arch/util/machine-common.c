@@ -219,7 +219,8 @@ static int        Cmi_usrsched;  /* Continue after start function finishes? */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret);
 static void ConverseRunPE(int everReturn);
 
-static void MachineSpecificInit(int argc, char **argv, int *numNodes, int *myNodeID);
+/*argc and argv could be changed by machine-specific initialization procedure*/
+static void MachineSpecificInit(int *argc, char ***argv, int *numNodes, int *myNodeID);
 /* Used in ConverseRunPE: one is called before ConverseCommonInit;
   * The other is called after ConverseCommonInit as some data structures
   * have been initialized, such as the tracing-relatd stuff --Chao Mei
@@ -822,7 +823,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
      */
     /* argv could be changed inside MachineSpecificInit */
     /* Inside this function, the number of nodes and my node id are obtained */
-    MachineSpecificInit(argc, argv, &_Cmi_numnodes, &_Cmi_mynode);
+    MachineSpecificInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
