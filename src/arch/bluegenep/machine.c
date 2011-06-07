@@ -906,7 +906,6 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
  * less than 10 according to Sameer Kumar. So it is off in
  * default.
  */
-#undef OPTIMIZED_MULTICAST
 #define OPTIMIZED_MULTICAST  0
 
 #if OPTIMIZED_MULTICAST
