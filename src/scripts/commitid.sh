@@ -10,7 +10,8 @@ then
     VOLD=`cat VERSION`
 fi
 
-git describe --long --dirty --always > VERSION.new || touch VERSION.new
+#git describe --long --dirty --always > VERSION.new || touch VERSION.new
+git describe --long --always > VERSION.new || touch VERSION.new
 
 VNEW=`cat VERSION.new`
 
