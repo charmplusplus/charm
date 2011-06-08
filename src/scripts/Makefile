@@ -213,7 +213,8 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h \
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
-	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
+	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
 		ckmessagelogging.h ckobjid.h\
 	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
