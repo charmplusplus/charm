@@ -1235,7 +1235,10 @@ extern "C" void CombineSummary()
     CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
     sumProxy[0].startSumOnly();
   }
-  else CkExit();
+  else {
+    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL);
+    CkExit();
+  }
 #else
   CkExit();
 #endif

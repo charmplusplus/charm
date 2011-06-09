@@ -412,8 +412,9 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
   /// Currently called on each PE
   void controlPointManager::processControlPoints(){
 
+#if DEBUGPRINT
     CkPrintf("[%d] processControlPoints() haveControlPointChangeCallback=%d frameworkShouldAdvancePhase=%d\n", CkMyPe(), (int)haveControlPointChangeCallback, (int)frameworkShouldAdvancePhase);
-
+#endif
 
     //==========================================================================================
     // Print the data for each phase
@@ -923,6 +924,7 @@ void controlPointManager::setFrameworkAdvancePhase(bool _frameworkShouldAdvanceP
 
 
   void controlPointManager::doExitNow(){
+          _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _threadEP,CkMyPe(), 0, NULL);
 	  writeOutputToDisk();
 	  //	  CkPrintf("[%d] Control point manager calling CkExit()\n", CkMyPe());
 	  CkExit();
