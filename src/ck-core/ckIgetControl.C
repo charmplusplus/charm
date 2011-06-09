@@ -17,8 +17,8 @@ int getAvailMemory(int grainsize);
 
 int 
 IGetControlClass::IGetControlClass::iget_request(CkIGetID fut, void *msg,
-int ep, CkArrayID id, CkArrayIndexMax idx,
-void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int),int msgsize)
+int ep, CkArrayID id, CkArrayIndex idx,
+void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int),int msgsize)
  {
     if(msgsize>0)  IGET_UNITMESSAGE=msgsize;
     int ret_status=1, size=1;

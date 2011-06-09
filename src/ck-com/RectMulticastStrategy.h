@@ -64,7 +64,7 @@ class RectMulticastStrategy: public Strategy, public CharmStrategy {
     ///Called when a new section multicast is called by the user locally.
     ///The strategy should then create a topology for it and return a hash
     ///object to store that topology.
-    virtual ComlibRectSectionHashObject *createObjectOnSrcPe(int nindices, CkArrayIndexMax *idx_list, unsigned int sectionid);
+    virtual ComlibRectSectionHashObject *createObjectOnSrcPe(int nindices, CkArrayIndex *idx_list, unsigned int sectionid);
 
     /**   
      * Similar to createHashObjectOnSrcPe, but that this call is made on the
@@ -79,7 +79,7 @@ class RectMulticastStrategy: public Strategy, public CharmStrategy {
      * @param srcpe processor which started the multicast
      * @return a hash object describing the section
      */
-    virtual ComlibRectSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndexMax *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe, int sectionID);
+    virtual ComlibRectSectionHashObject *createObjectOnIntermediatePe(int nindices, CkArrayIndex *idxlist, int npes, ComlibMulticastIndexCount *counts, int srcpe, int sectionID);
         
     ///Needed for getNewMulticastMessage, to specify if the list of processors need to be ordered
     virtual int needSorting() { return 0; }

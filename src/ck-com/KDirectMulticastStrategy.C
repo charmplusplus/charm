@@ -205,7 +205,7 @@
 //     sid->ndestpes = npes;    
 // }
 
-// KDirectHashObject *KDirectMulticastStrategy::createHashObject(int nelements, CkArrayIndexMax *elements){
+// KDirectHashObject *KDirectMulticastStrategy::createHashObject(int nelements, CkArrayIndex *elements){
 
 //     KDirectHashObject *kobj = new KDirectHashObject;
 //     kobj->pelist = new int[kfactor];
@@ -216,7 +216,7 @@
 
 
 // void KDirectMulticastStrategy::getPeList(int nelements, 
-//                                          CkArrayIndexMax *elements, 
+//                                          CkArrayIndex *elements, 
 //                                          int *pelist, int &npes, 
 //                                          int src_pe){
     

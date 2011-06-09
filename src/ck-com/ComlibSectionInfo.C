@@ -78,9 +78,9 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
 
     // fill in the three pointers of the ComlibMulticastMsg
     memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
-    //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndexMax));
+    //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndex));
 
-    CkArrayIndexMax **indicesPe = (CkArrayIndexMax**)alloca(nRemotePes * sizeof(CkArrayIndexMax*));
+    CkArrayIndex **indicesPe = (CkArrayIndex**)alloca(nRemotePes * sizeof(CkArrayIndex*));
 
     if (needSort) {
     	// if we are sorting the array, then we need to fix the problem that belongingList
@@ -142,7 +142,7 @@ void ComlibSectionInfo::getPeList(envelope *cb_env, int npes, int *&pelist)
 
 void ComlibSectionInfo::unpack(envelope *cb_env,
 			       int &nLocalElems,
-                               CkArrayIndexMax *&dest_indices, 
+                               CkArrayIndex *&dest_indices, 
                                envelope *&env) {
         
     ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)EnvToUsr(cb_env);
@@ -170,7 +170,7 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
     */
     /*
     for(int count = 0; count < ccmsg->nIndices; count++){
-        CkArrayIndexMax idx = ccmsg->indices[count];
+        CkArrayIndex idx = ccmsg->indices[count];
         
         //This will work because. lastknown always knows if I have the
         //element of not
@@ -211,7 +211,7 @@ CkMcastBaseMsg *ComlibSectionInfo::getNewDeliveryErrorMsg(CkMcastBaseMsg *base) 
 }
 
 void ComlibSectionInfo::getPeList(int _nElems, 
-                                  CkArrayIndexMax *_elems,
+                                  CkArrayIndex *_elems,
 				  CkArrayID &destArrayID,
                                   int &npes, int *&pelist){
 
@@ -294,7 +294,7 @@ inline int getPErepresentingNodeContainingPE(int pe){
 	2) belongs -- belongs[i] points to the owning pe's entry in the "counts" array.
 	
 */
-void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist, 
+void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndex *idxlist, 
 		      const CkArrayID &destArrayID, int &npes, int &nidx,
 		      ComlibMulticastIndexCount *&counts, int *&belongs) {
 
@@ -358,7 +358,7 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
 
 
 void ComlibSectionInfo::getRemotePelist(int nindices, 
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
                                         int &npes, int *&pelist) {
 
@@ -413,9 +413,9 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
 
 
 void ComlibSectionInfo::getLocalIndices(int nindices,
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
-                                        CkVec<CkArrayIndexMax> &idx_vec){    
+                                        CkVec<CkArrayIndex> &idx_vec){    
 	ComlibPrintf("ComlibSectionInfo::getLocalIndices()\n");
 	
 	int count = 0, acount = 0;
@@ -433,9 +433,9 @@ void ComlibSectionInfo::getLocalIndices(int nindices,
 
 
 void ComlibSectionInfo::getNodeLocalIndices(int nindices,
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
-                                        CkVec<CkArrayIndexMax> &idx_vec){    
+                                        CkVec<CkArrayIndex> &idx_vec){    
     int count = 0, acount = 0;
     idx_vec.resize(0);
     

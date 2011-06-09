@@ -365,7 +365,7 @@ void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
 
   int localElems;
   envelope *newenv;
-  CkArrayIndexMax *local_idx_list;    
+  CkArrayIndex *local_idx_list;    
     
   // Extract the list of elements to be delivered locally
   sinfo.unpack(env, localElems, local_idx_list, newenv);
@@ -382,7 +382,7 @@ void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
   }
 
   /*
-    CkArrayIndexMax *idx_list_array = new CkArrayIndexMax[idx_list.size()];
+    CkArrayIndex *idx_list_array = new CkArrayIndex[idx_list.size()];
     for(int count = 0; count < idx_list.size(); count++)
     idx_list_array[count] = idx_list[count];
   */

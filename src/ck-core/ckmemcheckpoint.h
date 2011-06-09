@@ -14,7 +14,7 @@ class CkArrayCheckPTMessage: public CMessage_CkArrayCheckPTMessage {
 public:
 	CkArrayID  aid;
 	CkGroupID  locMgr;
-	CkArrayIndexMax index;
+	CkArrayIndex index;
 	double *packData;
 	int bud1, bud2;
 	int len;
@@ -37,11 +37,11 @@ class CkCheckPTInfo {
 protected:
    CkArrayID aid;
    CkGroupID locMgr;
-   CkArrayIndexMax index;
+   CkArrayIndex index;
    int pNo;   //another buddy
 public:
    CkCheckPTInfo();
-   CkCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno):
+   CkCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno):
                   aid(a), locMgr(loc), index(idx), pNo(pno)   {}
    virtual ~CkCheckPTInfo() {}
    virtual void updateBuffer(CkArrayCheckPTMessage *data) = 0;
@@ -64,7 +64,7 @@ public:
   void doItNow(int sp, CkCallback &);
   void restart(int diePe);
   void removeArrayElements();
-  void createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndexMax index, int buddy);
+  void createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndex index, int buddy);
   void recvData(CkArrayCheckPTMessage *);
   void gotData();
   void recvProcData(CkProcCheckPTMessage *);
@@ -78,7 +78,7 @@ public:
   void resetReductionMgr();
   void finishUp();
   void inmem_restore(CkArrayCheckPTMessage *m);
-  void updateLocations(int n, CkGroupID *g, CkArrayIndexMax *idx,int nowOnPe);
+  void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
   void resetLB(int diepe);
 public:
   static CkCallback  cpCallback;

@@ -198,167 +198,10 @@ public:
 	friend void operator|(PUP::er &p,CkMsgQ<MSG> &v) {v.pup(p);}
 };
 
-/*******************************************************
-Array Index class.  An array index is just a hash key-- 
-a run of integers used to look up an object in a hash table.
-*/
+
 
 #include "ckhashtable.h"
-
-#ifndef CK_ARRAYINDEX_MAXLEN 
-#define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
-#endif
-
-
-/**
- * Base class for array index objects used in charm.
- *
- * @warning: Do not instantiate! Always create and use a child class
- * @warning: Do not add constructors / destructors. Class participates in unions
- */
-class CkArrayIndex
-{
-public:
-        ///Length of index in *integers*
-        short int nInts;
-        ///Number of dimensions in this index, not valid for user-defined indices
-        short int dimension; 
-        /// The actual index data
-        union {
-            int index[CK_ARRAYINDEX_MAXLEN];
-            short int indexShorts[2 * CK_ARRAYINDEX_MAXLEN];
-        };
-
-        /// Zero out the index bits upon construction
-        //CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
-        inline void init(void)  { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
-
-	int *data(void)             {return index; }
-	const int *data(void) const {return index; }
-
-        int getCombinedCount(void) const {
-          if (nInts == 1) return data()[0];
-          else if (nInts == 2) return data()[0] * data()[1];
-          else if (nInts == 3) return data()[0] * data()[1] * data()[2];
-          else return 0;
-        }
-
-	void pup(PUP::er &p);
-
-    //These routines allow CkArrayIndex to be used in
-    //  a CkHashtableT
-	CkHashCode hash(void) const;
-	static CkHashCode staticHash(const void *a,size_t);
-	int compare(const CkArrayIndex &ind) const;
-	static int staticCompare(const void *a,const void *b,size_t);
-};
-
-inline CkHashCode CkArrayIndex::hash(void) const
-{
-        register int i;
-	register const int *d=data();
-	register CkHashCode ret=d[0];
-	for (i=1;i<nInts;i++)
-		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
-	return ret;
-}
-inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
-{
-	const CkArrayIndex &i1=*this;
-#if CMK_1D_ONLY
-	return i1.data()[0]==i2.data()[0];
-#else
-	const int *d1=i1.data();
-	const int *d2=i2.data();
-	int l=i1.nInts;
-	if (l!=i2.nInts) return 0;
-	for (int i=0;i<l;i++)
-		if (d1[i]!=d2[i])
-			return 0;
-	//If we got here, the two keys must have exactly the same data
-	return 1;
-#endif
-}
-
-
-//This class is as large as any CkArrayIndex
-class CkArrayIndexMax : public CkArrayIndex {
-	void copyFrom(const CkArrayIndex &that)
-	{
-		nInts=that.nInts;
-		dimension=that.dimension;
-		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	}
-public:
-	CkArrayIndexMax(void)  { init(); }
-	CkArrayIndexMax(int i) { init(); }
-	CkArrayIndexMax(const CkArrayIndex &that) 
-		{copyFrom(that);}
-	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
-		{copyFrom(that); return *this;}
-        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
-        void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
-	/*
-	 * Code for the previous attempt to introduce CkArrayID into CmiObjId
-	 * 
-	 * Turns out this:
-	 * i) does not appear to work right.
-	 * ii) does not result in the same ID as the ones used by the Load
-	 *     Balancer.
-	 *
-	 * FIXME **CWL** - temporary solution:
-	 * i) ignore the arrayID passed into the method.
-	 * ii) use exactly the same code as the 
-	 *     idx2LDObjid(const CkArrayIndex &idx) found in cklocation.C
-	 *     The only problem is that the code only exists when the
-	 *     CMK_LBDB_ON is set, so we cannot reuse the code and
-	 *     risk having to modify the code should idx2LDObjid be changed.
-	 *
-	CmiObjId *getProjectionID(int arrayID) { 
-	  CmiObjId *ret = new CmiObjId;
-	  for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) {
-	    ret->id[i] = index.data[i];
-	  }
-	  ret->id[CK_ARRAYINDEX_MAXLEN] = arrayID;
-	  return ret; 
-	}
-	*/
-	CmiObjId *getProjectionID(int arrayID) {
-	  CmiObjId *ret = new CmiObjId;
-	    int i;
-	    const int *data=this->data();
-	    if (OBJ_ID_SZ>=this->nInts) {
-	      for (i=0;i<this->nInts;i++)
-		ret->id[i]=data[i];
-	      for (i=this->nInts;i<OBJ_ID_SZ;i++)
-		ret->id[i]=0;
-	    } else {
-	      //Must hash array index into LBObjid
-	      int j;
-	      for (j=0;j<OBJ_ID_SZ;j++)
-		ret->id[j]=data[j];
-	      for (i=0;i<this->nInts;i++)
-		for (j=0;j<OBJ_ID_SZ;j++)
-		  ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
-		    circleShift(data[i],21-9*i*(j+1));
-	    }
-	    return ret;
-	}
-
-        CmiBool operator==(const CkArrayIndexMax& idx) const {
-          if (nInts != idx.nInts) return CmiFalse;
-          for (int i=0; i<nInts; i++)
-                if (index[i] != idx.index[i]) return CmiFalse;
-          return CmiTrue;
-        }
-};
-PUPmarshall(CkArrayIndexMax)
-
+#include "ckarrayindex.h"
 
 class CkArrayID {
 	CkGroupID _gid;
@@ -672,8 +515,8 @@ class CkDelegateMgr : public IrrGroup {
     virtual void NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g);
     virtual void NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s);
 
-    virtual void ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
-    virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
+    virtual void ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a);
+    virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s,int opts);
     virtual void initDelegateMgr(CProxy *proxy)  {}

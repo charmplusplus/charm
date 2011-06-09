@@ -312,7 +312,7 @@ public:
   //...
   
   //Return an ``arrayHdl'', given some information about the array
-  virtual int registerArray(CkArrayIndexMax& numElements,CkArrayID aid);
+  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
   //Return the home processor number for this element of this array
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
 \}
@@ -327,7 +327,7 @@ class BlockMap : public CkArrayMap
  public:
   BlockMap(void) \{\}
   BlockMap(CkMigrateMessage *m)\{\}
-  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid) \{
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid) \{
     return 0;
   \}
   int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) \{
@@ -819,10 +819,10 @@ The above codes create a section proxy that contains array elements of
 [0:9, 0:19:2, 0:29:2].
 
 For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
-one needs to use the generic array index type: CkArrayIndexMax.
+one needs to use the generic array index type: CkArrayIndex.
 
 \begin{alltt}
-  CkArrayIndexMax *elems;    // add array indices
+  CkArrayIndex *elems;    // add array indices
   int numElems;
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
 \end{alltt}
@@ -1058,10 +1058,10 @@ arrays as follows:
 	  int aceiling=ArraySize-1;
 	  int asectionSize=aceiling-afloor+1;
 	  // cross section lower half of each array
-	  CkArrayIndexMax **aelems= new CkArrayIndexMax*[3];
-	  aelems[0]= new CkArrayIndexMax[asectionSize];
-	  aelems[1]= new CkArrayIndexMax[asectionSize];
-	  aelems[2]= new CkArrayIndexMax[asectionSize];
+	  CkArrayIndex **aelems= new CkArrayIndex*[3];
+	  aelems[0]= new CkArrayIndex[asectionSize];
+	  aelems[1]= new CkArrayIndex[asectionSize];
+	  aelems[2]= new CkArrayIndex[asectionSize];
 	  int *naelems=new int[3];
 	  for(int k=0;k<3;k++)
 	    \{

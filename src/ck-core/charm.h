@@ -348,10 +348,10 @@ extern void  CkSendToFutureID(CkFutureID futNum, void *msg, int pe);
 extern CkFutureID CkCreateAttachedFuture(void *msg);
 /* forward declare */
 struct CkArrayID;
-struct CkArrayIndexMax;
+struct CkArrayIndex;
 extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
-struct CkArrayID id, struct CkArrayIndexMax idx, void(*fptr)(struct
-CkArrayID,struct CkArrayIndexMax,void*,int,int),int size CK_MSGOPTIONAL);
+struct CkArrayID id, CkArrayIndex idx, void(*fptr)(struct
+CkArrayID, CkArrayIndex,void*,int,int),int size CK_MSGOPTIONAL);
 /* extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int)); */
 
 extern void *CkWaitReleaseFuture(CkFutureID futNum);

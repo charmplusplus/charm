@@ -15,7 +15,7 @@ mainmodule hello {
   };
   group DelegateMgr {
     entry DelegateMgr(void);
-    entry void forwardMsg(int ep,CkArrayIndexMax idx,CkArrayID a,
+    entry void forwardMsg(int ep,CkArrayIndex idx,CkArrayID a,
 	int nBytes,char msg[nBytes]);
   };
 };

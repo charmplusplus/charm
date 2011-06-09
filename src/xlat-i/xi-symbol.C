@@ -1511,9 +1511,9 @@ Array::genSubDecls(XStr& str)
 	<< "  { return " << super << "::ckGetSectionID(i); }\n"
 	<< "inline CkArrayID ckGetArrayIDn(int i) const\n"
 	<< "{return " << super << "::ckGetArrayIDn(i); } \n"
-	<< "inline CkArrayIndexMax *ckGetArrayElements() const\n"
+	<< "inline CkArrayIndex *ckGetArrayElements() const\n"
 	<< "  { return " << super << "::ckGetArrayElements(); }\n"
-	<< "inline CkArrayIndexMax *ckGetArrayElements(int i) const\n"
+	<< "inline CkArrayIndex *ckGetArrayElements(int i) const\n"
 	<< "{return " << super << "::ckGetArrayElements(i); }\n"
 	<< "inline int ckGetNumElements() const\n"
 	<< "  { return " << super << "::ckGetNumElements(); } \n"
@@ -1629,18 +1629,18 @@ Array::genSubDecls(XStr& str)
     "    } \n";
     }
 
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) \n"
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems, CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkSectionID &sid)"
 	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
-	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems, CK_DELCTOR_PARAM) \n"
+	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, CK_DELCTOR_PARAM) \n"
 	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems) \n"
+	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems) \n"
 	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems)", ", ");str<<" {}\n";
     str <<
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
   }
@@ -3202,7 +3202,7 @@ void Entry::genArrayDefs(XStr& str)
       str << "#endif\n";
       if (!isNoTrace())
 	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg," << epIdx()
-	      << ",CkMyPe(), 0, ((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+	      << ",CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"

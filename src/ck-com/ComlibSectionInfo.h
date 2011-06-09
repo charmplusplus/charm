@@ -85,7 +85,7 @@ inline CkHashCode ComlibSectionHashKey::staticHash(const void *v,size_t){
 class ComlibSectionHashObject {
  public:
     //My local indices
-    CkVec<CkArrayIndexMax> indices;
+    CkVec<CkArrayIndex> indices;
     
     //Other processors to send this message to
     int npes;
@@ -169,7 +169,7 @@ class ComlibSectionInfo {
      * elements are local. env is a new allocated memory containing the user
      * message.
      */
-    void unpack(envelope *cb_env, int &nLocalElems, CkArrayIndexMax *&destIndices, 
+    void unpack(envelope *cb_env, int &nLocalElems, CkArrayIndex *&destIndices, 
                 envelope *&env);
 
     void localMulticast(envelope *env);
@@ -187,7 +187,7 @@ class ComlibSectionInfo {
      * @param counts array of associations pe-count: number of elements in proc pe (output, new'ed(CkNumPes()))
      * @param belongs array of integers expressing association of elements with pes: belongs[i] = index in counts of the processor having index i (output, new'ed(nindices))
     */
-    void getPeCount(int nindices, CkArrayIndexMax *idxlist, const CkArrayID &destArrayID,
+    void getPeCount(int nindices, CkArrayIndex *idxlist, const CkArrayID &destArrayID,
 		    int &npes, int &nidx,
 		    ComlibMulticastIndexCount *&counts, int *&belongs);
 
@@ -203,19 +203,19 @@ class ComlibSectionInfo {
      * @param npes number of processors involved (output)
      * @param pelist list of the processors involved (output, new'ed)
      */
-    void getRemotePelist(int nindices, CkArrayIndexMax *idxlist, CkArrayID &destArrayID,
+    void getRemotePelist(int nindices, CkArrayIndex *idxlist, CkArrayID &destArrayID,
                          int &npes, int *&pelist);
 
     /** Returns the same list as getRemotePeList, only that it does not exclude
 	the local processor from the list if it is involved. */
-    void getPeList(int nindices, CkArrayIndexMax *idxlist, CkArrayID &destArrayID,
+    void getPeList(int nindices, CkArrayIndex *idxlist, CkArrayID &destArrayID,
                    int &npes, int *&pelist);
 
-    void getLocalIndices(int nindices, CkArrayIndexMax *idxlist, CkArrayID &destArrayID,
-                         CkVec<CkArrayIndexMax> &idx_vec);   
+    void getLocalIndices(int nindices, CkArrayIndex *idxlist, CkArrayID &destArrayID,
+                         CkVec<CkArrayIndex> &idx_vec);   
         
-    void getNodeLocalIndices(int nindices, CkArrayIndexMax *idxlist, CkArrayID &destArrayID,
-                         CkVec<CkArrayIndexMax> &idx_vec);   
+    void getNodeLocalIndices(int nindices, CkArrayIndex *idxlist, CkArrayID &destArrayID,
+                         CkVec<CkArrayIndex> &idx_vec);   
         
     void pup(PUP::er &p) {
         p | MaxSectionID;

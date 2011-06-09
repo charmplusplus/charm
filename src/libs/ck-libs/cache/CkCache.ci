@@ -8,11 +8,11 @@ module CkCache {
     entry CkCacheManager(int size, CkGroupID gid);
     entry CkCacheManager(int size, int n, CkGroupID gid[n]);
     entry CkCacheManager(int size, int n, CkGroupID gid[n], int nWB, CkGroupID gidWB[nWB]);
-    entry [local] void * requestData(CkCacheKey what, CkArrayIndexMax &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
+    entry [local] void * requestData(CkCacheKey what, CkArrayIndex &toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req);
     entry [local] void * requestDataNoFetch(CkCacheKey key, int chunk);
-    entry [local] void cacheSync(int &numChunks, CkArrayIndexMax &chareIdx, int &localIdx);
+    entry [local] void cacheSync(int &numChunks, CkArrayIndex &chareIdx, int &localIdx);
     entry void recvData(CkCacheFillMsg *msg);
-    entry [local] void recvData(CkCacheKey key, CkArrayIndexMax &from, CkCacheEntryType *type, int chunk, void *data);
+    entry [local] void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType *type, int chunk, void *data);
     entry void writebackChunk(int num);
     entry void finishedChunk(int num, CmiUInt8 weight);
     entry void collectStatistics(CkCallback &cb);

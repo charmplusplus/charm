@@ -102,14 +102,14 @@ public:
   CkCacheFillMsg (CkCacheKey k) : key(k) {}
 };
 
-typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndexMax&, CkCacheKey, CkCacheUserData &, void*, int);
+typedef void (*CkCacheCallback)(CkArrayID, CkArrayIndex&, CkCacheKey, CkCacheUserData &, void*, int);
 
 class CkCacheRequestorData {
 public:
   CkCacheUserData userData;
   CkCacheCallback fn;
   CkArrayID requestorID;
-  CkArrayIndexMax requestorIdx;
+  CkArrayIndex requestorIdx;
 
   CkCacheRequestorData(CProxyElement_ArrayElement &el, CkCacheCallback f, CkCacheUserData &data) {
     userData = data;
@@ -125,9 +125,9 @@ public:
 
 class CkCacheEntryType {
 public:
-  virtual void * request(CkArrayIndexMax&, CkCacheKey) = 0;
-  virtual void * unpack(CkCacheFillMsg *, int, CkArrayIndexMax &) = 0;
-  virtual void writeback(CkArrayIndexMax&, CkCacheKey, void *) = 0;
+  virtual void * request(CkArrayIndex&, CkCacheKey) = 0;
+  virtual void * unpack(CkCacheFillMsg *, int, CkArrayIndex &) = 0;
+  virtual void writeback(CkArrayIndex&, CkCacheKey, void *) = 0;
   virtual void free(void *) = 0;
   virtual int size(void *) = 0;
 };
@@ -135,7 +135,7 @@ public:
 class CkCacheEntry {
 public:
   CkCacheKey key;
-  CkArrayIndexMax home;
+  CkArrayIndex home;
   CkCacheEntryType *type;
   std::vector<CkCacheRequestorData> requestorVec;
 
@@ -180,7 +180,7 @@ public:
 class CkCacheArrayCounter : public CkLocIterator {
 public:
   int count;
-  CkHashtableT<CkArrayIndexMax, int> registered;
+  CkHashtableT<CkArrayIndex, int> registered;
   CkCacheArrayCounter() : count(0) { }
   void addLocation(CkLocation &loc) {
     registered.put(loc.getIndex()) = ++count;
@@ -283,7 +283,7 @@ class CkCacheManager : public CBase_CkCacheManager {
   void recvData(CkCacheFillMsg *msg);
   void recvData(CkCacheKey key, CkArrayIndex &from, CkCacheEntryType *type, int chunk, void *data);
 
-  void cacheSync(int &numChunks, CkArrayIndexMax &chareIdx, int &localIdx);
+  void cacheSync(int &numChunks, CkArrayIndex &chareIdx, int &localIdx);
 
   /** Called from the TreePieces to acknowledge that a particular chunk
       can be written back to the original senders */

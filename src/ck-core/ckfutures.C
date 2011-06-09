@@ -328,8 +328,8 @@ extern "C" CkFutureID CkCreateAttachedFuture(void *msg)
 }
 
 extern "C" CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
-CkArrayID id, CkArrayIndexMax idx,
-void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int),int size)
+CkArrayID id, CkArrayIndex idx,
+void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int),int size)
 {
 CkFutureID ret=createFuture();
 UsrToEnv(msg)->setRef(ret);

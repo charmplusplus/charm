@@ -103,7 +103,7 @@ public:
     testProxy4dest = CProxy_EachToManyArray::ckNew(nElements);
     
     
-    CkArrayIndexMax *allElts = new CkArrayIndexMax[nElements];
+    CkArrayIndex *allElts = new CkArrayIndex[nElements];
     for (int i = 0; i<nElements; i++) {
     	CkArrayIndex1D index = i;
     	allElts[i] = index;

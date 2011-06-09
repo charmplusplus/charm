@@ -31,7 +31,7 @@
 #define MAXFRAGS 20
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
-typedef CkVec<CkArrayIndexMax>   arrayIndexList;
+typedef CkVec<CkArrayIndex>   arrayIndexList;
 typedef CkVec<CkSectionInfo>     sectionIdList;
 typedef CkVec<CkReductionMsg *>  reductionMsgs;
 typedef CkQ<int>                 PieceSize;
@@ -194,7 +194,7 @@ public:
 class multicastSetupMsg: public CMessage_multicastSetupMsg {
 public:
   int  nIdx;
-  CkArrayIndexMax *arrIdx;
+  CkArrayIndex *arrIdx;
   int      *lastKnown;
   CkSectionInfo parent;
   CkSectionInfo rootSid;
@@ -251,7 +251,7 @@ extern LDObjid idx2LDObjid(const CkArrayIndex &idx);    // cklocation.C
 
 
 
-void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndexMax *al, int n)
+void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex *al, int n)
 {
     // Create a multicast entry
     mCastEntry *entry = new mCastEntry(aid);
@@ -289,7 +289,7 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 
   mCastEntry *entry = new mCastEntry(aid);
 
-  const CkArrayIndexMax *al = proxy.ckGetArrayElements();
+  const CkArrayIndex *al = proxy.ckGetArrayElements();
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem.push_back(al[i]);
 #if CMK_LBDB_ON
@@ -320,7 +320,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
   mCastEntry *oldentry = (mCastEntry *)info.get_val();
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
-  const CkArrayIndexMax *al = sid->_elems;
+  const CkArrayIndex *al = sid->_elems;
   CmiAssert(info.aid == aid);
   prepareCookie(entry, *sid, al, sid->_nElems, aid);
 
@@ -340,7 +340,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
 
 
 /// Build a mCastEntry object with relevant section info and set the section cookie to point to this object
-void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid)
+void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
   for (int i=0; i<count; i++) {
     entry->allElem.push_back(al[i]);
@@ -368,7 +368,7 @@ void CkMulticastMgr::initDelegateMgr(CProxy *cproxy)
       CkArrayID aid = proxy->ckGetArrayIDn(i);
       mCastEntry *entry = new mCastEntry(aid);
       CkSectionID *sid = &( proxy->ckGetSectionID(i) );
-      const CkArrayIndexMax *al = proxy->ckGetArrayElements(i);
+      const CkArrayIndex *al = proxy->ckGetArrayElements(i);
       prepareCookie(entry, *sid, al, proxy->ckGetNumElements(i), aid);
       initCookie(sid->_cookie);
   }

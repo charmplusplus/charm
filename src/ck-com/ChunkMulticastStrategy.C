@@ -159,7 +159,7 @@ void ChunkMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 void ChunkMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
   double start = CmiWallTimer();
   CkSectionID *sec_id = cmsg->sec_id;
-  CkVec< CkArrayIndexMax > localIndices;
+  CkVec< CkArrayIndex > localIndices;
   sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, sec_id->_cookie.aid, localIndices);
   deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() );
   //if (deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() ) == 0) 
@@ -275,7 +275,7 @@ void ChunkMulticastStrategy::handleMessage(void *msg){
   // Deliver to objects marked as local in the message
   int localElems;
   envelope *newenv;
-  CkArrayIndexMax *local_idx_list;  
+  CkArrayIndex *local_idx_list;  
   sinfo.unpack(env, localElems, local_idx_list, newenv);
   ComlibMulticastMsg *newmsg = (ComlibMulticastMsg *)EnvToUsr(newenv);  
 

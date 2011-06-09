@@ -18,7 +18,7 @@
 /*     int mode; //Array destinations or processor destinations */
 
 /*     CkArrayID mAid; */
-/*     CkVec<CkArrayIndexMax> *indexVec; */
+/*     CkVec<CkArrayIndex> *indexVec; */
 /*     int NodeMulticastHandlerId, entryPoint, nelements; */
     
 /*     int npes, *pelist, NodeMulticastCallbackHandlerId; */
@@ -33,7 +33,7 @@
 /*  public: */
 /*     NodeMulticast(){} */
 /*     void setDestinationArray(CkArrayID a, int nelem,  */
-/* 			     CkArrayIndexMax **idx, int ep); */
+/* 			     CkArrayIndex **idx, int ep); */
 
 /*     //void setPeList(int npes, int *pelist, CkCallback callback); */
 /*     //void setPeList(int npes, int *pelist, ComlibMulticastHandler handler); */
