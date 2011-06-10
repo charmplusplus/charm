@@ -6,6 +6,7 @@
 
 BgTimeLineRec* currTline = NULL;
 int currTlineIdx=0;
+char* traceFileName="bgTrace";
 
 //Used for parallel file I/O
 int BgReadProc(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProcs, int* allNodeOffsets, BgTimeLineRec& tlinerec){
@@ -20,7 +21,7 @@ int BgReadProc(int procNum, int numWth ,int numEmulatingPes, int totalWorkerProc
    //   CmiPrintf("nodeNum: %d arrayId:%d numNodes:%d numPes:%d\n",nodeNum,arrayID,numNodes,numPes);
  
   char fName[20];
-  sprintf(fName,"bgTrace%d",fileNum);
+  sprintf(fName,"%s%d",traceFileName,fileNum);
   FILE*  f = fopen(fName,"rb");
   if (f == NULL) {
     printf("Error> Open failed with %s. \n", fName);
@@ -109,7 +110,7 @@ int* BgLoadOffsets(int totalProcs, int numPes){
 
   PUP::machineInfo machInfo;
   for (int i=0; i<numPes; i++){
-    sprintf(d,"bgTrace%d",i);
+    sprintf(d,"%s%d",traceFileName,i);
     FILE *f = fopen(d,"rb");
     if (f == NULL) {
       CmiPrintf("BgLoadOffsets: can not open file %s!\n", d);
