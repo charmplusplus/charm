@@ -8,7 +8,7 @@ an asynchronous adaptive runtime system. The general pattern of usage
 that MSA supports is one in which the application does one sort of
 access on an array for a while, and then changes to another kind of
 access at some distinguished point in the execution. For instance, one
-part of the program might accumulate a physical quanitity onto a grid
+part of the program might accumulate a physical quantity onto a grid
 representing the simulation space, and another part might read from
 that grid once it is fully calculated.
 
@@ -67,7 +67,7 @@ To provide the guarantees described above, MSA requires that clients
 of an array collectively synchronize when they wish to change the mode
 in which the array will be accessed. Each period between
 synchronizations is called a \emph{phase}. At phase boundaries, writes
-are flushed and accumulations are totalled up.
+are flushed and accumulations are totaled up.
 
 MSA enforces most of the restrictions of its access modes discipline
 at compile time through the static types of \emph{handle}
@@ -108,7 +108,7 @@ on these classes.
 
 When constructing an MSA, the application must specify the extent of
 the array in each dimension and the number of clients that will access
-the array (so that the library can tell when all clients ahve
+the array (so that the library can tell when all clients have
 synchronized). The array creation constructors are as follows:
 \begin{verbatim}
 /// Indices range over [0, N]
