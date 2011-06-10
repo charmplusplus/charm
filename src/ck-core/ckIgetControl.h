@@ -1,3 +1,5 @@
+#include "ckfutures.h"
+
 #ifndef _IGET_FLOWCONTROL_H
 #define _IGET_FLOWCONTROL_H
 
@@ -232,5 +234,7 @@ private:
 };
 
 #endif
+
+extern IGetControlClass TheIGetControlClass;
 
 #endif
