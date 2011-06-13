@@ -26,7 +26,7 @@ where \uw{queueingtype} is one of the following constants:
   CK_QUEUEING_ILIFO
   CK_QUEUEING_BFIFO
   CK_QUEUEING_BLIFO
-  CK_QUEUEING_LLIFO
+  CK_QUEUEING_LFIFO
   CK_QUEUEING_LLIFO
 \end{alltt}
 
@@ -67,7 +67,7 @@ space, but they don't admit more fine-grained control. To provide that
 degree of control, \charmpp\ also allows explicit prioritization of
 messages.
 
-The other four queueing strategies involve the use of
+The other six queueing strategies involve the use of
 priorities\index{priorities}.  There are two kinds of priorities which
 can be attached to a message: {\sl integer priorities}\index{integer
   priorities} and {\sl bitvector priorities}\index{bitvector
@@ -138,7 +138,7 @@ i.e. bitvector priorities.
 
 To assign a bitvector priority, two methods are available.  The
 first is to obtain a pointer to the priority field using  \kw{CkPriorityPtr},
-and to then manually set the bits using the bit-setting operations
+and then manually set the bits using the bit-setting operations
 inherent to C.  To achieve this, one must know the format
 \index{bitvector format} of the
 bitvector, which is as follows: the bitvector is represented as an
@@ -183,6 +183,8 @@ dequeued in FIFO order or LIFO order, depending upon which
 queuing strategy was used.
 
 \end{itemize}
+
+Additionally, {\sl long integer priorities} can be specified by the {\em L} strategy. 
 
 A final reminder about prioritized execution: \charmpp\ processes
 messages in {\it roughly} the order you specify; it never guarantees
