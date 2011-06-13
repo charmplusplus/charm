@@ -52,6 +52,7 @@ public:
   void SendTo(int index, MsgInfo* who);
   int RecvCount(int index);
   void RecvFrom(int index, MsgInfo* who);
+	void shuffleLoad();
 
 private:
   struct Elem;

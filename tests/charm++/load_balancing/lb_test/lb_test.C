@@ -33,6 +33,8 @@
 #define N_LOADBALANCE 500 /*Times around ring until we load balance*/
 #define DEBUGF(x)       // CmiPrintf x
 
+#define DYNAMIC_IMBALANCE 1
+
 int specialTracing = 0;
 
 void initialize()
@@ -61,6 +63,11 @@ public:
     CkPrintf("All done\n");
     CkExit();
   };
+	void resume(void){
+		CkPrintf("Resuming...\n");
+		lbproxy.ForwardMessages();
+	};
+
 
 private:
   void arg_error(char* argv0);
@@ -116,6 +123,8 @@ main::main(CkArgMsg *m)
   if (topoid.isZero())
     CkAbort("ERROR! Topology not found!  \n");
 
+	// TODO: this code looks wrong, since reduction client is set AFTER array creation,
+	// which, according to Charm++ manual, should be done BEFORE array is created
   lbproxy = CProxy_Lb_array::ckNew(element_count);
   lbproxy.setReductionClient(programBegin, NULL);
 }
@@ -289,7 +298,14 @@ public:
           contribute(0, NULL, CkReduction::sum_int, cb);
 #endif
 	  loadbalancing = 1;
-	} else ForwardMessages();
+	} 
+#if DYNAMIC_IMBALANCE
+	else if(nTimes > n_loadbalance && (nTimes-(n_loadbalance/2)) % n_loadbalance == 0) {
+		printf("Here at %d\n",nTimes);
+		contribute(CkCallback(CkIndex_Topo::shuffleLoad(),topoid));
+	} 
+#endif
+	else ForwardMessages();
       }
       delete m;
     }
