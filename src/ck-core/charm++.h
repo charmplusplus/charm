@@ -987,7 +987,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"
-#include "CkFutures.decl.h"
+#include "ckfutures.h"
 #include "charisma.h"
 #include "tempo.h"
 #include "waitqd.h"
@@ -1093,8 +1093,6 @@ public:
     ++refcount;
   }
 };
-
-PUPbytes(CkFuture)
 
 #endif
 

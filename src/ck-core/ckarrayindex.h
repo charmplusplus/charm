@@ -9,6 +9,11 @@
     #define CK_ARRAYINDEX_MAXLEN 3
 #endif
 
+/** @warning: fwd declaration of child class to support crazy ptr cast
+ */
+class CkArrayIndex;
+
+
 /**
  * Base class for array index objects used in charm.
  *

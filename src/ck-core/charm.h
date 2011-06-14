@@ -312,50 +312,6 @@ extern void CkArrayManagerDeliver(int onPe,void *msg, int opts CK_MSGOPTIONAL);
 
 
 
-/*********************************************************/
-/**
-\addtogroup CkFutures
-\brief Futures--ways to block Converse threads on remote events.
-
-These routines are implemented in ckfutures.C.
-*/
-/*@{*/
-typedef int CkFutureID;
-typedef struct _CkFuture {
-  CkFutureID id;
-  int        pe;
-} CkFuture;
-extern CkFuture CkCreateFuture(void);
-extern void  CkSendToFuture(CkFuture fut, void *msg);
-extern void* CkWaitFuture(CkFuture futNum);
-extern void CkReleaseFuture(CkFuture futNum);
-extern int CkProbeFuture(CkFuture futNum);
-
-extern void* CkRemoteCall(int eIdx, void *msg,const CkChareID *chare);
-extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
-extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
-extern CkFutureID CkRemoteCallAsync(int eIdx, void *msg, const CkChareID *chare);
-extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, 
-                                          int pe);
-extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, 
-                                              CkGroupID gID, int node);
-
-extern void* CkWaitFutureID(CkFutureID futNum);
-extern void CkWaitVoidFuture(CkFutureID futNum);
-extern void CkReleaseFutureID(CkFutureID futNum);
-extern int CkProbeFutureID(CkFutureID futNum);
-extern void  CkSendToFutureID(CkFutureID futNum, void *msg, int pe);
-extern CkFutureID CkCreateAttachedFuture(void *msg);
-/* forward declare */
-struct CkArrayID;
-struct CkArrayIndex;
-extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
-struct CkArrayID id, CkArrayIndex idx, void(*fptr)(struct
-CkArrayID, CkArrayIndex,void*,int,int),int size CK_MSGOPTIONAL);
-/* extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int)); */
-
-extern void *CkWaitReleaseFuture(CkFutureID futNum);
-
 /******************************************************************************
  *
  * Semaphore calls
