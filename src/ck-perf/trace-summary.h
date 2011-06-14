@@ -195,6 +195,7 @@ class SumLogPool {
   public:
     SumLogPool(char *pgm);
     ~SumLogPool();
+    double *getCpuTime() {return cpuTime;}
     void initMem();
     void write(void) ;
     void writeSts(void);
@@ -206,11 +207,13 @@ class SumLogPool {
       }
     }
     void shrink(void);
+    void shrink(double max);
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
-    int getNumEntries() const { return numBins; }
-
+    UInt getNumEntries() { return numBins; }
+    UInt getEpInfoSize() {return epInfoSize;} 
+    UInt getPoolSize() {return poolSize;}
     // accessors to normal summary data
     inline double getTime(unsigned int interval) {
       return pool[interval].time();
