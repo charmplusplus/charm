@@ -628,7 +628,6 @@ TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
 
   CkpvInitialize(int, binCount);
   CkpvInitialize(double, binSize);
-  CkpvInitialize(double, numEntries);
   CkpvInitialize(double, version);
   CkpvAccess(binSize) = BIN_SIZE;
   CkpvAccess(version) = VER;
