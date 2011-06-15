@@ -440,7 +440,24 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(){
 }
 #endif
 
+#if CMK_BLUEGENEP
+/* Report the memory usage according to the following wiki page i
+* https://wiki.alcf.anl.gov/index.php/Debugging#How_do_I_get_information_on_used.2Favailable_memory_in_my_code.3F
+*/
+#include <malloc.h>
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageBGP(){
+    struct mallinfo m = mallinfo();
+    return m.hblkhd + m.uordblks;
+}
+#endif
+
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
+#if CMK_BLUEGENEP
+    return MemusageBGP(); 
+#else
     CMK_TYPEDEF_UINT8 memtotal = 0;
 #ifdef _WIN32
     if(!memtotal) memtotal = MemusageWindows();
@@ -451,6 +468,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     if(!memtotal) memtotal = MemusageSbrk();
     if(!memtotal) memtotal = MemusagePS();
     return memtotal;
+#endif
 }
 
 /******End of a general way to get memory usage information*****/
