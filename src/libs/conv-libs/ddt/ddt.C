@@ -240,6 +240,15 @@ CkDDT::newStruct(int count, int* arrbLength, int* arrDisp,
   types[index] = CkDDT_STRUCT ;
 }
 
+typedef struct { float val; int idx; } FloatInt;
+typedef struct { double val; int idx; } DoubleInt;
+typedef struct { long val; int idx; } LongInt;
+typedef struct { int val; int idx; } IntInt;
+typedef struct { short val; int idx; } ShortInt;
+typedef struct { long double val; int idx; } LongdoubleInt;
+typedef struct { float val; float idx; } FloatFloat;
+typedef struct { double val; double idx; } DoubleDouble;
+
 CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
 {
   count = 1;
@@ -291,28 +300,28 @@ CkDDT_DataType::CkDDT_DataType(int type):datatype(type)
       size = sizeof(long double);
       break ;
     case CkDDT_FLOAT_INT:
-      size = sizeof(float)+sizeof(int);
+      size = sizeof(FloatInt);
       break;
     case CkDDT_DOUBLE_INT:
-      size = sizeof(double)+sizeof(int);
+      size = sizeof(DoubleInt);
       break;
     case CkDDT_LONG_INT:
-      size = sizeof(long)+sizeof(int);
+      size = sizeof(LongInt);
       break;
     case CkDDT_2INT:
-      size = 2*sizeof(int);
+      size = sizeof(IntInt);
       break;
     case CkDDT_SHORT_INT:
-      size = sizeof(short)+sizeof(int);
+      size = sizeof(ShortInt);
       break;
     case CkDDT_LONG_DOUBLE_INT:
-      size = sizeof(long double)+sizeof(int);
+      size = sizeof(LongdoubleInt);
       break;
     case CkDDT_2FLOAT:
-      size = 2*sizeof(float);
+      size = sizeof(FloatFloat);
       break;
     case CkDDT_2DOUBLE:
-      size = 2*sizeof(double);
+      size = sizeof(DoubleDouble);
       break;
     case CkDDT_LB:
     case CkDDT_UB:
