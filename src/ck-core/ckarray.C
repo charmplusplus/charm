@@ -1177,7 +1177,12 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0, len = elements->length();
+	int idx=0, len=0;
+        if (stableLocations) {            /* remove all NULLs in the array */
+          len = 0;
+          while (elements->next(idx)!=NULL) len++;
+          idx = 0;
+        }
 	ArrayElement *el;
 #if CMK_BLUEGENE_CHARM
         void *root;
