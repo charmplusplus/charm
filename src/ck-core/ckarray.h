@@ -473,6 +473,9 @@ class ArrayElement : public CkMigratable
   friend class CkArrayListener;
   int numInitialElements; // Number of elements created by ckNew(numElements)
   void initBasics(void);
+#ifdef _PIPELINED_ALLREDUCE_
+AllreduceMgr * allredMgr; // for allreduce
+#endif
 public:
   ArrayElement(void);
   ArrayElement(CkMigrateMessage *m);
@@ -495,8 +498,21 @@ public:
   /// Synonym for ckMigrate
   inline void migrateMe(int toPe) {ckMigrate(toPe);}
 
+#ifdef _PIPELINED_ALLREDUCE_
+	void contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
+			   const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);
+	void contribute2(int dataSize,const void *data,CkReduction::reducerType type, 
+					CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); 
+	void contribute2(int dataSize,const void *data,CkReduction::reducerType type, 
+					const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); 
+	void contribute2(CkReductionMsg *msg); 
+	void contribute2(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);
+	void contribute2(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);
+#else
   CK_REDUCTION_CONTRIBUTE_METHODS_DECL
-
+#endif
+	// for _PIPELINED_ALLREDUCE_, assembler entry method
+	inline void defrag(CkReductionMsg* msg);
   inline const CkArrayID &ckGetArrayID(void) const {return thisArrayID;}
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
@@ -549,6 +565,31 @@ public:
         mlogData->objID.data.array.idx=thisIndexMax;
 #endif
 }
+#ifdef _PIPELINED_ALLREDUCE_
+	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
+						CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1)
+	{
+		contribute2( dataSize,data, type, userFlag);
+
+	}
+	void contribute(int dataSize,const void *data,CkReduction::reducerType type,
+						const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1)
+	{
+		contribute2((CkArrayIndex)(thisIndex) ,dataSize, data, type,   cb, userFlag);
+	}
+	void contribute(CkReductionMsg *msg) 
+	{
+		contribute2(msg);
+	}
+	void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1)
+	{
+		contribute2(cb ,userFlag);
+	}
+	void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1)
+	{
+		contribute2(userFlag);
+	}
+#endif
   ArrayElementT(CkMigrateMessage *msg)
 	:ArrayElement(msg),
 	thisIndex(*(const T *)thisIndexMax.data()) {}

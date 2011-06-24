@@ -29,6 +29,9 @@ class ArrayElement;
 
 class CkCallback {
 public:
+#ifdef _PIPELINED_ALLREDUCE_
+	friend class ArrayElement;
+#endif
 	typedef enum {
 	invalid=0, //Invalid callback
 	ignore, //Do nothing
