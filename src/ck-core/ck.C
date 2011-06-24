@@ -498,7 +498,7 @@ void *CkLocalChare(const CkChareID *pCid)
 #else
 		VidBlock *v=CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
 #endif
-		return v->getLocalChare();
+		return v->getLocalChareObj();
 	}
 	else
 	{ //An ordinary chare ID

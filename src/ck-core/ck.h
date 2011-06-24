@@ -65,6 +65,10 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #define _CldNodeEnqueue   CldNodeEnqueue
 #endif
 
+#ifndef CMK_CHARE_USE_PTR
+CkpvExtern(CkVec<void *>, chare_objs);
+#endif
+
 /// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
@@ -101,6 +105,16 @@ class VidBlock {
     void *getLocalChare(void) {
       if (state==FILLED && actualID.onPE==CkMyPe()) 
           return actualID.objPtr;
+      return NULL;
+    }
+    void *getLocalChareObj(void) {   
+         // returns actual object, different when CMK_CHARE_USE_PTR is false
+      if (state==FILLED && actualID.onPE==CkMyPe()) 
+#ifdef CMK_CHARE_USE_PTR
+          return actualID.objPtr;
+#else
+          return CkpvAccess(chare_objs)[(CmiIntPtr)actualID.objPtr];
+#endif
       return NULL;
     }
     void pup(PUP::er &p) {
