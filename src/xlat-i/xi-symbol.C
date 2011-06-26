@@ -846,7 +846,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			  (char *)type->getBaseName(),
 			  new ParamList(new Parameter(line,
-				new PtrType(new NamedType((char *)"CkMigrateMessage")))),0,0,0);
+				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
 			list=new MemberList(e,list);
 		}
