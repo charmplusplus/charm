@@ -218,7 +218,6 @@ class PtrType : public Type {
     }
 };
 
-/* I don't think these are useful any longer (OSL 11/30/2001) */
 class ReferenceType : public Type {
   private:
     Type *referant;
