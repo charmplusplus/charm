@@ -696,7 +696,12 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		    else
                       $5->param = new ParamList(new Parameter(0, new BuiltinType("void")));
                   }
-		  $$ = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0); 
+		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
+		  if (e->param && e->param->isCkMigMsgPtr()) {
+		    yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
+		    $$ = NULL;
+		  } else
+		    $$ = e;
 		}
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
                 {
