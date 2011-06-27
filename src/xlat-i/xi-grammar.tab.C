@@ -4450,7 +4450,7 @@ yyreturn:
 
 void yyerror(const char *mesg)
 {
-    std::cout << cur_file<<":"<<lineno<<": Charmxi syntax error> "
+    std::cerr << cur_file<<":"<<lineno<<": Charmxi syntax error> "
 	      << mesg << std::endl;
 }
 
