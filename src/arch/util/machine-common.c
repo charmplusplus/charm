@@ -512,17 +512,26 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
     /* first send msgs to other nodes */
     relDist = CmiMyNode()-startNode;
     if (relDist < 0) relDist += CmiNumNodes();
-    cnt=0;
-    tmp = relDist;
-    /* count how many zeros (in binary format) relDist has */
-    for (i=0; i<dims; i++, cnt++) {
-        if (tmp & 1 == 1) break;
-        tmp = tmp >> 1;
-    }
 
-    /*CmiPrintf("ND[%d]: SendHypercube with snd=%d, relDist=%d, cnt=%d\n", CmiMyNode(), startnode, relDist, cnt);*/
-    for (i = cnt-1; i >= 0; i--) {
-        int nd = relDist + (1 << i);
+    /* Sending scheme example: say we have 9 nodes, and the msg is sent from 0
+     * The overall sending steps will be as follows:
+     * 0-->8, 0-->4, 0-->2, 0-->1
+     *               4-->6, 4-->5
+     *                      2-->3
+     *                      6-->7
+     * So for node id as N=A+2^B, it will forward the broadcast (B-1) msg to in
+     * the order as: N+2^(B-1), N+2^(B-2),..., N+1 except node 0, where B is
+     * the first position of bit 1 in the binary format of the number of N
+     * counting from the right with count starting from 0.
+     * On node 0, the value "B" should be CmiNodesDim
+     */
+    /* Calculate 2^B */
+    if(relDist==0) cnt = 1<<dims;
+    else cnt = relDist & ((~relDist)+1);
+    /*CmiPrintf("ND[%d]: send bcast msg with cnt=%d\n", CmiMyNode(), cnt);*/
+    /* Begin to send msgs */
+    for(cnt>>=1; cnt>0; cnt>>=1){
+        int nd = relDist + cnt;
         if (nd >= CmiNumNodes()) continue;
         nd = (nd+startNode)%CmiNumNodes();
         /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
