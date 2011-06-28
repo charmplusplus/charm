@@ -534,11 +534,23 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
+#if CMK_BLUEGENEP
+  if(affinity_flag){
+      affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on BG/P, thus ignored.\n");
+  }
+  if(show_affinity_flag){
+      show_affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on BG/P.\n");
+  }
+#endif
+
   if (!affinity_flag) {
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;
   }
-  else if (CmiMyPe() == 0) {
+
+  if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
        CmiPrintf("Charm++> cpuaffinity excludes core: %d", excludecore[0]);
