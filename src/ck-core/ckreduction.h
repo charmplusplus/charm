@@ -27,8 +27,8 @@ The calls needed to use the reduction manager are:
 #endif
 
 #ifdef _PIPELINED_ALLREDUCE_
-#define FRAG_SIZE 32768
-#define FRAG_THRESHOLD 65536
+#define FRAG_SIZE 131072
+#define FRAG_THRESHOLD 131072
 #endif
 
 class CkReductionMsg; //See definition below
