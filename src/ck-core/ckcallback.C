@@ -151,6 +151,15 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline)
 	secID=sectElt.ckGetSectionID(0); 
 }
 
+CkCallback::CkCallback(int ep, CkSectionID &id) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=bcastSection;
+      d.section.ep=ep;
+      secID=id;
+}
+
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
 #ifndef CMK_OPTIMIZE
       bzero(this, sizeof(CkCallback));
@@ -271,12 +280,6 @@ void CkCallback::send(void *msg) const
 		break;
 	};
 }
-CkCallback::CkCallback(int ep, CkSectionID &id)
-	{
-		type=bcastSection;
-		d.section.ep=ep;
-		secID=id;
-	}
 
 void CkCallback::pup(PUP::er &p) {
   //p((char*)this, sizeof(CkCallback));
