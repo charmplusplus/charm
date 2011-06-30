@@ -247,12 +247,10 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
 		break;
-	/* Xiang begin*/
 	case bcastSection:
 		if(!msg)msg=CkAllocSysMsg();
 		CkBroadcastMsgSection(d.section.ep,msg,secID);
 		break;
-	/* Xiang end */
 	case replyCCS: { /* Send CkDataMsg as a CCS reply */
 		void *data=NULL;
 		int length=0;
@@ -273,14 +271,13 @@ void CkCallback::send(void *msg) const
 		break;
 	};
 }
-/* Xiang begin */
 CkCallback::CkCallback(int ep, CkSectionID &id)
 	{
 		type=bcastSection;
 		d.section.ep=ep;
 		secID=id;
 	}
-/* Xiang end */
+
 void CkCallback::pup(PUP::er &p) {
   //p((char*)this, sizeof(CkCallback));
   int t = (int)type;

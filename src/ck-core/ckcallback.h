@@ -46,9 +46,7 @@ public:
 	bcastGroup, //Broadcast to a group (d.group)
 	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
-	/* Xiang Ni begin*/
 	bcastSection,//Broadcast to a section(d.section)
-	/* Xiang Ni end*/
 	replyCCS // Reply to a CCS message (d.ccsReply)
 	} callbackType;
 private:
@@ -81,11 +79,9 @@ private:
 		CkGroupID id; //Array ID to call it on
 		CkArrayIndexBase idx; //Index to send to (if any)
 	} array;
-	/* Xiang begin*/
 	struct s_section{
 		int ep;
 	} section;
-	/* Xiang end*/
 
 	struct s_ccsReply {
 		CcsDelayedReply reply;
@@ -192,11 +188,9 @@ public:
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
 	
-	/* Xiang begin*/
 	//Bcast to section
 	CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline=CmiFalse);
 	CkCallback(int ep, CkSectionID &sid);
-    /* Xiang end*/
 	
 	// Send to chare
 	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
