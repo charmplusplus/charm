@@ -13,7 +13,6 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #include "ckcallback-ccs.h"
 #include "CkCallback.decl.h"
 #include "envelope.h"
-
 /*readonly*/ CProxy_ckcallback_group _ckcallbackgroup;
 
 typedef CkHashtableT<CkHashtableAdaptorT<unsigned int>, CkCallback*> threadCB_t;
@@ -143,6 +142,15 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doIn
 	d.array.idx = arrElt.ckGetIndex();
 }
 
+CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline) {
+#ifndef CMK_OPTIMIZE
+      bzero(this, sizeof(CkCallback));
+#endif
+      type=bcastSection;
+	d.array.ep=ep; 
+	secID=sectElt.ckGetSectionID(0); 
+}
+
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
 #ifndef CMK_OPTIMIZE
       bzero(this, sizeof(CkCallback));
@@ -152,6 +160,7 @@ CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
 	d.array.id=p->ckGetArrayID(); 
 	d.array.idx = p->ckGetArrayIndex();
 }
+
 
 void CkCallback::send(int length,const void *data) const
 {
@@ -165,6 +174,7 @@ void CkCallback::send(int length,const void *data) const
 void CkCallback::send(void *msg) const
 {
 	switch(type) {
+	CkPrintf("type:%d\n",type);
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
 		break;
@@ -237,6 +247,12 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
 		break;
+	/* Xiang begin*/
+	case bcastSection:
+		if(!msg)msg=CkAllocSysMsg();
+		CkBroadcastMsgSection(d.section.ep,msg,secID);
+		break;
+	/* Xiang end */
 	case replyCCS: { /* Send CkDataMsg as a CCS reply */
 		void *data=NULL;
 		int length=0;
@@ -257,7 +273,14 @@ void CkCallback::send(void *msg) const
 		break;
 	};
 }
-
+/* Xiang begin */
+CkCallback::CkCallback(int ep, CkSectionID &id)
+	{
+		type=bcastSection;
+		d.section.ep=ep;
+		secID=id;
+	}
+/* Xiang end */
 void CkCallback::pup(PUP::er &p) {
   //p((char*)this, sizeof(CkCallback));
   int t = (int)type;

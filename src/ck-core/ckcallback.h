@@ -13,25 +13,21 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #define _CKCALLBACK_H_
 
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
-
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
 
 class CProxyElement_ArrayBase; /*forward declaration*/
+class CProxySection_ArrayBase;/*forward declaration*/
 class CProxyElement_Group; /*forward declaration*/
 class CProxy_NodeGroup;
 class Chare;
 class Group;
 class NodeGroup;
 class ArrayElement;
-
 #define CkSelfCallback(ep)  CkCallback(this, ep)
 
 class CkCallback {
 public:
-#ifdef _PIPELINED_ALLREDUCE_
-	friend class ArrayElement;
-#endif
 	typedef enum {
 	invalid=0, //Invalid callback
 	ignore, //Do nothing
@@ -50,6 +46,9 @@ public:
 	bcastGroup, //Broadcast to a group (d.group)
 	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
+	/* Xiang Ni begin*/
+	bcastSection,//Broadcast to a section(d.section)
+	/* Xiang Ni end*/
 	replyCCS // Reply to a CCS message (d.ccsReply)
 	} callbackType;
 private:
@@ -82,14 +81,24 @@ private:
 		CkGroupID id; //Array ID to call it on
 		CkArrayIndexBase idx; //Index to send to (if any)
 	} array;
+	/* Xiang begin*/
+	struct s_section{
+		int ep;
+	} section;
+	/* Xiang end*/
+
 	struct s_ccsReply {
 		CcsDelayedReply reply;
 	} ccsReply;
+	//callbackData(){memset(this,0,sizeof(callbackData));}
+	//callbackData()=default;
+	//constructor()=default;
 	};
+
 public:	
 	callbackType type;
 	callbackData d;
-	
+	CkSectionID secID;
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
 
@@ -182,8 +191,14 @@ public:
 
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
-
-    // Send to chare
+	
+	/* Xiang begin*/
+	//Bcast to section
+	CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline=CmiFalse);
+	CkCallback(int ep, CkSectionID &sid);
+    /* Xiang end*/
+	
+	// Send to chare
 	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
 
     // Send to group element on current PE

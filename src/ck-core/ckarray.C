@@ -993,6 +993,12 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 	return CkWaitReleaseFuture(f);
 }
 
+void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts     )
+{
+	CProxySection_ArrayBase sp(sID);
+	sp.ckSend((CkArrayMessage *)msg,entryIndex,opts);
+}
+
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr

@@ -459,7 +459,7 @@ PUPmarshall(CProxySection_ArrayBase)
 void CkSendMsgArray(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
 void CkSendMsgArrayInline(int entryIndex, void *msg, CkArrayID aID, const CkArrayIndex &idx, int opts=0);
 void CkBroadcastMsgArray(int entryIndex, void *msg, CkArrayID aID, int opts=0);
-
+void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts=    0);
 /************************ Array Element *********************/
 /**
  *An array element is a chare that lives inside the array.
