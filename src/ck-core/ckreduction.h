@@ -430,7 +430,7 @@ public:
 	// recieve an allreduce message
 	void allreduce_recieve(CkReductionMsg* msg)
 	{
-		allred_msgs.enq(msg);
+		// allred_msgs.enq(msg);
 		fragsRecieved++;
 		if(fragsRecieved==1)
 		{
@@ -439,8 +439,12 @@ public:
 		memcpy(data+msg->fragNo*FRAG_SIZE, msg->data, msg->dataSize);
 		size += msg->dataSize;
 		
-		if(fragsRecieved==msg->nFrags)
-			cb.send(size, (void*)data);
+		if(fragsRecieved==msg->nFrags) {
+			CkReductionMsg* ret = CkReductionMsg::buildNew(size, data);
+			cb.send(ret);
+			fragsRecieved=0; size=0;
+			delete [] data;
+		}
 		
 	}
 	// TODO: check for same reduction
@@ -448,7 +452,7 @@ public:
 	int size;
 	char* data;
 	int fragsRecieved;
-	CkMsgQ<CkReductionMsg> allred_msgs;
+	// CkMsgQ<CkReductionMsg> allred_msgs;
 };
 #endif // _PIPELINED_ALLREDUCE_
 
