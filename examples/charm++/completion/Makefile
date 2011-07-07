@@ -1,4 +1,4 @@
-CXX = charmc
+CXX = ../../../bin/charmc
 CXXFLAGS = -g -O3 -Wall
 
 SRC = $(wildcard *.cc)
