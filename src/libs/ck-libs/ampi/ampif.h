@@ -137,3 +137,7 @@
        integer, parameter :: MPI_BXOR = 109
        integer, parameter :: MPI_MAXLOC = 110
        integer, parameter :: MPI_MINLOC = 111
+!
+       integer, parameter :: MPI_OFFSET_KIND = 8
+       integer, parameter :: MPI_ADDRESS_KIND = 8
+
