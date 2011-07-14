@@ -47,7 +47,13 @@ TODO:
 #include "conv-ccs.h"
 #include <signal.h>
 
-#define DEBUGF      // CkPrintf
+void noopck(const char*, ...)
+{}
+
+
+//#define DEBUGF      // CkPrintf
+#define DEBUGF noopck
+
 
 // pick buddy processor from a different physical node
 #define NODE_CHECKPOINT                        0

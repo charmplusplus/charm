@@ -12,7 +12,6 @@ Set::Set()
 
 Set::~Set()
 {
-  int n;
   listNode *p = head;
   while (p){
     listNode *cur = p;

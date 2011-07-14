@@ -595,7 +595,6 @@ void CkPupProcessorData(PUP::er &p)
 // called only on pe 0
 static void checkpointOne(const char* dirname, CkCallback& cb){
 	CmiAssert(CkMyPe()==0);
-	int i;
 	char filename[1024];
 	
 	// save readonlys, and callback BTW

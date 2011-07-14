@@ -46,9 +46,13 @@ class QdCallback {
 //    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
     void send(void) {
       // pretending pe 0 in blue gene mode, switch back after the call.
+#if CMK_CONDS_USE_SPECIAL_CODE
       int old = CmiSwitchToPE(0);
+#endif
       cb.send(NULL);
+#if CMK_CONDS_USE_SPECIAL_CODE
       CmiSwitchToPE(old);
+#endif
     }
 };
 
