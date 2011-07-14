@@ -17,6 +17,7 @@ extern int com_debug;
 double busyWait;
 double sim_timer;
 int POSE_inactDetect;
+int totalNumPosers;
 POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
@@ -74,6 +75,7 @@ void POSE_init(int IDflag, int ET) // can specify both
     unlink(fName);
   }
   POSE_inactDetect = IDflag;
+  totalNumPosers = 0;
   POSE_endtime = ET;
 #ifdef SEQUENTIAL_POSE
   _POSE_SEQUENTIAL = 1;
@@ -217,7 +219,23 @@ void setPoseIndexOfStopEvent(int index) {
 /// Exit simulation program after terminus reduction
 void POSE_prepExit(void *param, void *msg)
 {
-  CkReductionMsg *m=(CkReductionMsg *)msg;
+  CkReductionMsg *m = (CkReductionMsg *)msg;
+  long long *finalBasicStats = ((long long*)m->getData());
+  CkPrintf("Final basic stats: Commits: %lld  Rollbacks: %lld\n", finalBasicStats[0], finalBasicStats[1]);
+  delete m;
+#ifdef SEQUENTIAL_POSE
+  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
+  POSE_Coordinator.prepExit();
+#else
+  CProxy_GVT g(TheGVT);
+  g.sumGVTIterationCounts();
+#endif
+}
+
+/// Collect GVT iteration counts
+void POSE_sumGVTIterations(void *param, void *msg) {
+  CkReductionMsg *m = (CkReductionMsg *)msg;
+  CkPrintf("Final basic stats: GVT iterations: %d\n", *((int*)m->getData()));
   delete m;
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.prepExit();

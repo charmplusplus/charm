@@ -30,6 +30,7 @@ sim::sim()
   if(pose_config.stats)
     localStats = (localStat *)CkLocalBranch(theLocalStats);
 #endif
+  basicStats[0] = basicStats[1] = 0LL;
   lastGVT = active = DOs = UNDOs = 0;
   srVector = (int *)malloc(CkNumPes() * sizeof(int));
   for (int i=0; i<CkNumPes(); i++) srVector[i] = 0;
@@ -59,8 +60,9 @@ void sim::pup(PUP::er &p) {
   // pup simple types
   p(active); p(myPVTidx); p(myLBidx); p(sync); p(DOs); p(UNDOs);
   // pup event queue
-  if (p.isUnpacking())
+  if (p.isUnpacking()) {
     eq = new eventQueue();
+  }
   eq->pup(p);
   // pup cancellations
   cancels.pup(p);
@@ -78,6 +80,7 @@ void sim::pup(PUP::er &p) {
 #endif
     active = 0;
   }
+  PUParray(p, basicStats, 2);
   // pup checkpoint info for sequential mode using sim 0 only
 #ifdef SEQUENTIAL_POSE
   if (thisIndex == 0) {
@@ -123,7 +126,8 @@ void sim::Step()
   case ADAPT_T:
   case ADAPT2_T:
   case ADAPT3_T:
-  case ADAPT4_T: // pass this step call directly to strategy
+  case ADAPT4_T:
+  case ADAPT5_T: // pass this step call directly to strategy
     myStrat->Step();
     break;
   default: 
@@ -231,7 +235,7 @@ void sim::Commit()
   if(pose_config.stats)
     localStats->SwitchTimer(SIM_TIMER);
 #endif
-  if (!isDone && (eq->currentPtr->timestamp > -1)) 
+  if (!isDone && (eq->currentPtr->timestamp > -1))
     Step(); // not done; try stepping again
 
 #ifndef CMK_OPTIMIZE
@@ -430,7 +434,7 @@ void sim::ResumeFromSync()
 /// Dump all data fields
 void sim::dump()
 {
-  CkPrintf("[SIM: active=%d sync=%d myPVTidx=%d ", active, sync, myPVTidx);
+  CkPrintf("[SIM: thisIndex=%d active=%d sync=%d myPVTidx=%d ", thisIndex, active, sync, myPVTidx);
   if (objID) objID->dump();
   else CkPrintf("objID=NULL\n");
   eq->dump();

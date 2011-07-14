@@ -184,7 +184,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   for (i=0; i<gvtp; i++) gvtDOP[i] = 0;
   for (i=0; i<grtp; i++) grtDOP[i] = 0;
   for (i=0; i<CkNumPes(); i++) { // read each processor's log
-    sprintf(filename, "dop%ld.log\0", i);
+    sprintf(filename, "dop%lld.log\0", i);
     fp = fopen(filename, "r");
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
@@ -193,7 +193,7 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
     }
     CkPrintf("Reading file %s...\n", filename);
 #if USE_LONG_TIMESTAMPS
-    const char* format = "%lf %lf %ld %ld\n";
+    const char* format = "%lf %lf %lld %lld\n";
 #else
     const char* format = "%lf %lf %d %d\n";
 #endif
@@ -214,8 +214,10 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   int zed = 0;
   fp = fopen("dop_mod.out", "w");
   for (i=0; i<gvtp; i++) {
+    // print status every ~64M iterations
+    if ((i & 0x03FFFFFF) == 0) CkPrintf("   current index: %lld of %lld\n", i, gvtp);
     if ((gvtDOP[i] != 0) || (zed == 0))
-      fprintf(fp, "%ld %d\n", i, gvtDOP[i]);
+      fprintf(fp, "%lld %d\n", i, gvtDOP[i]);
     if (gvtDOP[i] == 0) zed = 1;
     else zed = 0;
     avgPEs += gvtDOP[i];
@@ -225,10 +227,10 @@ void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
   fclose(fp);
   fp = fopen("dop_sim.out", "w");
   for (i=0; i<grtp; i++) {
-    fprintf(fp, "%ld %d\n", i, grtDOP[i]);
+    fprintf(fp, "%lld %d\n", i, grtDOP[i]);
     if (grtDOP[i] > simulationPEs) simulationPEs = grtDOP[i];
   } 
   fclose(fp);
-  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %d\n",
+  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %lld\n",
 	   modelPEs, simulationPEs, avgPEs);
 }

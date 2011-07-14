@@ -84,6 +84,8 @@ class SRentry {
       CkPrintf("TS:%d #s:%d #r:%d n:!NULL ", timestamp, sends, recvs); 
     else CkPrintf("TS:%d #s:%d #r:%d n:NULL ",timestamp, sends, recvs);
   }
+  /// Dump data fields to a string
+  char *dumpString();
   /// Check validity of data fields
   void sanitize() {
     CmiAssert(timestamp >= POSE_UnsetTS); // should be POSE_UnsetTS or > if initialized
@@ -308,7 +310,9 @@ class SRtable {
   /// Free all buckets and overflows, reset all counts
   void FreeTable();
   /// Dump data fields
-  void dump();    
+  void dump();
+  /// Dump data fields to a string
+  char *dumpString();
   /// Check validity of data fields
   void sanitize();
   /// Test this class

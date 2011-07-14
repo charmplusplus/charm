@@ -81,9 +81,7 @@ public:
   localStat(CkMigrateMessage *msg) : Group(msg) { };
   /// Destructor
   ~localStat() {
-    if (pose_config.dop) {
-      fclose(dopFilePtr);
-    }
+    fclose(dopFilePtr);
   }
   /// Start the specified timer
   void TimerStart(int timer);
@@ -121,10 +119,12 @@ public:
   /// Write data to this PE's DOP log file
   inline void WriteDopData(double srt, double ert, POSE_TimeType svt, POSE_TimeType evt) {
 #if USE_LONG_TIMESTAMPS
-    const char* format = "%f %f %ld %ld\n";
+    const char* format = "%f %f %lld %lld\n";
 #else
     const char* format = "%f %f %d %d\n";
 #endif
+    // fprintf returns the number of characters written, or a negative
+    // number if something went wrong
     if (fprintf(dopFilePtr, format, srt, ert, svt, evt) <= 0) {
       CkPrintf("WARNING: DOP data not written to %s\n", dopFileName);
     }

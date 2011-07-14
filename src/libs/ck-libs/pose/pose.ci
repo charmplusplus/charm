@@ -6,6 +6,7 @@ module pose {
 //  readonly ComlibInstanceHandle POSE_commlib_insthndl;
   readonly POSE_TimeType POSE_endtime;  
   readonly POSE_Config pose_config;
+  readonly int totalNumPosers;
   message callBack;
   chare [migratable] pose {
     entry pose();

@@ -201,6 +201,28 @@ void HeapNode::dump()
   CkPrintf(" end HpNd]\n");
 }
 
+/// Dump all data fields in entire subheap
+char *HeapNode::dumpString() {
+  char str[PVT_DEBUG_BUFFER_LINE_LENGTH];
+#if USE_LONG_TIMESTAMPS
+  sprintf(str, "[HpNd: sz=%d event=%lld(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
+#else
+  sprintf(str, "[HpNd: sz=%d event=%d(%u.%d) ", subheapsize, e->timestamp, e->evID.id, e->evID.getPE());
+#endif
+  if (left) {
+    strcat(str, left->dumpString());
+  } else {
+    strcat(str, "[NULL] ");
+  }
+  if (right) {
+    strcat(str, right->dumpString());
+  } else {
+    strcat(str, "[NULL]");
+  }
+  strcat(str, "] ");
+  return str;
+}
+
 /// Pack/unpack/sizing operator
 /** Recursively packs/sizes entire subheap; DOES NOT UNPACK HEAP!!! */
 void HeapNode::pup(PUP::er &p)
@@ -417,6 +439,20 @@ void EqHeap::dump()
   if (top) top->dump();
   else CkPrintf("NULL");
   CkPrintf(" end EQHEAP]\n");
+}
+
+/// Dump entire heap to a string
+char *EqHeap::dumpString() {
+  char str[8192];
+  sprintf(str, "[EQHEAP: ");
+  //if (top) {
+  //  strcat(str, top->dumpString());
+  //} else {
+  //  strcat(str, "NULL");
+  //}
+  strcat(str, "<not printed right now>");
+  strcat(str, " end EQHEAP] ");
+  return str;
 }
 
 /// Check validity of data fields

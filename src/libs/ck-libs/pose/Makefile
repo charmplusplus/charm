@@ -13,7 +13,7 @@ POSEINCDIR = $(CHARMINC)/pose
 OBJECTS=	eventID.o stats.o srtable.o cancel.o memory_temporal.o \
 		mempool.o pvtobj.o lbObject.o ldbal.o gvt.o event.o eqheap.o \
 		evq.o sim.o rep.o strat.o seq.o cons.o opt.o opt2.o opt3.o \
-		spec.o adapt.o adapt2.o adapt3.o adapt4.o pose.o
+		spec.o adapt.o adapt2.o adapt3.o adapt4.o adapt5.o pose.o
 SEQOBJECTS=     $(OBJECTS:.o=.seq.o)
 
 LIB = libmodulepose.a
@@ -49,7 +49,7 @@ $(LIBSEQDEST):	$(SEQOBJECTS)
 
 # *******************************
 
-docs: pose.doxy adapt2.C adapt3.C adapt4.C eventID.C lbObject.C spec.C adapt2.h adapt3.h adapt4.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h memory_temporal.C mempool.C ldbal.ci srtable.h memory_temporal.ci mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci memory_temporal.h mempool.h pvtobj.h chpt.h seq.C cons.C evq.C rep.C stats.h seq.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
+docs: pose.doxy adapt2.C adapt3.C adapt4.C adapt5.C eventID.C lbObject.C spec.C adapt2.h adapt3.h adapt4.h adapt5.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h memory_temporal.C mempool.C ldbal.ci srtable.h memory_temporal.ci mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci memory_temporal.h mempool.h pvtobj.h chpt.h seq.C cons.C evq.C rep.C stats.h seq.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
 	doxygen pose.doxy
 
 # HOUSE-KEEPING RULES
