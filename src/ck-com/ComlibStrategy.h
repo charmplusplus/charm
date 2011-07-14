@@ -86,7 +86,6 @@ class CharmMessageHolder : public MessageHolder{
 
     inline char * getCharmMessage() {
         return (char *)EnvToUsr((envelope *) data);
-	checkme();
     }
     
     /// Store a local copy of the sec_id, so I can use it later.

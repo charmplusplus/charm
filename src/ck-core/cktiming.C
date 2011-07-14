@@ -27,7 +27,7 @@ CkpvDeclare(FILE*, bgfp);     // for bigsim run
 
 CkpvDeclare(int, outputParameters);
 
-static int outputTiming = 0;
+
 
 
 //======================PAPI======================= 
@@ -75,6 +75,10 @@ public:
 
 CkpvStaticDeclare(StringPool, eventsPool);
 
+#ifdef CMK_BLUEGENE_CHARM
+static int outputTiming = 0;
+#endif
+
 // called on all PEs once
 extern "C"
 void initBigSimTrace(int outputParams, int _outputTiming)
@@ -85,9 +89,8 @@ void initBigSimTrace(int outputParams, int _outputTiming)
   bgTraceCounter = 0;
 #ifdef CMK_BLUEGENE_CHARM
   if (!BgIsReplay()) outputTiming = 0;
-#endif
   outputTiming = _outputTiming;
-
+#endif
   CkpvInitialize(bool, insideTraceBracket);
   CkpvAccess(insideTraceBracket) = false;
 
@@ -221,10 +224,10 @@ void endTraceBigSim_20param(char * eventname, int stepno, int num_params, double
 
     CkAssert(CkpvAccess(insideTraceBracket) == true);
     CkpvAccess(insideTraceBracket) = false;
-
+#ifdef CMK_BLUEGENE_CHARM
     char perfCountString[1024]; 
     perfCountString[0] = 0; 
- 
+#endif
 	char params[2048];
 
 if(num_params==0) sprintf(params, "");
@@ -309,11 +312,11 @@ if (t<0.0) {
 	}
   }
 #endif
+#ifdef CMK_BLUEGENE_CHARM
 
   char sequenceString[128];
   sequenceString[0] = 0;
 
-#ifdef CMK_BLUEGENE_CHARM
   BgMark("endTraceBigSim %f\n");
   if (CkpvAccess(bgfp) != NULL) {
   // write event ID

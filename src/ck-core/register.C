@@ -152,7 +152,7 @@ void CkEnableTracing(int epIdx) {
 	_entryTable[epIdx]->traceEnabled=CmiTrue;
 }
 
-
+#if CMK_CHARMDEBUG
 static void pupEntry(PUP::er &p,int index)
 {
   EntryInfo *c=_entryTable[index];
@@ -163,6 +163,7 @@ static void pupEntry(PUP::er &p,int index)
   PCOM(chareIdx)
   PCOM(inCharm);
 }
+
 static void pupMsg(PUP::er &p,int i)
 {
   MsgInfo *c=_msgTable[i];
@@ -198,7 +199,7 @@ static void pupReadonlyMsg(PUP::er &p,int i)
   p.comment("value");
   CkPupMessage(p,c->pMsg,0);
 }
-
+#endif
 extern void CpdCharmInit(void);
 
 void _registerDone(void)

@@ -471,7 +471,7 @@ void ChunkTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, con
 
 //like tree except with the mother node sending chunks instead of a ring between depth 1 processors
 void ChunkPipeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes, int chunkNumber, int numChunks) {
-  int hop;
+  /*  int hop;*/
   int *allpelist;
   CkPrintf("myindex = %d\n", myIndex);
   if (myIndex == -1) {

@@ -418,7 +418,7 @@ void ComlibSectionInfo::getLocalIndices(int nindices,
                                         CkVec<CkArrayIndex> &idx_vec){    
 	ComlibPrintf("ComlibSectionInfo::getLocalIndices()\n");
 	
-	int count = 0, acount = 0;
+	int acount = 0;
     idx_vec.resize(0);
     
     CkArray *a = (CkArray *)_localBranch(destArrayID);
@@ -436,7 +436,7 @@ void ComlibSectionInfo::getNodeLocalIndices(int nindices,
                                         CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
                                         CkVec<CkArrayIndex> &idx_vec){    
-    int count = 0, acount = 0;
+    int acount = 0;
     idx_vec.resize(0);
     
     CkArray *a = (CkArray *)_localBranch(destArrayID);

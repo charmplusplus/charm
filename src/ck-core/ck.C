@@ -1280,8 +1280,9 @@ void CkUnpackMessage(envelope **pEnv)
 //There's no reason for most messages to go through the Cld--
 // the PE can never be CLD_ANYWHERE; wasting _infoFn calls.
 // Thus these accellerated versions of the Cld calls.
-
+#if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
+#endif
 int index_tokenHandler;
 int index_skipCldHandler;
 
@@ -1574,7 +1575,9 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
+#if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
+#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1904,7 +1907,9 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 
 void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
+#if CMK_OBJECT_QUEUE_AVAILABLE
 	index_objectQHandler = CkRegisterHandler((CmiHandler)_ObjectQHandler);
+#endif
 	index_tokenHandler = CkRegisterHandler((CmiHandler)_TokenHandler);
 	CkpvInitialize(TokenPool*, _tokenPool);
 	CkpvAccess(_tokenPool) = new TokenPool;
@@ -2028,7 +2033,6 @@ CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
 
-    int i;
     char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
     strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
     sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
@@ -2072,7 +2076,6 @@ private:
   }
   virtual CmiBool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
-      char tmp[128];
       bool wasPacked = (*envptr)->isPacked();
       if (!wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;

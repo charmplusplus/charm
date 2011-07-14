@@ -32,7 +32,7 @@ public:
   MyHierarchyTree(): span(NULL), myname(NULL) {}
   virtual ~MyHierarchyTree() {}
   const char* name() const { return myname; }
-  virtual const int numLevels() const { return nLevels; }
+  virtual int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;

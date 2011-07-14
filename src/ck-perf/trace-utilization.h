@@ -279,7 +279,6 @@ class TraceUtilization : public Trace {
     if (epIdx >= epInfoSize) {
       CkPrintf("WARNING: epIdx=%d >=  epInfoSize=%d\n", (int)epIdx, (int)epInfoSize );
       return;
-      CmiAbort("Too many entry points!!\n");
     }
     
     int startingBinIdx = (int)(startTime/BIN_SIZE);

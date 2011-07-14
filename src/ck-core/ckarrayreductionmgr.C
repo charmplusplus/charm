@@ -3,10 +3,13 @@
 #include "CkArrayReductionMgr.decl.h"
 #define ARRREDDEBUG 0
 
+void noopitar(const char*, ...)
+{}
+
 #if ARRREDDEBUG
 #define ARPRINT CkPrintf
 #else
-#define ARPRINT //ARPRINT
+#define ARPRINT noopitar
 #endif
 
 void CkArrayReductionMgr::init()

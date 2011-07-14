@@ -14,7 +14,11 @@ More documentation goes here...
 #include "ck.h"
 #include "ckcheckpoint.h"
 
-#define DEBCHK  // CkPrintf
+void noopit(const char*, ...)
+{}
+
+//#define DEBCHK  // CkPrintf
+#define DEBCHK noopit
 
 #define DEBUGC(x) x
 //#define DEBUGC(x) 
@@ -591,7 +595,6 @@ void CkPupProcessorData(PUP::er &p)
 // called only on pe 0
 static void checkpointOne(const char* dirname, CkCallback& cb){
 	CmiAssert(CkMyPe()==0);
-	int i;
 	char filename[1024];
 	
 	// save readonlys, and callback BTW

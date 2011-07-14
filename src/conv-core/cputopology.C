@@ -219,12 +219,10 @@ static int done = 0;
 /* called on PE 0 */
 static void cpuTopoHandler(void *m)
 {
-  static int count = 0;
-  static int nodecount = 0;
   _procInfo *rec;
   hostnameMsg *msg = (hostnameMsg *)m;
   char str[256];
-  int tag, tag1, pe, myrank;
+  int tag, tag1, pe;
 
   if (topomsg == NULL) {
     int i;
@@ -251,12 +249,10 @@ static void cpuTopoHandler(void *m)
     if ((rec = (_procInfo *)CmmProbe(hostTable, 1, &tag, &tag1)) != NULL) {
     }
     else {
-//    msg->nodeID = nodecount++;
       proc->nodeID = pe;           // we will compact the node ID later
       rec = proc;
       CmmPut(hostTable, 1, &tag, proc);
     }
-    myrank = rec->rank%rec->ncores;
     topomsg->nodes[pe] = rec->nodeID;
     rec->rank ++;
   }
@@ -387,7 +383,6 @@ static int _noip = 0;
 extern "C" void CmiInitCPUTopology(char **argv)
 {
   static skt_ip_t myip;
-  int ret, i;
   hostnameMsg  *msg;
   double startT;
  

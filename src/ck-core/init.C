@@ -169,8 +169,9 @@ CkpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
 
+#if CMK_WITH_STATS
 static Stats** _allStats = 0;
-
+#endif
 static int   _numStatsRecd = 0;
 static int   _exitStarted = 0;
 
@@ -1234,7 +1235,9 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 	if (faultFunc) {
+#if CMK_WITH_STATS
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
+#endif
 		if (!inCommThread) {
                   CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
                   msg->argc = CmiGetArgc(argv);
@@ -1243,7 +1246,9 @@ void _initCharm(int unused_argc, char **argv)
                   CkFreeMsg(msg);
                 }
 	}else if(CkMyPe()==0){
+#if CMK_WITH_STATS
 		_allStats = new Stats*[CkNumPes()];
+#endif
 		register size_t i, nMains=_mainTable.size();
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{
