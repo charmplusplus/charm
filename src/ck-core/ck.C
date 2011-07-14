@@ -170,7 +170,6 @@ void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   traceAddThreadListeners(th, UsrToEnv(msg));
 }
 
-
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
   p.comment("Bytes");
   int ts=UsrToEnv(msg)->getTotalsize();
@@ -246,13 +245,13 @@ void CkDelegateMgr::GroupSend(CkDelegateData *pd,int ep,void *m,int onPE,CkGroup
 void CkDelegateMgr::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g)
   { CkBroadcastMsgBranch(ep,m,g); }
 void CkDelegateMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
+  { CkSendMsgBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
 void CkDelegateMgr::NodeGroupSend(CkDelegateData *pd,int ep,void *m,int onNode,CkNodeGroupID g)
   { CkSendMsgNodeBranch(ep,m,onNode,g); }
 void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g)
   { CkBroadcastMsgNodeBranch(ep,m,g); }
 void CkDelegateMgr::NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
+  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
 void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
@@ -354,7 +353,7 @@ void CProxy::pup(PUP::er &p) {
 /**** Array sections */
 #define CKSECTIONID_CONSTRUCTOR_DEF(index) \
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems): _nElems(nElems) { \
-  _cookie.aid = aid;	\
+  _cookie.get_aid() = aid;	\
   _cookie.get_pe() = CkMyPe();	\
   _elems = new CkArrayIndex[nElems];	\
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];	\
@@ -373,7 +372,7 @@ CKSECTIONID_CONSTRUCTOR_DEF(Max)
 CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes): _nElems(0), _elems(NULL), npes(_npes) {
   pelist = new int[npes];
   for (int i=0; i<npes; i++) pelist[i] = _pelist[i];
-  _cookie.aid = gid;
+  _cookie.get_aid() = gid;
 }
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {

@@ -70,11 +70,11 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     
     ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
     msg->nPes = nRemotePes;
-    msg->_cookie.sInfo.cInfo.instId = instanceID;
-    msg->_cookie.sInfo.cInfo.id = MaxSectionID - 1;
-    msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
-    msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
-    msg->_cookie.pe = CkMyPe();
+    msg->_cookie.info.sInfo.cInfo.instId = instanceID;
+    msg->_cookie.info.sInfo.cInfo.id = MaxSectionID - 1;
+    msg->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
+    msg->_cookie.get_type() = COMLIB_MULTICAST_MESSAGE;
+    msg->_cookie.get_pe() = CkMyPe();
 
     // fill in the three pointers of the ComlibMulticastMsg
     memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
@@ -198,15 +198,15 @@ void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
 
     //Old section id, send the id with the message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)cmsg->getCharmMessage();
-    cbmsg->_cookie.pe = CkMyPe();
-    cbmsg->_cookie.sInfo.cInfo.id = cur_sec_id;
-    cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
+    cbmsg->_cookie.get_pe() = CkMyPe();
+    cbmsg->_cookie.info.sInfo.cInfo.id = cur_sec_id;
+    cbmsg->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
 }
 
 CkMcastBaseMsg *ComlibSectionInfo::getNewDeliveryErrorMsg(CkMcastBaseMsg *base) {
   CkMcastBaseMsg *dest= (CkMcastBaseMsg*)CkAllocMsg(0, sizeof(CkMcastBaseMsg), 0);
   memcpy(dest, base, sizeof(CkMcastBaseMsg));
-  dest->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_SECTION_ERROR;
+  dest->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_SECTION_ERROR;
   return dest;
 }
 

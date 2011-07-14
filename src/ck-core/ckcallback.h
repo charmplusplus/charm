@@ -80,6 +80,11 @@ private:
 		CkArrayIndexBase idx; //Index to send to (if any)
 	} array;
 	struct s_section{
+		CkSectionInfoStruct sinfo;
+                CkArrayIndex *_elems;
+                int _nElems;
+                int *pelist;
+                int npes;
 		int ep;
 	} section;
 
@@ -94,7 +99,6 @@ private:
 public:	
 	callbackType type;
 	callbackData d;
-	CkSectionID secID;
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
 
@@ -214,6 +218,10 @@ public:
 
 	~CkCallback() {
 	  thread_destroy();
+          if (bcastSection == type) {
+            if (d.section._elems != NULL) delete [] d.section._elems;
+            if (d.section.pelist != NULL) delete [] d.section.pelist;
+          }
 	}
 	
 	int isInvalid(void) const {return type==invalid;}

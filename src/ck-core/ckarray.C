@@ -1007,13 +1007,13 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 	  // send through all
 	  for (int k=0; k<_nsid; ++k) {
 	    for (int i=0; i< _sid[k]._nElems-1; i++) {
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.aid, _sid[k]._elems[i]);
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
 	      void *newMsg=CkCopyMsg((void **)&msg);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	    if (_sid[k]._nElems > 0) {
 	      void *newMsg= (k<_nsid-1) ? CkCopyMsg((void **)&msg) : msg;
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.aid, _sid[k]._elems[_sid[k]._nElems-1]);
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._nElems-1]);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	  }

@@ -21,7 +21,7 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#define SPLIT_MULTICAST  0 
+#define SPLIT_MULTICAST  0
 // each multicast message is split into SPLIT_NUM fragments
 #define SPLIT_NUM 20
 #define SPLIT_SIZE (250000)
@@ -264,7 +264,7 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
 #endif
     }
     //  entry->aid = aid;
-    _id.aid = aid;
+    _id.get_aid() = aid;
     _id.get_val() = entry;		// allocate table for this section
     // 
     initCookie(_id);
@@ -297,8 +297,8 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
     entry->allObjKeys.push_back(key);
 #endif
   }
-  _id.type = MulticastMsg;
-  _id.aid = aid;
+  _id.get_type() = MulticastMsg;
+  _id.get_aid() = aid;
   _id.get_val() = entry;		// allocate table for this section
   initCookie(_id);
 }
@@ -321,7 +321,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayElement &proxy)
   DEBUGF(("[%d] resetSection: old entry:%p new entry:%p\n", CkMyPe(), oldentry, entry));
 
   const CkArrayIndex *al = sid->_elems;
-  CmiAssert(info.aid == aid);
+  CmiAssert(info.get_aid() == aid);
   prepareCookie(entry, *sid, al, sid->_nElems, aid);
 
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
@@ -349,8 +349,8 @@ void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const Ck
     entry->allObjKeys.push_back(key);
 #endif
   }
-  sid._cookie.type = MulticastMsg;
-  sid._cookie.aid = aid;
+  sid._cookie.get_type() = MulticastMsg;
+  sid._cookie.get_aid() = aid;
   sid._cookie.get_val() = entry;	// allocate table for this section
   sid._cookie.get_pe() = CkMyPe();
 }
@@ -411,7 +411,7 @@ void CkMulticastMgr::initCookie(CkSectionInfo s)
     msg->rootSid = s;
     msg->redNo = entry->red.redNo;
     // Fill the message with the section member indices and their last known locations
-    CkArray *array = CProxy_ArrayBase(s.aid).ckLocalBranch();
+    CkArray *array = CProxy_ArrayBase(s.get_aid()).ckLocalBranch();
     for (int i=0; i<n; i++) {
       msg->arrIdx[i] = entry->allElem[i];
       int ape = array->lastKnown(entry->allElem[i]);
@@ -487,7 +487,7 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 {
     int i,j;
     mCastEntry *entry;
-    CkArrayID aid = msg->rootSid.aid;
+    CkArrayID aid = msg->rootSid.get_aid();
     if (msg->parent.get_pe() == CkMyPe()) 
       entry = (mCastEntry *)msg->rootSid.get_val(); //sid.val;
     else 
@@ -745,14 +745,14 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
 #if CMK_LBDB_ON
     // fixme: running obj?
     envelope *env = UsrToEnv(msg);
-    const LDOMHandle &om = CProxy_ArrayBase(s.aid).ckLocMgr()->getOMHandle();
+    const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
     LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
 #endif
 
     // first time need to rebuild, we do simple send to refresh lastKnown
     if (entry->needRebuild == 1) {
       msg->_cookie = s;
-      SimpleSend(ep, msg, s.aid, *sid, opts);
+      SimpleSend(ep, msg, s.get_aid(), *sid, opts);
       entry->needRebuild = 2;
       return;
     }
@@ -866,7 +866,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int i;
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
-  CmiAssert(entry->getAid() == sectionInfo.aid);
+  CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
 #if ! SPLIT_MULTICAST
   if (entry->notReady()) {
@@ -889,9 +889,9 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   int nLocal = entry->localElem.length();
   DEBUGF(("send to local %d\n", nLocal));
   for (i=0; i<nLocal-1; i++) {
-    CProxyElement_ArrayBase ap(sectionInfo.aid, entry->localElem[i]);
+    CProxyElement_ArrayBase ap(sectionInfo.get_aid(), entry->localElem[i]);
     if (_entryTable[msg->ep]->noKeep) {
-      CkSendMsgArrayInline(msg->ep, msg, sectionInfo.aid, entry->localElem[i], CK_MSG_KEEP);
+      CkSendMsgArrayInline(msg->ep, msg, sectionInfo.get_aid(), entry->localElem[i], CK_MSG_KEEP);
     }
     else {
       // send through scheduler queue
@@ -906,7 +906,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     //CmiNetworkProgressAfter(3);
   }
   if (nLocal) {
-    CProxyElement_ArrayBase ap(sectionInfo.aid, entry->localElem[nLocal-1]);
+    CProxyElement_ArrayBase ap(sectionInfo.get_aid(), entry->localElem[nLocal-1]);
     ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
 //    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
@@ -927,7 +927,7 @@ void CkGetSectionInfo(CkSectionInfo &id, void *msg)
   }
   // ignore invalid cookie sent by SimpleSend
   if (m->gpe() != -1) {
-    id.type = MulticastMsg;
+    id.get_type() = MulticastMsg;
     id.get_pe() = m->gpe();
     id.get_val() = m->cookie();
   }
