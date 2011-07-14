@@ -383,9 +383,9 @@ public:
 		const CkArrayIndex *elems, const int nElems, CK_DELCTOR_PARAM)
 		:CProxy_ArrayBase(aid,CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(aid, elems, nElems); }
 	CProxySection_ArrayBase(const CkSectionID &sid)
-		:CProxy_ArrayBase(sid._cookie.aid), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid()), _nsid(1) { _sid = new CkSectionID(sid); }
 	CProxySection_ArrayBase(const CkSectionID &sid, CK_DELCTOR_PARAM)
-		:CProxy_ArrayBase(sid._cookie.aid, CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
+		:CProxy_ArrayBase(sid._cookie.get_aid(), CK_DELCTOR_ARGS), _nsid(1) { _sid = new CkSectionID(sid); }
         CProxySection_ArrayBase(const CProxySection_ArrayBase &cs)
 		:CProxy_ArrayBase(cs.ckGetArrayID()), _nsid(cs._nsid) {
       if (_nsid == 1) _sid = new CkSectionID(cs.ckGetArrayID(), cs.ckGetArrayElements(), cs.ckGetNumElements());
@@ -446,7 +446,7 @@ public:
 	inline CkSectionID *ckGetSectionIDs() {return _sid;}
 	inline CkSectionID &ckGetSectionID() {return _sid[0];}
 	inline CkSectionID &ckGetSectionID(int i) {return _sid[i];}
-	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.aid;}
+	inline CkArrayID ckGetArrayIDn(int i) const {return _sid[i]._cookie.get_aid();}
     inline CkArrayIndex *ckGetArrayElements() const {return _sid[0]._elems;}
     inline CkArrayIndex *ckGetArrayElements(int i) const {return _sid[i]._elems;}
     inline int ckGetNumElements() const { return _sid[0]._nElems; }

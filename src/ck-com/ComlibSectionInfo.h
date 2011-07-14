@@ -136,9 +136,9 @@ class ComlibSectionInfo {
         CkAbort("Too many sections allocated, wrapping of ints should be done!\n");
       }
       ComlibPrintf("[%d] ComlibSectionInfo::initSectionID: creating section number %d for proc %d\n",
-          CkMyPe(), MaxSectionID, sid->_cookie.pe);
-      sid->_cookie.sInfo.cInfo.id = MaxSectionID ++;
-      sid->_cookie.pe = CkMyPe();
+          CkMyPe(), MaxSectionID, sid->_cookie.get_pe());
+      sid->_cookie.info.sInfo.cInfo.id = MaxSectionID ++;
+      sid->_cookie.get_pe() = CkMyPe();
     }
     
     void processOldSectionMessage(CharmMessageHolder *cmsg);

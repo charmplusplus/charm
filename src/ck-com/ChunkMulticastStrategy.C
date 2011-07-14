@@ -160,7 +160,8 @@ void ChunkMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
   double start = CmiWallTimer();
   CkSectionID *sec_id = cmsg->sec_id;
   CkVec< CkArrayIndex > localIndices;
-  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, sec_id->_cookie.aid, localIndices);
+  CkArrayID aid(sec_id->_cookie.get_aid());
+  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, aid, localIndices);
   deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() );
   //if (deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() ) == 0) 
     //CkFreeMsg(cmsg->getCharmMessage());

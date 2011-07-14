@@ -25,10 +25,9 @@
 
 /** Structure that holds info relevant to the use of an array/group section
  */
-class CkSectionInfo {
- public:
+typedef struct _CkSectionInfoStruct {
     /// The array ID of the array that has been sectioned
-    CkArrayID aid; ///< @note: Also used to store a CkGroupID for group multicasts
+    CkGroupID aid; ///< @note: Also used to store a CkGroupID for group multicasts
     /// The pe on which this object has been created
     int pe;
     /// Info needed by the section comm managers
@@ -60,50 +59,61 @@ class CkSectionInfo {
     } sInfo;
     // Indicates which library has been delegated the section comm
     char type;
+} CkSectionInfoStruct;
+
+class CkSectionInfo {
+ public:
+    CkSectionInfoStruct  info;
     
     CkSectionInfo()  {
-        type = 0; pe = -1;
-        sInfo.sCookie.val=NULL; sInfo.sCookie.redNo=0;
-        sInfo.cInfo.instId = 0;
-        sInfo.cInfo.status = 0;
-        sInfo.cInfo.id     = 0;
+        info.type = 0; info.pe = -1;
+        info.sInfo.sCookie.val=NULL; info.sInfo.sCookie.redNo=0;
+        info.sInfo.cInfo.instId = 0;
+        info.sInfo.cInfo.status = 0;
+        info.sInfo.cInfo.id     = 0;
     }
 
+    CkSectionInfo(CkSectionInfoStruct i): info(i) {}
+
     CkSectionInfo(int t) {
-      type = t; pe = -1;
-      switch (type) {
+      info.type = t; info.pe = -1;
+      switch (info.type) {
       case MulticastMsg:
-        sInfo.sCookie.val=NULL; 
-        sInfo.sCookie.redNo=0;
+        info.sInfo.sCookie.val=NULL; 
+        info.sInfo.sCookie.redNo=0;
         break;
       case COMLIB_MULTICAST_MESSAGE:
-        sInfo.cInfo.instId=0;
-        sInfo.cInfo.status=0;
-        sInfo.cInfo.id=0;
+        info.sInfo.cInfo.instId=0;
+        info.sInfo.cInfo.status=0;
+        info.sInfo.cInfo.id=0;
         break;
       default:
         CmiAssert(0);
       }
     }
 
-    CkSectionInfo(CkArrayID _aid, void *p = NULL): pe(CkMyPe()),
-    type(MulticastMsg) {
-      aid = _aid;
-      sInfo.sCookie.val=p;
-      sInfo.sCookie.redNo=0;
+    CkSectionInfo(CkArrayID _aid, void *p = NULL) {
+      info.type = MulticastMsg;
+      info.pe = CkMyPe();
+      info.aid = _aid;
+      info.sInfo.sCookie.val=p;
+      info.sInfo.sCookie.redNo=0;
     }
 
     CkSectionInfo(int e, void *p, int r, CkArrayID _aid) {
-      type = MulticastMsg;
-      pe = e; 
-      aid = _aid;
-      sInfo.sCookie.val=p;
-      sInfo.sCookie.redNo=r;
+      info.type = MulticastMsg;
+      info.pe = e; 
+      info.aid = _aid;
+      info.sInfo.sCookie.val=p;
+      info.sInfo.sCookie.redNo=r;
     }
 
-    inline int   &get_pe()    { return pe; }
-    inline int   &get_redNo() { CmiAssert(type==MulticastMsg); return sInfo.sCookie.redNo; }
-    inline void* &get_val()   { CmiAssert(type==MulticastMsg); return sInfo.sCookie.val; }
+    inline char  &get_type() { return info.type; }
+    inline int   &get_pe()    { return info.pe; }
+    inline int   &get_redNo() { CmiAssert(info.type==MulticastMsg); return info.sInfo.sCookie.redNo; }
+    inline void* &get_val()   { CmiAssert(info.type==MulticastMsg); return info.sInfo.sCookie.val; }
+    inline CkGroupID   &get_aid()    { return info.aid; }
+    inline CkGroupID   get_aid() const   { return info.aid; }
 
     /*
     void pup(PUP::er &p) {
@@ -186,6 +196,7 @@ class CkSectionID {
         
         CkSectionID(): _elems(NULL), _nElems(0), pelist(0), npes(0) {}
         CkSectionID(const CkSectionID &sid);
+        CkSectionID(CkSectionInfo &c, CkArrayIndex *e, int n, int *_pelist, int _npes): _cookie(c), _elems(e), _nElems(n), pelist(_pelist), npes(_npes)  {}
         CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes);
         CKSECTIONID_CONSTRUCTOR(1D)
         CKSECTIONID_CONSTRUCTOR(2D)
@@ -195,7 +206,7 @@ class CkSectionID {
         CKSECTIONID_CONSTRUCTOR(6D)
         CKSECTIONID_CONSTRUCTOR(Max)
 
-        inline int getSectionID(){ return _cookie.sInfo.cInfo.id; }
+        inline int getSectionID(){ return _cookie.info.sInfo.cInfo.id; }
         void operator=(const CkSectionID &);
         ~CkSectionID() {
             if (_elems != NULL) delete [] _elems;

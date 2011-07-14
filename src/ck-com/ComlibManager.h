@@ -218,7 +218,7 @@ void ComlibEnd(CProxy &proxy, int iteration);
     now it is used to reset a proxy before it is reassociated with another strategy. 
  */
 inline void ComlibResetSectionProxy(CProxySection_ArrayBase &sproxy) {
-  sproxy.ckGetSectionInfo().sInfo.cInfo.id = 0;
+  sproxy.ckGetSectionInfo().info.sInfo.cInfo.id = 0;
 }
 
 

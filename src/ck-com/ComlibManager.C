@@ -1033,10 +1033,10 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_SECTION_MULTICAST, CMH_ARRAYSECTIONSEND);
 	cmsg->npes = 0;
 	cmsg->sec_id = s;
-	cmsg->array_id = s->_cookie.aid;
+	cmsg->array_id = s->_cookie.get_aid();
 	
 
-	msg_prepareSend_noinline((CkArrayMessage*)m, ep, s->_cookie.aid);
+	msg_prepareSend_noinline((CkArrayMessage*)m, ep, s->_cookie.get_aid());
 	
 	register envelope * env = UsrToEnv(m);
 	env->getsetArrayIndex()= dummyArrayIndex;
@@ -1049,11 +1049,11 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 	
 
 	CkSectionInfo minfo;
-	minfo.type = COMLIB_MULTICAST_MESSAGE;
-	minfo.sInfo.cInfo.instId = ci->getID();
+	minfo.get_type() = COMLIB_MULTICAST_MESSAGE;
+	minfo.info.sInfo.cInfo.instId = ci->getID();
 	//minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
-	minfo.sInfo.cInfo.id = 0; 
-	minfo.pe = CkMyPe();
+	minfo.info.sInfo.cInfo.id = 0; 
+	minfo.get_pe() = CkMyPe();
 	((CkMcastBaseMsg *)env)->_cookie = minfo;    
 	
 	multicast(cmsg, instid);
@@ -1295,10 +1295,10 @@ ComlibDelegateData::ComlibDelegateData(int instid) : CkDelegateData(), _instid(i
 
 void ComlibInitSectionID(CkSectionID &sid){
 
-	sid._cookie.type = COMLIB_MULTICAST_MESSAGE;
-	sid._cookie.pe = CkMyPe();
+	sid._cookie.get_type() = COMLIB_MULTICAST_MESSAGE;
+	sid._cookie.get_pe() = CkMyPe();
 
-	sid._cookie.sInfo.cInfo.id = 0;    
+	sid._cookie.info.sInfo.cInfo.id = 0;    
 	sid.npes = 0;
 	sid.pelist = NULL;
 }

@@ -147,8 +147,15 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline)
       bzero(this, sizeof(CkCallback));
 #endif
       type=bcastSection;
-	d.array.ep=ep; 
-	secID=sectElt.ckGetSectionID(0); 
+      d.section.ep=ep; 
+      CkSectionID secID=sectElt.ckGetSectionID(0); 
+      d.section.sinfo = secID._cookie.info;
+      d.section._elems = secID._elems;
+      d.section._nElems = secID._nElems;
+      d.section.pelist = secID.pelist;
+      d.section.npes = secID.npes;
+      secID._elems = NULL;
+      secID.pelist = NULL;
 }
 
 CkCallback::CkCallback(int ep, CkSectionID &id) {
@@ -157,7 +164,11 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
 #endif
       type=bcastSection;
       d.section.ep=ep;
-      secID=id;
+      d.section.sinfo = id._cookie.info;
+      d.section._elems = id._elems;
+      d.section._nElems = id._nElems;
+      d.section.pelist = id.pelist;
+      d.section.npes = id.npes;
 }
 
 CkCallback::CkCallback(ArrayElement *p, int ep,CmiBool doInline) {
@@ -256,10 +267,15 @@ void CkCallback::send(void *msg) const
 		if (!msg) msg=CkAllocSysMsg();
 		CkBroadcastMsgArray(d.array.ep,msg,d.array.id);
 		break;
-	case bcastSection:
+	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
+                CkSectionInfo sinfo(d.section.sinfo);
+                CkSectionID secID(sinfo, d.section._elems, d.section._nElems, d.section.pelist, d.section.npes);
 		CkBroadcastMsgSection(d.section.ep,msg,secID);
+                secID._elems = NULL;
+                secID.pelist = NULL;
 		break;
+             }
 	case replyCCS: { /* Send CkDataMsg as a CCS reply */
 		void *data=NULL;
 		int length=0;
