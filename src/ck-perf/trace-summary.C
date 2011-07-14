@@ -978,7 +978,6 @@ void TraceSummaryBOC::maxBinSize(CkReductionMsg *msg)
 void TraceSummaryBOC::shrink(double _mBin){
     UInt    numBins = CkpvAccess(_trace)->pool()->getNumEntries();  
     UInt    epNums  = CkpvAccess(_trace)->pool()->getEpInfoSize();
-    int     numEntries = epNums - NUM_DUMMY_EPS - 1;
     _maxBinSize = _mBin;
     if(CkpvAccess(binSize) < _maxBinSize)
     {
@@ -1104,7 +1103,6 @@ void TraceSummaryBOC::ccsRequestSummaryUnsignedChar(CkCcsRequestMsg *m) {
     
     for(int i=0;i<numData;i++){
       sendBuffer[i] = 1000.0 * doubleData[i] / (double)CkNumPes() * 200.0; // max = 200 is the same as 100% utilization
-      int v = sendBuffer[i];
     }    
 
     datalength = sizeof(unsigned char) * numData;
@@ -1238,7 +1236,6 @@ void TraceSummaryBOC::sendSummaryBOC(CkReductionMsg *msg)
 
 void TraceSummaryBOC::write(void) 
 {
-  int i;
   unsigned int j;
 
   char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(".sum")+1];

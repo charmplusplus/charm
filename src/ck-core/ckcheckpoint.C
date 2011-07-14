@@ -14,7 +14,11 @@ More documentation goes here...
 #include "ck.h"
 #include "ckcheckpoint.h"
 
-#define DEBCHK  // CkPrintf
+void noopit(const char*, ...)
+{}
+
+//#define DEBCHK  // CkPrintf
+#define DEBCHK noopit
 
 #define DEBUGC(x) x
 //#define DEBUGC(x) 

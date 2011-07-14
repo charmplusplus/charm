@@ -532,10 +532,8 @@ void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 {
   LDCommData *com_data;
   int send_object;
-  int send_pe;
   int send_cluster;
   int recv_object;
-  int recv_pe;
   int recv_cluster;
   LDObjKey *recv_objects;
   int num_objects;

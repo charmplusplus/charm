@@ -60,7 +60,7 @@ public:
 				}else{
 					return false;
 				}
-				break;
+				//break; unreachable
 			case TypeGroup:
 			case TypeNodeGroup:
 				if((data.group.onPE == t.data.group.onPE) && (data.group.id == t.data.group.id)){
@@ -68,7 +68,7 @@ public:
 				}else{
 					return false;
 				}
-				break;
+				//break; unreachable
 			case TypeArray:
 				bool val;
 				if(data.array.id == t.data.array.id && data.array.idx.asChild().compare(t.data.array.idx.asChild())){
@@ -77,8 +77,9 @@ public:
 					val = false;
 				}
 				return val;
-				break;
+				// break; unreachable
 		}
+		return false;
 	}
 	
 	void* getObject();

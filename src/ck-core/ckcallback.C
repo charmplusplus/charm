@@ -183,7 +183,7 @@ void CkCallback::send(int length,const void *data) const
 void CkCallback::send(void *msg) const
 {
 	switch(type) {
-	CkPrintf("type:%d\n",type);
+	  //	CkPrintf("type:%d\n",type);
 	case ignore: //Just ignore the callback
 		if (msg) CkFreeMsg(msg);
 		break;

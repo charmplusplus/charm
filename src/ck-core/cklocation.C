@@ -425,10 +425,10 @@ public:
       mapping.resize(numChares);
       FILE *mapf = fopen("mapfile", "r");
       TopoManager tmgr;
-      int x, y, z, t, rv;
+      int x, y, z, t;
 
       for(int i=0; i<numChares; i++) {
-	rv = fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+	(void) fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
 	mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
       }
       fclose(mapf);

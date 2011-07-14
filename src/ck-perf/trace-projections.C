@@ -537,7 +537,6 @@ void LogPool::writeSts(void)
 {
   // for whining compilers
   int i;
-  char name[30];
   // generate an automatic unique ID for each log
   fprintf(stsfp, "PROJECTIONS_ID %s\n", "");
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
@@ -1699,18 +1698,13 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
 
 void TraceProjections::endPhase() {
   double currentPhaseTime = TraceTimer();
-  double lastPhaseTime = 0.0;
-
   if (lastPhaseEvent != NULL) {
-    lastPhaseTime = lastPhaseEvent->time;
   } else {
     if (_logPool->pool != NULL) {
       // assumed to be BEGIN_COMPUTATION
-      lastPhaseTime = _logPool->pool[0].time;
     } else {
       CkPrintf("[%d] Warning: End Phase encountered in an empty log. Inserting BEGIN_COMPUTATION event\n", CkMyPe());
       _logPool->add(BEGIN_COMPUTATION, 0, 0, currentPhaseTime, -1, -1);
-      lastPhaseTime = currentPhaseTime;
     }
   }
 
@@ -1959,7 +1953,6 @@ void KMeansBOC::getNextPhaseMetrics() {
   LogPool *pool = CkpvAccess(_trace)->_logPool;
   
   CkAssert(pool->numEntries > lastPhaseIdx);
-  double startPhaseTime = pool->pool[lastPhaseIdx].time;
   double totalPhaseTime = 0.0;
   double totalActiveTime = 0.0; // entry method + idle
 

@@ -122,11 +122,10 @@ void GreedyCommLB::add_graph(int x, int y, int data, int nmsg){
 }
   
 static void init_data(int *assign, graph * object_graph, int l, int b){
-    int i,j;
     for(int obj=0;obj < b;obj++)
 	assign[obj] = 0;
 
-    for(j=0;j<b;j++){
+    for(int j=0;j<b;j++){
 	object_graph[j].data = 0;
 	object_graph[j].nmsg = 0;
 	object_graph[j].next = NULL;
@@ -231,7 +230,7 @@ void GreedyCommLB::work(LDStats* stats)
       if (stats->procs[i].available)
         lightProcessors->insert((InfoRecord *) &(processors[i]));
 
-    int id,maxid,spe=0,minpe=0,mpos;
+    int id,maxid,minpe=0;
     double temp,total_time,min_temp;
     // for(pe=0;pe < count;pe++)
     //	CkPrintf("avail for %d = %d\n",pe,stats[pe].available);
@@ -243,8 +242,6 @@ void GreedyCommLB::work(LDStats* stats)
 	x  = maxh.deleteMax();
 
 	maxid = x->id;
-	spe = x->pe;
-	mpos = x->pos;
 
         processorInfo *donor = (processorInfo *) lightProcessors->deleteMin();
 	CmiAssert(donor);

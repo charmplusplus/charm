@@ -269,9 +269,11 @@ int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
 }
 
 void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
-  int minHops = getHopsBetweenRanks(pe, pes[0]);
-  int minIdx = 0;
-  int nowHops, tmp;
+  /* The next three lines appear to do nothing other than waste time.
+     int minHops = getHopsBetweenRanks(pe, pes[0]);
+     int minIdx = 0;
+     int nowHops, tmp;
+  */
   for(int i=0;i<n;i++)
     idx[i] = i;
   quicksort(pe, pes, idx, 0, n-1);

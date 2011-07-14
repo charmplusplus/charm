@@ -91,23 +91,16 @@ public:
   inline void install(void *datav) const {
     char *data=(char *)datav;
     for (int i=0;i<nRec;i++) {
-      int size;
-      if (i<nRec-1) 
-        size=rec[i+1].off-rec[i].off;
-      else /* i==nRec-1, last one: */ 
-        size=datalen-rec[i].off;
       memcpy((void *)rec[i].got, data+rec[i].off, rec[i].size);
     }
   }
   
   inline void install_var(void *datav, void *ptr) const {
     char *data=(char *)datav;
-    int done = 0;
     for (int i=0;i<nRec;i++) {
       long offset = (char*)ptr-(char *)rec[i].got;
       if (offset >= 0 && offset < rec[i].size) {
         memcpy((void *)rec[i].got, data+rec[i].off, rec[i].size);
-        done = 1;
         break;
       }
     }
@@ -138,23 +131,16 @@ int CtgGlobalList::isUserSymbol(const char *name) {
 void CtgGlobalList::read(void *datav) const {
     char *data=(char *)datav;
     for (int i=0;i<nRec;i++) {
-      int size;
-      if (i<nRec-1) 
-        size=rec[i+1].off-rec[i].off;
-      else /* i==nRec-1, last one: */ 
-        size=datalen-rec[i].off;
       memcpy(data+rec[i].off, (void *)rec[i].got, rec[i].size);
     }
 }
 
 void CtgGlobalList::read_var(void *datav, void *ptr) const {
     char *data=(char *)datav;
-    int done = 0;
     for (int i=0;i<nRec;i++) {
       long offset = (char*)ptr-(char *)rec[i].got;
       if (offset >= 0 && offset < rec[i].size) {
         memcpy(data+rec[i].off, (void *)rec[i].got, rec[i].size);
-        done = 1;
         break;
       }
     }
@@ -196,14 +182,6 @@ CtgGlobalList::CtgGlobalList() {
     nRec=0;
     
     int count;
-    int relt_size = 0;
-    int symt_size = 0;
-    int type, symindx;
-    char *sym_name;
-    ELFXX_TYPE_Rel *relt=NULL;       //Relocation table
-    ELFXX_TYPE_Sym *symt=NULL;       //symbol table
-    char *str_tab=NULL;         //String table
-
     for (count = 0; count < _namelist.size(); count ++) 
     {
 	unsigned long addr;
