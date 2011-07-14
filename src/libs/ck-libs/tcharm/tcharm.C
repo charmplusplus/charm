@@ -82,7 +82,23 @@ void TCharm::procInit(void)
   char *traceLibName=NULL;
   while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
-  CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  // CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  char *str;
+  if (CmiGetArgStringDesc(argv,"+tcharm_stacksize",&str,"Set the thread stack size (default 1MB)"))  {
+    if (strpbrk(str,"M")) {
+      sscanf(str, "%dM", &tcharm_stacksize);
+      tcharm_stacksize *= 1024*1024;
+    }
+    else if (strpbrk(str,"K")) {
+      sscanf(str, "%dK", &tcharm_stacksize);
+      tcharm_stacksize *= 1024;
+    }
+    else {
+      sscanf(str, "%d", &tcharm_stacksize);
+    }
+    if (CkMyPe() == 0)
+      CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
+  }
   if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
   	int ignored;
   	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
