@@ -41,13 +41,13 @@ public:
 class DelegateMgr : public CkDelegateMgr {
 public:
 	DelegateMgr(void) {}
-	virtual void ArraySend(int ep,void *m,const CkArrayIndex &idx,CkArrayID a)
+	virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a)
 	{
 		CkArray *arrMgr=CProxy_CkArray(a).ckLocalBranch();
 		int onPE=arrMgr->lastKnown(idx);
 		if (onPE==CkMyPe()) 
 		{ //Send to local element
-			arrMgr->deliverViaQueue((CkMessage *)m);
+			arrMgr->deliver((CkMessage *)m, CkDeliver_queue);
 		} else 
 		{ //Forward to remote element
 			ckout<<"DelegateMgr> Sending message for "<<idx.data()[0]<<" to "<<onPE<<endl;
@@ -67,8 +67,8 @@ public:
 		envelope *msg=(envelope *)CmiAlloc(nBytes);
 		memcpy(msg,env,nBytes);
 		CkUnpackMessage(&msg);
-		CProxy_CkArray ap(msg->array_mgr());
-		ap.ckLocalBranch()->deliver((CkMessage *)EnvToUsr(msg));
+		CProxy_CkArray ap(msg->getsetArrayMgr());
+		ap.ckLocalBranch()->deliver((CkMessage *)EnvToUsr(msg),CkDeliver_inline);
 	}
 };
 
