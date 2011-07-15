@@ -4918,8 +4918,8 @@ do
   esac
 done
 
-trap 'rm -fr Makefile mpi-io/Makefile mpi2-other/info/Makefile \
-		   mpi2-other/array/Makefile adio/common/Makefile \
+trap 'rm -fr Makefile mpi-io/Makefile mpi-io/fortran/Makefile mpi2-other/info/Makefile \
+		   mpi2-other/array/Makefile mpi2-other/array/fortran/Makefile adio/common/Makefile \
 		   test/Makefile test/misc.c test/large_file.c \
 		   test/runtests util/romioinstall include/mpio.h \
 		   include/mpiof.h \
@@ -5008,8 +5008,8 @@ cat >> config.status <<\EOF
 
 top_srcdir=$srcdir
 
-CONFIG_FILES=${CONFIG_FILES-"Makefile mpi-io/Makefile mpi2-other/info/Makefile \
-		   mpi2-other/array/Makefile adio/common/Makefile \
+CONFIG_FILES=${CONFIG_FILES-"Makefile mpi-io/Makefile mpi-io/fortran/Makefile mpi2-other/info/Makefile \
+		   mpi2-other/array/Makefile mpi2-other/array/fortran/Makefile adio/common/Makefile \
 		   test/Makefile test/misc.c test/large_file.c \
 		   test/runtests util/romioinstall include/mpio.h \
 		   include/mpiof.h \

@@ -1494,8 +1494,9 @@ rm -f adio/include/romioconf.h ${top_srcdir}/adio/include/romioconf.h
 #
 # Create makefiles for all of the adio devices.  Only the ones that 
 # are active will be called by the top level ROMIO make
-AC_OUTPUT(Makefile mpi-io/Makefile mpi2-other/info/Makefile \
-		   mpi2-other/array/Makefile adio/common/Makefile \
+AC_OUTPUT(Makefile mpi-io/Makefile mpi-io/fortran/Makefile mpi2-other/info/Makefile \
+		   mpi2-other/array/Makefile mpi2-other/array/fortran/Makefile \
+                   adio/common/Makefile \
 		   test/Makefile test/misc.c test/large_file.c \
 		   test/runtests util/romioinstall include/mpio.h \
 		   include/mpiof.h \
