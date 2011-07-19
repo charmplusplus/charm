@@ -1064,7 +1064,7 @@ void arena_init()
   size_t maxmem = 0;
   int nslots;
   char *s;
-#if CMK_CRAYXT
+#if CMK_CRAYXT | CMK_CRAYXE
   if (s = getenv("XT_SYMMETRIC_HEAP_SIZE")) {
     size_t n=0;
     switch (s[strlen(s)-1]) {
