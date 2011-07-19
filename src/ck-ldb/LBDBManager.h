@@ -219,6 +219,7 @@ public:
   private:
     LBDB *db; //Enclosing LBDB object
     double period;//Time (seconds) between builtin-atsyncs  
+    double nextT;
     LDBarrierClient BH;//Handle for the builtin-atsync barrier 
     static void gotoSync(void *bs);
     static void resumeFromSync(void *bs);

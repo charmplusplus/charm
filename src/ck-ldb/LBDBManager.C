@@ -35,6 +35,10 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
 //  CmiPrintf("[%d] LBDB::batsyncer::resumeFromSync with %gs\n", CkMyPe(), s->period);
+  double curT = CmiWallTimer();
+  if (s->nextT<curT)  s->period *= 2;
+  s->nextT = curT + s->period;
+
   CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
 }
 
@@ -43,6 +47,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
 {
   db=_db;
   period=initPeriod;
+  nextT = CmiWallTimer() + period;
   BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync,(void*)(this));
   //This just does a CcdCallFnAfter
   resumeFromSync((void *)this);
