@@ -575,7 +575,7 @@ void ConverseExit()
   }
 #endif
   ConverseCommonExit();
-#if CMK_CRAYXT
+#if CMK_CRAYXT | CMK_CRAYXE
   shmem_finalize();
 #endif
   exit(0);
@@ -633,12 +633,12 @@ static void McInit()
 {
   CMK_SHMEM_INIT;
 
-#if !CMK_CRAYXT
-  _Cmi_mype = _my_pe();
-  _Cmi_numpes = _num_pes();
-#else
+#if CMK_CRAYXT | CMK_CRAYXE
   _Cmi_mype = shmem_my_pe();
   _Cmi_numpes = shmem_n_pes();
+#else
+  _Cmi_mype = _my_pe();
+  _Cmi_numpes = _num_pes();
 #endif
   _Cmi_myrank = 0;
 
