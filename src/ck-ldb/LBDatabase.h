@@ -265,8 +265,21 @@ public:
     LDRemoveStartLBFn(myLDHandle,fn);
   };
 
-public:
   inline void StartLB() { LDStartLB(myLDHandle); }
+
+  inline void AddMigrationDoneFn(LDMigrationDoneFn fn, void *data) 
+  {
+    LDAddMigrationDoneFn(myLDHandle,fn,data);
+  };
+
+  inline void RemoveMigrationDoneFn(LDMigrationDoneFn fn) 
+  {
+    LDRemoveMigrationDoneFn(myLDHandle,fn);
+  };
+
+  inline void MigrationDone() { LDMigrationDone(myLDHandle); }
+
+public:
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
   inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
  

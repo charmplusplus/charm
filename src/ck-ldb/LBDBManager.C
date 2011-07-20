@@ -35,9 +35,12 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
 //  CmiPrintf("[%d] LBDB::batsyncer::resumeFromSync with %gs\n", CkMyPe(), s->period);
+
+#if 0
   double curT = CmiWallTimer();
   if (s->nextT<curT)  s->period *= 2;
   s->nextT = curT + s->period;
+#endif
 
   CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
 }
@@ -395,6 +398,34 @@ void LBDB::StartLB()
   for (int i=0; i<startLBFnList.length(); i++) {
     StartLBCB *startLBFn = startLBFnList[i];
     if (startLBFn && startLBFn->on) startLBFn->fn(startLBFn->data);
+  }
+}
+
+int LBDB::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data) {
+  // Save migrationDone callback function
+  MigrationDoneCB* callbk = new MigrationDoneCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  migrationDoneCBList.push_back(callbk);
+  return migrationDoneCBList.size()-1;
+}
+
+void LBDB::RemoveMigrationDoneFn(LDMigrationDoneFn fn) {
+  for (int i=0; i<migrationDoneCBList.length(); i++) {
+    MigrationDoneCB* callbk = migrationDoneCBList[i];
+    if (callbk && callbk->fn == fn) {
+      delete callbk;
+      migrationDoneCBList[i] = 0; 
+      break;
+    }
+  }
+}
+
+void LBDB::MigrationDone() {
+  for (int i=0; i<migrationDoneCBList.length(); i++) {
+    MigrationDoneCB *callbk = migrationDoneCBList[i];
+    if (callbk) callbk->fn(callbk->data);
   }
 }
 

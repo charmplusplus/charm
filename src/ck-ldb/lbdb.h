@@ -283,6 +283,11 @@ void LDStartLB(LDHandle _db);
 void LDTurnManualLBOn(LDHandle _lbdb);
 void LDTurnManualLBOff(LDHandle _lbdb);
 
+typedef void (*LDMigrationDoneFn)(void *user_ptr);
+int LDAddMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn,  void* data);
+void  LDRemoveMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn);
+void LDMigrationDone(LDHandle _lbdb);
+
 typedef void (*LDPredictFn)(void* user_ptr);
 typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
 typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);

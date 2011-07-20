@@ -146,6 +146,24 @@ extern "C" void LDTurnManualLBOff(LDHandle _db)
   db->TurnManualLBOff();
 }
 
+extern "C" int LDAddMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn,  void* data) 
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->AddMigrationDoneFn(fn,data);
+}
+
+extern "C" void  LDRemoveMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->RemoveMigrationDoneFn(fn);
+}
+
+extern "C" void LDMigrationDone(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->MigrationDone();
+}
+
 extern "C" void LDTurnPredictorOn(LDHandle _db, void *model)
 {
   LBDB *const db = (LBDB*)(_db.handle);

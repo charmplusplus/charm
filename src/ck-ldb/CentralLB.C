@@ -904,6 +904,8 @@ void CentralLB::MigrationDone(int balancing)
     startLoadBalancingMlog(&resumeCentralLbAfterChkpt,(void *)this);
 #endif
 
+  LBDatabase::Object()->MigrationDone();    // call registered callbacks
+
   LoadbalanceDone(balancing);        // callback
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   // if sync resume invoke a barrier
