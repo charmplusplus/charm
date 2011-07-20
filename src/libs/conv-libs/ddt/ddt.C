@@ -869,6 +869,7 @@ CkDDT_Struct::CkDDT_Struct(int nCount, int* arrBlock,
       }
   }
   extent = ub - lb;
+  size = extent;     // considering padding, size needs to be the same as extent
   DDTDEBUG("type %d: ub=%d, lb=%d, extent=%d, size=%d\n",datatype,ub,lb,extent,size);
 }
 
@@ -878,10 +879,11 @@ int CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) {
   int bytesCopied = 0;
 
   for (; num; num--) {
+      char *buf = buffer;
       for (int i=0; i<count; i++) {
           for (int j=0; j<arrayBlockLength[i]; j++) {
-              DDTDEBUG("writing block of type %d from offset %d to offset %d\n",
-                      arrayDataType[i]->getType(),
+              DDTDEBUG("writing block of type %d (size %d) from offset %d to offset %d\n",
+                      arrayDataType[i]->getType(), arrayDataType[i]->getSize(),
                       userdata-sbuf,
                       buffer-dbuf);
               bytesCopied += arrayDataType[i]->serialize(
@@ -892,6 +894,7 @@ int CkDDT_Struct::serialize(char* userdata, char* buffer, int num, int dir) {
               buffer += arrayDataType[i]->getSize();
           }
       }
+      buffer = buf + extent;
       userdata += extent;
   }
   return bytesCopied;
