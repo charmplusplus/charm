@@ -8,6 +8,12 @@ CkGroupID ThePVT;
 CkGroupID TheGVT;
 CpvExtern(int, stateRecovery);
 CpvExtern(eventID, theEventID);
+
+static void staticDoneLB(void *data)
+{
+  ((PVT*)data)->doneLB();
+}
+
 /// Basic Constructor
 PVT::PVT() 
 {
@@ -81,6 +87,8 @@ PVT::PVT()
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
+
+  LBDatabase::Object()->AddMigrationDoneFn(staticDoneLB, this);
 }
 
 /// PUP routine
@@ -358,16 +366,9 @@ void PVT::callAtSync() {
 }
 
 void PVT::doneLB() {
-  static int count = 0;
-  count ++;
-  if (count == objs.getNumObjs()) {
-    count =0;
-    if (CkMyPe()==0) { 
-      eventMsg *dummyMsg = new eventMsg();
-      CProxy_PVT p(ThePVT);
-      p[0].resumeAfterLB(dummyMsg);
-    }
-  }
+  eventMsg *dummyMsg = new eventMsg();
+  CProxy_PVT p(ThePVT);
+  p[0].resumeAfterLB(dummyMsg);
 }
 
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
@@ -395,7 +396,15 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
 #endif
 }
 
+// called on PE 0
 void PVT::resumeAfterLB(eventMsg *m) {
+  static int count = 0;
+  count ++;
+  if (count != CkNumPes()) {
+    CkFreeMsg(m);
+    return;
+  }
+  count = 0;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStart(GVT_TIMER);

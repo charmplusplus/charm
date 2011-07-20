@@ -427,8 +427,8 @@ void sim::SeqResumeAfterCheckpoint() {
 
 void sim::ResumeFromSync()
 {
-  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
-  localPVT->doneLB();
+//  PVT *localPVT = (PVT *)CkLocalBranch(ThePVT);
+//  localPVT->doneLB();
 }
 
 /// Dump all data fields
