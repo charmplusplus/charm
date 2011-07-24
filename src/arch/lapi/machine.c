@@ -323,34 +323,34 @@ static int checkMsgInOrder(char *msg, MsgOrderInfo *info);
 
 /* The machine-specific send function */
 static CmiCommHandle MachineSendFuncForLAPI(int destNode, int size, char *msg, int mode);
-#define CmiMachineSpecificSendFunc MachineSendFuncForLAPI
+#define LrtsSendFunc MachineSendFuncForLAPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
 static void MachineInitForLAPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
-#define MachineSpecificInit MachineInitForLAPI
+#define LrtsInit MachineInitForLAPI
 
 static void MachinePreCommonInitForLAPI(int everReturn);
 static void MachinePostCommonInitForLAPI(int everReturn);
-#define MachineSpecificPreCommonInit MachinePreCommonInitForLAPI
-#define MachineSpecificPostCommonInit MachinePostCommonInitForLAPI
+#define LrtsPreCommonInit MachinePreCommonInitForLAPI
+#define LrtsPostCommonInit MachinePostCommonInitForLAPI
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
 static void AdvanceCommunicationForLAPI();
-#define MachineSpecificAdvanceCommunication AdvanceCommunicationForLAPI
+#define LrtsAdvanceCommunication AdvanceCommunicationForLAPI
 
 static void DrainResourcesForLAPI(); /* used when exit */
-#define MachineSpecificDrainResources DrainResourcesForLAPI
+#define LrtsDrainResources DrainResourcesForLAPI
 
 static void MachineExitForLAPI();
-#define MachineSpecificExit MachineExitForLAPI
+#define LrtsExit MachineExitForLAPI
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
 /* ### End of Idle-state Related Functions ### */
 
-void MachinePostNonLocalForLAPI();
-#define MachineSpecificPostNonLocal MachinePostNonLocalForLAPI
+static void MachinePostNonLocalForLAPI();
+#define LrtsPostNonLocal MachinePostNonLocalForLAPI
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -363,6 +363,7 @@ void MachinePostNonLocalForLAPI();
 /* For async msg sending ops, using lapi specific implementations */
 #define USE_COMMON_ASYNC_BCAST 0
 #define CMK_OFFLOAD_BCAST_PROCESS 1
+#include "machine-common.h"
 #include "machine-common.c"
 
 /* The machine specific msg-sending function */
@@ -787,7 +788,7 @@ static INLINE_KEYWORD void AdvanceCommunicationForLAPI() {
 }
 /* ######End of functions related with communication progress ###### */
 
-void MachinePostNonLocalForLAPI() {
+static void MachinePostNonLocalForLAPI() {
     /* None here */
 }
 
