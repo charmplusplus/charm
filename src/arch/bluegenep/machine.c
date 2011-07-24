@@ -251,7 +251,7 @@ static void send_done(void *data);
 static void send_multi_done(void *data);
 #endif
 static CmiCommHandle MachineSpecificSendForDCMF(int destNode, int size, char *msg, int mode);
-#define CmiMachineSpecificSendFunc MachineSpecificSendForDCMF
+#define LrtsSendFunc MachineSpecificSendForDCMF
 
 /* The machine-specific recv-related function (on the receiver side) */
 #if (DCMF_VERSION_MAJOR >= 2)
@@ -284,23 +284,23 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 
 /* ### Beginning of Machine-startup Related Functions ### */
 static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNodeID);
-#define MachineSpecificInit MachineInitForDCMF
+#define LrtsInit MachineInitForDCMF
 
 static void MachinePreCommonInitForDCMF(int everReturn);
 static void MachinePostCommonInitForDCMF(int everReturn);
-#define MachineSpecificPreCommonInit MachinePreCommonInitForDCMF
-#define MachineSpecificPostCommonInit MachinePostCommonInitForDCMF
+#define LrtsPreCommonInit MachinePreCommonInitForDCMF
+#define LrtsPostCommonInit MachinePostCommonInitForDCMF
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
 static void AdvanceCommunicationForDCMF();
-#define MachineSpecificAdvanceCommunication AdvanceCommunicationForDCMF
+#define LrtsAdvanceCommunication AdvanceCommunicationForDCMF
 
 static void DrainResourcesForDCMF();
-#define MachineSpecificDrainResources DrainResourcesForDCMF
+#define LrtsDrainResources DrainResourcesForDCMF
 
 static void MachineExitForDCMF();
-#define MachineSpecificExit MachineExitForDCMF
+#define LrtsExit MachineExitForDCMF
 
 /* ### End of Machine-running Related Functions ### */
 
@@ -308,8 +308,8 @@ static void MachineExitForDCMF();
 
 /* ### End of Idle-state Related Functions ### */
 
-void MachinePostNonLocalForDCMF();
-#define MachineSpecificPostNonLocal MachinePostNonLocalForDCMF
+static void MachinePostNonLocalForDCMF();
+#define LrtsPostNonLocal MachinePostNonLocalForDCMF
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -320,6 +320,7 @@ void MachinePostNonLocalForDCMF();
  *  CMK_OFFLOAD_BCAST_PROCESS etc.
  */
 #define CMK_OFFLOAD_BCAST_PROCESS 1
+#include "machine-common.h"
 #include "machine-common.c"
 
 /*######Beginning of functions related with Communication-Op functions ######*/
@@ -686,7 +687,7 @@ static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
 }
 /* ######End of functions related with communication progress ###### */
 
-void MachinePostNonLocalForDCMF() {
+static void MachinePostNonLocalForDCMF() {
     /* None here */
 }
 
