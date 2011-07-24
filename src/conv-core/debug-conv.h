@@ -7,6 +7,9 @@
 
 #include "pup_c.h"
 
+#define CHARMDEBUG_MAJOR   10
+#define CHARMDEBUG_MINOR    6
+
 #ifdef __cplusplus
 extern "C" {
 #endif

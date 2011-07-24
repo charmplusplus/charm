@@ -1,8 +1,6 @@
 
 #define CMK_NET_VERSION					   1
 
-#define CMK_CCS_AVAILABLE                                  1
-
 #define CMK_CMIPRINTF_IS_A_BUILTIN                         1
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1

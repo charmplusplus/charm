@@ -11,7 +11,7 @@
 #include "ckhashtable.h"
 #include "pup.h"
 #include "pup_toNetwork.h"
-#include "debug-charm.h"
+#include "debug-conv++.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
 #include "queueing.h"
@@ -341,33 +341,6 @@ public:
 #endif /*CMK_CCS_AVAILABLE*/
 /*We have to include these virtual functions, even when CCS is
 disabled, to avoid bizarre link-time errors.*/
-
-CpdListAccessor::~CpdListAccessor() { }
-CpdSimpleListAccessor::~CpdSimpleListAccessor() { }
-const char *CpdSimpleListAccessor::getPath(void) const {return path;}
-size_t CpdSimpleListAccessor::getLength(void) const {return length;}
-void CpdSimpleListAccessor::pup(PUP::er &p,CpdListItemsRequest &req) 
-{
-	for (int i=req.lo;i<req.hi;i++) {
-		beginItem(p,i);
-		(*pfn)(p,i);
-	}
-}
-
-static void CpdListBeginItem_impl(PUP::er &p,int itemNo)
-{
-	p.syncComment(PUP::sync_item);
-}
-
-extern "C" void CpdListBeginItem(pup_er p,int itemNo)
-{
-  CpdListBeginItem_impl(*(PUP::er *)p,itemNo);
-}
-
-void CpdListAccessor::beginItem(PUP::er &p,int itemNo)
-{
-  CpdListBeginItem_impl(p,itemNo);
-}
 
 // C++ and C client API
 void CpdListRegister(CpdListAccessor *acc)

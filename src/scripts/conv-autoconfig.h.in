@@ -12,6 +12,9 @@
 /* build MPI. */
 #undef CMK_BUILD_ON_MPI
 
+/* enable ccs */
+#undef CMK_CCS_AVAILABLE
+
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 

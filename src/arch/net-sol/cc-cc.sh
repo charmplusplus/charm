@@ -21,8 +21,8 @@ CMK_QT='generic_alloca'
 # native compiler
 CMK_NATIVE_CC='cc  -z muldefs '
 CMK_NATIVE_LD='cc -z muldefs '
-CMK_NATIVE_CXX='CC -library=Cstd -z muldefs '
-CMK_NATIVE_LDXX='CC -library=Cstd -z muldefs '
+CMK_NATIVE_CXX='CC -library=Cstd -instances=global -z muldefs '
+CMK_NATIVE_LDXX='CC -library=Cstd -instances=global -z muldefs '
 CMK_NATIVE_LIBS='-lnsl -lsocket'
 
 # Sun Forte Developer 7 f90 7.0

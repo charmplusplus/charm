@@ -89,6 +89,19 @@ then
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no"
+then
+  Echo "CCS is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+else
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([controlpoint],
             [AS_HELP_STRING([--enable-controlpoint],
               [enable control point])],

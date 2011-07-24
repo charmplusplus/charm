@@ -383,6 +383,7 @@ static void KillOnAllSigs(int sigNo)
   	machine_exit(1); /*Don't infinite loop if there's a signal during a signal handler-- just die.*/
   already_in_signal_handler=1;
 
+#if CMK_CCS_AVAILABLE
   if (CpvAccess(cmiArgDebugFlag)) {
     int reply = 0;
     CpdNotify(CPD_SIGNAL,sigNo);
@@ -394,6 +395,7 @@ static void KillOnAllSigs(int sigNo)
     CpdFreeze();
 #endif
   }
+#endif
   
   CmiDestoryLocks();		/* destory locks */
 
@@ -587,11 +589,13 @@ void CmiAbort(const char *message)
 	}
   MACHSTATE1(5,"CmiAbort(%s)",message);
 
+#if CMK_CCS_AVAILABLE
   /* if CharmDebug is attached simply try to send a message to it */
   if (CpvAccess(cmiArgDebugFlag)) {
     CpdNotify(CPD_ABORT, message);
     CpdFreeze();
   }
+#endif
   
   /* CmiDestoryLocks();  */
 

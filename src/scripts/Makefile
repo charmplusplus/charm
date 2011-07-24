@@ -191,7 +191,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
-      memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
+      memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
       blue.h blue-conv.h bgconverse.h \
 	3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
@@ -210,7 +210,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	TopoManager.h XT3Torus.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckIgetControl.h cktiming.h \
+	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
@@ -379,7 +379,7 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
-	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
+	debug-conv.o debug-conv++.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \

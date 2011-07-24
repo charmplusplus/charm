@@ -149,7 +149,7 @@ extern "C" void LDTurnManualLBOff(LDHandle _db)
 extern "C" int LDAddMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn,  void* data) 
 {
   LBDB *const db = (LBDB*)(_db.handle);
-  db->AddMigrationDoneFn(fn,data);
+  return db->AddMigrationDoneFn(fn,data);
 }
 
 extern "C" void  LDRemoveMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn)
