@@ -219,32 +219,17 @@ static int        Cmi_usrsched;  /* Continue after start function finishes? */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret);
 static void ConverseRunPE(int everReturn);
 
-/*argc and argv could be changed by machine-specific initialization procedure*/
-static void MachineSpecificInit(int *argc, char ***argv, int *numNodes, int *myNodeID);
-/* Used in ConverseRunPE: one is called before ConverseCommonInit;
-  * The other is called after ConverseCommonInit as some data structures
-  * have been initialized, such as the tracing-relatd stuff --Chao Mei
-  */
-static void MachineSpecificPreCommonInit(int everReturn);
-static void MachineSpecificPostCommonInit(int everReturn);
-
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication();
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
 
-static void MachineSpecificAdvanceCommunication();
-static void MachineSpecificDrainResources(); /* used when exit */
-static void MachineSpecificExit();
-
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
 #if CMK_NODE_QUEUE_AVAILABLE
 void *CmiGetNonLocalNodeQ(void);
 #endif
-void MachineSpecificPostNonLocal(void);
-
 /* Utiltiy functions */
 static char *CopyMsg(char *msg, int len);
 
@@ -491,10 +476,10 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        CmiMachineSpecificSendFunc(nd, size, msg, P2P_SYNC);
+        LrtsSendFunc(nd, size, msg, P2P_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
-        CmiMachineSpecificSendFunc(nd, size, newmsg, P2P_SYNC);
+        LrtsSendFunc(nd, size, newmsg, P2P_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -538,10 +523,10 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        CmiMachineSpecificSendFunc(nd, size, msg, P2P_SYNC);
+        LrtsSendFunc(nd, size, msg, P2P_SYNC);
 #else
         char *newmsg = CopyMsg(msg, size);
-        CmiMachineSpecificSendFunc(nd, size, newmsg, P2P_SYNC);
+        LrtsSendFunc(nd, size, newmsg, P2P_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -635,7 +620,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-        CmiMachineSpecificSendFunc(destNode, size, msg, P2P_SYNC);
+        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -647,7 +632,7 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
         CmiSyncSendFn(destPE,size,msg);
         return 0;
     } else {
-        return CmiMachineSpecificSendFunc(destPE, size, msg, P2P_ASYNC);
+        return LrtsSendFunc(destPE, size, msg, P2P_ASYNC);
     }
 }
 #endif
@@ -738,7 +723,7 @@ void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSendNodeSelf(msg);
     } else {
-        CmiMachineSpecificSendFunc(destNode, size, msg, P2P_SYNC);
+        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -749,7 +734,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
         CmiSyncNodeSendFn(destNode, size, msg);
         return 0;
     } else {
-        return CmiMachineSpecificSendFunc(destNode, size, msg, P2P_ASYNC);
+        return LrtsSendFunc(destNode, size, msg, P2P_ASYNC);
     }
 }
 #endif
@@ -827,12 +812,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
     CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
-    /* _Cmi_mynodesize has to be obtained before MachineSpecificInit
-     * because it may be used inside MachineSpecificInit
+    /* _Cmi_mynodesize has to be obtained before LrtsInit
+     * because it may be used inside LrtsInit
      */
-    /* argv could be changed inside MachineSpecificInit */
+    /* argv could be changed inside LrtsInit */
     /* Inside this function, the number of nodes and my node id are obtained */
-    MachineSpecificInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
+    LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -875,7 +860,7 @@ static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
 
-    MachineSpecificPreCommonInit(everReturn);
+    LrtsPreCommonInit(everReturn);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
     int createQueue = 1;
@@ -917,7 +902,7 @@ static void ConverseRunPE(int everReturn) {
 
     ConverseCommonInit(CmiMyArgv);
 
-    MachineSpecificPostCommonInit(everReturn);
+    LrtsPostCommonInit(everReturn);
 
     /* Converse initialization finishes, immediate messages can be processed.
        node barrier previously should take care of the node synchronization */
@@ -941,7 +926,7 @@ static void ConverseRunPE(int everReturn) {
 static INLINE_KEYWORD void AdvanceCommunication() {
     int doProcessBcast = 1;
 
-    MachineSpecificAdvanceCommunication();
+    LrtsAdvanceCommunication();
 
 #if CMK_OFFLOAD_BCAST_PROCESS
 #if CMK_SMP_NO_COMMTHD
@@ -968,12 +953,12 @@ static void CommunicationServer(int sleepTime) {
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
-        MachineSpecificDrainResources();
+        LrtsDrainResources();
         MACHSTATE(2, "} CommunicationServer EXIT");
 
         ConverseCommonExit();
 
-        MachineSpecificExit();
+        LrtsExit();
     }
 #endif
 }
@@ -987,7 +972,7 @@ static void CommunicationServerThread(int sleepTime) {
 
 void ConverseExit(void) {
 #if !CMK_SMP
-    MachineSpecificDrainResources();
+    LrtsDrainResources();
 #endif
 
     ConverseCommonExit();
@@ -997,7 +982,7 @@ void ConverseExit(void) {
 #endif
 
 #if !CMK_SMP
-    MachineSpecificExit();
+    LrtsExit();
 #else
     /* In SMP, the communication thread will exit */
     /* atomic increment */
@@ -1038,7 +1023,7 @@ void *CmiGetNonLocal(void) {
     msg = PCQueuePop(cs->recv);
 
 #if !CMK_SMP
-    MachineSpecificPostNonLocal();
+    LrtsPostNonLocal();
 #endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);

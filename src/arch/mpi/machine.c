@@ -231,27 +231,27 @@ static  void EnqueueMsg(void *m, int size, int node);
 
 /* The machine-specific send function */
 static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg, int mode);
-#define CmiMachineSpecificSendFunc MachineSpecificSendForMPI
+#define LrtsSendFunc MachineSpecificSendForMPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
 static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
-#define MachineSpecificInit MachineInitForMPI
+#define LrtsInit MachineInitForMPI
 
 static void MachinePreCommonInitForMPI(int everReturn);
 static void MachinePostCommonInitForMPI(int everReturn);
-#define MachineSpecificPreCommonInit MachinePreCommonInitForMPI
-#define MachineSpecificPostCommonInit MachinePostCommonInitForMPI
+#define LrtsPreCommonInit MachinePreCommonInitForMPI
+#define LrtsPostCommonInit MachinePostCommonInitForMPI
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
 static void AdvanceCommunicationForMPI();
-#define MachineSpecificAdvanceCommunication AdvanceCommunicationForMPI
+#define LrtsAdvanceCommunication AdvanceCommunicationForMPI
 
 static void DrainResourcesForMPI(); /* used when exit */
-#define MachineSpecificDrainResources DrainResourcesForMPI
+#define LrtsDrainResources DrainResourcesForMPI
 
 static void MachineExitForMPI();
-#define MachineSpecificExit MachineExitForMPI
+#define LrtsExit MachineExitForMPI
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
@@ -259,7 +259,7 @@ void CmiNotifyIdleForMPI(void);
 /* ### End of Idle-state Related Functions ### */
 
 void MachinePostNonLocalForMPI();
-#define MachineSpecificPostNonLocal MachinePostNonLocalForMPI
+#define LrtsPostNonLocal MachinePostNonLocalForMPI
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -270,6 +270,7 @@ void MachinePostNonLocalForMPI();
  *  CMK_OFFLOAD_BCAST_PROCESS etc.
  */
 #define CMK_HAS_SIZE_IN_MSGHDR 0
+#include "machine-common.h"
 #include "machine-common.c"
 
 /* The machine specific msg-sending function */
