@@ -53,111 +53,45 @@ static void sleep(int secs) {
 /* =====End of Declarations of Machine Specific Variables===== */
 
 
-/* =====Beginning of Declarations of Machine Specific Functions===== */
-/* Utility functions */
-/* TODO: add any that are related */
-
-/* TODO: The machine-specific send function */
-/*
-static CmiCommHandle MachineSpecificSend(int destPE, int size, char *msg, int mode);
-#define CmiMachineSpecificSendFunc "function name defined above"
-*/
-
-/* ### Beginning of Machine-startup Related Functions ### */
-/* TODO: */
-/*
-static void MachineInitFor${MACHNAME}(int argc, char **argv, int *numNodes, int *myNodeID);
-#define MachineSpecificInit "function name defined above"
-*/
-
-/*
-static void MachinePreCommonInitFor${MACHNAME}(int everReturn);
-static void MachinePostCommonInitFor${MACHNAME}(int everReturn);
-#define MachineSpecificPreCommonInit "function name defined above1"
-#define MachineSpecificPostCommonInit "function name defined above2"
-*/
-/* ### End of Machine-startup Related Functions ### */
-
-/* ### Beginning of Machine-running Related Functions ### */
-/* TODO:
-static void AdvanceCommunicationFor${MACHNAME}();
-#define MachineSpecificAdvanceCommunication "function name defined above2"
-
-static void DrainResourcesFor${MACHNAME}(); //used when exit
-#define MachineSpecificDrainResources "function name defined above2"
-
-
-static void MachineExitFor${MACHNAME}();
-#define MachineSpecificExit
-*/
-/* ### End of Machine-running Related Functions ### */
-
-/* ### Beginning of Idle-state Related Functions ### */
-
-/* ### End of Idle-state Related Functions ### */
-
-/* TODO: if there's any related
-void MachinePostNonLocalForMPI();
-#define MachineSpecificPostNonLocal MachinePostNonLocalForMPI
-*/
-
-/* =====End of Declarations of Machine Specific Functions===== */
-
-/**
-   * Functions that requires machine specific implementation:
-   * 1. void CmiReleaseCommHandle(CmiCommHandle c);
-   * 2. int CmiAsyncMsgSent(CmiCommHandle c);
-   * 3. char *CmiGetNonLocalNodeQ(void)
-   * 4. void *CmiGetNonLocal(void)
-   */
-
+#include "machine-common.h"
 #include "machine-common.c"
 
-/* The machine specific msg-sending function */
+static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+{}
 
-/* TODO: machine specific send operation */
+/* ### Beginning of Machine-startup Related Functions ### */
+static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
+{
+}
 
+static void LrtsPreCommonInit(int everReturn)
+{
+}
+static void LrtsPostCommonInit(int everReturn)
+{
+}
+static void LrtsAdvanceCommunication()
+{
+}
+static void LrtsDrainResources() /* used when exit */
+{
+}
+static void LrtsExit()
+{
+}
+static void LrtsPostNonLocal()
+{
+}
 
-/* TODO: machine specific functions for driving communication */
-/* ######Beginning of functions related with communication progress ###### */
-/* ######End of functions related with communication progress ###### */
-
-/* Network progress function is used to poll the network when for
-   messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl() {
 }
 #endif
 
-/* TODO: */
-/* ######Beginning of functions related with exiting programs###### */
-/* 1. functions to drain resources */
-/* 2. functions to exit */
-/* ######End of functions related with exiting programs###### */
-
-
-/* ######Beginning of functions related with starting programs###### */
-/* TODO */
-/* 1. machine init function */
-/* 2. machine pre/post common init functions */
-/**
- *  Obtain the number of nodes, my node id, and consuming machine layer
- *  specific arguments
- */
-/* ######End of functions related with starting programs###### */
-
-/***********************************************************************
- *
- * Abort function:
- *
- ************************************************************************/
-
 void CmiAbort(const char *message) {
 }
 
-/**************************  TIMER FUNCTIONS **************************/
 
-/************Barrier Related Functions****************/
+/* Other assist function */
 
-/*@}*/
 
