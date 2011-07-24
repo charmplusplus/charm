@@ -258,7 +258,7 @@ static void MachineExitForMPI();
 void CmiNotifyIdleForMPI(void);
 /* ### End of Idle-state Related Functions ### */
 
-void MachinePostNonLocalForMPI();
+static void MachinePostNonLocalForMPI();
 #define LrtsPostNonLocal MachinePostNonLocalForMPI
 
 /* =====End of Declarations of Machine Specific Functions===== */
@@ -825,7 +825,7 @@ static void AdvanceCommunicationForMPI() {
 }
 /* ######End of functions related with communication progress ###### */
 
-void MachinePostNonLocalForMPI() {
+static void MachinePostNonLocalForMPI() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
         while (MsgQueueLen>0) {
