@@ -498,9 +498,6 @@ TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XTTo
 CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -c -o CrayNid.o CrayNid.c
 
-ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
-	$(CHARMC) -I. -o ckbitvector.o ckbitvector.C
-
 ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 	$(CHARMC) -o ckdll.o ckdll.C
 
