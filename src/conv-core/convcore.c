@@ -65,9 +65,11 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "memory-isomalloc.h"
+#if CMK_PROJECTOR
 #include "converseEvents.h"             /* projector */
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
+#endif
 
 extern const char * const CmiCommitID;
 
@@ -1542,7 +1544,9 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1553,7 +1557,9 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -1566,7 +1572,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
