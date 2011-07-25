@@ -394,7 +394,7 @@ COMLIB_CORE_OBJS = ComlibModuleInterface.o
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
-	conv-lists.o RTH.o persist-comm.o \
+	conv-lists.o RTH.o persist-comm.o graph.o \
 	ckbitvector.o TopoManager.o CrayNid.o crc32.o
 
 LIBCONV_UTILF=pup_f.o
@@ -689,7 +689,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o  
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
-           ckgraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
+           ckgraph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
 	   charmProjections.o cktiming.o pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
