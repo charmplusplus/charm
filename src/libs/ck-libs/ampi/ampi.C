@@ -4,8 +4,10 @@
 #define exit exit /*Supress definition of exit in ampi.h*/
 #include "ampiimpl.h"
 #include "tcharm.h"
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
 #include "ampiEvents.h" /*** for trace generation for projector *****/
 #include "ampiProjections.h"
+#endif
 
 #if CMK_BLUEGENE_CHARM
 #include "bigsim_logs.h"
@@ -580,8 +582,11 @@ static void ampiProcInit(void){
   CkpvInitialize(int, argvExtracted);
   CkpvAccess(argvExtracted) = 0;
 
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   REGISTER_AMPI
-    initAmpiProjections();
+#endif
+  initAmpiProjections();
+
   char **argv=CkGetArgv();
 #if AMPI_COMLIB  
   if(CkpvAccess(argvExtracted)==0){
@@ -2035,9 +2040,11 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     ((MPI_Status *)sts)->MPI_LENGTH = 0;
     return 0;
   }
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
+#endif
 #if CMK_BLUEGENE_CHARM
-    void *curLog;		// store current log in timeline
+   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   //  TRACE_BG_AMPI_SUSPEND();
 #if CMK_TRACE_IN_CHARM
@@ -2087,7 +2094,9 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   int status = dis->processMessage(msg, t, s, buf, count, type);
   if (status != 0) return status;
 
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
+#endif
 
 #if CMK_BLUEGENE_CHARM
 #if CMK_TRACE_IN_CHARM
