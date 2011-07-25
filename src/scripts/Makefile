@@ -504,6 +504,9 @@ ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 ckimage.o: ckimage.C ckimage.h $(CVHEADERS)
 	$(CHARMC) -o ckimage.o ckimage.C
 
+graph.o: graph.c $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -c -o graph.o graph.c
+
 RTH.o: RTH.C RTH.h $(CVHEADERS)
 	$(CHARMC) -o RTH.o RTH.C
 
