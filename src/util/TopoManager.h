@@ -12,7 +12,7 @@
 #ifndef _TOPO_MANAGER_H_
 #define _TOPO_MANAGER_H_
 
-#include "charm.h"
+#include "converse.h"
 
 #if CMK_BLUEGENEL
 #include "BGLTorus.h"

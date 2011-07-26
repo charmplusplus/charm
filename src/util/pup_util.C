@@ -18,7 +18,7 @@ virtual functions are defined here.
 #include <ctype.h>
 #include <errno.h>
 
-#include "charm.h"
+#include "converse.h"
 #include "pup.h"
 #include "ckhashtable.h"
 
@@ -107,10 +107,10 @@ void PUP::sizer::bytes(void * /*p*/,int n,size_t itemSize,dataType /*t*/)
 	nBytes+=sizeof(pupCheckRec);
 #endif
 #ifndef CMK_OPTIMIZE
-	if (n<0) CkAbort("PUP::sizer> Tried to pup a negative number of items!");
+	if (n<0) CmiAbort("PUP::sizer> Tried to pup a negative number of items!");
 	const unsigned int maxPupBytes=1024*1024*1024; //Pup 1 GB at a time
 	if (((unsigned int)(n*itemSize))>maxPupBytes) 
-		CkAbort("PUP::sizer> Tried to pup absurdly large number of bytes!");
+		CmiAbort("PUP::sizer> Tried to pup absurdly large number of bytes!");
 #endif
 	nBytes+=n*itemSize;
 }
