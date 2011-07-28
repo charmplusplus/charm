@@ -3,20 +3,34 @@ PMI_LIBS=`pkg-config --libs cray-pmi`
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
 UGNI_LIBS=`pkg-config --libs cray-ugni`
 
+PGCC=`CC -V 2>/dev/null | grep pgCC`
+
 CMK_CPP_CHARM='/lib/cpp -P'
 CMK_CPP_C="cc -E"
 CMK_CC="cc $PMI_CFLAGS $UGNI_CFLAGS "
 CMK_CXX="CC $PMI_CFLAGS $UGNI_CFLAGS"
 CMK_CXXPP="$CMK_CXX -x c++ -E  "
 CMK_LD="eval $CMK_CC "
-CMK_RANLIB='ranlib'
 CMK_LIBS='-lckqt'
 CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS $UGNI_LIBS"
-CMK_QT='cc'
-CMK_XIOPTS='-ansi'
 
-# fortran compilers
-CMK_CF77='f77 -automatic'
-CMK_CF90='f90 -automatic'
-CMK_F90LIBS="-lUfor -lfor -lFutil"
-CMK_F77LIBS="$CMK_F90LIBS"
+CMK_QT="generic64"
+
+# compiler for native programs
+CMK_NATIVE_CC="gcc "
+CMK_NATIVE_LD="gcc "
+CMK_NATIVE_CXX="g++ "
+CMK_NATIVE_LDXX="g++ "
+CMK_NATIVE_LIBS=""
+
+CMK_RANLIB="ranlib"
+
+# for F90 compiler
+CMK_CF77="ftn "
+CMK_CF90="ftn "
+CMK_F90LIBS=""
+CMK_F90_USE_MODDIR=1
+CMK_F90_MODINC="-I"
+CMK_MOD_EXT="mod"
+
+CMK_NO_BUILD_SHARED=true
