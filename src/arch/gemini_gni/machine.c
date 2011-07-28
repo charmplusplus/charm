@@ -415,10 +415,8 @@ static void PumpMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t pd;
 
-    CmiPrintf("PE:%d In PumpMsg\n", CmiMyPe());
     status = GNI_CqGetEvent(rx_cqh, &event_data);
 
-    CmiPrintf("PE:%d In PumpMsg, status=%s\n", CmiMyPe(), gni_err_str[status]);
     if(status == GNI_RC_SUCCESS)
     {
         type = GNI_CQ_GET_TYPE(event_data);
@@ -520,12 +518,12 @@ static void LrtsAdvanceCommunication()
 {
     /*  Receive Msg first */
 
-    CmiPrintf("Calling Lrts Pump Msg PE:%d\n", CmiMyPe());
+    //CmiPrintf("Calling Lrts Pump Msg PE:%d\n", CmiMyPe());
     PumpMsgs();
     /* Release Sent Msg */
-    CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
+    //CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
     ReleaseSentMessages();
-    CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", CmiMyPe());
+    //CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", CmiMyPe());
     /* Send buffered Message */
     SendBufferMsg();
 }
