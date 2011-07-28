@@ -329,6 +329,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
     gni_return_t status;
     MSG_LIST *msg_tmp;
     CONTROL_MSG *control_msg_tmp;
+    uint8_t             tag_data = DATA_TAG;
+    uint8_t             tag_control= LMSG_INIT_TAG ;
 
     /* No mailbox available */
     if(buffered_smsg_head != 0)
@@ -350,7 +352,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             msg_tmp->msg = msg;
             msg_tmp->destNode = destNode;
             msg_tmp ->size = size;
-            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &(msg_tmp->size), (uint32_t)sizeof(int), msg, (uint32_t)size, NULL, DATA_TAG);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &(msg_tmp->size), (uint32_t)sizeof(int), msg, (uint32_t)size, 0, tag_data);
         }else
         {
             /* construct a control message and send */
@@ -369,7 +371,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             msg_tmp->destNode = destNode;
             msg_tmp ->size = size;
             
-            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), NULL, LMSG_INIT_TAG);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
         }
         if(status == GNI_RC_SUCCESS)
         {
