@@ -35,12 +35,20 @@ static void sleep(int secs) {
 
 #include "pcqueue.h"
 
+#define DEBUY_PRINT
+
+#ifdef DEBUY_PRINT
+#define PRINT_INFO(msg) {fprintf(stdout, "%s\n", msg); fflush(stdout);}
+#else
+#define PRINT_INFO(msg)
+#endif
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
-static int useSMSG   = 0;
+static int useSMSG   = 1;
 static int useDynamicSmsg = 0;
 static int useMsgq = 0;
 static int size, rank;
-static int FMA_BUFFER_SIZE 1024
+#define FMA_PER_CORE  1024
+#define FMA_BUFFER_SIZE 1024
 #define SMSG_PER_MSG    1024
 #define SMSG_MAX_CREDIT 16
 #define SMSG_BUFFER_SIZE        10240
@@ -54,11 +62,12 @@ static int FMA_BUFFER_SIZE 1024
 #endif
 
 #ifdef DEBUG
-#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           printf("%d: %s; err=%s\n",me,msg,gni_err_str[rc]); exit(911); } } while(0)
+#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           printf("%s; err=%s\n",msg,gni_err_str[rc]); exit(911); } } while(0)
 #else
 #define GNI_RC_CHECK(msg,rc)
 #endif
 
+static gni_nic_handle_t      nic_hndl;
 static unsigned int         *MPID_UGNI_AllAddr;
 static gni_smsg_attr_t      *smsg_attr;
 static gni_smsg_attr_t      *smsg_attr_vec;
@@ -79,9 +88,9 @@ gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
-static gni_cq_handle_t       rx_cq_hndl = NULL;
+static gni_cq_handle_t       rx_cqh = NULL;
 static gni_cq_handle_t       remote_bte_cq_hndl = NULL;
-static gni_cq_handle_t       tx_cq_hndl = NULL;
+static gni_cq_handle_t       tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
 
 /* preallocated memory buffer for FMA for short message and control message */
@@ -102,7 +111,7 @@ typedef struct msg_list
 {
     int destNode;
     int size;
-    char *msg;
+    void *msg;
     struct msg_list *next;
 
 }MSG_LIST;
@@ -178,7 +187,7 @@ static void* gather_nic_addresses(void)
     alladdrs = (unsigned int *)malloc(addr_len * size);
     CmiAssert(alladdrs != NULL);
 
-    MPI_Allgather(&local_addr,sizeof(int), MPI_INT, alladdrs,sizeof(int), MPI_INT, MPI_COMM_WORLD);
+    MPI_Allgather(&local_addr, addr_len, MPI_BYTE, alladdrs, addr_len, MPI_BYTE, MPI_COMM_WORLD);
 
     return (void *)alladdrs;
 
@@ -191,7 +200,7 @@ static uint8_t get_ptag(void)
 
     p_ptr = getenv("PMI_GNI_PTAG");
     CmiAssert(p_ptr != NULL);
-    token = strok(p_ptr, ":");
+    token = strtok(p_ptr, ":");
     ptag = (uint8_t)atoi(token);
     return ptag;
         
@@ -204,7 +213,7 @@ static uint32_t get_cookie(void)
 
     p_ptr = getenv("PMI_GNI_COOKIE");
     CmiAssert(p_ptr != NULL);
-    token = strok(p_ptr, ":");
+    token = strtok(p_ptr, ":");
     cookie = (uint32_t)atoi(token);
 
     return cookie;
@@ -279,8 +288,8 @@ static int send_with_fma(int destNode, int size, char *msg)
         pd.cq_mode         = GNI_CQMODE_GLOBAL_EVENT | GNI_CQMODE_REMOTE_EVENT;
         pd.dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
         pd.length          = 8;
-        pd.remote_addr     = fma_buffer_mdh_addr[destNode].addr + fma_buffer_len_eachcore*destNode;
-        pd.remote_mem_hndl = fma_buffer_mdh_addr[destNode].mdh;
+        pd.remote_addr     = fma_buffer_mdh_addr_base[destNode].addr + fma_buffer_len_eachcore*destNode;
+        pd.remote_mem_hndl = fma_buffer_mdh_addr_base[destNode].mdh;
         if(size < FMA_BUFFER_SIZE)
         {
             /* send the message */
@@ -288,14 +297,14 @@ static int send_with_fma(int destNode, int size, char *msg)
         }else
         {
             /* construct a control message and send */
-            control_msg_tmp = (CONTROL_MSG *)LrtsAlloc(sizeof(CONTROL_MSG));
-            MemRegister(nic_hndl, (uint64_t)msg, 
+            control_msg_tmp = (CONTROL_MSG *)LrtsAlloc((int)sizeof(CONTROL_MSG));
+            GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, remote_bte_cq_hndl,
-                GNI_MEM_READONLY | GNI_MEM_USE_GART,
+                GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 -1, &(control_msg_tmp->source_mem_hndl));
             
             control_msg_tmp->source = _Cmi_mynode;
-            control_msg_tmp->source_addr = msg;
+            control_msg_tmp->source_addr = (uint64_t)msg;
             msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
             msg_tmp->msg = control_msg_tmp;
             msg_tmp->destNode = destNode;
@@ -332,33 +341,33 @@ static int send_with_smsg(int destNode, int size, char *msg)
     }else
     {
         /* Can use SMSGSend */
-        if(size < SMSG_MAXMSG)
+        if(size < SMSG_PER_MSG)
         {
             /* send the msg itself */
             msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
             msg_tmp->msg = msg;
             msg_tmp->destNode = destNode;
             msg_tmp ->size = size;
-            status = SmsgSendWTag(ep_hndl_array[destNode], &(msg_tmp->size), sizeof(int), msg, size, NULL, DATA_TAG);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &(msg_tmp->size), (uint32_t)sizeof(int), msg, (uint32_t)size, NULL, DATA_TAG);
         }else
         {
             /* construct a control message and send */
             control_msg_tmp = (CONTROL_MSG *)LrtsAlloc(sizeof(CONTROL_MSG));
             
-            MemRegister(nic_hndl, (uint64_t)msg, 
+            GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, remote_bte_cq_hndl,
-                GNI_MEM_READONLY | GNI_MEM_USE_GART,
-                -1, &(mcontrol_msg_tmp->source_mem_hndl));
+                GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
+                -1, &(control_msg_tmp->source_mem_hndl));
             
             control_msg_tmp->source = _Cmi_mynode;
-            control_msg_tmp->source_addr = msg;
+            control_msg_tmp->source_addr = (uint64_t)msg;
         
             msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
             msg_tmp->msg = control_msg_tmp;
             msg_tmp->destNode = destNode;
             msg_tmp ->size = size;
             
-            status = SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), NULL, LMSG_INIT_TAG);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), NULL, LMSG_INIT_TAG);
         }
         if(status == GNI_RC_SUCCESS)
         {
@@ -390,10 +399,13 @@ static void LrtsPostCommonInit(int everReturn){}
 static void LrtsDrainResources() /* used when exit */
 {}
 
+void LrtsPostNonLocal(){}
 /* pooling CQ to receive network message */
 static void PumpMsgs()
 {
     void *header;
+    uint8_t             tag_data;
+    uint8_t             tag_control;
     gni_return_t status;
     uint64_t source_data, source_control, type, inst_id, data;
     gni_cq_entry_t event_data;
@@ -402,7 +414,7 @@ static void PumpMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t pd;
 
-    status = GNI_CqGetEvent(remote_smsg_event_handler, &event_data);
+    status = GNI_CqGetEvent(rx_cqh, &event_data);
     if(status == GNI_RC_SUCCESS)
     {
         type = GNI_CQ_GET_TYPE(event_data);
@@ -418,13 +430,13 @@ static void PumpMsgs()
         msg_data = CmiAlloc(msg_nbytes);
         handleOneRecvedMsg(msg_nbytes, msg_data);
         GNI_SmsgRelease(ep_hndl_array[inst_id]);
-    } else if ((status = GNI_SmsgGetNextWTag(ep_hndl_array[source], &header, &tag_control)) == GNI_RC_SUCCESS)
+    } else if ((status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &tag_control)) == GNI_RC_SUCCESS)
     {
         /* initial a get to transfer data from the sender side */
         request_msg = (CONTROL_MSG *) header;
         msg_data = CmiAlloc(request_msg->length); //need align checking
         /* register this memory */
-        if(request_msg->size <= FMA_BTE_THRESHOLD) 
+        if(request_msg->length <= FMA_BTE_THRESHOLD) 
             pd.type            = GNI_POST_FMA_GET;
         else
             pd.type            = GNI_POST_RDMA_GET;
@@ -433,16 +445,16 @@ static void PumpMsgs()
         pd.dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
         pd.length          = request_msg->length;
         pd.local_addr      = (uint64_t) request_msg;
-        pd.remote_addr     = mds[tgt].addr;
-        pd.remote_mem_hndl = mds[tgt].mdh;
+        pd.remote_addr     = request_msg->source_addr;
+        pd.remote_mem_hndl = request_msg->source_mem_hndl;
      // rdma specific
         pd.src_cq_hndl     = tx_cqh;
         pd.rdma_mode       = 0;
 
         if(pd.type == GNI_POST_RDMA_PUT) 
-            gni_rc = GNI_PostRdma(eph, &pd);
+            status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
         else
-            gni_rc = GNI_PostFma(eph, &pd);
+            status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
 
         if(status = GNI_RC_SUCCESS)
         {
@@ -460,10 +472,11 @@ static void PumpMsgs()
 static void ReleaseSentMessages()
 {
     gni_cq_entry_t ev;
+    gni_return_t status;
     uint64_t type, source, inst_id, data_addr;
     gni_post_descriptor_t *tmp_pd;
     MSG_LIST  *ptr;
-    status = GNI_CqGetEvent(tx_cq_hndl, &ev);
+    status = GNI_CqGetEvent(tx_cqh, &ev);
     if(status == GNI_RC_SUCCESS)
     {
         source      = GNI_CQ_GET_SOURCE(ev);
@@ -474,7 +487,7 @@ static void ReleaseSentMessages()
 
     if(type == GNI_CQ_EVENT_TYPE_POST)
     {
-        gni_rc = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
+        status = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
     }
     /* memory leak here , need to realease struct MSG_list */ 
     CmiFree(data_addr);
@@ -487,10 +500,10 @@ static void SendBufferMsg()
     {
         if(useSMSG)
         {
-            ret = send_with_smsg(buffered_smsg_head->destNode, buffered_smsg_head->size, buffered_smsg_head_>msg); 
+            ret = send_with_smsg(buffered_smsg_head->destNode, buffered_smsg_head->size, buffered_smsg_head->msg); 
         }else
         {
-            ret = send_with_fma(buffered_smsg_head->destNode, buffered_smsg_head->size, buffered_smsg_head_>msg); 
+            ret = send_with_fma(buffered_smsg_head->destNode, buffered_smsg_head->size, buffered_smsg_head->msg); 
         }
         if(ret == GNI_RC_SUCCESS) 
         {
@@ -505,7 +518,7 @@ static void LrtsAdvanceCommunication()
 
     PumpMsgs();
     /* Release Sent Msg */
-    ReleaseSentMessagesAndSendBuffMsg();
+    ReleaseSentMessages();
     /* Send buffered Message */
     SendBufferMsg();
 }
@@ -543,7 +556,7 @@ void remoteEventHandle(gni_cq_entry_t *event_data, void *context)
 /* CDM initialization, register cache, two CQs created, DMA buffer, free list of transaction management structure.  
  * SMSG - all endpoint pairs created, buffer allocated, connection built (static)
  * MSQ */
-static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
+static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int          i;
     int                   rc;
@@ -561,23 +574,25 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
     int first_spawned;
     int                      size, rank;
 
-    useDynamicSmsg = CmiGetArgFlag(argv, "+useDynamicSmsg");
-    useMsgq = CmiGetArgFlag(argv, "+useMsgq");
+    void (*local_event_handler)(gni_cq_entry_t *, void *) = &LocalEventHandle;
+    void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
+    void (*remote_bte_event_handler)(gni_cq_entry_t *, void *) = &RemoteBteEventHandle;
+    
+    //useDynamicSmsg = CmiGetArgFlag(argv, "+useDynamicSmsg");
+    //useMsgq = CmiGetArgFlag(argv, "+useMsgq");
 
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD,&myNodeID);
-    MPI_Comm_size(MPI_COMM_WORLD,&numNodes);
+    MPI_Init(argc, argv);
+    MPI_Comm_rank(MPI_COMM_WORLD,myNodeID);
+    MPI_Comm_size(MPI_COMM_WORLD,numNodes);
+
 
     size = *numNodes;
     rank = *myNodeID;
+    
     ptag = get_ptag();
     cookie = get_cookie();
-   
-    void (*local_event_handler)(gni_cq_entry_t *, void *) = &LocalEvenHandle;
-    void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEvenHandle;
-    void (*remote_bte_event_handler)(gni_cq_entry_t *, void *) = &RemoteBteEvenHandle;
-
+    
     /* Create and attach to the communication  domain */
 
     status = GNI_CdmCreate(rank, ptag, cookie, modes, &cdm_hndl);
@@ -586,16 +601,16 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
     0 default */
     status = GNI_CdmAttach(cdm_hndl, device_id, &local_addr, &nic_hndl);
     GNI_RC_CHECK("GNI_CdmAttach", status);
-    
+   
     /* create the local completion queue */
     /* adaptive control TODO more option */
     /* the third parameter : The number of events the NIC allows before generating an interrupt. Setting this parameter to zero results in interrupt delivery with every event. When using this parameter, the mode parameter must be set to GNI_CQ_BLOCKING*/
-    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &local_event_handler, NULL, &tx_cq_hndl);
+    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &local_event_handler, NULL, &tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate (tx)", status);
     
     /* create the destination completion queue for receiving micro-messages, make this queue considerably larger than the number of transfers */
 
-    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &remote_smsg_event_handler, NULL, &rx_cq_hndl);
+    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &remote_smsg_event_handler, NULL, &rx_cqh);
     status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &remote_bte_event_handler, NULL, &remote_bte_cq_hndl);
 
     GNI_RC_CHECK("Create CQ (rx)", status);
@@ -607,22 +622,21 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
     MPID_UGNI_AllAddr = (unsigned int *)gather_nic_addresses();
     /* include self */
     for (i=0; i<size; i++) {
-        if(i == myNodeID) continue;
-        status = GNI_EpCreate(nic_hndl, tx_cq_hndl, &ep_hndl_array[i]);
+        if(i == rank) continue;
+        status = GNI_EpCreate(nic_hndl, tx_cqh, &ep_hndl_array[i]);
         GNI_RC_CHECK("GNI_EpCreate ", status);   
-        
         remote_addr = MPID_UGNI_AllAddr[i];
         status = GNI_EpBind(ep_hndl_array[i], remote_addr, i);
         
         GNI_RC_CHECK("GNI_EpBind ", status);   
     }
     /* Allocate a dma buffer to hook the destination cq to */
-
-    fma_buffer = (uint64_t *)calloc(fma_buffer_len_percore*numNodes, 1);
+    
+    fma_buffer = (uint64_t *)calloc(FMA_PER_CORE*size, 1);
     CmiAssert(fma_buffer != NULL);
 
     status = GNI_MemRegister(nic_hndl, (uint64_t)fma_buffer,
-        fma_buffer_len_percore*numNodes, rx_cq_hndl, 
+        FMA_PER_CORE*size, rx_cqh, 
         GNI_MEM_READWRITE | GNI_MEM_USE_GART, vmdh_index,
         &fma_buffer_mdh_addr);
 
@@ -636,19 +650,19 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
     my_mdh_addr.mdh = fma_buffer_mdh_addr;
 
     MPI_Allgather(&my_mdh_addr, sizeof(mdh_addr_t), MPI_BYTE, fma_buffer_mdh_addr_base, sizeof(mdh_addr_t), MPI_BYTE, MPI_COMM_WORLD);
-    
+   
     /*  If use SMSG mode (1) register memory buffer as mailbox (2)gather the buffer on remote peers */
     if(useMsgq==0 && useSMSG==1 ){
+        PRINT_INFO("Using static SMSG")
         smsg_memlen = SMSG_BUFFER_SIZE ;
         smsg_mem_buffer = (char*)calloc(smsg_memlen, 1);
         status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mem_buffer,
-                                smsg_memlen, rx_cq_hndl,
+                                smsg_memlen, rx_cqh,
                                 GNI_MEM_READWRITE | GNI_MEM_USE_GART,   
                                 vmdh_index,
                                 &my_smsg_mdh_mailbox);
        
-        GNI_RC_CHECK("GNI_MemRegister mem buffer", status);
-        fprintf(stdout, "GNI_MemRegister send buffer successful\n");
+        GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
         smsg_attr = (gni_smsg_attr_t *)malloc(size*sizeof(gni_smsg_attr_t));
 
@@ -664,7 +678,7 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
                 smsg_attr[i].msg_maxsize = SMSG_PER_MSG;
             }
             smsg_attr_vec = (gni_smsg_attr_t*)malloc(size * sizeof(gni_smsg_attr_t));
-            assert(smsg_attr_vec);
+            CmiAssert(smsg_attr_vec);
             MPI_Alltoall(smsg_attr, sizeof(gni_smsg_attr_t), MPI_BYTE, smsg_attr_vec, sizeof(gni_smsg_attr_t), MPI_BYTE, MPI_COMM_WORLD);
             for(i=0; i<size; i++)
             {
@@ -692,6 +706,8 @@ static void LrtsInit(int argc, char **argv, int *numNodes, int *myNodeID)
         status = GNI_MsgqInit(nic_hndl, NULL, NULL, NULL, &msgq_attrs, &msgq_handle);
         GNI_RC_CHECK("MSGQ Init", status);
     } //end MSGQ
+
+    PRINT_INFO("Done with LrtsInit")
 }
 
 static void* LrtsAlloc(int n_bytes)
@@ -702,7 +718,7 @@ static void* LrtsAlloc(int n_bytes)
         return malloc(n_bytes);
     }else if(n_bytes <= FMA_BTE_THRESHOLD)
     {
-        return malloc(n_bytes)
+        return malloc(n_bytes);
     }else 
     {
         return memalign(64, n_bytes);
@@ -735,11 +751,10 @@ void CmiAbort(const char *message) {
 
 /************Barrier Related Functions****************/
 
-int LrtsBarrier()
+int CmiBarrier()
 {
     int status;
-    status = MPI_Barrier();
-
+    status = MPI_Barrier(MPI_COMM_WORLD);
     return status;
 
 }
