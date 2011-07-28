@@ -16,6 +16,22 @@ CMK_LD_LIBRARY_PATH="-rpath $CHARMLIBSO/ $PMI_LIBS $UGNI_LIBS"
 
 CMK_QT="generic64"
 
+# compiler for compiling sequential programs
+if test -n "$PGCC"
+then
+CMK_CC="$CMK_CC -DCMK_CC_PGCC=1 "
+CMK_CXX="$CMK_CXX -DCMK_CC_PGCC=1 "
+# gcc is needed for building QT
+CMK_SEQ_CC="gcc "
+CMK_SEQ_CXX="pgCC "
+else
+CMK_SEQ_CC="gcc "
+CMK_SEQ_CXX="g++ "
+fi
+CMK_SEQ_LD="$CMK_SEQ_CC "
+CMK_SEQ_LDXX="$CMK_SEQ_CXX "
+CMK_SEQ_LIBS=""
+
 # compiler for native programs
 CMK_NATIVE_CC="gcc "
 CMK_NATIVE_LD="gcc "
