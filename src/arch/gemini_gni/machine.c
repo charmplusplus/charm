@@ -11,7 +11,9 @@
 /*@{*/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
+#include <malloc.h>
 #include "converse.h"
 
 #include "gni_pub.h"
@@ -492,7 +494,7 @@ static void ReleaseSentMessages()
         status = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
     }
     /* memory leak here , need to realease struct MSG_list */ 
-    CmiFree(data_addr);
+    CmiFree((void *)data_addr);
 }
 
 static void SendBufferMsg()
@@ -638,7 +640,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     }
     /* Allocate a dma buffer to hook the destination cq to */
     
-    fma_buffer = (uint64_t *)calloc(FMA_PER_CORE*size, 1);
+    fma_buffer = (char *)calloc(FMA_PER_CORE*size, 1);
     CmiAssert(fma_buffer != NULL);
 
     status = GNI_MemRegister(nic_hndl, (uint64_t)fma_buffer,
@@ -754,6 +756,141 @@ void CmiAbort(const char *message) {
 }
 
 /**************************  TIMER FUNCTIONS **************************/
+
+#if CMK_TIMER_USE_SPECIAL
+
+/* MPI calls are not threadsafe, even the timer on some machines */
+static CmiNodeLock  timerLock = 0;
+                                static int _absoluteTime = 0;
+                                                           static double starttimer = 0;
+                                                                                      static int _is_global = 0;
+
+int CmiTimerIsSynchronized() {
+    int  flag;
+    void *v;
+
+    /*  check if it using synchronized timer */
+    if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
+        printf("MPI_WTIME_IS_GLOBAL not valid!\n");
+    if (flag) {
+        _is_global = *(int*)v;
+        if (_is_global && CmiMyPe() == 0)
+            printf("Charm++> MPI timer is synchronized\n");
+    }
+    return _is_global;
+}
+
+int CmiTimerAbsolute() {
+    return _absoluteTime;
+}
+
+double CmiStartTimer() {
+    return 0.0;
+}
+
+double CmiInitTime() {
+    return starttimer;
+}
+
+void CmiTimerInit(char **argv) {
+    _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+    if (_absoluteTime && CmiMyPe() == 0)
+        printf("Charm++> absolute MPI timer is used\n");
+
+    _is_global = CmiTimerIsSynchronized();
+
+    if (_is_global) {
+        if (CmiMyRank() == 0) {
+            double minTimer;
+#if CMK_TIMER_USE_XT3_DCLOCK
+            starttimer = dclock();
+#else
+            starttimer = MPI_Wtime();
+#endif
+
+            MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
+                          MPI_COMM_WORLD );
+            starttimer = minTimer;
+        }
+    } else { /* we don't have a synchronous timer, set our own start time */
+        CmiBarrier();
+        CmiBarrier();
+        CmiBarrier();
+#if CMK_TIMER_USE_XT3_DCLOCK
+        starttimer = dclock();
+#else
+        starttimer = MPI_Wtime();
+#endif
+    }
+
+#if 0 && CMK_SMP && CMK_MPI_INIT_THREAD
+    if (CmiMyRank()==0 && _thread_provided == MPI_THREAD_SINGLE)
+        timerLock = CmiCreateLock();
+#endif
+    CmiNodeAllBarrier();          /* for smp */
+}
+
+/**
+ * Since the timerLock is never created, and is
+ * always NULL, then all the if-condition inside
+ * the timer functions could be disabled right
+ * now in the case of SMP. --Chao Mei
+ */
+double CmiTimer(void) {
+    double t;
+#if 0 && CMK_SMP
+    if (timerLock) CmiLock(timerLock);
+#endif
+
+#if CMK_TIMER_USE_XT3_DCLOCK
+    t = dclock();
+#else
+    t = MPI_Wtime();
+#endif
+
+#if 0 && CMK_SMP
+    if (timerLock) CmiUnlock(timerLock);
+#endif
+
+    return _absoluteTime?t: (t-starttimer);
+}
+
+double CmiWallTimer(void) {
+    double t;
+#if 0 && CMK_SMP
+    if (timerLock) CmiLock(timerLock);
+#endif
+
+#if CMK_TIMER_USE_XT3_DCLOCK
+    t = dclock();
+#else
+    t = MPI_Wtime();
+#endif
+
+#if 0 && CMK_SMP
+    if (timerLock) CmiUnlock(timerLock);
+#endif
+
+    return _absoluteTime? t: (t-starttimer);
+}
+
+double CmiCpuTimer(void) {
+    double t;
+#if 0 && CMK_SMP
+    if (timerLock) CmiLock(timerLock);
+#endif
+#if CMK_TIMER_USE_XT3_DCLOCK
+    t = dclock() - starttimer;
+#else
+    t = MPI_Wtime() - starttimer;
+#endif
+#if 0 && CMK_SMP
+    if (timerLock) CmiUnlock(timerLock);
+#endif
+    return t;
+}
+
+#endif
 
 /************Barrier Related Functions****************/
 

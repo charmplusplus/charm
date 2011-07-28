@@ -13,6 +13,9 @@
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
 
+#define CMI_IO_BUFFER_EXPLICIT                             0
+#define CMI_IO_FLUSH_USER                                  0
+
 /* specifies if there is a node queue. it is used in convcore.c and it is
    tipically set to 1 in smp versions */
 #define CMK_NODE_QUEUE_AVAILABLE                           0
