@@ -384,6 +384,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
 
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
+    PRINT_INFO("Calling LrtsSend")
     if(useSMSG)
     {
         send_with_smsg(destNode, size, msg); 
@@ -414,7 +415,10 @@ static void PumpMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t pd;
 
+    CmiPrintf("PE:%d In PumpMsg\n", CmiMyPe());
     status = GNI_CqGetEvent(rx_cqh, &event_data);
+
+    CmiPrintf("PE:%d In PumpMsg, status=%s\n", CmiMyPe(), gni_err_str[status]);
     if(status == GNI_RC_SUCCESS)
     {
         type = GNI_CQ_GET_TYPE(event_data);
@@ -479,11 +483,11 @@ static void ReleaseSentMessages()
     status = GNI_CqGetEvent(tx_cqh, &ev);
     if(status == GNI_RC_SUCCESS)
     {
-        source      = GNI_CQ_GET_SOURCE(ev);
         type        = GNI_CQ_GET_TYPE(ev);
         inst_id     = GNI_CQ_GET_INST_ID(ev);
         data_addr   = GNI_CQ_GET_DATA(ev);
-    }
+    }else
+        return;
 
     if(type == GNI_CQ_EVENT_TYPE_POST)
     {
@@ -516,9 +520,12 @@ static void LrtsAdvanceCommunication()
 {
     /*  Receive Msg first */
 
+    CmiPrintf("Calling Lrts Pump Msg PE:%d\n", CmiMyPe());
     PumpMsgs();
     /* Release Sent Msg */
+    CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
     ReleaseSentMessages();
+    CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", CmiMyPe());
     /* Send buffered Message */
     SendBufferMsg();
 }
@@ -605,13 +612,14 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* create the local completion queue */
     /* adaptive control TODO more option */
     /* the third parameter : The number of events the NIC allows before generating an interrupt. Setting this parameter to zero results in interrupt delivery with every event. When using this parameter, the mode parameter must be set to GNI_CQ_BLOCKING*/
-    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &local_event_handler, NULL, &tx_cqh);
+    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &tx_cqh);
+    //status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &local_event_handler, NULL, &tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate (tx)", status);
     
     /* create the destination completion queue for receiving micro-messages, make this queue considerably larger than the number of transfers */
 
-    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &remote_smsg_event_handler, NULL, &rx_cqh);
-    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, &remote_bte_event_handler, NULL, &remote_bte_cq_hndl);
+    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &rx_cqh);
+    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &remote_bte_cq_hndl);
 
     GNI_RC_CHECK("Create CQ (rx)", status);
 
