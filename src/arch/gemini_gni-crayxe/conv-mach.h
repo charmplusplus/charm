@@ -1,20 +1,17 @@
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
-/* define the default linker, together with its options */
-#define CMK_DLL_CC   "g++ -shared -O3 -o "
 
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
    used in the memory files of converse */
-#define CMK_GETPAGESIZE_AVAILABLE                          0
+#define CMK_GETPAGESIZE_AVAILABLE                          1
+#define CMK_MEMORY_PAGESIZE                                8192
+#define CMK_MEMORY_PROTECTABLE                             1
 
 /* defines which version of memory handlers should be used.
    used in conv-core/machine.c */
 #define CMK_MALLOC_USE_GNU_MALLOC                          0
 #define CMK_MALLOC_USE_OS_BUILTIN                          1
-
-#define CMK_MEMORY_PAGESIZE                                8192
-#define CMK_MEMORY_PROTECTABLE                             1
 
 /* specifies if there is a node queue. it is used in convcore.c and it is
    tipically set to 1 in smp versions */
@@ -38,7 +35,8 @@
    other must be 0. they differ in the fact that the second (_WITH_RESTART)
    enables retry on interrupt (a function is recalled upon interrupt and does
    not return EINTR as in the first case) */
-#define CMK_SIGNAL_USE_SIGACTION                           1
+#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 /* specifies whether the CthCpv variables should be defined as Cpv (0) or
@@ -58,7 +56,7 @@
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
-#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_GETRUSAGE                            1
 #define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL                            0
@@ -80,7 +78,8 @@
    into busy waiting mode (0). In convcore.c there are a few files included if
    sleeping mode, but the real distinct implementation is in the machine.c
    file. */
-#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     1
+#define CMK_WHEN_PROCESSOR_IDLE_BUSYWAIT                   1
+#define CMK_WHEN_PROCESSOR_IDLE_USLEEP                     0
 
 /* specifies weather there is a web server collecting utilization statistics (1)
    or not (0) */
@@ -91,8 +90,7 @@
 /* enables the load balancer framework. set to 1 for almost all the machines */
 #define CMK_LBDB_ON					   1
 
-/* snables smp support if set to 1 */
-#define CMK_SMP                                            0
+#define CMK_64BIT					   1
 
 /* Other possible definitions:
 
