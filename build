@@ -27,7 +27,7 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^vmi$)|(^lapi$)|(^cell$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^vmi$)|(^lapi$)|(^cell$)|(^gemini_gni$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale clang'
