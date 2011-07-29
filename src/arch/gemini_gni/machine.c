@@ -252,7 +252,7 @@ void RemoteBteEventHandle(gni_cq_entry_t *cq_entry, void *userdata)
 
 
 #include "machine-lrts.h"
-#include "machine-common.c"
+#include "machine-common-core.c"
 
 /* Network progress function is used to poll the network when for
    messages. This flushes receive buffers on some  implementations*/

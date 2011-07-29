@@ -271,7 +271,7 @@ static void MachinePostNonLocalForMPI();
  */
 #define CMK_HAS_SIZE_IN_MSGHDR 0
 #include "machine-lrts.h"
-#include "machine-common.c"
+#include "machine-common-core.c"
 
 /* The machine specific msg-sending function */
 
