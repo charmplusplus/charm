@@ -48,7 +48,7 @@ static void sleep(int secs) {
 static int useStaticSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
-static int size, rank;
+static int mysize, myrank;
 /* If SMSG is not used */
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
@@ -370,7 +370,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
         if(size <= SMSG_PER_MSG)
         {
             /* send the msg itself */
-            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &size, (uint32_t)sizeof(int), msg, (uint32_t)size, 0, tag_data);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &size, sizeof(int), msg, size, 0, tag_data);
             if (status == GNI_RC_SUCCESS)
                 return 1;
             else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
@@ -385,6 +385,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 buffered_smsg_tail = msg_tmp;
                 return 0;
             }
+            else
                 GNI_RC_CHECK("GNI_SmsgSendWTag", status);
         }else
         {
@@ -663,24 +664,24 @@ static void _init_static_smsg()
 
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
-    smsg_attr = (gni_smsg_attr_t *)malloc(size*sizeof(gni_smsg_attr_t));
+    smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
 
-    for(i=0; i<size; i++)
+    for(i=0; i<mysize; i++)
     {
         smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;
         smsg_attr[i].msg_buffer = smsg_mem_buffer;
         smsg_attr[i].buff_size = smsg_memlen;
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
-        smsg_attr[i].mbox_offset = smsg_memlen/size*i;
+        smsg_attr[i].mbox_offset = smsg_memlen/mysize*i;
         smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
         smsg_attr[i].msg_maxsize = SMSG_PER_MSG;
     }
-    smsg_attr_vec = (gni_smsg_attr_t*)malloc(size * sizeof(gni_smsg_attr_t));
+    smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * sizeof(gni_smsg_attr_t));
     CmiAssert(smsg_attr_vec);
     MPI_Alltoall(smsg_attr, sizeof(gni_smsg_attr_t), MPI_BYTE, smsg_attr_vec, sizeof(gni_smsg_attr_t), MPI_BYTE, MPI_COMM_WORLD);
-    for(i=0; i<size; i++)
+    for(i=0; i<mysize; i++)
     {
-        if (rank == i) continue;
+        if (myrank == i) continue;
         /* initialize the smsg channel */
         status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &smsg_attr_vec[i]);
         GNI_RC_CHECK("SMSG Init", status);
@@ -716,7 +717,6 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     uint32_t              vmdh_index = -1;
     uint8_t                  ptag;
     int first_spawned;
-    int                      size, rank;
 
     unsigned int         *MPID_UGNI_AllAddr;
     
@@ -733,15 +733,15 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     MPI_Comm_size(MPI_COMM_WORLD,numNodes);
 
 
-    size = *numNodes;
-    rank = *myNodeID;
+    mysize = *numNodes;
+    myrank = *myNodeID;
     
     ptag = get_ptag();
     cookie = get_cookie();
     
     /* Create and attach to the communication  domain */
 
-    status = GNI_CdmCreate(rank, ptag, cookie, modes, &cdm_hndl);
+    status = GNI_CdmCreate(myrank, ptag, cookie, modes, &cdm_hndl);
     GNI_RC_CHECK("GNI_CdmCreate", status);
     /* device id The device id is the minor number for the device that is assigned to the device by the system when the device is created. To determine the device number, look in the /dev directory, which contains a list of devices. For a NIC, the device is listed as kgniX, where X is the device number
     0 default */
@@ -763,12 +763,12 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     GNI_RC_CHECK("Create BTE CQ", status);
 
     /* create the endpoints. they need to be bound to allow later CQWrites to them */
-    ep_hndl_array = (gni_ep_handle_t*)malloc(size * sizeof(gni_ep_handle_t));
+    ep_hndl_array = (gni_ep_handle_t*)malloc(mysize * sizeof(gni_ep_handle_t));
     CmiAssert(ep_hndl_array != NULL);
 
     MPID_UGNI_AllAddr = (unsigned int *)gather_nic_addresses();
-    for (i=0; i<size; i++) {
-        if(i == rank) continue;
+    for (i=0; i<mysize; i++) {
+        if(i == myrank) continue;
         status = GNI_EpCreate(nic_hndl, tx_cqh, &ep_hndl_array[i]);
         GNI_RC_CHECK("GNI_EpCreate ", status);   
         remote_addr = MPID_UGNI_AllAddr[i];
@@ -779,13 +779,13 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
     if(useStaticSMSG == 1)
     {
-        _init_static_smsg(size);
+        _init_static_smsg(mysize);
     }else if(useStaticMSGQ == 1)
     {
         _init_static_msgq();
     }else if( useStaticFMA == 1)
     {
-        _init_smallMsgwithFma(size);
+        _init_smallMsgwithFma(mysize);
     }
     PRINT_INFO("\nDone with LrtsInit")
 }
@@ -794,10 +794,10 @@ static void* LrtsAlloc(int n_bytes)
 {
     if(n_bytes <= SMSG_PER_MSG)
     {
-        return malloc(n_bytes);
+        return CmiAlloc(n_bytes);
     }else if(n_bytes <= FMA_BTE_THRESHOLD)
     {
-        return malloc(n_bytes);
+        return CmiAlloc(n_bytes);
     }else 
     {
         return memalign(64, n_bytes);
