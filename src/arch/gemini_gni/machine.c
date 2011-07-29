@@ -47,7 +47,7 @@ static void sleep(int secs) {
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 static int useStaticSMSG   = 1;
 static int useStaticMSGQ = 0;
-static int useStaicFMA = 0;
+static int useStaticFMA = 0;
 static int size, rank;
 /* If SMSG is not used */
 #define FMA_PER_CORE  1024
@@ -128,6 +128,12 @@ static MSG_LIST *buffered_smsg_tail= 0;
 
 static MSG_LIST *buffered_fma_head = 0;
 static MSG_LIST *buffered_fma_tail = 0;
+
+/* functions  */
+
+
+static void* LrtsAlloc(int);
+static void  LrtsFree(void*);
 
 static unsigned int get_gni_nic_address(int device_id)
 {
@@ -270,6 +276,7 @@ static int send_with_fma(int destNode, int size, char *msg)
     gni_return_t status;
     CONTROL_MSG *control_msg_tmp;
     MSG_LIST *msg_tmp;
+    uint32_t              vmdh_index = -1;
     if(buffered_fma_head != 0)
     {
         msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
@@ -298,7 +305,7 @@ static int send_with_fma(int destNode, int size, char *msg)
             GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, remote_bte_cq_hndl,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                -1, &(control_msg_tmp->source_mem_hndl));
+                vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
@@ -326,6 +333,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
     CONTROL_MSG *control_msg_tmp;
     uint8_t             tag_data = DATA_TAG;
     uint8_t             tag_control= LMSG_INIT_TAG ;
+    uint32_t              vmdh_index = -1;
 
     /* No mailbox available, buffer this msg and its info */
     if(buffered_smsg_head != 0)
@@ -343,7 +351,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, remote_bte_cq_hndl,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                -1, &(control_msg_tmp->source_mem_hndl));
+                vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
@@ -386,7 +394,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, remote_bte_cq_hndl,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                -1, &(control_msg_tmp->source_mem_hndl));
+                vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
@@ -416,7 +424,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
     PRINT_INFO("Calling LrtsSend")
-    if(useSMSG)
+    if(useStaticSMSG)
     {
         send_with_smsg(destNode, size, msg); 
     }else
@@ -519,7 +527,7 @@ static void ReleaseSentMessages()
     if(type == GNI_CQ_EVENT_TYPE_POST)
     {
         status = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
-        GNI_RC_CHECK("Local CQ completed ", status)
+        GNI_RC_CHECK("Local CQ completed ", status);
     }
     /* memory leak here , need to realease struct MSG_list */ 
     CmiFree((void *)data_addr);
@@ -527,9 +535,10 @@ static void ReleaseSentMessages()
 
 static void SendBufferMsg()
 {
-    int ret;
     MSG_LIST *ptr;
-   
+    uint8_t tag_data, tag_control;
+    gni_return_t status;
+
     tag_data = DATA_TAG;
     tag_control = LMSG_INIT_TAG;
     /* can add flow control here to control the number of messages sent before handle message */
@@ -541,11 +550,11 @@ static void SendBufferMsg()
             if(ptr->tag == tag_data)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], &(ptr->size), (uint32_t)sizeof(int), ptr->msg, ptr->size, 0, tag_data);
-            }else (ptr->tag ==tag_control)
+            }else if(ptr->tag ==tag_control)
             {
-                status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
+                status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
             }
-        } else if(useStaicMSGQ)
+        } else if(useStaticMSGQ)
         {
             CmiPrintf("MSGQ Send not done\n");
         }else
@@ -609,13 +618,14 @@ static void _init_smallMsgwithFma(int size)
     char            *fma_buffer;
     gni_mem_handle_t      fma_buffer_mdh_addr;
     mdh_addr_t            my_mdh_addr;
+    gni_return_t status;
     
     fma_buffer = (char *)calloc(FMA_PER_CORE*size, 1);
     CmiAssert(fma_buffer != NULL);
 
     status = GNI_MemRegister(nic_hndl, (uint64_t)fma_buffer,
         FMA_PER_CORE*size, rx_cqh, 
-        GNI_MEM_READWRITE | GNI_MEM_USE_GART, vmdh_index,
+        GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
         &fma_buffer_mdh_addr);
 
     GNI_RC_CHECK("Memregister DMA ", status);
@@ -638,16 +648,20 @@ static void _init_static_smsg()
     char                 *smsg_mem_buffer = NULL;
     uint32_t             smsg_memlen;
     gni_mem_handle_t      my_smsg_mdh_mailbox;
-    
+    register    int         i;
+    gni_return_t status;
+    uint32_t              vmdh_index = -1;
+
     smsg_memlen = SMSG_BUFFER_SIZE ;
     smsg_mem_buffer = (char*)calloc(smsg_memlen, 1);
+    CmiAssert(smsg_mem_buffer != NULL);
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mem_buffer,
                              smsg_memlen, rx_cqh,
                              GNI_MEM_READWRITE | GNI_MEM_USE_GART,   
-                            vmdh_index,
+                             vmdh_index,
                             &my_smsg_mdh_mailbox);
 
-    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status)
+    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
     smsg_attr = (gni_smsg_attr_t *)malloc(size*sizeof(gni_smsg_attr_t));
 
@@ -675,6 +689,7 @@ static void _init_static_smsg()
 
 static void _init_static_msgq()
 {
+    gni_return_t status;
     /* MSGQ is to send and receive short messages for large jobs (exceeding 200,000 ranks). The          performance scales by the node count rather than rank count */
     msgq_attrs.max_msg_sz = MSGQ_MAXSIZE;
     msgq_attrs.smsg_q_sz = 1;
@@ -713,9 +728,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     void (*remote_bte_event_handler)(gni_cq_entry_t *, void *) = &RemoteBteEventHandle;
     
-    useDynamicSmsg = CmiGetArgFlag(argv, "+useStaticSmsg");
-    useMsgq = CmiGetArgFlag(argv, "+useStaticMsgQ");
-    //useMsgq = CmiGetArgFlag(argv, "+useStaticMsgQ");
+    //useStaticSMSG = CmiGetArgFlag(argv, "+useStaticSmsg");
+    //useStaticMSGQ = CmiGetArgFlag(argv, "+useStaticMsgQ");
 
 
     MPI_Init(argc, argv);
@@ -770,7 +784,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if(useStaticSMSG == 1)
     {
         _init_static_smsg(size);
-    }else if(useStaticMsgq == 1)
+    }else if(useStaticMSGQ == 1)
     {
         _init_static_msgq();
     }else if( useStaticFMA == 1)
