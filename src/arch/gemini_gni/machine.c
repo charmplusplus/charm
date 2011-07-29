@@ -307,16 +307,16 @@ static int send_with_fma(int destNode, int size, char *msg)
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
-            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
-            msg_tmp->msg = control_msg_tmp;
-            msg_tmp->destNode = destNode;
-            msg_tmp ->size = size;
         }
         status = GNI_PostFma(ep_hndl_array[destNode], &pd);
         if(status == GNI_RC_SUCCESS)
             return 1;
         else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
         {
+            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
+            msg_tmp->msg = control_msg_tmp;
+            msg_tmp->destNode = destNode;
+            msg_tmp ->size = size;
             /* store into buffer fma_list and send later */
             buffered_fma_head = msg_tmp;
             buffered_fma_tail = msg_tmp;
@@ -365,11 +365,6 @@ static int send_with_smsg(int destNode, int size, char *msg)
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
-        
-            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
-            msg_tmp->msg = control_msg_tmp;
-            msg_tmp->destNode = destNode;
-            msg_tmp ->size = size;
             
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
         }
@@ -378,6 +373,10 @@ static int send_with_smsg(int destNode, int size, char *msg)
             return 1;
         }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
         {
+            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
+            msg_tmp->msg = control_msg_tmp;
+            msg_tmp->destNode = destNode;
+            msg_tmp ->size = size;
             /* store into buffer smsg_list and send later */
             buffered_smsg_head = msg_tmp;
             buffered_smsg_tail = msg_tmp;
