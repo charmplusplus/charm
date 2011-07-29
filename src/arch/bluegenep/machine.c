@@ -320,7 +320,7 @@ static void MachinePostNonLocalForDCMF();
  *  CMK_OFFLOAD_BCAST_PROCESS etc.
  */
 #define CMK_OFFLOAD_BCAST_PROCESS 1
-#include "machine-common.h"
+#include "machine-lrts.h"
 #include "machine-common.c"
 
 /*######Beginning of functions related with Communication-Op functions ######*/

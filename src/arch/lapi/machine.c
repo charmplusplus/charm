@@ -363,7 +363,7 @@ static void MachinePostNonLocalForLAPI();
 /* For async msg sending ops, using lapi specific implementations */
 #define USE_COMMON_ASYNC_BCAST 0
 #define CMK_OFFLOAD_BCAST_PROCESS 1
-#include "machine-common.h"
+#include "machine-lrts.h"
 #include "machine-common.c"
 
 /* The machine specific msg-sending function */
