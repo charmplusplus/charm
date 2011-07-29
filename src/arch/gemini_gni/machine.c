@@ -531,7 +531,7 @@ static void ReleaseSentMessages()
         GNI_RC_CHECK("Local CQ completed ", status);
     }
     /* memory leak here , need to realease struct MSG_list */ 
-    CmiFree((void *)data_addr);
+    LrtsFree((void *)data_addr);
 }
 
 static void SendBufferMsg()
@@ -806,7 +806,7 @@ static void* LrtsAlloc(int n_bytes)
 
 static void  LrtsFree(void *msg)
 {
-    free(msg);
+    CmiFree(msg);
 }
 
 static void LrtsExit()
