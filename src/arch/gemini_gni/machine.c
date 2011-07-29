@@ -462,7 +462,7 @@ static void PumpMsgs()
 
         if(pd.type == GNI_POST_RDMA_PUT) 
             status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
-        lse
+        else
             status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
 
         if(status = GNI_RC_SUCCESS)
