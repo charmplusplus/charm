@@ -40,7 +40,7 @@ static void sleep(int secs) {
 #define DEBUY_PRINT
 
 #ifdef DEBUY_PRINT
-#define PRINT_INFO(msg) {fprintf(stdout, "%s\n", msg); fflush(stdout);}
+#define PRINT_INFO(msg) {fprintf(stdout, "[%d] %s\n", CmiMyPe(), msg); fflush(stdout);}
 #else
 #define PRINT_INFO(msg)
 #endif
@@ -53,7 +53,7 @@ static int size, rank;
 #define FMA_BUFFER_SIZE 1024
 #define SMSG_PER_MSG    1024
 #define SMSG_MAX_CREDIT 16
-#define SMSG_BUFFER_SIZE        10240
+#define SMSG_BUFFER_SIZE        102400
 #define FMA_BTE_THRESHOLD  4096
 #define MSGQ_MAXSIZE       4096
 
@@ -382,6 +382,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
             buffered_smsg_tail = msg_tmp;
             return 0;
         }
+        else
+            GNI_RC_CHECK("GNI_SmsgSendWTag", status);
     }
 }
 
@@ -431,8 +433,10 @@ static void PumpMsgs()
     if((status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &tag_data)) == GNI_RC_SUCCESS)
     {
         /* copy msg out and then put into queue */
-        memcpy(&msg_nbytes, header, sizeof(int));   
+        // memcpy(&msg_nbytes, header, sizeof(int));   
+        msg_nbytes = *(int*)header;
         msg_data = CmiAlloc(msg_nbytes);
+        memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
         handleOneRecvedMsg(msg_nbytes, msg_data);
         GNI_SmsgRelease(ep_hndl_array[inst_id]);
     } else if ((status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &tag_control)) == GNI_RC_SUCCESS)
