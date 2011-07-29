@@ -251,7 +251,7 @@ void RemoteBteEventHandle(gni_cq_entry_t *cq_entry, void *userdata)
 /* =====End of Definitions of Message-Corruption Related Macros=====*/
 
 
-#include "machine-common.h"
+#include "machine-lrts.h"
 #include "machine-common.c"
 
 /* Network progress function is used to poll the network when for
@@ -462,7 +462,7 @@ static void PumpMsgs()
 
         if(pd.type == GNI_POST_RDMA_PUT) 
             status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
-        else
+        lse
             status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
 
         if(status = GNI_RC_SUCCESS)
