@@ -26,12 +26,6 @@
 #define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 #define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
 
-#if USE_COMMON_SYNC_BCAST || USE_COMMON_ASYNC_BCAST
-#if !CMK_BROADCAST_SPANNING_TREE && !CMK_BROADCAST_HYPERCUBE
-#warning "Broadcast function is based on the plain P2P O(P)-message scheme!!!"
-#endif
-#endif
-
 /**
  * For some machine layers such as on Active Message framework,
  * the receiver callback is usally executed on an internal
@@ -179,6 +173,12 @@ void CmiPushNode(void *msg);
 #endif
 #ifndef USE_COMMON_ASYNC_BCAST
 #define USE_COMMON_ASYNC_BCAST 1
+#endif
+
+#if USE_COMMON_SYNC_BCAST || USE_COMMON_ASYNC_BCAST
+#if !CMK_BROADCAST_SPANNING_TREE && !CMK_BROADCAST_HYPERCUBE
+#warning "Broadcast function is based on the plain P2P O(P)-message scheme!!!"
+#endif
 #endif
 
 static void CmiSendSelf(char *msg);
