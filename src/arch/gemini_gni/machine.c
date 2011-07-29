@@ -709,15 +709,11 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     register int          i;
     int                   rc;
     int                   device_id = 0;
-    int                   events_returned;
-    int                   test_id;
     unsigned int          local_addr;
     unsigned int          remote_addr;
     gni_cdm_handle_t      cdm_hndl;
-    gni_nic_handle_t      nic_hndl;
     gni_return_t          status = GNI_RC_SUCCESS;
     uint32_t              vmdh_index = -1;
-    uint64_t              *recv_buffer;
     uint8_t                  ptag;
     int first_spawned;
     int                      size, rank;
