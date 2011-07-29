@@ -1,5 +1,5 @@
-#ifndef  _MACHINE_H_
-#define  _MACHINE_H_
+#ifndef  _MACHINE_LRTS_H_
+#define  _MACHINE_LRTS_H_
 /* The machine-specific send function */
 CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode);
 
