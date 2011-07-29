@@ -504,6 +504,7 @@ CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
     }
 }
 #endif
+#endif
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
