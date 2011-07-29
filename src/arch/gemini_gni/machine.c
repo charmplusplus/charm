@@ -53,7 +53,7 @@ static int size, rank;
 #define FMA_BUFFER_SIZE 1024
 #define SMSG_PER_MSG    1024
 #define SMSG_MAX_CREDIT 16
-#define SMSG_BUFFER_SIZE        102400
+#define SMSG_BUFFER_SIZE        1024000
 #define FMA_BTE_THRESHOLD  4096
 #define MSGQ_MAXSIZE       4096
 
@@ -348,11 +348,22 @@ static int send_with_smsg(int destNode, int size, char *msg)
         if(size < SMSG_PER_MSG)
         {
             /* send the msg itself */
-            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
-            msg_tmp->msg = msg;
-            msg_tmp->destNode = destNode;
-            msg_tmp ->size = size;
-            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &(msg_tmp->size), (uint32_t)sizeof(int), msg, (uint32_t)size, 0, tag_data);
+            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &size, (uint32_t)sizeof(int), msg, (uint32_t)size, 0, tag_data);
+            if (status == GNI_RC_SUCCESS)
+                return 1;
+            else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
+            {
+                msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
+                msg_tmp->msg = msg;
+                msg_tmp->destNode = destNode;
+                msg_tmp ->size = size;
+                /* store into buffer smsg_list and send later */
+                buffered_smsg_head = msg_tmp;
+                buffered_smsg_tail = msg_tmp;
+                return 0;
+            }
+            else
+                GNI_RC_CHECK("GNI_SmsgSendWTag", status);
         }else
         {
             /* construct a control message and send */
@@ -367,23 +378,23 @@ static int send_with_smsg(int destNode, int size, char *msg)
             control_msg_tmp->source_addr = (uint64_t)msg;
             
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
-        }
-        if(status == GNI_RC_SUCCESS)
-        {
-            return 1;
-        }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
-        {
-            msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
-            msg_tmp->msg = control_msg_tmp;
-            msg_tmp->destNode = destNode;
-            msg_tmp ->size = size;
-            /* store into buffer smsg_list and send later */
-            buffered_smsg_head = msg_tmp;
-            buffered_smsg_tail = msg_tmp;
-            return 0;
-        }
+            if(status == GNI_RC_SUCCESS)
+            {
+                return 1;
+            }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
+            {
+                msg_tmp = (MSG_LIST *)LrtsAlloc(sizeof(MSG_LIST));
+                msg_tmp->msg = control_msg_tmp;
+                msg_tmp->destNode = destNode;
+                msg_tmp ->size = size;
+                /* store into buffer smsg_list and send later */
+                buffered_smsg_head = msg_tmp;
+                buffered_smsg_tail = msg_tmp;
+                return 0;
+            }
         else
             GNI_RC_CHECK("GNI_SmsgSendWTag", status);
+        }
     }
 }
 
@@ -509,6 +520,8 @@ static void SendBufferMsg()
     {
         if(useSMSG)
         {
+            /* FIXME: this is not good, since it may end up enqueue again */
+            /* it also does not differentiate two cases: with data or control data */
             ret = send_with_smsg(buffered_smsg_head->destNode, buffered_smsg_head->size, buffered_smsg_head->msg); 
         }else
         {
@@ -516,6 +529,7 @@ static void SendBufferMsg()
         }
         if(ret == GNI_RC_SUCCESS) 
         {
+            /* FIXME: free buffered_smsg_head  */
             buffered_smsg_head = buffered_smsg_head->next;
         }else
             break;
