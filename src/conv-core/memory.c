@@ -393,7 +393,9 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
     memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
     /* printf("%lld %lld %lld %lld %lld\n", mi.uordblks, mi.usmblks,mi.hblkhd,mi.arena,mi.keepcost); */
+#if ! CMK_CRAYXT
     if(memtotal2 > memtotal) memtotal = memtotal2;
+#endif
     return memtotal;
 }
 #endif
