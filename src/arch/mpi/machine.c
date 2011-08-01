@@ -894,7 +894,7 @@ void DrainResourcesForMPI() {
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void MachineExitForMPI(void) {
+void LrtsExit() {
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
 #if CMK_SMP
@@ -946,7 +946,7 @@ static void machine_exit(char *m) {
 static void KillOnAllSigs(int sigNo) {
     static int already_in_signal_handler = 0;
     char *m;
-    if (already_in_signal_handler) MPI_Abort(MPI_COMM_WORLD,1);
+    if (already_in_signal_handler) return;   /* MPI_Abort(MPI_COMM_WORLD,1); */
     already_in_signal_handler = 1;
 #if CMK_CCS_AVAILABLE
     if (CpvAccess(cmiArgDebugFlag)) {
