@@ -84,6 +84,7 @@ gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 #define DATA_TAG        0x38
 /* SMSG is a control message to initialize a BTE */
 #define LMSG_INIT_TAG        0x39 
+#define ACK_TAG         0x37
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
@@ -441,7 +442,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             {
                 //free(control_msg_tmp);
                 FreeControlMsg(control_msg_tmp);
-                //CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
+                CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
             {
@@ -484,7 +485,7 @@ void LrtsPostNonLocal(){}
 static void PumpNetworkMsgs()
 {
     void *header;
-    uint8_t             msg_tag, data_tag, control_tag;
+    uint8_t             msg_tag, data_tag, control_tag, ack_tag;
     gni_return_t status;
     uint64_t inst_id;
     gni_cq_entry_t event_data;
@@ -494,8 +495,9 @@ static void PumpNetworkMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t pd;
 
-    data_tag = DATA_TAG;
-    control_tag= LMSG_INIT_TAG; 
+    data_tag        = DATA_TAG;
+    control_tag     = LMSG_INIT_TAG;
+    ack_tag         = ACK_TAG;
     status = GNI_CqGetEvent(rx_cqh, &event_data);
 
     if(status == GNI_RC_SUCCESS)
@@ -507,6 +509,7 @@ static void PumpNetworkMsgs()
     msg_tag = GNI_SMSG_ANY_TAG;
     status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
 
+    CmiPrintf("++++## PumpNetwork Small msg is received on PE:%d message tag=%c\n", myrank, msg_tag);
     if(status  == GNI_RC_SUCCESS)
     {
         /* copy msg out and then put into queue */
@@ -514,15 +517,12 @@ static void PumpNetworkMsgs()
         {
             msg_nbytes = *(int*)header;
             msg_data = LrtsAlloc(msg_nbytes);
-            //CmiPrintf("++Small data msg is received on PE:%d, %c, bytes=%d\n", myrank, data_tag, msg_nbytes);
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
-            GNI_SmsgRelease(ep_hndl_array[inst_id]);
         }else if(msg_tag == control_tag)
         {
             /* initial a get to transfer data from the sender side */
             request_msg = (CONTROL_MSG *) header;
-            //CmiPrintf("++++## Small control msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
             msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
             //bzero(&pd, sizeof(pd));
             if(request_msg->length <= FMA_BTE_THRESHOLD) 
@@ -554,13 +554,21 @@ static void PumpNetworkMsgs()
             }else
             {
             }
-            GNI_SmsgRelease(ep_hndl_array[inst_id]);
-        }else {
+        }else if(msg_tag == ack_tag){
+            /* Get is done, release message . Now put is not used yet*/
+            request_msg = (CONTROL_MSG *) header;
+            CmiPrintf("++++## ACK msg is received on PE:%d message size=%d, addr=%p\n", myrank, request_msg->length, (void*)request_msg->source_addr);
+            CmiFree((void*)request_msg->source_addr);
+            CmiPrintf("++++## release ACK msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
+        }else{
+            CmiPrintf("weird tag problne\n");
             CmiAbort("Unknown tag\n");
         }
+        GNI_SmsgRelease(ep_hndl_array[inst_id]);
     }else
     {
         //CmiPrintf("Message not ready\n");
+        //
     }
 
 }
@@ -571,9 +579,12 @@ static void PumpLocalTransactions()
     gni_cq_entry_t ev;
     gni_return_t status;
     uint64_t type, inst_id, data_addr;
+    uint8_t         ack_tag = ACK_TAG;
     gni_post_descriptor_t *tmp_pd;
-    gni_post_descriptor_t   ack_pd;
+    MSG_LIST *msg_tmp;
+    //gni_post_descriptor_t   ack_pd;
     MSG_LIST  *ptr;
+    CONTROL_MSG *ack_msg_tmp;
     status = GNI_CqGetEvent(tx_cqh, &ev);
     if(status == GNI_RC_SUCCESS)
     {
@@ -587,37 +598,73 @@ static void PumpLocalTransactions()
     {
         status = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
         GNI_RC_CHECK("Local CQ completed ", status);
-        //Message is sent, free message 
+        //Message is sent, free message , put is not used now
         if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
         {
             CmiFree((void *)tmp_pd->local_addr);
         }else if(tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
         {
-           handleOneRecvedMsg(SIZEFIELD((void*)tmp_pd->local_addr), (void*)tmp_pd->local_addr); 
            /* Send an ACK to remote side */
-          /* 
-           ack_pd.type = GNI_POST_CQWRITE;
+           /*ack_pd.type = GNI_POST_CQWRITE;
            ack_pd.cq_mode = GNI_CQMODE_GLOBAL_EVENT;
            ack_pd.dlvr_mode = GNI_DLVMODE_NO_ADAPT;
-           ack_pd.cqwrite_value = 0xdeadbeefdeadbeef + i;
-           ack_pd.remote_mem_hndl = remote_mdh_addr_vec[send_to].mdh;
-
-           status = GNI_PostCqWrite(ep_hndl_array[send_to], &fma_data_desc[i]);
+           ack_pd.cqwrite_value = tmp_pd->remote_addr&0x0000ffffffffffff;
+           ack_pd.remote_mem_hndl = tmp_pd->remote_mem_hndl;
+           status = GNI_PostCqWrite(ep_hndl_array[inst_id], &ack_pd);
+           GNI_RC_CHECK("Ack Post by CQWrite ", status);
            */
+           CmiPrintf("\n+++PE:%d Received large message by get , sizefield=%d, length=%d, addr=%p", myrank, SIZEFIELD((void*)tmp_pd->local_addr), tmp_pd->length, tmp_pd->remote_addr); 
+           MallocControlMsg(ack_msg_tmp);
+           ack_msg_tmp->source = myrank;
+           CmiPrintf("\nPE:%d Received large message by get , sizefield=%d, length=%d, addr=%p", myrank, SIZEFIELD((void*)tmp_pd->local_addr), tmp_pd->length, tmp_pd->remote_addr); 
+           ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+           ack_msg_tmp->length=tmp_pd->length; 
+           ack_msg_tmp->source_mem_hndl = tmp_pd->remote_mem_hndl;
+           CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr); 
+           
+           if(buffered_smsg_head!=0)
+           {
+               msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+               msg_tmp->msg = ack_msg_tmp;
+               msg_tmp ->size = sizeof(CONTROL_MSG);
+               msg_tmp->tag = ack_tag;
+               msg_tmp->destNode = inst_id;
+               buffered_smsg_tail->next = msg_tmp;
+               buffered_smsg_tail = msg_tmp;
+           }else
+           {
+               CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr); 
+               status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, ack_tag);
+               if(status == GNI_RC_SUCCESS)
+               {
+                   FreeControlMsg(ack_msg_tmp);
+               }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
+               {
+                   msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+                   msg_tmp->msg = ack_msg_tmp;
+                   msg_tmp ->size = sizeof(CONTROL_MSG);
+                   msg_tmp->tag = ack_tag;
+                   msg_tmp->destNode = inst_id;
+                   buffered_smsg_head = msg_tmp;
+                   buffered_smsg_tail = msg_tmp;
+               }
+               else
+                   GNI_RC_CHECK("GNI_SmsgSendWTag", status);
+           }
+           handleOneRecvedMsg(SIZEFIELD((void*)tmp_pd->local_addr), (void*)tmp_pd->local_addr); 
         }
     }
-    /* memory leak here , need to realease struct MSG_list */ 
-    //LrtsFree((void *)data_addr);
 }
 
 static void SendBufferMsg()
 {
     MSG_LIST *ptr;
-    uint8_t tag_data, tag_control;
+    uint8_t tag_data, tag_control, tag_ack;
     gni_return_t status;
 
     tag_data = DATA_TAG;
     tag_control = LMSG_INIT_TAG;
+    tag_ack = ACK_TAG;
     /* can add flow control here to control the number of messages sent before handle message */
     while(buffered_smsg_head != 0)
     {
@@ -630,6 +677,9 @@ static void SendBufferMsg()
             }else if(ptr->tag ==tag_control)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
+            }else if (ptr->tag == tag_ack)
+            {
+                status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_ack);
             }
         } else if(useStaticMSGQ)
         {
