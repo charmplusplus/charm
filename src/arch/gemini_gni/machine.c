@@ -113,11 +113,28 @@ typedef struct msg_list
 
 typedef struct control_msg
 {
-    int             source;   //source rank
-    uint64_t        source_addr;
+    uint64_t            source_addr;
+    int                 source;               /* source rank */
+    int                 length;
     gni_mem_handle_t    source_mem_hndl;
-    uint64_t            length;
+    struct control_msg *next;
 }CONTROL_MSG;
+
+static int controllen = 0;
+
+/* reuse PendingMsg memory */
+static CONTROL_MSG *control_freelist=NULL;
+
+#define FreeControlMsg(d)       \
+  d->next = control_freelist;\
+  control_freelist = d;\
+
+#define MallocControlMsg(d) \
+  d = control_freelist;\
+  if (d==0) {d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));\
+             _MEMCHECK(d);\
+  } else control_freelist = d->next;
+
 
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
 static MSG_LIST *buffered_smsg_head= 0;
@@ -139,9 +156,7 @@ static void*  aligned_memory_alloc(size_t size, size_t alignment)
 {
     void *pa, *ptr;
     pa=malloc((size+alignment-1)+sizeof(void*));
-
-    if(!pa)
-        return NULL;
+    _MEMCHECK(pa);
 
     ptr=(void*)(((uint64_t)pa+sizeof(void*)+alignment-1)&~(alignment-1));
     *((void **)ptr-1) = pa;
@@ -188,13 +203,12 @@ static unsigned int get_gni_nic_address(int device_id)
     }
     return address;
 }
+
 static void* gather_nic_addresses(void)
 {
     unsigned int local_addr,*alladdrs;
-    int size,rc;
+    int rc;
     size_t addr_len;
-
-    MPI_Comm_size(MPI_COMM_WORLD,&size);
 
     /*
      * * just assume a single gemini device
@@ -203,8 +217,8 @@ static void* gather_nic_addresses(void)
 
     addr_len = sizeof(unsigned int);
 
-    alladdrs = (unsigned int *)malloc(addr_len * size);
-    CmiAssert(alladdrs != NULL);
+    alladdrs = (unsigned int *)malloc(addr_len * mysize);
+    _MEMCHECK(alladdrs);
 
     MPI_Allgather(&local_addr, addr_len, MPI_BYTE, alladdrs, addr_len, MPI_BYTE, MPI_COMM_WORLD);
 
@@ -343,6 +357,7 @@ static int send_with_fma(int destNode, int size, char *msg)
         }
     }
 }
+
 static int send_with_smsg(int destNode, int size, char *msg)
 {
     gni_return_t status;
@@ -363,7 +378,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
             msg_tmp->tag = tag_data;
         }else
         {
-            control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
+            //control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
+            MallocControlMsg(control_msg_tmp);
 
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, rx_cqh,
@@ -408,7 +424,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
         }else
         {
             /* construct a control message and send */
-            control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
+            //control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
+            MallocControlMsg(control_msg_tmp);
             
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, rx_cqh,
@@ -422,7 +439,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
             if(status == GNI_RC_SUCCESS)
             {
-                free(control_msg_tmp);
+                //free(control_msg_tmp);
+                FreeControlMsg(control_msg_tmp);
                 //CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
@@ -519,7 +537,7 @@ static void PumpNetworkMsgs()
             pd.local_mem_hndl  = msg_mem_hndl; 
             pd.remote_addr     = request_msg->source_addr;
             pd.remote_mem_hndl = request_msg->source_mem_hndl;
-            pd.src_cq_hndl     = tx_cqh;
+            pd.src_cq_hndl     = 0;     /* tx_cqh;  */
             pd.rdma_mode       = 0;
 
            // CmiPrintf("source=%d, addr=%p, handler=%ld,%ld \n", request_msg->source, (void*)pd.remote_addr, (request_msg->source_mem_hndl).qword1, (request_msg->source_mem_hndl).qword2);
@@ -538,7 +556,7 @@ static void PumpNetworkMsgs()
             }
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
         }else {
-            CmiPrintf("Some weird tag\n");
+            CmiAbort("Unknown tag\n");
         }
     }else
     {
@@ -714,7 +732,7 @@ static void _init_static_smsg()
 
     smsg_memlen = SMSG_BUFFER_SIZE ;
     smsg_mem_buffer = (char*)calloc(smsg_memlen, 1);
-    CmiAssert(smsg_mem_buffer != NULL);
+    _MEMCHECK(smsg_mem_buffer);
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mem_buffer,
                              smsg_memlen, rx_cqh,
                              GNI_MEM_READWRITE | GNI_MEM_USE_GART,   
@@ -724,6 +742,7 @@ static void _init_static_smsg()
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
     smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
+    _MEMCHECK(smsg_attr);
 
     for(i=0; i<mysize; i++)
     {
@@ -745,6 +764,8 @@ static void _init_static_smsg()
         status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &smsg_attr_vec[i]);
         GNI_RC_CHECK("SMSG Init", status);
     } //end initialization
+    free(smsg_attr);
+    free(smsg_attr_vec);
 } 
 
 static void _init_static_msgq()
@@ -823,7 +844,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     /* create the endpoints. they need to be bound to allow later CQWrites to them */
     ep_hndl_array = (gni_ep_handle_t*)malloc(mysize * sizeof(gni_ep_handle_t));
-    CmiAssert(ep_hndl_array != NULL);
+    _MEMCHECK(ep_hndl_array);
 
     MPID_UGNI_AllAddr = (unsigned int *)gather_nic_addresses();
     for (i=0; i<mysize; i++) {
@@ -873,6 +894,7 @@ static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)
     void *ptr;
     gni_return_t status;
     ptr = CmiAlloc(n_bytes);
+    _MEMCHECK(ptr);
     status = GNI_MemRegister(nic_hndl, (uint64_t)ptr,
         n_bytes, rx_cqh, 
         GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
@@ -888,6 +910,7 @@ static void LrtsExit()
     /* free memory ? */
     MPI_Finalize();
 }
+
 void CmiAbort(const char *message) {
 
     MPI_Abort(MPI_COMM_WORLD, -1);
