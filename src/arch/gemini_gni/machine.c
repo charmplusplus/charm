@@ -81,9 +81,9 @@ gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 #define REMOTE_QUEUE_ENTRIES  1048576
 #define LOCAL_QUEUE_ENTRIES 1024
 /* SMSG is data message */
-#define DATA_TAG        0xF0
+#define DATA_TAG        0x38
 /* SMSG is a control message to initialize a BTE */
-#define LMSG_INIT_TAG        0xF1 
+#define LMSG_INIT_TAG        0x39 
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
@@ -465,8 +465,7 @@ void LrtsPostNonLocal(){}
 static void PumpNetworkMsgs()
 {
     void *header;
-    uint8_t             tag_data;
-    uint8_t             tag_control;
+    uint8_t             msg_tag, data_tag, control_tag;
     gni_return_t status;
     uint64_t inst_id;
     gni_cq_entry_t event_data;
@@ -476,9 +475,8 @@ static void PumpNetworkMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t pd;
 
-    tag_data = DATA_TAG;
-    tag_control = LMSG_INIT_TAG;
-   
+    data_tag = DATA_TAG;
+    control_tag= LMSG_INIT_TAG; 
     status = GNI_CqGetEvent(rx_cqh, &event_data);
 
     if(status == GNI_RC_SUCCESS)
@@ -487,49 +485,62 @@ static void PumpNetworkMsgs()
     }else
         return;
     CmiPrintf("Message is received on PE:%d from %d\n", myrank, inst_id);
-    if((status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &tag_data)) == GNI_RC_SUCCESS)
+  
+    msg_tag = GNI_SMSG_ANY_TAG;
+    status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
+
+    if(status  == GNI_RC_SUCCESS)
     {
-        CmiPrintf("Small data msg is received on PE:%d, tag=%c\n", myrank, tag_data);
+        CmiPrintf("Small data msg is received on PE:%d, tag=%c, data=%c, control=%c\n", myrank, msg_tag, data_tag, control_tag);
         /* copy msg out and then put into queue */
-        msg_nbytes = *(int*)header;
-        msg_data = LrtsAlloc(msg_nbytes);
-        CmiPrintf("++Small data msg is received on PE:%d, %c, bytes=%d\n", myrank, tag_data, msg_nbytes);
-        memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
-        handleOneRecvedMsg(msg_nbytes, msg_data);
-        GNI_SmsgRelease(ep_hndl_array[inst_id]);
-    } else if ((status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &tag_control)) == GNI_RC_SUCCESS)
-    {
-        CmiPrintf("Small control msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
-        /* initial a get to transfer data from the sender side */
-        request_msg = (CONTROL_MSG *) header;
-        msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
-        /* register this memory */
-        if(request_msg->length <= FMA_BTE_THRESHOLD) 
+        if(msg_tag == data_tag)
+        {
+            msg_nbytes = *(int*)header;
+            msg_data = LrtsAlloc(msg_nbytes);
+            CmiPrintf("++Small data msg is received on PE:%d, %c, bytes=%d\n", myrank, data_tag, msg_nbytes);
+            memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
+            handleOneRecvedMsg(msg_nbytes, msg_data);
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
+        }else if(msg_tag == control_tag)
+        {
+            CmiPrintf("++++## Small control msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
+            /* initial a get to transfer data from the sender side */
+            request_msg = (CONTROL_MSG *) header;
+            msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
+            /* register this memory */
+            if(request_msg->length <= FMA_BTE_THRESHOLD) 
             pd.type            = GNI_POST_FMA_GET;
-        else
-            pd.type            = GNI_POST_RDMA_GET;
+            else
+                pd.type            = GNI_POST_RDMA_GET;
 
-        pd.cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
-        pd.dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
-        pd.length          = request_msg->length;
-        pd.local_addr      = (uint64_t) msg_data;
-        pd.local_mem_hndl  = msg_mem_hndl; 
-        pd.remote_addr     = request_msg->source_addr;
-        pd.remote_mem_hndl = request_msg->source_mem_hndl;
+            pd.cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+            pd.dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
+            pd.length          = request_msg->length;
+            pd.local_addr      = (uint64_t) msg_data;
+            pd.local_mem_hndl  = msg_mem_hndl; 
+            pd.remote_addr     = request_msg->source_addr;
+            pd.remote_mem_hndl = request_msg->source_mem_hndl;
 
-        if(pd.type == GNI_POST_RDMA_GET) 
-            status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
+            if(pd.type == GNI_POST_RDMA_GET) 
+                status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
+            else
+                status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
 
-        if(status = GNI_RC_SUCCESS)
-        {
-            /* put into receive buffer queue */
-        }else
-        {
+            if(status = GNI_RC_SUCCESS)
+            {
+                /* put into receive buffer queue */
+            }else
+            {
+            }
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
+        }else {
+            CmiPrintf("Some weird tag\n");
         }
-        GNI_SmsgRelease(ep_hndl_array[inst_id]);
+    }else
+    {
+        CmiPrintf("Message not ready\n");
     }
+
 }
 
 /* Check whether message send or get is confirmed by remote */
