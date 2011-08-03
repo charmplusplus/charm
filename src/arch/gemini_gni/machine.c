@@ -325,6 +325,7 @@ static int send_with_fma(int destNode, int size, char *msg)
             
             control_msg_tmp->source = _Cmi_mynode;
             control_msg_tmp->source_addr = (uint64_t)msg;
+            control_msg_tmp->length = size;
         }
         status = GNI_PostFma(ep_hndl_array[destNode], &pd);
         if(status == GNI_RC_SUCCESS)
@@ -372,7 +373,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             GNI_RC_CHECK("MemRegister fails at ", status);
             control_msg_tmp->source = myrank;
             control_msg_tmp->source_addr = (uint64_t)msg;
-            
+            control_msg_tmp->length=size; 
             msg_tmp->msg = control_msg_tmp;
             msg_tmp ->size = sizeof(CONTROL_MSG);
             msg_tmp->tag = tag_control;
@@ -417,12 +418,12 @@ static int send_with_smsg(int destNode, int size, char *msg)
             GNI_RC_CHECK("MemRegister fails at ", status);
             control_msg_tmp->source = myrank;
             control_msg_tmp->source_addr = (uint64_t)msg;
-            
+            control_msg_tmp->length = size; 
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
             if(status == GNI_RC_SUCCESS)
             {
                 free(control_msg_tmp);
-                CmiPrintf("Control message sent bytes:%d on PE:%d\n", sizeof(CONTROL_MSG), myrank);
+                //CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
             {
@@ -484,32 +485,30 @@ static void PumpNetworkMsgs()
         inst_id = GNI_CQ_GET_INST_ID(event_data);
     }else
         return;
-    CmiPrintf("Message is received on PE:%d from %d\n", myrank, inst_id);
   
     msg_tag = GNI_SMSG_ANY_TAG;
     status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
 
     if(status  == GNI_RC_SUCCESS)
     {
-        CmiPrintf("Small data msg is received on PE:%d, tag=%c, data=%c, control=%c\n", myrank, msg_tag, data_tag, control_tag);
         /* copy msg out and then put into queue */
         if(msg_tag == data_tag)
         {
             msg_nbytes = *(int*)header;
             msg_data = LrtsAlloc(msg_nbytes);
-            CmiPrintf("++Small data msg is received on PE:%d, %c, bytes=%d\n", myrank, data_tag, msg_nbytes);
+            //CmiPrintf("++Small data msg is received on PE:%d, %c, bytes=%d\n", myrank, data_tag, msg_nbytes);
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
         }else if(msg_tag == control_tag)
         {
-            CmiPrintf("++++## Small control msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
             /* initial a get to transfer data from the sender side */
             request_msg = (CONTROL_MSG *) header;
+            //CmiPrintf("++++## Small control msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
             msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
-            /* register this memory */
+            //bzero(&pd, sizeof(pd));
             if(request_msg->length <= FMA_BTE_THRESHOLD) 
-            pd.type            = GNI_POST_FMA_GET;
+                pd.type            = GNI_POST_FMA_GET;
             else
                 pd.type            = GNI_POST_RDMA_GET;
 
@@ -520,12 +519,17 @@ static void PumpNetworkMsgs()
             pd.local_mem_hndl  = msg_mem_hndl; 
             pd.remote_addr     = request_msg->source_addr;
             pd.remote_mem_hndl = request_msg->source_mem_hndl;
+            pd.src_cq_hndl     = tx_cqh;
+            pd.rdma_mode       = 0;
 
+           // CmiPrintf("source=%d, addr=%p, handler=%ld,%ld \n", request_msg->source, (void*)pd.remote_addr, (request_msg->source_mem_hndl).qword1, (request_msg->source_mem_hndl).qword2);
             if(pd.type == GNI_POST_RDMA_GET) 
                 status = GNI_PostRdma(ep_hndl_array[request_msg->source], &pd);
             else
                 status = GNI_PostFma(ep_hndl_array[request_msg->source], &pd);
-
+            GNI_RC_CHECK("post ", status);
+           
+            //CmiPrintf("post status=%s on PE:%d\n", gni_err_str[status], myrank);
             if(status = GNI_RC_SUCCESS)
             {
                 /* put into receive buffer queue */
@@ -538,7 +542,7 @@ static void PumpNetworkMsgs()
         }
     }else
     {
-        CmiPrintf("Message not ready\n");
+        //CmiPrintf("Message not ready\n");
     }
 
 }
