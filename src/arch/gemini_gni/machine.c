@@ -134,8 +134,10 @@ typedef struct control_msg
 static CONTROL_MSG *control_freelist=NULL;
 
 #define FreeControlMsg(d)       \
-  d->next = control_freelist;\
+  do {  \
+  (d)->next = control_freelist;\
   control_freelist = d;\
+  } while (0); 
 
 #define MallocControlMsg(d) \
   d = control_freelist;\
@@ -379,6 +381,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             }
             else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
             {
+                CmiPrintf("[%d] data msg add to send queue\n", myrank);
                 msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
                 msg_tmp->msg        = msg;
                 msg_tmp->destNode   = destNode;
@@ -414,6 +417,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
             {
+                CmiPrintf("[%d] control msg add to send queue\n", myrank);
                 msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
                 msg_tmp->msg        = control_msg_tmp;
                 msg_tmp->destNode   = destNode;
@@ -462,6 +466,8 @@ static void PumpNetworkMsgs()
     gni_mem_handle_t msg_mem_hndl;
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t *pd;
+
+    while (1) {
 
     data_tag        = DATA_TAG;
     control_tag     = LMSG_INIT_TAG;
@@ -538,8 +544,10 @@ static void PumpNetworkMsgs()
     {
         //CmiPrintf("Message not ready\n");
         //
+        return;
     }
 
+    }   // end of while loop
 }
 
 /* Check whether message send or get is confirmed by remote */
@@ -554,6 +562,10 @@ static void PumpLocalTransactions()
     //gni_post_descriptor_t   ack_pd;
     MSG_LIST  *ptr;
     CONTROL_MSG *ack_msg_tmp;
+
+    while (1) 
+    {
+
     status = GNI_CqGetEvent(tx_cqh, &ev);
     if(status == GNI_RC_SUCCESS)
     {
@@ -595,6 +607,7 @@ static void PumpLocalTransactions()
            
            if(buffered_smsg_head!=0)
            {
+               CmiPrintf("[%d] PumpLocalTransactions: smsg buffered.\n", myrank);
                msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
                msg_tmp->msg = ack_msg_tmp;
                msg_tmp ->size = sizeof(CONTROL_MSG);
@@ -611,6 +624,7 @@ static void PumpLocalTransactions()
                    FreeControlMsg(ack_msg_tmp);
                }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
                {
+                   CmiPrintf("[%d] PumpLocalTransactions: ack smsg buffered.\n", myrank);
                    msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
                    msg_tmp->msg = ack_msg_tmp;
                    msg_tmp ->size = sizeof(CONTROL_MSG);
@@ -625,6 +639,7 @@ static void PumpLocalTransactions()
            handleOneRecvedMsg(SIZEFIELD((void*)tmp_pd->local_addr), (void*)tmp_pd->local_addr); 
         }
     }
+    }   /* end of while loop */
 }
 
 static void SendBufferMsg()
@@ -651,12 +666,12 @@ static void SendBufferMsg()
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
                 if(status == GNI_RC_SUCCESS)
-                    FreeControlMsg(((CONTROL_MSG)(ptr->msg)));
+                    FreeControlMsg((CONTROL_MSG*)(ptr->msg));
             }else if (ptr->tag == tag_ack)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_ack);
                 if(status == GNI_RC_SUCCESS)
-                    FreeControlMsg(ptr->msg);
+                    FreeControlMsg((CONTROL_MSG*)ptr->msg);
             }
         } else if(useStaticMSGQ)
         {
@@ -757,11 +772,17 @@ static void _init_static_smsg()
     uint32_t              vmdh_index = -1;
 
     smsg_memlen = SMSG_BUFFER_SIZE ;
+#if 0
     smsg_mem_buffer = (char*)calloc(smsg_memlen, 1);
     _MEMCHECK(smsg_mem_buffer);
+#else
+    smsg_mem_buffer = memalign(64, smsg_memlen);
+    _MEMCHECK(smsg_mem_buffer);
+    bzero(smsg_mem_buffer, smsg_memlen);
+#endif
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mem_buffer,
                              smsg_memlen, rx_cqh,
-                             GNI_MEM_READWRITE | GNI_MEM_USE_GART,   
+                             GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
                              vmdh_index,
                             &my_smsg_mdh_mailbox);
 
