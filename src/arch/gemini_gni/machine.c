@@ -148,9 +148,6 @@ static MSG_LIST *buffered_fma_tail = 0;
 /* functions  */
 
 
-static void* LrtsAlloc(int);
-static void  LrtsFree(void*);
-
 static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl);
 
 static void*  aligned_memory_alloc(size_t size, size_t alignment)
@@ -516,7 +513,7 @@ static void PumpNetworkMsgs()
         if(msg_tag == data_tag)
         {
             msg_nbytes = *(int*)header;
-            msg_data = LrtsAlloc(msg_nbytes);
+            msg_data = CmiAlloc(msg_nbytes);
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
         }else if(msg_tag == control_tag)
@@ -562,7 +559,7 @@ static void PumpNetworkMsgs()
             CmiFree((void*)request_msg->source_addr);
             //CmiPrintf("++++## release ACK msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
         }else{
-            CmiPrintf("weird tag problne\n");
+            CmiPrintf("weird tag problem\n");
             CmiAbort("Unknown tag\n");
         }
         GNI_SmsgRelease(ep_hndl_array[inst_id]);
@@ -614,7 +611,7 @@ static void PumpLocalTransactions()
            status = GNI_PostCqWrite(ep_hndl_array[inst_id], &ack_pd);
            GNI_RC_CHECK("Ack Post by CQWrite ", status);
            */
-           // CmiPrintf("\nPE:%d Received large message by get , sizefield=%d, length=%d, addr=%p\n", myrank, SIZEFIELD((void*)tmp_pd->local_addr), tmp_pd->length, tmp_pd->remote_addr); 
+            //CmiPrintf("\nPE:%d Received large message by get , sizefield=%d, length=%d, addr=%p\n", myrank, SIZEFIELD((void*)tmp_pd->local_addr), tmp_pd->length, tmp_pd->remote_addr); 
            //CmiPrintf("\n+PE:%d Received large message by get , sizefield=%d, length=%d, addr=%p\n", myrank, remote_length , tmp_pd->length, (void*)remote_addr); 
            MallocControlMsg(ack_msg_tmp);
            ack_msg_tmp->source = myrank;
@@ -923,23 +920,37 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     PRINT_INFO("\nDone with LrtsInit")
 }
 
-static void* LrtsAlloc(int n_bytes)
+#define ALIGNBUF                64
+
+void* LrtsAlloc(int n_bytes, int header)
 {
     if(n_bytes <= SMSG_PER_MSG)
     {
-        return CmiAlloc(n_bytes);
-    }else if(n_bytes < LRTS_GNI_RDMA_THRESHOLD)
+        int totalsize = n_bytes+header;
+        return malloc(totalsize);
+/*
+    }else if(n_bytes <= LRTS_GNI_RDMA_THRESHOLD)
     {
-        return CmiAlloc(n_bytes);
+        return malloc(n_bytes);
+*/
     }else 
     {
-        return memalign(64, n_bytes);
+        CmiAssert(header <= ALIGNBUF);
+        char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+        return res + ALIGNBUF - header;
     }
 }
 
-static void  LrtsFree(void *msg)
+void  LrtsFree(void *msg)
 {
+    int size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
+    if (size <= SMSG_PER_MSG)
+      free(msg);
+    else
+      free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+/*
     CmiFree(msg);
+*/
 }
 
 static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)

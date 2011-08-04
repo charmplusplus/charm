@@ -17,5 +17,6 @@ void LrtsExit();
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal();
 
-void* LrtsAlloc(int);
+void* LrtsAlloc(int, int);
+void  LrtsFree(void*);
 #endif
