@@ -59,7 +59,7 @@ static int mysize, myrank;
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
-#define FMA_BTE_THRESHOLD  4096
+#define LRTS_GNI_RDMA_THRESHOLD  16384
 
 #define DEBUG
 #ifdef GNI_RC_CHECK
@@ -526,7 +526,7 @@ static void PumpNetworkMsgs()
             msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
             pd = (gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t));
             //bzero(&pd, sizeof(pd));
-            if(request_msg->length <= FMA_BTE_THRESHOLD) 
+            if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
                 pd->type            = GNI_POST_FMA_GET;
             else
                 pd->type            = GNI_POST_RDMA_GET;
@@ -928,7 +928,7 @@ static void* LrtsAlloc(int n_bytes)
     if(n_bytes <= SMSG_PER_MSG)
     {
         return CmiAlloc(n_bytes);
-    }else if(n_bytes <= FMA_BTE_THRESHOLD)
+    }else if(n_bytes < LRTS_GNI_RDMA_THRESHOLD)
     {
         return CmiAlloc(n_bytes);
     }else 
