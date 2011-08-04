@@ -25,6 +25,12 @@
 #include <wincon.h>
 #include <sys/types.h>
 #include <sys/timeb.h>
+
+//#define  USE_ONESIDED 1
+
+#ifdef USE_ONESIDED
+#include "onesided.h"
+#endif
 static void sleep(int secs) {
     Sleep(1000*secs);
 }
@@ -45,10 +51,6 @@ static void sleep(int secs) {
 #define PRINT_INFO(msg)
 #endif
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
-static int useStaticSMSG   = 1;
-static int useStaticMSGQ = 0;
-static int useStaticFMA = 0;
-static int mysize, myrank;
 /* If SMSG is not used */
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
@@ -61,6 +63,14 @@ static int mysize, myrank;
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  16384
 
+#define REMOTE_QUEUE_ENTRIES  1048576
+#define LOCAL_QUEUE_ENTRIES 1024
+/* SMSG is data message */
+#define DATA_TAG        0x38
+/* SMSG is a control message to initialize a BTE */
+#define LMSG_INIT_TAG        0x39 
+#define ACK_TAG         0x37
+
 #define DEBUG
 #ifdef GNI_RC_CHECK
 #undef GNI_RC_CHECK
@@ -71,20 +81,21 @@ static int mysize, myrank;
 #define GNI_RC_CHECK(msg,rc)
 #endif
 
+#ifdef USE_ONESIDED
+onesided_hnd_t   onesided_hnd;
+onesided_md_t    omdh;
+#endif
+
+static int useStaticSMSG   = 1;
+static int useStaticMSGQ = 0;
+static int useStaticFMA = 0;
+static int mysize, myrank;
 static gni_nic_handle_t      nic_hndl;
 
 gni_msgq_attr_t         msgq_attrs;
 gni_msgq_handle_t       msgq_handle;
 gni_msgq_ep_attr_t      msgq_ep_attrs;
 gni_msgq_ep_attr_t      msgq_ep_attrs_size;
-
-#define REMOTE_QUEUE_ENTRIES  1048576
-#define LOCAL_QUEUE_ENTRIES 1024
-/* SMSG is data message */
-#define DATA_TAG        0x38
-/* SMSG is a control message to initialize a BTE */
-#define LMSG_INIT_TAG        0x39 
-#define ACK_TAG         0x37
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
@@ -101,11 +112,9 @@ typedef struct {
 } mdh_addr_t;
 
 static mdh_addr_t            *fma_buffer_mdh_addr_base;
-/* =====Beginning of Declarations of Machine Specific Functions===== */
-
 typedef struct msg_list
 {
-    int destNode;
+    uint32_t destNode;
     uint32_t size;
     void *msg;
     struct msg_list *next;
@@ -120,8 +129,6 @@ typedef struct control_msg
     gni_mem_handle_t    source_mem_hndl;
     struct control_msg *next;
 }CONTROL_MSG;
-
-static int controllen = 0;
 
 /* reuse PendingMsg memory */
 static CONTROL_MSG *control_freelist=NULL;
@@ -149,20 +156,6 @@ static MSG_LIST *buffered_fma_tail = 0;
 
 
 static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl);
-
-static void*  aligned_memory_alloc(size_t size, size_t alignment)
-{
-    void *pa, *ptr;
-    pa=malloc((size+alignment-1)+sizeof(void*));
-    _MEMCHECK(pa);
-
-    ptr=(void*)(((uint64_t)pa+sizeof(void*)+alignment-1)&~(alignment-1));
-    *((void **)ptr-1) = pa;
-    printf("Alignment alloc %p %dbytes\n", ptr, size);
-    return ptr;
-}
-
-
 
 static unsigned int get_gni_nic_address(int device_id)
 {
@@ -200,28 +193,6 @@ static unsigned int get_gni_nic_address(int device_id)
         address = alps_address;
     }
     return address;
-}
-
-static void* gather_nic_addresses(void)
-{
-    unsigned int local_addr,*alladdrs;
-    int rc;
-    size_t addr_len;
-
-    /*
-     * * just assume a single gemini device
-     */
-    local_addr = get_gni_nic_address(0);
-
-    addr_len = sizeof(unsigned int);
-
-    alladdrs = (unsigned int *)malloc(addr_len * mysize);
-    _MEMCHECK(alladdrs);
-
-    MPI_Allgather(&local_addr, addr_len, MPI_BYTE, alladdrs, addr_len, MPI_BYTE, MPI_COMM_WORLD);
-
-    return (void *)alladdrs;
-
 }
 
 static uint8_t get_ptag(void)
@@ -294,7 +265,6 @@ void CmiMachineProgressImpl() {
 /* 
  * The message can be copied to registered memory buffer and be sent
  * This message memory can be registered to network. It depends on which one is cheaper
- *
  * register might be better when the msg is large
  */
 
@@ -358,25 +328,25 @@ static int send_with_fma(int destNode, int size, char *msg)
 
 static int send_with_smsg(int destNode, int size, char *msg)
 {
-    gni_return_t status;
-    MSG_LIST *msg_tmp;
-    CONTROL_MSG *control_msg_tmp;
+    gni_return_t        status;
+    MSG_LIST            *msg_tmp;
+    CONTROL_MSG         *control_msg_tmp;
     uint8_t             tag_data = DATA_TAG;
     uint8_t             tag_control= LMSG_INIT_TAG ;
-    uint32_t              vmdh_index = -1;
+    uint32_t            vmdh_index = -1;
 
     /* No mailbox available, buffer this msg and its info */
     if(buffered_smsg_head != 0)
     {
         msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+        msg_tmp->destNode = destNode;
         if(size <=SMSG_PER_MSG)
         {
-            msg_tmp->msg = msg;
-            msg_tmp ->size = size;
-            msg_tmp->tag = tag_data;
+            msg_tmp->msg    = msg;
+            msg_tmp->size   = size;
+            msg_tmp->tag    = tag_data;
         }else
         {
-            //control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
             MallocControlMsg(control_msg_tmp);
 
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
@@ -385,16 +355,15 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             GNI_RC_CHECK("MemRegister fails at ", status);
-            control_msg_tmp->source = myrank;
-            control_msg_tmp->source_addr = (uint64_t)msg;
-            control_msg_tmp->length=size; 
-            msg_tmp->msg = control_msg_tmp;
-            msg_tmp ->size = sizeof(CONTROL_MSG);
-            msg_tmp->tag = tag_control;
+            control_msg_tmp->source         = myrank;
+            control_msg_tmp->source_addr    = (uint64_t)msg;
+            control_msg_tmp->length         =size; 
+            msg_tmp->msg                    = control_msg_tmp;
+            msg_tmp->size                   = sizeof(CONTROL_MSG);
+            msg_tmp->tag                    = tag_control;
         }
-        msg_tmp->destNode = destNode;
-        buffered_smsg_tail->next = msg_tmp;
-        buffered_smsg_tail = msg_tmp;
+        buffered_smsg_tail->next    = msg_tmp;
+        buffered_smsg_tail          = msg_tmp;
         return 0;
     }else
     {
@@ -404,17 +373,20 @@ static int send_with_smsg(int destNode, int size, char *msg)
             /* send the msg itself */
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &size, sizeof(int), msg, size, 0, tag_data);
             if (status == GNI_RC_SUCCESS)
+            {
+                CmiFree(msg);
                 return 1;
+            }
             else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
             {
-                msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
-                msg_tmp->msg = msg;
-                msg_tmp->destNode = destNode;
-                msg_tmp ->size = size;
-                msg_tmp->tag = tag_data;
+                msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+                msg_tmp->msg        = msg;
+                msg_tmp->destNode   = destNode;
+                msg_tmp->size       = size;
+                msg_tmp->tag        = tag_data;
                 /* store into buffer smsg_list and send later */
-                buffered_smsg_head = msg_tmp;
-                buffered_smsg_tail = msg_tmp;
+                buffered_smsg_head  = msg_tmp;
+                buffered_smsg_tail  = msg_tmp;
                 return 0;
             }
             else
@@ -431,23 +403,22 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             GNI_RC_CHECK("MemRegister fails at ", status);
-            control_msg_tmp->source = myrank;
-            control_msg_tmp->source_addr = (uint64_t)msg;
-            control_msg_tmp->length = size; 
+            control_msg_tmp->source         = myrank;
+            control_msg_tmp->source_addr    = (uint64_t)msg;
+            control_msg_tmp->length         = size; 
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
             if(status == GNI_RC_SUCCESS)
             {
-                //free(control_msg_tmp);
                 FreeControlMsg(control_msg_tmp);
                 //CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
             {
-                msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
-                msg_tmp->msg = control_msg_tmp;
-                msg_tmp->destNode = destNode;
-                msg_tmp ->size = sizeof(CONTROL_MSG);
-                msg_tmp->tag = tag_control;
+                msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+                msg_tmp->msg        = control_msg_tmp;
+                msg_tmp->destNode   = destNode;
+                msg_tmp ->size      = sizeof(CONTROL_MSG);
+                msg_tmp->tag        = tag_control;
                 /* store into buffer smsg_list and send later */
                 buffered_smsg_head = msg_tmp;
                 buffered_smsg_tail = msg_tmp;
@@ -674,12 +645,18 @@ static void SendBufferMsg()
             if(ptr->tag == tag_data)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], &(ptr->size), (uint32_t)sizeof(int), ptr->msg, ptr->size, 0, tag_data);
+                if(status == GNI_RC_SUCCESS)
+                    CmiFree(ptr->msg);
             }else if(ptr->tag ==tag_control)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
+                if(status == GNI_RC_SUCCESS)
+                    FreeControlMsg(((CONTROL_MSG)(ptr->msg)));
             }else if (ptr->tag == tag_ack)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_ack);
+                if(status == GNI_RC_SUCCESS)
+                    FreeControlMsg(ptr->msg);
             }
         } else if(useStaticMSGQ)
         {
@@ -692,7 +669,6 @@ static void SendBufferMsg()
         {
             buffered_smsg_head= buffered_smsg_head->next;
             free(ptr);
-            free(ptr->msg);
         }else
             break;
     }
@@ -840,22 +816,19 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     register int          i;
     int                   rc;
     int                   device_id = 0;
-    unsigned int          local_addr;
     unsigned int          remote_addr;
     gni_cdm_handle_t      cdm_hndl;
     gni_return_t          status = GNI_RC_SUCCESS;
     uint32_t              vmdh_index = -1;
-    uint8_t                  ptag;
-    int first_spawned;
-
-    unsigned int         *MPID_UGNI_AllAddr;
+    uint8_t               ptag;
+    unsigned int         local_addr, *MPID_UGNI_AllAddr;
     
-    void (*local_event_handler)(gni_cq_entry_t *, void *) = &LocalEventHandle;
+    void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
-    void (*remote_bte_event_handler)(gni_cq_entry_t *, void *) = &RemoteBteEventHandle;
+    void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
     
-    //useStaticSMSG = CmiGetArgFlag(argv, "+useStaticSmsg");
-    //useStaticMSGQ = CmiGetArgFlag(argv, "+useStaticMsgQ");
+    //useStaticSMSG = CmiGetArgFlag(*argv, "+useStaticSmsg");
+    //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
 
 
     MPI_Init(argc, argv);
@@ -865,19 +838,35 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     mysize = *numNodes;
     myrank = *myNodeID;
-    
+  
+    if(myrank == 0)
+    {
+        printf("Charm++> Running on Gemini (GNI)\n");
+    }
+#ifdef USE_ONESIDED
+    onesided_init(NULL, &onesided_hnd);
+
+    // this is a GNI test, so use the libonesided bypass functionality
+    onesided_gni_bypass_get_nih(onesided_hnd, &nic_hndl);
+    local_addr = gniGetNicAddress();
+#else
     ptag = get_ptag();
     cookie = get_cookie();
     
-    /* Create and attach to the communication  domain */
-
+    //Create and attach to the communication  domain */
     status = GNI_CdmCreate(myrank, ptag, cookie, modes, &cdm_hndl);
     GNI_RC_CHECK("GNI_CdmCreate", status);
-    /* device id The device id is the minor number for the device that is assigned to the device by the system when the device is created. To determine the device number, look in the /dev directory, which contains a list of devices. For a NIC, the device is listed as kgniX, where X is the device number
-    0 default */
+    //* device id The device id is the minor number for the device
+    //that is assigned to the device by the system when the device is created.
+    //To determine the device number, look in the /dev directory, which contains a list of devices. For a NIC, the device is listed as kgniX
+    //where X is the device number 0 default 
     status = GNI_CdmAttach(cdm_hndl, device_id, &local_addr, &nic_hndl);
     GNI_RC_CHECK("GNI_CdmAttach", status);
-   
+    local_addr = get_gni_nic_address(0);
+#endif
+    MPID_UGNI_AllAddr = (unsigned int *)malloc(sizeof(unsigned int) * mysize);
+    _MEMCHECK(MPID_UGNI_AllAddr);
+    MPI_Allgather(&local_addr, sizeof(unsigned int), MPI_BYTE, MPID_UGNI_AllAddr, sizeof(unsigned int), MPI_BYTE, MPI_COMM_WORLD);
     /* create the local completion queue */
     /* the third parameter : The number of events the NIC allows before generating an interrupt. Setting this parameter to zero results in interrupt delivery with every event. When using this parameter, the mode parameter must be set to GNI_CQ_BLOCKING*/
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &tx_cqh);
@@ -896,7 +885,6 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ep_hndl_array = (gni_ep_handle_t*)malloc(mysize * sizeof(gni_ep_handle_t));
     _MEMCHECK(ep_hndl_array);
 
-    MPID_UGNI_AllAddr = (unsigned int *)gather_nic_addresses();
     for (i=0; i<mysize; i++) {
         if(i == myrank) continue;
         status = GNI_EpCreate(nic_hndl, tx_cqh, &ep_hndl_array[i]);
@@ -917,6 +905,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     {
         _init_smallMsgwithFma(mysize);
     }
+    free(MPID_UGNI_AllAddr);
     PRINT_INFO("\nDone with LrtsInit")
 }
 
