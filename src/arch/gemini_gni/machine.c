@@ -17,8 +17,8 @@
 #include "converse.h"
 
 #include "gni_pub.h"
-#include "mpi.h"
 #include "pmi.h"
+#include "mpi.h"
 /*Support for ++debug: */
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <windows.h>
@@ -55,9 +55,8 @@ static void sleep(int secs) {
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
-#define SMSG_PER_MSG    1024
+#define SMSG_MAX_MSG    1024
 #define SMSG_MAX_CREDIT 16
-#define SMSG_BUFFER_SIZE        1024000
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
@@ -92,6 +91,8 @@ static int useStaticFMA = 0;
 static int mysize, myrank;
 static gni_nic_handle_t      nic_hndl;
 
+
+static void             **smsg_attr_ptr;
 gni_msgq_attr_t         msgq_attrs;
 gni_msgq_handle_t       msgq_handle;
 gni_msgq_ep_attr_t      msgq_ep_attrs;
@@ -131,7 +132,8 @@ typedef struct control_msg
 }CONTROL_MSG;
 
 /* reuse PendingMsg memory */
-static CONTROL_MSG *control_freelist=NULL;
+static CONTROL_MSG  *control_freelist=NULL;
+static MSG_LIST     *msglist_freelist=NULL;
 
 #define FreeControlMsg(d)       \
   do {  \
@@ -144,6 +146,19 @@ static CONTROL_MSG *control_freelist=NULL;
   if (d==0) {d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));\
              _MEMCHECK(d);\
   } else control_freelist = d->next;
+
+
+#define FreeMsgList(d)       \
+  do {  \
+  (d)->next = msglist_freelist;\
+  msglist_freelist = d;\
+  } while (0); 
+
+#define MallocMsgList(d) \
+  d = msglist_freelist;\
+  if (d==0) {d = ((MSG_LIST*)malloc(sizeof(MSG_LIST)));\
+             _MEMCHECK(d);\
+  } else msglist_freelist = d->next;
 
 
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
@@ -279,7 +294,7 @@ static int send_with_fma(int destNode, int size, char *msg)
     uint32_t              vmdh_index = -1;
     if(buffered_fma_head != 0)
     {
-        msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+        MallocMsgList(msg_tmp);
         msg_tmp->msg = msg;
         msg_tmp->destNode = destNode;
         msg_tmp ->size = size;
@@ -316,7 +331,7 @@ static int send_with_fma(int destNode, int size, char *msg)
             return 1;
         else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
         {
-            msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+            MallocMsgList(msg_tmp);
             msg_tmp->msg = control_msg_tmp;
             msg_tmp->destNode = destNode;
             msg_tmp ->size = size;
@@ -333,19 +348,19 @@ static int send_with_smsg(int destNode, int size, char *msg)
     gni_return_t        status;
     MSG_LIST            *msg_tmp;
     CONTROL_MSG         *control_msg_tmp;
-    uint8_t             tag_data = DATA_TAG;
-    uint8_t             tag_control= LMSG_INIT_TAG ;
-    uint32_t            vmdh_index = -1;
+    uint8_t             tag_data    = DATA_TAG;
+    uint8_t             tag_control = LMSG_INIT_TAG ;
+    uint32_t            vmdh_index  = -1;
 
     /* No mailbox available, buffer this msg and its info */
     if(buffered_smsg_head != 0)
     {
-        msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+        MallocMsgList(msg_tmp);
         msg_tmp->destNode = destNode;
-        if(size <=SMSG_PER_MSG)
+        if(size <=SMSG_MAX_MSG)
         {
-            msg_tmp->msg    = msg;
             msg_tmp->size   = size;
+            msg_tmp->msg    = msg;
             msg_tmp->tag    = tag_data;
         }else
         {
@@ -357,11 +372,11 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             GNI_RC_CHECK("MemRegister fails at ", status);
-            control_msg_tmp->source         = myrank;
             control_msg_tmp->source_addr    = (uint64_t)msg;
+            control_msg_tmp->source         = myrank;
             control_msg_tmp->length         =size; 
-            msg_tmp->msg                    = control_msg_tmp;
             msg_tmp->size                   = sizeof(CONTROL_MSG);
+            msg_tmp->msg                    = control_msg_tmp;
             msg_tmp->tag                    = tag_control;
         }
         buffered_smsg_tail->next    = msg_tmp;
@@ -370,7 +385,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
     }else
     {
         /* Can use SMSGSend */
-        if(size <= SMSG_PER_MSG)
+        if(size <= SMSG_MAX_MSG)
         {
             /* send the msg itself */
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], &size, sizeof(int), msg, size, 0, tag_data);
@@ -381,11 +396,11 @@ static int send_with_smsg(int destNode, int size, char *msg)
             }
             else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
             {
-                CmiPrintf("[%d] data msg add to send queue\n", myrank);
-                msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
-                msg_tmp->msg        = msg;
+                //CmiPrintf("[%d] data msg add to send queue\n", myrank);
+                MallocMsgList(msg_tmp);
                 msg_tmp->destNode   = destNode;
                 msg_tmp->size       = size;
+                msg_tmp->msg        = msg;
                 msg_tmp->tag        = tag_data;
                 /* store into buffer smsg_list and send later */
                 buffered_smsg_head  = msg_tmp;
@@ -399,16 +414,15 @@ static int send_with_smsg(int destNode, int size, char *msg)
             /* construct a control message and send */
             //control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
             MallocControlMsg(control_msg_tmp);
-            
+            control_msg_tmp->source_addr    = (uint64_t)msg;
+            control_msg_tmp->source         = myrank;
+            control_msg_tmp->length         = size; 
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, rx_cqh,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
             
             GNI_RC_CHECK("MemRegister fails at ", status);
-            control_msg_tmp->source         = myrank;
-            control_msg_tmp->source_addr    = (uint64_t)msg;
-            control_msg_tmp->length         = size; 
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
             if(status == GNI_RC_SUCCESS)
             {
@@ -417,11 +431,11 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 return 1;
             }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
             {
-                CmiPrintf("[%d] control msg add to send queue\n", myrank);
-                msg_tmp             = (MSG_LIST *)malloc(sizeof(MSG_LIST));
-                msg_tmp->msg        = control_msg_tmp;
+                //CmiPrintf("[%d] control msg add to send queue\n", myrank);
+                MallocMsgList(msg_tmp);
                 msg_tmp->destNode   = destNode;
                 msg_tmp ->size      = sizeof(CONTROL_MSG);
+                msg_tmp->msg        = control_msg_tmp;
                 msg_tmp->tag        = tag_control;
                 /* store into buffer smsg_list and send later */
                 buffered_smsg_head = msg_tmp;
@@ -467,13 +481,12 @@ static void PumpNetworkMsgs()
     CONTROL_MSG *request_msg;
     gni_post_descriptor_t *pd;
 
-    while (1) {
-
     data_tag        = DATA_TAG;
     control_tag     = LMSG_INIT_TAG;
     ack_tag         = ACK_TAG;
+    
+    while (1) {
     status = GNI_CqGetEvent(rx_cqh, &event_data);
-
     if(status == GNI_RC_SUCCESS)
     {
         inst_id = GNI_CQ_GET_INST_ID(event_data);
@@ -489,8 +502,8 @@ static void PumpNetworkMsgs()
         /* copy msg out and then put into queue */
         if(msg_tag == data_tag)
         {
-            msg_nbytes = *(int*)header;
-            msg_data = CmiAlloc(msg_nbytes);
+            msg_nbytes  = *(int*)header;
+            msg_data    = CmiAlloc(msg_nbytes);
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
         }else if(msg_tag == control_tag)
@@ -499,7 +512,6 @@ static void PumpNetworkMsgs()
             request_msg = (CONTROL_MSG *) header;
             msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
             pd = (gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t));
-            //bzero(&pd, sizeof(pd));
             if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
                 pd->type            = GNI_POST_FMA_GET;
             else
@@ -608,7 +620,7 @@ static void PumpLocalTransactions()
            if(buffered_smsg_head!=0)
            {
                CmiPrintf("[%d] PumpLocalTransactions: smsg buffered.\n", myrank);
-               msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+               MallocMsgList(msg_tmp);
                msg_tmp->msg = ack_msg_tmp;
                msg_tmp ->size = sizeof(CONTROL_MSG);
                msg_tmp->tag = ack_tag;
@@ -625,7 +637,7 @@ static void PumpLocalTransactions()
                }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
                {
                    CmiPrintf("[%d] PumpLocalTransactions: ack smsg buffered.\n", myrank);
-                   msg_tmp = (MSG_LIST *)malloc(sizeof(MSG_LIST));
+                   MallocMsgList(msg_tmp);
                    msg_tmp->msg = ack_msg_tmp;
                    msg_tmp ->size = sizeof(CONTROL_MSG);
                    msg_tmp->tag = ack_tag;
@@ -683,7 +695,7 @@ static void SendBufferMsg()
         if(status == GNI_RC_SUCCESS)
         {
             buffered_smsg_head= buffered_smsg_head->next;
-            free(ptr);
+            FreeMsgList(ptr);
         }else
             break;
     }
@@ -764,42 +776,41 @@ static void _init_static_smsg()
 {
     gni_smsg_attr_t      *smsg_attr;
     gni_smsg_attr_t      *smsg_attr_vec;
-    char                 *smsg_mem_buffer = NULL;
-    uint32_t             smsg_memlen;
-    gni_mem_handle_t      my_smsg_mdh_mailbox;
-    register    int         i;
+    unsigned int         smsg_memlen;
+    gni_mem_handle_t     my_smsg_mdh_mailbox;
+    register    int      i;
     gni_return_t status;
     uint32_t              vmdh_index = -1;
 
-    smsg_memlen = SMSG_BUFFER_SIZE ;
-#if 0
-    smsg_mem_buffer = (char*)calloc(smsg_memlen, 1);
-    _MEMCHECK(smsg_mem_buffer);
-#else
-    smsg_mem_buffer = memalign(64, smsg_memlen);
-    _MEMCHECK(smsg_mem_buffer);
-    bzero(smsg_mem_buffer, smsg_memlen);
-#endif
-    status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mem_buffer,
-                             smsg_memlen, rx_cqh,
-                             GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
-                             vmdh_index,
-                            &my_smsg_mdh_mailbox);
-
-    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-
-    smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
+     smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
     _MEMCHECK(smsg_attr);
 
+    smsg_attr_ptr = malloc(sizeof(void*) *mysize);
     for(i=0; i<mysize; i++)
     {
+        if(i==myrank)
+            continue;
         smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;
-        smsg_attr[i].msg_buffer = smsg_mem_buffer;
+        smsg_attr[i].mbox_offset = 0;
+        smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
+        smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
+        status = GNI_SmsgBufferSizeNeeded(&smsg_attr[i], &smsg_memlen);
+        GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+
+        smsg_attr_ptr[i] = memalign(64, smsg_memlen);
+        _MEMCHECK(smsg_attr_ptr[i]);
+        bzero(smsg_attr_ptr[i], smsg_memlen);
+        status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_attr_ptr[i],
+            smsg_memlen, rx_cqh,
+            GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
+            vmdh_index,
+            &my_smsg_mdh_mailbox);
+
+        GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+      
+        smsg_attr[i].msg_buffer = smsg_attr_ptr[i];
         smsg_attr[i].buff_size = smsg_memlen;
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
-        smsg_attr[i].mbox_offset = smsg_memlen/mysize*i;
-        smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
-        smsg_attr[i].msg_maxsize = SMSG_PER_MSG;
     }
     smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * sizeof(gni_smsg_attr_t));
     CmiAssert(smsg_attr_vec);
@@ -934,7 +945,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 void* LrtsAlloc(int n_bytes, int header)
 {
-    if(n_bytes <= SMSG_PER_MSG)
+    if(n_bytes <= SMSG_MAX_MSG)
     {
         int totalsize = n_bytes+header;
         return malloc(totalsize);
@@ -954,7 +965,7 @@ void* LrtsAlloc(int n_bytes, int header)
 void  LrtsFree(void *msg)
 {
     int size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
-    if (size <= SMSG_PER_MSG)
+    if (size <= SMSG_MAX_MSG)
       free(msg);
     else
       free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
