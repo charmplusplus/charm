@@ -18,7 +18,6 @@
 
 #include "gni_pub.h"
 #include "pmi.h"
-#include "mpi.h"
 /*Support for ++debug: */
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <windows.h>
@@ -173,6 +172,40 @@ static MSG_LIST *buffered_fma_tail = 0;
 
 
 static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl);
+
+static void
+allgather(void *in,void *out, int len)
+{
+    //PMI_Allgather is out of order
+    int i,rc, extend_len;
+    int  rank_index;
+    char *out_ptr, *out_ref;
+    char *in2;
+
+    extend_len = sizeof(int) + len;
+    in2 = (char*)malloc(extend_len);
+
+    memcpy(in2, &myrank, sizeof(int));
+    memcpy(in2+sizeof(int), in, len);
+
+    out_ptr = (char*)malloc(mysize*extend_len);
+
+    rc = PMI_Allgather(in2, out_ptr, extend_len);
+    GNI_RC_CHECK("allgather", rc);
+
+    out_ref = out;
+
+    for(i=0;i<mysize;i++) {
+        //rank index 
+        memcpy(&rank_index, &(out_ptr[extend_len*i]), sizeof(int));
+        //copy to the rank index slot
+        memcpy(&out_ref[rank_index*len], &out_ptr[extend_len*i+sizeof(int)], len);
+    }
+
+    free(out_ptr);
+    free(in2);
+
+}
 
 static unsigned int get_gni_nic_address(int device_id)
 {
@@ -767,8 +800,7 @@ static void _init_smallMsgwithFma(int size)
 
     my_mdh_addr.addr = (uint64_t)fma_buffer;
     my_mdh_addr.mdh = fma_buffer_mdh_addr;
-
-    MPI_Allgather(&my_mdh_addr, sizeof(mdh_addr_t), MPI_BYTE, fma_buffer_mdh_addr_base, sizeof(mdh_addr_t), MPI_BYTE, MPI_COMM_WORLD);
+    allgather(&my_mdh_addr, fma_buffer_mdh_addr_base, sizeof(mdh_addr_t));	
 
 }
 
@@ -812,14 +844,16 @@ static void _init_static_smsg()
         smsg_attr[i].buff_size = smsg_memlen;
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
     }
-    smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * sizeof(gni_smsg_attr_t));
+    smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * mysize * sizeof(gni_smsg_attr_t));
     CmiAssert(smsg_attr_vec);
-    MPI_Alltoall(smsg_attr, sizeof(gni_smsg_attr_t), MPI_BYTE, smsg_attr_vec, sizeof(gni_smsg_attr_t), MPI_BYTE, MPI_COMM_WORLD);
+   
+    allgather(smsg_attr, smsg_attr_vec,  mysize*sizeof(gni_smsg_attr_t));
+    //MPI_Alltoall(smsg_attr, sizeof(gni_smsg_attr_t), MPI_BYTE, smsg_attr_vec, sizeof(gni_smsg_attr_t), MPI_BYTE, MPI_COMM_WORLD);
     for(i=0; i<mysize; i++)
     {
         if (myrank == i) continue;
         /* initialize the smsg channel */
-        status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &smsg_attr_vec[i]);
+        status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &smsg_attr_vec[i*mysize+myrank]);
         GNI_RC_CHECK("SMSG Init", status);
     } //end initialization
     free(smsg_attr);
@@ -845,31 +879,35 @@ static void _init_static_msgq()
 }
 static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
-    register int          i;
-    int                   rc;
-    int                   device_id = 0;
-    unsigned int          remote_addr;
-    gni_cdm_handle_t      cdm_hndl;
-    gni_return_t          status = GNI_RC_SUCCESS;
-    uint32_t              vmdh_index = -1;
-    uint8_t               ptag;
-    unsigned int         local_addr, *MPID_UGNI_AllAddr;
-    
+    register int            i;
+    int                     rc;
+    int                     device_id = 0;
+    unsigned int            remote_addr;
+    gni_cdm_handle_t        cdm_hndl;
+    gni_return_t            status = GNI_RC_SUCCESS;
+    uint32_t                vmdh_index = -1;
+    uint8_t                 ptag;
+    unsigned int            local_addr, *MPID_UGNI_AllAddr;
+    int                     first_spawned;
+
     void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
     
     //useStaticSMSG = CmiGetArgFlag(*argv, "+useStaticSmsg");
     //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
+    
+    status = PMI_Init(&first_spawned);
+    GNI_RC_CHECK("PMI_Init", status);
 
+    status = PMI_Get_size(&mysize);
+    GNI_RC_CHECK("PMI_Getsize", status);
 
-    MPI_Init(argc, argv);
-    MPI_Comm_rank(MPI_COMM_WORLD,myNodeID);
-    MPI_Comm_size(MPI_COMM_WORLD,numNodes);
+    status = PMI_Get_rank(&myrank);
+    GNI_RC_CHECK("PMI_getrank", status);
 
-
-    mysize = *numNodes;
-    myrank = *myNodeID;
+    *myNodeID = myrank;
+    *numNodes = mysize;
   
     if(myrank == 0)
     {
@@ -898,7 +936,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
     MPID_UGNI_AllAddr = (unsigned int *)malloc(sizeof(unsigned int) * mysize);
     _MEMCHECK(MPID_UGNI_AllAddr);
-    MPI_Allgather(&local_addr, sizeof(unsigned int), MPI_BYTE, MPID_UGNI_AllAddr, sizeof(unsigned int), MPI_BYTE, MPI_COMM_WORLD);
+    allgather(&local_addr, MPID_UGNI_AllAddr, sizeof(unsigned int));
     /* create the local completion queue */
     /* the third parameter : The number of events the NIC allows before generating an interrupt. Setting this parameter to zero results in interrupt delivery with every event. When using this parameter, the mode parameter must be set to GNI_CQ_BLOCKING*/
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &tx_cqh);
@@ -993,14 +1031,15 @@ static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)
 static void LrtsExit()
 {
     /* free memory ? */
-    MPI_Finalize();
+    PMI_Finalize();
 }
 
 void CmiAbort(const char *message) {
 
-    MPI_Abort(MPI_COMM_WORLD, -1);
+    PMI_Abort(-1, message);
 }
 
+#if 0
 /**************************  TIMER FUNCTIONS **************************/
 #if CMK_TIMER_USE_SPECIAL
 /* MPI calls are not threadsafe, even the timer on some machines */
@@ -1106,13 +1145,13 @@ double CmiCpuTimer(void) {
 }
 
 #endif
-
+#endif
 /************Barrier Related Functions****************/
 
 int CmiBarrier()
 {
     int status;
-    status = MPI_Barrier(MPI_COMM_WORLD);
+    status = PMI_Barrier();
     return status;
 
 }

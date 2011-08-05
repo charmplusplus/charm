@@ -60,8 +60,8 @@
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
-#define CMK_TIMER_USE_GETRUSAGE                            0
-#define CMK_TIMER_USE_SPECIAL                              1
+#define CMK_TIMER_USE_GETRUSAGE                            1
+#define CMK_TIMER_USE_SPECIAL                              0
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL                            0
 
