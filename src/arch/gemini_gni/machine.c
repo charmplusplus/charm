@@ -1030,6 +1030,7 @@ static void LrtsExit()
 {
     /* free memory ? */
     PMI_Finalize();
+    exit(0);
 }
 
 void CmiAbort(const char *message) {
