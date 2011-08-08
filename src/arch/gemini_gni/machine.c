@@ -74,7 +74,7 @@ static void sleep(int secs) {
 #undef GNI_RC_CHECK
 #endif
 #ifdef DEBUG
-#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           CmiPrintf("%s; err=%s\n",msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
+#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           CmiPrintf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
 #else
 #define GNI_RC_CHECK(msg,rc)
 #endif
@@ -158,6 +158,22 @@ static MSG_LIST     *msglist_freelist=0;
   if (d==0) {d = ((MSG_LIST*)malloc(sizeof(MSG_LIST)));\
              _MEMCHECK(d);\
   } else msglist_freelist = d->next;
+
+/* reuse gni_post_descriptor_t */
+static gni_post_descriptor_t *post_freelist=NULL;
+
+#define FreePostDesc(d)       \
+  do {  \
+    (d)->next_descr = post_freelist;\
+    post_freelist = d;\
+  } while (0); 
+
+#define MallocPostDesc(d) \
+  d = post_freelist;\
+  if (d==0) { \
+     d = ((gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t)));\
+     _MEMCHECK(d);\
+  } else post_freelist = d->next_descr;
 
 
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
@@ -416,8 +432,8 @@ static int send_with_smsg(int destNode, int size, char *msg)
         buffered_smsg_tail->next    = msg_tmp;
         buffered_smsg_tail          = msg_tmp;
         return 0;
-    }else
-    {
+    }
+    else {
         /* Can use SMSGSend */
         if(size <= SMSG_MAX_MSG)
         {
@@ -499,8 +515,6 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 
 static void LrtsPreCommonInit(int everReturn){}
 static void LrtsPostCommonInit(int everReturn){}
-static void LrtsDrainResources() /* used when exit */
-{}
 
 void LrtsPostNonLocal(){}
 /* pooling CQ to receive network message */
@@ -543,16 +557,21 @@ static void PumpNetworkMsgs()
         /* copy msg out and then put into queue */
         if(msg_tag == data_tag)
         {
-            memcpy(&msg_nbytes, header, sizeof(int));
+            //memcpy(&msg_nbytes, header, sizeof(int));
+            msg_nbytes = *(int*)header;
             msg_data    = CmiAlloc(msg_nbytes);
+            //CmiPrintf("[%d] PumpNetworkMsgs: get datamsg, size: %d msg id:%d\n", myrank, msg_nbytes, GNI_CQ_GET_MSG_ID(event_data));
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
-        }else if(msg_tag == control_tag)
+        }
+        else if(msg_tag == control_tag) 
         {
             /* initial a get to transfer data from the sender side */
             request_msg = (CONTROL_MSG *) header;
             msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
-            pd = (gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t));
+            //pd = (gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t));
+            MallocPostDesc(pd);
+            //bzero(&pd, sizeof(pd));
             if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
                 pd->type            = GNI_POST_FMA_GET;
             else
@@ -582,12 +601,14 @@ static void PumpNetworkMsgs()
             }else
             {
             }
-        }else if(msg_tag == ack_tag){
+        }
+        else if(msg_tag == ack_tag) {
             /* Get is done, release message . Now put is not used yet*/
             request_msg = (CONTROL_MSG *) header;
             //CmiPrintf("++++## ACK msg is received on PE:%d message size=%d, addr=%p\n", myrank, request_msg->length, (void*)request_msg->source_addr);
+
+            GNI_MemDeregister(nic_hndl, &request_msg->source_mem_hndl);
             CmiFree((void*)request_msg->source_addr);
-            //CmiPrintf("++++## release ACK msg is received on PE:%d message size=%d\n", myrank, request_msg->length);
         }else{
             CmiPrintf("weird tag problem\n");
             CmiAbort("Unknown tag\n");
@@ -688,7 +709,7 @@ static void PumpLocalTransactions()
     }   /* end of while loop */
 }
 
-static void SendBufferMsg()
+static int SendBufferMsg()
 {
     MSG_LIST        *ptr;
     uint8_t         tag_data, tag_control, tag_ack;
@@ -733,7 +754,9 @@ static void SendBufferMsg()
         }else
             break;
     }
+    return 1;
 }
+
 static void LrtsAdvanceCommunication()
 {
     /*  Receive Msg first */
@@ -823,7 +846,7 @@ static void _init_static_smsg()
     {
         if(i==myrank)
             continue;
-        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;
+        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
         smsg_attr[i].mbox_offset = 0;
         smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
         smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
@@ -1031,6 +1054,14 @@ static void LrtsExit()
     /* free memory ? */
     PMI_Finalize();
     exit(0);
+}
+
+static void LrtsDrainResources()
+{
+    while (!SendBufferMsg()) {
+      PumpNetworkMsgs();
+      PumpLocalTransactions();
+    }
 }
 
 void CmiAbort(const char *message) {
