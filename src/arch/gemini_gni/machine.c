@@ -396,7 +396,7 @@ static int send_with_fma(int destNode, int size, char *msg)
 
 static int send_with_smsg(int destNode, int size, char *msg)
 {
-    gni_return_t        status;
+    gni_return_t        status  =   GNI_RC_SUCCESS;
     MSG_LIST            *msg_tmp;
     CONTROL_MSG         *control_msg_tmp;
     uint8_t             tag_data    = DATA_TAG;
@@ -416,12 +416,14 @@ static int send_with_smsg(int destNode, int size, char *msg)
         }else
         {
             MallocControlMsg(control_msg_tmp);
-
+#ifdef USE_ONESIDED
+            onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
+#else
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, rx_cqh,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
-            
+#endif 
             GNI_RC_CHECK("MemRegister fails at ", status);
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
@@ -469,12 +471,15 @@ static int send_with_smsg(int destNode, int size, char *msg)
             MallocControlMsg(control_msg_tmp);
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
-            control_msg_tmp->length         = size; 
+            control_msg_tmp->length         = size;
+#ifdef USE_ONESIDED
+            onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
+#else
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
                 size, rx_cqh,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
-            
+#endif 
             GNI_RC_CHECK("MemRegister fails at ", status);
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
             if(status == GNI_RC_SUCCESS)
@@ -608,8 +613,11 @@ static void PumpNetworkMsgs()
             /* Get is done, release message . Now put is not used yet*/
             request_msg = (CONTROL_MSG *) header;
             //CmiPrintf("++++## ACK msg is received on PE:%d message size=%d, addr=%p\n", myrank, request_msg->length, (void*)request_msg->source_addr);
-
+#ifdef USE_ONESIDED
+            onesided_mem_deregister(onesided_hnd, &request_msg->source_mem_hndl);
+#else
             GNI_MemDeregister(nic_hndl, &request_msg->source_mem_hndl);
+#endif
             CmiFree((void*)request_msg->source_addr);
         }else{
             CmiPrintf("weird tag problem\n");
@@ -1039,15 +1047,19 @@ void  LrtsFree(void *msg)
 static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)
 {
     void *ptr;
-    gni_return_t status;
+    gni_return_t status = GNI_RC_SUCCESS;
     ptr = CmiAlloc(n_bytes);
     _MEMCHECK(ptr);
+#ifdef USE_ONESIDED
+    onesided_mem_register(onesided_hnd, (uint64_t)ptr, n_bytes, 0, mem_hndl);
+#else
     status = GNI_MemRegister(nic_hndl, (uint64_t)ptr,
         n_bytes, rx_cqh, 
         GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
         mem_hndl);
-
+#endif
     if (status == GNI_RC_ERROR_RESOURCE) {
+        GNI_RC_CHECK("GNI_MemRegister in LrtsAlloc", status);
         // FIXME
     }
     else
