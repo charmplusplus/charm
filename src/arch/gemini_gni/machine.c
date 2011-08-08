@@ -351,6 +351,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
         }else
         {
             MallocControlMsg(control_msg_tmp);
+            /*
 #ifdef USE_ONESIDED
             onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
 #else
@@ -360,9 +361,12 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
 #endif 
             GNI_RC_CHECK("MemRegister fails at ", status);
+            */
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
             control_msg_tmp->length         =size; 
+            control_msg_tmp->source_mem_hndl.qword1 = 0;
+            control_msg_tmp->source_mem_hndl.qword2 = 0;
             msg_tmp->size                   = sizeof(CONTROL_MSG);
             msg_tmp->msg                    = control_msg_tmp;
             msg_tmp->tag                    = tag_control;
@@ -415,33 +419,42 @@ static int send_with_smsg(int destNode, int size, char *msg)
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
 #endif 
-            GNI_RC_CHECK("MemRegister fails at ", status);
-            status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
-            if(status == GNI_RC_SUCCESS)
+            if(status == GNI_RC_ERROR_RESOURCE || status == GNI_RC_ERROR_NOMEM)
             {
-                FreeControlMsg(control_msg_tmp);
-                //CmiPrintf("Control message sent bytes:%d on PE:%d, source=%d, add=%p, mem_hndl=%ld, %ld\n", sizeof(CONTROL_MSG), myrank, control_msg_tmp->source, (void*)control_msg_tmp->source_addr, (control_msg_tmp->source_mem_hndl).qword1, (control_msg_tmp->source_mem_hndl).qword2);
-                return 1;
-            }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
+                control_msg_tmp->source_mem_hndl.qword1 = 0;
+                control_msg_tmp->source_mem_hndl.qword2 = 0;
+            }else if(status == GNI_RC_SUCCESS)
             {
-                //CmiPrintf("[%d] control msg add to send queue\n", myrank);
-                MallocMsgList(msg_tmp);
-                msg_tmp->destNode   = destNode;
-                msg_tmp ->size      = sizeof(CONTROL_MSG);
-                msg_tmp->msg        = control_msg_tmp;
-                msg_tmp->tag        = tag_control;
-                msg_tmp->next       = 0;
-                /* store into buffer smsg_list and send later */
-                buffered_smsg_head = msg_tmp;
-                buffered_smsg_tail = msg_tmp;
-                return 0;
+                status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
+                if(status == GNI_RC_SUCCESS)
+                {
+                    FreeControlMsg(control_msg_tmp);
+                    return 1;
+                }
             }
             else
-                GNI_RC_CHECK("GNI_SmsgSendWTag", status);
+            {
+                GNI_RC_CHECK("MemRegister fails at ", status);
+            }
+            
+            if(status == GNI_RC_INVALID_PARAM)
+                GNI_RC_CHECK("MemRegister fails at ", status);
+            
+            // Memory register fails or send fails 
+            //CmiPrintf("[%d] control msg add to send queue\n", myrank);
+            MallocMsgList(msg_tmp);
+            msg_tmp->destNode   = destNode;
+            msg_tmp ->size      = sizeof(CONTROL_MSG);
+            msg_tmp->msg        = control_msg_tmp;
+            msg_tmp->tag        = tag_control;
+            msg_tmp->next       = 0;
+            /* store into buffer smsg_list and send later */
+            buffered_smsg_head = msg_tmp;
+            buffered_smsg_tail = msg_tmp;
+            return 0;
         }
     }
 }
-
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
     //PRINT_INFO("Calling LrtsSend")
@@ -653,9 +666,10 @@ static void PumpLocalTransactions()
 
 static int SendBufferMsg()
 {
-    MSG_LIST        *ptr;
-    uint8_t         tag_data, tag_control, tag_ack;
-    gni_return_t     status;
+    MSG_LIST            *ptr;
+    CONTROL_MSG         *control_msg_tmp;
+    uint8_t             tag_data, tag_control, tag_ack;
+    gni_return_t        status;
 
     tag_data    = DATA_TAG;
     tag_control = LMSG_INIT_TAG;
@@ -673,6 +687,20 @@ static int SendBufferMsg()
                     CmiFree(ptr->msg);
             }else if(ptr->tag ==tag_control)
             {
+                control_msg_tmp = (CONTROL_MSG*)ptr->msg;
+                if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
+                {
+#ifdef USE_ONESIDED
+                    onesided_mem_register(onesided_hnd, (uint64_t)control_msg_tmp->source_addr, control_msg_tmp->length, 0, &(control_msg_tmp->source_mem_hndl));
+#else
+                    status = GNI_MemRegister(nic_hndl, (uint64_t)control_msg_tmp->source_addr, 
+                        control_msg_tmp->length, rx_cqh,
+                        GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
+                        -1, &(control_msg_tmp->source_mem_hndl));
+#endif 
+                    if(status != GNI_RC_SUCCESS)
+                        break;
+                }
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, tag_control);
                 if(status == GNI_RC_SUCCESS)
                     FreeControlMsg((CONTROL_MSG*)(ptr->msg));
