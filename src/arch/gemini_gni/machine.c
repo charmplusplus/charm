@@ -84,6 +84,8 @@ onesided_hnd_t   onesided_hnd;
 onesided_md_t    omdh;
 #endif
 
+#define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
+
 static int useStaticSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
@@ -579,7 +581,7 @@ static void PumpNetworkMsgs()
 
             pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
             pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
-            pd->length          = request_msg->length;
+            pd->length          = ALIGN4(request_msg->length);
             pd->local_addr      = (uint64_t) msg_data;
             pd->local_mem_hndl  = msg_mem_hndl; 
             pd->remote_addr     = request_msg->source_addr;
@@ -587,12 +589,12 @@ static void PumpNetworkMsgs()
             pd->src_cq_hndl     = 0;     /* tx_cqh;  */
             pd->rdma_mode       = 0;
 
-           // CmiPrintf("source=%d, addr=%p, handler=%ld,%ld \n", request_msg->source, (void*)pd.remote_addr, (request_msg->source_mem_hndl).qword1, (request_msg->source_mem_hndl).qword2);
+            // CmiPrintf("source=%d, addr=%p, handler=%ld,%ld, size:%d\n", request_msg->source, (void*)pd->remote_addr, (request_msg->source_mem_hndl).qword1, (request_msg->source_mem_hndl).qword2, request_msg->length);
             if(pd->type == GNI_POST_RDMA_GET) 
                 status = GNI_PostRdma(ep_hndl_array[request_msg->source], pd);
             else
                 status = GNI_PostFma(ep_hndl_array[request_msg->source],  pd);
-            GNI_RC_CHECK("post ", status);
+            GNI_RC_CHECK("post", status);
            
             //CmiPrintf("post status=%s on PE:%d\n", gni_err_str[status], myrank);
             if(status = GNI_RC_SUCCESS)
@@ -1019,6 +1021,7 @@ void* LrtsAlloc(int n_bytes, int header)
     }else 
     {
         CmiAssert(header <= ALIGNBUF);
+        n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
         return res + ALIGNBUF - header;
     }
@@ -1044,9 +1047,13 @@ static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)
         GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
         mem_hndl);
 
-    GNI_RC_CHECK("GNI_MemRegister in LrtsAlloc", status);
-    return ptr;
+    if (status == GNI_RC_ERROR_RESOURCE) {
+        // FIXME
+    }
+    else
+      GNI_RC_CHECK("GNI_MemRegister in LrtsAlloc", status);
 
+    return ptr;
 }
 
 static void LrtsExit()
