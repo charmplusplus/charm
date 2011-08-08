@@ -107,7 +107,6 @@ static gni_cq_handle_t       tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
 
 /* preallocated memory buffer for FMA for short message and control message */
-static int              fma_buffer_len_eachcore = FMA_BUFFER_SIZE;
 typedef struct {
     gni_mem_handle_t mdh;
     uint64_t addr;
@@ -132,10 +131,17 @@ typedef struct control_msg
     struct control_msg *next;
 }CONTROL_MSG;
 
-/* reuse PendingMsg memory */
-static CONTROL_MSG  *control_freelist=0;
-static MSG_LIST     *msglist_freelist=0;
+typedef struct  rmda_msg
+{
+    int                   destNode;
+    gni_post_descriptor_t *pd;
+    struct  rmda_msg      *next;
+}RDMA_REQUEST;
 
+/* reuse PendingMsg memory */
+static CONTROL_MSG          *control_freelist=0;
+static MSG_LIST             *msglist_freelist=0;
+static RDMA_REQUEST         *rdma_freelist = 0;
 #define FreeControlMsg(d)       \
   do {  \
   (d)->next = control_freelist;\
@@ -161,6 +167,18 @@ static MSG_LIST     *msglist_freelist=0;
              _MEMCHECK(d);\
   } else msglist_freelist = d->next;
 
+#define FreeRdmaRequest(d)       \
+  do {  \
+  (d)->next = rdma_freelist;\
+  rdma_freelist = d;\
+  } while (0); 
+
+#define MallocRdmaRequest(d) \
+  d = rdma_freelist;\
+  if (d==0) {d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));\
+             _MEMCHECK(d);\
+  } else rdma_freelist = d->next;
+
 /* reuse gni_post_descriptor_t */
 static gni_post_descriptor_t *post_freelist=NULL;
 
@@ -183,13 +201,13 @@ static MSG_LIST *buffered_smsg_head= 0;
 static MSG_LIST *buffered_smsg_tail= 0;
 /* SmsgSend return success but message sent is not confirmed by remote side */
 
+static RDMA_REQUEST  *pending_rdma_head = 0;
+static RDMA_REQUEST  *pending_rdma_tail = 0;
+
 static MSG_LIST *buffered_fma_head = 0;
 static MSG_LIST *buffered_fma_tail = 0;
 
 /* functions  */
-
-
-static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl);
 
 static void
 allgather(void *in,void *out, int len)
@@ -481,6 +499,7 @@ static void PumpNetworkMsgs()
     void                *msg_data;
     gni_mem_handle_t    msg_mem_hndl;
     CONTROL_MSG         *request_msg;
+    RDMA_REQUEST        *rdma_request_msg;
     gni_post_descriptor_t *pd;
 
     data_tag        = DATA_TAG;
@@ -515,15 +534,31 @@ static void PumpNetworkMsgs()
             //CmiPrintf("[%d] PumpNetworkMsgs: get datamsg, size: %d msg id:%d\n", myrank, msg_nbytes, GNI_CQ_GET_MSG_ID(event_data));
             memcpy(msg_data, (char*)header+sizeof(int), msg_nbytes);
             handleOneRecvedMsg(msg_nbytes, msg_data);
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
         }
         else if(msg_tag == control_tag) 
         {
             /* initial a get to transfer data from the sender side */
             request_msg = (CONTROL_MSG *) header;
-            msg_data = LrtsAllocRegister(request_msg->length, &msg_mem_hndl); //need align checking
-            //pd = (gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t));
+            msg_data = CmiAlloc(request_msg->length);
+            _MEMCHECK(msg_data);
+#ifdef USE_ONESIDED
+            onesided_mem_register(onesided_hnd, (uint64_t)msg_data, request_msg->length, 0, &msg_mem_hndl);
+#else
+            status = GNI_MemRegister(nic_hndl, (uint64_t)msg_data,
+                request_msg->length, rx_cqh, 
+                GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
+                &msg_mem_hndl);
+#endif
+
+            if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
+            {
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+                GNI_RC_CHECK("Mem Register before post", status);
+            }
+
+            //buffer this request and send later
             MallocPostDesc(pd);
-            //bzero(&pd, sizeof(pd));
             if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
                 pd->type            = GNI_POST_FMA_GET;
             else
@@ -533,26 +568,41 @@ static void PumpNetworkMsgs()
             pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
             pd->length          = ALIGN4(request_msg->length);
             pd->local_addr      = (uint64_t) msg_data;
-            pd->local_mem_hndl  = msg_mem_hndl; 
             pd->remote_addr     = request_msg->source_addr;
             pd->remote_mem_hndl = request_msg->source_mem_hndl;
             pd->src_cq_hndl     = 0;     /* tx_cqh;  */
             pd->rdma_mode       = 0;
 
-            // CmiPrintf("source=%d, addr=%p, handler=%ld,%ld, size:%d\n", request_msg->source, (void*)pd->remote_addr, (request_msg->source_mem_hndl).qword1, (request_msg->source_mem_hndl).qword2, request_msg->length);
-            if(pd->type == GNI_POST_RDMA_GET) 
-                status = GNI_PostRdma(ep_hndl_array[request_msg->source], pd);
-            else
-                status = GNI_PostFma(ep_hndl_array[request_msg->source],  pd);
-            GNI_RC_CHECK("post", status);
-           
-            //CmiPrintf("post status=%s on PE:%d\n", gni_err_str[status], myrank);
-            if(status = GNI_RC_SUCCESS)
+            //memory registration successful
+            if(status == GNI_RC_SUCCESS)
             {
-                /* put into receive buffer queue */
+                pd->local_mem_hndl  = msg_mem_hndl;
+                if(pd->type == GNI_POST_RDMA_GET) 
+                    status = GNI_PostRdma(ep_hndl_array[request_msg->source], pd);
+                else
+                    status = GNI_PostFma(ep_hndl_array[request_msg->source],  pd);
             }else
             {
+                pd->local_mem_hndl.qword1  = 0; 
+                pd->local_mem_hndl.qword1  = 0; 
             }
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
+            if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
+            {
+                MallocRdmaRequest(rdma_request_msg);
+                rdma_request_msg->next = 0;
+                rdma_request_msg->destNode = inst_id;
+                if(pending_rdma_head == 0)
+                {
+                    pending_rdma_head = rdma_request_msg;
+                }else
+                {
+                    pending_rdma_tail->next = rdma_request_msg;
+                }
+                pending_rdma_tail = rdma_request_msg;
+                return;
+            }else
+                GNI_RC_CHECK("AFter posting", status);
         }
         else if(msg_tag == ack_tag) {
             /* Get is done, release message . Now put is not used yet*/
@@ -564,11 +614,13 @@ static void PumpNetworkMsgs()
             GNI_MemDeregister(nic_hndl, &request_msg->source_mem_hndl);
 #endif
             CmiFree((void*)request_msg->source_addr);
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
+            SendRdmaMsg();
         }else{
+            GNI_SmsgRelease(ep_hndl_array[inst_id]);
             CmiPrintf("weird tag problem\n");
             CmiAbort("Unknown tag\n");
         }
-        GNI_SmsgRelease(ep_hndl_array[inst_id]);
     }  //else not match smsg, maybe larger message
     }   // end of while loop
 }
@@ -658,12 +710,60 @@ static void PumpLocalTransactions()
                     else
                         GNI_RC_CHECK("GNI_SmsgSendWTag", status);
                 }
+#ifdef USE_ONESIDED
+                onesided_mem_deregister(onesided_hnd, &tmp_pd->local_mem_hndl);
+#else
+                GNI_MemDeregister(nic_hndl, &tmp_pd->local_mem_hndl);
+#endif
                 handleOneRecvedMsg(SIZEFIELD((void*)tmp_pd->local_addr), (void*)tmp_pd->local_addr); 
+                SendRdmaMsg(); 
             }
         }
     }   /* end of while loop */
 }
 
+static int SendRdmaMsg()
+{
+
+    RDMA_REQUEST            *ptr;
+    gni_post_descriptor_t   *pd;
+    gni_return_t            status = GNI_RC_SUCCESS;
+    gni_mem_handle_t        msg_mem_hndl;
+    while(pending_rdma_head != 0)
+    {
+        ptr=pending_rdma_head;
+        pd = ptr->pd;
+        // register memory first
+        if( pd->local_mem_hndl.qword1  == 0 && pd->local_mem_hndl.qword2  == 0)
+        {
+#ifdef USE_ONESIDED
+            onesided_mem_register(onesided_hnd, (uint64_t)pd->local_addr, pd->length, 0, &(pd->local_mem_hndl));
+#else
+            status = GNI_MemRegister(nic_hndl, (uint64_t)pd->local_addr,
+                pd->length, rx_cqh, 
+                GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
+                &(pd->local_mem_hndl));
+#endif
+        }
+        if(status == GNI_RC_SUCCESS)
+        {
+            if(pd->type == GNI_POST_RDMA_GET) 
+                status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
+            else
+                status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
+            if(status == GNI_RC_SUCCESS)
+            {
+                pending_rdma_head = pending_rdma_head->next; 
+                FreePostDesc(pd);
+                FreeRdmaRequest(ptr);
+            }
+            else
+                return 1;
+        }else
+            return 1;
+    } //end while
+    return 0;
+}
 static int SendBufferMsg()
 {
     MSG_LIST            *ptr;
@@ -971,30 +1071,6 @@ void  LrtsFree(void *msg)
       free(msg);
     else
       free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
-}
-
-static void* LrtsAllocRegister(int n_bytes, gni_mem_handle_t* mem_hndl)
-{
-    void *ptr;
-    gni_return_t status = GNI_RC_SUCCESS;
-    ptr = CmiAlloc(n_bytes);
-    _MEMCHECK(ptr);
-#ifdef USE_ONESIDED
-    onesided_mem_register(onesided_hnd, (uint64_t)ptr, n_bytes, 0, mem_hndl);
-#else
-    status = GNI_MemRegister(nic_hndl, (uint64_t)ptr,
-        n_bytes, rx_cqh, 
-        GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
-        mem_hndl);
-#endif
-    if (status == GNI_RC_ERROR_RESOURCE) {
-        GNI_RC_CHECK("GNI_MemRegister in LrtsAlloc", status);
-        // FIXME
-    }
-    else
-      GNI_RC_CHECK("GNI_MemRegister in LrtsAlloc", status);
-
-    return ptr;
 }
 
 static void LrtsExit()
