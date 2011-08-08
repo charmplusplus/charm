@@ -329,71 +329,6 @@ void CmiMachineProgressImpl() {
 }
 #endif
 
-
-/* 
- * The message can be copied to registered memory buffer and be sent
- * This message memory can be registered to network. It depends on which one is cheaper
- * register might be better when the msg is large
- */
-
-static int send_with_fma(int destNode, int size, char *msg)
-{
-    gni_post_descriptor_t   pd;
-    gni_return_t status;
-    CONTROL_MSG *control_msg_tmp;
-    MSG_LIST *msg_tmp;
-    uint32_t              vmdh_index = -1;
-    if(buffered_fma_head != 0)
-    {
-        MallocMsgList(msg_tmp);
-        msg_tmp->msg = msg;
-        msg_tmp->destNode = destNode;
-        msg_tmp ->size = size;
-        buffered_smsg_tail->next = msg_tmp;
-        buffered_smsg_tail = msg_tmp;
-        return 0;
-    } else
-    {
-        pd.type            = GNI_POST_FMA_PUT;
-        pd.cq_mode         = GNI_CQMODE_GLOBAL_EVENT | GNI_CQMODE_REMOTE_EVENT;
-        pd.dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
-        pd.length          = 8;
-        pd.remote_addr     = fma_buffer_mdh_addr_base[destNode].addr + fma_buffer_len_eachcore*destNode;
-        pd.remote_mem_hndl = fma_buffer_mdh_addr_base[destNode].mdh;
-        if(size < FMA_BUFFER_SIZE)
-        {
-            /* send the message */
-            pd.local_addr      = (uint64_t) msg;
-        }else
-        {
-            /* construct a control message and send */
-            control_msg_tmp = (CONTROL_MSG *)malloc((int)sizeof(CONTROL_MSG));
-            GNI_MemRegister(nic_hndl, (uint64_t)msg, 
-                size, remote_bte_cq_hndl,
-                GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                vmdh_index, &(control_msg_tmp->source_mem_hndl));
-            
-            control_msg_tmp->source = _Cmi_mynode;
-            control_msg_tmp->source_addr = (uint64_t)msg;
-            control_msg_tmp->length = size;
-        }
-        status = GNI_PostFma(ep_hndl_array[destNode], &pd);
-        if(status == GNI_RC_SUCCESS)
-            return 1;
-        else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE) 
-        {
-            MallocMsgList(msg_tmp);
-            msg_tmp->msg = control_msg_tmp;
-            msg_tmp->destNode = destNode;
-            msg_tmp ->size = size;
-            /* store into buffer fma_list and send later */
-            buffered_fma_head = msg_tmp;
-            buffered_fma_tail = msg_tmp;
-            return 0;
-        }
-    }
-}
-
 static int send_with_smsg(int destNode, int size, char *msg)
 {
     gni_return_t        status  =   GNI_RC_SUCCESS;
@@ -513,9 +448,6 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     if(useStaticSMSG)
     {
         send_with_smsg(destNode, size, msg); 
-    }else
-    {
-        send_with_fma(destNode, size, msg); 
     }
     return 0;
 }
@@ -810,34 +742,6 @@ void remoteEventHandle(gni_cq_entry_t *event_data, void *context)
 
 }
 
-/* if FMA is used to transfer small messages, static allocation*/
-static void _init_smallMsgwithFma(int size)
-{
-    char            *fma_buffer;
-    gni_mem_handle_t      fma_buffer_mdh_addr;
-    mdh_addr_t            my_mdh_addr;
-    gni_return_t status;
-    
-    fma_buffer = (char *)calloc(FMA_PER_CORE*size, 1);
-    CmiAssert(fma_buffer != NULL);
-
-    status = GNI_MemRegister(nic_hndl, (uint64_t)fma_buffer,
-        FMA_PER_CORE*size, rx_cqh, 
-        GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
-        &fma_buffer_mdh_addr);
-
-    GNI_RC_CHECK("Memregister DMA ", status);
-    /* Gather up all of the mdh's over the socket network, 
-     * * this also serves as a barrier */
-    fma_buffer_mdh_addr_base = (mdh_addr_t*)malloc(size* sizeof(mdh_addr_t));
-    CmiAssert(fma_buffer_mdh_addr_base);
-
-    my_mdh_addr.addr = (uint64_t)fma_buffer;
-    my_mdh_addr.mdh = fma_buffer_mdh_addr;
-    allgather(&my_mdh_addr, fma_buffer_mdh_addr_base, sizeof(mdh_addr_t));	
-
-}
-
 static void _init_static_smsg()
 {
     gni_smsg_attr_t      *smsg_attr;
@@ -1005,9 +909,6 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     }else if(useStaticMSGQ == 1)
     {
         _init_static_msgq();
-    }else if( useStaticFMA == 1)
-    {
-        _init_smallMsgwithFma(mysize);
     }
     free(MPID_UGNI_AllAddr);
     //PRINT_INFO("\nDone with LrtsInit")
