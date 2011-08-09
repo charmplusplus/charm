@@ -68,8 +68,8 @@ PENDING_GETNEXT     *pending_smsg_tail = 0;
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
-#define SMSG_MAX_MSG    1024
-#define SMSG_MAX_CREDIT 16
+#define SMSG_MAX_MSG     1024
+#define SMSG_MAX_CREDIT  16
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
@@ -387,6 +387,7 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
       buffered_smsg_tail->next    = msg_tmp;
       buffered_smsg_tail          = msg_tmp;
     }
+    // CmiPrintf("[%d] delay_send_small_msg msg to PE %d  tag: 0x%x \n", myrank, destNode, tag);
 }
 
 static int send_with_smsg(int destNode, int size, char *msg)
@@ -439,7 +440,6 @@ static int send_with_smsg(int destNode, int size, char *msg)
             /* send the msg itself */
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, 0, tag_data);
             //CmiPrintf("[%d] send_with_smsg sends a data msg to PE %d status: %s\n", myrank, destNode, gni_err_str[status]);
-            //CmiPrintf("Sending msg PE:%d=>%d\n", myrank, destNode);
             if (status == GNI_RC_SUCCESS)
             {
                 send_pending++;
@@ -570,7 +570,18 @@ static void PumpNetworkMsgs()
         {
             GNI_RC_CHECK("CQ Get event", status);
         }
-        processSmsg(inst_id);
+        ret = processSmsg(inst_id);
+        if (ret == 0) {
+           pending_next = (PENDING_GETNEXT*)malloc(sizeof(PENDING_GETNEXT));   
+           pending_next->next = 0;
+           pending_next->inst_id = inst_id;
+           if(pending_smsg_head == 0)
+           {
+              pending_smsg_head = pending_next;
+           }else
+               pending_smsg_tail->next =pending_next;
+           pending_smsg_tail= pending_next;
+        }
     }
 
 }
@@ -592,17 +603,12 @@ static int  processSmsg(uint64_t inst_id)
     gni_post_descriptor_t *pd;
     PENDING_GETNEXT     *pending_next;
  
-#if PRINT_SYH
-    CmiPrintf("+## PumpNetwork Small msg is received on PE:%d from %d  status=%s\n", myrank, inst_id, gni_err_str[status]);
-#endif  
-    //printf("[%d]  PumpNetworkMsgs GNI_CQ_GET_TYPE %d from %d. \n", myrank, GNI_CQ_GET_TYPE(event_data), inst_id);
-
     msg_tag = GNI_SMSG_ANY_TAG;
     status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
-
 #if PRINT_SYH
-    CmiPrintf("++## PumpNetwork Small msg is received on PE:%d message tag=%c(%d), status=%s\n", myrank, msg_tag, msg_tag, gni_err_str[status]);
+    CmiPrintf("[%d] PumpNetworkMsgs small msgs is received from PE: %d, tag=0x%x, status=%s\n", myrank, inst_id, msg_tag, gni_err_str[status]);
 #endif
+
     if(status  == GNI_RC_SUCCESS)
     {
         lrts_received_msg++;
@@ -711,15 +717,6 @@ static int  processSmsg(uint64_t inst_id)
         return 1;
     }else 
     {
-        pending_next = (PENDING_GETNEXT*)malloc(sizeof(PENDING_GETNEXT));   
-        pending_next->next = 0;
-        pending_next->inst_id = inst_id;
-        if(pending_smsg_head == 0)
-        {
-           pending_smsg_head = pending_next;
-        }else
-            pending_smsg_tail->next =pending_next;
-        pending_smsg_tail= pending_next;
         return 0;
     }
 }
@@ -859,6 +856,7 @@ static int SendRdmaMsg()
     } //end while
     return 0;
 }
+
 static int SendBufferMsg()
 {
     MSG_LIST            *ptr;
