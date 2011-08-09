@@ -40,12 +40,12 @@ struct testinfo
   void (*initiator)(void);
   void (*initializer)(void);
 } tests[] = {
-  { "overhead",  overhead_init,  overhead_moduleinit },
-  { "timer",     timer_init,     timer_moduleinit },
-  { "proc",      proc_init,      proc_moduleinit },
-  { "smputil",   smputil_init,   smputil_moduleinit },
+ // { "overhead",  overhead_init,  overhead_moduleinit },
+  //{ "timer",     timer_init,     timer_moduleinit },
+ // { "proc",      proc_init,      proc_moduleinit },
+  //{ "smputil",   smputil_init,   smputil_moduleinit },
   { "pingpong",  pingpong_init,  pingpong_moduleinit },
-  { "ctxt",      ctxt_init,      ctxt_moduleinit },
+//  { "ctxt",      ctxt_init,      ctxt_moduleinit },
   { 0,0,0 },
 };
 

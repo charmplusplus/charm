@@ -64,7 +64,7 @@ static void sleep(int secs) {
 #define LRTS_GNI_RDMA_THRESHOLD  16384
 
 #define REMOTE_QUEUE_ENTRIES  1048576
-#define LOCAL_QUEUE_ENTRIES   1024
+#define LOCAL_QUEUE_ENTRIES   10240
 /* SMSG is data message */
 #define DATA_TAG          0x38
 /* SMSG is a control message to initialize a BTE */
@@ -387,6 +387,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
 
     CmiSetMsgSize(msg, size);
 
+    //CmiPrintf("LrtsSend PE:%d==>%d, size=%d\n", myrank, destNode, size);
     /* No mailbox available, buffer this msg and its info */
     if(buffered_smsg_head != 0)
     {
@@ -424,6 +425,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             /* send the msg itself */
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, 0, tag_data);
             //CmiPrintf("[%d] send_with_smsg sends a data msg to PE %d status: %s\n", myrank, destNode, gni_err_str[status]);
+            //CmiPrintf("Sending msg PE:%d=>%d\n", myrank, destNode);
             if (status == GNI_RC_SUCCESS)
             {
                 send_pending++;
@@ -450,7 +452,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
 #else
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
-                size, rx_cqh,
+                size, NULL,
                 GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
                 vmdh_index, &(control_msg_tmp->source_mem_hndl));
 #endif 
@@ -549,12 +551,14 @@ static void PumpNetworkMsgs()
     {
         GNI_RC_CHECK("CQ Get event", status);
     }
+    //CmiPrintf("--## PumpNetwork Small msg is received on PE:%d from %d  status=%s\n", myrank, inst_id, gni_err_str[status]);
   
     //printf("[%d]  PumpNetworkMsgs GNI_CQ_GET_TYPE %d from %d. \n", myrank, GNI_CQ_GET_TYPE(event_data), inst_id);
 
     msg_tag = GNI_SMSG_ANY_TAG;
     status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
 
+    //CmiPrintf("++++## PumpNetwork Small msg is received on PE:%d message tag=%c(%d), status=%s\n", myrank, msg_tag, msg_tag, gni_err_str[status]);
     if(status  == GNI_RC_SUCCESS)
     {
         /* copy msg out and then put into queue */
@@ -581,7 +585,7 @@ static void PumpNetworkMsgs()
             onesided_mem_register(onesided_hnd, (uint64_t)msg_data, request_msg->length, 0, &msg_mem_hndl);
 #else
             status = GNI_MemRegister(nic_hndl, (uint64_t)msg_data,
-                request_msg->length, rx_cqh, 
+                request_msg->length, NULL, 
                 GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
                 &msg_mem_hndl);
 #endif
@@ -657,9 +661,9 @@ static void PumpNetworkMsgs()
             CmiPrintf("weird tag problem\n");
             CmiAbort("Unknown tag\n");
         }
-    }  //else not match smsg, maybe larger message
-    else {
-       // CmiPrintf("[%d] GNI_SmsgGetNextWTag returns %s\n", myrank, gni_err_str[status]);
+    }else if(status == GNI_RC_NO_MATCH)  //else not match smsg, maybe larger message
+    {
+        CmiPrintf("This is weird on PE:%d\n", myrank);
     }
     }   // end of while loop
 }
@@ -772,7 +776,7 @@ static int SendRdmaMsg()
             onesided_mem_register(onesided_hnd, (uint64_t)pd->local_addr, pd->length, 0, &(pd->local_mem_hndl));
 #else
             status = GNI_MemRegister(nic_hndl, (uint64_t)pd->local_addr,
-                pd->length, rx_cqh, 
+                pd->length, NULL, 
                 GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
                 &(pd->local_mem_hndl));
 #endif
@@ -932,7 +936,7 @@ static void _init_static_smsg()
     {
         if(i==myrank)
             continue;
-        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;//GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
         smsg_attr[i].mbox_offset = 0;
         smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
         smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
@@ -999,7 +1003,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     uint8_t                 ptag;
     unsigned int            local_addr, *MPID_UGNI_AllAddr;
     int                     first_spawned;
-
+    int                     physicalID;
     void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
@@ -1015,6 +1019,10 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     status = PMI_Get_rank(&myrank);
     GNI_RC_CHECK("PMI_getrank", status);
+
+    physicalID = CmiPhysicalNodeID(myrank);
+    
+    printf("Pysical Node ID:%d for PE:%d\n", physicalID, myrank);
 
     *myNodeID = myrank;
     *numNodes = mysize;
