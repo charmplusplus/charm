@@ -31,7 +31,19 @@ static void sleep(int secs) {
 #else
 #include <unistd.h> /*For getpid()*/
 #endif
+#define PRINT_SYH  1
+int         lrts_send_request = 0;
+int         lrts_received_msg = 0;
+int         lrts_local_done_msg = 0;
 
+typedef    struct  pending_smg
+{
+    int     inst_id;
+    struct  pending_smg *next;
+} PENDING_GETNEXT;
+
+PENDING_GETNEXT     *pending_smsg_head = 0;
+PENDING_GETNEXT     *pending_smsg_tail = 0;
 //#define  USE_ONESIDED 1
 #ifdef USE_ONESIDED
 #include "onesided.h"
@@ -104,7 +116,7 @@ gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 static int cookie;
 static int modes = 0;
 static gni_cq_handle_t       rx_cqh = NULL;
-static gni_cq_handle_t       remote_bte_cq_hndl = NULL;
+static gni_cq_handle_t       rdma_cqh = NULL;
 static gni_cq_handle_t       tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
 
@@ -386,8 +398,10 @@ static int send_with_smsg(int destNode, int size, char *msg)
     uint32_t            vmdh_index  = -1;
 
     CmiSetMsgSize(msg, size);
-
-    //CmiPrintf("LrtsSend PE:%d==>%d, size=%d\n", myrank, destNode, size);
+    lrts_send_request++;
+#if PRINT_SYH
+    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_request);
+#endif
     /* No mailbox available, buffer this msg and its info */
     if(buffered_smsg_head != 0)
     {
@@ -463,7 +477,7 @@ static int send_with_smsg(int destNode, int size, char *msg)
             }else if(status == GNI_RC_SUCCESS)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, tag_control);
-                CmiPrintf("[%d] send_with_smsg sends a control msg to PE %d status: %d\n", myrank, destNode, status);
+                //CmiPrintf("[%d] send_with_smsg sends a control msg to PE %d status: %d\n", myrank, destNode, status);
                 if(status == GNI_RC_SUCCESS)
                 {
                     send_pending ++;
@@ -522,7 +536,47 @@ static void LrtsPostCommonInit(int everReturn)
 
 void LrtsPostNonLocal(){}
 /* pooling CQ to receive network message */
+static int  processSmsg(uint64_t inst_id);
 static void PumpNetworkMsgs()
+{
+    uint64_t            inst_id;
+    PENDING_GETNEXT     *pending_next;
+    int                 ret;
+    gni_cq_entry_t      event_data;
+    gni_return_t        status;
+    while(pending_smsg_head != 0)
+    {
+        pending_next= pending_smsg_head;
+        ret = processSmsg(pending_next->inst_id);
+        if(ret == 0)
+            break;
+        else
+        {
+            CmiPrintf("Msg does happen %d from %d\n", myrank, pending_next->inst_id);
+            pending_smsg_head=pending_smsg_head->next;
+            free(pending_next);
+        }
+    }
+   
+    while (1) {
+        status = GNI_CqGetEvent(rx_cqh, &event_data);
+        if(status == GNI_RC_SUCCESS)
+        {
+            inst_id = GNI_CQ_GET_INST_ID(event_data);
+        }else if (status == GNI_RC_NOT_DONE)
+        {
+            return;
+        }else
+        {
+            GNI_RC_CHECK("CQ Get event", status);
+        }
+        processSmsg(inst_id);
+    }
+
+}
+
+// 0 means no ready message 1means msg received
+static int  processSmsg(uint64_t inst_id)
 {
     void                *header;
     uint8_t             msg_tag;
@@ -530,41 +584,34 @@ static void PumpNetworkMsgs()
     const uint8_t       control_tag = LMSG_INIT_TAG;
     const uint8_t       ack_tag = ACK_TAG;
     gni_return_t        status;
-    uint64_t            inst_id;
-    gni_cq_entry_t      event_data;
     int                 msg_nbytes;
     void                *msg_data;
     gni_mem_handle_t    msg_mem_hndl;
     CONTROL_MSG         *request_msg;
     RDMA_REQUEST        *rdma_request_msg;
     gni_post_descriptor_t *pd;
-
-    while (1) {
-    status = GNI_CqGetEvent(rx_cqh, &event_data);
-    if(status == GNI_RC_SUCCESS)
-    {
-        inst_id = GNI_CQ_GET_INST_ID(event_data);
-    }else if (status == GNI_RC_NOT_DONE)
-    {
-        return;
-    }else
-    {
-        GNI_RC_CHECK("CQ Get event", status);
-    }
-    //CmiPrintf("--## PumpNetwork Small msg is received on PE:%d from %d  status=%s\n", myrank, inst_id, gni_err_str[status]);
-  
+    PENDING_GETNEXT     *pending_next;
+ 
+#if PRINT_SYH
+    CmiPrintf("+## PumpNetwork Small msg is received on PE:%d from %d  status=%s\n", myrank, inst_id, gni_err_str[status]);
+#endif  
     //printf("[%d]  PumpNetworkMsgs GNI_CQ_GET_TYPE %d from %d. \n", myrank, GNI_CQ_GET_TYPE(event_data), inst_id);
 
     msg_tag = GNI_SMSG_ANY_TAG;
     status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
 
-    //CmiPrintf("++++## PumpNetwork Small msg is received on PE:%d message tag=%c(%d), status=%s\n", myrank, msg_tag, msg_tag, gni_err_str[status]);
+#if PRINT_SYH
+    CmiPrintf("++## PumpNetwork Small msg is received on PE:%d message tag=%c(%d), status=%s\n", myrank, msg_tag, msg_tag, gni_err_str[status]);
+#endif
     if(status  == GNI_RC_SUCCESS)
     {
+        lrts_received_msg++;
         /* copy msg out and then put into queue */
         if(msg_tag == data_tag)
         {
-            //CmiPrintf("[%d] PumpNetwork data msg is received\n", myrank);
+#if PRINT_SYH
+            CmiPrintf("+++[%d] PumpNetwork data msg is received, messageid:%d\n", myrank, lrts_received_msg);
+#endif
             //memcpy(&msg_nbytes, header, sizeof(int));
             //msg_nbytes = *(int*)header;
             msg_nbytes = CmiGetMsgSize(header);
@@ -639,12 +686,12 @@ static void PumpNetworkMsgs()
                     pending_rdma_tail->next = rdma_request_msg;
                 }
                 pending_rdma_tail = rdma_request_msg;
-                return;
+                return 1;
             }else
                 GNI_RC_CHECK("AFter posting", status);
         }
         else if(msg_tag == ack_tag) {
-            CmiPrintf("[%d] PumpNetwork tag msg is received\n", myrank);
+            //CmiPrintf("[%d] PumpNetwork tag msg is received\n", myrank);
             /* Get is done, release message . Now put is not used yet*/
             request_msg = (CONTROL_MSG *) header;
             //CmiPrintf("++++## ACK msg is received on PE:%d message size=%d, addr=%p\n", myrank, request_msg->length, (void*)request_msg->source_addr);
@@ -661,11 +708,20 @@ static void PumpNetworkMsgs()
             CmiPrintf("weird tag problem\n");
             CmiAbort("Unknown tag\n");
         }
-    }else if(status == GNI_RC_NO_MATCH)  //else not match smsg, maybe larger message
+        return 1;
+    }else 
     {
-        CmiPrintf("This is weird on PE:%d\n", myrank);
+        pending_next = (PENDING_GETNEXT*)malloc(sizeof(PENDING_GETNEXT));   
+        pending_next->next = 0;
+        pending_next->inst_id = inst_id;
+        if(pending_smsg_head == 0)
+        {
+           pending_smsg_head = pending_next;
+        }else
+            pending_smsg_tail->next =pending_next;
+        pending_smsg_tail= pending_next;
+        return 0;
     }
-    }   // end of while loop
 }
 
 /* Check whether message send or get is confirmed by remote */
@@ -696,12 +752,15 @@ static void PumpLocalTransactions()
         {
             GNI_RC_CHECK("CQ Get event", status);
         }
-
-        // printf("[%d]  PumpLocalTransactions GNI_CQ_GET_TYPE %d. \n", myrank, GNI_CQ_GET_TYPE(ev));
-
+        lrts_local_done_msg++;
+#if PRINT_SYH
+        CmiPrintf("*[%d]  PumpLocalTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
+#endif
         if (type == GNI_CQ_EVENT_TYPE_SMSG) {
             send_pending --;
-            //CmiPrintf("[%d] PumpLocalTransactions smsg pending: %d\n", myrank, send_pending);
+#if PRINT_SYH
+            CmiPrintf("**[%d] PumpLocalTransactions smsg pending: %d, localdone=%d\n", myrank, send_pending, lrts_local_done_msg);
+#endif
         }
         else if(type == GNI_CQ_EVENT_TYPE_POST)
         {
@@ -834,7 +893,7 @@ static int SendBufferMsg()
                     onesided_mem_register(onesided_hnd, (uint64_t)control_msg_tmp->source_addr, control_msg_tmp->length, 0, &(control_msg_tmp->source_mem_hndl));
 #else
                     status = GNI_MemRegister(nic_hndl, (uint64_t)control_msg_tmp->source_addr, 
-                        control_msg_tmp->length, rx_cqh,
+                        control_msg_tmp->length, NULL,
                         GNI_MEM_READ_ONLY | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,
                         -1, &(control_msg_tmp->source_mem_hndl));
 #endif 
@@ -1066,7 +1125,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &rx_cqh);
     GNI_RC_CHECK("Create CQ (rx)", status);
     
-    //status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &remote_bte_cq_hndl);
+    //status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &rdma_cqh);
     //GNI_RC_CHECK("Create BTE CQ", status);
 
     /* create the endpoints. they need to be bound to allow later CQWrites to them */
