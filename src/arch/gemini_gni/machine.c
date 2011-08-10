@@ -31,11 +31,12 @@ static void sleep(int secs) {
 #else
 #include <unistd.h> /*For getpid()*/
 #endif
-#define PRINT_SYH  1
+#define PRINT_SYH  0
 int         lrts_send_request = 0;
+int         lrts_sent_msgs = 0;
 int         lrts_received_msg = 0;
 int         lrts_local_done_msg = 0;
-
+int         lrts_cq_events    = 0;
 typedef    struct  pending_smg
 {
     int     inst_id;
@@ -69,7 +70,7 @@ PENDING_GETNEXT     *pending_smsg_tail = 0;
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
 #define SMSG_MAX_MSG     1024
-#define SMSG_MAX_CREDIT  16
+#define SMSG_MAX_CREDIT  1024
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
@@ -442,7 +443,10 @@ static int send_with_smsg(int destNode, int size, char *msg)
             //CmiPrintf("[%d] send_with_smsg sends a data msg to PE %d status: %s\n", myrank, destNode, gni_err_str[status]);
             if (status == GNI_RC_SUCCESS)
             {
-                send_pending++;
+                lrts_sent_msgs++;
+#if PRINT_SYH
+                CmiPrintf("Really sent msg on PE:%d to PE:%d is %d\n", myrank, destNode, lrts_sent_msgs);
+#endif
                 CmiFree(msg);
                 return 1;
             }
@@ -552,7 +556,9 @@ static void PumpNetworkMsgs()
             break;
         else
         {
+#if PRINT_SYH
             CmiPrintf("Msg does happen %d from %d\n", myrank, pending_next->inst_id);
+#endif
             pending_smsg_head=pending_smsg_head->next;
             free(pending_next);
         }
@@ -608,16 +614,15 @@ static int  processSmsg(uint64_t inst_id)
 #if PRINT_SYH
     CmiPrintf("[%d] PumpNetworkMsgs small msgs is received from PE: %d, tag=0x%x, status=%s\n", myrank, inst_id, msg_tag, gni_err_str[status]);
 #endif
-
     if(status  == GNI_RC_SUCCESS)
     {
         lrts_received_msg++;
+#if PRINT_SYH
+        CmiPrintf("++## PumpNetwork Small msg is received on PE:%d message tag=%c(%d), status=%s, receivedmsg=%d\n", myrank, msg_tag, msg_tag, gni_err_str[status], lrts_received_msg);
+#endif
         /* copy msg out and then put into queue */
         if(msg_tag == data_tag)
         {
-#if PRINT_SYH
-            CmiPrintf("+++[%d] PumpNetwork data msg is received, messageid:%d\n", myrank, lrts_received_msg);
-#endif
             //memcpy(&msg_nbytes, header, sizeof(int));
             //msg_nbytes = *(int*)header;
             msg_nbytes = CmiGetMsgSize(header);
@@ -662,7 +667,7 @@ static int  processSmsg(uint64_t inst_id)
             pd->local_addr      = (uint64_t) msg_data;
             pd->remote_addr     = request_msg->source_addr;
             pd->remote_mem_hndl = request_msg->source_mem_hndl;
-            pd->src_cq_hndl     = 0;     /* tx_cqh;  */
+            pd->src_cq_hndl     = tx_cqh;  
             pd->rdma_mode       = 0;
 
             //memory registration successful
@@ -726,7 +731,7 @@ static void PumpLocalTransactions()
 {
     gni_cq_entry_t ev;
     gni_return_t status;
-    uint64_t type, inst_id, data_addr;
+    uint64_t type, inst_id;
     uint8_t         ack_tag = ACK_TAG;
     gni_post_descriptor_t *tmp_pd;
     //gni_post_descriptor_t   ack_pd;
@@ -741,7 +746,6 @@ static void PumpLocalTransactions()
         {
             type        = GNI_CQ_GET_TYPE(ev);
             inst_id     = GNI_CQ_GET_INST_ID(ev);
-            data_addr   = GNI_CQ_GET_DATA(ev);
         }else if (status == GNI_RC_NOT_DONE)
         {
             return;
@@ -878,7 +882,10 @@ static int SendBufferMsg()
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], NULL, 0, ptr->msg, ptr->size, 0, tag_data);
                 //CmiPrintf("[%d] SendBufferMsg sends a data msg to PE %d status: %s\n", myrank, ptr->destNode, gni_err_str[status]);
                 if(status == GNI_RC_SUCCESS) {
-                    send_pending++;
+                    lrts_sent_msgs++;
+#if PRINT_SYH
+                    CmiPrintf("Really sent msg on PE:%d to PE:%d is %d\n", myrank, ptr->destNode, lrts_sent_msgs);
+#endif
                     CmiFree(ptr->msg);
                 }
             }
@@ -993,13 +1000,14 @@ static void _init_static_smsg()
     {
         if(i==myrank)
             continue;
-        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;//GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
         smsg_attr[i].mbox_offset = 0;
         smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
         smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
         status = GNI_SmsgBufferSizeNeeded(&smsg_attr[i], &smsg_memlen);
         GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
+        smsg_memlen *=2;
         smsg_attr_ptr[i] = memalign(64, smsg_memlen);
         _MEMCHECK(smsg_attr_ptr[i]);
         bzero(smsg_attr_ptr[i], smsg_memlen);
@@ -1131,7 +1139,6 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     _MEMCHECK(ep_hndl_array);
 
     for (i=0; i<mysize; i++) {
-        if(i == myrank) continue;
         status = GNI_EpCreate(nic_hndl, tx_cqh, &ep_hndl_array[i]);
         GNI_RC_CHECK("GNI_EpCreate ", status);   
         remote_addr = MPID_UGNI_AllAddr[i];
