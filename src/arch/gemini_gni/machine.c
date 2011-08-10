@@ -31,7 +31,7 @@ static void sleep(int secs) {
 #else
 #include <unistd.h> /*For getpid()*/
 #endif
-#define PRINT_SYH  1
+#define PRINT_SYH  0
 int         lrts_send_request = 0;
 int         lrts_received_msg = 0;
 int         lrts_local_done_msg = 0;
@@ -69,7 +69,7 @@ PENDING_GETNEXT     *pending_smsg_tail = 0;
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
 #define SMSG_MAX_MSG     1024
-#define SMSG_MAX_CREDIT  16
+#define SMSG_MAX_CREDIT  128
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
@@ -552,7 +552,9 @@ static void PumpNetworkMsgs()
             break;
         else
         {
+#if PRINT_SYH
             CmiPrintf("Msg does happen %d from %d\n", myrank, pending_next->inst_id);
+#endif
             pending_smsg_head=pending_smsg_head->next;
             free(pending_next);
         }
@@ -563,6 +565,11 @@ static void PumpNetworkMsgs()
         if(status == GNI_RC_SUCCESS)
         {
             inst_id = GNI_CQ_GET_INST_ID(event_data);
+            if(GNI_CQ_OVERRUN(event_data))
+            {
+                CmiPrintf("ERROR in overrun PE:%d\n", myrank);
+                CmiAbort("Overrun problem and abort");
+            }
         }else if (status == GNI_RC_NOT_DONE)
         {
             return;
