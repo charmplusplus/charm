@@ -46,6 +46,10 @@ added by Ryan Mokos in July 2008.
 
 #define CMK_THREADS_DEBUG 0
 
+/* 0: do not use the intermediate mapregion management
+   1: use the intermediate mapregion management  */
+#define USE_MAPREGION 1
+
 /* 0: use the old isomalloc implementation (array)
    1: use the new isomalloc implementation (b-tree)  */
 #define USE_BTREE_ISOMALLOC 1
@@ -112,6 +116,7 @@ typedef size_t memRange_t;
 
 /* Size in bytes of a single slot */
 static size_t slotsize;
+static size_t regionSize;
 
 /* Total number of slots per processor */
 static CmiInt8 numslots=0;
@@ -137,6 +142,25 @@ static int length2slots(int nBytes) {
 	return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
 
+typedef struct
+{
+	CmiInt8 size;
+	CmiInt8 count;
+	int **counter;
+	CmiInt8 **marker;
+}mapRegion;
+
+CpvStaticDeclare(mapRegion *, mapRegions); 
+
+struct _maplist
+{
+	struct _maplist *prev;
+	CmiInt8 start,end,count; 
+	struct _maplist *next;
+};
+
+typedef struct _maplist maplist;
+CpvStaticDeclare(maplist **, mapLists); 
 
 /* ======================================================================
  * New isomalloc (b-tree-based implementation)
@@ -1576,6 +1600,400 @@ init_map(char **argv)
 
 #endif /* UNIX memory map */
 
+#if USE_MAPREGION
+
+/* method to check if mmap behaved as was desired*/
+static int 
+check_map(void *pa, void *addr, CmiInt8 requestSize)
+{
+  if (pa != addr)
+  { /*Map worked, but gave us back the wrong place*/
+#if CMK_THREADS_DEBUG
+    //CmiPrintf("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),addr,pa);
+#endif
+    call_munmap(pa,requestSize);
+    return 1;
+  }
+
+  if (pa==NULL)
+  { /*Map just failed completely*/
+
+#if CMK_THREADS_DEBUG
+    perror("mmap failed");
+    //CmiPrintf("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
+#endif
+    return 1;
+  }
+  return 0;
+}
+
+/* method to handle mmap of VM spots beyong processor's local range - uses linked lists,
+   one for each processor  */
+static CmiIsomallocBlock *
+remoteSlotmap(CmiInt8 slot, CmiInt8 nslots)
+{
+  void *addr = slot2addr(slot);
+  void *pa,*newaddr;
+  maplist *newentry,*temp,*prev,*next;
+
+  CmiInt8 startRegion, endRegion;
+  CmiInt8 left, tleft;
+  maplist **mapList = CpvAccess(mapLists);
+  CmiInt8 ratio = regionSize/slotsize;
+
+  startRegion = (slot/ratio);
+  endRegion = (slot + nslots - 1)/ratio;
+  int whichPE = slot/numslots;
+
+  /* new linked list for memory in this range*/
+  if(mapList[whichPE] == NULL)
+  {
+	newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+	newentry->prev = newentry->next = NULL;
+  	newaddr = (void *)(slot2addr(startRegion*ratio));
+  	pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+	if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+	  return NULL;
+        newentry->start = (startRegion * ratio);
+	newentry->end = ((endRegion+1) * ratio);
+	newentry->count = nslots;
+	mapList[whichPE] = newentry;
+  	return (CmiIsomallocBlock *)addr;
+  }	
+
+  temp = mapList[whichPE];
+
+  /* VM region needed should be head of this linked list*/
+  if((slot + nslots - 1) < temp->start) 
+  {
+        newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+        newentry->prev = NULL;
+	newentry->next = temp;
+	temp->prev = newentry;
+  	newaddr = (void *)(slot2addr(startRegion*ratio));
+        pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+	if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+	  return NULL;
+        newentry->start = (startRegion * ratio);
+        newentry->end = ((endRegion+1) * ratio);
+        newentry->count = nslots;
+        mapList[whichPE] = newentry;
+        return (CmiIsomallocBlock *)addr;
+  }
+
+  prev = NULL;
+  while(temp != NULL)
+  {
+	if(slot < temp->end)
+		break; 
+	prev = temp;
+	temp = temp->next;
+  }
+
+  /* VM region needed should be at the end of linked list */ 
+  if(temp == NULL)
+  {
+        newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+        newentry->prev = prev;
+	prev->next = newentry; 
+	newentry->next = NULL;
+  	newaddr = (void *)(slot2addr(startRegion*ratio));
+        pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+	if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+	  return NULL;
+        newentry->start = (startRegion * ratio);
+        newentry->end = ((endRegion+1) * ratio);
+        newentry->count = nslots;
+        return (CmiIsomallocBlock *)addr;
+  }
+
+  left = nslots;
+
+  /* VM region needed should be added before temp region */
+  if((slot + nslots - 1) < temp->start)
+  {
+        newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+        newentry->prev = prev;
+	prev->next = newentry; 
+	newentry->next = temp;
+	temp->prev = newentry;
+  	newaddr = (void *)(slot2addr(startRegion*ratio));
+        pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+	if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+	  return NULL;
+        newentry->start = (startRegion * ratio);
+        newentry->end = ((endRegion+1) * ratio);
+        newentry->count = nslots;
+        return (CmiIsomallocBlock *)addr;
+  }
+
+  /* VM region needed starts before temp but overlaps with it */
+  if((slot < temp->start))
+  {
+	tleft = (slot + nslots - temp->start);
+	temp->count += tleft;
+	left -= tleft;
+	endRegion = (temp->start/ratio) - 1;
+
+	newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+	if(mapList[whichPE] == temp)
+	{
+		mapList[whichPE] = newentry;
+		newentry->prev = NULL;
+	}
+	else
+	{
+		newentry->prev = prev;
+		prev->next = newentry;
+	}
+	temp->prev = newentry;
+	newentry->next = temp;
+	newaddr = (void *)(slot2addr(startRegion*ratio));
+	pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+	if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+	  return NULL;
+	newentry->start = (startRegion * ratio);
+	newentry->end = ((endRegion+1) * ratio);
+	newentry->count = left;
+	return (CmiIsomallocBlock *)addr;
+  }
+ 
+  tleft = temp->end - slot;
+  if(tleft >= nslots)
+  {
+	temp->count += nslots;
+        return (CmiIsomallocBlock *)addr;
+  }
+  else
+  {
+	temp->count += tleft;
+	left -= tleft;
+	startRegion = temp->end/ratio;
+  }
+	 
+  next = temp->next;
+
+  if(next != NULL)
+  {
+	  if((slot + nslots) > next->start)
+	  {
+		tleft = (slot + nslots - next->start);
+		next->count += tleft;
+		left -= tleft;
+		if(left <= 0)
+		{
+        		return (CmiIsomallocBlock *)addr;
+		}
+		endRegion = (next->start/ratio)-1;
+	  }
+  }
+
+  /* add a new region in between 2 existing region */	 
+  newentry = (maplist *)(malloc_reentrant(sizeof(maplist)));
+  newentry->prev = temp;
+  temp->next = newentry;
+  newentry->next = next;
+  if(next != NULL)
+  	next->prev = newentry;
+  newaddr = (void *)(slot2addr(startRegion*ratio));
+  pa = call_mmap_fixed(newaddr, (endRegion-startRegion+1)*regionSize);
+  if(check_map(pa,newaddr,(endRegion-startRegion+1)*regionSize))
+    return NULL;
+  newentry->start = (startRegion * ratio);
+  newentry->end = ((endRegion+1) * ratio);
+  newentry->count = left;
+  return (CmiIsomallocBlock *)addr;
+  
+}
+#endif
+
+#if USE_MAPREGION
+/**
+ * maps the virtual memory associated with slot using mmap
+   using list based mmap slot maintenance
+ */
+static CmiIsomallocBlock *
+map_slots(CmiInt8 slot, CmiInt8 nslots)
+{
+  void *pa;
+  void *addr,*newaddr;
+  int ratio, checkmap;
+  CmiInt8 i, starti, endi, j;
+  CmiInt8 start1off, start2off, end1off, end2off;
+  CmiInt8 off1, off2, temp, toff1, toff2;
+  CmiInt8 actualSlot, requestSize, begin, currentR;
+  CmiInt8 startAddr, left, tleft, extraleft;
+
+  CmiInt8 startSlot, endSlot;
+  startSlot = pe2slot(CmiMyPe());
+  endSlot = startSlot + numslots - 1;
+  if((slot < startSlot) || (slot > endSlot))
+	return ((CmiIsomallocBlock *)remoteSlotmap(slot,nslots)); 
+
+  mapRegion *mapregion = CpvAccess(mapRegions);
+  startAddr = (CmiInt8)slot2addr(slot);
+  addr = slot2addr(slot);
+	
+  ratio = regionSize/slotsize;
+  actualSlot = slot - pe2slot(CmiMyPe());
+  left = nslots;
+
+  start1off = actualSlot/(1024*ratio);
+  start2off = (actualSlot - 1024*ratio*start1off)/ratio;
+  currentR = (1024*start1off) + start2off;  
+
+  end1off = (actualSlot + nslots - 1)/(1024*ratio);
+  end2off = (actualSlot + nslots - 1 - 1024*ratio*end1off)/ratio;
+
+  if(!(end1off < mapregion->count))
+  {
+	starti = mapregion->count;
+	endi = end1off + 11;
+	for(i = starti; i < endi; i++)
+	{
+		mapregion->counter[i] = (int *)(malloc_reentrant
+        	                        (1024 * sizeof(int)));
+        	mapregion->marker[i] = (CmiInt8 *)(malloc_reentrant
+                	                (1024 * sizeof(CmiInt8)));
+		for(j = 0; j < 1024; j++)
+		{
+			mapregion->counter[i][j] = 0;
+			mapregion->marker[i][j] = -1;
+		}
+	}	
+	mapregion->count = endi;
+  } 
+
+  temp = mapregion->marker[start1off][start2off];
+ 
+  if(temp != -1)
+  {
+  	if(temp >= currentR)
+  	{
+		begin = currentR;
+	}	
+	else
+	{
+		begin = temp;
+		temp = mapregion->marker[begin/1024][begin - ((begin/1024)*1024)];
+	}
+	tleft = (((temp + 1)*ratio) - actualSlot);
+	off1 = begin/1024;
+	off2 = begin - (off1 * 1024);
+	if(left <= tleft)
+	{
+		mapregion->counter[off1][off2] += left ;	
+		return (CmiIsomallocBlock *)addr;
+	}		
+	else
+	{
+		mapregion->counter[off1][off2] += tleft ;	
+		left -= tleft;
+		off1 = (temp+1)/1024;
+		off2 = (temp+1) - (off1 * 1024);
+	}
+  }			
+  else
+  {
+	off1 = start1off;
+	off2 = start2off;
+  }
+
+  extraleft = 0;
+  if(mapregion->marker[start1off][start2off] == -1)
+  {
+	extraleft = actualSlot % ratio;
+  }
+ 
+  temp = mapregion->marker[end1off][end2off];
+  currentR = (1024*end1off) + end2off;  
+  
+  if(temp != -1)
+  {
+  	if(temp > currentR)
+  	{
+		temp = currentR;
+	}	
+	toff1 = temp/1024;
+	toff2 = temp - (toff1*1024);
+	tleft = (actualSlot + nslots) - (temp * ratio);
+	mapregion->counter[toff1][toff2] += tleft;
+	left -= tleft;
+	end1off = (temp - 1)/1024;
+	end2off = (temp - 1) - (end1off * 1024);
+  }  	
+
+  if((end1off < off1)||((end1off == off1)&&(end2off < off2)))
+  {
+	return (CmiIsomallocBlock *)addr;
+  }
+
+  requestSize = ((left + extraleft + (ratio-1))/ratio)*regionSize;
+  newaddr = (void*)((CmiInt8)slot2addr(pe2slot(CmiMyPe())));
+  newaddr = (void*)((CmiInt8)newaddr + ((1024*off1 + off2)*regionSize));
+  pa = call_mmap_fixed(newaddr, requestSize);
+  if (pa != newaddr)
+  { /*Map worked, but gave us back the wrong place*/
+#if CMK_THREADS_DEBUG
+    //CmiPrintf("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),newaddr,pa);
+#endif
+    call_munmap(newaddr,requestSize);
+    return NULL;
+  }
+
+  if (pa==NULL)
+  { /*Map just failed completely*/
+
+#if CMK_THREADS_DEBUG
+    perror("mmap failed");
+    //CmiPrintf("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
+#endif
+    return NULL;
+  }
+#if CMK_THREADS_DEBUG
+  //CmiPrintf("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),
+            slot,slot+nslots-1,addr);
+#endif
+
+  mapregion->counter[off1][off2] += left;
+  mapregion->marker[off1][off2] = 1024*end1off + end2off;
+
+  temp = (1024 * off1) + off2;
+
+  starti = off2 + 1;
+  if(off1 == end1off)
+	endi = end2off + 1;
+  else
+	endi = 1024;
+
+  for(i = starti; i < endi; i++)
+  {
+	mapregion->marker[off1][i] = temp;
+  }
+ 
+  starti = off1 + 1;
+  endi = end1off;
+  for(i = starti; i < endi; i++)
+  {
+	for(j = 0; j < 1024; j++)	
+		mapregion->marker[i][j] = temp;
+  }
+
+  starti = 0;
+  if(off1 == end1off)
+	endi = 0;
+  else
+	endi = end2off + 1;
+
+  for(i = starti; i < endi; i++)
+  {
+	mapregion->marker[end1off][i] = temp;
+  }
+
+  return (CmiIsomallocBlock *)addr;
+}
+
+#else
 
 /**
  * maps the virtual memory associated with slot using mmap
@@ -1586,8 +2004,8 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
   void *pa;
   void *addr=slot2addr(slot);
   pa = call_mmap_fixed(addr, slotsize*nslots);
-  
-  if (pa==NULL) 
+
+  if (pa==NULL)
   { /*Map just failed completely*/
 #if CMK_THREADS_DEBUG
     perror("mmap failed");
@@ -1605,10 +2023,282 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
   }
 #if CMK_THREADS_DEBUG
   CmiPrintf("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),
-	    slot,slot+nslots-1,addr);
+            slot,slot+nslots-1,addr);
 #endif
   return (CmiIsomallocBlock *)pa;
 }
+#endif //end of else of if USE_MAPREGION 
+
+#if USE_MAPREGION
+
+/* method to delete a node of in a linked list */
+static void
+freelistentry(maplist *target)
+{
+	maplist *prev,*next;
+	prev = target->prev;
+	next = target->next;
+	if(prev != NULL)
+		prev->next = next;
+	if(next != NULL)
+		next->prev = prev;
+	free_reentrant(target);
+}
+
+/* method to free an entry for VM not in range of my processor */
+static void 
+remoteSlotunmap(CmiInt8 slot, CmiInt8 nslots)
+{
+  void *addr = slot2addr(slot);
+  void *pa,*newaddr;
+  maplist *temp,*tofree;
+
+  CmiInt8 left, tleft;
+  maplist **mapList = CpvAccess(mapLists);
+  CmiInt8 ratio = regionSize/slotsize;
+
+  int whichPE = slot/numslots;
+
+  if(mapList[whichPE] == NULL)
+  {
+	return;
+  }
+
+  temp = mapList[whichPE];
+
+  while(temp != NULL)
+  {
+        if(slot < temp->end)
+                break;
+        temp = temp->next;
+  }
+  if(temp == NULL)
+  {
+	return;
+  }
+
+  left = nslots;
+
+  tleft = temp->end - slot;
+  if(tleft >= nslots)
+  {
+        temp->count -= nslots;
+	left -= nslots;
+  }
+  else
+  {
+	temp->count -= tleft;
+	left -= tleft;
+  }
+
+  tofree = temp;
+  temp = temp->next;
+  if(tofree->count <= 0)
+  {
+	newaddr = (void *)(slot2addr(tofree->start));
+	call_munmap(newaddr, (tofree->end - tofree->start)*slotsize);
+	if(tofree == mapList[whichPE])
+	{
+		mapList[whichPE] = tofree->next;
+	}
+	freelistentry(tofree);
+  }
+
+  if((temp == NULL) || (left <= 0))
+  {
+	return;
+  }
+
+  if((slot+nslots-1) < temp->end)
+  {
+	tleft = slot + nslots - temp->start;
+  }
+  else
+  {
+	tleft = temp->count;
+  }
+
+  temp->count -= tleft;
+  left -= tleft;
+
+  tofree = temp;
+  temp = temp->next;
+  if(tofree->count <= 0)
+  {
+        newaddr = (void *)(slot2addr(tofree->start));
+        call_munmap(newaddr, (tofree->end - tofree->start)*slotsize);
+        if(tofree == mapList[whichPE])
+        {
+                mapList[whichPE] = tofree->next;
+        }
+        freelistentry(tofree);
+  }
+
+  if((temp == NULL) || (left <= 0))
+  {
+      return;
+  }
+
+  tleft = slot + nslots - temp->start;
+  temp->count -= tleft;
+  left -= tleft;
+
+  tofree = temp;
+
+  if(tofree->count <= 0)
+  {
+        newaddr = (void *)(slot2addr(tofree->start));
+        call_munmap(newaddr, (tofree->end - tofree->start)*slotsize);
+        if(tofree == mapList[whichPE])
+        {
+                mapList[whichPE] = tofree->next;
+        }
+        freelistentry(tofree);
+  }
+}
+#endif
+
+#if USE_MAPREGION
+
+/*
+ * unmaps the virtual memory associated with slot using munmap and in the list
+ */
+static void
+unmap_slots(CmiInt8 slot, CmiInt8 nslots)
+{
+  void *addr=slot2addr(slot);
+
+  mapRegion *mapregion;
+  CmiInt8 start1off, start2off, end1off, end2off;
+  CmiInt8 off1, off2, requestSize;
+  CmiInt8 actualSlot, temp, left, tleft;
+  CmiInt8 i, starti, endi, j;
+  CmiInt8 currentR, begin;
+  int ratio;
+
+  CmiInt8 startSlot, endSlot;
+  startSlot = pe2slot(CmiMyPe());
+  endSlot = startSlot + numslots - 1;
+  if((slot < startSlot) || (slot > endSlot))
+  {
+    remoteSlotunmap(slot,nslots); 
+    return;
+  }
+
+  mapregion = CpvAccess(mapRegions);
+
+  ratio = regionSize/slotsize;
+  actualSlot = slot - pe2slot(CmiMyPe());
+  left = nslots;
+
+  start1off = actualSlot/(1024*ratio);
+  start2off = (actualSlot - (start1off*1024*ratio))/ratio;
+  currentR = (1024*start1off + start2off);  
+
+  end1off = (actualSlot+nslots-1)/(1024*ratio);
+  end2off = (actualSlot+nslots-1 - (end1off*1024*ratio))/ratio;
+
+  temp = mapregion->marker[start1off][start2off];
+
+  if(temp >= currentR)
+  {
+	begin = currentR;
+  }
+  else
+  {
+	begin = temp;
+	temp = mapregion->marker[begin/1024][begin - ((begin/1024)*1024)]; 
+  }
+
+  tleft = (ratio*(temp+1)) - actualSlot;
+  off1 = begin/1024;
+  off2 = begin - (off1*1024);
+
+  if(tleft >= nslots)
+  {
+	mapregion->counter[off1][off2] -= nslots;
+	left -= nslots;
+  }
+  else
+  {
+	mapregion->counter[off1][off2] -= tleft;
+	left -= tleft;
+  }
+
+  if(mapregion->counter[off1][off2] == 0)
+  {
+	addr = (void*)((CmiInt8)slot2addr(pe2slot(CmiMyPe())));
+	addr = (void*)((CmiInt8)addr + ((1024*off1 + off2)*regionSize));
+	call_munmap(addr,(temp+1-begin)*regionSize);
+	for(i = begin; i <= temp; i++)
+	{
+		mapregion->marker[i/1024][i - ((i/1024)*1024)] = -1;
+	}
+  }
+
+ if(left <= 0)
+	return;
+
+  starti = temp + 1;
+
+  currentR = (1024*end1off + end2off);
+  temp = mapregion->marker[end1off][end2off];
+
+  if(temp >= currentR)
+  {
+	begin = currentR;
+  }
+  else
+  {
+	begin = temp;
+	temp = mapregion->marker[begin/1024][begin - ((begin/1024)*1024)]; 
+  }
+
+  tleft = (actualSlot+nslots) - (ratio*begin);
+  off1 = begin/1024;
+  off2 = begin - (off1*1024);
+
+  mapregion->counter[off1][off2] -= tleft;
+  left -= tleft;
+
+  if(mapregion->counter[off1][off2] == 0)
+  {
+	addr = (void*)((CmiInt8)slot2addr(pe2slot(CmiMyPe())));
+	addr = (void*)((CmiInt8)addr + ((1024*off1 + off2)*regionSize));
+	call_munmap(addr,(temp+1-begin)*regionSize);
+	for(i = begin; i <= temp; i++)
+	{
+		mapregion->marker[i/1024][i - ((i/1024)*1024)] = -1;
+	}
+  }
+
+  if(left <= 0)
+	return;
+
+  endi = begin;
+
+  begin = starti;
+  off1 = begin/1024;
+  off2 = begin - (1024*off1);
+  temp = mapregion->marker[off1][off2];
+  mapregion->counter[off1][off2] = 0;
+  
+  addr = (void*)((CmiInt8)slot2addr(pe2slot(CmiMyPe())));
+  addr = (void*)((CmiInt8)addr + ((1024*off1 + off2)*regionSize));
+  call_munmap(addr,(temp+1-begin)*regionSize);
+
+  for(i = starti; i < endi; i++)
+  {
+	mapregion->marker[i/1024][i - ((i/1024)*1024)] = -1;
+  }	
+
+
+#if CMK_THREADS_DEBUG
+  CmiPrintf("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),
+	    slot,slot+nslots-1,addr);
+#endif
+}
+#else
 
 /*
  * unmaps the virtual memory associated with slot using munmap
@@ -1620,9 +2310,10 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
   call_munmap(addr, slotsize*nslots);
 #if CMK_THREADS_DEBUG
   CmiPrintf("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),
-	    slot,slot+nslots-1,addr);
+            slot,slot+nslots-1,addr);
 #endif
 }
+#endif 
 
 static void map_failed(CmiInt8 s,CmiInt8 n)
 {
@@ -1715,6 +2406,7 @@ static int good_range(char *start,memRange_t len,int n) {
   CmiPrintf("good_range: %lld, %d\n", quant, n);
 #endif
   CmiAssert (quant > 0);
+
   for (i=0;i<n;i++)
     if (bad_location(start+i*quant)) return 0; /* it's got some bad parts */
   /* It's all good: */
@@ -1832,8 +2524,6 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     memRegion_t regions[10]; /*used portions of address space*/
     memRegion_t freeRegion; /*Largest unused block of address space*/
 
-    /* printf("%p %p %p %p %p %p %p %p \n", staticData, code, threadData, codeDll, heapLil, heapBig, stack, mmapAny); */
-
 /*Mark off regions of virtual address space as ususable*/
     regions[nRegions].type="NULL";
     regions[nRegions].start=NULL; 
@@ -1842,19 +2532,19 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 #else
     regions[nRegions++].len=16u*meg;
 #endif
-    
+	    
     regions[nRegions].type="Static program data";
     regions[nRegions].start=staticData; regions[nRegions++].len=256u*meg;
-    
+
     regions[nRegions].type="Program executable code";
     regions[nRegions].start=code; regions[nRegions++].len=256u*meg;
-    
+
     regions[nRegions].type="Heap (small blocks)";
     regions[nRegions].start=heapLil; regions[nRegions++].len=1u*gig;
-    
+
     regions[nRegions].type="Heap (large blocks)";
     regions[nRegions].start=heapBig; regions[nRegions++].len=1u*gig;
-    
+
     regions[nRegions].type="Stack space";
     regions[nRegions].start=stack; regions[nRegions++].len=256u*meg;
 
@@ -1902,7 +2592,6 @@ static int find_largest_free_region(memRegion_t *destRegion) {
     }
 }
 
-/* probe method */
 static int try_largest_mmap_region(memRegion_t *destRegion)
 {
   void *bad_alloc=(void*)(-1); /* mmap error return address */
@@ -1941,7 +2630,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
 #if CMK_THREADS_DEBUG
                CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
 #endif
-		call_munmap(range,size); /* needed/wanted? */
+	       call_munmap(range,size); /* needed/wanted? */
 		if (size > good_size) {
 		  good_range = range;
 		  good_size = size;
@@ -1977,6 +2666,19 @@ static void init_ranges(char **argv)
   memRange_t intMax=(((memRange_t)1)<<(sizeof(int)*8-1))-1;
   int pagesize = 0;
 
+
+#if USE_MAPREGION
+  /*Round regionSize size up to nearest page size*/
+  slotsize = 128;
+  regionSize=16*1024;
+
+#if CMK_HAS_GETPAGESIZE
+  pagesize = getpagesize();
+#endif
+  if (pagesize < CMK_MEMORY_PAGESIZE)
+    pagesize = CMK_MEMORY_PAGESIZE;
+  regionSize=(regionSize+pagesize-1) & ~(pagesize-1);
+#else
   /*Round slot size up to nearest page size*/
   slotsize=16*1024;
 #if CMK_HAS_GETPAGESIZE
@@ -1985,11 +2687,12 @@ static void init_ranges(char **argv)
   if (pagesize < CMK_MEMORY_PAGESIZE)
     pagesize = CMK_MEMORY_PAGESIZE;
   slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
+#endif
+
 #if CMK_THREADS_DEBUG
   if (CmiMyPe() == 0)
   CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
-
   freeRegion.len=0u;
 
   if (CmiMyRank()==0 && numslots==0)
@@ -1998,7 +2701,7 @@ static void init_ranges(char **argv)
       freeRegion.start=CMK_MMAP_START_ADDRESS;
       freeRegion.len=CMK_MMAP_LENGTH_MEGS*meg;
 #endif
-
+      
       if (freeRegion.len==0u)  {
         if (_mmap_probe == 1) {
           if (try_largest_mmap_region(&freeRegion)) _sync_iso = 1;
@@ -2007,7 +2710,7 @@ static void init_ranges(char **argv)
           if (freeRegion.len==0u) find_largest_free_region(&freeRegion);
         }
       }
-      
+
 #if 0
       /*Make sure our largest slot number doesn't overflow an int:*/
       if (freeRegion.len/slotsize>intMax)
@@ -2135,9 +2838,15 @@ static void init_ranges(char **argv)
   {
         /*Isomalloc covers entire unused region*/
         isomallocStart=freeRegion.start;
+#if USE_MAPREGION
+        numslots=((freeRegion.len/regionSize)/CmiNumPes())*(regionSize/slotsize);
+        freeRegion.len = numslots*CmiNumPes()*slotsize;
+        isomallocEnd=freeRegion.start+ freeRegion.len;
+#else
         isomallocEnd=freeRegion.start+freeRegion.len;
         numslots=(freeRegion.len/slotsize)/CmiNumPes();
-        
+#endif 
+
 #if CMK_THREADS_DEBUG
         CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
 	      ((memRange_t)numslots)*slotsize/meg);
@@ -2146,11 +2855,43 @@ static void init_ranges(char **argv)
 
   /*SMP Mode: wait here for rank 0 to initialize numslots before calculating myss*/
   CmiNodeAllBarrier(); 
-  
+ 
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = NULL;
+ 
   if (isomallocStart!=NULL) {
     CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
+
+#if USE_MAPREGION
+    CmiInt8 i,j;
+    CpvInitialize(maplist **, mapLists);
+    CpvAccess(mapLists) = (maplist **)(malloc_reentrant(CmiNumPes()*sizeof(maplist *)));
+    maplist **mapList = CpvAccess(mapLists);
+    for(i=0; i < CmiNumPes(); i++)
+	mapList[i] = NULL;
+
+    CpvInitialize(mapRegion *,mapRegions);
+    CpvAccess(mapRegions) = (mapRegion *)(malloc_reentrant(sizeof(mapRegion)));
+    mapRegion *mapregion = CpvAccess(mapRegions);
+    mapregion->size = 32 * 1024;//good enough for 512 GB	
+    mapregion->counter = (int **)(malloc_reentrant
+			(mapregion->size * sizeof(int*)));
+    mapregion->marker = (CmiInt8 **)(malloc_reentrant
+			(mapregion->size * sizeof(CmiInt8*)));
+    mapregion->count = 10;
+    for(i = 0; i < mapregion->count; i++)    	
+    {
+	mapregion->counter[i] = (int *)(malloc_reentrant
+				(1024 * sizeof(int)));
+	mapregion->marker[i] = (CmiInt8 *)(malloc_reentrant
+				(1024 * sizeof(CmiInt8)));
+	for(j = 0; j < 1024; j++)
+	{
+		mapregion->counter[i][j] = 0;
+		mapregion->marker[i][j] = -1;
+	}
+    }
+#endif
   }
 }
 
@@ -2335,8 +3076,9 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
 	if (pup_isUnpacking(p)) 
 	{ /*Must allocate a new block in its old location*/
 		if (pup_isUserlevel(p) || pup_isRestarting(p))
-			/*Checkpoint: must grab old slots (even remote!)*/
+		{	/*Checkpoint: must grab old slots (even remote!)*/
 			all_slotOP(&grabOP,s,n);
+		}
 		blk=map_slots(s,n);
 		if (!blk) map_failed(s,n);
 		blk->slot=s;
