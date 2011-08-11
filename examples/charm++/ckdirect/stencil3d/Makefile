@@ -24,5 +24,7 @@ stencil3d-ckdirect.o: stencil3d.C stencil3d.decl.h
 stencil3d-msg.o: stencil3d.C stencil3d.decl.h
 	$(CHARMC) -o stencil3d-msg.o -DUSE_MESSAGES stencil3d.C 
 
+# these test values are for sanity checking.  Wider and larger favors RDMA
 test: all
-	./charmrun stencil3d +p4 20 5 100
+	./charmrun stencil3d-msg +p4 20 10 100 2 2 2 10 $(TESTOPTS)
+	./charmrun stencil3d-ckdirect +p4 20 10 100 2 2 2 10 $(TESTOPTS)
