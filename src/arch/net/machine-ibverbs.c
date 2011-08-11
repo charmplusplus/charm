@@ -2550,7 +2550,7 @@ void infi_CmiFreeDirect(void *ptr){
 
         MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //      CmiAssert(poolIdx >= 0);
-        if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].count <= INFIMAXPERPOOL){
+        if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].count <= INFIMAXPERPOOL/((1<<poolIdx)*firstBinSize)){
                 metaData->nextBuf = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
                 infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = freePtr;
                         infiCmiChunkPools[CmiMyRank()][poolIdx].count++;
@@ -2671,7 +2671,7 @@ void infi_CmiFree(void *ptr){
 		}
 		MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //		CmiAssert(poolIdx >= 0);
-		if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].count <= INFIMAXPERPOOL){
+		if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].count <= INFIMAXPERPOOL/((1<<poolIdx)*firstBinSize)){
 			metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
 			infiCmiChunkPools[poolIdx].startBuf = freePtr;
 			infiCmiChunkPools[poolIdx].count++;
