@@ -44,25 +44,30 @@ typedef    struct  pending_smg
 
 PENDING_GETNEXT     *pending_smsg_head = 0;
 PENDING_GETNEXT     *pending_smsg_tail = 0;
-//#define  USE_ONESIDED 1
-#ifdef USE_ONESIDED
-#include "onesided.h"
-#endif
-
 #include "machine.h"
 
 #include "pcqueue.h"
+//#define  USE_ONESIDED 1
+#ifdef USE_ONESIDED
+//onesided implementation is wrong, since no place to restore omdh
+#include "onesided.h"
+onesided_hnd_t   onesided_hnd;
+onesided_md_t    omdh;
+#define MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh)  omdh. onesided_mem_register(handler, (uint64_t)msg, size, 0, myomdh) 
+
+#define MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh) onesided_mem_deregister(handler, myomdh)
+
+#else
+uint8_t   onesided_hnd, omdh;
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE|GNI_MEM_USE_GART, -1, mem_hndl)
+
+#define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
+#endif
+
 
 #define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)  do {((((CmiMsgHeaderExt*)m)->size)=(s));} while(0)
 
-#define DEBUY_PRINT
-
-#ifdef DEBUY_PRINT
-#define PRINT_INFO(msg) {fprintf(stdout, "[%d] %s\n", CmiMyPe(), msg); fflush(stdout);}
-#else
-#define PRINT_INFO(msg)
-#endif
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
 #define FMA_PER_CORE  1024
@@ -94,8 +99,8 @@ PENDING_GETNEXT     *pending_smsg_tail = 0;
 #endif
 
 #ifdef USE_ONESIDED
-onesided_hnd_t   onesided_hnd;
-onesided_md_t    omdh;
+#else
+uint8_t             onesided_hnd;
 #endif
 
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
@@ -413,17 +418,6 @@ static int send_with_smsg(int destNode, int size, char *msg)
         else
         {
             MallocControlMsg(control_msg_tmp);
-            /*
-#ifdef USE_ONESIDED
-            onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
-#else
-            status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
-                size, rx_cqh,
-                GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                vmdh_index, &(control_msg_tmp->source_mem_hndl));
-#endif 
-            GNI_RC_CHECK("MemRegister fails at ", status);
-            */
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
             control_msg_tmp->length         =size; 
@@ -462,14 +456,9 @@ static int send_with_smsg(int destNode, int size, char *msg)
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
             control_msg_tmp->length         = size;
-#ifdef USE_ONESIDED
-            onesided_mem_register(onesided_hnd, (uint64_t)msg, size, 0, &(control_msg_tmp->source_mem_hndl));
-#else
-            status = GNI_MemRegister(nic_hndl, (uint64_t)msg, 
-                size, NULL,
-                GNI_MEM_READ_ONLY | GNI_MEM_USE_GART,
-                vmdh_index, &(control_msg_tmp->source_mem_hndl));
-#endif 
+            
+            status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, size, &(control_msg_tmp->source_mem_hndl), &omdh);
+            
             if(status == GNI_RC_ERROR_RESOURCE || status == GNI_RC_ERROR_NOMEM)
             {
                 control_msg_tmp->source_mem_hndl.qword1 = 0;
@@ -504,7 +493,6 @@ static int send_with_smsg(int destNode, int size, char *msg)
 
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
-    //PRINT_INFO("Calling LrtsSend")
     if(useStaticSMSG)
     {
         send_with_smsg(destNode, size, msg); 
@@ -641,14 +629,8 @@ static int  processSmsg(uint64_t inst_id)
             request_msg = (CONTROL_MSG *) header;
             msg_data = CmiAlloc(request_msg->length);
             _MEMCHECK(msg_data);
-#ifdef USE_ONESIDED
-            onesided_mem_register(onesided_hnd, (uint64_t)msg_data, request_msg->length, 0, &msg_mem_hndl);
-#else
-            status = GNI_MemRegister(nic_hndl, (uint64_t)msg_data,
-                request_msg->length, NULL, 
-                GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
-                &msg_mem_hndl);
-#endif
+           
+            status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, (request_msg->length), &msg_mem_hndl, &omdh);
 
             if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
             {
@@ -708,11 +690,9 @@ static int  processSmsg(uint64_t inst_id)
             /* Get is done, release message . Now put is not used yet*/
             request_msg = (CONTROL_MSG *) header;
             //CmiPrintf("++++## ACK msg is received on PE:%d message size=%d, addr=%p\n", myrank, request_msg->length, (void*)request_msg->source_addr);
-#ifdef USE_ONESIDED
-            onesided_mem_deregister(onesided_hnd, &request_msg->source_mem_hndl);
-#else
-            GNI_MemDeregister(nic_hndl, &request_msg->source_mem_hndl);
-#endif
+
+            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(request_msg->source_mem_hndl), &omdh);
+            
             CmiFree((void*)request_msg->source_addr);
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
             SendRdmaMsg();
@@ -808,11 +788,8 @@ static void PumpLocalTransactions()
                     else
                         GNI_RC_CHECK("GNI_SmsgSendWTag", status);
                 }
-#ifdef USE_ONESIDED
-                onesided_mem_deregister(onesided_hnd, &tmp_pd->local_mem_hndl);
-#else
-                GNI_MemDeregister(nic_hndl, &tmp_pd->local_mem_hndl);
-#endif
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                
                 handleOneRecvedMsg(SIZEFIELD((void*)tmp_pd->local_addr), (void*)tmp_pd->local_addr); 
                 SendRdmaMsg(); 
             }
@@ -835,14 +812,7 @@ static int SendRdmaMsg()
         // register memory first
         if( pd->local_mem_hndl.qword1  == 0 && pd->local_mem_hndl.qword2  == 0)
         {
-#ifdef USE_ONESIDED
-            onesided_mem_register(onesided_hnd, (uint64_t)pd->local_addr, pd->length, 0, &(pd->local_mem_hndl));
-#else
-            status = GNI_MemRegister(nic_hndl, (uint64_t)pd->local_addr,
-                pd->length, NULL, 
-                GNI_MEM_READWRITE | GNI_MEM_USE_GART, -1,
-                &(pd->local_mem_hndl));
-#endif
+            status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh);
         }
         if(status == GNI_RC_SUCCESS)
         {
@@ -894,14 +864,7 @@ static int SendBufferMsg()
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
                 if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
                 {
-#ifdef USE_ONESIDED
-                    onesided_mem_register(onesided_hnd, (uint64_t)control_msg_tmp->source_addr, control_msg_tmp->length, 0, &(control_msg_tmp->source_mem_hndl));
-#else
-                    status = GNI_MemRegister(nic_hndl, (uint64_t)control_msg_tmp->source_addr, 
-                        control_msg_tmp->length, NULL,
-                        GNI_MEM_READ_ONLY | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,
-                        -1, &(control_msg_tmp->source_mem_hndl));
-#endif 
+                    MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, control_msg_tmp->length, &(control_msg_tmp->source_mem_hndl), &omdh);
                     if(status != GNI_RC_SUCCESS)
                         break;
                 }
@@ -1155,7 +1118,6 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         _init_static_msgq();
     }
     free(MPID_UGNI_AllAddr);
-    //PRINT_INFO("\nDone with LrtsInit")
 }
 
 #define ALIGNBUF                64
@@ -1166,11 +1128,6 @@ void* LrtsAlloc(int n_bytes, int header)
     {
         int totalsize = n_bytes+header;
         return malloc(totalsize);
-/*
-    }else if(n_bytes <= LRTS_GNI_RDMA_THRESHOLD)
-    {
-        return malloc(n_bytes);
-*/
     }else 
     {
         CmiAssert(header <= ALIGNBUF);
@@ -1210,7 +1167,6 @@ void CmiAbort(const char *message) {
     PMI_Abort(-1, message);
 }
 
-#if 0
 /**************************  TIMER FUNCTIONS **************************/
 #if CMK_TIMER_USE_SPECIAL
 /* MPI calls are not threadsafe, even the timer on some machines */
@@ -1220,18 +1176,7 @@ static double starttimer = 0;
 static int _is_global = 0;
 
 int CmiTimerIsSynchronized() {
-    int  flag;
-    void *v;
-
-    /*  check if it using synchronized timer */
-    if (MPI_SUCCESS != MPI_Attr_get(MPI_COMM_WORLD, MPI_WTIME_IS_GLOBAL, &v, &flag))
-        printf("MPI_WTIME_IS_GLOBAL not valid!\n");
-    if (flag) {
-        _is_global = *(int*)v;
-        if (_is_global && CmiMyPe() == 0)
-            printf("Charm++> MPI timer is synchronized\n");
-    }
-    return _is_global;
+    return 0;
 }
 
 int CmiTimerAbsolute() {
@@ -1247,36 +1192,6 @@ double CmiInitTime() {
 }
 
 void CmiTimerInit(char **argv) {
-    _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
-    if (_absoluteTime && CmiMyPe() == 0)
-        printf("Charm++> absolute MPI timer is used\n");
-    _is_global = CmiTimerIsSynchronized();
-
-    if (_is_global) {
-        if (CmiMyRank() == 0) {
-            double minTimer;
-#if CMK_TIMER_USE_XT3_DCLOCK
-            starttimer = dclock();
-#else
-            starttimer = MPI_Wtime();
-#endif
-
-            MPI_Allreduce(&starttimer, &minTimer, 1, MPI_DOUBLE, MPI_MIN,
-                MPI_COMM_WORLD );
-            starttimer = minTimer;
-        }
-    } else { /* we don't have a synchronous timer, set our own start time */
-        CmiBarrier();
-        CmiBarrier();
-        CmiBarrier();
-#if CMK_TIMER_USE_XT3_DCLOCK
-        starttimer = dclock();
-#else
-        starttimer = MPI_Wtime();
-#endif
-    }
-
-    CmiNodeAllBarrier();          /* for smp */
 }
 
 /**
@@ -1286,36 +1201,18 @@ void CmiTimerInit(char **argv) {
  * now in the case of SMP.
  */
 double CmiTimer(void) {
-    double t;
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock();
-#else
-    t = MPI_Wtime();
-#endif
-    return _absoluteTime?t: (t-starttimer);
+
+    return 0;
 }
 
 double CmiWallTimer(void) {
-    double t;
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock();
-#else
-    t = MPI_Wtime();
-#endif
-    return _absoluteTime? t: (t-starttimer);
+    return 0;
 }
 
 double CmiCpuTimer(void) {
-    double t;
-#if CMK_TIMER_USE_XT3_DCLOCK
-    t = dclock() - starttimer;
-#else
-    t = MPI_Wtime() - starttimer;
-#endif
-    return t;
+    return 0;
 }
 
-#endif
 #endif
 /************Barrier Related Functions****************/
 
