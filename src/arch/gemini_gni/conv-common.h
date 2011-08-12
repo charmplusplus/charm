@@ -5,9 +5,9 @@
 
 #define CMI_MPI_TRACE_USEREVENTS                           0
 
-#define CMK_HANDLE_SIGUSR                                  1
+#define CMK_HANDLE_SIGUSR                                  0
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt8 size; CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt8 size; CmiUInt2 rank,hdl,xhdl,info,stratid,redID; CmiInt4 root; 
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
