@@ -48,7 +48,9 @@ added by Ryan Mokos in July 2008.
 
 /* 0: do not use the intermediate mapregion management
    1: use the intermediate mapregion management  */
-#define USE_MAPREGION 1
+#ifndef USE_MAPREGION
+#define USE_MAPREGION      0
+#endif
 
 /* 0: use the old isomalloc implementation (array)
    1: use the new isomalloc implementation (b-tree)  */
