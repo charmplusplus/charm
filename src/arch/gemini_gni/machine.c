@@ -102,7 +102,7 @@ static int mysize, myrank;
 static gni_nic_handle_t      nic_hndl;
 
 
-static void             **smsg_attr_ptr;
+static void             *smsg_mailbox_base;
 gni_msgq_attr_t         msgq_attrs;
 gni_msgq_handle_t       msgq_handle;
 gni_msgq_ep_attr_t      msgq_ep_attrs;
@@ -875,31 +875,36 @@ static void _init_static_smsg()
      smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
     _MEMCHECK(smsg_attr);
 
-    smsg_attr_ptr = malloc(sizeof(void*) *mysize);
-    for(i=0; i<mysize; i++)
-    {
-        if(i==myrank)
-            continue;
-        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX;//GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
-        smsg_attr[i].mbox_offset = 0;
-        smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
-        smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
-        status = GNI_SmsgBufferSizeNeeded(&smsg_attr[i], &smsg_memlen);
-        GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-
-        smsg_attr_ptr[i] = memalign(64, smsg_memlen);
-        _MEMCHECK(smsg_attr_ptr[i]);
-        bzero(smsg_attr_ptr[i], smsg_memlen);
-        status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_attr_ptr[i],
+    smsg_attr[0].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+    smsg_attr[0].mbox_maxcredit = SMSG_MAX_CREDIT;
+    smsg_attr[0].msg_maxsize = SMSG_MAX_MSG;
+    status = GNI_SmsgBufferSizeNeeded(&smsg_attr[0], &smsg_memlen);
+    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+    smsg_mailbox_base = memalign(64, smsg_memlen*(mysize-1));
+    _MEMCHECK(smsg_mailbox_base);
+    bzero(smsg_mailbox_base, smsg_memlen);
+    status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen, rx_cqh,
             GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
             vmdh_index,
             &my_smsg_mdh_mailbox);
 
-        GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-      
-        smsg_attr[i].msg_buffer = smsg_attr_ptr[i];
-        smsg_attr[i].buff_size = smsg_memlen;
+    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+
+    for(i=0; i<mysize; i++)
+    {
+        if(i==myrank)
+            continue;
+        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+        smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
+        smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
+        if(i<myrank)
+            smsg_attr[i].mbox_offset = i*smsg_memlen;
+        else
+            smsg_attr[i].mbox_offset = (i-1)*smsg_memlen;
+
+        smsg_attr[i].msg_buffer = smsg_mailbox_base;
+        smsg_attr[i].buff_size = smsg_memlen*(mysize-1);
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
     }
     smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * mysize * sizeof(gni_smsg_attr_t));
