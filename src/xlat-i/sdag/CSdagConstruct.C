@@ -827,12 +827,10 @@ void SdagConstruct::generateWhen(XStr& op)
  
 //  op << "       int impl_off=0;\n";
   int hasArray = 0;
-  int isVoid = 0;
   int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
-        isVoid = 1;
        op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
     }
     else {
@@ -1495,17 +1493,12 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        SdagConstruct *notConnectNode = this;
         SdagConstruct *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
-        else if (cn->type != SCONNECT)
-          notConnectNode = cn;
         int flag = 1;
         SdagConstruct *nextNode=constructs->next();
         for(; nextNode != 0;) {
-          if (nextNode->type != SCONNECT)
-            notConnectNode = nextNode;
           flag = 1;
 	  while ((flag == 1) && (nextNode->type == SCONNECT)) {
 	    nextNode = constructs->next();
