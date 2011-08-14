@@ -240,7 +240,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
    op << "  void " <<connectEntry->charstar() <<'(';
    ParamList *pl = param;
    XStr msgParams;
-   int count;
    if (pl->isVoid() == 1) {
      op << "void) {\n"; 
    }
@@ -248,7 +247,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
      op << pl->getBaseName() <<" *" <<pl->getGivenName() <<") {\n";
    }
    else {
-    count = 0;
     op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg) {\n";
     msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
     param->beginUnmarshall(msgParams);
