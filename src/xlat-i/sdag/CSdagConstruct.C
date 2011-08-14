@@ -337,9 +337,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  TList <CStateVar*> *olistTempStateVars;
   TList<CStateVar*> *whensEntryMethodStateVars; 
-  olistTempStateVars = new TList<CStateVar*>();
   stateVars = new TList<CStateVar*>();
   switch(type) {
     case SFORALL:
