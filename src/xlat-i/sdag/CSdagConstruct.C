@@ -364,31 +364,12 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       int numParameters; 
       int count;
       int isMsg;
-      int stateVarsHasVoid;
-      int stateVarsChildrenHasVoid; 
       numParameters=0; count=0; isMsg=0; 
-      stateVarsHasVoid = 0;
-      stateVarsChildrenHasVoid = 0;
-      for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
-         if (sv->isVoid == 1)
-	     stateVarsHasVoid == 1;	// what this means??? gengbin
-      }
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-         if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
-	    stateVars->append(sv);
-	    stateVarsHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1)
-	    stateVars->append(sv);
-	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
-	    stateVarsChildren->append(sv);
-	    stateVarsChildrenHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1) {
-	    stateVarsChildren->append(sv);
-	 }
-      }
 
+      for(sv=list.begin(); !list.end(); sv=list.next()) {
+        stateVars->append(sv);
+        stateVarsChildren->append(sv);
+      }
      
       {  
         EntryList *el;
