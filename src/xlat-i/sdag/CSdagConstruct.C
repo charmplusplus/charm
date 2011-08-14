@@ -361,11 +361,6 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
     case SWHEN:
       whensEntryMethodStateVars = new TList<CStateVar*>();
       stateVarsChildren = new TList<CStateVar*>();
-      int numParameters; 
-      int count;
-      int isMsg;
-      numParameters=0; count=0; isMsg=0; 
-
       for(sv=list.begin(); !list.end(); sv=list.next()) {
         stateVars->append(sv);
         stateVarsChildren->append(sv);
