@@ -1496,20 +1496,13 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
         SdagConstruct *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
-        int flag = 1;
-        SdagConstruct *nextNode=constructs->next();
-        for(; nextNode != 0;) {
-          flag = 1;
-	  while ((flag == 1) && (nextNode->type == SCONNECT)) {
-	    nextNode = constructs->next();
-            if (nextNode == 0)
-              flag = 0;
-	  }
-	  if (nextNode != 0) {
-            cn->setNext(nextNode, 1);
-            cn = nextNode;
-            nextNode = constructs->next();
-	  }
+
+        for(SdagConstruct *nextNode=constructs->next(); nextNode != 0; nextNode = constructs->next()) {
+	  if (nextNode->type == SCONNECT)
+	    continue;
+
+          cn->setNext(nextNode, 1);
+          cn = nextNode;
         }
         cn->setNext(this, 0);
       }
