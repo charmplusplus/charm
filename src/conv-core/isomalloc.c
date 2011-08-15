@@ -1636,6 +1636,7 @@ remoteSlotmap(CmiInt8 slot, CmiInt8 nslots)
   void *pa,*newaddr;
   maplist *newentry,*temp,*prev,*next;
 
+  int whichPE = slot/numslots;
   CmiInt8 startRegion, endRegion;
   CmiInt8 left, tleft;
   maplist **mapList = CpvAccess(mapLists);
@@ -1643,7 +1644,6 @@ remoteSlotmap(CmiInt8 slot, CmiInt8 nslots)
 
   startRegion = (slot/ratio);
   endRegion = (slot + nslots - 1)/ratio;
-  int whichPE = slot/numslots;
 
   /* new linked list for memory in this range*/
   if(mapList[whichPE] == NULL)
@@ -1824,13 +1824,14 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
   CmiInt8 actualSlot, requestSize, begin, currentR;
   CmiInt8 startAddr, left, tleft, extraleft;
 
+  mapRegion *mapregion = CpvAccess(mapRegions);
   CmiInt8 startSlot, endSlot;
+
   startSlot = pe2slot(CmiMyPe());
   endSlot = startSlot + numslots - 1;
   if((slot < startSlot) || (slot > endSlot))
 	return ((CmiIsomallocBlock *)remoteSlotmap(slot,nslots)); 
 
-  mapRegion *mapregion = CpvAccess(mapRegions);
   startAddr = (CmiInt8)slot2addr(slot);
   addr = slot2addr(slot);
 	
@@ -2669,6 +2670,9 @@ static void init_ranges(char **argv)
 
 #if USE_MAPREGION
   /*Round regionSize size up to nearest page size*/
+  CmiInt8 i,j;
+  maplist **mapList;
+  mapRegion *mapregion;
   slotsize = 128;
   regionSize=16*1024;
 
@@ -2863,16 +2867,15 @@ static void init_ranges(char **argv)
     CpvAccess(myss) = new_slotset(pe2slot(CmiMyPe()), numslots);
 
 #if USE_MAPREGION
-    CmiInt8 i,j;
     CpvInitialize(maplist **, mapLists);
     CpvAccess(mapLists) = (maplist **)(malloc_reentrant(CmiNumPes()*sizeof(maplist *)));
-    maplist **mapList = CpvAccess(mapLists);
+    mapList = CpvAccess(mapLists);
     for(i=0; i < CmiNumPes(); i++)
 	mapList[i] = NULL;
 
     CpvInitialize(mapRegion *,mapRegions);
     CpvAccess(mapRegions) = (mapRegion *)(malloc_reentrant(sizeof(mapRegion)));
-    mapRegion *mapregion = CpvAccess(mapRegions);
+    mapregion = CpvAccess(mapRegions);
     mapregion->size = 32 * 1024;//good enough for 512 GB	
     mapregion->counter = (int **)(malloc_reentrant
 			(mapregion->size * sizeof(int*)));
