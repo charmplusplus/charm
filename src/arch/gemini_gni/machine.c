@@ -61,7 +61,7 @@ uint8_t   onesided_hnd, omdh;
 #endif
 
 #define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
-#define CmiSetMsgSize(m,s)  do {((((CmiMsgHeaderExt*)m)->size)=(s));} while(0)
+#define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
@@ -424,7 +424,6 @@ static int send_with_smsg(int destNode, int size, char *msg)
         }else
         {
             /* construct a control message and send */
-            //control_msg_tmp = (CONTROL_MSG *)malloc(sizeof(CONTROL_MSG));
             MallocControlMsg(control_msg_tmp);
             control_msg_tmp->source_addr    = (uint64_t)msg;
             control_msg_tmp->source         = myrank;
@@ -674,20 +673,20 @@ static int  processSmsg(uint64_t inst_id)
 /* Check whether message send or get is confirmed by remote */
 static void PumpLocalTransactions()
 {
-    gni_cq_entry_t ev;
-    gni_return_t status;
-    uint64_t type, inst_id;
-    uint8_t         ack_tag = ACK_TAG;
-    gni_post_descriptor_t *tmp_pd;
-    //gni_post_descriptor_t   ack_pd;
-    MSG_LIST  *ptr;
-    CONTROL_MSG *ack_msg_tmp;
+    gni_cq_entry_t          ev;
+    gni_return_t            status;
+    uint64_t                type, inst_id;
+    uint8_t                 ack_tag = ACK_TAG;
+    gni_post_descriptor_t   *tmp_pd;
+    MSG_LIST                *ptr;
+    CONTROL_MSG             *ack_msg_tmp;
 
     while (1) 
     {
         status = GNI_CqGetEvent(tx_cqh, &ev);
         if(status == GNI_RC_SUCCESS)
         {
+            //GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
             type        = GNI_CQ_GET_TYPE(ev);
             inst_id     = GNI_CQ_GET_INST_ID(ev);
         }else if (status == GNI_RC_NOT_DONE)
@@ -709,7 +708,7 @@ static void PumpLocalTransactions()
         else if(type == GNI_CQ_EVENT_TYPE_POST)
         {
             status = GNI_GetCompleted(tx_cqh, ev, &tmp_pd);
-            GNI_RC_CHECK("Local CQ completed ", status);
+            //GNI_RC_CHECK("Local CQ completed ", status);
             //Message is sent, free message , put is not used now
             if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
             {
@@ -718,10 +717,10 @@ static void PumpLocalTransactions()
             {
                 /* Send an ACK to remote side */
                 MallocControlMsg(ack_msg_tmp);
-                ack_msg_tmp->source = myrank;
-                ack_msg_tmp->source_addr = tmp_pd->remote_addr;
-                ack_msg_tmp->length=tmp_pd->length; 
-                ack_msg_tmp->source_mem_hndl = tmp_pd->remote_mem_hndl;
+                ack_msg_tmp->source             = myrank;
+                ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
+                ack_msg_tmp->length             =tmp_pd->length; 
+                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
                 //CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr); 
            
                 if(buffered_smsg_head!=0)
@@ -1092,14 +1091,14 @@ void CmiAbort(const char *message) {
 /* MPI calls are not threadsafe, even the timer on some machines */
 static CmiNodeLock  timerLock = 0;
 static int _absoluteTime = 0;
-static double starttimer = 0;
 static int _is_global = 0;
+static struct timespec start_ns;
 
-int CmiTimerIsSynchronized() {
-    return 0;
+inline int CmiTimerIsSynchronized() {
+    return 1;
 }
 
-int CmiTimerAbsolute() {
+inline int CmiTimerAbsolute() {
     return _absoluteTime;
 }
 
@@ -1108,10 +1107,28 @@ double CmiStartTimer() {
 }
 
 double CmiInitTime() {
-    return starttimer;
+    return (double)(start_ts.tv_sec)+(double)start_ts.tv_nsec/1000000000.0;
 }
 
 void CmiTimerInit(char **argv) {
+    _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
+    if (_absoluteTime && CmiMyPe() == 0)
+        printf("Charm++> absolute  timer is used\n");
+    
+    _is_global = CmiTimerIsSynchronized();
+
+
+    if (_is_global) {
+        if (CmiMyRank() == 0) {
+            clock_gettime(CLOCK_MONOTONIC, &start_ts)
+        }
+    } else { /* we don't have a synchronous timer, set our own start time */
+        CmiBarrier();
+        CmiBarrier();
+        CmiBarrier();
+        clock_gettime(CLOCK_MONOTONIC, &start_ts)
+    }
+    CmiNodeAllBarrier();          /* for smp */
 }
 
 /**
@@ -1121,16 +1138,24 @@ void CmiTimerInit(char **argv) {
  * now in the case of SMP.
  */
 double CmiTimer(void) {
-
-    return 0;
+    struct timespec now_ts;
+    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
+        : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
 
 double CmiWallTimer(void) {
-    return 0;
+    struct timespec now_ts;
+    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
+        : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
 
 double CmiCpuTimer(void) {
-    return 0;
+    struct timespec now_ts;
+    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
+        : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
 
 #endif
