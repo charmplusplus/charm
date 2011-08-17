@@ -60,7 +60,7 @@ onesided_md_t    omdh;
 
 #else
 uint8_t   onesided_hnd, omdh;
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, post_rx_cqh,  GNI_MEM_READWRITE|GNI_MEM_USE_GART, -1, mem_hndl)
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE|GNI_MEM_USE_GART, -1, mem_hndl)
 
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
@@ -236,10 +236,8 @@ static MSG_LIST             *smsg_free_tail=0;
 */
 
 #define FreeMsgList(d)  \
-  do {  \
   (d)->next = msglist_freelist;\
-  msglist_freelist = d;\
-  } while (0); 
+  msglist_freelist = d;
 
 
 
@@ -251,10 +249,8 @@ static MSG_LIST             *smsg_free_tail=0;
 
 
 #define FreeControlMsg(d)       \
-  do {  \
   (d)->next = control_freelist;\
-  control_freelist = d;\
-  } while (0); 
+  control_freelist = d;
 
 #define MallocControlMsg(d) \
   d = control_freelist;\
@@ -265,10 +261,8 @@ static MSG_LIST             *smsg_free_tail=0;
 
 static RDMA_REQUEST         *rdma_freelist = 0;
 #define FreeControlMsg(d)       \
-  do {  \
   (d)->next = control_freelist;\
-  control_freelist = d;\
-  } while (0); 
+  control_freelist = d;
 
 #define MallocControlMsg(d) \
   d = control_freelist;\
@@ -277,10 +271,8 @@ static RDMA_REQUEST         *rdma_freelist = 0;
   } else control_freelist = d->next;
 
 #define FreeMediumControlMsg(d)       \
-  do {  \
   (d)->next = medium_control_freelist;\
-  medium_control_freelist = d;\
-  } while (0); 
+  medium_control_freelist = d;
 
 
 #define MallocMediumControlMsg(d) \
@@ -290,10 +282,8 @@ static RDMA_REQUEST         *rdma_freelist = 0;
 } else mediumcontrol_freelist = d->next;
 
 #define FreeRdmaRequest(d)       \
-  do {  \
   (d)->next = rdma_freelist;\
-  rdma_freelist = d;\
-  } while (0); 
+  rdma_freelist = d;
 
 #define MallocRdmaRequest(d) \
   d = rdma_freelist;\
@@ -302,14 +292,12 @@ static RDMA_REQUEST         *rdma_freelist = 0;
   } else rdma_freelist = d->next;
 
 /* reuse gni_post_descriptor_t */
-static gni_post_descriptor_t *post_freelist=NULL;
+static gni_post_descriptor_t *post_freelist=0;
 
 #if 1
 #define FreePostDesc(d)       \
-  do {  \
     (d)->next_descr = post_freelist;\
-    post_freelist = d;\
-  } while (0); 
+    post_freelist = d;
 
 #define MallocPostDesc(d) \
   d = post_freelist;\
@@ -487,19 +475,19 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
     msg_tmp->next   = 0;
-    if (smsg_msglist_tail == 0) {
+    if (smsg_msglist_head == 0) {
         smsg_msglist_head  = msg_tmp;
     }
     else {
       smsg_msglist_tail->next    = msg_tmp;
     }
     smsg_msglist_tail          = msg_tmp;
-    buffered_smsg_counter++;
+    //buffered_smsg_counter++;
 }
 
 // messages smaller than max single SMSG
 inline
-static int send_small_messages(int destNode, int size, char *msg)
+static void send_small_messages(int destNode, int size, char *msg)
 {
     gni_return_t        status  =   GNI_RC_SUCCESS;
     const uint8_t       tag_data    = SMALL_DATA_TAG;
@@ -514,7 +502,7 @@ static int send_small_messages(int destNode, int size, char *msg)
             CmiPrintf("[%d==>%d] sent done%d\n", myrank, destNode, lrts_smsg_success);
 #endif
             CmiFree(msg);
-            return 1;
+            return;
         }else if (status == GNI_RC_INVALID_PARAM)
         {
             CmiAbort("SmsgSen fails\n");
@@ -522,7 +510,6 @@ static int send_small_messages(int destNode, int size, char *msg)
     }
     //buffer this message when buffer_msg_head!=0 or send fails
     delay_send_small_msg(msg, size, destNode, SMALL_DATA_TAG);
-    return 0;
 }
 
 // Get first 0 in DMA_tags starting from index
@@ -849,68 +836,64 @@ static void PumpLocalRdmaTransactions()
 
     while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     {
-        inst_id     = GNI_CQ_GET_INST_ID(ev);
         type        = GNI_CQ_GET_TYPE(ev);
 #if PRINT_SYH
         lrts_local_done_msg++;
         CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d (type=%d)\n", myrank,  lrts_local_done_msg, type);
 #endif
-        if(type == GNI_CQ_EVENT_TYPE_SMSG)
+        /*if(type == GNI_CQ_EVENT_TYPE_SMSG)
         {
-        }else if (type == GNI_CQ_EVENT_TYPE_POST)
+        }else */
+        if (type == GNI_CQ_EVENT_TYPE_POST)
         {
+            inst_id     = GNI_CQ_GET_INST_ID(ev);
 #if PRINT_SYH
             CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
 #endif
-        status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
-        //CmiPrintf("**[%d] SMSGPumpLocalTransactions local done(type=%d) length=%d, size=%d\n", myrank, type, tmp_pd->length, SIZEFIELD((void*)(tmp_pd->local_addr)) );
-        //Message is sent, free message , put is not used now
-        if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
-        {
-            CmiFree((void *)tmp_pd->local_addr);
-        }else if(tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
-        {
-            /* Send an ACK to remote side */
-            MallocControlMsg(ack_msg_tmp);
-            ack_msg_tmp->source             = myrank;
-            ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
-            ack_msg_tmp->length             =tmp_pd->length; 
-            ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-#if PRINT_SYH
-            lrts_send_msg_id++;
-            CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
-#endif
-            if(smsg_msglist_head!=0)
+            status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
+            //CmiPrintf("**[%d] SMSGPumpLocalTransactions local done(type=%d) length=%d, size=%d\n", myrank, type, tmp_pd->length, SIZEFIELD((void*)(tmp_pd->local_addr)) );
+            ////Message is sent, free message , put is not used now
+            if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
             {
-                delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
-            }else
+                CmiFree((void *)tmp_pd->local_addr);
+            }else if(tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
             {
-                status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, ACK_TAG);
-                if(status == GNI_RC_SUCCESS)
-                {
+                /* Send an ACK to remote side */
+                MallocControlMsg(ack_msg_tmp);
+                ack_msg_tmp->source             = myrank;
+                ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
+                ack_msg_tmp->length             =tmp_pd->length; 
+                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
 #if PRINT_SYH
-                    lrts_smsg_success++;
-                    CmiPrintf("[%d==>%d] sent ACK done%d\n", myrank, inst_id, lrts_smsg_success);
+                lrts_send_msg_id++;
+                CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
 #endif
-                    FreeControlMsg(ack_msg_tmp);
-                }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
+                if(smsg_msglist_head!=0)
                 {
                     delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
+                }else
+                {
+                    status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, ACK_TAG);
+                    if(status == GNI_RC_SUCCESS)
+                    {
+#if PRINT_SYH
+                        lrts_smsg_success++;
+                        CmiPrintf("[%d==>%d] sent ACK done%d\n", myrank, inst_id, lrts_smsg_success);
+#endif
+                        FreeControlMsg(ack_msg_tmp);
+                    }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
+                    {
+                        delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
+                    }
+                    else
+                        GNI_RC_CHECK("GNI_SmsgSendWTag", status);
                 }
-                else
-                    GNI_RC_CHECK("GNI_SmsgSendWTag", status);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
+                handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
+                SendRdmaMsg(); 
             }
-            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
-
-            CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
-            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
-            handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
-            SendRdmaMsg(); 
-        }
-        FreePostDesc(tmp_pd);
-        }else
-        {
-            CmiPrintf("weird type\n");
+            FreePostDesc(tmp_pd);
         }
     }
 }
@@ -1015,10 +998,10 @@ static int SendBufferMsg()
         if(status == GNI_RC_SUCCESS)
         {
             smsg_msglist_head = smsg_msglist_head->next;
-            if(smsg_msglist_head == 0)
-                smsg_msglist_tail = 0;
+            //if(smsg_msglist_head == 0)
+            //    smsg_msglist_tail = 0;
             FreeMsgList(ptr);
-            buffered_smsg_counter--;
+            //buffered_smsg_counter--;
 #if PRINT_SYH
             CmiPrintf("SUCCESS [%d==>%d] sent done(%d)(counter=%d)\n", myrank, ptr->destNode, lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter);
 #endif
@@ -1038,7 +1021,7 @@ static void LrtsAdvanceCommunication()
     //CmiPrintf("Calling Lrts Pump Msg PE:%d\n", CmiMyPe());
     PumpNetworkSmsg();
     //CmiPrintf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
-    PumpNetworkRdmaMsgs();
+    //PumpNetworkRdmaMsgs();
     /* Release Sent Msg */
     //CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
     //PumpLocalSmsgTransactions();
@@ -1169,7 +1152,7 @@ static void _init_DMA_buffer()
     DMA_buffer_size     = DMA_max_single_msg + 8192;
     DMA_buffer_base_mdh_addr.addr = (uint64_t)memalign(ALIGNBUF, DMA_buffer_size);
     status = GNI_MemRegister(nic_hndl, DMA_buffer_base_mdh_addr.addr,
-        DMA_buffer_size, post_rx_cqh,
+        DMA_buffer_size, smsg_rx_cqh,
         GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
         -1,
         &(DMA_buffer_base_mdh_addr.mdh));
@@ -1247,15 +1230,15 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &smsg_tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate (tx)", status);
     
-    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_tx_cqh);
-    GNI_RC_CHECK("GNI_CqCreate post (tx)", status);
+    //status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_tx_cqh);
+    //GNI_RC_CHECK("GNI_CqCreate post (tx)", status);
     /* create the destination completion queue for receiving micro-messages, make this queue considerably larger than the number of transfers */
 
     status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &smsg_rx_cqh);
     GNI_RC_CHECK("Create CQ (rx)", status);
     
-    status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_rx_cqh);
-    GNI_RC_CHECK("Create Post CQ (rx)", status);
+    //status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_rx_cqh);
+    //GNI_RC_CHECK("Create Post CQ (rx)", status);
     
     //status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &rdma_cqh);
     //GNI_RC_CHECK("Create BTE CQ", status);
