@@ -423,7 +423,6 @@ static unsigned int get_gni_nic_address(int device_id)
         CmiAssert(alps_address != -1);
         address = alps_address;
     }
-printf("[%d] address:%d\n", myrank, address);
     return address;
 }
 
@@ -866,7 +865,7 @@ static void PumpLocalRdmaTransactions()
                 MallocControlMsg(ack_msg_tmp);
                 ack_msg_tmp->source             = myrank;
                 ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
-                ack_msg_tmp->length             =tmp_pd->length; 
+                ack_msg_tmp->length             = tmp_pd->length; 
                 ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
 #if PRINT_SYH
                 lrts_send_msg_id++;
@@ -894,7 +893,8 @@ static void PumpLocalRdmaTransactions()
                 }
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
                 CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
-                handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
+                //handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
+                handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 SendRdmaMsg(); 
             }
             FreePostDesc(tmp_pd);
@@ -925,7 +925,7 @@ static int SendRdmaMsg()
             if(status == GNI_RC_SUCCESS)
             {
                 pending_rdma_head = pending_rdma_head->next; 
-                FreePostDesc(pd);
+                //FreePostDesc(pd);
                 FreeRdmaRequest(ptr);
             }
             else
