@@ -69,6 +69,7 @@ uint8_t   onesided_hnd, omdh;
 #define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
 
 #define ALIGNBUF                64
+
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
 #define FMA_PER_CORE  1024
@@ -259,7 +260,8 @@ static MSG_LIST             *smsg_free_tail=0;
   } else control_freelist = d->next;
 
 
-static RDMA_REQUEST         *rdma_freelist = 0;
+static RDMA_REQUEST         *rdma_freelist = NULL;
+
 #define FreeControlMsg(d)       \
   (d)->next = control_freelist;\
   control_freelist = d;
@@ -421,6 +423,7 @@ static unsigned int get_gni_nic_address(int device_id)
         CmiAssert(alps_address != -1);
         address = alps_address;
     }
+printf("[%d] address:%d\n", myrank, address);
     return address;
 }
 
@@ -808,11 +811,11 @@ static void PumpLocalSmsgTransactions()
 {
     gni_return_t            status;
     gni_cq_entry_t          ev;
-    while (status = GNI_CqGetEvent(smsg_tx_cqh, &ev) == GNI_RC_SUCCESS)
+    while ((status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS)
     {
 #if PRINT_SYH
         lrts_local_done_msg++;
-        //CmiPrintf("*[%d]  PumpLocalTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
+        //CmiPrintf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
 #endif
         if(GNI_CQ_OVERRUN(ev))
         {
@@ -825,6 +828,7 @@ static void PumpLocalSmsgTransactions()
         GNI_RC_CHECK("Smsg_tx_cq full", status);
     }
 }
+
 static void PumpLocalRdmaTransactions()
 {
     gni_cq_entry_t          ev;
@@ -944,6 +948,7 @@ static int SendBufferMsg()
         if(useStaticSMSG)
         {
             ptr = smsg_msglist_head;
+            CmiAssert(ptr!=NULL);
             if(ptr->tag == SMALL_DATA_TAG)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], NULL, 0, ptr->msg, ptr->size, 0, SMALL_DATA_TAG);
@@ -1005,9 +1010,10 @@ static int SendBufferMsg()
 #if PRINT_SYH
             CmiPrintf("SUCCESS [%d==>%d] sent done(%d)(counter=%d)\n", myrank, ptr->destNode, lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter);
 #endif
-        }else
+        }else {
             return 0;
-    }
+        }
+    }   // end of for
 #if PRINT_SYH
     if(lrts_send_msg_id-lrts_smsg_success !=0)
         CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head, (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
@@ -1066,9 +1072,9 @@ static void _init_static_smsg()
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
     smsg_mailbox_base = memalign(64, smsg_memlen*(mysize-1));
     _MEMCHECK(smsg_mailbox_base);
-    bzero(smsg_mailbox_base, smsg_memlen);
+    bzero(smsg_mailbox_base, smsg_memlen*(mysize-1));
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
-            smsg_memlen, smsg_rx_cqh,
+            smsg_memlen*(mysize-1), smsg_rx_cqh,
             GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
             vmdh_index,
             &my_smsg_mdh_mailbox);
@@ -1088,7 +1094,7 @@ static void _init_static_smsg()
             smsg_attr[i].mbox_offset = (i-1)*smsg_memlen;
 
         smsg_attr[i].msg_buffer = smsg_mailbox_base;
-        smsg_attr[i].buff_size = smsg_memlen*(mysize-1);
+        smsg_attr[i].buff_size = smsg_memlen;
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
     }
     smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * mysize * sizeof(gni_smsg_attr_t));
@@ -1105,11 +1111,10 @@ static void _init_static_smsg()
     free(smsg_attr);
     free(smsg_attr_vec);
 
-/*
     status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
-*/
 } 
+
 static void _init_static_msgq()
 {
     gni_return_t status;
@@ -1161,6 +1166,7 @@ static void _init_DMA_buffer()
 
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
+
 static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
