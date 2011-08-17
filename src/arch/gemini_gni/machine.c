@@ -35,7 +35,7 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
-#define PRINT_SYH  1
+#define PRINT_SYH  0
 
 #if PRINT_SYH
 int         lrts_smsg_success = 0;
@@ -76,7 +76,7 @@ uint8_t   onesided_hnd, omdh;
 /* If SMSG is used */
 static int  SMSG_MAX_MSG;
 static int  log2_SMSG_MAX_MSG;
-#define SMSG_MAX_CREDIT  36
+#define SMSG_MAX_CREDIT  1;//36
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
@@ -215,7 +215,7 @@ typedef struct  rmda_msg
 
 /* reuse PendingMsg memory */
 static CONTROL_MSG          *control_freelist=0;
-static MSG_LIST             *msglist_freelist;
+static MSG_LIST             *msglist_freelist=0;
 static MSG_LIST             *smsg_msglist_head= 0;
 static MSG_LIST             *smsg_msglist_tail= 0;
 static MSG_LIST             *smsg_free_head=0;
@@ -486,16 +486,16 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->size   = size;
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
-    msg_tmp->next   = NULL;
-    if (smsg_msglist_tail == NULL) {
-      smsg_msglist_head  = msg_tmp;
+    msg_tmp->next   = 0;
+    if (smsg_msglist_tail == 0) {
+        smsg_msglist_head  = msg_tmp;
     }
     else {
       smsg_msglist_tail->next    = msg_tmp;
     }
     smsg_msglist_tail          = msg_tmp;
     buffered_smsg_counter++;
-    // CmiPrintf("[%d] delay_send_small_msg msg to PE %d  tag: 0x%x \n", myrank, destNode, tag);
+    //CmiPrintf("[%d] delay_send_small_msg msg to PE %d  tag: 0x%x buffercounter=%d, head=%p, msg_tmp=%p, tail=%p\n", myrank, destNode, tag, buffered_smsg_counter, smsg_msglist_head, msg_tmp, smsg_msglist_tail);
 }
 
 // messages smaller than max single SMSG
@@ -610,7 +610,7 @@ static int send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->length         =size; 
 #if PRINT_SYH
     lrts_send_msg_id++;
-    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+    CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
     if(smsg_msglist_head == 0)
     {
@@ -647,7 +647,7 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     {
 #if PRINT_SYH
     lrts_send_msg_id++;
-    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
+    CmiPrintf("SMSG LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
     send_small_messages(destNode, size, msg);
     }/*else if(size <=DMA_max_single_msg )
@@ -880,7 +880,7 @@ static void PumpLocalRdmaTransactions()
             //CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr);
 #if PRINT_SYH
             lrts_send_msg_id++;
-            CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
+            CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
 #endif
             if(smsg_msglist_head!=0)
             {
@@ -961,11 +961,11 @@ static int SendBufferMsg()
     {
         if(useStaticSMSG)
         {
-            //CmiPrintf("[%d buffered msg is not empty(%d)\n", myrank, buffered_smsg_counter);
             ptr = smsg_msglist_head;
             if(ptr->tag == SMALL_DATA_TAG)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], NULL, 0, ptr->msg, ptr->size, 0, SMALL_DATA_TAG);
+               // CmiPrintf("[%d==>%d] buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
                 if(status == GNI_RC_SUCCESS) {
 #if PRINT_SYH
                     lrts_smsg_success++;
@@ -977,6 +977,9 @@ static int SendBufferMsg()
             else if(ptr->tag == LMSG_INIT_TAG)
             {
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
+#if PRINT_SYH
+                CmiPrintf("[%d==>%d] LMSG buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
+#endif
                 if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
                 {
                     MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, control_msg_tmp->length, &(control_msg_tmp->source_mem_hndl), &omdh);
@@ -994,6 +997,9 @@ static int SendBufferMsg()
                 }
             }else if (ptr->tag == ACK_TAG)
             {
+#if PRINT_SYH
+                CmiPrintf("[%d==>%d] ACK buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
+#endif
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, ACK_TAG);
                 //CmiPrintf("[%d] SendBufferMsg sends a tag msg to PE %d status: %d\n", myrank, ptr->destNode, status);
                 if(status == GNI_RC_SUCCESS) {
@@ -1003,22 +1009,31 @@ static int SendBufferMsg()
 #endif
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
+            }else
+            {
+                CmiPrintf("Weird tag\n");
+                CmiAbort("should not happen\n");
             }
-        } else if(useStaticMSGQ)
-        {
-            CmiAbort("MSGQ Send not done\n");
-        }else
-        {
-            CmiAbort("FMA Send not done\n");
-        }
+        } 
         if(status == GNI_RC_SUCCESS)
         {
             smsg_msglist_head = smsg_msglist_head->next;
+            if(smsg_msglist_head == 0)
+                smsg_msglist_tail = 0;
             FreeMsgList(ptr);
             buffered_smsg_counter--;
-        }else
+#if PRINT_SYH
+            CmiPrintf("SUCCESS [%d==>%d] sent done(%d)(counter=%d)\n", myrank, ptr->destNode, lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter);
+#endif
+        }else{
+            //CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head, (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
             return 0;
+        }
     }
+#if PRINT_SYH
+    if(lrts_send_msg_id-lrts_smsg_success !=0)
+        CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head, (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
+#endif
     return 1;
 }
 
