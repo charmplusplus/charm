@@ -608,6 +608,10 @@ static int send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->source_addr    = (uint64_t)msg;
     control_msg_tmp->source         = myrank;
     control_msg_tmp->length         =size; 
+#if PRINT_SYH
+    lrts_send_msg_id++;
+    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+#endif
     if(smsg_msglist_head == 0)
     {
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, size, &(control_msg_tmp->source_mem_hndl), &omdh);
@@ -616,6 +620,10 @@ static int send_large_messages(int destNode, int size, char *msg)
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
             if(status == GNI_RC_SUCCESS)
             {
+#if PRINT_SYH
+                lrts_smsg_success++;
+                CmiPrintf("[%d==>%d] sent done%d\n", myrank, destNode, lrts_smsg_success);
+#endif
                 FreeControlMsg(control_msg_tmp);
                 return 1;
             }
@@ -633,15 +641,15 @@ static int send_large_messages(int destNode, int size, char *msg)
 
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
-#if PRINT_SYH
-    lrts_send_msg_id++;
-    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
-#endif
     CmiSetMsgSize(msg, size);
 
     if(size <= SMSG_MAX_MSG)
     {
-        send_small_messages(destNode, size, msg);
+#if PRINT_SYH
+    lrts_send_msg_id++;
+    CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
+#endif
+    send_small_messages(destNode, size, msg);
     }/*else if(size <=DMA_max_single_msg )
     {
         send_medium_messages(destNode, size, msg);
@@ -788,7 +796,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
             status = GNI_PostRdma(ep_hndl_array[source], pd);
         else
             status = GNI_PostFma(ep_hndl_array[source],  pd);
-        CmiPrintf("[%d]Msg sent RDMA to source:%d, gni=%s\n", myrank, source, gni_err_str[status]);
     }else
     {
         pd->local_mem_hndl.qword1  = 0; 
@@ -842,19 +849,22 @@ static void PumpLocalRdmaTransactions()
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
 
-    while ( (status = GNI_CqGetEvent(post_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
+    while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     {
         inst_id     = GNI_CQ_GET_INST_ID(ev);
         type        = GNI_CQ_GET_TYPE(ev);
-
+#if PRINT_SYH
+        lrts_local_done_msg++;
+        CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d (type=%d)\n", myrank,  lrts_local_done_msg, type);
+#endif
         if(type == GNI_CQ_EVENT_TYPE_SMSG)
         {
-#if PRINT_SYH
-            CmiPrintf("**[%d] PumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
-#endif
         }else if (type == GNI_CQ_EVENT_TYPE_POST)
         {
-        status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
+#if PRINT_SYH
+            CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
+#endif
+        status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
         //Message is sent, free message , put is not used now
         if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
         {
@@ -868,6 +878,10 @@ static void PumpLocalRdmaTransactions()
             ack_msg_tmp->length             =tmp_pd->length; 
             ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
             //CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr);
+#if PRINT_SYH
+            lrts_send_msg_id++;
+            CmiPrintf("LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
+#endif
             if(smsg_msglist_head!=0)
             {
                 delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
@@ -876,6 +890,10 @@ static void PumpLocalRdmaTransactions()
                 status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, ACK_TAG);
                 if(status == GNI_RC_SUCCESS)
                 {
+#if PRINT_SYH
+                    lrts_smsg_success++;
+                    CmiPrintf("[%d==>%d] sent ACK done%d\n", myrank, inst_id, lrts_smsg_success);
+#endif
                     FreeControlMsg(ack_msg_tmp);
                 }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
                 {
@@ -968,6 +986,10 @@ static int SendBufferMsg()
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
                 //CmiPrintf("[%d] SendBufferMsg sends a control msg to PE %d status: %d\n", myrank, ptr->destNode, status);
                 if(status == GNI_RC_SUCCESS) {
+#if PRINT_SYH
+                    lrts_smsg_success++;
+                    CmiPrintf("[%d==>%d] sent LMSG done%d\n", myrank, ptr->destNode, lrts_smsg_success);
+#endif
                     FreeControlMsg((CONTROL_MSG*)(ptr->msg));
                 }
             }else if (ptr->tag == ACK_TAG)
@@ -975,6 +997,10 @@ static int SendBufferMsg()
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, ACK_TAG);
                 //CmiPrintf("[%d] SendBufferMsg sends a tag msg to PE %d status: %d\n", myrank, ptr->destNode, status);
                 if(status == GNI_RC_SUCCESS) {
+#if PRINT_SYH
+                    lrts_smsg_success++;
+                    CmiPrintf("[%d==>%d] sent done%d\n", myrank, ptr->destNode, lrts_smsg_success);
+#endif
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
             }
@@ -1006,7 +1032,7 @@ static void LrtsAdvanceCommunication()
     /* Release Sent Msg */
     //CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
     //PumpLocalSmsgTransactions();
-    CmiPrintf("Calling Lrts Rlease RdmaMsg PE:%d\n", CmiMyPe());
+    //CmiPrintf("Calling Lrts Rlease RdmaMsg PE:%d\n", CmiMyPe());
     PumpLocalRdmaTransactions();
     //CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", CmiMyPe());
     /* Send buffered Message */
