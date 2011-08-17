@@ -20,6 +20,7 @@ void deadlock_inc(incmsg m)
   if (CpvAccess(deadlock_count)==0) {
     Cpm_megacon_ack(CpmSend(0));
   }
+  CmiFree(m);
 }
 
 void deadlock_cram(char *msg)
@@ -33,6 +34,7 @@ void deadlock_cram(char *msg)
   } 
   m.n = -count;
   CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
+  CmiFree(msg);
 }
 
 void deadlock_init()
