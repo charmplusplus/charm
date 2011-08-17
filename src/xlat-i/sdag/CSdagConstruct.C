@@ -240,7 +240,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
    op << "  void " <<connectEntry->charstar() <<'(';
    ParamList *pl = param;
    XStr msgParams;
-   int count;
    if (pl->isVoid() == 1) {
      op << "void) {\n"; 
    }
@@ -248,7 +247,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
      op << pl->getBaseName() <<" *" <<pl->getGivenName() <<") {\n";
    }
    else {
-    count = 0;
     op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg) {\n";
     msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
     param->beginUnmarshall(msgParams);
@@ -337,9 +335,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  TList <CStateVar*> *olistTempStateVars;
   TList<CStateVar*> *whensEntryMethodStateVars; 
-  olistTempStateVars = new TList<CStateVar*>();
   stateVars = new TList<CStateVar*>();
   switch(type) {
     case SFORALL:
@@ -361,34 +357,10 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
     case SWHEN:
       whensEntryMethodStateVars = new TList<CStateVar*>();
       stateVarsChildren = new TList<CStateVar*>();
-      int numParameters; 
-      int count;
-      int isMsg;
-      int stateVarsHasVoid;
-      int stateVarsChildrenHasVoid; 
-      numParameters=0; count=0; isMsg=0; 
-      stateVarsHasVoid = 0;
-      stateVarsChildrenHasVoid = 0;
-      for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
-         if (sv->isVoid == 1)
-	     stateVarsHasVoid == 1;	// what this means??? gengbin
-      }
       for(sv=list.begin(); !list.end(); sv=list.next()) {
-         if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
-	    stateVars->append(sv);
-	    stateVarsHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1)
-	    stateVars->append(sv);
-	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
-	    stateVarsChildren->append(sv);
-	    stateVarsChildrenHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1) {
-	    stateVarsChildren->append(sv);
-	 }
+        stateVars->append(sv);
+        stateVarsChildren->append(sv);
       }
-
      
       {  
         EntryList *el;
@@ -855,12 +827,10 @@ void SdagConstruct::generateWhen(XStr& op)
  
 //  op << "       int impl_off=0;\n";
   int hasArray = 0;
-  int isVoid = 0;
   int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
-        isVoid = 1;
        op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
     }
     else {
@@ -1523,28 +1493,16 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        SdagConstruct *notConnectNode = this;
         SdagConstruct *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
-        else if (cn->type != SCONNECT)
-          notConnectNode = cn;
-        int flag = 1;
-        SdagConstruct *nextNode=constructs->next();
-        for(; nextNode != 0;) {
-          if (nextNode->type != SCONNECT)
-            notConnectNode = nextNode;
-          flag = 1;
-	  while ((flag == 1) && (nextNode->type == SCONNECT)) {
-	    nextNode = constructs->next();
-            if (nextNode == 0)
-              flag = 0;
-	  }
-	  if (nextNode != 0) {
-            cn->setNext(nextNode, 1);
-            cn = nextNode;
-            nextNode = constructs->next();
-	  }
+
+        for(SdagConstruct *nextNode=constructs->next(); nextNode != 0; nextNode = constructs->next()) {
+	  if (nextNode->type == SCONNECT)
+	    continue;
+
+          cn->setNext(nextNode, 1);
+          cn = nextNode;
         }
         cn->setNext(this, 0);
       }
