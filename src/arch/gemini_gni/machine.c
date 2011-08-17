@@ -605,14 +605,14 @@ static int send_large_messages(int destNode, int size, char *msg)
     MallocControlMsg(control_msg_tmp);
     control_msg_tmp->source_addr    = (uint64_t)msg;
     control_msg_tmp->source         = myrank;
-    control_msg_tmp->length         =size; 
+    control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
 #if PRINT_SYH
     lrts_send_msg_id++;
     CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
     if(smsg_msglist_head == 0)
     {
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, size, &(control_msg_tmp->source_mem_hndl), &omdh);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN4(size), &(control_msg_tmp->source_mem_hndl), &omdh);
         if(status == GNI_RC_SUCCESS)
         {
             status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
@@ -757,7 +757,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
     RDMA_REQUEST        *rdma_request_msg;
     gni_mem_handle_t    msg_mem_hndl;
     int source;
-    
     // initial a get to transfer data from the sender side */
     request_msg = (CONTROL_MSG *) header;
     source = request_msg->source;
@@ -804,6 +803,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         MallocRdmaRequest(rdma_request_msg);
         rdma_request_msg->next = 0;
         rdma_request_msg->destNode = inst_id;
+        rdma_request_msg->pd = pd;
         if(pending_rdma_head == 0)
         {
             pending_rdma_head = rdma_request_msg;
@@ -863,6 +863,7 @@ static void PumpLocalRdmaTransactions()
             CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
 #endif
         status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
+        //CmiPrintf("**[%d] SMSGPumpLocalTransactions local done(type=%d) length=%d, size=%d\n", myrank, type, tmp_pd->length, SIZEFIELD((void*)(tmp_pd->local_addr)) );
         //Message is sent, free message , put is not used now
         if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
         {
@@ -901,8 +902,9 @@ static void PumpLocalRdmaTransactions()
             }
             MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
 
-            CmiAssert(SIZEFIELD((void*)tmp_pd->local_addr) == tmp_pd->length);
-            handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
+            CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
+            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+            handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
             SendRdmaMsg(); 
         }
         FreePostDesc(tmp_pd);
