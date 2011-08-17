@@ -77,7 +77,7 @@ uint8_t   onesided_hnd, omdh;
 /* If SMSG is used */
 static int  SMSG_MAX_MSG;
 static int  log2_SMSG_MAX_MSG;
-#define SMSG_MAX_CREDIT  1;//36
+#define SMSG_MAX_CREDIT  36
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
