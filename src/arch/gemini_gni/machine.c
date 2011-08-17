@@ -495,7 +495,6 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     }
     smsg_msglist_tail          = msg_tmp;
     buffered_smsg_counter++;
-    //CmiPrintf("[%d] delay_send_small_msg msg to PE %d  tag: 0x%x buffercounter=%d, head=%p, msg_tmp=%p, tail=%p\n", myrank, destNode, tag, buffered_smsg_counter, smsg_msglist_head, msg_tmp, smsg_msglist_tail);
 }
 
 // messages smaller than max single SMSG
@@ -508,7 +507,6 @@ static int send_small_messages(int destNode, int size, char *msg)
     if(smsg_msglist_head == 0)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, 0, SMALL_DATA_TAG);
-        //CmiPrintf("[%d] Send Immediately sends a data msg to PE %d status: %s\n", myrank, destNode, gni_err_str[status]);
         if (status == GNI_RC_SUCCESS)
         {
 #if PRINT_SYH
@@ -877,7 +875,6 @@ static void PumpLocalRdmaTransactions()
             ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
             ack_msg_tmp->length             =tmp_pd->length; 
             ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-            //CmiPrintf("PE:%d sending ACK back addr=%p \n", myrank, ack_msg_tmp->source_addr);
 #if PRINT_SYH
             lrts_send_msg_id++;
             CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
@@ -987,7 +984,6 @@ static int SendBufferMsg()
                         break;
                 }
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
-                //CmiPrintf("[%d] SendBufferMsg sends a control msg to PE %d status: %d\n", myrank, ptr->destNode, status);
                 if(status == GNI_RC_SUCCESS) {
 #if PRINT_SYH
                     lrts_smsg_success++;
@@ -1001,7 +997,6 @@ static int SendBufferMsg()
                 CmiPrintf("[%d==>%d] ACK buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
 #endif
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, ACK_TAG);
-                //CmiPrintf("[%d] SendBufferMsg sends a tag msg to PE %d status: %d\n", myrank, ptr->destNode, status);
                 if(status == GNI_RC_SUCCESS) {
 #if PRINT_SYH
                     lrts_smsg_success++;
@@ -1025,10 +1020,8 @@ static int SendBufferMsg()
 #if PRINT_SYH
             CmiPrintf("SUCCESS [%d==>%d] sent done(%d)(counter=%d)\n", myrank, ptr->destNode, lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter);
 #endif
-        }else{
-            //CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head, (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
+        }else
             return 0;
-        }
     }
 #if PRINT_SYH
     if(lrts_send_msg_id-lrts_smsg_success !=0)
