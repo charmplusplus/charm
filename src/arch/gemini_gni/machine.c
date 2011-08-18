@@ -620,8 +620,9 @@ static int send_large_messages(int destNode, int size, char *msg)
             CmiAbort("Memory registor for large msg\n");
         }
     }
-    control_msg_tmp->source_mem_hndl.qword1 = 0;
-    control_msg_tmp->source_mem_hndl.qword2 = 0;
+    bzero(control_msg_tmp->source_mem_hndl);
+    //control_msg_tmp->source_mem_hndl.qword1 = 0;
+    //control_msg_tmp->source_mem_hndl.qword2 = 0;
     delay_send_small_msg((char*)control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     return 0;
 }
@@ -1196,16 +1197,16 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     status = PMI_Get_rank(&myrank);
     GNI_RC_CHECK("PMI_getrank", status);
 
-    physicalID = CmiPhysicalNodeID(myrank);
+    //physicalID = CmiPhysicalNodeID(myrank);
     
-    printf("Pysical Node ID:%d for PE:%d\n", physicalID, myrank);
+    //printf("Pysical Node ID:%d for PE:%d\n", physicalID, myrank);
 
     *myNodeID = myrank;
     *numNodes = mysize;
   
     if(myrank == 0)
     {
-        printf("Charm++> Running on Gemini (GNI)\n");
+        printf("Charm++> Running on Gemini (GNI) using %d  cores\n", mysize);
     }
 #ifdef USE_ONESIDED
     onesided_init(NULL, &onesided_hnd);
