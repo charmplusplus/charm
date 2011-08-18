@@ -40,6 +40,8 @@ static void sleep(int secs) {
 #if PRINT_SYH
 int         lrts_smsg_success = 0;
 int         lrts_send_msg_id = 0;
+int         lrts_send_rdma_id = 0;
+int         lrts_send_rdma_success = 0;
 int         lrts_received_msg = 0;
 int         lrts_local_done_msg = 0;
 #endif
@@ -484,7 +486,9 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
       smsg_msglist_tail->next    = msg_tmp;
     }
     smsg_msglist_tail          = msg_tmp;
-    //buffered_smsg_counter++;
+#if PRINT_SYH
+    buffered_smsg_counter++;
+#endif
 }
 
 // messages smaller than max single SMSG
@@ -501,7 +505,10 @@ static void send_small_messages(int destNode, int size, char *msg)
         {
 #if PRINT_SYH
             lrts_smsg_success++;
-            CmiPrintf("[%d==>%d] sent done%d\n", myrank, destNode, lrts_smsg_success);
+            if(lrts_smsg_success == lrts_send_msg_id)
+                CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+            else
+                CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
             CmiFree(msg);
             return;
@@ -609,7 +616,10 @@ static int send_large_messages(int destNode, int size, char *msg)
             {
 #if PRINT_SYH
                 lrts_smsg_success++;
-                CmiPrintf("[%d==>%d] sent done%d\n", myrank, destNode, lrts_smsg_success);
+                if(lrts_smsg_success == lrts_send_msg_id)
+                    CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+                else
+                    CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
                 FreeControlMsg(control_msg_tmp);
                 return 1;
@@ -620,9 +630,8 @@ static int send_large_messages(int destNode, int size, char *msg)
             CmiAbort("Memory registor for large msg\n");
         }
     }
-    bzero(control_msg_tmp->source_mem_hndl);
-    //control_msg_tmp->source_mem_hndl.qword1 = 0;
-    //control_msg_tmp->source_mem_hndl.qword2 = 0;
+    control_msg_tmp->source_mem_hndl.qword1 = 0;
+    control_msg_tmp->source_mem_hndl.qword2 = 0;
     delay_send_small_msg((char*)control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     return 0;
 }
@@ -676,6 +685,7 @@ static void PumpNetworkRdmaMsgs()
     while( (status = GNI_CqGetEvent(post_rx_cqh, &event_data)) == GNI_RC_SUCCESS);
 }
 
+static int SendRdmaMsg();
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
 static void PumpNetworkSmsg()
 {
@@ -942,7 +952,7 @@ static int SendBufferMsg()
     MSG_LIST            *ptr;
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status;
-
+    //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {CmiPrintf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
     /* can add flow control here to control the number of messages sent before handle message */
     while(smsg_msglist_head != 0)
     {
@@ -957,7 +967,10 @@ static int SendBufferMsg()
                 if(status == GNI_RC_SUCCESS) {
 #if PRINT_SYH
                     lrts_smsg_success++;
-                    CmiPrintf("[%d==>%d] sent done%d\n", myrank, ptr->destNode, lrts_smsg_success);
+                    if(lrts_smsg_success == lrts_send_msg_id)
+                        CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
+                    else
+                        CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
                     CmiFree(ptr->msg);
                 }
@@ -991,7 +1004,10 @@ static int SendBufferMsg()
                 if(status == GNI_RC_SUCCESS) {
 #if PRINT_SYH
                     lrts_smsg_success++;
-                    CmiPrintf("[%d==>%d] sent done%d\n", myrank, ptr->destNode, lrts_smsg_success);
+                    if(lrts_smsg_success == lrts_send_msg_id)
+                        CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
+                    else
+                        CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
@@ -1004,12 +1020,13 @@ static int SendBufferMsg()
         if(status == GNI_RC_SUCCESS)
         {
             smsg_msglist_head = smsg_msglist_head->next;
-            //if(smsg_msglist_head == 0)
-            //    smsg_msglist_tail = 0;
             FreeMsgList(ptr);
-            //buffered_smsg_counter--;
 #if PRINT_SYH
-            CmiPrintf("SUCCESS [%d==>%d] sent done(%d)(counter=%d)\n", myrank, ptr->destNode, lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter);
+            buffered_smsg_counter--;
+            if(lrts_smsg_success == lrts_send_msg_id)
+                CmiPrintf("GOOD send buff [%d==>%d] send buffer sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
+            else
+                CmiPrintf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
         }else {
             return 0;
@@ -1037,6 +1054,7 @@ static void LrtsAdvanceCommunication()
     //CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", CmiMyPe());
     /* Send buffered Message */
     SendBufferMsg();
+    SendRdmaMsg();
 }
 
 static void _init_static_smsg()
