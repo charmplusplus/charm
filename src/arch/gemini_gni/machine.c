@@ -602,6 +602,8 @@ static int send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->source_addr    = (uint64_t)msg;
     control_msg_tmp->source         = myrank;
     control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
+    control_msg_tmp->source_mem_hndl.qword1 = 0;
+    control_msg_tmp->source_mem_hndl.qword2 = 0;
 #if PRINT_SYH
     lrts_send_msg_id++;
     CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
@@ -630,8 +632,6 @@ static int send_large_messages(int destNode, int size, char *msg)
             CmiAbort("Memory registor for large msg\n");
         }
     }
-    control_msg_tmp->source_mem_hndl.qword1 = 0;
-    control_msg_tmp->source_mem_hndl.qword2 = 0;
     delay_send_small_msg((char*)control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     return 0;
 }
@@ -918,12 +918,14 @@ static int SendRdmaMsg()
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
 
-    while(pending_rdma_head != 0)
+    RDMA_REQUEST *ptr = pending_rdma_head;
+    RDMA_REQUEST *prev = NULL;
+
+    while (ptr != NULL)
     {
-        RDMA_REQUEST *ptr=pending_rdma_head;
         gni_post_descriptor_t *pd = ptr->pd;
         // register memory first
-        if( pd->local_mem_hndl.qword1  == 0 && pd->local_mem_hndl.qword2  == 0)
+        if( pd->local_mem_hndl.qword1 == 0 && pd->local_mem_hndl.qword2 == 0)
         {
             status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh);
         }
@@ -935,14 +937,18 @@ static int SendRdmaMsg()
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
             if(status == GNI_RC_SUCCESS)
             {
-                pending_rdma_head = pending_rdma_head->next; 
-                //FreePostDesc(pd);
-                FreeRdmaRequest(ptr);
+                RDMA_REQUEST *tmp = ptr;
+                if (prev)
+                  prev->next = ptr->next;
+                else
+                  pending_rdma_head = ptr->next;
+                ptr = ptr->next;
+                FreeRdmaRequest(tmp);
+                continue;
             }
-            else
-                return 1;
-        }else
-            return 1;
+        }
+        prev = ptr;
+        ptr = ptr->next;
     } //end while
     return 0;
 }
