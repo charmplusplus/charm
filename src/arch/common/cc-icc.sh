@@ -2,6 +2,11 @@
 # test version
 ICC_ver=`icc -v 2>&1 | grep Version`
 ICC_ver=`echo $ICC_ver | awk '{ print $2; }' | awk 'BEGIN {FS="."}; { print $1; }'`
+if test -z "$ICC_ver" 
+then
+  ICC_ver=`icc -v 2>&1 | grep "icc version"`
+  ICC_ver=`echo $ICC_ver | awk '{ print $3; }' | awk 'BEGIN {FS="."}; { print $1; }'`
+fi
 test -z "$ICC_ver" && echo "ICC compiler not found!" && exit 1
 #echo version:$ICC_ver
 
