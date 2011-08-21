@@ -76,7 +76,6 @@ public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
   {
-    delete m;
     if(CkNumPes()>2) {
       CkAbort("Run this program on 1 or 2 processors only.\n");
     }
@@ -111,6 +110,7 @@ public:
     arrF.doneInserting();
     phase=0;
     mainProxy.maindone();
+    delete m;
   };
 
   void maindone(void)
