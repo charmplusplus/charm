@@ -954,15 +954,32 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     machineMulticast (new_npes, newpelist, size, msg);
 #else /* non-optimized multicast */
 
+    /* Note: if the pe list contains this processor,
+     * CmiReference call is dangerous unless the user code
+     * calls CmiFree to free the msg instead of "delete"
+     * for C++ codes. In this case, this self-msg could
+     * be processed before it gets sent to other procs.
+     * So, a "delete" of this msg whose ref count has 
+     * been increased will corrupt the msg data that
+     * have not been sent to other procs.
+     */
+    int isRefed = 0;
     for (i=0; i<npes-1; i++) {
-#if !CMK_SMP
-        CmiReference(msg);
-        CmiFreeSendFn(pes[i], size, msg);
-#else
-    CmiSyncSend(pes[i], size, msg);
-#endif
+	if(CmiNodeOf(pes[i]) == CmiMyNode()){
+            CmiSyncSend(pes[i], size, msg);
+        }else{
+            CmiReference(msg);
+            isRefed = 1;
+            CmiFreeSendFn(pes[i], size, msg);
+        }
     }
-    CmiFreeSendFn(pes[npes-1], size, msg);
+
+    if(CmiNodeOf(pes[npes-1]) == CmiMyNode() && isRefed == 1){
+       CmiSyncSend(pes[npes-1], size, msg);
+       CmiFree(msg);
+    }else{
+       CmiFreeSendFn(pes[npes-1], size, msg);
+    }
 #endif /* end of #if OPTIMIZED_MULTICAST */
 }
 #endif /* end of #if !CMK_MULTICAST_LIST_USE_COMMON_CODE */
