@@ -125,6 +125,7 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   torusX = true;
   torusY = true;
   torusZ = true;
+  numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
 int TopoManager::hasMultipleProcsPerNode() const {
