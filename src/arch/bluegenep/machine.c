@@ -954,6 +954,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     machineMulticast (new_npes, newpelist, size, msg);
 #else /* non-optimized multicast */
 
+#if !CMK_SMP
     /* Note: if the pe list contains this processor,
      * CmiReference call is dangerous unless the user code
      * calls CmiFree to free the msg instead of "delete"
@@ -965,7 +966,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
      */
     int isRefed = 0;
     for (i=0; i<npes-1; i++) {
-	if(CmiNodeOf(pes[i]) == CmiMyNode()){
+	if(pes[i] == CmiMyPe()){
             CmiSyncSend(pes[i], size, msg);
         }else{
             CmiReference(msg);
@@ -974,12 +975,21 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
         }
     }
 
-    if(CmiNodeOf(pes[npes-1]) == CmiMyNode() && isRefed == 1){
+    if(pes[npes-1] == CmiMyPe() && isRefed == 1){
        CmiSyncSend(pes[npes-1], size, msg);
        CmiFree(msg);
     }else{
        CmiFreeSendFn(pes[npes-1], size, msg);
     }
+#else
+   /* Note: in SMP mode, the CmiReferece could not be used because
+    * of the race condition between this thread and the other thread
+    * that calls CmiFree. In this case, CmiSyncSend has to be used
+    * instead.
+    */
+   for(i=0; i<npes-1; i++) CmiSyncSend(pes[i], size, msg);
+   CmiFreeSendFn(pes[npes-1], size, msg);
+#endif
 #endif /* end of #if OPTIMIZED_MULTICAST */
 }
 #endif /* end of #if !CMK_MULTICAST_LIST_USE_COMMON_CODE */
