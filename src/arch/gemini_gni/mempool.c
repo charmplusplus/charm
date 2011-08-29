@@ -106,7 +106,8 @@ void*  mempool_malloc(int size)
     }
     printf("++MALLOC served: %d, ptr:%p\n", size, alloc_ptr);
 
-    memset(alloc_ptr, ((long int)(alloc_ptr+size))%255, size);
+    //memset(alloc_ptr, ((long int)(alloc_ptr+size))%126, size);
+    //printf("Memset, %p, %d vs=%ld, vr=%ld\n", alloc_ptr, size, ((long int)(alloc_ptr+size))%126,  (*((char*)alloc_ptr)));
     return alloc_ptr;
 }
 
@@ -126,15 +127,16 @@ void mempool_free(void *ptr_free)
     printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
     free_lastbytes_pos = ptr_free +free_size;
 
+    /*
     for(i=0; i<free_size; i++)
     {
-        if( (int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%255)
+        if( (long int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%126)
         {
-            printf("verifying fails\n");
+            printf("verifying fails, %p, %d vs=%ld, vr=%ld\n", ptr_free, free_size, ((long int)(ptr_free+free_size))%126,  (long int)(*((char*)ptr_free+i)));
             exit(2);
         }
     }
-
+*/
     while(current!= NULL && current->mempool_ptr < ptr_free )
     {
         previous = current;
