@@ -5,15 +5,22 @@
  * $Revision$
  *****************************************************************************/
 
-#include <time.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #define SIZE_BYTES       4
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
+
+#define         MEMPOOL_DEBUG   0
+
+int malloc_count = 0;
+int free_count = 0;
+
 // for small memory allocation, large allocation
 int MEMPOOL_SIZE[POOLS_NUM] = {536870912, 536870912};
+
 
 typedef struct free_block_t 
 {
@@ -37,8 +44,9 @@ free_block_entry    *freelist_head;
 void init_mempool( int pool_size)
 {
     mempool = malloc(pool_size);
-
+#if  MEMPOOL_DEBUG
     printf("Mempool init with base_addr=%p\n\n", mempool);
+#endif
     freelist_head           = (free_block_entry*)malloc(sizeof(free_block_entry));
     freelist_head->size     = pool_size;
     freelist_head->mempool_ptr = mempool;
@@ -67,10 +75,12 @@ void*  mempool_malloc(int size)
     
     free_block_entry *bestfit = NULL;
     free_block_entry *bestfit_previous = NULL;
+#if  MEMPOOL_DEBUG
     printf("+MALLOC request :%d\n", size);
+#endif
     if(current == NULL)
     {
-        printf("Mempool overflow exit\n");
+        //printf("Mempool overflow exit\n");
         return NULL;
     }
     while(current!= NULL)
@@ -86,7 +96,7 @@ void*  mempool_malloc(int size)
     }
     if(bestfit == NULL)
     {
-        printf("No memory has such free empty chunck of %d\n", size);
+        //printf("No memory has such free empty chunck of %d\n", size);
         return NULL;
     }
 
@@ -104,10 +114,12 @@ void*  mempool_malloc(int size)
             bestfit_previous ->next = bestfit->next;
         free(bestfit);
     }
+#if  MEMPOOL_DEBUG
     printf("++MALLOC served: %d, ptr:%p\n", size, alloc_ptr);
 
-    //memset(alloc_ptr, ((long int)(alloc_ptr+size))%126, size);
-    //printf("Memset, %p, %d vs=%ld, vr=%ld\n", alloc_ptr, size, ((long int)(alloc_ptr+size))%126,  (*((char*)alloc_ptr)));
+    memset(alloc_ptr, ((long int)(alloc_ptr+size))%126, size);
+    printf("Memset, %p, %d vs=%ld, vr=%ld\n", alloc_ptr, size, ((long int)(alloc_ptr+size))%126,  (*((char*)alloc_ptr)));
+#endif
     return alloc_ptr;
 }
 
@@ -124,10 +136,10 @@ void mempool_free(void *ptr_free)
     free_block_entry *previous = NULL;
     
     memcpy(&free_size, free_firstbytes_pos, SIZE_BYTES);
-    printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
     free_lastbytes_pos = ptr_free +free_size;
 
-    /*
+#if  MEMPOOL_DEBUG
+    printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
     for(i=0; i<free_size; i++)
     {
         if( (long int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%126)
@@ -136,7 +148,7 @@ void mempool_free(void *ptr_free)
             exit(2);
         }
     }
-*/
+#endif
     while(current!= NULL && current->mempool_ptr < ptr_free )
     {
         previous = current;
@@ -196,6 +208,7 @@ void* syh_malloc(int size)
         mempools_data[pool_index].mempool_base_addr = mempool;
         mempools_data[pool_index].freelist_head = freelist_head;
     }   
+    malloc_count++;
     return mempool_malloc(size);
 }
 
@@ -211,24 +224,36 @@ void syh_free(void *ptr)
             break;
         }
     }
+    free_count++;
     mempool_free(ptr);
 }
-#define MAX_BINS  32
-void*  malloc_list[32];
+
+#if  0
+#define MAX_BINS  1024*1024
+void*  malloc_list[MAX_BINS];
 int    empty_pos = 0;
+
 
 int main(int argc, char* argv[])
 {
 
     void *ptr;
+    int mem_size = atoi(argv[2]);
     int iter = atoi(argv[1]);
     int i, size;
+    struct timeval start, end;
+    float timecost;
     //init_mempool();
     //srand(time(NULL));    
-    
+    if(argc<3)
+    {
+        printf("mempool iteration mem_size\n");
+        return 1;
+    }
+    gettimeofday(&start, NULL); 
     for(i=0; i<iter; i++)
     {
-        size = (rand()%(9)) + 8;
+        size = (rand()%(131)) + mem_size;
         if(empty_pos == MAX_BINS)
         {
             empty_pos--;
@@ -246,6 +271,11 @@ int main(int argc, char* argv[])
             syh_free(malloc_list[empty_pos]);
         }
     }
-
+    gettimeofday(&end, NULL); 
+    
+    timecost =  ((end.tv_sec * 1000000.0 + end.tv_usec)- (start.tv_sec * 1000000 + start.tv_usec))/iter;
+    printf("Memsize:%d Malloc time:%f us\n",  mem_size, timecost); 
     kill_allmempool();
 }
+
+#endif
