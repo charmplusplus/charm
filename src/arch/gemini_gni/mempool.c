@@ -1,187 +1,228 @@
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define SIZE_BYTES       4
+#define POOLS_NUM       2
+#define MAX_INT         536870912
+// for small memory allocation, large allocation
+int MEMPOOL_SIZE[POOLS_NUM] = {536870912, 536870912};
 
-/* adapted by Eric Bohm from Sanjay Kale's pplKalloc */
-
-
-/* An extremely simple implementation of memory allocation
-   that maintains bins for power-of-two sizes.
-   May waste about 33%  memory
-   Does not do recombining or buddies. 
-   Maintains stats that can be turned off for performance, but seems
-   plenty fast.
-*/
-
-
-#include "mempool.h"
-
-CpvStaticDeclare(char **, bins);
-CpvStaticDeclare(int *, binLengths);
-CpvStaticDeclare(int, maxBin);
-CpvStaticDeclare(int, numKallocs);
-CpvStaticDeclare(int, numMallocs);
-CpvStaticDeclare(int, numOallocs);
-CpvStaticDeclare(int, numFrees);
-CpvStaticDeclare(int, numOFrees);
-
-/* Each block has a 8 byte header.
-   This contains the pointer to the next  block, when 
-   the block is in the free list of a particular bin.
-   When it is allocated to the app, the header doesn't
-  have the pointer, but instead has the bin number to which
-  it belongs. I.e. the lg(block size).
-*/
-
-/* TODO wrap ifndef CMK_OPTIMIZE around the stats collection bits */
-
-/* TODO figure out where we should apply CmiMemLock in here */
-
-/* Once it all works inline it */
-
-extern void *malloc_nomigrate(size_t size);
-extern void free_nomigrate(void *mem);
-
-void GniPoolAllocInit(int numBins)
+typedef struct free_block_t 
 {
-  int i;
-  if (CpvInitialized(bins)) return;
-  CpvInitialize(char **, bins);
-  CpvInitialize(int *, binLengths);
-  CpvInitialize(int, maxBin);
-  CpvInitialize(int, numKallocs);
-  CpvInitialize(int, numMallocs);
-  CpvInitialize(int, numOFrees);
-  CpvInitialize(int, numFrees);
+    int     size;
+    void    *mempool_ptr;   //where this entry points to
+    struct free_block_t *next;
+} free_block_entry;
 
-  CpvAccess(bins) = (char **) malloc_nomigrate(  numBins*sizeof(char *));
-  CpvAccess(binLengths) = (int *) malloc_nomigrate(  numBins*sizeof(int));
-  CpvAccess(maxBin) = numBins -1;
-  for (i=0; i<numBins; i++) CpvAccess(bins)[i] = NULL;
-  for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
+// multiple mempool for different size allocation
+typedef struct mempool_block_t
+{
+    void *mempool_base_addr;
+    free_block_entry *freelist_head;
+}mempool_block;
 
-  CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
+mempool_block mempools_data[2];
+
+void  *mempool;
+free_block_entry *freelist_head;
+
+void init_mempool( int pool_size)
+{
+    mempool = malloc(pool_size);
+
+    printf("Mempool init with base_addr=%p\n\n", mempool);
+    freelist_head = (free_block_entry*)malloc(sizeof(free_block_entry));
+    freelist_head->size = pool_size;
+    freelist_head->mempool_ptr = mempool;
+    freelist_head->next = NULL;
 }
 
-void * GniPoolAlloc(unsigned int numBytes)
+void kill_allmempool()
 {
-  char *p;
-  int bin=0;
-  int n=numBytes+GNI_POOL_HEADER_SIZE;
-  CmiInt8 *header;
-  /* get 8 more bytes, so I can store a header to the left*/
-  numBytes = n;
-  while (n !=0) /* find the bin*/
-    {     
-      n = n >> 1;
-      bin++;
-    }
-  /* even 0 size messages go in bin 1 leaving 0 bin for oversized */
-  if(bin<CpvAccess(maxBin))
+    int i;
+    for(i=0; i<POOLS_NUM; i++)
     {
-      CmiAssert(bin>0);
-      if(CpvAccess(bins)[bin] != NULL) 
-	{
-	  /* CmiPrintf("p\n"); */
-#if CMK_WITH_STATS
-	  CpvAccess(numKallocs)++;
-#endif
-	  /* store some info in the header*/
-	  p = CpvAccess(bins)[bin];
-	  /*next pointer from the header*/
-
-	  /* this conditional should not be necessary
-	     as the header next pointer should contain NULL
-	     for us when there is nothing left in the pool */
-#if CMK_WITH_STATS
-	  if(--CpvAccess(binLengths)[bin])
-	      CpvAccess(bins)[bin] = (char *) *((char **)(p -GNI_POOL_HEADER_SIZE)); 
-	  else  /* there is no next */
-	      CpvAccess(bins)[bin] = NULL;
-#else
-	  CpvAccess(bins)[bin] = (char *) *((char **)(p -GNI_POOL_HEADER_SIZE)); 
-#endif
-	}
-      else
-	{
-	  /* CmiPrintf("np %d\n",bin); */
-#if CMK_WITH_STATS
-	  CpvAccess(numMallocs)++;
-#endif
-	  /* Round up the allocation to the max for this bin */
-	   p =(char *) malloc_nomigrate(1 << bin) + GNI_POOL_HEADER_SIZE;
-	}
+        if(mempools_data[i].mempool_base_addr != NULL)
+            free(mempools_data[i].mempool_base_addr);
     }
-  else
-    {
-      /*  CmiPrintf("u b%d v %d\n",bin,CpvAccess(maxBin));  */
-      /* just revert to malloc for big things and set bin 0 */
-#if CMK_WITH_STATS
-	  CpvAccess(numOallocs)++;
-#endif
-      p = (char *) malloc_nomigrate(numBytes) + GNI_POOL_HEADER_SIZE;
-      bin=0; 
-
-    }
-  header = (CmiInt8 *) (p-GNI_POOL_HEADER_SIZE);
-  CmiAssert(header !=NULL);
-  *header = bin; /* stamp the bin number on the header.*/
-  return p;
+    //all free entry
 }
 
-void GniPoolFree(void * p) 
+// append size before the real memory buffer
+void*  mempool_malloc(int size)
 {
-  char **header = (char **)( (char*)p - GNI_POOL_HEADER_SIZE);
-  int bin = *(CmiInt8 *)header;
-  /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
-  if(bin==0)
+    int     real_size = size + SIZE_BYTES;
+    void    *alloc_ptr;
+    int     bestfit_size = MAX_INT; //most close size  
+    free_block_entry *current = freelist_head;
+    free_block_entry *previous = NULL;
+    
+    free_block_entry *bestfit = NULL;
+    free_block_entry *bestfit_previous = NULL;
+    printf("+MALLOC request :%d\n", size);
+    if(current == NULL)
     {
-#if CMK_WITH_STATS
-      CpvAccess(numOFrees)++;
-#endif
-      free_nomigrate(header);
+        printf("Mempool overflow exit\n");
+        return NULL;
     }
-  else if(bin<CpvAccess(maxBin))
+    while(current!= NULL)
     {
-#if CMK_WITH_STATS
-      CpvAccess(numFrees)++;
-#endif
-      /* add to the begining of the list at CpvAccess(bins)[bin]*/
-      *header =  CpvAccess(bins)[bin]; 
-      CpvAccess(bins)[bin] = p;
-#if CMK_WITH_STATS
-      CpvAccess(binLengths)[bin]++;
-#endif
+        if(current->size >= real_size && current->size<bestfit_size)
+        {
+            bestfit_size = current->size;
+            bestfit = current;
+            bestfit_previous = previous;
+        }
+        previous = current;
+        current = current->next;
+    }
+    if(bestfit == NULL)
+    {
+        printf("No memory has such free empty chunck of %d\n", size);
+        return NULL;
+    }
+
+    alloc_ptr = bestfit->mempool_ptr+SIZE_BYTES;
+    memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
+    if(bestfit->size > real_size) //deduct this entry 
+    {
+        bestfit->size -= real_size;
+        bestfit->mempool_ptr += real_size;
+    }else   //delete this free entry
+    {
+        if(bestfit == freelist_head)
+            freelist_head = NULL;
+        else
+            bestfit_previous ->next = bestfit->next;
+        free(bestfit);
+    }
+    printf("++MALLOC served: %d, ptr:%p\n", size, alloc_ptr);
+    return alloc_ptr;
+}
+
+//sorted free_list and merge it if it become continous 
+void mempool_free(void *ptr_free)
+{
+    int merged = 0;
+    int free_size;
+    void *free_firstbytes_pos = ptr_free-SIZE_BYTES;
+    void *free_lastbytes_pos;
+    free_block_entry *new_entry; 
+    free_block_entry *current = freelist_head;
+    free_block_entry *previous = NULL;
+    
+    memcpy(&free_size, free_firstbytes_pos, SIZE_BYTES);
+    printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
+    free_lastbytes_pos = ptr_free +free_size;
+    while(current!= NULL && current->mempool_ptr < ptr_free )
+    {
+        previous = current;
+        current = current->next;
+    }
+    //continuos with previous free space 
+    if(previous!= NULL && previous->mempool_ptr + previous->size  == free_firstbytes_pos)
+    {
+        previous->size += (free_size + SIZE_BYTES);
+        merged = 1;
+    }
+    
+    if(current!= NULL && free_lastbytes_pos == current->mempool_ptr)
+    {
+        current->mempool_ptr = free_firstbytes_pos;
+        current->size +=  (free_size + SIZE_BYTES);
+        merged = 1;
+    }
+    //continous, merge
+    if(previous!= NULL && current!= NULL && previous->mempool_ptr + previous->size  == current->mempool_ptr)
+    {
+       previous->size += current->size;
+       previous->next = current->next;
+       free(current);
+    }
+    // no merge to previous, current, create new entry
+    if(merged == 0)
+    {
+        new_entry = malloc(sizeof(free_block_entry));
+        new_entry->mempool_ptr = free_firstbytes_pos;
+        new_entry->size = free_size + SIZE_BYTES;
+        new_entry->next = current;
+        if(previous == NULL)
+            freelist_head = new_entry;
+        else
+            previous->next = new_entry;
     }
 }
 
-void  GniPoolAllocStats()
+
+// external interface 
+void* syh_malloc(int size)
 {
-/*  int i;
-  CmiPrintf("numKallocs: %d\n", CpvAccess(numKallocs));
-  CmiPrintf("numMallocs: %d\n", CpvAccess(numMallocs));
-  CmiPrintf("numOallocs: %d\n", CpvAccess(numOallocs));
-  CmiPrintf("numOFrees: %d\n", CpvAccess(numOFrees));
-  CmiPrintf("numFrees: %d\n", CpvAccess(numFrees));
-  CmiPrintf("Bin:");
-  for (i=0; i<=CpvAccess(maxBin); i++)
-    if(CpvAccess(binLengths)[i])
-      CmiPrintf("%d\t", i);
-  CmiPrintf("\nVal:");
-  for (i=0; i<=CpvAccess(maxBin); i++)
-    if(CpvAccess(binLengths)[i])
-      CmiPrintf("%d\t", CpvAccess(binLengths)[i]);
-  CmiPrintf("\n");
-*/
+    int pool_index;
+    if(size < 1024*512)
+    {
+        pool_index = 0;
+    }else 
+        pool_index = 1;
+
+    mempool = mempools_data[pool_index].mempool_base_addr;
+    freelist_head = mempools_data[pool_index].freelist_head;
+    
+    if(mempool == NULL)
+    {
+        init_mempool(MEMPOOL_SIZE[pool_index]);
+        mempools_data[pool_index].mempool_base_addr = mempool;
+        mempools_data[pool_index].freelist_head = freelist_head;
+    }   
+    return mempool_malloc(size);
 }
 
-void GniPoolPrintList(char *p)
+void syh_free(void *ptr)
 {
-  CmiPrintf("Free list is: -----------\n");
-  while (p != 0) {
-    char ** header = (char **) p-GNI_POOL_HEADER_SIZE;
-    //CmiPrintf("next ptr is %p. ", p);
-    //CmiPrintf("header is at: %p, and contains: %p \n", header, *header);
-    p = *header;
-  }
-  //CmiPrintf("End of Free list: -----------\n");
- 
+    int i=0;
+    for(i=0; i<2; i++)
+    {
+        if(ptr> mempools_data[i].mempool_base_addr && ptr< mempools_data[i].mempool_base_addr + MEMPOOL_SIZE[i])
+        {
+            mempool = mempools_data[i].mempool_base_addr;
+            freelist_head = mempools_data[i].freelist_head;
+            break;
+        }
+    }
+    mempool_free(ptr);
 }
+#define MAX_BINS  32
+void*  malloc_list[32];
+int    empty_pos = 0;
+int main(int argc, char* argv[])
+{
 
+    void *ptr;
+    int iter = atoi(argv[1]);
+    int i, size;
+    //init_mempool();
+    //srand(time(NULL));    
+    
+    for(i=0; i<iter; i++)
+    {
+        size = (rand()%(9)) + 8;
+        if(empty_pos == MAX_BINS)
+        {
+            empty_pos--;
+            syh_free(malloc_list[empty_pos]);
+        }
+        while( (malloc_list[empty_pos] = syh_malloc(size)) == NULL)
+        {
+            empty_pos--;
+            syh_free(malloc_list[empty_pos]);
+        }
+        empty_pos++;
+        if(rand()%3 == 0 && empty_pos>0)
+        {
+            empty_pos--;
+            syh_free(malloc_list[empty_pos]);
+        }
+    }
+
+    kill_allmempool();
+}
