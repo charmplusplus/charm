@@ -188,6 +188,36 @@ void mempool_free(void *ptr_free)
     }
 }
 
+void* syh_memalign(int size, int align)
+{
+    int pool_index;
+    void *align_ptr, *ptr;
+    if(size < 1024*512)
+    {
+        pool_index = 0;
+    }else 
+        pool_index = 1;
+
+    mempool = mempools_data[pool_index].mempool_base_addr;
+    freelist_head = mempools_data[pool_index].freelist_head;
+    
+    if(mempool == NULL)
+    {
+        init_mempool(MEMPOOL_SIZE[pool_index]);
+        mempools_data[pool_index].mempool_base_addr = mempool;
+        mempools_data[pool_index].freelist_head = freelist_head;
+    }   
+    
+    ptr = mempool_malloc(size+(align-1) + sizeof(void*));
+ 
+    align_ptr = ptr + sizeof(void*);
+
+}
+
+void syh_alignfree(void *ptr)
+{
+
+}
 
 // external interface 
 void* syh_malloc(int size)
