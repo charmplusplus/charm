@@ -5,22 +5,15 @@
  * $Revision$
  *****************************************************************************/
 
-#include <sys/time.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+/** Memory pool implementation */
+
 #define SIZE_BYTES       4
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
 
-#define         MEMPOOL_DEBUG   0
-
-int malloc_count = 0;
-int free_count = 0;
-
+#define  GetMemHndl(x)  (x-ALIGNBUF+SIZE_BYTES)
 // for small memory allocation, large allocation
 int MEMPOOL_SIZE[POOLS_NUM] = {536870912, 536870912};
-
 
 typedef struct free_block_t 
 {
@@ -33,6 +26,7 @@ typedef struct free_block_t
 typedef struct mempool_block_t
 {
     void                *mempool_base_addr;
+    gni_mem_handle_t    mempool_hndl;
     free_block_entry    *freelist_head;
 }mempool_block;
 
@@ -40,10 +34,13 @@ mempool_block       mempools_data[2];
 
 void                *mempool;
 free_block_entry    *freelist_head;
-
+gni_mem_handle_t    *mem_hndl;
 void init_mempool( int pool_size)
 {
-    mempool = malloc(pool_size);
+    gni_return_t status;
+    mempool = memalign(ALIGNBUF, pool_size);
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mempool, pool_size,  mem_hndl, &omdh);
+    GNI_RC_CHECK("Mempool register", status);
 #if  MEMPOOL_DEBUG
     printf("Mempool init with base_addr=%p\n\n", mempool);
 #endif
@@ -102,6 +99,7 @@ void*  mempool_malloc(int size)
 
     alloc_ptr = bestfit->mempool_ptr+SIZE_BYTES;
     memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
+    memcpy(bestfit->mempool_ptr+SIZE_BYTES, mem_hndl, sizeof(gni_mem_handle_t));
     if(bestfit->size > real_size) //deduct this entry 
     {
         bestfit->size -= real_size;
@@ -188,37 +186,6 @@ void mempool_free(void *ptr_free)
     }
 }
 
-void* syh_memalign(int size, int align)
-{
-    int pool_index;
-    void *align_ptr, *ptr;
-    if(size < 1024*512)
-    {
-        pool_index = 0;
-    }else 
-        pool_index = 1;
-
-    mempool = mempools_data[pool_index].mempool_base_addr;
-    freelist_head = mempools_data[pool_index].freelist_head;
-    
-    if(mempool == NULL)
-    {
-        init_mempool(MEMPOOL_SIZE[pool_index]);
-        mempools_data[pool_index].mempool_base_addr = mempool;
-        mempools_data[pool_index].freelist_head = freelist_head;
-    }   
-    
-    ptr = mempool_malloc(size+(align-1) + sizeof(void*));
- 
-    align_ptr = ptr + sizeof(void*);
-
-}
-
-void syh_alignfree(void *ptr)
-{
-
-}
-
 // external interface 
 void* syh_malloc(int size)
 {
@@ -231,14 +198,13 @@ void* syh_malloc(int size)
 
     mempool = mempools_data[pool_index].mempool_base_addr;
     freelist_head = mempools_data[pool_index].freelist_head;
-    
+    mem_hndl = mempools_data[pool_index].mempool_hndl; 
     if(mempool == NULL)
     {
         init_mempool(MEMPOOL_SIZE[pool_index]);
         mempools_data[pool_index].mempool_base_addr = mempool;
         mempools_data[pool_index].freelist_head = freelist_head;
     }   
-    malloc_count++;
     return mempool_malloc(size);
 }
 
@@ -254,58 +220,6 @@ void syh_free(void *ptr)
             break;
         }
     }
-    free_count++;
     mempool_free(ptr);
 }
 
-#if  0
-#define MAX_BINS  1024*1024
-void*  malloc_list[MAX_BINS];
-int    empty_pos = 0;
-
-
-int main(int argc, char* argv[])
-{
-
-    void *ptr;
-    int mem_size = atoi(argv[2]);
-    int iter = atoi(argv[1]);
-    int i, size;
-    struct timeval start, end;
-    float timecost;
-    //init_mempool();
-    //srand(time(NULL));    
-    if(argc<3)
-    {
-        printf("mempool iteration mem_size\n");
-        return 1;
-    }
-    gettimeofday(&start, NULL); 
-    for(i=0; i<iter; i++)
-    {
-        size = (rand()%(131)) + mem_size;
-        if(empty_pos == MAX_BINS)
-        {
-            empty_pos--;
-            syh_free(malloc_list[empty_pos]);
-        }
-        while( (malloc_list[empty_pos] = syh_malloc(size)) == NULL)
-        {
-            empty_pos--;
-            syh_free(malloc_list[empty_pos]);
-        }
-        empty_pos++;
-        if(rand()%3 == 0 && empty_pos>0)
-        {
-            empty_pos--;
-            syh_free(malloc_list[empty_pos]);
-        }
-    }
-    gettimeofday(&end, NULL); 
-    
-    timecost =  ((end.tv_sec * 1000000.0 + end.tv_usec)- (start.tv_sec * 1000000 + start.tv_usec))/iter;
-    printf("Memsize:%d Malloc time:%f us\n",  mem_size, timecost); 
-    kill_allmempool();
-}
-
-#endif

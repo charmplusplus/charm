@@ -35,6 +35,7 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
+#define USE_LRTS_MEMPOOL   0
 #define PRINT_SYH  0
 
 #if PRINT_SYH
@@ -106,6 +107,7 @@ static int  log2_SMSG_MAX_MSG;
 #define GNI_RC_CHECK(msg,rc)
 #endif
 
+#define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
 static int useStaticSMSG   = 1;
@@ -141,6 +143,8 @@ int                     DMA_buffer_size;
 int                     DMA_max_single_msg = 131072;//524288 ;
 
 #define                 DMA_SIZE_PER_SLOT       8192
+
+#include "mempool.c"
 
 typedef struct dma_msgid_map
 {
@@ -590,10 +594,43 @@ static int send_medium_messages(int destNode, int size, char *msg)
     }
 #endif
 }
+
 // Large message, send control to receiver, receiver register memory and do a GET 
 inline
 static int send_large_messages(int destNode, int size, char *msg)
 {
+#if     USE_LRTS_MEMPOOL
+    gni_return_t        status  =   GNI_RC_SUCCESS;
+    CONTROL_MSG         *control_msg_tmp;
+    uint32_t            vmdh_index  = -1;
+    /* construct a control message and send */
+    MallocControlMsg(control_msg_tmp);
+    control_msg_tmp->source_addr    = (uint64_t)msg;
+    control_msg_tmp->source         = myrank;
+    control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
+    memcpy( &(control_msg_tmp->source_mem_hndl), GetMemHndl(msg), sizeof(gni_mem_handle_t)) ;
+#if PRINT_SYH
+    lrts_send_msg_id++;
+    CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+#endif
+    status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
+    if(status == GNI_RC_SUCCESS)
+    {
+#if PRINT_SYH
+        lrts_smsg_success++;
+        if(lrts_smsg_success == lrts_send_msg_id)
+            CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+        else
+            CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+#endif
+        FreeControlMsg(control_msg_tmp);
+        return 1;
+    }
+
+    delay_send_small_msg((char*)control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+    return 0;
+// NOT use mempool, should slow 
+#else
     gni_return_t        status  =   GNI_RC_SUCCESS;
     CONTROL_MSG         *control_msg_tmp;
     uint32_t            vmdh_index  = -1;
@@ -634,8 +671,8 @@ static int send_large_messages(int destNode, int size, char *msg)
     }
     delay_send_small_msg((char*)control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     return 0;
+#endif
 }
-
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
     CmiSetMsgSize(msg, size);
@@ -731,7 +768,9 @@ static void PumpNetworkSmsg()
             }
             else if(msg_tag == ACK_TAG) {
                 /* Get is done, release message . Now put is not used yet*/
+#if         !USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh);
+#endif
                 CmiFree((void*)((CONTROL_MSG *) header)->source_addr);
                 SendRdmaMsg();
             }else{
@@ -750,6 +789,59 @@ static void PumpNetworkSmsg()
 
 static void getLargeMsgRequest(void* header, uint64_t inst_id)
 {
+#if     USE_LRTS_MEMPOOL
+    CONTROL_MSG         *request_msg;
+    gni_return_t        status;
+    void                *msg_data;
+    gni_post_descriptor_t *pd;
+    RDMA_REQUEST        *rdma_request_msg;
+    gni_mem_handle_t    msg_mem_hndl;
+    int source;
+    // initial a get to transfer data from the sender side */
+    request_msg = (CONTROL_MSG *) header;
+    source = request_msg->source;
+    msg_data = CmiAlloc(request_msg->length);
+    _MEMCHECK(msg_data);
+    memcpy(&msg_mem_hndl, GetMemHndl(msg_data), sizeof(gni_mem_handle_t));
+
+    MallocPostDesc(pd);
+    if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
+        pd->type            = GNI_POST_FMA_GET;
+    else
+        pd->type            = GNI_POST_RDMA_GET;
+
+    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+    pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
+    pd->length          = ALIGN4(request_msg->length);
+    pd->local_addr      = (uint64_t) msg_data;
+    pd->local_mem_hndl  = msg_mem_hndl;
+    pd->remote_addr     = request_msg->source_addr;
+    pd->remote_mem_hndl = request_msg->source_mem_hndl;
+    pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
+    pd->rdma_mode       = 0;
+
+    if(pd->type == GNI_POST_RDMA_GET) 
+        status = GNI_PostRdma(ep_hndl_array[source], pd);
+    else
+        status = GNI_PostFma(ep_hndl_array[source],  pd);
+    if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
+    {
+        MallocRdmaRequest(rdma_request_msg);
+        rdma_request_msg->next = 0;
+        rdma_request_msg->destNode = inst_id;
+        rdma_request_msg->pd = pd;
+        if(pending_rdma_head == 0)
+        {
+            pending_rdma_head = rdma_request_msg;
+        }else
+        {
+            pending_rdma_tail->next = rdma_request_msg;
+        }
+        pending_rdma_tail = rdma_request_msg;
+    }else
+        GNI_RC_CHECK("AFter posting", status);
+
+#else
     CONTROL_MSG         *request_msg;
     gni_return_t        status;
     void                *msg_data;
@@ -814,8 +906,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         pending_rdma_tail = rdma_request_msg;
     }else
         GNI_RC_CHECK("AFter posting", status);
+#endif
 }
-
 /* Check whether message send or get is confirmed by remote */
 static void PumpLocalSmsgTransactions()
 {
@@ -902,7 +994,9 @@ static void PumpLocalRdmaTransactions()
                     else
                         GNI_RC_CHECK("GNI_SmsgSendWTag", status);
                 }
+#if     !USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+#endif
                 CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                 //handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
                 handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
@@ -1311,9 +1405,15 @@ void* LrtsAlloc(int n_bytes, int header)
         return malloc(totalsize);
     }else 
     {
+
         CmiAssert(header <= ALIGNBUF);
+#if     USE_LRTS_MEMPOOL
+        n_bytes = ALIGN64(n_bytes);
+        char *res = syh_malloc(ALIGNBUF+n_bytes);
+#else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
+#endif
         return res + ALIGNBUF - header;
     }
 }
@@ -1324,7 +1424,13 @@ void  LrtsFree(void *msg)
     if (size <= SMSG_MAX_MSG)
       free(msg);
     else
-      free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+    {
+#if     USE_LRTS_MEMPOOL
+        syh_free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+#else
+        free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+#endif
+    }
 }
 
 static void LrtsExit()
@@ -1432,4 +1538,6 @@ int CmiBarrier()
     return status;
 
 }
+
+
 
