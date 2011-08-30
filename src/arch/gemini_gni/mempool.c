@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /** Memory pool implementation */
-
+#define MEMPOOL_DEBUG   0
 #define SIZE_BYTES       4
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
@@ -56,7 +56,10 @@ void kill_allmempool()
     for(i=0; i<POOLS_NUM; i++)
     {
         if(mempools_data[i].mempool_base_addr != NULL)
+        {
+            GNI_MemDeregister(nic_hndl, &(mempools_data[i].mempool_hndl));
             free(mempools_data[i].mempool_base_addr);
+        }
     }
     //all free entry
 }
@@ -64,7 +67,7 @@ void kill_allmempool()
 // append size before the real memory buffer
 void*  mempool_malloc(int size)
 {
-    int     real_size = size + SIZE_BYTES;
+    int     real_size = size;
     void    *alloc_ptr;
     int     bestfit_size = MAX_INT; //most close size  
     free_block_entry *current = freelist_head;
@@ -77,7 +80,7 @@ void*  mempool_malloc(int size)
 #endif
     if(current == NULL)
     {
-        //printf("Mempool overflow exit\n");
+        printf("Mempool overflow exit\n");
         return NULL;
     }
     while(current!= NULL)
@@ -93,11 +96,11 @@ void*  mempool_malloc(int size)
     }
     if(bestfit == NULL)
     {
-        //printf("No memory has such free empty chunck of %d\n", size);
+        printf("No memory has such free empty chunck of %d\n", size);
         return NULL;
     }
 
-    alloc_ptr = bestfit->mempool_ptr+SIZE_BYTES;
+    alloc_ptr = bestfit->mempool_ptr;//+SIZE_BYTES;
     memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
     memcpy(bestfit->mempool_ptr+SIZE_BYTES, mem_hndl, sizeof(gni_mem_handle_t));
     if(bestfit->size > real_size) //deduct this entry 
@@ -115,8 +118,8 @@ void*  mempool_malloc(int size)
 #if  MEMPOOL_DEBUG
     printf("++MALLOC served: %d, ptr:%p\n", size, alloc_ptr);
 
-    memset(alloc_ptr, ((long int)(alloc_ptr+size))%126, size);
-    printf("Memset, %p, %d vs=%ld, vr=%ld\n", alloc_ptr, size, ((long int)(alloc_ptr+size))%126,  (*((char*)alloc_ptr)));
+    //memset(alloc_ptr+SIZE_BYTES, ((long int)(alloc_ptr+size))%126, size);
+    //printf("Memset, %p, %d vs=%ld, vr=%ld\n", alloc_ptr, size, ((long int)(alloc_ptr+size))%126,  (*((char*)alloc_ptr)));
 #endif
     return alloc_ptr;
 }
@@ -127,7 +130,7 @@ void mempool_free(void *ptr_free)
     int i;
     int merged = 0;
     int free_size;
-    void *free_firstbytes_pos = ptr_free-SIZE_BYTES;
+    void *free_firstbytes_pos = ptr_free;
     void *free_lastbytes_pos;
     free_block_entry *new_entry; 
     free_block_entry *current = freelist_head;
@@ -138,14 +141,14 @@ void mempool_free(void *ptr_free)
 
 #if  MEMPOOL_DEBUG
     printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
-    for(i=0; i<free_size; i++)
+    /*for(i=0; i<free_size; i++)
     {
         if( (long int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%126)
         {
             printf("verifying fails, %p, %d vs=%ld, vr=%ld\n", ptr_free, free_size, ((long int)(ptr_free+free_size))%126,  (long int)(*((char*)ptr_free+i)));
             exit(2);
         }
-    }
+    }*/
 #endif
     while(current!= NULL && current->mempool_ptr < ptr_free )
     {
@@ -155,14 +158,14 @@ void mempool_free(void *ptr_free)
     //continuos with previous free space 
     if(previous!= NULL && previous->mempool_ptr + previous->size  == free_firstbytes_pos)
     {
-        previous->size += (free_size + SIZE_BYTES);
+        previous->size += free_size;
         merged = 1;
     }
     
     if(current!= NULL && free_lastbytes_pos == current->mempool_ptr)
     {
         current->mempool_ptr = free_firstbytes_pos;
-        current->size +=  (free_size + SIZE_BYTES);
+        current->size +=  free_size ;
         merged = 1;
     }
     //continous, merge
@@ -177,7 +180,7 @@ void mempool_free(void *ptr_free)
     {
         new_entry = malloc(sizeof(free_block_entry));
         new_entry->mempool_ptr = free_firstbytes_pos;
-        new_entry->size = free_size + SIZE_BYTES;
+        new_entry->size = free_size ;
         new_entry->next = current;
         if(previous == NULL)
             freelist_head = new_entry;
@@ -190,7 +193,7 @@ void mempool_free(void *ptr_free)
 void* syh_malloc(int size)
 {
     int pool_index;
-    if(size < 1024*512)
+    if(size <= 1024*1024*4)
     {
         pool_index = 0;
     }else 
@@ -198,7 +201,7 @@ void* syh_malloc(int size)
 
     mempool = mempools_data[pool_index].mempool_base_addr;
     freelist_head = mempools_data[pool_index].freelist_head;
-    mem_hndl = mempools_data[pool_index].mempool_hndl; 
+    mem_hndl = &(mempools_data[pool_index].mempool_hndl); 
     if(mempool == NULL)
     {
         init_mempool(MEMPOOL_SIZE[pool_index]);

@@ -35,7 +35,7 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
-#define USE_LRTS_MEMPOOL   0
+#define USE_LRTS_MEMPOOL   1
 #define PRINT_SYH  0
 
 #if PRINT_SYH
@@ -144,7 +144,6 @@ int                     DMA_max_single_msg = 131072;//524288 ;
 
 #define                 DMA_SIZE_PER_SLOT       8192
 
-#include "mempool.c"
 
 typedef struct dma_msgid_map
 {
@@ -337,6 +336,8 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define IsFree(a,ind)  !( a& (1<<(ind) ))
 #define SET_BITS(a,ind) a = ( a | (1<<(ind )) )
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
+
+#include "mempool.c"
 /* get the upper bound of log 2 */
 int mylog2(int size)
 {
@@ -1399,10 +1400,14 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 void* LrtsAlloc(int n_bytes, int header)
 {
+    void *ptr;
+#if PRINT_SYH
+    CmiPrintf("Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
+#endif
     if(n_bytes <= SMSG_MAX_MSG)
     {
         int totalsize = n_bytes+header;
-        return malloc(totalsize);
+        ptr = malloc(totalsize);
     }else 
     {
 
@@ -1414,13 +1419,20 @@ void* LrtsAlloc(int n_bytes, int header)
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
 #endif
-        return res + ALIGNBUF - header;
+        ptr = res + ALIGNBUF - header;
     }
+#if PRINT_SYH
+    CmiPrintf("Done Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
+#endif
+    return ptr;
 }
 
 void  LrtsFree(void *msg)
 {
     int size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
+#if PRINT_SYH
+    CmiPrintf("Free lrts for bytes=%d, ptr=%p\n", size, msg);
+#endif
     if (size <= SMSG_MAX_MSG)
       free(msg);
     else
@@ -1431,11 +1443,17 @@ void  LrtsFree(void *msg)
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
     }
+#if PRINT_SYH
+    CmiPrintf("Done Free lrts for bytes=%d\n", size);
+#endif
 }
 
 static void LrtsExit()
 {
     /* free memory ? */
+#if     USE_LRTS_MEMPOOL
+    kill_allmempool();
+#endif
     PMI_Finalize();
     exit(0);
 }
