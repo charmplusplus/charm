@@ -34,24 +34,26 @@ mempool_block       mempools_data[2];
 
 void                *mempool;
 free_block_entry    *freelist_head;
-gni_mem_handle_t    *mem_hndl;
+//free_block_entry    **freelist_head;
+gni_mem_handle_t    mem_hndl;
 void init_mempool( int pool_size)
 {
     gni_return_t status;
     mempool = memalign(ALIGNBUF, pool_size);
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mempool, pool_size,  mem_hndl, &omdh);
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mempool, pool_size,  &mem_hndl, &omdh);
     GNI_RC_CHECK("Mempool register", status);
 #if  MEMPOOL_DEBUG
     printf("Mempool init with base_addr=%p\n\n", mempool);
 #endif
     freelist_head           = (free_block_entry*)malloc(sizeof(free_block_entry));
-    freelist_head->size     = pool_size;
-    freelist_head->mempool_ptr = mempool;
-    freelist_head->next     = NULL;
+    (freelist_head)->size     = pool_size;
+    (freelist_head)->mempool_ptr = mempool;
+    (freelist_head)->next     = NULL;
 }
 
 void kill_allmempool()
 {
+#if 0
     int i;
     for(i=0; i<POOLS_NUM; i++)
     {
@@ -61,6 +63,9 @@ void kill_allmempool()
             free(mempools_data[i].mempool_base_addr);
         }
     }
+#endif
+    GNI_MemDeregister(nic_hndl, &mem_hndl);
+    free(mempool);
     //all free entry
 }
 
@@ -76,7 +81,7 @@ void*  mempool_malloc(int size)
     free_block_entry *bestfit = NULL;
     free_block_entry *bestfit_previous = NULL;
 #if  MEMPOOL_DEBUG
-    printf("+MALLOC request :%d\n", size);
+    printf("+MALLOC request :%d, freehead=%p, current=%p\n", size, current->mempool_ptr, (freelist_head)->mempool_ptr);
 #endif
     if(current == NULL)
     {
@@ -91,8 +96,10 @@ void*  mempool_malloc(int size)
             bestfit = current;
             bestfit_previous = previous;
         }
+        //printf(" free entr:%p, size=%d\n", current->mempool_ptr, current->size);
         previous = current;
         current = current->next;
+
     }
     if(bestfit == NULL)
     {
@@ -102,7 +109,7 @@ void*  mempool_malloc(int size)
 
     alloc_ptr = bestfit->mempool_ptr;//+SIZE_BYTES;
     memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
-    memcpy(bestfit->mempool_ptr+SIZE_BYTES, mem_hndl, sizeof(gni_mem_handle_t));
+    memcpy(bestfit->mempool_ptr+SIZE_BYTES, &mem_hndl, sizeof(gni_mem_handle_t));
     if(bestfit->size > real_size) //deduct this entry 
     {
         bestfit->size -= real_size;
@@ -110,7 +117,7 @@ void*  mempool_malloc(int size)
     }else   //delete this free entry
     {
         if(bestfit == freelist_head)
-            freelist_head = NULL;
+            freelist_head = freelist_head->next;
         else
             bestfit_previous ->next = bestfit->next;
         free(bestfit);
@@ -136,11 +143,10 @@ void mempool_free(void *ptr_free)
     free_block_entry *current = freelist_head;
     free_block_entry *previous = NULL;
     
-    memcpy(&free_size, free_firstbytes_pos, SIZE_BYTES);
-    free_lastbytes_pos = ptr_free +free_size;
 
 #if  MEMPOOL_DEBUG
-    printf("--FREE request :ptr=%p, size=%d\n", ptr_free, free_size); 
+    printf("INSIDE FREE ptr=%p, freehead=%p\n", ptr_free, freelist_head);
+    printf("--FREE request :ptr=%p, size=%d, freehead=%p\n", ptr_free, free_size, (freelist_head)->mempool_ptr); 
     /*for(i=0; i<free_size; i++)
     {
         if( (long int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%126)
@@ -150,18 +156,22 @@ void mempool_free(void *ptr_free)
         }
     }*/
 #endif
+    memcpy(&free_size, free_firstbytes_pos, SIZE_BYTES);
+    free_lastbytes_pos = ptr_free +free_size;
+    
     while(current!= NULL && current->mempool_ptr < ptr_free )
     {
         previous = current;
         current = current->next;
     }
+    //printf("pre=%p, current=%p, current->ptr=%p\n", previous, current->mempool_ptr);
     //continuos with previous free space 
     if(previous!= NULL && previous->mempool_ptr + previous->size  == free_firstbytes_pos)
     {
         previous->size += free_size;
         merged = 1;
     }
-    
+    else
     if(current!= NULL && free_lastbytes_pos == current->mempool_ptr)
     {
         current->mempool_ptr = free_firstbytes_pos;
@@ -186,12 +196,15 @@ void mempool_free(void *ptr_free)
             freelist_head = new_entry;
         else
             previous->next = new_entry;
+        //printf(" create new entry, freehead=%p, %p\n", (freelist_head)->mempool_ptr, free_firstbytes_pos);
     }
 }
 
 // external interface 
 void* syh_malloc(int size)
 {
+#if 0
+    void *ptr;
     int pool_index;
     if(size <= 1024*1024*4)
     {
@@ -200,29 +213,31 @@ void* syh_malloc(int size)
         pool_index = 1;
 
     mempool = mempools_data[pool_index].mempool_base_addr;
-    freelist_head = mempools_data[pool_index].freelist_head;
+    *freelist_head = mempools_data[pool_index].freelist_head;
     mem_hndl = &(mempools_data[pool_index].mempool_hndl); 
     if(mempool == NULL)
     {
         init_mempool(MEMPOOL_SIZE[pool_index]);
         mempools_data[pool_index].mempool_base_addr = mempool;
-        mempools_data[pool_index].freelist_head = freelist_head;
-    }   
+    }
+#endif
     return mempool_malloc(size);
 }
 
 void syh_free(void *ptr)
 {
+#if 0
     int i=0;
     for(i=0; i<2; i++)
     {
         if(ptr> mempools_data[i].mempool_base_addr && ptr< mempools_data[i].mempool_base_addr + MEMPOOL_SIZE[i])
         {
             mempool = mempools_data[i].mempool_base_addr;
-            freelist_head = mempools_data[i].freelist_head;
+            *freelist_head = mempools_data[i].freelist_head;
             break;
         }
     }
+#endif
     mempool_free(ptr);
 }
 

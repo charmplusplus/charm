@@ -1394,6 +1394,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
+    
+    init_mempool( 536870912);
     free(MPID_UGNI_AllAddr);
 }
 
@@ -1401,8 +1403,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr;
-#if PRINT_SYH
-    CmiPrintf("Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
+#if 0
+    CmiPrintf("\n[PE:%d]Alloc Lrts for bytes=%d, head=%d\n", CmiMyPe(), n_bytes, header);
 #endif
     if(n_bytes <= SMSG_MAX_MSG)
     {
@@ -1421,7 +1423,7 @@ void* LrtsAlloc(int n_bytes, int header)
 #endif
         ptr = res + ALIGNBUF - header;
     }
-#if PRINT_SYH
+#if 0 
     CmiPrintf("Done Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
 #endif
     return ptr;
@@ -1430,20 +1432,20 @@ void* LrtsAlloc(int n_bytes, int header)
 void  LrtsFree(void *msg)
 {
     int size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
-#if PRINT_SYH
-    CmiPrintf("Free lrts for bytes=%d, ptr=%p\n", size, msg);
-#endif
     if (size <= SMSG_MAX_MSG)
       free(msg);
     else
     {
+#if 0
+        CmiPrintf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+#endif
 #if     USE_LRTS_MEMPOOL
         syh_free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #else
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
     }
-#if PRINT_SYH
+#if 0 
     CmiPrintf("Done Free lrts for bytes=%d\n", size);
 #endif
 }
