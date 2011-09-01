@@ -956,13 +956,13 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 
 #if !CMK_SMP
     /* Note: if the pe list contains this processor,
-     * CmiReference call is dangerous unless the user code
-     * calls CmiFree to free the msg instead of "delete"
-     * for C++ codes. In this case, this self-msg could
-     * be processed before it gets sent to other procs.
-     * So, a "delete" of this msg whose ref count has 
-     * been increased will corrupt the msg data that
-     * have not been sent to other procs.
+     * this self-msg could be processed before it gets
+     * sent to other procs. So when using CmiReference
+     * to this msg in order to avoid copies for inter-node
+     * msg sending, this self-msg needs to be unchanged 
+     * in the user codes. Since this condition could not
+     * be guaranteed, CmiSyncSend needs to be used to
+     * send this msg to itself.
      */
     int isRefed = 0;
     for (i=0; i<npes-1; i++) {
