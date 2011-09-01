@@ -63,7 +63,7 @@ onesided_md_t    omdh;
 
 #else
 uint8_t   onesided_hnd, omdh;
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE|GNI_MEM_USE_GART, -1, mem_hndl)
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
 
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
@@ -110,6 +110,7 @@ static int  log2_SMSG_MAX_MSG;
 #define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
+static int Mempool_MaxSize = 1024*1024*128;
 static int useStaticSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
@@ -1195,7 +1196,7 @@ static void _init_static_smsg()
     bzero(smsg_mailbox_base, smsg_memlen*(mysize-1));
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize-1), smsg_rx_cqh,
-            GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
+            GNI_MEM_READWRITE,   
             vmdh_index,
             &my_smsg_mdh_mailbox);
 
@@ -1268,7 +1269,7 @@ static void _init_DMA_buffer()
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)DMA_incoming_base_addr,
             DMA_buffer_size, smsg_rx_cqh,
-            GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
+            GNI_MEM_READWRITE ,   
             vmdh_index,
             &);
             */
@@ -1278,7 +1279,7 @@ static void _init_DMA_buffer()
     DMA_buffer_base_mdh_addr.addr = (uint64_t)memalign(ALIGNBUF, DMA_buffer_size);
     status = GNI_MemRegister(nic_hndl, DMA_buffer_base_mdh_addr.addr,
         DMA_buffer_size, smsg_rx_cqh,
-        GNI_MEM_READWRITE | GNI_MEM_USE_GART | GNI_MEM_PI_FLUSH,   
+        GNI_MEM_READWRITE ,   
         -1,
         &(DMA_buffer_base_mdh_addr.mdh));
     GNI_RC_CHECK("GNI_MemRegister", status);
@@ -1303,7 +1304,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
-    
+   
+    //Mempool_MaxSize = CmiGetArgFlag(*argv, "+useMemorypoolSize");
     //useStaticSMSG = CmiGetArgFlag(*argv, "+useStaticSmsg");
     //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
     
@@ -1390,12 +1392,15 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     {
         _init_static_msgq();
     }
+#if     USE_LRTS_MEMPOOL
+    init_mempool( 1024*1024*128);
+    //init_mempool(Mempool_MaxSize);
+#endif
 
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
     
-    init_mempool( 536870912);
     free(MPID_UGNI_AllAddr);
 }
 
