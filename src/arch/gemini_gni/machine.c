@@ -1385,15 +1385,18 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     }
     /* Depending on the number of cores in the job, decide different method */
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
-    if(useStaticSMSG == 1)
+    if(mysize > 1)
     {
-        _init_static_smsg(mysize);
-    }else if(useStaticMSGQ == 1)
-    {
-        _init_static_msgq();
+        if(useStaticSMSG == 1)
+        {
+            _init_static_smsg(mysize);
+        }else if(useStaticMSGQ == 1)
+        {
+            _init_static_msgq();
+        }
     }
 #if     USE_LRTS_MEMPOOL
-    init_mempool( 1024*1024*128);
+    init_mempool( 1024*1024*16);
     //init_mempool(Mempool_MaxSize);
 #endif
 
@@ -1421,7 +1424,7 @@ void* LrtsAlloc(int n_bytes, int header)
         CmiAssert(header <= ALIGNBUF);
 #if     USE_LRTS_MEMPOOL
         n_bytes = ALIGN64(n_bytes);
-        char *res = syh_malloc(ALIGNBUF+n_bytes);
+        char *res = syh_mempool_malloc(ALIGNBUF+n_bytes);
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
@@ -1445,7 +1448,7 @@ void  LrtsFree(void *msg)
         CmiPrintf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
 #if     USE_LRTS_MEMPOOL
-        syh_free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+        syh_mempool_free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #else
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif

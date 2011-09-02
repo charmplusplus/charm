@@ -19,6 +19,7 @@ typedef struct free_block_t
 {
     int     size;
     void    *mempool_ptr;   //where this entry points to
+    gni_mem_handle_t    mem_hndl;
     struct  free_block_t *next;
 } free_block_entry;
 
@@ -32,22 +33,19 @@ typedef struct mempool_block_t
 
 mempool_block       mempools_data[2];
 
-void                *mempool;
 free_block_entry    *freelist_head;
 //free_block_entry    **freelist_head;
-gni_mem_handle_t    mem_hndl;
 void init_mempool( int pool_size)
 {
     gni_return_t status;
-    mempool = memalign(ALIGNBUF, pool_size);
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mempool, pool_size,  &mem_hndl, &omdh);
-    GNI_RC_CHECK("Mempool register", status);
-#if  MEMPOOL_DEBUG
-    printf("Mempool init with base_addr=%p\n\n", mempool);
-#endif
     freelist_head           = (free_block_entry*)malloc(sizeof(free_block_entry));
     (freelist_head)->size     = pool_size;
-    (freelist_head)->mempool_ptr = mempool;
+    (freelist_head)->mempool_ptr = memalign(ALIGNBUF, pool_size);
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, freelist_head->mempool_ptr, pool_size,  &(freelist_head->mem_hndl), &omdh);
+    GNI_RC_CHECK("Mempool register", status);
+#if  MEMPOOL_DEBUG
+    printf("Mempool init with base_addr=%p\n\n", freelist_head->mempool_ptr);
+#endif
     (freelist_head)->next     = NULL;
 }
 
@@ -64,13 +62,13 @@ void kill_allmempool()
         }
     }
 #endif
-    GNI_MemDeregister(nic_hndl, &mem_hndl);
-    free(mempool);
+    GNI_MemDeregister(nic_hndl, &(freelist_head->mem_hndl));
+    free( freelist_head->mempool_ptr);
     //all free entry
 }
 
 // append size before the real memory buffer
-void*  mempool_malloc(int size)
+void*  syh_mempool_malloc(int size)
 {
     int     real_size = size;
     void    *alloc_ptr;
@@ -109,7 +107,7 @@ void*  mempool_malloc(int size)
 
     alloc_ptr = bestfit->mempool_ptr;//+SIZE_BYTES;
     memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
-    memcpy(bestfit->mempool_ptr+SIZE_BYTES, &mem_hndl, sizeof(gni_mem_handle_t));
+    memcpy(bestfit->mempool_ptr+SIZE_BYTES, &(bestfit->mem_hndl), sizeof(gni_mem_handle_t));
     if(bestfit->size > real_size) //deduct this entry 
     {
         bestfit->size -= real_size;
@@ -132,7 +130,7 @@ void*  mempool_malloc(int size)
 }
 
 //sorted free_list and merge it if it become continous 
-void mempool_free(void *ptr_free)
+void syh_mempool_free(void *ptr_free)
 {
     int i;
     int merged = 0;
@@ -190,6 +188,7 @@ void mempool_free(void *ptr_free)
     {
         new_entry = malloc(sizeof(free_block_entry));
         new_entry->mempool_ptr = free_firstbytes_pos;
+        memcpy(&(new_entry->mem_hndl), ptr_free+SIZE_BYTES, sizeof( gni_mem_handle_t));
         new_entry->size = free_size ;
         new_entry->next = current;
         if(previous == NULL)
@@ -198,46 +197,5 @@ void mempool_free(void *ptr_free)
             previous->next = new_entry;
         //printf(" create new entry, freehead=%p, %p\n", (freelist_head)->mempool_ptr, free_firstbytes_pos);
     }
-}
-
-// external interface 
-void* syh_malloc(int size)
-{
-#if 0
-    void *ptr;
-    int pool_index;
-    if(size <= 1024*1024*4)
-    {
-        pool_index = 0;
-    }else 
-        pool_index = 1;
-
-    mempool = mempools_data[pool_index].mempool_base_addr;
-    *freelist_head = mempools_data[pool_index].freelist_head;
-    mem_hndl = &(mempools_data[pool_index].mempool_hndl); 
-    if(mempool == NULL)
-    {
-        init_mempool(MEMPOOL_SIZE[pool_index]);
-        mempools_data[pool_index].mempool_base_addr = mempool;
-    }
-#endif
-    return mempool_malloc(size);
-}
-
-void syh_free(void *ptr)
-{
-#if 0
-    int i=0;
-    for(i=0; i<2; i++)
-    {
-        if(ptr> mempools_data[i].mempool_base_addr && ptr< mempools_data[i].mempool_base_addr + MEMPOOL_SIZE[i])
-        {
-            mempool = mempools_data[i].mempool_base_addr;
-            *freelist_head = mempools_data[i].freelist_head;
-            break;
-        }
-    }
-#endif
-    mempool_free(ptr);
 }
 
