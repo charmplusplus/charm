@@ -36,6 +36,9 @@ static void sleep(int secs) {
 #endif
 
 #define USE_LRTS_MEMPOOL   1
+#if USE_LRTS_MEMPOOL
+static int _mempool_size = 1024*1024*8;
+#endif
 #define PRINT_SYH  0
 
 #if PRINT_SYH
@@ -223,8 +226,8 @@ typedef struct  rmda_msg
 /* reuse PendingMsg memory */
 static CONTROL_MSG          *control_freelist=0;
 static MSG_LIST             *msglist_freelist=0;
-static MSG_LIST             *smsg_msglist_head= 0;
-static MSG_LIST             *smsg_msglist_tail= 0;
+static MSG_LIST             **smsg_msglist_head= 0;
+static MSG_LIST             **smsg_msglist_tail= 0;
 static MSG_LIST             *smsg_free_head=0;
 static MSG_LIST             *smsg_free_tail=0;
 
@@ -485,13 +488,13 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
     msg_tmp->next   = 0;
-    if (smsg_msglist_head == 0) {
-        smsg_msglist_head  = msg_tmp;
+    if (smsg_msglist_head[destNode] == 0) {
+        smsg_msglist_head[destNode]  = msg_tmp;
     }
     else {
-      smsg_msglist_tail->next    = msg_tmp;
+      smsg_msglist_tail[destNode]->next    = msg_tmp;
     }
-    smsg_msglist_tail          = msg_tmp;
+    smsg_msglist_tail[destNode]          = msg_tmp;
 #if PRINT_SYH
     buffered_smsg_counter++;
 #endif
@@ -504,7 +507,7 @@ static void send_small_messages(int destNode, int size, char *msg)
     gni_return_t        status  =   GNI_RC_SUCCESS;
     const uint8_t       tag_data    = SMALL_DATA_TAG;
     
-    if(smsg_msglist_head == 0)
+    if(smsg_msglist_head[destNode] == 0)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, 0, SMALL_DATA_TAG);
         if (status == GNI_RC_SUCCESS)
@@ -647,7 +650,7 @@ static int send_large_messages(int destNode, int size, char *msg)
     lrts_send_msg_id++;
     CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
-    if(smsg_msglist_head == 0)
+    if(smsg_msglist_head[destNode] == 0)
     {
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN4(size), &(control_msg_tmp->source_mem_hndl), &omdh);
         if(status == GNI_RC_SUCCESS)
@@ -976,7 +979,7 @@ static void PumpLocalRdmaTransactions()
                 lrts_send_msg_id++;
                 CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
 #endif
-                if(smsg_msglist_head!=0)
+                if(smsg_msglist_head[inst_id]!=0)
                 {
                     delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
                 }else
@@ -1054,13 +1057,18 @@ static int SendBufferMsg()
     MSG_LIST            *ptr;
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status;
+    register    int     i;
     //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {CmiPrintf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
     /* can add flow control here to control the number of messages sent before handle message */
-    while(smsg_msglist_head != 0)
+    for(i=0; i<mysize; i++)
     {
+        if(i==myrank || smsg_msglist_head[i]==0) continue;
+       
+        while(smsg_msglist_head[i]!=0)
+        {
         if(useStaticSMSG)
         {
-            ptr = smsg_msglist_head;
+            ptr = smsg_msglist_head[i];
             CmiAssert(ptr!=NULL);
             if(ptr->tag == SMALL_DATA_TAG)
             {
@@ -1121,7 +1129,7 @@ static int SendBufferMsg()
         } 
         if(status == GNI_RC_SUCCESS)
         {
-            smsg_msglist_head = smsg_msglist_head->next;
+            smsg_msglist_head[i] = smsg_msglist_head[i]->next;
             FreeMsgList(ptr);
 #if PRINT_SYH
             buffered_smsg_counter--;
@@ -1131,12 +1139,13 @@ static int SendBufferMsg()
                 CmiPrintf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
         }else {
-            return 0;
+            break;
         }
-    }   // end of for
+        } //end pooling this i-th core
+    }   // end pooling for all cores
 #if PRINT_SYH
     if(lrts_send_msg_id-lrts_smsg_success !=0)
-        CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head, (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
+        CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head[i], (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
 #endif
     return 1;
 }
@@ -1234,6 +1243,10 @@ static void _init_static_smsg()
 
     status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
+    smsg_msglist_head = (MSG_LIST**) malloc(mysize*sizeof(MSG_LIST*));
+    memset(smsg_msglist_head, 0, mysize*sizeof(MSG_LIST*));
+    smsg_msglist_tail = (MSG_LIST**) malloc(mysize*sizeof(MSG_LIST*));
+    memset(smsg_msglist_tail, 0, mysize*sizeof(MSG_LIST*));
 } 
 
 static void _init_static_msgq()
@@ -1396,7 +1409,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         }
     }
 #if     USE_LRTS_MEMPOOL
-    init_mempool( 1024*1024*16);
+    init_mempool(_mempool_size);
     //init_mempool(Mempool_MaxSize);
 #endif
 

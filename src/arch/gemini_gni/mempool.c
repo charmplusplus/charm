@@ -51,19 +51,19 @@ void init_mempool( int pool_size)
 
 void kill_allmempool()
 {
-#if 0
-    int i;
-    for(i=0; i<POOLS_NUM; i++)
+    gni_return_t status;
+    
+    free_block_entry *current = freelist_head;
+    while(freelist_head!= NULL)
     {
-        if(mempools_data[i].mempool_base_addr != NULL)
-        {
-            GNI_MemDeregister(nic_hndl, &(mempools_data[i].mempool_hndl));
-            free(mempools_data[i].mempool_base_addr);
-        }
+        status = GNI_MemDeregister(nic_hndl, &(freelist_head->mem_hndl));
+        GNI_RC_CHECK("Mempool de-register", status);
+        //printf("[%d] free mempool:%p\n", CmiMyPe(), freelist_head->mempool_ptr);
+        free( freelist_head->mempool_ptr);
+        current=freelist_head;
+        freelist_head = freelist_head->next;
+        free(current);
     }
-#endif
-    GNI_MemDeregister(nic_hndl, &(freelist_head->mem_hndl));
-    free( freelist_head->mempool_ptr);
     //all free entry
 }
 
@@ -73,6 +73,7 @@ void*  syh_mempool_malloc(int size)
     int     real_size = size;
     void    *alloc_ptr;
     int     bestfit_size = MAX_INT; //most close size  
+    gni_return_t status;
     free_block_entry *current = freelist_head;
     free_block_entry *previous = NULL;
     
@@ -81,11 +82,6 @@ void*  syh_mempool_malloc(int size)
 #if  MEMPOOL_DEBUG
     printf("+MALLOC request :%d, freehead=%p, current=%p\n", size, current->mempool_ptr, (freelist_head)->mempool_ptr);
 #endif
-    if(current == NULL)
-    {
-        printf("Mempool overflow exit\n");
-        return NULL;
-    }
     while(current!= NULL)
     {
         if(current->size >= real_size && current->size<bestfit_size)
@@ -101,8 +97,25 @@ void*  syh_mempool_malloc(int size)
     }
     if(bestfit == NULL)
     {
-        printf("No memory has such free empty chunck of %d\n", size);
-        return NULL;
+        
+        bestfit           = (free_block_entry*)malloc(sizeof(free_block_entry));
+        bestfit ->size     = size*8;
+        bestfit ->mempool_ptr = memalign(ALIGNBUF, bestfit->size);
+        //printf("No memory has such free empty chunck of %d. Expanding mempool %p\n", size,  bestfit->mempool_ptr);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, bestfit->mempool_ptr, bestfit->size,  &(bestfit->mem_hndl), &omdh);
+        GNI_RC_CHECK("Mempool register", status);
+        bestfit->next     = NULL;
+
+        alloc_ptr = bestfit->mempool_ptr;//+SIZE_BYTES;
+        memcpy(bestfit->mempool_ptr, &size, SIZE_BYTES);
+        memcpy(bestfit->mempool_ptr+SIZE_BYTES, &(bestfit->mem_hndl), sizeof(gni_mem_handle_t));
+        bestfit->size -= size;
+        bestfit->mempool_ptr += size;
+        if(previous == NULL)
+            freelist_head = bestfit;
+        else
+            previous->next = bestfit;
+        return alloc_ptr;
     }
 
     alloc_ptr = bestfit->mempool_ptr;//+SIZE_BYTES;
@@ -140,11 +153,10 @@ void syh_mempool_free(void *ptr_free)
     free_block_entry *new_entry; 
     free_block_entry *current = freelist_head;
     free_block_entry *previous = NULL;
-    
+    gni_mem_handle_t    mem_hndl;
 
 #if  MEMPOOL_DEBUG
     printf("INSIDE FREE ptr=%p, freehead=%p\n", ptr_free, freelist_head);
-    printf("--FREE request :ptr=%p, size=%d, freehead=%p\n", ptr_free, free_size, (freelist_head)->mempool_ptr); 
     /*for(i=0; i<free_size; i++)
     {
         if( (long int)(*((char*)ptr_free+i)) != ((long int)(ptr_free+free_size))%126)
@@ -164,20 +176,20 @@ void syh_mempool_free(void *ptr_free)
     }
     //printf("pre=%p, current=%p, current->ptr=%p\n", previous, current->mempool_ptr);
     //continuos with previous free space 
-    if(previous!= NULL && previous->mempool_ptr + previous->size  == free_firstbytes_pos)
+    if(previous!= NULL && previous->mempool_ptr + previous->size  == free_firstbytes_pos &&  memcmp(&(previous->mem_hndl), ptr_free+SIZE_BYTES, sizeof(gni_mem_handle_t))==0 )
     {
         previous->size += free_size;
         merged = 1;
     }
     else
-    if(current!= NULL && free_lastbytes_pos == current->mempool_ptr)
+    if(current!= NULL && free_lastbytes_pos == current->mempool_ptr && memcmp(&(current->mem_hndl), ptr_free+SIZE_BYTES, sizeof(gni_mem_handle_t))==0)
     {
         current->mempool_ptr = free_firstbytes_pos;
         current->size +=  free_size ;
         merged = 1;
     }
     //continous, merge
-    if(previous!= NULL && current!= NULL && previous->mempool_ptr + previous->size  == current->mempool_ptr)
+    if(previous!= NULL && current!= NULL && previous->mempool_ptr + previous->size  == current->mempool_ptr && memcmp(&(previous->mem_hndl), &(current->mem_hndl), sizeof(gni_mem_handle_t))==0)
     {
        previous->size += current->size;
        previous->next = current->next;
@@ -197,5 +209,8 @@ void syh_mempool_free(void *ptr_free)
             previous->next = new_entry;
         //printf(" create new entry, freehead=%p, %p\n", (freelist_head)->mempool_ptr, free_firstbytes_pos);
     }
+#if  MEMPOOL_DEBUG
+    printf("Memory free done %p\n", ptr_free);
+#endif
 }
 
