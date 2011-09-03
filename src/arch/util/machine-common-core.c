@@ -49,6 +49,15 @@ CsvDeclare(PCQueue, nodeBcastQ);
 #endif
 #endif
 
+static int  MSG_STATISTIC = 0;
+int     msg_histogram[22];
+static int _cmi_log2(int size)
+{
+    int ret = 1;
+    size = size-1;
+    while( (size=size>>1)>0) ret++;
+    return ret;
+}
 #if CMK_BROADCAST_HYPERCUBE
 /* ceil(log2(CmiNumNodes)) except when _Cmi_numnodes is 1, used for hypercube */
 static int CmiNodesDim;
@@ -445,6 +454,12 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
         LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
@@ -457,6 +472,12 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
         CmiSyncSendFn(destPE,size,msg);
         return 0;
     } else {
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+        if(ret_log >21) ret_log = 21;
+        msg_histogram[ret_log]++;
+}
         return LrtsSendFunc(destPE, size, msg, P2P_ASYNC);
     }
 }
@@ -489,6 +510,12 @@ void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSendNodeSelf(msg);
     } else {
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
         LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
@@ -500,6 +527,12 @@ CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
         CmiSyncNodeSendFn(destNode, size, msg);
         return 0;
     } else {
+if (  MSG_STATISTIC)
+{
+        int ret_log = _cmi_log2(size);
+        if(ret_log >21) ret_log = 21;
+        msg_histogram[ret_log]++;
+}
         return LrtsSendFunc(destNode, size, msg, P2P_ASYNC);
     }
 }
@@ -508,7 +541,9 @@ CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
+    int _ii;
     int tmp;
+    MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
     /* processor per node */
     _Cmi_mynodesize = 1;
     if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
@@ -528,6 +563,11 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
      */
     /* argv could be changed inside LrtsInit */
     /* Inside this function, the number of nodes and my node id are obtained */
+if (  MSG_STATISTIC)
+{
+    for(_ii=0; _ii<22; _ii++)
+        msg_histogram[_ii] = 0;
+}
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
@@ -682,12 +722,23 @@ static void CommunicationServerThread(int sleepTime) {
 }
 
 void ConverseExit(void) {
+    int i;
 #if !CMK_SMP
     LrtsDrainResources();
 #endif
 
     ConverseCommonExit();
 
+if (MSG_STATISTIC)
+{
+    CmiPrintf("[MSG PE:%d]", CmiMyPe());
+    for(i=0; i<22; i++)
+    {
+        if(msg_histogram[i] >0)
+            CmiPrintf("(%d:%d) ", 1<<i, msg_histogram[i]);
+    }
+    CmiPrintf("\n");
+}
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
