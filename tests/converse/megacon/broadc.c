@@ -65,6 +65,7 @@ void broadc_reply(mesg m)
   c = m->reply_ptr;
   c->totalreplies++;
   if ((c->totalreplies % CmiNumPes())==0) broadc_start_cycle(c);
+  CmiFree(m);
 }
 
 void broadc_init(void)

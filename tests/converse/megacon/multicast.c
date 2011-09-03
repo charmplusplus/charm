@@ -30,7 +30,7 @@ void multicast_recv(mesg m)
     exit(1);
   }
   CmiSetHandler(m, CpvAccess(multicast_reply_idx));
-  CmiSyncSend(m->reply_pe, sizeof(struct mesg), m);
+  CmiSyncSendAndFree(m->reply_pe, sizeof(struct mesg), m);
 }
 
 void multicast_start_cycle(bchare c)
@@ -67,6 +67,7 @@ void multicast_reply(mesg m)
   c = m->reply_ptr;
   c->totalreplies++;
   if ((c->totalreplies % CmiNumPes())==0) multicast_start_cycle(c);
+  CmiFree(m);
 }
 
 CmiGroup multicast_all()
