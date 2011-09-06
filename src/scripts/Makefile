@@ -352,17 +352,24 @@ TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-u
           $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
 	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
           $(L)/libtracef_f.a $(L)/libtrace-memory.a
+
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
-	  $(L)/libmemory-charmdebug-slot.o $(L)/libmemory-charmdebug-mmap-slot.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
-          $(L)/libmemory-os-lock.o \
-	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o \
-	  $(L)/libmemory-hooks-charmdebug.o
+          $(L)/libmemory-os-lock.o $(L)/libmemory-os-wrapper.o
+
+BUILD_CHARMDEBUG=$(shell CHARMINC=.; . ./conv-config.sh; if [ "$$CMK_CHARMDEBUG" = 1 ]; then echo "1"; fi)
+
+ifeq "$(BUILD_CHARMDEBUG)" "1"
+MEMLIBS += $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
+	  $(L)/libmemory-charmdebug-slot.o  \
+          $(L)/libmemory-charmdebug-mmap-slot.o \
+	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-hooks-charmdebug.o
+endif
+
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-default-tls.o  \
           $(L)/libthreads-qt.o 	$(L)/libthreads-qt-tls.o  \
 	  $(L)/libthreads-context.o $(L)/libthreads-context-tls.o  \
