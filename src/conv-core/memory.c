@@ -359,7 +359,7 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     FILE *f;
-    int i;
+    int i, ret;
     static int failed_once = 0;
     CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
 
@@ -367,8 +367,8 @@ static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     
     f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
-    for(i=0; i<22; i++) fscanf(f, "%*s");
-    fscanf(f, "%lu", &vsz);
+    for(i=0; i<22; i++) ret = fscanf(f, "%*s");
+    ret = fscanf(f, "%lu", &vsz);
     fclose(f);
     if(!vsz) failed_once=1;
     return vsz;
@@ -410,10 +410,11 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
     char pscmd[100];
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
+    int ret;
     sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
-	fscanf(p, "%ld", &vsz);
+	ret = fscanf(p, "%ld", &vsz);
 	pclose(p);
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);
