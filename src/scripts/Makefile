@@ -361,9 +361,9 @@ MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
           $(L)/libmemory-os-lock.o $(L)/libmemory-os-wrapper.o
 
-BUILD_CHARMDEBUG=$(shell CHARMINC=.; . ./conv-config.sh; echo $$CMK_CHARMDEBUG )
+BUILD_CHARMDEBUG=$(shell CHARMINC=.; if test -x ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
 
-ifeq "$(BUILD_CHARMDEBUG)" "1"
+ifneq "$(BUILD_CHARMDEBUG)" "0"
 MEMLIBS += $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
 	  $(L)/libmemory-charmdebug-slot.o  \
           $(L)/libmemory-charmdebug-mmap-slot.o \
