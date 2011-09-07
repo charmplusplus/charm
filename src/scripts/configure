@@ -1788,12 +1788,14 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_ENABLED 0
 _ACEOF
 
+  add_flag CMK_TRACE_ENABLED=0
 else
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_ENABLED 1
 _ACEOF
 
+  add_flag CMK_TRACE_ENABLED=1
 fi
 
 # Check whether --enable-charmdebug was given.

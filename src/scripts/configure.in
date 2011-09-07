@@ -88,8 +88,10 @@ if test "$enable_tracing" = "no"
 then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
+  add_flag CMK_TRACE_ENABLED=0
 else
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
+  add_flag CMK_TRACE_ENABLED=1
 fi
 
 AC_ARG_ENABLE([charmdebug],
