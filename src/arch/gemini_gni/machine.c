@@ -36,9 +36,11 @@ static void sleep(int secs) {
 #endif
 
 #define USE_LRTS_MEMPOOL   1
+
 #if USE_LRTS_MEMPOOL
 static int _mempool_size = 1024*1024*8;
 #endif
+
 #define PRINT_SYH  0
 
 #if PRINT_SYH
@@ -342,6 +344,11 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
 
 #include "mempool.c"
+
+#if CMK_PERSISTENT_COMM
+#include "machine-persistent.c"
+#endif
+
 /* get the upper bound of log 2 */
 int mylog2(int size)
 {
@@ -1052,11 +1059,13 @@ static int SendRdmaMsg()
     return 0;
 }
 
+// return 1 if all messages are sent
 static int SendBufferMsg()
 {
     MSG_LIST            *ptr;
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status;
+    int done = 1;
     register    int     i;
     //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {CmiPrintf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
     /* can add flow control here to control the number of messages sent before handle message */
@@ -1094,8 +1103,10 @@ static int SendBufferMsg()
                 if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
                 {
                     MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, control_msg_tmp->length, &(control_msg_tmp->source_mem_hndl), &omdh);
-                    if(status != GNI_RC_SUCCESS)
+                    if(status != GNI_RC_SUCCESS) {
+                        done = 0;
                         break;
+                    }
                 }
                 status = GNI_SmsgSendWTag(ep_hndl_array[ptr->destNode], 0, 0, ptr->msg, sizeof(CONTROL_MSG), 0, LMSG_INIT_TAG);
                 if(status == GNI_RC_SUCCESS) {
@@ -1139,6 +1150,7 @@ static int SendBufferMsg()
                 CmiPrintf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
         }else {
+            done = 0;
             break;
         }
         } //end pooling this i-th core
@@ -1147,7 +1159,7 @@ static int SendBufferMsg()
     if(lrts_send_msg_id-lrts_smsg_success !=0)
         CmiPrintf("WRONG [%d buffered msg is empty(%p) (actually=%d)(buffercounter=%d)\n", myrank, smsg_msglist_head[i], (lrts_send_msg_id-lrts_smsg_success, buffered_smsg_counter));
 #endif
-    return 1;
+    return done;
 }
 
 static void LrtsAdvanceCommunication()
@@ -1489,6 +1501,7 @@ static void LrtsDrainResources()
         PumpLocalSmsgTransactions();
         PumpLocalRdmaTransactions();
     }
+    PMI_Barrier();
 }
 
 void CmiAbort(const char *message) {
