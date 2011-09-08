@@ -685,6 +685,7 @@ static int send_large_messages(int destNode, int size, char *msg)
     return 0;
 #endif
 }
+
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
     CmiSetMsgSize(msg, size);
@@ -920,6 +921,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         GNI_RC_CHECK("AFter posting", status);
 #endif
 }
+
 /* Check whether message send or get is confirmed by remote */
 static void PumpLocalSmsgTransactions()
 {
