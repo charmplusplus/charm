@@ -87,7 +87,7 @@ static int  log2_SMSG_MAX_MSG;
 
 #define MSGQ_MAXSIZE       4096
 /* large message transfer with FMA or BTE */
-#define LRTS_GNI_RDMA_THRESHOLD  16384
+#define LRTS_GNI_RDMA_THRESHOLD  4096
 
 #define REMOTE_QUEUE_ENTRIES  1048576
 #define LOCAL_QUEUE_ENTRIES   32
