@@ -347,22 +347,36 @@ dirs+sources:
 # 
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o   $(L)/libldb-workstealing.o  $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
-	  $(L)/libtrace-simple.a \
-          $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
-	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
-          $(L)/libtracef_f.a $(L)/libtrace-memory.a
+
+TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
+
+BUILD_TRACING=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
+
+ifneq "$(BUILD_TRACING)" "0"
+TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
+             $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
+             $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
+	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
+             $(L)/libtrace-memory.a
+endif
+
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
-	  $(L)/libmemory-charmdebug-slot.o $(L)/libmemory-charmdebug-mmap-slot.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
-          $(L)/libmemory-os-lock.o \
-	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o \
-	  $(L)/libmemory-hooks-charmdebug.o
+          $(L)/libmemory-os-lock.o $(L)/libmemory-os-wrapper.o
+
+BUILD_CHARMDEBUG=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
+
+ifneq "$(BUILD_CHARMDEBUG)" "0"
+MEMLIBS += $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
+	  $(L)/libmemory-charmdebug-slot.o  \
+          $(L)/libmemory-charmdebug-mmap-slot.o \
+	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-hooks-charmdebug.o
+endif
+
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-default-tls.o  \
           $(L)/libthreads-qt.o 	$(L)/libthreads-qt-tls.o  \
 	  $(L)/libthreads-context.o $(L)/libthreads-context-tls.o  \
