@@ -84,9 +84,9 @@ void*  syh_mempool_malloc(int size)
     int     expand_size;
 
 #if  MEMPOOL_DEBUG
-    CmiPrintf("request malloc for size %d, freelist:%p\n", size, freelist_head);
+    CmiPrintf("[%d] request malloc for size %d, freelist:%p\n", CmiMyPe(), size, freelist_head);
 #endif
-#if 0
+#if 1
     while(current!= NULL)     /* best fit */
     {
 #if  MEMPOOL_DEBUG
@@ -105,7 +105,7 @@ void*  syh_mempool_malloc(int size)
     while(current!= NULL)             /*  first fit */
     {
 #if  MEMPOOL_DEBUG
-        CmiPrintf("[%d] current=%p size:%d \n", CmiMyPe(), current, current->size);
+        CmiPrintf("[%d] current=%p size:%d ->%p \n", CmiMyPe(), current, current->size, (char*)current+current->size);
 #endif
         if(current->size >= size)
         {
@@ -219,6 +219,8 @@ void syh_mempool_free(void *ptr_free)
         merged = 1;
         if(previous == NULL)
             freelist_head = current;
+        else
+            previous->next = to_free;
     }
     //continous, merge
     if(merged) {
