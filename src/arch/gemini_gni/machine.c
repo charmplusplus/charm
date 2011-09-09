@@ -38,7 +38,7 @@ static void sleep(int secs) {
 #define USE_LRTS_MEMPOOL   1
 
 #if USE_LRTS_MEMPOOL
-static int _mempool_size = 1024*1024*8;
+static size_t _mempool_size = 1024ll*1024*8;
 #endif
 
 #define PRINT_SYH  0
@@ -620,7 +620,8 @@ static int send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->source_addr    = (uint64_t)msg;
     control_msg_tmp->source         = myrank;
     control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
-    memcpy( &(control_msg_tmp->source_mem_hndl), GetMemHndl(msg), sizeof(gni_mem_handle_t)) ;
+    //memcpy( &(control_msg_tmp->source_mem_hndl), GetMemHndl(msg), sizeof(gni_mem_handle_t)) ;
+    control_msg_tmp->source_mem_hndl = GetMemHndl(msg);
 #if PRINT_SYH
     lrts_send_msg_id++;
     CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
@@ -751,7 +752,8 @@ static void PumpNetworkSmsg()
     gni_mem_handle_t    msg_mem_hndl;
  
 
-    while ((status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS) {
+    while ((status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS)
+    {
         inst_id = GNI_CQ_GET_INST_ID(event_data);
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
 #if PRINT_SYH
@@ -765,30 +767,37 @@ static void PumpNetworkSmsg()
             CmiPrintf("+++[%d] PumpNetwork msg is received, messageid:%d tag=%d\n", myrank, lrts_received_msg, msg_tag);
 #endif
             /* copy msg out and then put into queue (small message) */
-            if(msg_tag == SMALL_DATA_TAG)
+            switch (msg_tag) {
+            case SMALL_DATA_TAG:
             {
                 msg_nbytes = CmiGetMsgSize(header);
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
                 handleOneRecvedMsg(msg_nbytes, msg_data);
+                break;
             }
-            else if(msg_tag == LMSG_INIT_TAG) 
+            case LMSG_INIT_TAG:
             {
 #if PRINT_SYH
                 CmiPrintf("+++[%d] from %d PumpNetwork Rdma Request msg is received, messageid:%d tag=%d\n", myrank, inst_id, lrts_received_msg, msg_tag);
 #endif
                 getLargeMsgRequest(header, inst_id);
+                break;
             }
-            else if(msg_tag == ACK_TAG) {
+            case ACK_TAG:
+            {
                 /* Get is done, release message . Now put is not used yet*/
 #if         !USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh);
 #endif
                 CmiFree((void*)((CONTROL_MSG *) header)->source_addr);
                 SendRdmaMsg();
-            }else{
+                break;
+            }
+            default: {
                 CmiPrintf("weird tag problem\n");
                 CmiAbort("Unknown tag\n");
+            }
             }
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
             msg_tag = GNI_SMSG_ANY_TAG;
@@ -815,7 +824,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
     source = request_msg->source;
     msg_data = CmiAlloc(request_msg->length);
     _MEMCHECK(msg_data);
-    memcpy(&msg_mem_hndl, GetMemHndl(msg_data), sizeof(gni_mem_handle_t));
+    //memcpy(&msg_mem_hndl, GetMemHndl(msg_data), sizeof(gni_mem_handle_t));
+    msg_mem_hndl = GetMemHndl(msg_data);
 
     MallocPostDesc(pd);
     if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
