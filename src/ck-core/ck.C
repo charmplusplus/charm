@@ -344,23 +344,27 @@ void CProxy::pup(PUP::er &p) {
       delegatedMgr = ckDelegatedTo(); 
     }
 
-    // if delegated manager has not been created, construct a dummy
-    // object on which to call DelegatePointerPup
-    if (delegatedMgr == NULL) {
-
-      int migCtor; 
+    int migCtor, cIdx; 
+    if (!p.isUnpacking()) {
       if (isNodeGroup) {
         CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-        migCtor = 
-          CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getmigCtor();
+        cIdx = CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getcIdx(); 
+        migCtor = _chareTable[cIdx]->migCtor; 
         CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       }
       else  {
         CmiImmediateLock(CkpvAccess(_groupTableImmLock));
-        migCtor = 
-          CkpvAccess(_groupTable)->find(delegatedGroupId).getmigCtor();
+        cIdx = CkpvAccess(_groupTable)->find(delegatedGroupId).getcIdx();
+        migCtor = _chareTable[cIdx]->migCtor; 
         CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
-      } 
+      }         
+    }
+
+    p|migCtor;
+
+    // if delegated manager has not been created, construct a dummy
+    // object on which to call DelegatePointerPup
+    if (delegatedMgr == NULL) {
 
       // create a dummy object for calling DelegatePointerPup
       int objId = _entryTable[migCtor]->chareIdx; 
