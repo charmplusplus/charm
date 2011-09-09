@@ -11,7 +11,7 @@
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
 
-#define  GetMemHndl(x)  &((mempool_header*)((char*)x-ALIGNBUF))->mem_hndl
+#define  GetMemHndl(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mem_hndl
 
 static      size_t     expand_mem = 1024ll*1024*16;
 
@@ -34,7 +34,7 @@ typedef struct mempool_header
 
 mempool_header    *freelist_head = NULL;
 
-void init_mempool( int pool_size)
+void init_mempool(size_t pool_size)
 {
     gni_return_t status;
     mempool_header *header;
@@ -86,7 +86,8 @@ void*  syh_mempool_malloc(int size)
 #if  MEMPOOL_DEBUG
     CmiPrintf("request malloc for size %d, freelist:%p\n", size, freelist_head);
 #endif
-    while(current!= NULL)
+#if 0
+    while(current!= NULL)     /* best fit */
     {
 #if  MEMPOOL_DEBUG
         CmiPrintf("[%d] current=%p size:%d \n", CmiMyPe(), current, current->size);
@@ -97,14 +98,29 @@ void*  syh_mempool_malloc(int size)
             bestfit = current;
             bestfit_previous = previous;
         }
-        //printf(" free entr:%p, size=%d\n", current->mempool_ptr, current->size);
         previous = current;
         current = current->next;
     }
+#else
+    while(current!= NULL)             /*  first fit */
+    {
+#if  MEMPOOL_DEBUG
+        CmiPrintf("[%d] current=%p size:%d \n", CmiMyPe(), current, current->size);
+#endif
+        if(current->size >= size)
+        {
+            bestfit_size = current->size;
+            bestfit = current;
+            bestfit_previous = previous;
+            break;
+        }
+        previous = current;
+        current = current->next;
+    }
+#endif
 
     if(bestfit == NULL)
     {
-      
         expand_size = expand_mem>size ? expand_mem:2*size; 
         expand_pool         = (mempool_block*)malloc(sizeof(mempool_block));
         expand_pool->mempool_ptr = memalign(ALIGNBUF, expand_size);
@@ -118,8 +134,18 @@ void*  syh_mempool_malloc(int size)
         bestfit->size = expand_size;
         bestfit->mem_hndl = expand_pool->mem_hndl;
         bestfit->next = NULL;
-        bestfit_previous = previous;
         bestfit_size = expand_size;
+#if 0
+        current = freelist_head;
+        while(current!= NULL && current < bestfit )
+        {
+          previous = current;
+          current = current->next;
+        }
+#else
+        CmiAssert(bestfit > previous);
+#endif
+        bestfit_previous = previous;
         if (previous == NULL)
            freelist_head = bestfit;
         else
