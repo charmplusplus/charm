@@ -84,7 +84,7 @@ uint8_t   onesided_hnd, omdh;
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
 static int  SMSG_MAX_MSG;
-static int  log2_SMSG_MAX_MSG;
+//static int  log2_SMSG_MAX_MSG;
 #define SMSG_MAX_CREDIT  36
 
 #define MSGQ_MAXSIZE       4096
@@ -374,6 +374,47 @@ int mylog2(int size)
 
 static void
 allgather(void *in,void *out, int len)
+{
+    static int *ivec_ptr=NULL,already_called=0,job_size=0;
+    int i,rc;
+    int my_rank;
+    char *tmp_buf,*out_ptr;
+
+    if(!already_called) {
+
+        rc = PMI_Get_size(&job_size);
+        CmiAssert(rc == PMI_SUCCESS);
+        rc = PMI_Get_rank(&my_rank);
+        CmiAssert(rc == PMI_SUCCESS);
+
+        ivec_ptr = (int *)malloc(sizeof(int) * job_size);
+        CmiAssert(ivec_ptr != NULL);
+
+        rc = PMI_Allgather(&my_rank,ivec_ptr,sizeof(int));
+        CmiAssert(rc == PMI_SUCCESS);
+
+        already_called = 1;
+
+    }
+
+    tmp_buf = (char *)malloc(job_size * len);
+    CmiAssert(tmp_buf);
+
+    rc = PMI_Allgather(in,tmp_buf,len);
+    CmiAssert(rc == PMI_SUCCESS);
+
+    out_ptr = out;
+
+    for(i=0;i<job_size;i++) {
+
+        memcpy(&out_ptr[len * ivec_ptr[i]],&tmp_buf[i * len],len);
+
+    }
+
+    free(tmp_buf);
+}
+static void
+allgather_2(void *in,void *out, int len)
 {
     //PMI_Allgather is out of order
     int i,rc, extend_len;
@@ -1195,46 +1236,87 @@ static void LrtsAdvanceCommunication()
 static void _init_static_smsg()
 {
     gni_smsg_attr_t      *smsg_attr;
+    gni_smsg_attr_t      remote_smsg_attr;
     gni_smsg_attr_t      *smsg_attr_vec;
     unsigned int         smsg_memlen;
     gni_mem_handle_t     my_smsg_mdh_mailbox;
-    register    int      i;
+    int      i;
     gni_return_t status;
     uint32_t              vmdh_index = -1;
-
+    mdh_addr_t            base_infor;
+    mdh_addr_t            *base_addr_vec;
     if(mysize <=1024)
     {
         SMSG_MAX_MSG = 1024;
-        log2_SMSG_MAX_MSG = 10;
+        //log2_SMSG_MAX_MSG = 10;
     }else if (mysize > 1024 && mysize <= 16384)
     {
         SMSG_MAX_MSG = 512;
-        log2_SMSG_MAX_MSG = 9;
+        //log2_SMSG_MAX_MSG = 9;
 
     }else {
         SMSG_MAX_MSG = 256;
-        log2_SMSG_MAX_MSG = 8;
+        //log2_SMSG_MAX_MSG = 8;
     }
-
-     smsg_attr = (gni_smsg_attr_t *)malloc(mysize*sizeof(gni_smsg_attr_t));
-    _MEMCHECK(smsg_attr);
-
+    
+    smsg_attr = malloc(mysize * sizeof(gni_smsg_attr_t));
+    
     smsg_attr[0].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
     smsg_attr[0].mbox_maxcredit = SMSG_MAX_CREDIT;
     smsg_attr[0].msg_maxsize = SMSG_MAX_MSG;
     status = GNI_SmsgBufferSizeNeeded(&smsg_attr[0], &smsg_memlen);
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-    smsg_mailbox_base = memalign(64, smsg_memlen*(mysize-1));
+    smsg_mailbox_base = memalign(64, smsg_memlen*(mysize));
     _MEMCHECK(smsg_mailbox_base);
-    bzero(smsg_mailbox_base, smsg_memlen*(mysize-1));
+    bzero(smsg_mailbox_base, smsg_memlen*(mysize));
+    
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
-            smsg_memlen*(mysize-1), smsg_rx_cqh,
+            smsg_memlen*(mysize), smsg_rx_cqh,
             GNI_MEM_READWRITE,   
             vmdh_index,
             &my_smsg_mdh_mailbox);
 
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
+#if 1
+    base_infor.addr =  (uint64_t)smsg_mailbox_base;
+    base_infor.mdh =  my_smsg_mdh_mailbox;
+    base_addr_vec = malloc(mysize * sizeof(mdh_addr_t));
+
+    allgather(&base_infor, base_addr_vec,  sizeof(mdh_addr_t));
+ 
+    for(i=0; i<mysize; i++)
+    {
+        if(i==myrank)
+            continue;
+        smsg_attr[i].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+        smsg_attr[i].mbox_maxcredit = SMSG_MAX_CREDIT;
+        smsg_attr[i].msg_maxsize = SMSG_MAX_MSG;
+        smsg_attr[i].mbox_offset = i*smsg_memlen;
+        smsg_attr[i].buff_size = smsg_memlen;
+        smsg_attr[i].msg_buffer = smsg_mailbox_base ;
+        smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
+    }
+
+    for(i=0; i<mysize; i++)
+    {
+        if (myrank == i) continue;
+
+        remote_smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+        remote_smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
+        remote_smsg_attr.msg_maxsize = SMSG_MAX_MSG;
+        remote_smsg_attr.mbox_offset = myrank*smsg_memlen;
+        remote_smsg_attr.buff_size = smsg_memlen;
+        remote_smsg_attr.msg_buffer = (void*)base_addr_vec[i].addr;
+        remote_smsg_attr.mem_hndl = base_addr_vec[i].mdh;
+
+        /* initialize the smsg channel */
+        status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &remote_smsg_attr);
+        GNI_RC_CHECK("SMSG Init", status);
+    } //end initialization
+
+    free(base_addr_vec);
+#else
     for(i=0; i<mysize; i++)
     {
         if(i==myrank)
@@ -1250,21 +1332,38 @@ static void _init_static_smsg()
         smsg_attr[i].msg_buffer = smsg_mailbox_base;
         smsg_attr[i].buff_size = smsg_memlen;
         smsg_attr[i].mem_hndl = my_smsg_mdh_mailbox;
+#if 0 
+        if(i<2)
+        {
+            CmiPrintf("[assign %d==%d]  offset=%d buf=%p,credit=%d size=%d, bufsize=%d\n", myrank, i, (smsg_attr[i]).mbox_offset, (smsg_attr[i]).msg_buffer, (smsg_attr[i]).mbox_maxcredit, (smsg_attr[i]).msg_maxsize, (smsg_attr[i]).buff_size ); 
+#endif 
+        }
     }
     smsg_attr_vec = (gni_smsg_attr_t*)malloc(mysize * mysize * sizeof(gni_smsg_attr_t));
     _MEMCHECK(smsg_attr_vec);
-   
+ 
+    if(myrank==0)
+        CmiPrintf("total size=%d\n", mysize*mysize*sizeof(gni_smsg_attr_t));
     allgather(smsg_attr, smsg_attr_vec,  mysize*sizeof(gni_smsg_attr_t));
+    
+    CmiBarrier();
     for(i=0; i<mysize; i++)
     {
         if (myrank == i) continue;
         /* initialize the smsg channel */
         status = GNI_SmsgInit(ep_hndl_array[i], &smsg_attr[i], &smsg_attr_vec[i*mysize+myrank]);
+#if 0 
+        if(i<2)
+        {
+            CmiPrintf("[%d==%d] SmsgInit rc=%s, offset=%d buf=%p,credit=%d size=%d, bufsize=%d\n", myrank, i, gni_err_str[status], (smsg_attr_vec[i*mysize+myrank]).mbox_offset, (smsg_attr_vec[i*mysize+myrank]).msg_buffer, (smsg_attr_vec[i*mysize+myrank]).mbox_maxcredit, (smsg_attr_vec[i*mysize+myrank]).msg_maxsize, (smsg_attr_vec[i*mysize+myrank]).buff_size ); 
+        }
+#endif
         GNI_RC_CHECK("SMSG Init", status);
     } //end initialization
-    free(smsg_attr);
+    CmiBarrier();
     free(smsg_attr_vec);
-
+#endif
+    free(smsg_attr);
     status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
     smsg_msglist_head = (MSG_LIST**) malloc(mysize*sizeof(MSG_LIST*));
