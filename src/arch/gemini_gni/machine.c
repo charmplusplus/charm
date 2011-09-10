@@ -759,6 +759,7 @@ void CmiNotifyIdleForGemini(void) {
 static void LrtsPostCommonInit(int everReturn)
 {
 #if CMK_SMP
+    CmiIdleState *s=CmiNotifyGetState();
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
