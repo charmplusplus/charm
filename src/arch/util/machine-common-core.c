@@ -311,10 +311,10 @@ static void CmiStartThreads(char **argv) {
 }
 #else
 /************** SMP *******************/
-INLINE_KEYWORD int CmiMyPe(void) {
+INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
 }
-INLINE_KEYWORD int CmiMyRank(void) {
+INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
 }
 INLINE_KEYWORD int CmiNodeFirst(int node) {
