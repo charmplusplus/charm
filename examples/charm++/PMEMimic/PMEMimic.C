@@ -21,8 +21,6 @@ public:
     int phrase;
     char data[2048];
 
-    DataMsg() {}
-
 };
 
 class PMEMap : public CkArrayMap 
@@ -60,9 +58,9 @@ public:
         pes_per_node = 3;
         if(m->argc > 1)
         {
-            pes_per_node = 3;
-            grid_x = grid_y = grid_z = atoi(m->argv[1]);
-            max_iter = atoi(m->argv[2]);
+            pes_per_node = atoi(m->argv[1]);;
+            grid_x = grid_y = grid_z = atoi(m->argv[2]);
+            max_iter = atoi(m->argv[3]);
         }
         delete m;
 
@@ -148,7 +146,7 @@ public:
             for(int x=0; x<grid_x; x++)
             {
                 DataMsg *msg= new DataMsg;
-                msg->phrase = 1;
+                msg->phrase = msg_recv->phrase+1;
                 pme_y(x, thisIndex.y).recvTrans(msg);  
             }
             CkPrintf("x==>y\n");
@@ -157,7 +155,7 @@ public:
             for(int y=0; y<grid_y; y++)
             {
                 DataMsg *msg= new DataMsg;
-                msg->phrase = msg->phrase+1;
+                msg->phrase = msg_recv->phrase+1;
                 pme_z(thisIndex.x, y).recvTrans(msg); 
             }
             CkPrintf("y==>z\n");
@@ -166,7 +164,7 @@ public:
             for(int z=0; z<grid_z; z++)
             {
                 DataMsg *msg= new DataMsg;
-                msg->phrase = msg->phrase+1;
+                msg->phrase = msg_recv->phrase+1;
                 pme_z(thisIndex.x, z).recvTrans(msg); 
             }
             CkPrintf("z==>y\n");
