@@ -23,7 +23,7 @@ mainmodule PMEMimic {
   message DataMsg;
 
   array [2D] PMEPencil {
-    entry PMEPencil();
+    entry PMEPencil(int);
     entry void start();
     entry void recvTrans( DataMsg *m);
   };        

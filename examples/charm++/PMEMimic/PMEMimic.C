@@ -81,13 +81,14 @@ public:
       CkArrayOptions opts_z(grid_x, grid_y); 
       opts_z.setMap(myMap_z);
 
-      pme_x = CProxy_PMEPencil::ckNew(opts_x);
-      pme_y = CProxy_PMEPencil::ckNew(opts_y);
-      pme_z = CProxy_PMEPencil::ckNew(opts_z);
+      pme_x = CProxy_PMEPencil::ckNew(0, opts_x);
+      pme_y = CProxy_PMEPencil::ckNew(1, opts_y);
+      pme_z = CProxy_PMEPencil::ckNew(2, opts_z);
 
       done_pme=0;
       startTimer = CmiWallTimer();
       pme_x.start();
+      
     };
 
     void done()
@@ -106,12 +107,16 @@ public:
 /*array [1D]*/
 class PMEPencil : public CBase_PMEPencil
 {
+    int PME_index;
+    int buffered_num, buffered_phrase;
     int recv_nums, iteration;
 public:
-  PMEPencil()
+  PMEPencil(int i)
   {
-    recv_nums = 0;
-    iteration = 0;
+      PME_index = i;
+      recv_nums = 0;
+      iteration = 0;
+      buffered_num = 0;
   }
   PMEPencil(CkMigrateMessage *m) {}
 
@@ -129,12 +134,20 @@ public:
   void recvTrans(DataMsg *msg_recv)
   {
     int expect_num, index;
-    recv_nums++;
     expect_num = grid_x;
     index = msg_recv->phrase;
 
+    if(msg_recv->phrase != PME_index)
+    {
+        buffered_num++;
+        buffered_phrase = msg_recv->phrase;
+        delete msg_recv;
+        return;
+    }
+    recv_nums++;
     if(recv_nums == expect_num)
     {
+        //CkPrintf("[%d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, msg_recv->phrase, iteration);
         if(index == 0  ) //x (y,z) to y(x,z)
         {
             iteration++;
@@ -149,7 +162,6 @@ public:
                 msg->phrase = msg_recv->phrase+1;
                 pme_y(x, thisIndex.y).recvTrans(msg);  
             }
-            CkPrintf("x==>y\n");
         }else if(index == 1) //y(x,z) send to z(x,y)
         {
             for(int y=0; y<grid_y; y++)
@@ -158,26 +170,26 @@ public:
                 msg->phrase = msg_recv->phrase+1;
                 pme_z(thisIndex.x, y).recvTrans(msg); 
             }
-            CkPrintf("y==>z\n");
+            PME_index = 3;
+            recv_nums = buffered_num;
         }else if(index == 2) //Z(x,y) send to y(x,z)
         {
             for(int z=0; z<grid_z; z++)
             {
                 DataMsg *msg= new DataMsg;
                 msg->phrase = msg_recv->phrase+1;
-                pme_z(thisIndex.x, z).recvTrans(msg); 
+                pme_y(thisIndex.x, z).recvTrans(msg); 
             }
-            CkPrintf("z==>y\n");
         } else if(index == 3) //y(x,z) to x(y,z)
         {
             for(int y=0; y<grid_y; y++)
             {
                 DataMsg *msg= new DataMsg;
                 msg->phrase = 0;
-                pme_z(y, thisIndex.y).recvTrans(msg); 
+                pme_x(y, thisIndex.y).recvTrans(msg); 
             }
-            CkPrintf("y==>x\n");
-
+            PME_index = 1;
+            recv_nums = buffered_num;
         }
         recv_nums = 0;
     }
