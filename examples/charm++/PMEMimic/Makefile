@@ -1,4 +1,4 @@
-CHARMC=/expand/home/jessie/PPL/git/charm/mpi-linux-x86_64/bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = PMEMimic.o
 
