@@ -56,13 +56,13 @@ public:
         grid_x = grid_y = grid_z = 10;
         max_iter = 100;
         pes_per_node = 3;
-        grain_size = grid_x/pes_per_node;
         if(m->argc > 1)
         {
             pes_per_node = atoi(m->argv[1]);;
             grid_x = grid_y = grid_z = atoi(m->argv[2]);
             max_iter = atoi(m->argv[3]);
         }
+        grain_size = grid_x/pes_per_node;
         delete m;
 
     //Start the computation
@@ -130,13 +130,14 @@ public:
     {
       DataMsg *msg= new DataMsg;
       msg->phrase = 1;
+      //CmiPrintf("g=%d(%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, x+thisIndex.z*grain_size, thisIndex.y, yindex);
       pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
     }
   }
   void recvTrans(DataMsg *msg_recv)
   {
     int expect_num, index;
-    expect_num = grid_x;
+    expect_num = grid_x/pes_per_node;
     index = msg_recv->phrase;
 
     if(msg_recv->phrase != PME_index)
@@ -149,7 +150,7 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, msg_recv->phrase, iteration);
+        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
         if(index == 0  ) //x (y,z) to y(x,z)
         {
             iteration++;
@@ -233,7 +234,7 @@ public:
   void recvTrans(DataMsg *msg_recv)
   {
     int expect_num, index;
-    expect_num = grid_x;
+    expect_num = grid_x/pes_per_node;
     index = msg_recv->phrase;
 
     if(msg_recv->phrase != PME_index)
@@ -246,7 +247,7 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, msg_recv->phrase, iteration);
+        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
         if(index == 0  ) //x (y,z) to y(x,z)
         {
             iteration++;
@@ -331,7 +332,7 @@ public:
   void recvTrans(DataMsg *msg_recv)
   {
     int expect_num, index;
-    expect_num = grid_x;
+    expect_num = grid_x/pes_per_node;
     index = msg_recv->phrase;
 
     if(msg_recv->phrase != PME_index)
@@ -344,7 +345,7 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, msg_recv->phrase, iteration);
+        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
         if(index == 0  ) //x (y,z) to y(x,z)
         {
             iteration++;
