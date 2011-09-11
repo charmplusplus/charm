@@ -2,10 +2,13 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 OBJS = PMEMimic.o
 
-all: PMEMimic
+all: pgm pgm.prj
 
-PMEMimic: $(OBJS)
-	$(CHARMC) -language charm++ -o PMEMimic $(OBJS)
+pgm: $(OBJS)
+	$(CHARMC) -language charm++ -o pgm $(OBJS)
+
+pgm.prj: $(OBJS)
+	$(CHARMC) -language charm++ -tracemode projections -o pgm.prj $(OBJS)
 
 PMEMimic.decl.h: PMEMimic.ci
 	$(CHARMC)  PMEMimic.ci
@@ -17,7 +20,7 @@ PMEMimic.o: PMEMimic.C PMEMimic.decl.h
 	$(CHARMC) -c PMEMimic.C
 
 test: all
-	./charmrun +p12 PMEMimic 3 2 2 $(TESTOPTS)
+	./charmrun +p12 pgm 3 2 2 $(TESTOPTS)
 
 bgtest: all
-	./charmrun PMEMimic +p4 10 +x2 +y2 +z1
+	./charmrun pgm +p4 10 +x2 +y2 +z1
