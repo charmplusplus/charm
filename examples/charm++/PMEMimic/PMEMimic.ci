@@ -1,0 +1,31 @@
+mainmodule PMEMimic {
+  readonly CProxy_Main mainProxy;
+
+  readonly int     N;
+  readonly int     grid_x;
+  readonly int     grid_y;
+  readonly int     grid_z;
+  readonly int     pes_per_node;
+  readonly int     max_iter;
+  readonly CProxy_PMEPencil pme_x;
+  readonly CProxy_PMEPencil pme_y;
+  readonly CProxy_PMEPencil pme_z;
+
+  group PMEMap : CkArrayMap {
+      entry PMEMap(int); 
+  }
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  message DataMsg;
+
+  array [2D] PMEPencil {
+    entry PMEPencil();
+    entry void start();
+    entry void recvTrans( DataMsg *m);
+  };        
+  
+};
