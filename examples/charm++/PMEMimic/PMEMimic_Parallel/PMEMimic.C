@@ -127,6 +127,7 @@ class PMEPencil_X : public CBase_PMEPencil_X
     int PME_index;
     int buffered_num, buffered_phrase;
     int recv_nums, iteration;
+    CkSectionInfo sid;
 public:
   PMEPencil_X(int i)
   {
@@ -134,6 +135,16 @@ public:
       recv_nums = 0;
       iteration = 0;
       buffered_num = 0;
+
+      if (thisIndex.z == 0) {
+          CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+          CProxySection_PMEPencil_X mcp_x;
+
+          mcp_x = CProxySection_PMEPencil_X::ckNew(pme_x, thisIndex.x, thisIndex.x, 1, thisIndex.y, thisIndex.y, 1,  0, pes_per_node-1, 1);
+          mcp_x.ckSectionDelegate(mg);
+          CkCallback *cb = new CkCallback(CkIndex_PMEPencil_X::cb_client(NULL), CkArrayIndex3D(thisIndex.x,thisIndex.y,0), pme_x);
+          mg->setReductionClient(mcp_x, cb);
+      }
   }
   PMEPencil_X(CkMigrateMessage *m) {}
 
@@ -155,6 +166,8 @@ public:
     int expect_num, index;
     expect_num = grid_x/pes_per_node;
     index = msg_recv->phrase;
+
+    CkGetSectionInfo(sid, msg_recv);
 
     if(msg_recv->phrase != PME_index)
     {
@@ -215,6 +228,8 @@ public:
             recv_nums = buffered_num;
         }
         recv_nums = 0;
+        CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+        mg->contribute(0, NULL,CkReduction::nop, sid);
     }
     delete msg_recv;
   }
