@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "PMEMimic.decl.h"
+#include "ckmulticast.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ 
@@ -15,7 +16,9 @@ CProxy_PMEPencil_X pme_x;
 CProxy_PMEPencil_Y pme_y;
 CProxy_PMEPencil_Z pme_z;
 
-class DataMsg : public CMessage_DataMsg
+CkGroupID mCastGrpId;
+
+class DataMsg : public CkMcastBaseMsg, public CMessage_DataMsg
 {
 public:
     int phrase;
@@ -85,6 +88,19 @@ public:
       pme_x = CProxy_PMEPencil_X::ckNew(0, opts_x);
       pme_y = CProxy_PMEPencil_Y::ckNew(1, opts_y);
       pme_z = CProxy_PMEPencil_Z::ckNew(2, opts_z);
+
+      mCastGrpId = CProxy_CkMulticastMgr::ckNew();
+      CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
+
+      CProxySection_PMEPencil_X mcp_x[grid_y][grid_z];
+
+      for (int i=0; i<grid_y; i++)
+        for (int j=0; j<grid_z; j++) {
+          mcp_x[i][j] = CProxySection_PMEPencil_X::ckNew(pme_x, i, i, 1, j, j, 1,  0, pes_per_node-1, 1);
+          mcp_x[i][j].ckSectionDelegate(mg);
+          CkCallback *cb = new CkCallback(CkIndex_PMEPencil_X::cb_client(NULL), CkArrayIndex3D(i,j,0), pme_x);
+          mg->setReductionClient(mcp_x[i][j], cb);
+      }
 
       done_pme=0;
       startTimer = CmiWallTimer();
@@ -202,7 +218,10 @@ public:
     }
     delete msg_recv;
   }
+  void cb_client(CkReductionMsg *msg) {
+  }
 };
+
 /*array [1D]*/
 class PMEPencil_Y : public CBase_PMEPencil_Y
 {
@@ -298,6 +317,8 @@ public:
         recv_nums = 0;
     }
     delete msg_recv;
+  }
+  void cb_client(CkReductionMsg *msg) {
   }
 };
 
@@ -396,6 +417,8 @@ public:
         recv_nums = 0;
     }
     delete msg_recv;
+  }
+  void cb_client(CkReductionMsg *msg) {
   }
 };
 
