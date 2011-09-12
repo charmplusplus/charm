@@ -56,6 +56,10 @@ int         lrts_local_done_msg = 0;
 
 #include "pcqueue.h"
 
+#if CMK_PERSISTENT_COMM
+#include "machine-persistent.h"
+#endif
+
 //#define  USE_ONESIDED 1
 #ifdef USE_ONESIDED
 //onesided implementation is wrong, since no place to restore omdh
@@ -344,10 +348,6 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
 
 #include "mempool.c"
-
-#if CMK_PERSISTENT_COMM
-#include "machine-persistent.c"
-#endif
 
 /* get the upper bound of log 2 */
 int mylog2(int size)
@@ -728,9 +728,14 @@ static int send_large_messages(int destNode, int size, char *msg)
 #endif
 }
 
-static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+void LrtsPrepareEnvelope(char *msg, int size)
 {
     CmiSetMsgSize(msg, size);
+}
+
+static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+{
+    LrtsPrepareEnvelope(msg, size);
 
     if(size <= SMSG_MAX_MSG)
     {
@@ -1705,5 +1710,9 @@ int CmiBarrier()
 
 }
 
+
+#if CMK_PERSISTENT_COMM
+#include "machine-persistent.c"
+#endif
 
 
