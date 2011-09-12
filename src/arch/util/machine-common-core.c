@@ -440,12 +440,30 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     CmiFreeSendFn(destPE, size, dupmsg);
 }
 
+#if CMK_USE_PXSHM
+inline int CmiValidPxshm(int dst, int size);
+void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiInitPxshm(char **argv);
+inline void CommunicationServerPxshm();
+void CmiExitPxshm();
+#endif
+
 void CmiFreeSendFn(int destPE, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
     if (CmiMyPe()==destPE) {
         CmiSendSelf(msg);
     } else {
+#if CMK_USE_PXSHM
+        int refcount = 0;
+        int ret=CmiValidPxshm(destPE, size);
+        if (ret) {
+          CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+          return;
+        }
+#endif
         int destNode = CmiNodeOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
@@ -568,6 +586,7 @@ if (  MSG_STATISTIC)
     for(_ii=0; _ii<22; _ii++)
         msg_histogram[_ii] = 0;
 }
+
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
@@ -576,6 +595,10 @@ if (  MSG_STATISTIC)
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
+
+#if CMK_USE_PXSHM
+    CmiInitPxshm(argv);
+#endif
 
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
@@ -604,6 +627,7 @@ if (  MSG_STATISTIC)
 #endif
 
     CmiStartThreads(argv);
+
     ConverseRunPE(initret);
 }
 
@@ -677,6 +701,10 @@ static void ConverseRunPE(int everReturn) {
 static INLINE_KEYWORD void AdvanceCommunication() {
     int doProcessBcast = 1;
 
+#if CMK_USE_PXSHM
+    CommunicationServerPxshm();
+#endif
+
     LrtsAdvanceCommunication();
 
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -727,6 +755,9 @@ void ConverseExit(void) {
     LrtsDrainResources();
 #endif
 
+#if CMK_USE_PXSHM
+        CmiExitPxshm();
+#endif
     ConverseCommonExit();
 
 if (MSG_STATISTIC)
@@ -863,3 +894,10 @@ static char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
+
+
+#if CMK_USE_PXSHM
+#include "machine-pxshm.c"
+#endif
+
+

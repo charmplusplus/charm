@@ -524,7 +524,7 @@ graph.o: graph.c $(CVHEADERS) $(UTILHEADERS)
 RTH.o: RTH.C RTH.h $(CVHEADERS)
 	$(CHARMC) -o RTH.o RTH.C
 
-persist-comm.o: persist-comm.c persist_impl.h $(CVHEADERS)
+persist-comm.o: persist-comm.c $(CVHEADERS)
 	$(CHARMC) -o persist-comm.o persist-comm.c
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)

@@ -1,5 +1,8 @@
 #ifndef  _MACHINE_LRTS_H_
 #define  _MACHINE_LRTS_H_
+
+void LrtsPrepareEnvelope(char *msg, int size);
+
 /* The machine-specific send function */
 CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode);
 

@@ -36,5 +36,5 @@
 
 #define CMK_LB_CPUTIMER					   0
 
-#define CMK_PERSISTENT_COMM                                0
+#define CMK_PERSISTENT_COMM                                1
 

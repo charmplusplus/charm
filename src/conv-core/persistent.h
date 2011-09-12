@@ -50,8 +50,7 @@ typedef void * PersistentHandle;
 typedef struct {
   int pe;
   int maxBytes;
-  void *messagePtr[2];
-  void *recvSizePtr[2];
+  void **bufPtr;
   PersistentHandle myHand;
 } PersistentReq;
 
