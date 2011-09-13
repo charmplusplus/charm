@@ -12,7 +12,6 @@ mainmodule PMEMimic {
   readonly CProxy_PMEPencil_Y pme_y;
   readonly CProxy_PMEPencil_Z pme_z;
 
-  readonly CkGroupID mCastGrpId;
 
   group PMEMap : CkArrayMap {
       entry PMEMap(int); 
@@ -27,23 +26,23 @@ mainmodule PMEMimic {
 
   array [3D] PMEPencil_X {
     entry PMEPencil_X(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
-    entry void cb_client(CkReductionMsg *msg);
+    entry void reducePencils();
   };        
  
   array [3D] PMEPencil_Y {
     entry PMEPencil_Y(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
-    entry void cb_client(CkReductionMsg *msg);
+    entry void reducePencils();
   }; 
 
   array [3D] PMEPencil_Z {
     entry PMEPencil_Z(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
-    entry void cb_client(CkReductionMsg *msg);
+    entry void reducePencils();
   };  
 
 };

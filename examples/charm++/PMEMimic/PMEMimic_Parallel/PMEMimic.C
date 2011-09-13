@@ -16,9 +16,8 @@ CProxy_PMEPencil_X pme_x;
 CProxy_PMEPencil_Y pme_y;
 CProxy_PMEPencil_Z pme_z;
 
-CkGroupID mCastGrpId;
 
-class DataMsg : public CkMcastBaseMsg, public CMessage_DataMsg
+class DataMsg : public CMessage_DataMsg
 {
 public:
     int phrase;
@@ -48,7 +47,7 @@ public:
 /*mainchare*/
 class Main : public CBase_Main
 {
-    double startTimer;
+    double nextPhraseTimer;
     int done_pme, iteration;
 public:
 
@@ -89,22 +88,9 @@ public:
       pme_y = CProxy_PMEPencil_Y::ckNew(1, opts_y);
       pme_z = CProxy_PMEPencil_Z::ckNew(2, opts_z);
 
-      mCastGrpId = CProxy_CkMulticastMgr::ckNew();
-      CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-
-      CProxySection_PMEPencil_X mcp_x[grid_y][grid_z];
-
-      for (int i=0; i<grid_y; i++)
-        for (int j=0; j<grid_z; j++) {
-          mcp_x[i][j] = CProxySection_PMEPencil_X::ckNew(pme_x, i, i, 1, j, j, 1,  0, pes_per_node-1, 1);
-          mcp_x[i][j].ckSectionDelegate(mg);
-          CkCallback *cb = new CkCallback(CkIndex_PMEPencil_X::cb_client(NULL), CkArrayIndex3D(i,j,0), pme_x);
-          mg->setReductionClient(mcp_x[i][j], cb);
-      }
-
       done_pme=0;
-      startTimer = CmiWallTimer();
-      pme_x.start();
+      nextPhraseTimer = CmiWallTimer();
+      pme_x.nextPhrase();
       
     };
 
@@ -115,40 +101,31 @@ public:
         {
             done_pme = 0;
 
-            CkPrintf("PME(%d, %d, %d) on %d PEs, %d iteration, avg time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), max_iter, (CmiWallTimer()-startTimer)/max_iter*1000);
+            CkPrintf("PME(%d, %d, %d) on %d PEs, %d iteration, avg time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), max_iter, (CmiWallTimer()-nextPhraseTimer)/max_iter*1000);
             CkExit();
         }
     }
 };
 
-/*array [1D]*/
+/*array [3D]*/
 class PMEPencil_X : public CBase_PMEPencil_X
 {
-    int PME_index;
-    int buffered_num, buffered_phrase;
     int recv_nums, iteration;
-    CkSectionInfo sid;
+    int barrier_num;
+    int phrase ;
+    int expect_num;
 public:
   PMEPencil_X(int i)
   {
-      PME_index = i;
       recv_nums = 0;
       iteration = 0;
-      buffered_num = 0;
-
-      if (thisIndex.z == 0) {
-          CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-          CProxySection_PMEPencil_X mcp_x;
-
-          mcp_x = CProxySection_PMEPencil_X::ckNew(pme_x, thisIndex.x, thisIndex.x, 1, thisIndex.y, thisIndex.y, 1,  0, pes_per_node-1, 1);
-          mcp_x.ckSectionDelegate(mg);
-          CkCallback *cb = new CkCallback(CkIndex_PMEPencil_X::cb_client(NULL), CkArrayIndex3D(thisIndex.x,thisIndex.y,0), pme_x);
-          mg->setReductionClient(mcp_x, cb);
-      }
+      barrier_num = 0;
+      phrase = 1;
+      expect_num = grid_x/pes_per_node;
   }
   PMEPencil_X(CkMigrateMessage *m) {}
 
-  void start()
+  void nextPhrase()
   {
    //thisindex.x thisindex.y
     // x (yz)(x), y(x, z)(y)
@@ -156,121 +133,90 @@ public:
     for(int x=0; x<grain_size; x++)
     {
       DataMsg *msg= new DataMsg;
-      msg->phrase = 1;
+      msg->phrase = phrase;
       //CmiPrintf("g=%d(%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, x+thisIndex.z*grain_size, thisIndex.y, yindex);
       pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
     }
   }
   void recvTrans(DataMsg *msg_recv)
   {
-    int expect_num, index;
-    expect_num = grid_x/pes_per_node;
-    index = msg_recv->phrase;
-
-    CkGetSectionInfo(sid, msg_recv);
-
-    if(msg_recv->phrase != PME_index)
-    {
-        buffered_num++;
-        buffered_phrase = msg_recv->phrase;
-        delete msg_recv;
-        return;
-    }
     recv_nums++;
     if(recv_nums == expect_num)
     {
         //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
-        if(index == 0  ) //x (y,z) to y(x,z)
-        {
-            iteration++;
-            if(iteration == max_iter)
-            {
-                mainProxy.done();
-                return;
-            }
-            int yindex = thisIndex.x/grain_size;
-            for(int x=0; x<grain_size; x++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
-            }
-        }else if(index == 1) //y(x,z) send to z(x,y)
-        {
-            int zindex = thisIndex.y/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_z(thisIndex.x, y+thisIndex.z*grain_size, zindex).recvTrans(msg); 
-            }
-            PME_index = 3;
-            recv_nums = buffered_num;
-        }else if(index == 2) //Z(x,y) send to y(x,z)
-        {
-            int yindex = thisIndex.y/grain_size;
-            for(int z=0; z<grain_size; z++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(thisIndex.x, z+thisIndex.z*grain_size, yindex).recvTrans(msg); 
-            }
-        } else if(index == 3) //y(x,z) to x(y,z)
-        {
-            int xindex = thisIndex.x/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = 0;
-                pme_x(y+grain_size*thisIndex.z, thisIndex.y, xindex).recvTrans(msg); 
-            }
-            PME_index = 1;
-            recv_nums = buffered_num;
-        }
+        phrase = msg_recv->phrase+1;
+        pme_x(thisIndex.x, thisIndex.y, 0).reducePencils();
         recv_nums = 0;
-        CkMulticastMgr *mg = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-        mg->contribute(0, NULL,CkReduction::nop, sid);
     }
     delete msg_recv;
   }
-  void cb_client(CkReductionMsg *msg) {
+  void reducePencils() {
+    barrier_num++;
+    if(barrier_num == pes_per_node)
+    {
+        iteration++;
+        if(iteration == max_iter)
+        {
+            mainProxy.done();
+            return;
+        }
+       for(int i=0; i<pes_per_node; i++)
+       {
+            pme_x(thisIndex.x, thisIndex.y, i).nextPhrase();
+       }
+    }
   }
 };
 
-/*array [1D]*/
+/*array [3D]*/
 class PMEPencil_Y : public CBase_PMEPencil_Y
 {
     int PME_index;
     int buffered_num, buffered_phrase;
     int recv_nums, iteration;
+    int barrier_num;
+    int phrase ;
+    int expect_num;
 public:
   PMEPencil_Y(int i)
   {
-      PME_index = i;
+      PME_index = 1;
       recv_nums = 0;
       iteration = 0;
       buffered_num = 0;
+      barrier_num = 0;
+      phrase = 1;
+      expect_num = grid_x/pes_per_node;
   }
   PMEPencil_Y(CkMigrateMessage *m) {}
 
-  void start()
+  void nextPhrase()
   {
-   //thisindex.x thisindex.y
-    // x (yz)(x), y(x, z)(y)
-    int yindex = thisIndex.x/grain_size;
-    for(int x=0; x<grain_size; x++)
-    {
-      DataMsg *msg= new DataMsg;
-      msg->phrase = 1;
-      pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
-    }
+      if(phrase == 1) //y(x,z) send to z(x,y)
+      {
+          int zindex = thisIndex.y/grain_size;
+            for(int y=0; y<grain_size; y++)
+            {
+                DataMsg *msg= new DataMsg;
+                msg->phrase = phrase+1;
+                pme_z(thisIndex.x, y+thisIndex.z*grain_size, zindex).recvTrans(msg); 
+            }
+            PME_index = 3; 
+        } else if(phrase == 3) //y(x,z) to x(y,z)
+        {
+            int xindex = thisIndex.x/grain_size;
+            for(int y=0; y<grain_size; y++)
+            {
+                DataMsg *msg= new DataMsg;
+                msg->phrase = 0;
+                pme_x(y+grain_size*thisIndex.z, thisIndex.y, xindex).recvTrans(msg); 
+            }
+            PME_index = 1;
+        }
   }
   void recvTrans(DataMsg *msg_recv)
   {
-    int expect_num, index;
-    expect_num = grid_x/pes_per_node;
-    index = msg_recv->phrase;
-
+    
     if(msg_recv->phrase != PME_index)
     {
         buffered_num++;
@@ -282,160 +228,78 @@ public:
     if(recv_nums == expect_num)
     {
         //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
-        if(index == 0  ) //x (y,z) to y(x,z)
-        {
-            iteration++;
-            if(iteration == max_iter)
-            {
-                mainProxy.done();
-                return;
-            }
-            int yindex = thisIndex.x/grain_size;
-            for(int x=0; x<grain_size; x++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
-            }
-        }else if(index == 1) //y(x,z) send to z(x,y)
-        {
-            int zindex = thisIndex.y/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_z(thisIndex.x, y+thisIndex.z*grain_size, zindex).recvTrans(msg); 
-            }
-            PME_index = 3;
-            recv_nums = buffered_num;
-        }else if(index == 2) //Z(x,y) send to y(x,z)
-        {
-            int yindex = thisIndex.y/grain_size;
-            for(int z=0; z<grain_size; z++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(thisIndex.x, z+thisIndex.z*grain_size, yindex).recvTrans(msg); 
-            }
-        } else if(index == 3) //y(x,z) to x(y,z)
-        {
-            int xindex = thisIndex.x/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = 0;
-                pme_x(y+grain_size*thisIndex.z, thisIndex.y, xindex).recvTrans(msg); 
-            }
-            PME_index = 1;
-            recv_nums = buffered_num;
-        }
-        recv_nums = 0;
+        phrase = msg_recv->phrase;
+        pme_y(thisIndex.x, thisIndex.y, 0).reducePencils();
+        recv_nums = buffered_num;
+        buffered_num = 0;
     }
     delete msg_recv;
   }
-  void cb_client(CkReductionMsg *msg) {
+  void reducePencils() {
+    barrier_num++;
+    if(barrier_num == pes_per_node)
+    {
+       for(int i=0; i<pes_per_node; i++)
+       {
+            pme_y(thisIndex.x, thisIndex.y, i).nextPhrase();
+       }
+    }
   }
 };
 
-/*array [1D]*/
+/*array [3D]*/
 class PMEPencil_Z : public CBase_PMEPencil_Z
 {
-    int PME_index;
-    int buffered_num, buffered_phrase;
     int recv_nums, iteration;
+    int barrier_num;
+    int phrase; 
+    int expect_num;
 public:
   PMEPencil_Z(int i)
   {
-      PME_index = i;
       recv_nums = 0;
       iteration = 0;
-      buffered_num = 0;
+      barrier_num = 0;
+      phrase = 1;
+      expect_num = grid_x/pes_per_node;
   }
+  
   PMEPencil_Z(CkMigrateMessage *m) {}
 
-  void start()
+  void nextPhrase()
   {
    //thisindex.x thisindex.y
-    // x (yz)(x), y(x, z)(y)
-    int yindex = thisIndex.x/grain_size;
-    for(int x=0; x<grain_size; x++)
+    // Z , y(x, z)(y)
+    int yindex = thisIndex.y/grain_size;
+    for(int z=0; z<grain_size; z++)
     {
-      DataMsg *msg= new DataMsg;
-      msg->phrase = 1;
-      pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
+        DataMsg *msg= new DataMsg;
+        msg->phrase = phrase+1;
+        pme_y(thisIndex.x, z+thisIndex.z*grain_size, yindex).recvTrans(msg); 
     }
   }
   void recvTrans(DataMsg *msg_recv)
   {
-    int expect_num, index;
-    expect_num = grid_x/pes_per_node;
-    index = msg_recv->phrase;
-
-    if(msg_recv->phrase != PME_index)
-    {
-        buffered_num++;
-        buffered_phrase = msg_recv->phrase;
-        delete msg_recv;
-        return;
-    }
     recv_nums++;
     if(recv_nums == expect_num)
     {
         //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
-        if(index == 0  ) //x (y,z) to y(x,z)
-        {
-            iteration++;
-            if(iteration == max_iter)
-            {
-                mainProxy.done();
-                return;
-            }
-            int yindex = thisIndex.x/grain_size;
-            for(int x=0; x<grain_size; x++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
-            }
-        }else if(index == 1) //y(x,z) send to z(x,y)
-        {
-            int zindex = thisIndex.y/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_z(thisIndex.x, y+thisIndex.z*grain_size, zindex).recvTrans(msg); 
-            }
-            PME_index = 3;
-            recv_nums = buffered_num;
-        }else if(index == 2) //Z(x,y) send to y(x,z)
-        {
-            int yindex = thisIndex.y/grain_size;
-            for(int z=0; z<grain_size; z++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = msg_recv->phrase+1;
-                pme_y(thisIndex.x, z+thisIndex.z*grain_size, yindex).recvTrans(msg); 
-            }
-        } else if(index == 3) //y(x,z) to x(y,z)
-        {
-            int xindex = thisIndex.x/grain_size;
-            for(int y=0; y<grain_size; y++)
-            {
-                DataMsg *msg= new DataMsg;
-                msg->phrase = 0;
-                pme_x(y+grain_size*thisIndex.z, thisIndex.y, xindex).recvTrans(msg); 
-            }
-            PME_index = 1;
-            recv_nums = buffered_num;
-        }
+        phrase = msg_recv->phrase;
+        pme_z(thisIndex.x, thisIndex.y, 0).reducePencils();
         recv_nums = 0;
     }
     delete msg_recv;
   }
-  void cb_client(CkReductionMsg *msg) {
+  void reducePencils() {
+    barrier_num++;
+    if(barrier_num == pes_per_node)
+    {
+       for(int i=0; i<pes_per_node; i++)
+       {
+            pme_z(thisIndex.x, thisIndex.y, i).nextPhrase();
+       }
+    }
   }
 };
-
 
 #include "PMEMimic.def.h"
