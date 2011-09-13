@@ -6,6 +6,7 @@ mainmodule PMEMimic {
   readonly int     grid_y;
   readonly int     grid_z;
   readonly int     pes_per_node;
+  readonly int     pes_per_node_type;
   readonly int     grain_size;
   readonly int     max_iter;
   readonly CProxy_PMEPencil_X pme_x;

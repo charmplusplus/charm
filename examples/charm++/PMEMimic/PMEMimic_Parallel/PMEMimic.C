@@ -10,6 +10,7 @@ int     grid_x;
 int     grid_y;
 int     grid_z;
 int     max_iter;
+int     pes_per_node_type;
 int     pes_per_node;
 int     grain_size;
 CProxy_PMEPencil_X pme_x;
@@ -29,7 +30,9 @@ class PMEMap : public CkArrayMap
 { 
     int offset;
 public: 
-    PMEMap(int off) { offset = off;} 
+    PMEMap(int off) { 
+        if(pes_per_node == pes_per_node_type) offset = 0;
+        else offset = off*pes_per_node_type;} 
     PMEMap(CkMigrateMessage *m){} 
     int registerArray(CkArrayIndex& numElements,CkArrayID aid) { 
         return 0; 
@@ -38,7 +41,7 @@ public:
         int penum;
         int *index =  (int *)idx.data();
         int node_index =  index[0]*grid_x + index[1];
-        penum = node_index * pes_per_node + index[2];
+        penum = node_index * pes_per_node + index[2]+offset;
         return penum; 
     } 
 }; 
@@ -57,31 +60,33 @@ public:
  
         grid_x = grid_y = grid_z = 10;
         max_iter = 100;
-        pes_per_node = 3;
+        pes_per_node_type = 3;
         if(m->argc > 1)
         {
-            pes_per_node = atoi(m->argv[1]);;
-            grid_x = grid_y = grid_z = atoi(m->argv[2]);
-            max_iter = atoi(m->argv[3]);
+            pes_per_node = atoi(m->argv[1]);
+            pes_per_node_type = atoi(m->argv[2]);
+            pes_per_node_type = pes_per_node/pes_per_node_type; // 1 or 3
+            grid_x = grid_y = grid_z = atoi(m->argv[3]);
+            max_iter = atoi(m->argv[4]);
         }
-        grain_size = grid_x/pes_per_node;
+        grain_size = grid_x/(pes_per_node_type);
         delete m;
-
+      CkPrintf("exec pes_per_node_type(must be 3 times) grid_x iteration\n");
     //Start the computation
       CkPrintf("Running PMEMimic on %d processors for %d elements\n",
           CkNumPes(), grid_x);
       mainProxy = thisProxy;
 
       CProxy_PMEMap myMap_x=CProxy_PMEMap::ckNew(0); 
-      CkArrayOptions opts_x(grid_y, grid_z, pes_per_node); 
+      CkArrayOptions opts_x(grid_y, grid_z, pes_per_node_type); 
       opts_x.setMap(myMap_x);
 
       CProxy_PMEMap myMap_y=CProxy_PMEMap::ckNew(1); 
-      CkArrayOptions opts_y(grid_x, grid_z, pes_per_node); 
+      CkArrayOptions opts_y(grid_x, grid_z, pes_per_node_type); 
       opts_y.setMap(myMap_y);
 
       CProxy_PMEMap myMap_z=CProxy_PMEMap::ckNew(2); 
-      CkArrayOptions opts_z(grid_x, grid_y, pes_per_node); 
+      CkArrayOptions opts_z(grid_x, grid_y, pes_per_node_type); 
       opts_z.setMap(myMap_z);
 
       pme_x = CProxy_PMEPencil_X::ckNew(0, opts_x);
@@ -121,7 +126,7 @@ public:
       iteration = 0;
       barrier_num = 0;
       phrase = 1;
-      expect_num = grid_x/pes_per_node;
+      expect_num = grid_x/pes_per_node_type;
   }
   PMEPencil_X(CkMigrateMessage *m) {}
 
@@ -156,7 +161,7 @@ public:
   }
   void reducePencils() {
     barrier_num++;
-    if(barrier_num == pes_per_node)
+    if(barrier_num == pes_per_node_type)
     {
         iteration++;
         if(iteration == max_iter)
@@ -164,7 +169,7 @@ public:
             mainProxy.done();
             return;
         }
-       for(int i=0; i<pes_per_node; i++)
+       for(int i=0; i<pes_per_node_type; i++)
        {
             pme_x(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
@@ -191,7 +196,7 @@ public:
       buffered_num = 0;
       barrier_num = 0;
       phrase = 1;
-      expect_num = grid_x/pes_per_node;
+      expect_num = grid_x/pes_per_node_type;
   }
   PMEPencil_Y(CkMigrateMessage *m) {}
 
@@ -250,9 +255,9 @@ public:
   }
   void reducePencils() {
     barrier_num++;
-    if(barrier_num == pes_per_node)
+    if(barrier_num == pes_per_node_type)
     {
-       for(int i=0; i<pes_per_node; i++)
+       for(int i=0; i<pes_per_node_type; i++)
        {
             pme_y(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
@@ -275,7 +280,7 @@ public:
       iteration = 0;
       barrier_num = 0;
       phrase = 1;
-      expect_num = grid_x/pes_per_node;
+      expect_num = grid_x/pes_per_node_type;
   }
   
   PMEPencil_Z(CkMigrateMessage *m) {}
@@ -311,9 +316,9 @@ public:
   }
   void reducePencils() {
     barrier_num++;
-    if(barrier_num == pes_per_node)
+    if(barrier_num == pes_per_node_type)
     {
-       for(int i=0; i<pes_per_node; i++)
+       for(int i=0; i<pes_per_node_type; i++)
        {
             pme_z(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
