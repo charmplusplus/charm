@@ -20,49 +20,61 @@
 
 void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 {
-  CmiAssert(h!=NULL);
-  PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  CmiAssert(slot->used == 1);
-  CmiAssert(slot->destPE == destPE);
-  if (size > slot->sizeMax) {
-    CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
-    CmiAbort("Abort: Invalid size\n");
-  }
+    gni_post_descriptor_t *pd;
+    gni_return_t status;
+    RDMA_REQUEST        *rdma_request_msg;
+    
+    CmiAssert(h!=NULL);
+    PersistentSendsTable *slot = (PersistentSendsTable *)h;
+    CmiAssert(slot->used == 1);
+    CmiAssert(slot->destPE == destPE);
+    if (size > slot->sizeMax) {
+        CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
+        CmiAbort("Abort: Invalid size\n");
+    }
 
 /*CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), destPE, slot->destAddress[0], size);*/
 
-  if (slot->destBuf[0].destAddress) {
-#if 0
-    ELAN_EVENT *e1, *e2;
-    int strategy = STRATEGY_ONE_PUT;
-    /* if (size > 280) strategy = STRATEGY_TWO_ELANPUT; */
-    int *footer = (int*)((char*)m + size);
-    footer[0] = size;
-    footer[1] = 1;
-    if (strategy == STRATEGY_ONE_PUT) CMI_MESSAGE_SIZE(m) = size;
-    else CMI_MESSAGE_SIZE(m) = 0;
-    e1 = elan_put(elan_base->state, m, slot->destAddress[0], size+sizeof(int)*2, destPE);
-    switch (strategy ) {
-    case STRATEGY_ONE_PUT:
-    case STRATEGY_TWO_PUT:  {
-      PMSG_LIST *msg_tmp;
-      NEW_PMSG_LIST(e1, m, size, destPE, slot->destSizeAddress[0], h, strategy);
-      APPEND_PMSG_LIST(msg_tmp);
-      swapSendSlotBuffers(slot);
-      break;
-      }
-    case 2:
-      elan_wait(e1, ELAN_POLL_EVENT);
-      e2 = elan_put(elan_base->state, &size, slot->destSizeAddress[0], sizeof(int), destPE);
-      elan_wait(e2, ELAN_POLL_EVENT);
-      CMI_MESSAGE_SIZE(m) = 0;
-      /*CmiPrintf("[%d] elan finished. \n", CmiMyPe());*/
-      CmiFree(m);
+    if (slot->destBuf[0].destAddress) {
+        // uGNI part
+     
+        MallocPostDesc(pd);
+        if(size < LRTS_GNI_RDMA_THRESHOLD) 
+            pd->type            = GNI_POST_FMA_PUT;
+        else
+            pd->type            = GNI_POST_RDMA_PUT;
+
+        pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+        pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
+        pd->length          = size;
+        pd->local_addr      = (uint64_t) m;
+        pd->local_mem_hndl  = GetMemHndl(m) ;
+        pd->remote_addr     = (uint64_t)slot->destBuf[0].destAddress;
+        pd->remote_mem_hndl = slot->destBuf[0].mem_hndl;
+        pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
+        pd->rdma_mode       = 0;
+
+        if(pd->type == GNI_POST_RDMA_PUT) 
+            status = GNI_PostRdma(ep_hndl_array[destPE], pd);
+        else
+            status = GNI_PostFma(ep_hndl_array[destPE],  pd);
+        if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
+        {
+            MallocRdmaRequest(rdma_request_msg);
+            rdma_request_msg->next = 0;
+            rdma_request_msg->destNode = destPE;
+            rdma_request_msg->pd = pd;
+            if(pending_rdma_head == 0)
+            {
+                pending_rdma_head = rdma_request_msg;
+            }else
+            {
+                pending_rdma_tail->next = rdma_request_msg;
+            }
+            pending_rdma_tail = rdma_request_msg;
+        }else
+            GNI_RC_CHECK("AFter posting", status);
     }
-#else
-     // uGNI part
-#endif
-  }
   else {
 #if 1
     if (slot->messageBuf != NULL) {
@@ -190,7 +202,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     slot->destBuf[i].destAddress = buf;
     /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
-    // slot->destBuf[i].mem_hdl = 0;
+    slot->destBuf[i].mem_hndl = GetMemHndl(buf);
   }
   slot->sizeMax = maxBytes;
 }

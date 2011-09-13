@@ -97,7 +97,7 @@ static int  SMSG_MAX_MSG;
 
 #define REMOTE_QUEUE_ENTRIES  1048576
 #define LOCAL_QUEUE_ENTRIES   32
-
+#define PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
 /* SMSG is data message */
 #define SMALL_DATA_TAG          0x31
@@ -841,6 +841,10 @@ static void PumpNetworkSmsg()
                 SendRdmaMsg();
                 break;
             }
+            case PUT_DONE_TAG: //persistent message
+            {
+                handleOneRecvedMsg(((CONTROL_MSG *) header)->length,((void*) (CONTROL_MSG *) header)); 
+            }
             default: {
                 CmiPrintf("weird tag problem\n");
                 CmiAbort("Unknown tag\n");
@@ -1010,6 +1014,7 @@ static void PumpLocalRdmaTransactions()
     gni_post_descriptor_t   *tmp_pd;
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
+    uint8_t             msg_tag;
 
     while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     {
@@ -1031,51 +1036,51 @@ static void PumpLocalRdmaTransactions()
             //CmiPrintf("**[%d] SMSGPumpLocalTransactions local done(type=%d) length=%d, size=%d\n", myrank, type, tmp_pd->length, SIZEFIELD((void*)(tmp_pd->local_addr)) );
             ////Message is sent, free message , put is not used now
             if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
-            {
+            {   //persistent message 
                 CmiFree((void *)tmp_pd->local_addr);
+                msg_tag = PUT_DONE_TAG;  
             }else if(tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
             {
-                /* Send an ACK to remote side */
-                MallocControlMsg(ack_msg_tmp);
-                ack_msg_tmp->source             = myrank;
-                ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
-                ack_msg_tmp->length             = tmp_pd->length; 
-                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-#if PRINT_SYH
-                lrts_send_msg_id++;
-                CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
-#endif
-                if(smsg_msglist_head[inst_id]!=0)
-                {
-                    delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
-                }else
-                {
-                    status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, ACK_TAG);
-                    if(status == GNI_RC_SUCCESS)
-                    {
-#if PRINT_SYH
-                        lrts_smsg_success++;
-                        CmiPrintf("[%d==>%d] sent ACK done%d\n", myrank, inst_id, lrts_smsg_success);
-#endif
-                        FreeControlMsg(ack_msg_tmp);
-                    }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
-                    {
-                        delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, ACK_TAG);
-                    }
-                    else
-                        GNI_RC_CHECK("GNI_SmsgSendWTag", status);
-                }
-#if     !USE_LRTS_MEMPOOL
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
-#endif
-                CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
-                //handleOneRecvedMsg(SIZEFIELD((void*)(tmp_pd->local_addr)), (void*)tmp_pd->local_addr); 
-                handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
-                SendRdmaMsg(); 
+                msg_tag = ACK_TAG;  
             }
-            FreePostDesc(tmp_pd);
+            MallocControlMsg(ack_msg_tmp);
+            ack_msg_tmp->source             = myrank;
+            ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
+            ack_msg_tmp->length             = tmp_pd->length; 
+            ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+#if PRINT_SYH
+            lrts_send_msg_id++;
+            CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
+#endif
+            if(smsg_msglist_head[inst_id]!=0)
+            {
+                delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, msg_tag);
+            }else
+            {
+                status = GNI_SmsgSendWTag(ep_hndl_array[inst_id], 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), 0, msg_tag);
+                if(status == GNI_RC_SUCCESS)
+                {
+#if PRINT_SYH
+                    lrts_smsg_success++;
+                    CmiPrintf("[%d==>%d] sent ACK done%d\n", myrank, inst_id, lrts_smsg_success);
+#endif
+                    FreeControlMsg(ack_msg_tmp);
+                }else if(status == GNI_RC_NOT_DONE || status == GNI_RC_ERROR_RESOURCE)
+                {
+                    delay_send_small_msg(ack_msg_tmp, sizeof(CONTROL_MSG), inst_id, msg_tag);
+                }
+                else
+                    GNI_RC_CHECK("GNI_SmsgSendWTag", status);
+            }
+#if     !USE_LRTS_MEMPOOL
+            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+#endif
+            CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
+            handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
+            SendRdmaMsg(); 
         }
-    }
+        FreePostDesc(tmp_pd);
+    } //end while
 }
 
 static int SendRdmaMsg()
@@ -1096,7 +1101,7 @@ static int SendRdmaMsg()
         }
         if(status == GNI_RC_SUCCESS)
         {
-            if(pd->type == GNI_POST_RDMA_GET) 
+            if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
                 status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
             else
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
@@ -1480,7 +1485,9 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
     ptag = get_ptag();
     cookie = get_cookie();
-    
+#if 0
+    modes = GNI_CDM_MODE_CQ_NIC_LOCAL_PLACEMENT;
+#endif
     //Create and attach to the communication  domain */
     status = GNI_CdmCreate(myrank, ptag, cookie, modes, &cdm_hndl);
     GNI_RC_CHECK("GNI_CdmCreate", status);
