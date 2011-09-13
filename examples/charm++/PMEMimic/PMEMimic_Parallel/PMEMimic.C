@@ -4,7 +4,7 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ 
-
+#define  YH_DEBUG 0
 int     N;
 int     grid_x;
 int     grid_y;
@@ -101,7 +101,7 @@ public:
         {
             done_pme = 0;
 
-            CkPrintf("PME(%d, %d, %d) on %d PEs, %d iteration, avg time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), max_iter, (CmiWallTimer()-nextPhraseTimer)/max_iter*1000);
+            CkPrintf("\nPME(%d, %d, %d) on %d PEs (%d pes/node)(%d nodes)\n %d iteration, average time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), pes_per_node, CkNumPes()/pes_per_node, max_iter, (CmiWallTimer()-nextPhraseTimer)/max_iter*1000);
             CkExit();
         }
     }
@@ -134,7 +134,9 @@ public:
     {
       DataMsg *msg= new DataMsg;
       msg->phrase = phrase;
-      //CmiPrintf("g=%d(%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, x+thisIndex.z*grain_size, thisIndex.y, yindex);
+#if     YH_DEBUG
+      CmiPrintf("X==>y %d (%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, x+thisIndex.z*grain_size, thisIndex.y, yindex);
+#endif
       pme_y(x+thisIndex.z*grain_size, thisIndex.y, yindex ).recvTrans(msg);  
     }
   }
@@ -143,7 +145,9 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#if     YH_DEBUG
+        CkPrintf("X [%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#endif
         phrase = msg_recv->phrase+1;
         pme_x(thisIndex.x, thisIndex.y, 0).reducePencils();
         recv_nums = 0;
@@ -164,6 +168,7 @@ public:
        {
             pme_x(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
+       barrier_num = 0;
     }
   }
 };
@@ -200,6 +205,9 @@ public:
                 DataMsg *msg= new DataMsg;
                 msg->phrase = phrase+1;
                 pme_z(thisIndex.x, y+thisIndex.z*grain_size, zindex).recvTrans(msg); 
+#if     YH_DEBUG
+                CmiPrintf("y==>Z %d (%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, thisIndex.x, y+thisIndex.z*grain_size, zindex);
+#endif
             }
             PME_index = 3; 
         } else if(phrase == 3) //y(x,z) to x(y,z)
@@ -210,6 +218,9 @@ public:
                 DataMsg *msg= new DataMsg;
                 msg->phrase = 0;
                 pme_x(y+grain_size*thisIndex.z, thisIndex.y, xindex).recvTrans(msg); 
+#if     YH_DEBUG
+                CmiPrintf("y==>X %d (%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, y+grain_size*thisIndex.z, thisIndex.y, xindex);
+#endif
             }
             PME_index = 1;
         }
@@ -227,7 +238,9 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#if     YH_DEBUG
+        CkPrintf("Y [%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#endif
         phrase = msg_recv->phrase;
         pme_y(thisIndex.x, thisIndex.y, 0).reducePencils();
         recv_nums = buffered_num;
@@ -243,6 +256,7 @@ public:
        {
             pme_y(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
+       barrier_num = 0;
     }
   }
 };
@@ -276,6 +290,9 @@ public:
         DataMsg *msg= new DataMsg;
         msg->phrase = phrase+1;
         pme_y(thisIndex.x, z+thisIndex.z*grain_size, yindex).recvTrans(msg); 
+#if     YH_DEBUG
+        CmiPrintf("Z==>Y %d (%d,%d,%d)==>(%d, %d,%d)\n", grain_size, thisIndex.x, thisIndex.y, thisIndex.z, thisIndex.x, z+thisIndex.z*grain_size, yindex);
+#endif
     }
   }
   void recvTrans(DataMsg *msg_recv)
@@ -283,7 +300,9 @@ public:
     recv_nums++;
     if(recv_nums == expect_num)
     {
-        //CkPrintf("[%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#if     YH_DEBUG
+        CkPrintf(" Z [%d, %d, %d] phrase %d, iter=%d\n", thisIndex.x, thisIndex.y, thisIndex.z, msg_recv->phrase, iteration);
+#endif
         phrase = msg_recv->phrase;
         pme_z(thisIndex.x, thisIndex.y, 0).reducePencils();
         recv_nums = 0;
@@ -298,6 +317,7 @@ public:
        {
             pme_z(thisIndex.x, thisIndex.y, i).nextPhrase();
        }
+       barrier_num = 0;
     }
   }
 };
