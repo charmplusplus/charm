@@ -5,10 +5,13 @@ OBJS = PMEMimic.o
 all: pgm pgm.prj
 
 pgm: $(OBJS)
-	$(CHARMC) -language charm++ -o pgm $(OBJS)
+	$(CHARMC) -language charm++ -o pgm $(OBJS) 
+#$(CHARMC) -language charm++ -o pgm $(OBJS) -module CkMulticast
+	
 
 pgm.prj: $(OBJS)
-	$(CHARMC) -language charm++ -tracemode projections -o pgm.prj $(OBJS)
+	$(CHARMC) -language charm++ -tracemode projections -o pgm.prj $(OBJS) 
+#$(CHARMC) -language charm++ -tracemode projections -o pgm.prj $(OBJS) -module CkMulticast
 
 PMEMimic.decl.h: PMEMimic.ci
 	$(CHARMC)  PMEMimic.ci

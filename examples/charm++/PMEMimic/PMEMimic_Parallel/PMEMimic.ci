@@ -6,11 +6,13 @@ mainmodule PMEMimic {
   readonly int     grid_y;
   readonly int     grid_z;
   readonly int     pes_per_node;
+  readonly int     pes_per_node_type;
   readonly int     grain_size;
   readonly int     max_iter;
   readonly CProxy_PMEPencil_X pme_x;
   readonly CProxy_PMEPencil_Y pme_y;
   readonly CProxy_PMEPencil_Z pme_z;
+
 
   group PMEMap : CkArrayMap {
       entry PMEMap(int); 
@@ -25,19 +27,23 @@ mainmodule PMEMimic {
 
   array [3D] PMEPencil_X {
     entry PMEPencil_X(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
+    entry void reducePencils();
   };        
  
   array [3D] PMEPencil_Y {
     entry PMEPencil_Y(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
+    entry void reducePencils();
   }; 
-array [3D] PMEPencil_Z {
+
+  array [3D] PMEPencil_Z {
     entry PMEPencil_Z(int);
-    entry void start();
+    entry void nextPhrase();
     entry void recvTrans( DataMsg *m);
+    entry void reducePencils();
   };  
 
 };
