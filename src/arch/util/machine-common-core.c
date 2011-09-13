@@ -448,6 +448,8 @@ inline void CommunicationServerPxshm();
 void CmiExitPxshm();
 #endif
 
+int refcount = 0;
+
 void CmiFreeSendFn(int destPE, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
@@ -455,7 +457,6 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         CmiSendSelf(msg);
     } else {
 #if CMK_USE_PXSHM
-        int refcount = 0;
         int ret=CmiValidPxshm(destPE, size);
         if (ret) {
           CMI_DEST_RANK(msg) = CmiRankOf(destPE);
@@ -464,6 +465,14 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
           return;
         }
 #endif
+#if CMK_PERSISTENT_COMM
+    if (phs) {
+        CmiAssert(phsSize == 1);
+        LrtsSendPersistentMsg(*phs, destPE, size, msg);
+        return;
+    }
+#endif
+
         int destNode = CmiNodeOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {

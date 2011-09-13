@@ -246,7 +246,7 @@ static void persistentReqGrantedHandler(void *env)
   slot->destHandle = msg->destHandlerIndex;
 
   if (slot->messageBuf) {
-    CmiSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messageBuf);
+    LrtsSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messageBuf);
     slot->messageBuf = NULL;
   }
   CmiFree(msg);

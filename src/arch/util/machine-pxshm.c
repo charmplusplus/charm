@@ -116,7 +116,6 @@ typedef struct {
 	volatile int flagReceiver;
         CmiMemorySMPSeparation_t pad2;
 	volatile int turn;
-	int dummy;
 #endif	
 
 } sharedBufHeader;
@@ -230,6 +229,11 @@ void CmiInitPxshm(char **argv){
 	pxshmContext->lockRecvCount = 0;
 #endif
 
+#if 0
+        char name[64];
+        gethostname(name,64);
+        printf("[%d] name: %s\n", myrank, name);
+#endif
 };
 
 /**************
@@ -619,7 +623,7 @@ int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmS
 	/***
 	 * Shared Buffer is too full for this message
 	 * **/
-	printf("send buffer is too full\n");
+	printf("[%d] send buffer is too full\n", CmiMyPe());
 	pushSendQ(dstSendQ,msg,size,refcount);
 	(*refcount)++;
 	MACHSTATE3(3,"Pxshm send ogm %p size %d queued refcount %d",ogm,ogm->size,ogm->refcount);
@@ -835,7 +839,7 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
  * ****************/
 
 void initSendQ(PxshmSendQ *q,int size){
-	q->data = (OutgoingMsgRec *)malloc(sizeof(OutgoingMsgRec)*size);
+	q->data = (OutgoingMsgRec *)calloc(size, sizeof(OutgoingMsgRec));
 
 	q->size = size;
 	q->numEntries = 0;
@@ -847,17 +851,17 @@ void initSendQ(PxshmSendQ *q,int size){
 void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount){
 	if(q->numEntries == q->size){
 		//need to resize 
+CmiPrintf("[%d] pushSendQ resize \n", CmiMyPe());
 		OutgoingMsgRec *oldData = q->data;
 		int newSize = q->size<<1;
-		q->data = (OutgoingMsgRec *)malloc(sizeof(OutgoingMsgRec)*newSize);
+		q->data = (OutgoingMsgRec *)calloc(newSize, sizeof(OutgoingMsgRec));
 		//copy head to the beginning of the new array
-		
 		CmiAssert(q->begin == q->end);
 
 		CmiAssert(q->begin < q->size);
 		memcpy(&(q->data[0]),&(oldData[q->begin]),sizeof(OutgoingMsgRec)*(q->size - q->begin));
 
-		if(q->end != 0){
+		if(q->end!=0){
 			memcpy(&(q->data[(q->size - q->begin)]),&(oldData[0]),sizeof(OutgoingMsgRec)*(q->end));
 		}
 		free(oldData);

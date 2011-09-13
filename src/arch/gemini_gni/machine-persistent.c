@@ -10,7 +10,7 @@
 
 /*
   machine specific persistent comm functions:
-  * CmiSendPersistentMsg
+  * LrtsSendPersistentMsg
   * CmiSyncSendPersistent
   * PumpPersistent
   * PerAlloc PerFree      // persistent message memory allocation/free functions
@@ -18,7 +18,7 @@
 */
 
 
-void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
+void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 {
   CmiAssert(h!=NULL);
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
@@ -29,7 +29,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     CmiAbort("Abort: Invalid size\n");
   }
 
-/*CmiPrintf("[%d] CmiSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), destPE, slot->destAddress[0], size);*/
+/*CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), destPE, slot->destAddress[0], size);*/
 
   if (slot->destBuf[0].destAddress) {
 #if 0
@@ -61,7 +61,6 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     }
 #else
      // uGNI part
-    CmiFree(m);
 #endif
   }
   else {
@@ -84,6 +83,7 @@ void CmiSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
   }
 }
 
+#if 0
 void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
 {
   CmiState cs = CmiGetState();
@@ -98,8 +98,9 @@ void CmiSyncSendPersistent(int destPE, int size, char *msg, PersistentHandle h)
     CdsFifo_Enqueue(CpvAccess(CmiLocalQueue),dupmsg);
   }
   else
-    CmiSendPersistentMsg(h, destPE, size, dupmsg);
+    LrtsSendPersistentMsg(h, destPE, size, dupmsg);
 }
+#endif
 
 extern void CmiReference(void *blk);
 
@@ -189,6 +190,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     slot->destBuf[i].destAddress = buf;
     /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
+    // slot->destBuf[i].mem_hdl = 0;
   }
   slot->sizeMax = maxBytes;
 }
