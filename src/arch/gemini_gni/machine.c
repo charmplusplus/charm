@@ -72,7 +72,8 @@ onesided_md_t    omdh;
 
 #else
 uint8_t   onesided_hnd, omdh;
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
+//#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl)
 
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
@@ -729,7 +730,7 @@ static int send_large_messages(int destNode, int size, char *msg)
 #endif
 }
 
-void LrtsPrepareEnvelope(char *msg, int size)
+inline void LrtsPrepareEnvelope(char *msg, int size)
 {
     CmiSetMsgSize(msg, size);
 }
@@ -741,14 +742,12 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     if(size <= SMSG_MAX_MSG)
     {
 #if PRINT_SYH
-    lrts_send_msg_id++;
-    CmiPrintf("SMSG LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
+        lrts_send_msg_id++;
+        CmiPrintf("SMSG LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
-    send_small_messages(destNode, size, msg);
-    }/*else if(size <=DMA_max_single_msg )
-    {
-        send_medium_messages(destNode, size, msg);
-    }*/else
+        send_small_messages(destNode, size, msg);
+    }
+    else
     {
         send_large_messages(destNode, size, msg);
     }
@@ -845,7 +844,7 @@ static void PumpNetworkSmsg()
             case PUT_DONE_TAG: //persistent message
             {
                 handleOneRecvedMsg(((CONTROL_MSG *) header)->length,((void*) (CONTROL_MSG *) header)); 
-		break;
+                break;
             }
             default: {
                 CmiPrintf("weird tag problem\n");
@@ -886,7 +885,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
     else
         pd->type            = GNI_POST_RDMA_GET;
 
-    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+    //pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = ALIGN4(request_msg->length);
     pd->local_addr      = (uint64_t) msg_data;
@@ -944,7 +944,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
     else
         pd->type            = GNI_POST_RDMA_GET;
 
-    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
+    //pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = ALIGN4(request_msg->length);
     pd->local_addr      = (uint64_t) msg_data;
@@ -1018,12 +1019,13 @@ static void PumpLocalRdmaTransactions()
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
 
+   // while ( (status = GNI_CqGetEvent(post_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     {
         type        = GNI_CQ_GET_TYPE(ev);
 #if PRINT_SYH
-        lrts_local_done_msg++;
-        CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d (type=%d)\n", myrank,  lrts_local_done_msg, type);
+        //lrts_local_done_msg++;
+        CmiPrintf("**[%d] SMSGPumpLocalTransactions (type=%d)\n", myrank, type);
 #endif
         /*if(type == GNI_CQ_EVENT_TYPE_SMSG)
         {
@@ -1034,6 +1036,7 @@ static void PumpLocalRdmaTransactions()
 #if PRINT_SYH
             CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
 #endif
+            //status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
             //CmiPrintf("**[%d] SMSGPumpLocalTransactions local done(type=%d) length=%d, size=%d\n", myrank, type, tmp_pd->length, SIZEFIELD((void*)(tmp_pd->local_addr)) );
             ////Message is sent, free message , put is not used now
