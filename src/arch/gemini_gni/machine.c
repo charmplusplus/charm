@@ -96,7 +96,8 @@ static int  SMSG_MAX_MSG;
 #define LRTS_GNI_RDMA_THRESHOLD  4096
 
 #define REMOTE_QUEUE_ENTRIES  1048576
-#define LOCAL_QUEUE_ENTRIES   32
+#define LOCAL_QUEUE_ENTRIES   1024
+
 #define PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
 /* SMSG is data message */
@@ -844,6 +845,7 @@ static void PumpNetworkSmsg()
             case PUT_DONE_TAG: //persistent message
             {
                 handleOneRecvedMsg(((CONTROL_MSG *) header)->length,((void*) (CONTROL_MSG *) header)); 
+		break;
             }
             default: {
                 CmiPrintf("weird tag problem\n");
@@ -1078,8 +1080,8 @@ static void PumpLocalRdmaTransactions()
             CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
             handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
             SendRdmaMsg(); 
+            FreePostDesc(tmp_pd);
         }
-        FreePostDesc(tmp_pd);
     } //end while
 }
 
