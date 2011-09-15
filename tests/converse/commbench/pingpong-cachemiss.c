@@ -29,15 +29,15 @@ static struct testdata {
   {-1,      -1},
 };
 
-Message *msg_pointers;
-static  int     buffered_messages;
-
 typedef struct message_{
   char core[CmiMsgHeaderSizeBytes];
   int srcpe;
   int idx;
+  int iter;
   int data[1];
 } Message;
+
+char     *buffer_msgs;
 
 static void fillMessage(Message *msg)
 {
@@ -90,6 +90,8 @@ pvd(int, nbrHandler);
 pvd(int, sizeHandler);
 pvd(int, iterHandler);
 pvd(int, bounceHandler);
+pvd(int, setupHandler);
+pvd(int, startHandler);
 
 static void recvTime(TimeMessage *msg)
 {
@@ -179,6 +181,7 @@ static void startNextSize(EmptyMsg *msg)
 {
   EmptyMsg m;
   Message *mm;
+  int i;
 
   pva(nextSize)++;
   if(pva(nextSize) == pva(numSizes)) {
@@ -187,13 +190,22 @@ static void startNextSize(EmptyMsg *msg)
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
   } else {
     int size = sizeof(Message)+sizes[pva(nextSize)].size;
+    
+    buffer_msgs = (char*)malloc((sizes[pva(nextSize)].numiter) * sizeof(Message*));
+    for(i=0; i<sizes[pva(nextSize)].numiter; i++)
+    {
+        mm = CmiAlloc(size);
+        mm->srcpe = CmiMyPe();
+        mm->idx = pva(nextSize);
+        CmiSetHandler(mm, pva(bounceHandler));
+        *((Message**)buffer_msgs+i*sizeof(char*)) = mm;
+    }
     mm = (Message *) CmiAlloc(size);
     mm->srcpe = CmiMyPe();
     mm->idx = pva(nextSize);
-    CmiSetHandler(mm, pva(iterHandler));
-    fillMessage(mm);
-    CmiSyncSendAndFree(CmiMyPe(), size, mm);
-    pva(starttime) = CmiWallTimer();
+    CmiSetHandler(mm, pva(setupHandler));
+    //fillMessage(mm);
+    CmiSyncSendAndFree(pva(nextNbr), size, mm);
   }
   CmiFree(msg);
 }
@@ -201,7 +213,7 @@ static void startNextSize(EmptyMsg *msg)
 static void startNextIter(Message *msg)
 {
   EmptyMsg m;
-
+  Message *mm;
   pva(nextIter)++;
   if(pva(nextIter) > sizes[pva(nextSize)].numiter) {
     pva(endtime) = CmiWallTimer();
@@ -213,19 +225,57 @@ static void startNextIter(Message *msg)
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
     CmiFree(msg);
   } else {
-
-    CmiSetHandler(msg, pva(bounceHandler));
-    CmiSyncSendAndFree(pva(nextNbr), sizeof(Message)+sizes[msg->idx].size, msg);
+      mm = *((Message**)(buffer_msgs + pva(nextIter)*sizeof(char*))); 
+      //CmiSetHandler(mm, pva(bounceHandler));
+      CmiSyncSendAndFree(pva(nextNbr), sizeof(Message)+sizes[mm->idx].size, mm);
   }
 }
 
 static void bounceMessage(Message *msg)
 {
-
-    mm = (Message *) CmiAlloc( sizeof(Message)+sizes[msg->idx].size);
-    CmiSetHandler(msg, pva(iterHandler));
-    CmiSyncSendAndFree(msg->srcpe, sizeof(Message)+sizes[msg->idx].size, msg);
+  CmiSetHandler(msg, pva(iterHandler));
+  CmiSyncSendAndFree(msg->srcpe, sizeof(Message)+sizes[msg->idx].size, msg);
 }
+static void setupMessage(Message *msg)
+{
+    Message *mm;
+    int     i, size;
+
+    int nextSize =  msg->idx; 
+    buffer_msgs = (char*)malloc((sizes[nextSize].numiter) * sizeof(Message*));
+    CmiFree(msg);
+
+    for(i=0; i<sizes[nextSize].numiter; i++)
+    {
+        mm = (Message*)CmiAlloc(size);
+        mm->srcpe = CmiMyPe();
+        CmiSetHandler(mm, pva(iterHandler));
+        //mm->idx = pva(nextSize);
+        *((Message**)buffer_msgs+i*sizeof(char*)) = mm;
+    }
+    mm = (Message *) CmiAlloc(size);
+    mm->srcpe = CmiMyPe();
+    mm->idx = nextSize;
+    CmiSetHandler(mm, pva(startHandler));
+    //fillMessage(mm);
+    CmiSyncSendAndFree(pva(nextNbr), size, mm);
+}
+static void startMessage(Message *msg)
+{
+    Message *mm;
+   
+    CmiFree(msg);
+
+    mm = *((Message**)buffer_msgs);
+    mm->srcpe = CmiMyPe();
+    mm->idx = pva(nextSize);
+    CmiSetHandler(mm, pva(iterHandler));
+    //fillMessage(mm);
+    pva(starttime) = CmiWallTimer();
+    CmiSyncSendAndFree(mm->srcpe, sizeof(Message)+sizes[pva(nextSize)].size, mm);
+  
+}
+
 
 void pingpong_init(void)
 {
@@ -305,4 +355,8 @@ void pingpong_moduleinit(void)
   pva(iterHandler) = CmiRegisterHandler((CmiHandler)startNextIter);
   pvi(int, bounceHandler);
   pva(bounceHandler) = CmiRegisterHandler((CmiHandler)bounceMessage);
+  pvi(int, setupHandler);
+  pva(setupHandler) = CmiRegisterHandler((CmiHandler)setupMessage);
+  pvi(int, startHandler);
+  pva(startHandler) = CmiRegisterHandler((CmiHandler)startMessage);
 }
