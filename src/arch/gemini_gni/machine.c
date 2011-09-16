@@ -92,12 +92,12 @@ static int  SMSG_MAX_MSG;
 //static int  log2_SMSG_MAX_MSG;
 #define SMSG_MAX_CREDIT  36
 
-#define MSGQ_MAXSIZE       4096
+#define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
-#define LRTS_GNI_RDMA_THRESHOLD  4096
+#define LRTS_GNI_RDMA_THRESHOLD  2048
 
 #define REMOTE_QUEUE_ENTRIES  1048576
-#define LOCAL_QUEUE_ENTRIES   1024
+#define LOCAL_QUEUE_ENTRIES   512
 
 #define PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
@@ -1109,6 +1109,7 @@ static int SendRdmaMsg()
     while (ptr != NULL)
     {
         gni_post_descriptor_t *pd = ptr->pd;
+        status = GNI_RC_SUCCESS;
         // register memory first
         if( pd->local_mem_hndl.qword1 == 0 && pd->local_mem_hndl.qword2 == 0)
         {
@@ -1284,11 +1285,11 @@ static void _init_static_smsg()
     uint32_t              vmdh_index = -1;
     mdh_addr_t            base_infor;
     mdh_addr_t            *base_addr_vec;
-    if(mysize <=1024)
+    if(mysize <=4096)
     {
         SMSG_MAX_MSG = 1024;
         //log2_SMSG_MAX_MSG = 10;
-    }else if (mysize > 1024 && mysize <= 16384)
+    }else if (mysize > 4096 && mysize <= 16384)
     {
         SMSG_MAX_MSG = 512;
         //log2_SMSG_MAX_MSG = 9;
@@ -1308,6 +1309,7 @@ static void _init_static_smsg()
     smsg_mailbox_base = memalign(64, smsg_memlen*(mysize));
     _MEMCHECK(smsg_mailbox_base);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
+    if (myrank == 0) CmiPrintf("Charm++> allocates %.2MB for SMSG. \n", smsg_memlen*mysize/1e6);
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,
