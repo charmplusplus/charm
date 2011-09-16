@@ -818,11 +818,13 @@ void *CmiGetNonLocal(void) {
     CmiIdleLock_checkMessage(&cs->idle);
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
-#if !CMK_SMP
-    AdvanceCommunication();
-#endif
-
     msg = PCQueuePop(cs->recv);
+#if !CMK_SMP
+    if (!msg) {
+       AdvanceCommunication();
+       msg = PCQueuePop(cs->recv);
+    } 
+#endif
 
 #if !CMK_SMP
     LrtsPostNonLocal();
@@ -832,6 +834,7 @@ void *CmiGetNonLocal(void) {
 
     return msg;
 }
+
 #if CMK_NODE_QUEUE_AVAILABLE
 void *CmiGetNonLocalNodeQ(void) {
     CmiState cs = CmiGetState();
