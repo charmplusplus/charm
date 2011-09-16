@@ -80,6 +80,10 @@ There are three options here for synchronization:
 #define CmiMemoryReadFence(startPtr,nBytes) 
 #endif
 
+#if CMK_SMP
+#error  "PXSHM can only be used in non-smp build of Charm++"
+#endif
+
 /***************************************************************************************/
 
 enum entities {SENDER,RECEIVER};
@@ -98,7 +102,7 @@ enum entities {SENDER,RECEIVER};
 
 #define SHMBUFLEN (1024*1024*1)
 
-#define SENDQSTARTSIZE 128
+#define SENDQSTARTSIZE    128
 
 
 /// This struct is used as the first portion of a shared memory region, followed by data
@@ -129,7 +133,6 @@ typedef struct {
 	char *data;
 } sharedBufData;
 
-#if ! CMK_NET_VERSION
 typedef struct OutgoingMsgRec
 {
   char *data;
@@ -137,7 +140,6 @@ typedef struct OutgoingMsgRec
   int   size;
 }
 OutgoingMsgRec;
-#endif
 
 typedef struct {
 	int size; //total size of data array
@@ -201,10 +203,12 @@ void CmiInitPxshm(char **argv){
 	
 	MACHSTATE1(3,"CminitPxshm  %d calculateNodeSizeAndRank",pxshmContext->nodesize);
 
-#if ! CMK_NET_VERSION
+#if CMK_CRAYXE
         srand(getpid());
         int Cmi_charmrun_pid = rand();
         PMI_Bcast(&Cmi_charmrun_pid, sizeof(int));
+#elif !CMK_NET_VERSION
+        #error "need a unique number"
 #endif
 	snprintf(&(pxshmContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
 
@@ -623,7 +627,7 @@ int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmS
 	/***
 	 * Shared Buffer is too full for this message
 	 * **/
-	printf("[%d] send buffer is too full\n", CmiMyPe());
+	//printf("[%d] send buffer is too full\n", CmiMyPe());
 	pushSendQ(dstSendQ,msg,size,refcount);
 	(*refcount)++;
 	MACHSTATE3(3,"Pxshm send ogm %p size %d queued refcount %d",ogm,ogm->size,ogm->refcount);
@@ -851,7 +855,6 @@ void initSendQ(PxshmSendQ *q,int size){
 void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount){
 	if(q->numEntries == q->size){
 		//need to resize 
-CmiPrintf("[%d] pushSendQ resize \n", CmiMyPe());
 		OutgoingMsgRec *oldData = q->data;
 		int newSize = q->size<<1;
 		q->data = (OutgoingMsgRec *)calloc(newSize, sizeof(OutgoingMsgRec));
