@@ -1309,7 +1309,7 @@ static void _init_static_smsg()
     smsg_mailbox_base = memalign(64, smsg_memlen*(mysize));
     _MEMCHECK(smsg_mailbox_base);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
-    if (myrank == 0) CmiPrintf("Charm++> allocates %.2MB for SMSG. \n", smsg_memlen*mysize/1e6);
+    if (myrank == 0) CmiPrintf("Charm++> allocates %.2fMB for SMSG. \n", smsg_memlen*mysize/1e6);
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,
@@ -1579,6 +1579,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         }
     }
 #if     USE_LRTS_MEMPOOL
+    CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
+    if (myrank==0) CmiPrintf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
     init_mempool(_mempool_size);
     //init_mempool(Mempool_MaxSize);
 #endif
