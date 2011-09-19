@@ -135,7 +135,7 @@ static gni_nic_handle_t      nic_hndl;
 typedef struct {
     gni_mem_handle_t mdh;
     uint64_t addr;
-} mdh_addr_t;
+} mdh_addr_t ;
 // this is related to dynamic SMSG
 
 typedef struct mdh_addr_list{
@@ -144,6 +144,7 @@ typedef struct mdh_addr_list{
     struct mdh_addr_list *next;
 }mdh_addr_list_t;
 
+static unsigned int         smsg_memlen;
 #define     SMSG_CONN_SIZE     24
 int     *smsg_connected_flag= 0;
 char    *smsg_connection_addr = 0;
@@ -584,15 +585,47 @@ inline
 static gni_return_t send_smsg_message(int destNode, void *header, int size_header, void *msg, int size, uint8_t tag, int inbuff )
 {
     gni_return_t status = GNI_RC_NOT_DONE;
+    gni_smsg_attr_t      smsg_attr;
+    gni_post_descriptor_t *pd;
     
+    mdh_addr_list_t  *new_entry = 0;
     if(useDynamicSMSG == 1)
     {
         if(smsg_connected_flag[destNode] == 0)
         {
+            if(smsg_available_slot == smsg_expand_slots)
+            {
+                new_entry = (mdh_addr_list_t*)malloc(sizeof(mdh_addr_list_t));
+                new_entry->addr = memalign(64, smsg_memlen*smsg_expand_slots);
+                bzero(new_entry->addr, smsg_memlen*smsg_expand_slots);
+    
+                status = GNI_MemRegister(nic_hndl, (uint64_t)new_entry->addr,
+                    smsg_memlen*smsg_expand_slots, smsg_rx_cqh,
+                    GNI_MEM_READWRITE,   
+                    vmdh_index,
+                    &(new_entry->mdh));
+                smsg_available_slot = 0; 
+                new_entry->next = smsg_dynamic_list;
+                smsg_dynamic_list = new_entry;
+            }
+            smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+            smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
+            smsg_attr.msg_maxsize = SMSG_MAX_MSG;
+            smsg_attr.mbox_offset = smsg_available_slot * smsg_memlen;
+            smsg_attr.buff_size = smsg_memlen;
+            smsg_attr.msg_buffer = smsg_dynamic_list->addr ;
+            smsg_attr.mem_hndl = smsg_dynamic_list->mdh;
+            MallocPostDesc(pd);
+            pd->type            = GNI_POST_FMA_PUT;
+            pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
+            pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
+            pd->length          = ALIGN4(request_msg->length);
+            pd->local_addr      = (uint64_t) smsg_attr;
+            pd->remote_addr     = smsg_connection_vec[destNode].addr;
+            pd->remote_mem_hndl = smsg_connection_vec[destNode].mdh;
+            status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+            GNI_RC_CHECK("SMSG Dynamic link", status);
 
-            //allocate mailbox 
-            //FMA_PUT to set up
-           //register mailbox for destNode 
         } else if (smsg_connected_flag[destNode] == 1)
         {
             //connection request sent
@@ -1254,7 +1287,6 @@ static void _init_dynamic_smsg()
     gni_smsg_attr_t smsg_attr;
     mdh_addr_t current_addr;
     gni_return_t status;
-    unsigned int         smsg_memlen;
     smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
     memset(smsg_connected_flag, 0, mysize*sizeof(int));
 
@@ -1299,7 +1331,6 @@ static void _init_static_smsg()
     gni_smsg_attr_t      *smsg_attr;
     gni_smsg_attr_t      remote_smsg_attr;
     gni_smsg_attr_t      *smsg_attr_vec;
-    unsigned int         smsg_memlen;
     gni_mem_handle_t     my_smsg_mdh_mailbox;
     int      i;
     gni_return_t status;
