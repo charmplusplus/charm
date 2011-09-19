@@ -138,11 +138,21 @@ typedef struct {
 } mdh_addr_t;
 // this is related to dynamic SMSG
 
+typedef struct mdh_addr_list{
+    gni_mem_handle_t mdh;
+    uint64_t addr;
+    struct mdh_addr_list *next;
+}mdh_addr_list_t;
+
 #define     SMSG_CONN_SIZE     24
 int     *smsg_connected_flag= 0;
 char    *smsg_connection_addr = 0;
 mdh_addr_t    *smsg_connection_vec = 0;
 gni_mem_handle_t    smsg_connection_memhndl;
+static int            smsg_expand_slots = 10;
+static int            smsg_available_slot = 0;
+static void           *smsg_mailbox_mempool = 0;
+mdh_addr_list_t       *smsg_dynamic_list = 0;
 
 static void             *smsg_mailbox_base;
 gni_msgq_attr_t         msgq_attrs;
@@ -575,7 +585,19 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
 {
     gni_return_t status = GNI_RC_NOT_DONE;
     
-    //if(useDynamicSMSG == 0 ) 
+    if(useDynamicSMSG == 1)
+    {
+        if(smsg_connected_flag[destNode] == 0)
+        {
+
+            //allocate mailbox 
+            //FMA_PUT to set up
+           //register mailbox for destNode 
+        } else if (smsg_connected_flag[destNode] == 1)
+        {
+            //connection request sent
+        }
+    }
     if(smsg_msglist_index[destNode].head == 0 || inbuff==1)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
@@ -1229,8 +1251,10 @@ static void LrtsAdvanceCommunication()
 
 static void _init_dynamic_smsg()
 {
+    gni_smsg_attr_t smsg_attr;
     mdh_addr_t current_addr;
     gni_return_t status;
+    unsigned int         smsg_memlen;
     smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
     memset(smsg_connected_flag, 0, mysize*sizeof(int));
 
@@ -1239,6 +1263,35 @@ static void _init_dynamic_smsg()
     
     smsg_connection_vec = (mdh_addr_t*) malloc(mysize*sizeof(mdh_addr_t)); 
     allgather(&current_addr, smsg_connection_vec, sizeof(mdh_addr_t));
+    
+    //pre-allocate some memory as mailbox for dynamic connection
+    if(mysize <=4096)
+    {
+        SMSG_MAX_MSG = 1024;
+    }else if (mysize > 4096 && mysize <= 16384)
+    {
+        SMSG_MAX_MSG = 512;
+    }else {
+        SMSG_MAX_MSG = 256;
+    }
+    
+    smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+    smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
+    smsg_attr.msg_maxsize = SMSG_MAX_MSG;
+    status = GNI_SmsgBufferSizeNeeded(&smsg_attr, &smsg_memlen);
+    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+    
+    smsg_dynamic_list = (mdh_addr_list_t*)malloc(sizeof(mdh_addr_list_t));
+
+    smsg_dynamic_list->addr = memalign(64, smsg_memlen*smsg_expand_slots);
+    bzero(smsg_dynamic_list->addr, smsg_memlen*smsg_expand_slots);
+    
+    status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_dynamic_list->addr,
+            smsg_memlen*smsg_expand_slots, smsg_rx_cqh,
+            GNI_MEM_READWRITE,   
+            vmdh_index,
+            &(smsg_dynamic_list->mdh));
+   smsg_available_slot = 0;  
 }
 
 static void _init_static_smsg()

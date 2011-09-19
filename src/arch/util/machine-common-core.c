@@ -771,9 +771,9 @@ void ConverseExit(void) {
 
 if (MSG_STATISTIC)
 {
-    CmiPrintf("[MSG PE:%d]", CmiMyPe());
     for(i=0; i<22; i++)
     {
+        CmiPrintf("[MSG PE:%d]", CmiMyPe());
         if(msg_histogram[i] >0)
             CmiPrintf("(%d:%d) ", 1<<i, msg_histogram[i]);
     }
