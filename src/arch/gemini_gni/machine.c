@@ -35,10 +35,11 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
+#define REMOTE_EVENT         0
 #define USE_LRTS_MEMPOOL   1
 
 #if USE_LRTS_MEMPOOL
-static size_t _mempool_size = 1024ll*1024*8;
+static size_t _mempool_size = 1024ll*1024*32;
 #endif
 
 #define PRINT_SYH  0
@@ -72,9 +73,11 @@ onesided_md_t    omdh;
 
 #else
 uint8_t   onesided_hnd, omdh;
-//#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
+#if REMOTE_EVENT
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
+#else
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl)
-
+#endif
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
 
@@ -96,8 +99,8 @@ static int  SMSG_MAX_MSG;
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  2048
 
-#define REMOTE_QUEUE_ENTRIES  1048576
-#define LOCAL_QUEUE_ENTRIES   512
+#define REMOTE_QUEUE_ENTRIES  2048 
+#define LOCAL_QUEUE_ENTRIES   64 
 
 #define PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
@@ -894,9 +897,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         pd->type            = GNI_POST_FMA_GET;
     else
         pd->type            = GNI_POST_RDMA_GET;
-
-    //pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+#if REMOTE_EVENT
+    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+#else
     pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
+#endif
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = ALIGN4(request_msg->length);
     pd->local_addr      = (uint64_t) msg_data;
@@ -953,9 +958,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         pd->type            = GNI_POST_FMA_GET;
     else
         pd->type            = GNI_POST_RDMA_GET;
-
+#if REMOTE_EVENT
+    pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+#else
     pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
-    //pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+#endif
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = ALIGN4(request_msg->length);
     pd->local_addr      = (uint64_t) msg_data;
