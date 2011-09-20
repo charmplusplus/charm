@@ -126,7 +126,9 @@ static int  SMSG_MAX_MSG;
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
 static int Mempool_MaxSize = 1024*1024*128;
-static int useDynamicSMSG   = 1;
+
+#define     useDynamicSMSG    0
+//static int useDynamicSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
 static int mysize, myrank;
@@ -369,6 +371,8 @@ static PENDING_GETNEXT     *pending_smsg_tail = 0;
 static int      buffered_smsg_counter = 0;
 
 /* SmsgSend return success but message sent is not confirmed by remote side */
+static RDMA_REQUEST  *pending_smsg_conn_head = 0;
+static RDMA_REQUEST  *pending_smsg_conn_tail = 0;
 
 static RDMA_REQUEST  *pending_rdma_head = 0;
 static RDMA_REQUEST  *pending_rdma_tail = 0;
@@ -585,7 +589,7 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
 
 inline static void print_smsg_attr(gni_smsg_attr_t     *a)
 {
-    //CmiPrintf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
+    CmiPrintf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
 }
 
 inline
@@ -595,6 +599,8 @@ static void setup_smsg_connection(int destNode)
     gni_post_descriptor_t *pd;
     gni_smsg_attr_t      *smsg_attr;
     gni_return_t status = GNI_RC_NOT_DONE;
+    RDMA_REQUEST        *rdma_request_msg;
+    
     if(smsg_available_slot == smsg_expand_slots)
     {
         new_entry = (mdh_addr_list_t*)malloc(sizeof(mdh_addr_list_t));
@@ -623,7 +629,7 @@ static void setup_smsg_connection(int destNode)
     MallocPostDesc(pd);
     pd->type            = GNI_POST_FMA_PUT;
     pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
-//pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
+    pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = sizeof(gni_smsg_attr_t);
     pd->local_addr      = (uint64_t) smsg_attr;
     pd->remote_addr     = (uint64_t)&((((gni_smsg_attr_t*)(smsg_connection_vec[destNode].addr))[myrank]));
@@ -631,9 +637,28 @@ static void setup_smsg_connection(int destNode)
     pd->src_cq_hndl     = 0;
     pd->rdma_mode       = 0;
     status = GNI_PostFma(ep_hndl_array[destNode],  pd);
-    //CmiPrintf("[%d=%d] send post FMA successful\n", myrank, destNode);
     print_smsg_attr(smsg_attr);
-    GNI_RC_CHECK("SMSG Dynamic link", status);
+    if(status == GNI_RC_ERROR_RESOURCE )
+    {
+        MallocRdmaRequest(rdma_request_msg);
+        rdma_request_msg->next = 0;
+        rdma_request_msg->destNode = destNode;
+        rdma_request_msg->pd = pd;
+        if(pending_smsg_conn_head== 0)
+        {
+            pending_smsg_conn_head  = rdma_request_msg;
+        }else
+        {
+            pending_smsg_conn_tail->next = rdma_request_msg;
+        }
+        pending_smsg_conn_tail = rdma_request_msg;
+
+    }
+    if(status != GNI_RC_SUCCESS)
+       CmiPrintf("[%d=%d] send post FMA %s\n", myrank, destNode, gni_err_str[status]);
+    else
+        CmiPrintf("[%d=%d]OK send post FMA \n", myrank, destNode);
+    //GNI_RC_CHECK("SMSG Dynamic link", status);
 }
 
 inline 
@@ -642,8 +667,9 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     gni_return_t status = GNI_RC_NOT_DONE;
     gni_smsg_attr_t      *smsg_attr;
     gni_post_descriptor_t *pd;
-  
-    if(useDynamicSMSG == 1)
+ 
+#if useDynamicSMSG
+    //if(useDynamicSMSG == 1)
     {
         if(smsg_connected_flag[destNode] == 0)
         {
@@ -660,6 +686,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             return status;
         }
     }
+#endif
     //CmiPrintf("[%d] reach send\n", myrank);
     if(smsg_msglist_index[destNode].head == 0 || inbuff==1)
     {
@@ -867,7 +894,7 @@ static void PumpNetworkRdmaMsgs()
     while( (status = GNI_CqGetEvent(post_rx_cqh, &event_data)) == GNI_RC_SUCCESS);
 }
 
-static int SendRdmaMsg();
+static void SendRdmaMsg();
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
 static void PumpNetworkSmsg()
 {
@@ -891,15 +918,15 @@ static void PumpNetworkSmsg()
 #if PRINT_SYH
         CmiPrintf("[%d] PumpNetworkMsgs small msgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
-
+#if     useDynamicSMSG
         rdma_id++;
-        if(useDynamicSMSG == 1)
+     //   if(useDynamicSMSG == 1)
         {
             init_flag = smsg_connected_flag[inst_id];
             //CmiPrintf("[%d] initflag=%d\n", myrank, init_flag);
             if(init_flag == 0 )
             {
-                CmiPrintf("[%d=%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                CmiPrintf("setup[%d==%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
                 smsg_connected_flag[inst_id] =20;
                 setup_smsg_connection(inst_id);
                 remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
@@ -908,7 +935,7 @@ static void PumpNetworkSmsg()
                 continue;
             } else if (init_flag <20) 
             {
-                CmiPrintf("[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                CmiPrintf("setup[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
                 smsg_connected_flag[inst_id] = 20;
                 remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
                 status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
@@ -917,6 +944,7 @@ static void PumpNetworkSmsg()
                 continue;
             }
         }
+#endif
         msg_tag = GNI_SMSG_ANY_TAG;
         while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS)
         {
@@ -1124,6 +1152,7 @@ static void PumpLocalSmsgTransactions()
     }
 }
 
+static void SendSmsgConnectMsg();
 static void PumpLocalRdmaTransactions()
 {
     gni_cq_entry_t          ev;
@@ -1153,7 +1182,11 @@ static void PumpLocalRdmaTransactions()
             ////Message is sent, free message , put is not used now
             if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
             {
+#if useDynamicSMSG
+                SendSmsgConnectMsg();
+                if(tmp_pd->length == sizeof(gni_smsg_attr_t))
                     continue;
+#endif
                 //else  
                 {
                     //persistent message 
@@ -1188,8 +1221,37 @@ static void PumpLocalRdmaTransactions()
         }
     } //end while
 }
+static void SendSmsgConnectMsg()
+{
+    gni_return_t            status = GNI_RC_SUCCESS;
+    gni_mem_handle_t        msg_mem_hndl;
 
-static int SendRdmaMsg()
+    RDMA_REQUEST *ptr = pending_smsg_conn_head;
+    RDMA_REQUEST *prev = NULL;
+
+    while (ptr != NULL)
+    {
+        gni_post_descriptor_t *pd = ptr->pd;
+        status = GNI_RC_SUCCESS;
+        status = GNI_PostFma(ep_hndl_array[ptr->destNode], pd);
+        if(status == GNI_RC_SUCCESS)
+        {
+            RDMA_REQUEST *tmp = ptr;
+            if (prev)
+                prev->next = ptr->next;
+            else
+                pending_smsg_conn_head = ptr->next;
+            CmiPrintf("[%d=%d]OK send post FMA resend\n", myrank, ptr->destNode);
+            ptr = ptr->next;
+            FreeRdmaRequest(tmp);
+            continue;
+        }
+        prev = ptr;
+        ptr = ptr->next;
+    } //end while
+ 
+}
+static void  SendRdmaMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
@@ -1227,7 +1289,6 @@ static int SendRdmaMsg()
         prev = ptr;
         ptr = ptr->next;
     } //end while
-    return 0;
 }
 
 // return 1 if all messages are sent
@@ -1577,15 +1638,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
    
     //Mempool_MaxSize = CmiGetArgFlag(*argv, "+useMemorypoolSize");
-    useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
-    if (myrank==0) 
-    {
-        if(useDynamicSMSG) 
-            CmiPrintf("Charm++> use Dynamic SMSG\n"); 
-        else 
-            CmiPrintf("Charm++> use Static SMSG\n");
-    };
-    //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
+    //useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
+       //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
     
     status = PMI_Init(&first_spawned);
     GNI_RC_CHECK("PMI_Init", status);
@@ -1605,6 +1659,11 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
   
     if(myrank == 0)
     {
+#if useDynamicSMSG
+        printf("Charm++> use Dynamic SMSG\n");
+#else
+        printf("Charm++> use Static SMSG\n");
+#endif
         printf("Charm++> Running on Gemini (GNI) using %d  cores\n", mysize);
     }
 #ifdef USE_ONESIDED
@@ -1667,15 +1726,13 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
     if(mysize > 1)
     {
-        if(useDynamicSMSG == 0)
-        {
-            _init_static_smsg();
-        }else
-        {
+#if useDynamicSMSG
             _init_dynamic_smsg();
-        }
-
+#else
+            _init_static_smsg();
+#endif
         _init_smsg();
+        CmiBarrier();
     }
 #if     USE_LRTS_MEMPOOL
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
