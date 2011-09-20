@@ -43,7 +43,7 @@ static void sleep(int secs) {
 static CmiInt8 _mempool_size = 1024ll*1024*32;
 #endif
 
-#define PRINT_SYH  1
+#define PRINT_SYH  0
 
 #if PRINT_SYH
 int         lrts_smsg_success = 0;
@@ -126,7 +126,7 @@ static int  SMSG_MAX_MSG;
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
 static int Mempool_MaxSize = 1024*1024*128;
-static int useDynamicSMSG   = 0;
+static int useDynamicSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
 static int mysize, myrank;
@@ -627,7 +627,7 @@ static void setup_smsg_connection(int destNode)
     pd->rdma_mode       = 0;
     status = GNI_PostFma(ep_hndl_array[destNode],  pd);
     GNI_RC_CHECK("SMSG Dynamic link", status);
-    CmiPrintf("[%d=%d] send post FMA successful (%p) %s\n", myrank, destNode, (void*)pd->remote_addr, gni_err_str[status]);
+    //CmiPrintf("[%d=%d] send post FMA successful (%p) %s\n", myrank, destNode, (void*)pd->remote_addr, gni_err_str[status]);
 }
 
 inline 
@@ -641,7 +641,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     {
         if(smsg_connected_flag[destNode] == 0)
         {
-            CmiPrintf("[%d]Init smsg connection\n", CmiMyPe());
+            //CmiPrintf("[%d]Init smsg connection\n", CmiMyPe());
             setup_smsg_connection(destNode);
             delay_send_small_msg(msg, size, destNode, tag);
             smsg_connected_flag[destNode] =1;
@@ -654,7 +654,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             return status;
         }
     }
-    CmiPrintf("[%d] reach send\n", myrank);
+    //CmiPrintf("[%d] reach send\n", myrank);
     if(smsg_msglist_index[destNode].head == 0 || inbuff==1)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
@@ -889,7 +889,7 @@ static void PumpNetworkSmsg()
         {
             if(smsg_connected_flag[inst_id] == 0 )
             {
-                CmiPrintf("[%d]pump Init smsg connection\n", CmiMyPe());
+                //CmiPrintf("[%d]pump Init smsg connection\n", CmiMyPe());
                 smsg_connected_flag[inst_id] =2;
                 setup_smsg_connection(inst_id);
                 status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]));
@@ -897,7 +897,7 @@ static void PumpNetworkSmsg()
                 continue;
             } else if (smsg_connected_flag[inst_id] <3) 
             {
-                CmiPrintf("[%d]pump setup smsg connection\n", CmiMyPe());
+                //CmiPrintf("[%d]pump setup smsg connection\n", CmiMyPe());
                 smsg_connected_flag[inst_id] += 1;
                 status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id], &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]));
                 GNI_RC_CHECK("SmsgInit", status);
@@ -1282,9 +1282,6 @@ static int SendBufferMsg()
             }
             if(status == GNI_RC_SUCCESS)
             {
-                smsg_msglist_index[index].head = smsg_msglist_index[index].head->next;
-                FreeMsgList(ptr);
-                ptr= smsg_msglist_index[index].head;
 #if PRINT_SYH
                 buffered_smsg_counter--;
                 if(lrts_smsg_success == lrts_send_msg_id)
@@ -1292,6 +1289,10 @@ static int SendBufferMsg()
                 else
                     CmiPrintf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
+                smsg_msglist_index[index].head = smsg_msglist_index[index].head->next;
+                FreeMsgList(ptr);
+                ptr= smsg_msglist_index[index].head;
+
             }else {
                 done = 0;
                 break;
@@ -1316,26 +1317,36 @@ static int SendBufferMsg()
 static void LrtsAdvanceCommunication()
 {
     /*  Receive Msg first */
+#if 0
     if(myrank == 0)
     CmiPrintf("Calling Lrts Pump Msg PE:%d\n", myrank);
+#endif
     PumpNetworkSmsg();
     //CmiPrintf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
     //PumpNetworkRdmaMsgs();
     /* Release Sent Msg */
     //CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
+#if 0
     ////PumpLocalSmsgTransactions();
     if(myrank == 0)
     CmiPrintf("Calling Lrts Rlease RdmaMsg PE:%d\n", myrank);
+#endif
     PumpLocalRdmaTransactions();
+#if 0
     if(myrank == 0)
     CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", myrank);
+#endif
     /* Send buffered Message */
     SendBufferMsg();
+#if 0
     if(myrank == 0)
     CmiPrintf("Calling Lrts rdma PE:%d\n", myrank);
+#endif
     SendRdmaMsg();
+#if 0
     if(myrank == 0)
     CmiPrintf("done PE:%d\n", myrank);
+#endif
 }
 
 static void _init_dynamic_smsg()
@@ -1488,7 +1499,6 @@ static void _init_smsg()
         smsg_msglist_index[i].tail = 0;
      }
      smsg_head_index = -1;
-
 }
 
 static void _init_static_msgq()
@@ -1561,7 +1571,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
    
     //Mempool_MaxSize = CmiGetArgFlag(*argv, "+useMemorypoolSize");
-    //useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
+    useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
     if (myrank==0) 
     {
         if(useDynamicSMSG) 
