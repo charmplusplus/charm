@@ -45,10 +45,10 @@ static CmiInt8 _mempool_size = 1024ll*1024*32;
 
 #define PRINT_SYH  0
 
+int         rdma_id = 0;
 #if PRINT_SYH
 int         lrts_smsg_success = 0;
 int         lrts_send_msg_id = 0;
-int         lrts_send_rdma_id = 0;
 int         lrts_send_rdma_success = 0;
 int         lrts_received_msg = 0;
 int         lrts_local_done_msg = 0;
@@ -583,6 +583,11 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
 #endif
 }
 
+inline static void print_smsg_attr(gni_smsg_attr_t     *a)
+{
+    //CmiPrintf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
+}
+
 inline
 static void setup_smsg_connection(int destNode)
 {
@@ -626,8 +631,9 @@ static void setup_smsg_connection(int destNode)
     pd->src_cq_hndl     = 0;
     pd->rdma_mode       = 0;
     status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+    //CmiPrintf("[%d=%d] send post FMA successful\n", myrank, destNode);
+    print_smsg_attr(smsg_attr);
     GNI_RC_CHECK("SMSG Dynamic link", status);
-    //CmiPrintf("[%d=%d] send post FMA successful (%p) %s\n", myrank, destNode, (void*)pd->remote_addr, gni_err_str[status]);
 }
 
 inline 
@@ -644,10 +650,10 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             //CmiPrintf("[%d]Init smsg connection\n", CmiMyPe());
             setup_smsg_connection(destNode);
             delay_send_small_msg(msg, size, destNode, tag);
-            smsg_connected_flag[destNode] =1;
+            smsg_connected_flag[destNode] =10;
             return status;
         }
-        else  if(smsg_connected_flag[destNode] < 3)
+        else  if(smsg_connected_flag[destNode] <20)
         {
             if(inbuff == 0)
                 delay_send_small_msg(msg, size, destNode, tag);
@@ -876,6 +882,8 @@ static void PumpNetworkSmsg()
     void                *msg_data;
     gni_mem_handle_t    msg_mem_hndl;
     gni_smsg_attr_t     *smsg_attr;
+    gni_smsg_attr_t     *remote_smsg_attr;
+    int                 init_flag;
     while ((status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS)
     {
         inst_id = GNI_CQ_GET_INST_ID(event_data);
@@ -884,22 +892,28 @@ static void PumpNetworkSmsg()
         CmiPrintf("[%d] PumpNetworkMsgs small msgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
 
+        rdma_id++;
         if(useDynamicSMSG == 1)
         {
-            if(smsg_connected_flag[inst_id] == 0 )
+            init_flag = smsg_connected_flag[inst_id];
+            //CmiPrintf("[%d] initflag=%d\n", myrank, init_flag);
+            if(init_flag == 0 )
             {
-                //CmiPrintf("[%d]pump Init smsg connection\n", CmiMyPe());
-                smsg_connected_flag[inst_id] =2;
+                CmiPrintf("[%d=%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                smsg_connected_flag[inst_id] =20;
                 setup_smsg_connection(inst_id);
-                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]));
-                GNI_RC_CHECK("SmsgInit", status);
+                remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
+                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
+                GNI_RC_CHECK("no send SmsgInit", status);
                 continue;
-            } else if (smsg_connected_flag[inst_id] <3) 
+            } else if (init_flag <20) 
             {
-                //CmiPrintf("[%d]pump setup smsg connection\n", CmiMyPe());
-                smsg_connected_flag[inst_id] += 1;
-                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id], &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]));
-                GNI_RC_CHECK("SmsgInit", status);
+                CmiPrintf("[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                smsg_connected_flag[inst_id] = 20;
+                remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
+                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
+                print_smsg_attr(remote_smsg_attr);
+                GNI_RC_CHECK("send once SmsgInit", status);
                 continue;
             }
         }
@@ -1139,12 +1153,8 @@ static void PumpLocalRdmaTransactions()
             ////Message is sent, free message , put is not used now
             if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
             {
-                if(smsg_connected_flag[inst_id] <3)
-                {
-                    smsg_connected_flag[inst_id] += 1;
                     continue;
-                }
-                else  
+                //else  
                 {
                     //persistent message 
                     CmiFree((void *)tmp_pd->local_addr);
@@ -1355,14 +1365,12 @@ static void _init_dynamic_smsg()
     smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
     memset(smsg_connected_flag, 0, mysize*sizeof(int));
 
-    CmiPrintf("start Dynamic init done %d\n", myrank);
     smsg_local_attr_vec = (gni_smsg_attr_t**) malloc(sizeof(gni_smsg_attr_t*) *mysize);
     
     setup_mem.addr = (uint64_t)malloc(mysize * sizeof(gni_smsg_attr_t));
-    status = GNI_MemRegister(nic_hndl, setup_mem.addr,  mysize * SMSG_CONN_SIZE, smsg_rx_cqh,  GNI_MEM_READWRITE, -1,  &(setup_mem.mdh));
+    status = GNI_MemRegister(nic_hndl, setup_mem.addr,  mysize * sizeof(gni_smsg_attr_t), smsg_rx_cqh,  GNI_MEM_READWRITE, -1,  &(setup_mem.mdh));
    
     GNI_RC_CHECK("Smsg dynamic allocation \n", status);
-    CmiPrintf("[%d]Smsg dynamic allocation (%p)\n", myrank, (void*)setup_mem.addr);
     smsg_connection_vec = (mdh_addr_t*) malloc(mysize*sizeof(mdh_addr_t)); 
     allgather(&setup_mem, smsg_connection_vec, sizeof(mdh_addr_t));
     
@@ -1394,7 +1402,6 @@ static void _init_dynamic_smsg()
             -1,
             &(smsg_dynamic_list->mdh));
    smsg_available_slot = 0;  
-   CmiPrintf(" Dynamic init done %d\n", myrank);
 }
 
 static void _init_static_smsg()
