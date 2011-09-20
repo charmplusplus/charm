@@ -669,10 +669,9 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
 #endif
             return status;
         }
-    }else {
-        if(inbuff ==0)
-            delay_send_small_msg(msg, size, destNode, tag);
     }
+    if(inbuff ==0)
+        delay_send_small_msg(msg, size, destNode, tag);
     return status;
 }
 
