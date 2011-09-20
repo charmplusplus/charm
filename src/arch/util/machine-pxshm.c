@@ -100,9 +100,10 @@ enum entities {SENDER,RECEIVER};
 #define NAMESTRLEN 60
 #define PREFIXSTRLEN 50 
 
-#define SHMBUFLEN (1024*1024*1)
+#define SHMBUFLEN (1024*1024*4)
+#define SHMMAXSIZE     (1024*1024)
 
-#define SENDQSTARTSIZE    128
+#define SENDQSTARTSIZE    256
 
 
 /// This struct is used as the first portion of a shared memory region, followed by data
@@ -287,7 +288,7 @@ inline int CmiValidPxshm(int dst, int size){
 	}*/
 	//replace by bitmap later
 	//if(ogm->dst >= pxshmContext->nodestart && ogm->dst <= pxshmContext->nodeend && ogm->size < SHMBUFLEN ){
-	if(dst >= pxshmContext->nodestart && dst <= pxshmContext->nodeend && size < SHMBUFLEN ){
+	if(dst >= pxshmContext->nodestart && dst <= pxshmContext->nodeend && size < SHMMAXSIZE ){
 		return 1;
 	}else{
 		return 0;
@@ -802,8 +803,8 @@ void emptyRecvBuf(sharedBufData *recvBuf){
 }
 
 
-void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int broot){
 #if CMK_NET_VERSION
+void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int broot){
 	CmiAssert(rank == 0);
 #if CMK_BROADCAST_SPANNING_TREE
         if (rank == DGRAM_BROADCAST
@@ -834,8 +835,8 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
           CmiPushPE(rank, newmsg);
 				}
   	}    /* end of switch */
-#endif
 }
+#endif
 
 
 /**************************

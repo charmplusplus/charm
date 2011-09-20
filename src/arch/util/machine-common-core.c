@@ -455,6 +455,9 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
     CQdCreate(CpvAccess(cQdState), 1);
     if (CmiMyPe()==destPE) {
         CmiSendSelf(msg);
+#if CMK_PERSISTENT_COMM
+        if (phs) curphs++;
+#endif
     } else {
 #if CMK_USE_PXSHM
         int ret=CmiValidPxshm(destPE, size);
@@ -462,13 +465,16 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
           CMI_DEST_RANK(msg) = CmiRankOf(destPE);
           CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
+#if CMK_PERSISTENT_COMM
+        if (phs) curphs++;
+#endif
           return;
         }
 #endif
 #if CMK_PERSISTENT_COMM
-    if (phs) {
-        CmiAssert(phsSize == 1);
-        LrtsSendPersistentMsg(*phs, destPE, size, msg);
+    if (phs && size > 8192) {
+        CmiAssert(curphs < phsSize);
+        LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
         return;
     }
 #endif

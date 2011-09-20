@@ -99,6 +99,7 @@ static int  SMSG_MAX_MSG;
 #define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  2048
+#define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
 
 #define REMOTE_QUEUE_ENTRIES  2048 
 #define LOCAL_QUEUE_ENTRIES   64 
@@ -980,11 +981,25 @@ static void PumpNetworkSmsg()
                 SendRdmaMsg();
                 break;
             }
+#if CMK_PERSISTENT_COMM
             case PUT_DONE_TAG: //persistent message
             {
-                handleOneRecvedMsg(((CONTROL_MSG *) header)->length,((void*) (CONTROL_MSG *) header)); 
+                void *msg = (void *)((CONTROL_MSG *) header)->source_addr;
+                int size = ((CONTROL_MSG *) header)->length;
+#if 0
+                void *dupmsg;
+                dupmsg = CmiAlloc(size);
+                _MEMCHECK(dupmsg);
+                memcpy(dupmsg, msg, size);
+                msg = dupmsg;
+
+#else
+                CmiReference(msg);
+#endif
+                handleOneRecvedMsg(size, msg); 
                 break;
             }
+#endif
             default: {
                 CmiPrintf("weird tag problem\n");
                 CmiAbort("Unknown tag\n");
@@ -1180,23 +1195,27 @@ static void PumpLocalRdmaTransactions()
             //status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
             ////Message is sent, free message , put is not used now
-            if(tmp_pd->type == GNI_POST_RDMA_PUT || tmp_pd->type == GNI_POST_FMA_PUT)
-            {
+            switch (tmp_pd->type) {
+#if CMK_PERSISTENT_COMM
+            case GNI_POST_RDMA_PUT:
+            case GNI_POST_FMA_PUT:
 #if useDynamicSMSG
                 SendSmsgConnectMsg();
                 if(tmp_pd->length == sizeof(gni_smsg_attr_t))
                     continue;
 #endif
-                //else  
-                {
-                    //persistent message 
-                    CmiFree((void *)tmp_pd->local_addr);
-                    msg_tag = PUT_DONE_TAG; 
-                }
-            }else if(tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
-            {
+                CmiFree((void *)tmp_pd->local_addr);
+                msg_tag = PUT_DONE_TAG;
+                break;
+#endif
+            case GNI_POST_RDMA_GET:
+            case GNI_POST_FMA_GET:
                 msg_tag = ACK_TAG;  
+                break;
+            default:
+                CmiAbort("PumpLocalRdmaTransactions: unknown type!");
             }
+
             MallocControlMsg(ack_msg_tmp);
             ack_msg_tmp->source             = myrank;
             ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
@@ -1214,13 +1233,19 @@ static void PumpLocalRdmaTransactions()
 #if     !USE_LRTS_MEMPOOL
             MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
 #endif
-            CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
-            handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
-            SendRdmaMsg(); 
+#if CMK_PERSISTENT_COMM
+            if (tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
+#endif
+            {
+              CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
+              handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
+              SendRdmaMsg(); 
+            }
             FreePostDesc(tmp_pd);
         }
     } //end while
 }
+
 static void SendSmsgConnectMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
@@ -1249,8 +1274,8 @@ static void SendSmsgConnectMsg()
         prev = ptr;
         ptr = ptr->next;
     } //end while
- 
 }
+
 static void  SendRdmaMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;

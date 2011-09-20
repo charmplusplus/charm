@@ -53,6 +53,7 @@ int persistentDestoryHandlerIdx;
 
 PersistentHandle  *phs = NULL;
 int phsSize;
+int curphs = 0;
 
 /******************************************************************************
      Utilities
@@ -230,11 +231,15 @@ static void persistentRequestHandler(void *env)
 static void persistentReqGrantedHandler(void *env)
 {
   int i;
-  /*CmiPrintf("Persistent handler granted\n");*/
+
+
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   PersistentHandle h = msg->sourceHandlerIndex;
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
   CmiAssert(slot->used == 1);
+
+  /* CmiPrintf("[%d] Persistent handler granted  h:%p\n", CmiMyPe(), h); */
+
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
 #if 0
     slot->destAddress[i] = msg->msgAddr[i];
@@ -419,6 +424,7 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n)
 #endif
   phs = p;
   phsSize = n;
+  curphs = 0;
 }
 
 #endif

@@ -33,18 +33,17 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
         CmiAbort("Abort: Invalid size\n");
     }
 
-/*CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), *phs, CmiGetHandler(m), destPE, slot->destAddress[0], size);*/
+    /* CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destPE, slot->destBuf[0].destAddress, size); */
 
     if (slot->destBuf[0].destAddress) {
         // uGNI part
-     
         MallocPostDesc(pd);
-        if(size < LRTS_GNI_RDMA_THRESHOLD) 
+        if(size < LRTS_GNI_RDMA_PUT_THRESHOLD) 
             pd->type            = GNI_POST_FMA_PUT;
         else
             pd->type            = GNI_POST_RDMA_PUT;
 
-        pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT |  GNI_CQMODE_REMOTE_EVENT;
+        pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
         pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
         pd->length          = size;
         pd->local_addr      = (uint64_t) m;

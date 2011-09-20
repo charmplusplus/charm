@@ -41,6 +41,7 @@ extern PersistentReceivesTable *persistentReceivesTableTail;
 
 extern PersistentHandle  *phs;
 extern int phsSize;
+extern int curphs;
 
 void *PerAlloc(int size);
 void PerFree(char *msg);
