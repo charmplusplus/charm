@@ -42,18 +42,19 @@ static void processBcastQs() {
 }
 
 static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenProc(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHyperCubeProc(size, msg);
-#endif
-
     /* Since this function is only called on intermediate nodes,
      * the rank of this msg should be 0.
      */
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
     CmiPushPE(0, msg);
+
+#if CMK_BROADCAST_SPANNING_TREE
+    SendSpanningChildrenProc(size, msg);
+#elif CMK_BROADCAST_HYPERCUBE
+    SendHyperCubeProc(size, msg);
+#endif
+
 }
 
 static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
@@ -102,6 +103,7 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
     CMI_DEST_RANK(msg) = oldRank;
 #endif
 }
+
 static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_HYPERCUBE
     int i, cnt, tmp, relDist, oldRank;
