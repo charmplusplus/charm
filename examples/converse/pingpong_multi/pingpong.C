@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <converse.h>
 
-enum {nCycles =4096};
+enum {nCycles =3};
 enum { maxMsgSize = 1 << 22 };
 
 CpvDeclare(int,msgSize);
@@ -22,7 +22,7 @@ CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
 #define  REUSE_MSG      1
-#define USE_PERSISTENT     1
+#define USE_PERSISTENT     0
 
 #if USE_PERSISTENT
 PersistentHandle h;
@@ -63,13 +63,12 @@ void startRing()
 void ringFinished()
 {
   //Print the time for that message size
-  CmiPrintf("\t\t  %.2lf\n", 
-             
-	     (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles));
+  //CmiPrintf("\t\t  %.2lf\n", 
+  //	     (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles));
 
-  //CmiPrintf("%d\t\t  %.2lf\n", 
-  //           CpvAccess(msgSize)-CmiMsgHeaderSizeBytes, 
-	    // (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles));
+  CmiPrintf("%d\t\t  %.2lf\n", 
+             CpvAccess(msgSize)-CmiMsgHeaderSizeBytes, 
+	     (1e6*(CpvAccess(endTime)-CpvAccess(startTime)))/(2.*nCycles));
   
   //Have we finished all message sizes?
   if (CpvAccess(msgSize) < maxMsgSize)
@@ -98,9 +97,10 @@ CmiHandler node0HandlerFunc(Message *msg)
     Message *m;
     CpvAccess(recvNum)++;
 #if REUSE_MSG
-    recvMsgs[msg->destPe-1] = msg;
+    recvMsgs[(msg->destPe)-1] = msg;
 #endif
     if (CpvAccess(recvNum) == CmiNumPes()-1) {
+        CpvAccess(recvNum) = 0;
         CpvAccess(cycleNum)++;
         if (CpvAccess(cycleNum) == nCycles) {
 #if REUSE_MSG
@@ -122,7 +122,7 @@ CmiHandler node0HandlerFunc(Message *msg)
 #if USE_PERSISTENT
                 CmiUsePersistentHandle(&h, 1);
 #endif
-                CmiSyncSendAndFree(1,CpvAccess(msgSize),m);
+                CmiSyncSendAndFree(i+1,CpvAccess(msgSize),m);
 #if USE_PERSISTENT
                 CmiUsePersistentHandle(NULL, 0);
 #endif
@@ -139,7 +139,7 @@ CmiHandler node1HandlerFunc(Message *msg)
 #if USE_PERSISTENT
     CmiUsePersistentHandle(&h, 1);
 #endif
-    msg->destPe = CmiMyRank();
+    msg->destPe = CmiMyPe();
     CmiSyncSendAndFree(0,msg->size,msg);
 #if USE_PERSISTENT
     CmiUsePersistentHandle(NULL, 0);
@@ -174,7 +174,7 @@ CmiStartFn mymain()
     
     if (CmiMyPe() == 0)
     {
-#if USE_PERSISTENT
+#if REUSE_MSG
         recvMsgs = (Message**) malloc(sizeof(Message*)*(CmiNumPes()-1));
 #endif
         startRing();
