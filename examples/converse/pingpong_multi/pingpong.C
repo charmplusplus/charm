@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <converse.h>
 
-enum {nCycles =3};
+enum {nCycles =4096};
 enum { maxMsgSize = 1 << 22 };
 
 CpvDeclare(int,msgSize);
@@ -87,6 +87,10 @@ CmiHandler exitHandlerFunc(char *msg)
 {
     CmiFree(msg);
     CsdExitScheduler();
+#if REUSE_MSG
+    if(CmiMyPe() ==0)
+        free(recvMsgs);
+#endif
     return 0;
 }
 
