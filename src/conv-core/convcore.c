@@ -3500,7 +3500,7 @@ void ConverseCommonInit(char **argv)
   CthSetSuspendable(CthSelf(), 0);
 */
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
   extern void initQd(char **argv);
   initQd(argv);

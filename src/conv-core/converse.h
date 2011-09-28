@@ -213,7 +213,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #include "string.h"
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP
+#if CMK_BIGSIM_L || CMK_BIGSIM_P
 #include "cmimemcpy.h"
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
@@ -413,7 +413,7 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 /* buggy xlc compiler on bluegene/p does not like memory fence in Cpvs */
-#if CMK_BLUEGENEP && ( defined(__xlC__) || defined(__xlc__) )
+#if CMK_BIGSIM_P && ( defined(__xlC__) || defined(__xlc__) )
 #define CpvMemoryReadFence()
 #define CpvMemoryWriteFence()
 #else
@@ -549,12 +549,12 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 #define CmiExtHeaderSizeBytes (sizeof(CmiMsgHeaderExt))
 
 /* all common extra fields in BigSim message header */
-#define CMK_BLUEGENE_FIELDS  CmiInt4 nd,n; double rt; CmiInt2 tID, hID; char t, flag; CmiInt2 ref; CmiInt4 msgID, srcPe;
+#define CMK_BIGSIM_FIELDS  CmiInt4 nd,n; double rt; CmiInt2 tID, hID; char t, flag; CmiInt2 ref; CmiInt4 msgID, srcPe;
 
 #ifndef CmiReservedHeaderSize
-typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
+typedef struct CMK_MSG_HEADER_BIGSIM_   CmiBlueGeneMsgHeader;
 #define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #  define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
 #else
 #  define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
@@ -1802,7 +1802,7 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 /*FAULT_EVAC */
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define CmiNodeAlive(x) (1)
 #else
 CpvExtern(char *,_validProcessors);

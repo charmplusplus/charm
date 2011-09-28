@@ -1,1 +1,1 @@
-CMK_BLUEGENE=true
+CMK_BIGSIM=true

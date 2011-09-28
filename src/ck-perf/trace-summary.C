@@ -1304,7 +1304,7 @@ extern "C" void CombineSummary()
 
 void initTraceSummaryBOC()
 {
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if(BgNodeRank()==0) {
 #else
   if (CkMyRank() == 0) {

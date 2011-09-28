@@ -11,8 +11,8 @@
 #include "bigsim_network.h"
 
 /* alway use handler table per node */
-#if ! defined(CMK_BLUEGENE_NODE) && ! defined(CMK_BLUEGENE_THREAD)
-#define CMK_BLUEGENE_THREAD   1
+#if ! defined(CMK_BIGSIM_NODE) && ! defined(CMK_BIGSIM_THREAD)
+#define CMK_BIGSIM_THREAD   1
 #endif
 
 /* define system parameters */
@@ -428,7 +428,7 @@ public:
   char 	       timeron_flag;	/* true if timer started */
  
   HandlerTable handlerTable; /* node level handler table */
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
   // for timing
   BgTimeLineRec *timelines;
   bgCorrectionQ cmsg;
@@ -496,7 +496,7 @@ public:
     int preStsIdx;
 #endif
 
-#if  CMK_BLUEGENE_THREAD
+#if  CMK_BIGSIM_THREAD
   HandlerTable   handlerTable;      /* thread level handler table */
 #endif
 
@@ -566,19 +566,19 @@ extern void (*BgProcessMessage)(threadInfo *t, char *msg);
 
 /* blue gene debug */
 
-#define BLUEGENE_DEBUG 0
+#define BIGSIM_DEBUG 0
 
-#if BLUEGENE_DEBUG
+#if BIGSIM_DEBUG
 /**Controls amount of debug messages: 1 (the lowest priority) is 
 extremely verbose, 2 shows most procedure entrance/exits, 
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define BLUEGENE_DEBUG_PRIO 2
-#define BLUEGENE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
+#define BIGSIM_DEBUG_PRIO 2
+#define BIGSIM_DEBUG_LOG 1 /**Controls whether output goes to log file*/
 
 extern FILE *bgDebugLog;
-# define BGSTATE_I(prio,args) if ((prio)>=BLUEGENE_DEBUG_PRIO) {\
+# define BGSTATE_I(prio,args) if ((prio)>=BIGSIM_DEBUG_PRIO) {\
 	fprintf args ; fflush(bgDebugLog); }
 # define BGSTATE(prio,str) \
 	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer()))
@@ -591,7 +591,7 @@ extern FILE *bgDebugLog;
 # define BGSTATE4(prio,str,a,b,c,d) \
 	BGSTATE_I(prio,(bgDebugLog,"[%.3f]> "str"\n",CmiWallTimer(),a,b,c,d))
 #else
-# define BLUEGENE_DEBUG_LOG 0
+# define BIGSIM_DEBUG_LOG 0
 # define BGSTATE(n,x) /*empty*/
 # define BGSTATE1(n,x,a) /*empty*/
 # define BGSTATE2(n,x,a,b) /*empty*/

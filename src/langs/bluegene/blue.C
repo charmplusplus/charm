@@ -296,7 +296,7 @@ int BgRegisterHandler(BgHandler h)
 {
   ASSERT(!cva(simState).inEmulatorInit);
   int cur;
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   return tMYNODE->handlerTable.registerHandler(h);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -311,7 +311,7 @@ int BgRegisterHandler(BgHandler h)
 void BgNumberHandler(int idx, BgHandler h)
 {
   ASSERT(!cva(simState).inEmulatorInit);
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   tMYNODE->handlerTable.numberHandler(idx,h);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -326,7 +326,7 @@ void BgNumberHandler(int idx, BgHandler h)
 void BgNumberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
 {
   ASSERT(!cva(simState).inEmulatorInit);
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   tMYNODE->handlerTable.numberHandlerEx(idx,h,uPtr);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -1051,7 +1051,7 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     int x,y,z,t;
     int pe = pes[i];
     int node;
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
     CmiAbort("Not implemented yet!");
 #else
     t = pe%BgGetNumWorkThread();
@@ -1254,7 +1254,7 @@ void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
   CmiAssert(handler < 1000);
 
   BgHandlerInfo *handInfo;
-#if  CMK_BLUEGENE_NODE
+#if  CMK_BIGSIM_NODE
   HandlerTable hdlTbl = tMYNODE->handlerTable;
   handInfo = hdlTbl.getHandle(handler);
 #else
@@ -1381,7 +1381,7 @@ static CmiHandler exitHandlerFunc(char *msg)
   int i,j;
 
   programExit = 2;
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
   // timing
   if (0)	// detail
   if (genTimeLog) {
@@ -1679,7 +1679,7 @@ CmiStartFn bgMain(int argc, char **argv)
       DEBUGF(("out-of-core turned on!\n"));
   }      
 
-#if BLUEGENE_DEBUG_LOG
+#if BIGSIM_DEBUG_LOG
   {
     char ln[200];
     sprintf(ln,"bgdebugLog.%d",CmiMyPe());
@@ -1802,7 +1802,7 @@ if(bgUseOutOfCore){
 // for conv-conds:
 // if -2 untouch
 // if -1 main thread
-#if CMK_BLUEGENE_THREAD
+#if CMK_BIGSIM_THREAD
 extern "C" int CmiSwitchToPEFn(int pe)
 {
   if (pe == -2) return -2;
@@ -2178,7 +2178,7 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
   CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
   CsdEnqueueGeneral(token, s, pb, prio);
 */
-#if CMK_BLUEGENE_THREAD
+#if CMK_BIGSIM_THREAD
   int x, y, z;
   BgGetMyXYZ(&x, &y, &z);
   int t = BgGetThreadID();

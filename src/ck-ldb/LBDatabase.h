@@ -36,7 +36,7 @@ private:
   int _lb_teamSize;		// specifies the team size for TeamLB
 public:
   CkLBArgs() {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
 #else
     _autoLbPeriod = 0.5;	// 0.5 second default

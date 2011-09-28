@@ -311,7 +311,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
     }
   }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
   stateVarsChildren = new TList<CStateVar*>();
 
@@ -597,7 +597,7 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "  int " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
 
@@ -674,7 +674,7 @@ void SdagConstruct::generateWhen(XStr& op)
   }
   op << ") {\n";
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // for tracing
   //TODO: instead of this, add a length field to EntryList
   int elen=0;
@@ -931,7 +931,7 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SWHEN_END);
 #endif
@@ -1013,13 +1013,13 @@ void SdagConstruct::generateFor(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // actual code here 
   generateBeginTime(op);
 #endif
   op << "    " << con1->text->charstar() << ";\n";
   //Record only the beginning for FOR
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEventBracket(op,SFOR);
 #endif
   op << "    if (" << con2->text->charstar() << ") {\n";
@@ -1044,7 +1044,7 @@ void SdagConstruct::generateFor(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
   // actual code here 
@@ -1055,7 +1055,7 @@ void SdagConstruct::generateFor(XStr& op)
   generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEventBracket(op,SFOR_END);
 #endif
   if(nextBeginOrEnd == 1)
@@ -1076,7 +1076,7 @@ void SdagConstruct::generateIf(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF);
 #endif
@@ -1105,7 +1105,7 @@ void SdagConstruct::generateIf(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF_END);
 #endif
@@ -1144,7 +1144,7 @@ void SdagConstruct::generateElse(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SELSE_END);
 #endif
@@ -1224,7 +1224,7 @@ void SdagConstruct::generateOlist(XStr& op)
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   op << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
 #endif
 
@@ -1232,7 +1232,7 @@ void SdagConstruct::generateOlist(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   op << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
@@ -1253,7 +1253,7 @@ void SdagConstruct::generateOlist(XStr& op)
 
   op << "      delete " << counter->charstar() << ";\n";
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateListEventBracket(op,SOLIST_END);
   op << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
 #endif
@@ -1276,7 +1276,7 @@ void SdagConstruct::generateOverlap(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP);
 #endif
@@ -1294,7 +1294,7 @@ void SdagConstruct::generateOverlap(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP_END);
 #endif
@@ -1350,7 +1350,7 @@ void SdagConstruct::generateSdagEntry(XStr& op)
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
         op << "    _connect_" << sc1->text->charstar() <<"();\n";
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEndSeq(op);
 #endif
   // actual code here 
@@ -1358,7 +1358,7 @@ void SdagConstruct::generateSdagEntry(XStr& op)
         "(";
   generateCall(op, *stateVarsChildren);
   op << ");\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateTlineEndCall(op);
   generateBeginExec(op, "spaceholder");
 #endif
@@ -1367,7 +1367,7 @@ void SdagConstruct::generateSdagEntry(XStr& op)
   op << "  }\n\n";
   op << "private:\n";
   op << "  void " << con1->text->charstar() << "_end(";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generatePrototype(op, *stateVarsChildren);
 #else
   generatePrototype(op, *stateVars);
@@ -1382,14 +1382,14 @@ void SdagConstruct::generateAtomic(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginExec(op, nameStr);
 #endif
   generateTraceBeginCall(op);
   op << "    " << text->charstar() << "\n";
   // trace
   generateTraceEndCall(op);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEndExec(op);
 #endif
   if(nextBeginOrEnd == 1)

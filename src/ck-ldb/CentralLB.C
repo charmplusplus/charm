@@ -312,7 +312,7 @@ void CentralLB::SendStats()
 
   statsMsg = NULL;
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   BgEndStreaming();
 #endif
 

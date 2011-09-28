@@ -51,7 +51,7 @@ extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #include <Multiprocessing.h>
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "middle-blue.h"
 using namespace BGConverse;
 #endif
@@ -401,7 +401,7 @@ extern "C" void CmiInitCPUTopology(char **argv)
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if (BgNodeRank() == 0)
 #endif
   {
@@ -419,13 +419,13 @@ extern "C" void CmiInitCPUTopology(char **argv)
   }
 
   if (CmiMyPe() == 0) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     if (BgNodeRank() == 0)
 #endif
       startT = CmiWallTimer();
   }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if (BgNodeRank() == 0)
   {
     //int numPes = BgNumNodes()*BgGetNumWorkThread();
@@ -548,14 +548,14 @@ extern "C" void CmiInitCPUTopology(char **argv)
     CsdSchedulePoll();
 
   if (CmiMyPe() == 0) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     if (BgNodeRank() == 0)
 #endif
       CmiPrintf("Charm++> cpu topology info is gathered in %.3f seconds.\n", CmiWallTimer()-startT);
   }
 #endif
 
-#endif   /* __BLUEGENE__ */
+#endif   /* __BIGSIM__ */
 
   // now every one should have the node info
   CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks

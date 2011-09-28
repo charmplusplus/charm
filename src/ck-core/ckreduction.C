@@ -384,7 +384,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
   DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
@@ -493,7 +493,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
 #if GROUP_LEVEL_REDUCTION
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
   addContribution(m);
@@ -827,7 +827,7 @@ void CkReductionMgr::finishReduction(void)
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
 #if GROUP_LEVEL_REDUCTION
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
@@ -862,7 +862,7 @@ countAdjustment &CkReductionMgr::adj(int number)
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkReductionMgr::reduceMessages(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_END_EXECUTE(1);
   void* _bgParentLog = NULL;
   _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
@@ -896,7 +896,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgs_userFlag=m->userFlag;
 			
 	isMigratableContributor=m->isMigratableContributor();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	_TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
     }
@@ -1285,7 +1285,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=-1000;
   ret->gcount=0;
   ret->migratableContributor = true;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   ret->log = NULL;
 #endif
   return ret;
@@ -1742,7 +1742,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1823,7 +1823,7 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
 #ifndef CMK_CPV_IS_SMP
@@ -2167,7 +2167,7 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_END_EXECUTE(1);
   void* _bgParentLog = NULL;
   _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
@@ -2206,7 +2206,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
         msgs_userFlag=m->userFlag;
 
 	isMigratableContributor= m->isMigratableContributor();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
 				
@@ -2266,7 +2266,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->sourceFlag=msgs_nSources;
   ret->setMigratableContributor(isMigratableContributor);
   DEBR((AA"Node Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&ret->log);
 #endif
 

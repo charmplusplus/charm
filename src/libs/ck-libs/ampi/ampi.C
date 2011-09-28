@@ -9,7 +9,7 @@
 #include "ampiProjections.h"
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "bigsim_logs.h"
 #endif
 
@@ -810,7 +810,7 @@ static ampi *ampiInit(char **argv)
   CtvAccess(ampiInitDone)=1;
   CtvAccess(ampiFinalized)=0;
   STARTUP_DEBUG("ampiInit> complete")
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     //  TRACE_BG_AMPI_START(ptr->getThread(), "AMPI_START");
     TRACE_BG_ADD_TAG("AMPI_START");
 #endif
@@ -834,7 +834,7 @@ static ampi *ampiInit(char **argv)
     thisParent = getAmpiParent();
   }
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   BgSetStartOutOfCore();
 #endif
 
@@ -1106,7 +1106,7 @@ void ampiParent::startCheckpoint(const char* dname){
     contribute(0, NULL, CkReduction::sum_int);
 
 #if 0
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   TRACE_BG_AMPI_SUSPEND();
@@ -1115,7 +1115,7 @@ void ampiParent::startCheckpoint(const char* dname){
 
   thread->stop();
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // _TRACE_BG_BEGIN_EXECUTE_NOMSG("CHECKPOINT_RESUME", &curLog);
   TRACE_BG_ADD_TAG("CHECKPOINT_RESUME");
 #endif
@@ -1440,7 +1440,7 @@ class ampiSplitKey {
 
 void ampi::split(int color,int key,MPI_Comm *dest, int type)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   //  TRACE_BG_AMPI_SUSPEND();
@@ -1464,7 +1464,7 @@ void ampi::split(int color,int key,MPI_Comm *dest, int type)
     MPI_Comm newComm=parent->getNextSplit()-1;
     *dest=newComm;
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //  TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "SPLIT_RESUME", curLog);
   //_TRACE_BG_BEGIN_EXECUTE_NOMSG("SPLIT_RESUME", &curLog);
   _TRACE_BG_SET_INFO(NULL, "SPLIT_RESUME", NULL, 0);
@@ -1828,7 +1828,7 @@ ampi::generic(AmpiMsg* msg)
       CkPrintf("AMPI vp %d arrival: tag=%d, src=%d, comm=%d  (from %d, seq %d) resumeOnRecv %d\n",
         thisIndex,msg->tag,msg->srcRank,msg->comm, msg->srcIdx, msg->seq,resumeOnRecv);
       )
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     TRACE_BG_ADD_TAG("AMPI_generic");
   msg->event = NULL;
 #endif
@@ -1883,7 +1883,7 @@ ampi::inorder(AmpiMsg* msg)
     //IReq *ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
     ireq = (IReq *)CmmGet(posted_ireqs, 3, tags, sts);
 #else
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _TRACE_BG_TLINE_END(&msg->event);    // store current log
     msg->eventPe = CmiMyPe();
 #endif
@@ -2043,7 +2043,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_END_AMPI_PROCESSING(thisIndex)
 #endif
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
    void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   //  TRACE_BG_AMPI_SUSPEND();
@@ -2098,7 +2098,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
   _LOG_E_BEGIN_AMPI_PROCESSING(thisIndex,s,count)
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #if CMK_TRACE_IN_CHARM
     //if(CpvAccess(traceOn)) CthTraceResume(thread->getThread());
     //Due to the reason mentioned the in the while loop above, we need to 
@@ -2131,7 +2131,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
 ampi::probe(int t, int s, int comm, int *sts)
 {
   int tags[3];
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   //  TRACE_BG_AMPI_SUSPEND();
@@ -2148,7 +2148,7 @@ ampi::probe(int t, int s, int comm, int *sts)
   resumeOnRecv=false;
   if(sts)
     ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //  TRACE_BG_AMPI_RESUME(thread->getThread(), msg, "PROBE_RESUME", curLog);
   _TRACE_BG_SET_INFO((char *)msg, "PROBE_RESUME",  &curLog, 1);
 #endif
@@ -2166,13 +2166,13 @@ ampi::iprobe(int t, int s, int comm, int *sts)
       ((MPI_Status*)sts)->MPI_LENGTH = msg->length;
     return 1;
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
   //  TRACE_BG_AMPI_SUSPEND();
 #endif
   thread->schedule();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //_TRACE_BG_BEGIN_EXECUTE_NOMSG("IPROBE_RESUME", &curLog);
   _TRACE_BG_SET_INFO(NULL, "IPROBE_RESUME",  &curLog, 1);
 #endif
@@ -2401,7 +2401,7 @@ CDECL void AMPI_Migrate(void)
 {
   //  AMPIAPI("AMPI_Migrate");
 #if 0
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
 #endif
@@ -2412,7 +2412,7 @@ CDECL void AMPI_Migrate(void)
   CpvAccess(_currentObj) = currentAmpi;
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //  TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
   TRACE_BG_ADD_TAG("AMPI_MIGRATE");
 #endif
@@ -2430,12 +2430,12 @@ CDECL void AMPI_Migrateto(int destPE)
 {
   AMPIAPI("AMPI_MigrateTo");
 #if 0
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
 #endif
   TCHARM_Migrate_to(destPE);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATETO")
   TRACE_BG_ADD_TAG("AMPI_MIGRATETO");
 #endif
@@ -2450,12 +2450,12 @@ CDECL void AMPI_Async_Migrate(void)
 {
   AMPIAPI("AMPI_Async_Migrate");
 #if 0
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
 #endif
   TCHARM_Async_Migrate();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //TRACE_BG_AMPI_START(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "AMPI_MIGRATE")
   TRACE_BG_ADD_TAG("AMPI_ASYNC_MIGRATE");
 #endif
@@ -2465,12 +2465,12 @@ CDECL void AMPI_Allow_Migrate(void)
 {
   AMPIAPI("AMPI_Allow_Migrate");
 #if 0
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_SUSPEND();
 #endif
 #endif
   TCHARM_Allow_Migrate();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_ADD_TAG("AMPI_ALLOW_MIGRATE");
 #endif
 }
@@ -2630,7 +2630,7 @@ int AMPI_Finalize(void)
 #endif
   CtvAccess(ampiFinalized)=1;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #if 0
   TRACE_BG_AMPI_SUSPEND();
 #endif
@@ -3062,7 +3062,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 
   CkDDT_DataType *ddt_type = ptr->getDDT()->getType(type);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_ALLREDUCE, ddt_type->getSize(count));
 #endif
 
@@ -3288,7 +3288,7 @@ double AMPI_Wtime(void)
   }
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   return BgGetTime();
 #else
   return TCHARM_Wall_timer();
@@ -3417,7 +3417,7 @@ int PersReq::wait(MPI_Status *sts){
   if(sndrcv == 2) {
     if(-1==getAmpiInstance(comm)->recv(tag, src, buf, count, type, comm, (int*)sts))
       CkAbort("AMPI> Error in persistent request wait");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _TRACE_BG_TLINE_END(&event);
 #endif
   }
@@ -3459,7 +3459,7 @@ int IReq::wait(MPI_Status *sts){
     //CmiPrintf("IReq's this pointer: %p\n", this);
     //print();
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     //Because of the out-of-core emulation, this pointer is changed after in-out
     //memory operation. So we need to return from this function and do the while loop
     //in the outer function call.	
@@ -3488,11 +3488,11 @@ int ATAReq::wait(MPI_Status *sts){
     if(-1==getAmpiInstance(myreqs[i].comm)->recv(myreqs[i].tag, myreqs[i].src, myreqs[i].buf,
           myreqs[i].count, myreqs[i].type, myreqs[i].comm, (int *)sts))
       CkAbort("AMPI> Error in alltoall request wait");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _TRACE_BG_TLINE_END(&myreqs[i].event);
 #endif
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //TRACE_BG_AMPI_NEWSTART(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq", NULL, 0);
   TRACE_BG_AMPI_BREAK(getAmpiInstance(MPI_COMM_WORLD)->getThread(), "ATAReq_wait", NULL, 0, 1);
   for (i=0; i<count; i++)
@@ -3598,7 +3598,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
   }
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *curLog;		// store current log in timeline
   _TRACE_BG_TLINE_END(&curLog);
 #if 0
@@ -3647,7 +3647,7 @@ int AMPI_Waitall(int count, MPI_Request request[], MPI_Status sts[])
 #endif
     }
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_WAITALL(reqs);   // setup forward and backward dependence
 #endif
   // free memory of requests
@@ -3785,7 +3785,7 @@ void IReq::receive(ampi *ptr, AmpiMsg *msg)
   src = msg->srcRank; // Although not required, we also extract src from msg
   comm = msg->comm;
   AMPI_DEBUG("Setting this->tag to %d in IReq::receive this=%p\n", (int)this->tag, this);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   event = msg->event; 
 #endif
   delete msg;
@@ -4729,7 +4729,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   int comm_size = size;
   MPI_Status status;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   TRACE_BG_AMPI_LOG(MPI_ALLTOALL, itemsize);
 #endif
 
@@ -6182,7 +6182,7 @@ int AMPI_System(const char *cmd) {
   return TCHARM_System(cmd);
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 
 extern "C" void startCFnCall(void *param,void *msg)
 {

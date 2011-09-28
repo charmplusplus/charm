@@ -916,7 +916,7 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 	if (local) {
 	  int onPe=CkMyPe();
 	  prepareCtorMsg(m,onPe,idx);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
           BgEntrySplit("split-array-new");
 #endif
 	  insertElement(m);
@@ -1283,7 +1283,7 @@ void CkArray::recvBroadcast(CkMessage *m)
           idx = 0;
         }
 	ArrayElement *el;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *root;
         _TRACE_BG_TLINE_END(&root);
 	BgSetEntryName("start-broadcast", &root);
@@ -1292,7 +1292,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void startVTimer();
 #endif
 	while (NULL!=(el=elements->next(idx))) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
                 void *curlog = BgSplitEntry("split-broadcast", &root, 1);
@@ -1305,7 +1305,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	}
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	//BgEntrySplit("end-broadcast");
 	stopVTimer();
 	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());

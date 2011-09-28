@@ -238,7 +238,7 @@ void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 
 void CpdFreezeModeScheduler(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     CmiAbort("Cannot run CpdFreezeModeScheduler inside BigSim emulated environment");
 #else
 #if CMK_CCS_AVAILABLE
@@ -296,7 +296,7 @@ void CpdMemoryMarkClean(char *msg);
 
 void CpdInit(void)
 {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   CpvInitialize(int, freezeModeFlag);
   CpvAccess(freezeModeFlag) = 0;
 

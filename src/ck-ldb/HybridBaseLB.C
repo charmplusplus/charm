@@ -85,7 +85,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
 void HybridBaseLB::initTree()
 {
 #if CMK_LBDB_ON
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
     int npes = tree->numChildren(CkMyPe(), 1);

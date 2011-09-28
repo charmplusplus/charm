@@ -144,7 +144,7 @@ static void traceCommonInit(char **argv)
     strcpy(CkpvAccess(selective), "");
   }
   
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if(BgNodeRank()==0) {
 #else
   if(CkMyRank()==0) {
@@ -299,7 +299,7 @@ static int checkTraceOnPe(char **argv)
 {
   int traceOnPE = 1;
   char *procs = NULL;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // check bgconfig file for settings
   traceOnPE=0;
   if (BgTraceProjectionOn(CkMyPe())) traceOnPE = 1;
@@ -549,7 +549,7 @@ void traceFlushLog(void)
 extern "C"
 void traceClose(void)
 {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif   
@@ -558,7 +558,7 @@ void traceClose(void)
 extern "C"
 void traceCharmClose(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif

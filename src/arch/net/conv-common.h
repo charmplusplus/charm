@@ -20,7 +20,7 @@
 #define CMK_MSG_HEADER_BASIC   CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,stratid,root,xhdl,info,redID;
 #define CMK_MSG_HEADER_EXT       { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BLUEGENE  { CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS }
+#define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_SPANTREE_MAXSPAN                               4
 #define CMK_SPANTREE_USE_COMMON_CODE                       1

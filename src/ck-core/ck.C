@@ -1412,7 +1412,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #   define  _skipCldEnqueue   _CldEnqueue
 #endif
 
@@ -2181,7 +2181,7 @@ private:
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
 extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 void CthEnqueueBigSimThread(CthThreadToken* token, int s,
                                    int pb,unsigned int *prio);
 #endif
@@ -2228,7 +2228,7 @@ class CkMessageReplay : public CkMessageWatcher {
 			return CmiFalse;
 		}
 #endif
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2296,7 +2296,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
 #else
 		CthEnqueueBigSimThread(token,0,0,NULL);
@@ -2426,7 +2426,7 @@ public:
 };
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
 #endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
@@ -2478,7 +2478,7 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 #endif
 
@@ -2540,7 +2540,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
 #else
 	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);

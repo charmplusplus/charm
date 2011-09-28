@@ -24,7 +24,7 @@
 #include "XTTorus.h"
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "blue.h"
 #endif
 

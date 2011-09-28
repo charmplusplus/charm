@@ -1556,7 +1556,7 @@ void req_ccs_connect(void)
     /*Treat out of bound values as errors. Helps detecting bugs*/
     /* But when virtualized with Bigemulator, we can have more pes than nodetabs */
     /* TODO: We should somehow check boundaries also for bigemulator... */
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     if (pe==-nodetab_size) fprintf(stderr,"Invalid processor index in CCS request: are you trying to do a broadcast instead?");
     else fprintf(stderr,"Invalid processor index in CCS request.");
     CcsServer_sendReply(&h.hdr,0,0);
@@ -1578,7 +1578,7 @@ void req_ccs_connect(void)
   CcsServer_sendReply(&h.hdr,0,0);
 #else
     int destpe = pe;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     destpe = destpe % nodetab_size;
 #endif
     if (replay_single) destpe = 0;

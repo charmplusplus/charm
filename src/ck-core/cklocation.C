@@ -172,7 +172,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ct
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(procNum(arrayHdl,idx)==thisPe);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         BgEntrySplit("split-array-new-end");
 #endif
 
@@ -2129,7 +2129,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-	    #if CMK_BLUEGENE_CHARM
+	    #if CMK_BIGSIM_CHARM
 		//After migration, reclaimRemote will be called through 
 		//the CkRemoveArrayElement in the pupping routines for those 
 		//objects that are not on the home processors. However,

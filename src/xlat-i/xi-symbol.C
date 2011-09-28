@@ -4389,7 +4389,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
    <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
   // str << "  CkpvAccess(_traces)->CkAddThreadListeners(tid);\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   str << "  BgAttach(tid);\n";
 #endif
   str << "  CthAwaken(tid);\n";

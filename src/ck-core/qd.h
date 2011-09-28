@@ -87,7 +87,7 @@ class QdState {
       envelope *env = UsrToEnv((void *)msg);
       CmiSetHandler(env, _qdHandlerIdx);
       for(int i=0; i<nChildren; i++) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         CmiSyncSendFn(children[i], env->getTotalsize(), (char *)env);
 #else
         CmiSyncSend(children[i], env->getTotalsize(), (char *)env);

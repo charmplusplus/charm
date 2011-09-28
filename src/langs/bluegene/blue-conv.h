@@ -9,7 +9,7 @@
 #include <memory.h>
 #include "converse.h"
 
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
 /**
   This version Blue Gene Charm++ use a whole Blue Gene node as 
   a Charm PE.
@@ -56,7 +56,7 @@ static inline void BgSyncBroadcastAllAndFree(int nb, char *m)
   BgBroadcastAllPacket(CmiGetHandler(m), LARGE_WORK, nb, m);
 }
 
-#else	 /* CMK_BLUEGENE_NODE */
+#else	 /* CMK_BIGSIM_NODE */
 /**
   This version of Blue Gene Charm++ use a Blue Gene thread as 
   a Charm PE.

@@ -22,7 +22,7 @@ The calls needed to use the reduction manager are:
 
 #include "CkArrayReductionMgr.decl.h"
 
-#if CMK_BLUEGENE_CHARM || CMK_MULTICORE || !CMK_SMP
+#if CMK_BIGSIM_CHARM || CMK_MULTICORE || !CMK_SMP
 #define GROUP_LEVEL_REDUCTION           1
 #endif
 
@@ -329,7 +329,7 @@ private:
     int fromPE;
 #endif
 private:
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *log;
 #endif
 	CkReduction::reducerType reducer;

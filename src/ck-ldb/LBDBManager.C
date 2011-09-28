@@ -95,7 +95,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   return newhandle;
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define LBOBJ_OOC_IDX 0x1
 #endif
 
@@ -109,7 +109,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   newhandle.id = _id;
   
 #if 1
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
     int newpos = -1;
@@ -159,7 +159,7 @@ void LBDB::UnregisterObj(LDObjHandle _h)
 // CmiPrintf("[%d] UnregisterObj: %d\n", CkMyPe(), _h.handle);
   delete objs[_h.handle];
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //hack for BigSim out-of-core emulation.
   //we want the chare array object to keep at the same
   //position even going through the pupping routine.
@@ -500,7 +500,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->refcount = cur_refcount;
 
   LDBarrierClient ret_val;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   ret_val.serial = first_free_client_slot;
   clients.insert(ret_val.serial, new_client);
 
@@ -531,7 +531,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
   const int cnum = c.serial;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if (cnum < clients.size() && clients[cnum] != 0) {
     delete (clients[cnum]);
     clients[cnum] = 0;

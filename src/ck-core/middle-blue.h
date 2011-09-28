@@ -51,7 +51,7 @@
   This version Blue Gene Charm++ use a whole Blue Gene node as 
   a Charm PE.
 */
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
 
 #define CkpvDeclare 	BnvDeclare
 #define CkpvExtern 	BnvExtern
@@ -122,7 +122,7 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 }  /* end of namespace */
 
 
-#else   /* end if CMK_BLUEGENE_NODE */
+#else   /* end if CMK_BIGSIM_NODE */
 
 /**
   This version of Blue Gene Charm++ use a Blue Gene thread as 

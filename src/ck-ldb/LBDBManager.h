@@ -27,7 +27,7 @@ friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
                    max_receiver= 0; at_count = 0; on = CmiFalse; 
-	#if CMK_BLUEGENE_CHARM
+	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
 	#endif
     };
@@ -69,7 +69,7 @@ private:
   int at_count;
   CmiBool on;
 
-  #if CMK_BLUEGENE_CHARM
+  #if CMK_BIGSIM_CHARM
   int first_free_client_slot;
   #endif
 };

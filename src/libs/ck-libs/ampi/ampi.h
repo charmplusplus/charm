@@ -769,7 +769,7 @@ extern void traceEndFuncProj(char *);
 extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define MPI_Set_startevent AMPI_Set_startevent
 int AMPI_Set_startevent(MPI_Comm comm);
 #endif

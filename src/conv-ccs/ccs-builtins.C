@@ -253,7 +253,7 @@ void CpdMachineArchitecture(char *msg) {
   if (firstByte == 1) reply[3] = 1;
   else reply[3] = 2;
   // add the third bit if we are in bigsim
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   reply[3] |= 4;
 #endif
   // get the size of an "int"

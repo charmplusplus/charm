@@ -314,7 +314,7 @@ int getNextSerializer(){
 }
 
 int CkNumValidPes(){
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         return CkNumPes();
 #else
 	int count=0;

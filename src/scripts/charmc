@@ -1075,17 +1075,17 @@ case "$LANGUAGE" in
 esac
 
 # update charm to bgcharm
-if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
+if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BIGSIM" ]
 then
         LANGUAGE="bgcharm++"
 fi
-if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BLUEGENE" ]
+if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BIGSIM" ]
 then
         LANGUAGE="bgconverse++"
 fi
 if [ "$LANGUAGE" = "bgcharm++" ]
 then
-	TRACEMODE=`AddList $TRACEMODE bluegene`
+	TRACEMODE=`AddList $TRACEMODE bigsim`
 fi
 
 ########################################################################

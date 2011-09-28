@@ -76,7 +76,7 @@ class fromzDisk : public zdisk {
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
-#if CMK_CONVERSE_LAPI ||  CMK_BLUEGENE_CHARM
+#if CMK_CONVERSE_LAPI ||  CMK_BIGSIM_CHARM
 #define AMPI_ALLTOALL_MEDIUM_MSG   4194304
 #else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
@@ -539,7 +539,7 @@ public:
 	int src;
 	int comm;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 public:
 	void *event;	// the event point that corresponding to this message
 #endif
@@ -583,7 +583,7 @@ public:
 		p(tag);
 		p(comm);
 		p(isvalid);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		//needed for bigsim out-of-core emulation
 		//as the "log" is not moved from memory, this pointer is safe
 		//to be reused
@@ -653,7 +653,7 @@ class ATAReq : public AmpiRequest {
 		int src;
 		int tag;
 		int comm;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		void *event;             // event buffered for the request
 #endif
 		virtual void pup(PUP::er &p){
@@ -661,7 +661,7 @@ class ATAReq : public AmpiRequest {
 			p(count);
 			p(type);
 			p(src);p(tag);p(comm);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		//needed for bigsim out-of-core emulation
 		//as the "log" is not moved from memory, this pointer is safe
 		//to be reused
@@ -869,7 +869,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *event;
   int  eventPe;	 // the PE that the event is located
 #endif

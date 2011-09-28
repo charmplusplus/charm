@@ -10,8 +10,8 @@
 */
 /*@{*/
 
-#ifndef _TRACE_BLUEGENE_H
-#define _TRACE_BLUEGENE_H
+#ifndef _TRACE_BIGSIM_H
+#define _TRACE_BIGSIM_H
 
 #include "trace.h"
 

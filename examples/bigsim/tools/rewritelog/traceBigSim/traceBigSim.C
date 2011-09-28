@@ -6,7 +6,7 @@
 /*
  *
  * WITH_MAMBO:    when using mambo
- * CMK_BLUEGENE_CHARM:  when build with bigsim
+ * CMK_BIGSIM_CHARM:  when build with bigsim
  * SPLIT_APART_CYCLE_ACCURATE: parallelize Mambo run
  * */
 
@@ -46,7 +46,7 @@ void initBigSimTrace()
   insideTraceBracket = false;
 
   CkpvInitialize(FILE*, bgfp);
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   //   for bigsim emulation, write to files, one for each processor
   char fname[128];
   sprintf(fname, "param.%d", CkMyPe());
@@ -68,7 +68,7 @@ void initBigSimTrace()
 
 void finalizeBigSimTrace()
 {
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   fclose(CkpvAccess(bgfp));
 #endif  
 }
@@ -131,7 +131,7 @@ void startTraceBigSim(){
 #endif
 
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   BgMark("startTraceBigSim %f\n");
 #endif
 
@@ -210,7 +210,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
   //  sprintf(timeString, "time:{ %f }", endTime-startTime);
   sprintf(timeString, "time_in_cycles:{ %llu }",  end_time-start_time); 
 #endif
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   timeString[0] = 0;
 #endif
 
@@ -228,7 +228,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
   char sequenceString[1024];
   sequenceString[0] = 0;
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   BgMark("endTraceBigSim %f\n");
   // write event ID
   int seqno = tTIMELINEREC.length()-1;

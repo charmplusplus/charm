@@ -86,7 +86,7 @@ CkpvExtern(bool, verbose);
 CkpvExtern(double, traceInitTime);
 CkpvExtern(double, traceInitCpuTime);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define  TRACE_TIMER   BgGetTime
 #define  TRACE_CPUTIMER   BgGetTime
 inline double TraceTimer() { return TRACE_TIMER(); }

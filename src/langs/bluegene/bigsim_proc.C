@@ -61,7 +61,7 @@ void commThreadInfo::run()
       BgProcessMessage(this, msg);
     }
     else {
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
       correctMsgTime(msg);
 #endif
     
@@ -180,7 +180,7 @@ void workThreadInfo::scheduler(int count)
       DEBUGM(4, ("N[%d] work thread %d awakened!\n", BgMyNode(), id));      
       continue;
     }
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
     correctMsgTime(msg);
 #if THROTTLE_WORK
     if (correctTimeLog) {

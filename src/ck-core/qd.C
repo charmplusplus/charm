@@ -14,7 +14,7 @@ extern int _qdCommHandlerIdx;
 // a fake QD which just wait for several seconds to triger QD callback
 int _dummy_dq = 0;                      /* seconds to wait for */
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 // this is a hack for bgcharm++, I need to figure out a better
 // way to do this
 #undef CmiSyncSendAndFree
@@ -240,7 +240,7 @@ void CkStartQD(const CkCallback& cb)
 #if CMK_MEM_CHECKPOINT
   CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
 #endif
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   CmiFreeSendFn(0, env->getTotalsize(), (char *)env);
 #else
   _CldEnqueue(0, env, _infoIdx);
