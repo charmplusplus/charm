@@ -213,7 +213,7 @@ extern CmiNodeLock CmiMemLock_lock;
 
 #include "string.h"
 
-#if CMK_BIGSIM_L || CMK_BIGSIM_P
+#if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "cmimemcpy.h"
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
@@ -413,7 +413,7 @@ for each processor in the node.
 #ifdef CMK_CPV_IS_SMP
 
 /* buggy xlc compiler on bluegene/p does not like memory fence in Cpvs */
-#if CMK_BIGSIM_P && ( defined(__xlC__) || defined(__xlc__) )
+#if CMK_BLUEGENEP && ( defined(__xlC__) || defined(__xlc__) )
 #define CpvMemoryReadFence()
 #define CpvMemoryWriteFence()
 #else
