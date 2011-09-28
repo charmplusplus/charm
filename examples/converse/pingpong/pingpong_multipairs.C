@@ -9,7 +9,8 @@
 #include <stdlib.h>
 #include <converse.h>
 
-enum {nCycles =4096};
+enum {nCycles =4004};
+enum {skip =4};
 enum { maxMsgSize = 1 << 22 };
 
 CpvDeclare(int,recvNum);
@@ -45,7 +46,6 @@ void startRing(char* msg_2)
   *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
   CmiSetHandler(msg,CpvAccess(node0Handler));
   CmiSyncSendAndFree(CmiMyPe(), CpvAccess(msgSize), msg);
-  CpvAccess(startTime) = CmiWallTimer();
 }
 
 void reduceHandlerFunc(char *msg)
@@ -54,7 +54,7 @@ void reduceHandlerFunc(char *msg)
    CpvAccess(sumTime) += *((double*)(msg+(CmiMsgHeaderSizeBytes)));
    if(CpvAccess(recvNum) == HALF)
    {
-       double us_time = (CpvAccess(sumTime))/(2.*nCycles*HALF)*1e6;
+       double us_time = (CpvAccess(sumTime))/(2.*(nCycles-skip)*HALF)*1e6;
        CmiPrintf("%d\t\t  %.2lf   %.2f\n",
            CpvAccess(msgSize)-CmiMsgHeaderSizeBytes,
            us_time, (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)/us_time);
@@ -108,7 +108,9 @@ CmiHandler exitHandlerFunc(char *msg)
 CmiHandler node0HandlerFunc(char *msg)
 {
     CpvAccess(cycleNum)++;
-    
+    if(CpvAccess(cycleNum)== skip)
+        CpvAccess(startTime) = CmiWallTimer();
+
     if (CpvAccess(cycleNum) == nCycles) {
         CpvAccess(endTime) = CmiWallTimer();
         ringFinished(msg);
