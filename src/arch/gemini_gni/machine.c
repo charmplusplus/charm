@@ -870,7 +870,8 @@ static void LrtsPreCommonInit(int everReturn){}
 
 /* Idle-state related functions: called in non-smp mode */
 void CmiNotifyIdleForGemini(void) {
-    LrtsAdvanceCommunication();
+    AdvanceCommunication();
+    //LrtsAdvanceCommunication();
 }
 
 static void LrtsPostCommonInit(int everReturn)
