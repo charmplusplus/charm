@@ -29,6 +29,16 @@
  * - use CmiReduce to optimize the collection of node info
  */
 
+#define CmiCpuTopologyEnabled LrtsCpuTopoEnabled
+#define CmiPeOnSamePhysicalNode LrtsPeOnSameNode
+#define CmiNumPhysicalNodes LrtsNumNodes
+#define CmiNumPesOnPhysicalNode LrtsNodeSize
+#define CmiGetPesOnPhysicalNode LrtsPeOnNode
+#define CmiPhysicalRank LrtsRankOf
+#define CmiPhysicalNodeID LrtsNodeOf
+#define CmiGetFirstPeOnPhysicalNode LrtsNodeFirst
+#define CmiInitCPUTopology LrtsInitCPUTopo
+
 #if 1
 
 #include <stdlib.h>
@@ -322,12 +332,14 @@ static void * combineMessage(int *size, void *data, void **remote, int count)
 
 /******************  API implementation **********************/
 
-extern "C" int CmiCpuTopologyEnabled()
+//extern "C" int CmiCpuTopologyEnabled()
+extern "C" int LrtsCpuTopoEnabled()
 {
   return CpuTopology::supported;
 }
 
-extern "C" int CmiPeOnSamePhysicalNode(int pe1, int pe2)
+//extern "C" int CmiPeOnSamePhysicalNode(int pe1, int pe2)
+extern "C" int LrtsPeOnSameNode(int pe1, int pe2)
 {
   int *nodeIDs = cpuTopo.nodeIDs;
   if (!cpuTopo.supported || nodeIDs == NULL) return CmiNodeOf(pe1) == CmiNodeOf(pe2);
@@ -335,25 +347,29 @@ extern "C" int CmiPeOnSamePhysicalNode(int pe1, int pe2)
 }
 
 // return -1 when not supported
-extern "C" int CmiNumPhysicalNodes()
+//extern "C" int CmiNumPhysicalNodes()
+extern "C" int LrtsNumNodes()
 {
   if (!cpuTopo.supported) return CmiNumNodes();
   else return cpuTopo.numUniqNodes();
 }
 
-extern "C" int CmiNumPesOnPhysicalNode(int node)
+//extern "C" int CmiNumPesOnPhysicalNode(int node)
+extern "C" int LrtsNodeSize(int node)
 {
   return !cpuTopo.supported?CmiNodeSize(node):(int)cpuTopo.bynodes[node].size();
 }
 
 // pelist points to system memory, user should not free it
-extern "C" void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num)
+//extern "C" void CmiGetPesOnPhysicalNode(int node, int **pelist, int *num)
+extern "C" void LrtsPeOnNode(int node, int **pelist, int *num)
 {
   *num = cpuTopo.bynodes[node].size();
   if (pelist!=NULL && *num>0) *pelist = cpuTopo.bynodes[node].getVec();
 }
 
-extern "C" int CmiPhysicalRank(int pe)
+//extern "C" int CmiPhysicalRank(int pe)
+extern "C" int LrtsRankOf(int pe)
 {
   if (!cpuTopo.supported) return CmiRankOf(pe);
   const CkVec<int> &v = cpuTopo.bynodes[cpuTopo.nodeIDs[pe]];
@@ -364,14 +380,16 @@ extern "C" int CmiPhysicalRank(int pe)
   return rank;
 }
 
-extern "C" int CmiPhysicalNodeID(int pe)
+//extern "C" int CmiPhysicalNodeID(int pe)
+extern "C" int LrtsNodeOf(int pe)
 {
   if (!cpuTopo.supported) return CmiNodeOf(pe);
   return cpuTopo.nodeIDs[pe];
 }
 
 // the least number processor on the same physical node
-extern "C"  int CmiGetFirstPeOnPhysicalNode(int node)
+//extern "C"  int CmiGetFirstPeOnPhysicalNode(int node)
+extern "C"  int LrtsNodeFirst(int node)
 {
   if (!cpuTopo.supported) return CmiNodeFirst(node);
   return cpuTopo.bynodes[node][0];
@@ -379,8 +397,8 @@ extern "C"  int CmiGetFirstPeOnPhysicalNode(int node)
 
 
 static int _noip = 0;
-
-extern "C" void CmiInitCPUTopology(char **argv)
+//extern "C" void CmiInitCPUTopology(char **argv)
+extern "C" void LrtsInitCPUTopo(char **argv)
 {
   static skt_ip_t myip;
   hostnameMsg  *msg;
@@ -564,7 +582,8 @@ extern "C" void CmiInitCPUTopology(char **argv)
 #else           /* not supporting cpu topology */
 
 
-extern "C" void CmiInitCPUTopology(char **argv)
+//extern "C" void CmiInitCPUTopology(char **argv)
+extern "C" void LrtsInitCPUTopo(char **argv)
 {
   /* do nothing */
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
