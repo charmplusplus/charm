@@ -37,7 +37,7 @@
 #define CmiPhysicalRank LrtsRankOf
 #define CmiPhysicalNodeID LrtsNodeOf
 #define CmiGetFirstPeOnPhysicalNode LrtsNodeFirst
-#define CmiInitCPUTopology LrtsInitCPUTopo
+#define CmiInitCPUTopology LrtsInitCpuTopo
 
 #if 1
 
@@ -398,7 +398,7 @@ extern "C"  int LrtsNodeFirst(int node)
 
 static int _noip = 0;
 //extern "C" void CmiInitCPUTopology(char **argv)
-extern "C" void LrtsInitCPUTopo(char **argv)
+extern "C" void LrtsInitCpuTopo(char **argv)
 {
   static skt_ip_t myip;
   hostnameMsg  *msg;
@@ -583,7 +583,7 @@ extern "C" void LrtsInitCPUTopo(char **argv)
 
 
 //extern "C" void CmiInitCPUTopology(char **argv)
-extern "C" void LrtsInitCPUTopo(char **argv)
+extern "C" void LrtsInitCpuTopo(char **argv)
 {
   /* do nothing */
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
