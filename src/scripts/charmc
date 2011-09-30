@@ -1085,7 +1085,7 @@ then
 fi
 if [ "$LANGUAGE" = "bgcharm++" ]
 then
-	TRACEMODE=`AddList $TRACEMODE bigsim`
+	TRACEMODE=`AddList $TRACEMODE bluegene`
 fi
 
 ########################################################################
