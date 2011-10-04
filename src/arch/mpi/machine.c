@@ -301,17 +301,10 @@ static void EnqueueMsg(void *m, int size, int node) {
 #endif
 
 /* The function that calls MPI_Isend so that both non-SMP and SMP could use */
-static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
+static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg, int mode) {
     int node = smsg->destpe;
     int size = smsg->size;
     char *msg = smsg->msg;
-
-#if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
-    while (MsgQueueLen > request_max) {
-        CmiReleaseSentMessages();
-        PumpMsgs();
-    }
-#endif
 
     MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
 #if CMK_ERROR_CHECKING
@@ -364,6 +357,17 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     else
         end_sent->next = smsg;
     end_sent = smsg;
+
+#if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
+    if (mode == P2P_SYNC || mode == P2P_ASYNC)
+    {
+    while (MsgQueueLen > request_max) {
+        CmiReleaseSentMessages();
+        PumpMsgs();
+    }
+    }
+#endif
+
     return (CmiCommHandle) &(smsg->req);
 }
 
@@ -385,7 +389,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
     msg_tmp->destpe = destNode;
     msg_tmp->size = size;
     msg_tmp->next = 0;
-    return MPISendOneMsg(msg_tmp);
+    return MPISendOneMsg(msg_tmp, mode);
 #endif
 }
 
