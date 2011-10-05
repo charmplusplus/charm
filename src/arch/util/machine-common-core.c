@@ -832,9 +832,7 @@ void *CmiGetNonLocal(void) {
     } 
 #endif
 
-#if !CMK_SMP
     LrtsPostNonLocal();
-#endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
 
