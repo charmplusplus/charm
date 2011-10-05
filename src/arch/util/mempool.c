@@ -13,17 +13,25 @@ Generalized by Gengbin Zheng  10/5/2011
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
 
+#include "conv-config.h"
+
+#include <stdlib.h>
+#if CMK_HAS_MALLOC_H
+#include <malloc.h>
+#endif
+
 #include "mempool.h"
 
 static      size_t     expand_mem = 1024ll*1024*16;
 
-
+#ifndef  ALIGNBUF
+#define ALIGNBUF                64
+#endif
 
 mempool_type *init_mempool(void *pool, size_t pool_size, gni_mem_handle_t mem_hndl)
 {
     mempool_type *mptr;
     mempool_header *header;
-    gni_return_t status;
 
     mptr = (mempool_type*)pool;
     mptr->mempools_head.mempool_ptr = pool;
@@ -40,7 +48,6 @@ mempool_type *init_mempool(void *pool, size_t pool_size, gni_mem_handle_t mem_hn
 
 void kill_allmempool(mempool_type *mptr)
 {
-    gni_return_t status;
     mempool_block *current, *mempools_head;
 
     current = mempools_head = &(mptr->mempools_head);
@@ -48,7 +55,7 @@ void kill_allmempool(mempool_type *mptr)
     while(mempools_head!= NULL)
     {
 #if CMK_CONVERSE_GEMINI_UGNI
-        status = GNI_MemDeregister(nic_hndl, &(mempools_head->mem_hndl));
+        gni_return_t status = GNI_MemDeregister(nic_hndl, &(mempools_head->mem_hndl));
         GNI_RC_CHECK("Mempool de-register", status);
 #endif
         //printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
@@ -62,7 +69,6 @@ void kill_allmempool(mempool_type *mptr)
 void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 {
     int     bestfit_size = MAX_INT; //most close size 
-    gni_return_t    status;
     size_t    *freelist_head = &mptr->freelist_head;
     mempool_header    *freelist_head_ptr = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
     mempool_header    *current = freelist_head_ptr;
@@ -123,6 +129,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         expand_pool->mempool_ptr = pool;
         printf("[%d] No memory has such free empty chunck of %d. expanding %p (%d)\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
 #if CMK_CONVERSE_GEMINI_UGNI
+        gni_return_t  status;
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, expand_pool->mempool_ptr, expand_size,  &(expand_pool->mem_hndl), &omdh);
         GNI_RC_CHECK("Mempool register", status);
 #endif

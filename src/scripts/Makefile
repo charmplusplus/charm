@@ -193,7 +193,7 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
       memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
-      blue.h blue-conv.h bgconverse.h cmipool.h \
+      blue.h blue-conv.h bgconverse.h cmipool.h mempool.h \
       cmidirect.h cmidirectmanytomany.h
 
 CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
@@ -410,7 +410,7 @@ COMLIB_CORE_OBJS = ComlibModuleInterface.o
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
-	conv-lists.o RTH.o persist-comm.o graph.o \
+	conv-lists.o RTH.o persist-comm.o mempool.o graph.o \
 	TopoManager.o CrayNid.o crc32.o
 
 LIBCONV_UTILF=pup_f.o
@@ -526,6 +526,9 @@ RTH.o: RTH.C RTH.h $(CVHEADERS)
 
 persist-comm.o: persist-comm.c $(CVHEADERS)
 	$(CHARMC) -o persist-comm.o persist-comm.c
+
+mempool.o: mempool.c $(CVHEADERS)
+	$(CHARMC) -o mempool.o mempool.c
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
