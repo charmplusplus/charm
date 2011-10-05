@@ -37,7 +37,7 @@ static void sleep(int secs) {
 
 
 #define REMOTE_EVENT         0
-#define USE_LRTS_MEMPOOL   1
+#define USE_LRTS_MEMPOOL     1
 
 #if USE_LRTS_MEMPOOL
 static CmiInt8 _mempool_size = 1024ll*1024*32;
@@ -81,6 +81,8 @@ uint8_t   onesided_hnd, omdh;
 #endif
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
+
+#define GetMemHndl(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mem_hndl
 
 #define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
@@ -386,6 +388,8 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
 
 #include "mempool.c"
+
+static mempool_type  *mempool = NULL;
 
 /* get the upper bound of log 2 */
 int mylog2(int size)
@@ -1766,7 +1770,12 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if     USE_LRTS_MEMPOOL
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
-    init_mempool(_mempool_size);
+    void *pool = memalign(ALIGNBUF, _mempool_size);
+    gni_mem_handle_t mem_hndl;
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, _mempool_size,  &mem_hndl, &omdh);
+    GNI_RC_CHECK("Mempool register", status);
+    mempool = init_mempool(pool, _mempool_size, mem_hndl);
+    //init_mempool(Mempool_MaxSize);
 #endif
     //init_mempool(Mempool_MaxSize);
 
@@ -1794,7 +1803,7 @@ void* LrtsAlloc(int n_bytes, int header)
         CmiAssert(header <= ALIGNBUF);
 #if     USE_LRTS_MEMPOOL
         n_bytes = ALIGN64(n_bytes);
-        char *res = syh_mempool_malloc(ALIGNBUF+n_bytes);
+        char *res = mempool_malloc(mempool, ALIGNBUF+n_bytes, 1);
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
@@ -1818,7 +1827,7 @@ void  LrtsFree(void *msg)
         CmiPrintf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
 #if     USE_LRTS_MEMPOOL
-        syh_mempool_free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+        mempool_free(mempool, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #else
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
@@ -1832,7 +1841,7 @@ static void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
-    kill_allmempool();
+    kill_allmempool(mempool);
 #endif
     PMI_Finalize();
     exit(0);
