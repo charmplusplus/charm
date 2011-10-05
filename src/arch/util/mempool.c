@@ -4,6 +4,7 @@
 Memory pool implementation , It is only good for Charm++ usage. The first 64 bytes provides additional information. sizeof(int)- size of this block(free or allocated), next gni_mem_handle_t, then void** point to the next available block. 
 
 Written by Yanhua Sun 08-27-2011
+Generalized by Gengbin Zheng  10/5/2011
 
 */
 
@@ -12,37 +13,10 @@ Written by Yanhua Sun 08-27-2011
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
 
+#include "mempool.h"
+
 static      size_t     expand_mem = 1024ll*1024*16;
 
-#if ! CMK_CONVERSE_GEMINI_UGNI
-  // in uGNI, it is memory handler, other versions, this is an integer
-  // a unique integer to represent the memory block
-typedef int    gni_mem_handle_t;
-#endif
-
-// multiple mempool for different size allocation
-typedef struct mempool_block_t
-{
-    void                *mempool_ptr;
-    struct              mempool_block_t *next;
-    gni_mem_handle_t    mem_hndl;
-} mempool_block;
-
-
-typedef struct mempool_header
-{
-  int size;
-  gni_mem_handle_t  mem_hndl;
-  size_t            next_free;
-} mempool_header;
-
-
-// only at beginning of first block of mempool
-typedef struct mempool_type
-{
-  mempool_block   mempools_head;
-  size_t          freelist_head;
-} mempool_type;
 
 
 mempool_type *init_mempool(void *pool, size_t pool_size, gni_mem_handle_t mem_hndl)
