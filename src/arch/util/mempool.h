@@ -4,7 +4,18 @@
 
 #include "conv-config.h"
 
-#if ! CMK_CONVERSE_GEMINI_UGNI
+#if CMK_CONVERSE_GEMINI_UGNI
+
+#include "gni_pub.h"
+#include "pmi.h"
+extern gni_nic_handle_t      nic_hndl;
+#if CMK_ERROR_CHECKING
+#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           CmiPrintf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
+#else
+#define GNI_RC_CHECK(msg,rc)
+#endif
+
+#else
   // in uGNI, it is memory handler, other versions, this is an integer
   // a unique integer to represent the memory block
 typedef int    gni_mem_handle_t;

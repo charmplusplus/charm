@@ -58,6 +58,8 @@ int         lrts_local_done_msg = 0;
 
 #include "pcqueue.h"
 
+#include "mempool.h"
+
 #if CMK_PERSISTENT_COMM
 #include "machine-persistent.h"
 #endif
@@ -135,7 +137,7 @@ static int Mempool_MaxSize = 1024*1024*128;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
 static int mysize, myrank;
-static gni_nic_handle_t      nic_hndl;
+gni_nic_handle_t      nic_hndl;
 
 typedef struct {
     gni_mem_handle_t mdh;
@@ -386,8 +388,6 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define IsFree(a,ind)  !( a& (1<<(ind) ))
 #define SET_BITS(a,ind) a = ( a | (1<<(ind )) )
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
-
-#include "mempool.c"
 
 static mempool_type  *mempool = NULL;
 

@@ -13,9 +13,12 @@ Generalized by Gengbin Zheng  10/5/2011
 #define POOLS_NUM       2
 #define MAX_INT        2147483647
 
-#include "conv-config.h"
+#include "converse.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
 #endif
@@ -76,7 +79,6 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     mempool_header    *bestfit = NULL;
     mempool_header    *bestfit_previous = NULL;
     mempool_block     *mempools_head = &(mptr->mempools_head);
-    int     expand_size;
 
 #if  MEMPOOL_DEBUG
     CmiPrintf("[%d] request malloc from pool: %p  free_head: %p %d for size %d, \n", CmiMyPe(), mptr, freelist_head_ptr, mptr->freelist_head, size);
@@ -119,6 +121,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     if(bestfit == NULL)
     {
         mempool_block   *expand_pool;
+        size_t   expand_size;
         void *pool;
 
         if (!expand) return NULL;
@@ -130,7 +133,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         printf("[%d] No memory has such free empty chunck of %d. expanding %p (%d)\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
 #if CMK_CONVERSE_GEMINI_UGNI
         gni_return_t  status;
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, expand_pool->mempool_ptr, expand_size,  &(expand_pool->mem_hndl), &omdh);
+        status = GNI_MemRegister(nic_hndl, (uint64_t)expand_pool->mempool_ptr, expand_size,  NULL, GNI_MEM_READWRITE, -1, &(expand_pool->mem_hndl));
         GNI_RC_CHECK("Mempool register", status);
 #endif
         expand_pool->next = NULL;
