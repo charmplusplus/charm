@@ -2064,7 +2064,6 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
       CkPrintf("AMPI vp %d blocking recv: tag=%d, src=%d, comm=%d\n",thisIndex,t,s,comm);
       )
 
-    resumeOnRecv=true;
   ampi *dis = getAmpiInstance(disComm);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   //  dis->yield();
@@ -2077,6 +2076,7 @@ ampi::recv(int t, int s, void* buf, int count, int type, int comm, int *sts)
     tags[0] = t; tags[1] = s; tags[2] = comm;
     msg = (AmpiMsg *) CmmGet(dis->msgs, 3, tags, sts);
     if (msg) break;
+    dis->resumeOnRecv=true;
     dis->thread->suspend();
     dosuspend = 1;
     dis = getAmpiInstance(disComm);
@@ -2957,9 +2957,11 @@ static CkReductionMsg *makeRednMsg(CkDDT_DataType *ddt,const void *inbuf,int cou
   AmpiOpHeader newhdr(op,type,count,szdata); 
   CkReductionMsg *msg=CkReductionMsg::buildNew(szdata+szhdr,NULL,AmpiReducer);
   memcpy(msg->getData(),&newhdr,szhdr);
-  TCharm::activateVariable(inbuf);
-  ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
-  TCharm::deactivateVariable(inbuf);
+  if (count > 0) {
+    TCharm::activateVariable(inbuf);
+    ddt->serialize((char*)inbuf, (char*)msg->getData()+szhdr, count, 1);
+    TCharm::deactivateVariable(inbuf);
+  }
   return msg;
 }
 

@@ -72,8 +72,8 @@ static void processBcastQs();
  * should not be used in machine-specific implementations
  * except in some special occasions.
  */
-static void processProcBcastMsg(int size, char *msg);
-static void processNodeBcastMsg(int size, char *msg);
+static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg);
+static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg);
 static void SendSpanningChildrenProc(int size, char *msg);
 static void SendHyperCubeProc(int size, char *msg);
 #if CMK_NODE_QUEUE_AVAILABLE

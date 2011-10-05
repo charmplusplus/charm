@@ -178,7 +178,7 @@ static int idleblock = 0;
 typedef struct msg_list {
     char *msg;
     struct msg_list *next;
-    int size, destpe;
+    int size, destpe, mode;
 #if CMK_SMP_TRACE_COMMTHREAD
     int srcpe;
 #endif
@@ -226,7 +226,7 @@ static void PumpMsgsBlocking(void);
 static int MsgQueueEmpty();
 static int RecvQueueEmpty();
 static int SendMsgBuf();
-static  void EnqueueMsg(void *m, int size, int node);
+static  void EnqueueMsg(void *m, int size, int node, int mode);
 #endif
 
 /* The machine-specific send function */
@@ -276,13 +276,14 @@ static void MachinePostNonLocalForMPI();
 /* The machine specific msg-sending function */
 
 #if CMK_SMP
-static void EnqueueMsg(void *m, int size, int node) {
+static void EnqueueMsg(void *m, int size, int node, int mode) {
     SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
     msg_tmp->msg = m;
     msg_tmp->size = size;
     msg_tmp->destpe = node;
     msg_tmp->next = 0;
+    msg_tmp->mode = mode;
 
 #if CMK_SMP_TRACE_COMMTHREAD
     msg_tmp->srcpe = CmiMyPe();
@@ -305,13 +306,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     int node = smsg->destpe;
     int size = smsg->size;
     char *msg = smsg->msg;
-
-#if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
-    while (MsgQueueLen > request_max) {
-        CmiReleaseSentMessages();
-        PumpMsgs();
-    }
-#endif
+    int mode = smsg->mode;
 
     MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
 #if CMK_ERROR_CHECKING
@@ -364,6 +359,17 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     else
         end_sent->next = smsg;
     end_sent = smsg;
+
+#if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
+    if (mode == P2P_SYNC || mode == P2P_ASYNC)
+    {
+    while (MsgQueueLen > request_max) {
+        CmiReleaseSentMessages();
+        PumpMsgs();
+    }
+    }
+#endif
+
     return (CmiCommHandle) &(smsg->req);
 }
 
@@ -376,7 +382,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 
     CmiAssert(destNode != CmiMyNode());
 #if CMK_SMP
-    EnqueueMsg(msg, size, destNode);
+    EnqueueMsg(msg, size, destNode, mode);
     return 0;
 #else
     /* non smp */
@@ -385,6 +391,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
     msg_tmp->destpe = destNode;
     msg_tmp->size = size;
     msg_tmp->next = 0;
+    msg_tmp->mode = mode;
     return MPISendOneMsg(msg_tmp);
 #endif
 }

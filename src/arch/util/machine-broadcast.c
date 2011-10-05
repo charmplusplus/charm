@@ -94,10 +94,10 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendFunc(nd, size, msg, P2P_SYNC);
+        LrtsSendFunc(nd, size, msg, BCAST_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
-        LrtsSendFunc(nd, size, newmsg, P2P_SYNC);
+        LrtsSendFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -142,10 +142,10 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendFunc(nd, size, msg, P2P_SYNC);
+        LrtsSendFunc(nd, size, msg, BCAST_SYNC);
 #else
         char *newmsg = CopyMsg(msg, size);
-        LrtsSendFunc(nd, size, newmsg, P2P_SYNC);
+        LrtsSendFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;

@@ -8,8 +8,6 @@
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
-#define CMK_PERSISTENT_COMM                                1
-
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
@@ -77,3 +75,6 @@
 #define CMK_LBDB_ON                                        1
 
 #define CMK_GRID_QUEUE_AVAILABLE                           0
+
+#define CMK_PERSISTENT_COMM                                0
+

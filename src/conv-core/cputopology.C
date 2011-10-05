@@ -379,7 +379,7 @@ extern "C"  int LrtsNodeFirst(int node)
 
 
 static int _noip = 0;
-extern "C" void LrtsInitCPUTopo(char **argv)
+extern "C" void LrtsInitCpuTopo(char **argv)
 {
   static skt_ip_t myip;
   hostnameMsg  *msg;
@@ -562,7 +562,7 @@ extern "C" void LrtsInitCPUTopo(char **argv)
 
 #else           /* not supporting cpu topology */
 
-extern "C" void LrtsInitCPUTopo(char **argv)
+extern "C" void LrtsInitCpuTopo(char **argv)
 {
   /* do nothing */
   int obtain_flag = CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
@@ -607,6 +607,6 @@ extern "C" int CmiGetFirstPeOnPhysicalNode(int node)
 }
 extern "C" void CmiInitCPUTopology(char **argv)
 {
-  LrtsInitCPUTopo(argv);
+  LrtsInitCpuTopo(argv);
 }
 
