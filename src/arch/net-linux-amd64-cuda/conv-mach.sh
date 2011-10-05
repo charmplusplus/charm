@@ -11,7 +11,7 @@ CMK_LD="$CMK_CC $CMK_AMD64 "
 CMK_LDXX="$CMK_CXX $CMK_AMD64 "
 CMK_LD_SHARED="-shared"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
-CMK_LIBDIR="-L$CUDA_DIR/lib64 -L$NVIDIA_CUDA_SDK/lib"
+CMK_LIBDIR="-L$CUDA_DIR/lib64"
 CMK_LIBS="-lckqt -lcuda -lcudart -lGL -lcudahybridapi"
 CMK_RANLIB="ranlib"
 

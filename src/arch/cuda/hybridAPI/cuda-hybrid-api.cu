@@ -59,7 +59,7 @@ extern int CmiMyPe();
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-#define GPU_TRACE
+//#define GPU_TRACE
 //#define GPU_DEBUG
 //#define _DEBUG
 

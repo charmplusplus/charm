@@ -1,11 +1,10 @@
 CUDA_DIR=/usr/local/cuda
-NVIDIA_CUDA_SDK=/usr/local/NVIDIA_GPU_Computing_SDK/C
 CHARMDIR=../../
 CHARMC=$(CHARMDIR)/bin/charmc
 
 NVCC = $(CUDA_DIR)/bin/nvcc
 NVCC_FLAGS = -c -use_fast_math -DGPU_MEMPOOL #-DGPU_PROFILE -DGPU_TRACE #-DGPU_MEMPOOL_DEBUG -DGPU_WRQ_VERBOSE #-device-debug -deviceemu
-NVCC_INC = -I$(CUDA_DIR)/include -I$(NVIDIA_CUDA_SDK)/common/inc -I.. 
+NVCC_INC = -I$(CUDA_DIR)/include -I.. 
 
 RM = rm -f
 
