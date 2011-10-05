@@ -37,7 +37,7 @@ static void sleep(int secs) {
 
 
 #define REMOTE_EVENT         0
-#define USE_LRTS_MEMPOOL   0
+#define USE_LRTS_MEMPOOL   1
 
 #if USE_LRTS_MEMPOOL
 static CmiInt8 _mempool_size = 1024ll*1024*32;
