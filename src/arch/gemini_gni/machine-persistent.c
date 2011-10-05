@@ -17,7 +17,7 @@
   * persist_machine_init  // machine specific initialization call
 */
 
-
+#define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
 void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
 {
     gni_post_descriptor_t *pd;
@@ -38,16 +38,28 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     if (slot->destBuf[0].destAddress) {
         // uGNI part
         MallocPostDesc(pd);
-        if(size < LRTS_GNI_RDMA_PUT_THRESHOLD) 
+#if USE_LRTS_MEMPOOL
+        if(size <= 2048){
+#else
+        if(size <= 16384){
+#endif
             pd->type            = GNI_POST_FMA_PUT;
+        }
         else
+        {
             pd->type            = GNI_POST_RDMA_PUT;
-
+#if USE_LRTS_MEMPOOL
+            pd->local_mem_hndl  = GetMemHndl(m);
+#else
+            status = MEMORY_REGISTER(onesided_hnd, nic_hndl,  m, size, &(pd->local_mem_hndl), &omdh);
+#endif
+            GNI_RC_CHECK("Mem Register before post", status);
+        }
         pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
         pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
         pd->length          = size;
         pd->local_addr      = (uint64_t) m;
-        pd->local_mem_hndl  = GetMemHndl(m) ;
+       
         pd->remote_addr     = (uint64_t)slot->destBuf[0].destAddress;
         pd->remote_mem_hndl = slot->destBuf[0].mem_hndl;
         pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
@@ -194,6 +206,7 @@ void persist_machine_init(void)
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 {
   int i;
+  gni_return_t status;
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
     char *buf = PerAlloc(maxBytes+sizeof(int)*2);
     _MEMCHECK(buf);
@@ -201,7 +214,12 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     slot->destBuf[i].destAddress = buf;
     /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
+#if USE_LRTS_MEMPOOL
     slot->destBuf[i].mem_hndl = GetMemHndl(buf);
+#else
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl,  buf, maxBytes+sizeof(int)*2 , &(slot->destBuf[i].mem_hndl), &omdh);
+    GNI_RC_CHECK("Mem Register before post", status);
+#endif
   }
   slot->sizeMax = maxBytes;
 }

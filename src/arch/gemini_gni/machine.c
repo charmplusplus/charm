@@ -37,7 +37,7 @@ static void sleep(int secs) {
 
 
 #define REMOTE_EVENT         0
-#define USE_LRTS_MEMPOOL   1
+#define USE_LRTS_MEMPOOL   0
 
 #if USE_LRTS_MEMPOOL
 static CmiInt8 _mempool_size = 1024ll*1024*32;
@@ -92,17 +92,17 @@ uint8_t   onesided_hnd, omdh;
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
-static int  SMSG_MAX_MSG;
+static int  SMSG_MAX_MSG = 1024;
 //static int  log2_SMSG_MAX_MSG;
 #define SMSG_MAX_CREDIT  36
 
 #define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  2048
-#define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
+//2048
 
-#define REMOTE_QUEUE_ENTRIES  2048 
-#define LOCAL_QUEUE_ENTRIES   64 
+#define REMOTE_QUEUE_ENTRIES  20480 
+#define LOCAL_QUEUE_ENTRIES   20480 
 
 #define PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
@@ -1199,6 +1199,9 @@ static void PumpLocalRdmaTransactions()
             switch (tmp_pd->type) {
 #if CMK_PERSISTENT_COMM
             case GNI_POST_RDMA_PUT:
+#if     !USE_LRTS_MEMPOOL
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+#endif
             case GNI_POST_FMA_PUT:
 #if useDynamicSMSG
                 SendSmsgConnectMsg();
@@ -1212,6 +1215,9 @@ static void PumpLocalRdmaTransactions()
             case GNI_POST_RDMA_GET:
             case GNI_POST_FMA_GET:
                 msg_tag = ACK_TAG;  
+#if     !USE_LRTS_MEMPOOL
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+#endif
                 break;
             default:
                 CmiAbort("PumpLocalRdmaTransactions: unknown type!");
@@ -1231,9 +1237,6 @@ static void PumpLocalRdmaTransactions()
             {
                 FreeControlMsg(ack_msg_tmp);
             }
-#if     !USE_LRTS_MEMPOOL
-            MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
-#endif
 #if CMK_PERSISTENT_COMM
             if (tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
 #endif
@@ -1764,8 +1767,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
     init_mempool(_mempool_size);
-    //init_mempool(Mempool_MaxSize);
 #endif
+    //init_mempool(Mempool_MaxSize);
 
     /* init DMA buffer for medium message */
 
@@ -1779,7 +1782,7 @@ void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr;
 #if 0
-    CmiPrintf("\n[PE:%d]Alloc Lrts for bytes=%d, head=%d\n", CmiMyPe(), n_bytes, header);
+    CmiPrintf("\n[PE:%d]Alloc Lrts for bytes=%d, head=%d %d\n", CmiMyPe(), n_bytes, header, SMSG_MAX_MSG);
 #endif
     if(n_bytes <= SMSG_MAX_MSG)
     {
