@@ -12,7 +12,6 @@
 
 #if CMK_PERSISTENT_COMM
 
-#include "gni_pub.h"
 #include "machine-persistent.h"
 
 #define TABLESIZE  512

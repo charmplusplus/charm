@@ -8,6 +8,8 @@
 */
 /*@{*/
 
+#include "gni_pub.h"
+
 #define PERSIST_BUFFERS_NUM             1
 
 typedef struct  _PersistentBuf {
