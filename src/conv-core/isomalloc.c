@@ -46,6 +46,11 @@ added by Ryan Mokos in July 2008.
 
 #define CMK_THREADS_DEBUG 0
 
+/* 0: use the old non-mempool implementation
+   1: use the new mempool implementation  */
+#define USE_MEMPOOL_ISOMALLOC 1
+
+
 /* 0: use the old isomalloc implementation (array)
    1: use the new isomalloc implementation (b-tree)  */
 #define USE_BTREE_ISOMALLOC 1
@@ -137,26 +142,6 @@ static CmiInt8 pe2slot(int pe) {
 static int length2slots(int nBytes) {
 	return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
-
-typedef struct
-{
-	CmiInt8 size;
-	CmiInt8 count;
-	int **counter;
-	CmiInt8 **marker;
-}mapRegion;
-
-CpvStaticDeclare(mapRegion *, mapRegions); 
-
-struct _maplist
-{
-	struct _maplist *prev;
-	CmiInt8 start,end,count; 
-	struct _maplist *next;
-};
-
-typedef struct _maplist maplist;
-CpvStaticDeclare(maplist **, mapLists); 
 
 /* ======================================================================
  * New isomalloc (b-tree-based implementation)
