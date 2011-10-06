@@ -40,7 +40,7 @@ static void sleep(int secs) {
 #define USE_LRTS_MEMPOOL     1
 
 #if USE_LRTS_MEMPOOL
-static CmiInt8 _mempool_size = 1024ll*1024*32;
+static CmiInt8 _mempool_size = 1024ll*1024*4;
 #endif
 
 #define PRINT_SYH  0
@@ -1653,6 +1653,21 @@ static void _init_DMA_buffer()
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
+void *alloc_mempool_block(int size, gni_mem_handle_t *mem_hndl)
+{
+    void *pool = memalign(ALIGNBUF, size);
+    gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, size,  mem_hndl, &omdh);
+    GNI_RC_CHECK("Mempool register", status);
+    return pool;
+}
+
+void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
+{
+    gni_return_t status = GNI_MemDeregister(nic_hndl, &mem_hndl);
+    GNI_RC_CHECK("Mempool de-register", status);
+    free(ptr);
+}
+
 static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
@@ -1770,11 +1785,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if     USE_LRTS_MEMPOOL
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
-    void *pool = memalign(ALIGNBUF, _mempool_size);
-    gni_mem_handle_t mem_hndl;
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, _mempool_size,  &mem_hndl, &omdh);
-    GNI_RC_CHECK("Mempool register", status);
-    mempool = init_mempool(pool, _mempool_size, mem_hndl);
+    mempool = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block);
     //init_mempool(Mempool_MaxSize);
 #endif
     //init_mempool(Mempool_MaxSize);
