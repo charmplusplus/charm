@@ -17,7 +17,6 @@ Generalized by Gengbin Zheng  10/5/2011
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
@@ -27,18 +26,19 @@ Generalized by Gengbin Zheng  10/5/2011
 
 static      size_t     expand_mem = 1024ll*1024*16;
 
-#ifndef  ALIGNBUF
-#define ALIGNBUF                64
-#endif
-
-mempool_type *init_mempool(void *pool, size_t pool_size, gni_mem_handle_t mem_hndl)
+mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
 {
     mempool_type *mptr;
     mempool_header *header;
+    gni_mem_handle_t  mem_hndl;
 
+    void *pool = allocfn(pool_size, &mem_hndl);
     mptr = (mempool_type*)pool;
+    mptr->newblockfn = allocfn;
+    mptr->freeblockfn = freefn;
     mptr->mempools_head.mempool_ptr = pool;
     mptr->mempools_head.mem_hndl = mem_hndl;
+    mptr->mempools_head.size = pool_size;
     mptr->mempools_head.next = NULL;
     header = (mempool_header *) ((char*)pool+sizeof(mempool_type));
     mptr->freelist_head = sizeof(mempool_type);
@@ -49,22 +49,19 @@ mempool_type *init_mempool(void *pool, size_t pool_size, gni_mem_handle_t mem_hn
     return mptr;
 }
 
-void kill_allmempool(mempool_type *mptr)
+void mempool_destory(mempool_type *mptr)
 {
     mempool_block *current, *mempools_head;
+    mempool_freeblock   freefn = mptr->freeblockfn;
 
     current = mempools_head = &(mptr->mempools_head);
 
     while(mempools_head!= NULL)
     {
-#if CMK_CONVERSE_GEMINI_UGNI
-        gni_return_t status = GNI_MemDeregister(nic_hndl, &(mempools_head->mem_hndl));
-        GNI_RC_CHECK("Mempool de-register", status);
-#endif
         //printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
         current=mempools_head;
         mempools_head = mempools_head->next;
-        free(current->mempool_ptr);
+        freefn(current->mempool_ptr, current->mem_hndl);
     }
 }
 
@@ -120,23 +117,22 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
     if(bestfit == NULL)
     {
+        void *pool;
         mempool_block   *expand_pool;
         size_t   expand_size;
-        void *pool;
+        gni_mem_handle_t  mem_hndl;
 
         if (!expand) return NULL;
 
         expand_size = expand_mem>size ? expand_mem:2*size; 
-        pool = memalign(ALIGNBUF, expand_size);
+        pool = mptr->newblockfn(expand_size, &mem_hndl);
         expand_pool = (mempool_block*)pool;
         expand_pool->mempool_ptr = pool;
-        printf("[%d] No memory has such free empty chunck of %d. expanding %p (%d)\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
-#if CMK_CONVERSE_GEMINI_UGNI
-        gni_return_t  status;
-        status = GNI_MemRegister(nic_hndl, (uint64_t)expand_pool->mempool_ptr, expand_size,  NULL, GNI_MEM_READWRITE, -1, &(expand_pool->mem_hndl));
-        GNI_RC_CHECK("Mempool register", status);
-#endif
+        expand_pool->mem_hndl = mem_hndl;
+        expand_pool->size = expand_size;
         expand_pool->next = NULL;
+        printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %d\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
+          // FIXME: go to the end of link list
         while (mempools_head->next != NULL) mempools_head = mempools_head->next;
         mempools_head->next = expand_pool;
 
