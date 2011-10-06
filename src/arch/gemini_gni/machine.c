@@ -40,7 +40,7 @@ static void sleep(int secs) {
 #define USE_LRTS_MEMPOOL     1
 
 #if USE_LRTS_MEMPOOL
-static CmiInt8 _mempool_size = 1024ll*1024*4;
+static CmiInt8 _mempool_size = 1024ll*1024*32;
 #endif
 
 #define PRINT_SYH  0
