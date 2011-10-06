@@ -17,7 +17,6 @@ Generalized by Gengbin Zheng  10/5/2011
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #if CMK_HAS_MALLOC_H
 #include <malloc.h>
