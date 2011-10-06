@@ -43,7 +43,7 @@ typedef struct mempool_type
 } mempool_type;
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn);
-void kill_allmempool(mempool_type *mptr);
+void  mempool_destory(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, int size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
 
