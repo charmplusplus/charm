@@ -46,10 +46,6 @@ added by Ryan Mokos in July 2008.
 
 #define CMK_THREADS_DEBUG 0
 
-/* 0: use the old non-mempool implementation
-1: use the new mempool implementation  */
-#define USE_MEMPOOL_ISOMALLOC 1
-
 /* 0: use the old isomalloc implementation (array)
 1: use the new isomalloc implementation (b-tree)  */
 #define USE_BTREE_ISOMALLOC 1
@@ -142,10 +138,15 @@ static CmiInt8 pe2slot(int pe) {
   return pe*numslots;
 }
 /* Return the number of slots in a block with n user data bytes */
+#if USE_MEMPOOL_ISOMALLOC
+static int length2slots(int nBytes) {
+  return (sizeof(CmiIsomallocBlock)+sizeof(mempool_type)+ sizeof(mempool_header)+nBytes+slotsize-1)/slotsize;
+}
+#else
 static int length2slots(int nBytes) {
   return (sizeof(CmiIsomallocBlock)+nBytes+slotsize-1)/slotsize;
 }
-
+#endif
 /* ======================================================================
  * New isomalloc (b-tree-based implementation)
  * ====================================================================== */
@@ -1647,6 +1648,40 @@ CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
 #if USE_MEMPOOL_ISOMALLOC
 CtvStaticDeclare(mempool_type *, threadpool); /*Thread managed pools*/
+
+//alloc function to be used by mempool
+void * isomallocfn (size_t *size, gni_mem_handle_t *mem_hndl)
+{
+  CmiInt8 s,n,i;
+  void *newaddr;
+  n=length2slots(*size);
+  /*Always satisfy mallocs with local slots:*/
+  s=get_slots(CpvAccess(myss),n);
+  if (s==-1) {
+    CmiError("Not enough address space left on processor %d to isomalloc %d bytes!\n",
+              CmiMyPe(),*size);
+    CmiAbort("Out of virtual address space for isomalloc");
+  }
+  grab_slots(CpvAccess(myss),s,n);
+  for (i=0; i<5; i++) {
+    newaddr=map_slots(s,n);
+    if (newaddr!=NULL) break;
+#if CMK_HAS_USLEEP
+    if (errno == ENOMEM) { usleep(rand()%1000); continue; }
+    else break;
+#endif
+  }
+  if (!newaddr) map_failed(s,n);
+  *mem_hndl = s;
+  *size = n*slotsize;
+  return newaddr;
+}
+
+//free function to be used by mempool
+void isofreefn(void *ptr, gni_mem_handle_t mem_hndl)
+{
+  call_munmap(ptr, ((mempool_block *)ptr)->size);
+}
 #endif
 
 /*This struct describes a range of virtual addresses*/
@@ -2256,6 +2291,22 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 }
 
 /************** External interface ***************/
+#if USE_MEMPOOL_ISOMALLOC
+void *CmiIsomalloc(int size)
+{
+  CmiInt8 s,n,i;
+  CmiIsomallocBlock *blk;
+  if (isomallocStart==NULL) return disabled_map(size);
+  if(CtvAccess(threadpool) == NULL) {
+    CtvAccess(threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
+                                                isomallocfn, isofreefn);
+  }
+  blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
+  blk->slot=-1;
+  blk->length=size;
+  return block2pointer(blk);
+}
+#else
 void *CmiIsomalloc(int size)
 {
   CmiInt8 s,n,i;
@@ -2283,6 +2334,7 @@ void *CmiIsomalloc(int size)
   blk->length=size;
   return block2pointer(blk);
 }
+#endif
 
 #define MALLOC_ALIGNMENT           (2*sizeof(size_t))
 #define MINSIZE                    (sizeof(CmiIsomallocBlock))
@@ -2377,16 +2429,20 @@ void CmiIsomallocFree(void *blockPtr)
   }
   else if (blockPtr!=NULL)
   {
+#if USE_MEMPOOL_ISOMALLOC
+    mempool_free(CtvAccess(threadpool), blockPtr);
+#else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 
     CmiInt8 n=length2slots(blk->length);
     unmap_slots(s,n);
     /*Mark used slots as free*/
     all_slotOP(&freeOP,s,n);
+#endif
   }
 }
 
-CmiInt8   CmiIsomallocLength(void *block)
+CmiInt8  CmiIsomallocLength(void *block)
 {
   return pointer2block(block)->length;
 }
@@ -2447,7 +2503,6 @@ void CmiIsomallocInit(char **argv)
 static char *Slot_toUser(CmiIsomallocBlockList *s) {return (char *)(s+1);}
 static CmiIsomallocBlockList *Slot_fmUser(void *s) {return ((CmiIsomallocBlockList *)s)-1;}
 
-
 /*Build a new blockList.*/
 CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
 {
@@ -2458,7 +2513,6 @@ CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
   return ret;
 }
 
-
 /* BIGSIM_OOC DEBUGGING */
 static void print_myslots();
 
@@ -2466,6 +2520,37 @@ static void print_myslots();
   list traversals.  Because everything's isomalloc'd, we don't even
   have to restore the pointers-- they'll be restored automatically!
   */
+#if USE_MEMPOOL_ISOMALLOC
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
+{
+  mempool_block *current, *mempools_head;
+  void *newblock;
+  int slot;
+  CmiInt8 size;
+
+  if(!pup_isUnpacking(p)) {
+    printf("[%d] address is %p %p\n",CmiMyPe(),CtvAccess(threadpool),&(CtvAccess(threadpool)->mempools_head));
+    current = &(CtvAccess(threadpool)->mempools_head);
+    while(current != NULL) {
+      pup_int8(p,&current->size);
+      pup_int(p,&current->mem_hndl);
+      pup_bytes(p,current->mempool_ptr,current->size);
+      current = current->next;
+    }
+    mempool_destroy(CtvAccess(threadpool));
+  }
+
+  if(pup_isUnpacking(p)) {
+    pup_int8(p,&size);
+    pup_int(p,&slot);
+    newblock = map_slots(slot,size/slotsize);
+    pup_bytes(p,newblock,size);
+  }
+  pup_bytes(p,lp,sizeof(int*));
+  if (pup_isDeleting(p))
+    *lp=NULL;
+}
+#else
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
   /* BIGSIM_OOC DEBUGGING */
@@ -2505,6 +2590,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
   /* BIGSIM_OOC DEBUGGING */
   /* if(pup_isUnpacking(p)) print_myslots(); */
 }
+#endif
 
 /*Delete all the blocks in this list.*/
 void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
@@ -2559,8 +2645,6 @@ void CmiIsomallocBlockListFree(void *block)
   n->next->prev=n->prev;
   CmiIsomallocFree(n);
 }
-
-
 
 /* BIGSIM_OOC DEBUGGING */
 static void print_myslots(){

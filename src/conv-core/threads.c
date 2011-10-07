@@ -596,7 +596,8 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 #elif CMK_THREADS_USE_STACKCOPY
 		/* do nothing */
 #else /* isomalloc */
-		CmiIsomallocPup(p,&t->stack);
+//		CmiIsomallocPup(p,&t->stack);
+		pup_bytes(p,&t->stack,sizeof(char*));
 #endif
 	} 
 	else {
@@ -617,7 +618,8 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
         pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
         aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
         /* fixme: tls global variables handling needs isomalloc */
-        CmiIsomallocPup(p, &aux);
+        //CmiIsomallocPup(p, &aux);
+		    pup_bytes(p,&aux,sizeof(char*));
         /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
 #endif
 
