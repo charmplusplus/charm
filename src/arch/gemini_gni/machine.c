@@ -122,7 +122,7 @@ static int  SMSG_MAX_MSG = 1024;
 #undef GNI_RC_CHECK
 #endif
 #ifdef DEBUG
-#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           CmiPrintf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
+#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           printf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
 #else
 #define GNI_RC_CHECK(msg,rc)
 #endif
@@ -224,7 +224,6 @@ typedef struct msg_list
     uint32_t size;
     void *msg;
     struct msg_list *next;
-    struct msg_list *pehead_next;
     uint8_t tag;
 }MSG_LIST;
 
@@ -265,8 +264,9 @@ typedef struct  rmda_msg
 typedef struct  msg_list_index
 {
     int         next;
-    MSG_LIST    *head;
-    MSG_LIST    *tail;
+    PCQueue     sendMsgBuf;
+    //MSG_LIST    *head;
+    //MSG_LIST    *tail;
 } MSG_LIST_INDEX;
 
 /* reuse PendingMsg memory */
@@ -389,6 +389,9 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define SET_BITS(a,ind) a = ( a | (1<<(ind )) )
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
 
+#if CMK_SMP
+CmiNodeLock     mempoolLock;
+#endif
 static mempool_type  *mempool = NULL;
 
 /* get the upper bound of log 2 */
@@ -568,6 +571,12 @@ void CmiMachineProgressImpl() {
 }
 #endif
 
+static void SendRdmaMsg();
+static void PumpNetworkSmsg();
+static void PumpLocalSmsgTransactions();
+static void PumpLocalRdmaTransactions();
+static int SendBufferMsg();
+
 inline
 static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
 {
@@ -577,16 +586,12 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->size   = size;
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
-    msg_tmp->next   = 0;
-    if (smsg_msglist_index[destNode].head == 0 ) {
-        smsg_msglist_index[destNode].head = msg_tmp;
+    //msg_tmp->next   = 0;
+    if (PCQueueEmpty(smsg_msglist_index[destNode].sendMsgBuf) ) {
         smsg_msglist_index[destNode].next = smsg_head_index;
         smsg_head_index = destNode;
     }
-    else {
-      (smsg_msglist_index[destNode].tail)->next    = msg_tmp;
-    }
-    smsg_msglist_index[destNode].tail          = msg_tmp;
+    PCQueuePush(smsg_msglist_index[destNode].sendMsgBuf, (char*)msg_tmp);
 #if PRINT_SYH
     buffered_smsg_counter++;
 #endif
@@ -594,7 +599,7 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
 
 inline static void print_smsg_attr(gni_smsg_attr_t     *a)
 {
-    CmiPrintf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
+    printf("type=%d\n, credit=%d\n, size=%d\n, buf=%p, offset=%d\n", a->msg_type, a->mbox_maxcredit, a->buff_size, a->msg_buffer, a->mbox_offset);
 }
 
 inline
@@ -660,9 +665,9 @@ static void setup_smsg_connection(int destNode)
 
     }
     if(status != GNI_RC_SUCCESS)
-       CmiPrintf("[%d=%d] send post FMA %s\n", myrank, destNode, gni_err_str[status]);
+       printf("[%d=%d] send post FMA %s\n", myrank, destNode, gni_err_str[status]);
     else
-        CmiPrintf("[%d=%d]OK send post FMA \n", myrank, destNode);
+        printf("[%d=%d]OK send post FMA \n", myrank, destNode);
     //GNI_RC_CHECK("SMSG Dynamic link", status);
 }
 
@@ -678,7 +683,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     {
         if(smsg_connected_flag[destNode] == 0)
         {
-            //CmiPrintf("[%d]Init smsg connection\n", CmiMyPe());
+            //printf("[%d]Init smsg connection\n", CmiMyPe());
             setup_smsg_connection(destNode);
             delay_send_small_msg(msg, size, destNode, tag);
             smsg_connected_flag[destNode] =10;
@@ -692,8 +697,8 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         }
     }
 #endif
-    //CmiPrintf("[%d] reach send\n", myrank);
-    if(smsg_msglist_index[destNode].head == 0 || inbuff==1)
+    //printf("[%d] reach send\n", myrank);
+    if(PCQueueEmpty(smsg_msglist_index[destNode].sendMsgBuf) || inbuff==1)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
         if(status == GNI_RC_SUCCESS)
@@ -701,9 +706,9 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
 #if PRINT_SYH
             lrts_smsg_success++;
             if(lrts_smsg_success == lrts_send_msg_id)
-                CmiPrintf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+                printf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
             else
-                CmiPrintf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+                printf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
             return status;
         }
@@ -800,7 +805,7 @@ static void send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->source_mem_hndl = GetMemHndl(msg);
 #if PRINT_SYH
     lrts_send_msg_id++;
-    CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+    printf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
     status = send_smsg_message( destNode, 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
     if(status == GNI_RC_SUCCESS)
@@ -821,7 +826,7 @@ static void send_large_messages(int destNode, int size, char *msg)
     control_msg_tmp->source_mem_hndl.qword2 = 0;
 #if PRINT_SYH
     lrts_send_msg_id++;
-    CmiPrintf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+    printf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
     status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN4(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     if(status == GNI_RC_SUCCESS)
@@ -855,7 +860,7 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     {
 #if PRINT_SYH
         lrts_send_msg_id++;
-        CmiPrintf("SMSG LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
+        printf("SMSG LrtsSend PE:%d==>%d, size=%d, messageid:%d\n", myrank, destNode, size, lrts_send_msg_id);
 #endif
         status = send_smsg_message( destNode, 0, 0, msg, size, SMALL_DATA_TAG, 0);  
         if(status == GNI_RC_SUCCESS)
@@ -890,8 +895,15 @@ static void LrtsPostCommonInit(int everReturn)
 
 }
 
-
-void LrtsPostNonLocal(){}
+/* this is called by worker thread */
+void LrtsPostNonLocal(){
+#if CMK_SMP
+    if(mysize == 1) return;
+    PumpLocalRdmaTransactions();
+    SendBufferMsg();
+    SendRdmaMsg();
+#endif
+}
 /* pooling CQ to receive network message */
 static void PumpNetworkRdmaMsgs()
 {
@@ -900,7 +912,6 @@ static void PumpNetworkRdmaMsgs()
     while( (status = GNI_CqGetEvent(post_rx_cqh, &event_data)) == GNI_RC_SUCCESS);
 }
 
-static void SendRdmaMsg();
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
 static void PumpNetworkSmsg()
 {
@@ -922,17 +933,17 @@ static void PumpNetworkSmsg()
         inst_id = GNI_CQ_GET_INST_ID(event_data);
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
 #if PRINT_SYH
-        CmiPrintf("[%d] PumpNetworkMsgs small msgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
+        printf("[%d] PumpNetworkMsgs small msgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
 #if     useDynamicSMSG
         rdma_id++;
      //   if(useDynamicSMSG == 1)
         {
             init_flag = smsg_connected_flag[inst_id];
-            //CmiPrintf("[%d] initflag=%d\n", myrank, init_flag);
+            //printf("[%d] initflag=%d\n", myrank, init_flag);
             if(init_flag == 0 )
             {
-                CmiPrintf("setup[%d==%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                printf("setup[%d==%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
                 smsg_connected_flag[inst_id] =20;
                 setup_smsg_connection(inst_id);
                 remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
@@ -941,7 +952,7 @@ static void PumpNetworkSmsg()
                 continue;
             } else if (init_flag <20) 
             {
-                CmiPrintf("setup[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
+                printf("setup[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
                 smsg_connected_flag[inst_id] = 20;
                 remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
                 status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
@@ -956,7 +967,7 @@ static void PumpNetworkSmsg()
         {
 #if PRINT_SYH
             lrts_received_msg++;
-            CmiPrintf("+++[%d] PumpNetwork msg is received, messageid:%d tag=%d\n", myrank, lrts_received_msg, msg_tag);
+            printf("+++[%d] PumpNetwork msg is received, messageid:%d tag=%d\n", myrank, lrts_received_msg, msg_tag);
 #endif
             /* copy msg out and then put into queue (small message) */
             switch (msg_tag) {
@@ -971,7 +982,7 @@ static void PumpNetworkSmsg()
             case LMSG_INIT_TAG:
             {
 #if PRINT_SYH
-                CmiPrintf("+++[%d] from %d PumpNetwork Rdma Request msg is received, messageid:%d tag=%d\n", myrank, inst_id, lrts_received_msg, msg_tag);
+                printf("+++[%d] from %d PumpNetwork Rdma Request msg is received, messageid:%d tag=%d\n", myrank, inst_id, lrts_received_msg, msg_tag);
 #endif
                 getLargeMsgRequest(header, inst_id);
                 break;
@@ -1006,7 +1017,7 @@ static void PumpNetworkSmsg()
             }
 #endif
             default: {
-                CmiPrintf("weird tag problem\n");
+                printf("weird tag problem\n");
                 CmiAbort("Unknown tag\n");
             }
             }
@@ -1158,11 +1169,11 @@ static void PumpLocalSmsgTransactions()
     {
 #if PRINT_SYH
         lrts_local_done_msg++;
-        //CmiPrintf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
+        //printf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
 #endif
         if(GNI_CQ_OVERRUN(ev))
         {
-            CmiPrintf("Overrun detected in local CQ");
+            printf("Overrun detected in local CQ");
             CmiAbort("Overrun in TX");
         }
     }
@@ -1189,13 +1200,13 @@ static void PumpLocalRdmaTransactions()
         type        = GNI_CQ_GET_TYPE(ev);
 #if PRINT_SYH
         //lrts_local_done_msg++;
-        CmiPrintf("**[%d] SMSGPumpLocalTransactions (type=%d)\n", myrank, type);
+        printf("**[%d] SMSGPumpLocalTransactions (type=%d)\n", myrank, type);
 #endif
         if (type == GNI_CQ_EVENT_TYPE_POST)
         {
             inst_id     = GNI_CQ_GET_INST_ID(ev);
 #if PRINT_SYH
-            CmiPrintf("**[%d] SMSGPumpLocalTransactions localdone=%d, %d\n", myrank,  lrts_local_done_msg, smsg_connected_flag[inst_id]);
+            printf("**[%d] SMSGPumpLocalTransactions localdone=%d, %d\n", myrank,  lrts_local_done_msg, smsg_connected_flag[inst_id]);
 #endif
             //status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
@@ -1234,7 +1245,7 @@ static void PumpLocalRdmaTransactions()
             ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
 #if PRINT_SYH
             lrts_send_msg_id++;
-            CmiPrintf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
+            printf("ACK LrtsSend PE:%d==>%d, size=%d, messageid:%d ACK\n", myrank, inst_id, sizeof(CONTROL_MSG), lrts_send_msg_id);
 #endif
             status = send_smsg_message(inst_id, 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), msg_tag, 0);  
             if(status == GNI_RC_SUCCESS)
@@ -1274,7 +1285,7 @@ static void SendSmsgConnectMsg()
                 prev->next = ptr->next;
             else
                 pending_smsg_conn_head = ptr->next;
-            CmiPrintf("[%d=%d]OK send post FMA resend\n", myrank, ptr->destNode);
+            printf("[%d=%d]OK send post FMA resend\n", myrank, ptr->destNode);
             ptr = ptr->next;
             FreeRdmaRequest(tmp);
             continue;
@@ -1334,14 +1345,17 @@ static int SendBufferMsg()
     register    int     i;
     int                 index_previous = -1;
     int                 index = smsg_head_index;
-    //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {CmiPrintf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
+    //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {printf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
     /* can add flow control here to control the number of messages sent before handle message */
     while(index != -1)
     {
-        ptr = smsg_msglist_index[index].head;
-       
-        while(ptr!=0)
+        while(!PCQueueEmpty(smsg_msglist_index[index].sendMsgBuf))
         {
+            ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendMsgBuf);
+#if         CMK_SMP
+            if(ptr == NULL)
+                break;
+#endif
             CmiAssert(ptr!=NULL);
             if(ptr->tag == SMALL_DATA_TAG)
             {
@@ -1355,7 +1369,7 @@ static int SendBufferMsg()
             {
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
 #if PRINT_SYH
-                CmiPrintf("[%d==>%d] LMSG buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
+                printf("[%d==>%d] LMSG buffer send call(%d)%s\n", myrank, ptr->destNode, lrts_smsg_success, gni_err_str[status] );
 #endif
                 if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
                 {
@@ -1380,7 +1394,7 @@ static int SendBufferMsg()
                 }
             }else
             {
-                CmiPrintf("Weird tag\n");
+                printf("Weird tag\n");
                 CmiAbort("should not happen\n");
             }
             if(status == GNI_RC_SUCCESS)
@@ -1388,21 +1402,22 @@ static int SendBufferMsg()
 #if PRINT_SYH
                 buffered_smsg_counter--;
                 if(lrts_smsg_success == lrts_send_msg_id)
-                    CmiPrintf("GOOD send buff [%d==>%d] send buffer sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
+                    printf("GOOD send buff [%d==>%d] send buffer sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
                 else
-                    CmiPrintf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
+                    printf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
-                smsg_msglist_index[index].head = smsg_msglist_index[index].head->next;
+                //smsg_msglist_index[index].head = smsg_msglist_index[index].head->next;
                 FreeMsgList(ptr);
-                ptr= smsg_msglist_index[index].head;
+                //ptr= smsg_msglist_index[index].head;
 
             }else {
+                PCQueuePush(smsg_msglist_index[index].sendMsgBuf, (char*)ptr);
                 done = 0;
                 break;
             } 
         
         } //end while
-        if(ptr == 0)
+        if(PCQueueEmpty(smsg_msglist_index[index].sendMsgBuf))
         {
             if(index_previous != -1)
                 smsg_msglist_index[index_previous].next = smsg_msglist_index[index].next;
@@ -1422,33 +1437,34 @@ static void LrtsAdvanceCommunication()
     /*  Receive Msg first */
 #if 0
     if(myrank == 0)
-    CmiPrintf("Calling Lrts Pump Msg PE:%d\n", myrank);
+    printf("Calling Lrts Pump Msg PE:%d\n", myrank);
 #endif
+    if(mysize == 1) return;
     PumpNetworkSmsg();
-    //CmiPrintf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
+    //printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
     //PumpNetworkRdmaMsgs();
     /* Release Sent Msg */
-    //CmiPrintf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
+    //printf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
 #if 0
     ////PumpLocalSmsgTransactions();
     if(myrank == 0)
-    CmiPrintf("Calling Lrts Rlease RdmaMsg PE:%d\n", myrank);
+    printf("Calling Lrts Rlease RdmaMsg PE:%d\n", myrank);
 #endif
     PumpLocalRdmaTransactions();
 #if 0
     if(myrank == 0)
-    CmiPrintf("Calling Lrts Send Buffmsg PE:%d\n", myrank);
+    printf("Calling Lrts Send Buffmsg PE:%d\n", myrank);
 #endif
     /* Send buffered Message */
     SendBufferMsg();
 #if 0
     if(myrank == 0)
-    CmiPrintf("Calling Lrts rdma PE:%d\n", myrank);
+    printf("Calling Lrts rdma PE:%d\n", myrank);
 #endif
     SendRdmaMsg();
 #if 0
     if(myrank == 0)
-    CmiPrintf("done PE:%d\n", myrank);
+    printf("done PE:%d\n", myrank);
 #endif
 }
 
@@ -1533,7 +1549,7 @@ static void _init_static_smsg()
     smsg_mailbox_base = memalign(64, smsg_memlen*(mysize));
     _MEMCHECK(smsg_mailbox_base);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
-    //if (myrank == 0) CmiPrintf("Charm++> allocates %.2fMB for SMSG. \n", smsg_memlen*mysize/1e6);
+    //if (myrank == 0) printf("Charm++> allocates %.2fMB for SMSG. \n", smsg_memlen*mysize/1e6);
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,
@@ -1595,8 +1611,8 @@ static void _init_smsg()
      for(i =0; i<mysize; i++)
      {
         smsg_msglist_index[i].next = -1;
-        smsg_msglist_index[i].head = 0;
-        smsg_msglist_index[i].tail = 0;
+        smsg_msglist_index[i].sendMsgBuf = PCQueueCreate();
+        
      }
      smsg_head_index = -1;
 }
@@ -1667,7 +1683,7 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
     GNI_RC_CHECK("Mempool de-register", status);
     free(ptr);
 }
-
+FILE *debugLog = NULL;
 static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
@@ -1795,6 +1811,15 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //_init_DMA_buffer();
     
     free(MPID_UGNI_AllAddr);
+#if CMK_SMP
+    mempoolLock = CmiCreateLock();
+#endif
+
+    if (CmiMyRank() == 0) {
+        char ln[200];
+        sprintf(ln,"debugLog.%d",CmiMyNode());
+        debugLog=fopen(ln,"w");
+    }
 }
 
 
@@ -1802,7 +1827,7 @@ void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr;
 #if 0
-    CmiPrintf("\n[PE:%d]Alloc Lrts for bytes=%d, head=%d %d\n", CmiMyPe(), n_bytes, header, SMSG_MAX_MSG);
+    printf("\n[PE:%d]Alloc Lrts for bytes=%d, head=%d %d\n", CmiMyPe(), n_bytes, header, SMSG_MAX_MSG);
 #endif
     if(n_bytes <= SMSG_MAX_MSG)
     {
@@ -1814,7 +1839,13 @@ void* LrtsAlloc(int n_bytes, int header)
         CmiAssert(header <= ALIGNBUF);
 #if     USE_LRTS_MEMPOOL
         n_bytes = ALIGN64(n_bytes);
+#if     CMK_SMP
+        CmiLock(mempoolLock);
+#endif
         char *res = mempool_malloc(mempool, ALIGNBUF+n_bytes, 1);
+#if     CMK_SMP
+        CmiUnlock(mempoolLock);
+#endif
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
@@ -1822,7 +1853,7 @@ void* LrtsAlloc(int n_bytes, int header)
         ptr = res + ALIGNBUF - header;
     }
 #if 0 
-    CmiPrintf("Done Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
+    printf("Done Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
 #endif
     return ptr;
 }
@@ -1835,16 +1866,22 @@ void  LrtsFree(void *msg)
     else
     {
 #if 0
-        CmiPrintf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+        printf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
 #if     USE_LRTS_MEMPOOL
+#if     CMK_SMP
+        CmiLock(mempoolLock);
+#endif
         mempool_free(mempool, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+#if     CMK_SMP
+        CmiUnlock(mempoolLock);
+#endif
 #else
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
     }
 #if 0 
-    CmiPrintf("Done Free lrts for bytes=%d\n", size);
+    printf("Done Free lrts for bytes=%d\n", size);
 #endif
 }
 
@@ -1871,7 +1908,8 @@ static void LrtsDrainResources()
 
 void CmiAbort(const char *message) {
 
-    CmiPrintf("CmiAbort is calling on PE:%d\n", myrank);
+    CmiPrintStackTrace(0);
+    printf("CmiAbort is calling on PE:%d\n", myrank);
     PMI_Abort(-1, message);
 }
 
