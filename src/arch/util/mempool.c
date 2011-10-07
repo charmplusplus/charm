@@ -125,7 +125,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         if (!expand) return NULL;
 
         expand_size = expand_mem>size ? expand_mem:2*size; 
-        pool = mptr->newblockfn(expand_size, &mem_hndl);
+        pool = mptr->newblockfn(&expand_size, &mem_hndl);
         expand_pool = (mempool_block*)pool;
         expand_pool->mempool_ptr = pool;
         expand_pool->mem_hndl = mem_hndl;
