@@ -49,7 +49,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     return mptr;
 }
 
-void mempool_destory(mempool_type *mptr)
+void mempool_destroy(mempool_type *mptr)
 {
     mempool_block *current, *mempools_head;
     mempool_freeblock   freefn = mptr->freeblockfn;

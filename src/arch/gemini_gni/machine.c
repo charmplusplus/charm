@@ -1852,7 +1852,7 @@ static void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
-    mempool_destory(mempool);
+    mempool_destroy(mempool);
 #endif
     PMI_Finalize();
     exit(0);
