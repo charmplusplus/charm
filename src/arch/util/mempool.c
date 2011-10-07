@@ -140,7 +140,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         bestfit->size = expand_size-sizeof(mempool_block);
         bestfit->mem_hndl = expand_pool->mem_hndl;
         bestfit->next_free = 0;
-        bestfit_size = expand_size;
+        bestfit_size = expand_size-sizeof(mempool_block);
 #if 0
         current = freelist_head;
         while(current!= NULL && current < bestfit )
@@ -152,14 +152,16 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         CmiAssert(bestfit > previous);
 #endif
         bestfit_previous = previous;
-        if (previous == NULL)
+        if (previous == NULL) {
            *freelist_head = (char*)bestfit - (char*)mptr;
+           freelist_head_ptr =  bestfit;
+        }
         else
            previous->next_free = (char*)bestfit-(char*)mptr;
     }
 
     bestfit->size = size;
-    if(bestfit_size > size) //deduct this entry 
+    if(bestfit_size > size + sizeof(mempool_header)) //deduct this entry 
     {
         mempool_header *ptr = (mempool_header *)((char*)bestfit + size);
         ptr->size = bestfit_size - size;
@@ -172,6 +174,9 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     }
     else {  
           //delete this free entry
+        if (bestfit_size > size) {
+           bestfit->size = bestfit_size;
+        }
         if(bestfit == freelist_head_ptr)
             *freelist_head = freelist_head_ptr->next_free;
         else
