@@ -96,7 +96,7 @@ EachToManyMulticastStrategy::~EachToManyMulticastStrategy() {
 
 void EachToManyMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 
-  cmsg -> checkme();
+  //  cmsg -> checkme();
 
 	ComlibPrintf("[%d] EachToManyMulticast: insertMessage\n", CkMyPe());
 
