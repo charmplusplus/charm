@@ -78,7 +78,7 @@ void StreamingStrategy::insertMessage(MessageHolder *cmsg) {
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
     bufSize[pe]+=size;
-    if (streamingMsgCount[pe] > bufferMax || bufSize[pe] > bufSizeMax) flushPE(pe);
+    if (streamingMsgCount[pe] >= bufferMax || bufSize[pe] >= bufSizeMax) flushPE(pe);
 }
 
 void StreamingStrategy::doneInserting() {

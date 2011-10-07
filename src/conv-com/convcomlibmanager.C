@@ -285,7 +285,7 @@ void ConvComlibManager::enableStrategy(int i) {
   MessageHolder *mh;
   while ((mh=strategyTable[i].tmplist.deq()) != NULL) {
     CharmMessageHolder*cmh = (CharmMessageHolder*)mh;
-    cmh->checkme();
+    //    cmh->checkme();
     cmh->sec_id = cmh->copy_of_sec_id;
 
 #if DEBUG_MULTICAST

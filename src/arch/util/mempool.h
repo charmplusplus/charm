@@ -30,7 +30,7 @@ typedef struct mempool_header
   size_t            next_free;
 } mempool_header;
 
-typedef void * (* mempool_newblockfn)(int size, gni_mem_handle_t *mem_hndl);
+typedef void * (* mempool_newblockfn)(int *size, gni_mem_handle_t *mem_hndl);
 typedef void (* mempool_freeblock)(void *ptr, gni_mem_handle_t mem_hndl);
 
 // only at beginning of first block of mempool
@@ -43,7 +43,7 @@ typedef struct mempool_type
 } mempool_type;
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn);
-void  mempool_destory(mempool_type *mptr);
+void  mempool_destroy(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, int size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
 

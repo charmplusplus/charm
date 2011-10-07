@@ -53,7 +53,7 @@ class EachToManyMulticastStrategy : public RouterStrategy, public CharmStrategy 
     ~EachToManyMulticastStrategy();
 
     void insertMessage(MessageHolder *msg) {
-      ((CharmMessageHolder*)msg) -> checkme();
+      //      ((CharmMessageHolder*)msg) -> checkme();
       insertMessage((CharmMessageHolder*)msg);
     }
 

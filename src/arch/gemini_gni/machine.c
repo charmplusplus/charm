@@ -40,7 +40,7 @@ static void sleep(int secs) {
 #define USE_LRTS_MEMPOOL     1
 
 #if USE_LRTS_MEMPOOL
-static CmiInt8 _mempool_size = 1024ll*1024*4;
+static CmiInt8 _mempool_size = 1024ll*1024*32;
 #endif
 
 #define PRINT_SYH  0
@@ -1653,10 +1653,10 @@ static void _init_DMA_buffer()
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
-void *alloc_mempool_block(int size, gni_mem_handle_t *mem_hndl)
+void *alloc_mempool_block(int *size, gni_mem_handle_t *mem_hndl)
 {
-    void *pool = memalign(ALIGNBUF, size);
-    gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, size,  mem_hndl, &omdh);
+    void *pool = memalign(ALIGNBUF, *size);
+    gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
     GNI_RC_CHECK("Mempool register", status);
     return pool;
 }
@@ -1852,7 +1852,7 @@ static void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
-    mempool_destory(mempool);
+    mempool_destroy(mempool);
 #endif
     PMI_Finalize();
     exit(0);
