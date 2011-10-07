@@ -385,11 +385,13 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   hostnameMsg  *msg;
   double startT;
  
+  int obtain_flag = 1;              // default on
+  int show_flag = 0;                // default not show topology
+
   if (CmiMyRank() ==0) {
      topoLock = CmiCreateLock();
   }
 
-  int obtain_flag = 1;              // default on
 #if __FAULT_|| CMK_BLUEGENEQ
   obtain_flag = 0;
 #endif
@@ -399,6 +401,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
   if (CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info"))
     obtain_flag = 0;
+  if(CmiGetArgFlagDesc(argv,"+show_cpu_topology",
+					   "Show cpu topology info"))
+    show_flag = 1;
 
 #if CMK_BIGSIM_CHARM
   if (BgNodeRank() == 0)
@@ -558,6 +563,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
   // now every one should have the node info
   CcdRaiseCondition(CcdTOPOLOGY_AVAIL);      // call callbacks
+  if (CmiMyPe() == 0 && show_flag) cpuTopo.print();
 }
 
 #else           /* not supporting cpu topology */
@@ -569,6 +575,8 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 						"obtain cpu topology info");
   CmiGetArgFlagDesc(argv,"+skip_cpu_topology",
                                "skip the processof getting cpu topology info");
+  CmiGetArgFlagDesc(argv,"+show_cpu_topology",
+					   "Show cpu topology info");
 }
 
 #endif
