@@ -1669,7 +1669,7 @@ static void _init_DMA_buffer()
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
-void *alloc_mempool_block(int *size, gni_mem_handle_t *mem_hndl)
+void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl)
 {
     void *pool = memalign(ALIGNBUF, *size);
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
@@ -1846,11 +1846,12 @@ void* LrtsAlloc(int n_bytes, int header)
 #if     CMK_SMP
         CmiUnlock(mempoolLock);
 #endif
+        ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
         char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
-#endif
         ptr = res + ALIGNBUF - header;
+#endif
     }
 #if 0 
     printf("Done Alloc Lrts for bytes=%d, head=%d\n", n_bytes, header);
@@ -1872,7 +1873,7 @@ void  LrtsFree(void *msg)
 #if     CMK_SMP
         CmiLock(mempoolLock);
 #endif
-        mempool_free(mempool, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
+        mempool_free(mempool, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
 #if     CMK_SMP
         CmiUnlock(mempoolLock);
 #endif

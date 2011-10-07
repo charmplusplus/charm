@@ -32,7 +32,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     mempool_header *header;
     gni_mem_handle_t  mem_hndl;
 
-    void *pool = allocfn(pool_size, &mem_hndl);
+    void *pool = allocfn(&pool_size, &mem_hndl);
     mptr = (mempool_type*)pool;
     mptr->newblockfn = allocfn;
     mptr->freeblockfn = freefn;
@@ -80,6 +80,8 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 #if  MEMPOOL_DEBUG
     CmiPrintf("[%d] request malloc from pool: %p  free_head: %p %d for size %d, \n", CmiMyPe(), mptr, freelist_head_ptr, mptr->freelist_head, size);
 #endif
+
+    size += sizeof(mempool_header);
 
 #if 1
     while(current!= NULL)     /* best fit */
@@ -187,7 +189,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 printf("[%d] freelist_head in malloc  offset:%d free_head: %ld %ld %d %d\n", myrank, (char*)bestfit-(char*)mptr, *freelist_head, ((mempool_header*)((char*)mptr+*freelist_head))->next_free, bestfit_size, size);
 #endif
     CmiAssert(*freelist_head >= 0);
-    return (char*)bestfit;
+    return (char*)bestfit + sizeof(mempool_header);
 }
 
 //sorted free_list and merge it if it become continous 
@@ -202,7 +204,9 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     mempool_header    *freelist_head_ptr;
     mempool_header    *current;
     mempool_header *previous = NULL;
-    mempool_header *to_free = (mempool_header *)ptr_free;
+    mempool_header *to_free;
+
+    to_free = (mempool_header *)((char*)ptr_free - sizeof(mempool_header));
 
     mempools_head = &(mptr->mempools_head);
     freelist_head = &mptr->freelist_head;
@@ -210,10 +214,10 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     current = freelist_head_ptr;
 
     free_size = to_free->size;
-    free_lastbytes_pos = (char*)ptr_free +free_size;
+    free_lastbytes_pos = (char*)to_free +free_size;
 
 #if  MEMPOOL_DEBUG
-    printf("[%d] INSIDE FREE ptr=%p, size=%d freehead=%p mutex: %p\n", CmiMyPe(), ptr_free, free_size, freelist_head, mptr->mutex);
+    printf("[%d] INSIDE FREE ptr=%p, size=%d freehead=%p mutex: %p\n", CmiMyPe(), to_free, free_size, freelist_head, mptr->mutex);
 #endif
     
     while(current!= NULL && current < to_free )
@@ -228,7 +232,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     if (current) CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, free_lastbytes_pos);
 #endif
     //continuos with previous free space 
-    if(previous!= NULL && (char*)previous+previous->size == ptr_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0 )
+    if(previous!= NULL && (char*)previous+previous->size == to_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0 )
     {
         previous->size +=  free_size;
         merged = 1;
@@ -261,7 +265,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
             previous->next_free = (char*)to_free - (char*)mptr;
     }
 #if  MEMPOOL_DEBUG
-    printf("[%d] Memory free done %p, freelist_head=%p\n", CmiMyPe(), ptr_free,  freelist_head);
+    printf("[%d] Memory free done %p, freelist_head=%p\n", CmiMyPe(), to_free,  freelist_head);
 #endif
 
     CmiAssert(*freelist_head >= 0);
