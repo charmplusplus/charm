@@ -55,7 +55,7 @@
 /* Tag variable y as being from unit x: */
 #define CMK_TAG(x,y) x##y##_
 
-#define USE_MEMPOOL_ISOMALLOC 1
+#define USE_MEMPOOL_ISOMALLOC 0
 
 #include "pup_c.h"
 

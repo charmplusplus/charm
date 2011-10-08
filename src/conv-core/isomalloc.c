@@ -1674,12 +1674,14 @@ void * isomallocfn (size_t *size, gni_mem_handle_t *mem_hndl)
   if (!newaddr) map_failed(s,n);
   *mem_hndl = s;
   *size = n*slotsize;
+  printf("Alloc slot long %lld from %p to %p\n",s,newaddr,newaddr+*size);
   return newaddr;
 }
 
 //free function to be used by mempool
 void isofreefn(void *ptr, gni_mem_handle_t mem_hndl)
 {
+  printf("Free slots at %p for slot %lld\n", ptr, mem_hndl); 
   call_munmap(ptr, ((mempool_block *)ptr)->size);
 }
 #endif
@@ -2296,6 +2298,7 @@ void *CmiIsomalloc(int size)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
+  printf("[%d] isomalloc request for %d\n",CmiMyPe(),size);
   if (isomallocStart==NULL) return disabled_map(size);
   if(CtvAccess(threadpool) == NULL) {
     CtvAccess(threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
@@ -2304,6 +2307,7 @@ void *CmiIsomalloc(int size)
   blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   blk->slot=-1;
   blk->length=size;
+  printf("[%d] isomalloc request done for %d\n",CmiMyPe(),size);
   return block2pointer(blk);
 }
 #else
@@ -2525,7 +2529,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
 {
   mempool_block *current, *mempools_head;
   void *newblock;
-  int slot;
+  CmiInt8 slot;
   CmiInt8 size;
 
   if(!pup_isUnpacking(p)) {
@@ -2533,22 +2537,25 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
     current = &(CtvAccess(threadpool)->mempools_head);
     while(current != NULL) {
       pup_int8(p,&current->size);
-      pup_int(p,&current->mem_hndl);
+      pup_int8(p,&current->mem_hndl);
       pup_bytes(p,current->mempool_ptr,current->size);
+      printf("[%d] Packing slot %lld size %lld at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
       current = current->next;
     }
-    mempool_destroy(CtvAccess(threadpool));
   }
 
   if(pup_isUnpacking(p)) {
     pup_int8(p,&size);
-    pup_int(p,&slot);
+    pup_int8(p,&slot);
     newblock = map_slots(slot,size/slotsize);
     pup_bytes(p,newblock,size);
+    printf("[%d] slot %lld size %lld at %p to %p\n",CmiMyPe(),slot,size,newblock,newblock+size);
   }
   pup_bytes(p,lp,sizeof(int*));
-  if (pup_isDeleting(p))
+  if(pup_isDeleting(p)) {
+    mempool_destroy(CtvAccess(threadpool));
     *lp=NULL;
+  }
 }
 #else
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)

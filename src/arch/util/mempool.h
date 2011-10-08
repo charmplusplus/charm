@@ -10,7 +10,7 @@
 #else
   // in uGNI, it is memory handler, other versions, this is an integer
   // a unique integer to represent the memory block
-typedef int    gni_mem_handle_t;
+typedef CmiInt8   gni_mem_handle_t;
 #endif
 
 // multiple mempool for different size allocation
