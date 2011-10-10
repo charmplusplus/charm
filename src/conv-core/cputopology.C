@@ -42,10 +42,8 @@
 #include "TopoManager.h"
 #endif
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
-#elif CMK_CRAYXE
-#include "pmi.h"
 #endif
 
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
@@ -485,12 +483,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
 
     int nid;
     for(int i=0; i<numPes; i++) {
-#if CMK_CRAYXT
       nid = getXTNodeID(CmiNodeOf(i), numNodes);
-#else
-      int status = PMI_Get_nid(i, &nid);
-      CmiAssert(status == PMI_SUCCESS);
-#endif
       cpuTopo.nodeIDs[i] = nid;
     }
     int prev = -1;
