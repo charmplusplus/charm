@@ -253,7 +253,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
-    simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
+    simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	graph.h bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
@@ -280,7 +280,7 @@ commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
-	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
+	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
 dirs+sources:
