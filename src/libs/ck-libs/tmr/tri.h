@@ -2,7 +2,7 @@
 // Created by: Terry L. Wilmarth
 
 #include <math.h>
-#include <vector.h>
+#include <vector>
 #include "charm++.h"
 #include "tcharm.h"
 #include "charm-api.h"
