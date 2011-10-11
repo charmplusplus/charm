@@ -24,10 +24,10 @@ Generalized by Gengbin Zheng  10/5/2011
 
 #include "mempool.h"
 
-#if USE_MEMPOOL_ISOMALLOC
-static      size_t     expand_mem = 1024*16;
-#else
+#if CMK_CONVERSE_GEMINI_UGNI
 static      size_t     expand_mem = 1024ll*1024*16;
+#else
+static      size_t     expand_mem = 1024*16;
 #endif 
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
