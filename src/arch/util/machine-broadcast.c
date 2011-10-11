@@ -47,13 +47,13 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
      */
     CmiAssert(CMI_DEST_RANK(msg)==0);
     /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
-    CmiPushPE(0, msg);
 
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildrenProc(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
     SendHyperCubeProc(size, msg);
 #endif
+    CmiPushPE(0, msg);
 
 }
 

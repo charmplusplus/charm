@@ -44,7 +44,7 @@ added by Ryan Mokos in July 2008.
 #include "converse.h"
 #include "memory-isomalloc.h"
 
-#define CMK_THREADS_DEBUG 0
+#define ISOMALLOC_DEBUG 0
 
 /* 0: use the old isomalloc implementation (array)
 1: use the new isomalloc implementation (b-tree)  */
@@ -1261,7 +1261,7 @@ static void print_list_array(slotset *ss) {
   }
 }
 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
 static void print_slots(slotset *ss) {
   print_btree_top_down(ss->btree_root);
   print_list_array(ss);
@@ -1447,7 +1447,7 @@ free_slots(slotset *ss, CmiInt8 sslot, CmiInt8 nslots)
  }
  */
 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   static void
 print_slots(slotset *ss)
 {
@@ -1597,7 +1597,7 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
 
   if (pa==NULL)
   { /*Map just failed completely*/
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     perror("mmap failed");
     CmiPrintf("[%d] tried to mmap %p, but encountered error\n",CmiMyPe(),addr);
 #endif
@@ -1605,13 +1605,13 @@ map_slots(CmiInt8 slot, CmiInt8 nslots)
   }
   if (pa != addr)
   { /*Map worked, but gave us back the wrong place*/
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] tried to mmap %p, but got %p back\n",CmiMyPe(),addr,pa);
 #endif
     call_munmap(addr,slotsize*nslots);
     return NULL;
   }
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   CmiPrintf("[%d] mmap'd slots %ld-%ld to address %p\n",CmiMyPe(),
       slot,slot+nslots-1,addr);
 #endif
@@ -1626,7 +1626,7 @@ unmap_slots(CmiInt8 slot, CmiInt8 nslots)
 {
   void *addr=slot2addr(slot);
   call_munmap(addr, slotsize*nslots);
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   CmiPrintf("[%d] munmap'd slots %ld-%ld from address %p\n",CmiMyPe(),
       slot,slot+nslots-1,addr);
 #endif
@@ -1674,14 +1674,12 @@ void * isomallocfn (size_t *size, gni_mem_handle_t *mem_hndl)
   if (!newaddr) map_failed(s,n);
   *mem_hndl = s;
   *size = n*slotsize;
-  printf("Alloc slot long %lld from %p to %p\n",s,newaddr,newaddr+*size);
   return newaddr;
 }
 
 //free function to be used by mempool
 void isofreefn(void *ptr, gni_mem_handle_t mem_hndl)
 {
-  printf("Free slots at %p for slot %lld\n", ptr, mem_hndl); 
   call_munmap(ptr, ((mempool_block *)ptr)->size);
 }
 #endif
@@ -1730,7 +1728,7 @@ static int bad_location(char *loc) {
   void *addr;
   addr=call_mmap_fixed(loc,slotsize);
   if (addr==NULL || addr!=loc) {
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] Skipping unmappable space at %p\n",CmiMyPe(),loc);
 #endif
     return 1; /*No good*/
@@ -1759,7 +1757,7 @@ static int partially_good(char *start,memRange_t len,int n) {
 static int good_range(char *start,memRange_t len,int n) {
   int i;
   memRange_t quant=divide_range(len,n);
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   CmiPrintf("good_range: %lld, %d\n", quant, n);
 #endif
   CmiAssert (quant > 0);
@@ -1800,7 +1798,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   }
 #endif
   if (len<=max->len) return; /*It's too short already!*/
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   CmiPrintf("[%d] Checking at %p - %p\n",CmiMyPe(),start,end);
 #endif
 
@@ -1808,7 +1806,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   if (!good_range(start,len,256)) {
     /* Try to split into subranges: */
     int i,n=2;
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] Trying to split bad address space at %p - %p...\n",CmiMyPe(),start,end);
 #endif
     len=divide_range(len,n);
@@ -1821,7 +1819,7 @@ static void check_range(char *start,char *end,memRegion_t *max)
   }
   else /* range is good */
   { 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] Address space at %p - %p is largest\n",CmiMyPe(),start,end);
 #endif
 
@@ -1927,7 +1925,7 @@ static int find_largest_free_region(memRegion_t *destRegion) {
 #if CMK_MACOSX
     if (regions[i].start+regions[i].len*2>regions[i].start) regions[i].len *= 2;
 #endif
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] Memory map: %p - %p (len: %lu => %lu) %s \n",CmiMyPe(),
         regions[i].start,regions[i].start+regions[i].len,
         old.len, regions[i].len, regions[i].type);
@@ -1973,7 +1971,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
     range = bad_alloc;
 #endif
     if (range == bad_alloc) {  /* mmap failed */
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
       /* CmiPrintf("[%d] test failed at size: %llu error: %d\n", CmiMyPe(), size, errno);  */
 #endif
 #if CMK_HAS_USLEEP
@@ -1984,7 +1982,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
       if (size<=0) return 0; /* mmap doesn't work */
     }
     else { /* this allocation size is available */
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
       CmiPrintf("[%d] available: %p, %lld\n", CmiMyPe(), range, size);
 #endif
       call_munmap(range,size); /* needed/wanted? */
@@ -2000,7 +1998,7 @@ static int try_largest_mmap_region(memRegion_t *destRegion)
   CmiAssert(good_range!=NULL);
   destRegion->start=good_range; 
   destRegion->len=good_size;
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   pid_t pid = getpid();
   {
     char s[128];
@@ -2032,7 +2030,7 @@ static void init_ranges(char **argv)
     pagesize = CMK_MEMORY_PAGESIZE;
   slotsize=(slotsize+pagesize-1) & ~(pagesize-1);
 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
   if (CmiMyPe() == 0)
     CmiPrintf("[%d] Using slotsize of %d\n", CmiMyPe(), slotsize);
 #endif
@@ -2065,7 +2063,7 @@ static void init_ranges(char **argv)
     }
     else /* freeRegion.len>0, so can isomalloc */
     {
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
       CmiPrintf("[%d] Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
           freeRegion.start,freeRegion.start+freeRegion.len,
           freeRegion.len/meg);
@@ -2139,7 +2137,7 @@ static void init_ranges(char **argv)
           }
           read(fd, &ss, sizeof(CmiUInt8));
           read(fd, &ee, sizeof(CmiUInt8));
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
           if (CmiMyPe() == 0) CmiPrintf("[%d] load node %d isomalloc region: %lx %lx. \n",
               CmiMyPe(), i, ss, ee);
 #endif
@@ -2184,7 +2182,7 @@ static void init_ranges(char **argv)
     isomallocEnd=freeRegion.start+freeRegion.len;
     numslots=(freeRegion.len/slotsize)/CmiNumPes();
 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
     CmiPrintf("[%d] Can isomalloc up to %lu megs per pe\n",CmiMyPe(),
         ((memRange_t)numslots)*slotsize/meg);
 #endif
@@ -2294,20 +2292,32 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 
 /************** External interface ***************/
 #if USE_MEMPOOL_ISOMALLOC
-void *CmiIsomalloc(int size)
+void *CmiIsomalloc(int size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
-  printf("[%d] isomalloc request for %d\n",CmiMyPe(),size);
   if (isomallocStart==NULL) return disabled_map(size);
-  if(CtvAccess(threadpool) == NULL) {
-    CtvAccess(threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
-                                                isomallocfn, isofreefn);
+  if(tid != NULL) {
+    if(CtvAccessOther(tid,threadpool) == NULL) {
+#if ISOMALLOC_DEBUG
+      printf("Init Mempool in %d for %d\n",CthSelf(), tid);
+#endif
+      CtvAccessOther(tid,threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
+                                                  isomallocfn, isofreefn);
+    }
+    blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
+  } else {
+    if(CtvAccess(threadpool) == NULL) {
+#if ISOMALLOC_DEBUG
+      printf("Init Mempool in %d\n",CthSelf());
+#endif
+      CtvAccess(threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
+                                                  isomallocfn, isofreefn);
+    }
+    blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
-  blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   blk->slot=-1;
   blk->length=size;
-  printf("[%d] isomalloc request done for %d\n",CmiMyPe(),size);
   return block2pointer(blk);
 }
 #else
@@ -2346,8 +2356,7 @@ void *CmiIsomalloc(int size)
 /** return an aligned isomalloc memory, the alignment occurs after the
  *  first 'reserved' bytes.  Total requested size is (size+reserved)
  */
-static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
-{
+static void *_isomallocAlign(size_t align, size_t size, size_t reserved, CthThread t) {
   void *ptr;
   CmiIntPtr ptr2align;
   CmiInt8 s;
@@ -2360,7 +2369,7 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
     align = a;
   }
   s = size + reserved + align;
-  ptr = CmiIsomalloc(s);
+  ptr = CmiIsomalloc(s,t);
   ptr2align = (CmiIntPtr)ptr;
   ptr2align += reserved;
   if (ptr2align % align != 0) { /* misaligned */
@@ -2375,9 +2384,9 @@ static void *_isomallocAlign(size_t align, size_t size, size_t reserved)
   return ptr;
 }
 
-void *CmiIsomallocAlign(size_t align, size_t size)
+void *CmiIsomallocAlign(size_t align, size_t size, CthThread t)
 {
-  return _isomallocAlign(align, size, 0);
+  return _isomallocAlign(align, size, 0, t);
 }
 
 int CmiIsomallocEnabled()
@@ -2508,10 +2517,10 @@ static char *Slot_toUser(CmiIsomallocBlockList *s) {return (char *)(s+1);}
 static CmiIsomallocBlockList *Slot_fmUser(void *s) {return ((CmiIsomallocBlockList *)s)-1;}
 
 /*Build a new blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void)
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread tid)
 {
   CmiIsomallocBlockList *ret;
-  ret=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(*ret));
+  ret=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(*ret),tid);
   ret->next=ret; /*1-entry circular linked list*/
   ret->prev=ret;
   return ret;
@@ -2525,40 +2534,62 @@ static void print_myslots();
   have to restore the pointers-- they'll be restored automatically!
   */
 #if USE_MEMPOOL_ISOMALLOC
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
 {
   mempool_block *current, *mempools_head;
   void *newblock;
   CmiInt8 slot;
   CmiInt8 size;
+  int i, numBlocks = 0;
 
   if(!pup_isUnpacking(p)) {
-    printf("[%d] address is %p %p\n",CmiMyPe(),CtvAccess(threadpool),&(CtvAccess(threadpool)->mempools_head));
-    current = &(CtvAccess(threadpool)->mempools_head);
+#if ISOMALLOC_DEBUG
+    printf("My rank is %d Pupping for %d \n",CthSelf(),tid);
+#endif
+    current = &(CtvAccessOther(tid,threadpool)->mempools_head);
+    while(current != NULL) {
+      numBlocks++;
+      current = current->next;
+    }
+#if ISOMALLOC_DEBUG
+    printf("Number of blocks packed %d\n",numBlocks);
+#endif
+    pup_int(p,&numBlocks);
+    current = &(CtvAccessOther(tid,threadpool)->mempools_head);
     while(current != NULL) {
       pup_int8(p,&current->size);
       pup_int8(p,&current->mem_hndl);
       pup_bytes(p,current->mempool_ptr,current->size);
-      printf("[%d] Packing slot %lld size %lld at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
+#if ISOMALLOC_DEBUG
+      printf("[%d] Packing slot %lld size %d at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
+#endif
       current = current->next;
     }
   }
 
   if(pup_isUnpacking(p)) {
-    pup_int8(p,&size);
-    pup_int8(p,&slot);
-    newblock = map_slots(slot,size/slotsize);
-    pup_bytes(p,newblock,size);
-    printf("[%d] slot %lld size %lld at %p to %p\n",CmiMyPe(),slot,size,newblock,newblock+size);
+    pup_int(p,&numBlocks);
+#if ISOMALLOC_DEBUG
+    printf("Number of blocks to be unpacked %d\n",numBlocks);
+#endif
+    for(i = 0; i < numBlocks; i++) { 
+      pup_int8(p,&size);
+      pup_int8(p,&slot);
+      newblock = map_slots(slot,size/slotsize);
+      pup_bytes(p,newblock,size);
+#if ISOMALLOC_DEBUG
+      printf("[%d] slot %lld size %d at %p to %p\n",CmiMyPe(),slot,size,newblock,newblock+size);
+#endif
+      }
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {
-    mempool_destroy(CtvAccess(threadpool));
+    mempool_destroy(CtvAccessOther(tid,threadpool));
     *lp=NULL;
   }
 }
 #else
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp)
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CmiInt8 tid=-1)
 {
   /* BIGSIM_OOC DEBUGGING */
   /* if(!pup_isUnpacking(p)) print_myslots(); */
@@ -2616,7 +2647,7 @@ void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l)
 void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-  n=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(CmiIsomallocBlockList)+nBytes);
+  n=(CmiIsomallocBlockList *)CmiIsomalloc(sizeof(CmiIsomallocBlockList)+nBytes,NULL);
   /*Link the new block into the circular blocklist*/
   n->prev=l;
   n->next=l->next;
@@ -2629,7 +2660,7 @@ void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes)
 void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes)
 {
   CmiIsomallocBlockList *n; /*Newly created slot*/
-  n=(CmiIsomallocBlockList *)_isomallocAlign(align,nBytes,sizeof(CmiIsomallocBlockList));
+  n=(CmiIsomallocBlockList *)_isomallocAlign(align,nBytes,sizeof(CmiIsomallocBlockList),NULL);
   /*Link the new block into the circular blocklist*/
   n->prev=l;
   n->next=l->next;

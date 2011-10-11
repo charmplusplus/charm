@@ -33,9 +33,9 @@ class CharmMessageHolder : public MessageHolder{
  public:
     /// An unused, and probably unnecessary array that was used to avoid a memory corruption that clobbers members in this class. The bug has likely been fixed.
 
-#define BUGTRAPSIZE 5000
+  //#define BUGTRAPSIZE 5000
 
-    int bug_trap[BUGTRAPSIZE];
+   //    int bug_trap[BUGTRAPSIZE];
 
     /// The section information for an enqueued multicast message
     CkSectionID *sec_id;
@@ -53,14 +53,17 @@ class CharmMessageHolder : public MessageHolder{
       type = t;
       sec_id = NULL;
       copy_of_sec_id = NULL;
+      /*
       for(int i=0;i<BUGTRAPSIZE;i++){
 	bug_trap[i] = 0;
       }
       
       checkme();
+      */
     }
     
     /// Verfiy that the bug_trap array has not been corrupted. Noone should ever write to that array.
+    /*
     void checkme() {
 	for(int i=0;i<BUGTRAPSIZE;i++){
 	  if(bug_trap[i] != 0){
@@ -69,19 +72,21 @@ class CharmMessageHolder : public MessageHolder{
 	  }
 	}
     }
-
+    */
 
     CharmMessageHolder(CkMigrateMessage *m) : MessageHolder(m) {
+      /*
       for(int i=0;i<BUGTRAPSIZE;i++){
 	bug_trap[i] = 0;
       }
       checkme();
+      */
     }
     
 
 
     ~CharmMessageHolder(){
-      checkme();
+      //      checkme();
     }
 
     inline char * getCharmMessage() {
@@ -92,7 +97,7 @@ class CharmMessageHolder : public MessageHolder{
     inline void saveCopyOf_sec_id(){
       //      ComlibPrintf("[%d] saveCopyOf_sec_id sec_id=%p NULL=%d\n", CkMyPe(), sec_id, NULL);
 
-      checkme();
+      //      checkme();
 
       if(sec_id!=NULL){
 
@@ -122,7 +127,7 @@ class CharmMessageHolder : public MessageHolder{
 	//	ComlibPrintf("saving copy of sec_id into %p\n", copy_of_sec_id);
       }
 
-      checkme();
+      //      checkme();
 
     }
 
@@ -135,7 +140,7 @@ class CharmMessageHolder : public MessageHolder{
 /* 	copy_of_sec_id = NULL; */
 /*       } */
 
-      checkme();
+//      checkme();
 
     }
 

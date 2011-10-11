@@ -55,7 +55,7 @@
 /* Tag variable y as being from unit x: */
 #define CMK_TAG(x,y) x##y##_
 
-#define USE_MEMPOOL_ISOMALLOC 0
+#define USE_MEMPOOL_ISOMALLOC 1
 
 #include "pup_c.h"
 
@@ -1205,36 +1205,6 @@ void   CmiHandleMessage(void *msg);
 /** @} */
 
 
-/****** Isomalloc: Migratable Memory Allocation ********/
-/*Simple block-by-block interface:*/
-void *CmiIsomalloc(int sizeInBytes);
-void *CmiIsomallocAlign(size_t align, size_t size);
-void  CmiIsomallocPup(pup_er p,void **block);
-void  CmiIsomallocFree(void *block);
-int   CmiIsomallocEnabled();
-void  CmiEnableIsomalloc();
-void  CmiDisableIsomalloc();
-
-CmiInt8   CmiIsomallocLength(void *block);
-int   CmiIsomallocInRange(void *addr);
-
-/*List-of-blocks interface:*/
-struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
-	struct CmiIsomallocBlockList *prev,*next;
-	/*actual data of block follows here...*/
-};
-typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
-
-/*Build/pup/destroy an entire blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void);
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
-void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
-
-/*Allocate/free a block from this blockList*/
-void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
-void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
-void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
-
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
@@ -1368,6 +1338,36 @@ void CthAddListener(CthThread th,struct CthThreadListener *l);
   as needed. User has to implement this somewhere in the system.
 */
 void CthUserAddListeners(CthThread th);
+
+/****** Isomalloc: Migratable Memory Allocation ********/
+/*Simple block-by-block interface:*/
+void *CmiIsomalloc(int sizeInBytes, CthThread tid);
+void *CmiIsomallocAlign(size_t align, size_t size, CthThread t);
+void  CmiIsomallocPup(pup_er p,void **block);
+void  CmiIsomallocFree(void *block);
+int   CmiIsomallocEnabled();
+void  CmiEnableIsomalloc();
+void  CmiDisableIsomalloc();
+
+CmiInt8   CmiIsomallocLength(void *block);
+int   CmiIsomallocInRange(void *addr);
+
+/*List-of-blocks interface:*/
+struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
+	struct CmiIsomallocBlockList *prev,*next;
+	/*actual data of block follows here...*/
+};
+typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
+
+/*Build/pup/destroy an entire blockList.*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread t);
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l, CthThread tid);
+void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
+
+/*Allocate/free a block from this blockList*/
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
+void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
+void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/

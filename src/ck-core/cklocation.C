@@ -2554,7 +2554,6 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	if(!CmiNodeAlive(toPe)){
 		return;
 	}
-
 	CkArrayIndex idx=rec->getIndex();
 
 #if CMK_OUT_OF_CORE

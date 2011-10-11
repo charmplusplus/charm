@@ -10,7 +10,7 @@
 #else
   // in uGNI, it is memory handler, other versions, this is an integer
   // a unique integer to represent the memory block
-typedef CmiInt8   gni_mem_handle_t;
+typedef size_t   gni_mem_handle_t;
 #endif
 
 // multiple mempool for different size allocation
@@ -18,7 +18,7 @@ typedef struct mempool_block_t
 {
     void                *mempool_ptr;
     gni_mem_handle_t    mem_hndl;
-    CmiInt8             size;
+    int                 size;
     struct              mempool_block_t *next;
 } mempool_block;
 

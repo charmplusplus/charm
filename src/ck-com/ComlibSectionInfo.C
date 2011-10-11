@@ -30,7 +30,7 @@
 */
 ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort, int instanceID){
     
-  cmsg->checkme();
+  //  cmsg->checkme();
 
     if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
         return NULL;
@@ -190,7 +190,7 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
 
 
 void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
-  cmsg->checkme();
+  //  cmsg->checkme();
 
     ComlibPrintf("Process Old Section Message \n");
 
