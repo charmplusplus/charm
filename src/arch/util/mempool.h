@@ -31,7 +31,7 @@ typedef struct mempool_header
   size_t            next_free;
 } mempool_header;
 
-typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl);
+typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
 typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
 // only at beginning of first block of mempool
