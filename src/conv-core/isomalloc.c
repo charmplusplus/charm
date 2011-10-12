@@ -1650,7 +1650,7 @@ CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 CtvStaticDeclare(mempool_type *, threadpool); /*Thread managed pools*/
 
 //alloc function to be used by mempool
-void * isomallocfn (size_t *size, mem_handle_t *mem_hndl)
+void * isomallocfn (size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 {
   CmiInt8 s,n,i;
   void *newaddr;
