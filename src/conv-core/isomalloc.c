@@ -2321,7 +2321,7 @@ void *CmiIsomalloc(int size, CthThread tid)
   return block2pointer(blk);
 }
 #else
-void *CmiIsomalloc(int size)
+void *CmiIsomalloc(int size, CthThread tid)
 {
   CmiInt8 s,n,i;
   CmiIsomallocBlock *blk;
@@ -2589,7 +2589,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   }
 }
 #else
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CmiInt8 tid=-1)
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
 {
   /* BIGSIM_OOC DEBUGGING */
   /* if(!pup_isUnpacking(p)) print_myslots(); */
