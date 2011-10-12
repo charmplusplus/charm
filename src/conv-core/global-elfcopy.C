@@ -250,8 +250,7 @@ void CtgGlobalStruct::pup(PUP::er &p) {
   p | seg_size;
   /* global data segment need to be isomalloc pupped */
   if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-    //CmiIsomallocPup(&p, &data_seg);
-    pub_bytes(&p, &data_seg,sizeof(char*));
+    CmiIsomallocPup(&p, &data_seg);
   else {
     if (p.isUnpacking()) allocate(seg_size);
     p((char *)data_seg, seg_size);
