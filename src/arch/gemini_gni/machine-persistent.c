@@ -72,17 +72,9 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
             MallocRdmaRequest(rdma_request_msg);
-            rdma_request_msg->next = 0;
             rdma_request_msg->destNode = destPE;
             rdma_request_msg->pd = pd;
-            if(pending_rdma_head == 0)
-            {
-                pending_rdma_head = rdma_request_msg;
-            }else
-            {
-                pending_rdma_tail->next = rdma_request_msg;
-            }
-            pending_rdma_tail = rdma_request_msg;
+            PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
         }else
             GNI_RC_CHECK("AFter posting", status);
     }
