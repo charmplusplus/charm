@@ -37,7 +37,6 @@ $(COMPATLIB): $(COMPAT)
 
 headers: $(HEADERS)
 	cp $(HEADERS) $(CDIR)/include/
-	cp vector2d.h $(CDIR)/include/
 	touch headers
 
 compat_init.o: compat_init.c

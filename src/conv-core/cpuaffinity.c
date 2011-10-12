@@ -476,7 +476,7 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -602,7 +602,7 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
   if (CmiMyRank() == 0)
   {
     int numPes = CmiNumPes();

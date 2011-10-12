@@ -42,7 +42,7 @@
 #include "TopoManager.h"
 #endif
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -474,7 +474,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
-#elif CMK_CRAYXT
+#elif CMK_CRAYXT || CMK_CRAYXE
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
     int numNodes = CmiNumNodes();

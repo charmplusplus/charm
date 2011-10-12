@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include "converse.h"
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 
 #if XT3_TOPOLOGY
 #include <catamount/cnos_mpi_os.h>
@@ -49,7 +49,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
 #endif /* CMK_CRAYXT */
 
-#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
+#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
 #if !CMK_HAS_RCALIB
 #error "The Cray rca library is not available. Try 'module load rca' and rebuild"
@@ -64,6 +64,11 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #elif XT5_TOPOLOGY
   #define MAXNID 22020
   #define TDIM 12
+
+  #elif XE6_TOPOLOGY
+    /* hopper */
+  #define MAXNID 6384
+  #define TDIM 24
   #endif
 
 int *pid2nid;                   /* rank to node ID */

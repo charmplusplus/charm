@@ -3,7 +3,7 @@
 #ifndef TRI_H
 #define TRI_H
 
-#include <vector.h>
+#include <vector>
 #include "charm++.h"
 #include "tcharm.h"
 #include "charm-api.h"

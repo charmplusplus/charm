@@ -1,7 +1,7 @@
 
 /** 
 
-Memory pool implementation , It is only good for Charm++ usage. The first 64 bytes provides additional information. sizeof(int)- size of this block(free or allocated), next gni_mem_handle_t, then void** point to the next available block. 
+Memory pool implementation , It is only good for Charm++ usage. The first 64 bytes provides additional information. sizeof(int)- size of this block(free or allocated), next mem_handle_t, then void** point to the next available block. 
 
 Written by Yanhua Sun 08-27-2011
 Generalized by Gengbin Zheng  10/5/2011
@@ -28,13 +28,13 @@ Generalized by Gengbin Zheng  10/5/2011
 static      size_t     expand_mem = 1024ll*1024*16;
 #else
 static      size_t     expand_mem = 1024*16;
-#endif 
+#endif
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
 {
     mempool_type *mptr;
     mempool_header *header;
-    gni_mem_handle_t  mem_hndl;
+    mem_handle_t  mem_hndl;
 
     void *pool = allocfn(&pool_size, &mem_hndl);
     mptr = (mempool_type*)pool;
@@ -43,15 +43,16 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     mptr->mempools_head.mempool_ptr = pool;
     mptr->mempools_head.mem_hndl = mem_hndl;
     mptr->mempools_head.size = pool_size;
-    mptr->mempools_head.next = NULL;
+    mptr->mempools_head.memblock_next = 0;
     header = (mempool_header *) ((char*)pool+sizeof(mempool_type));
     mptr->freelist_head = sizeof(mempool_type);
+    mptr->memblock_tail = 0;
+#if MEMPOOL_DEBUG
+    printf("[%d] pool: %p  free: %p\n", myrank, pool, header);
+#endif
     header->size = pool_size-sizeof(mempool_type)-sizeof(mempool_header);
     header->mem_hndl = mem_hndl;
     header->next_free = 0;
-#if MEMPOOL_DEBUG 
-    printf("[%d] Initiated pool of size %lld at %p\n",CmiMyPe(),pool_size,mptr);
-#endif
     return mptr;
 }
 
@@ -64,8 +65,11 @@ void mempool_destroy(mempool_type *mptr)
 
     while(mempools_head!= NULL)
     {
+#if MEMPOOL_DEBUG
+        printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
+#endif
         current=mempools_head;
-        mempools_head = mempools_head->next;
+        mempools_head = mempools_head->memblock_next?(mempool_block *)((char*)mptr+mempools_head->memblock_next):NULL;
         freefn(current->mempool_ptr, current->mem_hndl);
     }
 }
@@ -124,13 +128,10 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
     if(bestfit == NULL)
     {
-#if MEMPOOL_DEBUG 
-        printf("[%d] Expanding pool %p by %d\n",CmiMyPe(),mptr,CthSelf());
-#endif
         void *pool;
-        mempool_block   *expand_pool;
+        mempool_block   *expand_pool, *memblock_tail;
         size_t   expand_size;
-        gni_mem_handle_t  mem_hndl;
+        mem_handle_t  mem_hndl;
 
         if (!expand) return NULL;
 
@@ -140,29 +141,33 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         expand_pool->mempool_ptr = pool;
         expand_pool->mem_hndl = mem_hndl;
         expand_pool->size = expand_size;
-        expand_pool->next = NULL;
-#if  MEMPOOL_DEBUG
-        printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %d\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
+        expand_pool->memblock_next = 0;
+#if MEMPOOL_DEBUG
+        printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %ld\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
 #endif
-        // FIXME: go to the end of link list
-        //while (mempools_head->next != NULL && mempools_head < expand_pool) mempools_head = mempools_head->next;
-        while (mempools_head->next != NULL) mempools_head = mempools_head->next;
-        mempools_head->next = expand_pool;
+         /* insert new block to memblock tail */
+        memblock_tail = (mempool_block*)((char*)mptr + mptr->memblock_tail);
+        memblock_tail->memblock_next = mptr->memblock_tail = (char*)expand_pool - (char*)mptr;
 
         bestfit = (mempool_header*)((char*)expand_pool->mempool_ptr + sizeof(mempool_block));
         bestfit->size = expand_size-sizeof(mempool_block);
         bestfit->mem_hndl = expand_pool->mem_hndl;
         bestfit->next_free = 0;
         bestfit_size = expand_size-sizeof(mempool_block);
-#if 0
+#if 1
+         /* insert bestfit to sorted free list */
+        previous = NULL;
         current = freelist_head_ptr;
-        while(current!= NULL && current < bestfit )
+        while (current) 
         {
-          previous = current;
-          current = current->next_free?(mempool_header*)((char *)mptr + current->next_free):NULL;
-        }
-#elif 0
+            if (current > bestfit) break;
+            previous = current;
+            current = current->next_free?(mempool_header*)((char *)mptr + current->next_free):NULL;
+        };
+        bestfit->next_free = current!=NULL? (char*)current-(char*)mptr:0;
+#else
         CmiAssert(bestfit > previous);
+        previous->next_free = (char*)bestfit-(char*)mptr;
 #endif
         bestfit_previous = previous;
         if (previous == NULL) {
@@ -231,23 +236,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     printf("[%d] INSIDE FREE ptr=%p, size=%d freehead=%p mutex: %p\n", CmiMyPe(), to_free, free_size, freelist_head, mptr->mutex);
 #endif
     
-    /*while(current!= NULL && current < to_free )
-    {
-#if  MEMPOOL_DEBUG
-        CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, (char*)current+current->size);
-#endif
-        previous = current;
-        current = current->next_free?(mempool_header*)((char*)mptr + current->next_free):NULL;
-    }*/
-    while(current!= NULL && memcmp(&current->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))!=0)
-    {
-#if  MEMPOOL_DEBUG
-        CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, (char*)current+current->size);
-#endif
-        previous = current;
-        current = current->next_free?(mempool_header*)((char*)mptr + current->next_free):NULL;
-    }
-    while(current!= NULL && current < to_free && memcmp(&current->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0)
+    while(current!= NULL && current < to_free )
     {
 #if  MEMPOOL_DEBUG
         CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, (char*)current+current->size);
@@ -259,12 +248,12 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     if (current) CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, free_lastbytes_pos);
 #endif
     //continuos with previous free space 
-    if(previous!= NULL && (char*)previous+previous->size == (char*)to_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0 )
+    if(previous!= NULL && (char*)previous+previous->size == (char*)to_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(mem_handle_t))==0 )
     {
         previous->size +=  free_size;
         merged = 1;
     }
-    else if(current!= NULL && free_lastbytes_pos == current && memcmp(&current->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0)
+    else if(current!= NULL && free_lastbytes_pos == current && memcmp(&current->mem_hndl, &to_free->mem_hndl, sizeof(mem_handle_t))==0)
     {
         to_free->size += current->size;
         to_free->next_free = current->next_free;
@@ -277,7 +266,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     }
     //continous, merge
     if(merged) {
-       if (previous!= NULL && current!= NULL && (char*)previous + previous->size  == (char *)current && memcmp(&previous->mem_hndl, &current->mem_hndl, sizeof(gni_mem_handle_t))==0)
+       if (previous!= NULL && current!= NULL && (char*)previous + previous->size  == (char *)current && memcmp(&previous->mem_hndl, &current->mem_hndl, sizeof(mem_handle_t))==0)
       {
          previous->size += current->size;
          previous->next_free = current->next_free;
