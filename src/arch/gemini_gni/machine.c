@@ -46,7 +46,9 @@ static CmiInt8 _expand_mem =  16*oneMB;
 #endif
 
 #define PRINT_SYH  0
-
+#if CMK_SMP
+#define COMM_THREAD_SEND 1
+#endif
 int         rdma_id = 0;
 #if PRINT_SYH
 int         lrts_smsg_success = 0;
@@ -577,7 +579,7 @@ static void PumpLocalRdmaTransactions();
 static int SendBufferMsg();
 
 inline
-static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
+static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
 {
     MSG_LIST        *msg_tmp;
     MallocMsgList(msg_tmp);
@@ -676,14 +678,14 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         {
             //printf("[%d]Init smsg connection\n", CmiMyPe());
             setup_smsg_connection(destNode);
-            delay_send_small_msg(msg, size, destNode, tag);
+            buffer_small_msgs(msg, size, destNode, tag);
             smsg_connected_flag[destNode] =10;
             return status;
         }
         else  if(smsg_connected_flag[destNode] <20)
         {
             if(inbuff == 0)
-                delay_send_small_msg(msg, size, destNode, tag);
+                buffer_small_msgs(msg, size, destNode, tag);
             return status;
         }
     }
@@ -700,12 +702,12 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
                 printf("GOOD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
             else
                 printf("BAD [%d==>%d] sent done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
-#endif
+#endif     
             return status;
         }
     }
     if(inbuff ==0)
-        delay_send_small_msg(msg, size, destNode, tag);
+        buffer_small_msgs(msg, size, destNode, tag);
     return status;
 }
 
@@ -769,7 +771,7 @@ static int send_medium_messages(int destNode, int size, char *msg)
             //buffer this smsg
             if(status != GNI_RC_SUCCESS)
             {
-                delay_send_small_msg(medium_msg_tmp, sizeof(MEDIUM_MSG_CONTROL), destNode, MEDIUM_HEAD_TAG);
+                buffer_small_msgs(medium_msg_tmp, sizeof(MEDIUM_MSG_CONTROL), destNode, MEDIUM_HEAD_TAG);
             }
             sub_id++;
         }while(remain_size > 0 );
@@ -778,47 +780,38 @@ static int send_medium_messages(int destNode, int size, char *msg)
     }
 #endif
 }
-
-// Large message, send control to receiver, receiver register memory and do a GET 
-inline
-static void send_large_messages(int destNode, int size, char *msg)
+inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
 {
-#if     USE_LRTS_MEMPOOL
-    gni_return_t        status  =   GNI_RC_SUCCESS;
-    CONTROL_MSG         *control_msg_tmp;
-    uint32_t            vmdh_index  = -1;
     /* construct a control message and send */
+    CONTROL_MSG         *control_msg_tmp;
     MallocControlMsg(control_msg_tmp);
     control_msg_tmp->source_addr    = (uint64_t)msg;
     control_msg_tmp->source         = myrank;
     control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
-    //memcpy( &(control_msg_tmp->source_mem_hndl), GetMemHndl(msg), sizeof(gni_mem_handle_t)) ;
+#if     USE_LRTS_MEMPOOL
     control_msg_tmp->source_mem_hndl = GetMemHndl(msg);
-#if PRINT_SYH
-    lrts_send_msg_id++;
-    printf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
+#else
+    control_msg_tmp->source_mem_hndl.qword1 = 0;
+    control_msg_tmp->source_mem_hndl.qword2 = 0;
 #endif
+    return control_msg_tmp;
+}
+// Large message, send control to receiver, receiver register memory and do a GET 
+inline
+static void send_large_messages(int destNode, int size, char *msg)
+{
+    gni_return_t        status  =   GNI_RC_SUCCESS;
+    CONTROL_MSG         *control_msg_tmp;
+    uint32_t            vmdh_index  = -1;
+
+   control_msg_tmp =  construct_control_msg(size, msg);
+#if     USE_LRTS_MEMPOOL
     status = send_smsg_message( destNode, 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
     if(status == GNI_RC_SUCCESS)
     {
         FreeControlMsg(control_msg_tmp);
     }
-// NOT use mempool, should slow 
 #else
-    gni_return_t        status  =   GNI_RC_SUCCESS;
-    CONTROL_MSG         *control_msg_tmp;
-    uint32_t            vmdh_index  = -1;
-    /* construct a control message and send */
-    MallocControlMsg(control_msg_tmp);
-    control_msg_tmp->source_addr    = (uint64_t)msg;
-    control_msg_tmp->source         = myrank;
-    control_msg_tmp->length         =ALIGN4(size); //for GET 4 bytes aligned 
-    control_msg_tmp->source_mem_hndl.qword1 = 0;
-    control_msg_tmp->source_mem_hndl.qword2 = 0;
-#if PRINT_SYH
-    lrts_send_msg_id++;
-    printf("Large LrtsSend PE:%d==>%d, size=%d, messageid:%d LMSG\n", myrank, destNode, size, lrts_send_msg_id);
-#endif
     status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN4(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     if(status == GNI_RC_SUCCESS)
     {
@@ -832,7 +825,7 @@ static void send_large_messages(int destNode, int size, char *msg)
         CmiAbort("Memory registor for large msg\n");
     }else 
     {
-        delay_send_small_msg(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+        buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
 #endif
 }
@@ -844,9 +837,20 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
 
 static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
+
     gni_return_t        status  =   GNI_RC_SUCCESS;
     LrtsPrepareEnvelope(msg, size);
+#if CMK_SMP
+    CONTROL_MSG         *control_msg_tmp;
 #if COMM_THREAD_SEND
+    if(size <= SMSG_MAX_MSG)
+        buffer_small_msgs(msg, size, destNode, SMALL_DATA_TAG);
+    else
+    {
+        control_msg_tmp =  construct_control_msg(size, msg);
+        buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+    }
+#endif
 #else
     if(size <= SMSG_MAX_MSG)
     {
@@ -1867,7 +1871,8 @@ static void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
-    mempool_destroy(mempool);
+    if (CmiMyRank() == 0)
+        mempool_destroy(mempool);
 #endif
     PMI_Finalize();
     exit(0);
