@@ -39,9 +39,10 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     mptr->mempools_head.mempool_ptr = pool;
     mptr->mempools_head.mem_hndl = mem_hndl;
     mptr->mempools_head.size = pool_size;
-    mptr->mempools_head.next = NULL;
+    mptr->mempools_head.memblock_next = 0;
     header = (mempool_header *) ((char*)pool+sizeof(mempool_type));
     mptr->freelist_head = sizeof(mempool_type);
+    mptr->memblock_tail = 0;
 //printf("[%d] pool: %p  free: %p\n", myrank, pool, header);
     header->size = pool_size-sizeof(mempool_type)-sizeof(mempool_header);
     header->mem_hndl = mem_hndl;
@@ -60,7 +61,7 @@ void mempool_destroy(mempool_type *mptr)
     {
         //printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
         current=mempools_head;
-        mempools_head = mempools_head->next;
+        mempools_head = mempools_head->memblock_next?(mempool_block *)((char*)mptr+mempools_head->memblock_next):NULL;
         freefn(current->mempool_ptr, current->mem_hndl);
     }
 }
@@ -120,7 +121,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     if(bestfit == NULL)
     {
         void *pool;
-        mempool_block   *expand_pool;
+        mempool_block   *expand_pool, *memblock_tail;
         size_t   expand_size;
         mem_handle_t  mem_hndl;
 
@@ -132,11 +133,12 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         expand_pool->mempool_ptr = pool;
         expand_pool->mem_hndl = mem_hndl;
         expand_pool->size = expand_size;
-        expand_pool->next = NULL;
+        expand_pool->memblock_next = 0;
         printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %ld\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
-          // FIXME: go to the end of link list
-        while (mempools_head->next != NULL && mempools_head < expand_pool) mempools_head = mempools_head->next;
-        mempools_head->next = expand_pool;
+
+         /* insert new block to memblock tail */
+        memblock_tail = (mempool_block*)((char*)mptr + mptr->memblock_tail);
+        memblock_tail->memblock_next = mptr->memblock_tail = (char*)expand_pool - (char*)mptr;
 
         bestfit = (mempool_header*)((char*)expand_pool->mempool_ptr + sizeof(mempool_block));
         bestfit->size = expand_size-sizeof(mempool_block);
@@ -144,14 +146,19 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         bestfit->next_free = 0;
         bestfit_size = expand_size-sizeof(mempool_block);
 #if 1
+         /* insert bestfit to sorted free list */
+        previous = NULL;
         current = freelist_head_ptr;
-        while(current!= NULL && current < bestfit )
+        while (current) 
         {
-          previous = current;
-          current = current->next_free?(mempool_header*)((char *)mptr + current->next_free):NULL;
-        }
+            if (current > bestfit) break;
+            previous = current;
+            current = current->next_free?(mempool_header*)((char *)mptr + current->next_free):NULL;
+        };
+        bestfit->next_free = current!=NULL? (char*)current-(char*)mptr:0;
 #else
         CmiAssert(bestfit > previous);
+        previous->next_free = (char*)bestfit-(char*)mptr;
 #endif
         bestfit_previous = previous;
         if (previous == NULL) {

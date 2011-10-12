@@ -20,7 +20,7 @@ typedef struct mempool_block_t
     void                *mempool_ptr;
     mem_handle_t    mem_hndl;
     int                 size;
-    struct              mempool_block_t *next;
+    size_t              memblock_next;     // offset to next memblock
 } mempool_block;
 
 
@@ -41,6 +41,7 @@ typedef struct mempool_type
   mempool_newblockfn     newblockfn;
   mempool_freeblock      freeblockfn;
   size_t          freelist_head;
+  size_t          memblock_tail;
 } mempool_type;
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_freeblock freefn);
