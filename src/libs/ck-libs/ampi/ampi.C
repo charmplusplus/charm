@@ -2984,6 +2984,8 @@ static int copyDatatype(MPI_Comm comm,MPI_Datatype type,int count,const void *in
   return MPI_SUCCESS;
 }
 
+#define SYNCHRONOUS_REDUCE                           0
+
   CDECL
 int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
     int root, MPI_Comm comm)
@@ -3023,11 +3025,22 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
   msg->setCallback(reduceCB);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Reduce called on comm %d root %d \n",ptr->thisIndex,comm,rootIdx));
   ptr->contribute(msg);
+
   if (ptr->thisIndex == rootIdx){
     /*HACK: Use recv() to block until reduction data comes back*/
     if(-1==ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, outbuf, count, type, MPI_REDUCE_COMM))
       CkAbort("AMPI>MPI_Reduce called with different values on different processors!");
+
+#if SYNCHRONOUS_REDUCE
+      AmpiMsg *msg = new (0, 0) AmpiMsg(-1, MPI_REDUCE_TAG, -1, rootIdx, 0, MPI_REDUCE_COMM);
+      CProxy_ampi pa(ptr->getProxy());
+      pa.generic(msg);
+#endif
   }
+#if SYNCHRONOUS_REDUCE
+  ptr->recv(MPI_REDUCE_TAG, MPI_REDUCE_SOURCE, NULL, 0, type, MPI_REDUCE_COMM);
+#endif
+
 #if AMPI_COUNTER
   getAmpiParent()->counters.reduce++;
 #endif

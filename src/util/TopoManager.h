@@ -20,7 +20,7 @@
 #include "BGPTorus.h"
 #elif XT3_TOPOLOGY
 #include "XT3Torus.h"
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 #include "XTTorus.h"
 #endif
 

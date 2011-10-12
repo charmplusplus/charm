@@ -3,6 +3,8 @@
 
 #define CMK_CRAYXE                                         1
 
+#define XE6_TOPOLOGY					   1
+
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
    used in the memory files of converse */
 #define CMK_GETPAGESIZE_AVAILABLE                          1
