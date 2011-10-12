@@ -478,7 +478,9 @@ static void CthThreadBaseFree(CthThreadBase *th)
 #if CMK_THREADS_ALIAS_STACK
     CthAliasFree(th->aliasStackHandle);
 #else /* isomalloc */
-    //CmiIsomallocFree(th->stack);
+#if !USE_MEMPOOL_ISOMALLOC
+    CmiIsomallocFree(th->stack);
+#endif
 #endif
   } 
   else if (th->stack!=NULL) {
@@ -596,8 +598,11 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 #elif CMK_THREADS_USE_STACKCOPY
     /* do nothing */
 #else /* isomalloc */
-    //		CmiIsomallocPup(p,&t->stack);
+#if USE_MEMPOOL_ISOMALLOC
     pup_bytes(p,&t->stack,sizeof(char*));
+#else
+    CmiIsomallocPup(p,&t->stack);
+#endif
 #endif
   } 
   else {
@@ -618,11 +623,14 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
   pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
   aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
   /* fixme: tls global variables handling needs isomalloc */
-  //CmiIsomallocPup(p, &aux);
+#if USE_MEMPOOL_ISOMALLOC
   pup_bytes(p,&aux,sizeof(char*));
+#else
+  CmiIsomallocPup(p, &aux);
+#endif
   /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
 #endif
-
+#endif
 }
 
 static void CthThreadFinished(CthThread t)
