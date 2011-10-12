@@ -24,11 +24,6 @@ Generalized by Gengbin Zheng  10/5/2011
 
 #include "mempool.h"
 
-#if CMK_CONVERSE_GEMINI_UGNI
-static      size_t     expand_mem = 1024ll*1024*16;
-#else
-static      size_t     expand_mem = 1024*16;
-#endif
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
 {
@@ -36,7 +31,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     mempool_header *header;
     mem_handle_t  mem_hndl;
 
-    void *pool = allocfn(&pool_size, &mem_hndl);
+    void *pool = allocfn(&pool_size, &mem_hndl, 0);
     mptr = (mempool_type*)pool;
     mptr->newblockfn = allocfn;
     mptr->freeblockfn = freefn;
@@ -135,8 +130,9 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
         if (!expand) return NULL;
 
-        expand_size = expand_mem>size ? expand_mem:2*size; 
-        pool = mptr->newblockfn(&expand_size, &mem_hndl);
+         /* set minimum size, newblockfn checks against the default size */
+        expand_size = 2*size; 
+        pool = mptr->newblockfn(&expand_size, &mem_hndl, 1);
         expand_pool = (mempool_block*)pool;
         expand_pool->mempool_ptr = pool;
         expand_pool->mem_hndl = mem_hndl;
@@ -155,7 +151,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         bestfit->next_free = 0;
         bestfit_size = expand_size-sizeof(mempool_block);
 #if 1
-         /* insert bestfit to sorted free list */
+         /* insert bestfit to the sorted free list */
         previous = NULL;
         current = freelist_head_ptr;
         while (current) 

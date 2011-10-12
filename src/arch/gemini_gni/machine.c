@@ -40,7 +40,9 @@ static void sleep(int secs) {
 #define USE_LRTS_MEMPOOL     1
 
 #if USE_LRTS_MEMPOOL
-static CmiInt8 _mempool_size = 1024ll*1024*32;
+#define oneMB (1024ll*1024)
+static CmiInt8 _mempool_size = 32*oneMB;
+static CmiInt8 _expand_mem =  16*oneMB;
 #endif
 
 #define PRINT_SYH  0
@@ -1645,9 +1647,13 @@ static void _init_DMA_buffer()
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
-void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl)
+void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
-    void *pool = memalign(ALIGNBUF, *size);
+    void *pool;
+
+    int default_size =  expand_flag? _expand_mem : _mempool_size;
+    if (*size < default_size) *size = default_size;
+    pool = memalign(ALIGNBUF, *size);
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
     GNI_RC_CHECK("Mempool register", status);
     return pool;
