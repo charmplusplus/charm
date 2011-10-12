@@ -261,10 +261,12 @@ typedef struct  rmda_msg
     struct  rmda_msg      *next;
 }RDMA_REQUEST;
 
+PCQueue sendRdmaBuf;
+
 typedef struct  msg_list_index
 {
     int         next;
-    PCQueue     sendMsgBuf;
+    PCQueue     sendSmsgBuf;
     //MSG_LIST    *head;
     //MSG_LIST    *tail;
 } MSG_LIST_INDEX;
@@ -376,11 +378,6 @@ static PENDING_GETNEXT     *pending_smsg_tail = 0;
 static int      buffered_smsg_counter = 0;
 
 /* SmsgSend return success but message sent is not confirmed by remote side */
-static RDMA_REQUEST  *pending_smsg_conn_head = 0;
-static RDMA_REQUEST  *pending_smsg_conn_tail = 0;
-
-static RDMA_REQUEST  *pending_rdma_head = 0;
-static RDMA_REQUEST  *pending_rdma_tail = 0;
 static MSG_LIST *buffered_fma_head = 0;
 static MSG_LIST *buffered_fma_tail = 0;
 
@@ -587,11 +584,11 @@ static void delay_send_small_msg(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
     //msg_tmp->next   = 0;
-    if (PCQueueEmpty(smsg_msglist_index[destNode].sendMsgBuf) ) {
+    if (PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) ) {
         smsg_msglist_index[destNode].next = smsg_head_index;
         smsg_head_index = destNode;
     }
-    PCQueuePush(smsg_msglist_index[destNode].sendMsgBuf, (char*)msg_tmp);
+    PCQueuePush(smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
 #if PRINT_SYH
     buffered_smsg_counter++;
 #endif
@@ -654,15 +651,7 @@ static void setup_smsg_connection(int destNode)
         rdma_request_msg->next = 0;
         rdma_request_msg->destNode = destNode;
         rdma_request_msg->pd = pd;
-        if(pending_smsg_conn_head== 0)
-        {
-            pending_smsg_conn_head  = rdma_request_msg;
-        }else
-        {
-            pending_smsg_conn_tail->next = rdma_request_msg;
-        }
-        pending_smsg_conn_tail = rdma_request_msg;
-
+        /* buffer this request */
     }
     if(status != GNI_RC_SUCCESS)
        printf("[%d=%d] send post FMA %s\n", myrank, destNode, gni_err_str[status]);
@@ -698,7 +687,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     }
 #endif
     //printf("[%d] reach send\n", myrank);
-    if(PCQueueEmpty(smsg_msglist_index[destNode].sendMsgBuf) || inbuff==1)
+    if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
         if(status == GNI_RC_SUCCESS)
@@ -855,7 +844,8 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
     gni_return_t        status  =   GNI_RC_SUCCESS;
     LrtsPrepareEnvelope(msg, size);
-
+#if COMM_THREAD_SEND
+#else
     if(size <= SMSG_MAX_MSG)
     {
 #if PRINT_SYH
@@ -872,6 +862,7 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     {
         send_large_messages(destNode, size, msg);
     }
+#endif
     return 0;
 }
 
@@ -1075,17 +1066,9 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
     {
         MallocRdmaRequest(rdma_request_msg);
-        rdma_request_msg->next = 0;
         rdma_request_msg->destNode = inst_id;
         rdma_request_msg->pd = pd;
-        if(pending_rdma_head == 0)
-        {
-            pending_rdma_head = rdma_request_msg;
-        }else
-        {
-            pending_rdma_tail->next = rdma_request_msg;
-        }
-        pending_rdma_tail = rdma_request_msg;
+        PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
     }else
         GNI_RC_CHECK("AFter posting", status);
 
@@ -1147,14 +1130,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         rdma_request_msg->next = 0;
         rdma_request_msg->destNode = inst_id;
         rdma_request_msg->pd = pd;
-        if(pending_rdma_head == 0)
-        {
-            pending_rdma_head = rdma_request_msg;
-        }else
-        {
-            pending_rdma_tail->next = rdma_request_msg;
-        }
-        pending_rdma_tail = rdma_request_msg;
+        PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
     }else
         GNI_RC_CHECK("AFter posting", status);
 #endif
@@ -1165,11 +1141,14 @@ static void PumpLocalSmsgTransactions()
 {
     gni_return_t            status;
     gni_cq_entry_t          ev;
+    uint64_t                type, inst_id;
     while ((status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS)
     {
+        type        = GNI_CQ_GET_TYPE(ev);
 #if PRINT_SYH
         lrts_local_done_msg++;
-        //printf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
+        printf("[%d] SMSGPumpLocalSMSGTransactions (type=%d)\n", myrank, type);
+        printf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
 #endif
         if(GNI_CQ_OVERRUN(ev))
         {
@@ -1194,7 +1173,7 @@ static void PumpLocalRdmaTransactions()
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
 
-   // while ( (status = GNI_CqGetEvent(post_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
+    //while ( (status = GNI_CqGetEvent(post_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
     {
         type        = GNI_CQ_GET_TYPE(ev);
@@ -1206,7 +1185,7 @@ static void PumpLocalRdmaTransactions()
         {
             inst_id     = GNI_CQ_GET_INST_ID(ev);
 #if PRINT_SYH
-            printf("**[%d] SMSGPumpLocalTransactions localdone=%d, %d\n", myrank,  lrts_local_done_msg, smsg_connected_flag[inst_id]);
+            printf("**[%d] SMSGPumpLocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
 #endif
             //status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
@@ -1235,6 +1214,7 @@ static void PumpLocalRdmaTransactions()
 #endif
                 break;
             default:
+                CmiPrintf("type=%d\n", tmp_pd->type);
                 CmiAbort("PumpLocalRdmaTransactions: unknown type!");
             }
 
@@ -1264,13 +1244,13 @@ static void PumpLocalRdmaTransactions()
         }
     } //end while
 }
-
+#if DYNAMIC_SMSG
 static void SendSmsgConnectMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
 
-    RDMA_REQUEST *ptr = pending_smsg_conn_head;
+    //RDMA_REQUEST *ptr = pending_smsg_conn_head;
     RDMA_REQUEST *prev = NULL;
 
     while (ptr != NULL)
@@ -1294,17 +1274,17 @@ static void SendSmsgConnectMsg()
         ptr = ptr->next;
     } //end while
 }
-
+#endif
 static void  SendRdmaMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
 
-    RDMA_REQUEST *ptr = pending_rdma_head;
-    RDMA_REQUEST *prev = NULL;
+    RDMA_REQUEST *ptr = NULL;
 
-    while (ptr != NULL)
+    while (!(PCQueueEmpty(sendRdmaBuf)))
     {
+        ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
         gni_post_descriptor_t *pd = ptr->pd;
         status = GNI_RC_SUCCESS;
         // register memory first
@@ -1320,18 +1300,14 @@ static void  SendRdmaMsg()
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
             if(status == GNI_RC_SUCCESS)
             {
-                RDMA_REQUEST *tmp = ptr;
-                if (prev)
-                  prev->next = ptr->next;
-                else
-                  pending_rdma_head = ptr->next;
-                ptr = ptr->next;
-                FreeRdmaRequest(tmp);
+                FreeRdmaRequest(ptr);
                 continue;
             }
+        }else
+        {
+            PCQueuePush(sendRdmaBuf, (char*)ptr);
+            break;
         }
-        prev = ptr;
-        ptr = ptr->next;
     } //end while
 }
 
@@ -1349,9 +1325,9 @@ static int SendBufferMsg()
     /* can add flow control here to control the number of messages sent before handle message */
     while(index != -1)
     {
-        while(!PCQueueEmpty(smsg_msglist_index[index].sendMsgBuf))
+        while(!PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
-            ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendMsgBuf);
+            ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
 #if         CMK_SMP
             if(ptr == NULL)
                 break;
@@ -1411,13 +1387,13 @@ static int SendBufferMsg()
                 //ptr= smsg_msglist_index[index].head;
 
             }else {
-                PCQueuePush(smsg_msglist_index[index].sendMsgBuf, (char*)ptr);
+                PCQueuePush(smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
                 done = 0;
                 break;
             } 
         
         } //end while
-        if(PCQueueEmpty(smsg_msglist_index[index].sendMsgBuf))
+        if(PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
             if(index_previous != -1)
                 smsg_msglist_index[index_previous].next = smsg_msglist_index[index].next;
@@ -1441,12 +1417,12 @@ static void LrtsAdvanceCommunication()
 #endif
     if(mysize == 1) return;
     PumpNetworkSmsg();
-    //printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
+   // printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
     //PumpNetworkRdmaMsgs();
     /* Release Sent Msg */
     //printf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
 #if 0
-    ////PumpLocalSmsgTransactions();
+    PumpLocalSmsgTransactions();
     if(myrank == 0)
     printf("Calling Lrts Rlease RdmaMsg PE:%d\n", myrank);
 #endif
@@ -1611,7 +1587,7 @@ static void _init_smsg()
      for(i =0; i<mysize; i++)
      {
         smsg_msglist_index[i].next = -1;
-        smsg_msglist_index[i].sendMsgBuf = PCQueueCreate();
+        smsg_msglist_index[i].sendSmsgBuf = PCQueueCreate();
         
      }
      smsg_head_index = -1;
@@ -1761,8 +1737,8 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &smsg_tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate (tx)", status);
     
-    //status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_tx_cqh);
-    //GNI_RC_CHECK("GNI_CqCreate post (tx)", status);
+    status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &post_tx_cqh);
+    GNI_RC_CHECK("GNI_CqCreate post (tx)", status);
     /* create the destination completion queue for receiving micro-messages, make this queue considerably larger than the number of transfers */
 
     status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &smsg_rx_cqh);
@@ -1796,7 +1772,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             _init_static_smsg();
 #endif
         _init_smsg();
-        CmiBarrier();
+        PMI_Barrier();
     }
 #if     USE_LRTS_MEMPOOL
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
@@ -1814,12 +1790,7 @@ static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP
     mempoolLock = CmiCreateLock();
 #endif
-
-    if (CmiMyRank() == 0) {
-        char ln[200];
-        sprintf(ln,"debugLog.%d",CmiMyNode());
-        debugLog=fopen(ln,"w");
-    }
+   sendRdmaBuf = PCQueueCreate(); 
 }
 
 
@@ -1992,7 +1963,26 @@ double CmiCpuTimer(void) {
 int CmiBarrier()
 {
     int status;
-    status = PMI_Barrier();
+    return status;
+
+#if CMK_SMP
+    /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */
+    CmiNodeAllBarrier();
+    if (CmiMyRank() == CmiMyNodeSize())
+#else
+    if (CmiMyRank() == 0)
+#endif
+    {
+        /**
+         *  The call of CmiBarrier is usually before the initialization
+         *  of trace module of Charm++, therefore, the START_EVENT
+         *  and END_EVENT are disabled here. -Chao Mei
+         */
+        /*START_EVENT();*/
+        status = PMI_Barrier();
+        /*END_EVENT(10);*/
+    }
+    CmiNodeAllBarrier();
     return status;
 
 }
