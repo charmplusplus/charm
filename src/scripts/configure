@@ -3737,6 +3737,9 @@ then
   fi
 fi
 
+## Cray specific test
+if test "$CMK_BUILD_CRAY" = "1"
+then
 
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
@@ -3773,6 +3776,8 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RCALIB $pass
 _ACEOF
 
+
+fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT
