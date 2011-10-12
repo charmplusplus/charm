@@ -1,6 +1,8 @@
 #CMK_DEFS="-I/opt/xt-mpt/1.5.47/mpich2-64/T/include "
 #CMK_LD_DEFS="-lrca "
 
+CMK_BUILD_CRAY=1
+
 PGCC=`CC -V 2>/dev/null | grep pgCC`
 
 CMK_CPP_CHARM="/lib/cpp -P"
