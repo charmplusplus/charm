@@ -630,7 +630,6 @@ void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 #endif
   /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
 #endif
-#endif
 }
 
 static void CthThreadFinished(CthThread t)

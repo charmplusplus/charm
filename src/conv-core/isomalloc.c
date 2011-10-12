@@ -2539,7 +2539,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   mempool_block *current, *mempools_head;
   void *newblock;
   CmiInt8 slot;
-  CmiInt8 size;
+  int size;
   int i, numBlocks = 0;
 
   if(!pup_isUnpacking(p)) {
@@ -2557,7 +2557,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     pup_int(p,&numBlocks);
     current = &(CtvAccessOther(tid,threadpool)->mempools_head);
     while(current != NULL) {
-      pup_int8(p,&current->size);
+      pup_int(p,&current->size);
       pup_int8(p,&current->mem_hndl);
       pup_bytes(p,current->mempool_ptr,current->size);
 #if ISOMALLOC_DEBUG
@@ -2573,7 +2573,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     printf("Number of blocks to be unpacked %d\n",numBlocks);
 #endif
     for(i = 0; i < numBlocks; i++) { 
-      pup_int8(p,&size);
+      pup_int(p,&size);
       pup_int8(p,&slot);
       newblock = map_slots(slot,size/slotsize);
       pup_bytes(p,newblock,size);
