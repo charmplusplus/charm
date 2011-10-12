@@ -135,7 +135,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         expand_pool->next = NULL;
         printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %d\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
           // FIXME: go to the end of link list
-        while (mempools_head->next != NULL) mempools_head = mempools_head->next;
+        while (mempools_head->next != NULL && mempools_head < expand_pool) mempools_head = mempools_head->next;
         mempools_head->next = expand_pool;
 
         bestfit = (mempool_header*)((char*)expand_pool->mempool_ptr + sizeof(mempool_block));
@@ -143,12 +143,12 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         bestfit->mem_hndl = expand_pool->mem_hndl;
         bestfit->next_free = 0;
         bestfit_size = expand_size-sizeof(mempool_block);
-#if 0
-        current = freelist_head;
+#if 1
+        current = freelist_head_ptr;
         while(current!= NULL && current < bestfit )
         {
           previous = current;
-          current = current->next;
+          current = current->next_free?(mempool_header*)((char *)mptr + current->next_free):NULL;
         }
 #else
         CmiAssert(bestfit > previous);
@@ -232,7 +232,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     if (current) CmiPrintf("[%d] previous=%p, current=%p size:%d %p\n", CmiMyPe(), previous, current, current->size, free_lastbytes_pos);
 #endif
     //continuos with previous free space 
-    if(previous!= NULL && (char*)previous+previous->size == to_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0 )
+    if(previous!= NULL && (char*)previous+previous->size == (char*)to_free &&  memcmp(&previous->mem_hndl, &to_free->mem_hndl, sizeof(gni_mem_handle_t))==0 )
     {
         previous->size +=  free_size;
         merged = 1;
