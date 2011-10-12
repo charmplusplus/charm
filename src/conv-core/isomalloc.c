@@ -1650,7 +1650,7 @@ CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 CtvStaticDeclare(mempool_type *, threadpool); /*Thread managed pools*/
 
 //alloc function to be used by mempool
-void * isomallocfn (size_t *size, gni_mem_handle_t *mem_hndl)
+void * isomallocfn (size_t *size, mem_handle_t *mem_hndl)
 {
   CmiInt8 s,n,i;
   void *newaddr;
@@ -1678,7 +1678,7 @@ void * isomallocfn (size_t *size, gni_mem_handle_t *mem_hndl)
 }
 
 //free function to be used by mempool
-void isofreefn(void *ptr, gni_mem_handle_t mem_hndl)
+void isofreefn(void *ptr, mem_handle_t mem_hndl)
 {
   call_munmap(ptr, ((mempool_block *)ptr)->size);
 }
@@ -2536,6 +2536,7 @@ static void print_myslots();
 #if USE_MEMPOOL_ISOMALLOC
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
 {
+  mempool_type *mptr;
   mempool_block *current, *mempools_head;
   void *newblock;
   CmiInt8 slot;
@@ -2546,10 +2547,12 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 #if ISOMALLOC_DEBUG
     printf("My rank is %d Pupping for %d \n",CthSelf(),tid);
 #endif
+    mptr = CtvAccessOther(tid,threadpool);
     current = &(CtvAccessOther(tid,threadpool)->mempools_head);
     while(current != NULL) {
       numBlocks++;
-      current = current->next;
+      current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
+      //current = current->next;
     }
 #if ISOMALLOC_DEBUG
     printf("Number of blocks packed %d\n",numBlocks);
@@ -2563,7 +2566,8 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 #if ISOMALLOC_DEBUG
       printf("[%d] Packing slot %lld size %d at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
 #endif
-      current = current->next;
+      current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
+      //current = current->next;
     }
   }
 
