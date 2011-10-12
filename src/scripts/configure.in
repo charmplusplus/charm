@@ -1619,6 +1619,9 @@ then
   fi
 fi
 
+## Cray specific test
+if test "$CMK_BUILD_CRAY" = "1"
+then
 
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
@@ -1647,6 +1650,8 @@ int main() {
 EOT
 test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
+
+fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT

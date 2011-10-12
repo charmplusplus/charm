@@ -273,7 +273,7 @@ int CmiPrintCPUAffinity()
 #endif
 }
 
-int CmiOnCore(void) {
+int CmiOnCore() {
 #if CMK_OS_IS_LINUX
   /*
    * The info (task_cpu) is read from the Linux /proc virtual file system.
@@ -574,6 +574,7 @@ void CmiInitCPUAffinity(char **argv)
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
+#if !CMK_CRAYXT && !CMK_CRAYXE
     if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -583,6 +584,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 #endif
     }
+#endif
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
@@ -626,6 +628,7 @@ void CmiInitCPUAffinity(char **argv)
       CmiAbort("set cpu affinity abort!\n");
     }
   }
+  CmiNodeAllBarrier();
   CmiNodeAllBarrier();
 #else
     /* get my ip address */

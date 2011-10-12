@@ -101,7 +101,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg);
 
 #if CMK_NODE_QUEUE_AVAILABLE
 void CmiSyncNodeBroadcastFn(int size, char *msg);
-CmiCommHandle CmiAsyncNodeBroadcastFn(int size, char *msg);
+CmiCommHandle CmiAsyncNodeeroadcastFn(int size, char *msg);
 void CmiFreeNodeBroadcastFn(int size, char *msg);
 
 void CmiSyncNodeBroadcastAllFn(int size, char *msg);
@@ -603,6 +603,13 @@ if (  MSG_STATISTIC)
 }
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
+   
+if (myrank==0) 
+#if !CMK_SMP 
+    printf("Charm++> Running on Non-smp mode\n");
+#else
+    printf("Charm++> Running on Smp mode, %d worker threads per process\n", _Cmi_mynodesize);
+#endif
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -829,10 +836,8 @@ void *CmiGetNonLocal(void) {
     if (!msg) {
        AdvanceCommunication();
        msg = PCQueuePop(cs->recv);
-    } 
+    }
 #endif
-
-    LrtsPostNonLocal();
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
 
@@ -888,6 +893,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 #if !CMK_SMP
     AdvanceCommunication();
+//#else
+//    LrtsPostNonLocal();
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
