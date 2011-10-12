@@ -24,7 +24,11 @@ Generalized by Gengbin Zheng  10/5/2011
 
 #include "mempool.h"
 
+#if CMK_CONVERSE_GEMINI_UGNI
 static      size_t     expand_mem = 1024ll*1024*16;
+#else
+static      size_t     expand_mem = 1024*16;
+#endif
 
 mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
 {
@@ -43,7 +47,9 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
     header = (mempool_header *) ((char*)pool+sizeof(mempool_type));
     mptr->freelist_head = sizeof(mempool_type);
     mptr->memblock_tail = 0;
-//printf("[%d] pool: %p  free: %p\n", myrank, pool, header);
+#if MEMPOOL_DEBUG
+    printf("[%d] pool: %p  free: %p\n", myrank, pool, header);
+#endif
     header->size = pool_size-sizeof(mempool_type)-sizeof(mempool_header);
     header->mem_hndl = mem_hndl;
     header->next_free = 0;
@@ -59,7 +65,9 @@ void mempool_destroy(mempool_type *mptr)
 
     while(mempools_head!= NULL)
     {
-        //printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
+#if MEMPOOL_DEBUG
+        printf("[%d] free mempool:%p\n", CmiMyPe(), mempools_head->mempool_ptr);
+#endif
         current=mempools_head;
         mempools_head = mempools_head->memblock_next?(mempool_block *)((char*)mptr+mempools_head->memblock_next):NULL;
         freefn(current->mempool_ptr, current->mem_hndl);
@@ -134,8 +142,9 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         expand_pool->mem_hndl = mem_hndl;
         expand_pool->size = expand_size;
         expand_pool->memblock_next = 0;
+#if MEMPOOL_DEBUG
         printf("[%d] No memory has such free empty chunck of %d. expanding %p with new size %ld\n", CmiMyPe(), size, expand_pool->mempool_ptr, expand_size);
-
+#endif
          /* insert new block to memblock tail */
         memblock_tail = (mempool_block*)((char*)mptr + mptr->memblock_tail);
         memblock_tail->memblock_next = mptr->memblock_tail = (char*)expand_pool - (char*)mptr;
