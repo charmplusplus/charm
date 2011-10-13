@@ -837,6 +837,8 @@ void *CmiGetNonLocal(void) {
        AdvanceCommunication();
        msg = PCQueuePop(cs->recv);
     }
+#else
+//    LrtsPostNonLocal();
 #endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
@@ -893,8 +895,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 #if !CMK_SMP
     AdvanceCommunication();
-//#else
-//    LrtsPostNonLocal();
+#else
+    LrtsPostNonLocal();
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
