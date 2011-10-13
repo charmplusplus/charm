@@ -14,7 +14,15 @@ using namespace std;
 #include <controlPoints.h>
 #endif
 
-#include "searchEngine_impl.h"
+#include "searchEngine.h"
+
+static SE_createInitialChildrenFn createInitialChildren = NULL;
+static SE_createChildrenFn createChildren = NULL;
+static SE_parallelLevelFn     parallelLevel = NULL;
+static SE_searchDepthLimitFn   searchDepthLimit = NULL;
+SE_lowerBoundFn   _lowerBoundFn = NULL;
+
+//#include "searchEngine_impl.h"
 
 void printPriority(SearchNodeMsg *pm){
 #if defined(USEBITPRIORITY) || defined(USEINTPRIORITY)
@@ -59,12 +67,6 @@ int se_statesize;     // readonly
 CProxy_SearchConductor searchEngineProxy;
 CProxy_SearchGroup groupProxy;
 
-
-static SE_createInitialChildrenFn createInitialChildren = NULL;
-static SE_createChildrenFn createChildren = NULL;
-static SE_parallelLevelFn     parallelLevel = NULL;
-static SE_searchDepthLimitFn   searchDepthLimit = NULL;
-static SE_lowerBoundFn   lowerBound = NULL;
 
 /****************************** search conductor  main chare */
 SearchConductor::SearchConductor( CkArgMsg *m )
@@ -186,7 +188,29 @@ SearchGroup::SearchGroup()
     minCost = 1000000;
 #endif
 }
-
+#ifdef BRANCHBOUND
+inline void SearchGroup::updateCost(double c)
+{
+    if(c<minCost) 
+    {
+        minCost = c;
+    //   CkPrintf("min cost =%f\n", c);
+    //    void **copyqueue;
+    //    CqsEnumerateQueue((Queue)CpvAccess(CsdSchedQueue), &copyqueue);
+    //    for(int i=0; i<CqsLength((Queue)CpvAccess(CsdSchedQueue)); i++)
+    //    {
+    //        void* msgchare = copyqueue[i];
+    //        int prior = *(int*)CkPriorityPtr(msgchare);
+    //        if(prior > minCost)
+    //        {
+    //              CqsRemoveSpecific((Queue)CpvAccess(CsdSchedQueue), msgchare);
+    //              CkPrintf("node is removed, prior=%d, mincost=%f\n", prior, minCost);
+    //        }
+    //    }
+    //    //CmiFree(copyqueue);
+    }
+}
+#endif
 // This method is invoked via a broadcast. Each branch then reports 
 //  its count to the branch on 0 (or via a spanning tree.)
 inline void SearchGroup::sendCounts()
@@ -284,7 +308,8 @@ SearchNode::SearchNode( SearchNodeMsg *msg )
         solver.setParentInfo(msg, mySearchDepth);
 #ifdef BRANCHBOUND
         double minCost = myGroup->getCost();
-        double lb = lowerBound(mySearchClass);
+        double lb = _lowerBoundFn(mySearchClass);
+        //CkPrintf("best solution is %f\n", minCost);
         if(lb<minCost)
             createChildren(mySearchClass, &solver, true);
         else
@@ -329,7 +354,7 @@ void SE_register(SE_createInitialChildrenFn f1,
   createChildren = f2;
   parallelLevel = f3;
   searchDepthLimit = f4;
-  lowerBound = f5;
+  _lowerBoundFn = f5;
 
   CmiPoolAllocInit(30);
 }

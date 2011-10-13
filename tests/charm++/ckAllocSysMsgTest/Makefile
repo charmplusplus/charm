@@ -22,6 +22,7 @@ ckAllocSysMsgTest.o: ckAllocSysMsgTest.C ckAllocSysMsgTest.decl.h ckAllocSysMsgT
 test: all
 	./charmrun ./ckAllocSysMsgTest 10 10 10 1 $(TESTOPTS) 
 	./charmrun ./ckAllocSysMsgTest 30 10 10 1 $(TESTOPTS) +p2 
+	./charmrun ./ckAllocSysMsgTest 40 5 2 1 $(TESTOPTS) +p2 
 	./charmrun ./ckAllocSysMsgTest 30 10 10 1 $(TESTOPTS) +p4
 
 

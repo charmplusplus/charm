@@ -26,6 +26,15 @@
 
 #include "crc32.h"
 
+#if ! CMK_CHARMDEBUG
+#error "charmdebug is not enabled (e.g. when building with-production)"
+static void *meta_malloc(size_t size);
+static void *meta_calloc(size_t nelem, size_t size);
+static void *meta_realloc(void *oldBuffer, size_t newSize);
+static void *meta_memalign(size_t align, size_t size);
+static void *meta_valloc(size_t size);
+#else
+
 typedef struct _Slot Slot;
 typedef struct _SlotStack SlotStack;
 
@@ -1444,7 +1453,7 @@ static void *meta_malloc(size_t size) {
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
       traceMalloc_c(user, size, s->from, s->stackLen);
 #endif
     }
@@ -1497,7 +1506,7 @@ static void meta_free(void *mem) {
     int memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     traceFree_c(mem, memSize);
 #endif
 
@@ -1590,7 +1599,7 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
 #endif
   return user;
@@ -1681,3 +1690,6 @@ void * MemoryToSlot(void *ptr) {
     CmiPrintf("%d 0 ",sl->chareID);
   }
 }*/
+
+
+#endif

@@ -65,9 +65,11 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "memory-isomalloc.h"
+#if CMK_PROJECTOR
 #include "converseEvents.h"             /* projector */
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
+#endif
 
 extern const char * const CmiCommitID;
 
@@ -129,7 +131,6 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
-
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -212,6 +213,10 @@ CpvDeclare(void *, CkGridObject);
 CpvDeclare(void *, CsdGridQueue);
 #endif
 
+#if CMK_CRAYXE
+void* LrtsAlloc(int, int);
+void  LrtsFree(void*);
+#endif
 
 /*****************************************************************************
  *
@@ -1543,7 +1548,9 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1554,7 +1561,9 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -1567,7 +1576,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
@@ -2758,6 +2767,8 @@ void *CmiAlloc(int size)
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CMK_CRAYXE
+  res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #else
@@ -2852,6 +2863,8 @@ void CmiFree(void *blk)
       }
 #endif
     infi_CmiFree(BLKSTART(parentBlk));
+#elif CMK_CRAYXE
+    LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
 #else
@@ -3428,10 +3441,8 @@ void ConverseCommonInit(char **argv)
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
-
   if (CmiMyPe() == 0)
-    CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
-
+      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */
@@ -3489,7 +3500,7 @@ void ConverseCommonInit(char **argv)
   CthSetSuspendable(CthSelf(), 0);
 */
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
   extern void initQd(char **argv);
   initQd(argv);
@@ -3516,7 +3527,7 @@ void ConverseCommonExit(void)
 #if CMK_CUDA
   exitHybridAPI(); 
 #endif
-
+  seedBalancerExit();
   EmergencyExit();
 }
 

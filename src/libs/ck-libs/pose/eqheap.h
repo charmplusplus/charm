@@ -47,7 +47,9 @@ class HeapNode
     return max;
   }
   /// Dump all data fields
-  void dump();                 
+  void dump();
+  /// Dump all data fields to a string
+  char *dumpString();
   /// Pack/unpack/sizing operator
   /** Packs/sizes the entire heap, DOES NOT UNPACK HEAP!!! */
   void pup(PUP::er &p);                     
@@ -87,7 +89,9 @@ class EqHeap {
     return POSE_UnsetTS;
   }
   /// Dump entire heap
-  void dump();                      
+  void dump();
+  /// Dump entire heap to a string
+  char *dumpString();
   /// Pack/unpack/sizing operator
   /** Pups entire heap relying on recursive HeapNode::pup */
   void pup(PUP::er &p);     

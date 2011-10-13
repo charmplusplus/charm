@@ -1,0 +1,13 @@
+mainmodule comp {
+  extern module completion;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void startTest();
+    entry void finishTest();
+  };
+
+  array [1D] completion_array {
+    entry completion_array(CProxy_CompletionDetector detector, int n);
+  };
+}

@@ -1,3 +1,5 @@
+#include "ckfutures.h"
+
 #ifndef _IGET_FLOWCONTROL_H
 #define _IGET_FLOWCONTROL_H
 
@@ -32,7 +34,7 @@ extern "C" int getRSS();
 
 class IGetControlClass {
 public:
-  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID, CkArrayIndexMax, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+  int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID, CkArrayIndex, void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int))
     {return 1;}
   void iget_free(CthThread tid, int size) {}
   void iget_resend(CkIGetID) {}
@@ -126,8 +128,8 @@ typedef struct iget_token_struct {
 //  void *obj;     
 //  void(*fptr1)(void*,void*,int,int);
   CkArrayID aid;
-  CkArrayIndexMax idx;
-  void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int);   
+  CkArrayIndex idx;
+  void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int);   
 } *iget_tokenqueue_entry;
 
 typedef HashQueueT<CkIGetID, iget_tokenqueue_entry> HashTokenQueue;
@@ -150,7 +152,7 @@ public:
   }
 */
 	int iget_request(CkIGetID fut, void *msg, int ep, CkArrayID id,
-CkArrayIndexMax idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int),
+CkArrayIndex idx, void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int),
 int);
 
 	void iget_free(int size);
@@ -205,8 +207,8 @@ private:
     queue.key_enq(e,gid);
   } 
 */
-  inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep, CkArrayID aid, CkArrayIndexMax
-				      idx, void(*fptr)(CkArrayID,CkArrayIndexMax,void*,int,int))
+  inline void iget_tokenqueue_enqueue(CkIGetID gid,void* m,int ep, CkArrayID aid, CkArrayIndex
+				      idx, void(*fptr)(CkArrayID,CkArrayIndex,void*,int,int))
   {
     iget_tokenqueue_entry e=new iget_token_struct();
     e->futNum=gid; e->m=m; e->ep=ep; e->aid=aid; e->idx=idx; e->fptr=fptr; e->status=0;
@@ -232,5 +234,7 @@ private:
 };
 
 #endif
+
+extern IGetControlClass TheIGetControlClass;
 
 #endif

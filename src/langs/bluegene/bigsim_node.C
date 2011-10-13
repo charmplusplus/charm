@@ -30,7 +30,7 @@ nodeInfo::nodeInfo(): lastW(0), udata(NULL), started(0), timeron_flag(0)
     affinityQ = new ckMsgQueue[numWth];
     _MEMCHECK(affinityQ);
 
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
     timelines = new BgTimeLineRec[numWth]; // set default size 1024
     _MEMCHECK(timelines);
 #endif

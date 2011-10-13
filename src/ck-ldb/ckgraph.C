@@ -65,6 +65,23 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 
       vertices[from].sendToList.push_back(Edge(to, commData.messages, commData.bytes));
       vertices[to].recvFromList.push_back(Edge(from, commData.messages, commData.bytes));
+    } //else if a multicast list
+    else if((!commData.from_proc()) && (commData.recv_type() == LD_OBJLIST_MSG)) {
+      int nobjs, offset;
+      LDObjKey *objs = commData.receiver.get_destObjs(nobjs);
+      McastSrc sender(nobjs, commData.messages, commData.bytes);
+
+      from = stats->getHash(commData.sender);
+      offset = vertices[from].mcastToList.size();
+
+      for(int i = 0; i < nobjs; i++) {
+        int idx = stats->getHash(objs[i]);
+        CmiAssert(idx != -1);
+        vertices[idx].mcastFromList.push_back(McastDest(from, offset,
+        commData.messages, commData.bytes));
+        sender.destList.push_back(idx);
+      }
+      vertices[from].mcastToList.push_back(sender);
     }
   } // end for
 }

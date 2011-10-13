@@ -27,7 +27,7 @@ friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
                    max_receiver= 0; at_count = 0; on = CmiFalse; 
-	#if CMK_BLUEGENE_CHARM
+	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
 	#endif
     };
@@ -69,7 +69,7 @@ private:
   int at_count;
   CmiBool on;
 
-  #if CMK_BLUEGENE_CHARM
+  #if CMK_BIGSIM_CHARM
   int first_free_client_slot;
   #endif
 };
@@ -165,6 +165,10 @@ public:
   void RemoveStartLBFn(LDStartLBFn fn);
   void StartLB();
 
+  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
+  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  void MigrationDone();
+
   inline void IdleTime(LBRealType* walltime) 
        { machineUtil.IdleTime(walltime); };
   inline void TotalTime(LBRealType* walltime, LBRealType* cputime) 
@@ -219,6 +223,7 @@ public:
   private:
     LBDB *db; //Enclosing LBDB object
     double period;//Time (seconds) between builtin-atsyncs  
+    double nextT;
     LDBarrierClient BH;//Handle for the builtin-atsync barrier 
     static void gotoSync(void *bs);
     static void resumeFromSync(void *bs);
@@ -241,6 +246,11 @@ private:
     int on;
   };
 
+  struct MigrationDoneCB {
+    LDMigrationDoneFn fn;
+    void* data;
+  };
+
   struct PredictCB {
     LDPredictModelFn on;
     LDPredictWindowFn onWin;
@@ -253,6 +263,7 @@ private:
   typedef CkVec<LBObj*> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
   typedef CkVec<StartLBCB*> StartLBCBList;
+  typedef CkVec<MigrationDoneCB*> MigrationDoneCBList;
 
   LBCommTable* commTable;
   OMList oms;
@@ -264,6 +275,8 @@ private:
 
   CmiBool statsAreOn;
   MigrateCBList migrateCBList;
+
+  MigrationDoneCBList migrationDoneCBList;
 
   PredictCB* predictCBFn;
 

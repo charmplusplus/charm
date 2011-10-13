@@ -231,7 +231,7 @@ void RecursiveBiPart(ObjGraph *ogr, vector<Vertex *> &pvertices, int parent, int
   for(int i=0;i<vhelpers.size();i++)
     taken[i]=false;
   int start = pvertices[0]->getVertexId();
-  int nextPe = 0, count=0, n=0;
+  int count=0;
   double loadseen=0;
   double pload=0;
   bool getout=false;
@@ -362,7 +362,7 @@ void RecursiveBiPart(ObjGraph *ogr, vector<Vertex *> &pvertices, int parent, int
 //Fills in que1, que2 and adjusts their gains, calculates initial edgecut before KLFM
 void adjustqueues(ObjGraph *ogr, BQueue *que1, BQueue *que2, vector <Vertex *> &partition1, vector<Vertex *> &partition2, int *initialedgecut, int parent)
 {
-  int i,j,uid,wid;
+  int i,uid,wid;
   bool swap=true;
   int ei=-1;
   Edge *edge;
@@ -574,7 +574,7 @@ void swapQ1toQ2(ObjGraph *ogr, BQueue *q1, BQueue *q2, int parent)
 
 Vertex * removeinSwap(ObjGraph *ogr,BQueue *q1, BQueue *q2, int parent)
 {
-  int i,j,ei=-1, uid, wid, einested=-1;
+  int ei=-1, uid, wid, einested=-1;
   Edge *edge, *edgenested;
   bool swap=true, swapnested=true;
   Vertex *v=(Vertex *)&(ogr->vertices[q1->getVertextoswap()]);

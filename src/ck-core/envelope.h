@@ -158,7 +158,7 @@ public:
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
-        CkArrayIndexStruct index; ///< Array element index
+        CkArrayIndexBase index; ///< Array element index
         int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
         CkGroupID arr;            ///< Array manager GID
         UChar hopCount;           ///< number of times message has been routed
@@ -346,8 +346,8 @@ private:
     int getArrayIfNotThere(void) {return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) {type.array.ifNotThere=nt;}
     int *getsetArrayListenerData(void) {return type.array.listenerData;}
-    CkArrayIndexMax &getsetArrayIndex(void) 
-    	{return *(CkArrayIndexMax *)&type.array.index;}
+    CkArrayIndex &getsetArrayIndex(void) 
+    	{return *(CkArrayIndex *)&type.array.index;}
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

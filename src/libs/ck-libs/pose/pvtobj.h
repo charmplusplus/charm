@@ -76,6 +76,8 @@ class pvtObjects {
   int size;
   /// lowest index of an empty slot in objs
   int firstEmpty; 
+  /// counter for strat calculations
+  int stratIterCount;
  public:
   /// the list of posers
   pvtObjectNode *objs;
@@ -97,6 +99,8 @@ class pvtObjects {
   void Commit();
   /// Call CheckpointCommit on all posers
   void CheckpointCommit();
+  /// Perform synchronization strategy calculations
+  void StratCalcs();
   /// Insert poser in list
   /** Inserts an object in the list in the firstEmpty slot, expanding the list
       size if necessary */

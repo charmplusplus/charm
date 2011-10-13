@@ -213,9 +213,7 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
   int numflag = 0; // C Style numbering
   int options[5];
   int edgecut;
-  int sameMapFlag = 1;
-
-	options[0] = 0;
+  options[0] = 0;
 
   if (count < 1) {
     CkPrintf("error: Number of Pe less than 1!");
@@ -223,10 +221,8 @@ void TopoLB::computePartitions(CentralLB::LDStats *stats,int count,int *newmap)
   else if (count == 1) {
    	for(m=0;m<numobjs;m++) 
 			newmap[i] = origmap[i];
-   	sameMapFlag = 1;
   }
   else {
-  	sameMapFlag = 0;
 		/*
   	if (count > 8)
 			METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
@@ -700,7 +696,7 @@ void TopoLB::performMapping(int *newmap, int count)
 
 void TopoLB :: work(LDStats *stats)
 {
-  int i, j;
+  int i;
   int n_pes = stats->nprocs();
 
   if (_lb_args.debug() >= 2) {
@@ -941,15 +937,11 @@ double TopoLB::getHopBytes(CentralLB::LDStats *stats,int count,CkVec<int>map)
   delete[] multicastAdded;
 
   double totalHB=0;
-  int proc1,proc2;
 
   for(i=0;i<count;i++)
   {
-    proc1=map[i];
     for(int j=0;j<count;j++)
     {
-      proc2=map[j];
-      //totalHB+=dist[proc1][proc2]*comm1[i][j];
       totalHB+=dist[i][j]*comm1[i][j];
     }
   }

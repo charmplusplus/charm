@@ -8,8 +8,6 @@
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
 
-#define CMK_PERSISTENT_COMM                                1
-
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
 #define CMK_MULTICAST_LIST_USE_COMMON_CODE                 1
@@ -23,7 +21,7 @@
 #define CMK_MSG_HEADER_FIELDS  unsigned char vmitype,vmicredits; CmiUInt2 tree_rank,tree_root,hdl,xhdl,info,stratid,root,redID,pad1,pad2,pad3;
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_FIELDS }
-#define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_FIELDS CMK_BLUEGENE_FIELDS }
+#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_FIELDS CMK_BIGSIM_FIELDS }
 
 #define CMK_VECTOR_SEND_USES_COMMON_CODE                   1
 
@@ -77,3 +75,6 @@
 #define CMK_LBDB_ON                                        1
 
 #define CMK_GRID_QUEUE_AVAILABLE                           0
+
+#define CMK_PERSISTENT_COMM                                0
+

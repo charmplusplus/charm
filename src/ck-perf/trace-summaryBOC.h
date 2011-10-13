@@ -28,7 +28,7 @@ private:
   int nTracedPEs;
 
   bool firstTime; // used to make sure traceEnableCCS only has an effect the first time.
-
+  double _maxBinSize; //the max bin size collected from all processors
 public:
   /* CCS support variables */
   int lastRequestedIndexBlock;
@@ -53,6 +53,12 @@ public:
 
   void collectSummaryData(double startTime, double binSize, int numBins);
   void summaryDataCollected(CkReductionMsg *);
+
+  void traceSummaryParallelShutdown(int pe);
+  void maxBinSize(CkReductionMsg *msg);
+  void shrink(double _maxBinSize);
+
+  void sumData(CkReductionMsg *msg);
 
 private:
   void write();

@@ -273,7 +273,7 @@ int CmiPrintCPUAffinity()
 #endif
 }
 
-int CmiOnCore(void) {
+int CmiOnCore() {
 #if CMK_OS_IS_LINUX
   /*
    * The info (task_cpu) is read from the Linux /proc virtual file system.
@@ -476,7 +476,7 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -534,11 +534,23 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
+#if CMK_BLUEGENEP
+  if(affinity_flag){
+      affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on BG/P, thus ignored.\n");
+  }
+  if(show_affinity_flag){
+      show_affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on BG/P.\n");
+  }
+#endif
+
   if (!affinity_flag) {
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;
   }
-  else if (CmiMyPe() == 0) {
+
+  if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
        CmiPrintf("Charm++> cpuaffinity excludes core: %d", excludecore[0]);
@@ -562,6 +574,7 @@ void CmiInitCPUAffinity(char **argv)
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
+#if !CMK_CRAYXT && !CMK_CRAYXE
     if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -571,6 +584,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 #endif
     }
+#endif
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
@@ -590,7 +604,7 @@ void CmiInitCPUAffinity(char **argv)
     return;
   }
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
   if (CmiMyRank() == 0)
   {
     int numPes = CmiNumPes();
@@ -614,6 +628,7 @@ void CmiInitCPUAffinity(char **argv)
       CmiAbort("set cpu affinity abort!\n");
     }
   }
+  CmiNodeAllBarrier();
   CmiNodeAllBarrier();
 #else
     /* get my ip address */

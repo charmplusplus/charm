@@ -55,7 +55,7 @@ public:
 
     // create eachToMany strategy for Array
     
-    CkArrayIndexMax *allElts = new CkArrayIndexMax[nElements];
+    CkArrayIndex *allElts = new CkArrayIndex[nElements];
     for (int i = 0; i<nElements; i++) {
     	allElts[i].data()[0] = i;
     	allElts[i].data()[1] = 0;

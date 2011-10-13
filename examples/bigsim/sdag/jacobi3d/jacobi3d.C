@@ -273,7 +273,7 @@ class Jacobi: public CBase_Jacobi {
     void begin_iteration(void) {
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
         CkPrintf("Start of iteration %d\n", iterations);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         BgPrintf("BgPrint> Start of iteration at %f\n");
 #endif
       }

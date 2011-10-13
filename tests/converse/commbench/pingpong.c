@@ -10,12 +10,23 @@ static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
-  {16,      256},
-  {256,     256},
-  {4096,    64},
-  {65536,   4},
-  {1048576, 1},
-  {-1,      -1},
+    {16,      4000},
+    {32,      4000},
+    {128,      4000},
+    {256,     1000},
+    {512,     1000},
+    {1024,    1000},
+    {2048,    1000},
+    {4096,    1000},
+    {8192,    1000},
+    {16384,   1000},
+    {32768,   1000},
+    {65536,   1000},
+    {131072,   400},
+    {524288,   400},
+    {1048576, 100},
+    {4194304, 40},
+    {-1,      -1},
 };
 
 typedef struct message_{
@@ -197,18 +208,17 @@ static void startNextIter(Message *msg)
     pva(nextIter) = -1;
     CmiSetHandler(&m, pva(sizeHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
+    CmiFree(msg);
   } else {
     CmiSetHandler(msg, pva(bounceHandler));
-    CmiSyncSend(pva(nextNbr), sizeof(Message)+sizes[msg->idx].size, msg);
+    CmiSyncSendAndFree(pva(nextNbr), sizeof(Message)+sizes[msg->idx].size, msg);
   }
-  CmiFree(msg);
 }
 
 static void bounceMessage(Message *msg)
 {
   CmiSetHandler(msg, pva(iterHandler));
-  CmiSyncSend(msg->srcpe, sizeof(Message)+sizes[msg->idx].size, msg);
-  CmiFree(msg);
+  CmiSyncSendAndFree(msg->srcpe, sizeof(Message)+sizes[msg->idx].size, msg);
 }
 
 void pingpong_init(void)

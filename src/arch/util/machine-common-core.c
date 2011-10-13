@@ -1,10 +1,14 @@
+/*
+ *created by Chao Mei
+ *revised by Yanhua
+ */
 #if CMK_C_INLINE
 #define INLINE_KEYWORD inline
 #else
 #define INLINE_KEYWORD
 #endif
 
-/* ###Beginning of Broadcast related definitions ### */
+/******* broadcast related  */
 #ifndef CMK_BROADCAST_SPANNING_TREE
 #define CMK_BROADCAST_SPANNING_TREE    1
 #endif
@@ -23,14 +27,7 @@
  * node-level bcast msg: root <=-1; (-CmiMyNode()-1)
  */
 #define CMI_BROADCAST_ROOT(msg)          ((CmiMsgHeaderBasic *)msg)->root
-#define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 #define CMI_SET_BROADCAST_ROOT(msg, root)  CMI_BROADCAST_ROOT(msg) = (root);
-
-#if USE_COMMON_SYNC_BCAST || USE_COMMON_ASYNC_BCAST
-#if !CMK_BROADCAST_SPANNING_TREE && !CMK_BROADCAST_HYPERCUBE
-#warning "Broadcast function is based on the plain P2P O(P)-message scheme!!!"
-#endif
-#endif
 
 /**
  * For some machine layers such as on Active Message framework,
@@ -38,12 +35,13 @@
  * thread (i.e. not the flow managed by ours). Therefore, for
  * forwarding broadcast messages, we could have a choice whether
  * to offload such function to the flow we manage such as the
- * communication thread. -Chao Mei
+ * communication thread. -
  */
 
 #ifndef CMK_OFFLOAD_BCAST_PROCESS
 #define CMK_OFFLOAD_BCAST_PROCESS 0
 #endif
+
 #if CMK_OFFLOAD_BCAST_PROCESS
 CsvDeclare(PCQueue, procBcastQ);
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -51,12 +49,69 @@ CsvDeclare(PCQueue, nodeBcastQ);
 #endif
 #endif
 
+static int  MSG_STATISTIC = 0;
+int     msg_histogram[22];
+static int _cmi_log2(int size)
+{
+    int ret = 1;
+    size = size-1;
+    while( (size=size>>1)>0) ret++;
+    return ret;
+}
 #if CMK_BROADCAST_HYPERCUBE
 /* ceil(log2(CmiNumNodes)) except when _Cmi_numnodes is 1, used for hypercube */
 static int CmiNodesDim;
 #endif
 /* ###End of Broadcast related definitions ### */
 
+
+static void handleOneBcastMsg(int size, char *msg);
+static void processBcastQs();
+
+/* Utility functions for forwarding broadcast messages,
+ * should not be used in machine-specific implementations
+ * except in some special occasions.
+ */
+static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg);
+static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg);
+static void SendSpanningChildrenProc(int size, char *msg);
+static void SendHyperCubeProc(int size, char *msg);
+#if CMK_NODE_QUEUE_AVAILABLE
+static void SendSpanningChildrenNode(int size, char *msg);
+static void SendHyperCubeNode(int size, char *msg);
+#endif
+
+static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode);
+static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode);
+
+#if USE_COMMON_SYNC_BCAST || USE_COMMON_ASYNC_BCAST
+#if !CMK_BROADCAST_SPANNING_TREE && !CMK_BROADCAST_HYPERCUBE
+#warning "Broadcast function is based on the plain P2P O(P)-message scheme!!!"
+#endif
+#endif
+
+
+void CmiSyncBroadcastFn(int size, char *msg);
+CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg);
+void CmiFreeBroadcastFn(int size, char *msg);
+
+void CmiSyncBroadcastAllFn(int size, char *msg);
+CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg);
+void CmiFreeBroadcastAllFn(int size, char *msg);
+
+#if CMK_NODE_QUEUE_AVAILABLE
+void CmiSyncNodeBroadcastFn(int size, char *msg);
+CmiCommHandle CmiAsyncNodeeroadcastFn(int size, char *msg);
+void CmiFreeNodeBroadcastFn(int size, char *msg);
+
+void CmiSyncNodeBroadcastAllFn(int size, char *msg);
+CmiCommHandle CmiAsyncNodeBroadcastAllFn(int size, char *msg);
+void CmiFreeNodeBroadcastAllFn(int size, char *msg);
+#endif
+
+/************** Done with Broadcast related */
+
+#define CMI_DEST_RANK(msg)               ((CmiMsgHeaderBasic *)msg)->rank
 
 #ifndef CMK_HAS_SIZE_IN_MSGHDR
 #define CMK_HAS_SIZE_IN_MSGHDR 1
@@ -101,7 +156,6 @@ static CmiNodeLock  commThdExitLock = 0;
  *  thread depends on the support of the underlying
  *  communication library.
  *
- *  --Chao Mei
  */
 #ifndef CMK_SMP_NO_COMMTHD
 #define CMK_SMP_NO_COMMTHD 0
@@ -137,25 +191,10 @@ static void PerrorExit(const char *msg);
 /* This function handles the msg received as which queue to push into */
 static void handleOneRecvedMsg(int size, char *msg);
 
-static void handleOneBcastMsg(int size, char *msg);
-static void processBcastQs();
-
 /* Utility functions for forwarding broadcast messages,
  * should not be used in machine-specific implementations
  * except in some special occasions.
  */
-static void processProcBcastMsg(int size, char *msg);
-static void processNodeBcastMsg(int size, char *msg);
-static void SendSpanningChildrenProc(int size, char *msg);
-static void SendHyperCubeProc(int size, char *msg);
-#if CMK_NODE_QUEUE_AVAILABLE
-static void SendSpanningChildrenNode(int size, char *msg);
-static void SendHyperCubeNode(int size, char *msg);
-#endif
-
-static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode);
-static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode);
-/* send to other ranks except me on the same node*/
 static void SendToPeers(int size, char *msg);
 
 
@@ -187,14 +226,6 @@ void CmiSyncSendFn(int destPE, int size, char *msg);
 CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg);
 void CmiFreeSendFn(int destPE, int size, char *msg);
 
-void CmiSyncBroadcastFn(int size, char *msg);
-CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg);
-void CmiFreeBroadcastFn(int size, char *msg);
-
-void CmiSyncBroadcastAllFn(int size, char *msg);
-CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg);
-void CmiFreeBroadcastAllFn(int size, char *msg);
-
 #if CMK_NODE_QUEUE_AVAILABLE
 static void CmiSendNodeSelf(char *msg);
 
@@ -202,13 +233,6 @@ void CmiSyncNodeSendFn(int destNode, int size, char *msg);
 CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg);
 void CmiFreeNodeSendFn(int destNode, int size, char *msg);
 
-void CmiSyncNodeBroadcastFn(int size, char *msg);
-CmiCommHandle CmiAsyncNodeBroadcastFn(int size, char *msg);
-void CmiFreeNodeBroadcastFn(int size, char *msg);
-
-void CmiSyncNodeBroadcastAllFn(int size, char *msg);
-CmiCommHandle CmiAsyncNodeBroadcastAllFn(int size, char *msg);
-void CmiFreeNodeBroadcastAllFn(int size, char *msg);
 #endif
 
 /* Functions and variables regarding machine startup */
@@ -219,31 +243,17 @@ static int        Cmi_usrsched;  /* Continue after start function finishes? */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret);
 static void ConverseRunPE(int everReturn);
 
-static void MachineSpecificInit(int argc, char **argv, int *numNodes, int *myNodeID);
-/* Used in ConverseRunPE: one is called before ConverseCommonInit;
-  * The other is called after ConverseCommonInit as some data structures
-  * have been initialized, such as the tracing-relatd stuff --Chao Mei
-  */
-static void MachineSpecificPreCommonInit(int everReturn);
-static void MachineSpecificPostCommonInit(int everReturn);
-
 /* Functions regarding machine running on every proc */
 static void AdvanceCommunication();
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
 
-static void MachineSpecificAdvanceCommunication();
-static void MachineSpecificDrainResources(); /* used when exit */
-static void MachineSpecificExit();
-
 /* Functions providing incoming network messages */
 void *CmiGetNonLocal(void);
 #if CMK_NODE_QUEUE_AVAILABLE
 void *CmiGetNonLocalNodeQ(void);
 #endif
-void MachineSpecificPostNonLocal(void);
-
 /* Utiltiy functions */
 static char *CopyMsg(char *msg, int len);
 
@@ -301,10 +311,10 @@ static void CmiStartThreads(char **argv) {
 }
 #else
 /************** SMP *******************/
-INLINE_KEYWORD int CmiMyPe(void) {
+INLINE_KEYWORD int CmiMyPe() {
     return CmiGetState()->pe;
 }
-INLINE_KEYWORD int CmiMyRank(void) {
+INLINE_KEYWORD int CmiMyRank() {
     return CmiGetState()->rank;
 }
 INLINE_KEYWORD int CmiNodeFirst(int node) {
@@ -323,6 +333,7 @@ INLINE_KEYWORD int CmiRankOf(int pe) {
 CsvDeclare(CmiNodeState, NodeState);
 /* ===== End of Processor/Node State-related Stuff =====*/
 
+#include "machine-broadcast.c"
 #include "immediate.c"
 
 /* ===== Beginning of Common Function Definitions ===== */
@@ -394,176 +405,6 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
 }
 
 
-/* ##### Beginning of Broadcast-related functions' defitions ##### */
-static void handleOneBcastMsg(int size, char *msg) {
-    CmiAssert(CMI_BROADCAST_ROOT(msg)!=0);
-#if CMK_OFFLOAD_BCAST_PROCESS
-    if (CMI_BROADCAST_ROOT(msg)>0) {
-        PCQueuePush(CsvAccess(procBcastQ), msg);
-    } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-        PCQueuePush(CsvAccess(nodeBcastQ), msg);
-#endif
-    }
-#else
-    if (CMI_BROADCAST_ROOT(msg)>0) {
-        processProcBcastMsg(size, msg);
-    } else {
-#if CMK_NODE_QUEUE_AVAILABLE
-        processNodeBcastMsg(size, msg);
-#endif
-    }
-#endif
-}
-
-static void processBcastQs() {
-#if CMK_OFFLOAD_BCAST_PROCESS
-    char *msg;
-    do {
-        msg = PCQueuePop(CsvAccess(procBcastQ));
-        if (!msg) break;
-        MACHSTATE2(4, "[%d]: process a proc-level bcast msg %p begin{", CmiMyNode(), msg);
-        processProcBcastMsg(CMI_MSG_SIZE(msg), msg);
-        MACHSTATE2(4, "[%d]: process a proc-level bcast msg %p end}", CmiMyNode(), msg);
-    } while (1);
-#if CMK_NODE_QUEUE_AVAILABLE
-    do {
-        msg = PCQueuePop(CsvAccess(nodeBcastQ));
-        if (!msg) break;
-        MACHSTATE2(4, "[%d]: process a node-level bcast msg %p begin{", CmiMyNode(), msg);
-        processNodeBcastMsg(CMI_MSG_SIZE(msg), msg);
-        MACHSTATE2(4, "[%d]: process a node-level bcast msg %p end}", CmiMyNode(), msg);
-    } while (1);
-#endif
-#endif
-}
-
-static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenProc(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHyperCubeProc(size, msg);
-#endif
-
-    /* Since this function is only called on intermediate nodes,
-     * the rank of this msg should be 0.
-     */
-    CmiAssert(CMI_DEST_RANK(msg)==0);
-    /*CmiPushPE(CMI_DEST_RANK(msg), msg);*/
-    CmiPushPE(0, msg);
-}
-
-static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
-#if CMK_BROADCAST_SPANNING_TREE
-    SendSpanningChildrenNode(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    SendHyperCubeNode(size, msg);
-#endif
-
-    /* In SMP mode, this push operation needs to be executed
-     * after forwarding broadcast messages. If it is executed
-     * earlier, then during the bcast msg forwarding period,
-     * the msg could be already freed on the worker thread.
-     * As a result, the forwarded message could be wrong!
-     * --Chao Mei
-     */
-    CmiPushNode(msg);
-}
-
-static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode) {
-#if CMK_BROADCAST_SPANNING_TREE
-    int i, oldRank;
-
-    oldRank = CMI_DEST_RANK(msg);
-    /* doing this is to avoid the multiple assignment in the following for loop */
-    CMI_DEST_RANK(msg) = rankToAssign;
-    /* first send msgs to other nodes */
-    CmiAssert(startNode >=0 &&  startNode<CmiNumNodes());
-    for (i=1; i<=BROADCAST_SPANNING_FACTOR; i++) {
-        int nd = CmiMyNode()-startNode;
-        if (nd<0) nd+=CmiNumNodes();
-        nd = BROADCAST_SPANNING_FACTOR*nd + i;
-        if (nd > CmiNumNodes() - 1) break;
-        nd += startNode;
-        nd = nd%CmiNumNodes();
-        CmiAssert(nd>=0 && nd!=CmiMyNode());
-#if CMK_BROADCAST_USE_CMIREFERENCE
-        CmiReference(msg);
-        CmiMachineSpecificSendFunc(nd, size, msg, P2P_SYNC);
-#else
-        char *newmsg = CopyMsg(msg, size);
-        CmiMachineSpecificSendFunc(nd, size, newmsg, P2P_SYNC);
-#endif
-    }
-    CMI_DEST_RANK(msg) = oldRank;
-#endif
-}
-static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode) {
-#if CMK_BROADCAST_HYPERCUBE
-    int i, cnt, tmp, relDist, oldRank;
-    const int dims=CmiNodesDim;
-
-    oldRank = CMI_DEST_RANK(msg);
-    /* doing this is to avoid the multiple assignment in the following for loop */
-    CMI_DEST_RANK(msg) = rankToAssign;
-
-    /* first send msgs to other nodes */
-    relDist = CmiMyNode()-startNode;
-    if (relDist < 0) relDist += CmiNumNodes();
-    cnt=0;
-    tmp = relDist;
-    /* count how many zeros (in binary format) relDist has */
-    for (i=0; i<dims; i++, cnt++) {
-        if (tmp & 1 == 1) break;
-        tmp = tmp >> 1;
-    }
-
-    /*CmiPrintf("ND[%d]: SendHypercube with snd=%d, relDist=%d, cnt=%d\n", CmiMyNode(), startnode, relDist, cnt);*/
-    for (i = cnt-1; i >= 0; i--) {
-        int nd = relDist + (1 << i);
-        if (nd >= CmiNumNodes()) continue;
-        nd = (nd+startNode)%CmiNumNodes();
-        /*CmiPrintf("ND[%d]: send to node %d\n", CmiMyNode(), nd);*/
-        CmiAssert(nd>=0 && nd!=CmiMyNode());
-#if CMK_BROADCAST_USE_CMIREFERENCE
-        CmiReference(msg);
-        CmiMachineSpecificSendFunc(nd, size, msg, P2P_SYNC);
-#else
-        char *newmsg = CopyMsg(msg, size);
-        CmiMachineSpecificSendFunc(nd, size, newmsg, P2P_SYNC);
-#endif
-    }
-    CMI_DEST_RANK(msg) = oldRank;
-#endif
-}
-
-static void SendSpanningChildrenProc(int size, char *msg) {
-    int startpe = CMI_BROADCAST_ROOT(msg)-1;
-    int startnode = CmiNodeOf(startpe);
-#if CMK_SMP
-    if (startpe > CmiNumPes()) startnode = startpe - CmiNumPes();
-#endif
-    SendSpanningChildren(size, msg, 0, startnode);
-#if CMK_SMP
-    /* second send msgs to my peers on this node */
-    SendToPeers(size, msg);
-#endif
-}
-
-/* send msg along the hypercube in broadcast. (Sameer) */
-static void SendHyperCubeProc(int size, char *msg) {
-    int startpe = CMI_BROADCAST_ROOT(msg)-1;
-    int startnode = CmiNodeOf(startpe);
-#if CMK_SMP
-    if (startpe > CmiNumPes()) startnode = startpe - CmiNumPes();
-#endif
-    SendHyperCube(size, msg, 0, startnode);
-#if CMK_SMP
-    /* second send msgs to my peers on this node */
-    SendToPeers(size, msg);
-#endif
-}
-
 static void SendToPeers(int size, char *msg) {
     /* FIXME: now it's just a flat p2p send!! When node size is large,
     * it should also be sent in a tree
@@ -578,17 +419,6 @@ static void SendToPeers(int size, char *msg) {
     }
 }
 
-#if CMK_NODE_QUEUE_AVAILABLE
-static void SendSpanningChildrenNode(int size, char *msg) {
-    int startnode = -CMI_BROADCAST_ROOT(msg)-1;
-    SendSpanningChildren(size, msg, DGRAM_NODEMESSAGE, startnode);
-}
-static void SendHyperCubeNode(int size, char *msg) {
-    int startnode = -CMI_BROADCAST_ROOT(msg)-1;
-    SendHyperCube(size, msg, DGRAM_NODEMESSAGE, startnode);
-}
-#endif
-/*##### End of Broadcast-related functions' defitions #####*/
 
 /* Functions regarding sending operations */
 static void CmiSendSelf(char *msg) {
@@ -610,12 +440,45 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
     CmiFreeSendFn(destPE, size, dupmsg);
 }
 
+#if CMK_USE_PXSHM
+inline int CmiValidPxshm(int dst, int size);
+void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiInitPxshm(char **argv);
+inline void CommunicationServerPxshm();
+void CmiExitPxshm();
+#endif
+
+int refcount = 0;
+
 void CmiFreeSendFn(int destPE, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
     CQdCreate(CpvAccess(cQdState), 1);
     if (CmiMyPe()==destPE) {
         CmiSendSelf(msg);
+#if CMK_PERSISTENT_COMM
+        if (phs) curphs++;
+#endif
     } else {
+#if CMK_USE_PXSHM
+        int ret=CmiValidPxshm(destPE, size);
+        if (ret) {
+          CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+#if CMK_PERSISTENT_COMM
+        if (phs) curphs++;
+#endif
+          return;
+        }
+#endif
+#if CMK_PERSISTENT_COMM
+    if (phs && size > 8192) {
+        CmiAssert(curphs < phsSize);
+        LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
+        return;
+    }
+#endif
+
         int destNode = CmiNodeOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
@@ -624,7 +487,13 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-        CmiMachineSpecificSendFunc(destNode, size, msg, P2P_SYNC);
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
+        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -636,69 +505,16 @@ CmiCommHandle CmiAsyncSendFn(int destPE, int size, char *msg) {
         CmiSyncSendFn(destPE,size,msg);
         return 0;
     } else {
-        return CmiMachineSpecificSendFunc(destPE, size, msg, P2P_ASYNC);
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+        if(ret_log >21) ret_log = 21;
+        msg_histogram[ret_log]++;
+}
+        return LrtsSendFunc(destPE, size, msg, P2P_ASYNC);
     }
 }
 #endif
-
-#if USE_COMMON_SYNC_BCAST
-/* Functions regarding broadcat op that sends to every one else except me */
-void CmiSyncBroadcastFn(int size, char *msg) {
-    int mype = CmiMyPe();
-    int i;
-
-    CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
-#if CMK_SMP
-    /*record the rank to avoid re-sending the msg in  spanning tree or hypercube*/
-    CMI_DEST_RANK(msg) = CmiMyRank();
-#endif
-
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT(msg, mype+1);
-    SendSpanningChildrenProc(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    CMI_SET_BROADCAST_ROOT(msg, mype+1);
-    SendHyperCubeProc(size, msg);
-#else
-    for ( i=mype+1; i<_Cmi_numpes; i++ )
-        CmiSyncSendFn(i, size, msg) ;
-    for ( i=0; i<mype; i++ )
-        CmiSyncSendFn(i, size, msg) ;
-#endif
-
-    /*CmiPrintf("In  SyncBroadcast broadcast\n");*/
-}
-
-void CmiFreeBroadcastFn(int size, char *msg) {
-    CmiSyncBroadcastFn(size,msg);
-    CmiFree(msg);
-}
-#endif
-
-#if USE_COMMON_ASYNC_BCAST
-/* FIXME: should use spanning or hypercube, but luckily async is never used */
-CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
-    /*CmiPrintf("In  AsyncBroadcast broadcast\n");*/
-    CmiAbort("CmiAsyncBroadcastFn should never be called");
-    return 0;
-}
-#endif
-
-/* Functions regarding broadcat op that sends to every one */
-void CmiSyncBroadcastAllFn(int size, char *msg) {
-    CmiSyncSendFn(CmiMyPe(), size, msg) ;
-    CmiSyncBroadcastFn(size, msg);
-}
-
-void CmiFreeBroadcastAllFn(int size, char *msg) {
-    CmiSendSelf(msg);
-    CmiSyncBroadcastFn(size, msg);
-}
-
-CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg) {
-    CmiSendSelf(CopyMsg(msg, size));
-    return CmiAsyncBroadcastFn(size, msg);
-}
 
 #if CMK_NODE_QUEUE_AVAILABLE
 static void CmiSendNodeSelf(char *msg) {
@@ -727,7 +543,13 @@ void CmiFreeNodeSendFn(int destNode, int size, char *msg) {
     if (destNode == CmiMyNode()) {
         CmiSendNodeSelf(msg);
     } else {
-        CmiMachineSpecificSendFunc(destNode, size, msg, P2P_SYNC);
+if (  MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
+        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -738,70 +560,23 @@ CmiCommHandle CmiAsyncNodeSendFn(int destNode, int size, char *msg) {
         CmiSyncNodeSendFn(destNode, size, msg);
         return 0;
     } else {
-        return CmiMachineSpecificSendFunc(destNode, size, msg, P2P_ASYNC);
+if (  MSG_STATISTIC)
+{
+        int ret_log = _cmi_log2(size);
+        if(ret_log >21) ret_log = 21;
+        msg_histogram[ret_log]++;
+}
+        return LrtsSendFunc(destNode, size, msg, P2P_ASYNC);
     }
 }
 #endif
-
-#if USE_COMMON_SYNC_BCAST
-void CmiSyncNodeBroadcastFn(int size, char *msg) {
-    int mynode = CmiMyNode();
-    int i;
-    CQdCreate(CpvAccess(cQdState), CmiNumNodes()-1);
-#if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT(msg, -CmiMyNode()-1);
-    SendSpanningChildrenNode(size, msg);
-#elif CMK_BROADCAST_HYPERCUBE
-    CMI_SET_BROADCAST_ROOT(msg, -CmiMyNode()-1);
-    SendHyperCubeNode(size, msg);
-#else
-    for (i=mynode+1; i<CmiNumNodes(); i++)
-        CmiSyncNodeSendFn(i, size, msg);
-    for (i=0; i<mynode; i++)
-        CmiSyncNodeSendFn(i, size, msg);
 #endif
-}
-
-void CmiFreeNodeBroadcastFn(int size, char *msg) {
-    CmiSyncNodeBroadcastFn(size, msg);
-    CmiFree(msg);
-}
-#endif
-
-#if USE_COMMON_ASYNC_BCAST
-CmiCommHandle CmiAsyncNodeBroadcastFn(int size, char *msg) {
-    CmiSyncNodeBroadcastFn(size, msg);
-    return 0;
-}
-#endif
-
-void CmiSyncNodeBroadcastAllFn(int size, char *msg) {
-    CmiSyncNodeSendFn(CmiMyNode(), size, msg);
-    CmiSyncNodeBroadcastFn(size, msg);
-}
-
-CmiCommHandle CmiAsyncNodeBroadcastAllFn(int size, char *msg) {
-    CmiSendNodeSelf(CopyMsg(msg, size));
-    return CmiAsyncNodeBroadcastFn(size, msg);
-}
-
-void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
-    CmiSyncNodeBroadcastFn(size, msg);
-    /* Since it's a node-level msg, the msg could be executed on any other
-     * procs on the same node. This means, the push of this msg to the
-     * node-level queue could be immediately followed a pop of this msg on
-     * other cores on the same node even when this msg has not been sent to
-     * other nodes. This is the reason CmiSendNodeSelf must be called after
-     * CmiSyncNodeBroadcastFn -Chao Mei
-     */
-    CmiSendNodeSelf(msg);
-}
-#endif
-/* ##### End of Functions Related with Message Sending OPs ##### */
 
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
+    int _ii;
     int tmp;
+    MSG_STATISTIC = CmiGetArgFlag(argv, "+msgstatistic");
     /* processor per node */
     _Cmi_mynodesize = 1;
     if (!CmiGetArgInt(argv,"+ppn", &_Cmi_mynodesize))
@@ -816,12 +591,25 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
     CmiGetArgInt(argv, "+networkProgressPeriod", &networkProgressPeriod);
 
-    /* _Cmi_mynodesize has to be obtained before MachineSpecificInit
-     * because it may be used inside MachineSpecificInit
+    /* _Cmi_mynodesize has to be obtained before LrtsInit
+     * because it may be used inside LrtsInit
      */
-    /* argv could be changed inside MachineSpecificInit */
+    /* argv could be changed inside LrtsInit */
     /* Inside this function, the number of nodes and my node id are obtained */
-    MachineSpecificInit(argc, argv, &_Cmi_numnodes, &_Cmi_mynode);
+if (  MSG_STATISTIC)
+{
+    for(_ii=0; _ii<22; _ii++)
+        msg_histogram[_ii] = 0;
+}
+
+    LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
+   
+if (_Cmi_mynode==0) 
+#if !CMK_SMP 
+    printf("Charm++> Running on Non-smp mode\n");
+#else
+    printf("Charm++> Running on Smp mode, %d worker threads per process\n", _Cmi_mynodesize);
+#endif
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -829,6 +617,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     Cmi_argv = argv;
     Cmi_startfn = fn;
     Cmi_usrsched = usched;
+
+#if CMK_USE_PXSHM
+    CmiInitPxshm(argv);
+#endif
 
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
@@ -857,6 +649,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 
     CmiStartThreads(argv);
+
     ConverseRunPE(initret);
 }
 
@@ -864,7 +657,7 @@ static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
 
-    MachineSpecificPreCommonInit(everReturn);
+    LrtsPreCommonInit(everReturn);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
     int createQueue = 1;
@@ -906,7 +699,7 @@ static void ConverseRunPE(int everReturn) {
 
     ConverseCommonInit(CmiMyArgv);
 
-    MachineSpecificPostCommonInit(everReturn);
+    LrtsPostCommonInit(everReturn);
 
     /* Converse initialization finishes, immediate messages can be processed.
        node barrier previously should take care of the node synchronization */
@@ -930,7 +723,11 @@ static void ConverseRunPE(int everReturn) {
 static INLINE_KEYWORD void AdvanceCommunication() {
     int doProcessBcast = 1;
 
-    MachineSpecificAdvanceCommunication();
+#if CMK_USE_PXSHM
+    CommunicationServerPxshm();
+#endif
+
+    LrtsAdvanceCommunication();
 
 #if CMK_OFFLOAD_BCAST_PROCESS
 #if CMK_SMP_NO_COMMTHD
@@ -957,12 +754,12 @@ static void CommunicationServer(int sleepTime) {
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
-        MachineSpecificDrainResources();
+        LrtsDrainResources();
         MACHSTATE(2, "} CommunicationServer EXIT");
 
         ConverseCommonExit();
 
-        MachineSpecificExit();
+        LrtsExit();
     }
 #endif
 }
@@ -975,18 +772,32 @@ static void CommunicationServerThread(int sleepTime) {
 }
 
 void ConverseExit(void) {
+    int i;
 #if !CMK_SMP
-    MachineSpecificDrainResources();
+    LrtsDrainResources();
 #endif
 
+#if CMK_USE_PXSHM
+        CmiExitPxshm();
+#endif
     ConverseCommonExit();
 
+if (MSG_STATISTIC)
+{
+    for(i=0; i<22; i++)
+    {
+        CmiPrintf("[MSG PE:%d]", CmiMyPe());
+        if(msg_histogram[i] >0)
+            CmiPrintf("(%d:%d) ", 1<<i, msg_histogram[i]);
+    }
+    CmiPrintf("\n");
+}
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     if (CmiMyPe() == 0) CmiPrintf("End of program\n");
 #endif
 
 #if !CMK_SMP
-    MachineSpecificExit();
+    LrtsExit();
 #else
     /* In SMP, the communication thread will exit */
     /* atomic increment */
@@ -1011,7 +822,7 @@ void *CmiGetNonLocal(void) {
       * on comm thread. In this case, the msg is sent to
       * the network queue of the work thread. Therefore,
       * even there's only one worker thread, the polling of
-      * network queue is still required. -Chao Mei
+      * network queue is still required.
       */
     if (CmiNumPes() == 1) return NULL;
 #endif
@@ -1020,20 +831,19 @@ void *CmiGetNonLocal(void) {
     CmiIdleLock_checkMessage(&cs->idle);
     /* ?????although it seems that lock is not needed, I found it crashes very often
        on mpi-smp without lock */
-#if !CMK_SMP
-    AdvanceCommunication();
-#endif
-
     msg = PCQueuePop(cs->recv);
-
 #if !CMK_SMP
-    MachineSpecificPostNonLocal();
+    if (!msg) {
+       AdvanceCommunication();
+       msg = PCQueuePop(cs->recv);
+    }
 #endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
 
     return msg;
 }
+
 #if CMK_NODE_QUEUE_AVAILABLE
 void *CmiGetNonLocalNodeQ(void) {
     CmiState cs = CmiGetState();
@@ -1052,7 +862,6 @@ void *CmiGetNonLocalNodeQ(void) {
 #endif
 /* ##### End of Functions Providing Incoming Network Messages ##### */
 
-/* ##### Beginning of Functions Related with Idle-state ##### */
 static CmiIdleState *CmiNotifyGetState(void) {
     CmiIdleState *s=(CmiIdleState *)malloc(sizeof(CmiIdleState));
     s->sleepMs=0;
@@ -1084,6 +893,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 #if !CMK_SMP
     AdvanceCommunication();
+//#else
+//    LrtsPostNonLocal();
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
@@ -1094,7 +905,6 @@ void CmiNotifyIdle(void) {
     AdvanceCommunication();
     CmiYield();
 }
-/* ##### End of Functions Related with Idle-state ##### */
 
 /* Utiltiy functions */
 static char *CopyMsg(char *msg, int len) {
@@ -1107,4 +917,10 @@ static char *CopyMsg(char *msg, int len) {
     memcpy(copy, msg, len);
     return copy;
 }
-/* ===== End of Common Function Definitions ===== */
+
+
+#if CMK_USE_PXSHM
+#include "machine-pxshm.c"
+#endif
+
+

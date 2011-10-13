@@ -6,6 +6,17 @@
 #include "srtable.h"
 #include "gvt.h"
 
+/// Dump data fields to a string
+char *SRentry::dumpString() {
+  char str[32];
+#if USE_LONG_TIMESTAMPS
+  sprintf(str, "%llds%dr%d ", timestamp, sends, recvs);
+#else
+  sprintf(str, "%ds%dr%d ", timestamp, sends, recvs);
+#endif
+  return str;
+}
+
 /// Basic constructor
 SRtable::SRtable() : offset(0), b(0), size_b(0), numOverflow(0), overflow(NULL), end_overflow(NULL), ofSends(0), ofRecvs(0)
 { 
@@ -509,6 +520,30 @@ void SRtable::dump()
     tmp = tmp->next;
   }
   CkPrintf("\n");
+}
+
+/// Dump data fields to a string
+char *SRtable::dumpString() {
+  char str[PVT_DEBUG_BUFFER_LINE_LENGTH], tempStr[32];
+  SRentry *tmp;
+  sprintf(str, "SRtable[");
+  for (int i=0; i<b; i++) {
+    tmp = buckets[i];
+    sprintf(tempStr, "b%d: ", i);
+    strcat(str, tempStr);
+    while (tmp) {
+      strcat(str, tmp->dumpString());
+      tmp = tmp->next;
+    }
+  }
+  tmp = overflow;
+  strcat(str, " OF: ");
+  while (tmp) {
+    strcat(str, tmp->dumpString());
+    tmp = tmp->next;
+  }
+  strcat(str, "]");
+  return str;
 }
 
 /// Check validity of data field

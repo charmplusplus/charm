@@ -85,7 +85,7 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
 void HybridBaseLB::initTree()
 {
 #if CMK_LBDB_ON
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
     int npes = tree->numChildren(CkMyPe(), 1);
@@ -861,7 +861,6 @@ void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atl
 
 void HybridBaseLB::StatsDone(int atlevel)
 {
-  int i;
 
   LevelData *lData = levelData[atlevel];
   lData->obj_expected = -1;
@@ -877,7 +876,7 @@ void HybridBaseLB::StatsDone(int atlevel)
 // called on a parent node
 void HybridBaseLB::NotifyObjectMigrationDone(int fromlevel)
 {
-  int i;
+
   int atlevel = fromlevel + 1;
   LevelData *lData = levelData[atlevel];
 

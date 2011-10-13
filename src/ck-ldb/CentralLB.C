@@ -312,7 +312,7 @@ void CentralLB::SendStats()
 
   statsMsg = NULL;
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   BgEndStreaming();
 #endif
 
@@ -903,6 +903,8 @@ void CentralLB::MigrationDone(int balancing)
     savedBalancing = balancing;
     startLoadBalancingMlog(&resumeCentralLbAfterChkpt,(void *)this);
 #endif
+
+  LBDatabase::Object()->MigrationDone();    // call registered callbacks
 
   LoadbalanceDone(balancing);        // callback
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))

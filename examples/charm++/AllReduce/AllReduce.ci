@@ -1,0 +1,16 @@
+mainmodule AllReduce {
+  readonly int units;
+  readonly int allredSize;
+
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void done();
+  };
+
+  array [1D] AllReduce {
+    entry AllReduce(CProxy_main);
+    entry void init();
+    entry void dowork(void);	
+    entry void report(CkReductionMsg *msg);
+  };        	
+}

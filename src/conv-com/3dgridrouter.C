@@ -107,7 +107,6 @@ inline int LPMsgExpect(int gpe, int gnpes)
     int len = (int)ceil(((double)gnpes) / (row * col));
 
     for (i=len-1;i>=0;i--) {
-        int myrow = (gpe%(row * col))/col;
         int toprep=i*(row * col);
         
         if ((toprep + (gpe % (row * col))) <= (gnpes-1)) return(i+1);

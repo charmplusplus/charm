@@ -199,7 +199,7 @@ class ComlibMulticastMsg : public CkMcastBaseMsg,
   public:
     int nPes;
     ComlibMulticastIndexCount *indicesCount;
-    CkArrayIndexMax *indices;
+    CkArrayIndex *indices;
     char *usrMsg;        
 };
 
@@ -218,7 +218,7 @@ void ComlibEnd(CProxy &proxy, int iteration);
     now it is used to reset a proxy before it is reassociated with another strategy. 
  */
 inline void ComlibResetSectionProxy(CProxySection_ArrayBase &sproxy) {
-  sproxy.ckGetSectionInfo().sInfo.cInfo.id = 0;
+  sproxy.ckGetSectionInfo().info.sInfo.cInfo.id = 0;
 }
 
 
@@ -240,7 +240,7 @@ class ComlibManager: public CkDelegateMgr {
     /// Used to register and record events into projection
     int section_send_event;
 
-    CkArrayIndexMax dummyArrayIndex;
+    CkArrayIndex dummyArrayIndex;
 
     /// Pointer to the converse comlib object, for efficiency over calling CkpvAccess
     ConvComlibManager *converseManager;
@@ -310,7 +310,7 @@ class ComlibManager: public CkDelegateMgr {
     /* The delegation framework reimplemented functions */
 
     void ArraySend(CkDelegateData *pd,int ep, void *msg, 
-                   const CkArrayIndexMax &idx, CkArrayID a);
+                   const CkArrayIndex &idx, CkArrayID a);
     void GroupSend(CkDelegateData *pd, int ep, void *msg, int onpe, 
                    CkGroupID gid);
     void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
@@ -348,7 +348,7 @@ class ComlibManager: public CkDelegateMgr {
     void bracketedReleaseBufferedMessages(int instid, int step);
 
     void bracketedStartDiscovery(int instid);
-    void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc);
+    void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndex &idx, int isSrc);
     void bracketedContributeDiscovery(int instid, int pe, int nsrc, int ndest, int step);
 
 

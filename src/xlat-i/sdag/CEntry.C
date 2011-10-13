@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include "CEntry.h"
 #include "xi-symbol.h"
 
@@ -57,7 +50,7 @@ void CEntry::generateCode(XStr& op)
   op <<  ") {\n";
   op << "    CWhenTrigger *tr;\n";
   op<<  "    void* _bgParentLog = NULL;\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   op<<  "    CkElapse(0.01e-6);\n";
   SdagConstruct::generateTlineEndCall(op);
 #endif
@@ -173,7 +166,7 @@ void CEntry::generateCode(XStr& op)
   op << "      return;\n"; 
 
   SdagConstruct::generateTraceEndCall(op);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   SdagConstruct::generateEndExec(op);
 #endif
 
@@ -191,7 +184,7 @@ void CEntry::generateCode(XStr& op)
     paramMarshalling = 0;
     lastWasVoid = 0;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     op <<"    cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
     //op << "    " << cn->label->charstar() << "(";    
 #endif
@@ -207,7 +200,7 @@ void CEntry::generateCode(XStr& op)
       if (sv->isMsg == 1) {
 	  if((i!=0) && (lastWasVoid == 0))
 	     whenParams->append(", ");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	  if(i==1){   
 	    whenParams->append("NULL");
 	    lastWasVoid=0;
@@ -251,7 +244,7 @@ void CEntry::generateCode(XStr& op)
     op << ");\n";
   
     op << "    delete tr;\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     cn->generateTlineEndCall(op);
     cn->generateBeginExec(op, "sdagholder");
 #endif
@@ -267,7 +260,7 @@ void CEntry::generateCode(XStr& op)
       op << "      case " << cn->nodeNum << ":\n";
       op << "      {\n";
       
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       // bgLog2 stores the parent dependence of when, e.g. for, olist
       op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";	 
 #endif
@@ -286,7 +279,7 @@ void CEntry::generateCode(XStr& op)
          if (sv->isMsg == 1) {
 	    if((i!=0) && (lastWasVoid == 0))
 	      whenParams->append(", ");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	    if(i==1) {
 	       whenParams->append(" NULL ");
 	       lastWasVoid=0;
@@ -332,7 +325,7 @@ void CEntry::generateCode(XStr& op)
       op << ");\n";
       op << "        delete tr;\n";
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       cn->generateTlineEndCall(op);
       cn->generateBeginExec(op, "sdagholder");
 #endif

@@ -9,7 +9,7 @@
     events */
 class eventQueue {
   /// This helper method cleans up all the commit code by removing the stats
-  void CommitStatsHelper(Event *commitPtr);
+  void CommitStatsHelper(sim *obj, Event *commitPtr);
  public:
   /// Sentinel nodes
   Event *frontPtr, *backPtr;
@@ -29,6 +29,18 @@ class eventQueue {
   unsigned int mem_usage;
   /// Keep track of last logged VT for this object so no duplicates are logged
   POSE_TimeType lastLoggedVT;
+  /// Average sparsity of recently committed events (in GVT ticks / event)
+  int recentAvgEventSparsity;
+  /// Timestamp of the first event for the sparsity calculation
+  POSE_TimeType sparsityStartTime;
+  /// Sparsity calculation counter
+  int sparsityCalcCount;
+  /// Counts the differences examined; used for timeleash calculation in adapt5
+  int tsDiffCount;
+  /// The timestamp of the last committed event
+  POSE_TimeType lastCommittedTS;
+  /// The largest timestamp differences at commit time; used for timeleash calculation in adapt5
+  POSE_TimeType tsCommitDiffs[DIFFS_TO_STORE];
 #ifdef MEM_TEMPORAL
   TimePool *localTimePool;
 #endif
@@ -128,7 +140,9 @@ class eventQueue {
     }
   }
   /// Dump the event queue
-  void dump();        
+  void dump();
+  /// Dump the event queue to a string
+  char *dumpString();
   /// Pack/unpack/sizing operator
   void pup(PUP::er &p);   
   /// Check validity of data fields

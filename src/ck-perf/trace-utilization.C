@@ -357,7 +357,6 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
    compressedBuffer fakeBuf(10000);
    
    int numBins = 55;
-   int totalsize = 0;
    int numProcs = 1000;
 
    // build a compressed representation of each merged bin

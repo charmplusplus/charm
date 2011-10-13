@@ -1,4 +1,4 @@
-#include "charm.h"
+#include "converse.h"
 #include "pup_paged.h"
 
 
@@ -10,7 +10,7 @@ pup_pagetable *getNewPagetable(char *fName){
 	_pagetable->tailtable = NULL;
 	_pagetable->maxblk=0;
 	_pagetable->fName = new char[strlen(fName)+20];
-	sprintf(_pagetable->fName,"%s_%d.dat",fName,CkMyPe());
+	sprintf(_pagetable->fName,"%s_%d.dat",fName,CmiMyPe());
 	_pagetable->fp = fopen(_pagetable->fName,"wb");
 	fclose(_pagetable->fp);
 	_pagetable->fp = fopen(_pagetable->fName,"r+b");

@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-all: pingpong
+all: pingpong pingpong_multipairs
 
 pingpong: pingpong.o
 	$(CHARMC) -language converse++ -o pingpong pingpong.o
@@ -8,11 +8,16 @@ pingpong: pingpong.o
 pingpong.o: pingpong.C
 	$(CHARMC) -language converse++ -c pingpong.C
 
+pingpong_multipairs: pingpong_multipairs.o
+	$(CHARMC) -language converse++ -o pingpong_multipairs pingpong_multipairs.o
+
+pingpong_multipairs.o: pingpong_multipairs.C
+	$(CHARMC) -language converse++ -c pingpong_multipairs.C
 test: pingpong
 	./charmrun ./pingpong +p2 $(TESTOPTS)
 
 clean:
 	rm -f core *.cpm.h
 	rm -f TAGS *.o
-	rm -f pingpong
+	rm -f pingpong pingpong_multipairs
 	rm -f conv-host charmrun

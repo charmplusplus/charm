@@ -20,10 +20,11 @@ void bigmsg_handler(void *vmsg)
 	exit(1);
       }
     }
+    CmiFree(msg);
     Cpm_megacon_ack(CpmSend(0));
   } else {
     next = (CmiMyPe()+1) % CmiNumPes();
-    CmiSyncSend(next, 250000*sizeof(int), msg);
+    CmiSyncSendAndFree(next, 250000*sizeof(int), msg);
   }
 }
 

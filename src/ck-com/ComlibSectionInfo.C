@@ -30,7 +30,7 @@
 */
 ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolder *cmsg, int needSort, int instanceID){
     
-  cmsg->checkme();
+  //  cmsg->checkme();
 
     if(cmsg->sec_id == NULL || cmsg->sec_id->_nElems == 0)
         return NULL;
@@ -70,17 +70,17 @@ ComlibMulticastMsg * ComlibSectionInfo::getNewMulticastMessage(CharmMessageHolde
     
     ComlibMulticastMsg *msg = new(sizes, 0) ComlibMulticastMsg;
     msg->nPes = nRemotePes;
-    msg->_cookie.sInfo.cInfo.instId = instanceID;
-    msg->_cookie.sInfo.cInfo.id = MaxSectionID - 1;
-    msg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
-    msg->_cookie.type = COMLIB_MULTICAST_MESSAGE;
-    msg->_cookie.pe = CkMyPe();
+    msg->_cookie.info.sInfo.cInfo.instId = instanceID;
+    msg->_cookie.info.sInfo.cInfo.id = MaxSectionID - 1;
+    msg->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_NEW_SECTION;
+    msg->_cookie.get_type() = COMLIB_MULTICAST_MESSAGE;
+    msg->_cookie.get_pe() = CkMyPe();
 
     // fill in the three pointers of the ComlibMulticastMsg
     memcpy(msg->indicesCount, indicesCount, sizes[0] * sizeof(ComlibMulticastIndexCount));
-    //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndexMax));
+    //memcpy(msg->indices, cmsg->sec_id->_elems, sizes[1] * sizeof(CkArrayIndex));
 
-    CkArrayIndexMax **indicesPe = (CkArrayIndexMax**)alloca(nRemotePes * sizeof(CkArrayIndexMax*));
+    CkArrayIndex **indicesPe = (CkArrayIndex**)alloca(nRemotePes * sizeof(CkArrayIndex*));
 
     if (needSort) {
     	// if we are sorting the array, then we need to fix the problem that belongingList
@@ -142,7 +142,7 @@ void ComlibSectionInfo::getPeList(envelope *cb_env, int npes, int *&pelist)
 
 void ComlibSectionInfo::unpack(envelope *cb_env,
 			       int &nLocalElems,
-                               CkArrayIndexMax *&dest_indices, 
+                               CkArrayIndex *&dest_indices, 
                                envelope *&env) {
         
     ComlibMulticastMsg *ccmsg = (ComlibMulticastMsg *)EnvToUsr(cb_env);
@@ -170,7 +170,7 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
     */
     /*
     for(int count = 0; count < ccmsg->nIndices; count++){
-        CkArrayIndexMax idx = ccmsg->indices[count];
+        CkArrayIndex idx = ccmsg->indices[count];
         
         //This will work because. lastknown always knows if I have the
         //element of not
@@ -190,7 +190,7 @@ void ComlibSectionInfo::unpack(envelope *cb_env,
 
 
 void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
-  cmsg->checkme();
+  //  cmsg->checkme();
 
     ComlibPrintf("Process Old Section Message \n");
 
@@ -198,20 +198,20 @@ void ComlibSectionInfo::processOldSectionMessage(CharmMessageHolder *cmsg) {
 
     //Old section id, send the id with the message
     CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)cmsg->getCharmMessage();
-    cbmsg->_cookie.pe = CkMyPe();
-    cbmsg->_cookie.sInfo.cInfo.id = cur_sec_id;
-    cbmsg->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
+    cbmsg->_cookie.get_pe() = CkMyPe();
+    cbmsg->_cookie.info.sInfo.cInfo.id = cur_sec_id;
+    cbmsg->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_OLD_SECTION;
 }
 
 CkMcastBaseMsg *ComlibSectionInfo::getNewDeliveryErrorMsg(CkMcastBaseMsg *base) {
   CkMcastBaseMsg *dest= (CkMcastBaseMsg*)CkAllocMsg(0, sizeof(CkMcastBaseMsg), 0);
   memcpy(dest, base, sizeof(CkMcastBaseMsg));
-  dest->_cookie.sInfo.cInfo.status = COMLIB_MULTICAST_SECTION_ERROR;
+  dest->_cookie.info.sInfo.cInfo.status = COMLIB_MULTICAST_SECTION_ERROR;
   return dest;
 }
 
 void ComlibSectionInfo::getPeList(int _nElems, 
-                                  CkArrayIndexMax *_elems,
+                                  CkArrayIndex *_elems,
 				  CkArrayID &destArrayID,
                                   int &npes, int *&pelist){
 
@@ -294,7 +294,7 @@ inline int getPErepresentingNodeContainingPE(int pe){
 	2) belongs -- belongs[i] points to the owning pe's entry in the "counts" array.
 	
 */
-void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist, 
+void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndex *idxlist, 
 		      const CkArrayID &destArrayID, int &npes, int &nidx,
 		      ComlibMulticastIndexCount *&counts, int *&belongs) {
 
@@ -358,7 +358,7 @@ void ComlibSectionInfo::getPeCount(int nindices, CkArrayIndexMax *idxlist,
 
 
 void ComlibSectionInfo::getRemotePelist(int nindices, 
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
                                         int &npes, int *&pelist) {
 
@@ -413,12 +413,12 @@ void ComlibSectionInfo::getRemotePelist(int nindices,
 
 
 void ComlibSectionInfo::getLocalIndices(int nindices,
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
-                                        CkVec<CkArrayIndexMax> &idx_vec){    
+                                        CkVec<CkArrayIndex> &idx_vec){    
 	ComlibPrintf("ComlibSectionInfo::getLocalIndices()\n");
 	
-	int count = 0, acount = 0;
+	int acount = 0;
     idx_vec.resize(0);
     
     CkArray *a = (CkArray *)_localBranch(destArrayID);
@@ -433,10 +433,10 @@ void ComlibSectionInfo::getLocalIndices(int nindices,
 
 
 void ComlibSectionInfo::getNodeLocalIndices(int nindices,
-                                        CkArrayIndexMax *idxlist,
+                                        CkArrayIndex *idxlist,
 					CkArrayID &destArrayID,
-                                        CkVec<CkArrayIndexMax> &idx_vec){    
-    int count = 0, acount = 0;
+                                        CkVec<CkArrayIndex> &idx_vec){    
+    int acount = 0;
     idx_vec.resize(0);
     
     CkArray *a = (CkArray *)_localBranch(destArrayID);

@@ -251,7 +251,7 @@ static void send_done(void *data);
 static void send_multi_done(void *data);
 #endif
 static CmiCommHandle MachineSpecificSendForDCMF(int destNode, int size, char *msg, int mode);
-#define CmiMachineSpecificSendFunc MachineSpecificSendForDCMF
+#define LrtsSendFunc MachineSpecificSendForDCMF
 
 /* The machine-specific recv-related function (on the receiver side) */
 #if (DCMF_VERSION_MAJOR >= 2)
@@ -283,24 +283,24 @@ DCMF_Request_t * first_pkt_recv_done (void              * clientdata,
 /* ### End of Communication-Op Related Functions ### */
 
 /* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNodeID);
-#define MachineSpecificInit MachineInitForDCMF
+static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNodeID);
+#define LrtsInit MachineInitForDCMF
 
 static void MachinePreCommonInitForDCMF(int everReturn);
 static void MachinePostCommonInitForDCMF(int everReturn);
-#define MachineSpecificPreCommonInit MachinePreCommonInitForDCMF
-#define MachineSpecificPostCommonInit MachinePostCommonInitForDCMF
+#define LrtsPreCommonInit MachinePreCommonInitForDCMF
+#define LrtsPostCommonInit MachinePostCommonInitForDCMF
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
 static void AdvanceCommunicationForDCMF();
-#define MachineSpecificAdvanceCommunication AdvanceCommunicationForDCMF
+#define LrtsAdvanceCommunication AdvanceCommunicationForDCMF
 
 static void DrainResourcesForDCMF();
-#define MachineSpecificDrainResources DrainResourcesForDCMF
+#define LrtsDrainResources DrainResourcesForDCMF
 
 static void MachineExitForDCMF();
-#define MachineSpecificExit MachineExitForDCMF
+#define LrtsExit MachineExitForDCMF
 
 /* ### End of Machine-running Related Functions ### */
 
@@ -308,8 +308,8 @@ static void MachineExitForDCMF();
 
 /* ### End of Idle-state Related Functions ### */
 
-void MachinePostNonLocalForDCMF();
-#define MachineSpecificPostNonLocal MachinePostNonLocalForDCMF
+static void MachinePostNonLocalForDCMF();
+#define LrtsPostNonLocal MachinePostNonLocalForDCMF
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -320,7 +320,8 @@ void MachinePostNonLocalForDCMF();
  *  CMK_OFFLOAD_BCAST_PROCESS etc.
  */
 #define CMK_OFFLOAD_BCAST_PROCESS 1
-#include "machine-common.c"
+#include "machine-lrts.h"
+#include "machine-common-core.c"
 
 /*######Beginning of functions related with Communication-Op functions ######*/
 
@@ -686,7 +687,7 @@ static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
 }
 /* ######End of functions related with communication progress ###### */
 
-void MachinePostNonLocalForDCMF() {
+static void MachinePostNonLocalForDCMF() {
     /* None here */
 }
 
@@ -720,7 +721,7 @@ static void MachineExitForDCMF() {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNodeID) {
+static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
     DCMF_Messager_initialize();
 
@@ -833,16 +834,16 @@ static void MachineInitForDCMF(int argc, char **argv, int *numNodes, int *myNode
 #if !CMK_SMP_NO_COMMTHD
     actualNodeSize++; //considering the extra comm thread
 #endif
-
+    int i;
     procState = (ProcState *)CmiAlloc((actualNodeSize) * sizeof(ProcState));
-    for (int i=0; i<actualNodeSize; i++) {
+    for (i=0; i<actualNodeSize; i++) {
         /*    procState[i].sendMsgBuf = PCQueueCreate();   */
         procState[i].recvLock = CmiCreateLock();
         procState[i].bcastLock = CmiCreateLock();
     }
 
     /* checksum flag */
-    if (CmiGetArgFlag(argv,"+checksum")) {
+    if (CmiGetArgFlag(*argv,"+checksum")) {
 #if CMK_ERROR_CHECKING
         checksum_flag = 1;
         if (*myNodeID == 0) CmiPrintf("Charm++: CheckSum checking enabled! \n");
@@ -902,14 +903,11 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
     CmiFreeListSendFn(npes, pes, size, copymsg);
 }
 
-/* Currently disable optimized multicast for non-SMP as it fails
- * for hybrid ldb in NAMD as reported by Gengbin --Chao Mei
+/* This optimized multicast only helps NAMD when #atoms/CPU is
+ * less than 10 according to Sameer Kumar. So it is off in
+ * default.
  */
-#if CMK_SMP
 #define OPTIMIZED_MULTICAST  0
-#else
-#define OPTIMIZED_MULTICAST  1
-#endif
 
 #if OPTIMIZED_MULTICAST
 #warning "Using Optimized Multicast"
@@ -956,15 +954,42 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     machineMulticast (new_npes, newpelist, size, msg);
 #else /* non-optimized multicast */
 
-    for (i=0; i<npes-1; i++) {
 #if !CMK_SMP
-        CmiReference(msg);
-        CmiFreeSendFn(pes[i], size, msg);
-#else
-    CmiSyncSend(pes[i], size, msg);
-#endif
+    /* Note: if the pe list contains this processor,
+     * this self-msg could be processed before it gets
+     * sent to other procs. So when using CmiReference
+     * to this msg in order to avoid copies for inter-node
+     * msg sending, this self-msg needs to be unchanged 
+     * in the user codes. Since this condition could not
+     * be guaranteed, CmiSyncSend needs to be used to
+     * send this msg to itself.
+     */
+    int isRefed = 0;
+    for (i=0; i<npes-1; i++) {
+	if(pes[i] == CmiMyPe()){
+            CmiSyncSend(pes[i], size, msg);
+        }else{
+            CmiReference(msg);
+            isRefed = 1;
+            CmiFreeSendFn(pes[i], size, msg);
+        }
     }
-    CmiFreeSendFn(pes[npes-1], size, msg);
+
+    if(pes[npes-1] == CmiMyPe() && isRefed == 1){
+       CmiSyncSend(pes[npes-1], size, msg);
+       CmiFree(msg);
+    }else{
+       CmiFreeSendFn(pes[npes-1], size, msg);
+    }
+#else
+   /* Note: in SMP mode, the CmiReferece could not be used because
+    * of the race condition between this thread and the other thread
+    * that calls CmiFree. In this case, CmiSyncSend has to be used
+    * instead.
+    */
+   for(i=0; i<npes-1; i++) CmiSyncSend(pes[i], size, msg);
+   CmiFreeSendFn(pes[npes-1], size, msg);
+#endif
 #endif /* end of #if OPTIMIZED_MULTICAST */
 }
 #endif /* end of #if !CMK_MULTICAST_LIST_USE_COMMON_CODE */

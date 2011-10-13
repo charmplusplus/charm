@@ -47,7 +47,13 @@ TODO:
 #include "conv-ccs.h"
 #include <signal.h>
 
-#define DEBUGF      // CkPrintf
+void noopck(const char*, ...)
+{}
+
+
+//#define DEBUGF      // CkPrintf
+#define DEBUGF noopck
+
 
 // pick buddy processor from a different physical node
 #define NODE_CHECKPOINT                        0
@@ -175,7 +181,7 @@ class CkMemCheckPTInfo: public CkCheckPTInfo
 {
   CkArrayCheckPTMessage *ckBuffer;
 public:
-  CkMemCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno): 
+  CkMemCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno): 
 	            CkCheckPTInfo(a, loc, idx, pno)
   {
     ckBuffer = NULL;
@@ -217,7 +223,7 @@ class CkDiskCheckPTInfo: public CkCheckPTInfo
   int bud1, bud2;
   int len; 			// checkpoint size
 public:
-  CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndexMax idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
+  CkDiskCheckPTInfo(CkArrayID a, CkGroupID loc, CkArrayIndex idx, int pno, int myidx): CkCheckPTInfo(a, loc, idx, pno)
   {
 #if CMK_USE_MKSTEMP
     fname = new char[64];
@@ -376,7 +382,7 @@ int CkMemCheckPT::totalFailed()
 }
 
 // create an checkpoint entry for array element of aid with index.
-void CkMemCheckPT::createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndexMax index, int buddy)
+void CkMemCheckPT::createEntry(CkArrayID aid, CkGroupID loc, CkArrayIndex index, int buddy)
 {
   // error check, no duplicate
   int idx, len = ckTable.size();
@@ -626,7 +632,7 @@ private:
 public:
         ElementDestoryer(CkLocMgr* mgr_):locMgr(mgr_){};
         void addLocation(CkLocation &loc) {
-		CkArrayIndexMax idx=loc.getIndex();
+		CkArrayIndex idx=loc.getIndex();
 		CkPrintf("[%d] destroy: ", CkMyPe()); idx.print();
 		loc.destroy();
         }
@@ -816,7 +822,7 @@ void CkMemCheckPT::gotData()
   }
 }
 
-void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndexMax *idx,int nowOnPe)
+void CkMemCheckPT::updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe)
 {
   for (int i=0; i<n; i++) {
     CkLocMgr *mgr = CProxy_CkLocMgr(g[i]).ckLocalBranch();
@@ -839,7 +845,7 @@ void CkMemCheckPT::recoverArrayElements()
   int count = 0;
 #if STREAMING_INFORMHOME
   CkVec<CkGroupID> * gmap = new CkVec<CkGroupID>[CkNumPes()];
-  CkVec<CkArrayIndexMax> * imap = new CkVec<CkArrayIndexMax>[CkNumPes()];
+  CkVec<CkArrayIndex> * imap = new CkVec<CkArrayIndex>[CkNumPes()];
 #endif
   for (int idx=0; idx<len; idx++)
   {

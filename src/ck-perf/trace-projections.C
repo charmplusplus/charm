@@ -112,10 +112,10 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(CkVec<char *>, usrEventlist);
   CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // CthRegister does not call the constructor
 //  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif //CMK_BLUEGENE_CHARM
+#endif //CMK_BIGSIM_CHARM
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -403,7 +403,7 @@ LogPool::~LogPool()
 #endif
   }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
     createFile("-bg");
@@ -537,7 +537,6 @@ void LogPool::writeSts(void)
 {
   // for whining compilers
   int i;
-  char name[30];
   // generate an automatic unique ID for each log
   fprintf(stsfp, "PROJECTIONS_ID %s\n", "");
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
@@ -596,7 +595,7 @@ void LogPool::writeRC(void)
 }
 
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
 {
   LogEntry *log = (LogEntry *)data;
@@ -633,12 +632,12 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
   if(poolSize==numEntries) {
     flushLogBuffer();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     extern int correctTimeLog;
     if (correctTimeLog) CmiAbort("I/O interrupt!\n");
 #endif
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   switch (type) {
     case BEGIN_PROCESSING:
       pool[numEntries-1].recvTime = BgGetRecvTime();
@@ -657,7 +656,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 }
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-#ifndef CMK_BLUEGENE_CHARM
+#ifndef CMK_BIGSIM_CHARM
   new (&pool[numEntries++])
 	LogEntry(time,type,funcID,lineNum,fileName);
   if(poolSize == numEntries){
@@ -669,7 +668,7 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-#ifndef CMK_BLUEGENE_CHARM
+#ifndef CMK_BIGSIM_CHARM
   new (&pool[numEntries++])
 	LogEntry(type,time,memUsage);
   if(poolSize == numEntries){
@@ -700,7 +699,7 @@ void LogPool::addUserSuppliedNote(char *note){
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#ifndef CMK_BLUEGENE_CHARM
+#ifndef CMK_BIGSIM_CHARM
 #if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
@@ -748,7 +747,7 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 
 void LogPool::postProcessLog()
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   bgUpdateProj(1);   // event type
 #endif
 }
@@ -1699,18 +1698,13 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
 
 void TraceProjections::endPhase() {
   double currentPhaseTime = TraceTimer();
-  double lastPhaseTime = 0.0;
-
   if (lastPhaseEvent != NULL) {
-    lastPhaseTime = lastPhaseEvent->time;
   } else {
     if (_logPool->pool != NULL) {
       // assumed to be BEGIN_COMPUTATION
-      lastPhaseTime = _logPool->pool[0].time;
     } else {
       CkPrintf("[%d] Warning: End Phase encountered in an empty log. Inserting BEGIN_COMPUTATION event\n", CkMyPe());
       _logPool->add(BEGIN_COMPUTATION, 0, 0, currentPhaseTime, -1, -1);
-      lastPhaseTime = currentPhaseTime;
     }
   }
 
@@ -1768,7 +1762,7 @@ extern "C" void TraceProjectionsExitHandler()
 void initTraceProjectionsBOC()
 {
   // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if (BgNodeRank() == 0) {
 #else
     if (CkMyRank() == 0) {
@@ -1959,7 +1953,6 @@ void KMeansBOC::getNextPhaseMetrics() {
   LogPool *pool = CkpvAccess(_trace)->_logPool;
   
   CkAssert(pool->numEntries > lastPhaseIdx);
-  double startPhaseTime = pool->pool[lastPhaseIdx].time;
   double totalPhaseTime = 0.0;
   double totalActiveTime = 0.0; // entry method + idle
 

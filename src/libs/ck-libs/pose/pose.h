@@ -46,6 +46,7 @@ class strat; // defined later in strat.h
 #include "adapt2.h"
 #include "adapt3.h"
 #include "adapt4.h"
+#include "adapt5.h"
 #include "cons.h"
 #include "seq.h"
 #include "chpt.h"
@@ -90,6 +91,14 @@ extern int _POSE_SEQUENTIAL;
        (*(CProxy_ ## _POSE_objectType*)&_POSE_proxy)[_POSE_handle]._POSE_method(_POSE_msg); \
    }
 
+/// Number of posers in the poser array (POSE_Objects)
+extern int totalNumPosers;
+
+/// For inserting posers into the POSE array - this must be used to get an accurate global poser count
+#define POSE_insert_poser(_POSE_poser_type, _POSE_array_index, _POSE_message, _POSE_physical_pe) { \
+  (*(CProxy_ ## _POSE_poser_type*)&POSE_Objects)[_POSE_array_index].insert(_POSE_message, _POSE_physical_pe); \
+  totalNumPosers++; \
+}
 
 /// User specified busy wait time (for grainsize testing)
 extern double busyWait;

@@ -250,7 +250,7 @@ extern "C" void traceControlPointsExitFunction() {
 // Initialization of the parallel trace module.
 void initTraceControlPointsBOC() {
 /*
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if (BgNodeRank()==0) {
 #else
     if (CkMyRank() == 0) {

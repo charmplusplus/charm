@@ -1,12 +1,6 @@
 #ifndef _SYMBOL_H
 #define _SYMBOL_H
 
-#include <iostream>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <list>
-
 #include "xi-util.h"
 #include "EToken.h"
 #include "CEntry.h"
@@ -14,6 +8,13 @@
 #include "CList.h"
 #include "CStateVar.h"
 #include "CParsedFile.h"
+
+#include <iostream>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <list>
+
 
 namespace xi {
 
@@ -217,7 +218,6 @@ class PtrType : public Type {
     }
 };
 
-/* I don't think these are useful any longer (OSL 11/30/2001) */
 class ReferenceType : public Type {
   private:
     Type *referant;

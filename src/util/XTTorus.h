@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if XT4_TOPOLOGY || XT5_TOPOLOGY
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
 // XDIM, YDIM, ZDIM and MAXNID depend on a specific Cray installation.
 // Please do NOT expect things to work if you use this code on a new
@@ -31,6 +31,14 @@
 #define YDIM 32
 #define ZDIM 24
 #define TDIM 12
+
+#elif XE6_TOPOLOGY
+   /* hopper */
+#define MAXNID 6384
+#define XDIM 17
+#define YDIM 8
+#define ZDIM 24
+#define TDIM 24
 
 #endif
 

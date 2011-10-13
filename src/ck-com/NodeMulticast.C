@@ -33,7 +33,7 @@
 // //Handles multicast by sending only one message to a nodes and making 
 // //them multicast locally
 // void NodeMulticast::setDestinationArray(CkArrayID a, int nelem, 
-// 					CkArrayIndexMax **idx, int ep){
+// 					CkArrayIndex **idx, int ep){
 
 //     mode = ARRAY_MODE;
 //     messageBuf = NULL;
@@ -53,7 +53,7 @@
 //     ComlibPrintf("In SetDestinationArray %d, %d, %d, %d\n", numNodes, 
 //                  pes_per_node, nelements, ep);
   
-//     indexVec = new CkVec<CkArrayIndexMax> [CkNumPes()];
+//     indexVec = new CkVec<CkArrayIndex> [CkNumPes()];
     
 //     for(int count = 0; count < nelements; count++) {
 //         ComlibPrintf("Before lastKnown %d\n", count);
@@ -115,7 +115,7 @@
 	    
 // 	    ComlibPrintf("[%d], %d elements to send to %d of size %d\n", CkMyPe(), size, dest_pe, env->getTotalsize());
 	    
-// 	    CkArrayIndexMax * idx_arr = indexVec[dest_pe].getVec();
+// 	    CkArrayIndex * idx_arr = indexVec[dest_pe].getVec();
 // 	    for(int itr = 0; itr < size; itr ++) {
 // 		void *newcharmmsg = CkCopyMsg(&charm_msg); 
 // 		envelope* newenv = UsrToEnv(newcharmmsg);
@@ -290,7 +290,7 @@
 //         nodeMap = new int[numNodes];
 	
 // 	if(mode == ARRAY_MODE) {
-// 	    typedef CkVec<CkArrayIndexMax> CkVecArrayIndex;
+// 	    typedef CkVec<CkArrayIndex> CkVecArrayIndex;
 // 	    CkVecArrayIndex *vec = new CkVecArrayIndex[CkNumPes()];
 // 	    indexVec = vec;
 // 	}

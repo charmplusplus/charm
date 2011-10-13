@@ -223,7 +223,6 @@ Agent::Elem* TopologyAgent :: my_preferred_procs(int *existing_map,int object,in
 	//prefreturnList[0].pe=preferred_list[min_cost_index].pe;
 	//prefreturnList[0].Cost=preferred_list[min_cost_index].Cost;
 	
-	int ret_index=0;
 	int s=0;
 	int flag=0;
 	int u=0;

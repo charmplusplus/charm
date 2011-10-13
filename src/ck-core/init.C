@@ -169,8 +169,9 @@ CkpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
 
+#if CMK_WITH_STATS
 static Stats** _allStats = 0;
-
+#endif
 static int   _numStatsRecd = 0;
 static int   _exitStarted = 0;
 
@@ -799,7 +800,7 @@ void _CkExit(void)
     CmiSetHandler(env, _exitHandlerIdx);
     CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
-#if ! CMK_BLUEGENE_THREAD
+#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
@@ -823,7 +824,7 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-#if ! CMK_BLUEGENE_THREAD
+#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
@@ -836,7 +837,7 @@ void CkExit(void)
    to the machine layer to call this function). */
 extern "C"
 void EmergencyExit(void) {
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
   if (CkpvAccess(_coreState) != NULL) {
     delete CkpvAccess(_coreState);
@@ -879,7 +880,7 @@ void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 void InitCallTable::enumerateInitCalls()
 {
   int i;
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if(BgNodeRank()==0)        // called only once on an emulating node
 #else
   if(CkMyRank()==0) 
@@ -914,7 +915,7 @@ extern "C" void initQd(char **argv)
         }
 }
 
-#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
 void CpdBgInit();
 #endif
 void CpdBreakPointInit();
@@ -954,7 +955,7 @@ void _initCharm(int unused_argc, char **argv)
 	/*
 		Added for evacuation-sayantan
 	*/
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
 #endif
 	CkpvInitialize(char ,startedEvac);
@@ -1003,7 +1004,7 @@ void _initCharm(int unused_argc, char **argv)
 	
 	CmiNodeAllBarrier();
 
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	initQd(argv);         // bigsim calls it in ConverseCommonInit
 #endif
 
@@ -1022,7 +1023,7 @@ void _initCharm(int unused_argc, char **argv)
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
@@ -1062,7 +1063,7 @@ void _initCharm(int unused_argc, char **argv)
 	  same order on every node, and *must not* be called by 
 	  multiple threads simultaniously.
 	*/
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #else
 	if(CkMyRank()==0)
@@ -1183,7 +1184,7 @@ void _initCharm(int unused_argc, char **argv)
     _messageLoggingInit();
 #endif
 
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
 	/*
 		FAULT_EVAC
 	*/
@@ -1218,7 +1219,7 @@ void _initCharm(int unused_argc, char **argv)
     if (!_replaySystem) {
         if (faultFunc == NULL) {         // this is not restart
             // these two are blocking calls for non-bigsim
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
 #endif
@@ -1226,7 +1227,7 @@ void _initCharm(int unused_argc, char **argv)
         CmiInitCPUTopology(argv);
     }
     //CldCallback();
-#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
       // Register the BG handler for CCS. Notice that this is put into a variable shared by
       // the whole real processor. This because converse needs to find it. We check that all
       // virtual processors register the same index for this handler.
@@ -1234,7 +1235,9 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 	if (faultFunc) {
+#if CMK_WITH_STATS
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
+#endif
 		if (!inCommThread) {
                   CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
                   msg->argc = CmiGetArgc(argv);
@@ -1243,7 +1246,9 @@ void _initCharm(int unused_argc, char **argv)
                   CkFreeMsg(msg);
                 }
 	}else if(CkMyPe()==0){
+#if CMK_WITH_STATS
 		_allStats = new Stats*[CkNumPes()];
+#endif
 		register size_t i, nMains=_mainTable.size();
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{

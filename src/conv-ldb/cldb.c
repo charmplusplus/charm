@@ -340,6 +340,8 @@ void CldSetPEBitVector(const char *newBV)
 
 /* End Bit Vector Stuff */
 
+static int _cldb_cs = 0;
+
 void CldModuleGeneralInit(char **argv)
 {
   CldToken sentinel = (CldToken)CmiAlloc(sizeof(struct CldToken_s));
@@ -366,6 +368,7 @@ void CldModuleGeneralInit(char **argv)
   CpvInitialize(CmiNodeLock, cldLock);
   CpvAccess(cldLock) = CmiCreateLock();
 
+  _cldb_cs = CmiGetArgFlagDesc(argv, "+cldb_cs", "Converse> Print seed load balancing statistics.");
   
   if (CmiMyPe() == 0) {
     char *stra = CldGetStrategy();
@@ -524,4 +527,10 @@ void CldSimpleMultipleSend(int pe, int numToSend, int rank)
       }
     }
   }
+}
+
+void seedBalancerExit()
+{
+  if (_cldb_cs)
+    CmiPrintf("[%d] Relocate message number is %d\n", CmiMyPe(), CpvAccess(CldRelocatedMessages));
 }

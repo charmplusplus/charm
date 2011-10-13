@@ -191,15 +191,15 @@ CVHEADERS=cpthreads.h converse.h conv-trace.h conv-random.h conv-qd.h \
       trace-simple.h trace-controlPoints.h charm-api.h \
       conv-ccs.h ccs-client.c ccs-client.h \
       ccs-server.h ccs-auth.c ccs-auth.h \
-      memory-isomalloc.h debug-conv.h debug-charm.h conv-autoconfig.h \
+      memory-isomalloc.h debug-conv.h debug-conv++.h conv-autoconfig.h \
       conv-common.h conv-config.sh conv-config.h conv-mach.h conv-mach.sh \
-      blue.h blue-conv.h bgconverse.h \
-	3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
+      blue.h blue-conv.h bgconverse.h cmipool.h mempool.h \
+      cmidirect.h cmidirectmanytomany.h
+
+CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
 	routerstrategy.h convcomlibstrategy.h  convcomlib.h dummyconversestrategy.h  treerouter.h \
 	convcomlibmanager.h graphrouter.h petable.h gridrouter.h router.h \
-	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h cmipool.h \
-      comlib.h cmidirect.h cmidirectmanytomany.h \
-      controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h
+	prefixrouter.h pipebroadcastconverse.h pipelinestrategy.h
 
 # The .c files are there to be #included by clients whole
 # This is a bit unusual, but makes client linking simpler.
@@ -210,12 +210,14 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 	TopoManager.h XT3Torus.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
-	  ckfutures.h ckIgetControl.h cktiming.h \
+	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
 	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
-	  ckarray.h cklocation.h ckreduction.h ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
-		ckmessagelogging.h ckobjid.h\
-	  ckobjQ.h readonly.h charisma.h ComlibArrayListener.h ComlibStrategy.h \
+	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
+	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
+          ckmessagelogging.h ckobjid.h\
+	  ckobjQ.h readonly.h charisma.h \
+          comlib.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
 	  tempo.h waitqd.h LBDatabase.h lbdb.h lbdb++.h LBProfit.h $(LBHEADERS) \
           LBDBManager.h	LBComm.h LBOM.h LBObj.h LBMachineUtil.h LBAgent.h \
@@ -247,10 +249,11 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  RectMulticastStrategy.h ckdirect.h \
 	  ControlPoints.decl.h PathHistory.decl.h \
 	  pathHistory.h envelope-path.h \
-	  $(CVHEADERS)
+          controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
+	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
-    simplemsg.h sm.h pvmc.h pvm3.h sdag.h \
+    simplemsg.h sm.h pvmc.h pvm3.h sdag.h vector2d.h \
 	graph.h bitvecset.h ckset.h LBSimulation.h  \
 	$(BLUE_HEADERS)
 
@@ -277,7 +280,7 @@ commitid.o: CC=$(CHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
-	-@for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
+	-for hdr in $(ALLHEADERS) ; do test ! -f "../include/$$hdr" && ./system_ln "../tmp/$$hdr" ../include ; done
 	touch headerlinks
 
 dirs+sources:
@@ -344,22 +347,36 @@ dirs+sources:
 # 
 ###############################################################################
 CLBLIBS=$(L)/libldb-rand.o $(L)/libldb-spray.o   $(L)/libldb-workstealing.o  $(L)/libldb-neighbor.o $(L)/libldb-none.o $(L)/libldb-test.o $(L)/libldb-bluegene.o
-TRACELIBS=$(L)/libtrace-projections.a  $(L)/libtrace-summary.a   $(L)/libtrace-utilization.a \
-	  $(L)/libtrace-simple.a \
-          $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
-	  $(L)/libtrace-projector.a $(L)/libtrace-all.a $(L)/libtrace-converse.a \
-          $(L)/libtracef_f.a $(L)/libtrace-memory.a
+
+TRACELIBS = $(L)/libtrace-converse.a $(L)/libtracef_f.a 
+
+BUILD_TRACING=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
+
+ifneq "$(BUILD_TRACING)" "0"
+TRACELIBS += $(L)/libtrace-projections.a  $(L)/libtrace-summary.a  \
+             $(L)/libtrace-utilization.a  $(L)/libtrace-simple.a \
+             $(L)/libtrace-counter.a $(L)/libtrace-bluegene.a \
+	     $(L)/libtrace-projector.a $(L)/libtrace-all.a  \
+             $(L)/libtrace-memory.a
+endif
+
 MEMLIBS=$(L)/libmemory-default.o $(L)/libmemory-os.o $(L)/libmemory-gnu.o \
           $(L)/libmemory-gnuold.o $(L)/libmemory-verbose.o 	\
 	  $(L)/libmemory-paranoid.o \
 	  $(L)/libmemory-leak.o $(L)/libmemory-isomalloc.o \
-	  $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
-	  $(L)/libmemory-charmdebug-slot.o $(L)/libmemory-charmdebug-mmap-slot.o \
 	  $(L)/libmemory-os-verbose.o $(L)/libmemory-os-isomalloc.o \
 	  $(L)/libmemory-os-leak.o $(L)/libmemory-os-paranoid.o \
-          $(L)/libmemory-os-lock.o \
-	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-os-wrapper.o \
-	  $(L)/libmemory-hooks-charmdebug.o
+          $(L)/libmemory-os-lock.o $(L)/libmemory-os-wrapper.o
+
+BUILD_CHARMDEBUG=$(shell CHARMINC=.; if test -f ./conv-config.sh; then . ./conv-config.sh; echo $$CMK_CHARMDEBUG; fi )
+
+ifneq "$(BUILD_CHARMDEBUG)" "0"
+MEMLIBS += $(L)/libmemory-charmdebug.o $(L)/libmemory-charmdebug-mmap.o \
+	  $(L)/libmemory-charmdebug-slot.o  \
+          $(L)/libmemory-charmdebug-mmap-slot.o \
+	  $(L)/libmemory-os-charmdebug.o $(L)/libmemory-hooks-charmdebug.o
+endif
+
 THREADLIBS=$(L)/libthreads-default.o $(L)/libthreads-default-tls.o  \
           $(L)/libthreads-qt.o 	$(L)/libthreads-qt-tls.o  \
 	  $(L)/libthreads-context.o $(L)/libthreads-context-tls.o  \
@@ -378,7 +395,7 @@ CVLIBS=$(L)/libconv-core.a \
 
 LIBCONV_CORE= convcore.o conv-conds.o queueing.o msgmgr.o \
 	cpm.o cpthreads.o futures.o cldb.o topology.o random.o \
-	debug-conv.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
+	debug-conv.o debug-conv++.o generate.o edgelist.o conv-ccs.o ccs-builtins.o middle-ccs.o \
 	traceCore.o traceCoreCommon.o \
 	converseProjections.o machineProjections.o \
 	quiescence.o isomalloc.o mem-arena.o conv-counter.o \
@@ -393,8 +410,8 @@ COMLIB_CORE_OBJS = ComlibModuleInterface.o
 LIBCONV_UTIL=pup_util.o pup_toNetwork.o pup_toNetwork4.o		\
 	pup_xlater.o pup_c.o pup_paged.o pup_cmialloc.o			\
 	ckimage.o ckdll.o ckhashtable.o sockRoutines.o			\
-	conv-lists.o RTH.o persist-comm.o \
-	ckbitvector.o TopoManager.o CrayNid.o crc32.o
+	conv-lists.o RTH.o persist-comm.o mempool.o graph.o \
+	TopoManager.o CrayNid.o crc32.o
 
 LIBCONV_UTILF=pup_f.o
 
@@ -495,20 +512,23 @@ TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XTTo
 CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -c -o CrayNid.o CrayNid.c
 
-ckbitvector.o: ckbitvector.C ckbitvector.h $(CVHEADERS)
-	$(CHARMC) -I. -o ckbitvector.o ckbitvector.C
-
 ckdll.o: ckdll.C ckdll.h $(CVHEADERS)
 	$(CHARMC) -o ckdll.o ckdll.C
 
 ckimage.o: ckimage.C ckimage.h $(CVHEADERS)
 	$(CHARMC) -o ckimage.o ckimage.C
 
+graph.o: graph.c $(CVHEADERS) $(UTILHEADERS)
+	$(CHARMC) -c -o graph.o graph.c
+
 RTH.o: RTH.C RTH.h $(CVHEADERS)
 	$(CHARMC) -o RTH.o RTH.C
 
-persist-comm.o: persist-comm.c persist_impl.h $(CVHEADERS)
+persist-comm.o: persist-comm.c $(CVHEADERS)
 	$(CHARMC) -o persist-comm.o persist-comm.c
+
+mempool.o: mempool.c $(CVHEADERS)
+	$(CHARMC) -o mempool.o mempool.c
 
 conv-lists.o: conv-lists.C $(UTILHEADERS) $(CVHEADERS)
 	$(CHARMC) -o conv-lists.o conv-lists.C
@@ -681,17 +701,18 @@ $(L)/loadsym.o: loadsym.c  $(CVHEADERS)
 
 CK_LIBS_CORE=$(L)/libck.a
 
-LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o  \
+LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
-	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o\
+	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
 	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
-           ckgraph.o graph.o LButil.o Refiner.o RefinerApprox.o  \
+           ckgraph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
-	   charmProjections.o cktiming.o pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
+	   charmProjections.o cktiming.o ckbitvector.o \
+           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
 
@@ -1047,6 +1068,7 @@ depends: cidepends
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
+        touch metis.h scotch.h;   \
 	processFiles=''; 	\
         for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) ; do \
 	      processed='false';	\
@@ -1062,7 +1084,8 @@ depends: cidepends
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done;  \
+        rm -f metis.h  scotch.h
 
 
 dependsCaseSensitive: cidepends
@@ -1072,6 +1095,7 @@ dependsCaseSensitive: cidepends
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \
         fi; \
 	echo '#generated by make depends' > $(DEPENDFILE); \
+        touch metis.h scotch.h;   \
 	processFiles=''; 	\
         for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS); do \
 	      processed='false';	\
@@ -1089,7 +1113,8 @@ dependsCaseSensitive: cidepends
               echo "checking dependencies for $$SRCFILE" ; \
               if g++ -MM -Wno-deprecated -I. -I$(INC) $$SRCFILE  >> $(DEPENDFILE); then   echo '	$$(CHARMC) -c -I. '$$SRCFILE >> $(DEPENDFILE) ; else echo '' ; echo "Compilation of '$$SRCFILE' failed, please fix it first!!!!" ; exit; fi;  \
 	      echo '' >> $(DEPENDFILE) ; \
-        done;
+        done;  \
+        rm -f metis.h  scotch.h
 
 
 

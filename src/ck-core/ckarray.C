@@ -168,7 +168,7 @@ CProxyElement_ArrayBase::ckSendWrapper(void *me, void *m, int ep, int opts){
 }
 */
 void
-CProxyElement_ArrayBase::ckSendWrapper(CkArrayID _aid, CkArrayIndexMax _idx, void *m, int ep, int opts) {
+CProxyElement_ArrayBase::ckSendWrapper(CkArrayID _aid, CkArrayIndex _idx, void *m, int ep, int opts) {
 	CProxyElement_ArrayBase me = CProxyElement_ArrayBase(_aid,_idx);
 	((CProxyElement_ArrayBase)me).ckSend((CkArrayMessage*)m,ep,opts);
 }
@@ -230,7 +230,7 @@ class ArrayElement_initInfo {
 public:
   CkArray *thisArray;
   CkArrayID thisArrayID;
-  CkArrayIndexMax numInitial;
+  CkArrayIndex numInitial;
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   CmiBool fromMigration;
 };
@@ -268,6 +268,9 @@ void ArrayElement::initBasics(void)
         mlogData->objID.type = TypeArray;
         mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
 #endif
+#ifdef _PIPELINED_ALLREDUCE_
+	allredMgr = NULL;
+#endif
 }
 
 ArrayElement::ArrayElement(void) 
@@ -300,8 +303,98 @@ void ArrayElement::ckJustRestored(void) {
     //empty for out-of-core emulation
 }
 
+#ifdef _PIPELINED_ALLREDUCE_
+void ArrayElement::contribute2(int dataSize,const void *data,CkReduction::reducerType type,
+					CMK_REFNUM_TYPE userFlag)
+{
+	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);
+	msg->setUserFlag(userFlag);
+	msg->setMigratableContributor(true);
+	thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+void ArrayElement::contribute2(int dataSize,const void *data,CkReduction::reducerType type,
+					const CkCallback &cb,CMK_REFNUM_TYPE userFlag)
+{
+	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);
+	msg->setUserFlag(userFlag);
+	msg->setCallback(cb);
+	msg->setMigratableContributor(true);
+	thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+void ArrayElement::contribute2(CkReductionMsg *msg) 
+{
+	msg->setMigratableContributor(true);
+	thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+void ArrayElement::contribute2(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)
+{
+	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);
+    msg->setUserFlag(userFlag);
+    msg->setCallback(cb);
+    msg->setMigratableContributor(true);
+    thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+void ArrayElement::contribute2(CMK_REFNUM_TYPE userFlag)
+{
+    CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);
+    msg->setUserFlag(userFlag);
+    msg->setMigratableContributor(true);
+    thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+
+void ArrayElement::contribute2(CkArrayIndex myIndex, int dataSize,const void *data,CkReduction::reducerType type,
+							  const CkCallback &cb,CMK_REFNUM_TYPE userFlag)
+{
+	// if it is a broadcast to myself and size is large
+	if(cb.type==CkCallback::bcastArray && cb.d.array.id==thisArrayID && dataSize>FRAG_THRESHOLD) 
+	{
+		if (!allredMgr) {
+			allredMgr = new AllreduceMgr();
+		}
+		// number of fragments
+		int fragNo = dataSize/FRAG_SIZE;
+		int size = FRAG_SIZE;
+		// for each fragment
+		for (int i=0; i<fragNo; i++) {
+			// callback to defragmentor
+			CkCallback defrag_cb(CkIndex_ArrayElement::defrag(NULL), thisArrayID);
+			if ((0 != i) && ((fragNo-1) == i) && (0 != dataSize%FRAG_SIZE)) {
+				size = dataSize%FRAG_SIZE;
+			}
+			CkReductionMsg *msg = CkReductionMsg::buildNew(size, (char*)data+i*FRAG_SIZE);
+			// initialize the new msg
+			msg->reducer            = type;
+			msg->nFrags             = fragNo;
+			msg->fragNo             = i;
+			msg->callback           = defrag_cb;
+			msg->userFlag           = userFlag;
+			allredMgr->cb		= cb;
+			allredMgr->cb.type	= CkCallback::sendArray;
+			allredMgr->cb.d.array.idx = myIndex;
+			contribute2(msg);
+		}
+		return;
+	}
+	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);
+	msg->setUserFlag(userFlag);
+	msg->setCallback(cb);
+	msg->setMigratableContributor(true);
+	thisArray->contribute(&*(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],msg);
+}
+
+
+#else
 CK_REDUCTION_CONTRIBUTE_METHODS_DEF(ArrayElement,thisArray,
    *(contributorInfo *)&listenerData[thisArray->reducer->ckGetOffset()],true)
+#endif
+// _PIPELINED_ALLREDUCE_
+void ArrayElement::defrag(CkReductionMsg *msg)
+{
+//	CkPrintf("in defrag\n");
+#ifdef _PIPELINED_ALLREDUCE_
+	allredMgr->allreduce_recieve(msg);
+#endif
+}
 
 /// Remote method: calls destructor
 void ArrayElement::ckDestroy(void)
@@ -372,7 +465,7 @@ int ArrayElement::ckDebugChareID(char *str, int limit) {
   if (limit<21) return -1;
   str[0] = 2;
   *((int*)&str[1]) = ((CkGroupID)thisArrayID).idx;
-  *((CkArrayIndexMax*)&str[5]) = thisIndexMax;
+  *((CkArrayIndex*)&str[5]) = thisIndexMax;
   return 21;
 }
 
@@ -426,7 +519,7 @@ CkLocMgr *CProxy_ArrayBase::ckLocMgr(void) const
 CK_REDUCTION_CLIENT_DEF(CProxy_ArrayBase,ckLocalBranch())
 
 CkArrayOptions::CkArrayOptions(void) //Default: empty array
-	:numInitial(0),map(_defaultArrayMapID)
+	:numInitial(),map(_defaultArrayMapID)
 {
     init();
 }
@@ -823,7 +916,7 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 	if (local) {
 	  int onPe=CkMyPe();
 	  prepareCtorMsg(m,onPe,idx);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
           BgEntrySplit("split-array-new");
 #endif
 	  insertElement(m);
@@ -900,6 +993,12 @@ void *CProxyElement_ArrayBase::ckSendSync(CkArrayMessage *msg, int ep) const
 	return CkWaitReleaseFuture(f);
 }
 
+void CkBroadcastMsgSection(int entryIndex, void *msg, CkSectionID sID, int opts     )
+{
+	CProxySection_ArrayBase sp(sID);
+	sp.ckSend((CkArrayMessage *)msg,entryIndex,opts);
+}
+
 void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 {
 	if (ckIsDelegated()) //Just call our delegateMgr
@@ -908,13 +1007,13 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage *msg, int ep, int opts)
 	  // send through all
 	  for (int k=0; k<_nsid; ++k) {
 	    for (int i=0; i< _sid[k]._nElems-1; i++) {
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.aid, _sid[k]._elems[i]);
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
 	      void *newMsg=CkCopyMsg((void **)&msg);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	    if (_sid[k]._nElems > 0) {
 	      void *newMsg= (k<_nsid-1) ? CkCopyMsg((void **)&msg) : msg;
-	      CProxyElement_ArrayBase ap(_sid[k]._cookie.aid, _sid[k]._elems[_sid[k]._nElems-1]);
+	      CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[_sid[k]._nElems-1]);
 	      ap.ckSend((CkArrayMessage *)newMsg,ep,opts);
 	    }
 	  }
@@ -1177,9 +1276,14 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0, len = elements->length();
+	int idx=0, len=0;
+        if (stableLocations) {            /* remove all NULLs in the array */
+          len = 0;
+          while (elements->next(idx)!=NULL) len++;
+          idx = 0;
+        }
 	ArrayElement *el;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *root;
         _TRACE_BG_TLINE_END(&root);
 	BgSetEntryName("start-broadcast", &root);
@@ -1188,7 +1292,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	extern void startVTimer();
 #endif
 	while (NULL!=(el=elements->next(idx))) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
                 //BgEntrySplit("split-broadcast");
   		stopVTimer();
                 void *curlog = BgSplitEntry("split-broadcast", &root, 1);
@@ -1201,7 +1305,7 @@ void CkArray::recvBroadcast(CkMessage *m)
 	}
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	//BgEntrySplit("end-broadcast");
 	stopVTimer();
 	BgSplitEntry("end-broadcast", logs.getVec(), logs.size());

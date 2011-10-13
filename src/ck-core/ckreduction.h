@@ -22,8 +22,13 @@ The calls needed to use the reduction manager are:
 
 #include "CkArrayReductionMgr.decl.h"
 
-#if CMK_BLUEGENE_CHARM || CMK_MULTICORE || !CMK_SMP
+#if CMK_BIGSIM_CHARM || CMK_MULTICORE || !CMK_SMP
 #define GROUP_LEVEL_REDUCTION           1
+#endif
+
+#ifdef _PIPELINED_ALLREDUCE_
+#define FRAG_SIZE 131072
+#define FRAG_THRESHOLD 131072
 #endif
 
 class CkReductionMsg; //See definition below
@@ -262,6 +267,10 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class CkNodeReductionMgr;
 	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
+#ifdef _PIPELINED_ALLREDUCE_
+	friend class ArrayElement;
+	friend class AllreduceMgr;
+#endif
     friend class ck::impl::XArraySectionReducer;
 public:
 
@@ -320,7 +329,7 @@ private:
     int fromPE;
 #endif
 private:
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *log;
 #endif
 	CkReduction::reducerType reducer;
@@ -412,5 +421,39 @@ class Group : public CkReductionMgr
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
 
+#ifdef _PIPELINED_ALLREDUCE_
+class AllreduceMgr
+{
+public:
+	AllreduceMgr() { fragsRecieved=0; size=0; }
+	friend class ArrayElement;
+	// recieve an allreduce message
+	void allreduce_recieve(CkReductionMsg* msg)
+	{
+		// allred_msgs.enq(msg);
+		fragsRecieved++;
+		if(fragsRecieved==1)
+		{
+			data = new char[FRAG_SIZE*msg->nFrags];
+		}
+		memcpy(data+msg->fragNo*FRAG_SIZE, msg->data, msg->dataSize);
+		size += msg->dataSize;
+		
+		if(fragsRecieved==msg->nFrags) {
+			CkReductionMsg* ret = CkReductionMsg::buildNew(size, data);
+			cb.send(ret);
+			fragsRecieved=0; size=0;
+			delete [] data;
+		}
+		
+	}
+	// TODO: check for same reduction
+	CkCallback cb;	
+	int size;
+	char* data;
+	int fragsRecieved;
+	// CkMsgQ<CkReductionMsg> allred_msgs;
+};
+#endif // _PIPELINED_ALLREDUCE_
 
 #endif //_CKREDUCTION_H

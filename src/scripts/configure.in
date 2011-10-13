@@ -22,6 +22,34 @@ Echo() {
 	echo $* >> $charmout
 }
 
+# add into conv-mach-opt.sh
+# add_flag $1 $2
+# $2 is description
+add_flag() {
+        key=`echo $1 | cut -d'=' -f1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1" 
+	then
+	  skip=1
+        fi
+	if test $skip = 0
+        then
+	  cat >> ../include/conv-mach-opt.sh << EOT
+
+$1   # Option added by configure script's $2 section
+EOT
+	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
+}
+
+
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
             [AS_HELP_STRING([--enable-error-checking],
@@ -60,8 +88,10 @@ if test "$enable_tracing" = "no"
 then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
+  add_flag CMK_TRACE_ENABLED=0
 else
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
+  add_flag CMK_TRACE_ENABLED=1
 fi
 
 AC_ARG_ENABLE([charmdebug],
@@ -73,8 +103,10 @@ if test "$enable_charmdebug" = "no"
 then
   Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
+  add_flag CMK_CHARMDEBUG=0
 else
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 1, [enable charmdebug])
+  add_flag CMK_CHARMDEBUG=1
 fi
 
 AC_ARG_ENABLE([replay],
@@ -87,6 +119,19 @@ if test "$enable_replay" = "no"
 then
   Echo "Charm record/replay is disabled"
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
+fi
+
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no"
+then
+  Echo "CCS is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+else
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
 fi
 
 AC_ARG_ENABLE([controlpoint],
@@ -300,33 +345,6 @@ test_linkso() {
 	fi
 	cat out >> $charmout
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
-}
-
-# add into conv-mach-opt.sh
-# add_flag $1 $2
-# $2 is description
-add_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
-        skip=0
-	if test -n "$last" -a  "$last" = "$1" 
-	then
-	  skip=1
-        fi
-	if test $skip = 0
-        then
-	  cat >> ../include/conv-mach-opt.sh << EOT
-
-$1   # Option added by configure script's $2 section
-EOT
-	fi
-}
-
-# remove_flag $1
-remove_flag() {
-     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
-     cp tmp.$$ ../include/conv-mach-opt.sh
-     /bin/rm -f tmp.$$
 }
 
 test_finish() {
@@ -1601,6 +1619,9 @@ then
   fi
 fi
 
+## Cray specific test
+if test "$CMK_BUILD_CRAY" = "1"
+then
 
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
@@ -1629,6 +1650,8 @@ int main() {
 EOT
 test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
+
+fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT

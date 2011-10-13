@@ -7,8 +7,11 @@
 
 #include "Topo.h"
 #include "Topo.def.h"
+#include "lb_test.decl.h"
 
 #define LINEARLY_GRADED                            0
+
+/* readonly*/ extern CProxy_main mainProxy;
 
 CkGroupID Topo::Create(const int _elem, const char* _topology, 
 		       const int min_us, const int max_us)
@@ -86,6 +89,18 @@ Topo::Topo(TopoInitMsg* _m)
 	};
 
   delete _m;
+}
+
+// Function to change loads in all the elements
+void Topo::shuffleLoad(){
+
+	printf("[%d] At shuffleLoad\n",CkMyPe());
+	
+	// calling function to assign new loads
+	FindComputeTimes();
+
+	// reduction to continue execution
+	contribute(CkCallback(CkIndex_main::resume(),mainProxy));
 }
 
 void Topo::FindComputeTimes()

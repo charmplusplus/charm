@@ -533,7 +533,7 @@ int check_stdio_header(CcsImplHeader *hdr) {
 }
 
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define MAX_PRINT_BUF_SIZE 1024
 #else
 #define MAX_PRINT_BUF_SIZE 8192

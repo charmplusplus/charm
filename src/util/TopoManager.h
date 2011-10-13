@@ -12,7 +12,7 @@
 #ifndef _TOPO_MANAGER_H_
 #define _TOPO_MANAGER_H_
 
-#include "charm.h"
+#include "converse.h"
 
 #if CMK_BLUEGENEL
 #include "BGLTorus.h"
@@ -20,11 +20,11 @@
 #include "BGPTorus.h"
 #elif XT3_TOPOLOGY
 #include "XT3Torus.h"
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 #include "XTTorus.h"
 #endif
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "blue.h"
 #endif
 

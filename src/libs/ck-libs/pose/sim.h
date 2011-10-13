@@ -238,6 +238,11 @@ class sim : public CBase_sim {
   */
   POSE_TimeType dop_override_evt;
 #endif
+  /// Used to count the number of commits (in [0]) and rollbacks (in [1])
+  /* These statistics are collected by the poser termination
+     reduction at the end of the simulation and printed in one of the
+     POSE exit functions */
+  long long basicStats[2];
   /// The local load balancer
   LBgroup *localLBG;
   /// Basic Constructor
@@ -268,7 +273,15 @@ class sim : public CBase_sim {
   /// Migrate this poser to processor indicated in m
   inline void Migrate(destMsg *m) { migrateMe(m->destPE); }
   /// Terminate this poser, when everyone is terminated we exit 
-  inline void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
+  inline void Terminate() {
+    //#ifndef SEQUENTIAL_POSE
+    //    CkPrintf("Step[%d] total=%lld stepCalls=%d avg=%d RBs=%lld\n", 
+    //	     objID->myHandle, myStrat->timeLeashTotal, myStrat->stepCalls, 
+    //	     myStrat->timeLeashTotal / ((myStrat->stepCalls == 0) ? -1 : myStrat->stepCalls), basicStats[1]);
+    //#endif
+    objID->terminus();
+    contribute(2 * sizeof(long long), basicStats, CkReduction::sum_int, CkCallback(POSE_prepExit, NULL));
+  }
   /// In sequential mode, begin checkpoint after reaching quiescence
   void SeqBeginCheckpoint();
   /// In sequential mode, resume after checkpointing or restarting

@@ -11,7 +11,7 @@ void initBigSimTrace()
   CkpvInitialize(unsigned long, bgTraceCounter);
   CkpvAccess(bgTraceCounter) = 0;
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   //   for bigsim emulation, write to files, one for each processor
   char fname[128];
   sprintf(fname, "param.%d", CkMyPe());
@@ -26,7 +26,7 @@ void initBigSimTrace()
 
 void finalizeBigSimTrace()
 {
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   fclose(CkpvAccess(bgfp));
 #endif  
 }

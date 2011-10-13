@@ -21,6 +21,7 @@ mainmodule lb_test {
   mainchare main {
     entry main();
     entry void maindone(void);
+	entry void resume(void);
   };
 
   array [1D] Lb_array {

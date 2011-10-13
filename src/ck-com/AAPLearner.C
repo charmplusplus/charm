@@ -57,7 +57,7 @@
     
 //     if(in_strat->getType() == ARRAY_STRATEGY) {
 //         CkArrayID said, daid;
-//         CkArrayIndexMax *sidxlist, *didxlist;
+//         CkArrayIndex *sidxlist, *didxlist;
 //         int nsrc, ndest;
         
 //         in_strat->ainfo.getSourceArray(said, sidxlist, nsrc);

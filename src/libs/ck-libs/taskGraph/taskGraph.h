@@ -18,13 +18,13 @@ class taskGraphSolver; // forward decl so taskGraph.decl.h doesn't die
 class taskGraphSolver : public PUP::able {
 private:
   CkArrayID __taskSet;
-  CkArrayIndexMax __taskIndex;
-  CkVec<CkArrayIndexMax> __taskDeps;
+  CkArrayIndex __taskIndex;
+  CkVec<CkArrayIndex> __taskDeps;
 public:
   virtual void dependsOn(int x) { dependsOn(CkArrayIndex1D(x)); }
   virtual void dependsOn(int x, int y) { dependsOn(CkArrayIndex2D(x,y)); }
   virtual void dependsOn(int x, int y, int z) { dependsOn(CkArrayIndex3D(x,y,z)); }
-  virtual void dependsOn(CkArrayIndexMax taskDep) { __taskDeps.push_back(CkArrayIndexMax(taskDep)); }
+  virtual void dependsOn(CkArrayIndex taskDep) { __taskDeps.push_back(CkArrayIndex(taskDep)); }
 
   static CkArrayID newTaskGraph() { return CProxy_taskGraphArray::ckNew(); }
   virtual void startTask() {
@@ -43,7 +43,7 @@ public:
     : __taskDeps(), __taskSet(set), __taskIndex(CkArrayIndex2D(x,y)) {};
   taskGraphSolver(CkArrayID set, int x, int y, int z)
     : __taskDeps(), __taskSet(set), __taskIndex(CkArrayIndex3D(x,y,z)) {};
-  taskGraphSolver(CkArrayID set, CkArrayIndexMax taskIndex)
+  taskGraphSolver(CkArrayID set, CkArrayIndex taskIndex)
     : __taskDeps(), __taskSet(set), __taskIndex(taskIndex) {};
   taskGraphSolver(CkMigrateMessage *m) : PUP::able(m) {};
 
@@ -60,8 +60,8 @@ public:
 class callbackMsg : public CMessage_callbackMsg {
 public:
   PUPable_marshall<taskGraphSolver> Data;
-  CkArrayIndexMax Index;
-  callbackMsg(taskGraphSolver* self, CkArrayIndexMax ind)
+  CkArrayIndex Index;
+  callbackMsg(taskGraphSolver* self, CkArrayIndex ind)
     : Data(self), Index(ind) {};
 };
 
@@ -87,13 +87,13 @@ void taskGraphAdd(CkArrayID id, T taskID,
 		  CkVec<T> deps,
 		  taskGraphSolver *self,
 		  CkCallback returnResults = CkCallback::ignore) {
-  CkVec<CkArrayIndexMax> newDeps;
+  CkVec<CkArrayIndex> newDeps;
 
   for ( int i = 0 ; i < deps.length() ; i++ ) {
-    newDeps.push_back( CkArrayIndexMax(deps[i]) );
+    newDeps.push_back( CkArrayIndex(deps[i]) );
   }
 
-  CkArrayIndexMax newTaskID( taskID );
+  CkArrayIndex newTaskID( taskID );
   CProxy_taskGraphArray array(id);
   array(newTaskID).insert(newDeps, self, returnResults);
 }
@@ -101,7 +101,7 @@ void taskGraphAdd(CkArrayID id, T taskID,
 /*
  * Delete an old task. The array ID and task number to delete are required.
  */
-void taskGraphDelete(CkArrayID id, CkArrayIndexMax taskID);
+void taskGraphDelete(CkArrayID id, CkArrayIndex taskID);
 
 
 /*
@@ -111,7 +111,7 @@ class taskGraphArray : public ArrayElementMax {
 protected:
   taskGraphSolver *Self;
   int isSolved;
-  CkVec<CkArrayIndexMax> Waiting;
+  CkVec<CkArrayIndex> Waiting;
 
   int DepsCount;
   taskGraphSolver **DepsData;
@@ -122,11 +122,11 @@ protected:
   void tryToSolve();
 
 public:
-  taskGraphArray(CkVec<CkArrayIndexMax> deps,
+  taskGraphArray(CkVec<CkArrayIndex> deps,
                  taskGraphSolver *data,
 		 CkCallback returnResults);
   taskGraphArray(CkMigrateMessage *m) {};
-  void requestData(CkArrayIndexMax from);
+  void requestData(CkArrayIndex from);
   void depositData(taskGraphSolver *data);
   void deleteElement();
 };

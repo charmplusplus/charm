@@ -23,6 +23,7 @@ typedef int (*SE_parallelLevelFn)();
 typedef int (*SE_searchDepthLimitFn)();
 typedef double (*SE_lowerBoundFn)(StateBase *_base);
 
+extern SE_lowerBoundFn   _lowerBoundFn;
 
 void SE_register(SE_createInitialChildrenFn  f1,
                  SE_createChildrenFn  f2,
@@ -67,20 +68,17 @@ extern int se_statesize;
 #define SE_Register(state, f1, f2, f3, f4, f5)  \
     void registerSE() {    \
       SE_register(f1, f2, f3, f4, f5);   \
-      se_statesize = sizeof(state);    \
     }  \
      void createMultipleChildren(SearchGroup* myGroup, StateBase *parent, SequentialSolver* solver, bool parallel) {  \
        StateBase *state;  \
        double minCost = myGroup->getCost(); \
-       double lb = lowerBound(parent); \
+       double lb = f5(parent); \
         if(lb<minCost)  \
             f2(parent, solver, false);  \
-       else  \
-            CkPrintf("Node pruned with lower bound:%f, best solution:%f\n", lb, minCost);  \
         while((state=solver->dequeue()) != NULL) \
         {  \
             minCost = myGroup->getCost(); \
-            lb = lowerBound(parent); \
+            lb = f5(parent); \
             if(lb>=minCost)  \
             continue;  \
             f2(state, solver, parallel); \
@@ -90,33 +88,30 @@ extern int se_statesize;
 #define SE_Register(state, f1, f2, f3, f4, f5)  \
     void registerSE() {    \
       SE_register(f1, f2, f3, f4, f5);   \
-      se_statesize = sizeof(state);    \
     }  \
     void createMultipleChildren(SearchGroup* myGroup, StateBase *parent, SequentialSolver* solver, bool parallel) {  \
-       StateBase *state;  \
+       StateBase *_state;  \
        double avgentrytime = 0;  \
        int processed_nodes = 1; \
        double instrument_start; \
        double accumulate_time = 0; \
        double minCost = myGroup->getCost(); \
-       double lb = lowerBound(parent); \
+       double lb = f5(parent); \
        instrument_start = CkWallTimer();  \
         if(lb<minCost)  \
             f2(parent, solver, false);  \
-       else  \
-            CkPrintf("Node pruned with lower bound:%f, best solution:%f\n", lb, minCost);  \
         accumulate_time = avgentrytime  = CkWallTimer() - instrument_start;  \
-        while((state=solver->dequeue()) != NULL) \
+        while((_state=solver->dequeue()) != NULL) \
         {  \
             minCost = myGroup->getCost(); \
-            lb = lowerBound(parent); \
+            lb = f5(parent); \
             if(lb>=minCost)  \
             continue;  \
             if(processed_nodes  == 20)  \
             {  \
                 avgentrytime  = (CkWallTimer() - instrument_start)/20;  \
             }  \
-            f2(state, solver, parallel); \
+            f2(_state, solver, parallel); \
             accumulate_time += avgentrytime; \
             if(accumulate_time > ENTRYGRAIN)  \
             {  solver-> dequeue_multiple(avgentrytime, processed_nodes);} \
@@ -129,7 +124,6 @@ extern int se_statesize;
 #define registerSE_DEF(state, f1, f2, f3, f4)    \
     void registerSE() {    \
       SE_register(f1, f2, f3, f4);   \
-      se_statesize = sizeof(state);    \
     }
 #ifndef ADAPTIVE
 #define SE_Register(state, f1, f2, f3, f4)  \

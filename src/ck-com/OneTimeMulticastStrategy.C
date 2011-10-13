@@ -86,8 +86,9 @@ void OneTimeMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 void OneTimeMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
   double start = CmiWallTimer();
   CkSectionID *sec_id = cmsg->sec_id;
-  CkVec< CkArrayIndexMax > localIndices;
-  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, sec_id->_cookie.aid, localIndices);
+  CkVec< CkArrayIndex > localIndices;
+  CkArrayID aid(sec_id->_cookie.get_aid());
+  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, aid, localIndices);
   deliverToIndices(cmsg->getCharmMessage(), localIndices );
   traceUserBracketEvent(10000, start, CmiWallTimer());
 }
@@ -113,7 +114,7 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   
   // Find my index in the list of all destination PEs
   if(rootPE){
-    CkAssert(CkMyPe() == multMsg->_cookie.pe);
+    CkAssert(CkMyPe() == multMsg->_cookie.get_pe());
     myIndex = -1;
   } else {
     for (int i=0; i<totalDestPEs; ++i) {
@@ -132,7 +133,7 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
 
   if(totalDestPEs > 0) {
     //CkPrintf("totalDestPEs = %d\n", totalDestPEs);
-    determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, multMsg->_cookie.pe, pelist, npes );
+    determineNextHopPEs(totalDestPEs, multMsg->indicesCount, myIndex, multMsg->_cookie.get_pe(), pelist, npes );
   } else {
     npes = 0;
   }
@@ -196,7 +197,7 @@ void OneTimeMulticastStrategy::handleMessage(void *msg){
   // Deliver to objects marked as local in the message
   int localElems;
   envelope *newenv;
-  CkArrayIndexMax *local_idx_list;  
+  CkArrayIndex *local_idx_list;  
   sinfo.unpack(env, localElems, local_idx_list, newenv);
   ComlibMulticastMsg *newmsg = (ComlibMulticastMsg *)EnvToUsr(newenv);  
 

@@ -159,8 +159,9 @@ void ChunkMulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 void ChunkMulticastStrategy::localMulticast(CharmMessageHolder *cmsg) {
   double start = CmiWallTimer();
   CkSectionID *sec_id = cmsg->sec_id;
-  CkVec< CkArrayIndexMax > localIndices;
-  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, sec_id->_cookie.aid, localIndices);
+  CkVec< CkArrayIndex > localIndices;
+  CkArrayID aid(sec_id->_cookie.get_aid());
+  sinfo.getLocalIndices(sec_id->_nElems, sec_id->_elems, aid, localIndices);
   deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() );
   //if (deliverToIndices(cmsg->getCharmMessage(), localIndices.size(), localIndices.getVec() ) == 0) 
     //CkFreeMsg(cmsg->getCharmMessage());
@@ -275,7 +276,7 @@ void ChunkMulticastStrategy::handleMessage(void *msg){
   // Deliver to objects marked as local in the message
   int localElems;
   envelope *newenv;
-  CkArrayIndexMax *local_idx_list;  
+  CkArrayIndex *local_idx_list;  
   sinfo.unpack(env, localElems, local_idx_list, newenv);
   ComlibMulticastMsg *newmsg = (ComlibMulticastMsg *)EnvToUsr(newenv);  
 
@@ -470,7 +471,7 @@ void ChunkTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, con
 
 //like tree except with the mother node sending chunks instead of a ring between depth 1 processors
 void ChunkPipeTreeMulticastStrategy::determineNextHopPEs(const int totalDestPEs, const ComlibMulticastIndexCount* destPEs, const int myIndex, int * &pelist, int &npes, int chunkNumber, int numChunks) {
-  int hop;
+  /*  int hop;*/
   int *allpelist;
   CkPrintf("myindex = %d\n", myIndex);
   if (myIndex == -1) {

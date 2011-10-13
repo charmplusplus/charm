@@ -40,7 +40,7 @@ public:
     CProxy_Hello *arrayOfArrays = new CProxy_Hello[numArrays];
     CkArrayID *arrID            = new CkArrayID[numArrays];
     int *nelems                 = new int[numArrays];
-    CkArrayIndexMax **elems     = new CkArrayIndexMax*[numArrays];
+    CkArrayIndex **elems     = new CkArrayIndex*[numArrays];
 
     // Create a list of array section members
     for(int k=0; k < numArrays; k++)
@@ -51,7 +51,7 @@ public:
         arrID[k]  = arrayOfArrays[k].ckGetArrayID();
         // Create a list of section member indices in this array
         nelems[k] = sectionSize;
-        elems[k]  = new CkArrayIndexMax[sectionSize];
+        elems[k]  = new CkArrayIndex[sectionSize];
         for(int i=afloor,j=0; i <= aceiling; i++,j++)
             elems[k][j] = CkArrayIndex1D(i);
     }

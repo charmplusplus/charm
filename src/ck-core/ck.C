@@ -170,7 +170,6 @@ void Chare::CkAddThreadListeners(CthThread th, void *msg) {
   traceAddThreadListeners(th, UsrToEnv(msg));
 }
 
-
 void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
   p.comment("Bytes");
   int ts=UsrToEnv(msg)->getTotalsize();
@@ -246,19 +245,19 @@ void CkDelegateMgr::GroupSend(CkDelegateData *pd,int ep,void *m,int onPE,CkGroup
 void CkDelegateMgr::GroupBroadcast(CkDelegateData *pd,int ep,void *m,CkGroupID g)
   { CkBroadcastMsgBranch(ep,m,g); }
 void CkDelegateMgr::GroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
+  { CkSendMsgBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
 void CkDelegateMgr::NodeGroupSend(CkDelegateData *pd,int ep,void *m,int onNode,CkNodeGroupID g)
   { CkSendMsgNodeBranch(ep,m,onNode,g); }
 void CkDelegateMgr::NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g)
   { CkBroadcastMsgNodeBranch(ep,m,g); }
 void CkDelegateMgr::NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s)
-  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.aid,s->npes,s->pelist); }
-void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a)
+  { CkSendMsgNodeBranchMulti(ep,m,s->_cookie.get_aid(),s->npes,s->pelist); }
+void CkDelegateMgr::ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
 	ap.ckInsert((CkArrayMessage *)m,ep,onPE);
 }
-void CkDelegateMgr::ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a)
+void CkDelegateMgr::ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a)
 {
 	CProxyElement_ArrayBase ap(a,idx);
 	ap.ckSend((CkArrayMessage *)m,ep);
@@ -293,20 +292,24 @@ void CProxy::ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr) {
 	ckUndelegate();
 	delegatedMgr = dTo;
 	delegatedPtr = dPtr;
+        delegatedGroupId = delegatedMgr->CkGetGroupID();
+        isNodeGroup = delegatedMgr->isNodeGroup();
 }
 void CProxy::ckUndelegate(void) {
 	delegatedMgr=NULL;
+        delegatedGroupId.setZero();
 	if (delegatedPtr) delegatedPtr->unref();
 	delegatedPtr=NULL;
 }
 
 /// Copy constructor
 CProxy::CProxy(const CProxy &src)
-    :delegatedMgr(src.delegatedMgr)
-{
+  :delegatedMgr(src.delegatedMgr), delegatedGroupId(src.delegatedGroupId), 
+   isNodeGroup(src.isNodeGroup) {
     delegatedPtr = NULL;
-    if(delegatedMgr != NULL && src.delegatedPtr != NULL)
+    if(delegatedMgr != NULL && src.delegatedPtr != NULL) {
         delegatedPtr = src.delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
+    }
 }
 
 /// Assignment operator
@@ -314,6 +317,8 @@ CProxy& CProxy::operator=(const CProxy &src) {
 	CkDelegateData *oldPtr=delegatedPtr;
 	ckUndelegate();
 	delegatedMgr=src.delegatedMgr;
+        delegatedGroupId = src.delegatedGroupId; 
+        isNodeGroup = src.isNodeGroup;
 
         if(delegatedMgr != NULL && src.delegatedPtr != NULL)
             delegatedPtr = delegatedMgr->ckCopyDelegateData(src.delegatedPtr);
@@ -326,37 +331,70 @@ CProxy& CProxy::operator=(const CProxy &src) {
 }
 
 void CProxy::pup(PUP::er &p) {
-      CkGroupID delegatedTo;
-      delegatedTo.setZero();
-      int isNodeGroup = 0;
-      if (!p.isUnpacking()) {
-        if (delegatedMgr) {
-          delegatedTo = delegatedMgr->CkGetGroupID();
- 	  isNodeGroup = delegatedMgr->isNodeGroup();
-        }
-      }
-      p|delegatedTo;
-      if (!delegatedTo.isZero()) {
-        p|isNodeGroup;
-        if (p.isUnpacking()) {
-	  if (isNodeGroup)
-		delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedTo);
-	  else
-		delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedTo);
-	}
+  if (!p.isUnpacking()) {
+    if (ckDelegatedTo() != NULL) {
+      delegatedGroupId = delegatedMgr->CkGetGroupID();
+      isNodeGroup = delegatedMgr->isNodeGroup();
+    }
+  }
+  p|delegatedGroupId;
+  if (!delegatedGroupId.isZero()) {
+    p|isNodeGroup;
+    if (p.isUnpacking()) {
+      delegatedMgr = ckDelegatedTo(); 
+    }
 
-        delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
-	if (p.isUnpacking() && delegatedPtr)
-            delegatedPtr->ref();
+    int migCtor, cIdx; 
+    if (!p.isUnpacking()) {
+      if (isNodeGroup) {
+        CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+        cIdx = CksvAccess(_nodeGroupTable)->find(delegatedGroupId).getcIdx(); 
+        migCtor = _chareTable[cIdx]->migCtor; 
+        CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       }
+      else  {
+        CmiImmediateLock(CkpvAccess(_groupTableImmLock));
+        cIdx = CkpvAccess(_groupTable)->find(delegatedGroupId).getcIdx();
+        migCtor = _chareTable[cIdx]->migCtor; 
+        CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
+      }         
+    }
+
+    p|migCtor;
+
+    // if delegated manager has not been created, construct a dummy
+    // object on which to call DelegatePointerPup
+    if (delegatedMgr == NULL) {
+
+      // create a dummy object for calling DelegatePointerPup
+      int objId = _entryTable[migCtor]->chareIdx; 
+      int objSize = _chareTable[objId]->size; 
+      void *obj = malloc(objSize); 
+      _entryTable[migCtor]->call(NULL, obj); 
+      delegatedPtr = static_cast<CkDelegateMgr *> (obj)
+        ->DelegatePointerPup(p, delegatedPtr);           
+      free(obj);
+
+    }
+    else {
+
+      // delegated manager has been created, so we can use it
+      delegatedPtr = delegatedMgr->DelegatePointerPup(p,delegatedPtr);
+
+    }
+
+    if (p.isUnpacking() && delegatedPtr) {
+      delegatedPtr->ref();
+    }
+  }
 }
 
 /**** Array sections */
 #define CKSECTIONID_CONSTRUCTOR_DEF(index) \
 CkSectionID::CkSectionID(const CkArrayID &aid, const CkArrayIndex##index *elems, const int nElems): _nElems(nElems) { \
-  _cookie.aid = aid;	\
+  _cookie.get_aid() = aid;	\
   _cookie.get_pe() = CkMyPe();	\
-  _elems = new CkArrayIndexMax[nElems];	\
+  _elems = new CkArrayIndex[nElems];	\
   for (int i=0; i<nElems; i++) _elems[i] = elems[i];	\
   pelist = NULL;	\
   npes  = 0;	\
@@ -373,7 +411,7 @@ CKSECTIONID_CONSTRUCTOR_DEF(Max)
 CkSectionID::CkSectionID(const CkGroupID &gid, const int *_pelist, const int _npes): _nElems(0), _elems(NULL), npes(_npes) {
   pelist = new int[npes];
   for (int i=0; i<npes; i++) pelist[i] = _pelist[i];
-  _cookie.aid = gid;
+  _cookie.get_aid() = gid;
 }
 
 CkSectionID::CkSectionID(const CkSectionID &sid) {
@@ -381,7 +419,7 @@ CkSectionID::CkSectionID(const CkSectionID &sid) {
   _cookie = sid._cookie;
   _nElems = sid._nElems;
   if (_nElems > 0) {
-    _elems = new CkArrayIndexMax[_nElems];
+    _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
   } else _elems = NULL;
   npes = sid.npes;
@@ -396,7 +434,7 @@ void CkSectionID::operator=(const CkSectionID &sid) {
   _cookie = sid._cookie;
   _nElems = sid._nElems;
   if (_nElems > 0) {
-    _elems = new CkArrayIndexMax[_nElems];
+    _elems = new CkArrayIndex[_nElems];
     for (i=0; i<_nElems; i++) _elems[i] = sid._elems[i];
   } else _elems = NULL;
   npes = sid.npes;
@@ -410,7 +448,7 @@ void CkSectionID::pup(PUP::er &p) {
     p | _cookie;
     p(_nElems);
     if (_nElems > 0) {
-      if (p.isUnpacking()) _elems = new CkArrayIndexMax[_nElems];
+      if (p.isUnpacking()) _elems = new CkArrayIndex[_nElems];
       for (int i=0; i< _nElems; i++) p | _elems[i];
       npes = 0;
       pelist = NULL;
@@ -498,7 +536,7 @@ void *CkLocalChare(const CkChareID *pCid)
 #else
 		VidBlock *v=CkpvAccess(vidblocks)[(CmiIntPtr)pCid->objPtr];
 #endif
-		return v->getLocalChare();
+		return v->getLocalChareObj();
 	}
 	else
 	{ //An ordinary chare ID
@@ -533,7 +571,7 @@ extern "C" void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   //fflush(stdout);
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
-#endif
+#endif    
   _entryTable[epIdx]->call(msg, obj);
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
@@ -1281,8 +1319,9 @@ void CkUnpackMessage(envelope **pEnv)
 //There's no reason for most messages to go through the Cld--
 // the PE can never be CLD_ANYWHERE; wasting _infoFn calls.
 // Thus these accellerated versions of the Cld calls.
-
+#if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
+#endif
 int index_tokenHandler;
 int index_skipCldHandler;
 
@@ -1373,7 +1412,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   }
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #   define  _skipCldEnqueue   _CldEnqueue
 #endif
 
@@ -1575,7 +1614,9 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 static inline envelope *_prepareMsgBranch(int eIdx,void *msg,CkGroupID gID,int type)
 {
   register envelope *env = UsrToEnv(msg);
+#if CMK_ERROR_CHECKING
   CkNodeGroupID nodeRedMgr;
+#endif
   _CHECK_USED(env);
   _SET_USED(env, 1);
 #if CMK_REPLAYSYSTEM
@@ -1905,7 +1946,9 @@ void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID)
 
 void _ckModuleInit(void) {
 	index_skipCldHandler = CkRegisterHandler((CmiHandler)_skipCldHandler);
+#if CMK_OBJECT_QUEUE_AVAILABLE
 	index_objectQHandler = CkRegisterHandler((CmiHandler)_ObjectQHandler);
+#endif
 	index_tokenHandler = CkRegisterHandler((CmiHandler)_TokenHandler);
 	CkpvInitialize(TokenPool*, _tokenPool);
 	CkpvAccess(_tokenPool) = new TokenPool;
@@ -2029,7 +2072,6 @@ CkMessageWatcher::~CkMessageWatcher() { if (next!=NULL) delete next;}
 
 static FILE *openReplayFile(const char *prefix, const char *suffix, const char *permissions) {
 
-    int i;
     char *fName = new char[CkpvAccess(traceRootBaseLength)+strlen(prefix)+strlen(suffix)+7];
     strncpy(fName, CkpvAccess(traceRoot), CkpvAccess(traceRootBaseLength));
     sprintf(fName+CkpvAccess(traceRootBaseLength), "%s%06d%s",prefix,CkMyPe(),suffix);
@@ -2073,7 +2115,6 @@ private:
   }
   virtual CmiBool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
-      char tmp[128];
       bool wasPacked = (*envptr)->isPacked();
       if (!wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;
@@ -2140,7 +2181,7 @@ private:
 extern "C" void CkMessageReplayQuiescence(void *rep, double time);
 extern "C" void CkMessageDetailReplayDone(void *rep, double time);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 void CthEnqueueBigSimThread(CthThreadToken* token, int s,
                                    int pb,unsigned int *prio);
 #endif
@@ -2187,7 +2228,7 @@ class CkMessageReplay : public CkMessageWatcher {
 			return CmiFalse;
 		}
 #endif
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 		if (nextSize!=env->getTotalsize())
                 {
 			CkPrintf("[%d] CkMessageReplay> Message size changed during replay org: [%d %d %d %d] got: [%d %d %d %d]\n", CkMyPe(), nextPE, nextSize, nextEvent, nextEP, env->getSrcPe(), env->getTotalsize(), env->getEvent(), env->getEpIdx());
@@ -2255,7 +2296,7 @@ class CkMessageReplay : public CkMessageWatcher {
 	      CthThreadToken *token=delayedTokens.deq();
 	      if (isNext(token)) {
             REPLAYDEBUG("Dequeueing token: "<<token->serialNo)
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	        CsdEnqueueLifo((void*)token);
 #else
 		CthEnqueueBigSimThread(token,0,0,NULL);
@@ -2385,7 +2426,7 @@ public:
 };
 
 extern "C" void CkMessageReplayQuiescence(void *rep, double time) {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   CkPrintf("[%d] Quiescence detected\n",CkMyPe());
 #endif
   CkMessageReplay *replay = (CkMessageReplay*)rep;
@@ -2437,7 +2478,7 @@ void CpdHandleLBMessage(LBMigrateMsg **msg) {
   }
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 CpvExtern(int      , CthResumeBigSimThreadIdx);
 #endif
 
@@ -2499,7 +2540,7 @@ void CkMessageWatcherInit(char **argv,CkCoreState *ck) {
 	    }
 	  }
 	  CpdSetInitializeMemory(1);
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	  CmiNumberHandler(CpvAccess(CthResumeNormalThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);
 #else
 	  CkNumberHandler(CpvAccess(CthResumeBigSimThreadIdx), (CmiHandler)CthResumeNormalThreadDebug);

@@ -1,4 +1,10 @@
-DIRS= emulator sdag tools
+DIRS= emulator tools
+
+BUILD_TRACING=$(shell CHARMINC=../../tmp; if test -f $$CHARMINC/conv-config.sh; then . $$CHARMINC/conv-config.sh; echo $$CMK_TRACE_ENABLED; fi )
+
+ifneq "$(BUILD_TRACING)" "0"
+DIRS += sdag
+endif
 
 all:
 	for d in $(DIRS); do \

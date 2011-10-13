@@ -604,6 +604,7 @@ enable_stats
 enable_tracing
 enable_charmdebug
 enable_replay
+enable_ccs
 enable_controlpoint
 with_numa
 with_lbtime_type
@@ -1226,6 +1227,7 @@ Optional Features:
   --enable-tracing        enable tracing modules
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
+  --enable-ccs            enable CCS
   --enable-controlpoint   enable control point
 
 Optional Packages:
@@ -1691,6 +1693,34 @@ Echo() {
 	echo $* >> $charmout
 }
 
+# add into conv-mach-opt.sh
+# add_flag $1 $2
+# $2 is description
+add_flag() {
+        key=`echo $1 | cut -d'=' -f1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1"
+	then
+	  skip=1
+        fi
+	if test $skip = 0
+        then
+	  cat >> ../include/conv-mach-opt.sh << EOT
+
+$1   # Option added by configure script's $2 section
+EOT
+	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
+}
+
+
 # enable/disable error checking
 # Check whether --enable-error-checking was given.
 if test "${enable_error_checking+set}" = set; then :
@@ -1758,12 +1788,14 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_ENABLED 0
 _ACEOF
 
+  add_flag CMK_TRACE_ENABLED=0
 else
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_ENABLED 1
 _ACEOF
 
+  add_flag CMK_TRACE_ENABLED=1
 fi
 
 # Check whether --enable-charmdebug was given.
@@ -1782,12 +1814,14 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_CHARMDEBUG 0
 _ACEOF
 
+  add_flag CMK_CHARMDEBUG=0
 else
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_CHARMDEBUG 1
 _ACEOF
 
+  add_flag CMK_CHARMDEBUG=1
 fi
 
 # Check whether --enable-replay was given.
@@ -1804,6 +1838,30 @@ then
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
+_ACEOF
+
+fi
+
+# Check whether --enable-ccs was given.
+if test "${enable_ccs+set}" = set; then :
+  enableval=$enable_ccs;
+else
+  enable_ccs=yes
+fi
+
+
+if test "$enable_ccs" = "no"
+then
+  Echo "CCS is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CCS_AVAILABLE 0
+_ACEOF
+
+else
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CCS_AVAILABLE 1
 _ACEOF
 
 fi
@@ -2053,33 +2111,6 @@ $as_echo_n "checking \"$1\"... " >&6; }
 	fi
 	cat out >> $charmout
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
-}
-
-# add into conv-mach-opt.sh
-# add_flag $1 $2
-# $2 is description
-add_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
-        skip=0
-	if test -n "$last" -a  "$last" = "$1"
-	then
-	  skip=1
-        fi
-	if test $skip = 0
-        then
-	  cat >> ../include/conv-mach-opt.sh << EOT
-
-$1   # Option added by configure script's $2 section
-EOT
-	fi
-}
-
-# remove_flag $1
-remove_flag() {
-     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
-     cp tmp.$$ ../include/conv-mach-opt.sh
-     /bin/rm -f tmp.$$
 }
 
 test_finish() {
@@ -3706,6 +3737,9 @@ then
   fi
 fi
 
+## Cray specific test
+if test "$CMK_BUILD_CRAY" = "1"
+then
 
 #### test if Cray node topology will work ####
 cat > $tc <<EOT
@@ -3742,6 +3776,8 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_RCALIB $pass
 _ACEOF
 
+
+fi
 
 #### test if it can build shared library ####
 cat > $t <<EOT

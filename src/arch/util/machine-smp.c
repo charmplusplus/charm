@@ -297,7 +297,7 @@ CmiState CmiGetState() {
 #endif
 
 
-CmiNodeLock CmiCreateLock(void)
+CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
   _MEMCHECK(lk);

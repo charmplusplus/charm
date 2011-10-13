@@ -35,12 +35,12 @@ class CkMulticastMgr: public CkDelegateMgr
         /// Internal class for the (array index, location) pair.
         class IndexPos {
             public:
-                CkArrayIndexMax idx;
+                CkArrayIndex idx;
                 int  pe;
             public:
                 IndexPos() {}
-                IndexPos(int i): idx(i), pe(i) {}
-                IndexPos(CkArrayIndexMax i, int p): idx(i), pe(p) {};
+                IndexPos(int i): idx(), pe(i) {}
+                IndexPos(CkArrayIndex i, int p): idx(i), pe(p) {};
                 void pup(PUP::er &p){ p|idx; p|pe; }
         };
         typedef CkVec<IndexPos>  arrayIndexPosList;
@@ -59,7 +59,7 @@ class CkMulticastMgr: public CkDelegateMgr
 
         // ------------------------- Spanning Tree Setup ------------------------
         /// Stuff section member info into CkSectionInfo and call initCookie for the tree building
-        void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndexMax *, int n);
+        void setSection(CkSectionInfo &id, CkArrayID aid, CkArrayIndex *, int n);
         /// Call initCookie to start the tree build
         void setSection(CkSectionInfo &id);
         /// @deprecated { Use the other setSection methods }
@@ -116,7 +116,7 @@ class CkMulticastMgr: public CkDelegateMgr
 
     private:
         /// Fill the SectionInfo cookie in the SectionID obj with relevant info
-        void prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndexMax *al, int count, CkArrayID aid);
+        void prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid);
         /// Get info from the CkSectionInfo and call setup() to start the spanning tree build
         void initCookie(CkSectionInfo sid);
         /// Actually trigger the multicast to a section of a chare array

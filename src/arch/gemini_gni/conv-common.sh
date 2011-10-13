@@ -1,0 +1,3 @@
+
+CMK_BUILD_CRAY=1
+

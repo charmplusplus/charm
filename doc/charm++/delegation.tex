@@ -93,8 +93,8 @@ public:
   virtual void NodeGroupSend(int ep,void *m,int onNode,CkNodeGroupID g);
   virtual void NodeGroupBroadcast(int ep,void *m,CkNodeGroupID g);
 
-  virtual void ArrayCreate(int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
-  virtual void ArraySend(int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
+  virtual void ArrayCreate(int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a);
+  virtual void ArraySend(int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
   virtual void ArrayBroadcast(int ep,void *m,CkArrayID a);
   virtual void ArraySectionSend(int ep,void *m,CkArrayID a,CkSectionID &s);
 };

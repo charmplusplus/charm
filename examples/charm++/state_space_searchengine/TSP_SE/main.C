@@ -2,7 +2,7 @@
 
 #include "searchEngine.h"
 #include "exampleTsp.h"
-
+#include <time.h>
 #include <vector>
 using namespace std;
 int initial_grainsize;
@@ -34,6 +34,82 @@ int geom_edgelen (int i, int j, CCdatagroup *dat)
      return (int) (6378388.0 * atan2(sqrt(q1*q1 + q2*q2), q5) + 1.0);
 }
 */
+
+void writeOutput()
+{
+    FILE *file;
+    char filename[10];
+    sprintf(filename, "%d.tsp", N);
+    file = fopen(filename, "w");
+    if(file == NULL)
+    {
+        printf("file write error %s\n", filename);
+        CkExit();
+    }
+    fprintf(file, "%d", N);
+    graph.resize(N*N);
+    srand(time(0));
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < i; j++) {
+            int edge = (int)( 1.1 * abs( (rand() % 701)) );
+            graph[i*N+j] = edge;
+            graph[j*N+i] = edge;
+            //CkPrintf("%d\t", edge);
+            fprintf(file, "%d ",edge); 
+        }
+        fprintf(file, "\n");
+        //CkPrintf("\n");
+    }
+    fclose(file);
+
+}
+void readinput_2(char* filename)
+{
+    FILE *file;
+
+    char line[128];
+    char value[64];
+    vector<double> xcoord;
+    vector<double> ycoord;
+    int start;
+    int k, j;
+
+    file = fopen(filename, "r");
+    if(file == NULL)
+    {
+        printf("file read error %s\n", filename);
+        CkExit();
+    }
+    /* parse the header lines to get the number of vertices*/
+    fgets(line, 128, file);
+    sscanf(line, "%d", &N);
+    graph.resize(N*N);
+    for(int i=1; i<N; i++)
+    {
+        fgets(line, 128, file);
+        k = 0;
+        start = 0;
+        j=0;
+        while(line[k]!='\0')
+        {
+            if(line[k]==' ')
+            {
+                memcpy(value, line+start, k-start); 
+                value[k-start]='\0';
+                //CkPrintf("value=%s, length=%d",  value, k-start);
+                start = k+1;
+                graph[i*N+j] = atof(value);
+                graph[j*N+i] = atof(value);
+                //CkPrintf("%f ", graph[i*N+j]);
+                j++;
+            }
+            k++;
+        }
+        //CkPrintf("\n");
+    }
+    fclose(file);
+}
+
 void readinput(char* filename)
 {
     FILE *file;
@@ -41,8 +117,8 @@ void readinput(char* filename)
     char line[128];
     char variable[64];
     char value[64];
-    vector<int> xcoord;
-    vector<int> ycoord;
+    vector<double> xcoord;
+    vector<double> ycoord;
 
     file = fopen(filename, "r");
     if(file == NULL)
@@ -65,14 +141,16 @@ void readinput(char* filename)
 
     xcoord.resize(N);
     ycoord.resize(N);
-    int index, x, y; 
+    int index;
+    float x, y; 
     for(int i=0; i<N; i++)
     {
         fgets(line, sizeof line, file);
 
-        sscanf(line, "%d %d %d", &index, &x, &y);
+        sscanf(line, "%d %f %f", &index, &x, &y);
         xcoord[i] = x;
         ycoord[i] = y;
+        CkPrintf("%d %f %f\n", index, x, y);
     }
     graph.resize(N*N);
     for(int i=0; i<N; i++)
@@ -82,8 +160,12 @@ void readinput(char* filename)
             graph[i*N+j]= distance;
             graph[j*N+i]= distance;
         }
+    CkPrintf("Done with reading\n");
+    fclose(file);
 }
  
+
+extern void set_statesize(int);
 
 class Main
 {
@@ -94,35 +176,26 @@ public:
         int arg_index = 1;
         if(m->argc<2)
         {
-            CkPrintf("Usage: tsp type(0-random graph, 1 inputfile) (Size of Problem) initialgrain\n");
+            CkPrintf("Usage: tsp type(0-random graph, 1 inputfile, 2 inputfile) (Size of Problem) initialgrain\n");
             delete m;
             CkExit();
         }
         int type = atoi(m->argv[1]);
         if(type == 0)
         {
-            // Input Problem parameters
             N = atoi(m->argv[2]);
-            initial_grainsize = atoi(m->argv[3]);
-
-            graph.resize(N*N);
-            // Allocate 2-D array for storing the distance
-            // // Asymmetric Problem
-            for (int i = 0; i < N; i++) {
-                for (int j = 0; j < i; j++) {
-                    int edge = (int)( 1.1 * abs( (rand() % 1000)) );
-                    graph[i*N+j] = edge;
-                    graph[j*N+i] = edge;
-                    CkPrintf("%d\t", graph[i*N+j]);
-				}
-                CkPrintf("\n");
-			}
+            writeOutput();
         }else if(type == 1) //read from file
         {
             /* input file */
             readinput(m->argv[2]);
-            initial_grainsize = atoi(m->argv[3]);
+        }else if(type == 2)
+        {
+            readinput_2(m->argv[2]);
         }
+        initial_grainsize = atoi(m->argv[3]);
+
+        set_statesize(N);
 
         CkPrintf("start\n");
         searchEngineProxy.start();

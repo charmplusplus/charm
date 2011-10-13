@@ -85,30 +85,8 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
 }
 #endif
 
-/************************* Array Index *********************
-Array Index class.  An array index is just a 
-a run of bytes used to look up an object in a hash table.
-*/
-typedef unsigned char uc;
-
-CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
-	{return ((const CkArrayIndex *)v)->hash();}
-
-int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
-{
-	return ((const CkArrayIndex *)k1)->
-		compare(*(const CkArrayIndex *)k2);
-}
-
-void CkArrayIndex::pup(PUP::er &p) 
-{
-	p(nInts);
-	p(dimension);
-	p(data(),nInts);
-}
-
 /*********************** Array Messages ************************/
-CkArrayIndexMax &CkArrayMessage::array_index(void)
+CkArrayIndex &CkArrayMessage::array_index(void)
 {
     return UsrToEnv((void *)this)->getsetArrayIndex();
 }
@@ -146,7 +124,7 @@ be forwarded by default.
 
 CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
-int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
+int CkArrayMap::registerArray(CkArrayIndex& numElements,CkArrayID aid)
 {return 0;}
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
@@ -182,19 +160,19 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
           } \
 	}
 
-void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)
+void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)
 {
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
 	int thisPe=CkMyPe();
-        /* The CkArrayIndexMax is supposed to have at most 3 dimensions, which
+        /* The CkArrayIndex is supposed to have at most 3 dimensions, which
            means that all the fields are ints, and numElements.nInts represents
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(procNum(arrayHdl,idx)==thisPe);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         BgEntrySplit("split-array-new-end");
 #endif
 
@@ -245,7 +223,7 @@ public:
  */
 class arrayMapInfo {
 public:
-  CkArrayIndexMax _nelems;
+  CkArrayIndex _nelems;
   int _binSizeFloor;		/* floor of numChares/numPes */
   int _binSizeCeil;		/* ceiling of numChares/numPes */
   int _numChares;		/* initial total number of chares */
@@ -259,7 +237,7 @@ public:
 
   arrayMapInfo(void) { }
 
-  arrayMapInfo(CkArrayIndexMax& n) : _nelems(n), _numChares(0) {
+  arrayMapInfo(CkArrayIndex& n) : _nelems(n), _numChares(0) {
     compute_binsize();
   }
 
@@ -312,7 +290,7 @@ public:
 
   DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
 
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx = amaps.size();
     amaps.resize(idx+1);
@@ -372,7 +350,7 @@ public:
 
   FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx;
     idx = DefaultArrayMap::registerArray(numElements, aid);
@@ -426,7 +404,7 @@ public:
 
   ReadFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx;
     idx = DefaultArrayMap::registerArray(numElements, aid);
@@ -447,10 +425,10 @@ public:
       mapping.resize(numChares);
       FILE *mapf = fopen("mapfile", "r");
       TopoManager tmgr;
-      int x, y, z, t, rv;
+      int x, y, z, t;
 
       for(int i=0; i<numChares; i++) {
-	rv = fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+	(void) fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
 	mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
       }
       fclose(mapf);
@@ -488,7 +466,7 @@ public:
 	DEBC((AA"Creating BlockMap\n"AB));
   }
   BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
@@ -508,7 +486,7 @@ public:
         CKARRAYMAP_POPULATE_INITIAL(i/binSize==thisPe);
 
         /*
-        CkArrayIndexMax idx;
+        CkArrayIndex idx;
 	for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
           //for (int i=0;i<numElements;i++) {
 		int binSize = (int)ceil((double)numElements.getCombinedCount()/(double)numPes);
@@ -548,14 +526,14 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)  {
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)  {
         if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
         int thisPe=CkMyPe();
         int numPes=CkNumPes();
-        //CkArrayIndexMax idx;
+        //CkArrayIndex idx;
 
         CKARRAYMAP_POPULATE_INITIAL(i%numPes==thisPe);
 	/*for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
@@ -665,7 +643,7 @@ public:
   ConfigurableRRMap(CkMigrateMessage *m):RRMap(m){ }
 
 
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
@@ -707,12 +685,12 @@ CkpvStaticDeclare(double*, rem);
 
 class arrInfo {
  private:
-   CkArrayIndexMax _nelems;
+   CkArrayIndex _nelems;
    int *_map;
    void distrib(int *speeds);
  public:
    arrInfo(void):_map(NULL){}
-   arrInfo(CkArrayIndexMax& n, int *speeds)
+   arrInfo(CkArrayIndex& n, int *speeds)
    {
      _nelems = n;
      _map = new int[_nelems.getCombinedCount()];
@@ -854,7 +832,7 @@ public:
     DEBC((AA"Creating PropMap\n"AB));
   }
   PropMap(CkMigrateMessage *m) {}
-  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid)
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
@@ -1787,7 +1765,7 @@ inline void CkLocMgr::springCleaning(void)
     if (rec->isObsolete(nSprings,idx)) {
       //This record is obsolete-- remove it from the table
       DEBK((AA"Cleaning out old record %s\n"AB,idx2str(idx)));
-      hash.remove(*(CkArrayIndexMax *)&idx);
+      hash.remove(*(CkArrayIndex *)&idx);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
@@ -1816,7 +1794,7 @@ void CkLocMgr::flushAllRecs(void)
       //the meta data in the location manager are not deleted so we need
       //this condition
       if(_BgOutOfCoreFlag!=1){
-        hash.remove(*(CkArrayIndexMax *)&idx);
+        hash.remove(*(CkArrayIndex *)&idx);
         delete rec;
         it->seek(-1);//retry this hash slot
       }
@@ -1845,7 +1823,7 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitial)
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -1899,7 +1877,7 @@ void CkLocMgr::pup(PUP::er &p){
 		//Register with the map object
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-                CkArrayIndexMax emptyIndex;
+                CkArrayIndex emptyIndex;
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
@@ -1911,7 +1889,7 @@ void CkLocMgr::pup(PUP::er &p){
         homeElementCount = count;
 
         for(int i=0;i<count;i++){
-            CkArrayIndexMax idx;
+            CkArrayIndex idx;
             int pe;
             idx.pup(p);
             p | pe;
@@ -1954,7 +1932,7 @@ void CkLocMgr::pup(PUP::er &p){
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
         CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-            CkArrayIndexMax max = idx;
+            CkArrayIndex max = idx;
             if(rec->type() != CkLocRec::local){
                 if(homePe(idx) == CmiMyPe()){
                     int pe;
@@ -2127,7 +2105,7 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 	return CmiTrue;
 }
-void CkLocMgr::updateLocation(const CkArrayIndexMax &idx,int nowOnPe) {
+void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
 	inform(idx,nowOnPe);
 }
 
@@ -2151,7 +2129,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-	    #if CMK_BLUEGENE_CHARM
+	    #if CMK_BIGSIM_CHARM
 		//After migration, reclaimRemote will be called through 
 		//the CkRemoveArrayElement in the pupping routines for those 
 		//objects that are not on the home processors. However,
@@ -2172,7 +2150,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	}
 }
 
-void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
+void CkLocMgr::reclaimRemote(const CkArrayIndex &idx,int deletedOnPe) {
 	DEBC((AA"Our element %s died on PE %d\n"AB,idx2str(idx),deletedOnPe));
 	CkLocRec *rec=elementNrec(idx);
 	if (rec==NULL) return; //We never knew him
@@ -2187,7 +2165,7 @@ void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
         CmiImmediateLock(hashImmLock);
-	hash.remove(*(CkArrayIndexMax *)&idx);
+	hash.remove(*(CkArrayIndex *)&idx);
         CmiImmediateUnlock(hashImmLock);
 #if CMK_ERROR_CHECKING
 	//Make sure it's really gone
@@ -2577,7 +2555,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 		return;
 	}
 
-	CkArrayIndexMax idx=rec->getIndex();
+	CkArrayIndex idx=rec->getIndex();
 
 #if CMK_OUT_OF_CORE
 	int localIdx=rec->getLocalIndex();
@@ -2870,7 +2848,7 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
 	DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
         CmiImmediateLock(hashImmLock);
-	hash.put(*(CkArrayIndexMax *)&idx)=rec;
+	hash.put(*(CkArrayIndex *)&idx)=rec;
         CmiImmediateUnlock(hashImmLock);
 }
 
@@ -2885,7 +2863,7 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 #if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-	return hash.getRef(*(CkArrayIndexMax *)&idx);
+	return hash.getRef(*(CkArrayIndex *)&idx);
 #else
 //Include an out-of-bounds check if the element isn't found
 	CkLocRec *rec=elementNrec(idx);
@@ -2896,7 +2874,7 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 
 //Look up array element in hash table.  Return NULL if not there.
 CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
-	return hash.get(*(CkArrayIndexMax *)&idx);
+	return hash.get(*(CkArrayIndex *)&idx);
 }
 
 struct LocalElementCounter :  public CkLocIterator

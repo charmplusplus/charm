@@ -283,7 +283,7 @@ class PathHistoryTableEntry {
 
 
 /// A debugging routine that outputs critical path info as Projections user events.
-void  saveCurrentPathAsUserEvent(char* prefix="");
+void  saveCurrentPathAsUserEvent(const char* prefix="");
 
 /// A debugging helper routine that sets the values in the currently executing message's path to 100
 void setCurrentlyExecutingPathTo100(void);

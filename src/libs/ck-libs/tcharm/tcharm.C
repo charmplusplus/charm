@@ -82,7 +82,23 @@ void TCharm::procInit(void)
   char *traceLibName=NULL;
   while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
-  CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  // CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  char *str;
+  if (CmiGetArgStringDesc(argv,"+tcharm_stacksize",&str,"Set the thread stack size (default 1MB)"))  {
+    if (strpbrk(str,"M")) {
+      sscanf(str, "%dM", &tcharm_stacksize);
+      tcharm_stacksize *= 1024*1024;
+    }
+    else if (strpbrk(str,"K")) {
+      sscanf(str, "%dK", &tcharm_stacksize);
+      tcharm_stacksize *= 1024;
+    }
+    else {
+      sscanf(str, "%d", &tcharm_stacksize);
+    }
+    if (CkMyPe() == 0)
+      CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
+  }
   if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
   	int ignored;
   	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
@@ -157,7 +173,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     } else {
       tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     BgAttach(tid);
     BgUnsetStartOutOfCore();
 #endif
@@ -303,7 +319,7 @@ void TCharm::pupThread(PUP::er &pc) {
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       BgAttach(tid);
 #endif
     }
@@ -587,13 +603,13 @@ void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
 	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
 	contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
 	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
 #endif
 	stop();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
 #endif
 }
@@ -737,7 +753,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     CkPrintf("USING ConfigurableRRMap\n");
     mapID=CProxy_ConfigurableRRMap::ckNew();
   } else if(mapping==NULL){
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     mapID=CProxy_BlockMap::ckNew();
 #else
 #if __FAULT__

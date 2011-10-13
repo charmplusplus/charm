@@ -91,7 +91,7 @@ void MulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
       ComlibPrintf("Array section id was %d, but now is %d\n", cur_sec_id, sid->getSectionID());
       CkAssert(cur_sec_id == sid->getSectionID());
 
-      ComlibPrintf("[%d] Comlib Section Multicast: insertMessage: cookiePE=%d\n",CkMyPe(),sid->_cookie.pe);
+      ComlibPrintf("[%d] Comlib Section Multicast: insertMessage: cookiePE=%d\n",CkMyPe(),sid->_cookie.get_pe());
       ComlibSectionHashKey key(CkMyPe(), cur_sec_id);
       ComlibSectionHashObject *obj = sec_ht.get(key);
 
@@ -114,7 +114,7 @@ void MulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
        * destination processor might find an "obj", created by somebody else. This "obj"
        * is accepted only if the current processor is equal to the processor in which the
        * cookie ID was defined. */
-      if (obj != NULL && CkMyPe() == sid->_cookie.pe && !obj->isOld) {
+      if (obj != NULL && CkMyPe() == sid->_cookie.get_pe() && !obj->isOld) {
 	envelope *env = UsrToEnv(cmsg->getCharmMessage());
 	localMulticast(env, obj, (CkMcastBaseMsg*)cmsg->getCharmMessage());
 	remoteMulticast(env, obj);
@@ -145,10 +145,10 @@ void MulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
       envelope *newenv = UsrToEnv(newmsg);
       CkPackMessage(&newenv);
     
-      ComlibSectionHashKey key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);        
+      ComlibSectionHashKey key(CkMyPe(), sid->_cookie.info.sInfo.cInfo.id);        
     
       obj = sec_ht.get(key);
-      ComlibPrintf("[%d] looking up key sid->_cookie.sInfo.cInfo.id=%d. Found obj=%p\n", CkMyPe(), (int)sid->_cookie.sInfo.cInfo.id, obj);
+      ComlibPrintf("[%d] looking up key sid->_cookie.sInfo.cInfo.id=%d. Found obj=%p\n", CkMyPe(), (int)sid->_cookie.info.sInfo.cInfo.id, obj);
       CkAssert(obj_inserted == obj);
     
 
@@ -180,24 +180,25 @@ void MulticastStrategy::insertMessage(CharmMessageHolder *cmsg){
 ComlibSectionHashObject * MulticastStrategy::insertSectionID(CkSectionID *sid, int npes, ComlibMulticastIndexCount* pelist) {
 
   ComlibPrintf("[%d] MulticastStrategy:insertSectionID\n",CkMyPe());
-  ComlibPrintf("[%d] MulticastStrategy:insertSectionID  sid->_cookie.sInfo.cInfo.id=%d \n",CkMyPe(),  (int)sid->_cookie.sInfo.cInfo.id);
+  ComlibPrintf("[%d] MulticastStrategy:insertSectionID  sid->_cookie.sInfo.cInfo.id=%d \n",CkMyPe(),  (int)sid->_cookie.info.sInfo.cInfo.id);
 
   //	double StartTime = CmiWallTimer();
 
-  ComlibSectionHashKey key(CkMyPe(), sid->_cookie.sInfo.cInfo.id);
+  ComlibSectionHashKey key(CkMyPe(), sid->_cookie.info.sInfo.cInfo.id);
 
   ComlibSectionHashObject *obj = NULL;    
   obj = sec_ht.get(key);
     
   if(obj != NULL) {
     ComlibPrintf("MulticastStrategy:insertSectionID: Deleting old object on proc %d for id %d\n",
-		 CkMyPe(), sid->_cookie.sInfo.cInfo.id);
+		 CkMyPe(), sid->_cookie.info.sInfo.cInfo.id);
     delete obj;
   }
 
   ComlibPrintf("[%d] Creating new ComlibSectionHashObject in insertSectionID\n", CkMyPe());
   obj = new ComlibSectionHashObject();
-  sinfo.getLocalIndices(sid->_nElems, sid->_elems, sid->_cookie.aid, obj->indices);
+  CkArrayID aid(sid->_cookie.get_aid());
+  sinfo.getLocalIndices(sid->_nElems, sid->_elems, aid, obj->indices);
     
   createObjectOnSrcPe(obj, npes, pelist);
   sec_ht.put(key) = obj;
@@ -311,7 +312,7 @@ void MulticastStrategy::handleMessage(void *msg){
   CkMcastBaseMsg *cbmsg = (CkMcastBaseMsg *)EnvToUsr(env);
   if (cbmsg->magic != _SECTION_MAGIC) CkAbort("MulticastStrategy received bad message! Did you forget to inherit from CkMcastBaseMsg?\n");
     
-  int status = cbmsg->_cookie.sInfo.cInfo.status;
+  int status = cbmsg->_cookie.info.sInfo.cInfo.status;
   ComlibPrintf("[%d] In handleMulticastMessage %d\n", CkMyPe(), status);
     
   if(status == COMLIB_MULTICAST_NEW_SECTION)
@@ -321,8 +322,8 @@ void MulticastStrategy::handleMessage(void *msg){
     // old. next time we try to use it, a new one will be generated with the
     // updated inforamtion in the location manager (since the wrong delivery
     // updated it indirectly.
-    ComlibSectionHashKey key(cbmsg->_cookie.pe, 
-			     cbmsg->_cookie.sInfo.cInfo.id);    
+    ComlibSectionHashKey key(cbmsg->_cookie.get_pe(), 
+			     cbmsg->_cookie.info.sInfo.cInfo.id);    
         
     ComlibSectionHashObject *obj;
     obj = sec_ht.get(key);
@@ -334,8 +335,8 @@ void MulticastStrategy::handleMessage(void *msg){
     obj->isOld = 1;
   } else if (status == COMLIB_MULTICAST_OLD_SECTION) {
     //status == COMLIB_MULTICAST_OLD_SECTION, use the cached section id
-    ComlibSectionHashKey key(cbmsg->_cookie.pe, 
-			     cbmsg->_cookie.sInfo.cInfo.id);    
+    ComlibSectionHashKey key(cbmsg->_cookie.get_pe(), 
+			     cbmsg->_cookie.info.sInfo.cInfo.id);    
         
     ComlibSectionHashObject *obj;
     obj = sec_ht.get(key);
@@ -365,14 +366,14 @@ void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
 
   int localElems;
   envelope *newenv;
-  CkArrayIndexMax *local_idx_list;    
+  CkArrayIndex *local_idx_list;    
     
   // Extract the list of elements to be delivered locally
   sinfo.unpack(env, localElems, local_idx_list, newenv);
 
   ComlibMulticastMsg *cbmsg = (ComlibMulticastMsg *)EnvToUsr(env);
-  ComlibSectionHashKey key(cbmsg->_cookie.pe, 
-			   cbmsg->_cookie.sInfo.cInfo.id);
+  ComlibSectionHashKey key(cbmsg->_cookie.get_pe(), 
+			   cbmsg->_cookie.info.sInfo.cInfo.id);
     
   ComlibSectionHashObject *old_obj = NULL;
     
@@ -382,7 +383,7 @@ void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
   }
 
   /*
-    CkArrayIndexMax *idx_list_array = new CkArrayIndexMax[idx_list.size()];
+    CkArrayIndex *idx_list_array = new CkArrayIndex[idx_list.size()];
     for(int count = 0; count < idx_list.size(); count++)
     idx_list_array[count] = idx_list[count];
   */
@@ -392,7 +393,7 @@ void MulticastStrategy::handleNewMulticastMessage(envelope *env) {
   new_obj->indices.resize(0);
   for (int i=0; i<localElems; ++i) new_obj->indices.insertAtEnd(local_idx_list[i]);
     
-  createObjectOnIntermediatePe(new_obj, cbmsg->nPes, cbmsg->indicesCount, cbmsg->_cookie.pe);
+  createObjectOnIntermediatePe(new_obj, cbmsg->nPes, cbmsg->indicesCount, cbmsg->_cookie.get_pe());
 
   ComlibPrintf("[%d] Inserting object into sec_ht\n", CkMyPe());
   ComlibPrintf("[%d] sec_ht.numObjects() =%d\n", CkMyPe(), sec_ht.numObjects());

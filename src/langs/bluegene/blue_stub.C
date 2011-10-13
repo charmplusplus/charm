@@ -1,8 +1,8 @@
 #include "charm++.h"
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
 
-#if  CMK_BLUEGENE_THREAD
+#if  CMK_BIGSIM_THREAD
 void BgEmulatorInit(int argc, char **argv)
 {
   BgSetWorkerThreadStart(_initCharm);

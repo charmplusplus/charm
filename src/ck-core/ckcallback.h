@@ -13,18 +13,17 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #define _CKCALLBACK_H_
 
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
-
 typedef void (*CkCallbackFn)(void *param,void *message);
 typedef void (*Ck1CallbackFn)(void *message);
 
 class CProxyElement_ArrayBase; /*forward declaration*/
+class CProxySection_ArrayBase;/*forward declaration*/
 class CProxyElement_Group; /*forward declaration*/
 class CProxy_NodeGroup;
 class Chare;
 class Group;
 class NodeGroup;
 class ArrayElement;
-
 #define CkSelfCallback(ep)  CkCallback(this, ep)
 
 class CkCallback {
@@ -47,6 +46,7 @@ public:
 	bcastGroup, //Broadcast to a group (d.group)
 	bcastNodeGroup, //Broadcast to a nodegroup (d.group)
 	bcastArray, //Broadcast to an array (d.array)
+	bcastSection,//Broadcast to a section(d.section)
 	replyCCS // Reply to a CCS message (d.ccsReply)
 	} callbackType;
 private:
@@ -77,16 +77,28 @@ private:
 	struct s_array { //(sendArray, bcastArray)
 		int ep; //Entry point to call
 		CkGroupID id; //Array ID to call it on
-		CkArrayIndexStruct idx; //Index to send to (if any)
+		CkArrayIndexBase idx; //Index to send to (if any)
 	} array;
+	struct s_section{
+		CkSectionInfoStruct sinfo;
+                CkArrayIndex *_elems;
+                int _nElems;
+                int *pelist;
+                int npes;
+		int ep;
+	} section;
+
 	struct s_ccsReply {
 		CcsDelayedReply reply;
 	} ccsReply;
+	//callbackData(){memset(this,0,sizeof(callbackData));}
+	//callbackData()=default;
+	//constructor()=default;
 	};
+
 public:	
 	callbackType type;
 	callbackData d;
-	
 	void impl_thread_init(void);
 	void *impl_thread_delay(void) const;
 
@@ -174,13 +186,17 @@ public:
       bzero(this, sizeof(CkCallback));
 #endif
       type=doInline?isendArray:sendArray;
-	  d.array.ep=ep; d.array.id=id; d.array.idx.asMax()=*(CkArrayIndexMax*)&idx;
+	  d.array.ep=ep; d.array.id=id; d.array.idx = idx;
 	}
 
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,CmiBool doInline=CmiFalse);
-
-    // Send to chare
+	
+	//Bcast to section
+	CkCallback(int ep,CProxySection_ArrayBase &sectElt,CmiBool doInline=CmiFalse);
+	CkCallback(int ep, CkSectionID &sid);
+	
+	// Send to chare
 	CkCallback(Chare *p, int ep, CmiBool doInline=CmiFalse);
 
     // Send to group element on current PE
@@ -202,6 +218,10 @@ public:
 
 	~CkCallback() {
 	  thread_destroy();
+          if (bcastSection == type) {
+            if (d.section._elems != NULL) delete [] d.section._elems;
+            if (d.section.pelist != NULL) delete [] d.section.pelist;
+          }
 	}
 	
 	int isInvalid(void) const {return type==invalid;}

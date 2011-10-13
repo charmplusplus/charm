@@ -49,7 +49,7 @@ void _ckEvacBcast(struct evacMsg *msg){
 	*/
 	int numGroups = CkpvAccess(_groupIDTable)->size();
 	int i;
-  CkElementInformHome inform;
+	CkElementInformHome inform;
 	CKLOCMGR_LOOP(((CkLocMgr*)(obj))->iterate(inform););
 	
 	if(msg->remainingElements == 0){
@@ -314,7 +314,7 @@ int getNextSerializer(){
 }
 
 int CkNumValidPes(){
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         return CkNumPes();
 #else
 	int count=0;

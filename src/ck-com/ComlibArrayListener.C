@@ -15,7 +15,7 @@
 //ComlibArrayListener::ComlibArrayListener () 
 //    : CkArrayListener(0){ //Carry 1 int for the sid, not used yet
 //    nElements = 0;
-//    ht = new CkHashtableT<CkArrayIndexMax, CkArrayIndexMax *>;
+//    ht = new CkHashtableT<CkArrayIndex, CkArrayIndex *>;
 //    //    CkPrintf("Creating Array Listener\n");
 //}
 //*/
@@ -30,7 +30,7 @@
 //    :CkArrayListener(m) {
 //  /*
 //    nElements = 0;
-//    ht = new CkHashtableT<CkArrayIndexMax, CkArrayIndexMax *>;
+//    ht = new CkHashtableT<CkArrayIndex, CkArrayIndex *>;
 //  */
 //}
 //
@@ -113,11 +113,11 @@
 //
 //int ComlibArrayListener::isRegistered(ArrayElement *elt, 
 //                                      CharmStrategy *strat){
-//    CkArrayIndexMax idx = elt->thisIndexMax;
+//    CkArrayIndex idx = elt->thisIndexMax;
 //
 //    CkArrayID st_aid;
 //    int st_nelements;
-//    CkArrayIndexMax *st_elem;
+//    CkArrayIndex *st_elem;
 //    strat->ainfo.getSourceArray(st_aid, st_elem, st_nelements);
 //
 //    if(st_nelements < 0)
@@ -141,7 +141,7 @@
 //
 //    CkArrayID st_aid;
 //    int st_nelements;
-//    CkArrayIndexMax *st_elem;
+//    CkArrayIndex *st_elem;
 //    strat->ainfo.getSourceArray(st_aid, st_elem, st_nelements);
 //
 //    if(st_nelements == 0) {//All elements of array in strategy
@@ -150,7 +150,7 @@
 ////         CkHashtableIterator *ht_iterator = ht->iterator();
 ////         ht_iterator->seekStart();
 ////         while(ht_iterator->hasNext()){
-////             CkArrayIndexMax *idx;
+////             CkArrayIndex *idx;
 ////             ht_iterator->next((void **)&idx);
 ////             stable_entry->strategy->insertLocalIndex(*idx);       
 ////         }
@@ -167,12 +167,12 @@
 //
 //}
 //
-//void ComlibArrayListener::getLocalIndices(CkVec<CkArrayIndexMax> &vec){
+//void ComlibArrayListener::getLocalIndices(CkVec<CkArrayIndex> &vec){
 //    
 //    CkHashtableIterator *ht_iterator = ht->iterator();
 //    ht_iterator->seekStart();
 //    while(ht_iterator->hasNext()){
-//        CkArrayIndexMax *idx;
+//        CkArrayIndex *idx;
 //        ht_iterator->next((void **)&idx);
 //        vec.insertAtEnd(*idx);       
 //    }

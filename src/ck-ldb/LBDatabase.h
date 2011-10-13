@@ -36,7 +36,7 @@ private:
   int _lb_teamSize;		// specifies the team size for TeamLB
 public:
   CkLBArgs() {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
 #else
     _autoLbPeriod = 0.5;	// 0.5 second default
@@ -265,8 +265,21 @@ public:
     LDRemoveStartLBFn(myLDHandle,fn);
   };
 
-public:
   inline void StartLB() { LDStartLB(myLDHandle); }
+
+  inline void AddMigrationDoneFn(LDMigrationDoneFn fn, void *data) 
+  {
+    LDAddMigrationDoneFn(myLDHandle,fn,data);
+  };
+
+  inline void RemoveMigrationDoneFn(LDMigrationDoneFn fn) 
+  {
+    LDRemoveMigrationDoneFn(myLDHandle,fn);
+  };
+
+  inline void MigrationDone() { LDMigrationDone(myLDHandle); }
+
+public:
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
   inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
  

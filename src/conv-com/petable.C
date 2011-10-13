@@ -280,8 +280,6 @@ char * PeTable ::ExtractAndPackAll(comID id, int ufield, int *length) {
   char *t = p; 
   char *junk = NULL;
     
-  int dummy = 0;
-    
   int refno = 0;
 
   AllToAllHdr ahdr;
@@ -562,7 +560,7 @@ int PeTable :: UnpackAndInsertAll(void *in, int npes, int *pelist) {
 PTvectorlist PeTable :: ExtractAndVectorize(comID id, int ufield, int npe, int *pelist) {
   char *junk;
   int nummsgs = 0;
-  int offset, num_distinctmsgs;
+  int offset;
   int i, j;
 
   for (i=0; i<npe; ++i) nummsgs += msgnum[pelist[i]];

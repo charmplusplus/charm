@@ -58,7 +58,7 @@ void LBMachineUtil::StatsOn()
 #endif
 
   if (state == off) {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     cancel_idleStart=CcdCallOnConditionKeep(
 	 CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)staticIdleStart,(void *)this);
     cancel_idleEnd=CcdCallOnConditionKeep(
@@ -82,7 +82,7 @@ void LBMachineUtil::StatsOn()
 void LBMachineUtil::StatsOff()
 {
   if (state == on) {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,cancel_idleStart);
     CcdCancelCallOnConditionKeep(CcdPROCESSOR_END_IDLE,cancel_idleEnd);
 #endif

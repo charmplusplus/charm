@@ -280,7 +280,7 @@ void TCHARM_Api_trace(const char *routineName, const char *libraryName);
 class TCharmAPIRoutine {
 	int state; //stores if the isomallocblockactivate and ctginstall need to be skipped during activation
 	CtgGlobals oldGlobals;	// this is actually a pointer
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
 	void *callEvent; // The BigSim-level event that called into the library
         int pe;          // in case thread migrates
 #endif
@@ -289,7 +289,7 @@ class TCharmAPIRoutine {
 	// Entering Charm++ from user code
 	TCharmAPIRoutine(const char *routineName, const char *libraryName)
 	{
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
 		// Start a new event, so we can distinguish between client 
 		// execution and library execution
 		_TRACE_BG_TLINE_END(&callEvent);
@@ -342,7 +342,7 @@ class TCharmAPIRoutine {
 			}
 		}
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
 		void *log;
 		_TRACE_BG_TLINE_END(&log);
 		_TRACE_BG_END_EXECUTE(0);

@@ -1,6 +1,6 @@
 #include "parallelJacobi.h"
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define BgElapse BgElapse
 #define BgGetTime   BgGetTime
 #else

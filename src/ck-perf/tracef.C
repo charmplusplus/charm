@@ -103,7 +103,7 @@ void ftraceEndFunc(int *idx){
 	traceEndFuncIndexProj(*idx);
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 void fbgprintf(char *str, int len)
 {
   char *newstr = new char[len + 1];
