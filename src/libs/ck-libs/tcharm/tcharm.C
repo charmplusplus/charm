@@ -189,7 +189,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
+  if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
   	heapBlocks=CmiIsomallocBlockListNew(tid);
   } else
   	heapBlocks=0;
@@ -324,7 +324,7 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
       CmiIsomallocBlockListPup(p,&heapBlocks,savedtid);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
