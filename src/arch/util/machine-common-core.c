@@ -604,7 +604,7 @@ if (  MSG_STATISTIC)
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
    
-if (myrank==0) 
+if (_Cmi_mynode==0) 
 #if !CMK_SMP 
     printf("Charm++> Running on Non-smp mode\n");
 #else

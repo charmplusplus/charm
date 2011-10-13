@@ -194,7 +194,7 @@ int                     DMA_max_single_msg = 131072;//524288 ;
 typedef struct dma_msgid_map
 {
     uint64_t     msg_id;
-    int     msg_subid
+    int     msg_subid;
 } dma_msgid_map_t;
 
 dma_msgid_map_t         *dma_map_list;
@@ -835,7 +835,7 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
     CmiSetMsgSize(msg, size);
 }
 
-static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
 
     gni_return_t        status  =   GNI_RC_SUCCESS;
@@ -872,7 +872,7 @@ static CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     return 0;
 }
 
-static void LrtsPreCommonInit(int everReturn){}
+void LrtsPreCommonInit(int everReturn){}
 
 /* Idle-state related functions: called in non-smp mode */
 void CmiNotifyIdleForGemini(void) {
@@ -880,7 +880,7 @@ void CmiNotifyIdleForGemini(void) {
     //LrtsAdvanceCommunication();
 }
 
-static void LrtsPostCommonInit(int everReturn)
+void LrtsPostCommonInit(int everReturn)
 {
 #if CMK_SMP
     CmiIdleState *s=CmiNotifyGetState();
@@ -1414,7 +1414,7 @@ static int SendBufferMsg()
     return done;
 }
 
-static void LrtsAdvanceCommunication()
+void LrtsAdvanceCommunication()
 {
     /*  Receive Msg first */
 #if 0
@@ -1669,8 +1669,9 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
     GNI_RC_CHECK("Mempool de-register", status);
     free(ptr);
 }
+
 FILE *debugLog = NULL;
-static void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
+void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
     int                     rc;
@@ -1867,7 +1868,7 @@ void  LrtsFree(void *msg)
 #endif
 }
 
-static void LrtsExit()
+void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
@@ -1878,7 +1879,7 @@ static void LrtsExit()
     exit(0);
 }
 
-static void LrtsDrainResources()
+void LrtsDrainResources()
 {
     while (!SendBufferMsg()) {
         PumpNetworkSmsg();
