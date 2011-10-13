@@ -1378,6 +1378,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
   SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_long,CmiInt8,"%d",loop) \
   SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
   SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
 
