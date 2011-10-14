@@ -608,7 +608,7 @@ if (_Cmi_mynode==0)
 #if !CMK_SMP 
     printf("Charm++> Running on Non-smp mode\n");
 #else
-    printf("Charm++> Running on Smp mode, %d worker threads per process\n", _Cmi_mynodesize);
+    printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
 #endif
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;

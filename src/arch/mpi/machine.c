@@ -160,8 +160,6 @@ static int checksum_flag = 0;
 #endif
 /* =====End of Definitions of Message-Corruption Related Macros=====*/
 
-static int thread_level;
-
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 #include <signal.h>
 void (*signal_int)(int);
@@ -377,7 +375,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 
     CmiAssert(destNode != CmiMyNode());
 #if CMK_SMP
-    if (thread_level != MPI_THREAD_MULTIPLE) {
+    if (_thread_provided != MPI_THREAD_MULTIPLE) {
       EnqueueMsg(msg, size, destNode, mode);
       return 0;
     }
@@ -849,7 +847,7 @@ static void MachinePostNonLocalForMPI() {
     }
 #endif
 #else
-  if (thread_level == MPI_THREAD_MULTIPLE) {
+  if (_thread_provided == MPI_THREAD_MULTIPLE) {
         CmiReleaseSentMessages();
         SendMsgBuf();
   }
@@ -1024,6 +1022,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     int n,i;
     int ver, subver;
     int provided;
+    int thread_level;
     int myNID;
     int largc=*argc;
     char** largv=*argv;
@@ -1227,7 +1226,7 @@ static void MachinePostCommonInitForMPI(int everReturn) {
 #if CMK_SMP
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
-    if (thread_level == MPI_THREAD_MULTIPLE)
+    if (_thread_provided == MPI_THREAD_MULTIPLE)
       CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)LrtsPostNonLocal,NULL);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForMPI,NULL);
