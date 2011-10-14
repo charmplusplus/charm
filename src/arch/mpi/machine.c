@@ -829,7 +829,7 @@ static void AdvanceCommunicationForMPI() {
 static void MachinePostNonLocalForMPI() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
-        while (MsgQueueLen>0) {
+        while (CpvAccess(MsgQueueLen)>0) {
             AdvanceCommunicationForMPI();
         }
     }
