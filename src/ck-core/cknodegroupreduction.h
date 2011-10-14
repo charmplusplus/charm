@@ -34,6 +34,15 @@ class CkReduction {
 public:
 	/*These are the reducers you can use,
 	  in addition to any user-defined reducers.*/
+
+        /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                 remember to update CkReduction::reducerTable
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
+
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,

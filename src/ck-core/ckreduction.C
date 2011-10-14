@@ -2610,4 +2610,14 @@ int CkNodeReductionMgr::findMaxRedNo(){
 	return max;
 }
 
+// initnode call. check the size of reduction table
+void CkReductionMgr::sanitycheck()
+{
+#if CMK_ERROR_CHECKING
+  int count = 0;
+  while (CkReduction::reducerTable[count] != NULL) count++;
+  CmiAssert(CkReduction::nReducers == count);
+#endif
+}
+
 #include "CkReduction.def.h"
