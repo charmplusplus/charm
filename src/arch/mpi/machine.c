@@ -1066,6 +1066,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
+#if CMK_CHARMDEBUG
     /* setup signal handlers */
     signal(SIGSEGV, KillOnAllSigs);
     signal(SIGFPE, KillOnAllSigs);
@@ -1077,6 +1078,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     signal(SIGQUIT, KillOnAllSigs);
     signal(SIGBUS, KillOnAllSigs);
 #   endif /*UNIX*/
+#endif
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
