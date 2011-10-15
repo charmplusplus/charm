@@ -41,7 +41,11 @@ static void sleep(int secs) {
 
 #if USE_LRTS_MEMPOOL
 #define oneMB (1024ll*1024)
+#if CMK_SMP
+static CmiInt8 _mempool_size = 64*oneMB;
+#else
 static CmiInt8 _mempool_size = 32*oneMB;
+#endif
 static CmiInt8 _expand_mem =  16*oneMB;
 #endif
 
@@ -215,12 +219,6 @@ static gni_cq_handle_t       post_rx_cqh = NULL;
 static gni_cq_handle_t       post_tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
 
-typedef    struct  pending_smg
-{
-    int     inst_id;
-    struct  pending_smg *next;
-} PENDING_GETNEXT;
-
 
 typedef struct msg_list
 {
@@ -297,11 +295,16 @@ static MSG_LIST             *smsg_free_tail=0;
     }else {d = free_head; free_head = free_head->next; if(free_tail->next == free_head) free_head =0;} \
 */
 
+#if CMK_SMP
+
+#define FreeMsgList(d)   free(d);
+#define MallocMsgList(d)  d = ((MSG_LIST*)malloc(sizeof(MSG_LIST)));
+
+#else
+
 #define FreeMsgList(d)  \
   (d)->next = msglist_freelist;\
   msglist_freelist = d;
-
-
 
 #define MallocMsgList(d) \
   d = msglist_freelist;\
@@ -309,6 +312,14 @@ static MSG_LIST             *smsg_free_tail=0;
              _MEMCHECK(d);\
   } else msglist_freelist = d->next;
 
+#endif
+
+#if CMK_SMP
+
+#define FreeControlMsg(d)      free(d);
+#define MallocControlMsg(d)    d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));
+
+#else
 
 #define FreeControlMsg(d)       \
   (d)->next = control_freelist;\
@@ -320,18 +331,9 @@ static MSG_LIST             *smsg_free_tail=0;
              _MEMCHECK(d);\
   } else control_freelist = d->next;
 
+#endif
 
 static RDMA_REQUEST         *rdma_freelist = NULL;
-
-#define FreeControlMsg(d)       \
-  (d)->next = control_freelist;\
-  control_freelist = d;
-
-#define MallocControlMsg(d) \
-  d = control_freelist;\
-  if (d==0) {d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));\
-             _MEMCHECK(d);\
-  } else control_freelist = d->next;
 
 #define FreeMediumControlMsg(d)       \
   (d)->next = medium_control_freelist;\
@@ -344,6 +346,11 @@ static RDMA_REQUEST         *rdma_freelist = NULL;
     _MEMCHECK(d);\
 } else mediumcontrol_freelist = d->next;
 
+# if CMK_SMP
+#define FreeRdmaRequest(d)       free(d);
+#define MallocRdmaRequest(d)     d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));   
+#else
+
 #define FreeRdmaRequest(d)       \
   (d)->next = rdma_freelist;\
   rdma_freelist = d;
@@ -353,11 +360,11 @@ static RDMA_REQUEST         *rdma_freelist = NULL;
   if (d==0) {d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));\
              _MEMCHECK(d);\
   } else rdma_freelist = d->next;
-
+#endif
 /* reuse gni_post_descriptor_t */
 static gni_post_descriptor_t *post_freelist=0;
 
-#if 1
+#if !CMK_SMP
 #define FreePostDesc(d)       \
     (d)->next_descr = post_freelist;\
     post_freelist = d;
@@ -374,9 +381,6 @@ static gni_post_descriptor_t *post_freelist=0;
 #define MallocPostDesc(d)   d = ((gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t))); _MEMCHECK(d);
 
 #endif
-
-static PENDING_GETNEXT     *pending_smsg_head = 0;
-static PENDING_GETNEXT     *pending_smsg_tail = 0;
 
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
 static int      buffered_smsg_counter = 0;
@@ -913,7 +917,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id);
 static void PumpNetworkSmsg()
 {
     uint64_t            inst_id;
-    PENDING_GETNEXT     *pending_next;
     int                 ret;
     gni_cq_entry_t      event_data;
     gni_return_t        status;
@@ -1801,7 +1804,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP
     mempoolLock = CmiCreateLock();
 #endif
-   sendRdmaBuf = PCQueueCreate(); 
+    sendRdmaBuf = PCQueueCreate(); 
 }
 
 
