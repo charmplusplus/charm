@@ -608,7 +608,7 @@ if (_Cmi_mynode==0)
 #if !CMK_SMP 
     printf("Charm++> Running on Non-smp mode\n");
 #else
-    printf("Charm++> Running on Smp mode, %d worker threads per process\n", _Cmi_mynodesize);
+    printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
 #endif
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
@@ -837,6 +837,8 @@ void *CmiGetNonLocal(void) {
        AdvanceCommunication();
        msg = PCQueuePop(cs->recv);
     }
+#else
+//    LrtsPostNonLocal();
 #endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
@@ -893,8 +895,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 #if !CMK_SMP
     AdvanceCommunication();
-//#else
-//    LrtsPostNonLocal();
+#else
+    LrtsPostNonLocal();
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())

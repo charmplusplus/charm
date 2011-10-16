@@ -159,6 +159,7 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
+        static void sanitycheck();
 private:
 
 

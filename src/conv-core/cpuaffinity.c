@@ -605,7 +605,7 @@ void CmiInitCPUAffinity(char **argv)
   }
 
 #if CMK_CRAYXT || CMK_CRAYXE
-  if (CmiMyRank() == 0)
+//  if (CmiMyRank() == 0)
   {
     int numPes = CmiNumPes();
     int numNodes = CmiNumNodes();

@@ -1822,6 +1822,7 @@ extern "C" int CmiSwitchToPEFn(int pe)
 //    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
     int t = pe%cva(bgMach).numWth;
     int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
+    if (cva(bgMach).replay!=-1) newpe = 0;
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;
     threadInfo *tinfo = ninfo->threadinfo[t];
     CthSwitchThread(tinfo->me);

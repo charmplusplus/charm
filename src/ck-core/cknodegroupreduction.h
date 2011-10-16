@@ -34,21 +34,30 @@ class CkReduction {
 public:
 	/*These are the reducers you can use,
 	  in addition to any user-defined reducers.*/
+
+        /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                 remember to update CkReduction::reducerTable
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
+
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
                 nop,
 	//Compute the sum the numbers passed by each element.
-		sum_int,sum_float,sum_double,
+		sum_int,sum_long,sum_float,sum_double,
 
 	//Compute the product the numbers passed by each element.
-		product_int,product_float,product_double,
+		product_int,product_long,product_float,product_double,
 
 	//Compute the largest number passed by any element.
-		max_int,max_float,max_double,
+		max_int,max_long,max_float,max_double,
 
 	//Compute the smallest number passed by any element.
-		min_int,min_float,min_double,
+		min_int,min_long,min_float,min_double,
 
 	//Compute the logical AND of the integers passed by each element.
 	// The resulting integer will be zero if any source integer is zero.
