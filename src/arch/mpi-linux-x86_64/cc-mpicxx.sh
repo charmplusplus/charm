@@ -18,8 +18,8 @@ CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
 g++)   CMK_AMD64="-m64 -fPIC" ;;
 icpc)  CMK_AMD64="-m64";;
-pgCC)  CMK_AMD64="-DCMK_CC_PGCC=1" ;;
-FCC)   CMK_AMD64="-Kfast -DCMK_CC_PGCC=1 --variadic_macros";;
+pgCC)  CMK_AMD64="-DCMK_FIND_FIRST_OF_PREDICATE=1 -DCMK_NEEDS_OFFSETOF=1" ;;
+FCC)   CMK_AMD64="-Kfast -DCMK_FIND_FIRST_OF_PREDICATE=1 --variadic_macros";;
 esac
 CMK_REAL_C_COMPILER=`$MPICC -show 2>/dev/null | cut -d' ' -f1 `
 

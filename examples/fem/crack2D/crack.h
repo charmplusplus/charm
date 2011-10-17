@@ -6,11 +6,6 @@
 #include <math.h>
 #include "fem.h"
 
-#if CMK_CC_PGCC
-#undef offsetof
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-#endif
-
 //Coord describes a property with X and Y components
 struct Coord
 {
