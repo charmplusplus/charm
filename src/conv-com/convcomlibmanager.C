@@ -38,7 +38,7 @@ CkpvDeclare(ConvComlibManager, conv_com_object);
 CkpvDeclare(int, comlib_handler);
 /// Method invoked upon receipt a message routed through comlib.
 void *strategyHandler(void *msg) {
-    CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
 
 #ifndef CMK_OPTIMIZE

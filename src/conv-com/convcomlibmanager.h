@@ -170,7 +170,7 @@ CkpvExtern(int, comlib_handler);
 // received the handleMessage method will be invoked.
 inline void ConvComlibSendMessage(int instance, int dest_pe, int size, char *msg) {
   CmiSetHandler(msg, CkpvAccess(strategy_handlerid));
-  ((CmiMsgHeaderBasic *) msg)->stratid = instance;
+  ((CmiMsgHeaderExt *) msg)->stratid = instance;
     
   CmiSyncSendAndFree(dest_pe, size, msg);
 }*/
