@@ -1207,6 +1207,8 @@ static void MachinePreCommonInitForMPI(int everReturn) {
 
 static void MachinePostCommonInitForMPI(int everReturn) {
 
+    CmiIdleState *s=CmiNotifyGetState();
+
     CpvInitialize(SMSG_LIST *, sent_msgs);
     CpvInitialize(SMSG_LIST *, end_sent);
     CpvInitialize(int, MsgQueueLen);
@@ -1214,7 +1216,6 @@ static void MachinePostCommonInitForMPI(int everReturn) {
     CpvAccess(end_sent) = NULL;
     CpvAccess(MsgQueueLen) = 0;
 
-    CmiIdleState *s=CmiNotifyGetState();
     machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
