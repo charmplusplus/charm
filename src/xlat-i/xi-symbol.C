@@ -5064,7 +5064,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 str << "  " << dt << " " << next->param->name << "; "
                     << next->param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << dt << ");\n";
+                    << param->type->deref() << ");\n";
                 dt = param->type->deref();
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
@@ -5073,7 +5073,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 str << "  " << dt << " " << param->name << "; "
                     << param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << dt << ");\n";
+                    << next->param->type->deref() << ");\n";
                 dt = next->param->type->deref();
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
