@@ -592,10 +592,12 @@ static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
     //msg_tmp->next   = 0;
+#if !CMK_SMP
     if (PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) ) {
         smsg_msglist_index[destNode].next = smsg_head_index;
         smsg_head_index = destNode;
     }
+#endif
     PCQueuePush(smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
 #if PRINT_SYH
     buffered_smsg_counter++;
@@ -899,10 +901,12 @@ void LrtsPostCommonInit(int everReturn)
 /* this is called by worker thread */
 void LrtsPostNonLocal(){
 #if CMK_SMP
+#if !COMM_THREAD_SEND
     if(mysize == 1) return;
     PumpLocalRdmaTransactions();
     SendBufferMsg();
     SendRdmaMsg();
+#endif
 #endif
 }
 /* pooling CQ to receive network message */
@@ -1330,9 +1334,19 @@ static int SendBufferMsg()
     register    int     i;
     int                 index_previous = -1;
     int                 index = smsg_head_index;
+#if !CMK_SMP
+    index = smsg_head_index;
+#else
+    index = 0;
+#endif
     //if( smsg_msglist_head == 0 && buffered_smsg_counter!= 0 ) {printf("WRONGWRONG on rank%d, buffermsg=%d, (msgid-succ:%d)\n", myrank, buffered_smsg_counter, (lrts_send_msg_id-lrts_smsg_success)); CmiAbort("sendbuf");}
     /* can add flow control here to control the number of messages sent before handle message */
+
+#if CMK_SMP
+    while(index <mysize)
+#else
     while(index != -1)
+#endif
     {
         while(!PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
@@ -1391,10 +1405,7 @@ static int SendBufferMsg()
                 else
                     printf("BAD send buff [%d==>%d] sent done%d (msgs=%d)\n", myrank, ptr->destNode, lrts_smsg_success, lrts_send_msg_id);
 #endif
-                //smsg_msglist_index[index].head = smsg_msglist_index[index].head->next;
                 FreeMsgList(ptr);
-                //ptr= smsg_msglist_index[index].head;
-
             }else {
                 PCQueuePush(smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
                 done = 0;
@@ -1402,6 +1413,7 @@ static int SendBufferMsg()
             } 
         
         } //end while
+#if !CMK_SMP
         if(PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
             if(index_previous != -1)
@@ -1413,6 +1425,9 @@ static int SendBufferMsg()
             index_previous = index;
         }
         index = smsg_msglist_index[index].next;
+#else
+        index++;
+#endif
     }   // end pooling for all cores
     return done;
 }
