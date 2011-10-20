@@ -4524,7 +4524,7 @@ void Entry::genDefs(XStr& str)
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
           genCall(str, precall, true);
-          str << "\n}\n\n";
+          str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
       }
   }
 
