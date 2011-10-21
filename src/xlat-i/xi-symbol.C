@@ -4515,7 +4515,7 @@ void Entry::genDefs(XStr& str)
   } else
     genChareDefs(str);
 
-  if (container->isChare() || container->isForElement()) {
+  if (container->isMainChare() || container->isChare() || container->isForElement()) {
       if (isReductionTarget()) {
           XStr retStr; retStr<<retType;
           str << retType << " " << indexName(); //makeDecl(retStr, 1)
