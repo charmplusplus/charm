@@ -1,9 +1,0 @@
-mainmodule Pgm {
-  extern module PMAF;
-  readonly CkChareID mainhandle;
-  
-  mainchare main {
-    entry main();
-    entry [threaded] void readMesh();
-  };
-};

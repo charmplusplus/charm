@@ -1,3 +1,0 @@
-def metodo(self):
-	l = charm.getValue(self, "X", "l", 8)
-	print("ok")

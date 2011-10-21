@@ -1,0 +1,14 @@
+module NodeHelper{
+
+	message Task;
+	nodegroup FuncNodeHelper{
+		entry FuncNodeHelper(int mode, int nElements, int threadNum);
+		entry void send(Task * msg);
+	};
+	chare FuncSingleHelper{
+		entry FuncSingleHelper(int, CkGroupID);
+   		entry void processWork();
+   		entry void reportCreated();
+		
+	};
+};

@@ -1,3 +1,0 @@
-module ParFUM_Iterators{
-  initproc void _initConfigurableCPUGPUMap(void);
-};

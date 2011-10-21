@@ -1,9 +1,0 @@
-mainmodule Pgm {
-  extern module Worker;
-  readonly CProxy_main mp;
-  
-  mainchare main {
-    entry main();
-    entry void finish(double avgLocal, double avgRemote);
-  };
-};

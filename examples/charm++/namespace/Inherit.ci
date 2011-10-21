@@ -1,7 +1,0 @@
-mainmodule Inherit {
-    extern module B;
-    extern module C;
-    mainchare Driver {
-        entry Driver(CkArgMsg*);
-    }
-}

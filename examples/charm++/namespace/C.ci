@@ -1,6 +1,0 @@
-module C {
-    extern module B;
-    chare C : Base::Derived::B {
-        entry C();
-    }
-}

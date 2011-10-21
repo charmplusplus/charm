@@ -1,9 +1,0 @@
-module TreeMatchLB {
-
-extern module CentralLB;
-initnode void lbinit(void);
-group [migratable] TreeMatchLB : CentralLB {
-  entry void TreeMatchLB(const CkLBOptions &);  
-};
-
-};

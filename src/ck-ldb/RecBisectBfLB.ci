@@ -1,9 +1,0 @@
-module RecBisectBfLB {
-
-extern module CentralLB;
-initnode void lbinit(void);
-group [migratable] RecBisectBfLB : CentralLB {
-  entry void RecBisectBfLB(const CkLBOptions &);  
-};
-
-};

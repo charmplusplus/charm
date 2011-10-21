@@ -1,9 +1,0 @@
-module CkArrayReductionMgr {
-	extern module CkReduction;
-	nodegroup [migratable] CkArrayReductionMgr {
-		entry CkArrayReductionMgr();
-		entry CkArrayReductionMgr(int dummy,  CkGroupID gid);
-		entry void setAttachedGroup(CkGroupID groupID);
-		//entry  [immediate] void contributeArrayReduction(CkReductionMsg *);
-	};
-};

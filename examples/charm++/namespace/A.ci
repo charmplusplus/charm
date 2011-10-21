@@ -1,8 +1,0 @@
-module A {
-    namespace Base {
-        chare A {
-            entry A();
-            entry void sayHello();
-        }
-    }
-}

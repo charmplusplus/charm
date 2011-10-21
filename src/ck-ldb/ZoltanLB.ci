@@ -1,9 +1,0 @@
-module ZoltanLB {
-
-extern module CentralLB;
-initnode void lbinit(void);
-group [migratable] ZoltanLB : CentralLB {
-  entry void ZoltanLB(const CkLBOptions &);  
-};
-
-};

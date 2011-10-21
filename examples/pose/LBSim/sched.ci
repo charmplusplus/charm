@@ -1,7 +1,0 @@
-mainmodule sched {
-  extern module SchedSIM;
-  
-  mainchare main {
-    entry main();
-  };
-};

@@ -1,8 +1,0 @@
-# no action, empty
-
-qt: 
-	rm -f qtmd.h
-	../system_ln md/setjmp_d.h qtmd.h
-	touch libqt.so
-	touch libqt.a
-

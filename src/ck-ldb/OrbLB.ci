@@ -1,9 +1,0 @@
-module OrbLB {
-
-extern module CentralLB;
-initnode void lbinit(void);
-group [migratable] OrbLB : CentralLB {
-  entry void OrbLB(const CkLBOptions &);  
-};
-
-};

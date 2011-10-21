@@ -1,8 +1,0 @@
-mainmodule MiniNet {
-  extern module Node;
-  readonly CkChareID mainhandle;
-  
-  mainchare main {
-    entry main();
-  };
-};

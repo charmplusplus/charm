@@ -1,5 +1,0 @@
-Hello World in SDAG Charm with a Chare Array.
-
-Demonstrates basic atomicity, when, and forall combined with chare
-array creation and use.
-

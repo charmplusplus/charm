@@ -1,8 +1,0 @@
-
-mainmodule testpencil {
-    readonly LineFFTInfo    info;
-    
-    mainchare  main {
-	entry main ();
-    };
-};

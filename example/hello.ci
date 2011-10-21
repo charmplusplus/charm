@@ -1,0 +1,21 @@
+mainmodule hello {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_TestInstance allTestsProxy;
+  readonly CProxy_FuncNodeHelper nodeHelperProxy;
+  readonly int iteration;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(void);
+    entry void doTests(CkQdMsg *msg);
+  };
+
+  array [1D] TestInstance{
+    entry TestInstance();
+    entry void doTest(int flag,int result,int chunck, int time);
+   };
+
+  group cyclicMap : CkArrayMap{
+    entry cyclicMap();
+  };
+  //extern module NodeHelper;  
+};
