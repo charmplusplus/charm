@@ -44,6 +44,17 @@ void Driver::typed_array_done(int* results, int n)
 void Driver::typed_array_done2(int x, int y, int z)
 {
     CkPrintf("Typed Sum: (x, y, z) = (%d, %d, %d)\n", x, y, z);
+    CkCallback *cb = new CkCallback(
+            CkReductionTarget(Driver, typed_array_done3), thisProxy);
+    w.ckSetReductionClient(cb);
+    w.reduce_array_doubles();
+}
+
+void Driver::typed_array_done3(int n, double* results)
+{
+    CkPrintf("Typed Sum: [ ");
+    for (int i=0; i<n; ++i) CkPrintf("%.5g ", results[i]);
+    CkPrintf("]\n");
     CkExit();
 }
 
@@ -57,6 +68,11 @@ void Worker::reduce() {
 void Worker::reduce_array() {
     int contribution[3] = { 1, 2, 3 };
     contribute(3*sizeof(int), &contribution, CkReduction::sum_int); 
+}
+
+void Worker::reduce_array_doubles() {
+    double contribution[3] = { 0.16180, 0.27182, 0.31415 };
+    contribute(3*sizeof(double), &contribution, CkReduction::sum_double);
 }
 
 #include "TypedReduction.def.h"

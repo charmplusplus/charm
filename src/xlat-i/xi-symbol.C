@@ -4515,7 +4515,7 @@ void Entry::genDefs(XStr& str)
   } else
     genChareDefs(str);
 
-  if (container->isChare() || container->isForElement()) {
+  if (container->isMainChare() || container->isChare() || container->isForElement()) {
       if (isReductionTarget()) {
           XStr retStr; retStr<<retType;
           str << retType << " " << indexName(); //makeDecl(retStr, 1)
@@ -4524,7 +4524,7 @@ void Entry::genDefs(XStr& str)
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
           genCall(str, precall, true);
-          str << "\n}\n\n";
+          str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
       }
   }
 
@@ -5064,7 +5064,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 str << "  " << dt << " " << next->param->name << "; "
                     << next->param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << dt << ");\n";
+                    << param->type->deref() << ");\n";
                 dt = param->type->deref();
                 str << "  " << dt << "* " << param->name << "; "
                     << param->name << " = (" << dt << "*)impl_buf;\n";
@@ -5073,7 +5073,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 str << "  " << dt << " " << param->name << "; "
                     << param->name << " = "
                     << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
-                    << dt << ");\n";
+                    << next->param->type->deref() << ");\n";
                 dt = next->param->type->deref();
                 str << "  " << dt << "* " << next->param->name << "; "
                     << next->param->name << " = (" << dt << "*)impl_buf;\n";
