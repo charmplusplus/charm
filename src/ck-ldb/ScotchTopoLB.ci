@@ -1,0 +1,8 @@
+module ScotchTopoLB {
+  extern module CentralLB;
+  initnode void lbinit (void);
+
+  group [migratable] ScotchTopoLB : CentralLB {
+    entry void ScotchTopoLB(const CkLBOptions &);
+  };
+};

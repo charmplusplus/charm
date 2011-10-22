@@ -1,4 +1,4 @@
-/** \file ScotchLB.C
+/** \file ScotchTopoLB.C
  *  Authors: Abhinav S Bhatele (bhatele@illinois.edu)
  *           Sebastien Fourestier (fouresti@labri.fr)
  *  Date Created: November 25th, 2010
@@ -11,26 +11,28 @@
 
 /*@{*/
 
-#include "ScotchLB.h"
+#include "ScotchTopoLB.h"
+#include "TopoManager.h"
 #include "ckgraph.h"
 #include "scotch.h"
 
-CreateLBFunc_Def(ScotchLB, "Load balancing using the Scotch graph partitioning library")
+CreateLBFunc_Def(ScotchTopoLB, "Load balancing using the Scotch graph partitioning library")
 
-ScotchLB::ScotchLB(const CkLBOptions &opt) : CentralLB(opt) {
-  lbname = "ScotchLB";
+ScotchTopoLB::ScotchTopoLB(const CkLBOptions &opt) : CentralLB(opt) {
+  lbname = "ScotchTopoLB";
   if(CkMyPe() == 0)
-    CkPrintf("ScotchLB created\n");
+    CkPrintf("ScotchTopoLB created\n");
 }
 
-CmiBool ScotchLB::QueryBalanceNow(int _step) {
+CmiBool ScotchTopoLB::QueryBalanceNow(int _step) {
   return CmiTrue;
 }
 
-void ScotchLB::work(LDStats *stats) {
+void ScotchTopoLB::work(LDStats *stats) {
   /** ========================== INITIALIZATION ============================= */
   ProcArray *parr = new ProcArray(stats);
   ObjGraph *ogr = new ObjGraph(stats);
+  TopoManager tmgr;
   double start_time = CmiWallTimer();
 
   /** ============================= STRATEGY ================================ */
@@ -55,9 +57,7 @@ void ScotchLB::work(LDStats *stats) {
       vert = ogr->vertices[i].sendToList[j].getNeighborId();
       for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
         if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert) {
-          ogr->vertices[i].sendToList[j].setNumBytes(
-              ogr->vertices[i].sendToList[j].getNumBytes() +
-              ogr->vertices[i].recvFromList[k].getNumBytes());
+          ogr->vertices[i].sendToList[j].setNumBytes(ogr->vertices[i].sendToList[j].getNumBytes() + ogr->vertices[i].recvFromList[k].getNumBytes());
           ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
         }
       }
@@ -129,11 +129,14 @@ void ScotchLB::work(LDStats *stats) {
   SCOTCH_graphBuild (&graph, baseval, vertnbr, verttab, NULL, velotab, NULL, edgenbr, edgetab, edlotab); 
   SCOTCH_graphCheck (&graph);
 
+
   SCOTCH_stratGraphMapBuild (&strat, SCOTCH_STRATBALANCE, parr->procs.size (), 0.01);
+
   SCOTCH_Num *pemap = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
+  SCOTCH_archInit (&arch);
+  SCOTCH_archTorus3 (&arch, tmgr.getDimNX(), tmgr.getDimNY(), tmgr.getDimNZ());
 
-  SCOTCH_graphPart(&graph, parr->procs.size(), &strat, pemap);
-
+  SCOTCH_graphMap (&graph, &arch, &strat, pemap);
 
   SCOTCH_graphExit (&graph);
   SCOTCH_archExit  (&arch);
@@ -154,6 +157,6 @@ void ScotchLB::work(LDStats *stats) {
   ogr->convertDecisions(stats);
 }
 
-#include "ScotchLB.def.h"
+#include "ScotchTopoLB.def.h"
 
 /*@}*/
