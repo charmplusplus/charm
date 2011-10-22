@@ -2671,6 +2671,27 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### test if offsetof exists ####
+cat > $t <<EOT
+#include <stddef.h>
+
+struct FooType {
+        int f1;
+        int f2;
+        double f3;
+};
+
+void foo()
+{
+  int off = offsetof(FooType, f2);
+}
+EOT
+test_cxx "whether offsetof is defined" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_OFFSETOF $pass
+_ACEOF
+
 
 #### test if we can use gcc x86 assembly like this ####
 cat > $t <<EOT

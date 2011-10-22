@@ -767,6 +767,23 @@ EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass, [whether operator delete can be overloaded in same class])
 
+#### test if offsetof exists ####
+cat > $t <<EOT
+#include <stddef.h>
+
+struct FooType {
+        int f1;
+        int f2;
+        double f3;
+};
+
+void foo()
+{
+  int off = offsetof(FooType, f2);
+}
+EOT
+test_cxx "whether offsetof is defined" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 
 #### test if we can use gcc x86 assembly like this ####
 cat > $t <<EOT

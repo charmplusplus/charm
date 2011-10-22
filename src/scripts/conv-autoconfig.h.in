@@ -147,6 +147,9 @@
 /* whether NUMA control related functions exist */
 #undef CMK_HAS_NUMACTRL
 
+/* whether offsetof exists */
+#undef CMK_HAS_OFFSETOF
+
 /* whether PMI_Get_nid exists */
 #undef CMK_HAS_PMI_GET_NID
 

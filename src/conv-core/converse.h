@@ -74,9 +74,11 @@ typedef bool CmiBool;
 #define CmiTrue true
 #endif
 
-#if CMK_NEEDS_OFFSETOF
+#if ! CMK_HAS_OFFSETOF
 #undef offsetof
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#else
+#include <stddef.h>
 #endif
 
 extern "C" {
