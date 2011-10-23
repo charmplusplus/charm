@@ -8,6 +8,7 @@ Driver::Driver(CkArgMsg* args) {
     CkCallback *cb = new CkCallback(CkIndex_Driver::untyped_done(NULL), thisProxy);
     w.ckSetReductionClient(cb);
     w.reduce();
+    delete args;
 }
 
 void Driver::untyped_done(CkReductionMsg* m) {
