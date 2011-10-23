@@ -5087,8 +5087,6 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
             str<<"  /*Unmarshall arrays:*/\n";
             callEach(&Parameter::unmarshallArrayData,str);
         }
-    } else if (isVoid()) {
-        str<<"  CkFreeSysMsg(impl_msg);\n";
     }
 }
 
