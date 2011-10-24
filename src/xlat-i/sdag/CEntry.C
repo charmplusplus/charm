@@ -216,7 +216,8 @@ void CEntry::generateCode(XStr& op)
 	  iArgs++;
        }
        else if (sv->isVoid == 1) 
-           op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+           // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+           op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
        else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
           if((i > 0) &&(lastWasVoid == 0)) 
 	     whenParams->append(", ");
@@ -296,7 +297,8 @@ void CEntry::generateCode(XStr& op)
 	    iArgs++;
          }
          else if (sv->isVoid == 1) 
-            op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+            // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+            op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
          else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
             if((i > 0) && (lastWasVoid == 0))
 	       whenParams->append(", ");
