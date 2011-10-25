@@ -7,7 +7,6 @@
 // reaching totalBufferCapacity_
 #define BUCKET_SIZE_FACTOR 4
 
-
 //#define DEBUG_STREAMER 1
 
 enum MeshStreamerMessageType {PlaneMessage, ColumnMessage, PersonalizedMessage};
@@ -40,11 +39,11 @@ template<class dtype>
 class MeshStreamerMessage : public CMessage_MeshStreamerMessage<dtype> {
 public:
     int numDataItems;
-    int dataItemSize;
+    int capacity;
     int *destinationPes;
     dtype *data;
 
-    MeshStreamerMessage(): numDataItems(0) {}   
+    MeshStreamerMessage(int c): numDataItems(0), capacity(c) {}   
 
     int addDataItem(dtype &dataItem) {
         data[numDataItems] = dataItem;
@@ -229,11 +228,11 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffe
     int dataSize = bucketSize_;  
     if (msgType == PersonalizedMessage) {
       messageBuffers[bucketIndex] = 
-        new (0, dataSize) MeshStreamerMessage<dtype>;
+        new (0, dataSize) MeshStreamerMessage<dtype>(dataSize);
     }
     else {
       messageBuffers[bucketIndex] = 
-        new (bucketSize_, dataSize) MeshStreamerMessage<dtype>;
+        new (bucketSize_, dataSize) MeshStreamerMessage<dtype>(dataSize);
     }
 #ifdef DEBUG_STREAMER
     CkAssert(messageBuffers[bucketIndex] != NULL);
@@ -419,6 +418,11 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messag
     destinationBucket = messageBuffers[flushIndex];
     destinationIndex = myNodeIndex_ + (flushIndex - myIndex) * dimensionFactor;
     if (destinationBucket != NULL) {
+      if (destinationBucket->capacity > destinationBucket->numDataItems) {
+          // not sending the full buffer, shrink the message size
+        envelope *env = UsrToEnv(destinationBucket);
+        env->setTotalsize(env->getTotalsize() - (destinationBucket->capacity - destinationBucket->numDataItems) * sizeof(dtype));
+      }
       numDataItemsBuffered_ -= destinationBucket->numDataItems;
     }
     if (messageBuffers == personalizedBuffers_) {
@@ -448,7 +452,7 @@ void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffe
        else {
          for (int j = 0; j < messageBuffers[i]->numDataItems; j++) {
            MeshStreamerMessage<dtype> *directMsg = 
-             new (0, 1) MeshStreamerMessage<dtype>;
+             new (0, 1) MeshStreamerMessage<dtype>(1);
 #ifdef DEBUG_STREAMER
            CkAssert(directMsg != NULL);
 #endif
