@@ -417,14 +417,14 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messag
   if (maxSize > 0) {
     destinationBucket = messageBuffers[flushIndex];
     destinationIndex = myNodeIndex_ + (flushIndex - myIndex) * dimensionFactor;
-    if (destinationBucket != NULL) {
-      if (destinationBucket->capacity > destinationBucket->numDataItems) {
-          // not sending the full buffer, shrink the message size
-        envelope *env = UsrToEnv(destinationBucket);
-        env->setTotalsize(env->getTotalsize() - (destinationBucket->capacity - destinationBucket->numDataItems) * sizeof(dtype));
-      }
-      numDataItemsBuffered_ -= destinationBucket->numDataItems;
+
+    if (destinationBucket->capacity > destinationBucket->numDataItems) {
+      // not sending the full buffer, shrink the message size
+      envelope *env = UsrToEnv(destinationBucket);
+      env->setTotalsize(env->getTotalsize() - (destinationBucket->capacity - destinationBucket->numDataItems) * sizeof(dtype));
     }
+    numDataItemsBuffered_ -= destinationBucket->numDataItems;
+
     if (messageBuffers == personalizedBuffers_) {
       clientProxy_[destinationIndex].receiveCombinedData(destinationBucket);
     }
