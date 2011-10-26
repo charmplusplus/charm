@@ -1668,7 +1668,7 @@ static void _init_DMA_buffer()
 
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
-
+#if USE_LRTS_MEMPOOL
 void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
     void *pool;
@@ -1687,7 +1687,7 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
     GNI_RC_CHECK("Mempool de-register", status);
     free(ptr);
 }
-
+#endif
 FILE *debugLog = NULL;
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
