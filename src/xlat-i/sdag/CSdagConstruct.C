@@ -831,7 +831,8 @@ void SdagConstruct::generateWhen(XStr& op)
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
-       op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+       // op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+       op <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
     }
     else {
       if (sv->isMsg == 1) {

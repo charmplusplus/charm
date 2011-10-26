@@ -392,7 +392,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
      topoLock = CmiCreateLock();
   }
 
-#if __FAULT_|| CMK_BLUEGENEQ
+#if __FAULT__|| CMK_BLUEGENEQ
   obtain_flag = 0;
 #endif
   if(CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",

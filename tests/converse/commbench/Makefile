@@ -1,6 +1,6 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS=commbench.o overhead.o timer.o proc.o smputil.o pingpong.o ctxt.o
+OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o ctxt.o
 
 all: pgm
 
@@ -9,6 +9,9 @@ pgm: $(OBJS)
 
 test: pgm
 	./charmrun ./pgm +p4 $(TESTOPTS)
+
+memoryAccess.o: memoryAccess.c
+	$(CHARMC) memoryAccess.c
 
 commbench.o: commbench.c
 	$(CHARMC) commbench.c

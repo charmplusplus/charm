@@ -1,9 +1,9 @@
 CHARMC = ../../../bin/charmc
 BINARY = typed_reduction
 
-CHARMCFLAGS =
+CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS = 
+TESTFLAGS = $(TESTOPTS)
 
 %.o: %.cc
 
