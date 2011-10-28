@@ -868,6 +868,7 @@ extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
+extern "C" void CmiInitPxshm(char **argv);
 
 //extern "C" void CldCallback();
 
@@ -1226,6 +1227,16 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
+
+#if CMK_USE_PXSHM
+      // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
+      // again after cpuaffinity is done
+    if (CkMyRank() == 0) {
+      CmiInitPxshm(argv);
+    }
+    CmiNodeAllBarrier();
+#endif
+
     //CldCallback();
 #if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
       // Register the BG handler for CCS. Notice that this is put into a variable shared by

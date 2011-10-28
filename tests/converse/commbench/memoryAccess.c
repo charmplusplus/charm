@@ -2,7 +2,7 @@
 #include "commbench.h"
 
 #define CLUBMALLOC 10000
-#define RANDMALLOC 100000
+#define RANDMALLOC 10000
 #define RANDOPS 10000
 #define POWER 15
 #define MAXSIZE 16384

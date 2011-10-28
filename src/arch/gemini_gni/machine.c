@@ -138,8 +138,6 @@ static int  SMSG_MAX_MSG = 1024;
 #define ALIGN64(x)       (size_t)((~63)&((x)+63))
 #define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
-static int Mempool_MaxSize = 1024*1024*128;
-
 #define     useDynamicSMSG    0
 //static int useDynamicSMSG   = 1;
 static int useStaticMSGQ = 0;
@@ -394,10 +392,7 @@ static MSG_LIST *buffered_fma_tail = 0;
 #define SET_BITS(a,ind) a = ( a | (1<<(ind )) )
 #define Reset(a,ind) a = ( a & (~(1<<(ind))) )
 
-#if CMK_SMP
-CmiNodeLock     mempoolLock;
-#endif
-static mempool_type  *mempool = NULL;
+CpvDeclare(mempool_type*, mempool);
 
 /* get the upper bound of log 2 */
 int mylog2(int size)
@@ -877,8 +872,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 #endif
     return 0;
 }
-
-void LrtsPreCommonInit(int everReturn){}
 
 /* Idle-state related functions: called in non-smp mode */
 void CmiNotifyIdleForGemini(void) {
@@ -1688,6 +1681,14 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
     free(ptr);
 }
 #endif
+void LrtsPreCommonInit(int everReturn){
+#if USE_LRTS_MEMPOOL
+    CpvInitialize(mempool_type*, mempool);
+    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block);
+#endif
+}
+
+
 FILE *debugLog = NULL;
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
@@ -1706,7 +1707,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
    
-    //Mempool_MaxSize = CmiGetArgFlag(*argv, "+useMemorypoolSize");
     //useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
        //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
     
@@ -1806,19 +1806,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if     USE_LRTS_MEMPOOL
     CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
-    mempool = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block);
-    //init_mempool(Mempool_MaxSize);
 #endif
-    //init_mempool(Mempool_MaxSize);
 
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
     
     free(MPID_UGNI_AllAddr);
-#if CMK_SMP
-    mempoolLock = CmiCreateLock();
-#endif
     sendRdmaBuf = PCQueueCreate(); 
 }
 
@@ -1839,13 +1833,7 @@ void* LrtsAlloc(int n_bytes, int header)
         CmiAssert(header <= ALIGNBUF);
 #if     USE_LRTS_MEMPOOL
         n_bytes = ALIGN64(n_bytes);
-#if     CMK_SMP
-        CmiLock(mempoolLock);
-#endif
-        char *res = mempool_malloc(mempool, ALIGNBUF+n_bytes, 1);
-#if     CMK_SMP
-        CmiUnlock(mempoolLock);
-#endif
+        char *res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes, 1);
         ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
@@ -1870,12 +1858,11 @@ void  LrtsFree(void *msg)
         printf("[PE:%d] Free lrts for bytes=%d, ptr=%p\n", CmiMyPe(), size, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
 #endif
 #if     USE_LRTS_MEMPOOL
-#if     CMK_SMP
-        CmiLock(mempoolLock);
-#endif
-        mempool_free(mempool, (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
-#if     CMK_SMP
-        CmiUnlock(mempoolLock);
+#if CMK_SMP
+
+        mempool_free_thread((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
+#else
+        mempool_free(CpvAccess(mempool), (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
 #endif
 #else
         free((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF);
@@ -1890,8 +1877,7 @@ void LrtsExit()
 {
     /* free memory ? */
 #if     USE_LRTS_MEMPOOL
-    if (CmiMyRank() == 0)
-        mempool_destroy(mempool);
+    mempool_destroy(CpvAccess(mempool));
 #endif
     PMI_Finalize();
     exit(0);
@@ -1899,6 +1885,7 @@ void LrtsExit()
 
 void LrtsDrainResources()
 {
+    if(mysize == 1) return;
     while (!SendBufferMsg()) {
         PumpNetworkSmsg();
         PumpNetworkRdmaMsgs();
