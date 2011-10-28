@@ -44,16 +44,16 @@ public:
 
     MeshStreamerMessage(): numDataItems(0) {}   
 
-    int addDataItem(dtype &dataItem) {
+    int addDataItem(const dtype &dataItem) {
         data[numDataItems] = dataItem;
         return ++numDataItems; 
     }
 
-    void markDestination(int index, int destinationPe) {
+    void markDestination(const int index, const int destinationPe) {
 	destinationPes[index] = destinationPe;
     }
 
-    dtype getDataItem(int index) {
+    dtype getDataItem(const int index) {
         return data[index];
     }
 };
@@ -94,13 +94,13 @@ private:
     void determineLocation(const int destinationPe, int &row, int &column, 
         int &plane, MeshStreamerMessageType &msgType);
 
-    void storeMessage(MeshStreamerMessage<dtype> **messageBuffers, 
+    void storeMessage(MeshStreamerMessage<dtype> ** const messageBuffers, 
         const int bucketIndex, const int destinationPe, 
         const int rowIndex, const int columnIndex, 
         const int planeIndex,
-        const MeshStreamerMessageType msgType, dtype &data);
+        const MeshStreamerMessageType msgType, const dtype &dataItem);
 
-    void flushLargestBucket(MeshStreamerMessage<dtype> **messageBuffers,
+    void flushLargestBucket(MeshStreamerMessage<dtype> ** const messageBuffers,
 			    const int numBuffers, const int myIndex, 
 			    const int dimensionFactor);
 public:
@@ -111,11 +111,11 @@ public:
 
     ~MeshStreamer();
 
-    void insertData(dtype &, int); 
+    void insertData(const dtype &dataItem, const int destinationPe); 
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
 
-    void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, int);
+    void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers);
     void flushDirect();
 };
 
@@ -215,12 +215,12 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe, int &rowInd
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffers, 
+void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messageBuffers, 
                                 const int bucketIndex, const int destinationPe, 
                                 const int rowIndex, const int columnIndex, 
                                 const int planeIndex, 
                                 const MeshStreamerMessageType msgType, 
-                                dtype &data) {
+                                const dtype &dataItem) {
 
   // allocate new message if necessary
   if (messageBuffers[bucketIndex] == NULL) {
@@ -239,7 +239,7 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffe
   
   MeshStreamerMessage<dtype> *destinationBucket = messageBuffers[bucketIndex];
   
-  int numBuffered = destinationBucket->addDataItem(data); 
+  int numBuffered = destinationBucket->addDataItem(dataItem); 
   if (msgType != PersonalizedMessage) {
     destinationBucket->markDestination(numBuffered-1, destinationPe);
   }
@@ -283,7 +283,7 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffe
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::insertData(dtype &data, int destinationPe) {
+void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinationPe) {
 
   int planeIndex, columnIndex, rowIndex; // location of destination
   int indexWithinPlane; 
@@ -315,7 +315,7 @@ void MeshStreamer<dtype>::insertData(dtype &data, int destinationPe) {
   }
 
   storeMessage(messageBuffers, bucketIndex, destinationPe, rowIndex, 
-               columnIndex, planeIndex, msgType, data);
+               columnIndex, planeIndex, msgType, dataItem);
 }
 
 template <class dtype>
@@ -399,7 +399,7 @@ void MeshStreamer::receivePersonalizedData(MeshStreamerMessage *msg) {
 */
 
 template <class dtype>
-void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messageBuffers,
+void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> ** const messageBuffers,
                                       const int numBuffers, const int myIndex, 
                                       const int dimensionFactor) {
 
@@ -435,7 +435,7 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messag
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, int numBuffers)
+void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers)
 {
 
     for (int i = 0; i < numBuffers; i++) {
