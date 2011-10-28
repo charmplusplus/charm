@@ -77,16 +77,18 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 {
     int     bestfit_size = MAX_INT; //most close size 
     size_t    *freelist_head = &mptr->freelist_head;
-    
+    mempool_header *freelist_head_ptr, *current, *previous, *bestfit, *bestfit_previous;
+    mempool_block *mempools_head;
+
 #if CMK_SMP
     CmiLock(mptr->mempoolLock);
 #endif
-    mempool_header    *freelist_head_ptr = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
-    mempool_header    *current = freelist_head_ptr;
-    mempool_header    *previous = NULL;
-    mempool_header    *bestfit = NULL;
-    mempool_header    *bestfit_previous = NULL;
-    mempool_block     *mempools_head = &(mptr->mempools_head);
+    freelist_head_ptr = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
+    current = freelist_head_ptr;
+    previous = NULL;
+    bestfit = NULL;
+    bestfit_previous = NULL;
+    mempools_head = &(mptr->mempools_head);
 
 #if  MEMPOOL_DEBUG
     CmiPrintf("[%d] request malloc from pool: %p  free_head: %p %d for size %d, \n", CmiMyPe(), mptr, freelist_head_ptr, mptr->freelist_head, size);
