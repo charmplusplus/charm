@@ -22,13 +22,11 @@
 
 // turn on or off fragmentation in multicast
 #define SPLIT_MULTICAST  0
-// each multicast message is split into SPLIT_NUM fragments
-#define SPLIT_NUM 20
-#define SPLIT_SIZE (250000)
+#define SPLIT_SIZE (32768)
 
-#define SPLIT_THRESHOLD (1000000)
+#define SPLIT_THRESHOLD (32768)
 // maximum number of fragments into which a message can be broken
-#define MAXFRAGS 20
+#define MAXFRAGS 100
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndex>   arrayIndexList;
