@@ -784,7 +784,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   }else{
     packetSize = SPLIT_SIZE;
     totalcount = totalsize/SPLIT_SIZE;
-    if(totalcount%SPLIT_SIZE) totalcount++; 
+    if(totalsize%SPLIT_SIZE) totalcount++; 
     //packetSize = totalsize/SPLIT_NUM;
     //if (totalsize%SPLIT_NUM) packetSize ++;
     //totalcount = SPLIT_NUM;
