@@ -208,9 +208,8 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #define FAIL_TAG   1200
 int num_workpes, total_pes;
 int *petorank = NULL;
-int *ranktope = NULL;
 int  nextrank;
-void mpi_end_crashed();
+void mpi_end_spare();
 #endif
 
 /* =====Beginning of Declarations of Machine Specific Functions===== */
@@ -905,6 +904,9 @@ void DrainResourcesForMPI() {
         PumpMsgs();
     }
 #endif
+#if CMK_MEM_CHECKPOINT
+    if (CmiMyPe() == 0) mpi_end_spare();
+#endif
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
     if (MPI_SUCCESS != MPI_Barrier(MPI_COMM_WORLD))
@@ -942,9 +944,6 @@ void LrtsExit() {
 
 #if ! CMK_AUTOBUILD
     signal(SIGINT, signal_int);
-#if CMK_MEM_CHECKPOINT
-    if (CmiMyPe() == 1) mpi_end_crashed();
-#endif
     MPI_Finalize();
 #endif
     exit(0);
@@ -1102,8 +1101,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     else
        num_workpes = *numNodes;
     petorank = (int *)malloc(sizeof(int) * num_workpes);
-    ranktope = (int *)malloc(sizeof(int) * num_workpes);
-    for (i=0; i<num_workpes; i++)  petorank[i] = ranktope[i] = i;
+    for (i=0; i<num_workpes; i++)  petorank[i] = i;
     nextrank = num_workpes;
 
     char msg[1];
@@ -1115,7 +1113,13 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       int newpe = vals[0];
       CpvAccess(_curRestartPhase) = vals[1];
 
-      ranktope[*myNodeID] = newpe;
+      if (newpe == -1) {
+          MPI_Barrier(MPI_COMM_WORLD);
+          MPI_Finalize();
+          exit(0);
+      }
+
+      nextrank = *myNodeID + 1;
       petorank[newpe] = *myNodeID;
       *myNodeID = newpe;
       myNID = newpe;
@@ -1141,8 +1145,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       *argc = i+2;
       largc = *argc;
       largv = *argv;
-i=0;
-      while(largv[i]!= NULL) { printf("%s\n", largv[i]); i++; }
+      /* i=0; while(largv[i]!= NULL) { printf("%s\n", largv[i]); i++; }  */
     }
 #endif
 
@@ -1540,9 +1543,8 @@ int CmiBarrierZero() {
     return 0;
 }
 
-#if CMK_MEM_CHECKPOINT
 
-extern void mpi_restart(int argc, char **argv);
+#if CMK_MEM_CHECKPOINT
 
 void mpi_restart_crashed(int pe, int rank)
 {
@@ -1552,15 +1554,13 @@ void mpi_restart_crashed(int pe, int rank)
     MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
 }
 
-void mpi_end_crashed()
+/* notify spare processors to exit */
+void mpi_end_spare()
 {
     int i;
-    for (i=0; i<total_pes; i++) {
-      if (ranktope[i] == -1) {
-        char msg[1];
-printf("[%d] end crash: %d\n", CmiMyPe(), i);
-        MPI_Send((void *)msg,1,MPI_BYTE,i,FAIL_TAG,MPI_COMM_WORLD);
-      }
+    for (i=nextrank; i<total_pes; i++) {
+        int vals[2] = {-1,-1};
+        MPI_Send((void *)vals,2,MPI_INT,i,FAIL_TAG,MPI_COMM_WORLD);
     }
 }
 
@@ -1569,44 +1569,25 @@ int find_spare_mpirank(int pe)
     if (nextrank == total_pes) {
       CmiAbort("Charm++> ran out of spared processors");
     }
-    ranktope[petorank[pe]] = -1;
     petorank[pe] = nextrank;
-    ranktope[nextrank] = pe;
     nextrank++;
     return nextrank-1;
 }
 
 void CkDieNow()
 {
-    char msg[1];
-    char phase_str[10];
-    MPI_Status sts;
+    CmiPrintf("[%d] die now.\n", CmiMyPe());
 
-    CmiPrintf("[%d] die now\n", CmiMyPe());
-
-    MPI_Recv(msg,1,MPI_BYTE,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
-    MPI_Finalize();
-
-#if 0
-    CmiPrintf("[%d] Restarted\n", CmiMyPe());
-
-    char **restart_argv;
-    int i=0;
-    while(Cmi_argvcopy[i]!= NULL) i++;
-    restart_argv = (char **)malloc(sizeof(char *)*(i+3));
-    i=0;
-    while(Cmi_argvcopy[i]!= NULL){
-                restart_argv[i] = Cmi_argvcopy[i];
-                i++;
+      /* release old messages */
+    while (!CmiAllAsyncMsgsSent()) {
+        PumpMsgs();
+        CmiReleaseSentMessages();
     }
-    restart_argv[i] = "+restartaftercrash";
-    sprintf(phase_str,"%d", ++CpvAccess(_curRestartPhase));
-    restart_argv[i+1]=phase_str;
-    restart_argv[i+2]=NULL;
-
-    mpi_restart(CmiGetArgc(restart_argv), restart_argv);
-#endif
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
+    exit(0);
 }
+
 #endif
 
 /*@}*/

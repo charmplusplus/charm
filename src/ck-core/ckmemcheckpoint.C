@@ -1268,7 +1268,6 @@ static int pingBackHandlerIdx;
 static int pingCheckHandlerIdx;
 static int buddyDieHandlerIdx;
 static double lastPingTime = -1;
-static int died = 0;
 
 extern void _initCharm(int argc, char **argv);
 extern "C" void mpi_restart_crashed(int pe, int rank);
@@ -1276,19 +1275,6 @@ extern "C" int  find_spare_mpirank(int pe);
 extern void CkDeleteChares();
 
 void pingCheckHandler();
-
-#if 0
-extern "C" void mpi_restart(int argc, char **argv)
-{
-   died = 1;
-
-   CkDeleteChares();
-
-   _initCharm(argc, argv);
-   CsdScheduler(-1);
-   ConverseExit();
-}
-#endif
 
 void buddyDieHandler(char *msg)
 {
