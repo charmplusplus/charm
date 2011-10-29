@@ -1104,7 +1104,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     for (i=0; i<num_workpes; i++)  petorank[i] = i;
     nextrank = num_workpes;
 
-    if (*myNodeID >= num_workpes) {
+    if (*myNodeID >= num_workpes) {    /* is spare processor */
       MPI_Status sts;
       int vals[2];
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
@@ -1123,8 +1123,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       *myNodeID = newpe;
       myNID = newpe;
 
-      // set identity
-      // add +restartaftercrash to argv
+       /* add +restartaftercrash to argv */
       char *phase_str;
       char **restart_argv;
       int i=0;
@@ -1144,7 +1143,6 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       *argc = i+2;
       largc = *argc;
       largv = *argv;
-      /* i=0; while(largv[i]!= NULL) { printf("%s\n", largv[i]); i++; }  */
     }
 #endif
 
