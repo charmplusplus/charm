@@ -1326,6 +1326,7 @@ void pingCheckHandler()
 
 void pingBuddy()
 {
+#if CMK_MEM_CHECKPOINT
   CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
   if (obj) {
     int buddy = obj->BuddyPE(CkMyPe());
@@ -1337,6 +1338,7 @@ void pingBuddy()
     CmiSyncSendAndFree(buddy, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
   }
   CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
+#endif
 }
 #endif
 
