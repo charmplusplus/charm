@@ -1104,10 +1104,8 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     for (i=0; i<num_workpes; i++)  petorank[i] = i;
     nextrank = num_workpes;
 
-    char msg[1];
-    MPI_Status sts;
-
     if (*myNodeID >= num_workpes) {
+      MPI_Status sts;
       int vals[2];
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
       int newpe = vals[0];
@@ -1119,8 +1117,9 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
           exit(0);
       }
 
+        /* update petorank */
+      MPI_Recv(petorank, num_workpes, MPI_INT,MPI_ANY_SOURCE,FAIL_TAG,MPI_COMM_WORLD, &sts);
       nextrank = *myNodeID + 1;
-      petorank[newpe] = *myNodeID;
       *myNodeID = newpe;
       myNID = newpe;
 
@@ -1552,6 +1551,7 @@ void mpi_restart_crashed(int pe, int rank)
     vals[0] = pe;
     vals[1] = CpvAccess(_curRestartPhase)+1;
     MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
+    MPI_Send(petorank, num_workpes, MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
 }
 
 /* notify spare processors to exit */
@@ -1567,7 +1567,7 @@ void mpi_end_spare()
 int find_spare_mpirank(int pe)
 {
     if (nextrank == total_pes) {
-      CmiAbort("Charm++> ran out of spared processors");
+      CmiAbort("Charm++> ran out of spare processors");
     }
     petorank[pe] = nextrank;
     nextrank++;

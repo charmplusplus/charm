@@ -117,6 +117,7 @@ void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting(); 
+extern "C" int CkHasCheckpoints();
 
 #if CMK_CONVERSE_MPI
 extern "C" void CkDieNow();

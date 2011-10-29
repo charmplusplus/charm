@@ -79,6 +79,7 @@ int _memChkptOn = 1;			// checkpoint is on or off
 
 CkGroupID ckCheckPTGroupID;		// readonly
 
+static int checkpointed = 0;
 
 /// @todo the following declarations should be moved into a separate file for all 
 // fault tolerant strategies
@@ -441,6 +442,7 @@ void CkMemCheckPT::recoverEntry(CkArrayCheckPTMessage *msg)
 // to send me checkpoint data.
 void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
 {
+  checkpointed = 1;
   cpCallback = cb;
   cpStarter = starter;
   if (CkMyPe() == cpStarter) {
@@ -1156,11 +1158,11 @@ void CkMemRestart(const char *dummy, CkArgMsg *args)
 	
   _discard_charm_message();
   
-if(CmiMyRank()==0){
-   CkCallback cb(qd_callback);
-   CkStartQD(cb);
-   CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
- }
+  if(CmiMyRank()==0){
+    CkCallback cb(qd_callback);
+    CkStartQD(cb);
+    CkPrintf("crash_node:%d\n",CpvAccess( _crashedNode));
+  }
 #else
    CmiAbort("Fault tolerance is not support, rebuild charm++ with 'syncft' option");
 #endif
@@ -1264,7 +1266,6 @@ extern "C" void (*notify_crash_fn)(int node);
 
 #if CMK_CONVERSE_MPI
 static int pingHandlerIdx;
-static int pingBackHandlerIdx;
 static int pingCheckHandlerIdx;
 static int buddyDieHandlerIdx;
 static double lastPingTime = -1;
@@ -1274,6 +1275,7 @@ extern "C" void mpi_restart_crashed(int pe, int rank);
 extern "C" int  find_spare_mpirank(int pe);
 extern void CkDeleteChares();
 
+void pingBuddy();
 void pingCheckHandler();
 
 void buddyDieHandler(char *msg)
@@ -1295,23 +1297,21 @@ void pingHandler(void *msg)
 {
   lastPingTime = CmiWallTimer();
   CmiFree(msg);
-}
-
-void pingBackHandler(char *msg)
-{
-  CmiSetHandler(msg, pingHandlerIdx);
-  int from = *(int *)(msg+CmiMsgHeaderSizeBytes);
-  CmiSyncSendAndFree(from, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
+//if (CmiMyPe() == 5) printf("[%d] pingHandler %f\n", 5, lastPingTime);
 }
 
 void pingCheckHandler()
 {
   double now = CmiWallTimer();
   if (lastPingTime > 0 && now - lastPingTime > 4) {
+    int pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
-    int buddy = obj->BuddyPE(CkMyPe());
-    CmiPrintf("[%d] detected buddy processor %d died. \n", CmiMyPe(), buddy);
+    for (pe = 0; pe < CmiNumPes(); pe++) {
+       if (obj->BuddyPE(pe) == CmiMyPe()) break;
+    }
+    buddy = pe;
+    CmiPrintf("[%d] detected buddy processor %d died %f %f. \n", CmiMyPe(), buddy, now, lastPingTime);
     for (int pe = 0; pe < CmiNumPes(); pe++) {
       if (obj->isFailed(pe) || pe == buddy) continue;
       char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
@@ -1332,10 +1332,11 @@ void pingBuddy()
 //printf("[%d] pingBuddy %d\n", CmiMyPe(), buddy);
     char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes+sizeof(int));
     *(int *)(msg+CmiMsgHeaderSizeBytes) = CmiMyPe();
-    CmiSetHandler(msg, pingBackHandlerIdx);
+    CmiSetHandler(msg, pingHandlerIdx);
+    CmiGetRestartPhase(msg) = 9999;
     CmiSyncSendAndFree(buddy, CmiMsgHeaderSizeBytes+sizeof(int), (char *)msg);
-    CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
   }
+  CcdCallOnCondition(CcdPERIODIC_100ms,(CcdVoidFn)pingBuddy,NULL);
 }
 #endif
 
@@ -1351,7 +1352,6 @@ void CkRegisterRestartHandler( )
 
 #if CMK_CONVERSE_MPI
   pingHandlerIdx = CkRegisterHandler((CmiHandler)pingHandler);
-  pingBackHandlerIdx = CkRegisterHandler((CmiHandler)pingBackHandler);
   pingCheckHandlerIdx = CkRegisterHandler((CmiHandler)pingCheckHandler);
   buddyDieHandlerIdx = CkRegisterHandler((CmiHandler)buddyDieHandler);
 
@@ -1368,6 +1368,13 @@ void CkRegisterRestartHandler( )
 //  sleep(4);
 #endif
 #endif
+}
+
+
+extern "C"
+int CkHasCheckpoints()
+{
+  return checkpointed;
 }
 
 /// @todo: the following definitions should be moved to a separate file containing
