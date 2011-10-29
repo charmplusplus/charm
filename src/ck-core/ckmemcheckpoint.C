@@ -1270,10 +1270,8 @@ static int pingCheckHandlerIdx;
 static int buddyDieHandlerIdx;
 static double lastPingTime = -1;
 
-extern void _initCharm(int argc, char **argv);
 extern "C" void mpi_restart_crashed(int pe, int rank);
 extern "C" int  find_spare_mpirank(int pe);
-extern void CkDeleteChares();
 
 void pingBuddy();
 void pingCheckHandler();
@@ -1297,17 +1295,18 @@ void pingHandler(void *msg)
 {
   lastPingTime = CmiWallTimer();
   CmiFree(msg);
-//if (CmiMyPe() == 5) printf("[%d] pingHandler %f\n", 5, lastPingTime);
 }
 
 void pingCheckHandler()
 {
+#if CMK_MEM_CHECKPOINT
   double now = CmiWallTimer();
   if (lastPingTime > 0 && now - lastPingTime > 4) {
-    int pe, buddy;
+    int i, pe, buddy;
     // tell everyone the buddy dies
     CkMemCheckPT *obj = CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch();
-    for (pe = 0; pe < CmiNumPes(); pe++) {
+    for (i = 1; i < CmiNumPes(); i++) {
+       pe = (CmiMyPe() - i + CmiNumPes()) % CmiNumPes();
        if (obj->BuddyPE(pe) == CmiMyPe()) break;
     }
     buddy = pe;
@@ -1322,6 +1321,7 @@ void pingCheckHandler()
   }
   else 
     CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
+#endif
 }
 
 void pingBuddy()
