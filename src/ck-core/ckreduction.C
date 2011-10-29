@@ -240,7 +240,9 @@ void CkReductionMgr::flushStates()
 
   adjVec.length()=0;
 
+#if ! GROUP_LEVEL_REDUCTION
   nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
+#endif
 }
 
 //////////// Reduction Manager Client API /////////////
@@ -1019,7 +1021,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-   init_BinaryTree();
+    init_BinaryTree();
 #endif
 #endif
   }

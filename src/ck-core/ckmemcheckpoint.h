@@ -57,7 +57,7 @@ public:
 class CkMemCheckPT: public CBase_CkMemCheckPT {
 public:
   CkMemCheckPT(int w);
-  CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) {}
+  CkMemCheckPT(CkMigrateMessage *m):CBase_CkMemCheckPT(m) {};
   virtual ~CkMemCheckPT();
   void pup(PUP::er& p);
   inline int BuddyPE(int pe);
@@ -80,6 +80,7 @@ public:
   void inmem_restore(CkArrayCheckPTMessage *m);
   void updateLocations(int n, CkGroupID *g, CkArrayIndex *idx,int nowOnPe);
   void resetLB(int diepe);
+  int  isFailed(int pe);
 public:
   static CkCallback  cpCallback;
 
@@ -101,7 +102,6 @@ private:
 private:
   inline int isMaster(int pe);
 
-  int  isFailed(int pe);
   void failed(int pe);
   int  totalFailed();
 
@@ -117,5 +117,10 @@ void CkStartMemCheckpoint(CkCallback &cb);
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting(); 
+extern "C" int CkHasCheckpoints();
+
+#if CMK_CONVERSE_MPI
+extern "C" void CkDieNow();
+#endif
 
 #endif
