@@ -1112,6 +1112,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
       int newpe = vals[0];
       CpvAccess(_curRestartPhase) = vals[1];
+      CmiPrintf("Charm++> Spare MPI rank %d is activated for PE %d.\n", *myNodeID, newpe);
 
       if (newpe == -1) {
           MPI_Barrier(MPI_COMM_WORLD);
