@@ -1097,11 +1097,11 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
        CmiAssert(num_workpes <= *numNodes);
        total_pes = *numNodes;
        *numNodes = num_workpes;
-       if (*myNodeID == 0)
-           CmiPrintf("Charm++> FT using %d processors and %d spare processors.\n", num_workpes, total_pes-num_workpes);
     }
     else
-       num_workpes = *numNodes;
+       total_pes = num_workpes = *numNodes;
+    if (*myNodeID == 0)
+       CmiPrintf("Charm++> FT using %d processors and %d spare processors.\n", num_workpes, total_pes-num_workpes);
     petorank = (int *)malloc(sizeof(int) * num_workpes);
     for (i=0; i<num_workpes; i++)  petorank[i] = i;
     nextrank = num_workpes;
@@ -1572,7 +1572,7 @@ void mpi_end_spare()
 int find_spare_mpirank(int pe)
 {
     if (nextrank == total_pes) {
-      CmiAbort("Charm++> ran out of spare processors");
+      CmiAbort("Charm++> No spare processor available.");
     }
     petorank[pe] = nextrank;
     nextrank++;
