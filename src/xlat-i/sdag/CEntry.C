@@ -63,7 +63,7 @@ void CEntry::generateCode(XStr& op)
   sv = (CStateVar *)myParameters->begin();
   i = 0;
   if (isVoid == 1) {
-     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), 0);\n";
+     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
      op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
   else {
