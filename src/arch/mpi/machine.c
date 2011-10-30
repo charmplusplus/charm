@@ -1097,6 +1097,8 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
        CmiAssert(num_workpes <= *numNodes);
        total_pes = *numNodes;
        *numNodes = num_workpes;
+       if (*myNodeID == 0)
+           CmiPrintf("Charm++> FT using %d processors and %d spare processors.\n", num_workpes, total_pes-num_workpes);
     }
     else
        num_workpes = *numNodes;
@@ -1383,7 +1385,11 @@ void CmiTimerInit(char **argv) {
     if (_absoluteTime && CmiMyPe() == 0)
         printf("Charm++> absolute MPI timer is used\n");
 
+#if ! CMK_MEM_CHECKPOINT
     _is_global = CmiTimerIsSynchronized();
+#else
+    _is_global = 0;
+#endif
 
     if (_is_global) {
         if (CmiMyRank() == 0) {
