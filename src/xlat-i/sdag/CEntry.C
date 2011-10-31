@@ -1,5 +1,6 @@
 #include "CEntry.h"
 #include "xi-symbol.h"
+#include "CStateVar.h"
 
 namespace xi {
 

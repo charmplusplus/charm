@@ -2,11 +2,13 @@
 #define _CStateVar_H_
 
 #include "xi-util.h"
+#include "xi-symbol.h"
 
 namespace xi {
 
-class CStateVar {
-  public:
+  class ParamList;
+
+struct CStateVar {
     int isVoid;
     XStr *type;
     int numPtrs;
@@ -14,6 +16,7 @@ class CStateVar {
     XStr *byRef;
     XStr *arrayLength;
     int isMsg;
+
     CStateVar(int v, const char *t, int np, const char *n, XStr *r, const char *a, int m) : isVoid(v), numPtrs(np),  byRef(r), isMsg(m)
  	{ 
 	  if (t != NULL) { type = new XStr(t); } 

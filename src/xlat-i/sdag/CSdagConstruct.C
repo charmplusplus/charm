@@ -4,6 +4,7 @@
 #include "xi-symbol.h"
 //#include "CParsedFile.h"
 #include "EToken.h"
+#include "CStateVar.h"
 
 namespace xi {
 
