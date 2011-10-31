@@ -1358,7 +1358,6 @@ void CkRegisterRestartHandler( )
   pingHandlerIdx = CkRegisterHandler((CmiHandler)pingHandler);
   pingCheckHandlerIdx = CkRegisterHandler((CmiHandler)pingCheckHandler);
   buddyDieHandlerIdx = CkRegisterHandler((CmiHandler)buddyDieHandler);
-
 #endif
 
   CpvInitialize(CkProcCheckPTMessage *, procChkptBuf);
@@ -1366,9 +1365,9 @@ void CkRegisterRestartHandler( )
 
   notify_crash_fn = notify_crash;
 
-#if 1
-  // for debugging
-  //CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+#if ! CMK_CONVERSE_MPI
+  // print pid to kill
+  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
 //  sleep(4);
 #endif
 #endif
