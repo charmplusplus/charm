@@ -148,7 +148,7 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 {
    // case SENTRY:
    CEntry *entry;
-   int notfound=1;
+   bool found = false;
    
    for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
      if(*(entry->entry) == (const char *)name) 
@@ -157,39 +157,29 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 	epl = entry->paramlist;
         ParamList *pl;
         pl = param;
-        notfound = 1;
+        found = false;
 	if ((entry->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
-	   notfound = 0;
+	   found = true;
 	}
 	while ((pl != NULL) && (epl != NULL))
 	{
-	   if (pl->isArray() && epl->isArray()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isBuiltin() && epl->isBuiltin()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isReference() && epl->isReference()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isMessage() && epl->isMessage()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isNamed() && epl->isNamed()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
- 	   pl = pl->next;
-	   epl = epl->next;
+          bool kindMatches =
+            (pl->isArray() && epl->isArray()) ||
+            (pl->isBuiltin() && epl->isBuiltin()) ||
+            (pl->isReference() && epl->isReference()) ||
+            (pl->isMessage() && epl->isMessage()) ||
+            (pl->isNamed() && epl->isNamed());
+          bool baseNameMatches = (strcmp(pl->getBaseName(), epl->getBaseName()) == 0);
+          if (kindMatches && baseNameMatches)
+            found = true;
+
+          pl = pl->next;
+          epl = epl->next;
         }
         if (((pl == NULL) && (epl != NULL)) ||
            ((pl != NULL) && (epl == NULL)))
-  	     notfound = 1;
-	if (notfound == 0) {
+          found = false;
+	if (found) {
           // check to see if thisWhen is already in entry's whenList
           int whenFound = 0;
           TList<SdagConstruct*> *tmpList = &(entry->whenList);
@@ -206,7 +196,7 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 	 } 
      }
    }
-   if(notfound == 1) {
+   if(!found) {
      CEntry *newEntry;
      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
      CEntrylist.append(newEntry);
