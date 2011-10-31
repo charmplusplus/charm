@@ -320,7 +320,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0, "CCounter", 1, txt,0,NULL, 1);
+        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
         stateVarsChildren->append(sv);
       }
       break;
@@ -380,7 +380,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0,"CCounter",1, txt,0, NULL, 1);
+        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
         stateVarsChildren->append(sv);
       }
       break;
