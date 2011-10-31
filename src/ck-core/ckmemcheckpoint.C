@@ -1366,7 +1366,7 @@ void CkRegisterRestartHandler( )
 
 #if 1
   // for debugging
-  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+  //CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
 //  sleep(4);
 #endif
 #endif
