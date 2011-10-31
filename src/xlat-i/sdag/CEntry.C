@@ -41,7 +41,7 @@ void CEntry::generateCode(XStr& op)
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         op << sv->type->charstar() <<" *"<<sv->name->charstar() <<"_msg";
+         op << sv->type->charstar() <<" "<<sv->name->charstar() <<"_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }
@@ -211,7 +211,7 @@ void CEntry::generateCode(XStr& op)
 #endif
 	  whenParams->append("(");
 	  whenParams->append(sv->type->charstar());
-	  whenParams->append(" *) tr->args[");
+	  whenParams->append(") tr->args[");
 	  *whenParams<<iArgs;
 	  whenParams->append("]");
 	  iArgs++;

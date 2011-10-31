@@ -26,6 +26,12 @@ struct CStateVar {
 	  if (a != NULL) {arrayLength = new XStr(a); }
 	  else { arrayLength = NULL; }
 	}
+
+CStateVar(ParamList *pl)
+      : isVoid(0), type(new XStr(*(pl->param->getType()))), numPtrs(0),
+      name(new XStr(pl->getGivenName())), byRef(pl->isReference() ? new XStr("&") : NULL),
+      arrayLength(pl->isArray() ? new XStr(pl->getArrayLen()) : NULL), isMsg(pl->isMessage())
+      { }
 };
 
 }

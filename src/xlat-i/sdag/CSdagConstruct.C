@@ -284,31 +284,10 @@ void SdagConstruct::propagateState(int uniqueVarNum)
      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
      stateVars->append(sv);
   }
-  else if (pl->isMessage() == 1){
-     sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
-     stateVars->append(sv);
-  }
   else {
-    while(pl != NULL) {
-      if (pl->isPointer() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
-      }
-      else if (pl->isReference() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
-
-      }
-      else if (pl->isArray() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
-      }
-      else if (pl->isBuiltin() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-
-      }
-      else if (pl->isNamed()) {
-          sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-      }
+    while (pl != NULL) {
+      stateVars->append(new CStateVar(pl));
       pl = pl->next;
-      stateVars->append(sv);
     }
   }
 
@@ -378,38 +357,15 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
  	      el->entry->estateVars.append(sv);
  	      el->entry->stateVars->append(sv);
           }
-          else if (pl->isMessage()){
-            sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
-            //stateVars->append(sv);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
-          }
           else {
             while(pl != NULL) {
-              if (pl->isPointer()) {
-                sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
-              }
-      	      else if (pl->isReference()) {
-       	        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
-              }
-              else if (pl->isArray()) {
-                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
-              }
-              else if (pl->isBuiltin()) {
-                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-              }
-	      else if (pl->isNamed()) {
-                sv = new CStateVar(0, (XStr)(*(pl->param->getType())), 0, pl->getGivenName(), 0, NULL, 0); 
-	      }
-	      else
-	         printf("PROBLEM - I DON'T KNOW THE TYPE\n");
-              pl = pl->next;
+              sv = new CStateVar(pl);
               stateVarsChildren->append(sv);
               whensEntryMethodStateVars->append(sv); 
  	      el->entry->estateVars.append(sv);
  	      el->entry->stateVars->append(sv);
+
+              pl = pl->next;
 	    }
 	  }
 	  el = el->next;
@@ -620,7 +576,7 @@ void SdagConstruct::generateWhen(XStr& op)
     else {
         for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
           op << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
-          op << "    " << sv->type->charstar() << " *" <<
+          op << "    " << sv->type->charstar() << " " <<
                           sv->name->charstar() << ";\n";
         } 
     }
@@ -745,7 +701,7 @@ void SdagConstruct::generateWhen(XStr& op)
      else {  // There was a message as the only parameter
         sv = e->stateVars->begin();
         op << "       " << sv->name->charstar() << " = (" << 
-              sv->type->charstar() << " *) " <<
+              sv->type->charstar() << ") " <<
               sv->name->charstar() << "_buf->msg;\n";
         op << "       __cDep->removeMessage(" << sv->name->charstar() <<
               "_buf);\n";
@@ -1407,30 +1363,21 @@ void SdagConstruct::generatePrototype(XStr& op, ParamList *list)
 {
    ParamList *pl = list;
    int count = 0;
-   int i, numStars;
+
    if (pl->isVoid() == 1) {
      op << "void"; 
-   }
-   else if (pl->isMessage() == 1){
-     op << pl->getBaseName() <<" *" <<pl->getGivenName() ;
    }
    else {
      while(pl != NULL) {
        if (count > 0)
           op <<", ";
-       if (pl->isPointer() == 1) {
-         op <<pl->getBaseName(); 
-	 numStars = pl->getNumStars();
-	 for(i=0; i< numStars; i++)
-	   op <<"*";
-	 op <<" "<<pl->getGivenName();
-       }
-       else if (pl->isReference() == 1) 
-         op <<pl->getBaseName() <<"& " <<pl->getGivenName();
-       else if (pl->isArray() == 1) 
-         op <<pl->getBaseName() <<"* " <<pl->getGivenName();
-       else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1))
-         op <<pl->getBaseName() <<" " <<pl->getGivenName();
+       op << pl->param->getType();
+
+       if (pl->isReference())
+         op << "&";
+
+       op << pl->getGivenName();
+
        pl = pl->next;
        count++;
      }
@@ -1454,12 +1401,7 @@ void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
       if (sv->byRef != 0)
          op <<" &";
       if (sv->arrayLength != NULL) 
-         op <<"*";
-      else if (sv->numPtrs != 0) {
-        for (int i=0; i<sv->numPtrs; i++) 
-	  op <<"*";
-         op <<" ";
-      }
+        op <<"* ";
       if (sv->name != 0)
          op <<sv->name->charstar();
     }
