@@ -1059,6 +1059,8 @@ static void restartBcastHandler(char *msg)
   char *restartmsg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   CmiSetHandler(restartmsg, restartBeginHandlerIdx);
   CmiSyncSendAndFree(_diePE, CmiMsgHeaderSizeBytes, (char *)restartmsg);
+
+  checkpointed = 0;
 #endif
 }
 
@@ -1422,6 +1424,17 @@ void readKillFile(){
         }
         fclose(fp);
 }
+
+#if ! CMK_CONVERSE_MPI
+void CkDieNow()
+{
+         // ignored for non-mpi version
+        CmiPrintf("[%d] die now.\n", CmiMyPe());
+        killTime = CmiWallTimer()+0.001;
+        CcdCallFnAfter(killLocal,NULL,1);
+}
+#endif
+
 #endif
 
 #include "CkMemCheckpoint.def.h"

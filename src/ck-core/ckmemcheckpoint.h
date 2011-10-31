@@ -119,8 +119,6 @@ void CkStartMemCheckpoint(CkCallback &cb);
 extern "C" int CkInRestarting(); 
 extern "C" int CkHasCheckpoints();
 
-#if CMK_CONVERSE_MPI
 extern "C" void CkDieNow();
-#endif
 
 #endif
