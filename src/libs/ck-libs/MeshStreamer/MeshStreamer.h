@@ -121,7 +121,7 @@ public:
     void flushDirect();
 
       // non entry
-    void callWhenFinished(CkCallback &cb) { 
+    void associateCallback(CkCallback &cb) { 
               userCallback_ = cb;
               CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::flushDirect(), thisProxy));
          }
