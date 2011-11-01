@@ -1280,6 +1280,7 @@ void pingCheckHandler();
 
 void buddyDieHandler(char *msg)
 {
+#if CMK_MEM_CHECKPOINT
    // notify
    int diepe = *(int *)(msg+CmiMsgHeaderSizeBytes);
    notify_crash(diepe);
@@ -1291,6 +1292,7 @@ void buddyDieHandler(char *msg)
      mpi_restart_crashed(diepe, newrank);
      CcdCallOnCondition(CcdPERIODIC_5s,(CcdVoidFn)pingCheckHandler,NULL);
    }
+#endif
 }
 
 void pingHandler(void *msg)
