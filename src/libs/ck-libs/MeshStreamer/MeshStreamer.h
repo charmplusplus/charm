@@ -87,6 +87,8 @@ private:
     int myColumnIndex_; 
     int myRowIndex_;
 
+    CkCallback   user_cb;
+
     MeshStreamerMessage<dtype> **personalizedBuffers_; 
     MeshStreamerMessage<dtype> **columnBuffers_; 
     MeshStreamerMessage<dtype> **planeBuffers_;
@@ -108,15 +110,21 @@ public:
     MeshStreamer(int totalBufferCapacity, int numRows, 
 		 int numColumns, int numPlanes, 
 		 const CProxy_MeshStreamerClient<dtype> &clientProxy);
-
     ~MeshStreamer();
 
+      // entry
     void insertData(const dtype &dataItem, const int destinationPe); 
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
 
     void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers);
     void flushDirect();
+
+      // non entry
+    void start(CkCallback &cb) { 
+              user_cb = cb;
+              CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::flushDirect(), thisProxy));
+         }
 };
 
 template <class dtype>
@@ -477,6 +485,10 @@ void MeshStreamer<dtype>::flushDirect(){
     CkAssert(numDataItemsBuffered_ == 0); 
 #endif
 
+    if (!user_cb.isInvalid()) {
+        CkStartQD(user_cb);
+        user_cb = CkCallback();      // nullify the current callback
+    }
 }
 
 #define CK_TEMPLATES_ONLY
