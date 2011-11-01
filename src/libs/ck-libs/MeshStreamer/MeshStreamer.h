@@ -61,9 +61,8 @@ public:
 template <class dtype>
 class MeshStreamerClient : public Group {
  public:
-     MeshStreamerClient();
-     virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-
+     void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
+     virtual void process(dtype data)=0; 
 };
 
 template <class dtype>
@@ -81,6 +80,7 @@ private:
     int planeSize_;
 
     CProxy_MeshStreamerClient<dtype> clientProxy_;
+    MeshStreamerClient<dtype> *clientObj_;
 
     int myNodeIndex_;
     int myPlaneIndex_;
@@ -128,11 +128,11 @@ public:
 };
 
 template <class dtype>
-MeshStreamerClient<dtype>::MeshStreamerClient() {}
-
-template <class dtype>
 void MeshStreamerClient<dtype>::receiveCombinedData(MeshStreamerMessage<dtype> *msg) {
-  CkError("Default implementation of receiveCombinedData should never be called\n");
+  for (int i = 0; i < msg->numDataItems; i++) {
+     dtype data = ((dtype*)(msg->data))[i];
+     process(data);
+  }
   delete msg;
 }
 
@@ -152,6 +152,7 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   numPlanes_ = numPlanes; 
   numNodes_ = CkNumPes(); 
   clientProxy_ = clientProxy; 
+  clientObj_ = ((MeshStreamerClient<dtype> *)CkLocalBranch(clientProxy_));
 
   personalizedBuffers_ = new MeshStreamerMessage<dtype> *[numRows];
   for (int i = 0; i < numRows; i++) {
@@ -292,10 +293,15 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
 
 template <class dtype>
 void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinationPe) {
+  static int count = 0;
+
+  if (destinationPe == CkMyPe()) {
+    clientObj_->process(dataItem);
+    return;
+  }
 
   int planeIndex, columnIndex, rowIndex; // location of destination
   int indexWithinPlane; 
-
   MeshStreamerMessageType msgType; 
 
   determineLocation(destinationPe, rowIndex, columnIndex, planeIndex, msgType);
@@ -324,6 +330,9 @@ void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinatio
 
   storeMessage(messageBuffers, bucketIndex, destinationPe, rowIndex, 
                columnIndex, planeIndex, msgType, dataItem);
+
+    // release control to scheduler, assume caller is threaded entry
+  if (++count % 1024 == 0) CthYield();
 }
 
 template <class dtype>

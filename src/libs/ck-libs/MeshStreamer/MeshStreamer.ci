@@ -13,7 +13,6 @@ module MeshStreamer {
   */
 
   template<class dtype> group MeshStreamerClient {
-    entry MeshStreamerClient();
     entry void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
   };
 
