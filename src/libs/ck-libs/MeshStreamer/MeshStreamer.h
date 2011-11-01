@@ -87,7 +87,7 @@ private:
     int myColumnIndex_; 
     int myRowIndex_;
 
-    CkCallback   user_cb;
+    CkCallback   userCallback_;
 
     MeshStreamerMessage<dtype> **personalizedBuffers_; 
     MeshStreamerMessage<dtype> **columnBuffers_; 
@@ -121,8 +121,8 @@ public:
     void flushDirect();
 
       // non entry
-    void start(CkCallback &cb) { 
-              user_cb = cb;
+    void callWhenFinished(CkCallback &cb) { 
+              userCallback_ = cb;
               CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::flushDirect(), thisProxy));
          }
 };
@@ -485,9 +485,9 @@ void MeshStreamer<dtype>::flushDirect(){
     CkAssert(numDataItemsBuffered_ == 0); 
 #endif
 
-    if (!user_cb.isInvalid()) {
-        CkStartQD(user_cb);
-        user_cb = CkCallback();      // nullify the current callback
+    if (!userCallback_.isInvalid()) {
+        CkStartQD(userCallback_);
+        userCallback_ = CkCallback();      // nullify the current callback
     }
 }
 
