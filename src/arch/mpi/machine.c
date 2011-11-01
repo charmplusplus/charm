@@ -307,6 +307,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     int size = smsg->size;
     char *msg = smsg->msg;
     int mode = smsg->mode;
+    int dstrank;
 
     MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
 #if CMK_ERROR_CHECKING
@@ -329,9 +330,9 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
 #else
     START_EVENT();
 #if CMK_MEM_CHECKPOINT
-    int dstrank = petorank[node];
+    dstrank = petorank[node];
 #else
-    int dstrank = node;
+    dstrank = node;
 #endif
     if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,MPI_COMM_WORLD,&(smsg->req)))
         CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
