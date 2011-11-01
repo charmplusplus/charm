@@ -115,7 +115,7 @@ public:
       // entry
     void insertData(const dtype &dataItem, const int destinationPe); 
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
-    void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
+    // void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
 
     void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers);
     void flushDirect();
