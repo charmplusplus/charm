@@ -823,6 +823,7 @@ static void send_large_messages(int destNode, int size, char *msg)
         }
     } else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
     {
+        printf("!!!!!!!!!!!Please try to use large page + module load craype-hugepages8m+ or contact charm++ developer for help\n");
         CmiAbort("Memory registor for large msg\n");
     }else 
     {
@@ -1096,6 +1097,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
 
     if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
     {
+        printf("!!!!!!!!!!!Please try to use large page + module load craype-hugepages8m+ or contact charm++ developer for help\n");
         GNI_RC_CHECK("Mem Register before post", status);
     }
 
@@ -1670,6 +1672,8 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if (*size < default_size) *size = default_size;
     pool = memalign(ALIGNBUF, *size);
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
+    if(status != GNI_RC_SUCCESS)
+        printf("!!!!!!!!!!!Please try to use large page + module load craype-hugepages8m+ or contact charm++ developer for help\n");
     GNI_RC_CHECK("Mempool register", status);
     return pool;
 }
