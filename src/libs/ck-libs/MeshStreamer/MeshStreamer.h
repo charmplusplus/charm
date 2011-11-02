@@ -88,6 +88,7 @@ private:
     int myRowIndex_;
 
     CkCallback   userCallback_;
+    int yield_flag_;
 
     MeshStreamerMessage<dtype> **personalizedBuffers_; 
     MeshStreamerMessage<dtype> **columnBuffers_; 
@@ -109,7 +110,8 @@ public:
 
     MeshStreamer(int totalBufferCapacity, int numRows, 
 		 int numColumns, int numPlanes, 
-		 const CProxy_MeshStreamerClient<dtype> &clientProxy);
+		 const CProxy_MeshStreamerClient<dtype> &clientProxy,
+                 int yield_flag = 0);
     ~MeshStreamer();
 
       // entry
@@ -139,7 +141,8 @@ void MeshStreamerClient<dtype>::receiveCombinedData(MeshStreamerMessage<dtype> *
 template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows, 
                            int numColumns, int numPlanes, 
-                           const CProxy_MeshStreamerClient<dtype> &clientProxy) {
+                           const CProxy_MeshStreamerClient<dtype> &clientProxy,
+                           int yield_flag): yield_flag_(yield_flag) {
   // limit total number of messages in system to totalBufferCapacity
   //   but allocate a factor BUCKET_SIZE_FACTOR more space to take
   //   advantage of nonuniform filling of buckets
@@ -332,7 +335,7 @@ void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinatio
                columnIndex, planeIndex, msgType, dataItem);
 
     // release control to scheduler, assume caller is threaded entry
-  if (++count % 1024 == 0) CthYield();
+  if (yield_flag_ && ++count % 1024 == 0) CthYield();
 }
 
 template <class dtype>

@@ -20,7 +20,8 @@ module MeshStreamer {
   group MeshStreamer {
     entry MeshStreamer(int totalBufferCapacity, int numRows, 
 		       int numColumns, int numPlanes, 
-		       const CProxy_MeshStreamerClient<dtype> &clientProxy );   
+		       const CProxy_MeshStreamerClient<dtype> &clientProxy, 
+                       int yield_flag=0 );   
     // entry void insertData(CmiUInt8, int); 
     entry void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     // entry void receivePersonalizedData(MeshStreamerMessage *msg);
