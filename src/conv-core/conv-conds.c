@@ -224,9 +224,9 @@ CpvStaticDeclare(ccd_cond_callbacks, conds);
 
 
 /*Make sure this matches the CcdPERIODIC_* list in converse.h*/
-#define CCD_PERIODIC_MAX 11
+#define CCD_PERIODIC_MAX 12
 const static double periodicCallInterval[CCD_PERIODIC_MAX]=
-{0.001, 0.010, 0.100, 1.0, 10.0, 60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
+{0.001, 0.010, 0.100, 1.0, 5.0, 10.0, 60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
 
 /**
  * List of periodic callbacks maintained by the scheduler
@@ -509,7 +509,6 @@ void CcdCallFnAfterOnPE(CcdVoidFn fnp, void *arg, double deltaT, int pe)
     double tcall = ctime + deltaT/1000.0;
     ccd_heap_insert(tcall, fnp, arg, pe);
 } 
-
 
 /**
  * Register a callback function that will be triggered after a minimum 

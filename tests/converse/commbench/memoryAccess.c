@@ -1,9 +1,9 @@
 #include <converse.h>
 #include "commbench.h"
 
-#define CLUBMALLOC 10000
-#define RANDMALLOC 10000
-#define RANDOPS 10000
+#define CLUBMALLOC 1000
+#define RANDMALLOC 1000
+#define RANDOPS 1000
 #define POWER 15
 #define MAXSIZE 16384
 typedef double myType;

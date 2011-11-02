@@ -39,22 +39,21 @@ template<class dtype>
 class MeshStreamerMessage : public CMessage_MeshStreamerMessage<dtype> {
 public:
     int numDataItems;
-    int capacity;
     int *destinationPes;
     dtype *data;
 
-    MeshStreamerMessage(int c): numDataItems(0), capacity(c) {}   
+    MeshStreamerMessage(): numDataItems(0) {}   
 
-    int addDataItem(dtype &dataItem) {
+    int addDataItem(const dtype &dataItem) {
         data[numDataItems] = dataItem;
         return ++numDataItems; 
     }
 
-    void markDestination(int index, int destinationPe) {
+    void markDestination(const int index, const int destinationPe) {
 	destinationPes[index] = destinationPe;
     }
 
-    dtype getDataItem(int index) {
+    dtype getDataItem(const int index) {
         return data[index];
     }
 };
@@ -62,9 +61,8 @@ public:
 template <class dtype>
 class MeshStreamerClient : public Group {
  public:
-     MeshStreamerClient();
      virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-
+     virtual void process(dtype data)=0; 
 };
 
 template <class dtype>
@@ -82,11 +80,15 @@ private:
     int planeSize_;
 
     CProxy_MeshStreamerClient<dtype> clientProxy_;
+    MeshStreamerClient<dtype> *clientObj_;
 
     int myNodeIndex_;
     int myPlaneIndex_;
     int myColumnIndex_; 
     int myRowIndex_;
+
+    CkCallback   userCallback_;
+    int yield_flag_;
 
     MeshStreamerMessage<dtype> **personalizedBuffers_; 
     MeshStreamerMessage<dtype> **columnBuffers_; 
@@ -95,44 +97,52 @@ private:
     void determineLocation(const int destinationPe, int &row, int &column, 
         int &plane, MeshStreamerMessageType &msgType);
 
-    void storeMessage(MeshStreamerMessage<dtype> **messageBuffers, 
+    void storeMessage(MeshStreamerMessage<dtype> ** const messageBuffers, 
         const int bucketIndex, const int destinationPe, 
         const int rowIndex, const int columnIndex, 
         const int planeIndex,
-        const MeshStreamerMessageType msgType, dtype &data);
+        const MeshStreamerMessageType msgType, const dtype &dataItem);
 
-    void flushLargestBucket(MeshStreamerMessage<dtype> **messageBuffers,
+    void flushLargestBucket(MeshStreamerMessage<dtype> ** const messageBuffers,
 			    const int numBuffers, const int myIndex, 
 			    const int dimensionFactor);
 public:
 
     MeshStreamer(int totalBufferCapacity, int numRows, 
 		 int numColumns, int numPlanes, 
-		 const CProxy_MeshStreamerClient<dtype> &clientProxy);
-
+		 const CProxy_MeshStreamerClient<dtype> &clientProxy,
+                 int yield_flag = 0);
     ~MeshStreamer();
 
-    void insertData(dtype &, int); 
+      // entry
+    void insertData(const dtype &dataItem, const int destinationPe); 
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
-    void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
+    // void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
 
-    void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, int);
+    void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers);
     void flushDirect();
+
+      // non entry
+    void associateCallback(CkCallback &cb) { 
+              userCallback_ = cb;
+              CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::flushDirect(), thisProxy));
+         }
 };
 
 template <class dtype>
-MeshStreamerClient<dtype>::MeshStreamerClient() {}
-
-template <class dtype>
 void MeshStreamerClient<dtype>::receiveCombinedData(MeshStreamerMessage<dtype> *msg) {
-  CkError("Default implementation of receiveCombinedData should never be called\n");
+  for (int i = 0; i < msg->numDataItems; i++) {
+     dtype data = ((dtype*)(msg->data))[i];
+     process(data);
+  }
   delete msg;
 }
 
 template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows, 
                            int numColumns, int numPlanes, 
-                           const CProxy_MeshStreamerClient<dtype> &clientProxy) {
+                           const CProxy_MeshStreamerClient<dtype> &clientProxy,
+                           int yield_flag): yield_flag_(yield_flag) {
   // limit total number of messages in system to totalBufferCapacity
   //   but allocate a factor BUCKET_SIZE_FACTOR more space to take
   //   advantage of nonuniform filling of buckets
@@ -145,6 +155,7 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   numPlanes_ = numPlanes; 
   numNodes_ = CkNumPes(); 
   clientProxy_ = clientProxy; 
+  clientObj_ = ((MeshStreamerClient<dtype> *)CkLocalBranch(clientProxy_));
 
   personalizedBuffers_ = new MeshStreamerMessage<dtype> *[numRows];
   for (int i = 0; i < numRows; i++) {
@@ -216,23 +227,22 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe, int &rowInd
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffers, 
+void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messageBuffers, 
                                 const int bucketIndex, const int destinationPe, 
                                 const int rowIndex, const int columnIndex, 
                                 const int planeIndex, 
                                 const MeshStreamerMessageType msgType, 
-                                dtype &data) {
+                                const dtype &dataItem) {
 
   // allocate new message if necessary
   if (messageBuffers[bucketIndex] == NULL) {
-    int dataSize = bucketSize_;  
     if (msgType == PersonalizedMessage) {
       messageBuffers[bucketIndex] = 
-        new (0, dataSize) MeshStreamerMessage<dtype>(dataSize);
+        new (0, bucketSize_) MeshStreamerMessage<dtype>();
     }
     else {
       messageBuffers[bucketIndex] = 
-        new (bucketSize_, dataSize) MeshStreamerMessage<dtype>(dataSize);
+        new (bucketSize_, bucketSize_) MeshStreamerMessage<dtype>();
     }
 #ifdef DEBUG_STREAMER
     CkAssert(messageBuffers[bucketIndex] != NULL);
@@ -241,7 +251,7 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffe
   
   MeshStreamerMessage<dtype> *destinationBucket = messageBuffers[bucketIndex];
   
-  int numBuffered = destinationBucket->addDataItem(data); 
+  int numBuffered = destinationBucket->addDataItem(dataItem); 
   if (msgType != PersonalizedMessage) {
     destinationBucket->markDestination(numBuffered-1, destinationPe);
   }
@@ -285,11 +295,16 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> **messageBuffe
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::insertData(dtype &data, int destinationPe) {
+void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinationPe) {
+  static int count = 0;
+
+  if (destinationPe == CkMyPe()) {
+    clientObj_->process(dataItem);
+    return;
+  }
 
   int planeIndex, columnIndex, rowIndex; // location of destination
   int indexWithinPlane; 
-
   MeshStreamerMessageType msgType; 
 
   determineLocation(destinationPe, rowIndex, columnIndex, planeIndex, msgType);
@@ -317,7 +332,10 @@ void MeshStreamer<dtype>::insertData(dtype &data, int destinationPe) {
   }
 
   storeMessage(messageBuffers, bucketIndex, destinationPe, rowIndex, 
-               columnIndex, planeIndex, msgType, data);
+               columnIndex, planeIndex, msgType, dataItem);
+
+    // release control to scheduler, assume caller is threaded entry
+  if (yield_flag_ && ++count % 1024 == 0) CthYield();
 }
 
 template <class dtype>
@@ -401,7 +419,7 @@ void MeshStreamer::receivePersonalizedData(MeshStreamerMessage *msg) {
 */
 
 template <class dtype>
-void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messageBuffers,
+void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> ** const messageBuffers,
                                       const int numBuffers, const int myIndex, 
                                       const int dimensionFactor) {
 
@@ -418,10 +436,10 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messag
     destinationBucket = messageBuffers[flushIndex];
     destinationIndex = myNodeIndex_ + (flushIndex - myIndex) * dimensionFactor;
 
-    if (destinationBucket->capacity > destinationBucket->numDataItems) {
+    if (destinationBucket->numDataItems < bucketSize_) {
       // not sending the full buffer, shrink the message size
       envelope *env = UsrToEnv(destinationBucket);
-      env->setTotalsize(env->getTotalsize() - (destinationBucket->capacity - destinationBucket->numDataItems) * sizeof(dtype));
+      env->setTotalsize(env->getTotalsize() - (bucketSize_ - destinationBucket->numDataItems) * sizeof(dtype));
     }
     numDataItemsBuffered_ -= destinationBucket->numDataItems;
 
@@ -437,7 +455,7 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> **messag
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, int numBuffers)
+void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers)
 {
 
     for (int i = 0; i < numBuffers; i++) {
@@ -452,7 +470,7 @@ void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffe
        else {
          for (int j = 0; j < messageBuffers[i]->numDataItems; j++) {
            MeshStreamerMessage<dtype> *directMsg = 
-             new (0, 1) MeshStreamerMessage<dtype>(1);
+             new (0, 1) MeshStreamerMessage<dtype>();
 #ifdef DEBUG_STREAMER
            CkAssert(directMsg != NULL);
 #endif
@@ -466,10 +484,6 @@ void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffe
        messageBuffers[i] = NULL;
     }
 
-#ifdef DEBUG_STREAMER
-    CkPrintf("[%d] numDataItemsBuffered_: %d\n", CkMyPe(), numDataItemsBuffered_);
-    CkAssert(numDataItemsBuffered_ == 0); 
-#endif
 }
 
 template <class dtype>
@@ -477,6 +491,16 @@ void MeshStreamer<dtype>::flushDirect(){
     flushBuckets(planeBuffers_, numPlanes_);
     flushBuckets(columnBuffers_, numColumns_);
     flushBuckets(personalizedBuffers_, numRows_);
+
+#ifdef DEBUG_STREAMER
+    //CkPrintf("[%d] numDataItemsBuffered_: %d\n", CkMyPe(), numDataItemsBuffered_);
+    CkAssert(numDataItemsBuffered_ == 0); 
+#endif
+
+    if (!userCallback_.isInvalid()) {
+        CkStartQD(userCallback_);
+        userCallback_ = CkCallback();      // nullify the current callback
+    }
 }
 
 #define CK_TEMPLATES_ONLY
