@@ -61,7 +61,7 @@ public:
 template <class dtype>
 class MeshStreamerClient : public Group {
  public:
-     void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
+     virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
      virtual void process(dtype data)=0; 
 };
 
