@@ -26,6 +26,7 @@ module MeshStreamer {
     entry void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     // entry void receivePersonalizedData(MeshStreamerMessage *msg);
     entry void flushDirect();
+    entry void finish(CkReductionMsg *msg);
   };
 
 };
