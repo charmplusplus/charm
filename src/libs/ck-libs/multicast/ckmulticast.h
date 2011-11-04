@@ -90,6 +90,8 @@ class CkMulticastMgr: public CkDelegateMgr
         /// entry
         void recvMsg(multicastGrpMsg *m);
         /// entry
+        void sendToLocal(multicastGrpMsg *m);
+        /// entry
         void recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
         // ------------------------- Reductions ------------------------
         /// entry Accept a redn msg from a child in the spanning tree

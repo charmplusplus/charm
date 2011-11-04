@@ -616,7 +616,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
         delete [] packet->data;
         delete packet;
     }
-#else
+#endif
     // clear msg buffer
     while (!entry->msgBuf.isEmpty()) 
     {
@@ -625,7 +625,6 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
         newmsg->_cookie.get_val() = entry;
         mCastGrp[CkMyPe()].recvMsg(newmsg);
     }
-#endif
     // release reduction msgs
     releaseFutureReduceMsgs(entry);
 }
@@ -790,6 +789,19 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   int sizesofar = 0;
   char *data = (char*) env;
+  if (totalcount == 1) {
+    if (s.get_pe() == CkMyPe()) {
+      CkUnpackMessage(&env);
+      msg = (multicastGrpMsg *)EnvToUsr(env);
+      recvMsg(msg);
+    }
+    else {
+      CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+      msg = (multicastGrpMsg *)EnvToUsr(env);
+      mCastGrp[s.get_pe()].recvMsg(msg);
+    }
+    return;
+  }
   for (int i=0; i<totalcount; i++) {
     int mysize = packetSize;
     if (mysize + sizesofar > totalsize) {
@@ -850,7 +862,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int s
     multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
     msg->_cookie = _cookie;
 //    mCastGrp[CkMyPe()].recvMsg(msg);
-    recvMsg(msg);
+    sendToLocal(msg);
     entry->asm_msg = NULL;
     entry->asm_fill = 0;
   }
@@ -864,7 +876,6 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
   CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
-#if ! SPLIT_MULTICAST
   if (entry->notReady()) {
     DEBUGF(("entry not ready, enq buffer %p\n", msg));
     entry->msgBuf.enq(msg);
@@ -879,7 +890,16 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
-#endif
+
+  sendToLocal(msg);
+}
+
+void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
+{
+  int i;
+  CkSectionInfo &sectionInfo = msg->_cookie;
+  mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
+  CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
   // send to local
   int nLocal = entry->localElem.length();
