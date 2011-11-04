@@ -43,12 +43,26 @@ namespace Ck { namespace IO {
 
 #include "CkIO.decl.h"
 #include <map>
+#include <vector>
 
 namespace Ck { namespace IO {
   struct FileReadyMsg : public CMessage_FileReadyMsg {
     Token token;
     FileReadyMsg(const Token &tok) : token(tok) {}
   };
+  
+  struct buffer
+  {
+    vector<char> array;
+    int bytes_filled_so_far;
+    
+    buffer()
+    {
+      bytes_filled_so_far = 0;
+    }
+    
+  };
+    
 
   struct FileInfo {
     std::string name;
@@ -56,6 +70,7 @@ namespace Ck { namespace IO {
     size_t bytes, total_written;
     int fd;
     CkCallback complete;
+    map<size_t, struct buffer> bufferMap;
 
     FileInfo(std::string name_, size_t bytes_, Options opts_)
     : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)
