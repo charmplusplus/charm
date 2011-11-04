@@ -50,9 +50,11 @@ class CkMulticastMgr: public CkDelegateMgr
         
     public:
         // ------------------------- Cons/Des-tructors ------------------------
-        CkMulticastMgr(unsigned int _split_size = 32768, unsigned int _split_threshold = 32768)  { factor = MAXMCASTCHILDREN; split_size = _split_size; split_threshold = _split_threshold;}
         CkMulticastMgr(CkMigrateMessage *m)  {}
-        CkMulticastMgr(int f, unsigned int _split_size = 32768, unsigned int _split_threshold = 32768)  { factor = f; split_size = _split_size; split_threshold = _split_threshold;}
+        CkMulticastMgr(int _factor = 2, unsigned int _split_size = 32768, unsigned int _split_threshold = 32768):
+            factor(_factor),
+            split_size(_split_size),
+            split_threshold(_split_threshold) {}
         int useDefCtor(void){ return 1; }
         void pup(PUP::er &p){ 
 		CkDelegateMgr::pup(p);
