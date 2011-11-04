@@ -42,7 +42,7 @@ static void sleep(int secs) {
 #if USE_LRTS_MEMPOOL
 #define oneMB (1024ll*1024)
 #if CMK_SMP
-static CmiInt8 _mempool_size = 64*oneMB;
+static CmiInt8 _mempool_size = 32*oneMB;
 #else
 static CmiInt8 _mempool_size = 32*oneMB;
 #endif
@@ -1139,8 +1139,10 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id)
         rdma_request_msg->destNode = inst_id;
         rdma_request_msg->pd = pd;
         PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
-    }else
+    }else {
+        /* printf("source: %d pd:%p\n", source, pd); */
         GNI_RC_CHECK("AFter posting", status);
+    }
 #endif
 }
 
@@ -1515,7 +1517,7 @@ static void _init_static_smsg()
     gni_smsg_attr_t      remote_smsg_attr;
     gni_smsg_attr_t      *smsg_attr_vec;
     gni_mem_handle_t     my_smsg_mdh_mailbox;
-    int      i;
+    int      ret, i;
     gni_return_t status;
     uint32_t              vmdh_index = -1;
     mdh_addr_t            base_infor;
@@ -1541,8 +1543,8 @@ static void _init_static_smsg()
     smsg_attr[0].msg_maxsize = SMSG_MAX_MSG;
     status = GNI_SmsgBufferSizeNeeded(&smsg_attr[0], &smsg_memlen);
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-    smsg_mailbox_base = memalign(64, smsg_memlen*(mysize));
-    _MEMCHECK(smsg_mailbox_base);
+    ret = posix_memalign(&smsg_mailbox_base, 64, smsg_memlen*(mysize));
+    CmiAssert(ret == 0);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
     //if (myrank == 0) printf("Charm++> allocates %.2fMB for SMSG. \n", smsg_memlen*mysize/1e6);
     
@@ -1663,17 +1665,26 @@ static void _init_DMA_buffer()
 
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
+
 #if USE_LRTS_MEMPOOL
 void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
     void *pool;
+    int ret;
 
     int default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
-    pool = memalign(ALIGNBUF, *size);
+    ret = posix_memalign(&pool, ALIGNBUF, *size);
+    if (ret != 0) {
+      printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
+      if (ret == ENOMEM)
+        CmiAbort("alloc_mempool_block: out of memory.");
+      else
+        CmiAbort("alloc_mempool_block: posix_memalign failed");
+    }
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
     if(status != GNI_RC_SUCCESS)
-        printf("!!!!!!!!!!!Please try to use large page + module load craype-hugepages8m+ or contact charm++ developer for help\n");
+        printf("Charm++> Fatal error with registering memory: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.\n");
     GNI_RC_CHECK("Mempool register", status);
     return pool;
 }
@@ -1685,6 +1696,7 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
     free(ptr);
 }
 #endif
+
 void LrtsPreCommonInit(int everReturn){
 #if USE_LRTS_MEMPOOL
     CpvInitialize(mempool_type*, mempool);
@@ -1737,7 +1749,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #else
         printf("Charm++> use Static SMSG\n");
 #endif
-        printf("Charm++> Running on Gemini (GNI) using %d  cores\n", mysize);
+        printf("Charm++> Running on Gemini (GNI) using %d cores\n", mysize);
     }
 #ifdef USE_ONESIDED
     onesided_init(NULL, &onesided_hnd);
@@ -1831,13 +1843,12 @@ void* LrtsAlloc(int n_bytes, int header)
     {
         int totalsize = n_bytes+header;
         ptr = malloc(totalsize);
-    }else 
-    {
-
-        CmiAssert(header <= ALIGNBUF);
+    }
+    else {
+        CmiAssert(header+sizeof(mempool_header) <= ALIGNBUF);
 #if     USE_LRTS_MEMPOOL
         n_bytes = ALIGN64(n_bytes);
-        char *res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes, 1);
+        char *res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes-sizeof(mempool_header), 1);
         ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
 #else
         n_bytes = ALIGN4(n_bytes);           /* make sure size if 4 aligned */
@@ -1863,7 +1874,6 @@ void  LrtsFree(void *msg)
 #endif
 #if     USE_LRTS_MEMPOOL
 #if CMK_SMP
-
         mempool_free_thread((char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));
 #else
         mempool_free(CpvAccess(mempool), (char*)msg + sizeof(CmiChunkHeader) - ALIGNBUF + sizeof(mempool_header));

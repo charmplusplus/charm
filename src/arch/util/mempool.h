@@ -26,12 +26,12 @@ typedef struct mempool_block_t
 
 typedef struct mempool_header
 {
-  int size;
-  mem_handle_t  mem_hndl;
-  size_t            next_free;
 #if CMK_SMP
   void*             pool_addr;
 #endif
+  mem_handle_t  mem_hndl;
+  size_t            next_free;
+  int size;
 } mempool_header;
 
 typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
