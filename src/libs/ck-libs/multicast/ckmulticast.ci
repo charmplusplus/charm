@@ -12,7 +12,8 @@ module CkMulticast {
   
   group [migratable] CkMulticastMgr {
     entry CkMulticastMgr();
-    entry CkMulticastMgr(int factor);
+    entry CkMulticastMgr(unsigned int, unsigned int);
+    entry CkMulticastMgr(int factor, unsigned int, unsigned int);
     // set up
     entry void setup(multicastSetupMsg *);
     entry void recvCookie(CkSectionInfo sid, CkSectionInfo child);

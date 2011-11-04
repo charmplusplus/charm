@@ -21,10 +21,8 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#define SPLIT_MULTICAST  0
-#define SPLIT_SIZE (32768)
+#define SPLIT_MULTICAST  1
 
-#define SPLIT_THRESHOLD (32768)
 // maximum number of fragments into which a message can be broken
 #define MAXFRAGS 100
 
@@ -778,13 +776,13 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   int totalsize = env->getTotalsize();
   int packetSize = 0;
   int totalcount = 0;
-  if(totalsize < SPLIT_THRESHOLD){
+  if(totalsize < split_threshold){
     packetSize = totalsize;
     totalcount = 1;
   }else{
-    packetSize = SPLIT_SIZE;
-    totalcount = totalsize/SPLIT_SIZE;
-    if(totalsize%SPLIT_SIZE) totalcount++; 
+    packetSize = split_size;
+    totalcount = totalsize/split_size;
+    if(totalsize%split_size) totalcount++; 
     //packetSize = totalsize/SPLIT_NUM;
     //if (totalsize%SPLIT_NUM) packetSize ++;
     //totalcount = SPLIT_NUM;
