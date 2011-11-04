@@ -3,7 +3,7 @@
 
 #include "MeshStreamer.decl.h"
 
-// allocate more total buffer space then the maximum buffering limit but flush upon
+// allocate more total buffer space than the maximum buffering limit but flush upon
 // reaching totalBufferCapacity_
 #define BUCKET_SIZE_FACTOR 4
 
@@ -88,7 +88,11 @@ private:
     int myRowIndex_;
 
     CkCallback   userCallback_;
-    int yield_flag_;
+    int yieldFlag_;
+
+    int progressPeriodInMs_; 
+    bool isPeriodicFlushEnabled_; 
+    double timeOfLastSend_; 
 
     MeshStreamerMessage<dtype> **personalizedBuffers_; 
     MeshStreamerMessage<dtype> **columnBuffers_; 
@@ -106,27 +110,37 @@ private:
     void flushLargestBucket(MeshStreamerMessage<dtype> ** const messageBuffers,
 			    const int numBuffers, const int myIndex, 
 			    const int dimensionFactor);
+
 public:
 
     MeshStreamer(int totalBufferCapacity, int numRows, 
 		 int numColumns, int numPlanes, 
 		 const CProxy_MeshStreamerClient<dtype> &clientProxy,
-                 int yield_flag = 0);
+                 int yieldFlag = 0, int progressPeriodInMs = -1);
     ~MeshStreamer();
 
       // entry
     void insertData(const dtype &dataItem, const int destinationPe); 
+    void doneInserting();
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     // void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
 
     void flushBuckets(MeshStreamerMessage<dtype> **messageBuffers, const int numBuffers);
     void flushDirect();
 
+    bool isPeriodicFlushEnabled() {
+      return isPeriodicFlushEnabled_;
+    }
       // non entry
-    void associateCallback(CkCallback &cb) { 
-              userCallback_ = cb;
-              CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::flushDirect(), thisProxy));
-         }
+    void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
+      userCallback_ = cb;
+      if (automaticFinish) {
+	CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+      }
+    }
+
+    void registerPeriodicProgressFunction();
+    void finish(CkReductionMsg *msg);
 };
 
 template <class dtype>
@@ -142,7 +156,7 @@ template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows, 
                            int numColumns, int numPlanes, 
                            const CProxy_MeshStreamerClient<dtype> &clientProxy,
-                           int yield_flag): yield_flag_(yield_flag) {
+			   int yieldFlag, int progressPeriodInMs): yieldFlag_(yieldFlag) {
   // limit total number of messages in system to totalBufferCapacity
   //   but allocate a factor BUCKET_SIZE_FACTOR more space to take
   //   advantage of nonuniform filling of buckets
@@ -156,6 +170,7 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   numNodes_ = CkNumPes(); 
   clientProxy_ = clientProxy; 
   clientObj_ = ((MeshStreamerClient<dtype> *)CkLocalBranch(clientProxy_));
+  progressPeriodInMs_ = progressPeriodInMs; 
 
   personalizedBuffers_ = new MeshStreamerMessage<dtype> *[numRows];
   for (int i = 0; i < numRows; i++) {
@@ -179,6 +194,14 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   int indexWithinPlane = myNodeIndex_ - myPlaneIndex_ * planeSize_;
   myRowIndex_ = indexWithinPlane / numColumns_;
   myColumnIndex_ = indexWithinPlane - myRowIndex_ * numColumns_; 
+
+  if (progressPeriodInMs_ > 0) {
+    isPeriodicFlushEnabled_ = true; 
+    registerPeriodicProgressFunction();
+  }
+  else {
+    isPeriodicFlushEnabled_ = false; 
+  }
 
 }
 
@@ -282,6 +305,11 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
     }
     messageBuffers[bucketIndex] = NULL;
     numDataItemsBuffered_ -= numBuffered; 
+
+    if (isPeriodicFlushEnabled_) {
+      timeOfLastSend_ = CkWallTimer();
+    }
+
   }
 
   if (numDataItemsBuffered_ == totalBufferCapacity_) {
@@ -289,6 +317,10 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
     flushLargestBucket(personalizedBuffers_, numRows_, myRowIndex_, numColumns_);
     flushLargestBucket(columnBuffers_, numColumns_, myColumnIndex_, 1);
     flushLargestBucket(planeBuffers_, numPlanes_, myPlaneIndex_, planeSize_);
+
+    if (isPeriodicFlushEnabled_) {
+      timeOfLastSend_ = CkWallTimer();
+    }
 
   }
 
@@ -334,9 +366,30 @@ void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinatio
   storeMessage(messageBuffers, bucketIndex, destinationPe, rowIndex, 
                columnIndex, planeIndex, msgType, dataItem);
 
-    // release control to scheduler, assume caller is threaded entry
-  if (yield_flag_ && ++count % 1024 == 0) CthYield();
+    // release control to scheduler if requested by the user, 
+    //   assume caller is threaded entry
+  if (yieldFlag_ && ++count % 1024 == 0) CthYield();
 }
+
+template <class dtype>
+void MeshStreamer<dtype>::doneInserting() {
+  contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL)), thisProxy);
+}
+
+template <class dtype>
+void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
+
+  isPeriodicFlushEnabled_ = false; 
+  flushDirect();
+
+  if (!userCallback_.isInvalid()) {
+    CkStartQD(userCallback_);
+    userCallback_ = CkCallback();      // nullify the current callback
+  }
+
+  delete msg; 
+}
+
 
 template <class dtype>
 void MeshStreamer<dtype>::receiveAggregateData(MeshStreamerMessage<dtype> *msg) {
@@ -488,20 +541,42 @@ void MeshStreamer<dtype>::flushBuckets(MeshStreamerMessage<dtype> **messageBuffe
 
 template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
-    flushBuckets(planeBuffers_, numPlanes_);
-    flushBuckets(columnBuffers_, numColumns_);
-    flushBuckets(personalizedBuffers_, numRows_);
+
+    if (!isPeriodicFlushEnabled_ || 
+	CkWallTimer() - timeOfLastSend_ >= progressPeriodInMs_) {
+      flushBuckets(planeBuffers_, numPlanes_);
+      flushBuckets(columnBuffers_, numColumns_);
+      flushBuckets(personalizedBuffers_, numRows_);
+    }
+
+    if (isPeriodicFlushEnabled_) {
+      timeOfLastSend_ = CkWallTimer();
+    }
 
 #ifdef DEBUG_STREAMER
     //CkPrintf("[%d] numDataItemsBuffered_: %d\n", CkMyPe(), numDataItemsBuffered_);
     CkAssert(numDataItemsBuffered_ == 0); 
 #endif
 
-    if (!userCallback_.isInvalid()) {
-        CkStartQD(userCallback_);
-        userCallback_ = CkCallback();      // nullify the current callback
-    }
 }
+
+template <class dtype>
+void periodicProgressFunction(void *MeshStreamerObj, double time) {
+
+  MeshStreamer<dtype> *properObj = 
+    static_cast<MeshStreamer<dtype>*>(MeshStreamerObj); 
+
+  if (properObj->isPeriodicFlushEnabled()) {
+    properObj->flushDirect();
+    properObj->registerPeriodicProgressFunction();
+  }
+}
+
+template <class dtype>
+void MeshStreamer<dtype>::registerPeriodicProgressFunction() {
+  CcdCallFnAfter(periodicProgressFunction<dtype>, (void *) this, progressPeriodInMs_); 
+}
+
 
 #define CK_TEMPLATES_ONLY
 #include "MeshStreamer.def.h"
