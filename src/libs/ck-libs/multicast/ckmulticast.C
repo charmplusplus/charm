@@ -716,20 +716,17 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsi
 
 void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts)
 {
-            DEBUGF(("ArraySectionSend\n"));
-
+  DEBUGF(("ArraySectionSend\n"));
   multicastGrpMsg *msg = (multicastGrpMsg *)m;
-//  msg->aid = a;
   msg->ep = ep;
-
   CkSectionInfo &s = sid->_cookie;
-
   mCastEntry *entry;
+
+  // If this section is rooted at this PE
   if (s.get_pe() == CkMyPe()) {
     entry = (mCastEntry *)s.get_val();   
-    if (entry == NULL) {
+    if (NULL == entry)
       CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
-    }
 
     // update entry pointer in case there is a newer one.
     if (entry->newc) {
@@ -744,26 +741,21 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
 #endif
 
-    // first time need to rebuild, we do simple send to refresh lastKnown
+    // The first time we need to rebuild the spanning tree, we do p2p sends to refresh lastKnown
     if (entry->needRebuild == 1) {
       msg->_cookie = s;
       SimpleSend(ep, msg, s.get_aid(), *sid, opts);
       entry->needRebuild = 2;
       return;
     }
+    // else the second time, we just rebuild cos now we'll have all the lastKnown PEs
     else if (entry->needRebuild == 2) rebuild(s);
   }
+  // else, if the root has migrated, we have a sub-optimal mcast
   else {
     // fixme - in this case, not recorded in LB
     CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
   }
-
-  // don't need packing here
-/*
-  register envelope *env = UsrToEnv(m);
-  CkPackMessage(&env);
-  m = EnvToUsr(env);
-*/
 
   // update cookie
   msg->_cookie = s;
@@ -790,11 +782,13 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   int sizesofar = 0;
   char *data = (char*) env;
   if (totalcount == 1) {
+    // If the root of this section's tree is on this PE, then just propagate msg
     if (s.get_pe() == CkMyPe()) {
       CkUnpackMessage(&env);
       msg = (multicastGrpMsg *)EnvToUsr(env);
       recvMsg(msg);
     }
+    // else send msg to root of section's spanning tree
     else {
       CProxy_CkMulticastMgr  mCastGrp(thisgroup);
       msg = (multicastGrpMsg *)EnvToUsr(env);
