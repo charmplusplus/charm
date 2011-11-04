@@ -53,7 +53,7 @@ namespace Ck { namespace IO {
   
   struct buffer
   {
-    vector<char> array;
+    std::vector<char> array;
     int bytes_filled_so_far;
     
     buffer()
@@ -70,7 +70,7 @@ namespace Ck { namespace IO {
     size_t bytes, total_written;
     int fd;
     CkCallback complete;
-    map<size_t, struct buffer> bufferMap;
+    std::map<size_t, struct buffer> bufferMap;
 
     FileInfo(std::string name_, size_t bytes_, Options opts_)
     : name(name_), opts(opts_), bytes(bytes_), total_written(0), fd(-1)

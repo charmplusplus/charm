@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <algorithm>
 
+
 namespace Ck { namespace IO {
     Manager::Manager() : nextToken(0) {
       __sdag_init();
@@ -39,13 +40,14 @@ namespace Ck { namespace IO {
       if(files[token].bufferMap.find((offset/stripeSize)*stripeSize) == files[token].bufferMap.end())
       {
 	struct buffer b;
-	files[token].bufferMap.insert(pair<((offset/stripeSize)*stripeSize),b>);
+	std::pair <size_t,buffer> pr (((offset/stripeSize)*stripeSize),b);
+	files[token].bufferMap.insert(pr);
 	files[token].bufferMap[(offset/stripeSize)*stripeSize].array.resize(stripeSize);
       }
      
     //write to buffer
     int current_index = 0;
-    vector<char>::iterator it = files[token].bufferMap[(offset/stripeSize)*stripeSize].array.begin();
+    std::vector<char>::iterator it = files[token].bufferMap[(offset/stripeSize)*stripeSize].array.begin();
     it = it + (offset%stripeSize);
     
     copy(data, data + bytes, it);
@@ -74,7 +76,7 @@ namespace Ck { namespace IO {
 	offset += ret;
       }
       //write complete - remove this element from bufferMap and call dataWritten
-      files[token].bufferMap.erase[(offset/stripeSize)*stripeSize];
+      files[token].bufferMap.erase((offset/stripeSize)*stripeSize);
       thisProxy[0].write_dataWritten(token, bytes);
     }
 
