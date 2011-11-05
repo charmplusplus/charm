@@ -1738,7 +1738,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
 #if CMK_SMP && STEAL_MEMPOOL
     if (ret != 0) {
       pool = steal_mempool_block(size, mem_hndl, expand_flag);
-      if (pool != NULL) ret = 0;
+      if (pool != NULL) return pool;
     }
 #endif
     if (ret != 0) {
