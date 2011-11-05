@@ -1717,7 +1717,6 @@ printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNod
           CmiUnlock(mptr->mempoolLock);
           *mem_hndl = tail->mem_hndl;
           *size = tail->size;
-          memset(pool,0,*size);
           return pool;
         }
         CmiUnlock(mptr->mempoolLock);
