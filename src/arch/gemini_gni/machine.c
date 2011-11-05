@@ -1671,36 +1671,36 @@ static void _init_DMA_buffer()
 }
 
 #if CMK_SMP && STEAL_MEMPOOL
-void *steal_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
+void *steal_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl)
 {
     void *pool = NULL;
-    if (expand_flag) {
-      int i, k;
-      // check other ranks
-      for (k=0; k<CmiMyNodeSize()+1; k++) {
+    int i, k;
+    // check other ranks
+    for (k=0; k<CmiMyNodeSize()+1; k++) {
         i = (CmiMyRank()+k)%CmiMyNodeSize();
         if (i==CmiMyRank()) continue;
         mempool_type *mptr = CpvAccessOther(mempool, i);
         CmiLock(mptr->mempoolLock);
         mempool_block *tail =  (mempool_block *)((char*)mptr + mptr->memblock_tail);
-        if ((char*)tail == (char*)mptr) { 
+        if ((char*)tail == (char*)mptr) {     /* this is the only memblock */
             CmiUnlock(mptr->mempoolLock);
-            continue;     // only one
+            continue;
         }
         mempool_header *header = (mempool_header*)((char*)tail + sizeof(mempool_block));
         if (header->size >= *size && header->size == tail->size - sizeof(mempool_block)) {
-            // locate from the free list
+            /* search in the free list */
           mempool_header *free_header = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
           mempool_header *current = free_header;
           while (current) {
             if (current->next_free == (char*)header-(char*)mptr) break;
             current = current->next_free?(mempool_header*)((char*)mptr + current->next_free):NULL;
           }
-          if (current == NULL) {
+          if (current == NULL) {         /* not found in free list */
             CmiUnlock(mptr->mempoolLock);
             continue;
           }
 printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, tail, header->size, tail->size, sizeof(mempool_block));
+            /* search the previous memblock, and remove the tail */
           mempool_block *ptr = (mempool_block *)mptr;
           while (ptr) {
             if (ptr->memblock_next == mptr->memblock_tail) break;
@@ -1710,17 +1710,18 @@ printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNod
           ptr->memblock_next = 0;
           mptr->memblock_tail = (char*)ptr - (char*)mptr;
 
-            // remove from free list
+            /* remove memblock from the free list */
           current->next_free = header->next_free;
           if (header == free_header) mptr->freelist_head = header->next_free;
-          pool = (void*)tail;
+
           CmiUnlock(mptr->mempoolLock);
+
+          pool = (void*)tail;
           *mem_hndl = tail->mem_hndl;
           *size = tail->size;
           return pool;
         }
         CmiUnlock(mptr->mempoolLock);
-      }
     }
     return pool;
 }
@@ -1735,13 +1736,11 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     int default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
     ret = posix_memalign(&pool, ALIGNBUF, *size);
+    if (ret != 0) {
 #if CMK_SMP && STEAL_MEMPOOL
-    if (ret != 0) {
-      pool = steal_mempool_block(size, mem_hndl, expand_flag);
+      pool = steal_mempool_block(size, mem_hndl);
       if (pool != NULL) return pool;
-    }
 #endif
-    if (ret != 0) {
       printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
       if (ret == ENOMEM)
         CmiAbort("alloc_mempool_block: out of memory.");
@@ -1750,9 +1749,9 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     }
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
 #if CMK_SMP && STEAL_MEMPOOL
-    if(status != GNI_RC_SUCCESS) {
+    if(expand_flag && status != GNI_RC_SUCCESS) {
       free(pool);
-      pool = steal_mempool_block(size, mem_hndl, expand_flag);
+      pool = steal_mempool_block(size, mem_hndl);
       if (pool != NULL) status = GNI_RC_SUCCESS;
     }
 #endif
