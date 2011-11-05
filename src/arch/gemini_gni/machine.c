@@ -36,10 +36,14 @@ static void sleep(int secs) {
 #endif
 
 
-#define REMOTE_EVENT         0
-#define USE_LRTS_MEMPOOL     1
+#define REMOTE_EVENT                      0
+#define USE_LRTS_MEMPOOL                  1
 
 #if USE_LRTS_MEMPOOL
+#if CMK_SMP
+#define STEAL_MEMPOOL                      0
+#endif
+
 #define oneMB (1024ll*1024)
 #if CMK_SMP
 static CmiInt8 _mempool_size = 32*oneMB;
@@ -1666,6 +1670,63 @@ static void _init_DMA_buffer()
     allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
+#if CMK_SMP && STEAL_MEMPOOL
+void *steal_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
+{
+    void *pool = NULL;
+    if (expand_flag) {
+      int i, k;
+      // check other ranks
+      for (k=0; k<CmiMyNodeSize()+1; k++) {
+        i = (CmiMyRank()+k)%CmiMyNodeSize();
+        if (i==CmiMyRank()) continue;
+        mempool_type *mptr = CpvAccessOther(mempool, i);
+        CmiLock(mptr->mempoolLock);
+        mempool_block *tail =  (mempool_block *)((char*)mptr + mptr->memblock_tail);
+        if ((char*)tail == (char*)mptr) { 
+            CmiUnlock(mptr->mempoolLock);
+            continue;     // only one
+        }
+        mempool_header *header = (mempool_header*)((char*)tail + sizeof(mempool_block));
+        if (header->size >= *size && header->size == tail->size - sizeof(mempool_block)) {
+            // locate from the free list
+          mempool_header *free_header = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
+          mempool_header *current = free_header;
+          while (current) {
+            if (current->next_free == (char*)header-(char*)mptr) break;
+            current = current->next_free?(mempool_header*)((char*)mptr + current->next_free):NULL;
+          }
+          if (current == NULL) {
+            CmiUnlock(mptr->mempoolLock);
+            continue;
+          }
+printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, tail, header->size, tail->size, sizeof(mempool_block));
+          mempool_block *ptr = (mempool_block *)mptr;
+          while (ptr) {
+            if (ptr->memblock_next == mptr->memblock_tail) break;
+            ptr = ptr->memblock_next?(mempool_block *)((char*)mptr + ptr->memblock_next):NULL;
+          }
+          CmiAssert(ptr!=NULL);
+          ptr->memblock_next = 0;
+          mptr->memblock_tail = (char*)ptr - (char*)mptr;
+
+            // remove from free list
+          current->next_free = header->next_free;
+          if (header == free_header) mptr->freelist_head = header->next_free;
+          pool = (void*)tail;
+          CmiUnlock(mptr->mempoolLock);
+          *mem_hndl = tail->mem_hndl;
+          *size = tail->size;
+          memset(pool,0,*size);
+          return pool;
+        }
+        CmiUnlock(mptr->mempoolLock);
+      }
+    }
+    return pool;
+}
+#endif
+
 #if USE_LRTS_MEMPOOL
 void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
@@ -1675,6 +1736,12 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     int default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
     ret = posix_memalign(&pool, ALIGNBUF, *size);
+#if CMK_SMP && STEAL_MEMPOOL
+    if (ret != 0) {
+      pool = steal_mempool_block(size, mem_hndl, expand_flag);
+      if (pool != NULL) ret = 0;
+    }
+#endif
     if (ret != 0) {
       printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
       if (ret == ENOMEM)
@@ -1683,6 +1750,13 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
         CmiAbort("alloc_mempool_block: posix_memalign failed");
     }
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
+#if CMK_SMP && STEAL_MEMPOOL
+    if(status != GNI_RC_SUCCESS) {
+      free(pool);
+      pool = steal_mempool_block(size, mem_hndl, expand_flag);
+      if (pool != NULL) status = GNI_RC_SUCCESS;
+    }
+#endif
     if(status != GNI_RC_SUCCESS)
         printf("Charm++> Fatal error with registering memory: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.\n");
     GNI_RC_CHECK("Mempool register", status);
