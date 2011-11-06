@@ -101,7 +101,7 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     std::vector<int>& min_pe_heap, std::vector<int>* pe_obj, int max_pe,
     double avg_load, double threshold) {
 
-  cout << "Picked max pe " << max_pe << " (" << parr->procs[max_pe].getTotalLoad() << ")" << endl;
+  //cout << "Picked max pe " << max_pe << " (" << parr->procs[max_pe].getTotalLoad() << ")" << endl;
   int best_p, best_p_iter, arr_index;
   bool allocated = false;
   int pe_considered;
@@ -136,10 +136,10 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     addObjToProc(parr, ogr, pe_obj, best_p, best_obj);
     removeObjFromProc(parr, ogr, pe_obj, max_pe, arr_index);
 
-    std::cout << " Moving obj " << best_obj << " (" <<
-      ogr->vertices[best_obj].getVertexLoad() << ") from " << max_pe << " to " <<
-      best_p << " New load " << max_pe << ":" << parr->procs[max_pe].getTotalLoad()
-      << " " << best_p << ":" << parr->procs[best_p].getTotalLoad()<< std::endl; 
+   // std::cout << " Moving obj " << best_obj << " (" <<
+   //   ogr->vertices[best_obj].getVertexLoad() << ") from " << max_pe << " to " <<
+   //   best_p << " New load " << max_pe << ":" << parr->procs[max_pe].getTotalLoad()
+   //   << " " << best_p << ":" << parr->procs[best_p].getTotalLoad()<< std::endl; 
 
     // Update the max heap and min list
     if (parr->procs[max_pe].getTotalLoad() > (avg_load + threshold)) {
@@ -160,51 +160,25 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
   return allocated;
 }
 
-bool refineSwap(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap, 
-    std::vector<int>& min_pe_heap, std::vector<int>* pe_obj, int max_pe,
+bool IsSwapPossWithPe(ProcArray* parr, ObjGraph* ogr, std::vector<int>* pe_obj,
+    std::vector<int>& max_pe_heap, std::vector<int>& min_pe_heap,
+    int max_pe, int pe_considered, int pe_cons_iter, double diff,
     double avg_load, double threshold) {
-
-  double diff = 0;
-  bool is_possible = false;
-  int pe_considered;
-  int pe_cons_iter;
-  for (int i = 0; i < min_pe_heap.size(); i++) {
-    pe_considered = min_pe_heap[i];
-    pe_cons_iter = i;
-    std::sort(pe_obj[pe_considered].begin(), pe_obj[pe_considered].end(), ObjLoadGreater(ogr));
-    diff = avg_load - parr->procs[pe_considered].getTotalLoad();
-    int pe_cons_max = pe_obj[pe_considered][pe_obj[pe_considered].size() - 1];
-
-      CkPrintf("Checking to swap maxload pe %d (%d) with minpe %d (%d) + diff %lf \n",
-            max_pe, pe_obj[max_pe][0], pe_considered, pe_cons_max, diff);
-
-    if (ogr->vertices[pe_cons_max].getVertexLoad() <
-        ogr->vertices[pe_obj[max_pe][0]].getVertexLoad()) {
-      if ((diff + ogr->vertices[pe_cons_max].getVertexLoad()) >
-          ogr->vertices[pe_obj[max_pe][0]].getVertexLoad()) {
-        CkPrintf("Possible to swap maxload pe %d (%d) with minpe %d (%d) + diff %lf \n",
-            max_pe, pe_obj[max_pe][0], pe_considered, pe_cons_max, diff);
-        is_possible = true;
-        break;
-      }
-    }
-  }
-
-  if (!is_possible) {
-    return false;
-  }
 
   bool set = false;
   for (int i = pe_obj[max_pe].size() - 1; i >= 0; i--) {
     for (int j = 0; j < pe_obj[pe_considered].size(); j++) {
       int pe_cons = pe_obj[pe_considered][j];
       int max_pe_obj = pe_obj[max_pe][i];
+     // CkPrintf("\tCandidates %d(%lf) with %d(%lf) : diff (%lf)\n", max_pe_obj,
+     //     ogr->vertices[max_pe_obj].getVertexLoad(), pe_cons,
+     //     ogr->vertices[pe_cons].getVertexLoad(), diff);
 
       if (ogr->vertices[pe_cons].getVertexLoad() <
           ogr->vertices[max_pe_obj].getVertexLoad()) {
         if ((diff + ogr->vertices[pe_cons].getVertexLoad()) >
             ogr->vertices[max_pe_obj].getVertexLoad()) {
-          CkPrintf("\tSwapping %d with %d\n", max_pe_obj, pe_cons);
+          //CkPrintf("\tSwapping %d with %d\n", max_pe_obj, pe_cons);
           set = true;
 
           addObjToProc(parr, ogr, pe_obj, pe_considered, max_pe_obj);
@@ -232,12 +206,42 @@ bool refineSwap(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
         }
       }
     }
+
     if (set) {
       break;
     }
   }
-  return true;
+  return set;
+}
 
+bool refineSwap(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap, 
+    std::vector<int>& min_pe_heap, std::vector<int>* pe_obj, int max_pe,
+    double avg_load, double threshold) {
+
+  double diff = 0;
+  bool is_possible = false;
+  int pe_considered;
+  int pe_cons_iter;
+  for (int i = 0; i < min_pe_heap.size(); i++) {
+    pe_considered = min_pe_heap[i];
+    pe_cons_iter = i;
+    std::sort(pe_obj[pe_considered].begin(), pe_obj[pe_considered].end(), ObjLoadGreater(ogr));
+    diff = avg_load - parr->procs[pe_considered].getTotalLoad();
+
+//    CkPrintf("Checking to swap maxload pe %d  with minpe %d  + diff %lf \n",
+//        max_pe, pe_considered, diff);
+    is_possible = IsSwapPossWithPe(parr, ogr, pe_obj, max_pe_heap, min_pe_heap, max_pe,
+        pe_considered, pe_cons_iter, diff, avg_load, threshold); 
+    if (is_possible) {
+      break;
+    }
+  }
+
+  if (!is_possible) {
+    return false;
+  }
+
+  return true;
 }
 
 void RefineSwapLB::work(LDStats* stats)
@@ -267,16 +271,16 @@ void RefineSwapLB::work(LDStats* stats)
 
 
   // Create a datastructure to store the objects in a processor
-  CkPrintf("Object load\n");
+//  CkPrintf("Object load\n");
   for (int i = 0; i < ogr->vertices.size(); i++) {
     pe_obj[ogr->vertices[i].getCurrentPe()].push_back(i);
-    CkPrintf("%d pe %d: %lf\n", i, ogr->vertices[i].getCurrentPe(), ogr->vertices[i].getVertexLoad());
+//    CkPrintf("%d pe %d: %lf\n", i, ogr->vertices[i].getCurrentPe(), ogr->vertices[i].getVertexLoad());
   }
 
   // Construct max heap of overloaded processors and min heap of underloaded
   // processors.
   for (int i = 0; i < parr->procs.size(); i++) {
-    CkPrintf("%d : %lf\n", i, parr->procs[i].getTotalLoad());
+    //CkPrintf("%d : %lf\n", i, parr->procs[i].getTotalLoad());
     if (parr->procs[i].getTotalLoad() > upper_bound_load) {
       max_pe_heap.push_back(i);
     } else if (parr->procs[i].getTotalLoad() < lower_bound_load) {
@@ -306,20 +310,20 @@ void RefineSwapLB::work(LDStats* stats)
     }
   }
 
-  std::cout << "Overloaded Processor load"<< endl;
+  //std::cout << "Overloaded Processor load " << avg_load << endl;
   for (int p_index = 0; p_index < max_pe_heap.size(); p_index++) {
-    std::cout << max_pe_heap[p_index] << ": " << parr->procs[max_pe_heap[p_index]].getTotalLoad() << std::endl;
+    //std::cout << max_pe_heap[p_index] << ": " << parr->procs[max_pe_heap[p_index]].getTotalLoad() << std::endl;
   }
 
-  std::cout << "Underloaded Processor load"<< endl;
+  //std::cout << "Underloaded Processor load"<< endl;
   for (int p_index = 0; p_index < min_pe_heap.size(); p_index++) {
-    std::cout << min_pe_heap[p_index] << ": " << parr->procs[min_pe_heap[p_index]].getTotalLoad() << std::endl;
+    //std::cout << min_pe_heap[p_index] << ": " << parr->procs[min_pe_heap[p_index]].getTotalLoad() << std::endl;
   }
 
 
-  std::cout << "Processor load"<< endl;
+  //std::cout << "Processor load"<< endl;
   for (int i = 0; i < parr->procs.size(); i++) {
-    CkPrintf("%d : %lf\n", i, parr->procs[i].getTotalLoad());
+    //CkPrintf("%d : %lf\n", i, parr->procs[i].getTotalLoad());
   }
 
   /** ============================== CLEANUP ================================ */
