@@ -41,7 +41,7 @@ static void sleep(int secs) {
 
 #if USE_LRTS_MEMPOOL
 #if CMK_SMP
-#define STEAL_MEMPOOL                      0
+#define STEAL_MEMPOOL                     0
 #endif
 
 #define oneMB (1024ll*1024)
@@ -785,6 +785,7 @@ static int send_medium_messages(int destNode, int size, char *msg)
     }
 #endif
 }
+
 inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
 {
     /* construct a control message and send */
@@ -801,6 +802,7 @@ inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
 #endif
     return control_msg_tmp;
 }
+
 // Large message, send control to receiver, receiver register memory and do a GET 
 inline
 static void send_large_messages(int destNode, int size, char *msg)
@@ -1258,6 +1260,7 @@ static void PumpLocalRdmaTransactions()
         }
     } //end while
 }
+
 #if DYNAMIC_SMSG
 static void SendSmsgConnectMsg()
 {
@@ -1723,7 +1726,73 @@ printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNod
         }
         CmiUnlock(mptr->mempoolLock);
     }
-    return pool;
+
+      /* steal failed, deregister and free memblock now */
+    int ret = posix_memalign(&pool, ALIGNBUF, *size);
+    CmiAssert(ret == 0);
+    int freed = 0;
+    for (k=0; k<CmiMyNodeSize()+1; k++) {
+        i = (CmiMyRank()+k)%CmiMyNodeSize();
+        mempool_type *mptr = CpvAccessOther(mempool, i);
+        if (i!=CmiMyRank()) CmiLock(mptr->mempoolLock);
+
+        mempool_block *mempools_head = &(mptr->mempools_head);
+        mempool_block *current = mempools_head;
+        mempool_block *prev = NULL;
+
+        while (current) {
+          int isfree = 0;
+          mempool_header *free_header = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
+printf("[%d:%d:%d] checking rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, current, current->size, *size);
+          mempool_header *cur = free_header;
+          mempool_header *header;
+          if (current != mempools_head) {
+            header = (mempool_header*)((char*)current + sizeof(mempool_block));
+             /* search in free list */
+            if (header->size == current->size - sizeof(mempool_block)) {
+              cur = free_header;
+              while (cur) {
+                if (cur->next_free == (char*)header-(char*)mptr) break;
+                cur = cur->next_free?(mempool_header*)((char*)mptr + cur->next_free):NULL;
+              }
+              if (cur != NULL) isfree = 1;
+            }
+          }
+          if (isfree) {
+              /* remove from free list */
+            cur->next_free = header->next_free;
+            if (header == free_header) mptr->freelist_head = header->next_free;
+             // deregister
+            gni_return_t status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &current->mem_hndl, &omdh);
+            GNI_RC_CHECK("Mempool de-register", status);
+            mempool_block *ptr = current;
+            current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
+            prev->memblock_next = current?(char*)current - (char*)mptr:0;
+printf("[%d:%d:%d] free rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, ptr, ptr->size, *size);
+            freed += ptr->size;
+            free(ptr);
+             // try now
+            if (freed > *size) {
+              status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
+              if (status == GNI_RC_SUCCESS) {
+                if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
+printf("[%d:%d:%d] GOT IT rank: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, *size);
+                return pool;
+              }
+printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, *size, status);
+            }
+          }
+          else {
+             prev = current;
+             current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
+          }
+        }
+
+        if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
+    }
+      /* still no luck registering pool */
+    free(pool);
+    return NULL;
 }
 #endif
 
@@ -1756,7 +1825,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     }
 #endif
     if(status != GNI_RC_SUCCESS)
-        printf("Charm++> Fatal error with registering memory: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.\n");
+        printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.\n", CmiMyPe(), *size);
     GNI_RC_CHECK("Mempool register", status);
     return pool;
 }
