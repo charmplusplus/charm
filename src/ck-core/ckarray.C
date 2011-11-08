@@ -1036,6 +1036,7 @@ void CkArray::insertInitial(const CkArrayIndex &idx,void *ctorMsg, int local)
 inline void msg_prepareSend(CkArrayMessage *msg, int ep,CkArrayID aid)
 {
 	envelope *env=UsrToEnv((void *)msg);
+        env->setMsgtype(ForArrayEltMsg);
 	env->getsetArrayMgr()=aid;
 	env->getsetArraySrcPe()=CkMyPe();
 #if CMK_SMP_TRACE_COMMTHREAD

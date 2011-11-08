@@ -38,10 +38,12 @@ void* CkAllocBuffer(void *msg, int bufsize)
                       env->getPriobits());
   
   register int size = packbuf->getTotalsize();
+  register int extrasize = packbuf->getExtrasize();
   CmiMemcpy(packbuf, env, sizeof(envelope));
   packbuf->setTotalsize(size);
   packbuf->setPacked(!env->isPacked());
   CmiMemcpy(packbuf->getPrioPtr(), env->getPrioPtr(), packbuf->getPrioBytes());
+  CmiMemcpy(packbuf->extraData(), env->extraData(), extrasize);
 
   return EnvToUsr(packbuf);;
 }
@@ -68,7 +70,8 @@ void* CkCopyMsg(void **pMsg)
   register int size = UsrToEnv(srcMsg)->getTotalsize();
   register envelope *newenv = (envelope *) CmiAlloc(size);
   CmiMemcpy(newenv, UsrToEnv(srcMsg), size);
-  //memcpy(newenv, UsrToEnv(srcMsg), size);
+  CmiMemcpy(newenv->extraData(), UsrToEnv(srcMsg)->extraData(), newenv->getExtrasize());
+
   if(UsrToEnv(srcMsg)->isPacked() && _msgTable[msgidx]->unpack) {
     srcMsg = _msgTable[msgidx]->unpack(srcMsg);
     UsrToEnv(srcMsg)->setPacked(0);

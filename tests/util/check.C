@@ -78,6 +78,10 @@ void check_test(int argc, char** argv) {
 #endif
 
   CmiPrintf("Info: converse header: %d envelope: %d\n", CmiReservedHeaderSize, sizeof(envelope));
+  if (sizeof(envelope) % 8 != 0) {
+    CmiPrintf("Error: size of envelope can not divide 8. \n");
+    exit(1);
+  }
   CmiPrintf("All tests passed\n");
 }
 
