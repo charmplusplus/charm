@@ -46,11 +46,11 @@ static void sleep(int secs) {
 
 #define oneMB (1024ll*1024)
 #if CMK_SMP
-static CmiInt8 _mempool_size = 32*oneMB;
+static CmiInt8 _mempool_size = 4*oneMB;
 #else
 static CmiInt8 _mempool_size = 32*oneMB;
 #endif
-static CmiInt8 _expand_mem =  16*oneMB;
+static CmiInt8 _expand_mem =  1*oneMB;
 #endif
 
 #define PRINT_SYH  0
@@ -105,11 +105,11 @@ uint8_t   onesided_hnd, omdh;
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
-//#define BIG_MSG       8*oneMB
-//#define ONE_SEG       8*oneMB
+#define BIG_MSG       1*oneMB
+#define ONE_SEG       1*oneMB
 
-#define BIG_MSG        65536 
-#define ONE_SEG        16384
+//#define BIG_MSG        65536 
+//#define ONE_SEG        16384
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
@@ -1896,7 +1896,8 @@ printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(),
     return NULL;
 }
 #endif
-
+static long long int total_mempool_size = 0;
+static long long int total_mempool_calls = 0;
 #if USE_LRTS_MEMPOOL
 void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
@@ -1905,6 +1906,8 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
 
     int default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
+    total_mempool_size += *size;
+    total_mempool_calls += 1;
     ret = posix_memalign(&pool, ALIGNBUF, *size);
     if (ret != 0) {
 #if CMK_SMP && STEAL_MEMPOOL
@@ -1926,7 +1929,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     }
 #endif
     if(status != GNI_RC_SUCCESS)
-        printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.\n", CmiMyPe(), *size);
+        printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     GNI_RC_CHECK("Mempool register", status);
     return pool;
 }
