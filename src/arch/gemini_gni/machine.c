@@ -885,9 +885,9 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
+    CONTROL_MSG         *control_msg_tmp;
     LrtsPrepareEnvelope(msg, size);
 #if CMK_SMP
-    CONTROL_MSG         *control_msg_tmp;
 #if COMM_THREAD_SEND
     if(size <= SMSG_MAX_MSG)
         buffer_small_msgs(msg, size, destNode, SMALL_DATA_TAG);
@@ -1127,13 +1127,13 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         transaction_size = ALIGN64(size);
     }
     else{
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, size, &msg_mem_hndl, &omdh);
+        transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &msg_mem_hndl, &omdh);
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
         }
         pd->first_operand = size;
-        transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
     }
 
     if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
