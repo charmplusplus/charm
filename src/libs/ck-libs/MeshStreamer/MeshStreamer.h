@@ -400,7 +400,7 @@ void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinatio
 
 template <class dtype>
 void MeshStreamer<dtype>::doneInserting() {
-  contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL)), thisProxy);
+  contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
 }
 
 template <class dtype>

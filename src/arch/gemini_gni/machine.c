@@ -46,12 +46,15 @@ static void sleep(int secs) {
 
 #define oneMB (1024ll*1024)
 #if CMK_SMP
-static CmiInt8 _mempool_size = 4*oneMB;
+static CmiInt8 _mempool_size = 8*oneMB;
 #else
 static CmiInt8 _mempool_size = 32*oneMB;
 #endif
-static CmiInt8 _expand_mem =  1*oneMB;
+static CmiInt8 _expand_mem =  4*oneMB;
 #endif
+
+#define BIG_MSG       4*oneMB
+#define ONE_SEG       8*oneMB
 
 #define PRINT_SYH  0
 #if CMK_SMP
@@ -105,11 +108,7 @@ uint8_t   onesided_hnd, omdh;
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
-#define BIG_MSG       1*oneMB
-#define ONE_SEG       1*oneMB
 
-//#define BIG_MSG        65536 
-//#define ONE_SEG        16384
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
@@ -885,9 +884,9 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
+    CONTROL_MSG         *control_msg_tmp;
     LrtsPrepareEnvelope(msg, size);
 #if CMK_SMP
-    CONTROL_MSG         *control_msg_tmp;
 #if COMM_THREAD_SEND
     if(size <= SMSG_MAX_MSG)
         buffer_small_msgs(msg, size, destNode, SMALL_DATA_TAG);
@@ -1127,13 +1126,13 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         transaction_size = ALIGN64(size);
     }
     else{
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, size, &msg_mem_hndl, &omdh);
+        transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &msg_mem_hndl, &omdh);
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
         }
         pd->first_operand = size;
-        transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
     }
 
     if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
@@ -1931,6 +1930,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if(status != GNI_RC_SUCCESS)
         printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     GNI_RC_CHECK("Mempool register", status);
+    //printf("####[%d] Memory pool registering memory of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     return pool;
 }
 
@@ -2099,6 +2099,7 @@ void* LrtsAlloc(int n_bytes, int header)
             ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
         }else 
         {
+            //printf("$$$$ [%d] Large message  %d\n", myrank, n_bytes); 
             char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
             ptr = res + ALIGNBUF - header;
 
