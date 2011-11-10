@@ -51,7 +51,7 @@ class CkMulticastMgr: public CkDelegateMgr
     public:
         // ------------------------- Cons/Des-tructors ------------------------
         CkMulticastMgr(CkMigrateMessage *m)  {}
-        CkMulticastMgr(int _factor = 2, unsigned int _split_size = 32768, unsigned int _split_threshold = 32768):
+        CkMulticastMgr(int _factor = 2, unsigned int _split_size = 8192, unsigned int _split_threshold = 8192):
             factor(_factor),
             split_size(_split_size),
             split_threshold(_split_threshold) {}
