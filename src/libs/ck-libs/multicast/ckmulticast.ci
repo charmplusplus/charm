@@ -11,8 +11,7 @@ module CkMulticast {
 //  };
   
   group [migratable] CkMulticastMgr {
-    entry CkMulticastMgr();
-    entry CkMulticastMgr(int factor);
+    entry CkMulticastMgr(int _factor = 2, unsigned int _split_size = 32768, unsigned int _split_threshold = 32768);
     // set up
     entry void setup(multicastSetupMsg *);
     entry void recvCookie(CkSectionInfo sid, CkSectionInfo child);
@@ -23,6 +22,7 @@ module CkMulticast {
     entry void retire(CkSectionInfo sid, CkSectionInfo root);
     // multicast
     entry [expedited, notrace] void recvMsg(multicastGrpMsg *m);
+    entry [expedited, notrace] void sendToLocal(multicastGrpMsg *m);
     entry [expedited, notrace] void recvPacket(CkSectionInfo _cookie, int n, char data[n], int seqno, int count, int totalsize, int frombufer);
     // reduction
     entry [expedited, notrace] void recvRedMsg(CkReductionMsg *msg);

@@ -57,8 +57,8 @@ class SpanningTreeStrategy_nodeAware_minGens<Iterator,SpanningTreeVertex>: publi
 
 namespace impl {
 
-    #if CMK_CC_PGCC
-    /** Hack for PGI compilers because of their incorrect implementation of an STL routine.
+    #if CMK_FIND_FIRST_OF_PREDICATE
+    /** Hack for PGI and Fujitsu STLport-using compilers because of their incorrect implementation of an STL routine.
      *
      * std::find_first_of(inpItr,inpItr,fwdItr,fwdItr) should use operator== for comparison.
      * However, PGI's implementation just instantiates a std::equal_to<T> object with
@@ -111,11 +111,11 @@ namespace impl {
                 std::vector<int>::iterator isChild;
                 /// Search the tree members for a PE on this node that is not already a direct child
                 do {
-                    #if ! CMK_CC_PGCC
-                    itr = std::find_first_of(++itr,beyondLastVtx,pesOnNode,pesOnNode + numOnNode);
-                    #else
-                    itr = std::find_first_of(++itr,beyondLastVtx,pesOnNode,pesOnNode + numOnNode,vtxEqual());
-                    #endif
+		    itr = std::find_first_of(++itr,beyondLastVtx,pesOnNode,pesOnNode + numOnNode
+#if CMK_FIND_FIRST_OF_PREDICATE
+					     , vtxEqual()
+#endif
+			);
                     int dist = std::distance(firstVtx,itr);
                     /// Check if this vertex is already a direct child
                     isChild = std::find(parent->childIndex.begin(),parent->childIndex.end(),dist);

@@ -240,7 +240,9 @@ void CkReductionMgr::flushStates()
 
   adjVec.length()=0;
 
+#if ! GROUP_LEVEL_REDUCTION
   nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
+#endif
 }
 
 //////////// Reduction Manager Client API /////////////
@@ -1019,7 +1021,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-   init_BinaryTree();
+    init_BinaryTree();
 #endif
 #endif
   }
@@ -1378,6 +1380,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
   SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_long,CmiInt8,"%d",loop) \
   SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
   SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
 
@@ -1549,16 +1552,16 @@ CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
     ::nop,
   //Compute the sum the numbers passed by each element.
-    ::sum_int,::sum_float,::sum_double,
+    ::sum_int,::sum_long,::sum_float,::sum_double,
 
   //Compute the product the numbers passed by each element.
-    ::product_int,::product_float,::product_double,
+    ::product_int,::product_long,::product_float,::product_double,
 
   //Compute the largest number passed by any element.
-    ::max_int,::max_float,::max_double,
+    ::max_int,::max_long,::max_float,::max_double,
 
   //Compute the smallest number passed by any element.
-    ::min_int,::min_float,::min_double,
+    ::min_int,::min_long,::min_float,::min_double,
 
   //Compute the logical AND of the integers passed by each element.
   // The resulting integer will be zero if any source integer is zero.
@@ -2607,6 +2610,16 @@ int CkNodeReductionMgr::findMaxRedNo(){
 		max--;
 	}
 	return max;
+}
+
+// initnode call. check the size of reduction table
+void CkReductionMgr::sanitycheck()
+{
+#if CMK_ERROR_CHECKING
+  int count = 0;
+  while (CkReduction::reducerTable[count] != NULL) count++;
+  CmiAssert(CkReduction::nReducers == count);
+#endif
 }
 
 #include "CkReduction.def.h"

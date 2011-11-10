@@ -93,7 +93,7 @@ extern "C" void isSane( void *, unsigned);
 CkpvExtern(CkGroupID, cmgrID);
 
 void *sourceOffRectstrategyHandler(void *msg) {
-    CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
     ComlibPrintf("sourceOff handler called on %d\n",CkMyPe(), instid);
 
@@ -373,7 +373,7 @@ void RectMulticastStrategy::sendRectDest(ComlibRectSectionHashObject *obj, int s
   //CmiSetHandler(env, handlerId);
   CmiSetHandler(env, CkpvAccess(strategy_handlerid));
 
-  ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+  ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
   //Collect Multicast Statistics
   RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, destpe);
@@ -608,7 +608,7 @@ void RectMulticastStrategy::remoteMulticast(envelope *env,
     //CmiSetHandler(env, handlerId);
     CmiSetHandler(env, CkpvAccess(strategy_handlerid));
 
-    ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+    ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
@@ -649,7 +649,7 @@ void RectMulticastStrategy::forwardMulticast(envelope *env,
     // handler is changed to special root handler
     CmiSetHandler(env, handlerId);
 
-    ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+    ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);

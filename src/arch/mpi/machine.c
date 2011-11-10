@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /** @file
  * MPI based machine layer
@@ -166,7 +160,6 @@ static int checksum_flag = 0;
 #endif
 /* =====End of Definitions of Message-Corruption Related Macros=====*/
 
-
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 #include <signal.h>
 void (*signal_int)(int);
@@ -185,10 +178,10 @@ typedef struct msg_list {
     MPI_Request req;
 } SMSG_LIST;
 
-static SMSG_LIST *sent_msgs=0;
-static SMSG_LIST *end_sent=0;
+CpvStaticDeclare(SMSG_LIST *, sent_msgs);
+CpvStaticDeclare(SMSG_LIST *, end_sent);
 
-int MsgQueueLen=0;
+CpvStaticDeclare(int, MsgQueueLen);
 static int request_max;
 /*FLAG: consume outstanding Isends in scheduler loop*/
 static int no_outstanding_sends=0;
@@ -211,6 +204,13 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #endif
 /* =====End of Declarations of Machine Specific Variables===== */
 
+#if CMK_MEM_CHECKPOINT
+#define FAIL_TAG   1200
+int num_workpes, total_pes;
+int *petorank = NULL;
+int  nextrank;
+void mpi_end_spare();
+#endif
 
 /* =====Beginning of Declarations of Machine Specific Functions===== */
 /* Utility functions */
@@ -307,6 +307,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     int size = smsg->size;
     char *msg = smsg->msg;
     int mode = smsg->mode;
+    int dstrank;
 
     MACHSTATE2(3,"MPI_send to node %d rank: %d{", node, CMI_DEST_RANK(msg));
 #if CMK_ERROR_CHECKING
@@ -328,7 +329,12 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     }
 #else
     START_EVENT();
-    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
+#if CMK_MEM_CHECKPOINT
+    dstrank = petorank[node];
+#else
+    dstrank = node;
+#endif
+    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,MPI_COMM_WORLD,&(smsg->req)))
         CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
     /*END_EVENT(40);*/
 #endif
@@ -353,17 +359,17 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
 #endif
 
     MACHSTATE(3,"}MPI_send end");
-    MsgQueueLen++;
-    if (sent_msgs==0)
-        sent_msgs = smsg;
+    CpvAccess(MsgQueueLen)++;
+    if (CpvAccess(sent_msgs)==0)
+        CpvAccess(sent_msgs) = smsg;
     else
-        end_sent->next = smsg;
-    end_sent = smsg;
+        CpvAccess(end_sent)->next = smsg;
+    CpvAccess(end_sent) = smsg;
 
 #if !CMI_DYNAMIC_EXERT_CAP && !CMI_EXERT_SEND_CAP
     if (mode == P2P_SYNC || mode == P2P_ASYNC)
     {
-    while (MsgQueueLen > request_max) {
+    while (CpvAccess(MsgQueueLen) > request_max) {
         CmiReleaseSentMessages();
         PumpMsgs();
     }
@@ -382,9 +388,11 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 
     CmiAssert(destNode != CmiMyNode());
 #if CMK_SMP
-    EnqueueMsg(msg, size, destNode, mode);
-    return 0;
-#else
+    if (_thread_provided != MPI_THREAD_MULTIPLE) {
+      EnqueueMsg(msg, size, destNode, mode);
+      return 0;
+    }
+#endif
     /* non smp */
     msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));
     msg_tmp->msg = msg;
@@ -393,11 +401,10 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
     msg_tmp->next = 0;
     msg_tmp->mode = mode;
     return MPISendOneMsg(msg_tmp);
-#endif
 }
 
 static size_t CmiAllAsyncMsgsSent(void) {
-    SMSG_LIST *msg_tmp = sent_msgs;
+    SMSG_LIST *msg_tmp = CpvAccess(sent_msgs);
     MPI_Status sts;
     int done;
 
@@ -415,7 +422,7 @@ static size_t CmiAllAsyncMsgsSent(void) {
 
 int CmiAsyncMsgSent(CmiCommHandle c) {
 
-    SMSG_LIST *msg_tmp = sent_msgs;
+    SMSG_LIST *msg_tmp = CpvAccess(sent_msgs);
     int done;
     MPI_Status sts;
 
@@ -437,7 +444,7 @@ void CmiReleaseCommHandle(CmiCommHandle c) {
 
 /* ######Beginning of functions related with communication progress ###### */
 static void CmiReleaseSentMessages(void) {
-    SMSG_LIST *msg_tmp=sent_msgs;
+    SMSG_LIST *msg_tmp=CpvAccess(sent_msgs);
     SMSG_LIST *prev=0;
     SMSG_LIST *temp;
     int done;
@@ -457,11 +464,11 @@ static void CmiReleaseSentMessages(void) {
             CmiAbort("CmiReleaseSentMessages: MPI_Test failed!\n");
         if (done) {
             MACHSTATE2(3,"CmiReleaseSentMessages release one %d to %d", CmiMyPe(), msg_tmp->destpe);
-            MsgQueueLen--;
+            CpvAccess(MsgQueueLen)--;
             /* Release the message */
             temp = msg_tmp->next;
             if (prev==0) /* first message */
-                sent_msgs = temp;
+                CpvAccess(sent_msgs) = temp;
             else
                 prev->next = temp;
             CmiFree(msg_tmp->msg);
@@ -479,7 +486,7 @@ static void CmiReleaseSentMessages(void) {
         }
 #endif
     }
-    end_sent = prev;
+    CpvAccess(end_sent) = prev;
     MACHSTATE(2,"} CmiReleaseSentMessages end");
 }
 
@@ -659,7 +666,7 @@ static void PumpMsgsBlocking(void) {
     if (!PCQueueEmpty(CmiGetState()->recv)) return;
     if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
     if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
-    if (sent_msgs)  return;
+    if (CpvAccess(sent_msgs))  return;
 
 #if 0
     CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
@@ -835,7 +842,7 @@ static void AdvanceCommunicationForMPI() {
 static void MachinePostNonLocalForMPI() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
-        while (MsgQueueLen>0) {
+        while (CpvAccess(MsgQueueLen)>0) {
             AdvanceCommunicationForMPI();
         }
     }
@@ -852,6 +859,11 @@ static void MachinePostNonLocalForMPI() {
             return 0;
     }
 #endif
+#else
+  if (_thread_provided == MPI_THREAD_MULTIPLE) {
+        CmiReleaseSentMessages();
+        SendMsgBuf();
+  }
 #endif
 }
 
@@ -892,6 +904,9 @@ void DrainResourcesForMPI() {
         SendMsgBuf();
         PumpMsgs();
     }
+#endif
+#if CMK_MEM_CHECKPOINT
+    if (CmiMyPe() == 0) mpi_end_spare();
 #endif
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
@@ -1039,7 +1054,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
-    thread_level = MPI_THREAD_FUNNELED;
+    thread_level = MPI_THREAD_MULTIPLE;
 #else
     thread_level = MPI_THREAD_SINGLE;
 #endif
@@ -1062,11 +1077,85 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
         printf("Charm++> Running on MPI version: %d.%d multi-thread support: %s (max supported: %s)\n", ver, subver, thread_level_tostring(thread_level), thread_level_tostring(provided));
     }
 
+    {
+        int debug = CmiGetArgFlag(largv,"++debug");
+        int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
+        if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
+#if CMK_HAS_GETPID
+            printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
+            fflush(stdout);
+            if (!debug_no_pause)
+                sleep(15);
+#else
+            printf("++debug ignored.\n");
+#endif
+        }
+    }
+
+
+#if CMK_MEM_CHECKPOINT
+    if (CmiGetArgInt(largv,"+wp",&num_workpes)) {
+       CmiAssert(num_workpes <= *numNodes);
+       total_pes = *numNodes;
+       *numNodes = num_workpes;
+    }
+    else
+       total_pes = num_workpes = *numNodes;
+    if (*myNodeID == 0)
+       CmiPrintf("Charm++> FT using %d processors and %d spare processors.\n", num_workpes, total_pes-num_workpes);
+    petorank = (int *)malloc(sizeof(int) * num_workpes);
+    for (i=0; i<num_workpes; i++)  petorank[i] = i;
+    nextrank = num_workpes;
+
+    if (*myNodeID >= num_workpes) {    /* is spare processor */
+      MPI_Status sts;
+      int vals[2];
+      MPI_Recv(vals,2,MPI_INT,MPI_ANY_SOURCE,FAIL_TAG, MPI_COMM_WORLD,&sts);
+      int newpe = vals[0];
+      CpvAccess(_curRestartPhase) = vals[1];
+
+      if (newpe == -1) {
+          MPI_Barrier(MPI_COMM_WORLD);
+          MPI_Finalize();
+          exit(0);
+      }
+
+      CmiPrintf("Charm++> Spare MPI rank %d is activated for PE %d.\n", *myNodeID, newpe);
+        /* update petorank */
+      MPI_Recv(petorank, num_workpes, MPI_INT,MPI_ANY_SOURCE,FAIL_TAG,MPI_COMM_WORLD, &sts);
+      nextrank = *myNodeID + 1;
+      *myNodeID = newpe;
+      myNID = newpe;
+
+       /* add +restartaftercrash to argv */
+      char *phase_str;
+      char **restart_argv;
+      int i=0;
+      while(largv[i]!= NULL) i++;
+      restart_argv = (char **)malloc(sizeof(char *)*(i+3));
+      i=0;
+      while(largv[i]!= NULL){
+                restart_argv[i] = largv[i];
+                i++;
+      }
+      restart_argv[i] = "+restartaftercrash";
+      phase_str = (char*)malloc(10);
+      sprintf(phase_str,"%d", CpvAccess(_curRestartPhase));
+      restart_argv[i+1]=phase_str;
+      restart_argv[i+2]=NULL;
+      *argv = restart_argv;
+      *argc = i+2;
+      largc = *argc;
+      largv = *argv;
+    }
+#endif
+
     idleblock = CmiGetArgFlag(largv, "+idleblocking");
     if (idleblock && _Cmi_mynode == 0) {
         printf("Charm++: Running in idle blocking mode.\n");
     }
 
+#if CMK_CHARMDEBUG
     /* setup signal handlers */
     signal(SIGSEGV, KillOnAllSigs);
     signal(SIGFPE, KillOnAllSigs);
@@ -1078,6 +1167,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     signal(SIGQUIT, KillOnAllSigs);
     signal(SIGBUS, KillOnAllSigs);
 #   endif /*UNIX*/
+#endif
 
 #if CMK_NO_OUTSTANDING_SENDS
     no_outstanding_sends=1;
@@ -1126,21 +1216,6 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
     }
 
-    {
-        int debug = CmiGetArgFlag(largv,"++debug");
-        int debug_no_pause = CmiGetArgFlag(largv,"++debug-no-pause");
-        if (debug || debug_no_pause) {  /*Pause so user has a chance to start and attach debugger*/
-#if CMK_HAS_GETPID
-            printf("CHARMDEBUG> Processor %d has PID %d\n",myNID,getpid());
-            fflush(stdout);
-            if (!debug_no_pause)
-                sleep(15);
-#else
-            printf("++debug ignored.\n");
-#endif
-        }
-    }
-
     procState = (ProcState *)malloc((_Cmi_mynodesize+1) * sizeof(ProcState));
     for (i=0; i<_Cmi_mynodesize+1; i++) {
 #if MULTI_SENDQUEUE
@@ -1157,6 +1232,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 }
 
 static void MachinePreCommonInitForMPI(int everReturn) {
+
 #if MPI_POST_RECV
     int doInit = 1;
     int i;
@@ -1204,7 +1280,16 @@ static void MachinePreCommonInitForMPI(int everReturn) {
 }
 
 static void MachinePostCommonInitForMPI(int everReturn) {
+
     CmiIdleState *s=CmiNotifyGetState();
+
+    CpvInitialize(SMSG_LIST *, sent_msgs);
+    CpvInitialize(SMSG_LIST *, end_sent);
+    CpvInitialize(int, MsgQueueLen);
+    CpvAccess(sent_msgs) = NULL;
+    CpvAccess(end_sent) = NULL;
+    CpvAccess(MsgQueueLen) = 0;
+
     machine_exit_idx = CmiRegisterHandler((CmiHandler)machine_exit);
 
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
@@ -1218,6 +1303,8 @@ static void MachinePostCommonInitForMPI(int everReturn) {
 #if CMK_SMP
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
+    if (_thread_provided == MPI_THREAD_MULTIPLE)
+      CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)LrtsPostNonLocal,NULL);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForMPI,NULL);
 #endif
@@ -1300,7 +1387,11 @@ void CmiTimerInit(char **argv) {
     if (_absoluteTime && CmiMyPe() == 0)
         printf("Charm++> absolute MPI timer is used\n");
 
+#if ! CMK_MEM_CHECKPOINT
     _is_global = CmiTimerIsSynchronized();
+#else
+    _is_global = 0;
+#endif
 
     if (_is_global) {
         if (CmiMyRank() == 0) {
@@ -1316,9 +1407,11 @@ void CmiTimerInit(char **argv) {
             starttimer = minTimer;
         }
     } else { /* we don't have a synchronous timer, set our own start time */
+#if ! CMK_MEM_CHECKPOINT
         CmiBarrier();
         CmiBarrier();
         CmiBarrier();
+#endif
 #if CMK_TIMER_USE_XT3_DCLOCK
         starttimer = dclock();
 #else
@@ -1393,7 +1486,7 @@ double CmiCpuTimer(void) {
     return t;
 }
 
-#endif
+#endif     /* CMK_TIMER_USE_SPECIAL */
 
 /************Barrier Related Functions****************/
 /* must be called on all ranks including comm thread in SMP */
@@ -1454,6 +1547,54 @@ int CmiBarrierZero() {
     CmiNodeAllBarrier();
     return 0;
 }
+
+
+#if CMK_MEM_CHECKPOINT
+
+void mpi_restart_crashed(int pe, int rank)
+{
+    int vals[2];
+    vals[0] = pe;
+    vals[1] = CpvAccess(_curRestartPhase)+1;
+    MPI_Send((void *)vals,2,MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
+    MPI_Send(petorank, num_workpes, MPI_INT,rank,FAIL_TAG,MPI_COMM_WORLD);
+}
+
+/* notify spare processors to exit */
+void mpi_end_spare()
+{
+    int i;
+    for (i=nextrank; i<total_pes; i++) {
+        int vals[2] = {-1,-1};
+        MPI_Send((void *)vals,2,MPI_INT,i,FAIL_TAG,MPI_COMM_WORLD);
+    }
+}
+
+int find_spare_mpirank(int pe)
+{
+    if (nextrank == total_pes) {
+      CmiAbort("Charm++> No spare processor available.");
+    }
+    petorank[pe] = nextrank;
+    nextrank++;
+    return nextrank-1;
+}
+
+void CkDieNow()
+{
+    CmiPrintf("[%d] die now.\n", CmiMyPe());
+
+      /* release old messages */
+    while (!CmiAllAsyncMsgsSent()) {
+        PumpMsgs();
+        CmiReleaseSentMessages();
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
+    exit(0);
+}
+
+#endif
 
 /*@}*/
 

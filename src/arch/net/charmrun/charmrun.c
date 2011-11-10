@@ -967,6 +967,10 @@ void arg_init(int argc, char **argv)
       exit(1);
     }
 #endif
+if(arg_debug && arg_local){
+	printf("++debug cannot be used with ++local.\n");
+	exit(0);
+	}
 }
 
 /****************************************************************************

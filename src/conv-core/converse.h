@@ -75,6 +75,13 @@ typedef bool CmiBool;
 #define CmiTrue true
 #endif
 
+#if ! CMK_HAS_OFFSETOF
+#undef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#else
+#include <stddef.h>
+#endif
+
 extern "C" {
 #endif
 
@@ -599,14 +606,14 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
 #define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
 #define CmiGetRoot(m)     (((CmiMsgHeaderExt*)m)->root)
-#define CmiGetRedID(m)     (((CmiMsgHeaderExt*)m)->redID)
+#define CmiGetRedID(m)    (((CmiMsgHeaderExt*)m)->redID)
 #define CmiGetStrategy(m) (((CmiMsgHeaderExt*)m)->stratid)
 
 #define CmiSetHandler(m,v)  do {((((CmiMsgHeaderExt*)m)->hdl)=(v));} while(0)
 #define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
 #define CmiSetRoot(m,v)     do {((((CmiMsgHeaderExt*)m)->root)=(v));} while(0)
-#define CmiSetRedID(m,v)     do {((((CmiMsgHeaderExt*)m)->redID)=(v));} while(0)
+#define CmiSetRedID(m,v)    do {((((CmiMsgHeaderExt*)m)->redID)=(v));} while(0)
 #define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v);} while(0)
 
 #define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
@@ -1510,15 +1517,17 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_100ms 18 /*every 100ms (10Hz)*/
 #define CcdPERIODIC_1second  19 /*every second*/
 #define CcdPERIODIC_1s       19 /*every second*/
-#define CcdPERIODIC_10second 20 /*every 10 seconds*/
-#define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
-#define CcdPERIODIC_10s      20 /*every 10 seconds*/
-#define CcdPERIODIC_1minute  21 /*every minute*/
-#define CcdPERIODIC_5minute  22 /*every 5 minute*/
-#define CcdPERIODIC_10minute 23 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    24 /*every hour*/
-#define CcdPERIODIC_12hour   25 /*every 12 hours*/
-#define CcdPERIODIC_1day     26 /*every day*/
+#define CcdPERIODIC_5s       20 /*every second*/
+#define CcdPERIODIC_5seconds 20 /*every second*/
+#define CcdPERIODIC_10second 21 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
+#define CcdPERIODIC_10s      21 /*every 10 seconds*/
+#define CcdPERIODIC_1minute  22 /*every minute*/
+#define CcdPERIODIC_5minute  23 /*every 5 minute*/
+#define CcdPERIODIC_10minute 24 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    25 /*every hour*/
+#define CcdPERIODIC_12hour   26 /*every 12 hours*/
+#define CcdPERIODIC_1day     27 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30

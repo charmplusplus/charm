@@ -40,6 +40,7 @@ else
   f95target=`gfortran -v 2>&1 | grep Target | cut -f2 -d' '`
   f95version=`gfortran -v 2>&1 | grep 'gcc version' | cut -d' ' -f3`
   F90LIBDIR=`cd $F90DIR/../lib/gcc/$f95target/$f95version/ 2>/dev/null && pwd`
+  test -n "$F90LIBDIR" && F90LIBDIR=`cd $F90DIR/../lib/$f95target/gcc/$f95version/ 2>/dev/null && pwd`
   #F90LIBDIR=`cd $F90DIR/../lib/gcc/ia64-unknown-linux-gnu/4.1.0; pwd`
 fi
 test -n "$F90LIBDIR" && CMK_F90LIBS="-L$F90LIBDIR -lgfortran -lgcc_eh"

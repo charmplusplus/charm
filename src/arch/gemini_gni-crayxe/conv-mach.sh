@@ -19,8 +19,8 @@ CMK_QT="generic64"
 # compiler for compiling sequential programs
 if test -n "$PGCC"
 then
-CMK_CC="$CMK_CC -DCMK_CC_PGCC=1 "
-CMK_CXX="$CMK_CXX -DCMK_CC_PGCC=1 "
+CMK_CC="$CMK_CC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
 CMK_SEQ_CXX="pgCC "

@@ -152,7 +152,7 @@ void OneTimeMulticastStrategy::remoteMulticast(ComlibMulticastMsg * multMsg, boo
   
 
   CmiSetHandler(env, CkpvAccess(comlib_handler));
-  ((CmiMsgHeaderBasic *) env)->stratid = getInstance();  
+  ((CmiMsgHeaderExt *) env)->stratid = getInstance();  
   CkPackMessage(&env);
 
   double middle = CmiWallTimer();

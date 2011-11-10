@@ -5,6 +5,8 @@
 
 #define CMI_MPI_TRACE_USEREVENTS                           0
 
+#define CMK_STACKSIZE_DEFAULT                              65536
+
 #define CMK_HANDLE_SIGUSR                                  1
 
 #if CMK_ERROR_CHECKING

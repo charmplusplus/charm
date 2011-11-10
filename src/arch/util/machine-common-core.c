@@ -459,24 +459,12 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         if (phs) curphs++;
 #endif
     } else {
-#if CMK_USE_PXSHM
-        int ret=CmiValidPxshm(destPE, size);
-        if (ret) {
-          CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
-          //for (int i=0; i<refcount; i++) CmiReference(msg);
 #if CMK_PERSISTENT_COMM
-        if (phs) curphs++;
-#endif
-          return;
+        if (phs && size > 8192) {
+            CmiAssert(curphs < phsSize);
+            LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
+            return;
         }
-#endif
-#if CMK_PERSISTENT_COMM
-    if (phs && size > 8192) {
-        CmiAssert(curphs < phsSize);
-        LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
-        return;
-    }
 #endif
 
         int destNode = CmiNodeOf(destPE);
@@ -487,6 +475,17 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+#if CMK_USE_PXSHM
+        int ret=CmiValidPxshm(destPE, size);
+        if (ret) {
+          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+#if CMK_PERSISTENT_COMM
+          if (phs) curphs++;
+#endif
+          return;
+        }
+#endif
 if (  MSG_STATISTIC)
 {
     int ret_log = _cmi_log2(size);
@@ -608,7 +607,7 @@ if (_Cmi_mynode==0)
 #if !CMK_SMP 
     printf("Charm++> Running on Non-smp mode\n");
 #else
-    printf("Charm++> Running on Smp mode, %d worker threads per process\n", _Cmi_mynodesize);
+    printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
 #endif
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
@@ -759,6 +758,9 @@ static void CommunicationServer(int sleepTime) {
 
         ConverseCommonExit();
 
+#if CMK_USE_PXSHM
+        CmiExitPxshm();
+#endif
         LrtsExit();
     }
 #endif
@@ -777,9 +779,6 @@ void ConverseExit(void) {
     LrtsDrainResources();
 #endif
 
-#if CMK_USE_PXSHM
-        CmiExitPxshm();
-#endif
     ConverseCommonExit();
 
 if (MSG_STATISTIC)
@@ -797,6 +796,9 @@ if (MSG_STATISTIC)
 #endif
 
 #if !CMK_SMP
+#if CMK_USE_PXSHM
+    CmiExitPxshm();
+#endif
     LrtsExit();
 #else
     /* In SMP, the communication thread will exit */
@@ -837,6 +839,8 @@ void *CmiGetNonLocal(void) {
        AdvanceCommunication();
        msg = PCQueuePop(cs->recv);
     }
+#else
+//    LrtsPostNonLocal();
 #endif
 
     MACHSTATE3(3,"[%p] CmiGetNonLocal from queue %p with msg %p end }",CmiGetState(),(cs->recv), msg);
@@ -893,8 +897,8 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 #if !CMK_SMP
     AdvanceCommunication();
-//#else
-//    LrtsPostNonLocal();
+#else
+    LrtsPostNonLocal();
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())

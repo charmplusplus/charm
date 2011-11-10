@@ -175,6 +175,12 @@ else
   test_finish 1
 fi
 
+#clean up conv-mach-opt.sh
+sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+rm -f conv-mach-opt.sh.clean
+
+
 #
 AC_MSG_CHECKING(machine name)
 version=`pwd | awk -F/ '{print $(NF-1)}'`
@@ -761,6 +767,23 @@ EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass, [whether operator delete can be overloaded in same class])
 
+#### test if offsetof exists ####
+cat > $t <<EOT
+#include <stddef.h>
+
+struct FooType {
+        int f1;
+        int f2;
+        double f3;
+};
+
+void foo()
+{
+  int off = offsetof(FooType, f2);
+}
+EOT
+test_cxx "whether offsetof is defined" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 
 #### test if we can use gcc x86 assembly like this ####
 cat > $t <<EOT
@@ -895,7 +918,7 @@ then
   test_finish 1
 fi
 
-if test $BUILD_MPI -eq 1
+if test $BUILD_MPI -eq 1 -a -z "$BGP_FLOOR"
 then
   test_link "whether need to specify MPI library" "no" "yes" ""
   if test $pass -ne 1

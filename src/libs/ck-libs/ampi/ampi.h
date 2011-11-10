@@ -121,6 +121,7 @@ typedef int MPI_Fint;
 #define MPI_LB                23
 #define MPI_UB                24
 #define MPI_LONG_LONG_INT     25
+#define MPI_LONG_LONG         MPI_LONG_LONG_INT
 #define MPI_DOUBLE_COMPLEX    26
 
 #define MPI_ANY_TAG      (-1)

@@ -28,6 +28,8 @@ module CkReduction {
 	//call back for using NodeGroup Reductions added by sayantan
 	entry void ArrayReductionHandler(CkReductionMsg *m);
 	entry void contributeViaMessage(CkReductionMsg *m);
+
+        initnode void sanitycheck();
   };
 
   nodegroup CkNodeReductionMgr : IrrGroup {
@@ -49,7 +51,6 @@ module CkReduction {
 	entry void unblockNode(int maxRedNo);
 	
   };
-
 
   
 

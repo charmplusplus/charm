@@ -7,6 +7,3 @@
 # define CMK_TIMER_USE_GETRUSAGE                            1
 # define CMK_TIMER_USE_RDTSC                                0
 #endif
-
-
-#define CMK_CC_PGCC                                         1
