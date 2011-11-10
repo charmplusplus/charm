@@ -1930,7 +1930,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if(status != GNI_RC_SUCCESS)
         printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     GNI_RC_CHECK("Mempool register", status);
-    printf("####[%d] Memory pool registering memory of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
+    //printf("####[%d] Memory pool registering memory of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     return pool;
 }
 
@@ -2099,7 +2099,7 @@ void* LrtsAlloc(int n_bytes, int header)
             ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
         }else 
         {
-            printf("$$$$ [%d] Large message  %d\n", myrank, n_bytes); 
+            //printf("$$$$ [%d] Large message  %d\n", myrank, n_bytes); 
             char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
             ptr = res + ALIGNBUF - header;
 
