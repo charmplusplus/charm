@@ -18,7 +18,7 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-#define HASH_LOCATIONS
+//#define HASH_LOCATIONS
 
 #ifdef HASH_LOCATIONS
 #include <map>
@@ -414,7 +414,7 @@ void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
     userCallback_ = CkCallback();      // nullify the current callback
   }
 
-  delete msg; 
+  //  delete msg; 
 }
 
 
