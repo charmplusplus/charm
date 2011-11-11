@@ -1,5 +1,5 @@
 CMK_DEFS="-fPIC"
-CMK_CPP_CHARM="/usr/ccs/lib/cpp $CMK_DEFS"
+CMK_CPP_CHARM="/usr/local/bin/cpp -P"
 CMK_CPP_C="gcc -E $CMK_DEFS"
 CMK_CC="gcc $CMK_DEFS"
 CMK_CXX="g++ $CMK_DEFS "
