@@ -836,7 +836,7 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     }else
     {
         if( control_msg_tmp->seq_id == 1)
-            size = ONE_SEG;
+            size = size>ONE_SEG?ONE_SEG:size;
 
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
         if(status == GNI_RC_SUCCESS)
