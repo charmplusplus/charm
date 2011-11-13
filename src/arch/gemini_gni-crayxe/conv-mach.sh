@@ -54,4 +54,4 @@ CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
 
-CMK_NO_BUILD_SHARED=true
+. $CHARMINC/conv-mach-pxshm.sh

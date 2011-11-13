@@ -2067,7 +2067,26 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         PMI_Barrier();
     }
 #if     USE_LRTS_MEMPOOL
-    CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
+    char *str;
+    //if (CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size))
+    if (CmiGetArgStringDesc(*argv,"+useMemorypoolSize",&str,"Set the memory pool size")) 
+    {
+      if (strpbrk(str,"G")) {
+        sscanf(str, "%lldG", &_mempool_size);
+        _mempool_size *= 1024ll*1024*1024;
+      }
+      else if (strpbrk(str,"M")) {
+        sscanf(str, "%lldM", &_mempool_size);
+        _mempool_size *= 1024*1024;
+      }
+      else if (strpbrk(str,"K")) {
+        sscanf(str, "%lldK", &_mempool_size);
+        _mempool_size *= 1024;
+      }
+      else {
+        sscanf(str, "%lld", &_mempool_size);
+      }
+    }
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
 #endif
 
