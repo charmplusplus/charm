@@ -221,14 +221,14 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 }
 
-void CkReductionMgr::flushStates()
+void CkReductionMgr::flushStates(int isgroup)
 {
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
   creating=CmiFalse;
-  gcount=lcount=0;
+  if (!isgroup) gcount=lcount=0;    // array reduction group needs to reset to 0
   startRequested=CmiFalse;
   nContrib=nRemote=0;
   maxStartRequest=0;

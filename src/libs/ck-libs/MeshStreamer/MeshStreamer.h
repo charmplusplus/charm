@@ -18,7 +18,7 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-#define HASH_LOCATIONS
+//#define HASH_LOCATIONS
 
 #ifdef HASH_LOCATIONS
 #include <map>
@@ -414,7 +414,7 @@ void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
     userCallback_ = CkCallback();      // nullify the current callback
   }
 
-  delete msg; 
+  //  delete msg; 
 }
 
 
@@ -570,7 +570,7 @@ template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
 
     if (!isPeriodicFlushEnabled_ || 
-	CkWallTimer() - timeOfLastSend_ >= progressPeriodInMs_) {
+	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
       flushBuckets(planeBuffers_, numPlanes_);
       flushBuckets(columnBuffers_, numColumns_);
       flushBuckets(personalizedBuffers_, numRows_);

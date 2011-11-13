@@ -1,5 +1,5 @@
 CHARMC_PATH = ../../../../bin
-CHARMC=$(CHARMC_PATH)/charmc -O3 $(OPTS)
+CHARMC=$(CHARMC_PATH)/charmc $(OPTS)
 
-override OPTS += -g -O3 -DADAPTIVE 
+#override OPTS += -g -O3 -DADAPTIVE 
 #-DUSEBITPRIORITY -DONESOLUTION -DADAPTIVE

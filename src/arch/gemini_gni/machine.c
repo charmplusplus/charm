@@ -46,12 +46,15 @@ static void sleep(int secs) {
 
 #define oneMB (1024ll*1024)
 #if CMK_SMP
-static CmiInt8 _mempool_size = 4*oneMB;
+static CmiInt8 _mempool_size = 8*oneMB;
 #else
 static CmiInt8 _mempool_size = 32*oneMB;
 #endif
-static CmiInt8 _expand_mem =  1*oneMB;
+static CmiInt8 _expand_mem =  4*oneMB;
 #endif
+
+#define BIG_MSG       4*oneMB
+#define ONE_SEG       8*oneMB
 
 #define PRINT_SYH  0
 #if CMK_SMP
@@ -105,11 +108,7 @@ uint8_t   onesided_hnd, omdh;
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* If SMSG is not used */
-#define BIG_MSG       1*oneMB
-#define ONE_SEG       1*oneMB
 
-//#define BIG_MSG        65536 
-//#define ONE_SEG        16384
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
 /* If SMSG is used */
@@ -837,7 +836,7 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     }else
     {
         if( control_msg_tmp->seq_id == 1)
-            size = ONE_SEG;
+            size = size>ONE_SEG?ONE_SEG:size;
 
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
         if(status == GNI_RC_SUCCESS)
@@ -1116,7 +1115,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     if(request_msg->seq_id < 2)  
         msg_data = CmiAlloc(size);
     else
-        msg_data = request_msg-> dest_addr;
+        msg_data = (void*)request_msg-> dest_addr;
     _MEMCHECK(msg_data);
    
     MallocPostDesc(pd);
@@ -1829,8 +1828,6 @@ printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNod
     }
 
       /* steal failed, deregister and free memblock now */
-    int ret = posix_memalign(&pool, ALIGNBUF, *size);
-    CmiAssert(ret == 0);
     int freed = 0;
     for (k=0; k<CmiMyNodeSize()+1; k++) {
         i = (CmiMyRank()+k)%CmiMyNodeSize();
@@ -1874,6 +1871,10 @@ printf("[%d:%d:%d] free rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiM
             free(ptr);
              // try now
             if (freed > *size) {
+              if (pool == NULL) {
+                int ret = posix_memalign(&pool, ALIGNBUF, *size);
+                CmiAssert(ret == 0);
+              }
               status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
               if (status == GNI_RC_SUCCESS) {
                 if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
@@ -1892,7 +1893,7 @@ printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(),
         if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
     }
       /* still no luck registering pool */
-    free(pool);
+    if (pool) free(pool);
     return NULL;
 }
 #endif
@@ -1931,6 +1932,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if(status != GNI_RC_SUCCESS)
         printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     GNI_RC_CHECK("Mempool register", status);
+    //printf("####[%d] Memory pool registering memory of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     return pool;
 }
 
@@ -2065,7 +2067,26 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         PMI_Barrier();
     }
 #if     USE_LRTS_MEMPOOL
-    CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
+    char *str;
+    //if (CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size))
+    if (CmiGetArgStringDesc(*argv,"+useMemorypoolSize",&str,"Set the memory pool size")) 
+    {
+      if (strpbrk(str,"G")) {
+        sscanf(str, "%lldG", &_mempool_size);
+        _mempool_size *= 1024ll*1024*1024;
+      }
+      else if (strpbrk(str,"M")) {
+        sscanf(str, "%lldM", &_mempool_size);
+        _mempool_size *= 1024*1024;
+      }
+      else if (strpbrk(str,"K")) {
+        sscanf(str, "%lldK", &_mempool_size);
+        _mempool_size *= 1024;
+      }
+      else {
+        sscanf(str, "%lld", &_mempool_size);
+      }
+    }
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
 #endif
 
@@ -2099,6 +2120,7 @@ void* LrtsAlloc(int n_bytes, int header)
             ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
         }else 
         {
+            //printf("$$$$ [%d] Large message  %d\n", myrank, n_bytes); 
             char *res = memalign(ALIGNBUF, n_bytes+ALIGNBUF);
             ptr = res + ALIGNBUF - header;
 

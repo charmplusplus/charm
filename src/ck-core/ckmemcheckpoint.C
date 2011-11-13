@@ -332,8 +332,9 @@ void CkMemCheckPT::pup(PUP::er& p)
   p|ckCheckPTGroupID;		// recover global variable
   p|cpCallback;			// store callback
   p|where;			// where to checkpoint
+  p|peCount;
   if (p.isUnpacking()) {
-    recvCount = peCount = 0;
+    recvCount = 0;
 #if CMK_CONVERSE_MPI
     void pingBuddy();
     void pingCheckHandler();
@@ -463,7 +464,7 @@ void CkMemCheckPT::doItNow(int starter, CkCallback &cb)
     CkSendMsgArray(CkIndex_ArrayElement::inmem_checkpoint(NULL),(CkArrayMessage *)msg,entry->aid,entry->index);
   }
     // if my table is empty, then I am done
-  if (len == 0) thisProxy[cpStarter].cpFinish();
+  if (len == 0) contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
 
   // pack and send proc level data
   sendProcData();
@@ -517,7 +518,7 @@ void CkMemCheckPT::recvProcData(CkProcCheckPTMessage *msg)
   if (CpvAccess(procChkptBuf)) delete CpvAccess(procChkptBuf);
   CpvAccess(procChkptBuf) = msg;
   DEBUGF("[%d] CkMemCheckPT::recvProcData report to %d\n", CkMyPe(), msg->reportPe);
-  thisProxy[msg->reportPe].cpFinish();
+  contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[msg->reportPe]));
 }
 
 // ArrayElement call this function to give us the checkpointed data
@@ -538,7 +539,7 @@ void CkMemCheckPT::recvData(CkArrayCheckPTMessage *msg)
     recvCount ++;
     if (recvCount == ckTable.length()) {
       if (where == CkCheckPoint_inMEM) {
-        thisProxy[cpStarter].cpFinish();
+        contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
       }
       else if (where == CkCheckPoint_inDISK) {
         // another barrier for finalize the writing using fsync
@@ -559,7 +560,7 @@ void CkMemCheckPT::syncFiles(CkReductionMsg *m)
 #if CMK_HAS_SYNC && ! CMK_DISABLE_SYNC
   system("sync");
 #endif
-  thisProxy[cpStarter].cpFinish();
+  contribute(CkCallback(CkReductionTarget(CkMemCheckPT, cpFinish), thisProxy[cpStarter]));
 }
 
 // only is called on cpStarter when checkpoint is done
@@ -568,7 +569,7 @@ void CkMemCheckPT::cpFinish()
   CmiAssert(CkMyPe() == cpStarter);
   peCount++;
     // now that all processors have finished, activate callback
-  if (peCount == 2*(CkNumPes())) {
+  if (peCount == 2) {
     CmiPrintf("[%d] Checkpoint finished in %f seconds, sending callback ... \n", CkMyPe(), CmiWallTimer()-startTime);
     cpCallback.send();
     peCount = 0;
@@ -909,8 +910,8 @@ void CkMemCheckPT::recoverArrayElements()
   CKLOCMGR_LOOP(mgr->doneInserting(););
 
   inRestarting = 0;
- // _crashedNode = -1;
-CpvAccess(_crashedNode) = -1;
+  // _crashedNode = -1;
+  CpvAccess(_crashedNode) = -1;
 
   if (CkMyPe() == 0)
     CkStartQD(CkCallback(CkIndex_CkMemCheckPT::finishUp(), thisProxy));
