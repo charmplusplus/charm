@@ -1,5 +1,5 @@
 
-override OPTS += -I../searchengineLib -L../searchengineLib -DVALUE_HEURISTIC #-DUSERSOLVER 
+override OPTS += -DVALUE_HEURISTIC #-DUSERSOLVER 
 
 include ../Makefile.common
 

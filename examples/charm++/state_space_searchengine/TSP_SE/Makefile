@@ -1,7 +1,5 @@
 OPTS =  -DBRANCHBOUND #-DSTATISTIC#  -DOPTIMIZE #-DUSEPRIORITY -DOPTIMIZE #-DADPATIVE
 
-OPTS += -I../searchengineLib -L../searchengineLib
-
 include ../Makefile.common
 
 

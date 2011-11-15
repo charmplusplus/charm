@@ -18,7 +18,7 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-#define HASH_LOCATIONS
+//#define HASH_LOCATIONS
 
 #ifdef HASH_LOCATIONS
 #include <map>
@@ -66,7 +66,7 @@ public:
 	destinationPes[index] = destinationPe;
     }
 
-    dtype getDataItem(const int index) {
+    dtype &getDataItem(const int index) {
         return data[index];
     }
 };
@@ -75,7 +75,7 @@ template <class dtype>
 class MeshStreamerClient : public Group {
  public:
      virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-     virtual void process(dtype data)=0; 
+     virtual void process(dtype &data)=0; 
 };
 
 template <class dtype>
@@ -135,7 +135,7 @@ public:
     ~MeshStreamer();
 
       // entry
-    void insertData(const dtype &dataItem, const int destinationPe); 
+    void insertData(dtype &dataItem, const int destinationPe); 
     void doneInserting();
     void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     // void receivePersonalizedData(MeshStreamerMessage<dtype> *msg);
@@ -355,7 +355,7 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::insertData(const dtype &dataItem, const int destinationPe) {
+void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
   static int count = 0;
 
   if (destinationPe == CkMyPe()) {
@@ -414,7 +414,7 @@ void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
     userCallback_ = CkCallback();      // nullify the current callback
   }
 
-  delete msg; 
+  //  delete msg; 
 }
 
 
@@ -427,7 +427,7 @@ void MeshStreamer<dtype>::receiveAggregateData(MeshStreamerMessage<dtype> *msg) 
 
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
-    dtype dataItem = msg->getDataItem(i);
+    dtype &dataItem = msg->getDataItem(i);
     determineLocation(destinationPe, destinationCoordinates);
 #ifdef DEBUG_STREAMER
     CkAssert(destinationCoordinates.planeIndex == myPlaneIndex_);
@@ -570,7 +570,7 @@ template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
 
     if (!isPeriodicFlushEnabled_ || 
-	CkWallTimer() - timeOfLastSend_ >= progressPeriodInMs_) {
+	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
       flushBuckets(planeBuffers_, numPlanes_);
       flushBuckets(columnBuffers_, numColumns_);
       flushBuckets(personalizedBuffers_, numRows_);

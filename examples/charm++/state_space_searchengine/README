@@ -1,14 +1,18 @@
 Steps to use the search engine:
 
-(1) In Makefile.common in top level, set Charm++ path
-(2) Go to template directory.  
-  (1)If you are using priority, define -DUSEBITPRIORITY
+(1) build state space searchengine in charm++ libs
+  (1) cd charm/<build dir>/tmp/libs/ck-libs/state_space_searchengine
+  (2) type 'make OPTS=-O3'
 
-  type 'make'
+      If you are using priority, add -DUSEBITPRIORITY to OPTS,
+      and type 'make OPTS="-O3 -DUSEBITPRIORITY"'
 
-(3) Go to your own application directory. For example NQueens:
+    this will build two search engine libraries: libmodulesearchEngine.a and libmodulesearchEngine_bound.a (for branch-and-bound).
 
-   type 'make'.  Same macros with step 2.
+(2) Go to your own application directory. For example, 
+   type 'cd NQueens'
+
+   and then type 'make OPTS=-O3'.  Make sure to use the same macro as in step (1)/(2) above.
 
 
 *Files to be changed. 

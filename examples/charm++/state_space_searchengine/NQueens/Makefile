@@ -1,6 +1,4 @@
 
-override OPTS += -I../searchengineLib -L../searchengineLib
-
 include ../Makefile.common
 
 

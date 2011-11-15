@@ -1,15 +1,10 @@
-CHARMC=charmc
 SRC_DIR=./
 MINISAT_DIR=./minisat
-OPTS =-g -I. -DUSEPRIORITY -DOPTIMIZE -D__ALWAYS_INLINE -DSTATISTIC -DONESOLUTION 
-
-OPTS += -I../searchengineLib -L../searchengineLib
+OPTS =-g -I. -DUSEPRIORITY -D__ALWAYS_INLINE -DSTATISTIC -DONESOLUTION 
 
 include ../Makefile.common
 
 all: main main_minisat
-
-include ../Makefile.common
 
 CMINISATFLAGS = -I$(MINISAT) -DMINISAT
 
@@ -21,9 +16,6 @@ main.decl.h: $(SRC_DIR)/main.ci
 
 main.o: $(SRC_DIR)/defines.h $(SRC_DIR)/main.C main.decl.h
 	$(CHARMC) $(OPTS) -c $(SRC_DIR)/main.C
-
-searchEngine.decl.h: $(SRC_DIR)/searchEngine.ci
-	$(CHARMC) $(OPTS) -E $(SRC_DIR)/searchEngine.ci
 
 searchEngineAPI.o: $(SRC_DIR)/searchEngineAPI.C $(SRC_DIR)/searchEngineAPI.h
 	$(CHARMC) -c  $(SRC_DIR)/searchEngineAPI.C

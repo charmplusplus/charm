@@ -19,7 +19,6 @@ ifeq ($(RNG), ALFG)
 endif
 
 OPTS = -DBRG_C99_TYPES #-std=c99 
-OPTS += -I../searchengineLib -L../searchengineLib
 
 include ../Makefile.common
 
