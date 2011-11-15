@@ -1680,7 +1680,7 @@ void * isomallocfn (size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 //free function to be used by mempool
 void isofreefn(void *ptr, mem_handle_t mem_hndl)
 {
-  call_munmap(ptr, ((mempool_block *)ptr)->size);
+  call_munmap(ptr, ((block_header *)ptr)->size);
 }
 #endif
 
@@ -2022,7 +2022,7 @@ static void init_ranges(char **argv)
   int pagesize = 0;
 
   /*Round slot size up to nearest page size*/
-  slotsize=16*1024;
+  slotsize=1024*1024;
 #if CMK_HAS_GETPAGESIZE
   pagesize = getpagesize();
 #endif
@@ -2302,8 +2302,8 @@ void *CmiIsomalloc(int size, CthThread tid)
 #if ISOMALLOC_DEBUG
       printf("Init Mempool in %d for %d\n",CthSelf(), tid);
 #endif
-      CtvAccessOther(tid,threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
-                                                  isomallocfn, isofreefn);
+      CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
+      printf("Other - request is %d\n",size);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
   } else {
@@ -2311,8 +2311,8 @@ void *CmiIsomalloc(int size, CthThread tid)
 #if ISOMALLOC_DEBUG
       printf("Init Mempool in %d\n",CthSelf());
 #endif
-      CtvAccess(threadpool) = mempool_init(size+sizeof(CmiIsomallocBlock), 
-                                                  isomallocfn, isofreefn);
+      CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
+      printf("Self - request is %d\n",size);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
@@ -2443,7 +2443,7 @@ void CmiIsomallocFree(void *blockPtr)
   else if (blockPtr!=NULL)
   {
 #if USE_MEMPOOL_ISOMALLOC
-    mempool_free(CtvAccess(threadpool), blockPtr);
+    mempool_free(CtvAccess(threadpool), pointer2block(blockPtr));
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 
@@ -2537,10 +2537,9 @@ static void print_myslots();
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
 {
   mempool_type *mptr;
-  mempool_block *current, *mempools_head;
+  block_header *current, *block_head;
   void *newblock;
-  CmiInt8 slot;
-  int size;
+  CmiInt8 slot,size;
   int i, numBlocks = 0;
 
   if(!pup_isUnpacking(p)) {
@@ -2548,26 +2547,24 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     printf("My rank is %d Pupping for %d \n",CthSelf(),tid);
 #endif
     mptr = CtvAccessOther(tid,threadpool);
-    current = &(CtvAccessOther(tid,threadpool)->mempools_head);
+    current = &(CtvAccessOther(tid,threadpool)->block_head);
     while(current != NULL) {
       numBlocks++;
-      current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
-      //current = current->next;
+      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
 #if ISOMALLOC_DEBUG
     printf("Number of blocks packed %d\n",numBlocks);
 #endif
     pup_int(p,&numBlocks);
-    current = &(CtvAccessOther(tid,threadpool)->mempools_head);
+    current = &(CtvAccessOther(tid,threadpool)->block_head);
     while(current != NULL) {
-      pup_int(p,&current->size);
+      pup_int8(p,&current->size);
       pup_int8(p,&current->mem_hndl);
       pup_bytes(p,current->mempool_ptr,current->size);
 #if ISOMALLOC_DEBUG
       printf("[%d] Packing slot %lld size %d at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
 #endif
-      current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
-      //current = current->next;
+      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
   }
 
@@ -2577,7 +2574,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     printf("Number of blocks to be unpacked %d\n",numBlocks);
 #endif
     for(i = 0; i < numBlocks; i++) { 
-      pup_int(p,&size);
+      pup_int8(p,&size);
       pup_int8(p,&slot);
       newblock = map_slots(slot,size/slotsize);
       pup_bytes(p,newblock,size);
