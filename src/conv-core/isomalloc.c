@@ -2303,7 +2303,6 @@ void *CmiIsomalloc(int size, CthThread tid)
       printf("Init Mempool in %d for %d\n",CthSelf(), tid);
 #endif
       CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
-      printf("Other - request is %d\n",size);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
   } else {
@@ -2312,7 +2311,6 @@ void *CmiIsomalloc(int size, CthThread tid)
       printf("Init Mempool in %d\n",CthSelf());
 #endif
       CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
-      printf("Self - request is %d\n",size);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
