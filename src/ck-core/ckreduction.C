@@ -718,6 +718,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
     result->gcount+=gcount+adj(redNo).gcount;
     thisProxy[treeParent()].RecvMsg(result);
+    delete result;
   }
   else 
   {//We are root-- pass data to client
@@ -1998,6 +1999,7 @@ void CkNodeReductionMgr::finishReduction(void)
 		*/
 			result->gcount += additionalGCount;//if u have replaced some node add its gcount to ur count
 	    thisProxy[treeParent()].RecvMsg(result);
+      delete result;
 	}
 
   }
@@ -2554,6 +2556,7 @@ void CkNodeReductionMgr::doneEvacuate(){
 			}
 			CkReductionMsg *result = reduceMessages();
 			thisProxy[treeParent()].RecvMsg(result);
+      delete result;
 			redNo++;
 		}
 		DEBR(("[%d] Asking parent %d to remove myself from list \n",CkMyNode(),treeParent()));
