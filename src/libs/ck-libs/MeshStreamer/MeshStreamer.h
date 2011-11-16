@@ -103,7 +103,7 @@ private:
     CkCallback   userCallback_;
     int yieldFlag_;
 
-    int progressPeriodInMs_; 
+    double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
     double timeOfLastSend_; 
 
@@ -131,7 +131,7 @@ public:
     MeshStreamer(int totalBufferCapacity, int numRows, 
 		 int numColumns, int numPlanes, 
 		 const CProxy_MeshStreamerClient<dtype> &clientProxy,
-                 int yieldFlag = 0, int progressPeriodInMs = -1);
+                 int yieldFlag = 0, double progressPeriodInMs = -1.0);
     ~MeshStreamer();
 
       // entry
@@ -171,7 +171,7 @@ template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows, 
                            int numColumns, int numPlanes, 
                            const CProxy_MeshStreamerClient<dtype> &clientProxy,
-			   int yieldFlag, int progressPeriodInMs): yieldFlag_(yieldFlag) {
+			   int yieldFlag, double progressPeriodInMs): yieldFlag_(yieldFlag) {
   // limit total number of messages in system to totalBufferCapacity
   //   but allocate a factor BUCKET_SIZE_FACTOR more space to take
   //   advantage of nonuniform filling of buckets

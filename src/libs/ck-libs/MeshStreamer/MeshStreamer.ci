@@ -21,7 +21,7 @@ module MeshStreamer {
     entry MeshStreamer(int totalBufferCapacity, int numRows, 
 		       int numColumns, int numPlanes, 
 		       const CProxy_MeshStreamerClient<dtype> &clientProxy, 
-                       int yieldFlag = 0, int progressPeriodInMs = -1);   
+                       int yieldFlag = 0, double progressPeriodInMs = -1.0);   
     // entry void insertData(CmiUInt8, int); 
     entry void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
     // entry void receivePersonalizedData(MeshStreamerMessage *msg);
