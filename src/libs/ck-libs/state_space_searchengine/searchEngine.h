@@ -10,6 +10,8 @@
 #include "charm++.h"
 #include "cmipool.h"
 
+#define ADAPTIVE     1
+
 class Solver;
 class StateBase;
 class SearchNodeMsg;
@@ -64,7 +66,7 @@ extern int se_statesize;
 
 
 #ifdef BRANCHBOUND
-#ifndef ADAPTIVE
+#if ! ADAPTIVE
 #define SE_Register(state, f1, f2, f3, f4, f5)  \
     void registerSE() {    \
       SE_register(f1, f2, f3, f4, f5);   \
@@ -125,7 +127,7 @@ extern int se_statesize;
     void registerSE() {    \
       SE_register(f1, f2, f3, f4);   \
     }
-#ifndef ADAPTIVE
+#if ! ADAPTIVE
 #define SE_Register(state, f1, f2, f3, f4)  \
     registerSE_DEF(state, f1, f2, f3, f4)  \
     void createMultipleChildren(StateBase *parent, SequentialSolver* solver, bool parallel) {  \

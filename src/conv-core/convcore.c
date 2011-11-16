@@ -2757,6 +2757,7 @@ extern void arena_free(void *blockPtr);
 
 void *CmiAlloc(int size)
 {
+
   char *res;
 
 #if CONVERSE_VERSION_ELAN

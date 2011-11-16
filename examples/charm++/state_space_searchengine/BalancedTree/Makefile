@@ -1,8 +1,5 @@
 
-override OPTS += -I../searchengineLib -L../searchengineLib
-
 include ../Makefile.common
-
 
 all: main  main.nb  main.ws
 

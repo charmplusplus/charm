@@ -105,4 +105,6 @@ extended header must contain also another field called "pn" (phase number).
 
 */
 
+#include "conv-mach-pxshm.h"
+
 #endif

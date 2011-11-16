@@ -836,7 +836,7 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     }else
     {
         if( control_msg_tmp->seq_id == 1)
-            size = ONE_SEG;
+            size = size>ONE_SEG?ONE_SEG:size;
 
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
         if(status == GNI_RC_SUCCESS)
@@ -1115,7 +1115,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     if(request_msg->seq_id < 2)  
         msg_data = CmiAlloc(size);
     else
-        msg_data = request_msg-> dest_addr;
+        msg_data = (void*)request_msg-> dest_addr;
     _MEMCHECK(msg_data);
    
     MallocPostDesc(pd);
@@ -1828,8 +1828,6 @@ printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNod
     }
 
       /* steal failed, deregister and free memblock now */
-    int ret = posix_memalign(&pool, ALIGNBUF, *size);
-    CmiAssert(ret == 0);
     int freed = 0;
     for (k=0; k<CmiMyNodeSize()+1; k++) {
         i = (CmiMyRank()+k)%CmiMyNodeSize();
@@ -1873,6 +1871,10 @@ printf("[%d:%d:%d] free rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiM
             free(ptr);
              // try now
             if (freed > *size) {
+              if (pool == NULL) {
+                int ret = posix_memalign(&pool, ALIGNBUF, *size);
+                CmiAssert(ret == 0);
+              }
               status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
               if (status == GNI_RC_SUCCESS) {
                 if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
@@ -1891,7 +1893,7 @@ printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(),
         if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
     }
       /* still no luck registering pool */
-    free(pool);
+    if (pool) free(pool);
     return NULL;
 }
 #endif
@@ -2065,7 +2067,26 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         PMI_Barrier();
     }
 #if     USE_LRTS_MEMPOOL
-    CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size);
+    char *str;
+    //if (CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size))
+    if (CmiGetArgStringDesc(*argv,"+useMemorypoolSize",&str,"Set the memory pool size")) 
+    {
+      if (strpbrk(str,"G")) {
+        sscanf(str, "%lldG", &_mempool_size);
+        _mempool_size *= 1024ll*1024*1024;
+      }
+      else if (strpbrk(str,"M")) {
+        sscanf(str, "%lldM", &_mempool_size);
+        _mempool_size *= 1024*1024;
+      }
+      else if (strpbrk(str,"K")) {
+        sscanf(str, "%lldK", &_mempool_size);
+        _mempool_size *= 1024;
+      }
+      else {
+        sscanf(str, "%lld", &_mempool_size);
+      }
+    }
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
 #endif
 

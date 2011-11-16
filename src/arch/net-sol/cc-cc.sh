@@ -1,4 +1,3 @@
-CMK_CPP_CHARM='/usr/ccs/lib/cpp '
 CMK_CPP_C='cc -E -z muldefs '
 CMK_CC='cc -KPIC -z muldefs '
 CMK_CC_RELIABLE='cc -z muldefs '
