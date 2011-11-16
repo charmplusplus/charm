@@ -150,12 +150,20 @@ public:
     void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
       userCallback_ = cb;
       if (automaticFinish) {
-	CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
       }
     }
 
     void registerPeriodicProgressFunction();
     void finish(CkReductionMsg *msg);
+
+    /*
+     * Flushing begins on a PE only after enablePeriodicFlushing has been invoked.
+     */
+    void enablePeriodicFlushing(){
+      isPeriodicFlushEnabled_ = true; 
+      registerPeriodicProgressFunction();
+    }
 };
 
 template <class dtype>
@@ -210,14 +218,7 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   myRowIndex_ = indexWithinPlane / numColumns_;
   myColumnIndex_ = indexWithinPlane - myRowIndex_ * numColumns_; 
 
-  if (progressPeriodInMs_ > 0) {
-    isPeriodicFlushEnabled_ = true; 
-    registerPeriodicProgressFunction();
-  }
-  else {
-    isPeriodicFlushEnabled_ = false; 
-  }
-
+  isPeriodicFlushEnabled_ = false; 
 }
 
 template <class dtype>
