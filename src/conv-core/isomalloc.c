@@ -2314,7 +2314,7 @@ void *CmiIsomalloc(int size, CthThread tid)
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
-  blk->slot=-1;
+  blk->slot=(CmiInt8)blk;
   blk->length=size;
   return block2pointer(blk);
 }
@@ -2397,6 +2397,7 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
   CmiIsomallocBlock *blk;
   CmiInt8 s,length;
   CmiInt8 n;
+  CmiPrintf("Incorrect pup is called\n");
   if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
 
   if (!pup_isUnpacking(p)) 
@@ -2441,7 +2442,8 @@ void CmiIsomallocFree(void *blockPtr)
   else if (blockPtr!=NULL)
   {
 #if USE_MEMPOOL_ISOMALLOC
-    mempool_free(CtvAccess(threadpool), pointer2block(blockPtr));
+    mempool_free_thread((void*)pointer2block(blockPtr)->slot);
+    //mempool_free(CtvAccess(threadpool), (void*)pointer2block(blockPtr)->slot);
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 

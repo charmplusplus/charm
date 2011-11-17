@@ -11,7 +11,6 @@ Heavily modified by Nikhil Jain
 #define MEMPOOL_DEBUG   0
 
 #include "converse.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -175,7 +174,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->newblockfn = allocfn;
   mptr->freeblockfn = freefn;
   mptr->block_tail = 0;
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mempool_ptr = pool;
@@ -212,7 +211,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;
 
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
     CmiLock(mptr->mempoolLock);
 #endif
 
@@ -280,7 +279,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         head_next->prev = 0;
       }
 
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
       head_free->pool_addr = mptr;
       CmiUnlock(mptr->mempoolLock);
 #endif
@@ -291,7 +290,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     return NULL;
 }
 
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
 void mempool_free_thread( void *ptr_free)
 {
     slot_header *to_free;
@@ -332,7 +331,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
       block_head = block_head->block_next?(block_header *)((char*)mptr+block_head->block_next):NULL;
     }
     if(block_head==NULL) {
-      CmiPrintf("Mempool-Free request pointer was not in mempool range\n");
+      CmiPrintf("[%d] Mempool-Free request pointer was not in mempool range %lld\n",CthSelf(),ptr_free);
       return;
     }
 

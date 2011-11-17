@@ -3,7 +3,9 @@
 #define MEMPOOL_H  
 
 #include "conv-config.h"
+#include "converse.h"
 
+#define USE_MEMPOOL_ISOMALLOC  1
 #if CMK_CONVERSE_GEMINI_UGNI
 #include "gni_pub.h"
 #include "pmi.h"
@@ -22,7 +24,7 @@ typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 //header of an free slot
 typedef struct slot_header_
 {
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC ||  (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
   void*			pool_addr;
 #endif
 #if CMK_CONVERSE_GEMINI_UGNI
@@ -35,7 +37,7 @@ typedef struct slot_header_
 
 typedef struct used_header_
 {
-#if CMK_SMP && CMK_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_GEMINI_UGNI)
   void*			pool_addr;
 #endif
 #if CMK_CONVERSE_GEMINI_UGNI
@@ -64,7 +66,7 @@ typedef struct mempool_type
   mempool_newblockfn     newblockfn;
   mempool_freeblock      freeblockfn;
   size_t                 block_tail;
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
     CmiNodeLock		mempoolLock;
 #endif
 } mempool_type;
@@ -73,7 +75,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn newfn, mempool_f
 void  mempool_destroy(mempool_type *mptr);
 void*  mempool_malloc(mempool_type *mptr, int size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
-#if CMK_SMP && CMK_CONVERSE_GEMINI_UGNI
+#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
 void mempool_free_thread(void *ptr_free);
 #endif
 

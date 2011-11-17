@@ -366,8 +366,8 @@ TCharm::~TCharm()
 {
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
-  
-  if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+   
+  //if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
   CthFree(tid);
   CtgFree(threadGlobals);
   delete initMsg;
