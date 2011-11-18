@@ -227,7 +227,7 @@ struct CtgGlobalStruct {
       seg_size=size;
       /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size);
+        data_seg=CmiIsomalloc(seg_size,NULL);
       else
         data_seg=malloc(seg_size);
       inited = 0;

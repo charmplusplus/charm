@@ -2022,7 +2022,11 @@ static void init_ranges(char **argv)
   int pagesize = 0;
 
   /*Round slot size up to nearest page size*/
+#if USE_MEMPOOL_ISOMALLOC
   slotsize=1024*1024;
+#else
+  slotsize=16*1024;
+#endif 
 #if CMK_HAS_GETPAGESIZE
   pagesize = getpagesize();
 #endif
@@ -2443,7 +2447,6 @@ void CmiIsomallocFree(void *blockPtr)
   {
 #if USE_MEMPOOL_ISOMALLOC
     mempool_free_thread((void*)pointer2block(blockPtr)->slot);
-    //mempool_free(CtvAccess(threadpool), (void*)pointer2block(blockPtr)->slot);
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
     CmiInt8 s=blk->slot; 
