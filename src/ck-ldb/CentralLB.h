@@ -84,9 +84,12 @@ public:
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
-
+  void ProcessAtSyncMin(void);
   void SendStats();
+  void SendMinStats();
   void ReceiveCounts(CkReductionMsg *);
+  void ReceiveMinStats(CkReductionMsg *);
+  void ReceiveIdealLBPeriod(double lb_ideal_trigger_lb_time, double lb_min_stat_coll_period);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
   
