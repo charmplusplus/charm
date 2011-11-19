@@ -11,13 +11,19 @@ readonly CkGroupID loadbalancer;
 
 initnode void lbinit(void);
 
+initcall void registerLBDataCollection(void);
+
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
+  entry void ProcessAtSyncMin(void);
   entry void ProcessAtSync(void);
   entry void SendStats();
+  entry void SendMinStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveCounts(CkReductionMsg *);
+  entry void ReceiveMinStats(CkReductionMsg *msg);
+  entry void ReceiveIdealLBPeriod(double lb_ideal_trigger_lb_time, double lb_min_stat_coll_period);
   entry void LoadBalance(void);
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);
