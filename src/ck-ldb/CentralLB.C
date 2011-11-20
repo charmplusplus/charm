@@ -10,6 +10,8 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
+#include <vector>
+
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
 
@@ -42,14 +44,25 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-double lb_iteration_start_time = 0.0;
-double lb_ideal_trigger_lb_time = 0.0;
 double lb_migration_cost = 0.0;
 double lb_strategy_cost = 0.0;
-int lb_no_iterations = 0;
-double lb_min_stat_coll_period = 0.0;
+
+int lb_ideal_period = 0;
+int lb_no_iterations = -1;
+
 double cur_max_pe_load = 0.0;
 double cur_avg_pe_load = 0.0;
+double prev_load = 0.0;
+
+struct AdaptiveData {
+  int iteration;
+  double max_load;
+  double avg_load;
+};
+
+struct AdaptiveLBDatabase {
+  std::vector<AdaptiveData> history_data;
+} adaptive_lbdb;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
@@ -213,6 +226,12 @@ void CentralLB::AtSync()
 
 void CentralLB::ProcessAtSync()
 {
+
+  // Reset all adaptive lb related fields since load balancing is being done.
+  lb_no_iterations = -1;
+  adaptive_lbdb.history_data.clear();
+  prev_load = 0.0;
+
 #if CMK_LBDB_ON
   if (reduction_started) return;              // reducton in progress
 
@@ -261,15 +280,23 @@ void CentralLB::ProcessAtSyncMin()
 	initMlogLBStep(thisgroup);
 #endif
   
-  CkPrintf("ProcessAtSyncMin [%d]\n", CkMyPe());
+  lb_no_iterations++;
+  CkPrintf("ProcessAtSyncMin [%d] lb_iteration [%d] lb_ideal_period [%d]\n", CkMyPe(),
+      lb_no_iterations, lb_ideal_period);
 
-//  if (CkWallTimer() > lb_min_stat_coll_period) {
-//    CkPrintf("Since the time is past the collection period, send MinStats of [%d]\n", CkMyPe());
+  if (lb_no_iterations >= lb_ideal_period) {
+    CkPrintf("Since the time is past the collection period, send MinStats of [%d]\n", CkMyPe());
     SendMinStats();
-//  } else {
-//    CkPrintf("No need to send MinStats of [%d]\n", CkMyPe());
-//    ResumeClients(1);
-//  }
+  } else {
+
+ double total_walltime;
+ double idle_time;
+ double bg_walltime;
+  theLbdb->GetTime(&total_walltime,&total_walltime, &idle_time, &bg_walltime, &bg_walltime);
+    CkPrintf("No need to send MinStats of [%d] load: %lf\n\n", CkMyPe(),
+    total_walltime);
+    ResumeClients(0);
+  }
 #endif
 }
 
@@ -281,6 +308,12 @@ void CentralLB::SendMinStats() {
   theLbdb->GetTime(&total_walltime,&total_walltime, &idle_time, &bg_walltime, &bg_walltime);
   CkPrintf("Total walltime [%d] %lf\n", CkMyPe(), total_walltime);
 
+  // Since the total_walltime is cumulative since the last load balancing stage,
+  // Hence it is subtracted from the previous load.
+  double tmp = total_walltime;
+  total_walltime -= prev_load;
+  prev_load = tmp; 
+
   double lb_data[3];
   lb_data[0] = total_walltime;
   lb_data[1] = total_walltime;
@@ -289,53 +322,55 @@ void CentralLB::SendMinStats() {
   CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
                   thisProxy[0]);
   contribute(3*sizeof(double), lb_data, lbDataCollectionType, cb);
-
-//  {
-//  // enfore the barrier to wait until centralLB says no
-//  LDOMHandle h;
-//  h.id.id.idx = 0;
-//  theLbdb->getLBDB()->RegisteringObjects(h);
-//  }
 }
 
 void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   CmiAssert(CkMyPe() == 0);
-  lb_no_iterations++;
   double* load = (LBRealType *) msg->getData();
   double max = load[1];
   double avg = load[0]/load[2];
-  CkPrintf("Total load : %lf Avg load: %lf Max load: %lf\n", load[0], load[0]/load[2], load[1]);
-  cur_max_pe_load = max;
-  cur_avg_pe_load = avg;
+  CkPrintf("Iteration[%d] Total load : %lf Avg load: %lf Max load: %lf\n\n",lb_no_iterations, load[0], load[0]/load[2], load[1]);
+
+  // Store the data for this iteration
+  AdaptiveData data;
+  data.iteration = lb_no_iterations;
+  data.max_load = max;
+  data.avg_load = avg;
+  adaptive_lbdb.history_data.push_back(data);
+
+  if (max/avg >= 1.01) {
+    CkPrintf("Carry out load balancing step\n");
+    thisProxy.ProcessAtSync();
+    return;
+  }
 
   // Some heuristics for lbperiod
-  int ideal_period = (lb_strategy_cost + lb_migration_cost) * lb_no_iterations / (max - avg);
-  lb_ideal_trigger_lb_time = CkWallTimer() + (ideal_period * max/lb_no_iterations);
-  lb_min_stat_coll_period = CkWallTimer() + (ideal_period * max / lb_no_iterations);
-  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d trigger  lb: %lf current time: %lf\n",
-      max/lb_no_iterations, avg/lb_no_iterations,
-      lb_strategy_cost, lb_migration_cost, ideal_period, lb_ideal_trigger_lb_time,
-      CkWallTimer());
-  CkPrintf("Walltime: %lf, lb trigger time %f, lb min stats coll time %f\n", CkWallTimer(), lb_ideal_trigger_lb_time, lb_min_stat_coll_period);
-  //  thisProxy.ResumeClients(0);
-  
-  thisProxy.ReceiveIdealLBPeriod(lb_ideal_trigger_lb_time, lb_min_stat_coll_period);
 
-//  if (max/avg > 1.01) { 
-//    CkPrintf("Carrying out loadbalancing\n");
-//    thisProxy.ProcessAtSync();
-//    lb_no_iterations = 0;
-//  } else {
-    CkPrintf("Not very overloaded\n");
-	  thisProxy.ResumeClients(1);
-//  }
+  // If constant load or almost constant,
+  // then max * new_lb_period > avg * new_lb_period + lb_cost
+  if (adaptive_lbdb.history_data.size() > 3) {
+    max = 0.0;
+    avg = 0.0;
+    for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
+      data = adaptive_lbdb.history_data[i];
+      max += data.max_load;
+      avg += data.avg_load;
+    }
+    max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+    avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+
+    int ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
+    CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
+        max, avg, lb_strategy_cost, lb_migration_cost, ideal_period);
+
+    CkPrintf("Not very overloaded\n\n");
+    thisProxy.ResumeClients(ideal_period, 0);
+  } else {
+    thisProxy.ResumeClients(0);
+  }
 }
 
-void CentralLB::ReceiveIdealLBPeriod(double lb_ideal_trigger_lbtime,
-    double lb_min_stat_collperiod) {
-  lb_ideal_trigger_lb_time = lb_ideal_trigger_lbtime;
-  lb_min_stat_coll_period = lb_min_stat_collperiod;
-}
+
 // called only on 0
 void CentralLB::ReceiveCounts(CkReductionMsg  *msg)
 {
@@ -980,7 +1015,6 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
     theLbdb->SetLBPeriod(theLbdb->GetLBPeriod()*2);
   }
 #endif
-  CkPrintf("Can set the LBPeriod here [%d]\n", CkMyPe());
   cur_ld_balancer = m->next_lb;
   if((CkMyPe() == cur_ld_balancer) && (cur_ld_balancer != 0)){
       LBDatabaseObj()->set_avail_vector(m->avail_vector, -2);
@@ -1084,6 +1118,11 @@ void CentralLB::ResumeClients(CkReductionMsg *msg)
   delete msg;
 }
 
+void CentralLB::ResumeClients(int ideal_period, int balancing) {
+  lb_ideal_period = ideal_period;
+  ResumeClients(balancing);
+}
+
 void CentralLB::ResumeClients(int balancing)
 {
 #if CMK_LBDB_ON
@@ -1132,8 +1171,6 @@ void CentralLB::CheckMigrationComplete()
     }
 
     lb_migration_cost = (CkWallTimer() - start_lb_time);
-    lb_iteration_start_time = CkWallTimer();
-    CkPrintf("lb_iteration_start_time[%d] %lf\n", CkMyPe(), lb_iteration_start_time);
 
     lbdone = 0;
     future_migrates_expected = -1;

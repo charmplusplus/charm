@@ -89,7 +89,6 @@ public:
   void SendMinStats();
   void ReceiveCounts(CkReductionMsg *);
   void ReceiveMinStats(CkReductionMsg *);
-  void ReceiveIdealLBPeriod(double lb_ideal_trigger_lb_time, double lb_min_stat_coll_period);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
   
@@ -98,6 +97,7 @@ public:
   void ResumeClients(int);                      // Resuming clients needs
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
+  void ResumeClients(int, int);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))

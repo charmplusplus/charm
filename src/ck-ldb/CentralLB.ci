@@ -23,9 +23,9 @@ group [migratable] CentralLB : BaseLB {
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveCounts(CkReductionMsg *);
   entry void ReceiveMinStats(CkReductionMsg *msg);
-  entry void ReceiveIdealLBPeriod(double lb_ideal_trigger_lb_time, double lb_min_stat_coll_period);
   entry void LoadBalance(void);
   entry void ResumeClients(int);
+  entry void ResumeClients(int, int);
   entry void ResumeClients(CkReductionMsg *);
   entry void ReceiveMigration(LBMigrateMsg*);	
   entry void ProcessReceiveMigration(CkReductionMsg  *);
