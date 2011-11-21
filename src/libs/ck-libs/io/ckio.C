@@ -36,6 +36,7 @@ namespace Ck { namespace IO {
       size_t bytes_left = bytes;
       size_t stripeSize = files[token].opts.peStripe;   
       size_t stripeOffset = (offset/stripeSize)*stripeSize;
+      size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
 
       //check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
       if(files[token].bufferMap.find(stripeOffset) == files[token].bufferMap.end())
@@ -43,7 +44,7 @@ namespace Ck { namespace IO {
 	struct buffer b;
 	std::pair <size_t,buffer> pr (stripeOffset,b);
 	files[token].bufferMap.insert(pr);
-	files[token].bufferMap[stripeOffset].array.resize(stripeSize);
+	files[token].bufferMap[stripeOffset].array.resize(expectedBufferSize);
       }
      
     //write to buffer
@@ -54,7 +55,7 @@ namespace Ck { namespace IO {
     copy(data, data + bytes, it);
     files[token].bufferMap[stripeOffset].bytes_filled_so_far += bytes;
      
-    if(offset + bytes == files[token].bytes || files[token].bufferMap[stripeOffset].bytes_filled_so_far >= stripeSize)
+    if(files[token].bufferMap[stripeOffset].bytes_filled_so_far == expectedBufferSize)
     {
       //flush buffer
 
