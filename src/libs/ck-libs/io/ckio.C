@@ -35,31 +35,32 @@ namespace Ck { namespace IO {
       // XXX: CkAssert(this is the right processor to receive this data)
       size_t bytes_left = bytes;
       size_t stripeSize = files[token].opts.peStripe;   
-      
+      size_t stripeOffset = (offset/stripeSize)*stripeSize;
+
       //check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
-      if(files[token].bufferMap.find((offset/stripeSize)*stripeSize) == files[token].bufferMap.end())
+      if(files[token].bufferMap.find(stripeOffset) == files[token].bufferMap.end())
       {
 	struct buffer b;
-	std::pair <size_t,buffer> pr (((offset/stripeSize)*stripeSize),b);
+	std::pair <size_t,buffer> pr (stripeOffset,b);
 	files[token].bufferMap.insert(pr);
-	files[token].bufferMap[(offset/stripeSize)*stripeSize].array.resize(stripeSize);
+	files[token].bufferMap[stripeOffset].array.resize(stripeSize);
       }
      
     //write to buffer
     int current_index = 0;
-    std::vector<char>::iterator it = files[token].bufferMap[(offset/stripeSize)*stripeSize].array.begin();
+    std::vector<char>::iterator it = files[token].bufferMap[stripeOffset].array.begin();
     it = it + (offset%stripeSize);
     
     copy(data, data + bytes, it);
-    files[token].bufferMap[(offset/stripeSize)*stripeSize].bytes_filled_so_far += bytes;
+    files[token].bufferMap[stripeOffset].bytes_filled_so_far += bytes;
      
-    if(offset + bytes == files[token].bytes || files[token].bufferMap[(offset/stripeSize)*stripeSize].bytes_filled_so_far >= stripeSize)
+    if(offset + bytes == files[token].bytes || files[token].bufferMap[stripeOffset].bytes_filled_so_far >= stripeSize)
     {
       //flush buffer
 
     //initializa params
-    int l = files[token].bufferMap[(offset/stripeSize)*stripeSize].bytes_filled_so_far;
-    char *d = &(files[token].bufferMap[(offset/stripeSize)*stripeSize].array[0]);
+    int l = files[token].bufferMap[stripeOffset].bytes_filled_so_far;
+    char *d = &(files[token].bufferMap[stripeOffset].array[0]);
     
     //write to file loop
       while (l > 0) {
@@ -76,7 +77,7 @@ namespace Ck { namespace IO {
 	offset += ret;
       }
       //write complete - remove this element from bufferMap and call dataWritten
-      files[token].bufferMap.erase((offset/stripeSize)*stripeSize);
+      files[token].bufferMap.erase(stripeOffset);
       thisProxy[0].write_dataWritten(token, bytes);
     }
 
