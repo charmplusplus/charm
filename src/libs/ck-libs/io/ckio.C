@@ -37,25 +37,26 @@ namespace Ck { namespace IO {
       size_t stripeSize = files[token].opts.peStripe;   
       size_t stripeOffset = (offset/stripeSize)*stripeSize;
       size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
+      struct buffer & currentBuffer = files[token].bufferMap[stripeOffset];
 
       //check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
-      files[token].bufferMap[stripeOffset].array.resize(expectedBufferSize);
+      currentBuffer.array.resize(expectedBufferSize);
      
     //write to buffer
     int current_index = 0;
-    std::vector<char>::iterator it = files[token].bufferMap[stripeOffset].array.begin();
+    std::vector<char>::iterator it = currentBuffer.array.begin();
     it = it + (offset%stripeSize);
     
     copy(data, data + bytes, it);
-    files[token].bufferMap[stripeOffset].bytes_filled_so_far += bytes;
+    currentBuffer.bytes_filled_so_far += bytes;
      
-    if(files[token].bufferMap[stripeOffset].bytes_filled_so_far == expectedBufferSize)
+    if(currentBuffer.bytes_filled_so_far == expectedBufferSize)
     {
       //flush buffer
 
     //initializa params
-    int l = files[token].bufferMap[stripeOffset].bytes_filled_so_far;
-    char *d = &(files[token].bufferMap[stripeOffset].array[0]);
+    int l = currentBuffer.bytes_filled_so_far;
+    char *d = &(currentBuffer.array[0]);
     
     //write to file loop
       while (l > 0) {
