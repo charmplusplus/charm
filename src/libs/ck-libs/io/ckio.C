@@ -43,20 +43,13 @@ namespace Ck { namespace IO {
 	size_t bytesInCurrentStripe = expectedBufferSize - offset%stripeSize;
 
 	//check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
-	currentBuffer.array.resize(expectedBufferSize);
+	currentBuffer.expect(expectedBufferSize);
 
-	//write to buffer
-	int current_index = 0;
-	std::vector<char>::iterator it = currentBuffer.array.begin();
-	it = it + (offset%stripeSize);
-    
-	copy(data, data + bytesInCurrentStripe, it);
-	currentBuffer.bytes_filled_so_far += bytesInCurrentStripe;
-     
-	if(currentBuffer.bytes_filled_so_far == expectedBufferSize)
+	currentBuffer.insertData(data, bytesInCurrentStripe, offset % stripeSize);
+
+	// Ready to flush?
+	if(currentBuffer.isFull()) 
 	  {
-	    //flush buffer
-
 	    //initializa params
 	    int l = currentBuffer.bytes_filled_so_far;
 	    char *d = &(currentBuffer.array[0]);

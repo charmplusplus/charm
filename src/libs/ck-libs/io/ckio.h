@@ -60,7 +60,25 @@ namespace Ck { namespace IO {
     {
       bytes_filled_so_far = 0;
     }
+
+    void expect(size_t bytes)
+    {
+      array.resize(bytes);
+    }
     
+    void insertData(const char *data, size_t length, size_t offset)
+    {
+      std::vector<char>::iterator it = array.begin();
+      it = it + offset;
+
+      copy(data, data + length, it);
+      bytes_filled_so_far += length;
+    }
+
+    bool isFull()
+    {
+      return bytes_filled_so_far == array.size();
+    }
   };
     
 
