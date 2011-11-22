@@ -48,30 +48,29 @@ namespace Ck { namespace IO {
 	currentBuffer.insertData(data, bytesInCurrentStripe, offset % stripeSize);
 
 	// Ready to flush?
-	if(currentBuffer.isFull()) 
-	  {
-	    //initializa params
-	    int l = currentBuffer.bytes_filled_so_far;
-	    char *d = &(currentBuffer.array[0]);
-	    size_t bufferOffset = stripeOffset;
-	    //write to file loop
-	    while (l > 0) {
-	      ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
-	      if (ret < 0)
-		if (errno == EINTR)
-		  continue;
-		else {
-		  CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
-		  CkAbort("Giving up");
-		}
-	      l -= ret;
-	      d += ret;
-	      bufferOffset += ret;
-	    }
-	    //write complete - remove this element from bufferMap and call dataWritten
-	    thisProxy[0].write_dataWritten(token, currentBuffer.bytes_filled_so_far);
-	    files[token].bufferMap.erase(stripeOffset);
+	if(currentBuffer.isFull()) {
+	  //initializa params
+	  int l = currentBuffer.bytes_filled_so_far;
+	  char *d = &(currentBuffer.array[0]);
+	  size_t bufferOffset = stripeOffset;
+	  //write to file loop
+	  while (l > 0) {
+	    ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
+	    if (ret < 0)
+	      if (errno == EINTR)
+		continue;
+	      else {
+		CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
+		CkAbort("Giving up");
+	      }
+	    l -= ret;
+	    d += ret;
+	    bufferOffset += ret;
 	  }
+	  //write complete - remove this element from bufferMap and call dataWritten
+	  thisProxy[0].write_dataWritten(token, currentBuffer.bytes_filled_so_far);
+	  files[token].bufferMap.erase(stripeOffset);
+	}
 
 	bytes -= bytesInCurrentStripe;
 	data += bytesInCurrentStripe;
