@@ -68,10 +68,9 @@ namespace Ck { namespace IO {
     
     void insertData(const char *data, size_t length, size_t offset)
     {
-      std::vector<char>::iterator it = array.begin();
-      it = it + offset;
+      char *dest = &array[offset];
+      memcpy(dest, data, length);
 
-      copy(data, data + length, it);
       bytes_filled_so_far += length;
     }
 
