@@ -37,7 +37,7 @@ public:
 struct test : public CBase_test {
   test(Ck::IO::Token token) {
     char out[11];
-    sprintf(out, "%10d", thisIndex);
+    sprintf(out, "%9d\n", thisIndex);
     ((Ck::IO::Manager *)CkLocalBranch(mgr))->write(token, out, 10, 10*thisIndex);
   }
   test(CkMigrateMessage *m) {}
