@@ -33,50 +33,57 @@ namespace Ck { namespace IO {
       //files[token].bufferMap[(offset/stripeSize)*stripeSize] is the buffer to which this char should write to.
       CkAssert(offset + bytes <= files[token].bytes);
       // XXX: CkAssert(this is the right processor to receive this data)
-      size_t bytes_left = bytes;
+
       size_t stripeSize = files[token].opts.peStripe;   
-      size_t stripeOffset = (offset/stripeSize)*stripeSize;
-      size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
-      struct buffer & currentBuffer = files[token].bufferMap[stripeOffset];
+      while(bytes > 0)
+      {
+	size_t stripeOffset = (offset/stripeSize)*stripeSize;
+	size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
+	struct buffer & currentBuffer = files[token].bufferMap[stripeOffset];
+	size_t bytesInCurrentStripe = expectedBufferSize - offset%stripeSize;
 
-      //check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
-      currentBuffer.array.resize(expectedBufferSize);
-     
-    //write to buffer
-    int current_index = 0;
-    std::vector<char>::iterator it = currentBuffer.array.begin();
-    it = it + (offset%stripeSize);
-    
-    copy(data, data + bytes, it);
-    currentBuffer.bytes_filled_so_far += bytes;
-     
-    if(currentBuffer.bytes_filled_so_far == expectedBufferSize)
-    {
-      //flush buffer
+	//check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
+	currentBuffer.array.resize(expectedBufferSize);
 
-    //initializa params
-    int l = currentBuffer.bytes_filled_so_far;
-    char *d = &(currentBuffer.array[0]);
+	//write to buffer
+	int current_index = 0;
+	std::vector<char>::iterator it = currentBuffer.array.begin();
+	it = it + (offset%stripeSize);
     
-    //write to file loop
-      while (l > 0) {
-        ssize_t ret = pwrite(files[token].fd, d, l, offset);
-	if (ret < 0)
-	  if (errno == EINTR)
-	    continue;
-	  else {
-	    CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
-	    CkAbort("Giving up");
+	copy(data, data + bytesInCurrentStripe, it);
+	currentBuffer.bytes_filled_so_far += bytesInCurrentStripe;
+     
+	if(currentBuffer.bytes_filled_so_far == expectedBufferSize)
+	  {
+	    //flush buffer
+
+	    //initializa params
+	    int l = currentBuffer.bytes_filled_so_far;
+	    char *d = &(currentBuffer.array[0]);
+	    size_t bufferOffset = stripeOffset;
+	    //write to file loop
+	    while (l > 0) {
+	      ssize_t ret = pwrite(files[token].fd, d, l, bufferOffset);
+	      if (ret < 0)
+		if (errno == EINTR)
+		  continue;
+		else {
+		  CkPrintf("Output failed on PE %d: %s", CkMyPe(), strerror(errno));
+		  CkAbort("Giving up");
+		}
+	      l -= ret;
+	      d += ret;
+	      bufferOffset += ret;
+	    }
+	    //write complete - remove this element from bufferMap and call dataWritten
+	    thisProxy[0].write_dataWritten(token, currentBuffer.bytes_filled_so_far);
+	    files[token].bufferMap.erase(stripeOffset);
 	  }
-	l -= ret;
-	d += ret;
-	offset += ret;
-      }
-      //write complete - remove this element from bufferMap and call dataWritten
-      files[token].bufferMap.erase(stripeOffset);
-      thisProxy[0].write_dataWritten(token, bytes);
-    }
 
+	bytes -= bytesInCurrentStripe;
+	data += bytesInCurrentStripe;
+	offset += bytesInCurrentStripe;
+      }
     }
 
     void Manager::write_dataWritten(Token token, size_t bytes) {
