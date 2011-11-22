@@ -40,7 +40,7 @@ namespace Ck { namespace IO {
 	size_t stripeOffset = (offset/stripeSize)*stripeSize;
 	size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
 	struct buffer & currentBuffer = files[token].bufferMap[stripeOffset];
-	size_t bytesInCurrentStripe = expectedBufferSize - offset%stripeSize;
+	size_t bytesInCurrentStripe = std::min(expectedBufferSize - offset%stripeSize, bytes);
 
 	//check if buffer this element already exists in map. If not, insert and resize buffer to stripe size
 	currentBuffer.expect(expectedBufferSize);
