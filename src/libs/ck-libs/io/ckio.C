@@ -38,7 +38,7 @@ namespace Ck { namespace IO {
       while(bytes > 0)
       {
 	size_t stripeOffset = (offset/stripeSize)*stripeSize;
-	size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize) ;
+	size_t expectedBufferSize = std::min(files[token].bytes - stripeOffset, stripeSize);
 	struct buffer & currentBuffer = files[token].bufferMap[stripeOffset];
 	size_t bytesInCurrentStripe = std::min(expectedBufferSize - offset%stripeSize, bytes);
 
