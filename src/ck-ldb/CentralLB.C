@@ -203,7 +203,7 @@ void CentralLB::turnOff()
 
 void CentralLB::AtSync()
 {
-  CkPrintf("AtSync CEntral LB\n");
+  CkPrintf("AtSync CEntral LB [%d]\n", CkMyPe());
 #if CMK_LBDB_ON
   DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 
@@ -344,32 +344,39 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
     return;
   }
 
-  // Some heuristics for lbperiod
-
-  // If constant load or almost constant,
-  // then max * new_lb_period > avg * new_lb_period + lb_cost
-  if (adaptive_lbdb.history_data.size() > 3) {
-    max = 0.0;
-    avg = 0.0;
-    for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
-      data = adaptive_lbdb.history_data[i];
-      max += data.max_load;
-      avg += data.avg_load;
-    }
-    max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
-    avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
-
-    int ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
-    CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
-        max, avg, lb_strategy_cost, lb_migration_cost, ideal_period);
-
-    CkPrintf("Not very overloaded\n\n");
-    thisProxy.ResumeClients(ideal_period, 0);
+  // Generate the plan for the adaptive strategy
+  if (generatePlan()) {
+    thisProxy.ResumeClients(lb_ideal_period, 0);
   } else {
     thisProxy.ResumeClients(0);
   }
 }
 
+bool CentralLB::generatePlan() {
+  if (adaptive_lbdb.history_data.size() <= 3) {
+    return false;
+  }
+
+  // Some heuristics for lbperiod
+  // If constant load or almost constant,
+  // then max * new_lb_period > avg * new_lb_period + lb_cost
+  double max = 0.0;
+  double avg = 0.0;
+  AdaptiveData data;
+  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
+    max += data.max_load;
+    avg += data.avg_load;
+  }
+  max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+  avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+
+  lb_ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
+  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
+      max, avg, lb_strategy_cost, lb_migration_cost, lb_ideal_period);
+
+  return true;
+}
 
 // called only on 0
 void CentralLB::ReceiveCounts(CkReductionMsg  *msg)

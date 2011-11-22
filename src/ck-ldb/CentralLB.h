@@ -255,6 +255,7 @@ private:
 
   void BuildStatsMsg();
   void buildStats();
+  bool generatePlan();
 
 public:
   int useMem();
