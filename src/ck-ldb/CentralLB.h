@@ -256,6 +256,8 @@ private:
   void BuildStatsMsg();
   void buildStats();
   bool generatePlan();
+  bool getLineEq(double& aslope, double& ac, double& mslope, double& mc);
+  int getPeriodForLinear(double a, double b, double c);
 
 public:
   int useMem();

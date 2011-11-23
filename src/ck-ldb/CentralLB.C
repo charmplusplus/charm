@@ -330,6 +330,9 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   double max = load[1];
   double avg = load[0]/load[2];
   CkPrintf("Iteration[%d] Total load : %lf Avg load: %lf Max load: %lf\n\n",lb_no_iterations, load[0], load[0]/load[2], load[1]);
+  if (lb_no_iterations == 0) {
+    return;
+  }
 
   // Store the data for this iteration
   AdaptiveData data;
@@ -338,12 +341,15 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   data.avg_load = avg;
   adaptive_lbdb.history_data.push_back(data);
 
-  if (max/avg >= 1.01) {
+  // If the max/avg ratio is greater than the threshold and also this is not the
+  // step immediately after load balancing, carry out load balancing
+  if (max/avg >= 1.1) {
     CkPrintf("Carry out load balancing step\n");
     thisProxy.ProcessAtSync();
     return;
   }
 
+  CkPrintf("No need to do lb now 
   // Generate the plan for the adaptive strategy
   if (generatePlan()) {
     thisProxy.ResumeClients(lb_ideal_period, 0);
@@ -360,21 +366,75 @@ bool CentralLB::generatePlan() {
   // Some heuristics for lbperiod
   // If constant load or almost constant,
   // then max * new_lb_period > avg * new_lb_period + lb_cost
-  double max = 0.0;
-  double avg = 0.0;
-  AdaptiveData data;
-  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
-    data = adaptive_lbdb.history_data[i];
-    max += data.max_load;
-    avg += data.avg_load;
+//  double max = 0.0;
+//  double avg = 0.0;
+//  AdaptiveData data;
+//  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
+//    data = adaptive_lbdb.history_data[i];
+//    max += data.max_load;
+//    avg += data.avg_load;
+//  }
+//  max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//  avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//
+//  lb_ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
+//  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
+//      max, avg, lb_strategy_cost, lb_migration_cost, lb_ideal_period);
+
+  // If linearly varying load, then find lb_period
+  // area between the max and avg curve 
+  double mslope, aslope, mc, ac;
+  getLineEq(aslope, ac, mslope, mc);
+  CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
+  double a = (mslope - aslope)/2;
+  double b = (mc - ac);
+  double c = -(lb_strategy_cost + lb_migration_cost);
+  lb_ideal_period = getPeriodForLinear(a, b, c);
+  CkPrintf("Ideal period for linear load %d\n", lb_ideal_period);
+
+  return true;
+}
+
+int CentralLB::getPeriodForLinear(double a, double b, double c) {
+  if (a == 0) {
+    return -c / b;
   }
-  max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
-  avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+  int x;
+  int t = (b * b) - (4*a*c);
+  x = (-b + sqrt(t)) / (2*a);
+  return x;
+}
 
-  lb_ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
-  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
-      max, avg, lb_strategy_cost, lb_migration_cost, lb_ideal_period);
+bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc) {
+  int total = adaptive_lbdb.history_data.size();
+  int iterations = 1 + adaptive_lbdb.history_data[total - 1].iteration -
+      adaptive_lbdb.history_data[0].iteration;
+  double a1 = 0;
+  double m1 = 0;
+  double a2 = 0;
+  double m2 = 0;
+  AdaptiveData data;
+  int i = 0;
+  for (i = 0; i <= total/2; i++) {
+    data = adaptive_lbdb.history_data[i];
+    m1 += data.max_load;
+    a1 += data.avg_load;
+  }
+  m1 /= i;
+  a1 /= i;
 
+  for (i = total/2; i < total; i++) {
+    data = adaptive_lbdb.history_data[i];
+    m2 += data.max_load;
+    a2 += data.avg_load;
+  }
+  m2 /= (i - total/2);
+  a2 /= (i - total/2);
+
+  aslope = 2 * (a2 - a1) / iterations;
+  mslope = 2 * (m2 - m1) / iterations;
+  ac = adaptive_lbdb.history_data[0].avg_load;
+  mc = adaptive_lbdb.history_data[0].max_load;
   return true;
 }
 
