@@ -821,7 +821,8 @@ void CkMemCheckPT::recoverBuddies()
 
 #if 1
   if (expectCount == 0) {
-    thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
+    contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
+    //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
   }
 #else
   if (CkMyPe() == 0) {
@@ -838,7 +839,8 @@ void CkMemCheckPT::gotData()
   if (ackCount == expectCount) {
     ackCount = 0;
     expectCount = -1;
-    thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
+    //thisProxy[0].quiescence(CkCallback(CkIndex_CkMemCheckPT::recoverArrayElements(), thisProxy));
+    contribute(CkCallback(CkReductionTarget(CkMemCheckPT, recoverArrayElements), thisProxy));
   }
 }
 
