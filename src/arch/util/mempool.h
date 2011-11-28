@@ -5,7 +5,6 @@
 #include "conv-config.h"
 #include "converse.h"
 
-#define USE_MEMPOOL_ISOMALLOC  1
 #if CMK_CONVERSE_GEMINI_UGNI
 #include "gni_pub.h"
 #include "pmi.h"
@@ -32,7 +31,7 @@ typedef struct slot_header_
 #endif
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
-  size_t      		prev,next;    //link list for either freelists slots
+  size_t      		prev,next;    //link list for freelists slots
 } slot_header;
 
 typedef struct used_header_

@@ -140,7 +140,7 @@ static CmiInt8 pe2slot(int pe) {
 /* Return the number of slots in a block with n user data bytes */
 #if USE_MEMPOOL_ISOMALLOC
 static int length2slots(int nBytes) {
-  return (sizeof(CmiIsomallocBlock)+sizeof(mempool_type)+ sizeof(mempool_header)+nBytes+slotsize-1)/slotsize;
+  return (nBytes+slotsize-1)/slotsize;
 }
 #else
 static int length2slots(int nBytes) {
@@ -2584,7 +2584,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 #if ISOMALLOC_DEBUG
       printf("[%d] slot %lld size %d at %p to %p\n",CmiMyPe(),slot,size,newblock,newblock+size);
 #endif
-      }
+    }
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {

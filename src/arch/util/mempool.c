@@ -5,7 +5,7 @@ Memory pool implementation , It is only good for Charm++ usage. The first 64 byt
 
 Written by Yanhua Sun 08-27-2011
 Generalized by Gengbin Zheng  10/5/2011
-Heavily modified by Nikhil Jain
+Heavily modified by Nikhil Jain 11/28/2011
 */
 
 #define MEMPOOL_DEBUG   0
@@ -206,7 +206,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     void          *pool;
     int           i;
     size_t        expand_size;
-    int           power, bestfit_size; //most close power of cutoffpoint 
+    int           power, bestfit_size; //closest power of cutoffpoint 
     block_header  *current,*tail;
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;
@@ -218,8 +218,6 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     bestfit_size = size + sizeof(used_header);
     power = which_pow2(bestfit_size);
     bestfit_size = cutOffPoints[power];
-    //if(CmiMyPe() == 0)
-    //  printf("malloc for %lld, %lld, %lld\n",size,bestfit_size,power);
 #if MEMPOOL_DEBUG
     CmiPrintf("Request size is %d, power value is %d, size is %d\n",size,power,cutOffPoints[power]);
 #endif
@@ -237,8 +235,6 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
     //no space in current blocks, get a new one
     if(head_free==NULL) {
-      //if(CmiMyPe() == 0)
-	//printf("Will attempt to expand now\n");
       if (!expand) return NULL;
 
 #if MEMPOOL_DEBUG
@@ -246,7 +242,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 #endif
 
       tail = (block_header*)((char*)mptr+mptr->block_tail);
-      expand_size = 2*bestfit_size; 
+      expand_size = 2*bestfit_size + sizeof(block_header); 
       pool = mptr->newblockfn(&expand_size, &mem_hndl, 1);
       if(pool==NULL) {
         CmiPrintf("Mempool-Did not get memory while expanding\n");
@@ -286,7 +282,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       return (char*)head_free + sizeof(used_header);
     }
     
-    CmiPrintf("Mempool - Reached a location which I should never have reached\n");
+    CmiPrintf("Mempool-Reached a location which I should never have reached\n");
     return NULL;
 }
 
@@ -387,9 +383,12 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     }
     left = size;
 
-    //if(CmiMyPe() == 0)
-    //  printf("free was for %lld, merging for %lld, power %lld\n",to_free->size,size,power);
-     loc = (char*)first - (char*)mptr;
+#if MEMPOOL_DEBUG
+    if(CmiMyPe() == 0)
+      printf("free was for %lld, merging for %lld, power %lld\n",to_free->size,size,power);
+#endif
+
+    loc = (char*)first - (char*)mptr;
     for(i=power; i>=0; i--) {
       if(left>=cutOffPoints[i]) {
         current = (slot_header*)((char*)mptr+loc);
