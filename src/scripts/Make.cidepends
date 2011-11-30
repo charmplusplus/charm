@@ -49,6 +49,7 @@ RecBipartLB.decl.h RecBipartLB.def.h: RecBipartLB.ci.stamp
 RecBisectBfLB.decl.h RecBisectBfLB.def.h: RecBisectBfLB.ci.stamp
 RefineCommLB.decl.h RefineCommLB.def.h: RefineCommLB.ci.stamp
 RefineKLB.decl.h RefineKLB.def.h: RefineKLB.ci.stamp
+RefineSwapLB.decl.h RefineSwapLB.def.h: RefineSwapLB.ci.stamp
 RefineLB.decl.h RefineLB.def.h: RefineLB.ci.stamp
 RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp
