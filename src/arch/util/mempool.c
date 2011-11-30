@@ -18,6 +18,12 @@ Heavily modified by Nikhil Jain 11/28/2011
 #include <malloc.h>
 #endif
 
+#if CMK_C_INLINE
+#define INLINE_KEYWORD inline
+#else
+#define INLINE_KEYWORD
+#endif
+
 #include "mempool.h"
 int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
                       65536,131072,262144,524288,1048576,2097152,4194304,
@@ -25,7 +31,7 @@ int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
                       536870912};
 
 
-inline int which_pow2(size_t size)
+INLINE_KEYWORD int which_pow2(size_t size)
 {
   int i;
   for(i=0; i<cutOffNum; i++) {
@@ -37,7 +43,7 @@ inline int which_pow2(size_t size)
 }
 
 //method to initialize the freelists of a newly allocated block
-inline void fillblock(mempool_type *mptr,block_header *block_head,int pool_size,int expansion) 
+INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int pool_size,int expansion) 
 {
   int         i,power;
   size_t      loc,left,prev;
