@@ -2541,14 +2541,10 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 {
   mempool_type *mptr;
   block_header *current, *block_head;
-  slot_header *currSlot;
   void *newblock;
   CmiInt8 slot,size;
-  int flags[2];
-  int i, j;
-  int numBlocks = 0, numSlots = 0, flag = 1;
+  int i, numBlocks = 0;
 
-  flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
 #if ISOMALLOC_DEBUG
     printf("My rank is %d Pupping for %d \n",CthSelf(),tid);
@@ -2567,36 +2563,10 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     while(current != NULL) {
       pup_int8(p,&current->size);
       pup_int8(p,&current->mem_hndl);
-      numSlots = 0;
-      if(flag) {
-        pup_bytes(p,current,sizeof(mempool_type));
-        currSlot = (slot_header*)((char*)current+sizeof(mempool_type));
-      } else {
-        pup_bytes(p,current,sizeof(block_header));
-        currSlot = (slot_header*)((char*)current+sizeof(block_header));
-      }
-      while(currSlot != NULL) {
-        numSlots++;
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
-      }
-      pup_int(p,&numSlots);
-      if(flag) {
-        currSlot = (slot_header*)((char*)current+sizeof(mempool_type));
-        flag = 0;
-      } else {
-        currSlot = (slot_header*)((char*)current+sizeof(block_header));
-      }
-      while(currSlot != NULL) {
-        pup_int(p,&currSlot->size);
-        if(currSlot->status) {
-          pup_int(p,&flags[0]);
-          pup_bytes(p,(void*)currSlot,sizeof(slot_header));
-        } else {
-          pup_int(p,&flags[1]);
-          pup_bytes(p,(void*)currSlot,currSlot->size);
-        }
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
-      }
+      pup_bytes(p,current->mempool_ptr,current->size);
+#if ISOMALLOC_DEBUG
+      printf("[%d] Packing slot %lld size %d at %p to %p\n",CmiMyPe(),current->mem_hndl,current->size,current->mempool_ptr,current->mempool_ptr+current->size);
+#endif
       current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
   }
@@ -2610,25 +2580,10 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       pup_int8(p,&size);
       pup_int8(p,&slot);
       newblock = map_slots(slot,size/slotsize);
-      if(flag) {
-        pup_bytes(p,newblock,sizeof(mempool_type));
-        newblock = (char*)newblock + sizeof(mempool_type);
-        flag = 0;
-      } else {
-        pup_bytes(p,newblock,sizeof(block_header));
-        newblock = (char*)newblock + sizeof(block_header);
-      }
-      pup_int(p,&numSlots);
-      for(j=0; j < numSlots; j++) {
-        pup_int(p,&flags[0]);
-        pup_int(p,&flags[1]);
-        if(flags[1] == 0) {
-          pup_bytes(p,newblock,sizeof(slot_header));
-        } else {
-          pup_bytes(p,newblock,flags[0]);
-        }
-        newblock = (char*)newblock + flags[0];
-      }
+      pup_bytes(p,newblock,size);
+#if ISOMALLOC_DEBUG
+      printf("[%d] slot %lld size %d at %p to %p\n",CmiMyPe(),slot,size,newblock,newblock+size);
+#endif
     }
   }
   pup_bytes(p,lp,sizeof(int*));
