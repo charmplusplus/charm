@@ -1672,7 +1672,7 @@ void * isomallocfn (size_t *size, mem_handle_t *mem_hndl, int expand_flag)
 #endif
   }
   if (!newaddr) map_failed(s,n);
-  *mem_hndl = s;
+  *((CmiInt8 *)mem_hndl) = s;
   *size = n*slotsize;
   return newaddr;
 }
@@ -2566,7 +2566,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     current = &(CtvAccessOther(tid,threadpool)->block_head);
     while(current != NULL) {
       pup_int8(p,&current->size);
-      pup_int8(p,&current->mem_hndl);
+      pup_bytes(p,&current->mem_hndl,sizeof(CmiInt8));
       numSlots = 0;
       if(flag) {
         pup_bytes(p,current,sizeof(mempool_type));
@@ -2608,7 +2608,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
 #endif
     for(i = 0; i < numBlocks; i++) { 
       pup_int8(p,&size);
-      pup_int8(p,&slot);
+      pup_bytes(p,&slot,sizeof(CmiInt8));
       newblock = map_slots(slot,size/slotsize);
       if(flag) {
         pup_bytes(p,newblock,sizeof(mempool_type));
