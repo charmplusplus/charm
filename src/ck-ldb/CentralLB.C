@@ -47,12 +47,13 @@ int load_balancer_created;
 double lb_migration_cost = 0.0;
 double lb_strategy_cost = 0.0;
 
-int lb_ideal_period = 0;
 int lb_no_iterations = -1;
 
 double cur_max_pe_load = 0.0;
 double cur_avg_pe_load = 0.0;
 double prev_load = 0.0;
+
+bool islb_done = false;
 
 struct AdaptiveData {
   int iteration;
@@ -203,9 +204,9 @@ void CentralLB::turnOff()
 
 void CentralLB::AtSync()
 {
-  CkPrintf("AtSync CEntral LB [%d]\n", CkMyPe());
+//  CkPrintf("AtSync CEntral LB [%d]\n", CkMyPe());
 #if CMK_LBDB_ON
-  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
+//  DEBUGF(("[%d] CentralLB AtSync step %d!!!!!\n",CkMyPe(),step()));
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	CpvAccess(_currentObj)=this;
@@ -223,6 +224,11 @@ void CentralLB::AtSync()
 }
 
 #include "ComlibStrategy.h"
+
+void CentralLB::ProcessAtSync(int ideal_lb_period) {
+  lb_ideal_period = ideal_lb_period;
+  ProcessAtSync();
+}
 
 void CentralLB::ProcessAtSync()
 {
@@ -285,38 +291,40 @@ void CentralLB::ProcessAtSyncMin()
       lb_no_iterations, lb_ideal_period);
 
   if (lb_no_iterations >= lb_ideal_period) {
-    CkPrintf("Since the time is past the collection period, send MinStats of [%d]\n", CkMyPe());
+//    CkPrintf("Since the time is past the collection period, send MinStats of [%d]\n", CkMyPe());
     SendMinStats();
   } else {
 
- double total_walltime;
- double idle_time;
- double bg_walltime;
-  theLbdb->GetTime(&total_walltime,&total_walltime, &idle_time, &bg_walltime, &bg_walltime);
-    CkPrintf("No need to send MinStats of [%d] load: %lf\n\n", CkMyPe(),
-    total_walltime);
-    ResumeClients(0);
+    SendMinStats();
+// double total_walltime;
+// double idle_time;
+// double bg_walltime;
+//  theLbdb->GetTime(&total_walltime,&total_walltime, &idle_time, &bg_walltime, &bg_walltime);
+//    CkPrintf("No need to send MinStats of [%d] load: %lf\n\n", CkMyPe(),
+//    total_walltime);
+//    ResumeClients(0);
   }
 #endif
 }
 
 void CentralLB::SendMinStats() {
 
- double total_walltime;
+ double total_load;
  double idle_time;
  double bg_walltime;
-  theLbdb->GetTime(&total_walltime,&total_walltime, &idle_time, &bg_walltime, &bg_walltime);
-  CkPrintf("Total walltime [%d] %lf\n", CkMyPe(), total_walltime);
+  theLbdb->GetTime(&total_load,&total_load, &idle_time, &bg_walltime, &bg_walltime);
+  CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(), total_load, idle_time, bg_walltime, (total_load - idle_time));
 
-  // Since the total_walltime is cumulative since the last load balancing stage,
+  // Since the total_load is cumulative since the last load balancing stage,
   // Hence it is subtracted from the previous load.
-  double tmp = total_walltime;
-  total_walltime -= prev_load;
+  total_load -= idle_time;
+  double tmp = total_load;
+  total_load -= prev_load;
   prev_load = tmp; 
 
   double lb_data[3];
-  lb_data[0] = total_walltime;
-  lb_data[1] = total_walltime;
+  lb_data[0] = total_load;
+  lb_data[1] = total_load;
   lb_data[2] = 1;
 
   CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
@@ -329,8 +337,11 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   double* load = (LBRealType *) msg->getData();
   double max = load[1];
   double avg = load[0]/load[2];
-  CkPrintf("Iteration[%d] Total load : %lf Avg load: %lf Max load: %lf\n\n",lb_no_iterations, load[0], load[0]/load[2], load[1]);
+  CkPrintf("Iteration %d Total load : %lf Avg load: %lf Max load: %lf\n\n",lb_no_iterations, load[0], load[0]/load[2], load[1]);
+
+//  if (lb_no_iterations == 0 || lb_no_iterations < lb_ideal_period) {
   if (lb_no_iterations == 0) {
+    thisProxy.ResumeClients(0);
     return;
   }
 
@@ -343,13 +354,13 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
 
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
-  if (max/avg >= 1.1) {
+  if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 5) {
     CkPrintf("Carry out load balancing step\n");
+    islb_done = true;
     thisProxy.ProcessAtSync();
     return;
   }
 
-  CkPrintf("No need to do lb now 
   // Generate the plan for the adaptive strategy
   if (generatePlan()) {
     thisProxy.ResumeClients(lb_ideal_period, 0);
@@ -359,28 +370,29 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
 }
 
 bool CentralLB::generatePlan() {
-  if (adaptive_lbdb.history_data.size() <= 3) {
+  if (adaptive_lbdb.history_data.size() <= 4) {
     return false;
   }
 
   // Some heuristics for lbperiod
   // If constant load or almost constant,
   // then max * new_lb_period > avg * new_lb_period + lb_cost
-//  double max = 0.0;
-//  double avg = 0.0;
-//  AdaptiveData data;
-//  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
-//    data = adaptive_lbdb.history_data[i];
-//    max += data.max_load;
-//    avg += data.avg_load;
-//  }
+  double max = 0.0;
+  double avg = 0.0;
+  AdaptiveData data;
+  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
+    max += data.max_load;
+    avg += data.avg_load;
+    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+  }
 //  max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
 //  avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
 //
 //  lb_ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
 //  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
 //      max, avg, lb_strategy_cost, lb_migration_cost, lb_ideal_period);
-
+//
   // If linearly varying load, then find lb_period
   // area between the max and avg curve 
   double mslope, aslope, mc, ac;
@@ -389,6 +401,7 @@ bool CentralLB::generatePlan() {
   double a = (mslope - aslope)/2;
   double b = (mc - ac);
   double c = -(lb_strategy_cost + lb_migration_cost);
+  //c = -2.5;
   lb_ideal_period = getPeriodForLinear(a, b, c);
   CkPrintf("Ideal period for linear load %d\n", lb_ideal_period);
 
@@ -396,12 +409,13 @@ bool CentralLB::generatePlan() {
 }
 
 int CentralLB::getPeriodForLinear(double a, double b, double c) {
-  if (a == 0) {
-    return -c / b;
+  if (a == 0.0) {
+    return (-c / b);
   }
   int x;
-  int t = (b * b) - (4*a*c);
-  x = (-b + sqrt(t)) / (2*a);
+  double t = (b * b) - (4*a*c);
+  t = (-b + sqrt(t)) / (2*a);
+  x = t;
   return x;
 }
 
@@ -1581,6 +1595,7 @@ void CentralLB::pup(PUP::er &p) {
       statsMsg = new CLBStatsMsg;
     statsMsg->pup(p);
   }
+  p|lb_ideal_period;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | lbDecisionCount;
   p | resumeCount;
