@@ -204,7 +204,6 @@ public:
 
   virtual void pup(PUP::er &p)
   {
-     ArrayElement1D::pup(p);		// pack our superclass
      p(nTimes);
      p(sendTime);
      p(usec);

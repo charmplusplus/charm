@@ -681,7 +681,6 @@ public:
 //In the .C file:
 void A2::pup(PUP::er \&p)
 \{
-    CBase\_A2::pup(p); //<- MUST call superclass's pup routine
     p|nt;
     p|chr;
     p(flt,7);

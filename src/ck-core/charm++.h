@@ -269,6 +269,7 @@ class Chare {
     Chare(CkMigrateMessage *m);
     Chare();
     virtual ~Chare(); //<- needed for *any* child to have a virtual destructor
+    virtual void base_pup(PUP::er &p) { }
     virtual void pup(PUP::er &p);//<- pack/unpack routine
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
@@ -340,10 +341,11 @@ public:
 
 	CBaseT1(void) :Parent()  { thisProxy=this; }
 	CBaseT1(CkMigrateMessage *m) :Parent(m) { thisProxy=this; }
-	void pup(PUP::er &p) {
+        void base_pup(PUP::er &p) {
 		Parent::pup(p);
 		p|thisProxy;
 	}
+        void pup(PUP::er &p) { }
 };
 
 /*Templated version of above for multiple (at least duplicate) inheritance:*/
@@ -356,11 +358,12 @@ public:
 		{ thisProxy = (Parent1 *)this; }
 	CBaseT2(CkMigrateMessage *m) :Parent1(m), Parent2(m)
 		{ thisProxy = (Parent1 *)this; } 
-	void pup(PUP::er &p) {
+        void base_pup(PUP::er &p) {
 		Parent1::pup(p);
 		Parent2::pup(p);
 		p|thisProxy;
 	}
+        void pup(PUP::er &p) { }
 
 //These overloads are needed to prevent ambiguity for multiple inheritance:
 	inline const CkChareID &ckGetChareID(void) const
@@ -376,10 +379,11 @@ public:
   BASEN(n)() : base(), PARENTN(n)() {}				      \
   BASEN(n)(CkMigrateMessage *m)                                       \
 	  : base(m), PARENTN(n)(m) {}				      \
-  void pup(PUP::er &p) {                                              \
+  void base_pup(PUP::er &p) {                                         \
     base::pup(p);                                                     \
     PARENTN(n)::pup(p);                                               \
   }                                                                   \
+  void pup(PUP::er &p) { }                                            \
   static int isIrreducible() {                                        \
     return (base::isIrreducible() && PARENTN(n)::isIrreducible());    \
   }

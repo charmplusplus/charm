@@ -149,10 +149,6 @@ public:
   }
   
   void pup(PUP::er &p){
-	  
-	  // Call PUP Routine for superclass
-	  CBase_EachToManyArray::pup(p);
-	  
 	  if(p.isUnpacking()){
 		  localProxy = thisProxy;
 		  ComlibAssociateProxy(stratEachToManyArray, localProxy);

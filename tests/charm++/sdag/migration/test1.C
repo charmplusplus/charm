@@ -46,7 +46,6 @@ public:
   void pup(PUP::er &p) {
     CkPrintf("called PUP for cell %s\n", p.isPacking() ? "packing" : "unpacking or sizing");
  
-    CBase_Cell::pup(p);
     __sdag_pup(p);
 
     p | val;

@@ -24,7 +24,6 @@ mig_Element::mig_Element()
 
 void mig_Element::pup(PUP::er &p)
 {
-  ArrayElement1D::pup(p);//Call superclass
   p(origPE);
   p(sum);
   p(numDone);

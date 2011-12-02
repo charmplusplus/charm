@@ -217,7 +217,6 @@ public:
   }
 
   void pup(PUP::er &p) {
-      ArrayElement1D::pup(p);
       p | comlib;
       p | verbose;
 

@@ -901,6 +901,7 @@ void CkArrayPrefetch_writeToSwap(FILE *swapfile,void *objptr) {
 
   //Save the element's data to disk:
   PUP::toDisk p(swapfile);
+  elt->base_pup(p);
   elt->pup(p);
 
   //Call the element's destructor in-place (so pointer doesn't change)
@@ -923,6 +924,7 @@ void CkArrayPrefetch_readFromSwap(FILE *swapfile,void *objptr) {
   
   //Restore the element's data from disk:
   PUP::fromDisk p(swapfile);
+  elt->base_pup(p);
   elt->pup(p);
 }
 
@@ -2099,7 +2101,9 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 
 #if CMK_OUT_OF_CORE
 	/* Register new element with out-of-core */
-	PUP::sizer p_getSize; elt->pup(p_getSize);
+	PUP::sizer p_getSize;
+        elt->base_pup(p_getSize);
+        elt->pup(p_getSize);
 	elt->prefetchObjID=CooRegisterObject(&CkArrayElementPrefetcher,p_getSize.size(),elt);
 #endif
 	
@@ -2511,9 +2515,10 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 	//Next pup the element data
 	for (m=firstManager;m!=NULL;m=m->next) {
 		CkMigratable *elt=m->element(localIdx);
-		if (elt!=NULL) 
-                {	
-                       elt->pup(p);
+		if (elt!=NULL)
+                {
+                        elt->base_pup(p);
+                        elt->pup(p);
                 }
 	}
 }

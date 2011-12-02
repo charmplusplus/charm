@@ -189,7 +189,6 @@ public:
         //if(p.isPacking())
         //  CkPrintf("Migrating from %d\n", CkMyPe());
 
-        ArrayElement1D::pup(p);
         p | pass ;
         p | mcount ;
         p | time;
