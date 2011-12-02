@@ -29,7 +29,7 @@ module CkMemCheckpoint {
 	entry void removeArrayElements();
  	entry void recoverBuddies();
 	entry void recoverEntry(CkArrayCheckPTMessage *msg);
- 	entry void recoverArrayElements();
+ 	entry [reductiontarget] void recoverArrayElements();
 	entry void finishUp();
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);

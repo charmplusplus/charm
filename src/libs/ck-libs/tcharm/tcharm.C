@@ -189,9 +189,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-  	heapBlocks=CmiIsomallocBlockListNew();
-  else
+  if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
+  	heapBlocks=CmiIsomallocBlockListNew(tid);
+  } else
   	heapBlocks=0;
   nUd=0;
   usesAtSync=CmiTrue;
@@ -315,6 +315,7 @@ void TCharm::pup(PUP::er &p) {
 // Pup our thread and related data
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
+    CthThread savedtid = tid;
     checkPupMismatch(pc,5138,"before TCHARM thread");
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
@@ -323,8 +324,8 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
+    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocBlockListPup(p,&heapBlocks,savedtid);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -366,7 +367,9 @@ TCharm::~TCharm()
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
   
+#if !USE_MEMPOOL_ISOMALLOC
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+#endif
   CthFree(tid);
   CtgFree(threadGlobals);
   delete initMsg;

@@ -21,6 +21,12 @@ processor in the debugger using:
 gdb pgm
 \end{alltt}
 
+If the program needs some environment variables
+to be set for its execution on compute nodes
+(such as library paths), they can be set in
+.charmrunrc under home directory. charmrun
+will run that shell script before running the executable.
+
 \subsection[Command Line Options]{Command Line Options}
 \label{command line options}
 \index{command line options}
