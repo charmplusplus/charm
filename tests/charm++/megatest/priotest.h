@@ -13,7 +13,7 @@ class priotest_msg : public CMessage_priotest_msg
     priotest_msg(int p) : prio(p) {}
 };
 
-class priotest_chare : public Chare
+class priotest_chare : public CBase_priotest_chare
 {
   private:
     int lastprio;

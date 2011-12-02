@@ -17,14 +17,14 @@ class varraystest_Msg : public CMessage_varraystest_Msg {
   CkChareID myMain;
 }; 
 
-class varraystest_main : public Chare {
+class varraystest_main : public CBase_varraystest_main {
  public:
   varraystest_main(void);
   varraystest_main(CkMigrateMessage *m) {}
   void exit(varraystest_Msg *m);
 };
 
-class varraystest_test : public Chare {
+class varraystest_test : public CBase_varraystest_test {
  public:
   varraystest_test(varraystest_Msg *m);
   varraystest_test(CkMigrateMessage *m) {}

@@ -29,7 +29,7 @@ class queens_countMsg : public CMessage_queens_countMsg {
   queens_countMsg(int c) : count(c) {};
 };
 
-class queens_main : public Chare {
+class queens_main : public CBase_queens_main {
  public:
   CkGroupID counterGroup;
   queens_main(queens_DMSG * dmsg);
@@ -37,7 +37,7 @@ class queens_main : public Chare {
   void Quiescence1(CkQdMsg *);
 };
 
-class queens_queens : public Chare {
+class queens_queens : public CBase_queens_queens {
  private:
   void seqQueens(int queens[], int nextRow);
   int consistent(int queens[], int lastRow, int col);

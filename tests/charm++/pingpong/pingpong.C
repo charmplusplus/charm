@@ -62,7 +62,7 @@ int payload;
 #define P1 0
 #define P2 1%CkNumPes()
 
-class main : public Chare
+class main : public CBase_main
 {
   int phase;
   CProxy_Ping1 arr1;
@@ -149,7 +149,7 @@ public:
   };
 };
 
-class PingG : public Group
+class PingG : public CBase_PingG
 {
   CProxyElement_PingG *pp;
   int niter;
@@ -190,7 +190,7 @@ public:
 };
 
 
-class PingN : public NodeGroup
+class PingN : public CBase_PingN
 {
   CProxyElement_PingN *pp;
   int niter;
@@ -313,7 +313,7 @@ public:
 };
 
 
-class Ping1 : public ArrayElement1D
+class Ping1 : public CBase_Ping1
 {
   CProxy_Ping1 *pp;
   int niter;
@@ -367,7 +367,7 @@ public:
   }
 };
 
-class Ping2 : public ArrayElement2D
+class Ping2 : public CBase_Ping2
 {
   CProxy_Ping2 *pp;
   int niter;
@@ -402,7 +402,7 @@ public:
   }
 };
 
-class Ping3 : public ArrayElement3D
+class Ping3 : public CBase_Ping3
 {
   CProxy_Ping3 *pp;
   int niter;
@@ -476,7 +476,7 @@ public:
   }
 };
 
-class PingC : public Chare
+class PingC : public CBase_PingC
 {
   CProxy_PingC *pp;
   int niter;

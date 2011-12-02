@@ -15,7 +15,7 @@ class nodering_message : public CMessage_nodering_message {
   nodering_message(int s, int i) : seqnum(s), iter(i) {}
 };
 
-class nodering_main : public Chare {
+class nodering_main : public CBase_nodering_main {
   public:
     nodering_main(CkArgMsg *m) {
       delete m;
@@ -24,7 +24,7 @@ class nodering_main : public Chare {
     nodering_main(CkMigrateMessage *m) {}
 };
 
-class nodering_group : public NodeGroup {
+class nodering_group : public CBase_nodering_group {
   public:
     nodering_group(void) {}
     nodering_group(CkMigrateMessage *m) {}

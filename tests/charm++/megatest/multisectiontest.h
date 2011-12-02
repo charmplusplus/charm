@@ -61,7 +61,7 @@ class multisection_proxymsg : public CMessage_multisectionGID_msg, CkMcastBaseMs
 /* this could be a chare, but singleton chares are unusual and
    would make the code look weirder than necessary */
 
-class multisectiontest_master : public Group
+class multisectiontest_master : public CBase_multisectiontest_master
 {
   private:
     int msgCount;
@@ -77,7 +77,7 @@ class multisectiontest_master : public Group
     void doneSetup(CkReductionMsg *);
 };
 
-class multisectiontest_grp : public Group
+class multisectiontest_grp : public CBase_multisectiontest_grp
 {
   private:
     bool low;

@@ -33,7 +33,7 @@ static const struct {
 };
 
 
-class Topo : public Group {
+class Topo : public CBase_Topo {
 public:
   struct MsgInfo {
     int obj;

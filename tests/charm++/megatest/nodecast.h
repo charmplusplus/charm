@@ -23,7 +23,7 @@ public:
   }
 };
 
-class nodecast_main : public Chare {
+class nodecast_main : public CBase_nodecast_main {
 private:
   CkGroupID gid;
   int count;
@@ -33,7 +33,7 @@ public:
   void reply(nodecast_SimpleMsg *em);
 };
 
-class nodecast_group : public NodeGroup {
+class nodecast_group : public CBase_nodecast_group {
 private:
   CkChareID myMain;
 public:

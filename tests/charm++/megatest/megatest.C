@@ -58,7 +58,7 @@ void megatest_register(const char *moduleName,const char *author,
 
 CkChareID mainhandle;
 
-class main : public Chare {
+class main : public CBase_main {
  private:
   int test_bank_size;
   double test_start_time;

@@ -93,12 +93,12 @@ public:
   }
 };
 
-class CHello : public Chare 
+class CHello : public CBase_CHello
 {
   int step;
 public:
   CHello(){ step = 0; }
-  CHello(CkMigrateMessage *m): Chare(m) { step = 0; }
+  CHello(CkMigrateMessage *m): CBase_CHello(m) { step = 0; }
 
   void SayHi(int s) {
     step = s;

@@ -71,7 +71,7 @@ public:
 };
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     int pass, superpass;
     double curTime;
@@ -183,7 +183,7 @@ public:
 
 /******** The all to all benchmar array *************/
 /*array [1D]*/
-class Bench : public ArrayElement1D
+class Bench : public CBase_Bench
 {
     int pass;
     int mcount;

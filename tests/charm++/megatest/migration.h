@@ -4,7 +4,7 @@
 #include "migration.decl.h"
 #include "megatest.h"
 
-class mig_Element : public ArrayElement1D
+class mig_Element : public CBase_mig_Element
 {
  public:
   mig_Element();

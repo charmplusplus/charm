@@ -20,7 +20,7 @@ ComlibInstanceHandle dummy_inst;
 int bucketSize = 400;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     double startTime;
     int recv_count;

@@ -15,7 +15,7 @@ class fib_Range :public CMessage_fib_Range{
   CkChareID parent;
 };
 
-class fib_main : public Chare {
+class fib_main : public CBase_fib_main {
  private:
   int result;
  public:

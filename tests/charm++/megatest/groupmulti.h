@@ -25,7 +25,7 @@ public:
   }
 };
 
-class groupmulti_main : public Chare {
+class groupmulti_main : public CBase_groupmulti_main {
 private:
   CkGroupID gid;
   int count;
@@ -35,7 +35,7 @@ public:
   void groupReady(void);
 };
 
-class groupmulti_group : public Group {
+class groupmulti_group : public CBase_groupmulti_group {
 private:
   CkChareID myMain;
 public:

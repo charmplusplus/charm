@@ -33,7 +33,7 @@ public:
 };
 PUPbytes(myReductionCounter)
 
-class main : public Chare
+class main : public CBase_main
 {
 public:
   main(CkMigrateMessage *m) {}

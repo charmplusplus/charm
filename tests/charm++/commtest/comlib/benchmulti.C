@@ -63,7 +63,7 @@ public:
 };
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     int pass, superpass;
     double curTime;

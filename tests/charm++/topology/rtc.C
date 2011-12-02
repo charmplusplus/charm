@@ -20,7 +20,7 @@
 /*readonly*/ CProxy_Main mainProxy;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
   public:
     Main(CkArgMsg* m) {

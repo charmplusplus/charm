@@ -9,7 +9,7 @@ using namespace std;
 int nrows = 5;
 int ncols = 5;
 
-class Main : public Chare {
+class Main : public CBase_Main {
 public:
   CProxy_Cell arr;
 

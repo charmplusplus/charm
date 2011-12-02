@@ -8,7 +8,7 @@
 /*readonly*/ CProxy_DelegateMgr delMgr;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
 public:
   Main(CkArgMsg* m)
@@ -73,7 +73,7 @@ public:
 };
 
 /*array [1D]*/
-class Hello : public ArrayElement1D
+class Hello : public CBase_Hello
 {
 public:
   Hello()

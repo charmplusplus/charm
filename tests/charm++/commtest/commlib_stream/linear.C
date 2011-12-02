@@ -31,7 +31,7 @@ ComlibInstanceHandle samp_inst; //streaming with short message packing
 ComlibInstanceHandle dummy_inst; //streaming with short message packing
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     double startTime;
     int recv_count;
