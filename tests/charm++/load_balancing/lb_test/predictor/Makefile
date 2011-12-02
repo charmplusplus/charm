@@ -1,4 +1,4 @@
-CHARMC=/home/net/gioachin/charm/bin/charmc $(OPTS)
+CHARMC=../../../../../bin/charmc $(OPTS)
 
 test:	test.o
 	$(CHARMC) test.o -o test -language charm++ -module RefineLB
