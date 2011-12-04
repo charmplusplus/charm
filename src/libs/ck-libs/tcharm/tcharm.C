@@ -366,7 +366,7 @@ TCharm::~TCharm()
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
   
-#if !USE_MEMPOOL_ISOMALLOC
+#if !CMK_USE_MEMPOOL_ISOMALLOC
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
 #endif
   CthFree(tid);

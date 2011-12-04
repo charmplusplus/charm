@@ -67,7 +67,7 @@ added by Ryan Mokos in July 2008.
 #include <sys/personality.h>
 #endif
 
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
 #include "mempool.h"
 #endif 
 
@@ -138,7 +138,7 @@ static CmiInt8 pe2slot(int pe) {
   return pe*numslots;
 }
 /* Return the number of slots in a block with n user data bytes */
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
 static int length2slots(int nBytes) {
   return (nBytes+slotsize-1)/slotsize;
 }
@@ -1646,7 +1646,7 @@ static void map_failed(CmiInt8 s,CmiInt8 n)
 
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
 CtvStaticDeclare(mempool_type *, threadpool); /*Thread managed pools*/
 
 //alloc function to be used by mempool
@@ -2022,7 +2022,7 @@ static void init_ranges(char **argv)
   int pagesize = 0;
 
   /*Round slot size up to nearest page size*/
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
   slotsize=1024*1024;
 #else
   slotsize=16*1024;
@@ -2198,7 +2198,7 @@ static void init_ranges(char **argv)
   CpvInitialize(slotset *, myss);
   CpvAccess(myss) = NULL;
 
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
   CtvInitialize(mempool_type *, threadpool);
   CtvAccess(threadpool) = NULL;
 #endif
@@ -2295,7 +2295,7 @@ static void all_slotOP(const slotOP *op,CmiInt8 s,CmiInt8 n)
 }
 
 /************** External interface ***************/
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
 void *CmiIsomalloc(int size, CthThread tid)
 {
   CmiInt8 s,n,i;
@@ -2401,7 +2401,9 @@ void CmiIsomallocPup(pup_er p,void **blockPtrPtr)
   CmiIsomallocBlock *blk;
   CmiInt8 s,length;
   CmiInt8 n;
-  CmiPrintf("Incorrect pup is called\n");
+#if CMK_USE_MEMPOOL_ISOMALLOC
+  CmiAbort("Incorrect pup is called\n");
+#endif
   if (isomallocStart==NULL) CmiAbort("isomalloc is disabled-- cannot use IsomallocPup");
 
   if (!pup_isUnpacking(p)) 
@@ -2445,7 +2447,7 @@ void CmiIsomallocFree(void *blockPtr)
   }
   else if (blockPtr!=NULL)
   {
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
     mempool_free_thread((void*)pointer2block(blockPtr)->slot);
 #else
     CmiIsomallocBlock *blk=pointer2block(blockPtr);
@@ -2536,7 +2538,7 @@ static void print_myslots();
   list traversals.  Because everything's isomalloc'd, we don't even
   have to restore the pointers-- they'll be restored automatically!
   */
-#if USE_MEMPOOL_ISOMALLOC
+#if CMK_USE_MEMPOOL_ISOMALLOC
 void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid)
 {
   mempool_type *mptr;

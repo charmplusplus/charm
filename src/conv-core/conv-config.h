@@ -68,6 +68,9 @@
 #define CMK_64BIT                1
 #endif
 
+#ifndef CMK_USE_MEMPOOL_ISOMALLOC
+#define CMK_USE_MEMPOOL_ISOMALLOC 1
+#endif
 
 /* set up what production/non-production means */
 #ifdef CMK_OPTIMIZE

@@ -180,7 +180,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->newblockfn = allocfn;
   mptr->freeblockfn = freefn;
   mptr->block_tail = 0;
-#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mempool_ptr = pool;
@@ -217,7 +217,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     slot_header   *head_free,*head_next;
     mem_handle_t  mem_hndl;
 
-#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
     CmiLock(mptr->mempoolLock);
 #endif
 
@@ -281,7 +281,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         head_next->prev = 0;
       }
 
-#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
       head_free->pool_addr = mptr;
       CmiUnlock(mptr->mempoolLock);
 #endif
@@ -292,7 +292,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
     return NULL;
 }
 
-#if USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
 void mempool_free_thread( void *ptr_free)
 {
     slot_header *to_free;
