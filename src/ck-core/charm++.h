@@ -561,7 +561,7 @@ class CProxy {
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :delegatedMgr(0), delegatedPtr(0), isNodeGroup(0) 
+ CProxy() :  isNodeGroup(0), delegatedMgr(0), delegatedPtr(0)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
