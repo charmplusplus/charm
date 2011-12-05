@@ -547,12 +547,6 @@ class CkDelegateMgr : public IrrGroup {
 
 /**************************** Proxies **************************/
 
-/*Message delegation support, where you send a message via
-a proxy normally, but the message ends up routed via a 
-special delegateMgr group.
-*/
-class CkDelegateMgr;
-
 /** 
   A proxy is a local handle to a remote object.  This is the superclass
   of all proxies: CProxy_Array, CProxy_Group, etc. inherit from this class.
