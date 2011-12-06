@@ -315,8 +315,9 @@ void TCharm::pup(PUP::er &p) {
 // Pup our thread and related data
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
-    CthThread savedtid = tid;
     checkPupMismatch(pc,5138,"before TCHARM thread");
+    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocBlockListPup(p,&heapBlocks,tid);
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
@@ -324,8 +325,6 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks,savedtid);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
