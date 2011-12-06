@@ -527,7 +527,6 @@ void TCharm::evacuate(){
 	*/
 	//CkClearAllArrayElementsCPP();
 	if(CkpvAccess(startedEvac)){
-		int nextPE = getNextPE(CkArrayIndex1D(thisIndex));
 //		resumeAfterMigration=true;
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
 		suspend();
@@ -746,8 +745,6 @@ CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-  char *tmp;
-  char **argv=CkGetArgv();
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==1);
 
@@ -777,7 +774,6 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
-  int nElem=msg->numElements; //<- save it because msg will be deleted.
   return CProxy_TCharm::ckNew(msg,opts);
 }
 
