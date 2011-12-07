@@ -656,9 +656,9 @@ class CkCompactVec : private CkSTLHelper<T> {
     T *block; //Elements of vector
     size_t blklen; //Allocated size of block (STL capacity) 
     size_t len; // total number of used elements in block, including ones before offset
-    size_t offset;    // seqno of the first element in the block
-    size_t lastnull;    // the index of the biggest consecutive NULLs
-    void makeBlock(int blklen_,int len_,int offset_,int lastnull_) {
+    size_t offset;      // global seqno of the first element in the block
+    size_t lastnull;    // the array index of the biggest consecutive NULLs
+    void makeBlock(int blklen_,int len_,int offset_=0,int lastnull_=-1) {
        if (blklen_==0) block=NULL; //< saves 1-byte allocations
        else {
          block=new T[blklen_];
@@ -681,7 +681,7 @@ class CkCompactVec : private CkSTLHelper<T> {
     CkCompactVec(): block(NULL), blklen(0), len(0), offset(0), lastnull(-1) {}
     ~CkCompactVec() { freeBlock(); }
     CkCompactVec(const this_type &src) {copyFrom(src);}
-    CkCompactVec(int size) { makeBlock(size,size,0,-1); } 
+    CkCompactVec(int size) { makeBlock(size,size); } 
     CkCompactVec(int size, int used) { makeBlock(size,used); } 
     CkCompactVec(const CkSkipInitialization &skip) {/* don't initialize */}
     this_type &operator=(const this_type &src) {
