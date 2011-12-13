@@ -1002,7 +1002,7 @@ FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 */
 /// Find this semaphore, or insert if there isn't one:
 TCharm::TCharmSemaphore *TCharm::findSema(int id) {
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) 
 			return &sema[s];
 	sema.push_back(TCharmSemaphore(id));
@@ -1011,7 +1011,7 @@ TCharm::TCharmSemaphore *TCharm::findSema(int id) {
 /// Remove this semaphore from the list
 void TCharm::freeSema(TCharmSemaphore *doomed) {
 	int id=doomed->id;
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) {
 			sema[s]=sema[sema.length()-1];
 			sema.length()--;
