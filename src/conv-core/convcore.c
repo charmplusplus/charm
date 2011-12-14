@@ -2757,6 +2757,7 @@ extern void arena_free(void *blockPtr);
 
 void *CmiAlloc(int size)
 {
+
   char *res;
 
 #if CONVERSE_VERSION_ELAN
@@ -3433,6 +3434,7 @@ void ConverseCommonInit(char **argv)
  */
 #if CMK_CCS_AVAILABLE
   CpvInitialize(int, cmiArgDebugFlag);
+  CpvAccess(cmiArgDebugFlag) = 0;
 #endif
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;

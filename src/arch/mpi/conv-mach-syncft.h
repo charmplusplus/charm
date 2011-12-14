@@ -8,7 +8,7 @@
 //#define CMK_MSG_HEADER_BIGSIM_    { CmiUInt2 d0,d1,d2,d3,d4,d5,hdl,xhdl,pn,info; int nd, n; double rt; CmiInt2 tID; CmiUInt2 hID; char t; int msgID; int srcPe;}
 //#define CMK_MSG_HEADER_BIGSIM_  { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
-#define CmiGetRestartPhase(m)       ((((CmiMsgHeaderExt*)m)->pn));
+#define CmiGetRestartPhase(m)       ((((CmiMsgHeaderExt*)m)->pn))
 
 #define __FAULT__					   1
 

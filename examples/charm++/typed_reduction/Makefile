@@ -1,15 +1,15 @@
 CHARMC = ../../../bin/charmc
 BINARY = typed_reduction
 
-CHARMCFLAGS =
+CHARMCFLAGS = $(OPTS)
 CHARMCLINKFLAGS = -language charm++
-TESTFLAGS = 
+TESTFLAGS = $(TESTOPTS)
 
 %.o: %.cc
 
 all: $(BINARY)
 $(BINARY): $(patsubst %.cc,%.o,$(wildcard *.cc))
-	$(CHARMC) $(CHARMCLINKFLAGS) -o $@ $+
+	$(CHARMC) $(CHARMCLINKFLAGS) -o $@ $+  -memory charmdebug
 
 .SECONDARY: $(patsubst %.cc,%.decl.h,$(wildcard *.cc))
 .SECONDARY: $(patsubst %.cc,%.def.h,$(wildcard *.cc))

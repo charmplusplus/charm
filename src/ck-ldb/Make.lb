@@ -30,6 +30,7 @@ ALL_LDBS=\
    $(L)/libmoduleRefineTopoLB.a \
    $(L)/libmoduleTopoCentLB.a \
    $(L)/libmoduleTopoLB.a \
+   $(L)/libmoduleRefineSwapLB.a \
    manager.o
 
 
@@ -213,6 +214,12 @@ $(L)/libmoduleTopoLB.a: TopoLB.o
 LBHEADERS += TopoLB.h TopoLB.decl.h
 
 
+$(L)/libmoduleRefineSwapLB.a: RefineSwapLB.o 
+	$(CHARMC) -o $(L)/libmoduleRefineSwapLB.a RefineSwapLB.o 
+	
+LBHEADERS += RefineSwapLB.h RefineSwapLB.decl.h
+
+
 $(L)/libmoduleTempAwareGreedyLB.a: TempAwareGreedyLB.o 
 	$(CHARMC) -o $(L)/libmoduleTempAwareGreedyLB.a TempAwareGreedyLB.o 
 	
@@ -275,6 +282,7 @@ ALL_LB_OBJS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
+    RefineSwapLB.o \
     TempAwareGreedyLB.o \
     MetisLB.o \
     ScotchLB.o \
@@ -317,6 +325,7 @@ EVERYLB_DEPS=EveryLB.o \
     RefineTopoLB.o \
     TopoCentLB.o \
     TopoLB.o \
+    RefineSwapLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \

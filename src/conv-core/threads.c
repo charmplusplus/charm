@@ -5,7 +5,7 @@
  * $Revision$
  *****************************************************************************/
 
- /**************************************************************************
+/**************************************************************************
  *
  * typedef CthThread
  *
@@ -76,28 +76,28 @@
  *     This specifies the scheduling functions to be used for thread 't'.
  *     The scheduling functions must have the following prototypes:
  *
- *          void awakenfn(CthThread t);
- *          CthThread choosefn();
- *
- *     These functions must be provided on a per-thread basis.  (Eg, if you
- *     CthAwaken a thread X, then X's awakefn will be called.  If a thread Y
- *     calls CthSuspend, then Y's choosefn will be called to pick the next
- *     thread.)  Of course, you may use the same functions for all threads
- *     (the common case), but the specification on a per-thread basis gives
- *     you maximum flexibility in controlling scheduling.
- *
- *     See also: common code, CthSetStrategyDefault.
- *
- * void CthYield()
- *
- *   - simply executes { CthAwaken(CthSelf()); CthSuspend(); }.  This
- *     combination gives up control temporarily, but ensures that control
- *     will eventually return.
- *
- *
- * Note: there are several possible ways to implement threads.   
- *****************************************************************************/
- 
+*          void awakenfn(CthThread t);
+*          CthThread choosefn();
+*
+*     These functions must be provided on a per-thread basis.  (Eg, if you
+    *     CthAwaken a thread X, then X's awakefn will be called.  If a thread Y
+    *     calls CthSuspend, then Y's choosefn will be called to pick the next
+    *     thread.)  Of course, you may use the same functions for all threads
+*     (the common case), but the specification on a per-thread basis gives
+*     you maximum flexibility in controlling scheduling.
+*
+*     See also: common code, CthSetStrategyDefault.
+  *
+* void CthYield()
+  *
+  *   - simply executes { CthAwaken(CthSelf()); CthSuspend(); }.  This
+  *     combination gives up control temporarily, but ensures that control
+  *     will eventually return.
+  *
+  *
+  * Note: there are several possible ways to implement threads.   
+  *****************************************************************************/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,23 +144,23 @@
 #include "cmitls.h"
 #endif
 
-/**************************** Shared Base Thread Class ***********************/
-/*
-	FAULT_EVAC
-	Moved the cmicore converse header from CthThreadBase to CthThreadToken.
-	The CthThreadToken gets enqueued in the converse queue instead of the
-	CthThread. This allows the thread to be moved out of a processor even
-	if there is an awaken call for it enqueued in the scheduler
+  /**************************** Shared Base Thread Class ***********************/
+  /*
+     FAULT_EVAC
+     Moved the cmicore converse header from CthThreadBase to CthThreadToken.
+     The CthThreadToken gets enqueued in the converse queue instead of the
+     CthThread. This allows the thread to be moved out of a processor even
+     if there is an awaken call for it enqueued in the scheduler
 
 */
 
 #define THD_MAGIC_NUM 0x12345678
 
-typedef struct CthThreadBase
+  typedef struct CthThreadBase
 {
   CthThreadToken *token; /* token that shall be enqueued into the ready queue*/
   int scheduled;	 /* has this thread been added to the ready queue ? */
- 
+
   CmiObjId   tid;        /* globally unique tid */
   CthAwkFn   awakenfn;   /* Insert this thread into the ready queue */
   CthThFn    choosefn;   /* Return the next ready thread */
@@ -190,7 +190,7 @@ static int CmiThreadIs_flag=0;
 
 int CmiThreadIs(int flag)
 {
-	return (CmiThreadIs_flag&flag)==flag;
+  return (CmiThreadIs_flag&flag)==flag;
 }
 
 /*Macros to convert between base and specific thread types*/
@@ -199,7 +199,7 @@ int CmiThreadIs(int flag)
 
 
 CthThreadToken *CthGetToken(CthThread t){
-	return B(t)->token;
+  return B(t)->token;
 }
 
 CpvStaticDeclare(int, Cth_serialNo);
@@ -213,13 +213,13 @@ CpvStaticDeclare(int, Cth_serialNo);
   the presence of files, at least under Linux with local disks context
   switches are still fast; the mmap overhead is less than 5us per
   switch, even for multi-megabyte stacks.
-  
-  WARNING: Does NOT work in SMP mode, because all the processors
-      on a node will try to map their stacks to the same place.
-  WARNING: Does NOT work if switching directly from one migrateable
-      thread to another, because it blows away the stack you're currently
-      running on.  The usual Charm approach of switching to the 
-      (non-migratable) scheduler thread on context switch works fine.
+
+WARNING: Does NOT work in SMP mode, because all the processors
+on a node will try to map their stacks to the same place.
+WARNING: Does NOT work if switching directly from one migrateable
+thread to another, because it blows away the stack you're currently
+running on.  The usual Charm approach of switching to the 
+(non-migratable) scheduler thread on context switch works fine.
 */
 
 #ifndef CMK_THREADS_ALIAS_STACK
@@ -252,11 +252,11 @@ int CthAliasCreate(int stackSize)
   fd=mkstemp(tmpName);
   if (fd==-1) CmiAbort("threads.c> Cannot create /tmp file to contain thread stack");
   unlink(tmpName); /* delete file when it gets closed */
-  
+
   /* Make file big enough for stack, by writing one byte at end */
   lseek(fd,stackSize-sizeof(lastByte),SEEK_SET);
   write(fd,&lastByte,sizeof(lastByte));
-  
+
   return fd;
 }
 
@@ -267,43 +267,43 @@ void CthAliasFree(int fd) {
 #endif
 
 /**
- CthAliasEnable brings this thread's stack into memory.
- You must call it before accessing the thread stack, 
- for example, before running, packing, or unpacking the stack data.
-*/
+  CthAliasEnable brings this thread's stack into memory.
+  You must call it before accessing the thread stack, 
+  for example, before running, packing, or unpacking the stack data.
+  */
 #if CMK_THREADS_ALIAS_STACK
 CthThreadBase *_curMappedStack=0;
 void CthAliasEnable(CthThreadBase *t) {
-	void *s;
-	int flags=MAP_FIXED|MAP_SHARED; /* Posix flags */
-	if (!t->isMigratable) return;
-	if (t==_curMappedStack) return; /* don't re-map */
-	_curMappedStack=t;
-	if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
-	
+  void *s;
+  int flags=MAP_FIXED|MAP_SHARED; /* Posix flags */
+  if (!t->isMigratable) return;
+  if (t==_curMappedStack) return; /* don't re-map */
+  _curMappedStack=t;
+  if (0) printf("Mmapping in thread %p from runtime stack %p\n",t,&s);
+
 #if CMK_BLUEGENEL
-        /* Blue Gene/L does not have mmap */
-        /* So this depends on a hack in CNK for syscall rts_memory_alias to
-           map stack pointer to a fix address */
-        {
-        register char *dest=(char *)0x70000000; /* point stack at high memory, not user memory */
-        int alias_slot;
-        rts_memory_alias(t->stack,dest,t->stacksize,&alias_slot);
-        }
+  /* Blue Gene/L does not have mmap */
+  /* So this depends on a hack in CNK for syscall rts_memory_alias to
+     map stack pointer to a fix address */
+  {
+    register char *dest=(char *)0x70000000; /* point stack at high memory, not user memory */
+    int alias_slot;
+    rts_memory_alias(t->stack,dest,t->stacksize,&alias_slot);
+  }
 #else
-	/* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
-	   only seems to slow down overall performance. */
-	/* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
+  /* Linux mmap flag MAP_POPULATE, to pre-fault in all the pages,
+     only seems to slow down overall performance. */
+  /* Linux mmap flag MAP_GROWSDOWN is rejected at runtime under 2.4.25 */
 #if CMK_AIX
-        if (_curMappedStack) munmap(_curMappedStack->stack,_curMappedStack->stacksize);
+  if (_curMappedStack) munmap(_curMappedStack->stack,_curMappedStack->stacksize);
 #endif
-	s=mmap(t->stack,t->stacksize,
-		PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
-		flags, t->aliasStackHandle,0);
-	if (s!=t->stack) {
-		perror("threads.c CthAliasEnable mmap");
-		CmiAbort("threads.c CthAliasEnable mmap failed");
-	}
+  s=mmap(t->stack,t->stacksize,
+      PROT_READ|PROT_WRITE|PROT_EXEC, /* exec for gcc nested function thunks */
+      flags, t->aliasStackHandle,0);
+  if (s!=t->stack) {
+    perror("threads.c CthAliasEnable mmap");
+    CmiAbort("threads.c CthAliasEnable mmap failed");
+  }
 #endif
 }
 #else
@@ -336,9 +336,9 @@ CmiObjId *CthGetThreadID(CthThread th)
 char *CthGetData(CthThread t) { return B(t)->data; }
 
 /* Ensure this thread has at least enough 
-room for all the thread-local variables 
-initialized so far on this processor.
-*/
+   room for all the thread-local variables 
+   initialized so far on this processor.
+   */
 #if CMK_C_INLINE
 inline
 #endif
@@ -356,9 +356,9 @@ static void CthFixData(CthThread t)
 }
 
 /**
-Allocate another size bytes of thread-local storage,
-and return the offset into the thread storage buffer.
- */
+  Allocate another size bytes of thread-local storage,
+  and return the offset into the thread storage buffer.
+  */
 int CthRegister(int size)
 {
   int datasize=CthCpvAccess(CthDatasize);
@@ -375,9 +375,9 @@ int CthRegister(int size)
 }
 
 /**
-Make sure we have room to store up to at least maxOffset
-bytes of thread-local storage.
-*/
+  Make sure we have room to store up to at least maxOffset
+  bytes of thread-local storage.
+  */
 void CthRegistered(int maxOffset) {
   if (CthCpvAccess(CthDatasize)<maxOffset) {
     CthThreadBase *th=(CthThreadBase *)CthCpvAccess(CthCurrent);
@@ -447,7 +447,7 @@ static void *CthAllocateStack(CthThreadBase *th,int *stackSize,int useMigratable
     th->aliasStackHandle=CthAliasCreate(*stackSize);
     ret=CMK_THREADS_ALIAS_LOCATION;
 #else /* isomalloc */
-    ret=CmiIsomalloc(*stackSize);
+    ret=CmiIsomalloc(*stackSize, (CthThread)th);
 #endif
   }
   _MEMCHECK(ret);
@@ -461,28 +461,30 @@ static void CthThreadBaseFree(CthThreadBase *th)
    * remove the token if it is not queued in the converse scheduler		
    */
   if(th->scheduled == 0){
-	free(th->token);
+    free(th->token);
   }else{
-	th->token->thread = NULL;
+    th->token->thread = NULL;
   }
   /* Call the free function pointer on all the listeners on
      this thread and also delete the thread listener objects
-  */
+     */
   for(l=th->listener;l!=NULL;l=lnext){
-	lnext=l->next;
-	l->next=0;
-	if (l->free) l->free(l);
+    lnext=l->next;
+    l->next=0;
+    if (l->free) l->free(l);
   }
   free(th->data);
   if (th->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
-	  CthAliasFree(th->aliasStackHandle);
+    CthAliasFree(th->aliasStackHandle);
 #else /* isomalloc */
-	  CmiIsomallocFree(th->stack);
+#if !USE_MEMPOOL_ISOMALLOC
+    CmiIsomallocFree(th->stack);
+#endif
 #endif
   } 
   else if (th->stack!=NULL) {
-	  free(th->stack);
+    free(th->stack);
   }
   th->stack=NULL;
 }
@@ -497,15 +499,15 @@ static void CthBaseInit(char **argv)
   CthCpvInitialize(int,  _defaultStackSize);
   CthCpvAccess(_defaultStackSize)=CMK_STACKSIZE_DEFAULT;
   CmiGetArgIntDesc(argv,"+stacksize",&CthCpvAccess(_defaultStackSize),
-  	"Default user-level thread stack size");  
-  
+      "Default user-level thread stack size");  
+
   CthCpvInitialize(CthThread,  CthCurrent);
   CthCpvInitialize(char *, CthData);
   CthCpvInitialize(int,        CthDatasize);
-  
+
   CthCpvAccess(CthData)=0;
   CthCpvAccess(CthDatasize)=0;
-  
+
   CpvInitialize(int, Cth_serialNo);
   CpvAccess(Cth_serialNo) = 1;
 
@@ -524,109 +526,116 @@ CthThread CthSelf()
 void CthPupBase(pup_er p,CthThreadBase *t,int useMigratable)
 {
 #if CMK_ERROR_CHECKING
-	if ((CthThread)t==CthCpvAccess(CthCurrent))
-		CmiAbort("CthPupBase: Cannot pack running thread!");
+  if ((CthThread)t==CthCpvAccess(CthCurrent))
+    CmiAbort("CthPupBase: Cannot pack running thread!");
 #endif
-	/*
-	 * Token will never be freed, so its pointer should be pupped.
-	 * When packing, set the thread pointer in this token to be NULL.
-	 * When unpacking, reset the thread pointer in token to this thread.
-	 */
-	  
-        if(_BgOutOfCoreFlag!=0){
-	    pup_bytes(p, &t->token, sizeof(void *));
-	    if(!pup_isUnpacking(p)){
-		t->token->thread = NULL;
-	    }
-	    pup_int(p, &t->scheduled);
-	}
-	if(pup_isUnpacking(p)){
-		if(_BgOutOfCoreFlag==0){
-		    t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-		    t->token->thread = S(t);
-		    t->token->serialNo = CpvAccess(Cth_serialNo)++;
-		    /*For normal runs where this pup is needed,
-		    set scheduled to 0 in the unpacking period since the thread has
-		    not been scheduled */
-		    t->scheduled = 0;
-		}else{
-		/* During out-of-core emulation */
-		    /* 
-		     * When t->scheduled is set, the thread is in the queue so the token
-		     * should be kept. Otherwise, allocate a new space for the token
-		     */
-		    if(t->scheduled==0){
-			/*CmiPrintf("Creating a new token for %p!\n", t->token);*/
-			t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
-		    }
-		    t->token->thread = S(t);
-            t->token->serialNo = CpvAccess(Cth_serialNo)++;
-		}
-	}
-	
-	/*BIGSIM_OOC DEBUGGING */
-	/*if(_BgOutOfCoreFlag!=0){
-	   if(pup_isUnpacking(p)){
-		CmiPrintf("Unpacking: ");
-	    }else{
-		CmiPrintf("Packing: ");
-	    }	
-	    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
-	} */
+  /*
+   * Token will never be freed, so its pointer should be pupped.
+   * When packing, set the thread pointer in this token to be NULL.
+   * When unpacking, reset the thread pointer in token to this thread.
+   */
 
-	/*Really need a pup_functionPtr here:*/
-	pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
-	pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
-	pup_bytes(p,&t->next,sizeof(t->next));
-	pup_int(p,&t->suspendable);
-	pup_int(p,&t->datasize);
-	if (pup_isUnpacking(p)) { 
-		t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
-	}
-	pup_bytes(p,(void *)t->data,t->datasize);
-	pup_int(p,&t->isMigratable);
-	pup_int(p,&t->stacksize);
-	if (t->isMigratable) {
+  if(_BgOutOfCoreFlag!=0){
+    pup_bytes(p, &t->token, sizeof(void *));
+    if(!pup_isUnpacking(p)){
+      t->token->thread = NULL;
+    }
+    pup_int(p, &t->scheduled);
+  }
+  if(pup_isUnpacking(p)){
+    if(_BgOutOfCoreFlag==0){
+      t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+      t->token->thread = S(t);
+      t->token->serialNo = CpvAccess(Cth_serialNo)++;
+      /*For normal runs where this pup is needed,
+        set scheduled to 0 in the unpacking period since the thread has
+        not been scheduled */
+      t->scheduled = 0;
+    }else{
+      /* During out-of-core emulation */
+      /* 
+       * When t->scheduled is set, the thread is in the queue so the token
+       * should be kept. Otherwise, allocate a new space for the token
+       */
+      if(t->scheduled==0){
+        /*CmiPrintf("Creating a new token for %p!\n", t->token);*/
+        t->token = (CthThreadToken *)malloc(sizeof(CthThreadToken));
+      }
+      t->token->thread = S(t);
+      t->token->serialNo = CpvAccess(Cth_serialNo)++;
+    }
+  }
+
+  /*BIGSIM_OOC DEBUGGING */
+  /*if(_BgOutOfCoreFlag!=0){
+    if(pup_isUnpacking(p)){
+    CmiPrintf("Unpacking: ");
+    }else{
+    CmiPrintf("Packing: ");
+    }	
+    CmiPrintf("thd=%p, its token=%p, token's thd=%p\n", t, t->token, t->token->thread); 
+    } */
+
+  /*Really need a pup_functionPtr here:*/
+  pup_bytes(p,&t->awakenfn,sizeof(t->awakenfn));
+  pup_bytes(p,&t->choosefn,sizeof(t->choosefn));
+  pup_bytes(p,&t->next,sizeof(t->next));
+  pup_int(p,&t->suspendable);
+  pup_int(p,&t->datasize);
+  if (pup_isUnpacking(p)) { 
+    t->data = (char *) malloc(t->datasize);_MEMCHECK(t->data);
+  }
+  pup_bytes(p,(void *)t->data,t->datasize);
+  pup_int(p,&t->isMigratable);
+  pup_int(p,&t->stacksize);
+  if (t->isMigratable) {
 #if CMK_THREADS_ALIAS_STACK
-		if (pup_isUnpacking(p)) { 
-			CthAllocateStack(t,&t->stacksize,1);
-		}
-		CthAliasEnable(t);
-		pup_bytes(p,t->stack,t->stacksize);
+    if (pup_isUnpacking(p)) { 
+      CthAllocateStack(t,&t->stacksize,1);
+    }
+    CthAliasEnable(t);
+    pup_bytes(p,t->stack,t->stacksize);
 #elif CMK_THREADS_USE_STACKCOPY
-		/* do nothing */
+    /* do nothing */
 #else /* isomalloc */
-		CmiIsomallocPup(p,&t->stack);
+#if USE_MEMPOOL_ISOMALLOC
+    pup_bytes(p,&t->stack,sizeof(char*));
+#else
+    CmiIsomallocPup(p,&t->stack);
 #endif
-	} 
-	else {
-		if (useMigratable)
-			CmiAbort("You must use CthCreateMigratable to use CthPup!\n");
-		/*Pup the stack pointer as raw bytes*/
-		pup_bytes(p,&t->stack,sizeof(t->stack));
-	}
-	if (pup_isUnpacking(p)) { 
-		/* FIXME:  restore thread listener */
-		t->listener = NULL;
-	}
+#endif
+  } 
+  else {
+    if (useMigratable)
+      CmiAbort("You must use CthCreateMigratable to use CthPup!\n");
+    /*Pup the stack pointer as raw bytes*/
+    pup_bytes(p,&t->stack,sizeof(t->stack));
+  }
+  if (pup_isUnpacking(p)) { 
+    /* FIXME:  restore thread listener */
+    t->listener = NULL;
+  }
 
-	pup_int(p, &t->magic);
+  pup_int(p, &t->magic);
 
 #if CMK_THREADS_BUILD_TLS
-        void* aux;
-        pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
-        aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
-        /* fixme: tls global variables handling needs isomalloc */
-        CmiIsomallocPup(p, &aux);
-        /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
+  void* aux;
+  pup_bytes(p, &t->tlsseg, sizeof(tlsseg_t));
+  aux = ((void*)(t->tlsseg.memseg)) - t->tlsseg.size;
+  /* fixme: tls global variables handling needs isomalloc */
+#if USE_MEMPOOL_ISOMALLOC
+  pup_bytes(p,&aux,sizeof(char*));
+#else
+  CmiIsomallocPup(p, &aux);
 #endif
-
+  /* printf("[%d] %s %p\n", CmiMyPe(), pup_typeString(p), t->tlsseg.memseg); */
+#endif
 }
 
 static void CthThreadFinished(CthThread t)
 {
-	B(t)->exiting=1;
-	CthSuspend();
+  B(t)->exiting=1;
+  CthSuspend();
 }
 
 
@@ -656,7 +665,7 @@ static void CthBaseResume(CthThread t)
 {
   struct CthThreadListener *l;
   for(l=B(t)->listener;l!=NULL;l=l->next){
-	if (l->resume) l->resume(l);
+    if (l->resume) l->resume(l);
   }
   CpvAccess(_numSwitches)++;
   CthFixData(t); /*Thread-local storage may have changed in other thread.*/
@@ -667,7 +676,7 @@ static void CthBaseResume(CthThread t)
 
 /**
   switch the thread to t
-*/
+  */
 void CthSwitchThread(CthThread t)
 {
   CthBaseResume(t);
@@ -684,20 +693,20 @@ void CthSuspend(void)
 
   if (cur->suspendable == 0)
     CmiAbort("Fatal Error> trying to suspend a non-suspendable thread!\n");
-  
+
   /*
-	Call the suspend function on listeners
-  */
+     Call the suspend function on listeners
+     */
   for(l=cur->listener;l!=NULL;l=l->next){
-	if (l->suspend) l->suspend(l);
+    if (l->suspend) l->suspend(l);
   }
   if (cur->choosefn == 0) CthNoStrategy();
   next = cur->choosefn();
   /*cur->scheduled=0;*/
   /*changed due to out-of-core emulation in BigSim*/
   /** Sometimes, a CthThread is running without ever being awakened
-    * In this case, the scheduled is the initialized value "0"
-    */
+   * In this case, the scheduled is the initialized value "0"
+   */
   if(cur->scheduled > 0)
     cur->scheduled--;
 
@@ -720,10 +729,10 @@ void CthAwaken(CthThread th)
   if (B(th)->awakenfn == 0) CthNoStrategy();
 
   /*BIGSIM_OOC DEBUGGING
-  if(B(th)->scheduled==1){
+    if(B(th)->scheduled==1){
     CmiPrintf("====Thread %p is already scheduled!!!!\n", th);
     return;
-  } */
+    } */
 
 #if CMK_TRACE_ENABLED
 #if ! CMK_TRACE_IN_CHARM
@@ -765,42 +774,42 @@ void CthYieldPrio(int s, int pb, unsigned int *prio)
 }
 
 /*
-	Add a new thread listener to a thread 
-*/
+   Add a new thread listener to a thread 
+   */
 void CthAddListener(CthThread t,struct CthThreadListener *l){
-		struct CthThreadListener *p=B(t)->listener;
-		if(p== NULL){ /* first listener */
-			B(t)->listener=l;
-			l->thread = t;
-			l->next=NULL;
-			return;	
-		}
-		/* Add l at end of current chain of listeners: */
-		while(p->next != NULL){
-			p = p->next;
-		}
-		p->next = l;
-		l->next = NULL;
-		l->thread = t;
+  struct CthThreadListener *p=B(t)->listener;
+  if(p== NULL){ /* first listener */
+    B(t)->listener=l;
+    l->thread = t;
+    l->next=NULL;
+    return;	
+  }
+  /* Add l at end of current chain of listeners: */
+  while(p->next != NULL){
+    p = p->next;
+  }
+  p->next = l;
+  l->next = NULL;
+  l->thread = t;
 }
 
 /*************************** Stack-Copying Threads (obsolete) *******************
-Basic idea: switch from thread A (currently running) to thread B by copying
-A's stack from the system stack area into A's buffer in the heap, then
-copy B's stack from its heap buffer onto the system stack.
+  Basic idea: switch from thread A (currently running) to thread B by copying
+  A's stack from the system stack area into A's buffer in the heap, then
+  copy B's stack from its heap buffer onto the system stack.
 
-This allows thread migration, because the system stack is in the same
-location on every processor; but the context-switching overhead (especially
-for threads with deep stacks) is extremely high.
+  This allows thread migration, because the system stack is in the same
+  location on every processor; but the context-switching overhead (especially
+  for threads with deep stacks) is extremely high.
 
-Written by Josh Yelon around May 1999
+  Written by Josh Yelon around May 1999
 
-stack grows down like:
-lo   <- savedptr    <- savedstack
+  stack grows down like:
+  lo   <- savedptr    <- savedstack
 
-...
+  ...
 
-high <- stackbase
+  high <- stackbase
 
 NOTE: this only works when system stack base is same on all processors.
 Which is not the case on my FC4 laptop ?!
@@ -839,23 +848,23 @@ int CthMigratable()
 
 CthThread CthPup(pup_er p, CthThread t)
 {
-    if (pup_isUnpacking(p))
-      { t = (CthThread) malloc(sizeof(CthThreadStruct));_MEMCHECK(t);}
-    pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
-    CthPupBase(p,&t->base,0);
-    pup_int(p,&t->savedsize);
-    if (pup_isUnpacking(p)) {
-      t->savedstack = (qt_t*) malloc(t->savedsize);_MEMCHECK(t->savedstack);
-      t->stacklen = t->savedsize;       /* reflect actual size */
-    }
-    pup_bytes(p, (void*) t->savedstack, t->savedsize);
+  if (pup_isUnpacking(p))
+  { t = (CthThread) malloc(sizeof(CthThreadStruct));_MEMCHECK(t);}
+  pup_bytes(p, (void*) t, sizeof(CthThreadStruct)); 
+  CthPupBase(p,&t->base,0);
+  pup_int(p,&t->savedsize);
+  if (pup_isUnpacking(p)) {
+    t->savedstack = (qt_t*) malloc(t->savedsize);_MEMCHECK(t->savedstack);
+    t->stacklen = t->savedsize;       /* reflect actual size */
+  }
+  pup_bytes(p, (void*) t->savedstack, t->savedsize);
 
-      /* assume system stacks are same on all processors !! */
-    pup_bytes(p,&t->savedptr,sizeof(t->savedptr));  
+  /* assume system stacks are same on all processors !! */
+  pup_bytes(p,&t->savedptr,sizeof(t->savedptr));  
 
-    if (pup_isDeleting(p))
-      {CthFree(t);t=0;}
-    return t;
+  if (pup_isDeleting(p))
+  {CthFree(t);t=0;}
+  return t;
 }
 
 
@@ -888,7 +897,7 @@ static void CthThreadFree(CthThread t)
 }
 
 void CthFree(t)
-CthThread t;
+  CthThread t;
 {
   if (t==NULL) return;
   CthProcInfo proc = CthCpvAccess(CthProc);	
@@ -920,7 +929,7 @@ void CthInit(char **argv)
   /* leave some space for current stack frame < 256 bytes */
   /* sp must be same on all processors for migration to work ! */
   sp = (qt_t*)(((size_t)&t) & ~((size_t)0xFF));
-/*printf("[%d] System stack base: %p\n", CmiMyPe(), sp);*/
+  /*printf("[%d] System stack base: %p\n", CmiMyPe(), sp);*/
   p->stackbase = QT_SP(sp, 0x100);
 
   /* printf("sp: %p\n", sp); */
@@ -1009,7 +1018,7 @@ static void CthResume1(qt_t *sp, CthProcInfo proc, CthThread t)
 }
 
 void CthResume(t)
-CthThread t;
+  CthThread t;
 {
   CthProcInfo proc = CthCpvAccess(CthProc);
   QT_BLOCK((qt_helper_t*)CthResume1, proc, t, proc->switchbuf_sp);
@@ -1029,12 +1038,12 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 }
 
 /**************************************************************************
-QuickThreads does not work on Win32-- our stack-shifting large allocas
-fail a stack depth check.  Windows NT and 98 provide a user-level thread 
-interface called "Fibers", used here.
+  QuickThreads does not work on Win32-- our stack-shifting large allocas
+  fail a stack depth check.  Windows NT and 98 provide a user-level thread 
+  interface called "Fibers", used here.
 
-Written by Sameer Paranjpye around October 2000
-*/
+  Written by Sameer Paranjpye around October 2000
+  */
 #elif  CMK_THREADS_ARE_WIN32_FIBERS
 #include <windows.h>
 #include <winbase.h>
@@ -1069,7 +1078,7 @@ CreateFiberEx(
     DWORD dwFlags,
     LPFIBER_START_ROUTINE lpStartAddress,
     LPVOID lpParameter
-);
+    );
 
 
 WINBASEAPI
@@ -1176,9 +1185,9 @@ static void CthClearThreads()
     }
   }
   if (m!=p)
-  for (i=m; i<n; i++,p++) {
+    for (i=m; i<n; i++,p++) {
       CthCpvAccess(exitThreads)[p] = CthCpvAccess(exitThreads)[i];
-  }
+    }
 }
 
 void CthFree(CthThread t)
@@ -1201,16 +1210,16 @@ void CthFree(CthThread t)
   CthCpvAccess(exitThreads)[CthCpvAccess(nExit)++] = t;
   if (t==CthCpvAccess(CthCurrent)) 
   {
-     t->base.exiting = 1;
+    t->base.exiting = 1;
   } 
   else 
   {
     CthClearThreads();
-/*  was
-    if (t->data) free(t->data);
-    DeleteFiber(t->fiber);
-    free(t);
-*/
+    /*  was
+        if (t->data) free(t->data);
+        DeleteFiber(t->fiber);
+        free(t);
+        */
   }
 }
 
@@ -1218,7 +1227,7 @@ void CthFree(CthThread t)
 void CthFiberBlock(CthThread t)
 {
   CthThread tp;
-  
+
   SwitchToFiber(t->fiber);
   tp = CthCpvAccess(CthPrevious);
   if (tp != 0 && tp->killed == 1)
@@ -1267,7 +1276,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   fiberData = (void**)malloc(2*sizeof(void *));
   fiberData[0] = (void *)fn;
   fiberData[1] = arg;
-  
+
   result = (CthThread)malloc(sizeof(struct CthThreadStruct));
   _MEMCHECK(result);
   CthThreadInit(result);
@@ -1275,7 +1284,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   result->fiber = CreateFiberEx(size, size, 0, FiberSetUp, (PVOID) fiberData);
   if (!result->fiber)
     CmiAbort("CthCreate failed to create fiber!\n");
-  
+
   return result;
 }
 
@@ -1295,10 +1304,10 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 }
 
 /***************************************************
-Use Posix Threads to simulate cooperative user-level
-threads.  This version is very portable but inefficient.
+  Use Posix Threads to simulate cooperative user-level
+  threads.  This version is very portable but inefficient.
 
-Written by Milind Bhandarkar around November 2000
+  Written by Milind Bhandarkar around November 2000
 
 IMPORTANT:  for SUN, must link with -mt compiler flag
 Rewritten by Gengbin Zheng
@@ -1323,11 +1332,11 @@ struct CthThreadStruct
   The sched_mutex is the current token of execution.
   Only the running thread holds this lock; all other threads
   have released the lock and are waiting on their condition variable.
-*/
+  */
 CthCpvStatic(pthread_mutex_t, sched_mutex);
 
 static void CthThreadInit(t)
-CthThread t;
+  CthThread t;
 {
   CthThreadBaseInit(&t->base);
   t->inited = 0;
@@ -1353,7 +1362,7 @@ void CthInit(char **argv)
 }
 
 void CthFree(t)
-CthThread t;
+  CthThread t;
 {
   if (t==NULL) return;
   if (t==CthCpvAccess(CthCurrent)) {
@@ -1375,10 +1384,10 @@ void CthResume(CthThread t)
     pthread_exit(0);
   } else {
     /* pthread_cond_wait might (with low probability) return when the 
-      condition variable has not been signaled, guarded with 
-      predicate checks */
+       condition variable has not been signaled, guarded with 
+       predicate checks */
     do {
-    pthread_cond_wait(&(tc->cond), &CthCpvAccess(sched_mutex));
+      pthread_cond_wait(&(tc->cond), &CthCpvAccess(sched_mutex));
     } while (tc!=CthCpvAccess(CthCurrent)) ;
   }
 }
@@ -1391,7 +1400,7 @@ static void *CthOnly(void * arg)
   pthread_mutex_lock(&CthCpvAccess(sched_mutex));
   pthread_cond_signal(th->creator);
   do {
-  pthread_cond_wait(&(th->cond), &CthCpvAccess(sched_mutex));
+    pthread_cond_wait(&(th->cond), &CthCpvAccess(sched_mutex));
   } while (arg!=CthCpvAccess(CthCurrent)) ;
   th->fn(th->arg);
   CthThreadFinished(th);
@@ -1418,19 +1427,19 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
   /* pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM); */
   if (size<1024) size = CthCpvAccess(_defaultStackSize);
   if (0!=(r=pthread_attr_setstacksize(&attr,size))) {
-      if (!reported) {
-        CmiPrintf("Warning: pthread_attr_setstacksize failed\n");
-	errno = r;
-	perror("pthread_attr_setstacksize");
-        reported = 1;
-      }
+    if (!reported) {
+      CmiPrintf("Warning: pthread_attr_setstacksize failed\n");
+      errno = r;
+      perror("pthread_attr_setstacksize");
+      reported = 1;
+    }
   }
-	
+
   /* **CWL** Am assuming Gengbin left this unchanged because the macro
      re-definition of pthread_create would not happen before this part of
      the code. If the assumption is not true, then we can simply replace
      this hash-if with the else portion.
-  */
+     */
 #if CMK_WITH_TAU
   r = tau_pthread_create(&(result->self), &attr, CthOnly, (void*) result);
 #else
@@ -1441,7 +1450,7 @@ CthThread CthCreate(CthVoidFn fn, void *arg, int size)
     CmiAbort("CthCreate failed to created a new pthread\n");
   }
   do {
-  pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
+    pthread_cond_wait(&(self->cond), &CthCpvAccess(sched_mutex));
   } while (result->inited==0);
   return result;
 }
@@ -1462,18 +1471,18 @@ CthThread CthCreateMigratable(CthVoidFn fn,void *arg,int size)
 }
 
 /***************************************************************
-Use SysV r3 setcontext/getcontext calls instead of
-quickthreads.  This works on lots of architectures (such as
-SUN, IBM SP, O2K, DEC Alpha, IA64, Cray X1, Linux with newer version of 
- glibc such as the one with RH9) 
-On some machine such as IA64 and Cray X1, the context version is the 
-only thread package that is working. 
+  Use SysV r3 setcontext/getcontext calls instead of
+  quickthreads.  This works on lots of architectures (such as
+  SUN, IBM SP, O2K, DEC Alpha, IA64, Cray X1, Linux with newer version of 
+  glibc such as the one with RH9) 
+  On some machine such as IA64 and Cray X1, the context version is the 
+  only thread package that is working. 
 
-Porting should be easy. To port context threads, one need to set the 
-direction of the thread stack properly in conv-mach.h.
+  Porting should be easy. To port context threads, one need to set the 
+  direction of the thread stack properly in conv-mach.h.
 
 Note: on some machine like Sun and IBM SP, one needs to link with memory gnuold
- to have this context thread working.
+to have this context thread working.
 
 Written by Gengbin Zheng around April 2001
 
@@ -1520,7 +1529,7 @@ struct CthThreadStruct
 
 
 static void CthThreadInit(t)
-CthThread t;
+  CthThread t;
 {
   CthThreadBaseInit(&t->base);
 }
@@ -1584,7 +1593,7 @@ void CthResume(CthThread) __attribute__((optimize(0)));
 #endif
 
 void CthResume(t)
-CthThread t;
+  CthThread t;
 {
   CthThread tc;
   tc = CthCpvAccess(CthCurrent);
@@ -1606,9 +1615,9 @@ CthThread t;
       setJcontext(&t->context);
     }
   }
-/*This check will mistakenly fail if the thread migrates (changing tc)
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
-*/
+  /*This check will mistakenly fail if the thread migrates (changing tc)
+    if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
+    */
 }
 
 #if CMK_THREADS_USE_CONTEXT && CMK_64BIT /* makecontext only pass integer arguments */
@@ -1633,10 +1642,10 @@ void CthStartThread(qt_userf_t fn,void *arg)
   ((void *)((((qt_word_t)(sp)) + (alignment) - 1) & ~((alignment)-1)))
 
 int ptrDiffLen(const void *a,const void *b) {
-	char *ac=(char *)a, *bc=(char *)b;
-	int ret=ac-bc;
-	if (ret<0) ret=-ret;
-	return ret;
+  char *ac=(char *)a, *bc=(char *)b;
+  int ret=ac-bc;
+  if (ret<0) ret=-ret;
+  return ret;
 }
 
 static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
@@ -1653,19 +1662,19 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #endif
   CthAllocateStack(&result->base,&size,migratable);
   stack = result->base.stack;
-  
+
   if (0 != getJcontext(&result->context))
     CmiAbort("CthCreateInner: getcontext failed.\n");
 
   ss_end = stack + size;
 
-/**
- Decide where to point the uc_stack.ss_sp field of our "context"
- structure.  The configuration values CMK_CONTEXT_STACKBEGIN, 
- CMK_CONTEXT_STACKEND, and CMK_CONTEXT_STACKMIDDLE determine where to
- point ss_sp: to the beginning, end, and middle of the stack buffer
- respectively.  The default, used by most machines, is CMK_CONTEXT_STACKBEGIN.
-*/
+  /**
+    Decide where to point the uc_stack.ss_sp field of our "context"
+    structure.  The configuration values CMK_CONTEXT_STACKBEGIN, 
+    CMK_CONTEXT_STACKEND, and CMK_CONTEXT_STACKMIDDLE determine where to
+    point ss_sp: to the beginning, end, and middle of the stack buffer
+    respectively.  The default, used by most machines, is CMK_CONTEXT_STACKBEGIN.
+    */
 #if CMK_THREADS_USE_JCONTEXT /* Jcontext is always STACKBEGIN */
   ss_sp = stack;
 #elif CMK_CONTEXT_STACKEND /* ss_sp should point to *end* of buffer */
@@ -1676,12 +1685,12 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
 #else /* CMK_CONTEXT_STACKBEGIN, the usual case  */
   ss_sp = stack;
 #endif
-  
+
   result->context.uc_stack.ss_sp = STP_STKALIGN(ss_sp,sizeof(char *)*8);
   result->context.uc_stack.ss_size = ptrDiffLen(result->context.uc_stack.ss_sp,ss_end);
   result->context.uc_stack.ss_flags = 0;
   result->context.uc_link = 0;
-  
+
   CthAliasEnable(B(result)); /* Change to new thread's stack while building context */
   errno = 0;
 #if CMK_THREADS_USE_CONTEXT
@@ -1702,7 +1711,7 @@ static CthThread CthCreateInner(CthVoidFn fn,void *arg,int size,int migratable)
   CthAliasEnable(B(CthCpvAccess(CthCurrent)));
 
 #if CMK_THREADS_BUILD_TLS
-  allocNewTLSSeg(&B(result)->tlsseg);
+  allocNewTLSSeg(&B(result)->tlsseg, result);
 #endif
 
   return result;  
@@ -1726,20 +1735,20 @@ CthThread CthPup(pup_er p, CthThread t)
 {
   int flag;
   if (pup_isUnpacking(p)) {
-	  t=(CthThread)malloc(sizeof(struct CthThreadStruct));
-	  _MEMCHECK(t);
-	  CthThreadInit(t);
+    t=(CthThread)malloc(sizeof(struct CthThreadStruct));
+    _MEMCHECK(t);
+    CthThreadInit(t);
   }
   CthPupBase(p,&t->base,1);
-  
+
   /*Pup the processor context as bytes-- this is not guarenteed to work!*/
   /* so far, context and context-memoryalias works for IA64, not ia32 */
   /* so far, uJcontext and context-memoryalias works for IA32, not ia64 */
   pup_bytes(p,&t->context,sizeof(t->context));
 #if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_FPU_POINTER
 #if ! CMK_CONTEXT_FPU_POINTER_UCREGS
-    /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
-       pup it separately */
+  /* context is not portable for ia32 due to pointer in uc_mcontext.fpregs,
+     pup it separately */
   if (!pup_isUnpacking(p)) flag = t->context.uc_mcontext.fpregs != NULL;
   pup_int(p,&flag);
   if (flag) {
@@ -1760,38 +1769,38 @@ CthThread CthPup(pup_er p, CthThread t)
 #endif
 #endif
 #if !CMK_THREADS_USE_JCONTEXT && CMK_CONTEXT_V_REGS
-    /* linux-ppc  64 bit */
+  /* linux-ppc  64 bit */
   if (pup_isUnpacking(p)) {
-      t->context.uc_mcontext.v_regs = malloc(sizeof(vrregset_t));
+    t->context.uc_mcontext.v_regs = malloc(sizeof(vrregset_t));
   }
   pup_bytes(p,t->context.uc_mcontext.v_regs,sizeof(vrregset_t));
 #endif
   if (pup_isUnpacking(p)) {
-      t->context.uc_link = 0;
+    t->context.uc_link = 0;
   }
   if (pup_isDeleting(p)) {
-	  CthFree(t);
-	  return 0;
+    CthFree(t);
+    return 0;
   }
   return t;
 }
 
 #else 
 /***************************************************************
-Basic qthreads implementation. 
+  Basic qthreads implementation. 
 
-These threads can also add a "protection block" of
-inaccessible memory to detect stack overflows, which
-would otherwise just trash the heap.
+  These threads can also add a "protection block" of
+  inaccessible memory to detect stack overflows, which
+  would otherwise just trash the heap.
 
-(7/13/2001 creation times on 300MHz AMD K6-3 x86, Linux 2.2.18:
-Qt setjmp, without stackprotect: 18.5 us
-Qt i386, without stackprotect: 17.9 us
-Qt setjmp, with stackprotect: 68.6 us
-)
+  (7/13/2001 creation times on 300MHz AMD K6-3 x86, Linux 2.2.18:
+  Qt setjmp, without stackprotect: 18.5 us
+  Qt i386, without stackprotect: 17.9 us
+  Qt setjmp, with stackprotect: 68.6 us
+  )
 
-Written by Josh Yelon around 1995
-*/
+  Written by Josh Yelon around 1995
+  */
 
 #if !CMK_ERROR_CHECKING || (!CMK_MEMORY_PROTECTABLE)
 #  define CMK_STACKPROTECT 0
@@ -1802,7 +1811,7 @@ Written by Josh Yelon around 1995
 #else
 #  define CMK_STACKPROTECT 1
 
-  extern void setProtection(char*, char*, int, int);
+extern void setProtection(char*, char*, int, int);
 #  include "sys/mman.h"
 #  define CthMemAlign(x,n) memalign((x),(n))
 #  define CthMemoryProtect(m,p,l) mprotect(p,l,PROT_NONE);setProtection((char*)m,p,l,1);
@@ -1827,7 +1836,7 @@ static CthThread CthThreadInit(void)
   CthThreadBaseInit(&ret->base);
   ret->protect = 0;
   ret->protlen = 0;
-  
+
   return ret;
 }
 
@@ -1882,7 +1891,7 @@ void CthResume(CthThread) __attribute__((optimize(0)));
 #endif
 
 void CthResume(t)
-CthThread t;
+  CthThread t;
 {
   CthThread tc = CthCpvAccess(CthCurrent);
   if (t == tc) return;
@@ -1897,9 +1906,9 @@ CthThread t;
   } else {
     QT_BLOCK((qt_helper_t*)CthBlockHelp, tc, 0, t->stackp);
   }
-/*This check will mistakenly fail if the thread migrates (changing tc)
-  if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
-*/
+  /*This check will mistakenly fail if the thread migrates (changing tc)
+    if (tc!=CthCpvAccess(CthCurrent)) { CmiAbort("Stack corrupted?\n"); }
+    */
 }
 
 static void CthOnly(void *arg, void *vt, qt_userf_t fn)
@@ -1915,12 +1924,12 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   result=CthThreadInit();
   if (doProtect) 
   { /*Can only protect on a page boundary-- allocate an extra page and align stack*/
-	  if (size==0) size=CthCpvAccess(_defaultStackSize);
-	  size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
-	  stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
-          B(result)->stack = stack;
+    if (size==0) size=CthCpvAccess(_defaultStackSize);
+    size = (size+(CMK_MEMORY_PAGESIZE*2)-1) & ~(CMK_MEMORY_PAGESIZE-1);
+    stack = (qt_t*)CthMemAlign(CMK_MEMORY_PAGESIZE, size);
+    B(result)->stack = stack;
   } else
-	  stack=CthAllocateStack(&result->base,&size,Migratable);
+    stack=CthAllocateStack(&result->base,&size,Migratable);
   CthAliasEnable(B(result)); /* Change to new thread's stack while setting args */
   stackbase = QT_SP(stack, size);
   stackp = QT_ARGS(stackbase, arg, result, (qt_userf_t *)fn, CthOnly);
@@ -1929,10 +1938,10 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   result->stackp = stackp;
   if (doProtect) {
 #ifdef QT_GROW_UP
-  /*Stack grows up-- protect highest page of stack*/
+    /*Stack grows up-- protect highest page of stack*/
     result->protect = ((char*)stack) + size - CMK_MEMORY_PAGESIZE;
 #else
-  /*Stack grows down-- protect lowest page in stack*/
+    /*Stack grows down-- protect lowest page in stack*/
     result->protect = ((char*)stack);
 #endif
     result->protlen = CMK_MEMORY_PAGESIZE;
@@ -1964,29 +1973,29 @@ int CthMigratable()
 CthThread CthPup(pup_er p, CthThread t)
 {
   if (pup_isUnpacking(p)) {
-	  t=CthThreadInit();
+    t=CthThreadInit();
   }
 #if CMK_THREADS_ALIAS_STACK
   CthPupBase(p,&t->base,0);
 #else
   CthPupBase(p,&t->base,1);
 #endif
-  
+
   /*Pup the stack pointer as bytes-- this works because stack is migratable*/
   pup_bytes(p,&t->stackp,sizeof(t->stackp));
 
   /*Don't worry about stack protection on migration*/  
 
   if (pup_isDeleting(p)) {
-	  CthFree(t);
-	  return 0;
+    CthFree(t);
+    return 0;
   }
   return t;
 }
 
 /* Functions that help debugging of out-of-core emulation in BigSim */
 void CthPrintThdStack(CthThread t){
-    CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
+  CmiPrintf("thread=%p, base stack=%p, stack pointer=%p\n", t, t->base.stack, t->stackp);
 }
 #endif
 
@@ -2024,6 +2033,6 @@ void CthTraceResume(CthThread t)
 
 /* Functions that help debugging of out-of-core emulation in BigSim */
 void CthPrintThdMagic(CthThread t){
-    CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
+  CmiPrintf("CthThread[%p]'s magic: %x\n", t, t->base.magic);
 }
 

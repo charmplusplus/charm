@@ -31,6 +31,7 @@ void ScotchLB::work(LDStats *stats) {
   /** ========================== INITIALIZATION ============================= */
   ProcArray *parr = new ProcArray(stats);
   ObjGraph *ogr = new ObjGraph(stats);
+  double start_time = CmiWallTimer();
 
   /** ============================= STRATEGY ================================ */
   // convert ObjGraph to the Scotch graph
@@ -39,27 +40,53 @@ void ScotchLB::work(LDStats *stats) {
   SCOTCH_Num edgenbr = 0;			// number of edges
 
   double maxLoad = 0.0;
+  double minLoad = 0.0;
+  if (vertnbr > 0) {
+    minLoad = ogr->vertices[baseval].getVertexLoad();
+  }
+
+  long maxBytes = 1;
   int i, j, k, vert;
+
 
   /** remove duplicate edges from recvFrom */
   for(i = baseval; i < vertnbr; i++) {
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       vert = ogr->vertices[i].sendToList[j].getNeighborId();
       for(k = 0; k < ogr->vertices[i].recvFromList.size(); k++) {
-	if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert) {
-          ogr->vertices[i].sendToList[j].setNumBytes(ogr->vertices[i].sendToList[j].getNumBytes() + ogr->vertices[i].recvFromList[k].getNumBytes());
+        if(ogr->vertices[i].recvFromList[k].getNeighborId() == vert) {
+          ogr->vertices[i].sendToList[j].setNumBytes(
+              ogr->vertices[i].sendToList[j].getNumBytes() +
+              ogr->vertices[i].recvFromList[k].getNumBytes());
           ogr->vertices[i].recvFromList.erase(ogr->vertices[i].recvFromList.begin() + k);
         }
       }
     }
   }
-
   /** the object load is normalized to an integer between 0 and 256 */
   for(i = baseval; i < vertnbr; i++) {
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
+
+    if (ogr->vertices[i].getVertexLoad() < minLoad) {
+      minLoad = ogr->vertices[i].getVertexLoad();
+    }
     edgenbr += ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
   }
+
+  for(i = baseval; i < vertnbr; i++) {
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      if (ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes) {
+        maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
+      }
+    }
+    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
+      if (ogr->vertices[i].recvFromList[j].getNumBytes() > maxBytes) {
+        maxBytes = ogr->vertices[i].recvFromList[j].getNumBytes();
+      }
+    }
+  }
+
 
   /* adjacency list */
   SCOTCH_Num *verttab = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * (vertnbr+1));
@@ -72,18 +99,19 @@ void ScotchLB::work(LDStats *stats) {
 
   int edgeNum = 0;
   double ratio = 256.0/maxLoad;
+  double byteRatio = 1024.0/maxBytes;
 
   for(i = baseval; i < vertnbr; i++) {
     verttab[i] = edgeNum;
-    velotab[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+    velotab[i] = (SCOTCH_Num) ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       edgetab[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      edlotab[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
+      edlotab[edgeNum] = (int) ceil(ogr->vertices[i].sendToList[j].getNumBytes() * byteRatio);
       edgeNum++;
     }
     for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
       edgetab[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
-      edlotab[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
+      edlotab[edgeNum] = (int) ceil(ogr->vertices[i].recvFromList[j].getNumBytes() * byteRatio);
       edgeNum++;
     }
   }
@@ -91,6 +119,7 @@ void ScotchLB::work(LDStats *stats) {
   CkAssert(edgeNum == edgenbr);
 
   SCOTCH_Graph graph;		// Graph to partition
+  SCOTCH_Arch  arch;            // Target architecture
   SCOTCH_Strat strat;		// Strategy to achieve partitioning
 
   /* Initialize data structures */
@@ -100,25 +129,24 @@ void ScotchLB::work(LDStats *stats) {
   SCOTCH_graphBuild (&graph, baseval, vertnbr, verttab, NULL, velotab, NULL, edgenbr, edgetab, edlotab); 
   SCOTCH_graphCheck (&graph);
 
-  // SCOTCH_stratGraphMap (&strat, "m{type=h,vert=80,low=r{job=t,map=t,poli=S,sep=h{pass=10}},asc=b{bnd=d{dif=1,rem=1,pass=40},org=}f{bal=0.01,move=80}}");
-
-  SCOTCH_stratGraphMap (&strat, "r{job=t,map=t,poli=S,sep=(m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=f{bal=0.001,move=80},org=f{bal=0.001,move=80}}}|m{type=h,vert=80,low=h{pass=10}f{bal=0.001,move=80},asc=b{bnd=f{bal=0.001,move=80},org=f{bal=0.001,move=80}}})}");
-
+  SCOTCH_stratGraphMapBuild (&strat, SCOTCH_STRATBALANCE, parr->procs.size (), 0.01);
   SCOTCH_Num *pemap = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
 
   SCOTCH_graphPart(&graph, parr->procs.size(), &strat, pemap);
 
+
   SCOTCH_graphExit (&graph);
+  SCOTCH_archExit  (&arch);
   SCOTCH_stratExit (&strat);
- 
+
   free(verttab);
   free(velotab);
   free(edgetab);
   free(edlotab);
-
   for(i = baseval; i < vertnbr; i++) {
-    if(pemap[i] != ogr->vertices[i].getCurrentPe())
+    if(pemap[i] != ogr->vertices[i].getCurrentPe()) {
       ogr->vertices[i].setNewPe(pemap[i]);
+    }
   }
 
   free(pemap);

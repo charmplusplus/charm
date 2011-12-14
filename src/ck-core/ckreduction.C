@@ -221,14 +221,14 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 }
 
-void CkReductionMgr::flushStates()
+void CkReductionMgr::flushStates(int isgroup)
 {
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
   creating=CmiFalse;
-  gcount=lcount=0;
+  if (!isgroup) gcount=lcount=0;    // array reduction group needs to reset to 0
   startRequested=CmiFalse;
   nContrib=nRemote=0;
   maxStartRequest=0;
@@ -240,7 +240,9 @@ void CkReductionMgr::flushStates()
 
   adjVec.length()=0;
 
+#if ! GROUP_LEVEL_REDUCTION
   nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
+#endif
 }
 
 //////////// Reduction Manager Client API /////////////
@@ -778,12 +780,11 @@ void CkReductionMgr::finishReduction(void)
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-	if(CkMyPe()!=0){
-#else
-    {
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_)) && !GROUP_LEVEL_REDUCTION
+    /* nodegroup reduction will adjust adjVec in endArrayReduction on PE 0 */
+  if(CkMyPe()!=0)
 #endif
-//	int i;
+  {
 	completedRedNo++;
   	for (i=1;i<(int)(adjVec.length());i++){
 	   adjVec[i-1]=adjVec[i];
@@ -1019,7 +1020,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-   init_BinaryTree();
+    init_BinaryTree();
 #endif
 #endif
   }

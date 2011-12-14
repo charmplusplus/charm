@@ -6,7 +6,6 @@
 #include "CEntry.h"
 #include "sdag-globals.h"
 #include "CList.h"
-#include "CStateVar.h"
 #include "CParsedFile.h"
 
 #include <iostream>
@@ -17,6 +16,8 @@
 
 
 namespace xi {
+
+class CStateVar;
 
 /******************* Utilities ****************/
 

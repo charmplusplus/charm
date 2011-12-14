@@ -1,0 +1,14 @@
+////////////////////////////////////////////////
+//
+//  cksequence_test.ci
+//
+//  Interface file for cksequence_test
+//
+//
+////////////////////////////////////////////////
+
+mainmodule cksequence_test {
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+};

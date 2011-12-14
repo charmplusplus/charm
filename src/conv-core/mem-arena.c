@@ -1090,7 +1090,7 @@ static void print_list_array(slotset *ss) {
   }
 }
 
-#if CMK_THREADS_DEBUG
+#if ISOMALLOC_DEBUG
 static void print_slots(slotset *ss) {
   print_btree_top_down(ss->btree_root);
   print_list_array(ss);

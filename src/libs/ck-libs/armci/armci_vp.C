@@ -65,7 +65,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   thisProxy = this;
   tcharmClientInit();
   thread->semaPut(ARMCI_TCHARM_SEMAID,this);
-  memBlock = CmiIsomallocBlockListNew();
+  memBlock = CmiIsomallocBlockListNew(NULL);
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
   addressReply = NULL;
   // Save ourselves for the waiting ARMCI_Init
@@ -561,7 +561,7 @@ void ArmciVirtualProcessor::notify_wait(int proc){
 
 void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
-  CmiIsomallocBlockListPup(&p, &memBlock);
+  CmiIsomallocBlockListPup(&p, &memBlock,NULL);
   p|thisProxy;
   p|hdlList;
   p|noteList;

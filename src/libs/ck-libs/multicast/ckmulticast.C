@@ -21,14 +21,10 @@
 #define DEBUGF(x)  // CkPrintf x;
 
 // turn on or off fragmentation in multicast
-#define SPLIT_MULTICAST  0
-// each multicast message is split into SPLIT_NUM fragments
-#define SPLIT_NUM 20
-#define SPLIT_SIZE (250000)
+#define SPLIT_MULTICAST  1
 
-#define SPLIT_THRESHOLD (1000000)
 // maximum number of fragments into which a message can be broken
-#define MAXFRAGS 20
+#define MAXFRAGS 100
 
 typedef CkQ<multicastGrpMsg *>   multicastGrpMsgBuf;
 typedef CkVec<CkArrayIndex>   arrayIndexList;
@@ -620,7 +616,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
         delete [] packet->data;
         delete packet;
     }
-#else
+#endif
     // clear msg buffer
     while (!entry->msgBuf.isEmpty()) 
     {
@@ -629,7 +625,6 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
         newmsg->_cookie.get_val() = entry;
         mCastGrp[CkMyPe()].recvMsg(newmsg);
     }
-#endif
     // release reduction msgs
     releaseFutureReduceMsgs(entry);
 }
@@ -721,20 +716,17 @@ void CkMulticastMgr::ArraySectionSend(CkDelegateData *pd,int ep,void *m, int nsi
 
 void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionID *sid, int opts)
 {
-            DEBUGF(("ArraySectionSend\n"));
-
+  DEBUGF(("ArraySectionSend\n"));
   multicastGrpMsg *msg = (multicastGrpMsg *)m;
-//  msg->aid = a;
   msg->ep = ep;
-
   CkSectionInfo &s = sid->_cookie;
-
   mCastEntry *entry;
+
+  // If this section is rooted at this PE
   if (s.get_pe() == CkMyPe()) {
     entry = (mCastEntry *)s.get_val();   
-    if (entry == NULL) {
+    if (NULL == entry)
       CmiAbort("Unknown array section, Did you forget to register the array section to CkMulticastMgr using setSection()?");
-    }
 
     // update entry pointer in case there is a newer one.
     if (entry->newc) {
@@ -749,26 +741,21 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     LBDatabaseObj()->MulticastSend(om,entry->allObjKeys.getVec(),entry->allObjKeys.size(),env->getTotalsize());
 #endif
 
-    // first time need to rebuild, we do simple send to refresh lastKnown
+    // The first time we need to rebuild the spanning tree, we do p2p sends to refresh lastKnown
     if (entry->needRebuild == 1) {
       msg->_cookie = s;
       SimpleSend(ep, msg, s.get_aid(), *sid, opts);
       entry->needRebuild = 2;
       return;
     }
+    // else the second time, we just rebuild cos now we'll have all the lastKnown PEs
     else if (entry->needRebuild == 2) rebuild(s);
   }
+  // else, if the root has migrated, we have a sub-optimal mcast
   else {
     // fixme - in this case, not recorded in LB
     CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
   }
-
-  // don't need packing here
-/*
-  register envelope *env = UsrToEnv(m);
-  CkPackMessage(&env);
-  m = EnvToUsr(env);
-*/
 
   // update cookie
   msg->_cookie = s;
@@ -780,13 +767,13 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   int totalsize = env->getTotalsize();
   int packetSize = 0;
   int totalcount = 0;
-  if(totalsize < SPLIT_THRESHOLD){
+  if(totalsize < split_threshold){
     packetSize = totalsize;
     totalcount = 1;
   }else{
-    packetSize = SPLIT_SIZE;
-    totalcount = totalsize/SPLIT_SIZE;
-    if(totalcount%SPLIT_SIZE) totalcount++; 
+    packetSize = split_size;
+    totalcount = totalsize/split_size;
+    if(totalsize%split_size) totalcount++; 
     //packetSize = totalsize/SPLIT_NUM;
     //if (totalsize%SPLIT_NUM) packetSize ++;
     //totalcount = SPLIT_NUM;
@@ -794,6 +781,21 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   int sizesofar = 0;
   char *data = (char*) env;
+  if (totalcount == 1) {
+    // If the root of this section's tree is on this PE, then just propagate msg
+    if (s.get_pe() == CkMyPe()) {
+      CkUnpackMessage(&env);
+      msg = (multicastGrpMsg *)EnvToUsr(env);
+      recvMsg(msg);
+    }
+    // else send msg to root of section's spanning tree
+    else {
+      CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+      msg = (multicastGrpMsg *)EnvToUsr(env);
+      mCastGrp[s.get_pe()].recvMsg(msg);
+    }
+    return;
+  }
   for (int i=0; i<totalcount; i++) {
     int mysize = packetSize;
     if (mysize + sizesofar > totalsize) {
@@ -854,7 +856,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int s
     multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
     msg->_cookie = _cookie;
 //    mCastGrp[CkMyPe()].recvMsg(msg);
-    recvMsg(msg);
+    sendToLocal(msg);
     entry->asm_msg = NULL;
     entry->asm_fill = 0;
   }
@@ -868,7 +870,6 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
   CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
-#if ! SPLIT_MULTICAST
   if (entry->notReady()) {
     DEBUGF(("entry not ready, enq buffer %p\n", msg));
     entry->msgBuf.enq(msg);
@@ -883,7 +884,16 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
     newmsg->_cookie = entry->children[i];
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
-#endif
+
+  sendToLocal(msg);
+}
+
+void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
+{
+  int i;
+  CkSectionInfo &sectionInfo = msg->_cookie;
+  mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
+  CmiAssert(entry->getAid() == sectionInfo.get_aid());
 
   // send to local
   int nLocal = entry->localElem.length();

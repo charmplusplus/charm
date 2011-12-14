@@ -1,5 +1,6 @@
 #include "CEntry.h"
 #include "xi-symbol.h"
+#include "CStateVar.h"
 
 namespace xi {
 
@@ -40,7 +41,7 @@ void CEntry::generateCode(XStr& op)
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         op << sv->type->charstar() <<" *"<<sv->name->charstar() <<"_msg";
+         op << sv->type->charstar() <<" "<<sv->name->charstar() <<"_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }
@@ -63,7 +64,7 @@ void CEntry::generateCode(XStr& op)
   sv = (CStateVar *)myParameters->begin();
   i = 0;
   if (isVoid == 1) {
-     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), 0);\n";
+     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
      op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
   else {
@@ -210,13 +211,14 @@ void CEntry::generateCode(XStr& op)
 #endif
 	  whenParams->append("(");
 	  whenParams->append(sv->type->charstar());
-	  whenParams->append(" *) tr->args[");
+	  whenParams->append(") tr->args[");
 	  *whenParams<<iArgs;
 	  whenParams->append("]");
 	  iArgs++;
        }
        else if (sv->isVoid == 1) 
-           op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+           // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+           op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
        else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
           if((i > 0) &&(lastWasVoid == 0)) 
 	     whenParams->append(", ");
@@ -296,7 +298,8 @@ void CEntry::generateCode(XStr& op)
 	    iArgs++;
          }
          else if (sv->isVoid == 1) 
-            op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+            // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+            op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
          else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
             if((i > 0) && (lastWasVoid == 0))
 	       whenParams->append(", ");

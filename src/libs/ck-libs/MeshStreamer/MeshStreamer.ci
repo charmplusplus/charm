@@ -1,0 +1,32 @@
+module MeshStreamer {
+
+  template<class dtype> 
+  message MeshStreamerMessage {
+    int destinationPes[];
+    dtype data[]; 
+  };
+
+  /*
+  message LocalMessage {
+    char data[]; 
+  };
+  */
+
+  template<class dtype> group MeshStreamerClient {
+    entry void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
+  };
+
+  template<class dtype> 
+  group MeshStreamer {
+    entry MeshStreamer(int totalBufferCapacity, int numRows, 
+		       int numColumns, int numPlanes, 
+		       const CProxy_MeshStreamerClient<dtype> &clientProxy, 
+                       int yieldFlag = 0, double progressPeriodInMs = -1.0);   
+    // entry void insertData(CmiUInt8, int); 
+    entry void receiveAggregateData(MeshStreamerMessage<dtype> *msg);
+    // entry void receivePersonalizedData(MeshStreamerMessage *msg);
+    entry void flushDirect();
+    entry void finish(CkReductionMsg *msg);
+  };
+
+};

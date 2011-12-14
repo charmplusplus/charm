@@ -45,12 +45,16 @@ class CkMulticastMgr: public CkDelegateMgr
         };
         typedef CkVec<IndexPos>  arrayIndexPosList;
         int factor;           // spanning tree factor, can be negative
+        unsigned int split_size;
+        unsigned int split_threshold;
         
     public:
         // ------------------------- Cons/Des-tructors ------------------------
-        CkMulticastMgr()  { factor = MAXMCASTCHILDREN; }
         CkMulticastMgr(CkMigrateMessage *m)  {}
-        CkMulticastMgr(int f)  { factor = f; }
+        CkMulticastMgr(int _factor = 2, unsigned int _split_size = 8192, unsigned int _split_threshold = 8192):
+            factor(_factor),
+            split_size(_split_size),
+            split_threshold(_split_threshold) {}
         int useDefCtor(void){ return 1; }
         void pup(PUP::er &p){ 
 		CkDelegateMgr::pup(p);
@@ -85,6 +89,8 @@ class CkMulticastMgr: public CkDelegateMgr
         // ------------------------- Multicasts ------------------------
         /// entry
         void recvMsg(multicastGrpMsg *m);
+        /// entry
+        void sendToLocal(multicastGrpMsg *m);
         /// entry
         void recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer);
         // ------------------------- Reductions ------------------------

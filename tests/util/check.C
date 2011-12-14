@@ -61,7 +61,7 @@ void check_test(int argc, char** argv) {
   }
 
 #if ! CMK_SMP
-  const int s = 1*1024*1024;
+  const int s = 8*1024*1024;
   void *buf1 = CmiAlloc(s);
   CmiUInt8 mem_before = CmiMemoryUsage();
   void *buf2 = CmiAlloc(s);

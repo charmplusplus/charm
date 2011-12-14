@@ -55,6 +55,7 @@ There are three options here for synchronization:
 
 
 /*** The following code was copied verbatim from pcqueue.h file ***/
+#if ! CMK_SMP
 #undef CmiMemoryWriteFence
 #if PXSHM_FENCE
 #ifdef POWER_PC
@@ -80,9 +81,13 @@ There are three options here for synchronization:
 #define CmiMemoryReadFence(startPtr,nBytes) 
 #endif
 
+#endif
+
+/*
 #if CMK_SMP
 #error  "PXSHM can only be used in non-smp build of Charm++"
 #endif
+*/
 
 /***************************************************************************************/
 
@@ -191,7 +196,8 @@ void initAllSendQs();
  * 	currently just testing start up
  * ****************/
 void CmiInitPxshm(char **argv){
-	MACHSTATE(3,"CminitPxshm start");
+        MACHSTATE(3,"CminitPxshm start");
+
 	pxshmContext = (PxshmContext *)calloc(1,sizeof(PxshmContext));
 
 #if CMK_NET_VERSION
@@ -248,9 +254,8 @@ void CmiInitPxshm(char **argv){
 void tearDownSharedBuffers();
 
 void CmiExitPxshm(){
-	int i=0;
-	
 	if(pxshmContext->nodesize != 1){
+                int i;
 		tearDownSharedBuffers();
 	
 		for(i=0;i<pxshmContext->nodesize;i++){
@@ -288,7 +293,8 @@ inline int CmiValidPxshm(int dst, int size){
 	}*/
 	//replace by bitmap later
 	//if(ogm->dst >= pxshmContext->nodestart && ogm->dst <= pxshmContext->nodeend && ogm->size < SHMBUFLEN ){
-	if(dst >= pxshmContext->nodestart && dst <= pxshmContext->nodeend && size < SHMMAXSIZE ){
+        int node = CmiNodeOf(dst);
+	if(node >= pxshmContext->nodestart && node <= pxshmContext->nodeend && size < SHMMAXSIZE ){
 		return 1;
 	}else{
 		return 0;
@@ -297,8 +303,9 @@ inline int CmiValidPxshm(int dst, int size){
 
 
 inline int PxshmRank(int dst){
-	return dst - pxshmContext->nodestart;
+	return CmiNodeOf(dst) - pxshmContext->nodestart;
 }
+
 inline void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount);
 inline int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmSendQ *dstSendQ);
 inline int flushSendQ(int dstRank);

@@ -245,7 +245,7 @@ void MulticastStrategy::localMulticast(envelope *env,
       CkMcastBaseMsg *errorMsg = sinfo.getNewDeliveryErrorMsg(base);
       envelope *errorEnv = UsrToEnv(errorMsg);
       CmiSetHandler(errorEnv, CkpvAccess(comlib_handler));
-      ((CmiMsgHeaderBasic *) errorEnv)->stratid = getInstance();
+      ((CmiMsgHeaderExt *) errorEnv)->stratid = getInstance();
       CmiSyncSendAndFree(env->getSrcPe(), errorEnv->getTotalsize(), (char*)errorEnv);
     }
   }
@@ -274,7 +274,7 @@ void MulticastStrategy::remoteMulticast(envelope *env,
   //CmiSetHandler(env, handlerId);
   CmiSetHandler(env, CkpvAccess(comlib_handler));
 
-  ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+  ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
   //Collect Multicast Statistics
   RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
