@@ -1473,7 +1473,7 @@ EveryLB.o: EveryLB.C LBDatabase.h lbdb.h converse.h conv-config.h \
  GridHybridLB.decl.h GridHybridSeedLB.decl.h GridMetisLB.decl.h \
  HbmLB.decl.h HybridLBMsg.h HybridLB.decl.h HybridBaseLB.decl.h \
  RefineKLB.decl.h RefineTopoLB.decl.h TopoCentLB.decl.h TopoLB.decl.h \
- EveryLB.def.h RefineSwapLB.decl.h
+ EveryLB.def.h 
 	$(CHARMC) -c -I. EveryLB.C
 
 CommonLBs.o: CommonLBs.C LBDatabase.h lbdb.h converse.h conv-config.h \
@@ -1753,25 +1753,6 @@ RefineLB.o: RefineLB.C elements.h converse.h conv-config.h \
  trace.h trace-bluegene.h envelope.h NullLB.decl.h BaseLB.decl.h \
  CentralLB.decl.h CentralLBMsg.h Refiner.h RefineLB.decl.h RefineLB.def.h
 	$(CHARMC) -c -I. RefineLB.C
-
-RefineSwapLB.o: RefineSwapLB.C elements.h converse.h conv-config.h \
- conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
- queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
- conv-trace.h persistent.h debug-conv.h lbdb.h charm.h pup.h middle.h \
- middle-conv.h ckset.h cklists.h ckheap.h RefineSwapLB.h CentralLB.h BaseLB.h \
- LBDatabase.h LBDBManager.h LBObj.h LBOM.h LBComm.h LBMachineUtil.h \
- lbdb++.h LBDatabase.decl.h charm++.h ckbitvector.h ckstream.h init.h \
- ckhashtable.h debug-charm.h debug-conv++.h simd.h CkMarshall.decl.h \
- ckarrayindex.h cksection.h ckcallback.h conv-ccs.h sockRoutines.h \
- ccs-server.h ckobjQ.h ckreduction.h CkReduction.decl.h \
- cknodegroupreduction.h CkArrayReductionMgr.decl.h ckmemcheckpoint.h \
- CkMemCheckpoint.decl.h readonly.h ckarray.h cklocation.h \
- CkLocation.decl.h CkArray.decl.h ckfutures.h CkFutures.decl.h charisma.h \
- charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
- ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h \
- trace.h trace-bluegene.h envelope.h NullLB.decl.h BaseLB.decl.h \
- CentralLB.decl.h CentralLBMsg.h Refiner.h RefineSwapLB.decl.h RefineSwapLB.def.h
-	$(CHARMC) -c -I. RefineSwapLB.C
 
 RefineCommLB.o: RefineCommLB.C elements.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
