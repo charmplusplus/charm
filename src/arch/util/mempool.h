@@ -32,6 +32,7 @@ typedef struct slot_header_
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
   size_t      		prev,next;    //link list for freelists slots
+  size_t          padding;    // fix for 32 bit machines
 } slot_header;
 
 typedef struct used_header_
@@ -44,6 +45,7 @@ typedef struct used_header_
 #endif
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
+  size_t          padding;    // fix for 32 bit machines
 } used_header;
 
 typedef used_header mempool_header;
