@@ -2569,7 +2569,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
     current = &(CtvAccessOther(tid,threadpool)->block_head);
     while(current != NULL) {
       pup_bytes(p,&current->size,sizeof(current->size));
-      pup_bytes(p,&current->mem_hndl,sizeof(current->mem_hndl));
+      pup_bytes(p,&current->mem_hndl,sizeof(CmiInt8));
       numSlots = 0;
       if(flag) {
         pup_bytes(p,current,sizeof(mempool_type));
