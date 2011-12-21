@@ -8,8 +8,8 @@ CMK_LDXX="$CMK_CXX $BGP_LIB"
 CMK_CF77="$XLC_F/${XLC_POST}xlf "
 CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
 CMK_CF90_FIXED="$XLC_PRE/xlf/bg/11.1/${XLC_POST}xlf90 " 
-CMK_C_OPTIMIZE='-O3 -qstrict -Q '
-CMK_CXX_OPTIMIZE='-O3 -qstrict -Q '
+CMK_C_OPTIMIZE='-O3 -qstrict -qarch=450 -Q '
+CMK_CXX_OPTIMIZE='-O3 -qstrict -qarch=450 -Q '
 CMK_AR='ar cq'
 CMK_NM='nm '
 CMK_QT="aix"
