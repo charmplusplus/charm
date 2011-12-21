@@ -200,11 +200,11 @@ void RecursiveBiPart(ObjGraph *ogr, vector<Vertex *> &pvertices, int parent, int
   //if the number of processors that this call has to deal with is 1, dont recurse any further
   if(nump==1)
   {
-    parray->procs[peno].setTotalLoad(0);
+    parray->procs[peno].totalLoad() = 0.0;
     for(int i=0;i<pvertices.size();i++)
     {
       pvertices[i]->setNewPe(peno);
-      parray->procs[peno].setTotalLoad(parray->procs[peno].getTotalLoad() + pvertices[i]->getVertexLoad());
+      parray->procs[peno].totalLoad() += pvertices[i]->getVertexLoad();
     }
     peno++;
 

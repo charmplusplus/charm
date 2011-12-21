@@ -21,16 +21,24 @@ class ProcInfo {
   friend class ProcArray;
 
   public:
+    ProcInfo() {}
+    ProcInfo(int i, double ov, double tl, double sp, bool avail): id(i), _overhead(ov), _totalLoad(tl), _pe_speed(sp), available(avail) {}
     inline int getProcId() { return id; }
-    inline double getTotalLoad() { return totalLoad; }
-    inline double getOverhead() { return overhead; }
-    inline void setTotalLoad(double _tload) { totalLoad = _tload; }
+    inline void setProcId(int _id) { id = _id; }
+    inline double getTotalLoad() { return _totalLoad; }
+//    inline void setTotalLoad(double load) { totalLoad = load; }
+//    inline double getOverhead() { return overhead; }
+//    inline void setOverhead(double oh) { overhead = oh; }
+    inline double &overhead() { return _overhead; }
+    inline double &totalLoad() { return _totalLoad; }
+    inline double &pe_speed() { return _pe_speed; }
     inline bool isAvailable() { return available; }
 
   private:
     int id;		// CkMyPe of the processor
-    double overhead;	// previously called background load (bg_walltime)
-    double totalLoad;	// includes object_load + overhead
+    double _overhead;	// previously called background load (bg_walltime)
+    double _totalLoad;	// includes object_load + overhead
+    double _pe_speed;	// CPU speed
     bool available;	// if the processor is available
 };
 
@@ -117,6 +125,8 @@ class Vertex {
   friend class ObjGraph;
 
   public:
+    Vertex() {}
+    Vertex(int i, double cl, bool mig, int curpe, int newpe=-1): id(i), compLoad(cl), migratable(mig), currPe(curpe), newPe(newpe)  {}
     inline int getVertexId() { return id; }
     inline double getVertexLoad() { return compLoad; }
     inline int getCurrentPe() { return currPe; }

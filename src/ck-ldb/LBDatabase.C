@@ -257,8 +257,11 @@ void _loadbalancerInit()
   if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
 
   // assume all CPUs are identical
+  _lb_args.testPeSpeed() = CmiGetArgFlagDesc(argv, "+LBTestPESpeed", 
+                      "Load balancer test all CPUs speed.");
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
                       "Load balancer assumes all CPUs are of same speed.");
+  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime", 
                       "Load balancer uses CPU time instead of wallclock time.");
