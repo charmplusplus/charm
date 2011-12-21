@@ -62,15 +62,19 @@ void CpdSearchLeaks(char * msg) {
   LeakSearchInfo *info = (LeakSearchInfo *)(msg+CmiMsgHeaderSizeBytes);
   if (CmiMyPe() == info->pe || (info->pe == -1 && CmiMyPe() == 0)) {
 #if CMK_64BIT
-      info->begin_data = (((CmiUInt8)ntohl(((int*)&info->begin_data)[0]))<<32) + ntohl(((int*)&info->begin_data)[1]);
-      info->end_data = (((CmiUInt8)ntohl(((int*)&info->end_data)[0]))<<32) + ntohl(((int*)&info->end_data)[1]);
-      info->begin_bss = (((CmiUInt8)ntohl(((int*)&info->begin_bss)[0]))<<32) + ntohl(((int*)&info->begin_bss)[1]);
-      info->end_bss = (((CmiUInt8)ntohl(((int*)&info->end_bss)[0]))<<32) + ntohl(((int*)&info->end_bss)[1]);
+      info->begin_data = (char*)(
+      (((CmiUInt8)ntohl(((int*)&info->begin_data)[0]))<<32) + ntohl(((int*)&info->begin_data)[1]));
+      info->end_data = (char*)(
+      (((CmiUInt8)ntohl(((int*)&info->end_data)[0]))<<32) + ntohl(((int*)&info->end_data)[1]));
+      info->begin_bss = (char*)(
+      (((CmiUInt8)ntohl(((int*)&info->begin_bss)[0]))<<32) + ntohl(((int*)&info->begin_bss)[1]));
+      info->end_bss = (char*)(
+      (((CmiUInt8)ntohl(((int*)&info->end_bss)[0]))<<32) + ntohl(((int*)&info->end_bss)[1]));
 #else
-      info->begin_data = ntohl((int)info->begin_data);
-      info->end_data = ntohl((int)info->end_data);
-      info->begin_bss = ntohl((int)info->begin_bss);
-      info->end_bss = ntohl((int)info->end_bss);
+      info->begin_data = (char*)(ntohl((int)info->begin_data));
+      info->end_data = (char*)(ntohl((int)info->end_data));
+      info->begin_bss = (char*)(ntohl((int)info->begin_bss));
+      info->end_bss = (char*)(ntohl((int)info->end_bss));
 #endif
     info->quick = ntohl(info->quick);
     info->pe = ntohl(info->pe);
