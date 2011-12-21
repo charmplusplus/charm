@@ -12,7 +12,7 @@ typedef gni_mem_handle_t    mem_handle_t;
 #else
   // in uGNI, it is memory handler, other versions, this is an integer
   // a unique integer to represent the memory block
-typedef size_t    mem_handle_t;
+typedef CmiInt8   mem_handle_t;
 #endif
 
 typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
@@ -58,6 +58,7 @@ typedef struct block_header_
     size_t              size;
     size_t              block_next;     // offset to next memblock
     size_t              freelists[cutOffNum];
+    size_t          padding;    // fix for 32 bit machines
 } block_header;
 
 // only at beginning of first block of mempool
