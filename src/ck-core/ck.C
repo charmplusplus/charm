@@ -63,7 +63,7 @@ Chare::Chare(void) {
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
   if (CkpvAccess(currentChareIdx) >= 0) {
-    thishandle.objPtr=(void*)CkpvAccess(currentChareIdx);
+    thishandle.objPtr=(void*)(CmiIntPtr)CkpvAccess(currentChareIdx);
   }
   chareIdx = CkpvAccess(currentChareIdx);
 #endif
@@ -130,7 +130,7 @@ void Chare::pup(PUP::er &p)
   thishandle.objPtr=(void *)this;
 #ifndef CMK_CHARE_USE_PTR
   p(chareIdx);
-  if (chareIdx != -1) thishandle.objPtr=(void*)chareIdx;
+  if (chareIdx != -1) thishandle.objPtr=(void*)(CmiIntPtr)chareIdx;
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	if(p.isUnpacking()){
@@ -648,8 +648,8 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 #ifndef CMK_CHARE_USE_PTR
     CkpvAccess(vidblocks).push_back((VidBlock*)pCid->objPtr);
     int idx = CkpvAccess(vidblocks).size()-1;
-    pCid->objPtr = (void *)idx;
-    env->setVidPtr((void *)idx);
+    pCid->objPtr = (void *)(CmiIntPtr)idx;
+    env->setVidPtr((void *)(CmiIntPtr)idx);
 #endif
   }
   env->setEpIdx(eIdx);
@@ -905,7 +905,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
       _allocMsg(FillVidMsg, sizeof(CkChareID));
   pCid->onPE = CkMyPe();
 #ifndef CMK_CHARE_USE_PTR
-  pCid->objPtr = (void*)idx;
+  pCid->objPtr = (void*)(CmiIntPtr)idx;
 #else
   pCid->objPtr = obj;
 #endif
