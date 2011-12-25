@@ -542,7 +542,7 @@ void *CkLocalChare(const CkChareID *pCid)
 		return CkpvAccess(chare_objs)[(CmiIntPtr)pCid->objPtr];
 #endif
 	}
-};
+}
 
 CkpvDeclare(char**,Ck_argv);
 
