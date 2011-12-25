@@ -4,10 +4,8 @@
 /*@{*/
 
 #include <charm++.h>
-extern "C"{
 #include "tm_tree.h"
 #include "tm_mapping.h"
-};
 #include "TreeMatchLB.h"
 #include "ckgraph.h"
 #include <algorithm>
