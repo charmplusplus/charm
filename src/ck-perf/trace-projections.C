@@ -10,11 +10,11 @@
 #include "trace-projectionsBOC.h"
 
 #if DEBUG_PROJ
-#define DEBUGF(format, ...) CkPrintf(format, ## __VA_ARGS__)
+#define DEBUGF(...) CkPrintf(__VA_ARGS__)
 #else
-#define DEBUGF(format, ...)           // CmiPrintf x
+#define DEBUGF(...)
 #endif
-#define DEBUGN(format, ...)  // easy way to selectively disable DEBUGs
+#define DEBUGN(...)  // easy way to selectively disable DEBUGs
 
 #define DefaultLogBufSize      1000000
 
