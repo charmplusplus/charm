@@ -72,14 +72,14 @@ public:
 };
 
 template <class dtype>
-class MeshStreamerClient : public Group {
+class MeshStreamerClient : public CBase_MeshStreamerClient<dtype> {
  public:
      virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
      virtual void process(dtype &data)=0; 
 };
 
 template <class dtype>
-class MeshStreamer : public Group {
+class MeshStreamer : public CBase_MeshStreamer<dtype> {
 
 private:
     int bucketSize_; 
@@ -150,7 +150,7 @@ public:
     void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
       userCallback_ = cb;
       if (automaticFinish) {
-        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), this->thisProxy));
       }
     }
 
@@ -309,24 +309,23 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
   // copy data into message and send if buffer is full
   if (numBuffered == bucketSize_) {
     int destinationIndex;
-    CProxy_MeshStreamer<dtype> thisProxy(thisgroup);
     switch (destinationCoordinates.msgType) {
 
     case PlaneMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.planeIndex - myPlaneIndex_) * planeSize_;  
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case ColumnMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.columnIndex - myColumnIndex_);
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case PersonalizedMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.rowIndex - myRowIndex_) * numColumns_;
       clientProxy_[destinationIndex].receiveCombinedData(destinationBucket);      
-      //      thisProxy[destinationIndex].receivePersonalizedData(destinationBucket);
+      //      this->thisProxy[destinationIndex].receivePersonalizedData(destinationBucket);
       break;
     default: 
       CkError("Incorrect MeshStreamer message type\n");
@@ -401,7 +400,7 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
 
 template <class dtype>
 void MeshStreamer<dtype>::doneInserting() {
-  contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+  this->contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), this->thisProxy));
 }
 
 template <class dtype>
@@ -528,8 +527,7 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> ** const
       clientProxy_[destinationIndex].receiveCombinedData(destinationBucket);
     }
     else {
-      CProxy_MeshStreamer<dtype> thisProxy(thisgroup);
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
     }
     messageBuffers[flushIndex] = NULL;
   }
