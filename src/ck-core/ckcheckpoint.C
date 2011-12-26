@@ -208,6 +208,7 @@ void CkPupMainChareData(PUP::er &p, CkArgMsg *args)
 			}
 			else 
 			 	obj = (Chare *)_mainTable[i]->getObj();
+			obj->base_pup(p);
 			obj->pup(p);
 		}
 	}
@@ -251,6 +252,7 @@ void CkPupChareData(PUP::er &p)
 		CkFreeSysMsg(m);
 	}
 	Chare *obj = (Chare*)CkpvAccess(chare_objs)[i];
+	obj->base_pup(p);
 	obj->pup(p);
   }
 
@@ -330,6 +332,7 @@ void CkPupGroupData(PUP::er &p, CmiBool create)
 	  // if using migration constructor, you'd better have a pup
 	  	if(!create)
 			gobj->mlogData->teamRecoveryFlag = 1;
+          gobj->base_pup(p);
           gobj->pup(p);
          // CkPrintf("Group PUP'ed: gid = %d, name = %s\n",gobj->ckGetGroupID().idx, tmpInfo[i].name);
 	}
@@ -380,6 +383,7 @@ void CkPupNodeGroupData(PUP::er &p, CmiBool create)
 		}
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
 		IrrGroup *obj = ent2.getObj();
+		obj->base_pup(p);
 		obj->pup(p);
 		if(CkMyPe() == 3) CkPrintf("Nodegroup PUP'ed: gid = %d, name = %s\n",
 			obj->ckGetGroupID().idx,
@@ -441,6 +445,7 @@ void CkPupGroupData(PUP::er &p)
 	  }   // end of unPacking
 	  IrrGroup *gobj = CkpvAccess(_groupTable)->find(gID).getObj();
 	  // if using migration constructor, you'd better have a pup
+          gobj->base_pup(p);
           gobj->pup(p);
           DEBCHK("Group PUP'ed: gid = %d, name = %s\n",
 			gobj->ckGetGroupID().idx, tmpInfo[i].name);
@@ -489,6 +494,7 @@ void CkPupNodeGroupData(PUP::er &p)
 		}
 		TableEntry ent2 = CksvAccess(_nodeGroupTable)->find(gID);
 		IrrGroup *obj = ent2.getObj();
+		obj->base_pup(p);
 		obj->pup(p);
 		DEBCHK("Nodegroup PUP'ed: gid = %d, name = %s\n",
 			obj->ckGetGroupID().idx,
