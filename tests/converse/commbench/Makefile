@@ -1,4 +1,4 @@
-CHARMC=../../../bin/charmc $(OPTS)
+CHARMC=../../../bin/charmc -g $(OPTS)
 
 OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o \
     broadcast.o reduction.o ctxt.o

@@ -85,7 +85,7 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
       head->size = cutOffPoints[i];
       head->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
-      head->mem_hndl = block_head->mem_hndl;
+      head->mempool_ptr = pool;
 #endif
       head->prev = head->next = 0;
       head->gprev = prev;
@@ -135,7 +135,7 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         head->size = cutOffPoints[i];
         head->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
-      	head->mem_hndl = current->mem_hndl;
+        head->mempool_ptr = current->mempool_ptr;
 #endif
         head->prev = head->next = 0;
         head->gprev = prev;
@@ -187,7 +187,9 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
   mptr->block_head.block_next = 0;
-
+#if CMK_CONVERSE_GEMINI_UGNI
+  mptr->block_head.msgs_in_flight = 0;
+#endif
   fillblock(mptr,&mptr->block_head,pool_size,0);
   return mptr;
 }
@@ -263,6 +265,9 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       current->mem_hndl = mem_hndl;
       current->size = expand_size;
       current->block_next = 0;
+#if CMK_CONVERSE_GEMINI_UGNI
+      current->msgs_in_flight = 0;
+#endif
 
       fillblock(mptr,current,expand_size,1);
       if(checkblock(mptr,current,power)) {
@@ -401,7 +406,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
         current->size = cutOffPoints[i];
         current->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
-      	current->mem_hndl = block_head->mem_hndl;
+      	current->mempool_ptr = block_head->mempool_ptr;
 #endif
         if(i!=power) {
           current->gprev = prev;
@@ -431,3 +436,9 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
 #endif
 }
 
+#if CMK_CONVERSE_GEMINI_UGNI
+inline void* getNextRegisteredPool(void *current)
+{
+    
+}
+#endif

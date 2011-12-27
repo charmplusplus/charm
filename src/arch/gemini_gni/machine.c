@@ -35,6 +35,28 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
+#define useDynamicSMSG  0
+
+#if useDynamicSMSG
+#define             AVG_SMSG_CONNECTION     10
+#define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
+int                 *smsg_connected_flag= 0;
+gni_smsg_attr_t     **smsg_attr_vector_local;
+gni_smsg_attr_t     **smsg_attr_vector_remote;
+gni_ep_handle_t       ep_hndl_unbound;
+gni_smsg_attr_t     send_smsg_attr;
+gni_smsg_attr_t     recv_smsg_attr;
+
+typedef struct _dynamic_smsg_mailbox{
+   void     *mailbox_base;
+   int      size;
+   int      offset;
+   gni_mem_handle_t  mem_hndl;
+   struct      _dynamic_smsg_mailbox  *next;
+}dynamic_smsg_mailbox_t;
+
+dynamic_smsg_mailbox_t  *mailbox_list;
+#endif
 
 #define REMOTE_EVENT                      0
 #define USE_LRTS_MEMPOOL                  1
@@ -53,7 +75,11 @@ static CmiInt8 _mempool_size = 32*oneMB;
 static CmiInt8 _expand_mem =  4*oneMB;
 #endif
 
-#define BIG_MSG       4*oneMB
+//Dynamic flow control about memory registration
+#define  MAX_BUFF_SEND      64*oneMB
+static CmiInt8 buffered_send_msg = 0;
+
+#define BIG_MSG       16*oneMB
 #define ONE_SEG       8*oneMB
 
 #define PRINT_SYH  0
@@ -99,7 +125,16 @@ uint8_t   onesided_hnd, omdh;
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
 #endif
 
-#define GetMemHndl(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mem_hndl
+#define   IncreaseMsgInFlight(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_flight)++
+#define   DecreaseMsgInFlight(x)   (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_flight)-- 
+#define   GetMempooladdr(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr
+#define   GetMempoolsize(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->size
+#define   GetMemHndl(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->mem_hndl
+#define   GetMemHndlFromHeader(x) ((block_header*)x)->mem_hndl
+#define   NoMsgInFlight(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_flight == 0
+#define   IsMemHndlZero(x)  (x.qword1 == 0 && x.qword2 == 0)
+#define   SetMemHndlZero(x)  x.qword1 = 0; x.qword2 = 0
+#define   NotRegistered(x)  IsMemHndlZero(((block_header*)x)->mem_hndl)
 
 #define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
@@ -149,8 +184,6 @@ static int  SMSG_MAX_MSG = 1024;
 #define ALIGN64(x)       (size_t)((~63)&((x)+63))
 //#define ALIGN4(x)        (size_t)((~3)&((x)+3)) 
 
-#define     useDynamicSMSG    0
-//static int useDynamicSMSG   = 1;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
 static int mysize, myrank;
@@ -171,8 +204,6 @@ typedef struct mdh_addr_list{
 static unsigned int         smsg_memlen;
 #define     SMSG_CONN_SIZE     sizeof(gni_smsg_attr_t)
 gni_smsg_attr_t    **smsg_local_attr_vec = 0;
-int                 *smsg_connected_flag= 0;
-char                *smsg_connection_addr = 0;
 mdh_addr_t          setup_mem;
 mdh_addr_t          *smsg_connection_vec = 0;
 gni_mem_handle_t    smsg_connection_memhndl;
@@ -280,8 +311,6 @@ typedef struct  msg_list_index
 {
     int         next;
     PCQueue     sendSmsgBuf;
-    //MSG_LIST    *head;
-    //MSG_LIST    *tail;
 } MSG_LIST_INDEX;
 
 /* reuse PendingMsg memory */
@@ -590,6 +619,43 @@ static void PumpLocalSmsgTransactions();
 static void PumpLocalRdmaTransactions();
 static int SendBufferMsg();
 
+
+inline 
+static gni_return_t registerMempool(void *msg)
+{
+    gni_return_t status;
+    int size = GetMempoolsize(msg);
+    void *addr = GetMempooladdr(msg);
+    gni_mem_handle_t  *memhndl =   &(GetMemHndl(msg));
+   
+    mempool_type *mptr = CpvAccess(mempool);
+    block_header *current = &(mptr->block_head);
+    while(1)
+    {
+       status = MEMORY_REGISTER(onesided_hnd, nic_hndl, addr, size, memhndl, &omdh);
+       //find one slot to de-register
+       if(status == GNI_RC_SUCCESS)
+       {
+           break;
+       }
+       else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
+       {
+                CmiAbort("Memory registor for mempool fails\n");
+       }
+        
+       while( current!= NULL && (current->msgs_in_flight>0 || IsMemHndlZero(current->mem_hndl) ))
+           current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+       
+       if(current == NULL)
+       { status = GNI_RC_ERROR_RESOURCE; break;}
+       status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(GetMemHndlFromHeader(current)) , &omdh);
+
+       GNI_RC_CHECK("registerMemorypool de-register", status);
+       SetMemHndlZero(GetMemHndlFromHeader(current));
+    }; 
+    return status;
+}
+
 inline
 static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
 {
@@ -677,35 +743,91 @@ static void setup_smsg_connection(int destNode)
     else
         printf("[%d=%d]OK send post FMA \n", myrank, destNode);
 #endif
-    //GNI_RC_CHECK("SMSG Dynamic link", status);
 }
+#if useDynamicSMSG
+inline 
+static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
+{
+    gni_return_t status = GNI_RC_NOT_DONE;
+    dynamic_smsg_mailbox_t *new_mailbox_entry;
 
+    if(mailbox_list->offset == mailbox_list->size-1)
+    {
+        new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
+
+        new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
+        new_mailbox_entry->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
+        new_mailbox_entry->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
+        new_mailbox_entry->offset = 0;
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, new_mailbox_entry->mailbox_base, new_mailbox_entry->size, &(new_mailbox_entry->mem_hndl), &omdh);
+        GNI_RC_CHECK("register", status);
+        new_mailbox_entry->next = mailbox_list;
+        mailbox_list = new_mailbox_entry;
+    }
+    local_smsg_attr->msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+    local_smsg_attr->mbox_maxcredit = SMSG_MAX_CREDIT;
+    local_smsg_attr->msg_maxsize = SMSG_MAX_MSG;
+    local_smsg_attr->mbox_offset = mailbox_list->offset;
+    mailbox_list->offset += SMSG_MAX_MSG;
+    local_smsg_attr->buff_size = mailbox_list->size;
+    local_smsg_attr->msg_buffer = mailbox_list->mailbox_base;
+    local_smsg_attr->mem_hndl = mailbox_list->mem_hndl;
+
+}
+#endif
 inline 
 static gni_return_t send_smsg_message(int destNode, void *header, int size_header, void *msg, int size, uint8_t tag, int inbuff )
 {
+    unsigned int          remote_address;
+    uint32_t             remote_id;
     gni_return_t status = GNI_RC_NOT_DONE;
     gni_smsg_attr_t      *smsg_attr;
     gni_post_descriptor_t *pd;
- 
+    gni_post_state_t      post_state;
+    
 #if useDynamicSMSG
-    //if(useDynamicSMSG == 1)
-    {
         if(smsg_connected_flag[destNode] == 0)
         {
-            //printf("[%d]Init smsg connection\n", CmiMyPe());
-            setup_smsg_connection(destNode);
-            buffer_small_msgs(msg, size, destNode, tag);
-            smsg_connected_flag[destNode] =10;
-            return status;
-        }
-        else  if(smsg_connected_flag[destNode] <20)
+            smsg_attr_vector_local[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
+            alloc_smsg_attr(smsg_attr_vector_local[destNode]);
+            smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
+            
+            status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode);
+            GNI_RC_CHECK("GNI_Post", status);
+            smsg_connected_flag[destNode] = 1;
+            status = GNI_RC_NOT_DONE;
+        }else if (smsg_connected_flag[destNode] == 1)   //already sending out connection_setup infor
         {
-            if(inbuff == 0)
-                buffer_small_msgs(msg, size, destNode, tag);
-            return status;
+            //check whether connection is done
+            status = GNI_EpPostDataTest( ep_hndl_array[destNode], &post_state, &remote_address, &remote_id);
+            if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED){
+                status = GNI_SmsgInit(ep_hndl_array[destNode], smsg_attr_vector_local[destNode], smsg_attr_vector_remote[destNode]);
+                GNI_RC_CHECK("GNI_SmsgInit", status);
+                smsg_connected_flag[destNode] = 2;
+            }
+            status = GNI_RC_NOT_DONE;
+        }else if (smsg_connected_flag[destNode] == 2) // connection done
+        {
+            if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
+            {
+                status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
+                if(status == GNI_RC_SUCCESS)
+                {
+#if PRINT_SYH
+                    lrts_smsg_success++;
+                    printf("[%d==>%d] send done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
+#endif     
+                    return status;
+                }
+            }
+            status = GNI_RC_NOT_DONE;
+
         }
-    }
-#endif
+
+        if(inbuff ==0)
+            buffer_small_msgs(msg, size, destNode, tag);
+        return status;
+#else
     //printf("[%d] reach send\n", myrank);
     if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
     {
@@ -722,6 +844,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     if(inbuff ==0)
         buffer_small_msgs(msg, size, destNode, tag);
     return status;
+#endif
 }
 
 // Get first 0 in DMA_tags starting from index
@@ -804,15 +927,15 @@ inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
     control_msg_tmp->length         =ALIGN64(size); //for GET 4 bytes aligned 
 #if     USE_LRTS_MEMPOOL
     if(size < BIG_MSG)
+    {
         control_msg_tmp->source_mem_hndl = GetMemHndl(msg);
+    }
     else
     {
-        control_msg_tmp->source_mem_hndl.qword1 = 0;
-        control_msg_tmp->source_mem_hndl.qword2 = 0;
+        SetMemHndlZero(control_msg_tmp->source_mem_hndl);
     }
 #else
-    control_msg_tmp->source_mem_hndl.qword1 = 0;
-    control_msg_tmp->source_mem_hndl.qword2 = 0;
+    SetMemHndlZero(control_msg_tmp->source_mem_hndl);
 #endif
     return control_msg_tmp;
 }
@@ -826,35 +949,52 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     int                 size;
 
     size    =   control_msg_tmp->length;
+
+    if(buffered_send_msg >= MAX_BUFF_SEND)
+    {
+        buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+        CmiPrintf(" [%d] send_large hit max %lld\n", myrank, buffered_send_msg); 
+        return;
+    }
 #if     USE_LRTS_MEMPOOL
     if( control_msg_tmp ->seq_id == 0 ){
+        if(IsMemHndlZero(GetMemHndl(control_msg_tmp->source_addr))) //it is in mempool, it is possible to be de-registered by others
+        {
+            //register the corresponding mempool
+            status = registerMempool((void*)(control_msg_tmp->source_addr));
+            if(status == GNI_RC_SUCCESS)
+            {
+                control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+            }
+        }else
+        {
+            control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+            status = GNI_RC_SUCCESS;
+        }
+    }else 
+    {
+        size = size>ONE_SEG?ONE_SEG:size;
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
+    }
+
+    if(status == GNI_RC_SUCCESS)
+    {
         status = send_smsg_message( destNode, 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
         if(status == GNI_RC_SUCCESS)
         {
+            buffered_send_msg += ALIGN64(size);
+            if(control_msg_tmp->seq_id == 0)
+                IncreaseMsgInFlight(control_msg_tmp->source_addr);
             FreeControlMsg(control_msg_tmp);
         }
-    }else
+    } else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
     {
-        if( control_msg_tmp->seq_id == 1)
-            size = size>ONE_SEG?ONE_SEG:size;
-
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
-        if(status == GNI_RC_SUCCESS)
-        {
-            status = send_smsg_message( destNode, 0, 0, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
-            if(status == GNI_RC_SUCCESS)
-            {
-                FreeControlMsg(control_msg_tmp);
-            }
-        } else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
-        {
-            CmiAbort("Memory registor for large msg\n");
-        }else 
-        {
-            buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
-        }
-
+        CmiAbort("Memory registor for large msg\n");
+    }else 
+    {
+        buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
+
 #else
     status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     if(status == GNI_RC_SUCCESS)
@@ -886,6 +1026,10 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     uint8_t tag;
     CONTROL_MSG         *control_msg_tmp;
     LrtsPrepareEnvelope(msg, size);
+
+#if PRINT_SYH
+    printf("LrtsSendFn %d==>%d, size=%d\n", myrank, destNode, size);
+#endif 
 #if CMK_SMP
 #if COMM_THREAD_SEND
     if(size <= SMSG_MAX_MSG)
@@ -959,12 +1103,60 @@ void LrtsPostNonLocal(){
 #endif
 #endif
 }
+
+#if useDynamicSMSG
+static void    PumpDatagramConnection()
+{
+    unsigned int          remote_address;
+    uint32_t             remote_id;
+    gni_return_t status;
+    gni_post_state_t  post_state;
+    int i;
+    uint64_t             datagram_id;
+    for(i=0; i<mysize; i++)
+    {
+        if(smsg_connected_flag[i] ==0 || smsg_connected_flag[i] == 2)
+            continue;
+        status = GNI_PostDataProbeById(nic_hndl, &datagram_id);
+        if(status != GNI_RC_SUCCESS)
+            continue;
+
+        status = GNI_EpPostDataTestById( ep_hndl_array[i], datagram_id, &post_state, &remote_address, &remote_id);
+        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
+        {
+            status = GNI_SmsgInit(ep_hndl_array[i], smsg_attr_vector_local[i], smsg_attr_vector_remote[i]);
+            GNI_RC_CHECK("Dynamic SMSG Init", status);
+            smsg_connected_flag[i] = 2;
+        }
+    }
+    
+    while((status = GNI_PostDataProbeById(nic_hndl, &datagram_id)) == GNI_RC_SUCCESS)
+    {
+        status = GNI_EpPostDataTestById( ep_hndl_unbound, datagram_id, &post_state, &remote_address, &remote_id);
+        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
+        {
+            status = GNI_SmsgInit(ep_hndl_array[remote_id], &send_smsg_attr, &recv_smsg_attr);
+            GNI_RC_CHECK("Dynamic SMSG Init", status);
+            smsg_connected_flag[remote_id] = 2;
+            // post next datagram  
+        
+            //recv_smsg_attr = (gni_smsg_attr_t*)malloc(sizeof(gni_smsg_attr_t)); 
+            //send_smsg_attr = (gni_smsg_attr_t*)malloc(sizeof(gni_smsg_attr_t)); 
+            alloc_smsg_attr(&send_smsg_attr);
+
+            status = GNI_EpPostDataWId (ep_hndl_unbound, &send_smsg_attr,  SMSG_ATTR_SIZE, &recv_smsg_attr, SMSG_ATTR_SIZE, myrank);
+            GNI_RC_CHECK("post unbound datagram", status);
+        }
+    };
+}
+#endif
 /* pooling CQ to receive network message */
 static void PumpNetworkRdmaMsgs()
 {
     gni_cq_entry_t      event_data;
     gni_return_t        status;
-    while( (status = GNI_CqGetEvent(post_rx_cqh, &event_data)) == GNI_RC_SUCCESS);
+
+    
 }
 
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
@@ -989,33 +1181,6 @@ static void PumpNetworkSmsg()
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
 #if PRINT_SYH
         printf("[%d] PumpNetworkMsgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
-#endif
-#if     useDynamicSMSG
-        rdma_id++;
-     //   if(useDynamicSMSG == 1)
-        {
-            init_flag = smsg_connected_flag[inst_id];
-            //printf("[%d] initflag=%d\n", myrank, init_flag);
-            if(init_flag == 0 )
-            {
-                printf("setup[%d==%d]pump Init smsg connection id=%d\n", myrank, inst_id, rdma_id);
-                smsg_connected_flag[inst_id] =20;
-                setup_smsg_connection(inst_id);
-                remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
-                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
-                GNI_RC_CHECK("no send SmsgInit", status);
-                continue;
-            } else if (init_flag <20) 
-            {
-                printf("setup[%d==%d]pump setup smsg connection id=%d\n", myrank, inst_id, rdma_id);
-                smsg_connected_flag[inst_id] = 20;
-                remote_smsg_attr = &(((gni_smsg_attr_t*)(setup_mem.addr))[inst_id]);
-                status = GNI_SmsgInit(ep_hndl_array[inst_id], smsg_local_attr_vec[inst_id],  remote_smsg_attr);
-                print_smsg_attr(remote_smsg_attr);
-                GNI_RC_CHECK("send once SmsgInit", status);
-                continue;
-            }
-        }
 #endif
         msg_tag = GNI_SMSG_ANY_TAG;
         while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS)
@@ -1043,7 +1208,10 @@ static void PumpNetworkSmsg()
                 /* Get is done, release message . Now put is not used yet*/
 #if         !USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh);
+#else
+                DecreaseMsgInFlight( ((void*)((CONTROL_MSG *) header)->source_addr));
 #endif
+                buffered_send_msg -= ((CONTROL_MSG *) header)->length;
                 CmiFree((void*)((CONTROL_MSG *) header)->source_addr);
                 SendRdmaMsg();
                 break;
@@ -1052,6 +1220,7 @@ static void PumpNetworkSmsg()
             {
                 header_tmp = (CONTROL_MSG *) header;
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(header_tmp->source_mem_hndl), &omdh);
+                buffered_send_msg -= (((CONTROL_MSG *) header)->length >ONE_SEG?ONE_SEG:((CONTROL_MSG *) header)->length);
                 if(header_tmp->length <= ONE_SEG) //transaction done
                 {
                     CmiFree((void*)(header_tmp->source_addr) - ONE_SEG*(header_tmp->seq_id-1));
@@ -1122,18 +1291,30 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->cqwrite_value = request_msg->seq_id;
     if( request_msg->seq_id == 0)
     {
-        msg_mem_hndl = GetMemHndl(msg_data);
+        pd->local_mem_hndl= GetMemHndl(msg_data);
         transaction_size = ALIGN64(size);
+        if(IsMemHndlZero(pd->local_mem_hndl))
+        {
+            status = registerMempool((void*)(msg_data));
+            if(status == GNI_RC_SUCCESS)
+            {
+                pd->local_mem_hndl = GetMemHndl(msg_data);
+            }
+            else
+            {
+                SetMemHndlZero(pd->local_mem_hndl);
+            }
+        }
     }
     else{
         transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &msg_mem_hndl, &omdh);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &(pd->local_mem_hndl), &omdh);
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
         }
-        pd->first_operand = size;
     }
+    pd->first_operand = ALIGN64(size);
 
     if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
         pd->type            = GNI_POST_FMA_GET;
@@ -1147,7 +1328,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = transaction_size;
     pd->local_addr      = (uint64_t) msg_data;
-    pd->local_mem_hndl  = msg_mem_hndl;
     pd->remote_addr     = request_msg->source_addr;
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
     pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
@@ -1156,14 +1336,20 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     //memory registration success
     if(status == GNI_RC_SUCCESS)
     {
+       // CmiPrintf(" PE:%d reigster(size=%d)(%s) (%lld, %lld), (%lld, %lld)\n", myrank, pd->length, gni_err_str[status], (pd->local_mem_hndl).qword1, (pd->local_mem_hndl).qword2, (pd->remote_mem_hndl).qword1, (pd->remote_mem_hndl).qword2);
         if(pd->type == GNI_POST_RDMA_GET) 
             status = GNI_PostRdma(ep_hndl_array[source], pd);
         else
             status = GNI_PostFma(ep_hndl_array[source],  pd);
+         
+        if(status == GNI_RC_SUCCESS )
+        {
+            if(pd->cqwrite_value == 0)
+                IncreaseMsgInFlight(msg_data);
+        }
     }else
     {
-        pd->local_mem_hndl.qword1  = 0; 
-        pd->local_mem_hndl.qword1  = 0; 
+        SetMemHndlZero(pd->local_mem_hndl);
     }
     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
     {
@@ -1225,8 +1411,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
             status = GNI_PostFma(ep_hndl_array[source],  pd);
     }else
     {
-        pd->local_mem_hndl.qword1  = 0; 
-        pd->local_mem_hndl.qword1  = 0; 
+        SetMemHndlZero(pd->local_mem_hndl);
     }
     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
     {
@@ -1299,11 +1484,6 @@ static void PumpLocalRdmaTransactions()
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
 #endif
             case GNI_POST_FMA_PUT:
-#if useDynamicSMSG
-                SendSmsgConnectMsg();
-                if(tmp_pd->length == sizeof(gni_smsg_attr_t))
-                    continue;
-#endif
                 CmiFree((void *)tmp_pd->local_addr);
                 msg_tag = PUT_DONE_TAG;
                 break;
@@ -1349,6 +1529,7 @@ static void PumpLocalRdmaTransactions()
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
+                    DecreaseMsgInFlight((void*)tmp_pd->local_addr);
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if (tmp_pd->first_operand <= ONE_SEG) {
 #if PRINT_SYH
@@ -1406,8 +1587,24 @@ static void  SendRdmaMsg()
         ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
         gni_post_descriptor_t *pd = ptr->pd;
         status = GNI_RC_SUCCESS;
+        
+        //CmiPrintf("LLLLLLLLMSG[%d==>%d], tag=%lld\n", myrank, ptr->destNode, pd->cqwrite_value);
         // register memory first
-        if( pd->local_mem_hndl.qword1 == 0 && pd->local_mem_hndl.qword2 == 0)
+        if(pd->cqwrite_value == 0)
+        {
+            if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
+            {
+                status = registerMempool((void*)(pd->local_addr));
+                if(status == GNI_RC_SUCCESS)
+                {
+                    pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
+                }
+            }else
+            {
+                pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
+                status = GNI_RC_SUCCESS;
+            }
+        }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool
         {
             status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh);
         }
@@ -1419,6 +1616,8 @@ static void  SendRdmaMsg()
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
             if(status == GNI_RC_SUCCESS)
             {
+                if(pd->cqwrite_value == 0)
+                    IncreaseMsgInFlight(((void*)(pd->local_addr)));
                 FreeRdmaRequest(ptr);
                 continue;
             }
@@ -1438,6 +1637,7 @@ static int SendBufferMsg()
     gni_return_t        status;
     int done = 1;
     register    int     i, register_size;
+    void                *register_addr;
     int                 index_previous = -1;
     int                 index = smsg_head_index;
 #if !CMK_SMP
@@ -1462,6 +1662,7 @@ static int SendBufferMsg()
                 break;
 #endif
             CmiAssert(ptr!=NULL);
+            //CmiPrintf("SMSG[%d==>%d], tag=%d\n", myrank, ptr->destNode, ptr->tag);
             switch(ptr->tag)
             {
             case SMALL_DATA_TAG:
@@ -1472,22 +1673,47 @@ static int SendBufferMsg()
                 }
                 break;
             case LMSG_INIT_TAG:
-                control_msg_tmp = (CONTROL_MSG*)ptr->msg;
-                if(control_msg_tmp->source_mem_hndl.qword1 == 0 && control_msg_tmp->source_mem_hndl.qword2 == 0)
+                if(buffered_send_msg >= MAX_BUFF_SEND)
                 {
-                    if(control_msg_tmp->seq_id >0)
-                        register_size = control_msg_tmp->length>=ONE_SEG?ONE_SEG:control_msg_tmp->length;
-                    else
-                        register_size = control_msg_tmp->length;
-                    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, register_size, &(control_msg_tmp->source_mem_hndl), &omdh);
-                    if(status != GNI_RC_SUCCESS) {
-                        done = 0;
-                        break;
+                    CmiPrintf(" [%d] send_buff hit max %lld\n", myrank, buffered_send_msg); 
+                    done = 0; break;
+                }
+                control_msg_tmp = (CONTROL_MSG*)ptr->msg;
+                register_size = control_msg_tmp->length;
+#if     USE_LRTS_MEMPOOL
+                if(control_msg_tmp->seq_id ==0) //fit into memory
+                {
+                    if(IsMemHndlZero(GetMemHndl(control_msg_tmp->source_addr))) //it is in mempool, it is possible to be de-registered by others
+                    {
+                        status = registerMempool((void*)(control_msg_tmp->source_addr));
+                        if(status == GNI_RC_SUCCESS)
+                        {
+                            control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+                        }
+                    }else{
+                        control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+                        status = GNI_RC_SUCCESS;
                     }
+                }
+                else if(control_msg_tmp->seq_id >0) //large msg
+                {
+                    register_size = control_msg_tmp->length>=ONE_SEG?ONE_SEG:control_msg_tmp->length;
+                    register_addr = (void*) (control_msg_tmp->source_addr);
+                    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, register_addr, register_size, &(control_msg_tmp->source_mem_hndl), &omdh);
+                }
+#else
+                status = MEMORY_REGISTER(onesided_hnd, nic_hndl, register_addr, register_size, &(control_msg_tmp->source_mem_hndl), &omdh);
+#endif
+                if(status != GNI_RC_SUCCESS) {
+                    done = 0;
+                    break;
                 }
                 status = send_smsg_message( ptr->destNode, 0, 0, ptr->msg, sizeof(CONTROL_MSG), ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
-                {
+                {   
+                    buffered_send_msg += ALIGN64(register_size);
+                    if(control_msg_tmp->seq_id ==0)
+                        IncreaseMsgInFlight(control_msg_tmp->source_addr);
                     FreeControlMsg((CONTROL_MSG*)(ptr->msg));
                 }
                 break;
@@ -1544,6 +1770,9 @@ void LrtsAdvanceCommunication()
     printf("Calling Lrts Pump Msg PE:%d\n", myrank);
 #endif
     if(mysize == 1) return;
+#if useDynamicSMSG
+    PumpDatagramConnection();
+#endif
     PumpNetworkSmsg();
    // printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
     //PumpNetworkRdmaMsgs();
@@ -1566,28 +1795,25 @@ void LrtsAdvanceCommunication()
     printf("Calling Lrts rdma PE:%d\n", myrank);
 #endif
     SendRdmaMsg();
+    //CmiPrintf("[%d]send buffer=%dM\n", myrank, buffered_send_msg/(1024*1024));
 #if 0
     if(myrank == 0)
     printf("done PE:%d\n", myrank);
 #endif
 }
-
+#if useDynamicSMSG
 static void _init_dynamic_smsg()
 {
-    gni_smsg_attr_t smsg_attr;
     gni_return_t status;
-    smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
-    memset(smsg_connected_flag, 0, mysize*sizeof(int));
+    int i;
 
-    smsg_local_attr_vec = (gni_smsg_attr_t**) malloc(sizeof(gni_smsg_attr_t*) *mysize);
+    smsg_attr_vector_local = (gni_smsg_attr_t**)malloc(mysize * sizeof(gni_smsg_attr_t*));
+    smsg_attr_vector_remote = (gni_smsg_attr_t**)malloc(mysize * sizeof(gni_smsg_attr_t*));
     
-    setup_mem.addr = (uint64_t)malloc(mysize * sizeof(gni_smsg_attr_t));
-    status = GNI_MemRegister(nic_hndl, setup_mem.addr,  mysize * sizeof(gni_smsg_attr_t), smsg_rx_cqh,  GNI_MEM_READWRITE, -1,  &(setup_mem.mdh));
-   
-    GNI_RC_CHECK("Smsg dynamic allocation \n", status);
-    smsg_connection_vec = (mdh_addr_t*) malloc(mysize*sizeof(mdh_addr_t)); 
-    allgather(&setup_mem, smsg_connection_vec, sizeof(mdh_addr_t));
-    
+    smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
+    for(i=0; i<mysize; i++)
+        smsg_connected_flag[i] = 0;
+
     //pre-allocate some memory as mailbox for dynamic connection
     if(mysize <=4096)
     {
@@ -1599,25 +1825,22 @@ static void _init_dynamic_smsg()
         SMSG_MAX_MSG = 256;
     }
     
-    smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
-    smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
-    smsg_attr.msg_maxsize = SMSG_MAX_MSG;
-    status = GNI_SmsgBufferSizeNeeded(&smsg_attr, &smsg_memlen);
-    GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
-    
-    smsg_dynamic_list = (mdh_addr_list_t*)malloc(sizeof(mdh_addr_list_t));
+    mailbox_list = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
+    mailbox_list->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
+    mailbox_list->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
+    mailbox_list->offset = 0;
+    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mailbox_list->mailbox_base, mailbox_list->size, &(mailbox_list->mem_hndl), &omdh);
+    GNI_RC_CHECK("MEMORY registration for smsg", status);
 
-    smsg_dynamic_list->addr = memalign(64, smsg_memlen*smsg_expand_slots);
-    bzero(smsg_dynamic_list->addr, smsg_memlen*smsg_expand_slots);
+    status = GNI_EpCreate(nic_hndl, smsg_tx_cqh, &ep_hndl_unbound);
+    GNI_RC_CHECK("Unbound EP", status);
     
-    status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_dynamic_list->addr,
-            smsg_memlen*smsg_expand_slots, smsg_rx_cqh,
-            GNI_MEM_READWRITE,   
-            -1,
-            &(smsg_dynamic_list->mdh));
-   smsg_available_slot = 0;  
+    alloc_smsg_attr(&send_smsg_attr);
+
+    status = GNI_EpPostDataWId (ep_hndl_unbound, &send_smsg_attr,  SMSG_ATTR_SIZE, &recv_smsg_attr, SMSG_ATTR_SIZE, myrank);
+    GNI_RC_CHECK("post unbound datagram", status);
 }
-
+#endif
 static void _init_static_smsg()
 {
     gni_smsg_attr_t      *smsg_attr;
@@ -1862,7 +2085,7 @@ printf("[%d:%d:%d] checking rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), 
             if (header == free_header) mptr->freelist_head = header->next_free;
              // deregister
             gni_return_t status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &current->mem_hndl, &omdh);
-            GNI_RC_CHECK("Mempool de-register", status);
+            GNI_RC_CHECK("steal Mempool de-register", status);
             mempool_block *ptr = current;
             current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
             prev->memblock_next = current?(char*)current - (char*)mptr:0;
@@ -1921,6 +2144,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
       else
         CmiAbort("alloc_mempool_block: posix_memalign failed");
     }
+    /*
     gni_return_t status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
 #if CMK_SMP && STEAL_MEMPOOL
     if(expand_flag && status != GNI_RC_SUCCESS) {
@@ -1929,17 +2153,25 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
       if (pool != NULL) status = GNI_RC_SUCCESS;
     }
 #endif
-    if(status != GNI_RC_SUCCESS)
-        printf("[%d] Charm++> Fatal error with registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
-    GNI_RC_CHECK("Mempool register", status);
-    //printf("####[%d] Memory pool registering memory of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
+*/
+  //  if(status != GNI_RC_SUCCESS)
+    {
+        //printf("[%d] Charm++> too much registering memory of %d bytes: Please try to use large page (module load craype-hugepages8m) or contact charm++ developer for help.[%lld, %lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
+        SetMemHndlZero((*mem_hndl));
+    
+   }
+    //if(expand_flag)
+    //    printf("[%d] Alloc more Memory pool of %d bytes: [mempool=%lld, calls=%lld]\n", CmiMyPe(), *size, total_mempool_size, total_mempool_calls);
     return pool;
 }
 
 void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 {
-    gni_return_t status = GNI_MemDeregister(nic_hndl, &mem_hndl);
-    GNI_RC_CHECK("Mempool de-register", status);
+    if(!(IsMemHndlZero(mem_hndl)))
+    {
+        gni_return_t status = GNI_MemDeregister(nic_hndl, &mem_hndl);
+        GNI_RC_CHECK("free_mempool_block Mempool de-register", status);
+    }
     free(ptr);
 }
 #endif
@@ -1971,7 +2203,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
    
     //useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
-       //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
+    //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
     
     status = PMI_Init(&first_spawned);
     GNI_RC_CHECK("PMI_Init", status);
@@ -2098,7 +2330,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     sendRdmaBuf = PCQueueCreate(); 
 }
 
-
 void* LrtsAlloc(int n_bytes, int header)
 {
     void *ptr;
@@ -2117,6 +2348,9 @@ void* LrtsAlloc(int n_bytes, int header)
         if(n_bytes <= BIG_MSG)
         {
             char *res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+n_bytes-sizeof(mempool_header), 1);
+            mempool_header* mh = ((mempool_header*)(res-sizeof(mempool_header)));
+            block_header *bh = (block_header*)(mh->mempool_ptr);
+            mem_handle_t hh=  bh->mem_hndl;
             ptr = res - sizeof(mempool_header) + ALIGNBUF - header;
         }else 
         {

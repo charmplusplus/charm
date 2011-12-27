@@ -27,7 +27,7 @@ typedef struct slot_header_
   void*			pool_addr;
 #endif
 #if CMK_CONVERSE_GEMINI_UGNI
-  mem_handle_t    	mem_hndl;
+  void              *mempool_ptr;
 #endif
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
@@ -41,7 +41,7 @@ typedef struct used_header_
   void*			pool_addr;
 #endif
 #if CMK_CONVERSE_GEMINI_UGNI
-  mem_handle_t    	mem_hndl;
+  void              *mempool_ptr;
 #endif
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
@@ -53,12 +53,15 @@ typedef used_header mempool_header;
 // multiple mempool for different size allocation
 typedef struct block_header_
 {
-    void                *mempool_ptr;
     mem_handle_t        mem_hndl;
     size_t              size;
     size_t              block_next;     // offset to next memblock
     size_t              freelists[cutOffNum];
     size_t          padding;    // fix for 32 bit machines
+#if CMK_CONVERSE_GEMINI_UGNI
+    int                 msgs_in_flight;
+#endif
+    void                *mempool_ptr;
 } block_header;
 
 // only at beginning of first block of mempool
@@ -79,6 +82,10 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand);
 void mempool_free(mempool_type *mptr, void *ptr_free);
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
 void mempool_free_thread(void *ptr_free);
+#endif
+
+#if CMK_CONVERSE_GEMINI_UGNI
+void* getNextRegisteredPool();
 #endif
 
 #if defined(__cplusplus)
