@@ -5,8 +5,13 @@ OBJS = broadcast.o
 
 all:	pgm
 
+projections: pgm.prj
+
 pgm: $(OBJS)
 	$(CHARMC) -language charm++ -o pgm $(OBJS)
+
+pgm.prj: $(OBJS)
+	$(CHARMC) -language charm++ -o pgm.prj -tracemode projections $(OBJS)
 
 cifiles: broadcast.ci
 	$(CHARMC)  broadcast.ci
@@ -19,14 +24,6 @@ broadcast.o: broadcast.C cifiles
 	$(CHARMC) -I$(SRC)/conv-core broadcast.C
 
 test: all
-	@echo "Intra-processor broadcast.."
-	./charmrun ./pgm +p1 $(TESTOPTS)
 	@echo "Inter-processor broadcast.."
 	./charmrun ./pgm +p2 $(TESTOPTS)
-
-bgtest: all
-	@echo "Intra-processor broadcast.."
-	./charmrun ./pgm +p1 +x1 +y1 +z1
-	@echo "Inter-processor broadcast.."
-	./charmrun ./pgm +p2 +x2 +y1 +z1
 
