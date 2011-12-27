@@ -213,9 +213,9 @@ void reduction_moduleinit(void)
   CpvInitialize(int, flip);
   CpvInitialize(int, currentPe);
   CpvInitialize(double, starttime);
-  CpvInitialize(doube, lasttime);
-  CpvInitialize(doube, endtime);
-  CpvInitialize(pdoube, timediff);
+  CpvInitialize(double, lasttime);
+  CpvInitialize(double, endtime);
+  CpvInitialize(pdouble, timediff);
   CpvInitialize(int, sync_starter);
   CpvInitialize(int, sync_reply);
   CpvInitialize(int, reduction_starter);
