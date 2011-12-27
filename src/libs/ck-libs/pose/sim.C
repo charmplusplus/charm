@@ -56,7 +56,6 @@ sim::~sim()
 
 /// Pack/unpack/sizing operator
 void sim::pup(PUP::er &p) {
-  ArrayElement1D::pup(p); // call parent class pup method
   // pup simple types
   p(active); p(myPVTidx); p(myLBidx); p(sync); p(DOs); p(UNDOs);
   // pup event queue
