@@ -526,7 +526,7 @@ collideVoxel::collideVoxel(void)
 	collideVoxel_extents[1].add(low23(thisIndex.y));
 	collideVoxel_extents[2].add(low23(thisIndex.z));
 }
-collideVoxel::collideVoxel(CkMigrateMessage *m) : ArrayElement3D(m) 
+collideVoxel::collideVoxel(CkMigrateMessage *m)
 {
 	CC_STATUS("arrived from migration");
 }
@@ -536,7 +536,6 @@ collideVoxel::~collideVoxel()
 	CC_STATUS("deleted. (migration depart)");
 }
 void collideVoxel::pup(PUP::er &p) {
-	ArrayElement3D::pup(p);
 	if (msgs.length()!=0) {
 		status("Error!  Cannot migrate voxels with messages in tow!\n");
 		CkAbort("collideVoxel::pup cannot handle message case");

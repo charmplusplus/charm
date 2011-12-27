@@ -1,0 +1,17 @@
+mainmodule broadcast {
+  readonly CProxy_main mainProxy;
+  readonly int iterations;
+  readonly int payload;
+  mainchare main {
+    entry main();
+    entry void maindone(void);
+  };
+  message PingMsg{char x[];};
+
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(void);
+    entry void recv(PingMsg *);
+    entry void back(PingMsg *);
+  };        	
+};

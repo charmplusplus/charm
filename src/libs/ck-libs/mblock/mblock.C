@@ -819,9 +819,6 @@ static void cmm_pup_mblock_message(pup_er p,void **msg) {
 void
 MBlockChunk::pup(PUP::er &p)
 {
-//Pup superclass
-  ArrayElement1D::pup(p);
-
   threads.pup(p);
   messages=CmmPup(&p,messages,cmm_pup_mblock_message);
 
