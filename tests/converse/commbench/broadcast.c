@@ -44,8 +44,8 @@ static struct testdata {
   {4096,    1024,      0.0},
   {16384,   1024,      0.0},
   {65536,   1024,      0.0},
-  {262144,  256,       0.0},
-  {1048576, 64,        0.0},
+  {262144,  1024,       0.0},
+  {1048576, 1024,        0.0},
   {-1,      -1,        0.0},
 };
 
@@ -86,8 +86,11 @@ static void bcast_handler(void *msg)
     if(CmiMyPe() == 0) {
       CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
       CmiFree(msg);
-    }
+    }else
+        CmiFree(msg);
+
   } else {
+      CmiFree(msg);
     red_msg = CmiAlloc(CmiMsgHeaderSizeBytes);
     CmiSetHandler(red_msg, CpvAccess(reduction_handler));
     CmiReduce(red_msg, CmiMsgHeaderSizeBytes, reduceMessage);

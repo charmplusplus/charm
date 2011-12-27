@@ -3,13 +3,18 @@
 
 #define NITER 1000
 #define PAYLOAD 100
+#define  WARM_UP 100
+#define SIMPLE_ACK 0
 
 #include "broadcast.decl.h"
 class PingMsg : public CMessage_PingMsg
 {
   public:
-    char *x;
+      int source;
+      char *x;
 
+};
+class DUMMY : public CMessage_DUMMY {
 };
 
 CProxy_main mainProxy;
@@ -58,7 +63,7 @@ public:
 class Ping1 : public CBase_Ping1
 {
   CProxy_Ping1 *pp;
-  int niter, ack;
+  int niter, ackCounter;
   double start_time, end_time;
 public:
   Ping1()
@@ -70,22 +75,27 @@ public:
   void start(void)
   {
       int i;
-      ack = 0;
+      ackCounter = 0;
       for(i=1; i<CkNumPes(); i++)
       {
           (*pp)[i].recv(new (payload) PingMsg);
       }
     start_time = CkWallTimer();
   }
-
-  void back(PingMsg *msg)
-  {
+#if SIMPLE_ACK
+  void back(PingMsg *msg) {}
+  void ack(DUMMY *msg) {
+#else
+  void ack(DUMMY *msg) {}
+  void back(PingMsg *msg) {
+#endif
       int i;
-    ack++;
-    if(ack == CkNumPes()-1)
-    {
+      delete msg;
+      ackCounter++;
+      if(ackCounter == CkNumPes()-1)
+      {
         niter++;
-        if(niter==iterations) {
+        if(niter==iterations+WARM_UP) {
             end_time = CkWallTimer();
             CkPrintf("Time for 1D Arrays broadcast and reduction is %lf us\n",
                  1.0e6*(end_time-start_time)/iterations);
@@ -96,18 +106,27 @@ public:
             mainProxy.maindone();
         }else
         {
+            if(niter==WARM_UP)
+                start_time = CkWallTimer();
+
             for(i=1; i<CkNumPes(); i++)
             {
                 (*pp)[i].recv(new (payload) PingMsg);
             }
-            ack =0;
+            ackCounter =0;
         }
     }
   }
   void recv(PingMsg *msg)
   {
-        (*pp)[0].back(msg);
+#if SIMPLE_ACK
+      delete msg;
+      (*pp)[0].back(new DUMMY);
+#else
+      (*pp)[0].back(msg);
+#endif
   }
+
 };
 
 #include "broadcast.def.h"

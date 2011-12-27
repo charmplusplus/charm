@@ -7,11 +7,12 @@ mainmodule broadcast {
     entry void maindone(void);
   };
   message PingMsg{char x[];};
-
+  message DUMMY;
   array [1D] Ping1 {
     entry Ping1();
     entry void start(void);
     entry void recv(PingMsg *);
+    entry void ack (DUMMY *);
     entry void back(PingMsg *);
   };        	
 };
