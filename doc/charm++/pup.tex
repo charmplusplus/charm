@@ -51,9 +51,9 @@ or equivalently, ``to call the pup routine of''.
 Pup routines for complicated objects normally call the pup routines
 for their simpler parts. If your class's declaration in the ci file
 includes a parent class, the generated code in CBase will call that
-class's pup routine automatically\footnote{In versions of Charm++
+class's pup routine automatically\footnote{In versions of \charmpp
   prior to 6.4, this was not automatic. Older code called
-  \verb|CBase_ClassName::pup(p)| at the beginning of each pup
+  \kw{CBase\_ClassName::pup(p)} at the beginning of each pup
   routine. This has been made a no-op so as not to break the API.}. If
 your class has a parent class that is not declared in the ci file, you
 are responsible for packing it appropriately, either by calling its
