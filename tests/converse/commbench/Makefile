@@ -1,6 +1,7 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
-OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o ctxt.o
+OBJS=memoryAccess.o commbench.o overhead.o timer.o proc.o smputil.o pingpong.o \
+    broadcast.o reduction.o ctxt.o
 
 all: pgm
 
@@ -30,6 +31,12 @@ smputil.o: smputil.c
 
 pingpong.o: pingpong.c
 	$(CHARMC) pingpong.c
+
+broadcast.o: broadcast.c
+	$(CHARMC) broadcast.c
+
+reduction.o: reduction.c
+	$(CHARMC) reduction.c
 
 ctxt.o: ctxt.c
 	$(CHARMC) ctxt.c
