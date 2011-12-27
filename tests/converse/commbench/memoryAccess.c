@@ -1,3 +1,19 @@
+/***************************************************************************
+ *
+ *  Benchmark to measure performnce of CmiAlloc/CmiFree and traversals
+ *  of associated memory
+ *
+ *  Two types of benchmarking has been done-
+ *
+ *  1. A flurry of operations of same type and on same size
+ *
+ *  2. A random but commuatatively organized  mix of operations on a range
+ *     of data size.
+ *
+ *  Author- Nikhil Jain
+ *
+ ***************************************************************************/
+
 #include <converse.h>
 #include "commbench.h"
 
