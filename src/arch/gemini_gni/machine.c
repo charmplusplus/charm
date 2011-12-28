@@ -775,8 +775,8 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
     local_smsg_attr->mbox_maxcredit = SMSG_MAX_CREDIT;
     local_smsg_attr->msg_maxsize = SMSG_MAX_MSG;
     local_smsg_attr->mbox_offset = mailbox_list->offset;
-    mailbox_list->offset += SMSG_MAX_MSG;
-    local_smsg_attr->buff_size = mailbox_list->size;
+    mailbox_list->offset += smsg_memlen;
+    local_smsg_attr->buff_size = smsg_memlen;
     local_smsg_attr->msg_buffer = mailbox_list->mailbox_base;
     local_smsg_attr->mem_hndl = mailbox_list->mem_hndl;
 
@@ -1117,12 +1117,13 @@ void LrtsPostNonLocal(){
 #if useDynamicSMSG
 static void    PumpDatagramConnection()
 {
-    unsigned int          remote_address;
-    uint32_t             remote_id;
+    uint32_t          remote_address;
+    uint32_t          remote_id;
     gni_return_t status;
     gni_post_state_t  post_state;
     int i;
     uint64_t             datagram_id;
+
     for(i=0; i<mysize; i++)
     {
         if(smsg_connected_flag[i] ==0 || smsg_connected_flag[i] == 2)
@@ -1132,6 +1133,7 @@ static void    PumpDatagramConnection()
             continue;
 
         status = GNI_EpPostDataTestById( ep_hndl_array[i], datagram_id, &post_state, &remote_address, &remote_id);
+        CmiAssert(remote_id == i);
         if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
         {
             status = GNI_SmsgInit(ep_hndl_array[i], smsg_attr_vector_local[i], smsg_attr_vector_remote[i]);
@@ -1166,6 +1168,7 @@ static void    PumpDatagramConnection()
     };
 }
 #endif
+
 /* pooling CQ to receive network message */
 static void PumpNetworkRdmaMsgs()
 {
@@ -1827,8 +1830,11 @@ static void _init_dynamic_smsg()
     smsg_attr_vector_remote = (gni_smsg_attr_t**)malloc(mysize * sizeof(gni_smsg_attr_t*));
     
     smsg_connected_flag = (int*)malloc(sizeof(int)*mysize);
-    for(i=0; i<mysize; i++)
+    for(i=0; i<mysize; i++) {
         smsg_connected_flag[i] = 0;
+        smsg_attr_vector_local[i] = NULL;
+        smsg_attr_vector_remote[i] = NULL;
+    }
 
     //pre-allocate some memory as mailbox for dynamic connection
     if(mysize <=4096)
@@ -1841,9 +1847,15 @@ static void _init_dynamic_smsg()
         SMSG_MAX_MSG = 256;
     }
     
+    send_smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
+    send_smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
+    send_smsg_attr.msg_maxsize = SMSG_MAX_MSG;
+    status = GNI_SmsgBufferSizeNeeded(&send_smsg_attr, &smsg_memlen);
+
     mailbox_list = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
-    mailbox_list->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
-    mailbox_list->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
+    mailbox_list->mailbox_base = malloc(smsg_memlen*AVG_SMSG_CONNECTION);
+    bzero(mailbox_list->mailbox_base, smsg_memlen*AVG_SMSG_CONNECTION);
+    mailbox_list->size = smsg_memlen*AVG_SMSG_CONNECTION;
     mailbox_list->offset = 0;
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)(mailbox_list->mailbox_base),
