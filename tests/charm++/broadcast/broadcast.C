@@ -4,7 +4,7 @@
 #define NITER 1000
 #define PAYLOAD 100
 #define  WARM_UP 100
-#define SIMPLE_ACK 0
+#define SIMPLE_ACK 1
 
 #include "broadcast.decl.h"
 class PingMsg : public CMessage_PingMsg
@@ -121,7 +121,7 @@ public:
   {
 #if SIMPLE_ACK
       delete msg;
-      (*pp)[0].back(new DUMMY);
+      (*pp)[0].ack(new DUMMY);
 #else
       (*pp)[0].back(msg);
 #endif

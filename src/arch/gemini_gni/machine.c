@@ -759,7 +759,14 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
         new_mailbox_entry->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
         new_mailbox_entry->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
         new_mailbox_entry->offset = 0;
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, new_mailbox_entry->mailbox_base, new_mailbox_entry->size, &(new_mailbox_entry->mem_hndl), &omdh);
+        
+        status = GNI_MemRegister(nic_hndl, (uint64_t)new_mailbox_entry->mailbox_base,
+            new_mailbox_entry->size, smsg_rx_cqh,
+            GNI_MEM_READWRITE,   
+            -1,
+            &(new_mailbox_entry->mem_hndl));
+
+        //status = MEMORY_REGISTER(onesided_hnd, nic_hndl, new_mailbox_entry->mailbox_base, new_mailbox_entry->size, &(new_mailbox_entry->mem_hndl), &omdh);
         GNI_RC_CHECK("register", status);
         new_mailbox_entry->next = mailbox_list;
         mailbox_list = new_mailbox_entry;
@@ -803,6 +810,9 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED){
                 status = GNI_SmsgInit(ep_hndl_array[destNode], smsg_attr_vector_local[destNode], smsg_attr_vector_remote[destNode]);
                 GNI_RC_CHECK("GNI_SmsgInit", status);
+#if PRINT_SYH
+                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, destNode);
+#endif
                 smsg_connected_flag[destNode] = 2;
             }
             status = GNI_RC_NOT_DONE;
@@ -1126,6 +1136,9 @@ static void    PumpDatagramConnection()
         {
             status = GNI_SmsgInit(ep_hndl_array[i], smsg_attr_vector_local[i], smsg_attr_vector_remote[i]);
             GNI_RC_CHECK("Dynamic SMSG Init", status);
+#if PRINT_SYH
+                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, i);
+#endif
             smsg_connected_flag[i] = 2;
         }
     }
@@ -1137,6 +1150,9 @@ static void    PumpDatagramConnection()
         {
             status = GNI_SmsgInit(ep_hndl_array[remote_id], &send_smsg_attr, &recv_smsg_attr);
             GNI_RC_CHECK("Dynamic SMSG Init", status);
+#if PRINT_SYH
+                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, remote_id);
+#endif
             smsg_connected_flag[remote_id] = 2;
             // post next datagram  
         
@@ -1829,7 +1845,13 @@ static void _init_dynamic_smsg()
     mailbox_list->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
     mailbox_list->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
     mailbox_list->offset = 0;
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mailbox_list->mailbox_base, mailbox_list->size, &(mailbox_list->mem_hndl), &omdh);
+    
+    status = GNI_MemRegister(nic_hndl, (uint64_t)(mailbox_list->mailbox_base),
+        mailbox_list->size, smsg_rx_cqh,
+        GNI_MEM_READWRITE,   
+        -1,
+        &(mailbox_list->mem_hndl));
+    //status = MEMORY_REGISTER(onesided_hnd, nic_hndl, mailbox_list->mailbox_base, mailbox_list->size, &(mailbox_list->mem_hndl), &omdh);
     GNI_RC_CHECK("MEMORY registration for smsg", status);
 
     status = GNI_EpCreate(nic_hndl, smsg_tx_cqh, &ep_hndl_unbound);
