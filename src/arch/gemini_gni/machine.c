@@ -756,8 +756,9 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
         new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
 
         new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
-        new_mailbox_entry->mailbox_base = malloc(SMSG_MAX_MSG*AVG_SMSG_CONNECTION);
-        new_mailbox_entry->size = SMSG_MAX_MSG*AVG_SMSG_CONNECTION;
+        new_mailbox_entry->mailbox_base = malloc(smsg_memlen*AVG_SMSG_CONNECTION);
+        bzero(mailbox_list->mailbox_base, smsg_memlen*AVG_SMSG_CONNECTION);
+        new_mailbox_entry->size = smsg_memlen*AVG_SMSG_CONNECTION;
         new_mailbox_entry->offset = 0;
         
         status = GNI_MemRegister(nic_hndl, (uint64_t)new_mailbox_entry->mailbox_base,
