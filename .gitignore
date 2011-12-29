@@ -31,5 +31,4 @@ tmp
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
 charmrun
 pgm
-lb_test
 *.swp
