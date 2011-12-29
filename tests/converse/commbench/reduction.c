@@ -119,8 +119,8 @@ static void reduction_starter(void *msg)
 
 static void reduction_handler(void *msg) 
 {
-  CpvAccess(endtime) = CmiWallTimer();
   EmptyMsg emsg;
+  CpvAccess(endtime) = CmiWallTimer();
 
   CmiFree(msg);
   CmiSetHandler(&emsg, CpvAccess(reduction_starter));
