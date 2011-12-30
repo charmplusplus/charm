@@ -423,6 +423,45 @@ static gni_post_descriptor_t *post_freelist=0;
 
 #endif
 
+#if useDynamicSMSG
+typedef struct  dynamic_smsgs_req
+{
+    int                   destNode;
+    struct  dynamic_smsgs_req      *next;
+} DYNAMIC_SMSGS_REQ;
+
+static DYNAMIC_SMSGS_REQ   *dynamic_smsgs_reqs = NULL;
+static DYNAMIC_SMSGS_REQ   *free_dynamic_smsgs_reqs = NULL;
+
+# if CMK_SMP
+#define FreeDynamicSmsgsRequest(d)       free(d);
+#define MallocDynamicSmsgsRequest(d)     d = ((DYNAMIC_SMSGS_REQ*)malloc(sizeof(DYNAMIC_SMSGS_REQ)));   
+#else
+
+#define FreeDynamicSmsgsRequest(d)       \
+  (d)->next = free_dynamic_smsgs_reqs;\
+  free_dynamic_smsgs_reqs = d;
+
+#define MallocDynamicSmsgsRequest(d) \
+  d = free_dynamic_smsgs_reqs;\
+  if (d==0) {d = ((DYNAMIC_SMSGS_REQ*)malloc(sizeof(DYNAMIC_SMSGS_REQ)));\
+             _MEMCHECK(d);\
+  } else free_dynamic_smsgs_reqs = d->next; \
+
+#endif
+
+#define EnqDynamicSmsgsRequest(d)  \
+  (d)->next = dynamic_smsgs_reqs;\
+  dynamic_smsgs_reqs = d;
+
+#define DeqDynamicSmsgsRequest(d) \
+  d = dynamic_smsgs_reqs; \
+  if (d!=0) dynamic_smsgs_reqs = d->next;
+
+
+#endif
+
+
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
 static int      buffered_smsg_counter = 0;
 
@@ -797,7 +836,7 @@ static int connect_to(int destNode)
       smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
     }
             
-#if 1
+#if 0
     do {
         status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
         if (status == GNI_RC_SUCCESS) break;
@@ -808,7 +847,14 @@ static int connect_to(int destNode)
       /* mark as pending connection using "-1" */
     status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
     if (status == GNI_RC_ERROR_RESOURCE) {
-      smsg_connected_flag[destNode] = -1;
+      /* possibly destNode is making connection at the same time */
+      //smsg_connected_flag[destNode] = -1;
+#if 0
+      DYNAMIC_SMSGS_REQ *req;
+      MallocDynamicSmsgsRequest(req);
+      req->destNode = destNode;
+      EnqDynamicSmsgsRequest(req);
+#endif
       return 0;
     }
 #endif
@@ -816,7 +862,7 @@ static int connect_to(int destNode)
     //printf("[%d] setting up %d -> %d\n", myrank, myrank, destNode);
     CmiAssert(smsg_connected_flag[destNode] <= 0);
     smsg_connected_flag[destNode] = 1;
-    return 0;
+    return 1;
 }
 #endif
 
@@ -835,7 +881,8 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         status = GNI_RC_NOT_DONE;
         switch (smsg_connected_flag[destNode]) {
         case 0: {
-            if (connect_to(destNode)) goto loop;
+            connect_to(destNode);
+            if (smsg_connected_flag[destNode] == 2) goto loop;
             status = GNI_RC_NOT_DONE;
             break;
         }
@@ -1163,19 +1210,9 @@ static void    PumpDatagramConnection()
     uint32_t          remote_id;
     gni_return_t status;
     gni_post_state_t  post_state;
-    uint64_t             datagram_id;
+    uint64_t          datagram_id;
     int i;
 
-#if 1         /* rewrite */
-#if 0
-     /* re-try pending connections */
-   for (i=0; i<mysize; i++) {
-     if (smsg_connected_flag[i] == -1) {
-       smsg_connected_flag[i]  = 0;
-       connect_to(i);
-     }
-   }
-#endif
    while ((status = GNI_PostDataProbeById(nic_hndl, &datagram_id)) == GNI_RC_SUCCESS)
    {
      if (datagram_id >= mysize) {           /* bound endpoint */
@@ -1212,50 +1249,19 @@ static void    PumpDatagramConnection()
         }
      }
    }
-#else                       /*  ORIGINAL,  NOT USED */
-    for(i=0; i<mysize; i++)
-    {
-        if(smsg_connected_flag[i] ==0 || smsg_connected_flag[i] == 2)
-            continue;
-        status = GNI_PostDataProbeById(nic_hndl, &datagram_id);
-        if(status != GNI_RC_SUCCESS)
-            continue;
-
-        status = GNI_EpPostDataTestById( ep_hndl_array[i], datagram_id, &post_state, &remote_address, &remote_id);
-printf("[%d] PumpDatagramConnection: %d %d %d\n", myrank, datagram_id, remote_id, i);
-        //CmiAssert(remote_id == i);
-        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
-        {
-            status = GNI_SmsgInit(ep_hndl_array[i], smsg_attr_vector_local[i], smsg_attr_vector_remote[i]);
-            GNI_RC_CHECK("Dynamic SMSG Init", status);
-#if PRINT_SYH
-                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, i);
-#endif
-            smsg_connected_flag[i] = 2;
-        }
-    }
-    
-    while((status = GNI_PostDataProbeById(nic_hndl, &datagram_id)) == GNI_RC_SUCCESS)
-    {
-        status = GNI_EpPostDataTestById( ep_hndl_unbound, datagram_id, &post_state, &remote_address, &remote_id);
-        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
-        {
-            status = GNI_SmsgInit(ep_hndl_array[remote_id], &send_smsg_attr, &recv_smsg_attr);
-            GNI_RC_CHECK("Dynamic SMSG Init", status);
-#if PRINT_SYH
-                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, remote_id);
-#endif
-            smsg_connected_flag[remote_id] = 2;
-            // post next datagram  
-        
-            //recv_smsg_attr = (gni_smsg_attr_t*)malloc(sizeof(gni_smsg_attr_t)); 
-            //send_smsg_attr = (gni_smsg_attr_t*)malloc(sizeof(gni_smsg_attr_t)); 
-            alloc_smsg_attr(&send_smsg_attr);
-
-            status = GNI_EpPostDataWId (ep_hndl_unbound, &send_smsg_attr,  SMSG_ATTR_SIZE, &recv_smsg_attr, SMSG_ATTR_SIZE, myrank);
-            GNI_RC_CHECK("post unbound datagram", status);
-        }
-    };
+#if 0
+     /* re-try pending connections */
+   DYNAMIC_SMSGS_REQ *req;
+   DeqDynamicSmsgsRequest(req);
+   while (req) {
+     int destNode = req->destNode;
+     FreeDynamicSmsgsRequest(req);
+     if (smsg_connected_flag[destNode] == 0) {
+        // printf("[%d] reconnect to %d\n", myrank, destNode);
+        if (!connect_to(destNode)) break;
+     }
+     DeqDynamicSmsgsRequest(req);
+   }
 #endif
 }
 #endif
@@ -1266,7 +1272,6 @@ static void PumpNetworkRdmaMsgs()
     gni_cq_entry_t      event_data;
     gni_return_t        status;
 
-    
 }
 
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
