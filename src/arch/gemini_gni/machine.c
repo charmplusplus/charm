@@ -35,10 +35,10 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
-#define useDynamicSMSG  0
+#define useDynamicSMSG  1
 
 #if useDynamicSMSG
-#define             AVG_SMSG_CONNECTION     10
+#define             AVG_SMSG_CONNECTION     64
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 static int                 *smsg_connected_flag= 0;
 static gni_smsg_attr_t     **smsg_attr_vector_local;
@@ -423,44 +423,6 @@ static gni_post_descriptor_t *post_freelist=0;
 
 #endif
 
-#if useDynamicSMSG
-typedef struct  dynamic_smsgs_req
-{
-    int                   destNode;
-    struct  dynamic_smsgs_req      *next;
-} DYNAMIC_SMSGS_REQ;
-
-static DYNAMIC_SMSGS_REQ   *dynamic_smsgs_reqs = NULL;
-static DYNAMIC_SMSGS_REQ   *free_dynamic_smsgs_reqs = NULL;
-
-# if CMK_SMP
-#define FreeDynamicSmsgsRequest(d)       free(d);
-#define MallocDynamicSmsgsRequest(d)     d = ((DYNAMIC_SMSGS_REQ*)malloc(sizeof(DYNAMIC_SMSGS_REQ)));   
-#else
-
-#define FreeDynamicSmsgsRequest(d)       \
-  (d)->next = free_dynamic_smsgs_reqs;\
-  free_dynamic_smsgs_reqs = d;
-
-#define MallocDynamicSmsgsRequest(d) \
-  d = free_dynamic_smsgs_reqs;\
-  if (d==0) {d = ((DYNAMIC_SMSGS_REQ*)malloc(sizeof(DYNAMIC_SMSGS_REQ)));\
-             _MEMCHECK(d);\
-  } else free_dynamic_smsgs_reqs = d->next; \
-
-#endif
-
-#define EnqDynamicSmsgsRequest(d)  \
-  (d)->next = dynamic_smsgs_reqs;\
-  dynamic_smsgs_reqs = d;
-
-#define DeqDynamicSmsgsRequest(d) \
-  d = dynamic_smsgs_reqs; \
-  if (d!=0) dynamic_smsgs_reqs = d->next;
-
-
-#endif
-
 
 /* LrtsSent is called but message can not be sent by SMSGSend because of mailbox full or no credit */
 static int      buffered_smsg_counter = 0;
@@ -836,31 +798,13 @@ static int connect_to(int destNode)
       smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
     }
             
-#if 0
-    do {
-        status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
-        if (status == GNI_RC_SUCCESS) break;
-        PumpDatagramConnection();
-        if (smsg_connected_flag[destNode] == 2) return 1;
-    } while (status == GNI_RC_ERROR_RESOURCE);
-#else
-      /* mark as pending connection using "-1" */
     status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
     if (status == GNI_RC_ERROR_RESOURCE) {
       /* possibly destNode is making connection at the same time */
-      //smsg_connected_flag[destNode] = -1;
-#if 0
-      DYNAMIC_SMSGS_REQ *req;
-      MallocDynamicSmsgsRequest(req);
-      req->destNode = destNode;
-      EnqDynamicSmsgsRequest(req);
-#endif
       return 0;
     }
-#endif
     GNI_RC_CHECK("GNI_Post", status);
     //printf("[%d] setting up %d -> %d\n", myrank, myrank, destNode);
-    CmiAssert(smsg_connected_flag[destNode] <= 0);
     smsg_connected_flag[destNode] = 1;
     return 1;
 }
@@ -877,17 +821,13 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     gni_post_state_t      post_state;
     
 #if useDynamicSMSG
-    loop:
-        status = GNI_RC_NOT_DONE;
-        switch (smsg_connected_flag[destNode]) {
-        case 0: {
+    switch (smsg_connected_flag[destNode]) {
+    case 0: {
             connect_to(destNode);
-            if (smsg_connected_flag[destNode] == 2) goto loop;
             status = GNI_RC_NOT_DONE;
             break;
         }
-        case 1:   //already sending out connection_setup infor
-        {
+    case 1: {  //already sending out connection_setup infor
 #if 0
             //check whether connection is done
             status = GNI_EpPostDataTest( ep_hndl_array[destNode], &post_state, &remote_address, &remote_id);
@@ -904,8 +844,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             status = GNI_RC_NOT_DONE;
             break;
         }
-        case 2:  // connection done
-        {
+    case 2:  { // connection done
             if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
             {
                 status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
@@ -921,7 +860,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             status = GNI_RC_NOT_DONE;
             break;
         }
-        }
+    }   /* end of switch */
 
         if(inbuff ==0)
             buffer_small_msgs(msg, size, destNode, tag);
@@ -1249,20 +1188,6 @@ static void    PumpDatagramConnection()
         }
      }
    }
-#if 0
-     /* re-try pending connections */
-   DYNAMIC_SMSGS_REQ *req;
-   DeqDynamicSmsgsRequest(req);
-   while (req) {
-     int destNode = req->destNode;
-     FreeDynamicSmsgsRequest(req);
-     if (smsg_connected_flag[destNode] == 0) {
-        // printf("[%d] reconnect to %d\n", myrank, destNode);
-        if (!connect_to(destNode)) break;
-     }
-     DeqDynamicSmsgsRequest(req);
-   }
-#endif
 }
 #endif
 
@@ -1298,7 +1223,7 @@ static void PumpNetworkSmsg()
         printf("[%d] PumpNetworkMsgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
 #if useDynamicSMSG
-          /* smsg comes before connection is setup */
+          /* subtle: smsg may come before connection is setup */
         while (smsg_connected_flag[inst_id] != 2) 
            PumpDatagramConnection();
 #endif
@@ -1987,7 +1912,7 @@ static void _init_dynamic_smsg()
     status = GNI_EpPostDataWId (ep_hndl_unbound, &send_smsg_attr,  SMSG_ATTR_SIZE, &recv_smsg_attr, SMSG_ATTR_SIZE, myrank);
     GNI_RC_CHECK("post unbound datagram", status);
 
-      /* pre-connect to proc 0 */
+      /* always pre-connect to proc 0 */
     if (myrank != 0) connect_to(0);
 }
 #endif
