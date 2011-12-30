@@ -35,7 +35,7 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
-#define useDynamicSMSG  1
+#define useDynamicSMSG  0
 
 #if useDynamicSMSG
 #define             AVG_SMSG_CONNECTION     64
