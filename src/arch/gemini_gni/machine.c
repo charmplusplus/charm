@@ -401,6 +401,7 @@ static RDMA_REQUEST         *rdma_freelist = NULL;
              _MEMCHECK(d);\
   } else rdma_freelist = d->next;
 #endif
+
 /* reuse gni_post_descriptor_t */
 static gni_post_descriptor_t *post_freelist=0;
 
@@ -784,6 +785,41 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
 
 static void PumpDatagramConnection();
 
+#if useDynamicSMSG
+inline 
+static int connect_to(int destNode)
+{
+    gni_return_t status = GNI_RC_NOT_DONE;
+    CmiAssert(smsg_connected_flag[destNode] == 0);
+    if (smsg_attr_vector_local[destNode] == NULL) {
+      smsg_attr_vector_local[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
+      alloc_smsg_attr(smsg_attr_vector_local[destNode]);
+      smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
+    }
+            
+#if 1
+    do {
+        status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
+        if (status == GNI_RC_SUCCESS) break;
+        PumpDatagramConnection();
+        if (smsg_connected_flag[destNode] == 2) return 1;
+    } while (status == GNI_RC_ERROR_RESOURCE);
+#else
+      /* mark as pending connection using "-1" */
+    status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
+    if (status == GNI_RC_ERROR_RESOURCE) {
+      smsg_connected_flag[destNode] = -1;
+      return 0;
+    }
+#endif
+    GNI_RC_CHECK("GNI_Post", status);
+    //printf("[%d] setting up %d -> %d\n", myrank, myrank, destNode);
+    CmiAssert(smsg_connected_flag[destNode] <= 0);
+    smsg_connected_flag[destNode] = 1;
+    return 0;
+}
+#endif
+
 inline 
 static gni_return_t send_smsg_message(int destNode, void *header, int size_header, void *msg, int size, uint8_t tag, int inbuff )
 {
@@ -799,25 +835,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         status = GNI_RC_NOT_DONE;
         switch (smsg_connected_flag[destNode]) {
         case 0: {
-            smsg_attr_vector_local[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
-            alloc_smsg_attr(smsg_attr_vector_local[destNode]);
-            smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
-            
-            do {
-              status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
-              if (status == GNI_RC_SUCCESS) break;
-              PumpDatagramConnection();
-              if (smsg_connected_flag[destNode] == 2) break;
-            } while (status == GNI_RC_ERROR_RESOURCE);
-            if (smsg_connected_flag[destNode] == 2) goto loop; // fixme, leak
-#if 0
-            if (status == GNI_RC_ERROR_RESOURCE) {
-              status = GNI_RC_NOT_DONE;
-              break;
-            }
-#endif
-            GNI_RC_CHECK("GNI_Post", status);
-            smsg_connected_flag[destNode] = 1;
+            if (connect_to(destNode)) goto loop;
             status = GNI_RC_NOT_DONE;
             break;
         }
@@ -1149,6 +1167,15 @@ static void    PumpDatagramConnection()
     int i;
 
 #if 1         /* rewrite */
+#if 0
+     /* re-try pending connections */
+   for (i=0; i<mysize; i++) {
+     if (smsg_connected_flag[i] == -1) {
+       smsg_connected_flag[i]  = 0;
+       connect_to(i);
+     }
+   }
+#endif
    while ((status = GNI_PostDataProbeById(nic_hndl, &datagram_id)) == GNI_RC_SUCCESS)
    {
      if (datagram_id >= mysize) {           /* bound endpoint */
@@ -1171,7 +1198,7 @@ static void    PumpDatagramConnection()
        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
        {
           CmiAssert(remote_id<mysize);
-	  //CmiAssert(smsg_connected_flag[remote_id] == 0);
+	  CmiAssert(smsg_connected_flag[remote_id] <= 0);
           status = GNI_SmsgInit(ep_hndl_array[remote_id], &send_smsg_attr, &recv_smsg_attr);
           GNI_RC_CHECK("Dynamic SMSG Init", status);
 #if PRINT_SYH
@@ -1266,7 +1293,9 @@ static void PumpNetworkSmsg()
         printf("[%d] PumpNetworkMsgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
 #if useDynamicSMSG
-        if (smsg_connected_flag[inst_id] != 2) continue;
+          /* smsg comes before connection is setup */
+        while (smsg_connected_flag[inst_id] != 2) 
+           PumpDatagramConnection();
 #endif
         msg_tag = GNI_SMSG_ANY_TAG;
         while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS)
@@ -1745,7 +1774,7 @@ static int SendBufferMsg()
         while(!PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
 #if useDynamicSMSG
-            if (smsg_connected_flag[index] != 2) {    /* connection exists */
+            if (smsg_connected_flag[index] != 2) {   /* connection not exists */
               done = 0;
               break;
             }
@@ -1952,6 +1981,9 @@ static void _init_dynamic_smsg()
 
     status = GNI_EpPostDataWId (ep_hndl_unbound, &send_smsg_attr,  SMSG_ATTR_SIZE, &recv_smsg_attr, SMSG_ATTR_SIZE, myrank);
     GNI_RC_CHECK("post unbound datagram", status);
+
+      /* pre-connect to proc 0 */
+    if (myrank != 0) connect_to(0);
 }
 #endif
 
