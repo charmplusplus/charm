@@ -38,7 +38,7 @@ static void sleep(int secs) {
 #define useDynamicSMSG  0
 
 #if useDynamicSMSG
-#define             AVG_SMSG_CONNECTION     64
+#define             AVG_SMSG_CONNECTION     32
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 static int                 *smsg_connected_flag= 0;
 static gni_smsg_attr_t     **smsg_attr_vector_local;
@@ -1913,7 +1913,7 @@ static void _init_dynamic_smsg()
     GNI_RC_CHECK("post unbound datagram", status);
 
       /* always pre-connect to proc 0 */
-    if (myrank != 0) connect_to(0);
+    //if (myrank != 0) connect_to(0);
 }
 #endif
 
