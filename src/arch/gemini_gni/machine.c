@@ -1072,13 +1072,6 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     return 0;
 }
 
-/* Idle-state related functions: called in non-smp mode */
-/* not used */
-void CmiNotifyIdleForGemini(void) {
-    AdvanceCommunication(1);
-    //LrtsAdvanceCommunication();
-}
-
 static void    PumpDatagramConnection();
 
 void LrtsPostCommonInit(int everReturn)
@@ -1089,8 +1082,8 @@ void LrtsPostCommonInit(int everReturn)
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
-#endif
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
+#endif
 }
 
 /* this is called by worker thread */
