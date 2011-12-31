@@ -293,7 +293,7 @@ static void MachinePostCommonInitForDCMF(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForDCMF();
+static void AdvanceCommunicationForDCMF(int whenidle);
 #define LrtsAdvanceCommunication AdvanceCommunicationForDCMF
 
 static void DrainResourcesForDCMF();
@@ -673,7 +673,7 @@ extern void        bgl_machine_RectBcastInit  (unsigned               commID,
 
 
 /* ######Beginning of functions related with communication progress ###### */
-static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
+static INLINE_KEYWORD void AdvanceCommunicationForDCMF(int whenidle) {
 #if CMK_SMP
     DCMF_CriticalSection_enter (0);
 #endif
@@ -695,7 +695,7 @@ static void MachinePostNonLocalForDCMF() {
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl() {
-    AdvanceCommunicationForDCMF();
+    AdvanceCommunicationForDCMF(0);
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();
 #endif
@@ -705,7 +705,7 @@ void CmiMachineProgressImpl() {
 /* ######Beginning of functions related with exiting programs###### */
 static void DrainResourcesForDCMF() {
     while (msgQueueLen > 0 || outstanding_recvs > 0) {
-        AdvanceCommunicationForDCMF();
+        AdvanceCommunicationForDCMF(0);
     }
 }
 

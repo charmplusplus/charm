@@ -244,7 +244,7 @@ static void MachinePostCommonInitForMPI(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForMPI();
+static void AdvanceCommunicationForMPI(int whenidle);
 #define LrtsAdvanceCommunication AdvanceCommunicationForMPI
 
 static void DrainResourcesForMPI(); /* used when exit */
@@ -794,7 +794,7 @@ static double pumptime = 0.0;
 
 #endif //end of CMK_SMP
 
-static void AdvanceCommunicationForMPI() {
+static void AdvanceCommunicationForMPI(int whenidle) {
 #if REPORT_COMM_METRICS
     double t1, t2, t3, t4;
     t1 = CmiWallTimer();
@@ -843,7 +843,7 @@ static void MachinePostNonLocalForMPI() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
         while (CpvAccess(MsgQueueLen)>0) {
-            AdvanceCommunicationForMPI();
+            AdvanceCommunicationForMPI(0);
         }
     }
 
