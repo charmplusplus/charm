@@ -1079,6 +1079,8 @@ void CmiNotifyIdleForGemini(void) {
     //LrtsAdvanceCommunication();
 }
 
+static void    PumpDatagramConnection();
+
 void LrtsPostCommonInit(int everReturn)
 {
 #if CMK_SMP
@@ -1088,7 +1090,7 @@ void LrtsPostCommonInit(int everReturn)
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
 #endif
-
+    CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
 }
 
 /* this is called by worker thread */
