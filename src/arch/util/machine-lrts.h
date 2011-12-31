@@ -18,7 +18,7 @@ void LrtsPostCommonInit(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-void LrtsAdvanceCommunication();
+void LrtsAdvanceCommunication(int whileidle);
 void LrtsDrainResources(); /* used when exit */
 void LrtsExit();
 /* ### End of Machine-running Related Functions ### */
