@@ -244,7 +244,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 static void ConverseRunPE(int everReturn);
 
 /* Functions regarding machine running on every proc */
-static void AdvanceCommunication();
+static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
@@ -727,14 +727,14 @@ static void ConverseRunPE(int everReturn) {
 /* ##### End of Functions Related with Machine Startup ##### */
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
-static INLINE_KEYWORD void AdvanceCommunication() {
+static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     int doProcessBcast = 1;
 
 #if CMK_USE_PXSHM
     CommunicationServerPxshm();
 #endif
 
-    LrtsAdvanceCommunication();
+    LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
 #if CMK_SMP_NO_COMMTHD
@@ -757,7 +757,7 @@ static INLINE_KEYWORD void AdvanceCommunication() {
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP
-    AdvanceCommunication();
+    AdvanceCommunication(0);
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
@@ -844,7 +844,7 @@ void *CmiGetNonLocal(void) {
     msg = PCQueuePop(cs->recv);
 #if !CMK_SMP
     if (!msg) {
-       AdvanceCommunication();
+       AdvanceCommunication(0);
        msg = PCQueuePop(cs->recv);
     }
 #else
@@ -892,7 +892,7 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
 #if !CMK_SMP
-    AdvanceCommunication();
+    AdvanceCommunication(1);
 #else
     LrtsPostNonLocal();
 
@@ -916,7 +916,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 /* usually called in non-smp mode */
 void CmiNotifyIdle(void) {
-    AdvanceCommunication();
+    AdvanceCommunication(1);
     CmiYield();
 }
 

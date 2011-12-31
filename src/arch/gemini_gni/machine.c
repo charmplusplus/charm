@@ -1073,8 +1073,9 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 }
 
 /* Idle-state related functions: called in non-smp mode */
+/* not used */
 void CmiNotifyIdleForGemini(void) {
-    AdvanceCommunication();
+    AdvanceCommunication(1);
     //LrtsAdvanceCommunication();
 }
 
@@ -1085,7 +1086,7 @@ void LrtsPostCommonInit(int everReturn)
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
-    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForGemini,NULL);
+    CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
 #endif
 
 }
@@ -1773,7 +1774,7 @@ static int SendBufferMsg()
     return done;
 }
 
-void LrtsAdvanceCommunication()
+void LrtsAdvanceCommunication(int whileidle)
 {
     /*  Receive Msg first */
 #if 0
@@ -1781,7 +1782,7 @@ void LrtsAdvanceCommunication()
     printf("Calling Lrts Pump Msg PE:%d\n", myrank);
 #endif
     if(mysize == 1) return;
-    if (useDynamicSMSG)
+    if (whileidle && useDynamicSMSG)
         PumpDatagramConnection();
     PumpNetworkSmsg();
    // printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
