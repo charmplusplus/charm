@@ -34,6 +34,8 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
+#define PRINT_SYH  0
+
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 
 static int useDynamicSMSG  =0;               /* dynamic smsgs setup */
@@ -80,7 +82,6 @@ static CmiInt8 buffered_send_msg = 0;
 #define BIG_MSG       16*oneMB
 #define ONE_SEG       8*oneMB
 
-#define PRINT_SYH  0
 #if CMK_SMP
 #define COMM_THREAD_SEND 1
 #endif
@@ -152,7 +153,6 @@ static int  SMSG_MAX_MSG = 1024;
 #define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  2048
-//2048
 
 #define REMOTE_QUEUE_ENTRIES  20480 
 #define LOCAL_QUEUE_ENTRIES   20480 
@@ -165,9 +165,9 @@ static int  SMSG_MAX_MSG = 1024;
 /* SMSG is a control message to initialize a BTE */
 #define MEDIUM_HEAD_TAG         0x32
 #define MEDIUM_DATA_TAG         0x33
-#define LMSG_INIT_TAG     0x39 
-#define VERY_LMSG_INIT_TAG     0x40 
-#define VERY_LMSG_TAG     0x41 
+#define LMSG_INIT_TAG           0x39 
+#define VERY_LMSG_INIT_TAG      0x40 
+#define VERY_LMSG_TAG           0x41 
 
 #define DEBUG
 #ifdef GNI_RC_CHECK
@@ -780,23 +780,25 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
     local_smsg_attr->mem_hndl = mailbox_list->mem_hndl;
 }
 
-static void PumpDatagramConnection();
-
 /* useDynamicSMSG */
 inline 
 static int connect_to(int destNode)
 {
     gni_return_t status = GNI_RC_NOT_DONE;
     CmiAssert(smsg_connected_flag[destNode] == 0);
-    if (smsg_attr_vector_local[destNode] == NULL) {
-      smsg_attr_vector_local[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
-      alloc_smsg_attr(smsg_attr_vector_local[destNode]);
-      smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
-    }
+    CmiAssert (smsg_attr_vector_local[destNode] == NULL);
+    smsg_attr_vector_local[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
+    alloc_smsg_attr(smsg_attr_vector_local[destNode]);
+    smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
             
     status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
     if (status == GNI_RC_ERROR_RESOURCE) {
       /* possibly destNode is making connection at the same time */
+      free(smsg_attr_vector_local[destNode]);
+      smsg_attr_vector_local[destNode] = NULL;
+      free(smsg_attr_vector_remote[destNode]);
+      smsg_attr_vector_remote[destNode] = NULL;
+      mailbox_list->offset -= smsg_memlen;
       return 0;
     }
     GNI_RC_CHECK("GNI_Post", status);
@@ -823,7 +825,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
             status = GNI_RC_NOT_DONE;
             if(inbuff ==0)
                 buffer_small_msgs(msg, size, destNode, tag);
-            return;
+            return status;
         }
     }
     if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
@@ -1660,7 +1662,8 @@ static int SendBufferMsg()
     {
         while(!PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
-            if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   /* connection not exists */
+            if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   
+                /* connection not exists yet */
               done = 0;
               break;
             }
@@ -2441,9 +2444,8 @@ void LrtsDrainResources()
 {
     if(mysize == 1) return;
     while (!SendBufferMsg()) {
-#if useDynamicSMSG
-        PumpDatagramConnection();
-#endif
+        if (useDynamicSMSG)
+            PumpDatagramConnection();
         PumpNetworkSmsg();
         //PumpNetworkRdmaMsgs();
         PumpLocalRdmaTransactions();
