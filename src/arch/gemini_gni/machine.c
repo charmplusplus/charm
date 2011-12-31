@@ -1,12 +1,11 @@
-/*****************************************************************************
- * $Source$
- * $Author$  Yanhua Sun
- * $Date$  07-01-2011
- * $Revision$ 
- *****************************************************************************/
 
 /** @file
  * Gemini GNI machine layer
+ *
+ * Author:   Yanhua Sun
+             Gengbin Zheng
+ * Date:   07-01-2011
+ *
  */
 /*@{*/
 
@@ -35,11 +34,11 @@ static void sleep(int secs) {
 #include <unistd.h> /*For getpid()*/
 #endif
 
-#define useDynamicSMSG  0
-
-#if useDynamicSMSG
-#define             AVG_SMSG_CONNECTION     32
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
+
+static int useDynamicSMSG  =0;               /* dynamic smsgs setup */
+
+static int avg_smsg_connection = 32;
 static int                 *smsg_connected_flag= 0;
 static gni_smsg_attr_t     **smsg_attr_vector_local;
 static gni_smsg_attr_t     **smsg_attr_vector_remote;
@@ -56,7 +55,6 @@ typedef struct _dynamic_smsg_mailbox{
 }dynamic_smsg_mailbox_t;
 
 static dynamic_smsg_mailbox_t  *mailbox_list;
-#endif
 
 #define REMOTE_EVENT                      0
 #define USE_LRTS_MEMPOOL                  1
@@ -202,7 +200,6 @@ typedef struct mdh_addr_list{
 }mdh_addr_list_t;
 
 static unsigned int         smsg_memlen;
-#define     SMSG_CONN_SIZE     sizeof(gni_smsg_attr_t)
 gni_smsg_attr_t    **smsg_local_attr_vec = 0;
 mdh_addr_t          setup_mem;
 mdh_addr_t          *smsg_connection_vec = 0;
@@ -747,7 +744,7 @@ static void setup_smsg_connection(int destNode)
 #endif
 }
 
-#if useDynamicSMSG
+/* useDynamicSMSG */
 inline 
 static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
 {
@@ -757,7 +754,7 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
     {
         dynamic_smsg_mailbox_t *new_mailbox_entry;
         new_mailbox_entry = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
-        new_mailbox_entry->size = smsg_memlen*AVG_SMSG_CONNECTION;
+        new_mailbox_entry->size = smsg_memlen*avg_smsg_connection;
         new_mailbox_entry->mailbox_base = malloc(new_mailbox_entry->size);
         bzero(new_mailbox_entry->mailbox_base, new_mailbox_entry->size);
         new_mailbox_entry->offset = 0;
@@ -782,11 +779,10 @@ static void alloc_smsg_attr( gni_smsg_attr_t *local_smsg_attr)
     local_smsg_attr->msg_buffer = mailbox_list->mailbox_base;
     local_smsg_attr->mem_hndl = mailbox_list->mem_hndl;
 }
-#endif
 
 static void PumpDatagramConnection();
 
-#if useDynamicSMSG
+/* useDynamicSMSG */
 inline 
 static int connect_to(int destNode)
 {
@@ -808,7 +804,6 @@ static int connect_to(int destNode)
     smsg_connected_flag[destNode] = 1;
     return 1;
 }
-#endif
 
 inline 
 static gni_return_t send_smsg_message(int destNode, void *header, int size_header, void *msg, int size, uint8_t tag, int inbuff )
@@ -820,53 +815,17 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     gni_post_descriptor_t *pd;
     gni_post_state_t      post_state;
     
-#if useDynamicSMSG
-    switch (smsg_connected_flag[destNode]) {
-    case 0: {
-            connect_to(destNode);
+    if (useDynamicSMSG) {
+        switch (smsg_connected_flag[destNode]) {
+        case 0: 
+            connect_to(destNode);         /* continue to case 1 */
+        case 1:                           /* pending connection, do nothing */
             status = GNI_RC_NOT_DONE;
-            break;
+            if(inbuff ==0)
+                buffer_small_msgs(msg, size, destNode, tag);
+            return;
         }
-    case 1: {  //already sending out connection_setup infor
-#if 0
-            //check whether connection is done
-            status = GNI_EpPostDataTest( ep_hndl_array[destNode], &post_state, &remote_address, &remote_id);
-            if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED){
-                status = GNI_SmsgInit(ep_hndl_array[destNode], smsg_attr_vector_local[destNode], smsg_attr_vector_remote[destNode]);
-                GNI_RC_CHECK("GNI_SmsgInit", status);
-#if PRINT_SYH
-                printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, destNode);
-#endif
-                smsg_connected_flag[destNode] = 2;
-                goto loop;
-            }
-#endif
-            status = GNI_RC_NOT_DONE;
-            break;
-        }
-    case 2:  { // connection done
-            if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
-            {
-                status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
-                if(status == GNI_RC_SUCCESS)
-                {
-#if PRINT_SYH
-                    lrts_smsg_success++;
-                    printf("[%d==>%d] send done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
-#endif     
-                    return status;
-                }
-            }
-            status = GNI_RC_NOT_DONE;
-            break;
-        }
-    }   /* end of switch */
-
-        if(inbuff ==0)
-            buffer_small_msgs(msg, size, destNode, tag);
-        return status;
-#else
-    //printf("[%d] reach send\n", myrank);
+    }
     if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
     {
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
@@ -882,7 +841,6 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     if(inbuff ==0)
         buffer_small_msgs(msg, size, destNode, tag);
     return status;
-#endif
 }
 
 // Get first 0 in DMA_tags starting from index
@@ -1142,7 +1100,7 @@ void LrtsPostNonLocal(){
 #endif
 }
 
-#if useDynamicSMSG
+/* useDynamicSMSG */
 static void    PumpDatagramConnection()
 {
     uint32_t          remote_address;
@@ -1189,7 +1147,6 @@ static void    PumpDatagramConnection()
      }
    }
 }
-#endif
 
 /* pooling CQ to receive network message */
 static void PumpNetworkRdmaMsgs()
@@ -1222,11 +1179,11 @@ static void PumpNetworkSmsg()
 #if PRINT_SYH
         printf("[%d] PumpNetworkMsgs is received from PE: %d,  status=%s\n", myrank, inst_id,  gni_err_str[status]);
 #endif
-#if useDynamicSMSG
-          /* subtle: smsg may come before connection is setup */
-        while (smsg_connected_flag[inst_id] != 2) 
-           PumpDatagramConnection();
-#endif
+        if (useDynamicSMSG) {
+            /* subtle: smsg may come before connection is setup */
+            while (smsg_connected_flag[inst_id] != 2) 
+               PumpDatagramConnection();
+        }
         msg_tag = GNI_SMSG_ANY_TAG;
         while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS)
         {
@@ -1703,12 +1660,10 @@ static int SendBufferMsg()
     {
         while(!PCQueueEmpty(smsg_msglist_index[index].sendSmsgBuf))
         {
-#if useDynamicSMSG
-            if (smsg_connected_flag[index] != 2) {   /* connection not exists */
+            if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   /* connection not exists */
               done = 0;
               break;
             }
-#endif
             ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
 #if         CMK_SMP
             if(ptr == NULL)
@@ -1823,9 +1778,8 @@ void LrtsAdvanceCommunication()
     printf("Calling Lrts Pump Msg PE:%d\n", myrank);
 #endif
     if(mysize == 1) return;
-#if useDynamicSMSG
-    PumpDatagramConnection();
-#endif
+    if (useDynamicSMSG)
+        PumpDatagramConnection();
     PumpNetworkSmsg();
    // printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
     //PumpNetworkRdmaMsgs();
@@ -1855,7 +1809,7 @@ void LrtsAdvanceCommunication()
 #endif
 }
 
-#if useDynamicSMSG
+/* useDynamicSMSG */
 static void _init_dynamic_smsg()
 {
     gni_return_t status;
@@ -1889,7 +1843,7 @@ static void _init_dynamic_smsg()
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
     mailbox_list = (dynamic_smsg_mailbox_t*)malloc(sizeof(dynamic_smsg_mailbox_t));
-    mailbox_list->size = smsg_memlen*AVG_SMSG_CONNECTION;
+    mailbox_list->size = smsg_memlen*avg_smsg_connection;
     //mailbox_list->mailbox_base = malloc(mailbox_list->size);
     posix_memalign(&mailbox_list->mailbox_base, 64, mailbox_list->size);
     bzero(mailbox_list->mailbox_base, mailbox_list->size);
@@ -1915,7 +1869,6 @@ static void _init_dynamic_smsg()
       /* always pre-connect to proc 0 */
     //if (myrank != 0) connect_to(0);
 }
-#endif
 
 static void _init_static_smsg()
 {
@@ -2278,9 +2231,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
    
-    //useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
-    //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
-    
     status = PMI_Init(&first_spawned);
     GNI_RC_CHECK("PMI_Init", status);
 
@@ -2297,14 +2247,15 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     *myNodeID = myrank;
     *numNodes = mysize;
   
+    useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
+    CmiGetArgIntDesc(*argv, "+smsgConnection", &avg_smsg_connection,"Initial number of SMSGS connection per code");
+    if (avg_smsg_connection>mysize) avg_smsg_connection = mysize;
+    //useStaticMSGQ = CmiGetArgFlag(*argv, "+useStaticMsgQ");
+    
     if(myrank == 0)
     {
-#if useDynamicSMSG
-        printf("Charm++> use Dynamic SMSG\n");
-#else
-        printf("Charm++> use Static SMSG\n");
-#endif
         printf("Charm++> Running on Gemini (GNI) using %d cores\n", mysize);
+        printf("Charm++> use %s SMSG\n", useDynamicSMSG?"Dynamic":"Static");
     }
 #ifdef USE_ONESIDED
     onesided_init(NULL, &onesided_hnd);
@@ -2366,11 +2317,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
     if(mysize > 1)
     {
-#if useDynamicSMSG
-        _init_dynamic_smsg();
-#else
-        _init_static_smsg();
-#endif
+        if (useDynamicSMSG)
+          _init_dynamic_smsg();
+        else
+          _init_static_smsg();
         _init_smsg();
         PMI_Barrier();
     }
@@ -2395,6 +2345,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         sscanf(str, "%lld", &_mempool_size);
       }
     }
+
     if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
 #endif
 
