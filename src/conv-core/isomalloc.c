@@ -69,6 +69,7 @@ added by Ryan Mokos in July 2008.
 
 #if CMK_USE_MEMPOOL_ISOMALLOC
 #include "mempool.h"
+extern int cutOffPoints[cutOffNum];
 #endif 
 
 static int _sync_iso = 0;
