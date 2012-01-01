@@ -65,8 +65,6 @@ typedef struct _timemsg {
 
 typedef struct _timemsg timemsg;
 
-
-
 static char *sync_outstr =
 "[broadcast] (%s) %le seconds per %d bytes\n"
 ;

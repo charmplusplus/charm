@@ -2590,13 +2590,13 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
         currSlot = (slot_header*)((char*)current+sizeof(block_header));
       }
       while(currSlot != NULL) {
-        pup_int(p,&currSlot->size);
+        pup_int(p,&cutOffPoints[currSlot->size]);
         if(currSlot->status) {
           pup_int(p,&flags[0]);
           pup_bytes(p,(void*)currSlot,sizeof(slot_header));
         } else {
           pup_int(p,&flags[1]);
-          pup_bytes(p,(void*)currSlot,currSlot->size);
+          pup_bytes(p,(void*)currSlot,cutOffPoints[currSlot->size]);
         }
         currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
       }

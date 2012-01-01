@@ -1,7 +1,12 @@
 
 /** 
 
-Memory pool implementation , It is only good for Charm++ usage. The first 64 bytes provides additional information. sizeof(int)- size of this block(free or allocated), next mem_handle_t, then void** point to the next available block. 
+Memory pool implementation. It is used in two places-
+1 - For UGNI management of pinned memory
+2 - Isomalloc allocation
+
+Memory is allocated in terms of blocks from the OS and the user
+is given back memory after rounding to nearest power of 2.
 
 Written by Yanhua Sun 08-27-2011
 Generalized by Gengbin Zheng  10/5/2011
@@ -25,11 +30,6 @@ Heavily modified by Nikhil Jain 11/28/2011
 #endif
 
 #include "mempool.h"
-int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
-                      65536,131072,262144,524288,1048576,2097152,4194304,
-                      8388608,16777216,33554432,67108864,134217728,268435456,
-                      536870912};
-
 
 INLINE_KEYWORD int which_pow2(size_t size)
 {
@@ -82,7 +82,7 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
   for(i=power; i>=0; i--) {
     if(block_head->freelists[i]) {
       head = (slot_header*)((char*)mptr+block_head->freelists[i]);
-      head->size = cutOffPoints[i];
+      head->size = i;
       head->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
       head->mempool_ptr = pool;
@@ -124,7 +124,7 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         current->freelists[i] = loc;
       }
 
-      head_move->size = cutOffPoints[power];
+      head_move->size = power;
       prev = current->freelists[power];
       head_move->next = prev+cutOffPoints[power]; 
       head = (slot_header*)((char*)head_move+cutOffPoints[power]);
@@ -132,7 +132,7 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         if(i!=power) {
           head = (slot_header*)((char*)head+cutOffPoints[i-1]);
         }
-        head->size = cutOffPoints[i];
+        head->size = i;
         head->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
         head->mempool_ptr = current->mempool_ptr;
@@ -329,7 +329,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     //by maintaining extra 8 bytes in slot_header but I am
     //currently doing it by linear search for gemini
     block_head = &mptr->block_head;
-    while(1 && block_head != NULL) {
+    while(block_head != NULL) {
       if((size_t)ptr_free >= (size_t)(block_head->mempool_ptr)
         && (size_t)ptr_free < (size_t)((char*)block_head->mempool_ptr 
         + block_head->size)) {
@@ -350,17 +350,17 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     size = 0;
     current = to_free;
     while(current->status == 1) {
-      size += current->size;
+      size += cutOffPoints[current->size];
       first = current;
       current = current->gprev?(slot_header*)((char*)mptr+current->gprev):NULL;
       if(current == NULL)
         break;
     }
 
-    size -= to_free->size;
+    size -= cutOffPoints[to_free->size];
     current = to_free;
     while(current->status == 1) {
-      size += current->size;
+      size += cutOffPoints[current->size];
       current = current->gnext?(slot_header*)((char*)mptr+current->gnext):NULL;
       if(current == NULL)
         break;
@@ -372,7 +372,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     current = first;
     while(current!=used_next) {
       if(current!=to_free) {
-        power = which_pow2(current->size);
+        power = current->size;
         temp = current->prev?(slot_header*)((char*)mptr+current->prev):NULL;
         if(temp!=NULL) {
           temp->next = current->next;
@@ -403,7 +403,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     for(i=power; i>=0; i--) {
       if(left>=cutOffPoints[i]) {
         current = (slot_header*)((char*)mptr+loc);
-        current->size = cutOffPoints[i];
+        current->size = i;
         current->status = 1;
 #if CMK_CONVERSE_GEMINI_UGNI
       	current->mempool_ptr = block_head->mempool_ptr;
