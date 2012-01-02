@@ -1,6 +1,7 @@
 #ifndef _MESH_STREAMER_H_
 #define _MESH_STREAMER_H_
 
+#include <algorithm>
 #include "MeshStreamer.decl.h"
 // allocate more total buffer space than the maximum buffering limit but flush upon
 // reaching totalBufferCapacity_
@@ -18,11 +19,7 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-//#define HASH_LOCATIONS
-
-#ifdef HASH_LOCATIONS
-#include <map>
-#endif
+// #define CACHE_LOCATIONS
 
 /*
 class LocalMessage : public CMessage_LocalMessage {
@@ -111,8 +108,9 @@ private:
     MeshStreamerMessage<dtype> **columnBuffers_; 
     MeshStreamerMessage<dtype> **planeBuffers_;
 
-#ifdef HASH_LOCATIONS
-    std::map<int, MeshLocation> hashedLocations; 
+#ifdef CACHE_LOCATIONS
+    MeshLocation *cachedLocations;
+    bool *isCached; 
 #endif
 
     void determineLocation(const int destinationPe, 
@@ -219,6 +217,13 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   myColumnIndex_ = indexWithinPlane - myRowIndex_ * numColumns_; 
 
   isPeriodicFlushEnabled_ = false; 
+
+#ifdef CACHE_LOCATIONS
+  cachedLocations = new MeshLocation[numNodes_];
+  isCached = new bool[numNodes_];
+  std::fill(isCached, isCached + numNodes_, false);
+#endif
+
 }
 
 template <class dtype>
@@ -245,10 +250,9 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe,
 
   int nodeIndex, indexWithinPlane; 
 
-#ifdef HASH_LOCATIONS
-  std::map<int, MeshLocation>::iterator it;
-  if ((it = hashedLocations.find(destinationPe)) != hashedLocations.end()) {
-    destinationCoordinates = it->second;
+#ifdef CACHE_LOCATIONS
+  if (isCached[destinationPe] == true) {
+    destinationCoordinates = cachedLocations[destinationPe]; 
     return;
   }
 #endif
@@ -272,8 +276,8 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe,
     }
   }
 
-#ifdef HASH_LOCATIONS
-  hashedLocations[destinationPe] = destinationCoordinates;
+#ifdef CACHE_LOCATIONS
+  cachedLocations[destinationPe] = destinationCoordinates;
 #endif
 
 }
