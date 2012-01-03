@@ -153,11 +153,7 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
 }
 
 static void SendSpanningChildrenProc(int size, char *msg) {
-    int startpe = CMI_BROADCAST_ROOT(msg)-1;
-    int startnode = CmiNodeOf(startpe);
-#if CMK_SMP
-    if (startpe > CmiNumPes()) startnode = startpe - CmiNumPes();
-#endif
+    int startnode = CMI_BROADCAST_ROOT(msg)-1;
     SendSpanningChildren(size, msg, 0, startnode);
 #if CMK_SMP
     /* second send msgs to my peers on this node */
@@ -193,8 +189,7 @@ static void SendHyperCubeNode(int size, char *msg) {
 #if USE_COMMON_SYNC_BCAST
 /* Functions regarding broadcat op that sends to every one else except me */
 void CmiSyncBroadcastFn(int size, char *msg) {
-    int mype = CmiMyPe();
-    int i;
+    int i, mype;
 
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
 #if CMK_SMP
@@ -203,14 +198,26 @@ void CmiSyncBroadcastFn(int size, char *msg) {
 #endif
 
 #if CMK_BROADCAST_SPANNING_TREE
-    CMI_SET_BROADCAST_ROOT(msg, mype+1);
+    CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
     SendSpanningChildrenProc(size, msg);
 #elif CMK_BROADCAST_HYPERCUBE
-    CMI_SET_BROADCAST_ROOT(msg, mype+1);
+    CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
     SendHyperCubeProc(size, msg);
 #else
-    for ( i=mype+1; i<_Cmi_numpes; i++ )
+	mype = CmiMyPe();
+	#if CMK_SMP
+	/* In SMP, this function may be called from comm thread which has a larger
+	 * proc id */
+	if(mype > _Cmi_numpes){
+		for(i=0; i<_Cmi_numpes; i++)
+			CmiSyncSendFn(i, size, msg);
+		return;
+	}
+	#endif
+	
+	for ( i=mype+1; i<_Cmi_numpes; i++ )
         CmiSyncSendFn(i, size, msg) ;
+	
     for ( i=0; i<mype; i++ )
         CmiSyncSendFn(i, size, msg) ;
 #endif
