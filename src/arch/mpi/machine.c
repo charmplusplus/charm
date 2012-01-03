@@ -1024,7 +1024,7 @@ static char *thread_level_tostring(int thread_level) {
     case MPI_THREAD_SERIALIZED:
         return "MPI_THREAD_SERIALIZED";
     case MPI_THREAD_MULTIPLE :
-        return "MPI_THREAD_MULTIPLE ";
+        return "MPI_THREAD_MULTIPLE";
     default: {
         char *str = (char*)malloc(5);
         sprintf(str,"%d", thread_level);
@@ -1061,9 +1061,18 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 #endif
 
+#if CMK_SMP
+    if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
+      Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
+    }
+#endif
+
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
-    thread_level = MPI_THREAD_MULTIPLE;
+    if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
+      thread_level = MPI_THREAD_FUNNELED;
+    else
+      thread_level = MPI_THREAD_MULTIPLE;
 #else
     thread_level = MPI_THREAD_SINGLE;
 #endif
@@ -1072,7 +1081,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #else
     MPI_Init(argc, argv);
     thread_level = 0;
-    provided = -1;
+    _thread_provided = -1;
 #endif
     largc = *argc;
     largv = *argv;
@@ -1082,25 +1091,15 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     myNID = *myNodeID;
 
 #if CMK_SMP
-    if (provided == MPI_THREAD_MULTIPLE) {
-        int smpmode =  0;
-        Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; /* the default value */
-        smpmode = CmiGetArgFlag(largv, "+comm_thread_only_recv");
-        if (smpmode) {
-            Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
-        } else {
-#if 0
-            /* TODO: Not supported yet! Needs some re-design -Chao Mei */
-            smpmode = CmiGetArgFlag(largv, "+no_comm_thread");
-            if (smpmode) Cmi_smp_mode_setting = COMM_THREAD_NOT_EXIST;
-#endif
-        }
+    if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV && _thread_provided != MPI_THREAD_MULTIPLE) {
+        Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; 
     }
 #endif
 
     MPI_Get_version(&ver, &subver);
     if (myNID == 0) {
-        printf("Charm++> Running on MPI version: %d.%d multi-thread support: %s (max supported: %s)\n", ver, subver, thread_level_tostring(thread_level), thread_level_tostring(provided));
+        printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
+        printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
     }
 
     {

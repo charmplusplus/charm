@@ -627,13 +627,13 @@ if (  MSG_STATISTIC)
 #else
 		printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
 		if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
-			printf("Charm++ SMP>The comm. thread will both send and receive messages\n");
+			printf("Charm++> The comm. thread will both send and receive messages\n");
 		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
-			printf("Charm++ SMP>The comm. thread will only receive messages, while work threads will send messages\n");
+			printf("Charm++> The comm. thread will only receive messages, while work threads will send messages\n");
 		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
-			printf("Charm++ SMP> There's no comm. thread. Work threads will both send and receive messages\n");
+			printf("Charm++> There's no comm. thread. Work threads will both send and receive messages\n");
 		} else {
-			CmiAbort("Charm++ SMP> Invalid SMP mode setting\n");
+			CmiAbort("Charm++> Invalid SMP mode setting\n");
 		}
 #endif
 	}
