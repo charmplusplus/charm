@@ -732,6 +732,7 @@ static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNo
 
     DCMF_Messager_configure(&config_in, &config_out);
     //assert (config_out.thread_level == DCMF_THREAD_MULTIPLE); //not supported in vn mode
+    Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
 #endif
 
     DCMF_Send_Configuration_t short_config, eager_config, rzv_config;

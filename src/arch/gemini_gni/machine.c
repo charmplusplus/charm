@@ -2246,6 +2246,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     *myNodeID = myrank;
     *numNodes = mysize;
   
+#if !COMM_THREAD_SEND
+    /* Currently, we only consider the case that comm. thread will only recv msgs */
+    Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
+#endif
+
     useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
     CmiGetArgIntDesc(*argv, "+smsgConnection", &avg_smsg_connection,"Initial number of SMSGS connection per code");
     if (avg_smsg_connection>mysize) avg_smsg_connection = mysize;

@@ -144,6 +144,16 @@ CpvDeclare(void*, CmiLocalQueue);
 #define BCAST_SYNC 0x3
 #define BCAST_ASYNC 0x4
 
+enum MACHINE_SMP_MODE {
+    INVALID_MODE,
+    COMM_THREAD_SEND_RECV = 0,
+    COMM_THREAD_ONLY_RECV, /* work threads will do the send */
+    COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
+};
+/* The default mode of smp charm runtime */
+static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
+
+
 #if CMK_SMP
 static volatile int commThdExit = 0;
 static CmiNodeLock  commThdExitLock = 0;
@@ -611,12 +621,22 @@ if (  MSG_STATISTIC)
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
    
-if (_Cmi_mynode==0) 
+	if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-    printf("Charm++> Running on Non-smp mode\n");
+		printf("Charm++> Running on Non-smp mode\n");
 #else
-    printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+		printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+		if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+			printf("Charm++ SMP>The comm. thread will both send and receive messages\n");
+		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+			printf("Charm++ SMP>The comm. thread will only receive messages, while work threads will send messages\n");
+		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
+			printf("Charm++ SMP> There's no comm. thread. Work threads will both send and receive messages\n");
+		} else {
+			CmiAbort("Charm++ SMP> Invalid SMP mode setting\n");
+		}
 #endif
+	}
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -785,6 +805,10 @@ void ConverseExit(void) {
     int i;
 #if !CMK_SMP
     LrtsDrainResources();
+#else
+	if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV
+	   || Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST)
+		LrtsDrainResources();
 #endif
 
     ConverseCommonExit();

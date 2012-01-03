@@ -388,7 +388,7 @@ static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg
 
     CmiAssert(destNode != CmiMyNode());
 #if CMK_SMP
-    if (_thread_provided != MPI_THREAD_MULTIPLE) {
+    if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
       EnqueueMsg(msg, size, destNode, mode);
       return 0;
     }
@@ -860,9 +860,12 @@ static void MachinePostNonLocalForMPI() {
     }
 #endif
 #else
-  if (_thread_provided == MPI_THREAD_MULTIPLE) {
-        CmiReleaseSentMessages();
-        SendMsgBuf();
+  if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+        CmiReleaseSentMessages();       
+        /* ??? SendMsgBuf is a not a thread-safe function. If it is put
+         * here and this function will be called in CmiNotifyStillIdle,
+         * then a data-race problem occurs */
+        /*SendMsgBuf();*/
   }
 #endif
 }
@@ -899,10 +902,16 @@ void DrainResourcesForMPI() {
         CmiReleaseSentMessages();
     }
 #else
-    while (!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
-        CmiReleaseSentMessages();
-        SendMsgBuf();
-        PumpMsgs();
+    if(Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV){
+        while (!MsgQueueEmpty() || !CmiAllAsyncMsgsSent()) {
+	    CmiReleaseSentMessages();
+            SendMsgBuf();
+            PumpMsgs();
+        }
+    }else if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+        while(!CmiAllAsyncMsgsSent()) {
+            CmiReleaseSentMessages();
+        }
     }
 #endif
 #if CMK_MEM_CHECKPOINT
@@ -1071,6 +1080,23 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
 
     myNID = *myNodeID;
+
+#if CMK_SMP
+    if (provided == MPI_THREAD_MULTIPLE) {
+        int smpmode =  0;
+        Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; /* the default value */
+        smpmode = CmiGetArgFlag(largv, "+comm_thread_only_recv");
+        if (smpmode) {
+            Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
+        } else {
+#if 0
+            /* TODO: Not supported yet! Needs some re-design -Chao Mei */
+            smpmode = CmiGetArgFlag(largv, "+no_comm_thread");
+            if (smpmode) Cmi_smp_mode_setting = COMM_THREAD_NOT_EXIST;
+#endif
+        }
+    }
+#endif
 
     MPI_Get_version(&ver, &subver);
     if (myNID == 0) {
@@ -1303,7 +1329,7 @@ static void MachinePostCommonInitForMPI(int everReturn) {
 #if CMK_SMP
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
-    if (_thread_provided == MPI_THREAD_MULTIPLE)
+    if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV)
       CcdCallOnConditionKeep(CcdPERIODIC,(CcdVoidFn)LrtsPostNonLocal,NULL);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyIdleForMPI,NULL);
