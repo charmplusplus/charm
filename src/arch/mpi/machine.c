@@ -788,8 +788,8 @@ static int RecvQueueEmpty() {
 #define REPORT_COMM_METRICS 0
 #if REPORT_COMM_METRICS
 static double pumptime = 0.0;
-                         static double releasetime = 0.0;
-                                                     static double sendtime = 0.0;
+static double releasetime = 0.0;
+static double sendtime = 0.0;
 #endif
 
 #endif //end of CMK_SMP
@@ -916,7 +916,7 @@ void DrainResourcesForMPI() {
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void LrtsExit() {
+void MachineExitForMPI() {
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
 #if CMK_SMP
