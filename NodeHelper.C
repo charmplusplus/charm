@@ -6,6 +6,8 @@
 NodeQueue Q;
 
 //vars local to spawned threads
+//Note: __thread is not portable, but works pretty much anywhere pthreads work.
+// after C++11 this should be thread_local
 __thread pthread_mutex_t lock;
 __thread pthread_cond_t condition;
 
@@ -131,6 +133,32 @@ void FuncNodeHelper::send(Task * msg){
 	counter[msg->master]++;
 	CmiUnlock(reqLock[msg->master]);
 }
+
+/**
+"func": the function that executes one partition of the task.
+
+"wps": the number of executions needed on this func (it is there for the purpose of testing.)
+"time": the time to finish this func, it is a user defined argument for testing, wps is calculated based on time.
+(the above two parameters could be ignored for real usage)
+
+"t": the priority bit for the nodegroup msg, it is the time initiating the nodehelper.
+
+"master": the arrayIndex of the array element that initiate the nodehelper, or the pe index if invoked on a group object. The master element is used to identify the corresponding lock and counter to find out whether all the partitioned tasks have been finished.
+
+"chunck": the number of tasks that the nodehelper will distribute among the nodegroup. If it not available through the user argument, it will calculate like:
+if(chunck==0){
+         if(time!=0)
+             chunck=(double)(time/THRESHOLD)+0.5;
+         else
+             chunck=(double)(wps/WPSTHRESHOLD)+0.5;
+  }
+
+"reduction": whether it is an reduction operation, it will return the reduction result if it is.
+"type": the reduction type.
+
+"MODE" means whether the scheduling is static or dynamic. If static, then the partitioned tasks will be assigned to threads evenly within the SMP nodes. If dynamic, then the threads will execute the task if they are idle at the time of the loop job. 
+ * 
+ */
 int FuncNodeHelper::parallelizeFunc(HelperFn func, int wps,unsigned int t, int master,int chunck,int time,int paramNum, void * param, int reduction, int type){
 	int result=0;
 	if(chunck==0){
