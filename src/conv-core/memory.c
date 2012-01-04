@@ -374,7 +374,7 @@ static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     return vsz;
 }
 
-#if ! CMK_HAS_MALLINFO
+#if ! CMK_HAS_MALLINFO || defined(CMK_MALLINFO_IS_BROKEN)
 #if CMK_C_INLINE
 inline
 #endif
