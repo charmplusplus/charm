@@ -399,7 +399,10 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
 
     // release control to scheduler if requested by the user, 
     //   assume caller is threaded entry
-  if (yieldFlag_ && ++count % 1024 == 0) CthYield();
+  if (yieldFlag_ && ++count == 1024) {
+    count = 0; 
+    CthYield();
+  }
 }
 
 template <class dtype>
