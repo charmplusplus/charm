@@ -60,6 +60,9 @@ void _initChareTables()
 Chare::Chare(void) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+#if CMK_ERROR_CHECKING
+  magic = CHARE_MAGIC;
+#endif
 #ifndef CMK_CHARE_USE_PTR
      // for plain chare, objPtr is actually the index to chare obj table
   if (CkpvAccess(currentChareIdx) >= 0) {
@@ -80,6 +83,9 @@ Chare::Chare(void) {
 Chare::Chare(CkMigrateMessage* m) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
+#if CMK_ERROR_CHECKING
+  magic = 0;
+#endif
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         mlogData = NULL;
@@ -138,6 +144,9 @@ void Chare::pup(PUP::er &p)
         	mlogData = new ChareMlogData();
 	}
 	mlogData->pup(p);
+#endif
+#if CMK_ERROR_CHECKING
+  p(magic);
 #endif
 }
 

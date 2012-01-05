@@ -248,6 +248,7 @@ PUPmarshall(CkArrayID)
 class ChareMlogData;
 #endif
 
+#define CHARE_MAGIC    0x201201
 
 /**
   The base class of all parallel objects in Charm++,
@@ -260,6 +261,9 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+#if CMK_ERROR_CHECKING
+    int magic;
+#endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
@@ -289,6 +293,12 @@ class Chare {
     virtual void ckDebugPup(PUP::er &p);
     /// Called when a [threaded] charm entry method is created:
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#if CMK_ERROR_CHECKING
+    inline void sanitycheck() { 
+        if (magic != CHARE_MAGIC)
+          CmiAbort("Charm++ Fatal Error> Chare magic number does not agree, possibly due to pup functions not calling parent class.");
+    }
+#endif
 };
 
 //Superclass of all Groups that cannot participate in reductions.
