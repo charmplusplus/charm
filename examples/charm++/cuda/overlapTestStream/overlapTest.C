@@ -1,7 +1,7 @@
 #include "overlapTest.decl.h"
 #include "overlapTest.h"
 
-// #define DEBUG
+#define DEBUG
 
 extern void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C); 
 CProxy_Main mainProxy; 
