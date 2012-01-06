@@ -1,19 +1,16 @@
-CHARMC=../../../../net-linux-amd64/bin/charmc $(OPTS)
+CHARMC=../../../../bin/charmc $(OPTS)
 
 OBJS = overlapTest.o overlapTestCU.o
 
 NVCC = /usr/local/cuda/bin/nvcc 
 NVCC_FLAGS = -O3 -c -use_fast_math #-device-debug -deviceemu 
-NVCC_INC = -I/usr/local/cuda/include -I../../../../NVIDIA_CUDA_SDK/common/inc -I../../charm/src/arch/cuda/hybridAPI/
-
-LD_LIBS += -lcuda -lcudart -lGL -lGLU -L../../../../NVIDIA_CUDA_SDK/lib
-
-#export LD_RUN_PATH = /usr/local/cuda/lib
-
+NVCC_INC = -I/usr/local/cuda/include 
+CHARMINC = -I../../../../include
+NVCC_LIBS = -L/usr/local/cuda/lib64 -lcuda -lcudart
 all: overlapTest
 
 overlapTest: $(OBJS)
-	$(CHARMC) -language charm++ -o overlapTest $(OBJS) $(LD_LIBS) -tracemode projections
+	$(CHARMC) -language charm++ -o overlapTest $(OBJS) $(NVCC_LIBS) 
 
 overlapTest.decl.h: overlapTest.ci
 	$(CHARMC)  overlapTest.ci
@@ -25,4 +22,7 @@ overlapTest.o: overlapTest.C overlapTest.decl.h
 	$(CHARMC) -O3 -c overlapTest.C
 
 overlapTestCU.o: overlapTest.cu
-	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) -o overlapTestCU.o overlapTest.cu
+	$(NVCC) $(NVCC_FLAGS) $(NVCC_INC) $(CHARMINC) -o overlapTestCU.o overlapTest.cu
+
+test: all
+	./charmrun overlapTest +p2 2 8 

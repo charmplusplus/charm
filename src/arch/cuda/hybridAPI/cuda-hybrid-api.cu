@@ -29,9 +29,7 @@ void cudaErrorDie(int err,const char *code,const char *file,int line)
 	  " Return value %d from '%s'.  Exiting.\n",
 	  file,line,
 	  err,code);
-  int ret;
   abort();
-  exit(ret);
 }
 
 #define cudaChk(code)							\

@@ -1267,7 +1267,7 @@ int sfactor=0;
 
 /** A mainchare, used to initialize the comlib framework at the program startup.
     Its main purpose is to create the ComlibManager group. */
-class ComlibManagerMain {
+class ComlibManagerMain : public CBase_ComlibManagerMain {
 public:
 	ComlibManagerMain(CkArgMsg *msg) {
 

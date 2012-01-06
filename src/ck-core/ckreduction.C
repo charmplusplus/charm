@@ -952,7 +952,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-	delete [] msgArr;
+  delete [] msgArr;
 
   //Set the message counts
   ret->redNo=redNo;

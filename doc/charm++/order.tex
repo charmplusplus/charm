@@ -111,7 +111,7 @@ through {\tt CkEntryOptions::setPriority()}:
 \begin{alltt}
   CkEntryOptions opts;
   opts.setPriority(7);
-  chare.entry_name(arg1, arg2, opts);
+  chare.entry_name(arg1, arg2, &opts);
 \end{alltt}
 
 Bitvector priorities are somewhat more complicated.  Bitvector

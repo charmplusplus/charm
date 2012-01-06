@@ -281,7 +281,7 @@ ArrayElement::ArrayElement(void)
 #endif
 }
 
-ArrayElement::ArrayElement(CkMigrateMessage *m) 
+ArrayElement::ArrayElement(CkMigrateMessage *m) : CkMigratable(m)
 {
 	initBasics();
 }

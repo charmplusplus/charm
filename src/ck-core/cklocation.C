@@ -985,7 +985,7 @@ CkMigratable::CkMigratable(void) {
 	DEBC((AA"In CkMigratable constructor\n"AB));
 	commonInit();
 }
-CkMigratable::CkMigratable(CkMigrateMessage *m) {
+CkMigratable::CkMigratable(CkMigrateMessage *m): Chare(m) {
 	commonInit();
 }
 
@@ -1093,7 +1093,7 @@ void CkMigratable::AtSync(int waitForMigration)
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    mlogData->toResumeOrNot=1;
+        mlogData->toResumeOrNot=1;
 #endif
 	myRec->AsyncMigrate(!waitForMigration);
 	if (waitForMigration) ReadyMigrate(CmiTrue);
@@ -2519,6 +2519,9 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
                 {
                         elt->base_pup(p);
                         elt->pup(p);
+#if CMK_ERROR_CHECKING
+                        if (p.isUnpacking()) elt->sanitycheck();
+#endif
                 }
 	}
 }
