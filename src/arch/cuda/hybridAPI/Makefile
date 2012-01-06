@@ -1,4 +1,4 @@
-CUDA_DIR=/usr/local/cuda
+#CUDA_DIR=/usr/local/cuda
 CHARMDIR=../../
 CHARMC=$(CHARMDIR)/bin/charmc
 
