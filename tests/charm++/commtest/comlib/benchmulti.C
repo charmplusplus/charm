@@ -189,6 +189,7 @@ public:
         //if(p.isPacking())
         //  CkPrintf("Migrating from %d\n", CkMyPe());
 
+        CBase_Bench::pup(p);
         p | pass ;
         p | mcount ;
         p | time;

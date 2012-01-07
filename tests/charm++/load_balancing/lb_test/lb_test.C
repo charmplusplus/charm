@@ -204,6 +204,7 @@ public:
 
   virtual void pup(PUP::er &p)
   {
+     CBase_Lb_array::pup(p);		// pack our superclass
      p(nTimes);
      p(sendTime);
      p(usec);

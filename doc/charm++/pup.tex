@@ -24,6 +24,7 @@ class foo : public mySuperclass \{
 
     //pack/unpack routine: describe my fields to charm++
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|a;
       p|x; p|y; p|z;
       PUParray(p,arr,3);
@@ -49,16 +50,11 @@ We often use ``pup'' as a verb, meaning ``to save/restore the value of''
 or equivalently, ``to call the pup routine of''.
 
 Pup routines for complicated objects normally call the pup routines
-for their simpler parts. If your class's declaration in the ci file
-includes a parent class, the generated code in CBase will call that
-class's pup routine automatically\footnote{In versions of \charmpp
-  prior to 6.4, this was not automatic. Older code called
-  \kw{CBase\_ClassName::pup(p)} at the beginning of each pup
-  routine. This has been made a no-op so as not to break the API.}. If
-your class has a parent class that is not declared in the ci file, you
-are responsible for packing it appropriately, either by calling its
-pup routine explicitly from your own, or by packing its fields
-individually.
+for their simpler parts.  Since all objects depend on their immediate
+superclass, the first line of every pup routine is a call to the 
+superclass's pup routine---the only time you shouldn't call your superclass's
+pup routine is when you don't have a superclass.  If your superclass has
+no pup routine, you must pup the values in the superclass yourself.
 
 
 \paragraph{PUP operator}
@@ -183,6 +179,7 @@ class bar : public barParent \{
     ...other methods...
 
     virtual void pup(PUP::er& p) \{
+      barParent::pup(p);
       __sdag_pup(p);
       ...pup other data here...
     \}
@@ -282,6 +279,7 @@ private:
 public:
     keepsFoo(void) \{ \}
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|f; // pup f's fields (calls f.pup(p);) 
     \}
     ~keepsFoo() \{ \}
@@ -303,6 +301,7 @@ public:
       f=new foo;
     \}
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|*f; // pup f's fields (calls f->pup(p))
     \}
     ~keepsHeapFoo() \{delete f;\}
@@ -323,6 +322,7 @@ public:
     keepsOneFoo(...) \{f=new foo(...);\}
     keepsOneFoo() \{f=NULL;\} /* pup constructor */
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       ...
       if (p.isUnpacking()) /* must allocate foo now */
          f=new foo(...);
@@ -353,6 +353,7 @@ public:
     keepsDoubles() \{ \} 
     
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|n;//pup the array length n
       if (p.isUnpacking())  arr=new double[n];
       PUParray(p,arr,n); //pup data in the array
@@ -376,6 +377,7 @@ public:
     keepsNullFoo(...) \{ if (...) f=new foo(...);\}
     keepsNullFoo() \{f=NULL;\}
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       int has_f=(f!=NULL);
       p|has_f;
       if (has_f) {
@@ -410,6 +412,7 @@ public:
     keepsFoos() \{ arr=NULL; \} 
     
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|n;//pup the array length n
       if (p.isUnpacking())  arr=new foo[n];
       PUParray(p,arr,n); //pup each foo in the array
@@ -441,6 +444,7 @@ public:
     keepsFooPtrs() \{ arr=NULL; \} 
     
     void pup(PUP::er &p) \{
+      mySuperclass::pup(p);
       p|n;//pup the array length n
       if (p.isUnpacking()) arr=new foo*[n]; // allocate array
       for (int i=0;i<n;i++) \{

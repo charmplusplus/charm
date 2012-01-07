@@ -217,6 +217,7 @@ public:
   }
 
   void pup(PUP::er &p) {
+      CBase_Hello::pup(p);
       p | comlib;
       p | verbose;
 
