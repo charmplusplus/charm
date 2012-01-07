@@ -887,6 +887,7 @@ ampiParent::ampiParent(CkMigrateMessage *msg):CBase_ampiParent(msg) {
 }
 
 void ampiParent::pup(PUP::er &p) {
+  ArrayElement1D::pup(p);
   p|threads;
   p|worldNo;           // why it was missing from here before??
   p|worldStruct;
@@ -1363,14 +1364,10 @@ static void cmm_pup_posted_ireq(pup_er p,void **msg) {
   //	printf("[%d] pupping postd irequests %p \n",CkMyPe(),*msg);
 }
 
-void ampi::base_pup(PUP::er &p)
-{
-  if(!p.isUserlevel())
-    ArrayElement1D::pup(p);
-}
-
 void ampi::pup(PUP::er &p)
 {
+  if(!p.isUserlevel())
+    ArrayElement1D::pup(p);//Pack superclass
   p|parentProxy;
   p|myComm;
   p|myRank;

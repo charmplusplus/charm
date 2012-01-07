@@ -482,7 +482,7 @@ public:
   virtual ~ArrayElement();
 
 /// Pack/unpack routine (called before and after migration)
-  void pup(PUP::er &p);
+  virtual void pup(PUP::er &p);
 
 //Overridden functions:
   /// Called by the system just before and after migration to another processor:

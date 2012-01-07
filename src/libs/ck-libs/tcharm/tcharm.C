@@ -220,6 +220,9 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 }
 
 void TCharm::pup(PUP::er &p) {
+//Pup superclass
+  ArrayElement1D::pup(p);
+
   //BIGSIM_OOC DEBUGGING
   //if(!p.isUnpacking()){
   //  CmiPrintf("TCharm[%d] packing: ", thisIndex);
