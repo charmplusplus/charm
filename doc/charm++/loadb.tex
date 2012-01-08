@@ -716,6 +716,7 @@ public:
   
   /* Must be written for migration to succeed */
   void pup(PUP::er &p){
+    CBase_LBExample::pup(p);
     p|workcnt;
     /* There may be some more variables used in doWork */
   }

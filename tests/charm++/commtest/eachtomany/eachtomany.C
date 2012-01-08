@@ -453,6 +453,7 @@ public:
   }
 
   void pup(PUP::er &p){
+	  CBase_EachToManyArray::pup(p);
 	  p | cinst;
 	  if(p.isUnpacking()){
 		  myDelegatedProxy = thisProxy;

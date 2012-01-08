@@ -24,6 +24,7 @@ mig_Element::mig_Element()
 
 void mig_Element::pup(PUP::er &p)
 {
+  CBase_mig_Element::pup(p);//Call superclass
   p(origPE);
   p(sum);
   p(numDone);

@@ -918,7 +918,7 @@ conv-cpm.o: conv-cpm.c $(CVHEADERS)
 ###############################################################################
 
 XIHEADERS=conv-autoconfig.h xi-symbol.h xi-util.h xi-grammar.tab.h
-CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
+CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o commitid.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
 	sdag-globals.h CEntry.h

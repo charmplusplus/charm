@@ -63,6 +63,7 @@ void MyArray::ResumeFromSync(void) {
 };
 
 void MyArray::pup(PUP::er &p) {
+  CBase_MyArray::pup(p);
   p|length;
   p|iterations;
 }
