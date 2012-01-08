@@ -645,5 +645,178 @@ public:
 	}
 };
 
+// a special vector, which grows at front, and remove at the end linearly
+// the vector keeps an offset, which represents all elements before offset 
+// are T(0); lastnull keeps track of the consecutive T(0) (NULL) in the current
+// block
+template <class T>
+class CkCompactVec : private CkSTLHelper<T> {
+    typedef CkVec<T> this_type;
+
+    T *block; //Elements of vector
+    size_t blklen; //Allocated size of block (STL capacity) 
+    size_t len; // total number of used elements in block, including ones before offset
+    size_t offset;    // seqno of the first element in the block
+    size_t lastnull;    // the index of the biggest consecutive NULLs
+    void makeBlock(int blklen_,int len_,int offset_,int lastnull_) {
+       if (blklen_==0) block=NULL; //< saves 1-byte allocations
+       else {
+         block=new T[blklen_];
+         if (block == NULL) blklen_=len_= 0;
+       }
+       blklen=blklen_; len=len_;
+       offset=offset_; lastnull=lastnull_;
+    }
+    void freeBlock(void) {
+       len=0; blklen=0;
+       delete[] block; 
+       block=NULL;
+       offset=0; lastnull=-1;
+    }
+    void copyFrom(const this_type &src) {
+       makeBlock(src.blklen, src.len, src.offset, src.lastnull);
+       elementCopy(block,src.block,blklen);
+    }
+  public:
+    CkCompactVec(): block(NULL), blklen(0), len(0), offset(0), lastnull(-1) {}
+    ~CkCompactVec() { freeBlock(); }
+    CkCompactVec(const this_type &src) {copyFrom(src);}
+    CkCompactVec(int size) { makeBlock(size,size,0,-1); } 
+    CkCompactVec(int size, int used) { makeBlock(size,used); } 
+    CkCompactVec(const CkSkipInitialization &skip) {/* don't initialize */}
+    this_type &operator=(const this_type &src) {
+      freeBlock();
+      copyFrom(src);
+      return *this;
+    }
+
+    size_t &length(void) { return len; }
+    size_t length(void) const {return len;}
+    T *getVec(void) { return block; }
+    const T *getVec(void) const { return block; }
+    
+    T& operator[](size_t n) {
+      CmiAssert(n<len && n>=offset);
+      return block[n-offset]; 
+    }
+    
+    const T& operator[](size_t n) const { 
+      CmiAssert(n-offset<len);
+      return n<offset?NULL:block[n-offset]; 
+    }
+    
+    /// Reserve at least this much space (changes capacity, size unchanged)
+    int reserve(size_t newcapacity) {
+      if (newcapacity-offset<=blklen) return 1; /* already there */
+      T *oldBlock=block; 
+      makeBlock(newcapacity-offset-lastnull,len,offset,lastnull);
+      //if (newcapacity-offset-lastnull != blklen) return 0;
+      elementCopy(block,oldBlock+lastnull+1,len-offset-lastnull-1);
+      offset+=lastnull+1;   
+      lastnull=-1;
+      delete[] oldBlock; //WARNING: leaks if element copy throws exception
+      return 1;
+    }
+    inline size_t capacity(void) const {return blklen;}
+
+    /// Set our length to this value
+    int resize(size_t newsize) {
+      if (!reserve(newsize)) return 0;
+      len=newsize;
+      return 1;
+    }
+
+    /// Set our length to this value
+    void free() {
+      freeBlock();
+    }
+
+    //Grow to contain at least this position:
+    void growAtLeast(size_t pos) {
+      if (pos>=blklen+offset) reserve(pos*2+16);
+    }
+    void insert(size_t pos, const T &elt) {
+      if (pos>=len) { 
+        growAtLeast(pos);
+        len=pos+1;
+      }
+      block[pos-offset] = elt;
+    }
+    void shrink() {
+      for (size_t i=offset+lastnull+1; i<len; i++)
+        block[i-offset-lastnull-1] = block[i-offset];
+      offset+=lastnull+1; lastnull=-1;
+      //printf("shrink: len:%d offset:%d  blklen:%d\n", len, offset, blklen);
+    }
+    void remove(size_t pos) {
+      if (pos < offset) {
+        CmiAbort("CkVec ERROR: try to remove non-exisitent element.\n\n");
+        return;
+      }
+      if (pos>=len) 
+	{
+	  CmiAbort("CkVec ERROR: out of bounds\n\n"); 
+	  return;
+	}
+      if (lastnull >= blklen/2) {   // shrink
+        for (size_t i=offset+lastnull+1; i<pos; i++)
+          block[i-offset-lastnull-1] = block[i-offset];
+        for (size_t i=pos; i<len-1; i++)
+          block[i-offset-lastnull-1] = block[i-offset+1];
+        offset+=lastnull+1; lastnull=-1;
+      }
+      else {
+      for (size_t i=pos; i<len-1; i++)
+        block[i-offset] = block[i-offset+1];
+      if (pos-offset==lastnull+1) lastnull++;
+      }
+      len--;
+    }
+    void marknull(size_t pos) {
+      block[pos-offset] = T(0);
+      if (pos == offset+lastnull+1) lastnull++;
+      if (lastnull >= blklen/4) shrink();
+    }
+    void removeAll() {
+      len = 0;
+      offset=0; lastnull=-1;
+    }
+
+    void clear()
+    {
+	freeBlock();
+    }
+
+    void insertAtEnd(const T &elt) {insert(length(),elt);}
+
+//STL-compatability:
+    void push_back(const T &elt) {insert(length(),elt);}
+    size_t size(void) const {return len;}
+
+//verbose position for easier removal
+    size_t push_back_v(const T &elt) {insert(length(),elt);return length()-1;}
+
+ 
+//PUP routine help:
+    //Only pup the length of this vector, which is returned:
+    int pupbase(PUP::er &p) {
+       size_t l=len;
+       p(l);
+       if (p.isUnpacking()) resize(l); 
+       return l;
+    }
+    
+#ifdef _MSC_VER
+/* Visual C++ 6.0's operator overloading is buggy,
+   so use default operator|, which calls this pup routine. */
+     void pup(PUP::er &p) {
+        pupCkVec(p,*this);
+        p|offset;
+        p|lastnull;
+     }
+#endif
+
+};
+
 
 #endif
