@@ -275,9 +275,10 @@ conv-autoconfig.h: configure config_opts.sh
 VERSION: VERSION.new
 	./commitid.sh
 
-commitid.c: VERSION
+commitid.c commitid-native.c: VERSION
 	echo "const char * const CmiCommitID = \"`cat VERSION`\";" > $@
 commitid.o: CC=$(CHARMC)
+commitid-native.o: CC=$(NATIVECHARMC)
 
 headerlinks: dirs+sources Makefile $(ALLHEADERS)
 	@[ "x$QUIET" = "x--quiet" ] || echo "Soft-linking headers..."
@@ -918,7 +919,7 @@ conv-cpm.o: conv-cpm.c $(CVHEADERS)
 ###############################################################################
 
 XIHEADERS=conv-autoconfig.h xi-symbol.h xi-util.h xi-grammar.tab.h
-CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o commitid.o
+CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o commitid-native.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o
 SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
 	sdag-globals.h CEntry.h
