@@ -12,6 +12,7 @@ Msg::pack(Msg* m)
   *t = m->listsize; t++;
   for(int i=0;i<m->listsize; i++, t++)
     *t = m->list1[i];
+  delete [] m->list1;
   CkFreeMsg(m);
   return(p);
 }
