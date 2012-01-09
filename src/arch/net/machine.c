@@ -996,13 +996,13 @@ CpvDeclare(void *, CmiLocalQueue);
 
 
 #ifndef CmiMyPe
-int CmiMyPe(void) 
+int CmiMyPe() 
 { 
   return CmiGetState()->pe; 
 }
 #endif
 #ifndef CmiMyRank
-int CmiMyRank(void)
+int CmiMyRank()
 {
   return CmiGetState()->rank;
 }
