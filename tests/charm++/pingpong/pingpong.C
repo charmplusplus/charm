@@ -4,12 +4,12 @@
 #define NITER 1000
 #define PAYLOAD 100
 
-#ifdef CMK_DIRECT 
+#if ! CMK_SMP            /* only test RDMA when non-SMP */
+
+#if defined(CMK_DIRECT) || defined(CMK_USE_IBVERBS)
 #define USE_RDMA 1
 #endif
 
-#ifdef CMK_USE_IBVERBS 
-#define USE_RDMA 1
 #endif
 
 #ifdef USE_RDMA
@@ -192,7 +192,6 @@ public:
 
 class PingN : public CBase_PingN
 {
-  CProxyElement_PingN *pp;
   int niter;
   int me, nbr;
 #ifdef USE_RDMA 
@@ -202,7 +201,6 @@ class PingN : public CBase_PingN
 #endif
   double start_time, end_time;
 public:
-  CProxyElement_PingN *myProxy;
   PingN()
   {
     me = CkMyNode();    
@@ -212,8 +210,6 @@ public:
     // upstream and downstream which makes this an artificially simple
     // calculation.
 
-    pp = new CProxyElement_PingN(thisgroup,nbr);
-    myProxy = new CProxyElement_PingN(thisgroup,me);
     niter = 0;
 #ifdef USE_RDMA 
     rbuff=(char *) malloc(payload*sizeof(char));
@@ -222,7 +218,7 @@ public:
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
     rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
-    (*pp).recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
+    thisProxy[nbr].recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
 #endif
   }
   PingN(CkMigrateMessage *m) {}
@@ -238,7 +234,7 @@ public:
   void start(void)
   {
     start_time = CkWallTimer();
-    (*pp).recv(new (payload) PingMsg);
+    thisProxy[nbr].recv(new (payload) PingMsg);
   }
   void startRDMA(void)
   {
@@ -263,10 +259,10 @@ public:
         delete msg;
         mainProxy.maindone();
       } else {
-        (*pp).recv(msg);
+        thisProxy[nbr].recv(msg);
       }
     } else {
-      (*pp).recv(msg);
+      thisProxy[nbr].recv(msg);
     }
   }
   static void Wrapper_To_CallBack(void* pt2Object){
@@ -277,7 +273,7 @@ public:
     if(CkNumNodes() == 0){
       mySelf->recvRDMA();
     }else{
-      (*mySelf->myProxy).recvRDMA();   
+      (mySelf->thisProxy)[CkMyNode()].recvRDMA();   
     }
   }
   // not an entry method, called via Wrapper_To_Callback
