@@ -433,13 +433,18 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
         /*END_EVENT(40);*/
     } else {
         START_EVENT();
-        if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
+		if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         /*END_EVENT(40);*/
     }
 #else
     START_EVENT();
-    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
+#if CMK_MEM_CHECKPOINT
+	dstrank = petorank[node];
+#else
+	dstrank=node;
+#endif
+    if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,MPI_COMM_WORLD,&(smsg->req)))
         CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
     /*END_EVENT(40);*/
 #endif
