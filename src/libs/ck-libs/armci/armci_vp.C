@@ -65,7 +65,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy)
   thisProxy = this;
   tcharmClientInit();
   thread->semaPut(ARMCI_TCHARM_SEMAID,this);
-  memBlock = CmiIsomallocBlockListNew(NULL);
+  memBlock = CmiIsomallocBlockListNew(thread->getThread());
   thisProxy = CProxy_ArmciVirtualProcessor(thisArrayID);
   addressReply = NULL;
   // Save ourselves for the waiting ARMCI_Init
@@ -81,7 +81,7 @@ ArmciVirtualProcessor::ArmciVirtualProcessor(CkMigrateMessage *m)
 
 ArmciVirtualProcessor::~ArmciVirtualProcessor()
 {
-  CmiIsomallocBlockListDelete(memBlock);
+  //CmiIsomallocBlockListDelete(memBlock);
   if (addressReply) {delete addressReply;}
 }
 
@@ -561,7 +561,9 @@ void ArmciVirtualProcessor::notify_wait(int proc){
 
 void ArmciVirtualProcessor::pup(PUP::er &p) {
   TCharmClient1D::pup(p);
-  CmiIsomallocBlockListPup(&p, &memBlock,NULL);
+  //Copying only address, the mempool will be pupped as part of the thread
+  //CmiIsomallocBlockListPup(&p, &memBlock, thread->getThread());
+  pup_bytes(&p, &memBlock, sizeof(CmiIsomallocBlockList*));
   p|thisProxy;
   p|hdlList;
   p|noteList;

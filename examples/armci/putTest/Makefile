@@ -3,10 +3,10 @@ CHARMC=../../../bin/charmc $(OPTS)
 all: put
 
 put: put.c
-	$(CHARMC) -o put put.c -language armci 
+	$(CHARMC) -o put put.c -language armci -balancer RotateLB 
 
 test: put
-	./charmrun +p2 ./put $(TESTOPTS)
+	./charmrun +p2 ./put +vp 2 $(TESTOPTS)
 
 bgtest: put
 	./charmrun +p1 ./put +vp 2 +x2 +y1 +z1 $(TESTOPTS)
