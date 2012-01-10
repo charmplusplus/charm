@@ -1648,7 +1648,7 @@ static void map_failed(CmiInt8 s,CmiInt8 n)
 CpvStaticDeclare(slotset *, myss); /*My managed slots*/
 
 #if CMK_USE_MEMPOOL_ISOMALLOC
-CtvStaticDeclare(mempool_type *, threadpool); /*Thread managed pools*/
+CtvDeclare(mempool_type *, threadpool); /*Thread managed pools*/
 
 //alloc function to be used by mempool
 void * isomallocfn (size_t *size, mem_handle_t *mem_hndl, int expand_flag)

@@ -1279,7 +1279,7 @@ void CtgInit(void);
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void);
+CtgGlobals CtgCreate(CthThread tid);
 /** Install this set of globals. If g==NULL, returns to original globals. */
 void CtgInstall(CtgGlobals g);
 /** PUP this (not currently installed) globals set */

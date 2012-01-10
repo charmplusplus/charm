@@ -129,7 +129,7 @@ void CtgInit(void) {
 }
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void) {
+CtgGlobals CtgCreate(CthThread tid) {
 	CtgGlobalStruct *g=new CtgGlobalStruct;
     const struct segment_command *seg = getsegbyname("__DATA");
     CHECK_MAGIC_NUM;

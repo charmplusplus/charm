@@ -370,11 +370,11 @@ public:
     void *data_seg;  
     int seg_size; /* size in bytes of data segment */
     
-    void allocate(int size) {
+    void allocate(int size, CthThread tid) {
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size,NULL);
+        data_seg=CmiIsomalloc(seg_size,tid);
       else
         data_seg=malloc(seg_size);
     }
@@ -386,7 +386,7 @@ public:
     ~CtgGlobalStruct() {
       if (data_seg) {
         if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-          CmiIsomallocFree(data_seg);
+        { } //CmiIsomallocFree(data_seg);
         else
           free(data_seg);
         data_seg = NULL;
@@ -400,9 +400,9 @@ void CtgGlobalStruct::pup(PUP::er &p) {
     p | seg_size;
         /* global data segment need to be isomalloc pupped */
     if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocPup(&p, &data_seg);
+      pup_bytes(&p, &data_seg, sizeof(void*));
     else {
-      if (p.isUnpacking()) allocate(seg_size);
+      if (p.isUnpacking()) allocate(seg_size, NULL);
       p((char *)data_seg, seg_size);
     }
 }
@@ -430,7 +430,7 @@ void CtgInit(void) {
 			CmiPrintf("Charm++> -swapglobals enabled\n");
 		}
 		
-		g->allocate(l->getSize());
+		g->allocate(l->getSize(), NULL);
 		l->read(g->data_seg);
 		l->install(g->data_seg);
 		_ctgList=l;
@@ -441,9 +441,9 @@ void CtgInit(void) {
 }
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void) {
+CtgGlobals CtgCreate(CthThread tid) {
 	CtgGlobalStruct *g=new CtgGlobalStruct;
-	g->allocate(_ctgList->getSize());
+	g->allocate(_ctgList->getSize(), tid);
 	_ctgList->read(g->data_seg);
 	return g;
 }

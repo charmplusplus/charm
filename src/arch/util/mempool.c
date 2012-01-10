@@ -205,6 +205,9 @@ void mempool_destroy(mempool_type *mptr)
   block_header *current,*tofree;
   mempool_freeblock   freefn = mptr->freeblockfn;
 
+  if(mptr == NULL)
+    return;
+
   current = tofree = &(mptr->block_head);
 
   while(current != NULL) {

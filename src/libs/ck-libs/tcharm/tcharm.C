@@ -161,7 +161,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
-  threadGlobals=CtgCreate();
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -178,6 +177,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     BgUnsetStartOutOfCore();
 #endif
   }
+  threadGlobals=CtgCreate(tid);
   CtvAccessOther(tid,_curTCharm)=this;
   isStopped=true;
   resumeAfterMigration=false;
