@@ -1899,4 +1899,8 @@ extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
 
+#if CMK_INTER_OPERATE
+CpvExtern(int,charmLibExitFlag);
+#endif
+
 #endif /* CONVERSE_H */

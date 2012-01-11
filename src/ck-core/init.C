@@ -476,8 +476,10 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
+#if !CMK_INTER_OPERATE
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+#endif
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -499,14 +501,17 @@ static void _exitHandler(envelope *env)
         _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
+#if !CMK_INTER_OPERATE
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+#endif
 	/*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
-      }	
+      }
+#if !CMK_INTER_OPERATE
       _mainDone = 1; // This is needed because the destructors for
-                     // readonly variables will be called when the program
+#endif   // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
@@ -526,7 +531,11 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
       if(CkMyPe()){
 	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+#if CMK_INTER_OPERATE
+        CpvAccess(charmLibExitFlag) = 1;
+#else
         ConverseExit();
+#endif
       }	
       break;
     case StatMsg:
@@ -538,9 +547,17 @@ static void _exitHandler(envelope *env)
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
 			/*FAULT_EVAC*/
       if(_numStatsRecd==CkNumValidPes()) {
+#if CMK_INTER_OPERATE
+        _numStatsRecd = 0;
+#endif
         _printStats();
 	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+#if CMK_INTER_OPERATE
+        _exitStarted = 0;
+        CpvAccess(charmLibExitFlag) = 1;
+#else
         ConverseExit();
+#endif
       }
       break;
     default:
@@ -824,10 +841,12 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
+#if !CMK_INTER_OPERATE
 #if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
+#endif
 #endif
 }
 
