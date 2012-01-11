@@ -1319,6 +1319,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     }
 #endif
 
+#if !CMK_INTER_OPERATE
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
@@ -1335,10 +1336,14 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     thread_level = 0;
     _thread_provided = -1;
 #endif
+#endif
+
     largc = *argc;
     largv = *argv;
+#if !CMK_INTER_OPERATE
     MPI_Comm_size(MPI_COMM_WORLD, numNodes);
     MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
+#endif
 
     myNID = *myNodeID;
 
@@ -1349,10 +1354,12 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 
     MPI_Get_version(&ver, &subver);
+#if !CMK_INTER_OPERATE
     if (myNID == 0) {
         printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
         printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
-    }
+        }
+#endif
 
     {
         int debug = CmiGetArgFlag(largv,"++debug");

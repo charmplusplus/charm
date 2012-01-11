@@ -588,7 +588,7 @@ if (  MSG_STATISTIC)
 }
 #endif
 #endif
-
+    
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -620,7 +620,7 @@ if (  MSG_STATISTIC)
 }
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
-   
+  
 	if (_Cmi_mynode==0) {
 #if !CMK_SMP 
 		printf("Charm++> Running on Non-smp mode\n");
@@ -676,7 +676,6 @@ if (  MSG_STATISTIC)
 #endif
 
     CmiStartThreads(argv);
-
     ConverseRunPE(initret);
 }
 
@@ -733,6 +732,9 @@ static void ConverseRunPE(int everReturn) {
     _immediateReady = 1;
 
     /* communication thread */
+#if CMK_INTER_OPERATE
+		Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+#else
     if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         while (1) CommunicationServerThread(5);
@@ -743,8 +745,17 @@ static void ConverseRunPE(int everReturn) {
             ConverseExit();
         }
     }
+#endif
 }
 /* ##### End of Functions Related with Machine Startup ##### */
+
+#if CMK_INTER_OPERATE
+void CharmLibInit(int peid, int numpes, int argc, char **argv, CmiStartFn fn) {
+	  _Cmi_numnodes = numpes;
+	  _Cmi_mynode = peid;
+    ConverseInit(argc, argv, fn, 1, 0);
+}
+#endif
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
 static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
@@ -960,5 +971,4 @@ static char *CopyMsg(char *msg, int len) {
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
 #endif
-
 

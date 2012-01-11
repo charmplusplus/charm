@@ -103,4 +103,8 @@
 #define CMK_WITH_CONTROLPOINT            1
 #endif
 
+#ifndef CMK_INTER_OPERATE
+#define CMK_INTER_OPERATE         1
+#endif
+
 #endif
