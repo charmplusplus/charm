@@ -43,9 +43,8 @@ int main(int argc, char * argv[]) {
     ARMCI_Barrier();
   }
 
-
+  
   ARMCI_Free(baseAddress[thisImage]);
-  ARMCI_Free_local(local);
   // finalize
   ARMCI_Finalize();
   return 0;

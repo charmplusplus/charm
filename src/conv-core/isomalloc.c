@@ -2552,11 +2552,11 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   int i, j;
   int numBlocks = 0, numSlots = 0, flag = 1;
 
+#if ISOMALLOC_DEBUG
+  printf("[%d] My rank is %lld Pupping for %lld with isUnpack %d isDelete %d \n",CmiMyPe(),CthSelf(),tid,pup_isUnpacking(p),pup_isDeleting(p));
+#endif
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
-#if ISOMALLOC_DEBUG
-    printf("My rank is %d Pupping for %d \n",CthSelf(),tid);
-#endif
     mptr = CtvAccessOther(tid,threadpool);
     current = &(CtvAccessOther(tid,threadpool)->block_head);
     while(current != NULL) {
