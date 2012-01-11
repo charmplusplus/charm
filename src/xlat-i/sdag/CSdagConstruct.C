@@ -441,11 +441,11 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
  } 
 }
 
-void SdagConstruct::generateCode(XStr& op)
+void SdagConstruct::generateCode(XStr& op, Entry *entry)
 {
   switch(type) {
     case SSDAGENTRY:
-      generateSdagEntry(op);
+      generateSdagEntry(op, entry);
       break;
     case SSLIST:
       generateSlist(op);
@@ -462,7 +462,7 @@ void SdagConstruct::generateCode(XStr& op)
     case SIF:
       generateIf(op);
       if(con2 != 0)
-        con2->generateCode(op);
+        con2->generateCode(op, entry);
       break;
     case SELSE:
       generateElse(op);
@@ -491,7 +491,7 @@ void SdagConstruct::generateCode(XStr& op)
   SdagConstruct *cn;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateCode(op);
+      cn->generateCode(op, entry);
     }
   }
 }
@@ -1285,7 +1285,7 @@ void SdagConstruct::generateSlist(XStr& op)
   op << "  }\n";
 }
 
-void SdagConstruct::generateSdagEntry(XStr& op)
+void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
 {
   // header file
   op << "public:\n";
@@ -1298,19 +1298,24 @@ void SdagConstruct::generateSdagEntry(XStr& op)
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
         op << "    _connect_" << sc1->text->charstar() <<"();\n";
   }
+
 #if CMK_BIGSIM_CHARM
   generateEndSeq(op);
 #endif
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateTraceEndCall(op);
+
   // actual code here 
   op << "    " << constructs->front()->label->charstar() <<
         "(";
   generateCall(op, *stateVarsChildren);
   op << ");\n";
+
 #if CMK_BIGSIM_CHARM
   generateTlineEndCall(op);
   generateBeginExec(op, "spaceholder");
 #endif
-  generateDummyBeginExecute(op);
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateDummyBeginExecute(op);
+
   // end actual code
   op << "  }\n\n";
   op << "private:\n";

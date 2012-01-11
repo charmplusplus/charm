@@ -620,6 +620,7 @@ class Member : public Construct {
   protected:
     Chare *container;
   public:
+    inline Chare *getContainer() { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
     virtual void collectSdagCode(CParsedFile *, int&) { return; }
@@ -1226,7 +1227,7 @@ private:
   void generateElse(XStr& op);
   void generateForall(XStr& op);
   void generateOlist(XStr& op);
-  void generateSdagEntry(XStr& op);
+  void generateSdagEntry(XStr& op, Entry *entry);
   void generateSlist(XStr& op);
   void generateAtomic(XStr& op);
   void generateForward(XStr& op);
@@ -1284,7 +1285,7 @@ public:
   void generateEntryList(TList<CEntry*>&, SdagConstruct *);
   void propagateState(int);
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
-  void generateCode(XStr& output);
+  void generateCode(XStr& output, Entry *entry);
   void setNext(SdagConstruct *, int);
 
   // for trace

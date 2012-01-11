@@ -2737,7 +2737,7 @@ void CParsedFile::generateCode(XStr& op)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op);
+    cn->sdagCon->generateCode(op, cn);
   }
 }
 
