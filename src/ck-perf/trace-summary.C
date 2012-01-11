@@ -431,7 +431,7 @@ void SumLogPool::write(void)
     fprintf(fp, "\n");
   }
 
-  CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
+  //CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
   // write summary details
   if (sumDetail) {
         fprintf(sdfp, "ver:%3.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
