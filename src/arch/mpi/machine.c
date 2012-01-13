@@ -1313,11 +1313,13 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 #endif
 
-#if CMK_SMP
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
+#if CMK_SMP
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
-    }
+#else
+      CmiAbort("+comm_thread_only_recv option can only be used with SMP version of Charm++");
 #endif
+    }
 
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
@@ -1342,17 +1344,20 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 
     myNID = *myNodeID;
 
-#if CMK_SMP
-    if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV && _thread_provided != MPI_THREAD_MULTIPLE) {
-        Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; 
-    }
-#endif
-
     MPI_Get_version(&ver, &subver);
     if (myNID == 0) {
         printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
         printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
     }
+
+#if CMK_SMP
+    if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV && _thread_provided != MPI_THREAD_MULTIPLE) {
+        Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV; 
+        if (myNID == 0) {
+          printf("Charm++> +comm_thread_only_recv disabled\n");
+        }
+    }
+#endif
 
     {
         int debug = CmiGetArgFlag(largv,"++debug");
