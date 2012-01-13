@@ -134,12 +134,12 @@ static void reduction_handler(void *msg)
   }
 }
    
+/* on PE 0 */
 static void sync_starter(void *msg) 
 {
   EmptyMsg emsg;    
   ptimemsg tmsg = (ptimemsg)msg;
 
-  CmiAssert(CmiMyPe() == 0);
   double midTime = (CmiWallTimer() + CpvAccess(lasttime))/2;
   CpvAccess(timediff)[CpvAccess(currentPe)] = midTime - tmsg->time;
   CmiFree(msg);
@@ -160,21 +160,21 @@ static void sync_starter(void *msg)
 
 static void sync_reply(void *msg) 
 {
-  CmiFree(msg);
   ptimemsg tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
   tmsg->time = CmiWallTimer();
   CmiSetHandler(tmsg, CpvAccess(sync_starter));
   CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
+  CmiFree(msg);
 }
  
 static void bcast_reply(void *msg)
 {
-  CmiFree(msg);
   ptimemsg tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
   tmsg->time = CmiWallTimer();
   tmsg->srcpe = CmiMyPe();
   CmiSetHandler(tmsg, CpvAccess(bcast_central));
   CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
+  CmiFree(msg);
 }
 
 static void bcast_central(void *msg)
