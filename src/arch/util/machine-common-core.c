@@ -367,7 +367,7 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
-    PCQueuePush(cs->recv,msg);
+    PCQueuePush(cs->recv,(char*)msg);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_noprocforcommthread)
@@ -734,6 +734,7 @@ static void ConverseRunPE(int everReturn) {
     /* communication thread */
 #if CMK_INTER_OPERATE
 		Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+    CsdScheduler(-1);
 #else
     if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
