@@ -23,12 +23,11 @@ int main(int argc, char * argv[]) {
 
   // allocate data (collective operation)
   ARMCI_Malloc(baseAddress, MAX_BUF_SIZE*sizeof(char));
+  local = (char *)ARMCI_Malloc_local(MAX_BUF_SIZE*sizeof(char));
 
   ARMCI_Barrier();
   ARMCI_Migrate();
 
-  local = (char *)ARMCI_Malloc_local(MAX_BUF_SIZE*sizeof(char));
-   
   if (thisImage == 0) {
     for(size = 1; size <= MAX_BUF_SIZE; size = size<<1){
       startTime = CkWallTimer();
