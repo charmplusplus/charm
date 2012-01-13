@@ -34,21 +34,23 @@ CpvStaticDeclare(int, currentPe);
 //change it if adding values to sizes
 #define MAXSIZE 1048576
 
+#define MAXITER     512
+
 static struct testdata {
   int size;
   int numiter;
   double time;
 } sizes[] = {
-  {4,       1024,      0.0},
-  {16,      1024,      0.0},
-  {64,      1024,      0.0},
-  {256,     1024,      0.0},
-  {1024,    1024,      0.0},
-  {4096,    1024,      0.0},
-  {16384,   1024,      0.0},
-  {65536,   1024,      0.0},
-  {262144,  1024,      0.0},
-  {1048576, 1024,      0.0},
+  {4,       MAXITER,      0.0},
+  {16,      MAXITER,      0.0},
+  {64,      MAXITER,      0.0},
+  {256,     MAXITER,      0.0},
+  {1024,    MAXITER,      0.0},
+  {4096,    MAXITER,      0.0},
+  {16384,   MAXITER,      0.0},
+  {65536,   MAXITER,      0.0},
+  {262144,  MAXITER,      0.0},
+  {1048576, MAXITER,      0.0},
   {-1,      -1,        0.0},
 };
 
@@ -191,8 +193,7 @@ static void sync_reply(void *msg)
 
   CmiFree(msg);
   CmiSetHandler(tmsg, CpvAccess(sync_starter));
-  CmiSyncSend(0, sizeof(timemsg), tmsg);
-  CmiFree(tmsg);
+  CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
 }
 
 void reduction_init(void)

@@ -31,22 +31,24 @@ CpvStaticDeclare(double, lasttime);
 CpvStaticDeclare(pdouble, timediff);
 CpvStaticDeclare(int, currentPe);
 
+#define MAXITER     512
+
 static struct testdata {
   int size;
   int numiter;
   double time;
 } sizes[] = {
-  {4,       1024,      0.0},
-  {16,      1024,      0.0},
-  {64,      1024,      0.0},
-  {256,     1024,      0.0},
-  {1024,    1024,      0.0},
-  {4096,    1024,      0.0},
-  {16384,   1024,      0.0},
-  {65536,   1024,      0.0},
-  {262144,  512,       0.0},
-  {1048576, 256,        0.0},
-  {-1,      -1,        0.0},
+  {4,       MAXITER,      0.0},
+  {16,      MAXITER,      0.0},
+  {64,      MAXITER,      0.0},
+  {256,     MAXITER,      0.0},
+  {1024,    MAXITER,      0.0},
+  {4096,    MAXITER,      0.0},
+  {16384,   MAXITER,      0.0},
+  {65536,   MAXITER,      0.0},
+  {262144,  MAXITER/2,    0.0},
+  {1048576, MAXITER/4,    0.0},
+  {-1,      -1,           0.0},
 };
 
 typedef struct _timemsg {
@@ -90,7 +92,7 @@ static void bcast_handler(void *msg)
         CmiFree(msg);
 
   } else {
-      CmiFree(msg);
+    CmiFree(msg);
     red_msg = CmiAlloc(CmiMsgHeaderSizeBytes);
     CmiSetHandler(red_msg, CpvAccess(reduction_handler));
     CmiReduce(red_msg, CmiMsgHeaderSizeBytes, reduceMessage);
@@ -112,7 +114,7 @@ static void reduction_handler(void *msg)
   CpvAccess(numiter) = 0;
   idx++;
   if(sizes[idx].size == (-1)) {
-    print_results("Consecutive CmiSyncBroadcastAll");
+    print_results("Consecutive CmiSyncBroadcastAllAndFree");
     CpvAccess(nextidx) = 0;
     CpvAccess(numiter) = 0;
     while(sizes[i].size != (-1)) {
@@ -128,8 +130,7 @@ static void reduction_handler(void *msg)
     msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[idx].size);
     CmiSetHandler(msg, CpvAccess(bcast_handler));
     CpvAccess(starttime) = CmiWallTimer();
-    CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
-    CmiFree(msg);
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
   }
 }
    
@@ -138,6 +139,7 @@ static void sync_starter(void *msg)
   EmptyMsg emsg;    
   ptimemsg tmsg = (ptimemsg)msg;
 
+  CmiAssert(CmiMyPe() == 0);
   double midTime = (CmiWallTimer() + CpvAccess(lasttime))/2;
   CpvAccess(timediff)[CpvAccess(currentPe)] = midTime - tmsg->time;
   CmiFree(msg);
@@ -152,37 +154,34 @@ static void sync_starter(void *msg)
     CmiSetHandler(msg, CpvAccess(bcast_reply));
     CpvAccess(currentPe) = 0;
     CpvAccess(starttime) = CmiWallTimer();
-    CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[0].size, msg);
-    CmiFree(msg);
+    CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[0].size, msg);
   }
 }
 
 static void sync_reply(void *msg) 
 {
+  CmiFree(msg);
   ptimemsg tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
   tmsg->time = CmiWallTimer();
-
-  CmiFree(msg);
   CmiSetHandler(tmsg, CpvAccess(sync_starter));
-  CmiSyncSend(0, sizeof(timemsg), tmsg);
-  CmiFree(tmsg);
+  CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
 }
  
 static void bcast_reply(void *msg)
 {
+  CmiFree(msg);
   ptimemsg tmsg = (ptimemsg)CmiAlloc(sizeof(timemsg));
   tmsg->time = CmiWallTimer();
   tmsg->srcpe = CmiMyPe();
-  CmiFree(msg);
   CmiSetHandler(tmsg, CpvAccess(bcast_central));
-  CmiSyncSend(0, sizeof(timemsg), tmsg);
-  CmiFree(tmsg);
+  CmiSyncSendAndFree(0, sizeof(timemsg), tmsg);
 }
 
 static void bcast_central(void *msg)
 {
   EmptyMsg emsg;
   ptimemsg tmsg = (ptimemsg)msg;
+  CmiAssert(CmiMyPe() == 0);
   if(CpvAccess(currentPe) == 0) {
     CpvAccess(lasttime) = tmsg->time - CpvAccess(starttime) + 
                           CpvAccess(timediff)[tmsg->srcpe];
@@ -207,7 +206,7 @@ static void bcast_central(void *msg)
       CpvAccess(numiter) = 0;
       CpvAccess(nextidx)++;
       if(sizes[CpvAccess(nextidx)].size == (-1)) {
-        print_results("CmiSyncBroadcastAll");
+        print_results("CmiSyncBroadcastAllAndFree");
         CmiSetHandler(&emsg, CpvAccess(ack_handler));
         CmiSyncSend(0, sizeof(EmptyMsg), &emsg);
         return;
@@ -231,8 +230,7 @@ void broadcast_init(void)
   msg = CmiAlloc(CmiMsgHeaderSizeBytes+sizes[0].size);
   CmiSetHandler(msg, CpvAccess(bcast_handler));
   CpvAccess(starttime) = CmiWallTimer();
-  CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[0].size, msg);
-  CmiFree(msg);
+  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[0].size, msg);
 }
 
 void broadcast_moduleinit(void)
