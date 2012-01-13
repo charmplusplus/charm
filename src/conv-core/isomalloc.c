@@ -2615,6 +2615,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       pup_bytes(p,&slot,sizeof(slot));
       newblock = map_slots(slot,size/slotsize);
       if(flag) {
+        mptr = (mempool_type*)newblock;
         pup_bytes(p,newblock,sizeof(mempool_type));
         newblock = (char*)newblock + sizeof(mempool_type);
         flag = 0;
@@ -2634,6 +2635,9 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
         newblock = (char*)newblock + flags[0];
       }
     }
+#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
+    mptr->mempoolLock = CmiCreateLock();
+#endif  
   }
   pup_bytes(p,lp,sizeof(int*));
   if(pup_isDeleting(p)) {
