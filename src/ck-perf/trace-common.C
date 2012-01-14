@@ -670,7 +670,7 @@ void traceEndFuncIndexProj(int idx){
 extern "C"
 void traceBeginCommOp(char *msg){
 #if CMK_TRACE_ENABLED
-  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
     CkpvAccess(_traces)->beginExecute(msg);
 #endif
 }
@@ -678,7 +678,7 @@ void traceBeginCommOp(char *msg){
 extern "C"
 void traceEndCommOp(char *msg){
 #if CMK_TRACE_ENABLED
-  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
     CkpvAccess(_traces)->endExecute(msg);
 #endif
 }
