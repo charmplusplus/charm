@@ -36,6 +36,36 @@ static void sleep(int secs) {
 
 #define PRINT_SYH  0
 
+// Trace communication thread
+#if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
+#define TRACE_THRESHOLD     0.001
+#define CMI_MPI_TRACE_MOREDETAILED 0
+#undef CMI_MPI_TRACE_USEREVENTS
+#define CMI_MPI_TRACE_USEREVENTS 1
+#else
+#undef CMK_SMP_TRACE_COMMTHREAD
+#define CMK_SMP_TRACE_COMMTHREAD 0
+#endif
+
+#define CMK_TRACE_COMMOVERHEAD 0
+#if CMK_TRACE_ENABLED && CMK_TRACE_COMMOVERHEAD
+#undef CMI_MPI_TRACE_USEREVENTS
+#define CMI_MPI_TRACE_USEREVENTS 1
+#else
+#undef CMK_TRACE_COMMOVERHEAD
+#define CMK_TRACE_COMMOVERHEAD 0
+#endif
+
+#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && ! CMK_TRACE_IN_CHARM
+CpvStaticDeclare(double, projTraceStart);
+#define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
+#define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
+#else
+#define  START_EVENT()
+#define  END_EVENT(x)
+#endif
+
+
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 
 static int useDynamicSMSG  =0;               /* dynamic smsgs setup */
@@ -816,7 +846,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     gni_smsg_attr_t      *smsg_attr;
     gni_post_descriptor_t *pd;
     gni_post_state_t      post_state;
-    
+    char                  *real_data; 
     if (useDynamicSMSG) {
         switch (smsg_connected_flag[destNode]) {
         case 0: 
@@ -833,6 +863,20 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
         if(status == GNI_RC_SUCCESS)
         {
+#if CMK_SMP_TRACE_COMMTHREAD && 1 
+            if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG)
+            { 
+                START_EVENT();
+                if ( tag == SMALL_DATA_TAG)
+                    real_data = (char*)msg; 
+                else 
+                    real_data = (char*)(((CONTROL_MSG*)msg)->source_addr);
+                traceBeginCommOp( real_data);
+                traceChangeLastTimestamp(CpvAccess(projTraceStart));
+                traceSendMsgComm(real_data);
+                traceEndCommOp(real_data);
+            }
+#endif
 #if PRINT_SYH
             lrts_smsg_success++;
             printf("[%d==>%d] send done%d (msgs=%d)\n", myrank, destNode, lrts_smsg_success, lrts_send_msg_id);
@@ -1073,9 +1117,26 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 }
 
 static void    PumpDatagramConnection();
+static void registerUserTraceEvents() {
+#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
+    traceRegisterUserEvent("setting up connections", 10);
+    traceRegisterUserEvent("Receiving small msgs", 20);
+    traceRegisterUserEvent("Release local transaction", 30);
+    traceRegisterUserEvent("Sending buffered small msgs", 40);
+    traceRegisterUserEvent("Sending buffered rdma msgs", 50);
+#endif
+}
 
 void LrtsPostCommonInit(int everReturn)
 {
+#if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
+    CpvInitialize(double, projTraceStart);
+    /* only PE 0 needs to care about registration (to generate sts file). */
+    if (CmiMyPe() == 0) {
+        registerMachineUserEventsFunction(&registerUserTraceEvents);
+    }
+#endif
+
 #if CMK_SMP
     CmiIdleState *s=CmiNotifyGetState();
     CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)CmiNotifyBeginIdle,(void *)s);
@@ -1189,9 +1250,15 @@ static void PumpNetworkSmsg()
             switch (msg_tag) {
             case SMALL_DATA_TAG:
             {
+                START_EVENT();
                 msg_nbytes = CmiGetMsgSize(header);
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
+#if CMK_SMP_TRACE_COMMTHREAD  
+                traceBeginCommOp(msg_data);
+                traceChangeLastTimestamp(CpvAccess(projTraceStart));
+                traceEndCommOp(msg_data);
+#endif
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
             }
@@ -1530,12 +1597,24 @@ static void PumpLocalRdmaTransactions()
 #if PRINT_SYH
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
+                    START_EVENT();
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInFlight((void*)tmp_pd->local_addr);
+#if CMK_SMP_TRACE_COMMTHREAD
+                    traceBeginCommOp( (void*)tmp_pd->local_addr);
+                    traceChangeLastTimestamp(CpvAccess(projTraceStart));
+                    traceEndCommOp((void*)tmp_pd->local_addr);
+#endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if (tmp_pd->first_operand <= ONE_SEG) {
+                    START_EVENT();
 #if PRINT_SYH
                     printf("Pipeline msg done [%d]\n", myrank);
+#endif
+#if CMK_SMP_TRACE_COMMTHREAD 
+                    traceBeginCommOp( (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
+                    traceChangeLastTimestamp(CpvAccess(projTraceStart));
+                    traceEndCommOp((void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
 #endif
                     handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
                 }
@@ -1776,31 +1855,61 @@ void LrtsAdvanceCommunication(int whileidle)
     if(myrank == 0)
     printf("Calling Lrts Pump Msg PE:%d\n", myrank);
 #endif
+#if CMK_SMP_TRACE_COMMTHREAD
+    double startT, endT;
+#endif
     if(mysize == 1) return;
     if (whileidle && useDynamicSMSG)
+    {
+#if CMK_SMP_TRACE_COMMTHREAD
+        startT = CmiWallTimer();
+#endif
         PumpDatagramConnection();
+#if CMK_SMP_TRACE_COMMTHREAD
+        endT = CmiWallTimer();
+        if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(10, startT, endT);
+#endif
+    }
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    startT = CmiWallTimer();
+#endif
     PumpNetworkSmsg();
-   // printf("Calling Lrts Pump RdmaMsg PE:%d\n", CmiMyPe());
-    //PumpNetworkRdmaMsgs();
-    /* Release Sent Msg */
-    //printf("Calling Lrts Rlease Msg PE:%d\n", CmiMyPe());
-#if 0
-    PumpLocalSmsgTransactions();
-    if(myrank == 0)
-    printf("Calling Lrts Rlease RdmaMsg PE:%d\n", myrank);
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(20, startT, endT);
+#endif
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    startT = CmiWallTimer();
 #endif
     PumpLocalRdmaTransactions();
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(30, startT, endT);
+#endif
 #if 0
     if(myrank == 0)
     printf("Calling Lrts Send Buffmsg PE:%d\n", myrank);
 #endif
     /* Send buffered Message */
+#if CMK_SMP_TRACE_COMMTHREAD
+        startT = CmiWallTimer();
+#endif
     SendBufferMsg();
-#if 0
-    if(myrank == 0)
-    printf("Calling Lrts rdma PE:%d\n", myrank);
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(40, startT, endT);
+#endif
+
+#if CMK_SMP_TRACE_COMMTHREAD
+        startT = CmiWallTimer();
 #endif
     SendRdmaMsg();
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(50, startT, endT);
+#endif
     //CmiPrintf("[%d]send buffer=%dM\n", myrank, buffered_send_msg/(1024*1024));
 #if 0
     if(myrank == 0)
