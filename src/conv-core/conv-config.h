@@ -103,4 +103,10 @@
 #define CMK_WITH_CONTROLPOINT            1
 #endif
 
+/* sanity checks */
+#if CMK_SMP_TRACE_COMMTHREAD && ! CMK_SMP
+#undef CMK_SMP_TRACE_COMMTHREAD
+#define CMK_SMP_TRACE_COMMTHREAD                               0
+#endif
+
 #endif
