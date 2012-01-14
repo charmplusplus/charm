@@ -257,9 +257,9 @@ extern "C" void traceBegin(void) {
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
   if(CmiMyRank()==0){
-	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=1){
+	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
-		CkpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
+		CpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
 	}
   }
 #endif
@@ -588,7 +588,7 @@ class CkCoreState;
 extern void _processHandler(void *, CkCoreState*);
 int CkIsCharmMessage(char *msg)
 {
-//CmiPrintf("getMsgtype: %d %d %d %d %d\n", ((envelope *)msg)->getMsgtype(), CmiGetHandler(msg), CmiGetXHandler(msg), _charmHandlerIdx, index_skipCldHandler);
+//CmiPrintf("[%d] CkIsCharmMessage: %d %p %d %p\n", CkMyPe(),CmiGetHandler(msg), CmiGetHandlerFunction(msg), _charmHandlerIdx, _processHandler);
   if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
          (CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
     return 1;

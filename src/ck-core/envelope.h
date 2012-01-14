@@ -251,6 +251,7 @@ private:
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
       env->setRef(0);
+      env->setEpIdx(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
