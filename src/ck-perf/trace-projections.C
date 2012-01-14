@@ -1256,12 +1256,11 @@ void TraceProjections::creation(char *msg)
 {
 #if CMK_SMP_TRACE_COMMTHREAD
 	//This function is only called from a comm thread
-	//in SMP mode. So, it is possible the msg is not
-	//a charm msg that contains an envelope, ep idx.
+	//in SMP mode. 
+        // msg must be a charm message
 	envelope *e = (envelope *)msg;
 	int ep = e->getEpIdx();
-	int num = _entryTable.size();
-	if(ep<num && ep>=0 && _entryTable[ep]->traceEnabled)
+	if(_entryTable[ep]->traceEnabled)
 		creation(e, ep, 1);
 #endif
 }

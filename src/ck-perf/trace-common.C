@@ -10,7 +10,6 @@
 */
 /*@{*/
 
-// cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -582,13 +581,16 @@ void traceAddThreadListeners(CthThread tid, envelope *e) {
   _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
 }
 
-#if 0
+#if 1
 // helper functions
+extern int _charmHandlerIdx;
+class CkCoreState;
+extern void _processHandler(void *, CkCoreState*);
 int CkIsCharmMessage(char *msg)
 {
 //CmiPrintf("getMsgtype: %d %d %d %d %d\n", ((envelope *)msg)->getMsgtype(), CmiGetHandler(msg), CmiGetXHandler(msg), _charmHandlerIdx, index_skipCldHandler);
   if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
-         (CmiGetHandlerFunction(msg) == (CmiHandler)_processHandler))
+         (CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
     return 1;
   if (CmiGetXHandler(msg) == _charmHandlerIdx) return 1;
   return 0;
@@ -684,7 +686,7 @@ void traceEndCommOp(char *msg){
 extern "C"
 void traceSendMsgComm(char *msg){
 #if CMK_TRACE_ENABLED
-  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
     CkpvAccess(_traces)->creation(msg);
 #endif
 }
