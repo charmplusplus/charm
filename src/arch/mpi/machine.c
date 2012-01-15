@@ -438,7 +438,12 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
         /*END_EVENT(40);*/
     }
 #else
+
+#if CMK_SMP_TRACE_COMMTHREAD
     START_EVENT();
+    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+#endif
+
 #if CMK_MEM_CHECKPOINT
 	dstrank = petorank[node];
 #else
@@ -449,23 +454,10 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     /*END_EVENT(40);*/
 #endif
 
-#if CMK_SMP_TRACE_COMMTHREAD
-    traceBeginCommOp(msg);
-    traceChangeLastTimestamp(CpvAccess(projTraceStart));
-    /* traceSendMsgComm must execute after traceBeginCommOp because
-         * we pretend we execute an entry method, and inside this we
-         * pretend we will send another message. Otherwise how could
-         * a message creation just before an entry method invocation?
-         * If such logic is broken, the projections will not trace
-         * messages correctly! -Chao Mei
-         */
-    traceSendMsgComm(msg);
-    traceEndCommOp(msg);
-#if CMI_MPI_TRACE_MOREDETAILED
+#if CMI_MPI_TRACE_MOREDETAILED && CMI_MPI_TRACE_MOREDETAILED
     char tmp[64];
     sprintf(tmp, "MPI_Isend: from proc %d to proc %d", smsg->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
     traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
-#endif
 #endif
 
     MACHSTATE(3,"}MPI_Isend end");
@@ -752,10 +744,19 @@ static int PumpMsgs(void) {
 
 #endif /*end of not MPI_POST_RECV */
 
+        MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
+        CMI_CHECK_CHECKSUM(msg, nbytes);
+#if CMK_ERROR_CHECKING
+        if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
+            CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
+            CmiFree(msg);
+            CmiAbort("Abort!\n");
+            continue;
+        }
+#endif
+
 #if CMK_SMP_TRACE_COMMTHREAD
-        traceBeginCommOp(msg);
-        traceChangeLastTimestamp(CpvAccess(projTraceStart));
-        traceEndCommOp(msg);
+        TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
 #if CMI_MPI_TRACE_MOREDETAILED
         char tmp[32];
         sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
@@ -767,17 +768,6 @@ static int PumpMsgs(void) {
         traceUserSuppliedBracketedNote(tmp, 30, CpvAccess(projTraceStart), CmiWallTimer());
 #endif
 
-
-        MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
-        CMI_CHECK_CHECKSUM(msg, nbytes);
-#if CMK_ERROR_CHECKING
-        if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-            CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
-            CmiFree(msg);
-            CmiAbort("Abort!\n");
-            continue;
-        }
-#endif
         if(doSyncRecv){
             handleOneRecvedMsg(nbytes, msg);
         }
@@ -875,9 +865,7 @@ static int PumpMsgs(void) {
         if(!irecvDone) break; /* in-order recv */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-        traceBeginCommOp(irecvEnt->msg);
-        traceChangeLastTimestamp(CpvAccess(projTraceStart));
-        traceEndCommOp(irecvEnt->msg);
+        TRACE_COMM_CREATION(CpvAccess(projTraceStart), irecvEnt->msg);
 #endif
     
         /*printf("PE[%d]: irecv entry=%p finished with size=%d, msg=%p\n", CmiMyPe(), irecvEnt, irecvEnt->size, irecvEnt->msg);*/
@@ -938,9 +926,7 @@ static void PumpMsgsBlocking(void) {
     memcpy(msg, buf, nbytes);
 
 #if CMK_SMP_TRACE_COMMTHREAD
-    traceBeginCommOp(msg);
-    traceChangeLastTimestamp(CpvAccess(projTraceStart));
-    traceEndCommOp(msg);
+    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
 #if CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
     sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
