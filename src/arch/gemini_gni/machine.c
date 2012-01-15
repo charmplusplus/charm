@@ -1253,7 +1253,8 @@ static void PumpNetworkSmsg()
                 memcpy(msg_data, (char*)header, msg_nbytes);
                 handleOneRecvedMsg(msg_nbytes, msg_data);
 #if CMK_SMP_TRACE_COMMTHREAD
-                TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
+                TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
+                //TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
 #endif
                 break;
             }
@@ -1597,7 +1598,8 @@ static void PumpLocalRdmaTransactions()
                     DecreaseMsgInFlight((void*)tmp_pd->local_addr);
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr );
+                   // TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
                 }else if (tmp_pd->first_operand <= ONE_SEG) {
                     START_EVENT();
@@ -1606,7 +1608,8 @@ static void PumpLocalRdmaTransactions()
 #endif
                     handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG );
+                    //TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
 #endif
                 }
                     SendRdmaMsg();
