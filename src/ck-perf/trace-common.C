@@ -668,10 +668,13 @@ void traceEndFuncIndexProj(int idx){
 
 #if CMK_SMP_TRACE_COMMTHREAD
 extern "C"
-void traceBeginCommOp(char *msg){
+int traceBeginCommOp(char *msg){
 #if CMK_TRACE_ENABLED
-  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg)) {
     CkpvAccess(_traces)->beginExecute(msg);
+    return 1;
+  }
+  return 0;
 #endif
 }
 

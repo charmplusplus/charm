@@ -863,7 +863,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
         if(status == GNI_RC_SUCCESS)
         {
-#if CMK_SMP_TRACE_COMMTHREAD && 1 
+#if CMK_SMP_TRACE_COMMTHREAD
             if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG)
             { 
                 START_EVENT();
@@ -871,10 +871,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
                     real_data = (char*)msg; 
                 else 
                     real_data = (char*)(((CONTROL_MSG*)msg)->source_addr);
-                traceBeginCommOp( real_data);
-                traceChangeLastTimestamp(CpvAccess(projTraceStart));
-                traceSendMsgComm(real_data);
-                traceEndCommOp(real_data);
+                TRACE_COMM_CREATION(CpvAccess(projTraceStart), real_data);
             }
 #endif
 #if PRINT_SYH
@@ -1254,12 +1251,10 @@ static void PumpNetworkSmsg()
                 msg_nbytes = CmiGetMsgSize(header);
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
-#if CMK_SMP_TRACE_COMMTHREAD  
-                traceBeginCommOp(msg_data);
-                traceChangeLastTimestamp(CpvAccess(projTraceStart));
-                traceEndCommOp(msg_data);
-#endif
                 handleOneRecvedMsg(msg_nbytes, msg_data);
+#if CMK_SMP_TRACE_COMMTHREAD
+                TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
+#endif
                 break;
             }
             case LMSG_INIT_TAG:
@@ -1600,23 +1595,19 @@ static void PumpLocalRdmaTransactions()
                     START_EVENT();
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInFlight((void*)tmp_pd->local_addr);
-#if CMK_SMP_TRACE_COMMTHREAD
-                    traceBeginCommOp( (void*)tmp_pd->local_addr);
-                    traceChangeLastTimestamp(CpvAccess(projTraceStart));
-                    traceEndCommOp((void*)tmp_pd->local_addr);
-#endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
+#if CMK_SMP_TRACE_COMMTHREAD
+                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+#endif
                 }else if (tmp_pd->first_operand <= ONE_SEG) {
                     START_EVENT();
 #if PRINT_SYH
                     printf("Pipeline msg done [%d]\n", myrank);
 #endif
-#if CMK_SMP_TRACE_COMMTHREAD 
-                    traceBeginCommOp( (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
-                    traceChangeLastTimestamp(CpvAccess(projTraceStart));
-                    traceEndCommOp((void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
-#endif
                     handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
+#if CMK_SMP_TRACE_COMMTHREAD
+                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
+#endif
                 }
                     SendRdmaMsg();
             }

@@ -1252,19 +1252,20 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   }
 }
 
+//This function is only called from a comm thread in SMP mode. 
 void TraceProjections::creation(char *msg)
 {
 #if CMK_SMP_TRACE_COMMTHREAD
-	//This function is only called from a comm thread
-	//in SMP mode. 
         // msg must be a charm message
 	envelope *e = (envelope *)msg;
 	int ep = e->getEpIdx();
         if(ep==0) return;
         int num = _entryTable.size();
         CmiAssert(ep < num);
-	if(_entryTable[ep]->traceEnabled)
+	if(_entryTable[ep]->traceEnabled) {
 		creation(e, ep, 1);
+                e->setSrcPe(CkMyPe());              // pretend I am the sender
+        }
 #endif
 }
 
