@@ -1533,6 +1533,24 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	return NULL;
 }
 
+
+void *CsdNextLocalNodeMessage(CsdSchedulerState_t *s) {
+	void *msg;
+#if CMK_NODE_QUEUE_AVAILABLE
+	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
+	/*if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;*/
+	if (!CqsEmpty(s->nodeQ))
+	{
+	  CmiLock(s->nodeLock);
+	  CqsDequeue(s->nodeQ,(void **)&msg);
+	  CmiUnlock(s->nodeLock);
+	  if (msg!=NULL) return msg;
+	}
+#endif
+	return NULL;
+
+}
+
 int CsdScheduler(int maxmsgs)
 {
 	if (maxmsgs<0) CsdScheduleForever();	
@@ -1656,6 +1674,21 @@ void CsdSchedulePoll(void)
 	CsdPeriodic();
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
+	{
+	     SCHEDULE_MESSAGE 
+     	}
+	else break;
+  }
+}
+
+void CsdScheduleNodePoll(void)
+{
+  SCHEDULE_TOP
+  while (1)
+  {
+	/*CsdPeriodic();*/
+        /*CmiMachineProgressImpl(); ??? */
+	if (NULL!=(msg = CsdNextLocalNodeMessage(&state)))
 	{
 	     SCHEDULE_MESSAGE 
      	}
