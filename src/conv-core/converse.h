@@ -907,6 +907,7 @@ typedef struct {
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
 extern void *CsdNextMessage(CsdSchedulerState_t *state);
+extern void *CsdNextLocalNodeMessage(CsdSchedulerState_t *state);
 
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
@@ -916,6 +917,7 @@ extern  int CsdScheduler(int maxmsgs);
 extern void CsdScheduleForever(void);
 extern  int CsdScheduleCount(int maxmsgs);
 extern void CsdSchedulePoll(void);
+extern void CsdScheduleNodePoll(void);
 
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 /** @} */
