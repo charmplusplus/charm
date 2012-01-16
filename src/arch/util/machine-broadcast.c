@@ -242,8 +242,17 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
 
 /* Functions regarding broadcat op that sends to every one */
 void CmiSyncBroadcastAllFn(int size, char *msg) {
-    CmiSyncSendFn(CmiMyPe(), size, msg) ;
-    CmiSyncBroadcastFn(size, msg);
+    void *newmsg = msg;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+      /* need to copy the msg in case the msg is on the stack */
+      /* and we only need to copy when sending out network */
+    if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
+#endif
+    CmiSyncSendFn(CmiMyPe(), size, newmsg) ;
+    CmiSyncBroadcastFn(size, newmsg);
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    if (newmsg != msg) CmiFree(newmsg);
+#endif
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg) {
