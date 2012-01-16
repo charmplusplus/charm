@@ -53,6 +53,15 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
 #elif CMK_BROADCAST_HYPERCUBE
     SendHyperCubeProc(size, msg);
 #endif
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
+      /* same message may be sent out, make a copy of it */
+    if (CmiNumNodes()>1) {
+      void *newmsg;
+      newmsg = CopyMsg(msg, size);
+      CmiFree(msg);
+      msg = newmsg;
+    }
+#endif
     CmiPushPE(0, msg);
 
 }
@@ -224,13 +233,13 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
 
 void CmiSyncBroadcastFn(int size, char *msg) {
     void *newmsg = msg;
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
       /* need to copy the msg in case the msg is on the stack */
       /* and we only need to copy when sending out network */
     if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
 #endif
     CmiSyncBroadcastFn1(size, newmsg);
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
     if (newmsg != msg) CmiFree(newmsg);
 #endif
 }
@@ -255,20 +264,20 @@ CmiCommHandle CmiAsyncBroadcastFn(int size, char *msg) {
 /* Functions regarding broadcat op that sends to every one */
 void CmiSyncBroadcastAllFn(int size, char *msg) {
     void *newmsg = msg;
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
       /* need to copy the msg in case the msg is on the stack */
       /* and we only need to copy when sending out network */
     if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
 #endif
     CmiSyncSendFn(CmiMyPe(), size, newmsg) ;
     CmiSyncBroadcastFn1(size, newmsg);
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
     if (newmsg != msg) CmiFree(newmsg);
 #endif
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg) {
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
     void *newmsg = msg;
       /* need to copy the msg in case the msg is on the stack */
       /* and we only need to copy when sending out network */
@@ -278,7 +287,7 @@ void CmiFreeBroadcastAllFn(int size, char *msg) {
     CmiSendSelf(msg);
 #endif
     CmiSyncBroadcastFn1(size, msg);
-#if CMK_BROADCAST_USE_CMIREFERENCE
+#if CMK_BROADCAST_SPANNING_TREE && CMK_BROADCAST_USE_CMIREFERENCE
     if (newmsg!=msg) CmiFree(msg);
 #endif
 }
