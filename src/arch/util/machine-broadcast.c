@@ -188,14 +188,12 @@ static void SendHyperCubeNode(int size, char *msg) {
 
 #if USE_COMMON_SYNC_BCAST
 /* Functions regarding broadcat op that sends to every one else except me */
-void CmiSyncBroadcastFn(int size, char *msg) {
+void CmiSyncBroadcastFn1(int size, char *msg) {
     int i, mype;
 
     CQdCreate(CpvAccess(cQdState), CmiNumPes()-1);
-#if CMK_SMP
     /*record the rank to avoid re-sending the msg in  spanning tree or hypercube*/
     CMI_DEST_RANK(msg) = CmiMyRank();
-#endif
 
 #if CMK_BROADCAST_SPANNING_TREE
     CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
@@ -204,18 +202,17 @@ void CmiSyncBroadcastFn(int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, CmiMyNode()+1);
     SendHyperCubeProc(size, msg);
 #else
-	mype = CmiMyPe();
-	#if CMK_SMP
-	/* In SMP, this function may be called from comm thread which has a larger
-	 * proc id */
-	if(mype > _Cmi_numpes){
-		for(i=0; i<_Cmi_numpes; i++)
-			CmiSyncSendFn(i, size, msg);
-		return;
-	}
-	#endif
+    mype = CmiMyPe();
+    #if CMK_SMP
+    /* In SMP, this function may be called from comm thread with a larger pe */
+    if(mype > _Cmi_numpes){
+	for(i=0; i<_Cmi_numpes; i++)
+		CmiSyncSendFn(i, size, msg);
+	return;
+    }
+    #endif
 	
-	for ( i=mype+1; i<_Cmi_numpes; i++ )
+    for ( i=mype+1; i<_Cmi_numpes; i++ )
         CmiSyncSendFn(i, size, msg) ;
 	
     for ( i=0; i<mype; i++ )
@@ -225,10 +222,25 @@ void CmiSyncBroadcastFn(int size, char *msg) {
     /*CmiPrintf("In  SyncBroadcast broadcast\n");*/
 }
 
+void CmiSyncBroadcastFn(int size, char *msg) {
+    void *newmsg = msg;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+      /* need to copy the msg in case the msg is on the stack */
+      /* and we only need to copy when sending out network */
+    if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
+#endif
+    CmiSyncBroadcastFn1(size, newmsg);
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    if (newmsg != msg) CmiFree(newmsg);
+#endif
+}
+
 void CmiFreeBroadcastFn(int size, char *msg) {
-    CmiSyncBroadcastFn(size,msg);
+    CmiSyncBroadcastFn1(size,msg);
     CmiFree(msg);
 }
+#else
+#define  CmiSyncBroadcastFn1(s,m)      CmiSyncBroadcastFn(s,m)
 #endif
 
 #if USE_COMMON_ASYNC_BCAST
@@ -249,15 +261,26 @@ void CmiSyncBroadcastAllFn(int size, char *msg) {
     if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
 #endif
     CmiSyncSendFn(CmiMyPe(), size, newmsg) ;
-    CmiSyncBroadcastFn(size, newmsg);
+    CmiSyncBroadcastFn1(size, newmsg);
 #if CMK_BROADCAST_USE_CMIREFERENCE
     if (newmsg != msg) CmiFree(newmsg);
 #endif
 }
 
 void CmiFreeBroadcastAllFn(int size, char *msg) {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    void *newmsg = msg;
+      /* need to copy the msg in case the msg is on the stack */
+      /* and we only need to copy when sending out network */
+    if (CmiNumNodes()>1) newmsg = CopyMsg(msg, size);
+    CmiSendSelf(newmsg);
+#else
     CmiSendSelf(msg);
-    CmiSyncBroadcastFn(size, msg);
+#endif
+    CmiSyncBroadcastFn1(size, msg);
+#if CMK_BROADCAST_USE_CMIREFERENCE
+    if (newmsg!=msg) CmiFree(msg);
+#endif
 }
 
 CmiCommHandle CmiAsyncBroadcastAllFn(int size, char *msg) {
