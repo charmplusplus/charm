@@ -2605,9 +2605,20 @@ void CmiGroupInit()
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   int i;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  for(i=0;i<npes;i++) {
+    if (npes[i] == CkMyPe())
+      CmiSyncSend(pes[i], len, msg);
+    else {
+      CmiReference(msg);
+      CmiSyncSendAndFree(pes[i], len, msg);
+    }
+  }
+#else
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
+#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
@@ -2619,6 +2630,14 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  if (npes == 1) {
+    CmiSyncSendAndFree(pes[0], len, msg);
+    return;
+  }
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
+#else
   int i;
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
@@ -2627,6 +2646,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiSyncSendAndFree(pes[npes-1], len, msg);
   else 
     CmiFree(msg);
+#endif
 }
 
 #endif
