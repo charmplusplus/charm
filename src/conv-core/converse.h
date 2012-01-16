@@ -682,6 +682,7 @@ extern void* malloc_nomigrate(size_t size);
 */
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
+int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 

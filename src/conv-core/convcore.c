@@ -2814,6 +2814,11 @@ static void *CmiAllocFindEnclosing(void *blk) {
   return blk;
 }
 
+int CmiGetReference(void *blk)
+{
+  return REFFIELD(CmiAllocFindEnclosing(blk));
+}
+
 /** Increment the reference count for this block's owner.
     This call must be matched by an equivalent CmiFree. */
 void CmiReference(void *blk)
