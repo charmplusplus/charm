@@ -2640,7 +2640,7 @@ void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
   int i;
 #if CMK_BROADCAST_USE_CMIREFERENCE
   for(i=0;i<npes;i++) {
-    if (npes[i] == CkMyPe())
+    if (pes[i] == CmiMyPe())
       CmiSyncSend(pes[i], len, msg);
     else {
       CmiReference(msg);
