@@ -16,7 +16,7 @@ fi
 
 CMK_REAL_COMPILER=`$MPICXX -show 2>/dev/null | cut -d' ' -f1 `
 case "$CMK_REAL_COMPILER" in
-g++) CMK_AMD64="-m64 -fPIC" ;;
+g++) CMK_AMD64="-fPIC" ;;
 esac
 
 CMK_CPP_CHARM="/lib/cpp -P"

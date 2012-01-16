@@ -14,14 +14,14 @@ module CkMemCheckpoint {
 
   group [migratable] CkMemCheckPT {
         entry CkMemCheckPT(int w);
-	entry void createEntry(CkArrayID, CkGroupID, CkArrayIndexMax, int);
+	entry void createEntry(CkArrayID, CkGroupID, CkArrayIndex, int);
  	// checkpointing
         entry [expedited] void doItNow(int spe, CkCallback &);  //checkpointing
  	entry void recvData(CkArrayCheckPTMessage *);
  	entry void gotData();
 	entry void recvProcData(CkProcCheckPTMessage *);
 	entry void syncFiles(CkReductionMsg *);
- 	entry void cpFinish();
+ 	entry [reductiontarget] void cpFinish();
  	entry void report();
 	// restart
         entry [expedited] void restart(int);
@@ -29,11 +29,11 @@ module CkMemCheckpoint {
 	entry void removeArrayElements();
  	entry void recoverBuddies();
 	entry void recoverEntry(CkArrayCheckPTMessage *msg);
- 	entry void recoverArrayElements();
+ 	entry [reductiontarget] void recoverArrayElements();
 	entry void finishUp();
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);
-	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndexMax idx[n],int nowOnPe);
+	entry void updateLocations(int n, CkGroupID g[n], CkArrayIndex idx[n],int nowOnPe);
   };
 
   initproc void CkRegisterRestartHandler();

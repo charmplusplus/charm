@@ -1,6 +1,5 @@
-DIRS=hello integrate integrate2 integrateArray \
-	piArray queens RedExample \
-	ring rings speeds
+DIRS	= hello integrate integrate2 integrateArray piArray queens RedExample \
+	  ring rings speeds load_balancing
 
 all: 
 	for d in $(DIRS); do \

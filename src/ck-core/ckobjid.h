@@ -11,7 +11,7 @@ union _ObjectID {
 	} group; //also used for NodeGroups
 	struct s_array{
 		CkGroupID id; //array id
-		CkArrayIndexStruct idx; //index
+		CkArrayIndexBase idx; //index
 	} array;
 };
 
@@ -39,8 +39,7 @@ public:
 		    ret += circleShift(data.group.id.idx,6);
 		    break;
 		case TypeArray:
-		    CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
-		    CkHashCode temp = i1.hash();
+		    CkHashCode temp = data.array.idx.asChild().hash();
 		    //ret = circleShift(ret,13);
 		    //ret += circleShift(temp,11);
 		    ret += temp;
@@ -61,7 +60,7 @@ public:
 				}else{
 					return false;
 				}
-				break;
+				//break; unreachable
 			case TypeGroup:
 			case TypeNodeGroup:
 				if((data.group.onPE == t.data.group.onPE) && (data.group.id == t.data.group.id)){
@@ -69,19 +68,18 @@ public:
 				}else{
 					return false;
 				}
-				break;
+				//break; unreachable
 			case TypeArray:
-				CkArrayIndex &i1= (CkArrayIndex &)data.array.idx.asMax();
-				CkArrayIndex &i2 = (CkArrayIndex &)t.data.array.idx.asMax();
 				bool val;
-				if(data.array.id == t.data.array.id && i1.compare(i2)){
+				if(data.array.id == t.data.array.id && data.array.idx.asChild().compare(t.data.array.idx.asChild())){
 					val = true;
 				}else{
 					val = false;
 				}
 				return val;
-				break;
+				// break; unreachable
 		}
+		return false;
 	}
 	
 	void* getObject();

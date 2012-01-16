@@ -19,6 +19,8 @@ versions of charm.
 #include <alloca.h>
 #endif
 
+#include "conv-config.h"
+
 struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 
 #ifdef __CYGWIN__
@@ -36,8 +38,15 @@ struct helpdesc { qt_helper_t *hfn; qt_t *jb; void *old; void *new; };
 #endif
 
 #define MAXTABLE 1000
-static void * pbuf[MAXTABLE] = {0};
-static int    pcounter = 1;
+
+#if CMK_SMP && CMK_TLS_THREAD
+#define TLS_SPECIFIER         __thread
+#else
+#define TLS_SPECIFIER
+#endif
+
+static TLS_SPECIFIER void * pbuf[MAXTABLE] = {0};
+static TLS_SPECIFIER int    pcounter = 1;
 
 static int push_buf(void *ptr)
 {

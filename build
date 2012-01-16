@@ -27,10 +27,10 @@ syntax() {
   echo ''
   fi
   echo '<versions>: ' 
-  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^vmi$)|(^lapi$)|(^cell$)|(^template$)|(^cuda$)' | pr -3 -t )
+  ( cd $src ; ls -1 | egrep -v '(^CVS)|(^shmem$)|(^mpi$)|(^sim$)|(^net$)|(^multicore$)|(^elan$)|(^util$)|(^common$)|(^uth$)|(^conv-mach-fix.sh$)|(^win32$)|(^win64$)|(^paragon$)|(^vmi$)|(^lapi$)|(^cell$)|(^gemini_gni$)|(^template$)|(^cuda$)' | pr -3 -t )
   echo ''
   echo '<options>: compiler and platform specific options'
-  echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale'
+  echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale clang'
   echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft papi'
   echo 'pthreads lam'
   echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
@@ -48,10 +48,11 @@ syntax() {
   echo '  acc             HP aCC compiler'
   echo '  icc             Intel C/C++ compiler for Linux IA32'
   echo '  ecc             Intel C/C++ compiler for Linux IA64'
-  echo '  gcc3            use gcc3 - GNU GCC/G++ version 3'
-  echo '  gcc4            use gcc4 - GNU GCC/G++ version 4 (only mpi-crayxt3)'
+  echo '  gcc3            GNU GCC/G++ version 3'
+  echo '  gcc4            GNU GCC/G++ version 4 (only mpi-crayxt3)'
   echo '  mpcc            SUN Solaris C++ compiler for MPI'
-  echo '  pathscale       use pathscale compiler suite'
+  echo '  pathscale       Pathscale compiler suite'
+  echo '  clang           Clang C/C++ compuler'
   echo ''
   echo 'Choose a fortran compile (only one option is allowed from this section):'
   echo '  g95             G95 at http://ww.g95.org'
@@ -89,13 +90,14 @@ syntax() {
   echo "  --with-production       build Charm++ with all optimizations for maximum performance, and disabling all above features"
   echo ''
   echo 'Miscellaneous options:'
-  echo '  --incdir=DIR       specify additional include path for compiler'
-  echo '  --libdir=DIR	     specify additional lib path for compiler'
-  echo '  --basedir=DIR	     shortcut for the above two - DIR/include and DIR/lib'
-  echo '  -j[N]              parallel make, N is the number of paralle make jobs'
-  echo "  --with-romio       build AMPI with ROMIO library"
-  echo "  --destination=DIR  build Charm++ inside DIR, by default the destination is <version>"
-  echo "  --suffix=DIR       append DIR to the destination directory of the Charm++ build"
+  echo '  --incdir=DIR        specify additional include path for compiler'
+  echo '  --libdir=DIR	      specify additional lib path for compiler'
+  echo '  --basedir=DIR	      shortcut for the above two - DIR/include and DIR/lib'
+  echo '  -j[N]               parallel make, N is the number of paralle make jobs'
+  echo "  --with-romio        build AMPI with ROMIO library"
+  echo "  --with-lbtime-type  specify real type for the load balancing timers"
+  echo "  --destination=DIR   build Charm++ inside DIR, by default the destination is <version>"
+  echo "  --suffix=DIR        append DIR to the destination directory of the Charm++ build"
   echo "  --tau-makefile=FILE Specify which TAU stub makefile to use"
   fi
   echo ''
@@ -132,7 +134,7 @@ syntax() {
   echo ''
   echo 'Thank you for using Charm++, please send questions or comments to '
   echo 'Parallel Programming Lab at University of Illinois at Urbana-Champaign'
-  echo '(email: charm@cs.uiuc.edu).'
+  echo '(email: charm@cs.illinois.edu).'
 
   else
   echo ''
@@ -210,7 +212,7 @@ BASEDIR=
 LIBDIR=
 INCDIR=
 ARCH=
-BUILD_SHARED=
+BUILD_SHARED=""             # default no shared lib
 WITH_ROMIO=
 WITH_PRODUCTION=
 BUILD_EMULATOR=0
@@ -294,8 +296,13 @@ do
 		done
           	shift
  	  	;;
-    --no-build-shared|-nobs|--no-shared)
-		BUILD_SHARED="-nobs"; shift
+    --no-build-shared|--no-shared)
+		#BUILD_SHARED="-no-build-shared"; 
+		shift
+		;;
+    --build-shared)
+		BUILD_SHARED="-build-shared"; 
+		shift
 		;;
     --with-romio)
 		WITH_ROMIO="true"; shift
@@ -310,10 +317,6 @@ do
 		;;
     --without-*)
 		CONFIG_OPTS="$CONFIG_OPTS $1"
-		shift
-		;;
-    --build-shared|-bs)
-		# obsolete, do nothing
 		shift
 		;;
     --destination)
@@ -462,6 +465,7 @@ rm -f $DESTINATION/tmp/Make.depends
 rm -f $DESTINATION/tmp/Make.cidepends
 rm -f $DESTINATION/tmp/Make.lb
 rm -f $DESTINATION/tmp/Make.machine
+rm -f $DESTINATION/tmp/Make.extlib
 
 
 # Create the bin, lib, include, etc. links:
@@ -484,6 +488,8 @@ then
 	echo "Copying $src/win32/createlink.exe to /bin directory"
 	cp $src/win32/createlink.exe /bin
         chmod +x $DESTINATION/tmp/system_ln
+	cp $src/win32/gathertree.local   $DESTINATION/tmp
+	cp $src/win32/gatherflat.local   $DESTINATION/tmp
 else
 	cat > $DESTINATION/tmp/system_ln <<EOF
 #!/bin/sh
@@ -505,10 +511,16 @@ fi
 
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.depends" $DESTINATION/tmp/Make.depends
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.cidepends" $DESTINATION/tmp/Make.cidepends
+if test -f src/ck-ldb/Make.lb
+then
 $DESTINATION/tmp/system_ln "../../src/ck-ldb/Make.lb" $DESTINATION/tmp/Make.lb
+else
+touch $DESTINATION/tmp/Make.lb
+fi
 $DESTINATION/tmp/system_ln "../../src/scripts/Makefile" $DESTINATION/tmp/Makefile
 $DESTINATION/tmp/system_ln "../../src/scripts/Make.tau" $DESTINATION/tmp/Make.tau
 touch $DESTINATION/tmp/Makefile.machine
+touch $DESTINATION/tmp/Make.extlib
 
 ConvUsr="$DESTINATION/tmp/conv-mach-pre.sh"
 Echo "Generating $ConvUsr"
@@ -550,8 +562,10 @@ then
     done
 fi
 
-if test  -n "$BUILD_SHARED" 
+if test  "$BUILD_SHARED"  = "-build-shared"
 then
+    echo "CMK_NO_BUILD_SHARED=false" >> $ConvSh
+else
     echo "CMK_NO_BUILD_SHARED=true" >> $ConvSh
 fi
 
@@ -564,8 +578,8 @@ if test -n "$WITH_PRODUCTION"
 then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
-    OPTS="-optimize $OPTS"
-    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking $CONFIG_OPTS"
+    OPTS="-optimize -production $OPTS"
+    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
 fi
 
 # build with Tau
@@ -614,8 +628,8 @@ printError()
 	Echo "-------------------------------------------------"
 	Echo "Charm++ NOT BUILT. Either cd into $DESTINATION/tmp and try"
 	Echo "to resolve the problems yourself, visit"
-	Echo "    http://charm.cs.uiuc.edu/"
-	Echo "for more information. Otherwise, email the developers at charm@cs.uiuc.edu"
+	Echo "    http://charm.cs.illinois.edu/"
+	Echo "for more information. Otherwise, email the developers at charm@cs.illinois.edu"
 	exit $MAKEEXIT
 }
 

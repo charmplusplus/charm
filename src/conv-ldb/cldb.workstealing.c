@@ -5,89 +5,83 @@
 #include "queueing.h"
 #include "cldb.h"
 
-#define IDLE_IMMEDIATE 		1
-#define TRACE_USEREVENTS        0
-
-#define PERIOD 10                /* default: 30 */
-#define MSGDELAY 10
-#define MAXOVERLOAD 1
-
-#define LOADTHRESH       3
-
+#define TRACE_USEREVENTS        1
+#define LOADTHRESH              3
 
 typedef struct CldProcInfo_s {
-  double lastCheck;
-  int    sent;			/* flag to disable idle work request */
-  int    balanceEvt;		/* user event for balancing */
+  int    askEvt;		/* user event for askLoad */
+  int    askNoEvt;		/* user event for askNoLoad */
   int    idleEvt;		/* user event for idle balancing */
-  int    idleprocEvt;		/* user event for processing idle req */
-  double lastBalanceTime;
 } *CldProcInfo;
 
-int _stealonly1 = 0;
+static int WS_Threshold = -1;
+static int _steal_prio = 0;
+static int _stealonly1 = 0;
+static int _steal_immediate = 0;
+static int workstealingproactive = 0;
 
 CpvStaticDeclare(CldProcInfo, CldData);
 CpvStaticDeclare(int, CldAskLoadHandlerIndex);
 CpvStaticDeclare(int, CldAckNoTaskHandlerIndex);
+CpvStaticDeclare(int, isStealing);
 
-void LoadNotifyFn(int l)
-{
-  CldProcInfo  cldData = CpvAccess(CldData);
-  cldData->sent = 0;
-}
 
 char *CldGetStrategy(void)
 {
   return "work stealing";
 }
 
-/* since I am idle, ask for work from neighbors */
-static void CldBeginIdle(void *dummy)
-{
-  CpvAccess(CldData)->lastCheck = CmiWallTimer();
-}
 
-static void CldEndIdle(void *dummy)
-{
-  CpvAccess(CldData)->lastCheck = -1;
-}
-
-static void CldStillIdle(void *dummy, double curT)
+static void StealLoad()
 {
   int i;
-  double startT;
+  double now;
   requestmsg msg;
-  int myload;
-  CldProcInfo  cldData = CpvAccess(CldData);
   int  victim;
   int mype;
+  int numpes;
 
-  double now = curT;
-  double lt = cldData->lastCheck;
-  /* only ask for work every 20ms */
-  if (cldData->sent && (lt!=-1 && now-lt< PERIOD*0.001)) return;
-  cldData->lastCheck = now;
+  if (CpvAccess(isStealing)) return;    /* already stealing, return */
 
-  myload = CldLoad();
-  if (myload > 0) return;
+  CpvAccess(isStealing) = 1;
 
-  msg.from_pe = CmiMyPe();
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
+
   mype = CmiMyPe();
-
+  msg.from_pe = mype;
+  numpes = CmiNumPes();
   do{
-      victim = (((CrnRand()+mype)&0x7FFFFFFF)%CmiNumPes());
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
   }while(victim == mype);
 
   CmiSetHandler(&msg, CpvAccess(CldAskLoadHandlerIndex));
+#if CMK_IMMEDIATE_MSG
   /* fixme */
-  //CmiBecomeImmediate(&msg);
-  msg.to_rank = CmiRankOf(victim);
-  CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
-  cldData->sent = 1;
-
-#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
-  traceUserBracketEvent(cldData->idleEvt, now, CmiWallTimer());
+  if (_steal_immediate) CmiBecomeImmediate(&msg);
 #endif
+  /* msg.to_rank = CmiRankOf(victim); */
+  msg.to_pe = victim;
+  CmiSyncSend(victim, sizeof(requestmsg),(char *)&msg);
+  
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->idleEvt, now, CmiWallTimer());
+#endif
+}
+
+void LoadNotifyFn(int l)
+{
+    if(CldCountTokens() <= WS_Threshold)
+        StealLoad();
+}
+
+/* since I am idle, ask for work from neighbors */
+static void CldBeginIdle(void *dummy)
+{
+    //if (CldCountTokens() == 0) StealLoad();
+    CmiAssert(CldCountTokens()==0);
+    StealLoad();
 }
 
 /* immediate message handler, work at node level */
@@ -95,56 +89,87 @@ static void CldStillIdle(void *dummy, double curT)
 static void CldAskLoadHandler(requestmsg *msg)
 {
   int receiver, rank, recvIdx, i;
-  int myload = CldLoad();
-  double now = CmiWallTimer();
-  CldProcInfo  cldData = CpvAccess(CldData);
+  int myload, sendLoad;
+  double now;
+  /* int myload = CldLoad(); */
 
-  int sendLoad;
-  sendLoad = myload / 2; 
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
+
+  /* rank = msg->to_rank; */
+  CmiAssert(msg->to_pe!=-1);
+  rank = CmiRankOf(msg->to_pe);
+  CmiAssert(rank!=-1);
+  myload = CldCountTokensRank(rank);
+
   receiver = msg->from_pe;
   /* only give you work if I have more than 1 */
-  if (sendLoad>0) {
+  if (myload>LOADTHRESH) {
       if(_stealonly1) sendLoad = 1;
-      rank = CmiMyRank();
-      if (msg->to_rank != -1) rank = msg->to_rank;
-      CldMultipleSend(receiver, sendLoad, rank, 0);
+      else sendLoad = myload/2; 
+      if(sendLoad > 0) {
+#if ! CMK_USE_IBVERBS
+        if (_steal_prio)
+          CldMultipleSendPrio(receiver, sendLoad, rank, 0);
+        else
+          CldMultipleSend(receiver, sendLoad, rank, 0);
+#else
+          CldSimpleMultipleSend(receiver, sendLoad, rank);
+#endif
+      }
+      CmiFree(msg);
   }else
-  {
-      requestmsg r_msg;
-      r_msg.from_pe = CmiMyPe();
-      r_msg.to_rank = CmiMyRank();
+  {     /* send ack indicating there is no task */
+      int pe = msg->to_pe;
+      msg->to_pe = msg->from_pe;
+      msg->from_pe = pe;
+      /*msg->to_rank = CmiMyRank(); */
 
-      CmiSetHandler(&r_msg, CpvAccess(CldAckNoTaskHandlerIndex));
-      CmiSyncSend(receiver, sizeof(requestmsg),(char *)&r_msg);
-    /* send ack indicating there is no task */
+      CmiSetHandler(msg, CpvAccess(CldAckNoTaskHandlerIndex));
+      CmiSyncSendAndFree(receiver, sizeof(requestmsg),(char *)msg);
   }
-  CmiFree(msg);
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->askEvt, now, CmiWallTimer());
+#endif
 }
 
 void  CldAckNoTaskHandler(requestmsg *msg)
 {
-    int victim; 
-    requestmsg r_msg;
-    int notaskpe = msg->from_pe;
-    CldProcInfo  cldData = CpvAccess(CldData);
-    int mype = CmiMyPe();
+  double now;
+  int victim; 
+  /* int notaskpe = msg->from_pe; */
+  int mype = CmiMyPe();
+  int numpes = CmiNumPes();
+
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  now = CmiWallTimer();
+#endif
+
   do{
-      victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());
-  }while(victim == mype || victim == notaskpe);
+      /*victim = (((CrnRand()+notaskpe)&0x7FFFFFFF)%CmiNumPes());*/
+      victim = (((CrnRand()+mype)&0x7FFFFFFF)%numpes);
+  } while(victim == mype);
 
+  /* reuse msg */
+#if CMK_IMMEDIATE_MSG
   /* fixme */
-  //CmiBecomeImmediate(&msg);
-  r_msg.to_rank = CmiRankOf(victim);
-  r_msg.from_pe = mype;
-  CmiSetHandler(&r_msg, CpvAccess(CldAskLoadHandlerIndex));
-  CmiSyncSend(victim, sizeof(requestmsg),(char *)&r_msg);
-  cldData->sent = 1;
+  if (_steal_immediate) CmiBecomeImmediate(msg);
+#endif
+  /*msg->to_rank = CmiRankOf(victim); */
+  msg->to_pe = victim;
+  msg->from_pe = mype;
+  CmiSetHandler(msg, CpvAccess(CldAskLoadHandlerIndex));
+  CmiSyncSendAndFree(victim, sizeof(requestmsg),(char *)msg);
 
-  cldData->lastCheck = CmiWallTimer();
+  CpvAccess(isStealing) = 1;
 
-  CmiFree(msg);
-
+#if CMK_TRACE_ENABLED && TRACE_USEREVENTS
+  traceUserBracketEvent(CpvAccess(CldData)->askNoEvt, now, CmiWallTimer());
+#endif
 }
+
 void CldHandler(void *msg)
 {
   CldInfoFn ifn; CldPackFn pfn;
@@ -153,14 +178,21 @@ void CldHandler(void *msg)
   CldRestoreHandler(msg);
   ifn = (CldInfoFn)CmiHandlerToFunction(CmiGetInfo(msg));
   ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-  /*CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr); */
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
+  /* CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr); */
 }
+
+#define CldPUTTOKEN(msg)  \
+           if (_steal_prio)   \
+             CldPutTokenPrio(msg);   \
+           else            \
+             CldPutToken(msg);
 
 void CldBalanceHandler(void *msg)
 {
   CldRestoreHandler(msg);
-  CldPutToken(msg);
+  CldPUTTOKEN(msg);
+  CpvAccess(isStealing) = 0;      /* fixme: this may not be right */
 }
 
 void CldEnqueueGroup(CmiGroup grp, void *msg, int infofn)
@@ -211,11 +243,10 @@ void CldEnqueue(int pe, void *msg, int infofn)
     }
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
     CmiSetInfo(msg,infofn);
-    CldPutToken(msg);
+    CldPUTTOKEN(msg);
   } 
   else if ((pe == CmiMyPe()) || (CmiNumPes() == 1)) {
     ifn(msg, &pfn, &len, &queueing, &priobits, &prioptr);
-    //CsdEnqueueGeneral(msg, CQS_QUEUEING_LIFO, priobits, prioptr);
     CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
   }
   else {
@@ -272,12 +303,10 @@ void CldGraphModuleInit(char **argv)
   CpvInitialize(int, CldBalanceHandlerIndex);
 
   CpvAccess(CldData) = (CldProcInfo)CmiAlloc(sizeof(struct CldProcInfo_s));
-  CpvAccess(CldData)->lastCheck = -1;
-  CpvAccess(CldData)->sent = 0;
 #if CMK_TRACE_ENABLED
-  CpvAccess(CldData)->balanceEvt = traceRegisterUserEvent("CldBalance", -1);
-  CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("CldBalanceIdle", -1);
-  CpvAccess(CldData)->idleprocEvt = traceRegisterUserEvent("CldBalanceProcIdle", -1);
+  CpvAccess(CldData)->askEvt = traceRegisterUserEvent("CldAskLoad", -1);
+  CpvAccess(CldData)->idleEvt = traceRegisterUserEvent("StealLoad", -1);
+  CpvAccess(CldData)->askNoEvt = traceRegisterUserEvent("CldAckNoTask", -1);
 #endif
 
   CpvAccess(CldBalanceHandlerIndex) = 
@@ -292,15 +321,25 @@ void CldGraphModuleInit(char **argv)
   if (CmiMyRank() == CmiMyNodeSize())  return;
 
   _stealonly1 = CmiGetArgFlagDesc(argv, "+stealonly1", "Charm++> Work Stealing, every time only steal 1 task");
+ 
+  if(CmiGetArgIntDesc(argv, "+WSThreshold", &WS_Threshold, "The number of minimum load before stealing"))
+  {
+      CmiAssert(WS_Threshold>=0);
+  }
 
-#if 1
+  _steal_immediate = CmiGetArgFlagDesc(argv, "+WSImmediate", "Charm++> Work Stealing, steal using immediate messages");
+
+  _steal_prio = CmiGetArgFlagDesc(argv, "+WSPriority", "Charm++> Work Stealing, using priority");
+
   /* register idle handlers - when idle, keep asking work from neighbors */
-  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
-  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,
-      (CcdVoidFn) CldStillIdle, NULL);
-    if (CmiMyPe() == 0) 
-      CmiPrintf("Charm++> Work stealing is enabled. \n");
+  if(CmiNumPes() > 1)
+    CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,
+      (CcdVoidFn) CldBeginIdle, NULL);
+  if(WS_Threshold >= 0 && CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work when load is fewer than %d. \n", WS_Threshold);
+#if CMK_IMMEDIATE_MSG
+  if(_steal_immediate && CmiMyPe() == 0)
+      CmiPrintf("Charm++> Steal work using immediate messages. \n", WS_Threshold);
 #endif
 }
 
@@ -319,6 +358,9 @@ void CldModuleInit(char **argv)
   CldGraphModuleInit(argv);
 
   CpvAccess(CldLoadNotify) = 1;
+
+  CpvInitialize(int, isStealing);
+  CpvAccess(isStealing) = 0;
 }
 
 void CldCallback()

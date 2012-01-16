@@ -17,7 +17,7 @@ class packtest_Msg : public CMessage_packtest_Msg
     ~packtest_Msg(void) { if(list1) delete[] list1; }
 };
 
-class packtest_Btest : public Group
+class packtest_Btest : public CBase_packtest_Btest
 {
   private:
     int sentval;

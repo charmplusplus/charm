@@ -6,7 +6,7 @@ module CkArray {
   readonly CmiBool _isAnytimeMigration;
   
   group [migratable] CkArray : CkReductionMgr {
-	entry CkArray(CkArrayOptions i,CkMarshalledMessage ctorMsg,CkNodeGroupID nodereductionProxy);
+	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
 	//Insertion
 	entry void insertElement(CkMessage *);
 	entry void remoteDoneInserting(void);
@@ -33,6 +33,9 @@ module CkArray {
     entry void recvBroadcast(CkMessage *);
     // CMK_MEM_CHECKPOINT
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
+    // _PIPELINED_ALLREDUCE_
+    entry void defrag(CkReductionMsg*);
+
   };
 
 

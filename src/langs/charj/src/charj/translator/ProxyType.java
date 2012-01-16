@@ -12,4 +12,8 @@ public class ProxyType extends Symbol implements Type {
     public String getTypeName() {
         return baseType.getTypeName() + "@";
     }
+
+    public String getTranslatedTypeName() {
+        return "CProxy_" + baseType.getTypeName();
+    }
 }

@@ -35,6 +35,13 @@ void LBDB::batsyncer::resumeFromSync(void *bs)
 {
   LBDB::batsyncer *s=(LBDB::batsyncer *)bs;
 //  CmiPrintf("[%d] LBDB::batsyncer::resumeFromSync with %gs\n", CkMyPe(), s->period);
+
+#if 0
+  double curT = CmiWallTimer();
+  if (s->nextT<curT)  s->period *= 2;
+  s->nextT = curT + s->period;
+#endif
+
   CcdCallFnAfterOnPE((CcdVoidFn)gotoSync, (void *)s, 1000*s->period, CkMyPe());
 }
 
@@ -43,6 +50,7 @@ void LBDB::batsyncer::init(LBDB *_db,double initPeriod)
 {
   db=_db;
   period=initPeriod;
+  nextT = CmiWallTimer() + period;
   BH = db->AddLocalBarrierClient((LDResumeFn)resumeFromSync,(void*)(this));
   //This just does a CcdCallFnAfter
   resumeFromSync((void *)this);
@@ -59,7 +67,10 @@ LBDB::LBDB(): useBarrier(CmiTrue)
     omCount = objCount = oms_registering = 0;
     obj_running = CmiFalse;
     commTable = new LBCommTable;
-    obj_walltime = obj_cputime = 0;
+    obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+    obj_cputime = 0;
+#endif
     startLBFn_count = 0;
     predictCBFn = NULL;
     batsync.init(this, _lb_args.lbperiod());	    // original 1.0 second
@@ -84,7 +95,7 @@ LDOMHandle LBDB::AddOM(LDOMid _userID, void* _userData,
   return newhandle;
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define LBOBJ_OOC_IDX 0x1
 #endif
 
@@ -98,7 +109,7 @@ LDObjHandle LBDB::AddObj(LDOMHandle _omh, LDObjid _id,
   newhandle.id = _id;
   
 #if 1
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if(_BgOutOfCoreFlag==2){ //taking object into memory
     //first find the first (LBOBJ_OOC_IDX) in objs and insert the object at that position
     int newpos = -1;
@@ -148,7 +159,7 @@ void LBDB::UnregisterObj(LDObjHandle _h)
 // CmiPrintf("[%d] UnregisterObj: %d\n", CkMyPe(), _h.handle);
   delete objs[_h.handle];
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   //hack for BigSim out-of-core emulation.
   //we want the chare array object to keep at the same
   //position even going through the pupping routine.
@@ -245,18 +256,25 @@ void LBDB::ClearLoads(void)
     LBObj *obj = objs[i]; 
     if (obj)
     {
-      if (obj->data.cpuTime>.0) {
-        obj->lastCpuTime = obj->data.cpuTime;
+      if (obj->data.wallTime>.0) {
         obj->lastWallTime = obj->data.wallTime;
+#if CMK_LB_CPUTIMER
+        obj->lastCpuTime = obj->data.cpuTime;
+#endif
       }
-      obj->data.wallTime = 
-	obj->data.cpuTime = 0.;
+      obj->data.wallTime = 0.;
+#if CMK_LB_CPUTIMER
+      obj->data.cpuTime = 0.;
+#endif
     }
   }
   delete commTable;
   commTable = new LBCommTable;
   machineUtil.Clear();
-  obj_walltime = obj_cputime = 0;
+  obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+  obj_cputime = 0;
+#endif
 }
 
 int LBDB::ObjDataCount()
@@ -383,6 +401,34 @@ void LBDB::StartLB()
   }
 }
 
+int LBDB::AddMigrationDoneFn(LDMigrationDoneFn fn, void* data) {
+  // Save migrationDone callback function
+  MigrationDoneCB* callbk = new MigrationDoneCB;
+
+  callbk->fn = fn;
+  callbk->data = data;
+  migrationDoneCBList.push_back(callbk);
+  return migrationDoneCBList.size()-1;
+}
+
+void LBDB::RemoveMigrationDoneFn(LDMigrationDoneFn fn) {
+  for (int i=0; i<migrationDoneCBList.length(); i++) {
+    MigrationDoneCB* callbk = migrationDoneCBList[i];
+    if (callbk && callbk->fn == fn) {
+      delete callbk;
+      migrationDoneCBList[i] = 0; 
+      break;
+    }
+  }
+}
+
+void LBDB::MigrationDone() {
+  for (int i=0; i<migrationDoneCBList.length(); i++) {
+    MigrationDoneCB *callbk = migrationDoneCBList[i];
+    if (callbk) callbk->fn(callbk->data);
+  }
+}
+
 void LBDB::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredictFn off, LDPredictModelFn change, void* data)
 {
   if (predictCBFn==NULL) predictCBFn = new PredictCB;
@@ -393,32 +439,38 @@ void LBDB::SetupPredictor(LDPredictModelFn on, LDPredictWindowFn onWin, LDPredic
   predictCBFn->data = data;
 }
 
-void LBDB::BackgroundLoad(double* walltime, double* cputime)
+void LBDB::BackgroundLoad(LBRealType* bg_walltime, LBRealType* bg_cputime)
 {
-  double totalwall;
-  double totalcpu;
-  TotalTime(&totalwall,&totalcpu);
+  LBRealType total_walltime;
+  LBRealType total_cputime;
+  TotalTime(&total_walltime, &total_cputime);
 
-  double idle;
-  IdleTime(&idle);
-  
-  //*walltime = totalwall - idle - obj_walltime;
-  *walltime = totalwall - idle - obj_cputime;
-  *cputime = totalcpu - obj_cputime;
-  if (*walltime < 0) *walltime = 0.;
+  LBRealType idletime;
+  IdleTime(&idletime);
+
+  *bg_walltime = total_walltime - idletime - obj_walltime;
+  if (*bg_walltime < 0) *bg_walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *bg_cputime = total_cputime - obj_cputime;
+#else
+  *bg_cputime = *bg_walltime;
+#endif
 }
 
-void LBDB::GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime)
+void LBDB::GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime)
 {
   TotalTime(total_walltime,total_cputime);
 
   IdleTime(idletime);
   
-  //*bg_walltime = *total_walltime - *idletime - obj_walltime;
-  *bg_walltime = *total_walltime - *idletime - obj_cputime;
-  *bg_cputime = *total_cputime - obj_cputime;
+  *bg_walltime = *total_walltime - *idletime - obj_walltime;
   if (*bg_walltime < 0) *bg_walltime = 0.;
+#if CMK_LB_CPUTIMER
+  *bg_cputime = *total_cputime - obj_cputime;
+#else
+  *bg_cputime = *bg_walltime;
+#endif
   //CkPrintf("HERE [%d] total: %f %f obj: %f %f idle: %f bg: %f\n", CkMyPe(), *total_walltime, *total_cputime, obj_walltime, obj_cputime, *idletime, *bg_walltime);
 }
 
@@ -448,7 +500,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
   new_client->refcount = cur_refcount;
 
   LDBarrierClient ret_val;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   ret_val.serial = first_free_client_slot;
   clients.insert(ret_val.serial, new_client);
 
@@ -479,7 +531,7 @@ LDBarrierClient LocalBarrier::AddClient(LDResumeFn fn, void* data)
 void LocalBarrier::RemoveClient(LDBarrierClient c)
 {
   const int cnum = c.serial;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   if (cnum < clients.size() && clients[cnum] != 0) {
     delete (clients[cnum]);
     clients[cnum] = 0;

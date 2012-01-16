@@ -19,7 +19,7 @@
 //#include "queueing.h"
 #include <unistd.h>
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "blue_impl.h"
 #endif
 
@@ -393,7 +393,7 @@ void CpdPupMessage(PUP::er &p, void *msg)
   if (envType == ForArrayEltMsg || envType == ArrayEltInitMsg) {
     int arrID = env->getsetArrayMgr().idx;
     PUPn(arrID);
-    CkArrayIndexStruct &idx = *(CkArrayIndexStruct *)&env->getsetArrayIndex();
+    CkArrayIndex &idx = env->getsetArrayIndex();
     int nInts = idx.nInts;
     int dimension = idx.dimension;
     PUPn(nInts);
@@ -502,7 +502,7 @@ public:
       p((char*)type, strlen(type));
       return;
     }
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     if (CmiGetHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Local Charm";}
     if (CmiGetXHandler(msg)==_charmHandlerIdx) {isCharm=1; type="Network Charm";}
 #else
@@ -558,7 +558,7 @@ static void CpdDeliverMessageInt(int msgNum) {
     CmiReference(queuedMsg);
     CdsFifo_Enqueue(CpvAccess(conditionalQueue), queuedMsg);
   }  
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   stopVTimer();
   BgProcessMessageDefault(cta(threadinfo), queuedMsg);
   startVTimer();
@@ -784,7 +784,7 @@ static void _call_freeze_on_break_point(void * msg, void * object)
       CkpvAccess(lastBreakPointIndex) = CkMessageToEpIdx(msg);
       CpdNotify(CPD_BREAKPOINT,breakPointEntryInfo->name);
       CpdFreeze();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       stopVTimer();
       ((workThreadInfo*)cta(threadinfo))->scheduler(-1);
 #endif
@@ -808,7 +808,7 @@ void CpdDeliverSingleMessage () {
     }
     CkpvAccess(lastBreakPointMsg) = NULL;
     CkpvAccess(lastBreakPointObject) = NULL;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     ((workThreadInfo*)cta(threadinfo))->stopScheduler();
 #endif
   }
@@ -822,7 +822,7 @@ void CpdDeliverSingleMessage () {
         CmiReference(queuedMsg);
         CdsFifo_Enqueue(CpvAccess(conditionalQueue),queuedMsg);
       }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       stopVTimer();
       BgProcessMessageDefault(cta(threadinfo), queuedMsg);
       startVTimer();
@@ -844,7 +844,7 @@ void CpdContinueFromBreakPoint ()
         EntryInfo * breakPointEntryInfo = CpvAccess(breakPointEntryTable)->get(CkpvAccess(lastBreakPointIndex));
         if (breakPointEntryInfo != NULL) {
            breakPointEntryInfo->call(CkpvAccess(lastBreakPointMsg), CkpvAccess(lastBreakPointObject));
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
            ((workThreadInfo*)cta(threadinfo))->stopScheduler();
 #endif
         } else {
@@ -960,7 +960,7 @@ extern "C" int CpdIsCharmDebugMessage(void *msg) {
          env->getMsgtype() == FillVidMsg || _entryTable[env->getEpIdx()]->inCharm;
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 CpvExtern(int, _bgCcsHandlerIdx);
 extern "C" int CpdIsBgCharmDebugMessage(void *msg) {
   envelope *env = (envelope*)msg;
@@ -1035,30 +1035,29 @@ extern "C" {
 
 void CpdCharmInit()
 {
-  CpdListRegister(new CpdListAccessor_c("converse/memory",cpd_memory_length,0,cpd_memory_pup,0));
-  //CpdListRegister(new CpdListAccessor_c("converse/memory/leak",cpd_memory_length,0,cpd_memory_leak,0));
-  CpdListRegister(new CpdListAccessor_c("converse/memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
+  CpdListRegister(new CpdListAccessor_c("memory/list",cpd_memory_length,0,cpd_memory_pup,0));
+  CpdListRegister(new CpdListAccessor_c("memory/data",cpd_memory_getLength,0,cpd_memory_get,0,false));
 
   //CpdBreakPointInit();
-  CcsRegisterHandler("ccs_set_break_point",(CmiHandler)CpdSetBreakPoint);
-  CcsSetMergeFn("ccs_set_break_point",CcsMerge_logical_and);
-  CcsRegisterHandler("ccs_remove_break_point",(CmiHandler)CpdRemoveBreakPoint);
-  CcsSetMergeFn("ccs_remove_break_point",CcsMerge_logical_and);
-  CcsRegisterHandler("ccs_remove_all_break_points",(CmiHandler)CpdRemoveAllBreakPoints);
-  CcsSetMergeFn("ccs_remove_all_break_points",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_continue_break_point",(CmiHandler)CpdContinueFromBreakPoint);
-  CcsSetMergeFn("ccs_continue_break_point",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_single_step",(CmiHandler)CpdDeliverSingleMessage);
-  CcsSetMergeFn("ccs_single_step",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_debug_quit",(CmiHandler)CpdQuitDebug);
-  CcsSetMergeFn("ccs_debug_quit",CmiReduceMergeFn_random);
-  CcsRegisterHandler("ccs_debug_startgdb",(CmiHandler)CpdStartGdb);
+  CcsRegisterHandler("debug/charm/bp/set",(CmiHandler)CpdSetBreakPoint);
+  CcsSetMergeFn("debug/charm/bp/set",CcsMerge_logical_and);
+  CcsRegisterHandler("debug/charm/bp/remove",(CmiHandler)CpdRemoveBreakPoint);
+  CcsSetMergeFn("debug/charm/bp/remove",CcsMerge_logical_and);
+  CcsRegisterHandler("debug/charm/bp/removeall",(CmiHandler)CpdRemoveAllBreakPoints);
+  CcsSetMergeFn("debug/charm/bp/removeall",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/charm/continue",(CmiHandler)CpdContinueFromBreakPoint);
+  CcsSetMergeFn("debug/charm/continue",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/charm/next",(CmiHandler)CpdDeliverSingleMessage);
+  CcsSetMergeFn("debug/charm/next",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/converse/quit",(CmiHandler)CpdQuitDebug);
+  CcsSetMergeFn("debug/converse/quit",CmiReduceMergeFn_random);
+  CcsRegisterHandler("debug/converse/startgdb",(CmiHandler)CpdStartGdb);
   CpdListRegister(new CpdListAccessor_c("hostinfo",hostInfoLength,0,hostInfo,0));
   CpdListRegister(new CpdList_localQ());
-  CcsRegisterHandler("deliverMessage",(CmiHandler)CpdDeliverMessage);
-  CcsRegisterHandler("deliverConditional",(CmiHandler)CpdDeliverMessageConditionally);
-  CcsRegisterHandler("endConditional",(CmiHandler)CpdEndConditionalDelivery);
-  CcsRegisterHandler("commitConditional",(CmiHandler)CpdCommitConditionalDelivery);
+  CcsRegisterHandler("debug/charm/deliver",(CmiHandler)CpdDeliverMessage);
+  CcsRegisterHandler("debug/provisional/deliver",(CmiHandler)CpdDeliverMessageConditionally);
+  CcsRegisterHandler("debug/provisional/rollback",(CmiHandler)CpdEndConditionalDelivery);
+  CcsRegisterHandler("debug/provisional/commit",(CmiHandler)CpdCommitConditionalDelivery);
   CpdListRegister(new CpdList_arrayElementNames());
   CpdListRegister(new CpdList_arrayElements());
   CpdListRegister(new CpdList_objectNames());
@@ -1067,12 +1066,12 @@ void CpdCharmInit()
   CpdListRegister(new CpdList_msgStack());
   CpdGetNextMessage = CsdNextMessage;
   CpdIsDebugMessage = CpdIsCharmDebugMessage;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   CpdIsDebugMessage = CpdIsBgCharmDebugMessage;
 #endif
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 CpvExtern(int, _bgCcsHandlerIdx);
 CpvExtern(int, _bgCcsAck);
 extern "C" void req_fw_handler(char*);
@@ -1106,7 +1105,7 @@ void CpdBgInit()
 
 void CpdBreakPointInit() {}
 void CpdCharmInit() {}
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 void CpdBgInit() {}
 #endif
 

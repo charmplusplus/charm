@@ -1,0 +1,20 @@
+mainmodule ckAllocSysMsgTest {
+    readonly CProxy_main mainProxy;		
+    readonly int period;
+  mainchare main {
+    entry main(CkArgMsg *m);	    	   
+    entry void startBatching();
+    entry void reportInArr();
+    entry void reportInGrp();
+    entry void nextBatch();
+    entry void done();
+    };
+  group RaceMeGrp {
+    entry RaceMeGrp();
+    entry void recvMsg();
+  };
+  array [3D] RaceMeArr{
+    entry RaceMeArr(int nElements);
+    entry void recvMsg();
+ };
+};

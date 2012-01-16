@@ -9,9 +9,10 @@ CpvDeclare(int, bigmsg_index);
 
 void Cpm_megacon_ack();
 
-void bigmsg_handler(int *msg)
+void bigmsg_handler(void *vmsg)
 {
   int i, next;
+  int *msg = vmsg;
   if (CmiMyPe()==0) {
     for (i=CmiMsgHeaderSizeInts; i<250000; i++) {
       if (msg[i] != i) {
@@ -19,10 +20,11 @@ void bigmsg_handler(int *msg)
 	exit(1);
       }
     }
+    CmiFree(msg);
     Cpm_megacon_ack(CpmSend(0));
   } else {
     next = (CmiMyPe()+1) % CmiNumPes();
-    CmiSyncSend(next, 250000*sizeof(int), msg);
+    CmiSyncSendAndFree(next, 250000*sizeof(int), msg);
   }
 }
 

@@ -10,8 +10,8 @@
 */
 /*@{*/
 
-#ifndef _TRACE_BLUEGENE_H
-#define _TRACE_BLUEGENE_H
+#ifndef _TRACE_BIGSIM_H
+#define _TRACE_BIGSIM_H
 
 #include "trace.h"
 
@@ -36,6 +36,7 @@ class TraceBluegene : public Trace {
     void bgSetInfo(char *msg, const char *str, void **logs, int count);
     void bgEndExec(int);
     virtual void beginExecute(envelope *);
+    virtual void beginExecute(char *) {}
     virtual void beginExecute(CmiObjId *tid) {}
     virtual void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx);
     void addBackwardDep(void *log);

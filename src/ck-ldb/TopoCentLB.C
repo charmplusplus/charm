@@ -8,12 +8,7 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include "charm++.h"
-#include "cklists.h"
-#include "CentralLB.h"
-
 #include "TopoCentLB.decl.h"
-
 #include "TopoCentLB.h"
 
 #define alpha PER_MESSAGE_SEND_OVERHEAD_DEFAULT  /*Startup time per message, seconds*/
@@ -173,9 +168,7 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
   int numflag = 0; // C Style numbering
   int options[5];
   int edgecut;
-  int sameMapFlag = 1;
-
-	options[0] = 0;
+  options[0] = 0;
 
   if (count < 1) {
     CkPrintf("error: Number of Pe less than 1!");
@@ -183,10 +176,8 @@ void TopoCentLB::computePartitions(CentralLB::LDStats *stats,int count,int *newm
   else if (count == 1) {
    	for(m=0;m<numobjs;m++) 
 			newmap[i] = origmap[i];
-   	sameMapFlag = 1;
   }
   else {
-  	sameMapFlag = 0;
 		/*
   	if (count > 8)
 			METIS_PartGraphKway(&numobjs, xadj, adjncy, objwt, edgewt, 
@@ -298,7 +289,6 @@ void TopoCentLB::BuildHeap(HeapNode *heap,int heapSize){
 }
 
 void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
-	int val;
 	if(wt != -1.00){
 		#ifdef MAX_EDGE
 			if(wt>heap[i].key)
@@ -323,338 +313,332 @@ void TopoCentLB :: increaseKey(HeapNode *heap,int i,double wt){
 
 /*This routine implements the algorithm used to produce the partition-processor mapping*/
 /*The algorithm uses an idea similar to the standard MST algorithm*/
-void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_mapping,int max_comm_part){
+void TopoCentLB :: calculateMST(PartGraph *partgraph,LBTopology *topo,int *proc_mapping,int max_comm_part) {
 
-	int *inHeap;
-	double *keys;
-	int count = partgraph->n_nodes;
-	int i=0,j=0;
+  int *inHeap;
+  double *keys;
+  int count = partgraph->n_nodes;
+  int i=0,j=0;
 
   //Arrays needed for keeping information
-	inHeap = new int[partgraph->n_nodes];
-	keys = new double[partgraph->n_nodes];
+  inHeap = new int[partgraph->n_nodes];
+  keys = new double[partgraph->n_nodes];
 
-	int *assigned_procs = new int[count];
+  int *assigned_procs = new int[count];
 
-	hopCount = new double*[count];
-	for(i=0;i<count;i++){
-		proc_mapping[i]=-1;
-		assigned_procs[i]=0;
-		hopCount[i] = new double[count];
-		for(j=0;j<count;j++)
-			hopCount[i][j] = 0;
-	}
+  hopCount = new double*[count];
+  for(i=0;i<count;i++){
+    proc_mapping[i]=-1;
+    assigned_procs[i]=0;
+    hopCount[i] = new double[count];
+    for(j=0;j<count;j++)
+      hopCount[i][j] = 0;
+  }
 
   //Call a topology routine to fill up hopCount
-	topo->get_pairwise_hop_count(hopCount);
+  topo->get_pairwise_hop_count(hopCount);
 	
   int max_neighbors = topo->max_neighbors();
 	
-	HeapNode *heap = new HeapNode[partgraph->n_nodes];
-	heapMapping = new int[partgraph->n_nodes];
+  HeapNode *heap = new HeapNode[partgraph->n_nodes];
+  heapMapping = new int[partgraph->n_nodes];
 	
-	int heapSize = 0;
+  int heapSize = 0;
 
-	for(i=0;i<partgraph->n_nodes;i++){
-		heap[i].key = 0.00;
-		heap[i].node = i;
-		keys[i] = 0.00;
-		inHeap[i] = 1;
-		heapMapping[i]=i;
-	}
+  for(i=0;i<partgraph->n_nodes;i++){
+    heap[i].key = 0.00;
+    heap[i].node = i;
+    keys[i] = 0.00;
+    inHeap[i] = 1;
+    heapMapping[i]=i;
+  }
 
-	//Assign the max comm partition first
-	heap[max_comm_part].key = 1.00;
+  //Assign the max comm partition first
+  heap[max_comm_part].key = 1.00;
 	
-	heapSize = partgraph->n_nodes;
-	BuildHeap(heap,heapSize);
+  heapSize = partgraph->n_nodes;
+  BuildHeap(heap,heapSize);
 
-	int k=0,comm_cnt=0,m=0,n=0;
-	int *commParts = new int[partgraph->n_nodes];
+  int k=0,comm_cnt=0,m=0;
+  int *commParts = new int[partgraph->n_nodes];
 	
-	//srand(count);
+  //srand(count);
 
-	while(heapSize > 0){
+  while(heapSize > 0){
 
     /****Phase1: Extracting appropriate partition from heap****/
 
-		HeapNode max = extractMax(heap,&heapSize);
-		inHeap[max.node] = 0;
+    HeapNode max = extractMax(heap,&heapSize);
+    inHeap[max.node] = 0;
 
-		for(i=0;i<partgraph->n_nodes;i++){
-			commParts[i]=-1;
-			PartGraph::Edge wt = partgraph->edges[max.node][i];
-			if(wt == 0)
-				continue;
-			if(inHeap[i]){
-			#ifdef MAX_EDGE
-				if(wt>keys[i])
-					keys[i]=wt;
-			#else
-				keys[i] += wt;
-			#endif
+    for(i=0;i<partgraph->n_nodes;i++){
+      commParts[i]=-1;
+      PartGraph::Edge wt = partgraph->edges[max.node][i];
+      if(wt == 0)
+	continue;
+      if(inHeap[i]){
+#ifdef MAX_EDGE
+	if(wt>keys[i])
+	  keys[i]=wt;
+#else
+	keys[i] += wt;
+#endif
         /*This part has been COMMENTED out for optimizing the code: we handle the updation using heapMapping*/
         /*array instead of searching for node in the heap everytime*/
 
-				//Update in the heap too
-				//First, find where this node is..in the heap
-				/*for(j=0;j<heapSize;j++)
-					if(heap[j].node == i)
-						break;
-				if(j==heapSize)
-					CmiAbort("Some error in heap...\n");*/
-				increaseKey(heap,heapMapping[i],wt);
-			}
-		}
+	//Update in the heap too
+	//First, find where this node is..in the heap
+	/*for(j=0;j<heapSize;j++)
+	  if(heap[j].node == i)
+	  break;
+	  if(j==heapSize)
+	  CmiAbort("Some error in heap...\n");*/
+	increaseKey(heap,heapMapping[i],wt);
+      }
+    }
 		 
     /*Phase2: ASSIGNING partition to processor*/
 		
     //Special case
-		if(heapSize == partgraph->n_nodes-1){ //Assign max comm partition to 0th proc in the topology
-			proc_mapping[max.node]=0;
-			assigned_procs[0]=1;
-			continue;
-		}
+    if(heapSize == partgraph->n_nodes-1){ //Assign max comm partition to 0th proc in the topology
+      proc_mapping[max.node]=0;
+      assigned_procs[0]=1;
+      continue;
+    }
 		
-		m=0;
-		n=0;
-		comm_cnt=0;
+    m=0;
 
-		int pot_proc=-1;
-		double min_cost=-1;
-		int min_cost_index=-1;
-		double cost=0;
-		int p=0;
-		//int q=0;
+    comm_cnt=0;
 
-		for(k=0;k<partgraph->n_nodes;k++){
-			if(!inHeap[k] && partgraph->edges[k][max.node]){
-				commParts[comm_cnt]=k;
-				comm_cnt++;
-			}
-		}
+    double min_cost=-1;
+    int min_cost_index=-1;
+    double cost=0;
+    int p=0;
+    //int q=0;
+
+    for(k=0;k<partgraph->n_nodes;k++){
+      if(!inHeap[k] && partgraph->edges[k][max.node]){
+	commParts[comm_cnt]=k;
+	comm_cnt++;
+      }
+    }
 
     //Optimized the loop by commenting out the get_hop_count code and getting all the hop counts initially
-		for(m=0;m<count;m++){
-			if(!assigned_procs[m]){
-				cost=0;
-				for(p=0;p<comm_cnt;p++){
-					//if(!hopCount[proc_mapping[commParts[p]]][m])
-						//hopCount[proc_mapping[commParts[p]]][m]=topo->get_hop_count(proc_mapping[commParts[p]],m);
-					cost += hopCount[proc_mapping[commParts[p]]][m]*partgraph->edges[commParts[p]][max.node];
-				}
-				if(min_cost==-1 || cost<min_cost){
-					min_cost=cost;
-					min_cost_index=m;
-				}
-			}
-		}
-
-		proc_mapping[max.node]=min_cost_index;
-		assigned_procs[min_cost_index]=1;
+    for(m=0;m<count;m++){
+      if(!assigned_procs[m]){
+	cost=0;
+	for(p=0;p<comm_cnt;p++){
+	  //if(!hopCount[proc_mapping[commParts[p]]][m])
+	  //hopCount[proc_mapping[commParts[p]]][m]=topo->get_hop_count(proc_mapping[commParts[p]],m);
+	  cost += hopCount[proc_mapping[commParts[p]]][m]*partgraph->edges[commParts[p]][max.node];
 	}
+	if(min_cost==-1 || cost<min_cost){
+	  min_cost=cost;
+	  min_cost_index=m;
+	}
+      }
+    }
 
-	//clear up memory
-	delete[] inHeap;
-	delete[] keys;
-	delete[] assigned_procs;
-	delete[] heap;
-	delete[] commParts;
+    proc_mapping[max.node]=min_cost_index;
+    assigned_procs[min_cost_index]=1;
+  }
+
+  //clear up memory
+  delete[] inHeap;
+  delete[] keys;
+  delete[] assigned_procs;
+  delete[] heap;
+  delete[] commParts;
 }
 
 
-void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
+void TopoCentLB :: work(LDStats *stats)
 {
   int proc;
-  int obj;
-  int dest;
   int i,j;
-	LDObjData *odata;
+  int n_pes = stats->nprocs();
 	
-	if (_lb_args.debug() >= 2) {
+  if (_lb_args.debug() >= 2) {
     CkPrintf("In TopoCentLB Strategy...\n");
   }
   
   // Make sure that there is at least one available processor.
-  for (proc = 0; proc < count; proc++) {
+  for (proc = 0; proc < n_pes; proc++) {
     if (stats->procs[proc].available) {
       break;
     }
   }
-	if (proc == count) {
+
+  if (proc == n_pes) {
     CmiAbort ("TopoCentLB: no available processors!");
   }
 
   
-  removeNonMigratable(stats,count);
+  removeNonMigratable(stats, n_pes);
+  int *newmap = new int[stats->n_objs];
 
-	int *newmap = new int[stats->n_objs];
 
-
-	if(make_mapping)
-		computePartitions(stats,count,newmap);
-	else{
-		//mapping taken from previous algo
-		for(i=0;i<stats->n_objs;i++){
+  if(make_mapping)
+    computePartitions(stats, n_pes, newmap);
+  else {
+    //mapping taken from previous algo
+    for(i=0;i<stats->n_objs;i++) {
       newmap[i]=stats->from_proc[i];
     }
-	}
+  }
 
   //Debugging Code
   if(_lb_args.debug() >=2){
-	  CkPrintf("Map obtained from partitioning:\n");
+    CkPrintf("Map obtained from partitioning:\n");
     for(i=0;i<stats->n_objs;i++)
-		  CkPrintf(" %d,%d ",i,newmap[i]);
+      CkPrintf(" %d,%d ",i,newmap[i]);
   }
 
-	int max_objs = findMaxObjs(newmap,stats->n_objs,count);
+  int max_objs = findMaxObjs(newmap,stats->n_objs, n_pes);
 	
-	partgraph = new PartGraph(count,max_objs);
+  partgraph = new PartGraph(n_pes, max_objs);
 
-	//Fill up the partition graph - first fill the nodes and then, the edges
+  //Fill up the partition graph - first fill the nodes and then, the edges
 
-	for(i=0;i<stats->n_objs;i++)
-	{
-		PartGraph::Node* n = &partgraph->nodes[newmap[i]];
-		n->obj_list[n->num_objs]=i;
-		n->num_objs++;
-	}
+  for(i=0;i<stats->n_objs;i++)
+    {
+      PartGraph::Node* n = &partgraph->nodes[newmap[i]];
+      n->obj_list[n->num_objs]=i;
+      n->num_objs++;
+    }
 
-	int *addedComm=new int[count];
+  int *addedComm=new int[n_pes];
   
   stats->makeCommHash();
   
-	int max_comm_part=-1;
+  int max_comm_part=-1;
 	
-	double max_comm=0;
+  double max_comm=0;
 
   //Try putting random amount of communication on the partition graph edges to see if things work fine
   //This also checks the running time of the algorithm since number of edges is high than in a practical scenario
-	#ifdef RAND_COMM
-	for(i=0;i<count;i++){
-		for(j=i+1;j<count;j++){
-			int val;
-			if(rand()%5==0)
-				val=0;
-			else
-				val= rand()%1000;
+#ifdef RAND_COMM
+  for(i = 0; i < n_pes; i++) {
+    for(j = i+1; j < n_pes; j++) {
+      int val;
+      if(rand()%5==0)
+	val=0;
+      else
+	val= rand()%1000;
 				
-			partgraph->edges[i][j] = val;
-			partgraph->edges[j][i] = val;
+      partgraph->edges[i][j] = val;
+      partgraph->edges[j][i] = val;
 			
-			partgraph->nodes[i].comm += val;
-			partgraph->nodes[j].comm += val;
+      partgraph->nodes[i].comm += val;
+      partgraph->nodes[j].comm += val;
 			
-			if(partgraph->nodes[i].comm > max_comm){
-				max_comm = partgraph->nodes[i].comm;
-				max_comm_part = i;
-			}
-			if(partgraph->nodes[j].comm > max_comm){
-				max_comm = partgraph->nodes[j].comm;
-				max_comm_part = j;
-			}
-		}
-	}
-	#else
+      if(partgraph->nodes[i].comm > max_comm){
+	max_comm = partgraph->nodes[i].comm;
+	max_comm_part = i;
+      }
+      if(partgraph->nodes[j].comm > max_comm){
+	max_comm = partgraph->nodes[j].comm;
+	max_comm_part = j;
+      }
+    }
+  }
+#else
   //Adding communication to the partition graph edges
-	for(i=0;i<stats->n_comm;i++)
-	{
-		//DO I consider other comm too....i.e. to or from a processor
-		LDCommData &cdata = stats->commData[i];
-		if(!cdata.from_proc() && cdata.receiver.get_type() == LD_OBJ_MSG){
+  for(i=0;i<stats->n_comm;i++)
+    {
+      //DO I consider other comm too....i.e. to or from a processor
+      LDCommData &cdata = stats->commData[i];
+      if(!cdata.from_proc() && cdata.receiver.get_type() == LD_OBJ_MSG){
     	int senderID = stats->getHash(cdata.sender);
     	int recverID = stats->getHash(cdata.receiver.get_destObj());
-			CmiAssert(senderID < stats->n_objs);
-   		CmiAssert(recverID < stats->n_objs);
+	CmiAssert(senderID < stats->n_objs);
+	CmiAssert(recverID < stats->n_objs);
 		
-			if(newmap[senderID]==newmap[recverID])
-				continue;
+	if(newmap[senderID]==newmap[recverID])
+	  continue;
 	
-			if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
-				partgraph->nodes[newmap[senderID]].degree++;
-				partgraph->nodes[newmap[recverID]].degree++;
-			}
-		
-			partgraph->edges[newmap[senderID]][newmap[recverID]] += cdata.bytes;
-			partgraph->edges[newmap[recverID]][newmap[senderID]] += cdata.bytes;
-			
-			partgraph->nodes[newmap[senderID]].comm += cdata.bytes;
-			partgraph->nodes[newmap[recverID]].comm += cdata.bytes;
-
-      //Keeping track of maximum communiacting partition
-			if(partgraph->nodes[newmap[senderID]].comm > max_comm){
-				max_comm = partgraph->nodes[newmap[senderID]].comm;
-				max_comm_part = newmap[senderID];
-			}
-			if(partgraph->nodes[newmap[recverID]].comm > max_comm){
-				max_comm = partgraph->nodes[newmap[recverID]].comm;
-				max_comm_part = newmap[recverID];
-			}
-		}
-		else if(cdata.receiver.get_type() == LD_OBJLIST_MSG) {
-			int nobjs;
-    	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
-      int senderID = stats->getHash(cdata.sender);
-			for(j=0;j<count;j++)
-				addedComm[j]=0;
-			for (j=0; j<nobjs; j++) {
-      	int recverID = stats->getHash(objs[j]);
-        if((senderID == -1)||(recverID == -1))
-        	if (_lb_args.migObjOnly()) continue;
-        	else CkAbort("Error in search\n");
-					
-				if(newmap[senderID]==newmap[recverID])
-					continue;
-	
-				if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
-					partgraph->nodes[newmap[senderID]].degree++;
-					partgraph->nodes[newmap[recverID]].degree++;
-				}
-
-        //Communication added only once for a message sent to many objects on a single processor
-				if(!addedComm[newmap[recverID]]){
-					partgraph->edges[newmap[senderID]][newmap[recverID]] += cdata.bytes;
-					partgraph->edges[newmap[recverID]][newmap[senderID]] += cdata.bytes;
-	
-					partgraph->nodes[newmap[senderID]].comm += cdata.bytes;
-					partgraph->nodes[newmap[recverID]].comm += cdata.bytes;
-
-					if(partgraph->nodes[newmap[senderID]].comm > max_comm){
-						max_comm = partgraph->nodes[newmap[senderID]].comm;
-						max_comm_part = newmap[senderID];
-					}
-					if(partgraph->nodes[newmap[recverID]].comm > max_comm){
-						max_comm = partgraph->nodes[newmap[recverID]].comm;
-						max_comm_part = newmap[recverID];
-					}
-					//bytesComm[newmap[senderID]][newmap[recverID]] += cdata.bytes;
-					//bytesComm[newmap[recverID]][newmap[senderID]] += cdata.bytes;
-					addedComm[newmap[recverID]]=1;
-				}
-      }
-		}
-
+	if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
+	  partgraph->nodes[newmap[senderID]].degree++;
+	  partgraph->nodes[newmap[recverID]].degree++;
 	}
-	#endif
-	
-	int *proc_mapping = new int[count];
-	
-	delete [] addedComm;
 		
-	LBtopoFn topofn;
- 	int max_neighbors=0;
-	int *neigh;
-	int num_neigh=0;
+	partgraph->edges[newmap[senderID]][newmap[recverID]] += cdata.bytes;
+	partgraph->edges[newmap[recverID]][newmap[senderID]] += cdata.bytes;
+			
+	partgraph->nodes[newmap[senderID]].comm += cdata.bytes;
+	partgraph->nodes[newmap[recverID]].comm += cdata.bytes;
+
+	//Keeping track of maximum communiacting partition
+	if(partgraph->nodes[newmap[senderID]].comm > max_comm){
+	  max_comm = partgraph->nodes[newmap[senderID]].comm;
+	  max_comm_part = newmap[senderID];
+	}
+	if(partgraph->nodes[newmap[recverID]].comm > max_comm){
+	  max_comm = partgraph->nodes[newmap[recverID]].comm;
+	  max_comm_part = newmap[recverID];
+	}
+      }
+      else if(cdata.receiver.get_type() == LD_OBJLIST_MSG) {
+	int nobjs;
+    	LDObjKey *objs = cdata.receiver.get_destObjs(nobjs);
+	int senderID = stats->getHash(cdata.sender);
+	for(j = 0; j < n_pes; j++)
+	  addedComm[j]=0;
+	for (j=0; j<nobjs; j++) {
+	  int recverID = stats->getHash(objs[j]);
+	  if((senderID == -1)||(recverID == -1))
+	    if (_lb_args.migObjOnly()) continue;
+	    else CkAbort("Error in search\n");
+					
+	  if(newmap[senderID]==newmap[recverID])
+	    continue;
+	
+	  if(partgraph->edges[newmap[senderID]][newmap[recverID]] == 0){
+	    partgraph->nodes[newmap[senderID]].degree++;
+	    partgraph->nodes[newmap[recverID]].degree++;
+	  }
+
+	  //Communication added only once for a message sent to many objects on a single processor
+	  if(!addedComm[newmap[recverID]]){
+	    partgraph->edges[newmap[senderID]][newmap[recverID]] += cdata.bytes;
+	    partgraph->edges[newmap[recverID]][newmap[senderID]] += cdata.bytes;
+	
+	    partgraph->nodes[newmap[senderID]].comm += cdata.bytes;
+	    partgraph->nodes[newmap[recverID]].comm += cdata.bytes;
+
+	    if(partgraph->nodes[newmap[senderID]].comm > max_comm){
+	      max_comm = partgraph->nodes[newmap[senderID]].comm;
+	      max_comm_part = newmap[senderID];
+	    }
+	    if(partgraph->nodes[newmap[recverID]].comm > max_comm){
+	      max_comm = partgraph->nodes[newmap[recverID]].comm;
+	      max_comm_part = newmap[recverID];
+	    }
+	    //bytesComm[newmap[senderID]][newmap[recverID]] += cdata.bytes;
+	    //bytesComm[newmap[recverID]][newmap[senderID]] += cdata.bytes;
+	    addedComm[newmap[recverID]]=1;
+	  }
+	}
+      }
+
+    }
+#endif
+	
+  int *proc_mapping = new int[n_pes];
+	
+  delete [] addedComm;
+		
+  LBtopoFn topofn;
 
   //Parsing the command line input for getting the processor topology
-	char *lbcopy = strdup(_lbtopo);
+  char *lbcopy = strdup(_lbtopo);
   char *ptr = strchr(lbcopy, ':');
   if (ptr!=NULL)
     ptr = strtok(lbcopy, ":");
-	else
-		ptr=lbcopy;
+  else
+    ptr=lbcopy;
 
-	topofn = LBTopoLookup(ptr);
+  topofn = LBTopoLookup(ptr);
   if (topofn == NULL) {
     char str[1024];
     CmiPrintf("TopoCentLB> Fatal error: Unknown topology: %s. Choose from:\n", ptr);
@@ -663,40 +647,40 @@ void TopoCentLB :: work(CentralLB::LDStats *stats,int count)
     CmiAbort(str);
   }
   
-	topo = topofn(count);
+  topo = topofn(n_pes);
 
   //Call the core routine to produce the partition processor mapping
-	calculateMST(partgraph,topo,proc_mapping,max_comm_part);
-	//Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
+  calculateMST(partgraph,topo,proc_mapping,max_comm_part);
+  //Returned partition graph is a Maximum Spanning Tree -- converted in above function itself
 
   //Debugging code: Result of mapping partition graph onto processor graph
-	if (_lb_args.debug()>1) {
-	  CkPrintf("Resultant mapping..(partition,processor)\n");
-	  for(i=0;i<count;i++)
-		  CkPrintf("%d,%d\n",i,proc_mapping[i]);
+  if (_lb_args.debug()>1) {
+    CkPrintf("Resultant mapping..(partition,processor)\n");
+    for(i = 0; i < n_pes; i++)
+      CkPrintf("%d,%d\n",i,proc_mapping[i]);
   }
 
   //Store the result in the load balancing database
-	int pe;
-	PartGraph::Node* n;
-	for(i=0;i<count;i++){
-		pe = proc_mapping[i];
-		n = &partgraph->nodes[i];
-		for(j=0;j<n->num_objs;j++){
-			stats->to_proc[n->obj_list[j]] = pe;
-			if (_lb_args.debug()>1) 
+  int pe;
+  PartGraph::Node* n;
+  for(i = 0; i < n_pes; i++){
+    pe = proc_mapping[i];
+    n = &partgraph->nodes[i];
+    for(j=0;j<n->num_objs;j++){
+      stats->to_proc[n->obj_list[j]] = pe;
+      if (_lb_args.debug()>1) 
         CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),n->obj_list[j],stats->from_proc[n->obj_list[j]],pe);
-		}
-	}
+    }
+  }
 
-	delete[] newmap;
-	delete[] proc_mapping;
-	//Delete hopCount
-	for(i=0;i<count;i++)
-		delete[] hopCount[i];
+  delete[] newmap;
+  delete[] proc_mapping;
+  //Delete hopCount
+  for(i = 0; i < n_pes; i++)
+    delete[] hopCount[i];
 
-	delete[] hopCount;
-	delete[] heapMapping;
+  delete[] hopCount;
+  delete[] heapMapping;
 	
   delete partgraph;
 }

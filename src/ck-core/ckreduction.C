@@ -204,6 +204,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
     totalCount = 0;
     processorCount = 0;
 #endif
+  disableNotifyChildrenStart = CmiFalse;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
 
@@ -220,14 +221,14 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 }
 
-void CkReductionMgr::flushStates()
+void CkReductionMgr::flushStates(int isgroup)
 {
   // CmiPrintf("[%d] CkReductionMgr::flushState\n", CkMyPe());
   redNo=0;
   completedRedNo = -1;
   inProgress=CmiFalse;
   creating=CmiFalse;
-  gcount=lcount=0;
+  if (!isgroup) gcount=lcount=0;    // array reduction group needs to reset to 0
   startRequested=CmiFalse;
   nContrib=nRemote=0;
   maxStartRequest=0;
@@ -239,7 +240,9 @@ void CkReductionMgr::flushStates()
 
   adjVec.length()=0;
 
+#if ! GROUP_LEVEL_REDUCTION
   nodeProxy[CkMyNode()].ckLocalBranch()->flushStates();
+#endif
 }
 
 //////////// Reduction Manager Client API /////////////
@@ -383,7 +386,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
   DEBR((AA"Contributor %p contributed for %d in grp %d ismigratable %d \n"AB,ci,ci->redNo,thisgroup.idx,m->isMigratableContributor()));
@@ -492,7 +495,7 @@ void CkReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 void CkReductionMgr::LateMigrantMsg(CkReductionMsg *m)
 {
 #if GROUP_LEVEL_REDUCTION
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
   addContribution(m);
@@ -547,6 +550,8 @@ void CkReductionMgr::startReduction(int number,int srcPE)
 	return;
   }
 
+  if(disableNotifyChildrenStart) return;
+  
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
   if(CmiMyPe() == 0 && redNo == 0){
             for(int j=0;j<CkNumPes();j++){
@@ -775,12 +780,11 @@ void CkReductionMgr::finishReduction(void)
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-	if(CkMyPe()!=0){
-#else
-    {
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_)) && !GROUP_LEVEL_REDUCTION
+    /* nodegroup reduction will adjust adjVec in endArrayReduction on PE 0 */
+  if(CkMyPe()!=0)
 #endif
-//	int i;
+  {
 	completedRedNo++;
   	for (i=1;i<(int)(adjVec.length());i++){
 	   adjVec[i-1]=adjVec[i];
@@ -824,7 +828,7 @@ void CkReductionMgr::finishReduction(void)
   void CkReductionMgr::RecvMsg(CkReductionMsg *m)
 {
 #if GROUP_LEVEL_REDUCTION
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
   if (isPresent(m->redNo)) { //Is a regular, in-order reduction message
@@ -859,7 +863,7 @@ countAdjustment &CkReductionMgr::adj(int number)
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkReductionMgr::reduceMessages(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_END_EXECUTE(1);
   void* _bgParentLog = NULL;
   _TRACE_BG_BEGIN_EXECUTE_NOMSG("GroupReduce", &_bgParentLog, 0);
@@ -893,7 +897,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
         msgs_userFlag=m->userFlag;
 			
 	isMigratableContributor=m->isMigratableContributor();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	_TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
     }
@@ -948,7 +952,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-	delete [] msgArr;
+  delete [] msgArr;
 
   //Set the message counts
   ret->redNo=redNo;
@@ -976,7 +980,7 @@ void CkReductionMgr::pup(PUP::er &p)
   p(redNo);
   p(completedRedNo);
   p(inProgress); p(creating); p(startRequested);
-  p(nContrib); p(nRemote);
+  p(nContrib); p(nRemote); p(disableNotifyChildrenStart);
   p|msgs;
   p|futureMsgs;
   p|futureRemoteMsgs;
@@ -1016,7 +1020,7 @@ void CkReductionMgr::pup(PUP::er &p)
 #ifdef BINOMIAL_TREE
     init_BinomialTree();
 #else
-   init_BinaryTree();
+    init_BinaryTree();
 #endif
 #endif
   }
@@ -1282,7 +1286,7 @@ CkReductionMsg *CkReductionMsg::buildNew(int NdataSize,const void *srcData,
   ret->sourceFlag=-1000;
   ret->gcount=0;
   ret->migratableContributor = true;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   ret->log = NULL;
 #endif
   return ret;
@@ -1347,6 +1351,11 @@ static CkReductionMsg *invalid_reducer(int nMsg,CkReductionMsg **msg)
 	return NULL;
 }
 
+static CkReductionMsg *nop(int nMsg,CkReductionMsg **msg)
+{
+  return CkReductionMsg::buildNew(0,NULL, CkReduction::invalid, msg[0]);
+}
+
 #define SIMPLE_REDUCTION(name,dataType,typeStr,loop) \
 static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 {\
@@ -1370,6 +1379,7 @@ static CkReductionMsg *name(int nMsg,CkReductionMsg **msg)\
 //Use this macro for reductions that have the same type for all inputs
 #define SIMPLE_POLYMORPH_REDUCTION(nameBase,loop) \
   SIMPLE_REDUCTION(nameBase##_int,int,"%d",loop) \
+  SIMPLE_REDUCTION(nameBase##_long,CmiInt8,"%d",loop) \
   SIMPLE_REDUCTION(nameBase##_float,float,"%f",loop) \
   SIMPLE_REDUCTION(nameBase##_double,double,"%f",loop)
 
@@ -1539,17 +1549,18 @@ int CkReduction::nReducers=CkReduction::lastSystemReducer;
 
 CkReduction::reducerFn CkReduction::reducerTable[CkReduction::MAXREDUCERS]={
     ::invalid_reducer,
+    ::nop,
   //Compute the sum the numbers passed by each element.
-    ::sum_int,::sum_float,::sum_double,
+    ::sum_int,::sum_long,::sum_float,::sum_double,
 
   //Compute the product the numbers passed by each element.
-    ::product_int,::product_float,::product_double,
+    ::product_int,::product_long,::product_float,::product_double,
 
   //Compute the largest number passed by any element.
-    ::max_int,::max_float,::max_double,
+    ::max_int,::max_long,::max_float,::max_double,
 
   //Compute the smallest number passed by any element.
-    ::min_int,::min_float,::min_double,
+    ::min_int,::min_long,::min_float,::min_double,
 
   //Compute the logical AND of the integers passed by each element.
   // The resulting integer will be zero if any source integer is zero.
@@ -1733,7 +1744,7 @@ void CkNodeReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMsg *m,int count)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1814,7 +1825,7 @@ void CkNodeReductionMgr::doRecvMsg(CkReductionMsg *m){
 //Sent up the reduction tree with reduced data
 void CkNodeReductionMgr::RecvMsg(CkReductionMsg *m)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&m->log);
 #endif
 #ifndef CMK_CPV_IS_SMP
@@ -1855,7 +1866,7 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
 	inProgress=CmiTrue;
 	//Sent start requests to our kids (in case they don't already know)
-
+	
 	for (int k=0;k<treeKids();k++)
 	{
 #ifdef BINOMIAL_TREE
@@ -2158,7 +2169,7 @@ int CkNodeReductionMgr::treeKids(void)//Number of children in tree
 //Combine (& free) the current message vector msgs.
 CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_END_EXECUTE(1);
   void* _bgParentLog = NULL;
   _TRACE_BG_BEGIN_EXECUTE_NOMSG("NodeReduce", &_bgParentLog, 0);
@@ -2197,7 +2208,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
         msgs_userFlag=m->userFlag;
 
 	isMigratableContributor= m->isMigratableContributor();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       _TRACE_BG_ADD_BACKWARD_DEP(m->log);
 #endif
 				
@@ -2257,7 +2268,7 @@ CkReductionMsg *CkNodeReductionMgr::reduceMessages(void)
   ret->sourceFlag=msgs_nSources;
   ret->setMigratableContributor(isMigratableContributor);
   DEBR((AA"Node Reduced gcount=%d; sourceFlag=%d\n"AB,ret->gcount,ret->sourceFlag));
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&ret->log);
 #endif
 
@@ -2598,6 +2609,16 @@ int CkNodeReductionMgr::findMaxRedNo(){
 		max--;
 	}
 	return max;
+}
+
+// initnode call. check the size of reduction table
+void CkReductionMgr::sanitycheck()
+{
+#if CMK_ERROR_CHECKING
+  int count = 0;
+  while (CkReduction::reducerTable[count] != NULL) count++;
+  CmiAssert(CkReduction::nReducers == count);
+#endif
 }
 
 #include "CkReduction.def.h"

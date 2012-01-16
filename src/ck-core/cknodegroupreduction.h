@@ -34,20 +34,30 @@ class CkReduction {
 public:
 	/*These are the reducers you can use,
 	  in addition to any user-defined reducers.*/
+
+        /*  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                 remember to update CkReduction::reducerTable
+
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  */
+
 	typedef enum {
 	//A placeholder invalid reduction type
 		invalid=0,
+                nop,
 	//Compute the sum the numbers passed by each element.
-		sum_int,sum_float,sum_double,
+		sum_int,sum_long,sum_float,sum_double,
 
 	//Compute the product the numbers passed by each element.
-		product_int,product_float,product_double,
+		product_int,product_long,product_float,product_double,
 
 	//Compute the largest number passed by any element.
-		max_int,max_float,max_double,
+		max_int,max_long,max_float,max_double,
 
 	//Compute the smallest number passed by any element.
-		min_int,min_float,min_double,
+		min_int,min_long,min_float,min_double,
 
 	//Compute the logical AND of the integers passed by each element.
 	// The resulting integer will be zero if any source integer is zero.
@@ -124,12 +134,12 @@ private:
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	int userFlag=-1); \
+	CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	const CkCallback &cb,int userFlag=-1); \
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1); \
   void contribute(CkReductionMsg *msg); \
-  void contribute(const CkCallback &cb,int userFlag=-1);\
-  void contribute(int userFlag=-1);\
+  void contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
+  void contribute(CMK_REFNUM_TYPE userFlag=(CMK_REFNUM_TYPE)-1);\
 
 
 

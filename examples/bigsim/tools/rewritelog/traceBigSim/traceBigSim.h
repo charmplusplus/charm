@@ -3,10 +3,10 @@
  *  
  */	
 
-// CMK_BLUEGENE_CHARM is used during the emulation phase, 
+// CMK_BIGSIM_CHARM is used during the emulation phase, 
 // where you genereate the bgTrace logs and the parameter files
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
 #include "blue.h"
 #include "blue_impl.h"
 #endif

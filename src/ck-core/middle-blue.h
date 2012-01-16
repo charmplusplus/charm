@@ -15,6 +15,9 @@
 #undef CkMyNode
 #undef CkNumNodes
 #undef CkMyNodeSize
+#undef CkNodeOf
+#undef CkNodeSize
+#undef CkNodeFirst
 
 #undef CmiSyncSend
 #undef CmiSyncSendAndFree
@@ -48,7 +51,7 @@
   This version Blue Gene Charm++ use a whole Blue Gene node as 
   a Charm PE.
 */
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
 
 #define CkpvDeclare 	BnvDeclare
 #define CkpvExtern 	BnvExtern
@@ -119,7 +122,7 @@ static inline void CmiSyncBroadcastAllAndFree(int nb, char *m)
 }  /* end of namespace */
 
 
-#else   /* end if CMK_BLUEGENE_NODE */
+#else   /* end if CMK_BIGSIM_NODE */
 
 /**
   This version of Blue Gene Charm++ use a Blue Gene thread as 
@@ -147,8 +150,11 @@ static inline int CkNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
 static inline int CkMyRank() { return BgGetThreadID(); }
 static inline int BgNodeRank() { return BgMyRank()*BgGetNumWorkThread()+BgGetThreadID(); }
 static inline int CkMyNode() { return BgMyNode(); }
+static inline int CkNodeOf(int pe) { return pe / BgGetNumWorkThread(); }
 static inline int CkNumNodes() { return BgNumNodes(); }
 static inline int CkMyNodeSize() { return BgGetNumWorkThread(); }
+static inline int CkNodeSize(int node) { return BgGetNumWorkThread(); }
+static inline int CkNodeFirst(int node) { return BgGetNumWorkThread()*node; }
 
 static inline void CksdScheduler(int ret) { BgScheduler(ret); }
 static inline void CksdExitScheduler() { BgExitScheduler(); }

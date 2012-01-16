@@ -4,14 +4,16 @@
 
 #include "BaseLB.h"
 
-LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
+LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats)
 {
    int i;
-   processorInfo *processors = new processorInfo[count];
+   int n_pes = stats->nprocs();
 
-   for(i=0; i < count; i++) {
+   processorInfo *processors = new processorInfo[n_pes];
+
+   for(i=0; i < n_pes; i++) {
     processors[i].Id = i;
-    processors[i].backgroundLoad = stats->procs[i].bg_cputime;
+    processors[i].backgroundLoad = stats->procs[i].bg_walltime;
     processors[i].computeLoad = stats->procs[i].total_walltime;
     processors[i].load = processors[i].computeLoad + processors[i].backgroundLoad;
     processors[i].pe_speed = stats->procs[i].pe_speed;
@@ -20,18 +22,18 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
 
   // compute average
   double total = 0.0;
-  for (i=0; i<count; i++)
+  for (i=0; i<n_pes; i++)
     total += processors[i].load;
                                                                                 
-  double averageLoad = total/count;
+  double averageLoad = total/n_pes;
 
-  if (_lb_args.debug()>1) CkPrintf("Average load: %f (total: %f, count: %d)\n", averageLoad, total, count);
+  if (_lb_args.debug()>1) CkPrintf("Average load: %f (total: %f, n_pes: %d)\n", averageLoad, total, n_pes);
 
-  maxHeap *heavyProcessors = new maxHeap(count);
+  maxHeap *heavyProcessors = new maxHeap(n_pes);
   Set *lightProcessors = new Set();
 
   double overload_factor = 1.01;
-  for (i=0; i<count; i++) {
+  for (i=0; i<n_pes; i++) {
     if (processors[i].load > averageLoad*overload_factor) {
       //      CkPrintf("Processor %d is HEAVY: load:%f averageLoad:%f!\n",
       //               i, processors[i].load, averageLoad);
@@ -44,8 +46,8 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
   }
 
   if (_lb_args.debug()>1) {
-    CkPrintf("Before migration: (%d) ", count);
-    for (i=0; i<count; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
+    CkPrintf("Before migration: (%d) ", n_pes);
+    for (i=0; i<n_pes; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
     CkPrintf("\n");
   }
 
@@ -96,8 +98,8 @@ LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count)
   }
 
   if (_lb_args.debug()>1) {
-    CkPrintf("After migration: (%d) ", count);
-    for (i=0; i<count; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
+    CkPrintf("After migration: (%d) ", n_pes);
+    for (i=0; i<n_pes; i++) CkPrintf("%f (%f %f) ", processors[i].load, processors[i].computeLoad, processors[i].backgroundLoad);
     CkPrintf("\n");
   }
 

@@ -1,5 +1,7 @@
 #include "charm++.h"
 
+#include <map>
+
 #ifndef TREE_STRATEGY_TOPO_UNAWARE
 #define TREE_STRATEGY_TOPO_UNAWARE
 namespace topo {
@@ -62,22 +64,68 @@ namespace impl {
         /// Return data holds the parent vertex info [and child info, if there are any]
         SpanningTreeVertex *parent = new SpanningTreeVertex(*firstVtx);
 
-        /// Compute the number of vertices in each branch
-        const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
-        int numInSubTree = numDescendants / maxBranches;
-        int remainder    = numDescendants % maxBranches;
+	//Containing no actual nodes to be built
+	if(firstVtx+1 == beyondLastVtx) return parent;
+	
+	//store the sequence of local indices for each different node ids
+	std::vector<int> nodesSeq; 
+	#if CMK_SMP	
+		//key is the node id, and the mapped value is the local index
+		std::map<int, int> nodesMap;
+		int localIndex = 1; //relative to the root
+		for(Iterator vtx=firstVtx+1; vtx!=beyondLastVtx; vtx++, localIndex++){
+			int nid = CmiNodeOf(topo::getProcID(*vtx));
+			if(nodesMap.find(nid) == nodesMap.end()){
+				//encounter a new node id
+				nodesMap[nid] = localIndex;
+				nodesSeq.push_back(localIndex);
+			}
+		}
+		nodesMap.clear();
+		int totalNodes = nodesSeq.size();
+		//check whether the building of this tree is for procs on remote SMP nodes.
+		//NOW: just use the condition whether the "parent" nid is same with (firstVtx+1)
+		int pnid = CmiNodeOf(topo::getProcID(*firstVtx));
+		int fnid = CmiNodeOf(topo::getProcID(*(firstVtx+1)));
+		int forRemoteNodes = (pnid != fnid);
+	#else
+		//in non-SMP case, just to fake there's no SMP nodes so the work flow of spanning tree 
+		//creation is correct
+		int totalNodes = 0;
+		int forRemoteNodes=0;
+	#endif
+		
+		if(totalNodes <= 1 && !forRemoteNodes){
+			/// Compute the number of vertices in each branch
+			const int numDescendants = std::distance(firstVtx,beyondLastVtx) - 1;
+			int numInSubTree = numDescendants / maxBranches;
+			int remainder    = numDescendants % maxBranches;
 
-        /// Push the appropriate relative distances (from the tree root) into the container of child indices
-        for (int i=0, indx=1; (i<maxBranches && indx<=numDescendants); i++, indx += numInSubTree)
-        {
-            parent->childIndex.push_back(indx);
-            /// Distribute any remainder vertices as evenly as possible amongst all the branches 
-            if (remainder-- > 0) indx++;
-        }
+			/// Push the appropriate relative distances (from the tree root) into the container of child indices
+			for (int i=0, indx=1; (i<maxBranches && indx<=numDescendants); i++, indx += numInSubTree)
+			{
+				parent->childIndex.push_back(indx);
+				/// Distribute any remainder vertices as evenly as possible amongst all the branches 
+				if (remainder-- > 0) indx++;
+			}	
+		}else{
+			/// Compute the number of vertices in each branch
+			const int numDescendants = totalNodes;
+			int numInSubTree = numDescendants / maxBranches;
+			int remainder    = numDescendants % maxBranches;
 
+			/// Push the appropriate relative distances (from the tree root) into the container of child indices
+			for (int i=0, indx=0; (i<maxBranches && indx<numDescendants); i++, indx += numInSubTree)
+			{
+				parent->childIndex.push_back(nodesSeq[indx]);
+				/// Distribute any remainder vertices as evenly as possible amongst all the branches 
+				if (remainder-- > 0) indx++;
+			}
+		}
+	nodesSeq.clear();
         /// Return the output structure
         return parent;
-    }
+    }	
 }
 
 } // end namespace topo

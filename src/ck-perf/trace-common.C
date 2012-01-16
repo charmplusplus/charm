@@ -10,7 +10,6 @@
 */
 /*@{*/
 
-// cannot include charm++.h because trace-common.o is part of libconv-core.a
 #include "charm.h"
 #include "middle.h"
 #include "cklists.h"
@@ -144,7 +143,7 @@ static void traceCommonInit(char **argv)
     strcpy(CkpvAccess(selective), "");
   }
   
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if(BgNodeRank()==0) {
 #else
   if(CkMyRank()==0) {
@@ -175,8 +174,10 @@ static void traceCommonInit(char **argv)
 extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
+  //Assuming there's only 1 comm thread now! --Chao Mei
   //considering the extra comm thread per node
-  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());
+  fprintf(stsfp, "PROCESSORS %d\n", CkNumPes()+CkNumNodes());  
+  fprintf(stsfp, "SMPMODE %d %d\n", CkMyNodeSize(), CkNumNodes());
 #else	
   fprintf(stsfp, "PROCESSORS %d\n", CkNumPes());
 #endif	
@@ -256,9 +257,9 @@ extern "C" void traceBegin(void) {
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
   if(CmiMyRank()==0){
-	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=1){
+	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
-		CkpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
+		CpvAccessOther(traceOn, CmiMyNodeSize()) = 1;
 	}
   }
 #endif
@@ -297,7 +298,7 @@ static int checkTraceOnPe(char **argv)
 {
   int traceOnPE = 1;
   char *procs = NULL;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // check bgconfig file for settings
   traceOnPE=0;
   if (BgTraceProjectionOn(CkMyPe())) traceOnPE = 1;
@@ -547,7 +548,7 @@ void traceFlushLog(void)
 extern "C"
 void traceClose(void)
 {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif   
@@ -556,7 +557,7 @@ void traceClose(void)
 extern "C"
 void traceCharmClose(void)
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   OPTIMIZE_WARNING
   CkpvAccess(_traces)->traceClose();
 #endif
@@ -580,13 +581,16 @@ void traceAddThreadListeners(CthThread tid, envelope *e) {
   _TRACE_ONLY(CkpvAccess(_traces)->traceAddThreadListeners(tid, e));
 }
 
-#if 0
+#if 1
 // helper functions
+extern int _charmHandlerIdx;
+class CkCoreState;
+extern void _processHandler(void *, CkCoreState*);
 int CkIsCharmMessage(char *msg)
 {
-//CmiPrintf("getMsgtype: %d %d %d %d %d\n", ((envelope *)msg)->getMsgtype(), CmiGetHandler(msg), CmiGetXHandler(msg), _charmHandlerIdx, index_skipCldHandler);
+//CmiPrintf("[%d] CkIsCharmMessage: %d %p %d %p\n", CkMyPe(),CmiGetHandler(msg), CmiGetHandlerFunction(msg), _charmHandlerIdx, _processHandler);
   if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
-         (CmiGetHandlerFunction(msg) == (CmiHandler)_processHandler))
+         (CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
     return 1;
   if (CmiGetXHandler(msg) == _charmHandlerIdx) return 1;
   return 0;
@@ -660,6 +664,43 @@ void traceEndFuncProj(char *name){
 extern "C" 
 void traceEndFuncIndexProj(int idx){
 	 _TRACE_ONLY(CkpvAccess(_traces)->endFunc(idx));
+}
+
+#if CMK_SMP_TRACE_COMMTHREAD
+extern "C"
+int traceBeginCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg)) {
+    CkpvAccess(_traces)->beginExecute(msg);
+    return 1;
+  }
+  return 0;
+#endif
+}
+
+extern "C"
+void traceEndCommOp(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+    CkpvAccess(_traces)->endExecute(msg);
+#endif
+}
+
+extern "C"
+void traceSendMsgComm(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+    CkpvAccess(_traces)->creation(msg);
+#endif
+}
+#endif
+
+extern "C"
+void traceChangeLastTimestamp(double ts){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces))
+    CkpvAccess(_traces)->changeLastEntryTimestamp(ts);
+#endif
 }
 
 /*@}*/

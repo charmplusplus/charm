@@ -5,7 +5,7 @@ OBJS = ldbDemo.o ldbDemof.o
 all: ldbDemo
 
 ldbDemo: $(OBJS)
-	$(CHARMC) -language f90charm -module EveryLB -o ldbDemo $(OBJS)
+	$(CHARMC) -language f90charm -module CommonLBs -o ldbDemo $(OBJS)
 
 ldbDemo.o: ldbDemo.C balanceDemo.decl.h
 	$(CHARMC) -O -c ldbDemo.C

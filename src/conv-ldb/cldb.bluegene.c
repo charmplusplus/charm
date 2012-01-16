@@ -18,7 +18,7 @@
 
 #define  DEBUGF(x)   /*CmiPrintf x;*/
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 
 extern int CldPresentPE(int pe);
 
@@ -49,7 +49,7 @@ void CldHandler(char *msg)
   CsdEnqueueGeneral(msg, queueing, priobits, prioptr);
 }
 
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
 static int BgMyPe() { return BgMyNode(); }
 static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
 #   define BGSENDPE(pe, msg, len)  {	\
@@ -65,7 +65,7 @@ static int BgNumPes() { int x,y,z; BgGetSize(&x, &y, &z); return (x*y*z); }
       BgBroadcastPacketExcept(BgMyNode(), ANYTHREAD, CmiGetHandler(msg), \
                               LARGE_WORK, len, msg);
 
-#elif CMK_BLUEGENE_THREAD
+#elif CMK_BIGSIM_THREAD
 static int BgMyPe() { return BgGetGlobalWorkerThreadID(); }
 static int BgNumPes() { return BgNumNodes()*BgGetNumWorkThread(); }
 #   define BGSENDPE(pe, msg, len)  {	\

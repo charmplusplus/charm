@@ -11,7 +11,6 @@
 
 CtvStaticDeclare(int,curThreadEvent);
 
-static int _numEvents = 0;
 static int curEvent;
 static int execEvent;
 static int execEp;

@@ -1,16 +1,8 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include "charm++.h"
 #include "BaseLB.h"
 #include "NborBaseLB.h"
 #include "LBDBManager.h"
@@ -154,9 +146,14 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
 {
 #if CMK_LBDB_ON
   // Get my own stats, this is used in NeighborLB for example
+#if CMK_LB_CPUTIMER
   theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_cputime);
-  theLbdb->IdleTime(&myStats.idletime);
   theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_cputime);
+#else
+  theLbdb->TotalTime(&myStats.total_walltime,&myStats.total_walltime);
+  theLbdb->BackgroundLoad(&myStats.bg_walltime,&myStats.bg_walltime);
+#endif
+  theLbdb->IdleTime(&myStats.idletime);
 
   myStats.move = QueryMigrateStep(step());
 
@@ -170,10 +167,15 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   myStats.commData = new LDCommData[myStats.n_comm];
   theLbdb->GetCommData(myStats.commData);
 
-  myStats.obj_walltime = myStats.obj_cputime = 0;
+  myStats.obj_walltime = 0;
+#if CMK_LB_CPUTIMER
+  myStats.obj_cputime = 0;
+#endif
   for(int i=0; i < myStats.n_objs; i++) {
     myStats.obj_walltime += myStats.objData[i].wallTime;
+#if CMK_LB_CPUTIMER
     myStats.obj_cputime += myStats.objData[i].cpuTime;
+#endif
   }    
 
   const int osz = theLbdb->GetObjDataSz();
@@ -185,12 +187,14 @@ NLBStatsMsg* NborBaseLB::AssembleStats()
   msg->serial = CrnRand();
   msg->pe_speed = myStats.pe_speed;
   msg->total_walltime = myStats.total_walltime;
-  msg->total_cputime = myStats.total_cputime;
   msg->idletime = myStats.idletime;
   msg->bg_walltime = myStats.bg_walltime;
-  msg->bg_cputime = myStats.bg_cputime;
   msg->obj_walltime = myStats.obj_walltime;
+#if CMK_LB_CPUTIMER
+  msg->total_cputime = myStats.total_cputime;
+  msg->bg_cputime = myStats.bg_cputime;
   msg->obj_cputime = myStats.obj_cputime;
+#endif
   msg->n_objs = osz;
   theLbdb->GetObjData(msg->objData);
   msg->n_comm = csz;
@@ -249,13 +253,15 @@ void NborBaseLB::ReceiveStats(CkMarshalledNLBStatsMessage &data)
       statsMsgsList[peslot] = m;
       statsDataList[peslot].from_pe = m->from_pe;
       statsDataList[peslot].total_walltime = m->total_walltime;
-      statsDataList[peslot].total_cputime = m->total_cputime;
       statsDataList[peslot].idletime = m->idletime;
       statsDataList[peslot].bg_walltime = m->bg_walltime;
-      statsDataList[peslot].bg_cputime = m->bg_cputime;
       statsDataList[peslot].pe_speed = m->pe_speed;
       statsDataList[peslot].obj_walltime = m->obj_walltime;
+#if CMK_LB_CPUTIMER
+      statsDataList[peslot].total_cputime = m->total_cputime;
+      statsDataList[peslot].bg_cputime = m->bg_cputime;
       statsDataList[peslot].obj_cputime = m->obj_cputime;
+#endif
 
       statsDataList[peslot].n_objs = m->n_objs;
       statsDataList[peslot].objData = m->objData;
@@ -396,15 +402,17 @@ void NborBaseLB::ResumeClients(int balancing)
 #endif
 }
 
-LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* NborBaseLB::Strategy(LDStats* stats, int n_nbrs)
 {
-  for(int j=0; j < count; j++) {
-    CkPrintf(
-    "[%d] Proc %d Speed %d Total(wall,cpu)=%f %f Idle=%f Bg=%f %f obj=%f %f\n",
-    CkMyPe(),stats[j].from_pe,stats[j].pe_speed,
-    stats[j].total_walltime,stats[j].total_cputime,
-    stats[j].idletime,stats[j].bg_walltime,stats[j].bg_cputime,
-    stats[j].obj_walltime,stats[j].obj_cputime);
+  for(int j=0; j < n_nbrs; j++) {
+    CkPrintf("[%d] Proc %d Speed %d WALL: Total %f Idle %f Bg %f obj %f",
+    CkMyPe(), stats[j].from_pe, stats[j].pe_speed, stats[j].total_walltime,
+    stats[j].idletime, stats[j].bg_walltime, stats[j].obj_walltime);
+#if CMK_LB_CPUTIMER
+    CkPrintf(" CPU: Total %f Bg %f obj %f", stats[j].total_cputime,
+    stats[j].bg_cputime, stats[j].obj_cputime);
+#endif
+    CkPrintf("\n");
   }
 
   int sizes=0;
@@ -461,9 +469,13 @@ void NLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|serial;
   p|pe_speed;
-  p|total_walltime; p|total_cputime;
+  p|total_walltime;
   p|idletime;
-  p|bg_walltime;   p|bg_cputime;
+  p|bg_walltime;
+#if CMK_LB_CPUTIMER
+  p|total_cputime;
+  p|bg_cputime;
+#endif
   p|n_objs;
   if (p.isUnpacking()) objData = new LDObjData[n_objs];
   for (i=0; i<n_objs; i++) p|objData[i];

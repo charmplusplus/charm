@@ -11,7 +11,7 @@ class priomsg_Msg : public CMessage_priomsg_Msg {
   int data[10];
 }; 
 
-class priomsg_test : public Chare {
+class priomsg_test : public CBase_priomsg_test {
  public:
   priomsg_test(void) {};
   priomsg_test(CkMigrateMessage *m) {}

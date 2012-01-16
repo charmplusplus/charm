@@ -91,6 +91,7 @@ scope ScopeStack; // default scope
         (packageDeclaration)? 
         (importDeclaration
         | typeDeclaration { $cs = $typeDeclaration.sym; }
+        | externDeclaration
         | readonlyDeclaration)*)
     ;
 
@@ -120,6 +121,10 @@ importDeclaration
 
 readonlyDeclaration
     :   ^(READONLY localVariableDeclaration)
+    ;
+
+externDeclaration
+    :   ^(EXTERN qualifiedIdentifier)
     ;
 
 typeDeclaration returns [ClassSymbol sym]

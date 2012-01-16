@@ -1,13 +1,13 @@
-/**
-\file
-\addtogroup CkArrayImpl
+/** \file cklocation.C
+ *  \addtogroup CkArrayImpl
+ *
+ *  The location manager keeps track of an indexed set of migratable objects.
+ *  It is used by the array manager to locate array elements, interact with the
+ *  load balancer, and perform migrations.
+ *
+ *  Orion Sky Lawlor, olawlor@acm.org 9/29/2001
+ */
 
-The location manager keeps track of an indexed set of migratable
-objects.  It is used by the array manager to locate array elements,
-interact with the load balancer, and perform migrations.
-
-Orion Sky Lawlor, olawlor@acm.org 9/29/2001
-*/
 #include "charm++.h"
 #include "register.h"
 #include "ck.h"
@@ -85,30 +85,8 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
 }
 #endif
 
-/************************* Array Index *********************
-Array Index class.  An array index is just a 
-a run of bytes used to look up an object in a hash table.
-*/
-typedef unsigned char uc;
-
-CkHashCode CkArrayIndex::staticHash(const void *v,size_t)
-	{return ((const CkArrayIndex *)v)->hash();}
-
-int CkArrayIndex::staticCompare(const void *k1,const void *k2,size_t /*len*/)
-{
-	return ((const CkArrayIndex *)k1)->
-		compare(*(const CkArrayIndex *)k2);
-}
-
-void CkArrayIndex::pup(PUP::er &p) 
-{
-	p(nInts);
-	p(dimension);
-	p(data(),nInts);
-}
-
 /*********************** Array Messages ************************/
-CkArrayIndexMax &CkArrayMessage::array_index(void)
+CkArrayIndex &CkArrayMessage::array_index(void)
 {
     return UsrToEnv((void *)this)->getsetArrayIndex();
 }
@@ -146,7 +124,7 @@ be forwarded by default.
 
 CkArrayMap::CkArrayMap(void) { }
 CkArrayMap::~CkArrayMap() { }
-int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
+int CkArrayMap::registerArray(CkArrayIndex& numElements,CkArrayID aid)
 {return 0;}
 
 #define CKARRAYMAP_POPULATE_INITIAL(POPULATE_CONDITION) \
@@ -182,19 +160,19 @@ int CkArrayMap::registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
           } \
 	}
 
-void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)
+void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)
 {
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
 	int thisPe=CkMyPe();
-        /* The CkArrayIndexMax is supposed to have at most 3 dimensions, which
+        /* The CkArrayIndex is supposed to have at most 3 dimensions, which
            means that all the fields are ints, and numElements.nInts represents
            how many of them are used */
         CKARRAYMAP_POPULATE_INITIAL(procNum(arrayHdl,idx)==thisPe);
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         BgEntrySplit("split-array-new-end");
 #endif
 
@@ -203,6 +181,7 @@ void CkArrayMap::populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void 
 }
 
 CkGroupID _defaultArrayMapID;
+CkGroupID _fastArrayMapID;
 
 class RRMap : public CkArrayMap
 {
@@ -218,7 +197,7 @@ public:
     if (i.nInts==1) {
       //Map 1D integer indices in simple round-robin fashion
       int ans= (i.data()[0])%CkNumPes();
-      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CpvAccess(startedEvac))){
+      while(!CmiNodeAlive(ans) || (ans == CkMyPe() && CkpvAccess(startedEvac))){
         ans = (ans +1 )%CkNumPes();
       }
       return ans;
@@ -242,26 +221,29 @@ public:
  * Class used to store the dimensions of the array and precalculate numChares,
  * binSize and other values for the DefaultArrayMap -- ASB
  */
-class dimInfo {
+class arrayMapInfo {
 public:
-  CkArrayIndexMax _nelems;
-  int _binSize;			/* floor of numChares/numPes */
+  CkArrayIndex _nelems;
+  int _binSizeFloor;		/* floor of numChares/numPes */
+  int _binSizeCeil;		/* ceiling of numChares/numPes */
   int _numChares;		/* initial total number of chares */
   int _remChares;		/* numChares % numPes -- equals the number of
 				   processors in the first set */
   int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
 				   chares in the first set */
 
-  dimInfo(void) { }
+  /** All processors are divided into two sets. Processors in the first set
+   *  have one chare more than the processors in the second set. */
 
-  dimInfo(CkArrayIndexMax& n) {
-    _nelems = n;
+  arrayMapInfo(void) { }
+
+  arrayMapInfo(CkArrayIndex& n) : _nelems(n), _numChares(0) {
     compute_binsize();
   }
 
-  ~dimInfo() {}
+  ~arrayMapInfo() {}
   
-  int compute_binsize()
+  void compute_binsize()
   {
     int numPes = CkNumPes();
 
@@ -274,15 +256,15 @@ public:
     }
 
     _remChares = _numChares % numPes;
-    _binSize = (int)floor((double)_numChares/(double)numPes);
-    _numFirstSet = _remChares * (_binSize + 1);
-
-    return _binSize;
+    _binSizeFloor = (int)floor((double)_numChares/(double)numPes);
+    _binSizeCeil = (int)ceil((double)_numChares/(double)numPes);
+    _numFirstSet = _remChares * (_binSizeFloor + 1);
   }
 
   void pup(PUP::er& p){
     p|_nelems;
-    p|_binSize;
+    p|_binSizeFloor;
+    p|_binSizeCeil;
     p|_numChares;
     p|_remChares;
     p|_numFirstSet;
@@ -297,43 +279,48 @@ public:
 class DefaultArrayMap : public RRMap
 {
 public:
-  CkPupPtrVec<dimInfo> arrs;
+  /** This array stores information about different chare arrays in a Charm
+   *  program (dimensions, binsize, numChares etc ... ) */
+  CkPupPtrVec<arrayMapInfo> amaps;
 
 public:
   DefaultArrayMap(void) {
     DEBC((AA"Creating DefaultArrayMap\n"AB));
   }
 
-  DefaultArrayMap(CkMigrateMessage *m):RRMap(m){}
+  DefaultArrayMap(CkMigrateMessage *m) : RRMap(m){}
 
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
   {
-    int idx = arrs.size();
-    arrs.resize(idx+1);
-    arrs[idx] = new dimInfo(numElements);
+    int idx = amaps.size();
+    amaps.resize(idx+1);
+    amaps[idx] = new arrayMapInfo(numElements);
     return idx;
   }
  
   int procNum(int arrayHdl, const CkArrayIndex &i) {
     int flati;
-    if (arrs[arrayHdl]->_nelems.nInts == 0) {
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
       return RRMap::procNum(arrayHdl, i);
     }
 
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
-    } else {
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    }
+#if CMK_ERROR_CHECKING
+    else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
+#endif
 
-    if(flati < arrs[arrayHdl]->_numFirstSet)
-      return (flati/(arrs[arrayHdl]->_binSize + 1));
-    else if (flati < arrs[arrayHdl]->_numChares)
-      return (arrs[arrayHdl]->_remChares + (flati - arrs[arrayHdl]->_numFirstSet) / (arrs[arrayHdl]->_binSize));
+    if(flati < amaps[arrayHdl]->_numFirstSet)
+      return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
+    else if (flati < amaps[arrayHdl]->_numChares)
+      return (amaps[arrayHdl]->_remChares + (flati - amaps[arrayHdl]->_numFirstSet) / (amaps[arrayHdl]->_binSizeFloor));
     else
       return (flati % CkNumPes());
   }
@@ -342,13 +329,64 @@ public:
     RRMap::pup(p);
     int npes = CkNumPes();
     p|npes;
-    p|arrs;
+    p|amaps;
     if (p.isUnpacking() && npes != CkNumPes())  {   // binSize needs update
-      for (int i=0; i<arrs.size(); i++)
-        arrs[i]->compute_binsize();
+      for (int i=0; i<amaps.size(); i++)
+        amaps[i]->compute_binsize();
     }
   }
 };
+
+/**
+ *  A fast map for chare arrays which do static insertions and promise NOT
+ *  to do late insertions -- ASB
+ */
+class FastArrayMap : public DefaultArrayMap
+{
+public:
+  FastArrayMap(void) {
+    DEBC((AA"Creating FastArrayMap\n"AB));
+  }
+
+  FastArrayMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
+
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
+  {
+    int idx;
+    idx = DefaultArrayMap::registerArray(numElements, aid);
+
+    return idx;
+  }
+
+  int procNum(int arrayHdl, const CkArrayIndex &i) {
+    int flati;
+    if (amaps[arrayHdl]->_nelems.nInts == 0) {
+      return RRMap::procNum(arrayHdl, i);
+    }
+
+    if (i.nInts == 1) {
+      flati = i.data()[0];
+    } else if (i.nInts == 2) {
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
+    } else if (i.nInts == 3) {
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
+    }
+#if CMK_ERROR_CHECKING
+    else {
+      CkAbort("CkArrayIndex has more than 3 integers!");
+    }
+#endif
+
+    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
+     *  but for this FastArrayMap, we need the ceiling */
+    return (flati / amaps[arrayHdl]->_binSizeCeil);
+  }
+
+  void pup(PUP::er& p){
+    DefaultArrayMap::pup(p);
+  }
+};
+
 
 /**
  * This map can be used for topology aware mapping when the mapping is provided
@@ -364,9 +402,9 @@ public:
     DEBC((AA"Creating ReadFileMap\n"AB));
   }
 
-  ReadFileMap(CkMigrateMessage *m):DefaultArrayMap(m){}
+  ReadFileMap(CkMigrateMessage *m) : DefaultArrayMap(m){}
 
-  int registerArray(CkArrayIndexMax& numElements, CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements, CkArrayID aid)
   {
     int idx;
     idx = DefaultArrayMap::registerArray(numElements, aid);
@@ -374,12 +412,12 @@ public:
     if(mapping.size() == 0) {
       int numChares;
 
-      if (arrs[idx]->_nelems.nInts == 1) {
-	numChares = arrs[idx]->_nelems.data()[0];
-      } else if (arrs[idx]->_nelems.nInts == 2) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1];
-      } else if (arrs[idx]->_nelems.nInts == 3) {
-	numChares = arrs[idx]->_nelems.data()[0] * arrs[idx]->_nelems.data()[1] * arrs[idx]->_nelems.data()[2];
+      if (amaps[idx]->_nelems.nInts == 1) {
+	numChares = amaps[idx]->_nelems.data()[0];
+      } else if (amaps[idx]->_nelems.nInts == 2) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1];
+      } else if (amaps[idx]->_nelems.nInts == 3) {
+	numChares = amaps[idx]->_nelems.data()[0] * amaps[idx]->_nelems.data()[1] * amaps[idx]->_nelems.data()[2];
       } else {
 	CkAbort("CkArrayIndex has more than 3 integers!");
       }
@@ -387,10 +425,10 @@ public:
       mapping.resize(numChares);
       FILE *mapf = fopen("mapfile", "r");
       TopoManager tmgr;
-      int x, y, z, t, rv;
+      int x, y, z, t;
 
       for(int i=0; i<numChares; i++) {
-	rv = fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
+	(void) fscanf(mapf, "%d %d %d %d", &x, &y, &z, &t);
 	mapping[i] = tmgr.coordinatesToRank(x, y, z, t);
       }
       fclose(mapf);
@@ -405,9 +443,9 @@ public:
     if (i.nInts == 1) {
       flati = i.data()[0];
     } else if (i.nInts == 2) {
-      flati = i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1];
+      flati = i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1];
     } else if (i.nInts == 3) {
-      flati = (i.data()[0] * arrs[arrayHdl]->_nelems.data()[1] + i.data()[1]) * arrs[arrayHdl]->_nelems.data()[2] + i.data()[2];
+      flati = (i.data()[0] * amaps[arrayHdl]->_nelems.data()[1] + i.data()[1]) * amaps[arrayHdl]->_nelems.data()[2] + i.data()[2];
     } else {
       CkAbort("CkArrayIndex has more than 3 integers!");
     }
@@ -428,7 +466,7 @@ public:
 	DEBC((AA"Creating BlockMap\n"AB));
   }
   BlockMap(CkMigrateMessage *m):RRMap(m){ }
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
 	if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
@@ -448,7 +486,7 @@ public:
         CKARRAYMAP_POPULATE_INITIAL(i/binSize==thisPe);
 
         /*
-        CkArrayIndexMax idx;
+        CkArrayIndex idx;
 	for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
           //for (int i=0;i<numElements;i++) {
 		int binSize = (int)ceil((double)numElements.getCombinedCount()/(double)numPes);
@@ -488,14 +526,14 @@ public:
   {
      return CLD_ANYWHERE;   // -1
   }
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr)  {
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr)  {
         if (numElements.nInts==0) {
           CkFreeMsg(ctorMsg);
           return;
         }
         int thisPe=CkMyPe();
         int numPes=CkNumPes();
-        //CkArrayIndexMax idx;
+        //CkArrayIndex idx;
 
         CKARRAYMAP_POPULATE_INITIAL(i%numPes==thisPe);
 	/*for (idx=numElements.begin(); idx<numElements; idx.getNext(numElements)) {
@@ -605,7 +643,7 @@ public:
   ConfigurableRRMap(CkMigrateMessage *m):RRMap(m){ }
 
 
-  void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr){
+  void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr){
     // Try to load the configuration from command line argument
     CkAssert(haveConfigurableRRMap());
     ConfigurableRRMapLoader &loader =  CkpvAccess(myConfigRRMapState);
@@ -647,12 +685,12 @@ CkpvStaticDeclare(double*, rem);
 
 class arrInfo {
  private:
-   CkArrayIndexMax _nelems;
+   CkArrayIndex _nelems;
    int *_map;
    void distrib(int *speeds);
  public:
    arrInfo(void):_map(NULL){}
-   arrInfo(CkArrayIndexMax& n, int *speeds)
+   arrInfo(CkArrayIndex& n, int *speeds)
    {
      _nelems = n;
      _map = new int[_nelems.getCombinedCount()];
@@ -794,7 +832,7 @@ public:
     DEBC((AA"Creating PropMap\n"AB));
   }
   PropMap(CkMigrateMessage *m) {}
-  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid)
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid)
   {
     int idx = arrs.size();
     arrs.resize(idx+1);
@@ -815,6 +853,7 @@ class CkMapsInit : public Chare
 public:
 	CkMapsInit(CkArgMsg *msg) {
 		_defaultArrayMapID = CProxy_DefaultArrayMap::ckNew();
+		_fastArrayMapID = CProxy_FastArrayMap::ckNew();
 		delete msg;
 	}
 
@@ -944,7 +983,7 @@ CkMigratable::CkMigratable(void) {
 	DEBC((AA"In CkMigratable constructor\n"AB));
 	commonInit();
 }
-CkMigratable::CkMigratable(CkMigrateMessage *m) {
+CkMigratable::CkMigratable(CkMigrateMessage *m): Chare(m) {
 	commonInit();
 }
 
@@ -1052,7 +1091,7 @@ void CkMigratable::AtSync(int waitForMigration)
 	if (!usesAtSync)
 		CkAbort("You must set usesAtSync=CmiTrue in your array element constructor to use AtSync!\n");
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    mlogData->toResumeOrNot=1;
+        mlogData->toResumeOrNot=1;
 #endif
 	myRec->AsyncMigrate(!waitForMigration);
 	if (waitForMigration) ReadyMigrate(CmiTrue);
@@ -1151,7 +1190,7 @@ void CkMigratableList::setSize(int s) {
 }
 
 void CkMigratableList::put(CkMigratable *v,int atIdx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if (atIdx>=length())
 		CkAbort("Internal array manager error (CkMigrableList::put index out of bounds)");
 #endif
@@ -1242,7 +1281,7 @@ void CkLocRec_local::setObjTime(double cputime) {
 	the_lbdb->EstObjLoad(ldHandle, cputime);
 }
 double CkLocRec_local::getObjTime() {
-        double walltime, cputime;
+        LBRealType walltime, cputime;
         the_lbdb->GetObjLoad(ldHandle, walltime, cputime);
         return walltime;
 }
@@ -1356,7 +1395,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	startTiming();
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		envelope *env=UsrToEnv(msg);
 	//	CkPrintf("ckLocation.C beginExecuteDetailed %d %d \n",env->getEvent(),env->getsetArraySrcPe());
@@ -1372,7 +1411,7 @@ CmiBool CkLocRec_local::invokeEntry(CkMigratable *obj,void *msg,
 	   CkDeliverMessageReadonly(epIdx,msg,obj);
 
 
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
 	if (msg) { /* Tracing: */
 		if (_entryTable[epIdx]->traceEnabled)
 			_TRACE_END_EXECUTE();
@@ -1563,7 +1602,7 @@ public:
 		:CkLocRec_aging(Narr)
 		{
 			onPe=NonPe;
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 			if (onPe==CkMyPe())
 				CkAbort("ERROR!  'remote' array element on this Pe!\n");
 #endif
@@ -1726,7 +1765,7 @@ inline void CkLocMgr::springCleaning(void)
     if (rec->isObsolete(nSprings,idx)) {
       //This record is obsolete-- remove it from the table
       DEBK((AA"Cleaning out old record %s\n"AB,idx2str(idx)));
-      hash.remove(*(CkArrayIndexMax *)&idx);
+      hash.remove(*(CkArrayIndex *)&idx);
       delete rec;
       it->seek(-1);//retry this hash slot
     }
@@ -1755,7 +1794,7 @@ void CkLocMgr::flushAllRecs(void)
       //the meta data in the location manager are not deleted so we need
       //this condition
       if(_BgOutOfCoreFlag!=1){
-        hash.remove(*(CkArrayIndexMax *)&idx);
+        hash.remove(*(CkArrayIndex *)&idx);
         delete rec;
         it->seek(-1);//retry this hash slot
       }
@@ -1784,7 +1823,7 @@ void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
 #endif
 
 /*************************** LocMgr: CREATION *****************************/
-CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndexMax& numInitial)
+CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
 	:thisProxy(thisgroup),thislocalproxy(thisgroup,CkMyPe()),
 	 hash(17,0.3)
 {
@@ -1838,7 +1877,7 @@ void CkLocMgr::pup(PUP::er &p){
 		//Register with the map object
 		map=(CkArrayMap *)CkLocalBranch(mapID);
 		if (map==NULL) CkAbort("ERROR!  Local branch of array map is NULL!");
-                CkArrayIndexMax emptyIndex;
+                CkArrayIndex emptyIndex;
 		map->registerArray(emptyIndex,thisgroup);
 		// _lbdb is the fixed global groupID
 		initLB(lbdbID);
@@ -1850,7 +1889,7 @@ void CkLocMgr::pup(PUP::er &p){
         homeElementCount = count;
 
         for(int i=0;i<count;i++){
-            CkArrayIndexMax idx;
+            CkArrayIndex idx;
             int pe;
             idx.pup(p);
             p | pe;
@@ -1893,7 +1932,7 @@ void CkLocMgr::pup(PUP::er &p){
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
         CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-            CkArrayIndexMax max = idx;
+            CkArrayIndex max = idx;
             if(rec->type() != CkLocRec::local){
                 if(homePe(idx) == CmiMyPe()){
                     int pe;
@@ -2066,7 +2105,7 @@ CmiBool CkLocMgr::addElementToRec(CkLocRec_local *rec,ManagerRec *m,
 	
 	return CmiTrue;
 }
-void CkLocMgr::updateLocation(const CkArrayIndexMax &idx,int nowOnPe) {
+void CkLocMgr::updateLocation(const CkArrayIndex &idx,int nowOnPe) {
 	inform(idx,nowOnPe);
 }
 
@@ -2090,7 +2129,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 		
 	if (!duringMigration) 
 	{ //This is a local element dying a natural death
-	    #if CMK_BLUEGENE_CHARM
+	    #if CMK_BIGSIM_CHARM
 		//After migration, reclaimRemote will be called through 
 		//the CkRemoveArrayElement in the pupping routines for those 
 		//objects that are not on the home processors. However,
@@ -2111,7 +2150,7 @@ void CkLocMgr::reclaim(const CkArrayIndex &idx,int localIdx) {
 	}
 }
 
-void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
+void CkLocMgr::reclaimRemote(const CkArrayIndex &idx,int deletedOnPe) {
 	DEBC((AA"Our element %s died on PE %d\n"AB,idx2str(idx),deletedOnPe));
 	CkLocRec *rec=elementNrec(idx);
 	if (rec==NULL) return; //We never knew him
@@ -2120,15 +2159,15 @@ void CkLocMgr::reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe) {
 	delete rec;
 }
 void CkLocMgr::removeFromTable(const CkArrayIndex &idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's actually in the table before we delete it
 	if (NULL==elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called on invalid index!");
 #endif
         CmiImmediateLock(hashImmLock);
-	hash.remove(*(CkArrayIndexMax *)&idx);
+	hash.remove(*(CkArrayIndex *)&idx);
         CmiImmediateUnlock(hashImmLock);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	//Make sure it's really gone
 	if (NULL!=elementNrec(idx))
 		CkAbort("CkLocMgr::removeFromTable called, but element still there!");
@@ -2472,9 +2511,12 @@ void CkLocMgr::pupElementsFor(PUP::er &p,CkLocRec_local *rec,
 	//Next pup the element data
 	for (m=firstManager;m!=NULL;m=m->next) {
 		CkMigratable *elt=m->element(localIdx);
-		if (elt!=NULL) 
-                {	
-                       elt->pup(p);
+		if (elt!=NULL)
+                {
+                        elt->pup(p);
+#if CMK_ERROR_CHECKING
+                        if (p.isUnpacking()) elt->sanitycheck();
+#endif
                 }
 	}
 }
@@ -2515,8 +2557,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	if(!CmiNodeAlive(toPe)){
 		return;
 	}
-
-	CkArrayIndexMax idx=rec->getIndex();
+	CkArrayIndex idx=rec->getIndex();
 
 #if CMK_OUT_OF_CORE
 	int localIdx=rec->getLocalIndex();
@@ -2648,7 +2689,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 		Leave a record here mentioning the processor where it got sent
 	*/
 	
-	if(CpvAccess(startedEvac)){
+	if(CkpvAccess(startedEvac)){
 		int newhomePE = getNextPE(idx);
 		DEBM((AA"Migrated into failed processor index size %s resent to %d \n"AB,idx2str(idx),newhomePE));	
 		CkLocMgr *mgr = rec->getLocMgr();
@@ -2669,7 +2710,7 @@ void CkLocMgr::restore(const CkArrayIndex &idx, PUP::er &p)
 	//This is in broughtIntoMem during out-of-core emulation in BigSim,
 	//informHome should not be called since such information is already
 	//immediately updated real migration
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 	if(_BgOutOfCoreFlag!=2)
 	    CmiAbort("CkLocMgr::restore should only be used in out-of-core emulation for BigSim and be called when object is brought into memory!\n");
 #endif
@@ -2809,7 +2850,7 @@ void CkLocMgr::insertRec(CkLocRec *rec,const CkArrayIndex &idx) {
 void CkLocMgr::insertRecN(CkLocRec *rec,const CkArrayIndex &idx) {
 	DEBC((AA"  adding new rec(%s) for %s\n"AB,rec2str[rec->type()],idx2str(idx)));
         CmiImmediateLock(hashImmLock);
-	hash.put(*(CkArrayIndexMax *)&idx)=rec;
+	hash.put(*(CkArrayIndex *)&idx)=rec;
         CmiImmediateUnlock(hashImmLock);
 }
 
@@ -2822,9 +2863,9 @@ static void abort_out_of_bounds(const CkArrayIndex &idx)
 
 //Look up array element in hash table.  Index out-of-bounds if not found.
 CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
-#ifdef CMK_OPTIMIZE
+#if ! CMK_ERROR_CHECKING
 //Assume the element will be found
-	return hash.getRef(*(CkArrayIndexMax *)&idx);
+	return hash.getRef(*(CkArrayIndex *)&idx);
 #else
 //Include an out-of-bounds check if the element isn't found
 	CkLocRec *rec=elementNrec(idx);
@@ -2835,7 +2876,7 @@ CkLocRec *CkLocMgr::elementRec(const CkArrayIndex &idx) {
 
 //Look up array element in hash table.  Return NULL if not there.
 CkLocRec *CkLocMgr::elementNrec(const CkArrayIndex &idx) {
-	return hash.get(*(CkArrayIndexMax *)&idx);
+	return hash.get(*(CkArrayIndex *)&idx);
 }
 
 struct LocalElementCounter :  public CkLocIterator

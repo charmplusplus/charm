@@ -174,7 +174,7 @@ void GridCommRefineLB::Initialize_PE_Data (CentralLB::LDStats *stats)
   // Also add background CPU time to each PE's scaled load.
   for (i = 0; i < Num_PEs; i++) {
     (&PE_Data[i])->relative_speed = (double) (stats->procs[i].pe_speed / min_speed);
-    (&PE_Data[i])->scaled_load += stats->procs[i].bg_cputime;
+    (&PE_Data[i])->scaled_load += stats->procs[i].bg_walltime;
   }
 }
 
@@ -578,7 +578,7 @@ void GridCommRefineLB::Assign_Object_To_PE (int target_object, int target_pe)
 ** The Charm++ load balancing framework invokes this method to cause the
 ** load balancer to migrate objects to "better" PEs.
 */
-void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
+void GridCommRefineLB::work (LDStats *stats)
 {
   int i;
   // int j;
@@ -603,7 +603,7 @@ void GridCommRefineLB::work (CentralLB::LDStats *stats, int count)
   stats->makeCommHash ();
 
   // Initialize object variables for the number of PEs and number of objects.
-  Num_PEs = count;
+  Num_PEs = stats->nprocs();
   Num_Objects = stats->n_objs;
 
   if (_lb_args.debug() > 0) {

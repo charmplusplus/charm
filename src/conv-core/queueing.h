@@ -193,6 +193,7 @@ void CqsDequeue(Queue, void **msgPtr);
 
 unsigned int CqsLength(Queue);
 int CqsEmpty(Queue);
+int CqsPrioGT_(unsigned int ints1, unsigned int *data1, unsigned int ints2, unsigned int *data2);
 int CqsPrioGT(_prio, _prio);
 
 /** Get the priority of the highest priority message in q */

@@ -22,7 +22,7 @@ void ComlibNotifyMigrationDone() {
         if(CkpvAccess(migrationDoneHandlerID) > 0) {
             char *msg = (char *)CmiAlloc(CmiReservedHeaderSize);
             CmiSetHandler(msg, CkpvAccess(migrationDoneHandlerID));
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	    // bluegene charm should avoid directly calling converse
             CmiSyncSendAndFree(CkMyPe(), CmiReservedHeaderSize, msg);
 #else

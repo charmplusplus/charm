@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -30,7 +23,7 @@ public:
 
   GreedyLB(const CkLBOptions &);
   GreedyLB(CkMigrateMessage *m):CentralLB(m) { lbname = "GreedyLB"; }
-  void work(LDStats* stats,int count);
+  void work(LDStats* stats);
 private:
 	enum           HeapCmp {GT = '>', LT = '<'};
     	void           Heapify(HeapData*, int, int, HeapCmp);

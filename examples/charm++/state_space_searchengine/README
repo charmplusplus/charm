@@ -1,0 +1,102 @@
+Steps to use the search engine:
+
+(1) build state space searchengine in charm++ libs
+  (1) cd charm/<build dir>/tmp/libs/ck-libs/state_space_searchengine
+  (2) type 'make OPTS=-O3'
+
+      If you are using priority, add -DUSEBITPRIORITY to OPTS,
+      and type 'make OPTS="-O3 -DUSEBITPRIORITY"'
+
+    this will build two search engine libraries: libmodulesearchEngine.a and libmodulesearchEngine_bound.a (for branch-and-bound).
+
+(2) Go to your own application directory. For example, 
+   type 'cd NQueens'
+
+   and then type 'make OPTS=-O3'.  Make sure to use the same macro as in step (1)/(2) above.
+
+
+*Files to be changed. 
+
+   All files in template/ are not supposed to be changed.
+   
+   You can modify main.C main.ci as you need.
+   The main changes are in searchEngineAPI.C
+
+   *****************************************************
+  *The following functions must be implemented:
+
+  (1) SE_Register(QueenStateBase, createInitialChildren, createChildren, parallelLevel, searchDepthLimit);
+   
+   This line is important, put it in the end of the file
+   The first parameter is your own state class name, the four others are function names that must be implemented)
+
+  (2) void createInitialChildren(Solver *solver) 
+    create the root node of search tree. 
+  (3) inline void createChildren( StateBase *_base , Solver* solver, bool parallel);
+  Expand children from the _base state.
+  
+  (4) int parallelLevel(); 
+  // static parallel search depth
+
+   (5) int searchDepthLimit();
+   // If it is a IDA* problem, define the depth. Othersize, set it to 1;In Hamiltonian problem, just return 1;
+    
+   *******************************************
+   *Interface search engine provides:
+
+    (1.1) StateBase* Solver::registerRootState(int sizeofstate, int childIndex, int totalChildren )
+    (1.2) StateBase* Solver::registerState(int sizeofstate, int childIndex, int totalChildren )
+
+    Use this function to allocate memory for a newly generated child (or root). Note: If in your state class, there is array data structure, you are responsible to set the pointer correctly.
+
+    (2)solver->deleteState(child); solver->reportSolution();
+     If the node is a solution, free the memory of child and report this solution.
+
+    (3) solver->process(child);
+        If the node is not a solution and also the depth is less than the parallel search depth threshold, call this function.
+
+    (4) solver->deleteState(child);
+    If it is a leaf node but not a solution, free the memory if you have used registerState() to allocate it.
+
+
+
+    Notes:
+
+  (1)  In this search engine, for the sequential part you can let the search engine do it or you can implement your own.
+
+    If you are letting the search engine do it, all you have to do is to implement the above functions. 
+
+    If you are implementing your own sequential part, in the createChildren(...) function, you can write code like this:
+
+    if(!parallel)
+    {
+        myown_sequential(....)
+        // in this function, you need to pass 'solver' as a parameter to report the solution.
+    }
+
+(2)  About allocating memory for children and setting the correct pointer. 
+
+    Here is an example.
+
+    class mystate: public StateBase{
+
+        int  intarray_length;
+        int  doublearray_length;
+        int  *my_intarray;
+        double *my_doublearray;
+
+        void setPointer()
+        {
+            int offset = sizeof(mystate);
+            my_intarray = (int*)((char*)this + offset);
+            offset += intarray_length*sizeof(int);
+            my_doublearray = (double*)((char*)this + offset);
+
+        }
+    }
+
+   ...
+   
+  mystate *child = (mystate*) solver-> registerRootState(...);
+  child->setPointer();
+

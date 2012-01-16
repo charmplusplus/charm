@@ -1,17 +1,32 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 #include <string.h>
 #include <stdlib.h>
 #include "sdag-globals.h"
 #include "xi-symbol.h"
 //#include "CParsedFile.h"
 #include "EToken.h"
+#include "CStateVar.h"
 
 namespace xi {
+
+SdagConstruct *buildAtomic(const char* code,
+			   SdagConstruct *pub_list,
+			   const char *trace_name)
+{
+  char *tmp = strdup(code);
+  RemoveSdagComments(tmp);
+  SdagConstruct *ret = new SdagConstruct(SATOMIC, new XStr(tmp), pub_list, 0,0,0,0, 0 );
+  free(tmp);
+
+  if (trace_name)
+  {
+    tmp = strdup(trace_name);
+    tmp[strlen(tmp)-1]=0;
+    ret->traceName = new XStr(tmp+1);
+    free(tmp);
+  }
+
+  return ret;
+}
 
 void SdagConstruct::numberNodes(void)
 {
@@ -133,7 +148,7 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 {
    // case SENTRY:
    CEntry *entry;
-   int notfound=1;
+   bool found = false;
    
    for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
      if(*(entry->entry) == (const char *)name) 
@@ -142,39 +157,29 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 	epl = entry->paramlist;
         ParamList *pl;
         pl = param;
-        notfound = 1;
+        found = false;
 	if ((entry->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
-	   notfound = 0;
+	   found = true;
 	}
 	while ((pl != NULL) && (epl != NULL))
 	{
-	   if (pl->isArray() && epl->isArray()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isBuiltin() && epl->isBuiltin()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isReference() && epl->isReference()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isMessage() && epl->isMessage()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
-	   else if (pl->isNamed() && epl->isNamed()) {
-	     if (strcmp(pl->getBaseName(), epl->getBaseName()) == 0)
-	        notfound = 0;
-	   }
- 	   pl = pl->next;
-	   epl = epl->next;
+          bool kindMatches =
+            (pl->isArray() && epl->isArray()) ||
+            (pl->isBuiltin() && epl->isBuiltin()) ||
+            (pl->isReference() && epl->isReference()) ||
+            (pl->isMessage() && epl->isMessage()) ||
+            (pl->isNamed() && epl->isNamed());
+          bool baseNameMatches = (strcmp(pl->getBaseName(), epl->getBaseName()) == 0);
+          if (kindMatches && baseNameMatches)
+            found = true;
+
+          pl = pl->next;
+          epl = epl->next;
         }
         if (((pl == NULL) && (epl != NULL)) ||
            ((pl != NULL) && (epl == NULL)))
-  	     notfound = 1;
-	if (notfound == 0) {
+          found = false;
+	if (found) {
           // check to see if thisWhen is already in entry's whenList
           int whenFound = 0;
           TList<SdagConstruct*> *tmpList = &(entry->whenList);
@@ -191,7 +196,7 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
 	 } 
      }
    }
-   if(notfound == 1) {
+   if(!found) {
      CEntry *newEntry;
      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
      CEntrylist.append(newEntry);
@@ -226,8 +231,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
    op << "  void " <<connectEntry->charstar() <<'(';
    ParamList *pl = param;
    XStr msgParams;
-   int i, numStars;
-   int count;
    if (pl->isVoid() == 1) {
      op << "void) {\n"; 
    }
@@ -235,7 +238,6 @@ void SdagConstruct::generateConnectEntries(XStr& op){
      op << pl->getBaseName() <<" *" <<pl->getGivenName() <<") {\n";
    }
    else {
-    count = 0;
     op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg) {\n";
     msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
     param->beginUnmarshall(msgParams);
@@ -272,35 +274,14 @@ void SdagConstruct::propagateState(int uniqueVarNum)
      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
      stateVars->append(sv);
   }
-  else if (pl->isMessage() == 1){
-     sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
-     stateVars->append(sv);
-  }
   else {
-    while(pl != NULL) {
-      if (pl->isPointer() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
-      }
-      else if (pl->isReference() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
-
-      }
-      else if (pl->isArray() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
-      }
-      else if (pl->isBuiltin() == 1) {
-        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-
-      }
-      else if (pl->isNamed()) {
-          sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-      }
+    while (pl != NULL) {
+      stateVars->append(new CStateVar(pl));
       pl = pl->next;
-      stateVars->append(sv);
     }
   }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
   stateVarsChildren = new TList<CStateVar*>();
 
@@ -324,10 +305,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  int i;
-  TList <CStateVar*> *olistTempStateVars;
   TList<CStateVar*> *whensEntryMethodStateVars; 
-  olistTempStateVars = new TList<CStateVar*>();
   stateVars = new TList<CStateVar*>();
   switch(type) {
     case SFORALL:
@@ -342,41 +320,17 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         char txt[128];
         sprintf(txt, "_cf%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0, "CCounter", 1, txt,0,NULL, 1);
+        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
         stateVarsChildren->append(sv);
       }
       break;
     case SWHEN:
       whensEntryMethodStateVars = new TList<CStateVar*>();
       stateVarsChildren = new TList<CStateVar*>();
-      int numParameters; 
-      int count;
-      int isMsg;
-      int stateVarsHasVoid;
-      int stateVarsChildrenHasVoid; 
-      numParameters=0; count=0; isMsg=0; 
-      stateVarsHasVoid = 0;
-      stateVarsChildrenHasVoid = 0;
-      for(sv = stateVars->begin(); ((!stateVars->end()) && (stateVarsHasVoid != 1)); sv=stateVars->next()) {
-         if (sv->isVoid == 1)
-	     stateVarsHasVoid == 1;	// what this means??? gengbin
-      }
       for(sv=list.begin(); !list.end(); sv=list.next()) {
-         if ((sv->isVoid == 1) && (stateVarsHasVoid != 1)) {
-	    stateVars->append(sv);
-	    stateVarsHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1)
-	    stateVars->append(sv);
-	 if ((sv->isVoid == 1) && (stateVarsChildrenHasVoid != 1)) {
-	    stateVarsChildren->append(sv);
-	    stateVarsChildrenHasVoid == 1;
-	 }
-	 else if (sv->isVoid != 1) {
-	    stateVarsChildren->append(sv);
-	 }
+        stateVars->append(sv);
+        stateVarsChildren->append(sv);
       }
-
      
       {  
         EntryList *el;
@@ -393,38 +347,15 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
  	      el->entry->estateVars.append(sv);
  	      el->entry->stateVars->append(sv);
           }
-          else if (pl->isMessage()){
-            sv = new CStateVar(0, pl->getBaseName(), 1, pl->getGivenName(), 0, NULL, 1);
-            //stateVars->append(sv);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
-          }
           else {
             while(pl != NULL) {
-              if (pl->isPointer()) {
-                sv = new CStateVar(0, pl->getBaseName(), pl->getNumStars(), pl->getGivenName(), 0, NULL, 0); 
-              }
-      	      else if (pl->isReference()) {
-       	        sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), new XStr("&"), NULL, 0); 
-              }
-              else if (pl->isArray()) {
-                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, pl->getArrayLen(), 0); 
-              }
-              else if (pl->isBuiltin()) {
-                sv = new CStateVar(0, pl->getBaseName(), 0, pl->getGivenName(), 0, NULL, 0); 
-              }
-	      else if (pl->isNamed()) {
-                sv = new CStateVar(0, (XStr)(*(pl->param->getType())), 0, pl->getGivenName(), 0, NULL, 0); 
-	      }
-	      else
-	         printf("PROBLEM - I DON'T KNOW THE TYPE\n");
-              pl = pl->next;
+              sv = new CStateVar(pl);
               stateVarsChildren->append(sv);
               whensEntryMethodStateVars->append(sv); 
  	      el->entry->estateVars.append(sv);
  	      el->entry->stateVars->append(sv);
+
+              pl = pl->next;
 	    }
 	  }
 	  el = el->next;
@@ -449,7 +380,7 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         char txt[128];
         sprintf(txt, "_co%d", nodeNum);
         counter = new XStr(txt);
-        sv = new CStateVar(0,"CCounter",1, txt,0, NULL, 1);
+        sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
         stateVarsChildren->append(sv);
       }
       break;
@@ -510,11 +441,11 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
  } 
 }
 
-void SdagConstruct::generateCode(XStr& op)
+void SdagConstruct::generateCode(XStr& op, Entry *entry)
 {
   switch(type) {
     case SSDAGENTRY:
-      generateSdagEntry(op);
+      generateSdagEntry(op, entry);
       break;
     case SSLIST:
       generateSlist(op);
@@ -531,7 +462,7 @@ void SdagConstruct::generateCode(XStr& op)
     case SIF:
       generateIf(op);
       if(con2 != 0)
-        con2->generateCode(op);
+        con2->generateCode(op, entry);
       break;
     case SELSE:
       generateElse(op);
@@ -560,7 +491,7 @@ void SdagConstruct::generateCode(XStr& op)
   SdagConstruct *cn;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateCode(op);
+      cn->generateCode(op, entry);
     }
   }
 }
@@ -613,7 +544,7 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "  int " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
 
@@ -635,7 +566,7 @@ void SdagConstruct::generateWhen(XStr& op)
     else {
         for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
           op << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
-          op << "    " << sv->type->charstar() << " *" <<
+          op << "    " << sv->type->charstar() << " " <<
                           sv->name->charstar() << ";\n";
         } 
     }
@@ -690,7 +621,7 @@ void SdagConstruct::generateWhen(XStr& op)
   }
   op << ") {\n";
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // for tracing
   //TODO: instead of this, add a length field to EntryList
   int elen=0;
@@ -760,7 +691,7 @@ void SdagConstruct::generateWhen(XStr& op)
      else {  // There was a message as the only parameter
         sv = e->stateVars->begin();
         op << "       " << sv->name->charstar() << " = (" << 
-              sv->type->charstar() << " *) " <<
+              sv->type->charstar() << ") " <<
               sv->name->charstar() << "_buf->msg;\n";
         op << "       __cDep->removeMessage(" << sv->name->charstar() <<
               "_buf);\n";
@@ -799,8 +730,6 @@ void SdagConstruct::generateWhen(XStr& op)
     e = el->entry;
     if (e->paramIsMarshalled() == 1) {
         op << "       delete " << e->getEntryName() << "_msg;\n";
-    } else if (e->param->isMessage() == 1) {
-	op << "       CmiFree(UsrToEnv(" << e->param->param->getGivenName() << "));\n";
     }
     el = el->next;
   }
@@ -845,13 +774,12 @@ void SdagConstruct::generateWhen(XStr& op)
  
 //  op << "       int impl_off=0;\n";
   int hasArray = 0;
-  int isVoid = 0;
   int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
-        isVoid = 1;
-       op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+       // op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+       op <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
     }
     else {
       if (sv->isMsg == 1) {
@@ -951,19 +879,33 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SWHEN_END);
 #endif
   // actual code here 
   if(nextBeginOrEnd == 1)
-   op << "    " << next->label->charstar() << "(";
+   op << "    " << next->label->charstar();
   else 
-   op << "    " << next->label->charstar() << "_end(";
+    op << "    " << next->label->charstar() << "_end";
+
+  op << "(";
 
   generateCall(op, *stateVars); 
   
   op << ");\n";
+
+  el = elist;
+  while (el) {
+    e = el->entry;
+    if (e->param->isMessage() == 1) {
+      sv = e->stateVars->begin();
+      op << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
+    }
+
+    el = el->next;
+  }
+
   // end actual code
   op << "  }\n\n";
 }
@@ -1019,13 +961,13 @@ void SdagConstruct::generateFor(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // actual code here 
   generateBeginTime(op);
 #endif
   op << "    " << con1->text->charstar() << ";\n";
   //Record only the beginning for FOR
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEventBracket(op,SFOR);
 #endif
   op << "    if (" << con2->text->charstar() << ") {\n";
@@ -1050,7 +992,7 @@ void SdagConstruct::generateFor(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
   // actual code here 
@@ -1061,7 +1003,7 @@ void SdagConstruct::generateFor(XStr& op)
   generateCall(op, *stateVarsChildren);
   op << ");\n";
   op << "    } else {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEventBracket(op,SFOR_END);
 #endif
   if(nextBeginOrEnd == 1)
@@ -1082,7 +1024,7 @@ void SdagConstruct::generateIf(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF);
 #endif
@@ -1111,7 +1053,7 @@ void SdagConstruct::generateIf(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF_END);
 #endif
@@ -1150,7 +1092,7 @@ void SdagConstruct::generateElse(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SELSE_END);
 #endif
@@ -1230,7 +1172,7 @@ void SdagConstruct::generateOlist(XStr& op)
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   op << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
 #endif
 
@@ -1238,7 +1180,7 @@ void SdagConstruct::generateOlist(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   op << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
@@ -1259,7 +1201,7 @@ void SdagConstruct::generateOlist(XStr& op)
 
   op << "      delete " << counter->charstar() << ";\n";
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateListEventBracket(op,SOLIST_END);
   op << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
 #endif
@@ -1282,7 +1224,7 @@ void SdagConstruct::generateOverlap(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP);
 #endif
@@ -1300,7 +1242,7 @@ void SdagConstruct::generateOverlap(XStr& op)
   op << "  void " << label->charstar() << "_end(";
   generatePrototype(op, *stateVarsChildren);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP_END);
 #endif
@@ -1343,7 +1285,7 @@ void SdagConstruct::generateSlist(XStr& op)
   op << "  }\n";
 }
 
-void SdagConstruct::generateSdagEntry(XStr& op)
+void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
 {
   // header file
   op << "public:\n";
@@ -1356,24 +1298,29 @@ void SdagConstruct::generateSdagEntry(XStr& op)
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
         op << "    _connect_" << sc1->text->charstar() <<"();\n";
   }
-#if CMK_BLUEGENE_CHARM
+
+#if CMK_BIGSIM_CHARM
   generateEndSeq(op);
 #endif
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateTraceEndCall(op);
+
   // actual code here 
   op << "    " << constructs->front()->label->charstar() <<
         "(";
   generateCall(op, *stateVarsChildren);
   op << ");\n";
-#if CMK_BLUEGENE_CHARM
+
+#if CMK_BIGSIM_CHARM
   generateTlineEndCall(op);
   generateBeginExec(op, "spaceholder");
 #endif
-  generateDummyBeginExecute(op);
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateDummyBeginExecute(op);
+
   // end actual code
   op << "  }\n\n";
   op << "private:\n";
   op << "  void " << con1->text->charstar() << "_end(";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generatePrototype(op, *stateVarsChildren);
 #else
   generatePrototype(op, *stateVars);
@@ -1388,17 +1335,16 @@ void SdagConstruct::generateAtomic(XStr& op)
   op << "  void " << label->charstar() << "(";
   generatePrototype(op, *stateVars);
   op << ") {\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateBeginExec(op, nameStr);
 #endif
   generateTraceBeginCall(op);
   op << "    " << text->charstar() << "\n";
   // trace
   generateTraceEndCall(op);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   generateEndExec(op);
 #endif
-  SdagConstruct *cn;
   if(nextBeginOrEnd == 1)
     op << "    " << next->label->charstar() << "(";
   else
@@ -1412,30 +1358,21 @@ void SdagConstruct::generatePrototype(XStr& op, ParamList *list)
 {
    ParamList *pl = list;
    int count = 0;
-   int i, numStars;
+
    if (pl->isVoid() == 1) {
      op << "void"; 
-   }
-   else if (pl->isMessage() == 1){
-     op << pl->getBaseName() <<" *" <<pl->getGivenName() ;
    }
    else {
      while(pl != NULL) {
        if (count > 0)
           op <<", ";
-       if (pl->isPointer() == 1) {
-         op <<pl->getBaseName(); 
-	 numStars = pl->getNumStars();
-	 for(i=0; i< numStars; i++)
-	   op <<"*";
-	 op <<" "<<pl->getGivenName();
-       }
-       else if (pl->isReference() == 1) 
-         op <<pl->getBaseName() <<"& " <<pl->getGivenName();
-       else if (pl->isArray() == 1) 
-         op <<pl->getBaseName() <<"* " <<pl->getGivenName();
-       else if ((pl->isBuiltin() == 1) || (pl->isNamed() == 1))
-         op <<pl->getBaseName() <<" " <<pl->getGivenName();
+       op << pl->param->getType();
+
+       if (pl->isReference())
+         op << "&";
+
+       op << pl->getGivenName();
+
        pl = pl->next;
        count++;
      }
@@ -1459,12 +1396,7 @@ void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
       if (sv->byRef != 0)
          op <<" &";
       if (sv->arrayLength != NULL) 
-         op <<"*";
-      else if (sv->numPtrs != 0) {
-        for (int i=0; i<sv->numPtrs; i++) 
-	  op <<"*";
-         op <<" ";
-      }
+        op <<"* ";
       if (sv->name != 0)
          op <<sv->name->charstar();
     }
@@ -1500,28 +1432,16 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        SdagConstruct *notConnectNode = this;
         SdagConstruct *cn=constructs->begin();
         if (cn==0) // empty slist
           return;
-        else if (cn->type != SCONNECT)
-          notConnectNode = cn;
-        int flag = 1;
-        SdagConstruct *nextNode=constructs->next();
-        for(; nextNode != 0;) {
-          if (nextNode->type != SCONNECT)
-            notConnectNode = nextNode;
-          flag = 1;
-	  while ((flag == 1) && (nextNode->type == SCONNECT)) {
-	    nextNode = constructs->next();
-            if (nextNode == 0)
-              flag = 0;
-	  }
-	  if (nextNode != 0) {
-            cn->setNext(nextNode, 1);
-            cn = nextNode;
-            nextNode = constructs->next();
-	  }
+
+        for(SdagConstruct *nextNode=constructs->next(); nextNode != 0; nextNode = constructs->next()) {
+	  if (nextNode->type == SCONNECT)
+	    continue;
+
+          cn->setNext(nextNode, 1);
+          cn = nextNode;
         }
         cn->setNext(this, 0);
       }
@@ -1569,7 +1489,7 @@ void SdagConstruct::generateTrace()
     if (traceName) {
       sprintf(text, "%s_%s", CParsedFile::className->charstar(), traceName->charstar());
       // remove blanks
-      for (int i=0; i<strlen(text); i++)
+      for (unsigned int i=0; i<strlen(text); i++)
         if (text[i]==' '||text[i]=='\t') text[i]='_';
     }
     else {
@@ -1580,10 +1500,14 @@ void SdagConstruct::generateTrace()
   default:
     break;
   }
+
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTrace();
   }
+  if (con1) con1->generateTrace();
+  if (con2) con2->generateTrace();
+  if (con3) con3->generateTrace();
 }
 
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
@@ -1613,19 +1537,19 @@ void SdagConstruct::generateEndExec(XStr& op){
 void SdagConstruct::generateBeginTime(XStr& op)
 {
   //Record begin time for tracing
-  op<< "    double __begintime = CkVTimer(); \n";
+  op << "    double __begintime = CkVTimer(); \n";
 }
 
 void SdagConstruct::generateTlineEndCall(XStr& op)
 {
   //Trace this event
-  op<<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
+  op <<"    _TRACE_BG_TLINE_END(&_bgParentLog);\n";
 }
 
 void SdagConstruct::generateEndSeq(XStr& op)
 {
-  op<<  "    void* _bgParentLog = NULL;\n";
-  op<<  "    CkElapse(0.01e-6);\n";
+  op <<  "    void* _bgParentLog = NULL;\n";
+  op <<  "    CkElapse(0.01e-6);\n";
   //op<<  "    BgElapse(1e-6);\n";
   generateTlineEndCall(op);
   generateTraceEndCall(op);
@@ -1634,28 +1558,36 @@ void SdagConstruct::generateEndSeq(XStr& op)
 
 void SdagConstruct::generateEventBracket(XStr& op, int eventType)
 {
+  (void) eventType;
   //Trace this event
-  op<<"     _TRACE_BG_USER_EVENT_BRACKET(\""<<nameStr<<"\", __begintime, CkVTimer(),&_bgParentLog); \n"; 
+  op << "     _TRACE_BG_USER_EVENT_BRACKET(\"" << nameStr
+     << "\", __begintime, CkVTimer(),&_bgParentLog); \n";
 }
 
-void SdagConstruct::generateListEventBracket(XStr& op, int eventType){
-
-  op<<"    _TRACE_BGLIST_USER_EVENT_BRACKET(\""<<nameStr<<"\",__begintime,CkVTimer(),&_bgParentLog, "<<label->charstar()<<"_bgLogList);\n";
+void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
+{
+  (void) eventType;
+  op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
+     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label->charstar()
+     << "_bgLogList);\n";
 }
 
 void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
 {
   if (traceName) {
-    //   op << "    __idx_" << traceName->charstar() << 
-    //     " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, 0);\n";
-    op << "    __idx_" << traceName->charstar() <<
-      " = CkRegisterEp(\"" << traceName->charstar() << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar() << "::__idx, 0);\n";
-
+    op << "    __idx_" << traceName->charstar()
+       << " = CkRegisterEp(\"" << traceName->charstar()
+       << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar()
+       << "::__idx, 0);\n";
   }
+
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateRegisterEp(op);
   }
+  if (con1) con1->generateRegisterEp(op);
+  if (con2) con2->generateRegisterEp(op);
+  if (con3) con3->generateRegisterEp(op);
 }
 
 void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
@@ -1667,25 +1599,32 @@ void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTraceEpDecl(op);
   }
+  if (con1) con1->generateTraceEpDecl(op);
+  if (con2) con2->generateTraceEpDecl(op);
+  if (con3) con3->generateTraceEpDecl(op);
 }
 
 
 void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
 {
   if (traceName) {
-    op << "  int " << CParsedFile::className->charstar() << "::__idx_" << traceName->charstar() << "=0;\\\n"; 
+    op << "  int " << CParsedFile::className->charstar()
+       << "::__idx_" << traceName->charstar() << "=0;\\\n";
   }
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     cn->generateTraceEpDef(op);
   }
+  if (con1) con1->generateTraceEpDef(op);
+  if (con2) con2->generateTraceEpDef(op);
+  if (con3) con3->generateTraceEpDef(op);
 }
 
 
 void RemoveSdagComments(char *str)
 {
   char *ptr = str;
-  while (ptr = strstr(ptr, "//")) {
+  while ((ptr = strstr(ptr, "//"))) {
     char *lend = strstr(ptr, "\n");
     if (lend==NULL) break;
     while (ptr != lend) *ptr++=' ';

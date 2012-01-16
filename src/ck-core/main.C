@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include "ck.h"
 
 #undef CMK_G95
@@ -14,7 +7,7 @@ extern "C" void g95_runtime_start(int argc, char *argv[]);
 extern "C" void g95_runtime_stop();
 #endif
 
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
 int main(int argc, char **argv)
 {
   int stack_top=0;

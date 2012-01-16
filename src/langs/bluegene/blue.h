@@ -11,10 +11,10 @@
   Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
 */ 
 
-#ifndef BLUEGENE_H
-#define BLUEGENE_H
+#ifndef BIGSIM_H 
+#define BIGSIM_H
 
-#define __BLUEGENE__
+#define __BIGSIM__
 
 #include "converse.h"
 
@@ -24,11 +24,6 @@ extern "C" {
 
 /**
   conform to Converse message header
-*/
-/*
-MOVED to converse.h
-typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
-#define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
 */
 
 /**

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -39,7 +32,7 @@ public:
   MyHierarchyTree(): span(NULL), myname(NULL) {}
   virtual ~MyHierarchyTree() {}
   const char* name() const { return myname; }
-  virtual const int numLevels() const { return nLevels; }
+  virtual int numLevels() const { return nLevels; }
   virtual int parent(int mype, int level) = 0;
   virtual int isroot(int mype, int level) = 0;
   virtual int numChildren(int mype, int level) = 0;
@@ -107,13 +100,17 @@ class ThreeLevelTree: public MyHierarchyTree {
 private:
   int toproot;
 public:
-  ThreeLevelTree() {
+  ThreeLevelTree(int groupsize=512) {
     myname = "ThreeLevelTree";
     span = new int[2];
     nLevels = 3;
-    int groupsize = 512;
     while (groupsize && CkNumPes() / groupsize < 2) {
       groupsize /= 2;
+    }
+    while ( CkNumPes() % groupsize ) --groupsize;
+    if ( groupsize == 1 ) {
+      ++groupsize;
+      while ( CkNumPes() % groupsize ) ++groupsize;
     }
     span[0] = groupsize;
     CmiAssert(span[0]>1);
@@ -241,9 +238,9 @@ public:
     nLevels = k;
     span = new int[nLevels-1];
     int P=CkNumPes();
-    G = exp(log(P*1.0)/(nLevels-1));
+    G = (int)(exp(log(P*1.0)/(nLevels-1))+0.5);
     if (pow(G*1.0, nLevels-1) != P) {
-      CkPrintf("KLevelTree: G=%d\n", G);
+      CkPrintf("KLevelTree failed: P=%d Level=%d G=%d\n", P, nLevels, G);
       CmiAbort("KLevelTree failed");
     }
     for (int i=0; i<nLevels-1; i++) span[i] = G;
@@ -349,19 +346,25 @@ private:
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-  virtual void work(LDStats* stats,int count);
-  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual void work(LDStats* stats);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
+  // helper function
+  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo, int count);
+  virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats);
+  void    printSummary(LDStats *stats, int count);
+  void    initTree();
 
-    // helper function
-  LBMigrateMsg * createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,int count);
-
-  virtual LBVectorMigrateMsg* VectorStrategy(LDStats* stats,int count);
+  // Not to be used -- maintained for legacy applications
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
+    return Strategy(stats);
+  }
 
   virtual int     useMem();
   int NeighborIndex(int pe, int atlevel);   // return the neighbor array index
 
   MyHierarchyTree  *tree;
+  int shrinklevel;
 
   class LevelData {
   public:

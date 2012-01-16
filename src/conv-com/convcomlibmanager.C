@@ -38,7 +38,7 @@ CkpvDeclare(ConvComlibManager, conv_com_object);
 CkpvDeclare(int, comlib_handler);
 /// Method invoked upon receipt a message routed through comlib.
 void *strategyHandler(void *msg) {
-    CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
 
 #ifndef CMK_OPTIMIZE
@@ -148,11 +148,13 @@ void *comlibReceiveTableHandler(void *msg) {
       // delete the old strategy. Since it is requested, it is safe
       delete current;
       current = NULL;
+      CkpvAccess(conv_com_object).decrementNumStrats(); 
     }
     if (current == NULL) {
       // if current is NULL either the strategy has never been set yet, or we
       // are replacing it
       CkpvAccess(conv_com_object).setStrategy(sw.position[i], sw.strategy[i]);
+      CkpvAccess(conv_com_object).incrementNumStrats(); 
     } else {
       // let's delete the incoming strategy since it is not used
       delete sw.strategy[i];
@@ -283,7 +285,7 @@ void ConvComlibManager::enableStrategy(int i) {
   MessageHolder *mh;
   while ((mh=strategyTable[i].tmplist.deq()) != NULL) {
     CharmMessageHolder*cmh = (CharmMessageHolder*)mh;
-    cmh->checkme();
+    //    cmh->checkme();
     cmh->sec_id = cmh->copy_of_sec_id;
 
 #if DEBUG_MULTICAST

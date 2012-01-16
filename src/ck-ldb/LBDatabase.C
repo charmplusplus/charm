@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -244,6 +237,11 @@ void _loadbalancerInit()
     _lb_args.debug() = CmiGetArgFlagDesc(argv, "+LBDebug", 
   					     "Turn on LB debugging printouts");
 
+  // getting the size of the team with +teamSize
+  if (!CmiGetArgIntDesc(argv, "+teamSize", &_lb_args.teamSize(), 
+                                          "Team size"))
+    _lb_args.teamSize() = 1;
+
   // ask to print summary/quality of load balancer
   _lb_args.printSummary() = CmiGetArgFlagDesc(argv, "+LBPrintSummary",
 		"Print load balancing result summary");
@@ -251,7 +249,7 @@ void _loadbalancerInit()
   // to ignore baclground load
   _lb_args.ignoreBgLoad() = CmiGetArgFlagDesc(argv, "+LBNoBackground", 
                       "Load balancer ignores the background load.");
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   _lb_args.ignoreBgLoad() = 1;
 #endif
   _lb_args.migObjOnly() = CmiGetArgFlagDesc(argv, "+LBObjOnly", 
@@ -259,8 +257,11 @@ void _loadbalancerInit()
   if (_lb_args.migObjOnly()) _lb_args.ignoreBgLoad() = 1;
 
   // assume all CPUs are identical
+  _lb_args.testPeSpeed() = CmiGetArgFlagDesc(argv, "+LBTestPESpeed", 
+                      "Load balancer test all CPUs speed.");
   _lb_args.samePeSpeed() = CmiGetArgFlagDesc(argv, "+LBSameCpus", 
                       "Load balancer assumes all CPUs are of same speed.");
+  if (!_lb_args.testPeSpeed()) _lb_args.samePeSpeed() = 1;
 
   _lb_args.useCpuTime() = CmiGetArgFlagDesc(argv, "+LBUseCpuTime", 
                       "Load balancer uses CPU time instead of wallclock time.");
@@ -283,25 +284,27 @@ void _loadbalancerInit()
 
   if (CkMyPe() == 0) {
     if (_lb_args.debug()) {
-      CmiPrintf("LB> Load balancer running with verbose mode level %d, period time: %gs, alpha: %es beta: %es.\n", _lb_args.debug(), _lb_args.lbperiod(), _lb_args.alpha(), _lb_args.beeta());
-      CkPrintf("LB> Topology %s\n", _lbtopo);
+      CmiPrintf("CharmLB> Verbose level %d, load balancing period: %g seconds\n", _lb_args.debug(), _lb_args.lbperiod());
+    }
+    if (_lb_args.debug() > 1) {
+      CmiPrintf("CharmLB> Topology %s alpha: %es beta: %es.\n", _lbtopo, _lb_args.alpha(), _lb_args.beeta());
     }
     if (_lb_args.printSummary())
-      CmiPrintf("LB> Load balancer print summary of load balancing result.\n");
+      CmiPrintf("CharmLB> Load balancer print summary of load balancing result.\n");
     if (_lb_args.ignoreBgLoad())
-      CmiPrintf("LB> Load balancer ignores processor background load.\n");
+      CmiPrintf("CharmLB> Load balancer ignores processor background load.\n");
     if (_lb_args.samePeSpeed())
-      CmiPrintf("LB> Load balancer assumes all CPUs are same.\n");
+      CmiPrintf("CharmLB> Load balancer assumes all CPUs are same.\n");
     if (_lb_args.useCpuTime())
-      CmiPrintf("LB> Load balancer uses CPU time instead of wallclock time.\n");
+      CmiPrintf("CharmLB> Load balancer uses CPU time instead of wallclock time.\n");
     if (LBSimulation::doSimulation)
-      CmiPrintf("LB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
+      CmiPrintf("CharmLB> Load balancer running in simulation mode on file '%s' version %d.\n", LBSimulation::dumpFile, _lb_args.lbversion());
     if (_lb_args.statsOn()==0)
-      CkPrintf("LB> Load balancing instrumentation is off.\n");
+      CkPrintf("CharmLB> Load balancing instrumentation is off.\n");
     if (_lb_args.traceComm()==0)
-      CkPrintf("LB> Load balancing instrumentation for communication is off.\n");
+      CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
     if (_lb_args.migObjOnly())
-      CkPrintf("LB> Load balancing strategy ignores non-migtabale objects.\n");
+      CkPrintf("LB> Load balancing strategy ignores non-migratable objects.\n");
   }
 }
 
@@ -309,7 +312,7 @@ int LBDatabase::manualOn = 0;
 char *LBDatabase::avail_vector = NULL;
 CmiNodeLock avail_vector_lock;
 
-static double * _expectedLoad = NULL;
+static LBRealType * _expectedLoad = NULL;
 
 void LBDatabase::initnodeFn()
 {
@@ -320,7 +323,7 @@ void LBDatabase::initnodeFn()
       avail_vector[proc] = 1;
   avail_vector_lock = CmiCreateLock();
 
-  _expectedLoad = new double[num_proc];
+  _expectedLoad = new LBRealType[num_proc];
   for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
 }
 

@@ -296,7 +296,7 @@ int BgRegisterHandler(BgHandler h)
 {
   ASSERT(!cva(simState).inEmulatorInit);
   int cur;
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   return tMYNODE->handlerTable.registerHandler(h);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -311,7 +311,7 @@ int BgRegisterHandler(BgHandler h)
 void BgNumberHandler(int idx, BgHandler h)
 {
   ASSERT(!cva(simState).inEmulatorInit);
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   tMYNODE->handlerTable.numberHandler(idx,h);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -326,7 +326,7 @@ void BgNumberHandler(int idx, BgHandler h)
 void BgNumberHandlerEx(int idx, BgHandlerEx h, void *uPtr)
 {
   ASSERT(!cva(simState).inEmulatorInit);
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
   tMYNODE->handlerTable.numberHandlerEx(idx,h,uPtr);
 #else
   if (tTHREADTYPE == COMM_THREAD) {
@@ -510,7 +510,7 @@ char * getFullBuffer()
 extern "C"
 void addBgNodeInbuffer(char *msgPtr, int lnodeID)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (lnodeID >= cva(numNodes)) CmiAbort("NodeID is out of range!");
 #endif
   nodeInfo &nInfo = cva(nodeinfo)[lnodeID];
@@ -526,7 +526,7 @@ void addBgNodeInbuffer(char *msgPtr, int lnodeID)
  */
 void addBgThreadMessage(char *msgPtr, int threadID)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (!cva(bgMach).isWorkThread(threadID)) CmiAbort("ThreadID is out of range!");
 #endif
   workThreadInfo *tInfo = (workThreadInfo *)tMYNODE->threadinfo[threadID];
@@ -569,7 +569,7 @@ void msgHandlerFunc(char *msg)
   /* bgmsg is CmiMsgHeaderSizeBytes offset of original message pointer */
   int gnodeID = CmiBgMsgNodeID(msg);
   if (gnodeID >= 0) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
     if (nodeInfo::Global2PE(gnodeID) != CmiMyPe())
       CmiAbort("msgHandlerFunc received wrong message!");
 #endif
@@ -952,7 +952,7 @@ void BgSendNonLocalPacket(nodeInfo *myNode, int x, int y, int z, int threadID, i
 {
   if (cva(bgMach).inReplayMode()) return;     // replay mode, no outgoing msg
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (x<0 || y<0 || z<0 || x>=cva(bgMach).x || y>=cva(bgMach).y || z>=cva(bgMach).z) {
     CmiPrintf("Trying to send packet to a nonexisting node: (%d %d %d)!\n", x,y,z);
     CmiAbort("Abort!\n");
@@ -1051,7 +1051,7 @@ void BgSyncListSend(int npes, int *pes, int handlerID, WorkType type, int numbyt
     int x,y,z,t;
     int pe = pes[i];
     int node;
-#if CMK_BLUEGENE_NODE
+#if CMK_BIGSIM_NODE
     CmiAbort("Not implemented yet!");
 #else
     t = pe%BgGetNumWorkThread();
@@ -1112,7 +1112,7 @@ void BgGetSize(int *sx, int *sy, int *sz)
 
 int BgTraceProjectionOn(int pe)
 {
-  return cva(bgMach).traceProejctions(pe);
+  return cva(bgMach).traceProjections(pe);
 }
 
 /* return the total number of Blue gene nodes */
@@ -1143,7 +1143,7 @@ int BgNodeSize()
 /* return the bg node ID (local array index) */
 int BgMyRank()
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (tMYNODE == NULL) CmiAbort("Calling BgMyRank in the main thread!");
 #endif
   ASSERT(!cva(simState).inEmulatorInit);
@@ -1153,7 +1153,7 @@ int BgMyRank()
 /* return my serialed blue gene node number */
 int BgMyNode()
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (tMYNODE == NULL) CmiAbort("Calling BgMyNode in the main thread!");
 #endif
   return nodeInfo::XYZ2Global(tMYX, tMYY, tMYZ);
@@ -1254,7 +1254,7 @@ void BgProcessMessageDefault(threadInfo *tinfo, char *msg)
   CmiAssert(handler < 1000);
 
   BgHandlerInfo *handInfo;
-#if  CMK_BLUEGENE_NODE
+#if  CMK_BIGSIM_NODE
   HandlerTable hdlTbl = tMYNODE->handlerTable;
   handInfo = hdlTbl.getHandle(handler);
 #else
@@ -1381,7 +1381,7 @@ static CmiHandler exitHandlerFunc(char *msg)
   int i,j;
 
   programExit = 2;
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
   // timing
   if (0)	// detail
   if (genTimeLog) {
@@ -1679,7 +1679,7 @@ CmiStartFn bgMain(int argc, char **argv)
       DEBUGF(("out-of-core turned on!\n"));
   }      
 
-#if BLUEGENE_DEBUG_LOG
+#if BIGSIM_DEBUG_LOG
   {
     char ln[200];
     sprintf(ln,"bgdebugLog.%d",CmiMyPe());
@@ -1802,7 +1802,7 @@ if(bgUseOutOfCore){
 // for conv-conds:
 // if -2 untouch
 // if -1 main thread
-#if CMK_BLUEGENE_THREAD
+#if CMK_BIGSIM_THREAD
 extern "C" int CmiSwitchToPEFn(int pe)
 {
   if (pe == -2) return -2;
@@ -1822,6 +1822,7 @@ extern "C" int CmiSwitchToPEFn(int pe)
 //    if (cva(bgMach).inReplayMode()) pe = 0;         /* replay mode */
     int t = pe%cva(bgMach).numWth;
     int newpe = nodeInfo::Global2Local(pe/cva(bgMach).numWth);
+    if (cva(bgMach).replay!=-1) newpe = 0;
     nodeInfo *ninfo = cva(nodeinfo) + newpe;;
     threadInfo *tinfo = ninfo->threadinfo[t];
     CthSwitchThread(tinfo->me);
@@ -2178,7 +2179,7 @@ void CthEnqueueBigSimThread(CthThreadToken* token, int s,
   CmiSetHandler(token, CpvAccess(CthResumeNormalThreadIdx));
   CsdEnqueueGeneral(token, s, pb, prio);
 */
-#if CMK_BLUEGENE_THREAD
+#if CMK_BIGSIM_THREAD
   int x, y, z;
   BgGetMyXYZ(&x, &y, &z);
   int t = BgGetThreadID();

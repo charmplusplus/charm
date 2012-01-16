@@ -1,21 +1,24 @@
 #ifndef _SYMBOL_H
 #define _SYMBOL_H
 
+#include "xi-util.h"
+#include "EToken.h"
+#include "CEntry.h"
+#include "sdag-globals.h"
+#include "CList.h"
+#include "CParsedFile.h"
+
 #include <iostream>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <list>
 
-#include "xi-util.h"
-#include "EToken.h"
-#include "CEntry.h"
-#include "sdag-globals.h"
-#include "CList.h"
-#include "CStateVar.h"
-#include "CParsedFile.h"
+extern "C" const char * const CmiCommitID;
 
 namespace xi {
+
+class CStateVar;
 
 /******************* Utilities ****************/
 
@@ -86,19 +89,22 @@ class Construct : public Printable {
     Construct() {external=0;line=-1;}
     void setExtern(int &e) { external = e; }
     void setModule(Module *m) { containerModule = m; }
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) = 0;
-    virtual void genDecls(XStr& str) = 0;
-    virtual void genDefs(XStr& str) = 0;
-    virtual void genReg(XStr& str) = 0;
+    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
+    {
+      (void)declstr; (void)defstr; (void)defconstr; (void)connectPresent;
+    }
+    virtual void genDecls(XStr& str) { (void)str; }
+    virtual void genDefs(XStr& str) { (void)str; }
+    virtual void genReg(XStr& str) { (void)str; }
     virtual void preprocess() { }
 
     // DMK - Accel Support
-    virtual int genAccels_spe_c_funcBodies(XStr& str) = 0;
-    virtual void genAccels_spe_c_regFuncs(XStr& str) = 0;
-    virtual void genAccels_spe_c_callInits(XStr& str) = 0;
-    virtual void genAccels_spe_h_includes(XStr& str) = 0;
-    virtual void genAccels_spe_h_fiCountDefs(XStr& str) = 0;
-    virtual void genAccels_ppe_c_regFuncs(XStr& str) = 0;
+    virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
+    virtual void genAccels_spe_c_regFuncs(XStr& str) { (void)str; }
+    virtual void genAccels_spe_c_callInits(XStr& str) { (void)str; }
+    virtual void genAccels_spe_h_includes(XStr& str) { (void)str; }
+    virtual void genAccels_spe_h_fiCountDefs(XStr& str) { (void)str; }
+    virtual void genAccels_ppe_c_regFuncs(XStr& str) { (void)str; }
 };
 
 class ConstructList : public Construct {
@@ -177,7 +183,7 @@ class NamedType : public Type {
     TParamList *tparams;
   public:
     NamedType(const char* n, TParamList* t=0, const char* scope_=NULL)
-       : name(n), tparams(t), scope(scope_) {}
+       : name(n), scope(scope_), tparams(t) {}
     int isTemplated(void) const { return (tparams!=0); }
     int isCkArgMsg(void) const {return 0==strcmp(name,"CkArgMsg");}
     int isCkMigMsg(void) const {return 0==strcmp(name,"CkMigrateMessage");}
@@ -214,7 +220,6 @@ class PtrType : public Type {
     }
 };
 
-/* I don't think these are useful any longer (OSL 11/30/2001) */
 class ReferenceType : public Type {
   private:
     Type *referant;
@@ -317,7 +322,7 @@ class ParamList {
   public:
     Parameter *param;
     ParamList *next;
-    ParamList(ParamList *pl) :param(pl->param), next(pl->next), manyPointers(false) {}
+    ParamList(ParamList *pl) : manyPointers(false), param(pl->param), next(pl->next) {}
     ParamList(Parameter *Nparam,ParamList *Nnext=NULL)
     	:param(Nparam), next(Nnext) { 
           manyPointers = false;
@@ -372,6 +377,7 @@ class ParamList {
     int hasConditional();
     void marshall(XStr &str, XStr &entry);
     void beginUnmarshall(XStr &str);
+    void beginRednWrapperUnmarshall(XStr &str);
     void unmarshall(XStr &str, int isFirst=1);
     void unmarshallAddress(XStr &str, int isFirst=1);
     void pupAllValues(XStr &str);
@@ -444,7 +450,7 @@ class Scope : public Construct {
     const char* name_;
     ConstructList* contents_;
   public:
-    Scope(const char* name, ConstructList* contents) : contents_(contents), name_(name) {}
+    Scope(const char* name, ConstructList* contents) : name_(name), contents_(contents) {}
     virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {
         contents_->genPub(declstr, defstr, defconstr, connectPresent);
     }
@@ -498,28 +504,16 @@ class UsingScope : public Construct {
     bool symbol_;
   public:
     UsingScope(const char* name, bool symbol=false) : name_(name), symbol_(symbol) {}
-    virtual void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
     virtual void genDecls(XStr& str) {
         str << "using ";
         if (!symbol_) str << "namespace ";
         str << name_ << ";\n";
     }
-    virtual void genDefs(XStr& str) {}
-    virtual void genReg(XStr& str) {}
-    virtual void preprocess() {}
     virtual void print(XStr& str) {
         str << "using ";
         if (!symbol_) str << "namespace ";
         str << name_ << ";\n";
     }
-
-    // DMK - Accel Support
-    virtual int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    virtual void genAccels_spe_c_regFuncs(XStr& str) { }
-    virtual void genAccels_spe_c_callInits(XStr& str) { }
-    virtual void genAccels_spe_h_includes(XStr& str) { }
-    virtual void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    virtual void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 
@@ -537,7 +531,6 @@ class Template : public Construct {
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
-    void genReg(XStr& str);
     void genSpec(XStr& str);
     void genVars(XStr& str);
 
@@ -627,16 +620,17 @@ class Member : public Construct {
   protected:
     Chare *container;
   public:
+    inline Chare *getContainer() { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
-    virtual void collectSdagCode(CParsedFile *pf, int& sdagPresent) { return; }
+    virtual void collectSdagCode(CParsedFile *, int&) { return; }
     XStr makeDecl(const XStr &returnType,int forProxy=0);
-    virtual void genPythonDecls(XStr& str) {}
-    virtual void genIndexDecls(XStr& str)=0;
-    virtual void genPythonDefs(XStr& str) {}
-    virtual void genPythonStaticDefs(XStr& str) {}
-    virtual void genPythonStaticDocs(XStr& str) {}
-    virtual void lookforCEntry(CEntry *centry)  {}
+    virtual void genPythonDecls(XStr& ) {}
+    virtual void genIndexDecls(XStr& ) {}
+    virtual void genPythonDefs(XStr& ) {}
+    virtual void genPythonStaticDefs(XStr&) {}
+    virtual void genPythonStaticDocs(XStr&) {}
+    virtual void lookforCEntry(CEntry *)  {}
 };
 
 /* List of members of a chare or group */
@@ -765,7 +759,7 @@ class Chare : public TEntity {
     void genPythonDefs(XStr& str);
     virtual char *chareTypeName(void) {return (char *)"chare";}
     virtual char *proxyPrefix(void);
-    virtual void genSubRegisterMethodDef(XStr& str);
+    virtual void genSubRegisterMethodDef(XStr& str) { (void)str; }
     void lookforCEntry(CEntry *centry);
 };
 
@@ -853,18 +847,9 @@ class Message : public TEntity {
       : type(t), mvlist(mv) 
       { line=l; setTemplate(0); }
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    void genAccels_spe_c_regFuncs(XStr& str) { }
-    void genAccels_spe_c_callInits(XStr& str) { }
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    void genAccels_ppe_c_regFuncs(XStr& str) { }
 
     virtual const char *proxyPrefix(void) {return Prefix::Message;}
     void genAllocDecl(XStr& str);
@@ -904,10 +889,11 @@ class Message : public TEntity {
 #define SSKIPSCHED    0x800 //<- is a message skipping charm scheduler
 #define SPYTHON       0x1000
 #define SINLINE       0x2000 //<- inline message
-#define SIGET   0x4000 
+#define SIGET         0x4000 
 #define SLOCAL        0x8000 //<- local message
-#define SACCEL  0x10000
-#define SMEM  0x20000
+#define SACCEL        0x10000
+#define SMEM          0x20000
+#define SREDUCE       0x40000 // <- reduction target
 
 /* An entry construct */
 class Entry : public Member {
@@ -923,7 +909,7 @@ class Entry : public Member {
 
 //    friend class CParsedFile;
     int hasCallMarshall;
-    void genCall(XStr &dest,const XStr &preCall);
+    void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
 
     XStr epStr(void);
     XStr epIdx(int fromProxy=1);
@@ -960,9 +946,6 @@ class Entry : public Member {
     void genAccelIndexWrapperDef_spe(XStr& str);
     int genAccels_spe_c_funcBodies(XStr& str);
     void genAccels_spe_c_regFuncs(XStr& str);
-    void genAccels_spe_c_callInits(XStr& str) { }
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
     void genAccels_ppe_c_regFuncs(XStr& str);
 
     XStr paramType(int withDefaultVals,int withEO=0,int useConst=1);
@@ -1027,6 +1010,7 @@ class Entry : public Member {
     int isAccel(void) { return (attribs & SACCEL); }
 
     int isMemCritical(void) { return (attribs & SMEM); }
+    int isReductionTarget(void) { return (attribs & SREDUCE); }
 
     void print(XStr& str);
     void genIndexDecls(XStr& str);
@@ -1078,22 +1062,13 @@ class AccelBlock : public Construct {
   ~AccelBlock() { delete code; }
 
   /// Printable Methods ///
-  void print(XStr& str) { }
+  void print(XStr& str) { (void)str; }
 
   /// Construct Methods ///
-  void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) { }
-  void genDecls(XStr& str) { }
   void genDefs(XStr& str) { outputCode(str); }
-  void genReg(XStr& str) { }
-  void preprocess() { }
 
   /// Construct Accel Support Methods ///
   int genAccels_spe_c_funcBodies(XStr& str) { outputCode(str); return 0; }
-  void genAccels_spe_c_regFuncs(XStr& str) { }
-  void genAccels_spe_c_callInits(XStr& str) { }
-  void genAccels_spe_h_includes(XStr& str) { }
-  void genAccels_spe_h_fiCountDefs(XStr& str) { }
-  void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 
@@ -1164,19 +1139,10 @@ class Readonly : public Member {
 	    : msg(m), type(t), name(n)
             { line=l; dims=d; setChare(0); }
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
     void genDecls(XStr& str);
     void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    void genAccels_spe_c_regFuncs(XStr& str) { }
-    void genAccels_spe_c_callInits(XStr& str) { }
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 class InitCall : public Member {
@@ -1191,19 +1157,10 @@ public:
 
     InitCall(int l, const char *n, int nodeCall);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
-    void genDecls(XStr& str);
-    void genIndexDecls(XStr& str);
-    void genDefs(XStr& str);
     void genReg(XStr& str);
 
     // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    void genAccels_spe_c_regFuncs(XStr& str) { }
     void genAccels_spe_c_callInits(XStr& str);
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    void genAccels_ppe_c_regFuncs(XStr& str) { }
 
     void setAccel() { isAccelFlag = 1; }
     void clearAccel() { isAccelFlag = 0; }
@@ -1216,9 +1173,6 @@ class PUPableClass : public Member {
 public:
     PUPableClass(int l, NamedType* type_, PUPableClass *next_);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
-    void genDecls(XStr& str);
-    void genIndexDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
 
@@ -1250,19 +1204,7 @@ class IncludeFile : public Member {
 public:
     IncludeFile(int l, const char *name_);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
-    void genIndexDecls(XStr& str);
-    void genDefs(XStr& str);
-    void genReg(XStr& str);
-
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    void genAccels_spe_c_regFuncs(XStr& str) { }
-    void genAccels_spe_c_callInits(XStr& str) { }
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 class ClassDeclaration : public Member {
@@ -1270,19 +1212,7 @@ class ClassDeclaration : public Member {
 public:
     ClassDeclaration(int l, const char *name_);
     void print(XStr& str);
-    void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
-    void genIndexDecls(XStr& str);
-    void genDefs(XStr& str);
-    void genReg(XStr& str);
-
-    // DMK - Accel Support
-    int genAccels_spe_c_funcBodies(XStr& str) { return 0; }
-    void genAccels_spe_c_regFuncs(XStr& str) { }
-    void genAccels_spe_c_callInits(XStr& str) { }
-    void genAccels_spe_h_includes(XStr& str) { }
-    void genAccels_spe_h_fiCountDefs(XStr& str) { }
-    void genAccels_ppe_c_regFuncs(XStr& str) { }
 };
 
 
@@ -1297,7 +1227,7 @@ private:
   void generateElse(XStr& op);
   void generateForall(XStr& op);
   void generateOlist(XStr& op);
-  void generateSdagEntry(XStr& op);
+  void generateSdagEntry(XStr& op, Entry *entry);
   void generateSlist(XStr& op);
   void generateAtomic(XStr& op);
   void generateForward(XStr& op);
@@ -1335,7 +1265,7 @@ public:
   SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
               SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el);
 
-  SdagConstruct(EToken t, const char *str) : type(t), con1(0), con2(0), con3(0), con4(0)
+ SdagConstruct(EToken t, const char *str) : type(t), traceName(NULL), con1(0), con2(0), con3(0), con4(0)
 		{ text = new XStr(str); constructs = new TList<SdagConstruct*>(); 
                   publishesList = new TList<SdagConstruct*>(); }
                                              
@@ -1355,7 +1285,7 @@ public:
   void generateEntryList(TList<CEntry*>&, SdagConstruct *);
   void propagateState(int);
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
-  void generateCode(XStr& output);
+  void generateCode(XStr& output, Entry *entry);
   void setNext(SdagConstruct *, int);
 
   // for trace
@@ -1371,6 +1301,10 @@ public:
   static void generateDummyBeginExecute(XStr& op);
 
 };
+
+SdagConstruct *buildAtomic(const char* code,
+			   SdagConstruct *pub_list,
+			   const char *trace_name);
 
 extern void RemoveSdagComments(char *);
 

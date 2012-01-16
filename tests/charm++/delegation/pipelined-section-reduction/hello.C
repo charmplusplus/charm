@@ -33,7 +33,7 @@ public:
 };
 PUPbytes(myReductionCounter);
 
-class main : public Chare
+class main : public CBase_main
 {
 public:
   main(CkMigrateMessage *m) {}
@@ -99,7 +99,7 @@ public:
 
     sectionSize = SectionSize;
     if (sectionSize > NumElements) sectionSize = NumElements;
-    CkArrayIndexMax *al = new CkArrayIndexMax[sectionSize];
+    CkArrayIndex *al = new CkArrayIndex[sectionSize];
     for (int i=0; i<sectionSize; i++) {
       al[i] = CkArrayIndex1D(i);
     }
@@ -182,7 +182,7 @@ public:
   }
 
   void pup(PUP::er &p) {
-    ArrayElement1D::pup(p);//Call superclass
+    CBase_Hello::pup(p);//Call superclass
     p|sid;
     p(init);
     p|cnt;

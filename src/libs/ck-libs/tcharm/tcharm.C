@@ -82,7 +82,23 @@ void TCharm::procInit(void)
   char *traceLibName=NULL;
   while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
-  CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  // CmiGetArgIntDesc(argv,"+tcharm_stacksize",&tcharm_stacksize,"Set the thread stack size (default 1MB)");
+  char *str;
+  if (CmiGetArgStringDesc(argv,"+tcharm_stacksize",&str,"Set the thread stack size (default 1MB)"))  {
+    if (strpbrk(str,"M")) {
+      sscanf(str, "%dM", &tcharm_stacksize);
+      tcharm_stacksize *= 1024*1024;
+    }
+    else if (strpbrk(str,"K")) {
+      sscanf(str, "%dK", &tcharm_stacksize);
+      tcharm_stacksize *= 1024;
+    }
+    else {
+      sscanf(str, "%d", &tcharm_stacksize);
+    }
+    if (CkMyPe() == 0)
+      CkPrintf("TCharm> stack size is set to %d.\n", tcharm_stacksize);
+  }
   if (CkMyPe()!=0) { //Processor 0 eats "+vp<N>" and "-vp<N>" later:
   	int ignored;
   	while (CmiGetArgIntDesc(argv,"-vp",&ignored,NULL)) {}
@@ -145,7 +161,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
-  threadGlobals=CtgCreate();
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -157,11 +172,12 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     } else {
       tid=CthCreateMigratable((CthVoidFn)startTCharmThread,initMsg,initMsg->opts.stackSize);
     }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     BgAttach(tid);
     BgUnsetStartOutOfCore();
 #endif
   }
+  threadGlobals=CtgCreate(tid);
   CtvAccessOther(tid,_curTCharm)=this;
   isStopped=true;
   resumeAfterMigration=false;
@@ -173,9 +189,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-  	heapBlocks=CmiIsomallocBlockListNew();
-  else
+  if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
+  	heapBlocks=CmiIsomallocBlockListNew(tid);
+  } else
   	heapBlocks=0;
   nUd=0;
   usesAtSync=CmiTrue;
@@ -300,15 +316,15 @@ void TCharm::pup(PUP::er &p) {
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread");
+    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocBlockListPup(p,&heapBlocks,tid);
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
       BgAttach(tid);
 #endif
     }
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -350,7 +366,9 @@ TCharm::~TCharm()
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
   
+#if !CMK_USE_MEMPOOL_ISOMALLOC
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+#endif
   CthFree(tid);
   CtgFree(threadGlobals);
   delete initMsg;
@@ -508,8 +526,7 @@ void TCharm::evacuate(){
 		FAULT_EVAC
 	*/
 	//CkClearAllArrayElementsCPP();
-	if(CpvAccess(startedEvac)){
-		int nextPE = getNextPE(CkArrayIndex1D(thisIndex));
+	if(CkpvAccess(startedEvac)){
 //		resumeAfterMigration=true;
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
 		suspend();
@@ -587,13 +604,13 @@ void TCharm::barrier(void) {
 	//Contribute to a synchronizing reduction
 	CkCallback cb(index_t::atBarrier(0), thisProxy[0]);
 	contribute(sizeof(_vals),&_vals,CkReduction::sum_int,cb);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *curLog;		// store current log in timeline
         _TRACE_BG_TLINE_END(&curLog);
 	TRACE_BG_AMPI_BREAK(NULL, "TCharm_Barrier_START", NULL, 0, 1);
 #endif
 	stop();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 	 _TRACE_BG_SET_INFO(NULL, "TCHARM_Barrier_END",  &curLog, 1);
 #endif
 }
@@ -728,8 +745,6 @@ CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-  char *tmp;
-  char **argv=CkGetArgv();
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==1);
 
@@ -737,7 +752,7 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     CkPrintf("USING ConfigurableRRMap\n");
     mapID=CProxy_ConfigurableRRMap::ckNew();
   } else if(mapping==NULL){
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     mapID=CProxy_BlockMap::ckNew();
 #else
 #if __FAULT__
@@ -759,7 +774,6 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
-  int nElem=msg->numElements; //<- save it because msg will be deleted.
   return CProxy_TCharm::ckNew(msg,opts);
 }
 
@@ -988,7 +1002,7 @@ FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 */
 /// Find this semaphore, or insert if there isn't one:
 TCharm::TCharmSemaphore *TCharm::findSema(int id) {
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) 
 			return &sema[s];
 	sema.push_back(TCharmSemaphore(id));
@@ -997,7 +1011,7 @@ TCharm::TCharmSemaphore *TCharm::findSema(int id) {
 /// Remove this semaphore from the list
 void TCharm::freeSema(TCharmSemaphore *doomed) {
 	int id=doomed->id;
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) {
 			sema[s]=sema[sema.length()-1];
 			sema.length()--;

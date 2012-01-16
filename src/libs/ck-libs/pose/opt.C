@@ -137,6 +137,7 @@ void opt::UndoEvent(Event *e)
     eventCount--;
     //CkPrintf("POSE_UNDO\n");
     parent->ResolveFn(((e->fnIdx) * -1), e->msg); // execute the anti-method
+    parent->basicStats[1]++;
     if (e->commitBfrLen > 0) free(e->commitBfr); // clean up buffered output
     e->commitBfr = NULL;
     e->commitErr = 0;
@@ -446,6 +447,7 @@ void opt::RecoverState(Event *recoveryPoint)
   // restore state from ev->cpData or ev->serialCPdata
   currentEvent = targetEvent = ev;
   parent->ResolveFn(((ev->fnIdx) * -1), ev->msg);
+  parent->basicStats[1]++;
   if (ev->commitBfrLen > 0)
     free(ev->commitBfr);
   ev->commitBfr = NULL;

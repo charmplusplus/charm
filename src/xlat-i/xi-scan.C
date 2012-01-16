@@ -8,7 +8,7 @@
 #define FLEX_SCANNER
 #define YY_FLEX_MAJOR_VERSION 2
 #define YY_FLEX_MINOR_VERSION 5
-#define YY_FLEX_SUBMINOR_VERSION 34
+#define YY_FLEX_SUBMINOR_VERSION 35
 #if YY_FLEX_SUBMINOR_VERSION > 0
 #define FLEX_BETA
 #endif
@@ -53,7 +53,6 @@ typedef int flex_int32_t;
 typedef unsigned char flex_uint8_t; 
 typedef unsigned short int flex_uint16_t;
 typedef unsigned int flex_uint32_t;
-#endif /* ! C99 */
 
 /* Limits of integral types. */
 #ifndef INT8_MIN
@@ -83,6 +82,8 @@ typedef unsigned int flex_uint32_t;
 #ifndef UINT32_MAX
 #define UINT32_MAX             (4294967295U)
 #endif
+
+#endif /* ! C99 */
 
 #endif /* ! FLEXINT_H */
 
@@ -140,7 +141,15 @@ typedef unsigned int flex_uint32_t;
 
 /* Size of default input buffer. */
 #ifndef YY_BUF_SIZE
+#ifdef __ia64__
+/* On IA-64, the buffer size is 16k, not 8k.
+ * Moreover, YY_BUF_SIZE is 2*YY_READ_BUF_SIZE in the general case.
+ * Ditto for the __ia64__ case accordingly.
+ */
+#define YY_BUF_SIZE 32768
+#else
 #define YY_BUF_SIZE 16384
+#endif /* __ia64__ */
 #endif
 
 /* The state buf must be large enough to hold one state per character in the main buffer.
@@ -177,13 +186,6 @@ extern FILE *yyin, *yyout;
 	while ( 0 )
 
 #define unput(c) yyunput( c, (yytext_ptr)  )
-
-/* The following is because we cannot portably get our hands on size_t
- * (without autoconf's help, which isn't available because we want
- * flex-generated scanners to compile on their own).
- * Given that the standard has decreed that size_t exists since 1989,
- * I guess we can afford to depend on it. Manoj.
- */
 
 #ifndef YY_TYPEDEF_YY_SIZE_T
 #define YY_TYPEDEF_YY_SIZE_T
@@ -842,7 +844,7 @@ int search(char *s);
 #undef yywrap
 #endif
 
-#line 846 "lex.yy.c"
+#line 848 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -859,6 +861,35 @@ int search(char *s);
 #endif
 
 static int yy_init_globals (void );
+
+/* Accessor methods to globals.
+   These are made visible to non-reentrant scanners for convenience. */
+
+int yylex_destroy (void );
+
+int yyget_debug (void );
+
+void yyset_debug (int debug_flag  );
+
+YY_EXTRA_TYPE yyget_extra (void );
+
+void yyset_extra (YY_EXTRA_TYPE user_defined  );
+
+FILE *yyget_in (void );
+
+void yyset_in  (FILE * in_str  );
+
+FILE *yyget_out (void );
+
+void yyset_out  (FILE * out_str  );
+
+int yyget_leng (void );
+
+char *yyget_text (void );
+
+int yyget_lineno (void );
+
+void yyset_lineno (int line_number  );
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -894,7 +925,12 @@ static int input (void );
 
 /* Amount of stuff to slurp up with each read. */
 #ifndef YY_READ_BUF_SIZE
+#ifdef __ia64__
+/* On IA-64, the buffer size is 16k, not 8k */
+#define YY_READ_BUF_SIZE 16384
+#else
 #define YY_READ_BUF_SIZE 8192
+#endif /* __ia64__ */
 #endif
 
 /* Copy whatever the last rule matched to the standard output. */
@@ -902,7 +938,7 @@ static int input (void );
 /* This used to be an fputs(), but since the string might contain NUL's,
  * we now use fwrite().
  */
-#define ECHO fwrite( yytext, yyleng, 1, yyout )
+#define ECHO do { if (fwrite( yytext, yyleng, 1, yyout )) {} } while (0)
 #endif
 
 /* Gets input and stuffs it into "buf".  number of characters read, or YY_NULL,
@@ -913,7 +949,7 @@ static int input (void );
 	if ( YY_CURRENT_BUFFER_LVALUE->yy_is_interactive ) \
 		{ \
 		int c = '*'; \
-		int n; \
+		size_t n; \
 		for ( n = 0; n < max_size && \
 			     (c = getc( yyin )) != EOF && c != '\n'; ++n ) \
 			buf[n] = (char) c; \
@@ -997,7 +1033,7 @@ YY_DECL
     
 #line 57 "xi-scan.l"
 
-#line 1001 "lex.yy.c"
+#line 1037 "lex.yy.c"
 
 	if ( !(yy_init) )
 		{
@@ -1179,7 +1215,7 @@ YY_RULE_SETUP
 #line 74 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 1183 "lex.yy.c"
+#line 1219 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -1903,8 +1939,8 @@ YY_BUFFER_STATE yy_scan_string (yyconst char * yystr )
 
 /** Setup the input buffer state to scan the given bytes. The next call to yylex() will
  * scan from a @e copy of @a bytes.
- * @param bytes the byte buffer to scan
- * @param len the number of bytes in the buffer pointed to by @a bytes.
+ * @param yybytes the byte buffer to scan
+ * @param _yybytes_len the number of bytes in the buffer pointed to by @a bytes.
  * 
  * @return the newly allocated buffer state object.
  */
@@ -2161,72 +2197,73 @@ struct rwtable {
 
 /* Reserved word table */
 struct rwtable rwtable[] = {
-  "module",	MODULE,
-  "mainmodule",	MAINMODULE,
-  "chare",	CHARE,
-  "group",	GROUP,
-  "nodegroup",  NODEGROUP,
-  "array",	ARRAY,
-  "message",	MESSAGE,
-  "conditional",CONDITIONAL,
-  "extern",	EXTERN,
-  "initcall",	INITCALL,
-  "initnode",	INITNODE,
-  "initproc",	INITPROC,
-  "readonly",	READONLY,
-  "stacksize",	STACKSIZE,
-  "threaded",	THREADED,
-  "migratable",	MIGRATABLE,
-  "PUPable",	PUPABLE,
-  "pupable",	PUPABLE,
-  "createhere",	CREATEHERE,
-  "createhome",	CREATEHOME,
-  "nokeep",	NOKEEP,
-  "notrace",	NOTRACE,
-  "template",	TEMPLATE,
-  "class",	CLASS,
-  "include",	INCLUDE,
-  "sync",	SYNC,
-  "iget",       IGET,
-  "exclusive",	EXCLUSIVE,
-  "immediate",  IMMEDIATE,
-  "expedited",  SKIPSCHED,
-  "inline",  	INLINE,
-  "local",      LOCAL,
-  "virtual",    VIRTUAL,
-  "mainchare",	MAINCHARE,
-  "packed",     PACKED,
-  "varsize",    VARSIZE,
-  "entry",      ENTRY,
-  "int",        INT,
-  "short",      SHORT,
-  "long",       LONG,
-  "char",       CHAR,
-  "float",      FLOAT,
-  "double",     DOUBLE,
-  "unsigned",   UNSIGNED,
-  "void",	VOID,
-  "const",	CONST,
-  "atomic", 	ATOMIC,
-  "forward", 	FORWARD,
-  "when", 	WHEN, 
-  "while", 	WHILE,
-  "for",	FOR,
-  "forall", 	FORALL, 
-  "if", 	IF, 
-  "else", 	ELSE,
-  "overlap", 	OVERLAP,
-  "connect",    CONNECT,
-  "publishes",  PUBLISHES,
-  "python",     PYTHON,
-  "namespace",  NAMESPACE,
-  "using",      USING,
-  "accel",      ACCEL,
-  "readwrite",  READWRITE,
-  "writeonly",  WRITEONLY,
-  "accelblock", ACCELBLOCK,
-  "memcritical", MEMCRITICAL,
-  "",		0
+{  "module",	MODULE },
+{  "mainmodule",	MAINMODULE },
+{  "chare",	CHARE },
+{  "group",	GROUP },
+{  "nodegroup",  NODEGROUP },
+{  "array",	ARRAY },
+{  "message",	MESSAGE },
+{  "conditional",CONDITIONAL },
+{  "extern",	EXTERN },
+{  "initcall",	INITCALL },
+{  "initnode",	INITNODE },
+{  "initproc",	INITPROC },
+{  "readonly",	READONLY },
+{  "stacksize",	STACKSIZE },
+{  "threaded",	THREADED },
+{  "migratable",	MIGRATABLE },
+{  "PUPable",	PUPABLE },
+{  "pupable",	PUPABLE },
+{  "createhere",	CREATEHERE },
+{  "createhome",	CREATEHOME },
+{  "nokeep",	NOKEEP },
+{  "notrace",	NOTRACE },
+{  "template",	TEMPLATE },
+{  "class",	CLASS },
+{  "include",	INCLUDE },
+{  "sync",	SYNC },
+{  "iget",       IGET },
+{  "exclusive",	EXCLUSIVE },
+{  "immediate",  IMMEDIATE },
+{  "expedited",  SKIPSCHED },
+{  "inline",  	INLINE },
+{  "local",      LOCAL },
+{  "virtual",    VIRTUAL },
+{  "mainchare",	MAINCHARE },
+{  "packed",     PACKED },
+{  "varsize",    VARSIZE },
+{  "entry",      ENTRY },
+{  "int",        INT },
+{  "short",      SHORT },
+{  "long",       LONG },
+{  "char",       CHAR },
+{  "float",      FLOAT },
+{  "double",     DOUBLE },
+{  "unsigned",   UNSIGNED },
+{  "void",	VOID },
+{  "const",	CONST },
+{  "atomic", 	ATOMIC },
+{  "forward", 	FORWARD },
+{  "when", 	WHEN },
+{  "while", 	WHILE },
+{  "for",	FOR },
+{  "forall", 	FORALL },
+{  "if", 	IF },
+{  "else", 	ELSE },
+{  "overlap", 	OVERLAP },
+{  "connect",    CONNECT },
+{  "publishes",  PUBLISHES },
+{  "python",     PYTHON },
+{  "namespace",  NAMESPACE },
+{  "using",      USING },
+{  "accel",      ACCEL },
+{  "readwrite",  READWRITE },
+{  "writeonly",  WRITEONLY },
+{  "accelblock", ACCELBLOCK },
+{  "memcritical", MEMCRITICAL },
+{  "reductiontarget", REDUCTIONTARGET },
+{  "",		0 }
 };
 
 int search(char *s)

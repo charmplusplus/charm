@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$ 
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 /* adapted by Eric Bohm from Sanjay Kale's pplKalloc */
 
@@ -19,14 +13,14 @@
 
 #include "cmipool.h"
 
-CpvDeclare(char **, bins);
-CpvDeclare(int *, binLengths);
-CpvDeclare(int, maxBin);
-CpvDeclare(int, numKallocs);
-CpvDeclare(int, numMallocs);
-CpvDeclare(int, numOallocs);
-CpvDeclare(int, numFrees);
-CpvDeclare(int, numOFrees);
+CpvStaticDeclare(char **, bins);
+CpvStaticDeclare(int *, binLengths);
+CpvStaticDeclare(int, maxBin);
+CpvStaticDeclare(int, numKallocs);
+CpvStaticDeclare(int, numMallocs);
+CpvStaticDeclare(int, numOallocs);
+CpvStaticDeclare(int, numFrees);
+CpvStaticDeclare(int, numOFrees);
 
 /* Each block has a 8 byte header.
    This contains the pointer to the next  block, when 
@@ -48,6 +42,7 @@ extern void free_nomigrate(void *mem);
 void CmiPoolAllocInit(int numBins)
 {
   int i;
+  if (CpvInitialized(bins)) return;
   CpvInitialize(char **, bins);
   CpvInitialize(int *, binLengths);
   CpvInitialize(int, maxBin);
@@ -62,12 +57,9 @@ void CmiPoolAllocInit(int numBins)
   for (i=0; i<numBins; i++) CpvAccess(bins)[i] = NULL;
   for (i=0; i<numBins; i++) CpvAccess(binLengths)[i] = 0;
 
-    CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
+  CpvAccess(numKallocs) =  CpvAccess(numMallocs) =  CpvAccess(numFrees)=CpvAccess(numOFrees) = 0;
 }
 
-#ifdef CMK_OPTIMIZE
-/*inline*/
-#endif
 void * CmiPoolAlloc(unsigned int numBytes)
 {
   char *p;
@@ -88,7 +80,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
       if(CpvAccess(bins)[bin] != NULL) 
 	{
 	  /* CmiPrintf("p\n"); */
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 	  CpvAccess(numKallocs)++;
 #endif
 	  /* store some info in the header*/
@@ -98,7 +90,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
 	  /* this conditional should not be necessary
 	     as the header next pointer should contain NULL
 	     for us when there is nothing left in the pool */
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 	  if(--CpvAccess(binLengths)[bin])
 	      CpvAccess(bins)[bin] = (char *) *((char **)(p -CMI_POOL_HEADER_SIZE)); 
 	  else  /* there is no next */
@@ -110,7 +102,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
       else
 	{
 	  /* CmiPrintf("np %d\n",bin); */
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 	  CpvAccess(numMallocs)++;
 #endif
 	  /* Round up the allocation to the max for this bin */
@@ -121,7 +113,7 @@ void * CmiPoolAlloc(unsigned int numBytes)
     {
       /*  CmiPrintf("u b%d v %d\n",bin,CpvAccess(maxBin));  */
       /* just revert to malloc for big things and set bin 0 */
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 	  CpvAccess(numOallocs)++;
 #endif
       p = (char *) malloc_nomigrate(numBytes) + CMI_POOL_HEADER_SIZE;
@@ -134,9 +126,6 @@ void * CmiPoolAlloc(unsigned int numBytes)
   return p;
 }
 
-#ifdef CMK_OPTIMIZE
-/*inline*/
-#endif
 void CmiPoolFree(void * p) 
 {
   char **header = (char **)( (char*)p - CMI_POOL_HEADER_SIZE);
@@ -144,20 +133,20 @@ void CmiPoolFree(void * p)
   /*  CmiPrintf("f%d\n",bin,CpvAccess(maxBin));  */
   if(bin==0)
     {
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
       CpvAccess(numOFrees)++;
 #endif
       free_nomigrate(header);
     }
   else if(bin<CpvAccess(maxBin))
     {
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
       CpvAccess(numFrees)++;
 #endif
       /* add to the begining of the list at CpvAccess(bins)[bin]*/
       *header =  CpvAccess(bins)[bin]; 
       CpvAccess(bins)[bin] = p;
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
       CpvAccess(binLengths)[bin]++;
 #endif
     }
@@ -189,8 +178,8 @@ void CmiPoolPrintList(char *p)
   CmiPrintf("Free list is: -----------\n");
   while (p != 0) {
     char ** header = (char **) p-CMI_POOL_HEADER_SIZE;
-    CmiPrintf("next ptr is %d. ", (int) p);
-    CmiPrintf("header is at: %d, and contains: %d \n", (int) header, (int) (*header));
+    CmiPrintf("next ptr is %p. ", p);
+    CmiPrintf("header is at: %p, and contains: %p \n", header, *header);
     p = *header;
   }
   CmiPrintf("End of Free list: -----------\n");

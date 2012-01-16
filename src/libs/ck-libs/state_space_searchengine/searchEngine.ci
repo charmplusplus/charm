@@ -1,0 +1,69 @@
+/* searchEngineAPI.ci
+ *
+ *  Nov 3
+ *
+ * author: Yanhua Sun
+ */
+
+module searchEngine
+{
+    readonly CProxy_SearchConductor searchEngineProxy;
+    readonly CProxy_SearchGroup groupProxy;
+
+    readonly int se_statesize;
+
+#ifdef USING_CONTROLPOINTS
+    include "controlPoints.h";
+
+    readonly CProxy_BThreshold threshGroup;    
+    message ThreshMsg;
+
+    /* for control point */
+    group BThreshold {
+        entry BThreshold();
+        entry [expedited] void changeThreshold(ThreshMsg *msg);
+    };
+
+#endif
+
+    message countMsg;
+
+    message SearchNodeMsg {
+		char objectDump[];
+    };
+	
+    initproc  registerSE();
+
+	mainchare SearchConductor
+	{
+		entry SearchConductor( CkArgMsg *m );
+		entry [threaded] void allSearchNodeDone(CkQdMsg *msg);
+		
+		entry void start();
+		entry void groupInitComplete();
+        entry [expedited] void foundSolution();
+#ifdef USING_CONTROLPOINTS
+        entry  void controlChange(controlPointMsg* msg);
+#endif
+    };
+
+	group SearchGroup
+	{
+        entry SearchGroup();
+        entry void sendCounts();
+        entry void childCount(countMsg *);
+		entry void init();
+		entry void setParallelLevel( int );
+		entry void searchDepthChange( int );
+        entry [expedited] void killSearch();
+#ifdef BRANCHBOUND
+        entry [expedited] void updateCost(double c);
+#endif
+    };
+	
+	chare SearchNode
+	{
+		entry SearchNode( SearchNodeMsg *msg );
+	};
+
+};

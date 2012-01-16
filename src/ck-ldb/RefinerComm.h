@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -14,9 +7,6 @@
 #define _REFINERCOMM_H_
 
 #include "CentralLB.h"
-
-#include "elements.h"
-#include "ckheap.h"
 #include "Refiner.h"
 
 class RefinerComm : public Refiner {

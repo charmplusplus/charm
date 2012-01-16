@@ -73,10 +73,10 @@ void multisectiontest_init()
 	  //  sectionSize);
 
 	  // cross section lower half of each array
-	  CkArrayIndexMax **aelems= new CkArrayIndexMax*[numarrays];
-	  aelems[0]= new CkArrayIndexMax[asectionSize];
-	  aelems[1]= new CkArrayIndexMax[asectionSize];
-	  aelems[2]= new CkArrayIndexMax[asectionSize];
+	  CkArrayIndex **aelems= new CkArrayIndex*[numarrays];
+	  aelems[0]= new CkArrayIndex[asectionSize];
+	  aelems[1]= new CkArrayIndex[asectionSize];
+	  aelems[2]= new CkArrayIndex[asectionSize];
 	  int *naelems=new int[numarrays];
 	  for(int k=0;k<numarrays;k++)
 	    {
@@ -114,10 +114,10 @@ void multisectiontest_init()
 
 	  // cross section upper half of each array
 	  // cross section lower half of each array
-	  CkArrayIndexMax **aelemsH= new CkArrayIndexMax*[numarrays];
-	  aelemsH[0]= new CkArrayIndexMax[asectionSize];
-	  aelemsH[1]= new CkArrayIndexMax[asectionSize];
-	  aelemsH[2]= new CkArrayIndexMax[asectionSize];
+	  CkArrayIndex **aelemsH= new CkArrayIndex*[numarrays];
+	  aelemsH[0]= new CkArrayIndex[asectionSize];
+	  aelemsH[1]= new CkArrayIndex[asectionSize];
+	  aelemsH[2]= new CkArrayIndex[asectionSize];
 	  for(int k=0;k<numarrays;k++)
 	    {
 	      naelems[k]=asectionSize;
@@ -292,10 +292,10 @@ void multisectiontest_grp::recvID( multisectionAID_msg *m)
   //  CkPrintf("G(%d)[%d] bound %d floor %d ceiling %d sectionSize %d\n",thisProxy.ckGetGroupID().idx, CkMyPe(), boundary, floor, ceiling, sectionSize);
   //  CkPrintf("G(%d)[%d] abound %d afloor %d aceiling %d asectionSize %d\n",thisProxy.ckGetGroupID().idx, CkMyPe(),aboundary, afloor, aceiling, asectionSize);
 
-  CkArrayIndexMax **aelems= new CkArrayIndexMax*[NUMARRAYS];
-  aelems[0]= new CkArrayIndexMax[asectionSize];
-  aelems[1]= new CkArrayIndexMax[asectionSize];
-  aelems[2]= new CkArrayIndexMax[asectionSize];
+  CkArrayIndex **aelems= new CkArrayIndex*[NUMARRAYS];
+  aelems[0]= new CkArrayIndex[asectionSize];
+  aelems[1]= new CkArrayIndex[asectionSize];
+  aelems[2]= new CkArrayIndex[asectionSize];
   int *naelems=new int[NUMARRAYS];
   for(int k=0;k<NUMARRAYS;k++)
     {

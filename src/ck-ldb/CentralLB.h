@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,7 +6,6 @@
 #ifndef CENTRALLB_H
 #define CENTRALLB_H
 
-#include <math.h>
 #include "BaseLB.h"
 #include "CentralLB.decl.h"
 
@@ -30,18 +22,18 @@ typedef LBMigrateMsg  CLBMigrateMsg;
 class LBInfo
 {
 public:
-  double *peLoads; 	// total load: object + background
-  double *objLoads; 	// total obj load
-  double *comLoads; 	// total comm load
-  double *bgLoads; 	// background load
+  LBRealType *peLoads; 	// total load: object + background
+  LBRealType *objLoads; 	// total obj load
+  LBRealType *comLoads; 	// total comm load
+  LBRealType *bgLoads; 	// background load
   int    numPes;
   int    msgCount;	// total non-local communication
   CmiUInt8  msgBytes;	// total non-local communication
-  double minObjLoad, maxObjLoad;
+  LBRealType minObjLoad, maxObjLoad;
   LBInfo(): peLoads(NULL), objLoads(NULL), comLoads(NULL), 
             bgLoads(NULL), numPes(0), msgCount(0),
             msgBytes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
-  LBInfo(double *pl, int count): peLoads(pl), objLoads(NULL), 
+  LBInfo(LBRealType *pl, int count): peLoads(pl), objLoads(NULL), 
             comLoads(NULL), bgLoads(NULL), numPes(count), msgCount(0),
             msgBytes(0), minObjLoad(0.0), maxObjLoad(0.0) {}
   LBInfo(int count);
@@ -49,7 +41,7 @@ public:
   void getInfo(BaseLB::LDStats* stats, int count, int considerComm);
   void clear();
   void print();
-  void getSummary(double &maxLoad, double &maxCpuLoad, double &totalLoad);
+  void getSummary(LBRealType &maxLoad, LBRealType &maxCpuLoad, LBRealType &totalLoad);
 };
 
 /** added by Abhinav
@@ -211,7 +203,7 @@ public:
   // END IMPLEMENTATION FOR FUTURE PREDICTOR
 
   LBMigrateMsg* callStrategy(LDStats* stats,int count){
-    return Strategy(stats,count);
+    return Strategy(stats);
   };
 
   int cur_ld_balancer;
@@ -219,11 +211,17 @@ public:
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
-  void preprocess(LDStats* stats,int count);
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
-  virtual void work(LDStats* stats,int count);
-  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats,int count);
+  void preprocess(LDStats* stats);
+  virtual LBMigrateMsg* Strategy(LDStats* stats);
+  virtual void work(LDStats* stats);
+  virtual LBMigrateMsg * createMigrateMsg(LDStats* stats);
   virtual LBMigrateMsg * extractMigrateMsg(LBMigrateMsg *m, int p);
+
+  // Not to be used -- maintained for legacy applications
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int nprocs) {
+    return Strategy(stats);
+  }
+
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryDumpData() { return CmiFalse; };  
@@ -275,11 +273,13 @@ class CLBStatsMsg {
 public:
   int from_pe;
   int pe_speed;
-  double total_walltime;
-  double total_cputime;
-  double idletime;
-  double bg_walltime;
-  double bg_cputime;
+  LBRealType total_walltime;
+  LBRealType idletime;
+  LBRealType bg_walltime;
+#if CMK_LB_CPUTIMER
+  LBRealType total_cputime;
+  LBRealType bg_cputime;
+#endif
   int n_objs;
   LDObjData *objData;
   int n_comm;
@@ -293,11 +293,12 @@ public:
 
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg(): from_pe(0), pe_speed(0), 
-                 total_walltime(0.0), total_cputime(0.0),
-                 idletime(0.0), bg_walltime(0.0), bg_cputime(0.0),
-                 n_objs(0), objData(NULL), n_comm(0), commData(NULL), 
-                 avail_vector(NULL), next_lb(0)  {}
+  CLBStatsMsg(): from_pe(0), pe_speed(0), total_walltime(0.0), idletime(0.0),
+		 bg_walltime(0.0), n_objs(0), objData(NULL), n_comm(0),
+#if CMK_LB_CPUTIMER
+		 total_cputime(0.0), bg_cputime(0.0),
+#endif
+		 commData(NULL), avail_vector(NULL), next_lb(0) {}
   ~CLBStatsMsg();
   void pup(PUP::er &p);
 }; 

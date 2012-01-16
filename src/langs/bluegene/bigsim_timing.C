@@ -56,7 +56,7 @@ void BgInitTiming()
 #if USE_MULTISEND
   corrMsgBucket = new CkVec<char *>[CmiNumPes()];
 #endif
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
   CpvInitialize(int,bgCorrectionHandler);
   cva(bgCorrectionHandler) = CmiRegisterHandler((CmiHandler) bgCorrectionFunc);
   cva(simState).bgStatCollectHandler = CmiRegisterHandler((CmiHandler) statsCollectionHandlerFunc);

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 #ifndef _TRACE_H
 #define _TRACE_H
@@ -80,21 +74,21 @@ class Trace {
     // a pair of begin/end user event has just occured
     virtual void userBracketEvent(int eventID, double bt, double et) {}
 
-	// a user supplied integer value(likely a timestep)
-	virtual void userSuppliedData(int e) {}
+    // a user supplied integer value(likely a timestep)
+    virtual void userSuppliedData(int e) {}
 
-	// a user supplied integer value(likely a timestep)
-	virtual void userSuppliedNote(char *note) {}
+    // a user supplied integer value(likely a timestep)
+    virtual void userSuppliedNote(char *note) {}
 
-	virtual void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
+    virtual void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
 
-
-	// the current memory usage as a double
-	virtual void memoryUsage(double currentMemUsage) {}
-	
+    // the current memory usage as a double
+    virtual void memoryUsage(double currentMemUsage) {}
 
     // creation of message(s)
     virtual void creation(envelope *, int epIdx, int num=1) {}
+    //epIdx is extracted from the envelope, num is always 1
+    virtual void creation(char *) {}
     virtual void creationMulticast(envelope *, int epIdx, int num=1,
 				     int *pelist=NULL) {}
     virtual void creationDone(int num=1) {}
@@ -114,6 +108,7 @@ class Trace {
     // NOTE: begin/endPack and begin/endUnpack can be called in between
     //       a beginExecute and its corresponding endExecute.
     virtual void beginExecute(envelope *) {}
+    virtual void beginExecute(char *) {}
     virtual void beginExecute(CmiObjId *tid) {}
     virtual void beginExecute(
       int event,   // event type defined in trace-common.h
@@ -123,7 +118,9 @@ class Trace {
       int ml,      // message size
       CmiObjId* idx)    // index
     { }
+    virtual void changeLastEntryTimestamp(double ts) {}
     virtual void endExecute(void) {}
+    virtual void endExecute(char *) {}
     // begin/end idle time for this pe
     virtual void beginIdle(double curWallTime) {}
     virtual void endIdle(double curWallTime) {}
@@ -216,15 +213,24 @@ public:
 
     /* Creation needs to access _entryTable, so moved into trace-common.C */
     void creation(envelope *env, int ep, int num=1);
+    inline void creation(char *msg){
+        /* The check for whether the ep got traced is moved into each elem's
+         * creation call as the ep could not be extracted here
+         */
+        ALLDO(creation(msg));
+    }
     void creationMulticast(envelope *env, int ep, int num=1, int *pelist=NULL);
     
     inline void creationDone(int num=1) { ALLDO(creationDone(num)); }
     inline void beginSDAGBlock(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginSDAGBlock(event, msgType, ep, srcPe, mlen,idx));}
     inline void endSDAGBlock(void) {ALLREVERSEDO(endExecute());}
     inline void beginExecute(envelope *env) {ALLDO(beginExecute(env));}
+    inline void beginExecute(char *msg) {ALLDO(beginExecute(msg));}
     inline void beginExecute(CmiObjId *tid) {ALLDO(beginExecute(tid));}
     inline void beginExecute(int event,int msgType,int ep,int srcPe, int mlen,CmiObjId *idx=NULL) {ALLDO(beginExecute(event, msgType, ep, srcPe, mlen,idx));}
     inline void endExecute(void) {ALLREVERSEDO(endExecute());}
+    inline void endExecute(char *msg) {ALLREVERSEDO(endExecute(msg));}
+    inline void changeLastEntryTimestamp(double ts) {ALLDO(changeLastEntryTimestamp(ts));}
     inline void messageRecv(char *env, int pe) {ALLDO(messageRecv(env, pe));}
     inline void beginPack(void) {ALLDO(beginPack());}
     inline void endPack(void) {ALLDO(endPack());}
@@ -285,7 +291,7 @@ public:
 CkpvExtern(TraceArray*, _traces);
 
 #if CMK_TRACE_ENABLED
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 extern void    resetVTime();
 #  define _TRACE_ONLY(code) do{ BgGetTime(); if(CpvAccess(traceOn) && CkpvAccess(_traces)->length()>0) { code; }  resetVTime(); } while(0)
 #else
@@ -328,7 +334,6 @@ extern "C" {
 /* Memory tracing */
 #define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
 #define _TRACE_FREE(where, size) _TRACE_ONLY(CkpvAccess(_traces)->free(where, size))
-
 
 #include "trace-bluegene.h"
 

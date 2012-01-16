@@ -1,3 +1,4 @@
 build
 .vimproject
 *.gen
+run_tests.log

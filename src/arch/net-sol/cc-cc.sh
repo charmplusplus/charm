@@ -1,4 +1,3 @@
-CMK_CPP_CHARM='/usr/ccs/lib/cpp '
 CMK_CPP_C='cc -E -z muldefs '
 CMK_CC='cc -KPIC -z muldefs '
 CMK_CC_RELIABLE='cc -z muldefs '
@@ -21,8 +20,8 @@ CMK_QT='generic_alloca'
 # native compiler
 CMK_NATIVE_CC='cc  -z muldefs '
 CMK_NATIVE_LD='cc -z muldefs '
-CMK_NATIVE_CXX='CC -library=Cstd -z muldefs '
-CMK_NATIVE_LDXX='CC -library=Cstd -z muldefs '
+CMK_NATIVE_CXX='CC -library=Cstd -instances=global -z muldefs '
+CMK_NATIVE_LDXX='CC -library=Cstd -instances=global -z muldefs '
 CMK_NATIVE_LIBS='-lnsl -lsocket'
 
 # Sun Forte Developer 7 f90 7.0

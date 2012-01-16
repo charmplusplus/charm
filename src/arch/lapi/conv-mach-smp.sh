@@ -7,6 +7,14 @@ CMK_CXX="$CMK_CXX  $CMK_DEFS "
 CMK_CXXPP="$CMK_CXXPP $CMK_DEFS "
 CMK_LD="$CMK_LD $CMK_DEFS "
 CMK_LDXX="$CMK_LDXX $CMK_DEFS "
-CMK_LIBS=" -lpthreads $CMK_LIBS "
+
+if test $isAIX = true
+then
+CMK_PTHREAD_LIB="-lpthreads"
+else
+CMK_PTHREAD_LIB="-lpthread"
+fi
+CMK_LIBS=" $CMK_PTHREAD_LIB $CMK_LIBS "
+
 CMK_SEQ_CC="$CMK_SEQ_CC -qtls=local-exec"
 CMK_SEQ_CXX="$CMK_SEQ_CXX -qtls=local-exec"

@@ -2,14 +2,13 @@
 #define _REFINERAPPROX_H_
 
 #include "CentralLB.h"
-
 #include "Refiner.h"
-#include "elements.h"
-#include "ckheap.h"
 
 #ifndef INFTY
 #define INFTY 999999
 #endif
+
+class processorInfo;
 
 class RefinerApprox:public Refiner {
 public:

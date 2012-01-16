@@ -1,0 +1,10 @@
+mainmodule main 
+{
+  readonly int initial_grainsize;
+  readonly int N;
+  readonly CkVec< double > graph; 
+	mainchare Main
+	{
+		entry Main(CkArgMsg *m);
+	}
+}

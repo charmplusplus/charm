@@ -78,7 +78,7 @@ void StreamingStrategy::insertMessage(MessageHolder *cmsg) {
     streamingMsgBuf[pe].enq(cmsg);
     streamingMsgCount[pe]++;
     bufSize[pe]+=size;
-    if (streamingMsgCount[pe] > bufferMax || bufSize[pe] > bufSizeMax) flushPE(pe);
+    if (streamingMsgCount[pe] >= bufferMax || bufSize[pe] >= bufSizeMax) flushPE(pe);
 }
 
 void StreamingStrategy::doneInserting() {
@@ -96,12 +96,12 @@ void StreamingStrategy::flushPE(int pe) {
   if(streamingMsgCount[pe] == 0)
       return; //Nothing to do.
   
-  MessageHolder *cmsg, *toBeDeleted = NULL;
+  MessageHolder *cmsg;
   int size = 0;
  
 
     // Build a CmiMultipleSend list of messages to be sent off:
-    int msg_count=streamingMsgCount[pe], msg_pe=0;
+    int msg_count=streamingMsgCount[pe];
 
     // If we have a single message we don't want to copy it
     if(msg_count == 1) {

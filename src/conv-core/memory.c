@@ -161,9 +161,9 @@ void initialize_memory_wrapper_cfree(void *ptr) {
 #endif
 #endif
 
-CMK_TYPEDEF_UINT8 memory_allocated = 0;
-CMK_TYPEDEF_UINT8 memory_allocated_max = 0; /* High-Water Mark */
-CMK_TYPEDEF_UINT8 memory_allocated_min = 0; /* Low-Water Mark */
+CMK_TYPEDEF_UINT8 _memory_allocated = 0;
+CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
+CMK_TYPEDEF_UINT8 _memory_allocated_min = 0; /* Low-Water Mark */
 
 /*Rank of the processor that's currently holding the CmiMemLock,
 or -1 if nobody has it.  Only set when malloc might be reentered.
@@ -191,8 +191,8 @@ void CmiOutOfMemory(int nBytes)
 { /* We're out of memory: free up the liferaft memory and abort */
   char errMsg[200];
   if (memory_lifeRaft) free(memory_lifeRaft);
-  if (nBytes>0) sprintf(errMsg,"Could not malloc() %d bytes--are we out of memory?",nBytes);
-  else sprintf(errMsg,"Could not malloc()--are we out of memory?");
+  if (nBytes>0) sprintf(errMsg,"Could not malloc() %d bytes--are we out of memory? (used :%.3fMB)",nBytes,CmiMemoryUsage()/1000000.0);
+  else sprintf(errMsg,"Could not malloc()--are we out of memory? (used: %.3fMB)", CmiMemoryUsage()/1000000.0);
   CmiAbort(errMsg);
 }
 
@@ -359,7 +359,7 @@ inline
 #endif
 static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     FILE *f;
-    int i;
+    int i, ret;
     static int failed_once = 0;
     CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
 
@@ -367,14 +367,14 @@ static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(){
     
     f = fopen("/proc/self/stat", "r");
     if(!f) { failed_once = 1; return 0; }
-    for(i=0; i<22; i++) fscanf(f, "%*s");
-    fscanf(f, "%lu", &vsz);
+    for(i=0; i<22; i++) ret = fscanf(f, "%*s");
+    ret = fscanf(f, "%lu", &vsz);
     fclose(f);
     if(!vsz) failed_once=1;
     return vsz;
 }
 
-#if ! CMK_HAS_MALLINFO
+#if ! CMK_HAS_MALLINFO || defined(CMK_MALLINFO_IS_BROKEN)
 #if CMK_C_INLINE
 inline
 #endif
@@ -393,7 +393,9 @@ static CMK_TYPEDEF_UINT8 MemusageMallinfo(){
     CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
     memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
     /* printf("%lld %lld %lld %lld %lld\n", mi.uordblks, mi.usmblks,mi.hblkhd,mi.arena,mi.keepcost); */
+#if ! CMK_CRAYXT && ! CMK_CRAYXE
     if(memtotal2 > memtotal) memtotal = memtotal2;
+#endif
     return memtotal;
 }
 #endif
@@ -408,10 +410,11 @@ static CMK_TYPEDEF_UINT8 MemusagePS(){
     char pscmd[100];
     CMK_TYPEDEF_UINT8 vsz=0;
     FILE *p;
+    int ret;
     sprintf(pscmd, "/bin/ps -o vsz= -p %d", getpid());
     p = popen(pscmd, "r");
     if(p){
-	fscanf(p, "%ld", &vsz);
+	ret = fscanf(p, "%ld", &vsz);
 	pclose(p);
     }
     return (vsz * (CMK_TYPEDEF_UINT8)1024);
@@ -440,7 +443,24 @@ static CMK_TYPEDEF_UINT8 MemusageWindows(){
 }
 #endif
 
+#if CMK_BLUEGENEP
+/* Report the memory usage according to the following wiki page i
+* https://wiki.alcf.anl.gov/index.php/Debugging#How_do_I_get_information_on_used.2Favailable_memory_in_my_code.3F
+*/
+#include <malloc.h>
+#if CMK_C_INLINE
+inline
+#endif
+static CMK_TYPEDEF_UINT8 MemusageBGP(){
+    struct mallinfo m = mallinfo();
+    return m.hblkhd + m.uordblks;
+}
+#endif
+
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
+#if CMK_BLUEGENEP
+    return MemusageBGP(); 
+#else
     CMK_TYPEDEF_UINT8 memtotal = 0;
 #ifdef _WIN32
     if(!memtotal) memtotal = MemusageWindows();
@@ -451,6 +471,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(){
     if(!memtotal) memtotal = MemusageSbrk();
     if(!memtotal) memtotal = MemusagePS();
     return memtotal;
+#endif
 }
 
 /******End of a general way to get memory usage information*****/
@@ -659,27 +680,27 @@ void free_reentrant(void *mem)
 /** Return number of bytes currently allocated, if possible. */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage()
 {
-  return memory_allocated;
+  return _memory_allocated;
 }
 
 /** Return number of maximum number of bytes allocated since the last call to CmiResetMaxMemory(), if possible. */
 CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage()
 {
-  return memory_allocated_max;
+  return _memory_allocated_max;
 }
 
 /** Reset the mechanism that records the highest seen (high watermark) memory usage. */
 void CmiResetMaxMemory() {
-  memory_allocated_max=memory_allocated;
+  _memory_allocated_max=_memory_allocated;
 }
 
 CMK_TYPEDEF_UINT8 CmiMinMemoryUsage()
 {
-  return memory_allocated_min;
+  return _memory_allocated_min;
 }
 
 void CmiResetMinMemory() {
-  memory_allocated_min=memory_allocated;
+  _memory_allocated_min=_memory_allocated;
 }
 
 #endif /* ! CMK_MEMORY_BUILD_BUILTIN*/

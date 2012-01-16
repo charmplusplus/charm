@@ -1,7 +1,7 @@
 #include <unistd.h>
 #include "middle.h"
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "bgconverse.h"
 #endif
 #include "ccs-server.h"
@@ -133,7 +133,7 @@ void CpdFreeze(void)
   CpdNotify(CPD_FREEZE,pid);
   if (CpvAccess(freezeModeFlag)) return; /*Already frozen*/
   CpvAccess(freezeModeFlag) = 1;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   CpdFreezeModeScheduler();
 #endif
 }
@@ -149,7 +149,7 @@ int CpdIsFrozen(void) {
 
 }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #include "blue_impl.h"
 void BgProcessMessageFreezeMode(threadInfo *t, char *msg) {
 //  CmiPrintf("BgProcessMessageFreezeMode\n");

@@ -38,8 +38,8 @@ init(void)
 {
   CkPrintf("init started\n");
   double startTime=CmiWallTimer();
-  const char *eleName="xxx.1.ele";
-  const char *nodeName="xxx.1.node";
+  const char *eleName = "xxx.1.ele";
+  const char *nodeName = "xxx.1.node";
   int nPts=0; //Number of nodes
   vector2d *pts=0; //Node coordinates
 
@@ -137,19 +137,17 @@ init(void)
 }
 
 
-// A driver() function 
-// driver() is required in all FEM programs
-extern "C" void
-driver(void)
+// A driver() function required in all FEM programs
+extern "C" void driver(void)
 {
   int nnodes,nelems,ignored;
   int i, myId=FEM_My_partition();
   myGlobals g;
   FEM_Register(&g,(FEM_PupFn)pup_myGlobals);
-  
-  
+
+
   int mesh=FEM_Mesh_default_read(); // Tell framework we are reading data from the mesh
-  
+
   // Get node data
   nnodes=FEM_Mesh_get_length(mesh,FEM_NODE); // Get number of nodes
   g.coord=new vector2d[nnodes];
@@ -176,11 +174,11 @@ driver(void)
   for (i=0;i<nnodes;i++)
     g.R_net[i]=g.d[i]=g.v[i]=g.a[i]=vector2d(0.0);
 
-//Apply a small initial perturbation to positions
+  //Apply a small initial perturbation to positions
   for (i=0;i<nnodes;i++) {
-	  const double max=1.0e-10/15.0; //Tiny perturbation
-	  g.d[i].x+=max*(i&15);
-	  g.d[i].y+=max*((i+5)&15);
+    const double max=1.0e-10/15.0; //Tiny perturbation
+    g.d[i].x+=max*(i&15);
+    g.d[i].y+=max*((i+5)&15);
   }
 
   int fid=FEM_Create_simple_field(FEM_DOUBLE,2);
@@ -188,20 +186,19 @@ driver(void)
   //Timeloop
   if (myId==0)
     CkPrintf("Entering timeloop\n");
-  int tSteps=5000;
+  int tSteps = 1024;
   double startTime, totalStart;
   startTime=totalStart=CkWallTimer();
   for (int t=0;t<tSteps;t++) {
-    if (1) { //Structural mechanics
+    if (1) { // Structural mechanics
+      // Compute forces on nodes exerted by elements
+      CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,nnodes,nelems,g.S11,g.S22,g.S12);
 
-    //Compute forces on nodes exerted by elements
-	CST_NL(g.coord,g.conn,g.R_net,g.d,matConst,nnodes,nelems,g.S11,g.S22,g.S12);
+      //Communicate net force on shared nodes
+      FEM_Update_field(fid,g.R_net);
 
-    //Communicate net force on shared nodes
-	FEM_Update_field(fid,g.R_net);
-
-    //Advance node positions
-	advanceNodes(dt,nnodes,g.coord,g.R_net,g.a,g.v,g.d,0);
+      // Advance node positions
+      advanceNodes(dt,nnodes,g.coord,g.R_net,g.a,g.v,g.d,0);
     }
 
     //Debugging/perf. output
@@ -209,33 +206,33 @@ driver(void)
     double total=curTime-startTime;
     startTime=curTime;
     if (myId==0 && (t%64==0)) {
-	    CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);
-    	    if (0) {
-	      CkPrintf("    Triangle 0:\n");
-	      for (int j=0;j<3;j++) {
-		    int n=g.conn[0][j];
-		    CkPrintf("    Node %d: coord=(%.4f,%.4f)  d=(%.4g,%.4g)\n",
-			     n,g.coord[n].x,g.coord[n].y,g.d[n].x,g.d[n].y);
-	      }
-    	    }
+      CkPrintf("%d %.6f sec for loop %d \n",CkNumPes(),total,t);
+#if 0
+      CkPrintf("    Triangle 0:\n");
+      for (int j=0;j<3;j++) {
+	int n=g.conn[0][j];
+	CkPrintf("    Node %d: coord=(%.4f,%.4f)  d=(%.4g,%.4g)\n",
+	    n,g.coord[n].x,g.coord[n].y,g.d[n].x,g.d[n].y);
+      }
+#endif
     }
     /* perform migration-based load balancing */
-    if (t%1024==0)
+    if (t > 1024 && t % 2048 == 0)
       FEM_Migrate();
-    
-    if (t%1024==0) { //Publish data to the net
-	    NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_POINTAT);
-	    
-	    NetFEM_Nodes(n,nnodes,(double *)g.coord,"Position (m)");
-	    NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
-	    NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
-	    
-	    NetFEM_Elements(n,nelems,3,(int *)g.conn,"Triangles");
-		NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
-		NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
-		NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
-	    
-	    NetFEM_End(n);
+
+    if (t > 1024 && t % 2048 == 0) { // Publish data to the net
+      NetFEM n=NetFEM_Begin(FEM_My_partition(),t,2,NetFEM_POINTAT);
+
+      NetFEM_Nodes(n,nnodes,(double *)g.coord,"Position (m)");
+      NetFEM_Vector(n,(double *)g.d,"Displacement (m)");
+      NetFEM_Vector(n,(double *)g.v,"Velocity (m/s)");
+
+      NetFEM_Elements(n,nelems,3,(int *)g.conn,"Triangles");
+      NetFEM_Scalar(n,g.S11,1,"X Stress (pure)");
+      NetFEM_Scalar(n,g.S22,1,"Y Stress (pure)");
+      NetFEM_Scalar(n,g.S12,1,"Shear Stress (pure)");
+
+      NetFEM_End(n);
     }
   }
 

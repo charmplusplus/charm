@@ -1,0 +1,14 @@
+
+# Intermediate files from compiling documentation
+*.aux
+*.idx
+*.log
+*.out
+*.pdf
+*.toc
+*.ilg
+*/index.tex
+*/pplmanual.sty
+
+*/.latex2html-init
+*/pplmanual.tex

@@ -62,7 +62,7 @@ private:
 	void done() {
    		int mype = BgGetGlobalWorkerThreadID();
                 printf("[%d] BgMessageReplay> Emulation replay finished at %f seconds due to end of log.\n", mype, CmiWallTimer());
-                printf("[%d] BgMessageReplay> Replayed %d local records and %d remote records, total of %lld bytes of data replayed.\n", mype, lcount, rcount, ftell(f));
+                printf("[%d] BgMessageReplay> Replayed %d local records and %d remote records, total of %ld bytes of data replayed.\n", mype, lcount, rcount, ftell(f));
        }
 public:
         BgMessageReplay(FILE * f_, int node);

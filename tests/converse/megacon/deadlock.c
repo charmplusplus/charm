@@ -20,25 +20,26 @@ void deadlock_inc(incmsg m)
   if (CpvAccess(deadlock_count)==0) {
     Cpm_megacon_ack(CpmSend(0));
   }
+  CmiFree(m);
 }
 
 void deadlock_cram(char *msg)
 {
-  struct incmsg m;
+  struct incmsg m={{0},1};
   int count = 0;
   CmiSetHandler(&m, CpvAccess(deadlock_inc_idx));
-  m.n = 1;
   while (count<5000) {
     CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
     count++;
   } 
   m.n = -count;
   CmiSyncSend(1-CmiMyPe(), sizeof(m), &m);
+  CmiFree(msg);
 }
 
 void deadlock_init()
 {
-  char msg[CmiMsgHeaderSizeBytes];
+  char msg[CmiMsgHeaderSizeBytes]={0};
   if (CmiNumPes()<2) {
     CmiPrintf("warning: need 2 processors for deadlock-test, skipping.\n");
     Cpm_megacon_ack(CpmSend(0));

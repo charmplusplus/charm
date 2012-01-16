@@ -1,0 +1,35 @@
+mainmodule jacobi2d {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Minor minorProxy;
+//  message CMessage_CkEntryOptions;
+//readonly CProxy_ProcFreq freqProxy;
+ 
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void report(CkReductionMsg *msg);
+    entry void exiting();
+  };
+
+  group ProcFreq{
+        entry ProcFreq();
+        entry void measureFreq(int f, int t);
+  };
+
+  array [1D] Jacobi {
+    // Normal Charm++ entry methods
+    entry Jacobi(int);
+    entry void begin_iteration(int i);
+
+    // A method for requesting data to be displayed graphically to the user
+  };
+
+  array [1D] Minor {
+    // Normal Charm++ entry methods
+    entry Minor(int);
+    entry void begin_iteration(int i);
+
+    // A method for requesting data to be displayed graphically to the user
+  };
+
+};

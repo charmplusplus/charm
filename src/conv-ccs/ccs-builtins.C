@@ -11,7 +11,7 @@
 #include "ckhashtable.h"
 #include "pup.h"
 #include "pup_toNetwork.h"
-#include "debug-charm.h"
+#include "debug-conv++.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
 #include "queueing.h"
@@ -253,7 +253,7 @@ void CpdMachineArchitecture(char *msg) {
   if (firstByte == 1) reply[3] = 1;
   else reply[3] = 2;
   // add the third bit if we are in bigsim
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   reply[3] |= 4;
 #endif
   // get the size of an "int"
@@ -342,33 +342,6 @@ public:
 /*We have to include these virtual functions, even when CCS is
 disabled, to avoid bizarre link-time errors.*/
 
-CpdListAccessor::~CpdListAccessor() { }
-CpdSimpleListAccessor::~CpdSimpleListAccessor() { }
-const char *CpdSimpleListAccessor::getPath(void) const {return path;}
-size_t CpdSimpleListAccessor::getLength(void) const {return length;}
-void CpdSimpleListAccessor::pup(PUP::er &p,CpdListItemsRequest &req) 
-{
-	for (int i=req.lo;i<req.hi;i++) {
-		beginItem(p,i);
-		(*pfn)(p,i);
-	}
-}
-
-static void CpdListBeginItem_impl(PUP::er &p,int itemNo)
-{
-	p.syncComment(PUP::sync_item);
-}
-
-extern "C" void CpdListBeginItem(pup_er p,int itemNo)
-{
-  CpdListBeginItem_impl(*(PUP::er *)p,itemNo);
-}
-
-void CpdListAccessor::beginItem(PUP::er &p,int itemNo)
-{
-  CpdListBeginItem_impl(p,itemNo);
-}
-
 // C++ and C client API
 void CpdListRegister(CpdListAccessor *acc)
 #if CMK_CCS_AVAILABLE
@@ -406,7 +379,7 @@ static void CpdListInit(void) {
   CcsRegisterHandler("ccs_list_items.txt",(CmiHandler)CpdList_ccs_list_items_txt);
   CcsRegisterHandler("ccs_list_items.fmt",(CmiHandler)CpdList_ccs_list_items_fmt);
   CcsRegisterHandler("ccs_list_items.set",(CmiHandler)CpdList_ccs_list_items_set);
-  CcsRegisterHandler("ccs_machine_architecture",(CmiHandler)CpdMachineArchitecture);
+  CcsRegisterHandler("debug/converse/arch",(CmiHandler)CpdMachineArchitecture);
 }
 
 #if CMK_WEB_MODE

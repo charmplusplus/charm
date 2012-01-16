@@ -11,6 +11,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public List<VariableInitializer> initializers = new ArrayList<VariableInitializer>();
     public List<VariableInitializer> pupInitializers = new ArrayList<VariableInitializer>();
     public List<CharjAST> varsToPup = new ArrayList<CharjAST>();
+    public List<CharjAST> objToPup = new ArrayList<CharjAST>();
 	public List<ArraySectionInitializer> sectionInitializers = new ArrayList<ArraySectionInitializer>();
 
     Map<String, PackageScope> imports =
@@ -23,6 +24,9 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
     public Map<String, VariableSymbol> fields = new LinkedHashMap<String, VariableSymbol>();
     public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
+
+    public Map<String, String> sdag_local_names = new LinkedHashMap<String, String>();
+    public Map<String, String> sdag_local_typenames = new LinkedHashMap<String, String>();
 
     public boolean hasCopyCtor = false;
     public boolean isPrimitive = false;
@@ -69,6 +73,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         this.usings.add("CharjArray::Array");
         this.usings.add("CharjArray::Domain");
         this.usings.add("CharjArray::Range");
+        this.usings.add("CharjArray::Matrix");
+        this.usings.add("CharjArray::Vector");
     }
 
     public Scope getEnclosingScope() {
@@ -313,6 +319,10 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return name;
     }
 
+    public String getTranslatedTypeName() {
+        return getTypeName();
+    }
+
     private boolean requiresInit() {
         for (CharjAST varAst : varsToPup) {
             if (varAst.def instanceof VariableSymbol &&
@@ -348,5 +358,23 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             if (e.getValue().hasSDAG) return true;
         }
         return false;
+    }
+
+    public void addSDAGLocal(String typename, String name, String mangledName) {
+        sdag_local_names.put(name, mangledName);
+        sdag_local_typenames.put(name, typename);
+    }
+
+    public String getSDAGLocalName(String name) {
+        String result = sdag_local_names.get(name);
+        return result == null ? name : result;
+    }
+
+    public List<String> getSDAGLocalTypeDefinitions() {
+        List<String> defs = new ArrayList<String>();
+        for (Map.Entry<String, String> def : sdag_local_typenames.entrySet()) {
+            defs.add(def.getValue() + " " + sdag_local_names.get(def.getKey()) + ";");
+        }
+        return defs;
     }
 }

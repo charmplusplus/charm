@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$ 
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
   @file
   @brief Main Converse header file.  Everything in Converse is 
@@ -51,6 +44,7 @@
 #include <stdint.h>
 #endif
 
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Paste the tokens x and y together, without any space between them.
@@ -60,7 +54,6 @@
 #define CMK_CONCAT(x,y) x##y
 /* Tag variable y as being from unit x: */
 #define CMK_TAG(x,y) x##y##_
-
 
 #include "pup_c.h"
 
@@ -78,6 +71,13 @@ typedef enum {false = 0, true = 1} bool;
 typedef bool CmiBool;
 #define CmiFalse false
 #define CmiTrue true
+#endif
+
+#if ! CMK_HAS_OFFSETOF
+#undef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#else
+#include <stddef.h>
 #endif
 
 extern "C" {
@@ -418,40 +418,49 @@ for each processor in the node.
 */
 #ifdef CMK_CPV_IS_SMP
 
+/* buggy xlc compiler on bluegene/p does not like memory fence in Cpvs */
+#if CMK_BLUEGENEP && ( defined(__xlC__) || defined(__xlc__) )
+#define CpvMemoryReadFence()
+#define CpvMemoryWriteFence()
+#else
+#define CpvMemoryReadFence() CmiMemoryReadFence()
+#define CpvMemoryWriteFence() CmiMemoryWriteFence()
+#endif
+
 #if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
-#define CMK_MAX_PTHREADS     128
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
+                        t ** CMK_TAG(Cpv_addr_,v);
 #define CpvExtern(t,v)  extern __thread t* CMK_TAG(Cpv_,v);  \
                         extern int CMK_TAG(Cpv_inited_,v);  \
-                        extern t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
+                        extern t ** CMK_TAG(Cpv_addr_,v)
 #ifdef __cplusplus
 #define CpvCExtern(t,v) extern "C"  __thread t* CMK_TAG(Cpv_,v);  \
                         extern "C" int CMK_TAG(Cpv_inited_,v);  \
-                        extern "C" t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS]
+                        extern "C" t ** CMK_TAG(Cpv_addr_,v)
 #else
 #define CpvCExtern(t,v)    CpvExtern(t,v)
 #endif
 #define CpvStaticDeclare(t,v) static __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         static int CMK_TAG(Cpv_inited_,v) = 0;  \
-                        static t * CMK_TAG(Cpv_addr_,v)[CMK_MAX_PTHREADS] = {0}
+                        static t ** CMK_TAG(Cpv_addr_,v)
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		while (!CpvInitialized(v)) CMK_CPV_IS_SMP; \
+	       /*while (!CpvInitialized(v)) CMK_CPV_IS_SMP;*/\
+               CpvMemoryReadFence(); \
+	       while (CMK_TAG(Cpv_inited_,v)==0) { CMK_CPV_IS_SMP; CpvMemoryReadFence(); } \
+               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
+               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
        } else { \
-               if(CMK_MAX_PTHREADS < CmiMyNodeSize()+1){ \
-		 CmiPrintf("Charm++: please increase CMK_MAX_PTHREADS to at least %d in converse.h\n", CmiMyNodeSize()+1); \
-		 CmiAssert(CMK_MAX_PTHREADS >= CmiMyNodeSize()+1);\
-		 /*CmiAbort("Error in TLS-based Converse Private Variables");*/\
-	       } \
-	       CMK_TAG(Cpv_inited_,v)=1; \
+               CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t); \
+               CMK_TAG(Cpv_addr_,v)=CpvInit_Alloc(t*, 1+CmiMyNodeSize()); \
+               CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v); \
+               CpvMemoryWriteFence();   \
+               CMK_TAG(Cpv_inited_,v)=1; \
        } \
-    } while(0); \
-    CMK_TAG(Cpv_,v)=CpvInit_Alloc_scalar(t);\
-    CMK_TAG(Cpv_addr_,v)[CmiMyRank()] = CMK_TAG(Cpv_,v) 
-#define CpvInitialized(v) (0!=CMK_TAG(Cpv_inited_,v))
+    } while(0)
+#define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
 #define CpvAccess(v) (*CMK_TAG(Cpv_,v))
 #define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 
@@ -468,9 +477,13 @@ for each processor in the node.
 #define CpvInitialize(t,v)\
     do { \
        if (CmiMyRank()) { \
-		while (!CpvInitialized(v)) CMK_CPV_IS_SMP \
+               CpvMemoryReadFence(); \
+		       while (!CpvInitialized(v)) { CMK_CPV_IS_SMP ; CpvMemoryReadFence(); } \
        } else { \
-	       CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               t* tmp = CpvInit_Alloc(t,1+CmiMyNodeSize());\
+               CpvMemoryWriteFence();   \
+               CMK_TAG(Cpv_,v)=tmp;   \
+	       /* CMK_TAG(Cpv_,v)=CpvInit_Alloc(t,1+CmiMyNodeSize()); */\
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
@@ -542,12 +555,12 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 #define CmiExtHeaderSizeBytes (sizeof(CmiMsgHeaderExt))
 
 /* all common extra fields in BigSim message header */
-#define CMK_BLUEGENE_FIELDS  CmiInt4 nd,n; double rt; CmiInt2 tID, hID; char t, flag; CmiInt2 ref; CmiInt4 msgID, srcPe;
+#define CMK_BIGSIM_FIELDS  CmiInt4 nd,n; double rt; CmiInt2 tID, hID; char t, flag; CmiInt2 ref; CmiInt4 msgID, srcPe;
 
 #ifndef CmiReservedHeaderSize
-typedef struct CMK_MSG_HEADER_BLUEGENE   CmiBlueGeneMsgHeader;
+typedef struct CMK_MSG_HEADER_BIGSIM_   CmiBlueGeneMsgHeader;
 #define CmiBlueGeneMsgHeaderSizeBytes (sizeof(CmiBlueGeneMsgHeader))
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #  define CmiReservedHeaderSize   CmiBlueGeneMsgHeaderSizeBytes
 #else
 #  define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
@@ -591,14 +604,14 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetXHandler(m) (((CmiMsgHeaderExt*)m)->xhdl)
 #define CmiGetInfo(m)     (((CmiMsgHeaderExt*)m)->info)
 #define CmiGetRoot(m)     (((CmiMsgHeaderExt*)m)->root)
-#define CmiGetRedID(m)     (((CmiMsgHeaderExt*)m)->redID)
+#define CmiGetRedID(m)    (((CmiMsgHeaderExt*)m)->redID)
 #define CmiGetStrategy(m) (((CmiMsgHeaderExt*)m)->stratid)
 
 #define CmiSetHandler(m,v)  do {((((CmiMsgHeaderExt*)m)->hdl)=(v));} while(0)
 #define CmiSetXHandler(m,v) do {((((CmiMsgHeaderExt*)m)->xhdl)=(v));} while(0)
 #define CmiSetInfo(m,v)     do {((((CmiMsgHeaderExt*)m)->info)=(v));} while(0)
 #define CmiSetRoot(m,v)     do {((((CmiMsgHeaderExt*)m)->root)=(v));} while(0)
-#define CmiSetRedID(m,v)     do {((((CmiMsgHeaderExt*)m)->redID)=(v));} while(0)
+#define CmiSetRedID(m,v)    do {((((CmiMsgHeaderExt*)m)->redID)=(v));} while(0)
 #define CmiSetStrategy(m,v) do {((((CmiMsgHeaderExt*)m)->stratid)=(v);} while(0)
 
 #define CmiHandlerToInfo(n) (CpvAccess(CmiHandlerTable)[n])
@@ -607,22 +620,22 @@ extern void CmiNumberHandlerEx(int n, CmiHandlerEx h,void *userPtr);
 #define CmiGetHandlerFunction(env) (CmiHandlerToFunction(CmiGetHandler(env)))
 
 #if __FAULT__
-extern int cur_restart_phase;      /* number of restarts */
+CpvExtern(int, _curRestartPhase);      /* number of restarts */
 #endif
 
 #if CMK_MEM_CHECKPOINT
 #undef CmiSetHandler
-#define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=cur_restart_phase;} while(0)
+#define CmiSetHandler(m,v)  do {(((CmiMsgHeaderExt*)m)->hdl)=(v); (((CmiMsgHeaderExt*)m)->pn)=CpvAccess(_curRestartPhase);} while(0)
 #define MESSAGE_PHASE_CHECK(msg)	\
 	{	\
           int phase = CmiGetRestartPhase(msg);	\
-	  if (phase != 9999 && phase < cur_restart_phase) {	\
+	  if (phase != 9999 && phase < CpvAccess(_curRestartPhase)) {	\
             /* CmiPrintf("[%d] discard message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
             CmiFree(msg);	\
 	    return;	\
           }	\
           /* CmiAssert(phase == cur_restart_phase || phase == 9999); */ \
-          if (phase > cur_restart_phase && phase != 9999) {    \
+          if (phase > CpvAccess(_curRestartPhase) && phase != 9999) {    \
             /* CmiPrintf("[%d] enqueue message of phase %d cur_restart_phase:%d. \n", CmiMyPe(), phase, cur_restart_phase); */	\
             CsdEnqueueFifo(msg);    \
 	    return;	\
@@ -669,6 +682,7 @@ extern void* malloc_nomigrate(size_t size);
 */
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
+int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 
@@ -712,6 +726,7 @@ int CmiMemoryIs(int flag); /* return state of this flag */
 #define CMI_THREAD_IS_FIBERS     (1<<5)
 #define CMI_THREAD_IS_ALIAS      (1<<6)
 #define CMI_THREAD_IS_STACKCOPY  (1<<7)
+#define CMI_THREAD_IS_TLS        (1<<8)
 int CmiThreadIs(int flag); /* return state of this flag */
 
 void CmiMkdir(const char *dirName);
@@ -756,15 +771,21 @@ static __inline__ unsigned long long int rdtsc(void)
 #define CmiWallTimer() ((double)rdtsc()*(_cpu_speed_factor))
 #define CmiTimer CmiCpuTimer
 double   CmiStartTimer(void);
+double   CmiInitTime(void);
 #define CmiTimerIsSynchronized()	(0)
+#define CmiTimerAbsolute()              (0)
 
 #else
-void     CmiTimerInit();
+void     CmiTimerInit(char **argv);
+int      CmiTimerAbsolute();
+double   CmiStartTimer(void);
+double   CmiInitTime(void);
 double   CmiTimer(void);
 double   CmiWallTimer(void);
-#define  CmiStartTimer()                (0.0)
 int      CmiTimerIsSynchronized();
 #endif
+
+char *CmiPrintDate();
 
 #include "queueing.h" /* for "Queue" */
 
@@ -1192,36 +1213,6 @@ void   CmiHandleMessage(void *msg);
 /** @} */
 
 
-/****** Isomalloc: Migratable Memory Allocation ********/
-/*Simple block-by-block interface:*/
-void *CmiIsomalloc(int sizeInBytes);
-void *CmiIsomallocAlign(size_t align, size_t size);
-void  CmiIsomallocPup(pup_er p,void **block);
-void  CmiIsomallocFree(void *block);
-int   CmiIsomallocEnabled();
-void  CmiEnableIsomalloc();
-void  CmiDisableIsomalloc();
-
-CmiInt8   CmiIsomallocLength(void *block);
-int   CmiIsomallocInRange(void *addr);
-
-/*List-of-blocks interface:*/
-struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
-	struct CmiIsomallocBlockList *prev,*next;
-	/*actual data of block follows here...*/
-};
-typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
-
-/*Build/pup/destroy an entire blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void);
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
-void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
-
-/*Allocate/free a block from this blockList*/
-void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
-void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
-void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
-
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
@@ -1291,7 +1282,7 @@ void CtgInit(void);
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void);
+CtgGlobals CtgCreate(CthThread tid);
 /** Install this set of globals. If g==NULL, returns to original globals. */
 void CtgInstall(CtgGlobals g);
 /** PUP this (not currently installed) globals set */
@@ -1355,6 +1346,36 @@ void CthAddListener(CthThread th,struct CthThreadListener *l);
   as needed. User has to implement this somewhere in the system.
 */
 void CthUserAddListeners(CthThread th);
+
+/****** Isomalloc: Migratable Memory Allocation ********/
+/*Simple block-by-block interface:*/
+void *CmiIsomalloc(int sizeInBytes, CthThread tid);
+void *CmiIsomallocAlign(size_t align, size_t size, CthThread t);
+void  CmiIsomallocPup(pup_er p,void **block);
+void  CmiIsomallocFree(void *block);
+int   CmiIsomallocEnabled();
+void  CmiEnableIsomalloc();
+void  CmiDisableIsomalloc();
+
+CmiInt8   CmiIsomallocLength(void *block);
+int   CmiIsomallocInRange(void *addr);
+
+/*List-of-blocks interface:*/
+struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
+	struct CmiIsomallocBlockList *prev,*next;
+	/*actual data of block follows here...*/
+};
+typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
+
+/*Build/pup/destroy an entire blockList.*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread t);
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l, CthThread tid);
+void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
+
+/*Allocate/free a block from this blockList*/
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
+void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
+void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
@@ -1497,18 +1518,21 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_100ms 18 /*every 100ms (10Hz)*/
 #define CcdPERIODIC_1second  19 /*every second*/
 #define CcdPERIODIC_1s       19 /*every second*/
-#define CcdPERIODIC_10second 20 /*every 10 seconds*/
-#define CcdPERIODIC_10seconds 20 /*every 10 seconds*/
-#define CcdPERIODIC_10s      20 /*every 10 seconds*/
-#define CcdPERIODIC_1minute  21 /*every minute*/
-#define CcdPERIODIC_5minute  22 /*every 5 minute*/
-#define CcdPERIODIC_10minute 23 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    24 /*every hour*/
-#define CcdPERIODIC_12hour   25 /*every 12 hours*/
-#define CcdPERIODIC_1day     26 /*every day*/
+#define CcdPERIODIC_5s       20 /*every second*/
+#define CcdPERIODIC_5seconds 20 /*every second*/
+#define CcdPERIODIC_10second 21 /*every 10 seconds*/
+#define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
+#define CcdPERIODIC_10s      21 /*every 10 seconds*/
+#define CcdPERIODIC_1minute  22 /*every minute*/
+#define CcdPERIODIC_5minute  23 /*every 5 minute*/
+#define CcdPERIODIC_10minute 24 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    25 /*every hour*/
+#define CcdPERIODIC_12hour   26 /*every 12 hours*/
+#define CcdPERIODIC_1day     27 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
+#define CcdTOPOLOGY_AVAIL  31
 #define CcdSIGUSR1 32+1
 #define CcdSIGUSR2 32+2
 
@@ -1789,7 +1813,7 @@ void CthSetThreadID(CthThread th, int a, int b, int c);
 void CthTraceResume(CthThread t);
 
 /*FAULT_EVAC */
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 #define CmiNodeAlive(x) (1)
 #else
 CpvExtern(char *,_validProcessors);
@@ -1798,7 +1822,7 @@ CpvExtern(char *,_validProcessors);
 
 int CmiEndianness();
 
-#if CMK_ERROR_CHECKING
+#if CMK_CHARMDEBUG
 extern void setMemoryTypeChare(void*); /* for memory debugging */
 extern void setMemoryTypeMessage(void*); /* for memory debugging */
 #else
@@ -1855,6 +1879,12 @@ extern int CmiGridQueueLookupMsg (char *msg);
 #endif
 #endif
 
+/******** I/O wrappers ***********/
+
+size_t CmiFwrite(const void *ptr, size_t size, size_t nmemb, FILE *f);
+FILE *CmiFopen(const char *path, const char *mode);
+int CmiFclose(FILE *fp);
+
 #include "debug-conv.h"
 
 typedef struct {
@@ -1865,9 +1895,11 @@ typedef struct {
 
 
 #if CMK_HAS_LOG2
-#define CmiLog2  log2
+#define CmiLog2   log2
+#define CmiILog2  log2
 #else
-extern unsigned int CmiLog2(unsigned int);
+extern unsigned int CmiILog2(unsigned int);
+extern double CmiLog2(double);
 #endif
 
 #endif /* CONVERSE_H */

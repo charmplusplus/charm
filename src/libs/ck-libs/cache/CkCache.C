@@ -66,7 +66,7 @@
   void * CkCacheManager::requestData(CkCacheKey what, CkArrayIndex &_toWhom, int chunk, CkCacheEntryType *type, CkCacheRequestorData &req){
 
     std::map<CkCacheKey,CkCacheEntry *>::iterator p;
-    CkArrayIndexMax toWhom(_toWhom);
+    CkArrayIndex toWhom(_toWhom);
     CkAssert(chunkAck[chunk] > 0);
     p = cacheTable[chunk].find(what);
     CkCacheEntry *e;
@@ -177,7 +177,7 @@
     e->requestorVec.clear();
   }
 
-  void CkCacheManager::cacheSync(int &_numChunks, CkArrayIndexMax &chareIdx, int &localIdx) {
+  void CkCacheManager::cacheSync(int &_numChunks, CkArrayIndex &chareIdx, int &localIdx) {
     finishedChunks = 0;
     if (syncdChares > 0) {
       _numChunks = numChunks;

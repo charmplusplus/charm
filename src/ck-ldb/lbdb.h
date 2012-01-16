@@ -20,9 +20,13 @@
 class LBDatabase;//Forward declaration
 
 //typedef float floatType;
-typedef double floatType;
+// type defined by build option
+#ifndef CMK_LBTIME_TYPE
+#define CMK_LBTIME_TYPE double
+#endif
+typedef CMK_LBTIME_TYPE LBRealType;
 
-//#define COMPRESS_LDB                       1
+#define COMPRESS_LDB	1
 
 extern int _lb_version;
 
@@ -84,6 +88,7 @@ typedef struct _LDObjid {
 
 /* LDObjKey uniquely identify one object */
 typedef struct _LDObjKey {
+  /// Id of the location manager for this object
   LDOMid omId;
   LDObjid objId;
 public:
@@ -116,10 +121,12 @@ typedef struct {
 
 typedef struct {
   LDObjHandle handle;
-  floatType cpuTime;
-  floatType wallTime;
+  LBRealType wallTime;
+#if CMK_LB_CPUTIMER
+  LBRealType cpuTime;
+#endif
 #if ! COMPRESS_LDB
-  floatType minWall, maxWall;
+  LBRealType minWall, maxWall;
 #endif
   CmiBool migratable;
   CmiBool asyncArrival;
@@ -247,7 +254,7 @@ void LDUnregisterObj(LDObjHandle h);
 const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
-void LDObjTime(LDObjHandle &h, double walltime, double cputime);
+void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
 int  CLDRunningObject(LDHandle _h, LDObjHandle* _o );
 void LDObjectStart(const LDObjHandle &_h);
 void LDObjectStop(const LDObjHandle &_h);
@@ -276,6 +283,11 @@ void LDStartLB(LDHandle _db);
 void LDTurnManualLBOn(LDHandle _lbdb);
 void LDTurnManualLBOff(LDHandle _lbdb);
 
+typedef void (*LDMigrationDoneFn)(void *user_ptr);
+int LDAddMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn,  void* data);
+void  LDRemoveMigrationDoneFn(LDHandle _lbdb, LDMigrationDoneFn fn);
+void LDMigrationDone(LDHandle _lbdb);
+
 typedef void (*LDPredictFn)(void* user_ptr);
 typedef void (*LDPredictModelFn)(void* user_ptr, void* model);
 typedef void (*LDPredictWindowFn)(void* user_ptr, void* model, int wind);
@@ -287,8 +299,8 @@ void LDCollectStatsOn(LDHandle _lbdb);
 void LDCollectStatsOff(LDHandle _lbdb);
 int  CLDCollectingStats(LDHandle _lbdb);
 void LDQueryEstLoad(LDHandle bdb);
-void LDGetObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
-void LDQueryKnownObjLoad(LDObjHandle &h, double *wallT, double *cpuT);
+void LDGetObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
+void LDQueryKnownObjLoad(LDObjHandle &h, LBRealType *wallT, LBRealType *cpuT);
 
 int LDGetObjDataSz(LDHandle _lbdb);
 void LDGetObjData(LDHandle _lbdb, LDObjData *data);
@@ -296,11 +308,11 @@ void LDGetObjData(LDHandle _lbdb, LDObjData *data);
 int LDGetCommDataSz(LDHandle _lbdb);
 void LDGetCommData(LDHandle _lbdb, LDCommData *data);
 
-void LDBackgroundLoad(LDHandle _lbdb, double *walltime, double *cputime);
-void LDIdleTime(LDHandle _lbdb, double *walltime);
-void LDTotalTime(LDHandle _lbdb, double *walltime, double *cputime);
-void LDGetTime(LDHandle _db, double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime);
+void LDBackgroundLoad(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
+void LDIdleTime(LDHandle _lbdb, LBRealType *walltime);
+void LDTotalTime(LDHandle _lbdb, LBRealType *walltime, LBRealType *cputime);
+void LDGetTime(LDHandle _db, LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime);
 
 void LDClearLoads(LDHandle _lbdb);
 int  LDMigrate(LDObjHandle h, int dest);
@@ -399,8 +411,10 @@ PUPmarshall(LDObjHandle)
 
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
-  p|cpuTime;
   p|wallTime;
+#if CMK_LB_CPUTIMER
+  p|cpuTime;
+#endif
 #if ! COMPRESS_LDB
   p|minWall;
   p|maxWall;

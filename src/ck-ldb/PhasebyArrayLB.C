@@ -1,16 +1,7 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
-
-#include <charm++.h>
 
 #include "PhasebyArrayLB.h"
 
@@ -47,7 +38,7 @@ CmiBool PhasebyArrayLB::QueryBalanceNow(int _step)
 
 void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats){
 	int i;
-	tempStats->count = stats->count;
+	tempStats->nprocs() = stats->nprocs();
 	tempStats->n_objs = stats->n_objs;
 	tempStats->n_comm = stats->n_comm;
 	tempStats->n_migrateobjs = stats->n_migrateobjs;
@@ -71,8 +62,8 @@ void PhasebyArrayLB::copyStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempStats
 	for(i=0;i<tempStats->n_comm;i++)
 		tempStats->commData[i]=stats->commData[i];
 	
-	tempStats->procs = new BaseLB::ProcStats[tempStats->count];
-	for(i=0;i<tempStats->count;i++)
+	tempStats->procs = new BaseLB::ProcStats[tempStats->nprocs()];
+	for(i=0; i<tempStats->nprocs(); i++)
 		tempStats->procs[i]=stats->procs[i];
 }
 
@@ -91,7 +82,7 @@ void PhasebyArrayLB::updateStats(BaseLB::LDStats *stats,BaseLB::LDStats *tempSta
 	
 }
 
-void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
+void PhasebyArrayLB::work(LDStats *stats){
 	//It is assumed that statically placed arrays are set non-migratable in the application
 	tempStats = new BaseLB::LDStats;
 
@@ -139,7 +130,7 @@ void PhasebyArrayLB::work(BaseLB::LDStats *stats, int count){
 					odata->migratable=CmiFalse;
  			}
 			//Call a strategy here
-			lb->work(tempStats,count);
+			lb->work(tempStats);
 			if(i!=omids.size()-1){
 				for(obj = 0; obj < tempStats->n_objs; obj++)
 					tempStats->from_proc[obj]=tempStats->to_proc[obj];

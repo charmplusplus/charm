@@ -39,7 +39,7 @@ public:
   /// Basic Constructor
   opt() :   specEventCount(0),
     eventCount(0), stepCount(0), avgEventsPerStep(0), rbCount(0), jumpCount(0),
-    rbFlag(0), idle(0), avgTimeLeash(0),avgJump(0)
+    rbFlag(0), idle(0), avgTimeLeash(0), avgJump(0)
     { 
       STRAT_T=OPT_T;
       cpRate=pose_config.store_rate;
@@ -60,8 +60,9 @@ public:
       ec=parent->cancels.getEarliest(), gvt=localPVT->getGVT(), 
       worktime = eq->currentPtr->timestamp;
     // Object is idle; report -1
-    if ((ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS))
+    if ((ec == POSE_UnsetTS) && (worktime == POSE_UnsetTS)) {
       return POSE_UnsetTS;
+    }
     if (ec > POSE_UnsetTS) {
       theTime = ec;
       if ((worktime > POSE_UnsetTS) && (worktime < ec) && (ovt < worktime))

@@ -76,7 +76,7 @@ class fromzDisk : public zdisk {
 #define AMPI_COUNTER 0
 
 #define AMPI_ALLTOALL_SHORT_MSG   32
-#if CMK_CONVERSE_LAPI ||  CMK_BLUEGENE_CHARM
+#if CMK_CONVERSE_LAPI ||  CMK_BIGSIM_CHARM
 #define AMPI_ALLTOALL_MEDIUM_MSG   4194304
 #else
 #define AMPI_ALLTOALL_MEDIUM_MSG   32768
@@ -439,8 +439,8 @@ inline groupStruct diffOp(groupStruct vec1, groupStruct vec2){
   }
   return newvec;
 }
-inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct vec2){
-  int* ret = new int[n];
+inline int* translateRanksOp(int n,groupStruct vec1,int* ranks1,groupStruct
+vec2, int *ret){
   for(int i=0;i<n;i++){
     ret[i] = getPosOp(vec1[ranks1[i]],vec2);
   }
@@ -524,25 +524,6 @@ extern int _mpi_nworlds;
 #define MPI_SCAN_TAG 	MPI_TAG_UB_VALUE+15
 #define MPI_ATA_TAG	MPI_TAG_UB_VALUE+16
 
-#if 0
-// This is currently not used.
-class BlockMap : public CkArrayMap {
- public:
-  BlockMap(void) {}
-  BlockMap(CkMigrateMessage *m) {}
-  int registerArray(CkArrayMapRegisterMessage *m) {
-    delete m;
-    return 0;
-  }
-  int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) {
-    int elem=*(int *)idx.data();
-    int penum =  (elem/(32/CkNumPes()));
-    CkPrintf("%d mapped to %d proc\n", elem, penum);
-    return penum;
-  }
-};
-#endif
-
 #define MyAlign8(x) (((x)+7)&(~7))
 
 /**
@@ -558,7 +539,7 @@ public:
 	int src;
 	int comm;
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 public:
 	void *event;	// the event point that corresponding to this message
 #endif
@@ -602,7 +583,7 @@ public:
 		p(tag);
 		p(comm);
 		p(isvalid);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		//needed for bigsim out-of-core emulation
 		//as the "log" is not moved from memory, this pointer is safe
 		//to be reused
@@ -672,7 +653,7 @@ class ATAReq : public AmpiRequest {
 		int src;
 		int tag;
 		int comm;
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		void *event;             // event buffered for the request
 #endif
 		virtual void pup(PUP::er &p){
@@ -680,7 +661,7 @@ class ATAReq : public AmpiRequest {
 			p(count);
 			p(type);
 			p(src);p(tag);p(comm);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 		//needed for bigsim out-of-core emulation
 		//as the "log" is not moved from memory, this pointer is safe
 		//to be reused
@@ -888,7 +869,7 @@ class AmpiMsg : public CMessage_AmpiMsg {
   int srcRank; //Communicator rank for source
   MPI_Comm comm; //Communicator for source
   int length; //Number of bytes in this message 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   void *event;
   int  eventPe;	 // the PE that the event is located
 #endif
@@ -921,97 +902,6 @@ class AmpiMsg : public CMessage_AmpiMsg {
     return m;
   }
 };
-
-
-#if 0
-// Moved to cklists.h
-/**
-  An array that is broken up into "pages"
-  which are separately allocated.  Useful for saving memory
-  when storing a long array with few used entries.
-  Should be almost as fast as a regular vector.
-  
-  When nothing is used, this reduces storage space by a factor
-  of pageSize*sizeof(T)/sizeof(T*).  For example, an 
-  array of 64-bit ints of length 1M takes 8MB; with paging
-  it takes just 32KB, plus 2KB for each used block.
-  
-  The class T must have a pup routine, a default constructor,
-  and a copy constructor.
-*/
-template <class T>
-class CkPagedVector : private CkNoncopyable {
-	/// This is the number of array entries per page.
-	///  For any kind of efficiency, it must be a power of 2,
-	///  which lets the compiler turn divides and mods into
-	///  bitwise operations.
-	enum {pageSize=256u};
-	T **pages;
-	int nPages;
-	void allocatePages(int nEntries) {
-		nPages=(nEntries+pageSize-1)/pageSize; // round up
-		pages=new T*[nPages];
-		for (int pg=0;pg<nPages;pg++) pages[pg]=0;
-	}
-	void allocatePage(int pg) {
-		T *np=new T[pageSize];
-		// Initialize the new elements of the page to 0:
-		for (int of=0;of<pageSize;of++) np[of]=T();
-		pages[pg]=np;
-	}
-public:
-	CkPagedVector() :pages(0), nPages(0) {}
-	CkPagedVector(int nEntries) {init(nEntries);}
-	~CkPagedVector() {
-		for (int pg=0;pg<nPages;pg++) 
-			if (pages[pg]) 
-				delete[] pages[pg];
-		delete[] pages;
-	}
-	void init(int nEntries) {
-		allocatePages(nEntries);
-	}
-	
-	inline T &operator[] (unsigned int i) {
-		// This divide and mod should be fast, 
-		//  as long as pageSize is a power of 2:
-		int pg=i/pageSize; 
-		int of=i%pageSize;
-		if (pages[pg]==NULL) allocatePage(pg);
-		return pages[pg][of];
-	}
-	
-	void pupPage(PUP::er &p,int pg) {
-		if (p.isUnpacking()) allocatePage(pg);
-		for (int of=0;of<pageSize;of++) 
-			p|pages[pg][of];
-	}
-	void pup(PUP::er &p) {
-		int pg, o;
-		unsigned int i;
-		p|nPages;
-		if (!p.isUnpacking()) 
-		{ // Packing phase: save each used page
-			for (pg=0;pg<nPages;pg++) 
-			if (pages[pg]) {
-				p|pg;
-				pupPage(p,pg);
-			}
-			pg=-1;
-			p|pg;
-		} else 
-		{ // Unpacking phase: allocate and restore
-			allocatePages(nPages*pageSize);
-			p|pg;
-			while (pg!=-1) {
-				pupPage(p,pg);
-				p|pg;
-			}
-		}
-	}
-};
-#endif
-
 
 /**
   Our local representation of another AMPI

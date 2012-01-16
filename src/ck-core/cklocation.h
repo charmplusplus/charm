@@ -13,7 +13,7 @@ array proxies, or the details of element creation (see ckarray.h).
 class CkArrayMessage : public CkMessage {
 public:
   //These routines are implementation utilities
-  CkArrayIndexMax &array_index(void);
+  CkArrayIndex &array_index(void);
   unsigned short &array_ep(void);
   unsigned short &array_ep_bcast(void);
   unsigned char &array_hops(void);
@@ -57,7 +57,7 @@ typedef enum {
 
 class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessage {
 public:
-	CkArrayIndexMax idx; // Array index that is migrating
+	CkArrayIndex idx; // Array index that is migrating
 	int ignoreArrival;   // if to inform LB of arrival
 	int length;//Size in bytes of the packed data
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -70,6 +70,7 @@ public:
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
+extern CkGroupID _fastArrayMapID;
 class CkLocMgr;
 class CkArrMgr;
 
@@ -87,8 +88,8 @@ public:
   CkArrayMap(void);
   CkArrayMap(CkMigrateMessage *m): IrrGroup(m) {}
   virtual ~CkArrayMap();
-  virtual int registerArray(CkArrayIndexMax& numElements,CkArrayID aid);
-  virtual void populateInitial(int arrayHdl,CkArrayIndexMax& numElements,void *ctorMsg,CkArrMgr *mgr);
+  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
+  virtual void populateInitial(int arrayHdl,CkArrayIndex& numElements,void *ctorMsg,CkArrMgr *mgr);
   virtual int procNum(int arrayHdl,const CkArrayIndex &element) =0;
   virtual int homePe(int arrayHdl,const CkArrayIndex &element)
              { return procNum(arrayHdl, element); }
@@ -162,7 +163,7 @@ public:
  * Represents a local array element.
  */
 class CkLocRec_local : public CkLocRec {
-  CkArrayIndexMax idx;/// Element's array index
+  CkArrayIndex idx;/// Element's array index
   int localIdx; /// Local index (into array manager's element lists)
   CmiBool running; /// True when inside a startTiming/stopTiming pair
   CmiBool *deletedMarker; /// Set this if we're deleted during processing
@@ -271,7 +272,7 @@ private:
   void commonInit(void);
   CmiBool asyncEvacuate;
 public:
-  CkArrayIndexMax thisIndexMax;
+  CkArrayIndex thisIndexMax;
 
   CkMigratable(void);
   CkMigratable(CkMigrateMessage *m);
@@ -347,6 +348,7 @@ public:
 public:
   void ckFinishConstruction(void) { }
 #endif
+
 #if CMK_OUT_OF_CORE
 private:
   friend class CkLocMgr;
@@ -356,9 +358,8 @@ private:
   int prefetchObjID; //From CooRegisterObject
   CmiBool isInCore; //If true, the object is present in memory
 #endif
-	/*
-		FAULT_EVAC
-	*/
+
+  // FAULT_EVAC
   void AsyncEvacuate(CmiBool set){myRec->AsyncEvacuate(set);asyncEvacuate = set;};
 public:
   CmiBool isAsyncEvacuate(){return asyncEvacuate;};
@@ -407,7 +408,7 @@ template <class T>
 class CkMigratableListT : public CkMigratableList {
 	typedef CkMigratableList super;
 public:
-	inline void put(T *v,int atIdx) {super::put((void *)v,atIdx);}
+	inline void put(T *v,int atIdx) {super::put((CkMigratable *)v,atIdx);}
 	inline T *get(int localIdx) {return (T *)super::get(localIdx);}
 	inline T *next(int &from) {return (T *)super::next(from);}
 };
@@ -429,7 +430,7 @@ class CkMagicNumber : public CkMagicNumber_impl {
 	inline void check(const char *file,int line,void *obj) const {
 		if (magic!=good) badMagicNumber(good,file,line,obj);
 	}
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #   define CK_MAGICNUMBER_CHECK magic.check(__FILE__,__LINE__,this);
 #else
 #   define CK_MAGICNUMBER_CHECK /*empty, for speed*/
@@ -518,7 +519,7 @@ typedef void (*CkLocFn)(CkArray *,void *,CkLocRec *,CkArrayIndex *);
 class CkLocMgr : public IrrGroup {
 	CkMagicNumber<CkMigratable> magic; //To detect heap corruption
 public:
-	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndexMax& numInitial);
+	CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex& numInitial);
 	CkLocMgr(CkMigrateMessage *m);
 	inline CmiBool isLocMgr(void) { return CmiTrue; }
 	CkGroupID &getGroupID(void) {return thisgroup;}
@@ -534,7 +535,7 @@ public:
 	CkMigratableList *addManager(CkArrayID aid,CkArrMgr *mgr);
 
 	/// Populate this array with initial elements
-	void populateInitial(CkArrayIndexMax& numElements,void *initMsg,CkArrMgr *mgr)
+	void populateInitial(CkArrayIndex& numElements,void *initMsg,CkArrMgr *mgr)
 		{map->populateInitial(mapHandle,numElements,initMsg,mgr);}
 
 	/// Add a new local array element, calling element's constructor
@@ -570,7 +571,7 @@ public:
 //Interface used by CkLocRec_local
 	//Look up the object with this local index
 	inline CkMigratable *lookupLocal(int localIdx,CkArrayID arrayID) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		if (managers.find(arrayID)->mgr==NULL)
 			CkAbort("CkLocMgr::lookupLocal called for unknown array!\n");
 #endif
@@ -629,8 +630,8 @@ public:
 
 //Communication:
 	void immigrate(CkArrayElementMigrateMessage *msg);
-	void updateLocation(const CkArrayIndexMax &idx,int nowOnPe);
-	void reclaimRemote(const CkArrayIndexMax &idx,int deletedOnPe);
+	void updateLocation(const CkArrayIndex &idx,int nowOnPe);
+	void reclaimRemote(const CkArrayIndex &idx,int deletedOnPe);
 	void dummyAtSync(void);
 
 	/// return a list of migratables in this local record
@@ -715,7 +716,7 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
 	CProxy_CkLocMgr thisProxy;
 	CProxyElement_CkLocMgr thislocalproxy;
 	/// The core of the location manager: map array index to element representative
-	CkHashtableT<CkArrayIndexMax,CkLocRec *> hash;
+	CkHashtableT<CkArrayIndex,CkLocRec *> hash;
 	CmiImmediateLockType hashImmLock;
 
 	/// This flag is set while we delete an old copy of a migrator

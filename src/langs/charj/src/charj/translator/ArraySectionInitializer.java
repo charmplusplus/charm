@@ -10,6 +10,15 @@ public class ArraySectionInitializer
 	private String classType;
 	private String methodName;
 
+	public String toString()
+	{
+		StringBuilder sb = new StringBuilder();
+		sb.append("ranges: " + ranges + "\n");
+		sb.append("classType: " + classType + "\n");
+		sb.append("methodName: " + methodName);
+		return sb.toString();
+	}
+
 	public static int getCount()
 	{
 		return count;
@@ -22,9 +31,19 @@ public class ArraySectionInitializer
 		this.classType = classType;
 	}
 
+	public int getDimensions()
+	{
+		return ranges.size();
+	}
+
 	public String getClassType()
 	{
 		return classType;
+	}
+
+	public String getMethodName()
+	{
+		return methodName;
 	}
 
 	public String emitCI()
@@ -54,13 +73,13 @@ public class ArraySectionInitializer
 	
 	private String emitCC(ArrayList<String> indicies, int dim)
 	{
-		if(dim == ranges.size())
+		if(dim >= ranges.size())
 		{
 			String ind = "";
 			if(indicies.size() >= 1)
 			{
 				ind += indicies.get(0);
-				for(int i=0; i<indicies.size(); i++)
+				for(int i = 1; i < indicies.size(); i++)
 					ind += (", " + indicies.get(1));
 			}
 
@@ -69,24 +88,28 @@ public class ArraySectionInitializer
 			st.setAttribute("indices", ind);
 			return st.toString();
 		}
+		else
+		{
+			StringTemplate st = new StringTemplate("for(int $coord$ = $start$; $coord$ < $end$; $coord$ += $step$)\n\t$body$\n");
 
-		StringTemplate st = new StringTemplate("for(int $coord$ = $start$, $coord$ < $end$, $coord$ += $step$)\n\t$body$\n");
+			ArrayList<Object> range = ranges.get(dim);
 
-		ArrayList<Object> range = ranges.get(dim);
+			Object start = range.get(0);
+			Object end = range.get(1);
+			Object step = range.size() < 3 ? 1 : range.get(2);
+			String coord = "coord" + dim;
 
-		Object start = range.get(0);
-		Object end = range.get(1);
-		Object step = range.size() < 3 ? 1 : range.get(2);
+			st.setAttribute("start", start);
+			st.setAttribute("end", end);
+			st.setAttribute("step", step);
+			st.setAttribute("coord", coord);
 
-		st.setAttribute("start", start);
-		st.setAttribute("end", end);
-		st.setAttribute("step", step);
+			indicies.add(coord);
 
-		indicies.add("coord" + dim);
+			st.setAttribute("body", emitCC(indicies, dim + 1));
 
-		st.setAttribute("body", emitCC(indicies, ++dim));
-
-		return st.toString();
+			return st.toString();
+		}
 	}
 }
 

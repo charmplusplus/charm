@@ -5,7 +5,7 @@ module comlib {
   message ComlibDummyMsg;
   message ComlibMulticastMsg {
     ComlibMulticastIndexCount indicesCount[];
-    CkArrayIndexMax indices[];
+    CkArrayIndex indices[];
     char usrMsg[];
   };
   //  message PrioMsg;
@@ -22,7 +22,7 @@ module comlib {
     entry void bracketedConfirmCount(int instid, int step);
     entry void bracketedCountConfirmed(int instid, int count, int step);
     entry void bracketedReceiveNewCount(int instid, int step);
-    entry void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc);
+    entry void bracketedDiscover(int instid, CkArrayID aid, CkArrayIndex &idx, int isSrc);
     entry void bracketedContributeDiscovery(int instid, int pe, int nsrc, int ndest, int step);
     entry void bracketedReceiveNewPeList(int instid, int step, int count[CkNumPes()]);
     entry void bracketedReleaseCount(int instid, int step);

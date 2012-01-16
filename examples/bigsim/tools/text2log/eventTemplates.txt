@@ -1,0 +1,64 @@
+Set the times, set fields with <>s in them, and fill in any remaining blank fields after the colons.
+
+==================================================
+                    Messages
+==================================================
+
+Standard unicast
+----------------
+-msgID: sent:0.000000 recvtime:0.000000 dstNode: tid: size: group:1
+
+
+Broadcast-all
+-------------
+-msgID: sent:0.000000 recvtime:0.000000 dstNode:-1 tid:-1 size: group:1
+
+
+Broadcast-all-except node N
+---------------------------
+-msgID: sent:0.000000 recvtime:0.000000 dstNode:<-100-N> tid:-1 size: group:1
+
+
+Broadcast-all-except core K of node N
+-------------------------------------
+-msgID: sent:0.000000 recvtime:0.000000 dstNode:<-100-N> tid:<K> size: group:1
+
+
+Multicast of X messages with message ID M
+-----------------------------------------
+-msgID:<M> sent:0.000000 recvtime:0.000000 dstNode: tid: size: group:<X>
+-msgID:<M> sent:0.000000 recvtime:0.000000 dstNode: tid: size: group:-1
+...
+-msgID:<M> sent:0.000000 recvtime:0.000000 dstNode: tid: size: group:-1
+
+
+==================================================
+                     Events
+==================================================
+
+Starting event (event 0 of time line 0)
+---------------------------------------
+[0] name:msgep (srcpe:-1 msgID:-1) ep:-1 charm_ep:-1
+startTime:0.000000 endTime:0.000000
+forward:
+
+
+Standard (dependent)
+--------------------
+[] name: (srcpe:-1 msgID:-1) ep: charm_ep:
+startTime:0.000000 endTime:0.000000
+forward:
+
+
+Message receive
+---------------
+[] name:msgep (srcpe: msgID:) ep: charm_ep:
+startTime:0.000000 endTime:0.000000
+forward:
+
+
+Stand-alone
+-----------
+[] name:addMsg (srcpe:-1 msgID:-1) ep:-1 charm_ep:-1
+startTime:0.000000 endTime:0.000000
+forward:

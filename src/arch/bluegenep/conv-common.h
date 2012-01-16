@@ -8,7 +8,7 @@
 #define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid; unsigned char cksum, magic; int root, size; CmiUInt2 redID, padding; 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS }
+#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
@@ -28,9 +28,11 @@
 
 #define NODE_0_IS_CONVHOST                                 1
 
-//#define CMK_IMMEDIATE_MSG				   1
+#define CMK_IMMEDIATE_MSG				   0
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
 #define CMI_DIRECT_MANY_TO_MANY_DEFINED                    1
 
 #define CMK_PERSISTENT_COMM                                0
+
+#define CMK_LB_CPUTIMER					   0

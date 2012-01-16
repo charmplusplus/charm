@@ -82,6 +82,127 @@ To enable performance tracing of your application, users simply need
 to link the appropriate trace data generation module(s) (also referred
 to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
 
+\subsection{\projections{} Tracing Modules at Application Link Time}
+\label{sec::trace modules}
+
+\projections{} tracing modules dictate the type of performance data,
+data detail and data format each processor will record. They are also
+refered to as ``tracemodes''. There are currently 2 tracemodes
+available. Zero or more tracemodes may be specified at link-time. When
+no tracemodes are specified, no trace data is generated.
+
+\subsubsection{Tracemode {\tt projections}}
+
+Link time option: {\tt -tracemode projections}
+
+This tracemode generates detailed event log files that contain
+information about all \charmpp{} events like entry method calls and
+message packing during the execution of the program.  The data will be
+used by \projections{} in visualization and analysis.
+
+This tracemode will generate a single symbol table file and $p$ ASCII
+log files for $p$ processors. The names of the log files will be
+NAME.\#.log where NAME is the name of your executable and \# is the
+processor \#. The name of the symbol table file is NAME.sts where NAME
+is the name of your executable.
+
+This is the main source of data expected by the performance
+visualizer. Certain tools like timeline will not work without the
+detailed data from this tracemode.
+
+The following is a list of runtime options available under this tracemode:
+
+\begin{itemize}
+\item
+{\tt +logsize NUM}: keep only NUM log entries in the memory of each
+processor. The logs are emptied and flushed to disk when filled.
+\item
+{\tt +binary-trace}:  generate projections log in binary form.
+\item
+{\tt +gz-trace}:      generate gzip (if available) compressed log files.
+\item
+{\tt +checknested}: a debug option. Checks if events are improperly nested
+while recorded and issue a warning immediately.
+
+\item {\tt +trace-subdirs NUM}: divide the generated log files among
+  {\tt NUM} subdirectories of the trace root, each named {\tt
+    PROGNAME.projdir.K}
+\end{itemize}
+
+\subsubsection{Tracemode {\tt summary}}
+
+Compile option: {\tt -tracemode summary}
+
+In this tracemode, execution time across all entry points for each
+processor is partitioned into a fixed number of equally sized
+time-interval bins. These bins are globally resized whenever they are
+all filled in order to accomodate longer execution times while keeping
+the amount of space used constant.
+
+Additional data like the total number of calls made to each entry
+point is summarised within each processor.
+
+This tracemode will generate a single symbol table file and $p$ ASCII
+summary files for $p$ processors. The names of the summary files will
+be NAME.\#.sum where NAME is the name of your executable and \# is the
+processor \#. The name of the symbol table file is NAME.sum.sts where NAME
+is the name of your executable.
+
+This tracemode can be used to control the amount of output generated
+in a run. It is typically used in scenarios where a quick look at the
+overall utilization graph of the application is desired to identify
+smaller regions of time for more detailed study. Attempting to
+generate the same graph using the detailed logs of the prior tracemode
+may be unnecessarily time consuming or impossible.
+
+The following is a list of runtime options available under this tracemode:
+
+\begin{itemize}
+\item
+{\tt +bincount NUM}:   use NUM time-interval bins. The bins are resized and compacted when filled.
+\item
+{\tt +binsize TIME}:   sets the initial time quantum each bin represents.
+\item
+{\tt +version}:        set summary version to generate.
+%\item
+%{\tt +epThreshold}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
+%\item
+%{\tt +epInterval}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
+\item
+{\tt +sumDetail}: Generates a additional set of files, one per processor,
+that stores the time spent by each entry method associated with each 
+time-bin. The names of ``summary detail'' files will be NAME.\#.sumd where
+NAME is the name of your executable and \# is the processor \#.
+\item
+{\tt +sumOnly}: Generates an additional file that stores a single
+utilization value per time-bin, averaged across all processors. This
+file bears the name NAME.sum where NAME is the name of your
+executable. This runtime option currently overrides the {\tt
++sumDetail} option.
+\end{itemize}
+
+\subsection{General Runtime Options}
+\label{sec::general options}
+
+The following is a list of runtime options available with the same
+semantics for all tracemodes:
+
+\begin{itemize}
+\item
+{\tt +traceroot DIR}: place all generated files in DIR.
+\item
+{\tt +traceoff}: trace generation is turned off when the application
+is started. The user is expected to insert code to turn tracing on at
+some point in the run.
+\item
+{\tt +traceWarn}: By default, warning messages from the framework are
+not displayed. This option enables warning messages to be printed to
+screen. However, on large numbers of processors, they can overwhelm
+the terminal I/O system of the machine and result in unacceptable
+perturbation of the application.
+\end{itemize}
+
+
 \subsection{\projections{} API for \charmpp{} Applications}
 \label{sec::api}
 
@@ -304,126 +425,6 @@ addition to standard \charmpp{} entry methods.
 %\projections{} visualization tool understands when a POSE simulation
 %is executed with the {\tt +dop\_pose} runtime option. No additional
 %user intervention is required.
-
-\subsection{\projections{} Tracing Modules at Application Link Time}
-\label{sec::trace modules}
-
-\projections{} tracing modules dictate the type of performance data,
-data detail and data format each processor will record. They are also
-refered to as ``tracemodes''. There are currently 2 tracemodes
-available. Zero or more tracemodes may be specified at link-time. When
-no tracemodes are specified, no trace data is generated.
-
-\subsubsection{Tracemode {\tt projections}}
-
-Link time option: {\tt -tracemode projections}
-
-This tracemode generates detailed event log files that contain
-information about all \charmpp{} events like entry method calls and
-message packing during the execution of the program.  The data will be
-used by \projections{} in visualization and analysis.
-
-This tracemode will generate a single symbol table file and $p$ ASCII
-log files for $p$ processors. The names of the log files will be
-NAME.\#.log where NAME is the name of your executable and \# is the
-processor \#. The name of the symbol table file is NAME.sts where NAME
-is the name of your executable.
-
-This is the main source of data expected by the performance
-visualizer. Certain tools like timeline will not work without the
-detailed data from this tracemode.
-
-The following is a list of runtime options available under this tracemode:
-
-\begin{itemize}
-\item
-{\tt +logsize NUM}: keep only NUM log entries in the memory of each
-processor. The logs are emptied and flushed to disk when filled.
-\item
-{\tt +binary-trace}:  generate projections log in binary form.
-\item
-{\tt +gz-trace}:      generate gzip (if available) compressed log files.
-\item
-{\tt +checknested}: a debug option. Checks if events are improperly nested
-while recorded and issue a warning immediately.
-
-\item {\tt +trace-subdirs NUM}: divide the generated log files among
-  {\tt NUM} subdirectories of the trace root, each named {\tt
-    PROGNAME.projdir.K}
-\end{itemize}
-
-\subsubsection{Tracemode {\tt summary}}
-
-Compile option: {\tt -tracemode summary}
-
-In this tracemode, execution time across all entry points for each
-processor is partitioned into a fixed number of equally sized
-time-interval bins. These bins are globally resized whenever they are
-all filled in order to accomodate longer execution times while keeping
-the amount of space used constant.
-
-Additional data like the total number of calls made to each entry
-point is summarised within each processor.
-
-This tracemode will generate a single symbol table file and $p$ ASCII
-summary files for $p$ processors. The names of the summary files will
-be NAME.\#.sum where NAME is the name of your executable and \# is the
-processor \#. The name of the symbol table file is NAME.sum.sts where NAME
-is the name of your executable.
-
-This tracemode can be used to control the amount of output generated
-in a run. It is typically used in scenarios where a quick look at the
-overall utilization graph of the application is desired to identify
-smaller regions of time for more detailed study. Attempting to
-generate the same graph using the detailed logs of the prior tracemode
-may be unnecessarily time consuming or impossible.
-
-The following is a list of runtime options available under this tracemode:
-
-\begin{itemize}
-\item
-{\tt +bincount NUM}:   use NUM time-interval bins. The bins are resized and compacted when filled.
-\item
-{\tt +binsize TIME}:   sets the initial time quantum each bin represents.
-\item
-{\tt +version}:        set summary version to generate.
-%\item
-%{\tt +epThreshold}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
-%\item
-%{\tt +epInterval}: DOESNT DO ANYTHING YET. LEFT COMMENTED FOR DOC PURPOSES
-\item
-{\tt +sumDetail}: Generates a additional set of files, one per processor,
-that stores the time spent by each entry method associated with each 
-time-bin. The names of ``summary detail'' files will be NAME.\#.sumd where
-NAME is the name of your executable and \# is the processor \#.
-\item
-{\tt +sumOnly}: Generates an additional file that stores a single
-utilization value per time-bin, averaged across all processors. This
-file bears the name NAME.sum where NAME is the name of your
-executable. This runtime option currently overrides the {\tt
-+sumDetail} option.
-\end{itemize}
-
-\subsection{General Runtime Options}
-\label{sec::general options}
-
-The following is a list of runtime options available with the same
-semantics for all tracemodes:
-
-\begin{itemize}
-\item
-{\tt +traceroot DIR}: place all generated files in DIR.
-\item
-{\tt +traceoff}: trace generation is turned off when the application
-is started. The user is expected to insert code to turn tracing on at
-some point in the run.
-\item
-{\tt +traceWarn}: By default, warning messages from the framework are
-not displayed. This option enables warning messages to be printed to
-screen. However, on large numbers of processors, they can overwhelm
-the terminal I/O system of the machine and result in unacceptable
-perturbation of the application.
-\end{itemize}
 
 \section{Advanced Tracing Features}
 \label{sec::advanced tracing features}

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -51,13 +44,15 @@ public:
 
   struct LDStats {  // Passed to Strategy
     int from_pe;
-    double total_walltime;
-    double total_cputime;
-    double idletime;
-    double bg_walltime;
-    double bg_cputime;
-    double obj_walltime;
-    double obj_cputime;
+    LBRealType total_walltime;
+    LBRealType idletime;
+    LBRealType bg_walltime;
+    LBRealType obj_walltime;
+#if CMK_LB_CPUTIMER
+    LBRealType total_cputime;
+    LBRealType bg_cputime;
+    LBRealType obj_cputime;
+#endif
     int pe_speed;
     CmiBool available;
     CmiBool move;
@@ -68,14 +63,17 @@ public:
     LDCommData* commData;
 
     inline void clearBgLoad() {
-      bg_walltime = bg_cputime = idletime = 0.0;
+      bg_walltime = idletime = 0.0;
+#if CMK_LB_CPUTIMER
+      bg_cputime = 0.0;
+#endif
     }
   };
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
   virtual CmiBool QueryMigrateStep(int) { return CmiTrue; };  
-  virtual LBMigrateMsg* Strategy(LDStats* stats,int count);
+  virtual LBMigrateMsg* Strategy(LDStats* stats, int n_nbrs);
 
   int NeighborIndex(int pe);   // return the neighbor array index
 
@@ -104,12 +102,14 @@ public:
   int serial;
   int pe_speed;
   double total_walltime;
-  double total_cputime;
   double idletime;
   double bg_walltime;
-  double bg_cputime;
   double obj_walltime;   // may not needed
+#if CMK_LB_CPUTIMER
+  double total_cputime;
+  double bg_cputime;
   double obj_cputime;   // may not needed
+#endif
   int n_objs;
   LDObjData *objData;
   int n_comm;

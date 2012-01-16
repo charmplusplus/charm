@@ -1,0 +1,13 @@
+================================================================================
+		      Load Balancing Framework Test Program
+================================================================================
+
+This program can be used to test various strategies for load balancing. The
+basic configuration is an array of elements which do some computation, and then
+send a "compute" message to ther neighbors. Three different topologies are
+possible which test different communication patterns: 1D linear ring, 2D
+stencil or mesh and a random irregular graph.
+
+================================================================================
+Updated on 2010-11-26					      by Abhinav Bhatele
+================================================================================

@@ -1,9 +1,11 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
+/**
+ *                 !!!!!!!!!!!!!!!!! DEFUNCT !!!!!!!!!!!!!!!!!!!
+ *
+ *  This file is not compiled anymore and its uses should be replaced by the
+ *  class of the same name (ObjGraph) in ckgraph.h
+ *
+ *                 !!!!!!!!!!!!!!!!! DEFUNCT !!!!!!!!!!!!!!!!!!!
+ */
 
 /**
  * \addtogroup CkLdb

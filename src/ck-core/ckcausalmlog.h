@@ -256,7 +256,7 @@ public:
  */
 class LocationID{
 public:
-	CkArrayIndexMax idx;
+	CkArrayIndex idx;
 	CkGroupID gid;
 };
 
@@ -404,7 +404,7 @@ typedef struct{
 
 typedef struct {
 	CkGroupID gID;
-	CkArrayIndexMax idx;
+	CkArrayIndex idx;
 	int fromPE,toPE;
 	char ackFrom,ackTo;
 } MigrationRecord;
@@ -445,7 +445,7 @@ typedef struct {
 typedef struct {
 	char header[CmiMsgHeaderSizeBytes];
 	CkGroupID mgrID;
-	CkArrayIndexMax idx;
+	CkArrayIndex idx;
 	int locationPE;
 	int fromPE;
 } CurrentLocationMsg;
@@ -468,7 +468,7 @@ typedef struct {
 	int count;// if just count
 	/**if object **/
 	CkGroupID mgrID;
-	CkArrayIndexMax idx;
+	CkArrayIndex idx;
 	int locationPE;
 } DummyMigrationMsg;
 
@@ -559,7 +559,7 @@ void processReceivedTN(Chare *obj,int vecsize,MCount *listTNs);
 void initializeRestart(void *data,ChareMlogData *mlogData);
 void distributeRestartedObjects();
 void sortRestoredLocalMsgLog(void *_dummy,ChareMlogData *mlogData);
-void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE);
+void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndex &idx,int locationPE);
 
 //TML: function for locally calling the restart
 void CkMlogRestartLocal();
@@ -640,7 +640,7 @@ extern void _initDone(void);
 extern void _resetNodeBocInitVec(void);
 
 //methods for updating location
-void informLocationHome(CkGroupID mgrID,CkArrayIndexMax idx,int homePE,int currentPE);
+void informLocationHome(CkGroupID mgrID,CkArrayIndex idx,int homePE,int currentPE);
 
 //handlers for updating locations
 void _receiveLocationHandler(CurrentLocationMsg *data);

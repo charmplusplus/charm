@@ -1,0 +1,26 @@
+mainmodule kNeighbor {
+  readonly CProxy_Main mainProxy;
+  readonly int num_chares;
+  readonly int gMsgSize;
+  readonly int gLBFreq;
+
+  message toNeighborMsg {
+    int data[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void nextStep(CkReductionMsg *);
+    entry void terminate(CkReductionMsg *);
+    entry void resumeIter();
+  };
+
+  array [1D] Block {
+    entry Block();
+    entry void commWithNeighbors();
+    entry void recvReplies(toNeighborMsg *);
+    entry void recvMsgs(toNeighborMsg *);
+    entry void pauseForLB();
+  };
+
+}

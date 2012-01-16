@@ -195,6 +195,7 @@ class SumLogPool {
   public:
     SumLogPool(char *pgm);
     ~SumLogPool();
+    double *getCpuTime() {return cpuTime;}
     void initMem();
     void write(void) ;
     void writeSts(void);
@@ -206,11 +207,13 @@ class SumLogPool {
       }
     }
     void shrink(void);
+    void shrink(double max);
     void addEventType(int eventType, double time);
     void startPhase(int phase) { phaseTab.startPhase(phase); }
     BinEntry *bins() { return pool; }
-    int getNumEntries() const { return numBins; }
-
+    UInt getNumEntries() { return numBins; }
+    UInt getEpInfoSize() {return epInfoSize;} 
+    UInt getPoolSize() {return poolSize;}
     // accessors to normal summary data
     inline double getTime(unsigned int interval) {
       return pool[interval].time();
@@ -260,16 +263,23 @@ class TraceSummary : public Trace {
     double start, packstart, unpackstart, idleStart;
     double binTime, binIdle;
     int msgNum; /* used to handle multiple endComputation calls?? */
+    int inIdle;
+    int inExec;
+    int depth;
   public:
     TraceSummary(char **argv);
     void creation(envelope *e, int epIdx, int num=1) {}
 
     void beginExecute(envelope *e);
+    void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL);
     void endExecute(void);
+    void endExecute(char *msg);
     void beginIdle(double currT);
     void endIdle(double currT);
+    void traceBegin(void);
+    void traceEnd(void);
     void beginPack(void);
     void endPack(void);
     void beginUnpack(void);

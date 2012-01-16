@@ -72,6 +72,20 @@ CkGroupID groupId = CProxy_G::ckNew(\uw{parameters1});
 CProxy_G groupProxy(groupId);
 \end{alltt}
 
+It is possible to specify the dependence of group creations using
+\uw{CkEntryOptions}, for example, creation of group B on each processor depends
+on group A being created on that processor.
+
+\begin{alltt}
+// create group A
+CkGroupID groupAId = CProxy_GroupA::ckNew(\uw{parameters1});
+
+// create group B which depends on group A being created
+CkEntryOptions opts;
+opts.setGroupDepID(groupAId);
+CkGroupID groupBId = CProxy_GroupB::ckNew(\uw{parameters2});
+\end{alltt}
+
 \subsubsection{Method Invocation on Groups}
 
 Before sending a message to a \index{group}group via an entry

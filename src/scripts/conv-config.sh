@@ -77,9 +77,16 @@ then
   QT=`echo $CMK_QT | sed -e 's/64$//'`
   if test $QT = $CMK_QT
   then
-    CMK_QT="${CMK_QT}64"
+    if echo $CMK_QT | grep '-' > /dev/null 2> /dev/null
+    then
+      CMK_QT=`echo $CMK_QT | sed -e 's/-/64-/'`
+    else
+      CMK_QT="${CMK_QT}64"
+    fi
   fi
 fi
+
+[ -z "$CMK_PIC" ] && CMK_PIC='-fpic'
 
 [ -z "$CMK_SEQ_CC" ] && CMK_SEQ_CC="$CMK_CC"
 [ -z "$CMK_SEQ_CXX" ] && CMK_SEQ_CXX="$CMK_CXX"

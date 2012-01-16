@@ -26,6 +26,15 @@
 
 #include "crc32.h"
 
+#if ! CMK_CHARMDEBUG
+#error "charmdebug is not enabled (e.g. when building with-production)"
+static void *meta_malloc(size_t size);
+static void *meta_calloc(size_t nelem, size_t size);
+static void *meta_realloc(void *oldBuffer, size_t newSize);
+static void *meta_memalign(size_t align, size_t size);
+static void *meta_valloc(size_t size);
+#else
+
 typedef struct _Slot Slot;
 typedef struct _SlotStack SlotStack;
 
@@ -391,7 +400,7 @@ void check_memory_leaks(LeakSearchInfo *info) {
     begin_bss = ntohl(((char**)(req->extra))[2]);
     end_bss = ntohl(((char**)(req->extra))[3]) - sizeof(char*) + 1;
   }*/
-  printf("scanning stack from %p (%d) to %p (%d)\n",begin_stack,begin_stack,end_stack,end_stack);
+  printf("scanning stack from %p to %p\n", begin_stack, end_stack);
   for (scanner = begin_stack; scanner < end_stack; scanner+=sizeof(char*)) {
     fnd = (Slot**)CkHashtableGet(table, scanner);
     //if (fnd != NULL) printf("scanning stack %p, %d\n",*fnd,isLeakSlot(*fnd));
@@ -404,7 +413,7 @@ void check_memory_leaks(LeakSearchInfo *info) {
       PCQueuePush(inProgress, (char*)found);
     }
   }
-  printf("scanning data from %p (%d) to %p (%d)\n",info->begin_data,info->begin_data,info->end_data,info->end_data);
+  printf("scanning data from %p to %p\n", info->begin_data, info->end_data);
   for (scanner = info->begin_data; scanner < info->end_data; scanner+=sizeof(char*)) {
     //fprintf(fd, "scanner = %p\n",scanner);
     //fflush(fd);
@@ -419,7 +428,7 @@ void check_memory_leaks(LeakSearchInfo *info) {
       PCQueuePush(inProgress, (char*)found);
     }
   }
-  printf("scanning bss from %p (%d) to %p (%d)\n",info->begin_bss,info->begin_bss,info->end_bss,info->end_bss);
+  printf("scanning bss from %p to %p\n", info->begin_bss, info->end_bss);
   for (scanner = info->begin_bss; scanner < info->end_bss; scanner+=sizeof(char*)) {
     //printf("bss: %p %p\n",scanner,*(char**)scanner);
     fnd = (Slot**)CkHashtableGet(table, scanner);
@@ -1383,7 +1392,7 @@ void CpdSetInitializeMemory(int v) { cpdInitializeMemory = v; }
 static void meta_init(char **argv) {
   status("Converse -memory mode: charmdebug\n");
   char buf[100];
-  sprintf(buf,"slot size %d\n",sizeof(Slot));
+  sprintf(buf, "slot size %d\n", (int)sizeof(Slot));
   status(buf);
   CmiMemoryIs_flag|=CMI_MEMORY_IS_CHARMDEBUG;
   cpdInitializeMemory = 0;
@@ -1444,7 +1453,7 @@ static void *meta_malloc(size_t size) {
     if (s!=NULL) {
       user = (char*)setSlot(&s,size);
       memory_allocated_user_total += size;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
       traceMalloc_c(user, size, s->from, s->stackLen);
 #endif
     }
@@ -1497,7 +1506,7 @@ static void meta_free(void *mem) {
     int memSize = 0;
     if (mem!=NULL) memSize = s->userSize;
     memory_allocated_user_total -= memSize;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     traceFree_c(mem, memSize);
 #endif
 
@@ -1590,7 +1599,7 @@ static void *meta_memalign(size_t align, size_t size) {
   s->extraStack->protectedMemory = NULL;
   s->extraStack->protectedMemoryLength = 0;
   memory_allocated_user_total += size;
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
   traceMalloc_c(user, size, s->from, s->stackLen);
 #endif
   return user;
@@ -1681,3 +1690,6 @@ void * MemoryToSlot(void *ptr) {
     CmiPrintf("%d 0 ",sl->chareID);
   }
 }*/
+
+
+#endif

@@ -1,14 +1,12 @@
 #!/bin/sh
 ##############################################################################
-# unix2nt_cc:  for VC++ ver 8
+# unix2nt_cc:  for VC++ ver 8 and later (VS 2003, 2008, 2010)
 # Maps UNIX C/C++ compiler command-line options to 
-# Microsoft Visual C++ 6.0 command line options. 
+# Microsoft Visual C++ command line options.
 # That is, this script is a UNIX-ifying wrapper for 
 # the NT CL and LINK commands. 
 #
 # Known bugs: pathnames with spaces cause quoting problems.
-#
-# Orion Sky Lawlor, olawlor@acm.org, 1/22/2001
 ##############################################################################
 
 #TMP environment variable seems get lost in sub shell
@@ -24,7 +22,7 @@ fi
 # Configurable option: Location of MSDEV
 if test -z "$VCINSTALLDIR"
 then
-  VCC_DIR="C:/Program Files (x86)/Microsoft Visual Studio 9.0/VC"
+  VCC_DIR="C:/Program Files (x86)/Microsoft Visual Studio 10.0/VC"
 else
   VCC_DIR=$VCINSTALLDIR
 fi
@@ -33,11 +31,14 @@ then
   echo VCC_DIR: $VCC_DIR is not set properly!
   exit 1
 fi
-if test -z "$WINDOWSSDKDIR"
+if test -n "$WINDOWSSDKDIR"
 then
-  SDK_DIR="C:/Program Files/Microsoft SDKs/Windows/v6.0A"
-else
   SDK_DIR=$WINDOWSSDKDIR
+elif test -n "$WindowsSdkDir"
+then
+  SDK_DIR=$WindowsSdkDir
+else
+  SDK_DIR="C:/Program Files/Microsoft SDKs/Windows/v6.0A"
 fi
 if test ! -d "`cygpath -u "$SDK_DIR"`"
 then
@@ -48,7 +49,9 @@ fi
 #CL command-line options for -O and -g mode
 #only for the environment that has set corresponding environmental variables
 CL_CMD="CL.EXE"
-CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS /FD'
+# Define NOMINMAX to avoid definition of unexpected min(a,b) and max(a,b)
+# macros,per http://support.microsoft.com/kb/143208
+CL_COMMON=' /nologo /W1 /EHsc /D_WINDOWS /DNOMINMAX'
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$SDK_DIR/Include\"`"
 CL_COMMON="$CL_COMMON /I`cygpath -d \"$VCC_DIR/Include\"`"
 CL_O=$CL_COMMON" /DNDEBUG /MT /Ox"
@@ -62,10 +65,19 @@ CL_DLL="/LD"
 #is a file "/usr/bin/link" which has the same name, and takes higher precedence
 #than the microsoft one.
 #LINK_CMD="link.exe"
+if test -d "`cygpath -u \"$VCC_DIR/BIN/amd64\"`"
+then
 LINK_CMD="$VCC_DIR/BIN/amd64/LINK.EXE"
+else
+LINK_CMD="$VCC_DIR/BIN/LINK.EXE"
+fi
 LINK_COMMON='/nologo /subsystem:console '
+if test -d "`cygpath -u \"$SDK_DIR/Lib/x64\"`"
+then
 LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$SDK_DIR/Lib/x64\"`"
-#LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$VCC_DIR/Lib/\"`"
+else
+LINK_COMMON="$LINK_COMMON /LIBPATH:`cygpath -d \"$VCC_DIR/Lib/\"`"
+fi
 LINK_O=$LINK_COMMON
 LINK_DEF=$LINK_COMMON
 LINK_G="$LINK_COMMON /DEBUG"

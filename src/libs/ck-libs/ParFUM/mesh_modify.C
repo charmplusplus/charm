@@ -1076,7 +1076,7 @@ void FEM_remove_element_local(FEM_Mesh *m, int element, int etype){
     The idxl info will be deleted in Purge, that way shared 
     chunks could still refer to it, needed for solution transfer
 */
-int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
+int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent, bool aggressive_node_removal){
   //CkAssert(elementid != -1);
 #ifdef DEBUG_2
   CkPrintf("removeElement, line %d\n", __LINE__);
@@ -1097,6 +1097,7 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
     rm->elementid = sharedIdx;
     rm->elemtype = elemtype;
     rm->permanent = permanent;
+    rm->aggressive_node_removal = aggressive_node_removal;
     meshMod[remoteChunk].removeElementRemote(rm);
     // remove local ghost element, now done in purge
 #ifdef DEBUG_2
@@ -1470,23 +1471,26 @@ int FEM_remove_element(FEM_Mesh *m, int elementid, int elemtype, int permanent){
 #endif
 // This code removes nodes that we still need in cases involving acquisition/flip for
 // CPSD. I don't really follow the logic here, so I'm just cutting this bit out for now
-#ifndef CPSD
-		  if(!irec1) {
-		    if(!losinglocal) {
-		      FEM_remove_node_local(m,nodes[j]);
-		    }
-		    else {
-		      deleteNodeLater = nodes[j];
-		    }
+//#ifndef CPSD
+          CkPrintf("removeElement, aggressive_node_removal: %d\n", aggressive_node_removal);
+          if (aggressive_node_removal) {
+              if(!irec1) {
+                  if(!losinglocal) {
+                      FEM_remove_node_local(m,nodes[j]);
+                  }
+                  else {
+                      deleteNodeLater = nodes[j];
+                  }
 #ifdef DEBUG_2
-  CkPrintf("removeElement, line %d\n", __LINE__);
+                  CkPrintf("removeElement, line %d\n", __LINE__);
 #endif
-		    //if losing a local node, then can remove it only after its attributes 
-		    //have been copied, since this is the only copy.. 
-		    //(as no other chunk has this node as local/shared)
-		    //so we'll need to delete the ghostsend idxl entry and the node later
-		  }
-#endif
+                  //if losing a local node, then can remove it only after its attributes 
+                  //have been copied, since this is the only copy.. 
+                  //(as no other chunk has this node as local/shared)
+                  //so we'll need to delete the ghostsend idxl entry and the node later
+              }
+          }
+//#endif
 		}
 	      }
 	      if(numElems!=0) delete[] elems;
@@ -2415,7 +2419,7 @@ void femMeshModify::removeGhostElem(removeGhostElemMsg *fm) {
 
 void femMeshModify::removeElementRemote(removeElemMsg *fm) {
   CtvAccess(_curTCharm) = tc;
-  fmUtil->removeElemRemote(fmMesh, fm->chk, fm->elementid, fm->elemtype, fm->permanent);
+  fmUtil->removeElemRemote(fmMesh, fm->chk, fm->elementid, fm->elemtype, fm->permanent, fm->aggressive_node_removal);
   delete fm;
   return;
 }

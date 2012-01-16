@@ -1,11 +1,4 @@
- /*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
- /** \file CrayNid.c
+/** \file CrayNid.c
  *  Author: Abhinav S Bhatele
  *  Date created: October 10th, 2007  
  *  
@@ -14,9 +7,10 @@
  *  can be called from C++ files
  */
 
+#include <stdlib.h>
 #include "converse.h"
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 
 #if XT3_TOPOLOGY
 #include <catamount/cnos_mpi_os.h>
@@ -44,8 +38,10 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   nid = nidpid[mpirank].nid;
   /* free(nidpid); */
 
-#else	/* if it is a XT4/5 */
-  PMI_Portals_get_nid(mpirank, &nid);
+#elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 */
+  PMI_Get_nid(mpirank, &nid);
+#else
+#error "Cannot get network topology information on a Cray build. Swap current module xt-mpt with xt-mpt/5.0.0 or higher and xt-asyncpe with xt-asyncpe/4.0 or higher and then rebuild"
 #endif
 
   return nid;
@@ -53,7 +49,11 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
 #endif /* CMK_CRAYXT */
 
-#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
+#if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+
+#if !CMK_HAS_RCALIB
+#error "The Cray rca library is not available. Try 'module load rca' and rebuild"
+#endif
 
 #include <rca_lib.h>
 
@@ -62,8 +62,13 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define TDIM 4
 
   #elif XT5_TOPOLOGY
-  #define MAXNID 17000
+  #define MAXNID 22020
   #define TDIM 12
+
+  #elif XE6_TOPOLOGY
+    /* hopper */
+  #define MAXNID 6384
+  #define TDIM 24
   #endif
 
 int *pid2nid;                   /* rank to node ID */
@@ -124,37 +129,21 @@ void pidtonid(int numpes) {
   }
   
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
-  int i, j, nid;
+  int i, l, nid;
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 
   for(i=0; i<MAXNID; i++)
-    for(j=0; j<4; j++)
-      nid2pid[i][j] = -1;
+    for(l=0; l<TDIM; l++)
+      nid2pid[i][l] = -1;
 
   for (i=0; i<numpes; i++) {
-    PMI_Portals_get_nid(i, &nid);
+    PMI_Get_nid(i, &nid);
     pid2nid[i] = nid;
-    if (nid2pid[nid][0] == -1)
-      nid2pid[nid][0] = i;
-    else if (nid2pid[nid][1] == -1)
-      nid2pid[nid][1] = i;
-    else if (nid2pid[nid][2] == -1)
-      nid2pid[nid][2] = i;
-    else 
-  #if XT4_TOPOLOGY
-      nid2pid[nid][3] = i;
-  #elif XT5_TOPOLOGY
-    if (nid2pid[nid][3] == -1)
-      nid2pid[nid][3] = i;
-    else if (nid2pid[nid][4] == -1)
-      nid2pid[nid][4] = i;
-    else if (nid2pid[nid][5] == -1)
-      nid2pid[nid][5] = i;
-    else if (nid2pid[nid][6] == -1)
-      nid2pid[nid][6] = i;
-    else
-      nid2pid[nid][7] = i;
-  #endif
+
+    l = 0;
+    while(nid2pid[nid][l] != -1)
+      l++;
+    nid2pid[nid][l] = i;
   }
 #endif
 }

@@ -11,14 +11,16 @@
 #include "conv-trace.h"
 
 CpvDeclare(int, traceOn); /* For threads.c */
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
 CpvExtern(int, _traceCoreOn);   /* For cursed projector core */
+#endif
 int _threadEP=-123; /* for charmProjections.C */
 int traceBluegeneLinked = 0;
 
 void traceInit(char **argv) {
   CpvInitialize(int, traceOn);
   CpvAccess(traceOn)=0;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   CpvInitialize(int, _traceCoreOn); 
   CpvAccess(_traceCoreOn)=0; 
   /* initTraceCore(argv); */
@@ -52,3 +54,7 @@ void traceUserSuppliedNote(char *note) {}
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
 void EmergencyExit(void) {}
 void CpdEndConditionalDeliver_master() {}
+
+
+int _lb_version;
+

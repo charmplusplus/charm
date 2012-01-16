@@ -1,6 +1,16 @@
 \documentclass[10pt]{article}
 
 \usepackage{../pplmanual} \input{../pplmanual} \usepackage{html}
+\usepackage{listings}
+%sadly latex2html does not understand listings
+%this hack will at least give you the program listing instead of garbage
+\begin{htmlonly}
+  \usepackage{verbatim}
+  \providecommand{\lstinputlisting}[2][]{\verbatiminput{#2}}
+  \providecommand{\lstset}[2][]{}
+\end{htmlonly}
+
+
 \title{The\\ \charmpp\\ Programming Language\\ Manual} \version{6.0
   (Release 1)} \credits{ {\small The Charm software was developed as a
     group effort.  The earliest prototype, Chare Kernel(1.0), was
@@ -74,6 +84,7 @@
   \input{entry}
   \input{marshalling}	
   \input{messages}
+  \input{order.tex}
   \input{chares}
   \input{readonly}    
   \input{arrays}
@@ -81,6 +92,7 @@
   \input{nodegroups}
   \input{loadb}
   \input{advancedlb}
+  \input{futures}
   \input{quiesce}
   \input{reductions}
   \input{callbacks}
@@ -89,8 +101,11 @@
   \input{othercalls}    
   \input{delegation}    
   \input{commlib}
+  \input{alltoall}
   \input{python}
 \input{inhertmplt}
+
+\input{msa.tex}
 
 \input{checkpoint}
 

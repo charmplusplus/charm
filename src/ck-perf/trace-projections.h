@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/src/ck-perf/trace-projections.h,v $
- * $Author: gioachin $
- * $Date: 2009-08-20 01:09:41 $
- * $Revision: 2.78 $
- *****************************************************************************/
-
 /**
  * \addtogroup CkPerf
 */
@@ -23,6 +16,7 @@
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
+#define NUMPAPIEVENTS 2
 #endif
 
 #if CMK_PROJECTIONS_USE_ZLIB
@@ -65,10 +59,9 @@ class LogEntry {
 
     // this is taken out so as to provide a placeholder value for non-PAPI
     // versions (whose value is *always* zero).
-    int numPapiEvents;
+    //int numPapiEvents;
 #if CMK_HAS_COUNTER_PAPI
-    int *papiIDs;
-    LONG_LONG_PAPI *papiValues;
+    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
     unsigned char type; 
     char *fName;
@@ -88,12 +81,12 @@ class LogEntry {
       if (d) id = *d; else {id.id[0]=id.id[1]=id.id[2]=id.id[3]=0; };
       recvTime = rt; cputime = cputm;
       // initialize for papi as well as non papi versions.
-      numPapiEvents = 0;
-      userSuppliedNote = NULL;
 #if CMK_HAS_COUNTER_PAPI
-      papiIDs = NULL;
-      papiValues = NULL;
+      //numPapiEvents = NUMPAPIEVENTS;
+#else
+      //numPapiEvents = 0;
 #endif
+      userSuppliedNote = NULL;
       fName = NULL;
       flen=0;
       pes=NULL;
@@ -190,10 +183,12 @@ class LogEntry {
       }	
     }
 
-
-
     // complementary function for adding papi data
-    void addPapi( int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals);
+    void addPapi(LONG_LONG_PAPI *papiVals){
+#if CMK_HAS_COUNTER_PAPI
+   	memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+#endif
+    }
    
     void setUserSuppliedData(int data){
       userSuppliedData = data;
@@ -231,6 +226,13 @@ class LogEntry {
 #if defined(WIN32) || CMK_MULTIPLE_DELETE
     void operator delete(void *, void *) { }
 #endif
+
+    void setNewStartTime(double t) {
+      time -= t;
+      if (endTime>=t) endTime -= t;
+      if (recvTime>=t) recvTime -= t;
+    }
+
     void pup(PUP::er &p);
     ~LogEntry(){
       if (fName) delete [] fName;
@@ -275,6 +277,7 @@ class LogPool {
     // writing out logs.
     double prevTime;
     double timeErr;
+    double globalStartTime; // used at the end on Pe 0 only
     double globalEndTime; // used at the end on Pe 0 only
 
     int numPhases;
@@ -322,8 +325,8 @@ class LogPool {
 
     // complementary function to set papi info to current log entry
     // must be called after an add()
-    void addPapi(int numPap, int *pap_ids, LONG_LONG_PAPI *papVals) {
-      pool[numEntries-1].addPapi(numPap, pap_ids, papVals);
+    void addPapi(LONG_LONG_PAPI *papVals) {
+      pool[numEntries-1].addPapi(papVals);
     }
 
 	/** add a record for a user supplied piece of data */
@@ -345,7 +348,11 @@ class LogPool {
     void setWriteData(bool b){
       writeData = b;
     }
+    void modLastEntryTimestamp(double ts);
 
+    void setNewStartTime() {
+      for(UInt i=0; i<numEntries; i++) pool[i].setNewStartTime(globalStartTime);
+    }
 };
 
 /*
@@ -445,7 +452,7 @@ class TraceProjections : public Trace {
     int idxRegistered(int idx);    
 #if CMK_HAS_COUNTER_PAPI
     int papiEventSet;
-    LONG_LONG_PAPI *papiValues;
+    LONG_LONG_PAPI papiValues[NUMPAPIEVENTS];
 #endif
 
   public:
@@ -461,13 +468,17 @@ class TraceProjections : public Trace {
     void userSuppliedNote(char* note);
     void memoryUsage(double m);
     void creation(envelope *e, int epIdx, int num=1);
+    void creation(char *m);
     void creationMulticast(envelope *e, int epIdx, int num=1, int *pelist=NULL);
     void creationDone(int num=1);
     void beginExecute(envelope *e);
+    void beginExecute(char *msg);
     void beginExecute(CmiObjId  *tid);
     void beginExecute(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
+    void changeLastEntryTimestamp(double ts);
     void beginExecuteLocal(int event,int msgType,int ep,int srcPe,int ml,CmiObjId *idx=NULL);
     void endExecute(void);
+    void endExecute(char *msg);
     void endExecuteLocal(void);
     void messageRecv(char *env, int pe);
     void beginIdle(double curWallTime);
@@ -549,7 +560,7 @@ class toProjectionsGZFile : public PUP::er {
 
 
 
-
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput();
 
@@ -558,6 +569,11 @@ void enableTraceLogOutput();
 
 /// Force the log file to be flushed
 void flushTraceLog();
+#else
+static inline void disableTraceLogOutput() { }
+static inline void enableTraceLogOutput() { }
+static inline void flushTraceLog() { }
+#endif
 
 #endif
 

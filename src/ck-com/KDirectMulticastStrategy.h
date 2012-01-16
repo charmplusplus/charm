@@ -11,7 +11,7 @@
 
 /* class KDirectHashObject{ */
 /*  public: */
-/*     CkVec<CkArrayIndexMax> indices; */
+/*     CkVec<CkArrayIndex> indices; */
 /*     int npes; */
 /*     int *pelist; */
 /* }; */

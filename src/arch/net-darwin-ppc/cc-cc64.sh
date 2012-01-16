@@ -1,8 +1,8 @@
 COMMENTS="gcc 64bit for MacOSX Tiger"
 
 CMK_MACOSX64=1
-CMK_CC="cc -m64 -Wno-long-double -fPIC -dynamic -fno-common "
-CMK_CXX="c++ -m64 -Wno-long-double -fPIC -dynamic -fno-common "
+CMK_CC="cc -m64 -fPIC -dynamic -fno-common "
+CMK_CXX="c++ -m64 -fPIC -dynamic -fno-common "
 CMK_CXXPP="c++ -m64 -x c++ -E "
 CMK_LD="$CMK_CC -multiply_defined suppress "
 CMK_LDXX="$CMK_CXX -multiply_defined suppress "

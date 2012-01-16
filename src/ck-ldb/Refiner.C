@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -36,7 +29,7 @@ void Refiner::create(int count, BaseLB::LDStats* stats, int* procs)
   numAvail = 0;
   for(i=0; i < P; i++) {
     processors[i].Id = i;
-    processors[i].backgroundLoad = stats->procs[i].bg_cputime;
+    processors[i].backgroundLoad = stats->procs[i].bg_walltime;
     processors[i].load = processors[i].backgroundLoad;
     processors[i].computeLoad = 0;
     processors[i].computeSet = new Set();

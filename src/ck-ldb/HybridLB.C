@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -16,7 +9,6 @@
   The test applies greedy strategy
 */
 
-#include "charm++.h"
 #include "HybridLB.h"
 #include "LBDBManager.h"
 
@@ -44,6 +36,8 @@ HybridLB::HybridLB(const CkLBOptions &opt): HybridBaseLB(opt)
   refine = (CentralLB *)AllocateRefineLB();
 //  greedy = (CentralLB *)AllocateMetisLB();
   greedy = (CentralLB *)AllocateGreedyLB();
+
+  initTree();
 #endif
 }
 
@@ -53,7 +47,7 @@ HybridLB::~HybridLB()
   delete refine;
 }
 
-void HybridLB::work(LDStats* stats,int count)
+void HybridLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   LevelData *lData = levelData[currentLevel];
@@ -62,9 +56,9 @@ void HybridLB::work(LDStats* stats,int count)
   //  take into account the outObjs
   //if (currentLevel == tree->numLevels()-1) 
   if (currentLevel == 1) 
-    greedy->work(stats, count);
+    greedy->work(stats);
   else
-    refine->work(stats, count);
+    refine->work(stats);
 #endif
 }
   

@@ -68,6 +68,9 @@
 #define CMK_64BIT                1
 #endif
 
+#ifndef CMK_USE_MEMPOOL_ISOMALLOC
+#define CMK_USE_MEMPOOL_ISOMALLOC 1
+#endif
 
 /* set up what production/non-production means */
 #ifdef CMK_OPTIMIZE
@@ -98,6 +101,12 @@
 
 #ifndef  CMK_WITH_CONTROLPOINT
 #define CMK_WITH_CONTROLPOINT            1
+#endif
+
+/* sanity checks */
+#if CMK_SMP_TRACE_COMMTHREAD && ! CMK_SMP
+#undef CMK_SMP_TRACE_COMMTHREAD
+#define CMK_SMP_TRACE_COMMTHREAD                               0
 #endif
 
 #endif

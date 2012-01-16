@@ -1,4 +1,7 @@
+#include "elements.h"
+#include "ckheap.h"
 #include "RefinerApprox.h"
+
 int _lb_debug=0;
 
 void RefinerApprox::create(int count, CentralLB::LDStats* stats, int* procs)
@@ -371,7 +374,6 @@ int RefinerApprox::refine(double opt)
     bool *largeFree=new bool[P];
     Set *largeComputes=new Set();
     Set *smallComputes=new Set();
-    int nmoves=0;
 
     //Step 1: Remove all but one large computes on each node
     for(i=0;i<P;i++)
@@ -513,11 +515,11 @@ int RefinerApprox::refine(double opt)
     delete cHeap;
     
     //Step 5: Arbitrarily assign remaining largeComputes to large-free procs
-    int j=0;
+
     Iterator nextCompute;
     nextCompute.id=0;
     computeInfo *c=(computeInfo *)
-	largeComputes->iterator((Iterator*)&nextCompute);
+      largeComputes->iterator((Iterator*)&nextCompute);
     if(_lb_debug)
     {
 	if(c) 

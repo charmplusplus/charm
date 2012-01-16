@@ -21,7 +21,7 @@
 //  CkArrayID thisArrayID;
 //  /*
 //  CkVec <StrategyTableEntry *> strategyList;
-//  CkHashtableT<CkArrayIndexMax, CkArrayIndexMax*> *ht;
+//  CkHashtableT<CkArrayIndex, CkArrayIndex*> *ht;
 //    
 //  int isRegistered(ArrayElement *elt, CharmStrategy *astrat);
 //  void addElement(ArrayElement *elt, CmiBool mogration_flag);
@@ -68,7 +68,7 @@
 //	strategyList.remove(count);
 //  }
 //
-//  void getLocalIndices(CkVec<CkArrayIndexMax> &vec);
+//  void getLocalIndices(CkVec<CkArrayIndex> &vec);
 //  */
 //
 //  void pup(PUP::er &p);

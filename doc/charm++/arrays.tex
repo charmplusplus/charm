@@ -276,6 +276,17 @@ will be significantly more efficient in the number of messages
 required than inserting each element individually which will require
 one message send per element.
 
+\kw{CkArrayOptions} contains a few flags that the runtime can use to
+optimize handling of a given array. If the array elements will only
+migrate at controlled points (such as periodic load balancing with
+{\tt AtASync()}), this is signalled to the runtime by calling {\tt
+  opts.setAnytimeMigration(false)}\footnote{At present, this optimizes
+broadcasts to not save old messages for immigrating chares.}. If all
+array elements will be inserted by bulk creation or by {\tt
+  fooArray[x].insert()} calls, signal this by calling {\tt
+  opts.setStaticInsertion(true)} \footnote{This can enable a slightly
+  faster default mapping scheme.}.
+
 \subsubsection{Advanced Array Creation: Map Object}
 
 \index{array map}
@@ -288,8 +299,10 @@ home processor is the processor responsible for maintaining
 the location of the element.
 
 There is a default map object, which maps 1D array indices
-in a round-robin fashion to processors, and maps other array
-indices based on a hash function.
+in a block fashion to processors, and maps other array
+indices based on a hash function. Some other mappings such as round-robin
+(\kw{RRMap}) also exist, which can be used
+similar to custom ones described below.
 
 A custom map object is implemented as a group which inherits from
 \kw{CkArrayMap} and defines these virtual methods:
@@ -301,7 +314,7 @@ public:
   //...
   
   //Return an ``arrayHdl'', given some information about the array
-  virtual int registerArray(CkArrayIndexMax& numElements,CkArrayID aid);
+  virtual int registerArray(CkArrayIndex& numElements,CkArrayID aid);
   //Return the home processor number for this element of this array
   virtual int procNum(int arrayHdl,const CkArrayIndex &element);
 \}
@@ -316,7 +329,7 @@ class BlockMap : public CkArrayMap
  public:
   BlockMap(void) \{\}
   BlockMap(CkMigrateMessage *m)\{\}
-  int registerArray(CkArrayIndexMax& numElements,CkArrayID aid) \{
+  int registerArray(CkArrayIndex& numElements,CkArrayID aid) \{
     return 0;
   \}
   int procNum(int /*arrayHdl*/,const CkArrayIndex &idx) \{
@@ -330,11 +343,11 @@ class BlockMap : public CkArrayMap
 Once you've instantiated a custom map object, you can use it to
 control the location of a new array's elements using the
 \kw{setMap} method of the \kw{CkArrayOptions} object described above.
-For example, if you've declared a map object named ``blockMap'':
+For example, if you've declared a map object named ``BlockMap'':
 
 \begin{alltt}
 //Create the map group
-  CProxy_blockMap myMap=CProxy_blockMap::ckNew();
+  CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
 //Make a new array using that map
   CkArrayOptions opts(nElements);
   opts.setMap(myMap);
@@ -808,10 +821,10 @@ The above codes create a section proxy that contains array elements of
 [0:9, 0:19:2, 0:29:2].
 
 For user-defined array index other than CkArrayIndex1D to CkArrayIndex6D,
-one needs to use the generic array index type: CkArrayIndexMax.
+one needs to use the generic array index type: CkArrayIndex.
 
 \begin{alltt}
-  CkArrayIndexMax *elems;    // add array indices
+  CkArrayIndex *elems;    // add array indices
   int numElems;
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
 \end{alltt}
@@ -1047,10 +1060,10 @@ arrays as follows:
 	  int aceiling=ArraySize-1;
 	  int asectionSize=aceiling-afloor+1;
 	  // cross section lower half of each array
-	  CkArrayIndexMax **aelems= new CkArrayIndexMax*[3];
-	  aelems[0]= new CkArrayIndexMax[asectionSize];
-	  aelems[1]= new CkArrayIndexMax[asectionSize];
-	  aelems[2]= new CkArrayIndexMax[asectionSize];
+	  CkArrayIndex **aelems= new CkArrayIndex*[3];
+	  aelems[0]= new CkArrayIndex[asectionSize];
+	  aelems[1]= new CkArrayIndex[asectionSize];
+	  aelems[2]= new CkArrayIndex[asectionSize];
 	  int *naelems=new int[3];
 	  for(int k=0;k<3;k++)
 	    \{

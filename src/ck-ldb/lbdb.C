@@ -76,21 +76,21 @@ extern "C" const LDObjHandle &LDGetObjHandle(LDHandle h, int oh)
 }
 
 extern "C" void LDObjTime(LDObjHandle &_h,
-			    double walltime, double cputime)
+			    LBRealType walltime, LBRealType cputime)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->IncrementTime(walltime,cputime);
 }
   
-extern "C" void LDGetObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
+extern "C" void LDGetObjLoad(LDObjHandle &_h, LBRealType *wallT, LBRealType *cpuT)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
   obj->getTime(wallT, cpuT);
 }
 
-extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, double *wallT, double *cpuT)
+extern "C" void LDQueryKnownObjLoad(LDObjHandle &_h, LBRealType *wallT, LBRealType *cpuT)
 {
   LBDB *const db = (LBDB*)(_h.omhandle.ldb.handle);
   LBObj *const obj = db->LbObj(_h);
@@ -144,6 +144,24 @@ extern "C" void LDTurnManualLBOff(LDHandle _db)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->TurnManualLBOff();
+}
+
+extern "C" int LDAddMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn,  void* data) 
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  return db->AddMigrationDoneFn(fn,data);
+}
+
+extern "C" void  LDRemoveMigrationDoneFn(LDHandle _db, LDMigrationDoneFn fn)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->RemoveMigrationDoneFn(fn);
+}
+
+extern "C" void LDMigrationDone(LDHandle _db)
+{
+  LBDB *const db = (LBDB*)(_db.handle);
+  db->MigrationDone();
 }
 
 extern "C" void LDTurnPredictorOn(LDHandle _db, void *model)
@@ -225,7 +243,7 @@ extern "C" void LDObjectStop(const LDObjHandle &_h)
   LBObj *const obj = db->LbObj(_h);
 
   if (db->StatsOn()) {
-    double walltime, cputime;
+    LBRealType walltime, cputime;
     obj->StopTimer(&walltime,&cputime);
     obj->IncrementTime(walltime,cputime);
   }
@@ -247,7 +265,7 @@ extern "C" void LDMulticastSend(const LDOMHandle &destOM, LDObjid *destids, int 
 }
 
 extern "C" void LDBackgroundLoad(LDHandle _db,
-				 double* walltime, double* cputime)
+				 LBRealType* walltime, LBRealType* cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->BackgroundLoad(walltime,cputime);
@@ -255,7 +273,7 @@ extern "C" void LDBackgroundLoad(LDHandle _db,
   return;
 }
 
-extern "C" void LDIdleTime(LDHandle _db,double* walltime)
+extern "C" void LDIdleTime(LDHandle _db,LBRealType* walltime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->IdleTime(walltime);
@@ -263,7 +281,7 @@ extern "C" void LDIdleTime(LDHandle _db,double* walltime)
   return;
 }
 
-extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
+extern "C" void LDTotalTime(LDHandle _db,LBRealType* walltime, LBRealType* cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->TotalTime(walltime,cputime);
@@ -271,9 +289,9 @@ extern "C" void LDTotalTime(LDHandle _db,double* walltime, double* cputime)
   return;
 }
 
-extern "C" void LDGetTime(LDHandle _db, double *total_walltime,
-                   double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime)
+extern "C" void LDGetTime(LDHandle _db, LBRealType *total_walltime,
+                   LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime)
 {
   LBDB *const db = (LBDB*)(_db.handle);
   db->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);

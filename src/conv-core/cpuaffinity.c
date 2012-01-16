@@ -15,8 +15,16 @@ cpu affinity.
 #include "converse.h"
 #include "sockRoutines.h"
 
-#define DEBUGP(x)   /* CmiPrintf x;  */
+#define DEBUGP(x)    /* CmiPrintf x;  */
 CpvDeclare(int, myCPUAffToCore);
+#if CMK_OS_IS_LINUX
+/* 
+ * /proc/<PID>/[task/<TID>]/stat file descriptor 
+ * Used to retrieve the info about which physical
+ * coer this process or thread is on.
+ **/
+CpvDeclare(void *, myProcStatFP);
+#endif
 
 #if CMK_HAS_SETAFFINITY || defined (_WIN32) || CMK_HAS_BINDPROCESSOR
 
@@ -34,6 +42,10 @@ CpvDeclare(int, myCPUAffToCore);
 //long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 #endif
 
+#if CMK_OS_IS_LINUX
+#include <sys/syscall.h>
+#endif
+
 #if defined(__APPLE__) 
 #include <Carbon/Carbon.h> /* Carbon APIs for Multiprocessing */
 #endif
@@ -43,7 +55,7 @@ CpvDeclare(int, myCPUAffToCore);
 #endif
 
 
-#define MAX_EXCLUDE      32
+#define MAX_EXCLUDE      64
 static int excludecore[MAX_EXCLUDE] = {-1};
 static int excludecount = 0;
 
@@ -261,22 +273,33 @@ int CmiPrintCPUAffinity()
 #endif
 }
 
-  /* returns which core is running on, only works on Linux */
-int CmiOnCore(void) {
-  FILE *fp;
-  int core=-1;
-  char str[128];
+int CmiOnCore() {
+#if CMK_OS_IS_LINUX
+  /*
+   * The info (task_cpu) is read from the Linux /proc virtual file system.
+   * The /proc/<PID>/[task/<TID>]/stat is explained in the Linux
+   * kernel documentation. The online one could be found in:
+   * http://www.mjmwired.net/kernel/Documentation/filesystems/proc.txt
+   * Based on the documentation, task_cpu is found at the 39th field in
+   * the stat file.
+   **/
+#define TASK_CPU_POS (39)
   int n;
-
-  fp = fopen("/proc/self/stat", "r");
-  if (fp == NULL) return -1;
-  for (n=0; n<39; n++)  {
-    fscanf(fp, "%s", str);
+  char str[128];
+  FILE *fp = (FILE *)CpvAccess(myProcStatFP);
+  if (fp == NULL){
+    printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+    return -1;
   }
-  fclose(fp);
-  core = atoi(str);
-
-  return core;
+  fseek(fp, 0, SEEK_SET);
+  for (n=0; n<TASK_CPU_POS; n++)  {
+    fscanf(fp, "%s", str);
+  }  
+  return atoi(str);
+#else
+  printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+  return -1;
+#endif
 }
 
 
@@ -300,7 +323,7 @@ typedef struct _rankMsg {
 
 static rankMsg *rankmsg = NULL;
 static CmmTable hostTable;
-static CmiNodeLock affLock = NULL;
+static CmiNodeLock affLock = 0;
 
 /* called on PE 0 */
 static void cpuAffinityHandler(void *m)
@@ -383,7 +406,6 @@ static void cpuAffinityRecvHandler(void *msg)
     CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
     CmiAbort("set cpu affinity abort!\n");
   }
-  /*CpvAccess(myCPUAffToCore) = myrank;*/
   CmiFree(m);
 }
 
@@ -454,7 +476,7 @@ static int search_pemap(char *pecoremap, int pe)
   return i;
 }
 
-#if CMK_CRAYXT
+#if CMK_CRAYXT || CMK_CRAYXE
 extern int getXTNodeID(int mpirank, int nummpiranks);
 #endif
 
@@ -466,18 +488,40 @@ void CmiInitCPUAffinity(char **argv)
   hostnameMsg  *msg;
   char *pemap = NULL;
   char *commap = NULL;
+  char *pemapfile = NULL;
  
   int show_affinity_flag;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
 
-  while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity")) 
+  while (CmiGetArgIntDesc(argv,"+excludecore", &exclude, "avoid core when setting cpuaffinity"))  {
     if (CmiMyRank() == 0) add_exclude(exclude);
+    affinity_flag = 1;
+  }
+
+  if (CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file")) {
+    FILE *fp;
+    char buf[128];
+    pemap = (char*)malloc(1024);
+    fp = fopen(pemapfile, "r");
+    if (fp == NULL) CmiAbort("pemapfile does not exist");
+    while (!feof(fp)) {
+      if (fgets(buf, 128, fp)) {
+        if (buf[strlen(buf)-1] == '\n') buf[strlen(buf)-1] = 0;
+        strcat(pemap, buf);
+      }
+    }
+    if (CmiMyPe()==0) CmiPrintf("Charm++> read from pemap file '%s': %s\n", pemapfile, pemap);
+  }
 
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
   if (pemap!=NULL && excludecount>0)
     CmiAbort("Charm++> +pemap can not be used with +excludecore.\n");
+
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
+
+  if (pemap!=NULL || commap!=NULL) affinity_flag = 1;
+
   show_affinity_flag = CmiGetArgFlagDesc(argv,"+showcpuaffinity",
 						"print cpu affinity");
 
@@ -486,18 +530,27 @@ void CmiInitCPUAffinity(char **argv)
   cpuAffinityRecvHandlerIdx =
        CmiRegisterHandler((CmiHandler)cpuAffinityRecvHandler);
 
-  CpvInitialize(int, myCPUAffToCore);
-  CpvAccess(myCPUAffToCore) = -1;
-
   if (CmiMyRank() ==0) {
      affLock = CmiCreateLock();
   }
+
+#if CMK_BLUEGENEP
+  if(affinity_flag){
+      affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on BG/P, thus ignored.\n");
+  }
+  if(show_affinity_flag){
+      show_affinity_flag = 0;
+      if(CmiMyPe()==0) CmiPrintf("Charm++> printing cpu affinity is not supported on BG/P.\n");
+  }
+#endif
 
   if (!affinity_flag) {
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;
   }
-  else if (CmiMyPe() == 0) {
+
+  if (CmiMyPe() == 0) {
      CmiPrintf("Charm++> cpu affinity enabled. \n");
      if (excludecount > 0) {
        CmiPrintf("Charm++> cpuaffinity excludes core: %d", excludecore[0]);
@@ -514,14 +567,14 @@ void CmiInitCPUAffinity(char **argv)
     CmiNodeAllBarrier();
     if (commap != NULL) {
       int mycore = search_pemap(commap, CmiMyPe()-CmiNumPes());
-      printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
+      if(CmiMyPe()-CmiNumPes()==0) printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
       if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
-      /*CpvAccess(myCPUAffToCore) = mycore;*/
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
     }
+#if !CMK_CRAYXT && !CMK_CRAYXE
     if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
     while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
@@ -531,6 +584,7 @@ void CmiInitCPUAffinity(char **argv)
 #endif
 #endif
     }
+#endif
     CmiNodeAllBarrier();
     if (show_affinity_flag) CmiPrintCPUAffinity();
     return;    /* comm thread return */
@@ -538,26 +592,49 @@ void CmiInitCPUAffinity(char **argv)
 
   if (pemap != NULL) {
     int mycore = search_pemap(pemap, CmiMyPe());
-    CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if(show_affinity_flag && CmiMyNode()==0) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
     if (mycore >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
     }
     if (CmiSetCPUAffinity(mycore) == -1) CmiAbort("set_cpu_affinity abort!");
-    /*CpvAccess(myCPUAffToCore) = mycore;*/
     CmiNodeAllBarrier();
     CmiNodeAllBarrier();
-    if (show_affinity_flag) CmiPrintCPUAffinity();
+    /* if (show_affinity_flag) CmiPrintCPUAffinity(); */
     return;
   }
 
+#if CMK_CRAYXT || CMK_CRAYXE
+//  if (CmiMyRank() == 0)
+  {
+    int numPes = CmiNumPes();
+    int numNodes = CmiNumNodes();
+
+    int myid = getXTNodeID(CmiMyNode(), CmiNumNodes());
+    int myrank;
+    int pe = CmiMyPe();
+    pe --;
+    while (pe >= 0) {
+      if (getXTNodeID(CmiNodeOf(pe), numNodes) != myid) break;
+      pe --;
+    }
+    myrank = CmiMyPe() - pe - 1;
+
+    if (-1 != CmiSetCPUAffinity(myrank)) {
+      DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
+    }
+    else{
+      CmiPrintf("Processor %d set affinity failed!\n", CmiMyPe());
+      CmiAbort("set cpu affinity abort!\n");
+    }
+  }
+  CmiNodeAllBarrier();
+  CmiNodeAllBarrier();
+#else
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-#if CMK_CRAYXT
-    ret = getXTNodeID(CmiMyNode(), CmiNumNodes());
-    memcpy(&myip, &ret, sizeof(int));
-#elif CMK_HAS_GETHOSTNAME
+#if CMK_HAS_GETHOSTNAME
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
 #else
     CmiAbort("Can not get unique name for the compute nodes. \n");
@@ -596,8 +673,32 @@ void CmiInitCPUAffinity(char **argv)
   affinity_doneflag++;
   CmiUnlock(affLock);
   CmiNodeAllBarrier();
+#endif
 
   if (show_affinity_flag) CmiPrintCPUAffinity();
+}
+
+/* called in ConverseCommonInit to initialize basic variables */
+void CmiInitCPUAffinityUtil(){
+    CpvInitialize(int, myCPUAffToCore);
+    CpvAccess(myCPUAffToCore) = -1;
+#if CMK_OS_IS_LINUX
+    CpvInitialize(void *, myProcStatFP);
+    char fname[64];
+    CmiLock(_smp_mutex);
+#if CMK_SMP
+    sprintf(fname, "/proc/%d/task/%d/stat", getpid(), syscall(SYS_gettid));
+#else
+    sprintf(fname, "/proc/%d/stat", getpid());
+#endif
+    CpvAccess(myProcStatFP) = (void *)fopen(fname, "r");
+    CmiUnlock(_smp_mutex);
+/*
+    if(CmiMyPe()==0 && CpvAccess(myProcStatFP) == NULL){
+        CmiPrintf("WARNING: ERROR IN OPENING FILE %s on PROC %d, CmiOnCore() SHOULDN'T BE CALLED\n", fname, CmiMyPe()); 
+    }
+*/
+#endif
 }
 
 #else           /* not supporting affinity */
@@ -611,18 +712,31 @@ int CmiPrintCPUAffinity()
 void CmiInitCPUAffinity(char **argv)
 {
   char *pemap = NULL;
+  char *pemapfile = NULL;
   char *commap = NULL;
   int excludecore = -1;
   int affinity_flag = CmiGetArgFlagDesc(argv,"+setcpuaffinity",
 						"set cpu affinity");
   while (CmiGetArgIntDesc(argv,"+excludecore",&excludecore, "avoid core when setting cpuaffinity"));
   CmiGetArgStringDesc(argv, "+pemap", &pemap, "define pe to core mapping");
+  CmiGetArgStringDesc(argv, "+pemapfile", &pemapfile, "define pe to core mapping file");
   CmiGetArgStringDesc(argv, "+commap", &commap, "define comm threads to core mapping");
   if (affinity_flag && CmiMyPe()==0)
     CmiPrintf("sched_setaffinity() is not supported, +setcpuaffinity disabled.\n");
-
-  CpvInitialize(int, myCPUAffToCore);
-  CpvAccess(myCPUAffToCore) = -1;
 }
 
+/* called in ConverseCommonInit to initialize basic variables */
+void CmiInitCPUAffinityUtil(){
+    CpvInitialize(int, myCPUAffToCore);
+    CpvAccess(myCPUAffToCore) = -1;
+#if CMK_OS_IS_LINUX	
+    CpvInitialize(void *, myProcStatFP);
+    CpvAccess(myProcStatFP) = NULL;
+ #endif
+}
+
+int CmiOnCore(){
+  printf("WARNING: CmiOnCore IS NOT SUPPORTED ON THIS PLATFORM\n");
+  return -1;
+}
 #endif

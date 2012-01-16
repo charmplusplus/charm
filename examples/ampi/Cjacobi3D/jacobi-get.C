@@ -3,7 +3,7 @@
 #include "mpi.h"
 #include <math.h>
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 extern void BgPrintf(char *);
 #define BGPRINTF(x)  if (thisIndex == 0) BgPrintf(x);
 #else

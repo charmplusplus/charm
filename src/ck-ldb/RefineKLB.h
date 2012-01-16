@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -15,13 +8,10 @@
 
 #include "CentralLB.h"
 #include "RefinerApprox.h"
+#include "RefineKLB.decl.h"
 
 class minheap;
 class maxheap;
-#include "RefineKLB.decl.h"
-
-#include "elements.h"
-#include "ckheap.h"
 
 void CreateRefineKLB();
 BaseLB *AllocateRefineKLB();
@@ -42,7 +32,7 @@ protected:
 public:
   RefineKLB(const CkLBOptions &);
   RefineKLB(CkMigrateMessage *m):CentralLB(m) { lbname = (char *)"RefineKLB"; }
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
 private:
   CmiBool QueryBalanceNow(int step) { return CmiTrue; }
 

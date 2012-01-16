@@ -1,4 +1,4 @@
-DIRS=megatest pingpong simplearrayhello loadbalancing chkpt delegation queue sdag
+DIRS=megatest pingpong simplearrayhello load_balancing chkpt delegation queue sdag ckAllocSysMsgTest
 
 all:
 	for d in $(DIRS); do \
@@ -12,7 +12,7 @@ test:
 
 # skip sdag, megatest and commtest
 bgtest:
-	for d in pingpong simplearrayhello loadbalancing chkpt delegation; do \
+	for d in pingpong simplearrayhello load_balancing chkpt delegation; do \
 		(cd $$d; $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 

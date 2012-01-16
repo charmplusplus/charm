@@ -2,45 +2,38 @@
 #include "ParFUM_internals.h"
 #include "MsaHashtable.h"
 
+using namespace MSA;
+
 void operator+=(Hashtuple &t, const Hashnode &n)
 {
     t.vec->push_back(n);
 }
 
-MsaHashtable::Add& MsaHashtable::getInitialAdd()
+MsaHashtable::Add MsaHashtable::getInitialAdd()
 {
 	if(initHandleGiven)
 		throw MSA_InvalidHandle();
 	
-	Add *a = new Add(*this);
-	sync();
 	initHandleGiven = true;
-	return *a;
+	return Add(&this->msa);
 }
 
-MsaHashtable::Add& MsaHashtable::syncToAdd(Read &r)
+MsaHashtable::Add MsaHashtable::Read::syncToAdd()
 {
-	r.checkInvalidate(this);
-	delete &r;
-	sync();
-	Add *a = new Add(*this);
-	return *a;
+    syncDone();
+    return Add(msa);
 }
 
-MsaHashtable::Read& MsaHashtable::syncToRead(Add &a)
+MsaHashtable::Read MsaHashtable::Add::syncToRead()
 {
-	a.checkInvalidate(this);
-	delete &a;
-	sync();
-	Read *r = new Read(*this);
-	return *r;
+	syncDone();
+	return Read(msa);
 }
 
 void MsaHashtable::Read::print()
 {
-	unsigned nEntries = MSA1DHASH::Read::msa.length();
 	char str[100];
-	for(int i=0;i<nEntries;i++){
+	for(int i=0; i < msa->length(); i++) {
 		const Hashtuple &t = get(i);
 		for(int j=0;j<t.vec->size();j++){
 			Hashnode &tuple = (*t.vec)[j];
@@ -53,8 +46,7 @@ void MsaHashtable::Read::print()
 
 int MsaHashtable::Add::addTuple(int *tuple,int nodesPerTuple,int chunk,int elementNo)
 {
-	int slots = msa.length();
-
+    int slots = msa->length();
 	// sort the tuples to get a canonical form
 	// bubble sort should do just as well since the number
 	// of nodes is less than 10.

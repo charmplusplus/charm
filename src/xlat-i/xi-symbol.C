@@ -67,6 +67,16 @@ char* fortranify(const char *s, const char *suff1="", const char *suff2="", cons
   return retVal;
 }
 
+void templateGuardBegin(bool templateOnly, XStr &str) {
+  if (templateOnly)
+    str << "#ifdef " << "CK_TEMPLATES_ONLY\n";
+  else
+    str << "#ifndef " << "CK_TEMPLATES_ONLY\n";
+}
+void templateGuardEnd(XStr &str) {
+  str << "#endif /* CK_TEMPLATES_ONLY */\n";
+}
+
 Value::Value(const char *s)
 {
   factor = 1;
@@ -125,9 +135,6 @@ public:
 	    }
 	}
 };
-
-static void (*nbp)(void*) = NULL;
-static void (*nbi)(int&) = NULL;
 
 template<typename T, typename U, typename A>
 void perElemGen(list<T*> &l, A& arg_, void (U::*fn_)(A&),
@@ -238,16 +245,19 @@ std::string TParamList::to_string()
 void
 Type::genProxyName(XStr &str,forWhom forElement)
 {
+  (void)str; (void)forElement;
   die("type::genProxyName called (INTERNAL ERROR)");
 }
 void
 Type::genIndexName(XStr &str)
 {
+  (void)str;
   die("type::genIndexName called (INTERNAL ERROR)");
 }
 void
 Type::genMsgProxyName(XStr &str)
 {
+  (void)str;
   die("type::genMsgProxyName called (INTERNAL ERROR)");
 }
 
@@ -482,8 +492,8 @@ Module::generate()
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
   genDefs(defstr);
+  templateGuardBegin(false, defstr);
   defstr <<
-  "#ifndef CK_TEMPLATES_ONLY\n"
   "void _register"<<name<<"(void)\n"
   "{\n"
   "  static int _done = 0; if(_done) return; _done = 1;\n";
@@ -500,7 +510,7 @@ Module::generate()
     "  _register"<<name<<"();\n"
     "}\n";
   }
-  defstr << "#endif\n";
+  templateGuardEnd(defstr);
   // defstr << "#endif"<<endx;
 
 
@@ -795,6 +805,7 @@ char *Chare::proxyPrefix(void)
 //Common multiple inheritance disambiguation code
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
+    (void)super;
     str<<"    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL) {\n";
     genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr);\n","");
     str<<"    }\n";
@@ -845,7 +856,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 			Entry *e=new Entry(ln,SMIGRATE,NULL,
 			  (char *)type->getBaseName(),
 			  new ParamList(new Parameter(line,
-				new PtrType(new NamedType((char *)"CkMigrateMessage")))),0,0,0);
+				new PtrType(new NamedType("CkMigrateMessage")))),0,0,0);
 			e->setChare(this);
 			list=new MemberList(e,list);
 		}
@@ -859,11 +870,7 @@ Chare::genRegisterMethodDef(XStr& str)
 {
   if(external || type->isTemplated())
     return;
-  if(!templat) {
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
-  } else {
-    str << "#ifdef CK_TEMPLATES_ONLY\n";
-  }
+  templateGuardBegin(isTemplated(), str);
   str <<  tspec() <<
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size,";
@@ -884,13 +891,8 @@ Chare::genRegisterMethodDef(XStr& str)
       str << "  " << baseName(0) << "::__sdag_register(); \n";
   }
   str << "}\n";
-  str << "#endif\n";
+  templateGuardEnd(str);
 }
-
-//extern void sdag_trans(XStr& classname, CParsedFile *input, XStr& output);
-
-
-
 
 void
 Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
@@ -902,10 +904,6 @@ Chare::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent)
     if(list)
       list->genPub(declstr, defstr, defconstr, connectPresent);
   }
-}
-
-void
-Chare::genSubRegisterMethodDef(XStr& str) {
 }
 
 void
@@ -987,7 +985,6 @@ Chare::genDecls(XStr& str)
       classname << baseName(0);
       resetNumbers();
       myParsedFile->doProcess(classname, sdag_output);
-     // sdag_trans(classname, myParsedFile, sdag_output);
       str << sdag_output;
     }
   }
@@ -1465,31 +1462,40 @@ Array::genSubDecls(XStr& str)
   //Add specialized indexing for these common types
     if (indexSuffix==(const char*)"1D")
     {
-    str <<
-    "    "<<etype<<" operator [] (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
-    "    "<<etype<<" operator () (int idx) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
+    str << "    " << etype << " operator [] (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n"
+	<< "    " << etype <<" operator () (int idx) const \n"
+	<< "        {return "<< etype <<"(ckGetArrayID(), CkArrayIndex1D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"2D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(i0,i1), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex2D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex2D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"3D") {
     str <<
     "    "<<etype<<" operator () (int i0,int i1,int i2) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(i0,i1,i2), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex3D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex3D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"4D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(i0,i1,i2,i3), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex4D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex4D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"5D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(i0,i1,i2,i3,i4), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex5D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex5D(idx), CK_DELCTOR_CALL);}\n";
     } else if (indexSuffix==(const char*)"6D") {
     str <<
     "    "<<etype<<" operator () (short int i0,short int i1,short int i2,short int i3,short int i4,short int i5) const \n"
-    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n";
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(i0,i1,i2,i3,i4,i5), CK_DELCTOR_CALL);}\n"
+    "    "<<etype<<" operator () (CkIndex6D idx) const \n"
+    "        {return "<<etype<<"(ckGetArrayID(), CkArrayIndex6D(idx), CK_DELCTOR_CALL);}\n";
     }
     str <<"    "<<ptype<<"(const CkArrayID &aid,CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
@@ -1511,9 +1517,9 @@ Array::genSubDecls(XStr& str)
 	<< "  { return " << super << "::ckGetSectionID(i); }\n"
 	<< "inline CkArrayID ckGetArrayIDn(int i) const\n"
 	<< "{return " << super << "::ckGetArrayIDn(i); } \n"
-	<< "inline CkArrayIndexMax *ckGetArrayElements() const\n"
+	<< "inline CkArrayIndex *ckGetArrayElements() const\n"
 	<< "  { return " << super << "::ckGetArrayElements(); }\n"
-	<< "inline CkArrayIndexMax *ckGetArrayElements(int i) const\n"
+	<< "inline CkArrayIndex *ckGetArrayElements(int i) const\n"
 	<< "{return " << super << "::ckGetArrayElements(i); }\n"
 	<< "inline int ckGetNumElements() const\n"
 	<< "  { return " << super << "::ckGetNumElements(); } \n"
@@ -1629,18 +1635,18 @@ Array::genSubDecls(XStr& str)
     "    } \n";
     }
 
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems, CK_DELCTOR_PARAM) \n"
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems, CK_DELCTOR_PARAM) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) \n"
+    str <<"    "<<ptype<<"(const CkArrayID &aid, CkArrayIndex *elems, int nElems) \n"
          "        :";genProxyNames(str, "",NULL, "(aid,elems,nElems)", ", ");str<<" {}\n";
     str <<"    "<<ptype<<"(const CkSectionID &sid)"
 	  "       :";genProxyNames(str, "",NULL, "(sid)", ", ");str<< " {}\n";
-	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems, CK_DELCTOR_PARAM) \n"
+	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems, CK_DELCTOR_PARAM) \n"
 	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems,CK_DELCTOR_ARGS)", ", ");str << " {}\n";
-	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndexMax const * const *elems, const int *nElems) \n"
+	str <<"    "<<ptype<<"(int n, const CkArrayID *aid, CkArrayIndex const * const *elems, const int *nElems) \n"
 	  "        :";genProxyNames(str, "",NULL, "(n,aid,elems,nElems)", ", ");str<<" {}\n";
     str <<
-    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndexMax *elems, int nElems) {\n"
+    "    static CkSectionID ckNew(const CkArrayID &aid, CkArrayIndex *elems, int nElems) {\n"
     "      return CkSectionID(aid, elems, nElems);\n"
     "    } \n";
   }
@@ -1804,25 +1810,15 @@ Chare::genDefs(XStr& str)
 
   }
 
+  templateGuardBegin(isTemplated(), str);
   if(!type->isTemplated()) {
-    if(!templat) {
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
-    } else {
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    }
     if(external) str << "extern ";
     str << tspec()<<" int "<<indexName()<<"::__idx";
     if(!external) str << "=0";
     str << ";\n";
-    str << "#endif\n";
   }
   if(list)
   {//Add definitions for all entry points
-    if(isTemplated())
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    else
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
-
     list->genDefs(str);
     if (hasElement)
     { //Define the entry points for the element
@@ -1834,21 +1830,15 @@ Chare::genDefs(XStr& str)
       }
       forElement=forIndividual;
     }
-    str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
   // define the python routines
   if (isPython()) {
-    if(isTemplated())
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    else
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
     str << "/* ---------------- python wrapper -------------- */\n";
 
     // write CkPy_MethodsCustom
     genPythonDefs(str);
-
-    str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
+  templateGuardEnd(str);
 
   if(!external && !type->isTemplated())
     genRegisterMethodDef(str);
@@ -1894,7 +1884,7 @@ Message::genAllocDecl(XStr &str)
   mtype << type;
   if(templat) templat->genVars(mtype);
   str << CIMsgClassAnsi;
-  str << "    CMessage_" << mtype << "() {};\n";
+  str << "    CMessage_" << mtype << "();\n";
   str << "    static void *pack(" << mtype << " *p);\n";
   str << "    static " << mtype << "* unpack(void* p);\n";
   num = numArrays();
@@ -1987,11 +1977,8 @@ Message::genDefs(XStr& str)
   if(templat) { templat->genSpec(tspec); tspec << " "; }
 
   str << "/* DEFS: "; print(str); str << " */\n";
-  if(!templat) {
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
-  } else {
-    str << "#ifdef CK_TEMPLATES_ONLY\n";
-  }
+
+  templateGuardBegin(templat, str);
   if(!(external||type->isTemplated())) {
 
     // new (size_t)
@@ -2033,30 +2020,33 @@ Message::genDefs(XStr& str)
     // alloc(int, size_t, int*, priobits)
     str << tspec << "void* " << ptype;
     str << "::alloc(int msgnum, size_t sz, int *sizes, int pb) {\n";
-    str << "  size_t offsets[" << numArray+1 << "];\n";
-    str << "  offsets[0] = ALIGN8(sz);\n";
+    str << "  CkpvAccess(_offsets)[0] = ALIGN8(sz);\n";
     for(i=0, count=0, ml=mvlist; i<num; i++, ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
         str << "  if(sizes==0)\n";
-        str << "    offsets[" << count+1 << "] = offsets[0];\n";
+        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[0];\n";
         str << "  else\n";
-        str << "    offsets[" << count+1 << "] = offsets[" << count << "] + ";
+        str << "    CkpvAccess(_offsets)[" << count+1 << "] = CkpvAccess(_offsets)[" << count << "] + ";
         str << "ALIGN8(sizeof(" << mv->type << ")*sizes[" << count << "]);\n";
         count ++;
       }
     }
-    str << "  " << mtype << " *newmsg = (" << mtype << " *) ";
-    str << "CkAllocMsg(msgnum, offsets[" << numArray << "], pb);\n";
+    str << "  return CkAllocMsg(msgnum, CkpvAccess(_offsets)[" << numArray << "], pb);\n";
+    str << "}\n";
+
+    str << tspec << ptype << "::" << proxyPrefix() << type << "() {\n";
+    str << mtype << " *newmsg = (" << mtype << " *)this;\n";
     for(i=0, count=0, ml=mvlist; i<num; i++,ml=ml->next) {
       mv = ml->msg_var;
       if (mv->isArray()) {
         str << "  newmsg->" << mv->name << " = (" << mv->type << " *) ";
-        str << "((char *)newmsg + offsets[" << count << "]);\n";
+        str << "((char *)newmsg + CkpvAccess(_offsets)[" << count << "]);\n";
         count ++;
       }
     }
-    str << "  return (void *) newmsg;\n}\n";
+    str << "}\n";
+
     int numCond = numConditional();
     str << tspec << "void " << ptype << "::dealloc(void *p) {\n";
     if (numCond > 0) {
@@ -2156,7 +2146,7 @@ Message::genDefs(XStr& str)
   } else {
     str << tspec << "int "<< ptype <<"::__idx=0;\n";
   }
-  str << "#endif\n";
+  templateGuardEnd(str);
 }
 
 void
@@ -2219,11 +2209,6 @@ Template::genDefs(XStr& str)
 {
   if(!external && entity)
     entity->genDefs(str);
-}
-
-void
-Template::genReg(XStr& str)
-{
 }
 
 int Template::genAccels_spe_c_funcBodies(XStr& str) {
@@ -2343,9 +2328,7 @@ Module::genDefs(XStr& str)
   #if CMK_CELL != 0
 
     if (!external) {
-
-      // Protected this functioni with CK_TEMPLATES_ONLY check
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
+      templateGuardBegin(false, str);
 
       // Create the registration function
       // NOTE: Add a check so modules won't register more than once.  It is possible that to modules
@@ -2367,7 +2350,7 @@ Module::genDefs(XStr& str)
 	    << "}\n";
       }
 
-      str << "#endif /*CK_TEMPLATES_ONLY*/\n";
+      templateGuardEnd(str);
     }
 
   #endif
@@ -2548,7 +2531,7 @@ Readonly::genDefs(XStr& str)
   }
 
   if (!msg) { //Generate a pup for this readonly
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
+    templateGuardBegin(false, str);
     str << "extern \"C\" void __xlater_roPup_"<<makeIdent(qName());
     str <<    "(void *_impl_pup_er) {\n";
     str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
@@ -2558,7 +2541,7 @@ Readonly::genDefs(XStr& str)
 	    str << "  _impl_p|"<<qName()<<";\n";
     }
     str << "}\n";
-    str << "#endif\n";
+    templateGuardEnd(str);
   }
 
   if (fortranMode) {
@@ -2754,7 +2737,7 @@ void CParsedFile::generateCode(XStr& op)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op);
+    cn->sdagCon->generateCode(op, cn);
   }
 }
 
@@ -2894,8 +2877,6 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   if (constructAppend != 0) {
     constructs->append(constructAppend);
   }
-  else
-    constructAppend = 0;
   elist = el;
 }
 
@@ -2922,7 +2903,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), name((char *)n), param(p), stacksize(sz), sdagCon(sc), intExpr(e), isConnect(connect), connectParam(connectPList)
+      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -3201,17 +3182,19 @@ void Entry::genArrayDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  LDObjHandle objHandle;\n  int objstopped=0;\n";
       str << "  "<<container->baseName()<<" *obj = ckLocal();\n";
-      str << "#ifndef CMK_OPTIMIZE\n";
+      str << "#if CMK_ERROR_CHECKING\n";
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,"<<epIdx()<<",CkMyPe(),0,((CkArrayIndexMax&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+      if (!isNoTrace())
+	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg," << epIdx()
+	      << ",CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n   ";
       if (!retType->isVoid()) str << retType<< " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n  obj->timingAfterCall(objHandle,&objstopped);\n#endif\n";
@@ -3271,7 +3254,7 @@ void Entry::genArrayStaticConstructorDecl(XStr& str)
         }
       }
   }
-  else if (container->getForWhom()==forSection);
+  else if (container->getForWhom()==forSection) { }
 }
 
 void Entry::genArrayStaticConstructorDefs(XStr& str)
@@ -3397,12 +3380,12 @@ void Entry::genGroupDefs(XStr& str)
 "    the_lbdb->ObjectStop(objHandle);\n"
 "  }\n"
 "#endif\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
       "#endif\n  ";
       if (!retType->isVoid()) str << retType << " retValue = ";
       str << "obj->"<<name<<"("<<unmarshallStr<<");\n";
-      str << "#ifndef CMK_OPTIMIZE\n"
+      str << "#if CMK_CHARMDEBUG\n"
       "  CpdAfterEp("<<epIdx()<<");\n"
       "#endif\n";
       str << "#if CMK_LBDB_ON\n"
@@ -4215,6 +4198,14 @@ void Entry::genIndexDecls(XStr& str)
     #endif
   }
 
+  if (isReductionTarget()) {
+      str << "    static int __idx_" << name << "_redn_wrapper;\n"
+          << "    static int " << name << "_redn_wrapper"
+          << "(CkReductionMsg* impl_msg) { return __idx_" << name << "_redn_wrapper; }\n"
+          << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
+          << container->baseName() <<"* impl_obj);\n";
+  }
+
   // call function declaration
   str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
     container->baseName()<<"* impl_obj);\n";
@@ -4383,7 +4374,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
    <<", new CkThrCallArg(impl_msg,impl_obj), "<<getStackSize()<<");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
   // str << "  CkpvAccess(_traces)->CkAddThreadListeners(tid);\n";
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   str << "  BgAttach(tid);\n";
 #endif
   str << "  CthAwaken(tid);\n";
@@ -4403,7 +4394,7 @@ XStr Entry::callThread(const XStr &procName,int prependEntryName)
   Generate the code to actually unmarshall the parameters and call
   the entry method.
 */
-void Entry::genCall(XStr& str, const XStr &preCall)
+void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
 {
   bool isArgcArgv=false;
   bool isMigMain=false;
@@ -4415,9 +4406,11 @@ void Entry::genCall(XStr& str, const XStr &preCall)
       (!param->isVoid()) && (!param->isCkArgMsgPtr())){
   	if(param->isCkMigMsgPtr()) isMigMain = true;
 	else isArgcArgv = true;
+  } else {
+    //Normal case: Unmarshall variables
+    if (redn_wrapper) param->beginRednWrapperUnmarshall(str);
+    else param->beginUnmarshall(str);
   }
-  else //Normal case: Unmarshall variables
-	param->beginUnmarshall(str);
 
   str << preCall;
   if (!isConstructor() && fortranMode) {
@@ -4481,9 +4474,9 @@ void Entry::genCall(XStr& str, const XStr &preCall)
 
     if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
         str<<"(m->argc,m->argv);\n";
-	str<<"  delete m;\n";
+        str<<"  delete m;\n";
     }else if(isMigMain){
-	str<<"((CkMigrateMessage*)impl_msg);\n";
+        str<<"((CkMigrateMessage*)impl_msg);\n";
     }
     else {//Normal case: unmarshall parameters (or just pass message)
         str<<"("; param->unmarshall(str); str<<");\n";
@@ -4507,11 +4500,28 @@ void Entry::genDefs(XStr& str)
   } else
     genChareDefs(str);
 
+  if (container->isMainChare() || container->isChare() || container->isForElement()) {
+      if (isReductionTarget()) {
+          XStr retStr; retStr<<retType;
+          str << retType << " " << indexName(); //makeDecl(retStr, 1)
+          str << "::_" << name << "_redn_wrapper(void* impl_msg, "
+              << container->baseName() << "* impl_obj)\n{\n"
+              << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
+          XStr precall;
+          genCall(str, precall, true);
+          str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
+      }
+  }
+
+
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
 
   //Define storage for entry point number
   str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
+  if (isReductionTarget()) {
+      str << " int " << indexName() << "::__idx_" << name <<"_redn_wrapper=0;\n";
+  }
 
   // DMK - Accel Support
   #if CMK_CELL != 0
@@ -4533,7 +4543,7 @@ void Entry::genDefs(XStr& str)
       preCall << "(void *) ";
     }
 
-    postCall << "  CkSendToFuture(impl_ref, impl_retMsg, impl_src);\n";
+    postCall << "  CkSendToFutureID(impl_ref, impl_retMsg, impl_src);\n";
   } else if(isExclusive()) {
   //An exclusive method
     if(!container->isNodeGroup()) die("only nodegroup methods can be exclusive",line);
@@ -4551,8 +4561,6 @@ void Entry::genDefs(XStr& str)
   }
 
   if (!isConstructor() && fortranMode) { // Fortran90
-      const char* msg_name = param->getBaseName();
-
       str << "/* FORTRAN SECTION */\n";
 
       XStr dim; dim << ((Array*)container)->dim();
@@ -4705,6 +4713,12 @@ void Entry::genReg(XStr& str)
   else if (param->isMessage() && !attribs&SMIGRATE) {
       str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
       str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
+  }
+  if (isReductionTarget()) {
+      str << "  " << "__idx_" << name << "_redn_wrapper = CkRegisterEp(\""
+          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\",\n"
+          << "     (CkCallFnPtr)_" << name << "_redn_wrapper, "
+          << "CMessage_CkReductionMsg::__idx, __idx, 0);";
   }
 }
 
@@ -5023,19 +5037,57 @@ void Parameter::copyPtr(XStr &str)
   }
 }
 
+void ParamList::beginRednWrapperUnmarshall(XStr &str)
+{
+    if (isMarshalled())
+    {
+        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
+        str<<"  PUP::fromMem implP(impl_buf);\n";
+        if (next != NULL && next->next == NULL) {
+            if (isArray()) {
+                Type* dt = next->param->type->deref();
+                str << "  " << dt << " " << next->param->name << "; "
+                    << next->param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << param->type->deref() << ");\n";
+                dt = param->type->deref();
+                str << "  " << dt << "* " << param->name << "; "
+                    << param->name << " = (" << dt << "*)impl_buf;\n";
+            } else if (next->isArray()) {
+                Type* dt = param->type->deref();
+                str << "  " << dt << " " << param->name << "; "
+                    << param->name << " = "
+                    << "((CkReductionMsg*)impl_msg)->getLength() / sizeof("
+                    << next->param->type->deref() << ");\n";
+                dt = next->param->type->deref();
+                str << "  " << dt << "* " << next->param->name << "; "
+                    << next->param->name << " = (" << dt << "*)impl_buf;\n";
+            } else {
+                callEach(&Parameter::beginUnmarshall,str);
+            }
+        } else {
+            str << "/* non two-param case */\n";
+            callEach(&Parameter::beginUnmarshall,str);
+            str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+            str<<"  /*Unmarshall arrays:*/\n";
+            callEach(&Parameter::unmarshallArrayData,str);
+        }
+    }
+}
+
 /** unmarshalling: unpack fields from flat buffer **/
 void ParamList::beginUnmarshall(XStr &str)
 {
-    	if (isMarshalled())
-    	{
-    		str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
-    		str<<"  PUP::fromMem implP(impl_buf);\n";
-    		callEach(&Parameter::beginUnmarshall,str);
-    		str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
-		str<<"  /*Unmarshall arrays:*/\n";
-		callEach(&Parameter::unmarshallArrayData,str);
-    	}
-	else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
+    if (isMarshalled())
+    {
+        str<<"  /*Unmarshall pup'd fields: ";print(str,0);str<<"*/\n";
+        str<<"  PUP::fromMem implP(impl_buf);\n";
+        callEach(&Parameter::beginUnmarshall,str);
+        str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
+        str<<"  /*Unmarshall arrays:*/\n";
+        callEach(&Parameter::unmarshallArrayData,str);
+    }
+    else if (isVoid()) {str<<"  CkFreeSysMsg(impl_msg);\n";}
 }
 void Parameter::beginUnmarshall(XStr &str)
 { //First pass: unpack pup'd entries
@@ -5101,7 +5153,7 @@ void Parameter::pupAllValues(XStr &str) {
 	  else str<<"  implDestP|"<<name<<";\n";
 	}
 }
-void ParamList::endUnmarshall(XStr &str)
+void ParamList::endUnmarshall(XStr &)
 {
 	/* Marshalled entry points now have the "SNOKEEP" attribute...
     	if (isMarshalled()) {
@@ -5123,10 +5175,6 @@ void InitCall::print(XStr& str)
 {
 	str<<"  initcall void "<<name<<"(void);\n";
 }
-void InitCall::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
-void InitCall::genDecls(XStr& str) {}
-void InitCall::genIndexDecls(XStr& str) {}
-void InitCall::genDefs(XStr& str) {}
 void InitCall::genReg(XStr& str)
 {
 	str<<"      _registerInitCall(";
@@ -5154,17 +5202,14 @@ void PUPableClass::print(XStr& str)
 	str << "  PUPable " << type <<";\n";
 	if (next) next->print(str);
 }
-void PUPableClass::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
-void PUPableClass::genDecls(XStr& str) {}
-void PUPableClass::genIndexDecls(XStr& str) {}
 void PUPableClass::genDefs(XStr& str)
 {
         if (type->isTemplated()) {
-                str << "#ifdef CK_TEMPLATES_ONLY\n";
+                templateGuardBegin(true, str);
                 str << "  #define _CHARMXI_CLASS_NAME " << type << "\n";
                 str << "  PUPable_def_template(_CHARMXI_CLASS_NAME)\n";
                 str << "  #undef _CHARMXI_CLASS_NAME\n";
-                str << "#endif\n";
+                templateGuardEnd(str);
         } else {
                 str<<"  PUPable_def(" << type << ")\n";
         }
@@ -5193,13 +5238,9 @@ void IncludeFile::print(XStr& str)
 {
 	str<<"  include "<<name<<";\n";
 }
-void IncludeFile::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void IncludeFile::genDecls(XStr& str) {
 	str<<"#include "<<name<<"\n";
 }
-void IncludeFile::genIndexDecls(XStr& str) {}
-void IncludeFile::genDefs(XStr& str) {}
-void IncludeFile::genReg(XStr& str) {}
 
 
 /***************** normal extern C Class support **************/
@@ -5212,13 +5253,9 @@ void ClassDeclaration::print(XStr& str)
 {
 	str<<"  class "<<name<<";\n";
 }
-void ClassDeclaration::genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent) {}
 void ClassDeclaration::genDecls(XStr& str) {
 	str<<"class "<<name<<";\n";
 }
-void ClassDeclaration::genIndexDecls(XStr& str) {}
-void ClassDeclaration::genDefs(XStr& str) {}
-void ClassDeclaration::genReg(XStr& str) {}
 
 
 /****************** Registration *****************/

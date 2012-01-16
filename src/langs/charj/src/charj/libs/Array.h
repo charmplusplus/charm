@@ -6,7 +6,11 @@
 #include <cstdlib>
 #include <cassert>
 #include <iostream>
+#include <algorithm>
 #include <charm++.h>
+#if CMK_HAS_CBLAS
+#include <cblas.h>
+#endif
 
 namespace CharjArray {
   class Range {
@@ -15,7 +19,7 @@ namespace CharjArray {
     Range() {}
     Range(int size_) : size(size_), start(0), stop(size) {}
     Range(int start_, int stop_) :
-      start(start_), stop(stop_), size(stop_ - start_) {
+    size(stop_ - start_), start(start_), stop(stop_) {
       assert(stop >= start);
     }
   };
@@ -42,13 +46,16 @@ namespace CharjArray {
       ranges[1] = range2;
     }
 
-    int size() {
+    int size() const {
       int total = 0;
+
       for (int i = 0; i < dims; i++)
 	if (total == 0)
 	  total = ranges[i].size;
 	else
 	  total *= ranges[i].size;
+
+      return total;
     }
   };
 
@@ -119,7 +126,7 @@ namespace CharjArray {
     }
 
     ~Array() {
-      delete block;
+      delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
@@ -130,7 +137,15 @@ namespace CharjArray {
       return block[atype::access(i, domain)];
     }
 
+    const type& operator[] (const int i) const {
+      return block[atype::access(i, domain)];
+    }
+
     type& access(const int i, const int j) {
+      return block[atype::access(i, j, domain)];
+    }
+
+    const type& access(const int i, const int j) const {
       return block[atype::access(i, j, domain)];
     }
 
@@ -138,16 +153,222 @@ namespace CharjArray {
       return new Array<type, dims, atype>(this, domain);
     }
 
-    int size() {
+    int size() const {
       return domain.size();
     }
 
-    int size(int dim) {
+    int size(int dim) const {
       return domain.ranges[dim].size;
     }
 
     void pup(PUP::er& p) { }
+
+    void fill(const type &t) {
+      for (int i = 0; i < domain.size(); ++i)
+	block[i] = t;
+    }
+
+    /// Do these arrays have the same shape and contents?
+    bool operator==(const Array &rhs) const
+    {
+      for (int i = 0; i < dims; ++i)
+	if (this->size(i) != rhs.size(i))
+	  return false;
+
+      for (int i = 0; i < this->size(); ++i)
+	if (this->block[i] != rhs.block[i])
+	  return false;
+
+      return true;
+    }
+    bool operator!=(const Array &rhs) const
+    {
+      return !(*this == rhs);
+    }
   };
+
+  /**
+     A local Matrix class for various sorts of linear-algebra work.
+
+     Indexed from 0, to reflect the C-heritage of Charj.
+   */
+  template <typename V, class atype = RowMajor<2> >
+  class Matrix : public Array<V, 2, atype>
+  {
+  public:
+    Matrix() { }
+    /// A square matrix
+    Matrix(unsigned int n) : Array<V,2,atype>(Domain<2>(n,n)) { }
+
+    /// A identity matrix
+    static Matrix* ident(int n)
+    {
+      Matrix *ret = new Matrix(n);
+      ret->fill(0);
+
+      for (int i = 0; i < n; ++i)
+	ret->access(i,i) = 1;
+
+      return ret;
+    }
+  };
+
+  template <typename T, class atype = RowMajor<1> >
+  class Vector : public Array<T, 1, atype>
+  {
+  public:
+    Vector() { }
+    Vector(unsigned int n) : Array<T, 1, atype>(Range(n)) { }
+  };
+
+  /// Compute the inner (dot) product v1^T * v2
+  // To compute v1^H * v2, call as dot(v1.C(), v2)
+  template<typename T, class atype1, class atype2>
+  T dot(const Vector<T, atype1> *pv1, const Vector<T, atype2> *pv2)
+  {
+    const Vector<T, atype1> &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    // XXX: This default initialization worries me some, since it
+    // won't necessarily be an additive identity for all T. - Phil
+    T ret = T();
+    int size = v1.size();
+    for (int i = 0; i < size; ++i)
+      ret += v1[i] * v2[i];
+    return ret;
+  }
+#if CMK_HAS_CBLAS
+  template <>
+  float dot<float, RowMajor<1>, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv1,
+					      const Vector<float, RowMajor<1> > *pv2)
+  {
+    const Vector<float, RowMajor<1> > &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    return cblas_sdot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
+  }
+  template <>
+  double dot<double, RowMajor<1>, RowMajor<1> >(const Vector<double, RowMajor<1> > *pv1,
+						const Vector<double, RowMajor<1> > *pv2)
+  {
+    const Vector<double, RowMajor<1> > &v1 = *pv1, &v2 = *pv2;
+    assert(v1.size() == v2.size());
+    return cblas_ddot(v1.size(), &(v1[0]), 1, &(v2[0]), 1);
+  }
+#endif
+
+  /// Computer the 1-norm of the given vector
+  template<typename T, class atype>
+    T norm1(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    // XXX: See comment about additive identity in dot(), above
+    T ret = T();
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      ret += v[i];
+    return ret;
+  }
+
+  /// Compute the Euclidean (2) norm of the given vector
+  template<typename T, class atype>
+    T norm2(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    // XXX: See comment about additive identity in dot(), above
+    T ret = T();
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      ret += v[i] * v[i];
+    return sqrt(ret);
+  }
+#if CMK_HAS_CBLAS
+  template<>
+    float norm2<float, RowMajor<1> >(const Vector<float, RowMajor<1> > *pv)
+  {
+    const Vector<float, RowMajor<1> > &v = *pv;
+    return cblas_snrm2(v.size(), &(v[0]), 1);
+  }
+  template<>
+    double norm2<double, RowMajor<1> >(const Vector<double, RowMajor<1> > *pv)
+  {
+    const Vector<double, RowMajor<1> > &v = *pv;
+    return cblas_dnrm2(v.size(), &(v[0]), 1);
+  }
+#endif
+
+  /// Compute the infinity (max) norm of the given vector
+  // Will fail on zero-length vectors
+  template<typename T, class atype>
+    T normI(const Vector<T, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    T ret = v[0];
+    int size = v.size();
+    for (int i = 1; i < size; ++i)
+      ret = max(ret, v[i]);
+    return ret;
+  }
+
+  /// Scale a vector by some constant
+  template<typename T, typename U, class atype>
+    void scale(const T &t, Vector<U, atype> *pv)
+  {
+    const Vector<T, atype> &v = *pv;
+    int size = v.size();
+    for (int i = 0; i < size; ++i)
+      v[i] = t * v[i];
+  }
+#if CMK_HAS_CBLAS
+  template<>
+    void scale<float, float, RowMajor<1> >(const float &t,
+					   Vector<float, RowMajor<1> > *pv)
+  {
+    Vector<float, RowMajor<1> > &v = *pv;
+    cblas_sscal(v.size(), t, &(v[0]), 1);
+  }
+  template<>
+    void scale<double, double, RowMajor<1> >(const double &t,
+					     Vector<double, RowMajor<1> > *pv)
+  {
+    Vector<double, RowMajor<1> > &v = *pv;
+    cblas_dscal(v.size(), t, &(v[0]), 1);
+  }
+#endif
+
+  /// Add one vector to a scaled version of another
+  template<typename T, typename U, class atype>
+    void axpy(const T &a, const Vector<U, atype> *px, Vector<U, atype> *py)
+  {
+    Vector<T, atype> &x = *px;
+    const Vector<T, atype> &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    for (int i = 0; i < size; ++i)
+      x[i] = a * x[i] + y[i];
+  }
+#if CMK_HAS_CBLAS
+  template<>
+    void axpy<float, float, RowMajor<1> >(const float &a,
+					  const Vector<float, RowMajor<1> > *px,
+					  Vector<float, RowMajor<1> > *py)
+  {
+    const Vector<float, RowMajor<1> > &x = *px;
+    Vector<float, RowMajor<1> > &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    cblas_saxpy(size, a, &(x[0]), 1, &(y[0]), 1);
+  }
+  template<>
+    void axpy<double, double, RowMajor<1> >(const double &a,
+					  const Vector<double, RowMajor<1> > *px,
+					  Vector<double, RowMajor<1> > *py)
+  {
+    const Vector<double, RowMajor<1> > &x = *px;
+    Vector<double, RowMajor<1> > &y = *py;
+    int size = x.size();
+    assert(size == y.size());
+    cblas_daxpy(size, a, &(x[0]), 1, &(y[0]), 1);
+  }
+#endif
 }
 
 #endif

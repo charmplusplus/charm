@@ -19,6 +19,8 @@ extern CkGroupID TheGVT;
 class SRtable;  // from srtable.h
 class SRentry;  // from srtable.h
 
+void POSE_sumGVTIterations(void *param, void *msg); 
+
 /// Message to send info to GVT 
 /** PVT sends processor virtual time and send/recv information to GVT.  
     GVT also sends info to next GVT index for next GVT invocation. */
@@ -64,7 +66,7 @@ public:
 /** Keeps track of local sends/recvs and computes processor virtual time.
     Interacts with GVT to obtain new estimate and invokes fossil 
     collection and forward execution on objects with new estimate. */
-class PVT : public Group {  
+class PVT : public Group {
  private:
 #ifndef CMK_OPTIMIZE
   localStat *localStats;
@@ -116,6 +118,9 @@ class PVT : public Group {
 #ifdef MEM_TEMPORAL
   TimePool *localTimePool;
 #endif
+  /// Circular buffer for storing debug prints
+  //  int debugBufferLoc, debugBufferWrapped, debugBufferDumped;
+  //  char debugBuffer[NUM_PVT_DEBUG_BUFFER_LINES][PVT_DEBUG_BUFFER_LINE_LENGTH];
 
  public:
   /// Basic Constructor
@@ -138,8 +143,11 @@ class PVT : public Group {
   void beginCheckpoint(eventMsg *m);
   /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
   void resumeAfterCheckpoint(eventMsg *m);
+  /// ENTRY: 
   void beginLoadbalancing(eventMsg *m);
+  /// ENTRY: 
   void resumeAfterLB(eventMsg *m);
+  /// ENTRY: 
   void callAtSync();
   void doneLB();
 
@@ -161,11 +169,51 @@ class PVT : public Group {
   void objUpdate(POSE_TimeType timestamp, int sr); 
   /// Update PVT with safeTime and send/recv table at timestamp
   void objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt);
-  /// Reduction point for PVT reports
+  /// ENTRY: Reduction point for PVT reports
   void reportReduce(UpdateMsg *);
   /// Adds incoming send/recv information to a list
   void addSR(SRentry **SRs, SRentry *e, POSE_TimeType og, int ne);
   inline int getNumObjs() { return objs.getNumObjs(); }
+/*
+  /// ENTRY: Dump the debug buffer
+  inline void dumpDebugBuffer() {
+    int endLoc;
+    if (!debugBufferDumped) {
+      debugBufferDumped = 1;
+      if (debugBufferLoc == 0) {
+	endLoc = NUM_PVT_DEBUG_BUFFER_LINES - 1;
+      } else {
+	endLoc = debugBufferLoc - 1;
+      }
+      if (debugBufferWrapped) {
+	int j = 0;
+	for (int i = debugBufferLoc; i < NUM_PVT_DEBUG_BUFFER_LINES; i++) {
+	  CkPrintf("{%5d} %s", j, debugBuffer[i]);
+	  j++;
+	}
+	if (debugBufferLoc != 0) {
+	  for (int i = 0; i <= endLoc; i++) {
+	    CkPrintf("{%5d} %s", j, debugBuffer[i]);
+	    j++;
+	  }
+	}
+      } else {
+	for (int i = 0; i <= endLoc; i++) {
+	  CkPrintf("{%5d} %s", i, debugBuffer[i]);
+	}
+      }
+    }
+  }
+  /// Write to the debug buffer
+  inline void printDebug(char *str) {
+    strcpy(debugBuffer[debugBufferLoc], str);
+    debugBufferLoc++;
+    if (debugBufferLoc >= NUM_PVT_DEBUG_BUFFER_LINES) {
+      debugBufferLoc = 0;
+      debugBufferWrapped = 1;
+    }
+  }
+*/
 };
 
 /// GVT chare group for estimating GVT
@@ -200,14 +248,26 @@ private:
   SRentry *SRs;
   int startOffset;
 public:
+  /// Counts the number of GVT interations
+  /* This count is contributed to a summation reduction upon
+     simulation completion for printout during one of the POSE exit
+     functions */
+  int gvtIterationCount;
+
   /// Basic Constructor
   GVT(void);
   /// Migration Constructor
   GVT(CkMigrateMessage *msg) : Group(msg) { };
   /// PUP routine
   void pup(PUP::er &p);
+  /// ENTRY: return the number of GVT iterations so far
+  inline int getGVTIterationCount() { return gvtIterationCount; }
   //Use this for Ccd calls
   //static void _runGVT(UpdateMsg *);
+  /// ENTRY: Contribute the current GVT iteration count to a summation reduction at the end of the simulation
+  inline void sumGVTIterationCounts() {
+    contribute(sizeof(int), &gvtIterationCount, CkReduction::sum_int, CkCallback(POSE_sumGVTIterations, NULL));
+  }
   /// ENTRY: Run the GVT
   /** Updates data fields with info from previous GVT estimation.  Fires
       off PVT calculations on all PVT branches. */

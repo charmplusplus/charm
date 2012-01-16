@@ -1,19 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include <charm++.h>
-
-#include "cklists.h"
-
+#include "elements.h"
 #include "ckheap.h"
 #include "NeighborCommLB.h"
 #include "topology.h"
@@ -32,7 +22,7 @@ NeighborCommLB::NeighborCommLB(const CkLBOptions &opt):NborBaseLB(opt)
     CkPrintf("[%d] NeighborCommLB created\n",CkMyPe());
 }
 
-LBMigrateMsg* NeighborCommLB::Strategy(NborBaseLB::LDStats* stats, int count)
+LBMigrateMsg* NeighborCommLB::Strategy(NborBaseLB::LDStats* stats, int n_nbrs)
 {
 bool _lb_debug=0;
 bool _lb_debug1=0;
@@ -45,9 +35,9 @@ bool _lb_debug2=0;
   double avgload = myload;
   int i;
   if (_lb_debug) 
-    CkPrintf("[%d] Neighbor Count = %d\n", CkMyPe(), count);
+    CkPrintf("[%d] Neighbor Count = %d\n", CkMyPe(), n_nbrs);
   
-  for(i=0; i < count; i++) {
+  for(i=0; i < n_nbrs; i++) {
     // Scale times we need appropriately for relative proc speeds
     const double scale =  ((double)myStats.pe_speed) 
       / stats[i].pe_speed;
@@ -57,7 +47,7 @@ bool _lb_debug2=0;
 
     avgload += (stats[i].total_walltime - stats[i].idletime);
   }
-  avgload /= (count+1);
+  avgload /= (n_nbrs + 1);
 
   CkVec<MigrateInfo*> migrateInfo;
 
@@ -169,8 +159,8 @@ bool _lb_debug2=0;
       for(i=0;i<myStats.n_objs;i++) {
         char temp[1000];
         char* now=temp;
-        sprintf(now, "[%d] Objs [%d] Load = %lf /%lf Comm Amount = %lf  ", 
-          CkMyPe(), i, myStats.objData[i].cpuTime, myStats.objData[i].wallTime, commamount[i] );
+        sprintf(now, "[%d] Objs [%d] Load = %lf Comm Amount = %lf  ", 
+          CkMyPe(), i, myStats.objData[i].wallTime, commamount[i] );
         now += strlen(now);
         sprintf(now, "Comm Center = [");
         now += strlen(now);
@@ -204,10 +194,10 @@ bool _lb_debug2=0;
       CkPrintf("[%d] Querying neighborhood topology...\n", CkMyPe() );
     }
 
-    procInfo* neighbors = new procInfo[count];
+    procInfo* neighbors = new procInfo[n_nbrs];
     {
       int *destProc = new int[dimension];
-      for(i=0; i < count; i++) {
+      for(i=0; i < n_nbrs; i++) {
         neighbors[i].id = stats[i].from_pe;
         neighbors[i].load = stats[i].total_walltime - stats[i].idletime;
         neighbors[i].difference = new int[dimension];
@@ -240,14 +230,15 @@ bool _lb_debug2=0;
       InfoRecord* obj;
       obj = objs.deleteMax();
       int bestDest = -1;
-      for(i=0; i<count;i++) if(neighbors[i].load +obj->load < myload - obj->load && (bestDest==-1 || neighbors[i].load < neighbors[bestDest].load)) {
-        double dotsum=0;
-        int j;
-        for(j=0; j<dimension; j++) dotsum += (commcenter[obj->Id][j] * neighbors[i].difference[j]);
-        if(myload - avgload < totalObjLoad || dotsum>0.5 || (dotsum>0 && objs.numElements()==0) || commamount[obj->Id]==0) {
-          bestDest = i;
-        }
-      }
+      for(i = 0; i < n_nbrs; i++)
+	if(neighbors[i].load +obj->load < myload - obj->load && (bestDest==-1 || neighbors[i].load < neighbors[bestDest].load)) {
+	  double dotsum=0;
+	  int j;
+	  for(j=0; j<dimension; j++) dotsum += (commcenter[obj->Id][j] * neighbors[i].difference[j]);
+	  if(myload - avgload < totalObjLoad || dotsum>0.5 || (dotsum>0 && objs.numElements()==0) || commamount[obj->Id]==0) {
+	    bestDest = i;
+	  }
+	}
       // Best place for the object
       if(bestDest != -1) {
         if(_lb_debug1) {
@@ -271,7 +262,7 @@ bool _lb_debug2=0;
       CkPrintf("[%d] Clearing Up...\n", CkMyPe());
     }
 
-    for(i=0;i<count;i++) {
+    for(i=0; i<n_nbrs; i++) {
       delete[] neighbors[i].difference;
     }
     delete[] neighbors;

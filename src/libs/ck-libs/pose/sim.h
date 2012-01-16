@@ -221,13 +221,28 @@ class sim : public CBase_sim {
   int *srVector;    
   /// Most recent GVT estimate
   POSE_TimeType lastGVT;
-  /// Relative start time, start time, end time and current time
+  /// Relative start time, end time, and current time
   /** Used to calculate degree of parallelism */
   double st, et, ct;
 #ifndef CMK_OPTIMIZE
   /// The local statistics collector
-  localStat *localStats; 
+  localStat *localStats;
+  /// Used to manually override the value of evt for DOP calculations
+  /* To override the ending virtual time of an entry method when doing
+     DOP analysis, add this code to the entry method:
+  #ifndef CMK_OPTIMIZE
+    if ((pose_config.stats) && (pose_config.dop)) {
+      parent->dop_override_evt = ovt + (POSE_TimeType)time_that_would_have_been_elapsed;
+    }
+  #endif
+  */
+  POSE_TimeType dop_override_evt;
 #endif
+  /// Used to count the number of commits (in [0]) and rollbacks (in [1])
+  /* These statistics are collected by the poser termination
+     reduction at the end of the simulation and printed in one of the
+     POSE exit functions */
+  long long basicStats[2];
   /// The local load balancer
   LBgroup *localLBG;
   /// Basic Constructor
@@ -236,7 +251,7 @@ class sim : public CBase_sim {
   /// Destructor
   virtual ~sim();
   /// Pack/unpack/sizing operator
-  virtual void pup(PUP::er &p);
+  void pup(PUP::er &p);
   /// Start a forward execution step on myStrat
   void Step();                 
   /// Start a prioritized forward execution step on myStrat
@@ -258,13 +273,25 @@ class sim : public CBase_sim {
   /// Migrate this poser to processor indicated in m
   inline void Migrate(destMsg *m) { migrateMe(m->destPE); }
   /// Terminate this poser, when everyone is terminated we exit 
-  inline void Terminate() { objID->terminus(); int i=1;contribute(sizeof(int),&i,CkReduction::sum_int,CkCallback(POSE_prepExit,NULL)); }
+  inline void Terminate() {
+    //#ifndef SEQUENTIAL_POSE
+    //    CkPrintf("Step[%d] total=%lld stepCalls=%d avg=%d RBs=%lld\n", 
+    //	     objID->myHandle, myStrat->timeLeashTotal, myStrat->stepCalls, 
+    //	     myStrat->timeLeashTotal / ((myStrat->stepCalls == 0) ? -1 : myStrat->stepCalls), basicStats[1]);
+    //#endif
+    objID->terminus();
+    contribute(2 * sizeof(long long), basicStats, CkReduction::sum_int, CkCallback(POSE_prepExit, NULL));
+  }
   /// In sequential mode, begin checkpoint after reaching quiescence
   void SeqBeginCheckpoint();
   /// In sequential mode, resume after checkpointing or restarting
   void SeqResumeAfterCheckpoint();
   /// Implement this for posers that will need to execute events when POSE reaches quiescence
   void invokeStopEvent() {}
+  /// Set simulationStartGVT in the rep
+  void setSimulationStartGVT(POSE_TimeType startGVT) {
+    objID->setSimulationStartGVT(startGVT);
+  }
   /// Return this poser's unique index on PVT branch
   inline int PVTindex() { return myPVTidx; }
   /// Test active flag

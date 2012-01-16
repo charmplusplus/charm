@@ -1,10 +1,11 @@
 # Default charmc options 
 # - changes to be passed in via simulation makefiles 
 # **************************************************
-CDIR=../../../..
-CHARMINC=$(CDIR)/include
-CHARMBIN=$(CDIR)/bin
-CHARMC=$(CDIR)/bin/charmc $(OPTS)
+CHARM=../../../..
+CHARMINC=$(CHARM)/include
+CHARMBIN=$(CHARM)/bin
+CHARMLIB=$(CHARM)/lib
+CHARMC=$(CHARM)/bin/charmc $(OPTS)
 POSEINCDIR = $(CHARMINC)/pose
 
 # POSE object definitions - DO NOT MODIFY
@@ -12,14 +13,13 @@ POSEINCDIR = $(CHARMINC)/pose
 OBJECTS=	eventID.o stats.o srtable.o cancel.o memory_temporal.o \
 		mempool.o pvtobj.o lbObject.o ldbal.o gvt.o event.o eqheap.o \
 		evq.o sim.o rep.o strat.o seq.o cons.o opt.o opt2.o opt3.o \
-		spec.o adapt.o adapt2.o adapt3.o adapt4.o pose.o
+		spec.o adapt.o adapt2.o adapt3.o adapt4.o adapt5.o pose.o
 SEQOBJECTS=     $(OBJECTS:.o=.seq.o)
 
 LIB = libmodulepose.a
 SEQLIB = libmoduleseqpose.a
-LIBDEST =  $(CDIR)/lib/$(LIB)
-LIBSEQDEST =  $(CDIR)/lib/$(SEQLIB)
-CIFILES = memory_temporal.def.h mempool.def.h gvt.def.h ldbal.def.h pose.def.h sim.def.h stats.def.h
+LIBDEST =  $(CHARMLIB)/$(LIB)
+LIBSEQDEST =  $(CHARMLIB)/$(SEQLIB)
 
 # POSE LIBRARY GENERATION RULES -
 # DO NOT MODIFY
@@ -37,76 +37,44 @@ $(LIBDEST):	$(OBJECTS)
 	$(CHARMC) -o $(LIBDEST) $(OBJECTS)
 	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
 	/bin/cp -f  *.h $(POSEINCDIR)
-	/bin/cp libmodulepose.dep $(CDIR)/lib/.
+	/bin/cp libmodulepose.dep $(CHARMLIB)/.
 	/bin/cp -f  etrans.pl $(CHARMBIN)
 
 $(LIBSEQDEST):	$(SEQOBJECTS)
 	$(CHARMC) -o $(LIBSEQDEST) $(SEQOBJECTS)
 	test ! -d $(POSEINCDIR) && mkdir $(POSEINCDIR) || true
 	/bin/cp -f  *.h $(POSEINCDIR)
-	/bin/cp libmodulepose.dep $(CDIR)/lib/libmoduleseqpose.dep
+	/bin/cp libmodulepose.dep $(CHARMLIB)/libmoduleseqpose.dep
 	/bin/cp -f  etrans.pl $(CHARMBIN)
 
-# POSE COMPILATION RULES 
-# - DO NOT MODIFY
-#***********************
+# *******************************
 
-
-sim.def.h : sim.decl.h
-
-sim.decl.h : sim.ci
-	$(CHARMC) sim.ci
-
-gvt.def.h: gvt.decl.h
-
-gvt.decl.h : gvt.ci
-	$(CHARMC) gvt.ci
-
-ldbal.def.h: ldbal.decl.h
-
-ldbal.decl.h : ldbal.ci
-	$(CHARMC) ldbal.ci
-
-pose.def.h: pose.decl.h
-
-pose.decl.h: pose.ci
-	$(CHARMC) pose.ci
-
-stats.def.h: stats.decl.h
-
-stats.decl.h : stats.ci
-	$(CHARMC) stats.ci
-
-mempool.def.h: mempool.decl.h 
-
-mempool.decl.h: mempool.ci
-	$(CHARMC) mempool.ci
-
-memory_temporal.def.h: memory_temporal.decl.h 
-
-memory_temporal.decl.h: memory_temporal.ci
-	$(CHARMC) memory_temporal.ci
-
-
-docs: pose.doxy adapt2.C adapt3.C adapt4.C eventID.C lbObject.C spec.C adapt2.h adapt3.h adapt4.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h memory_temporal.C mempool.C ldbal.ci srtable.h memory_temporal.ci mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci memory_temporal.h mempool.h pvtobj.h chpt.h seq.C cons.C evq.C rep.C stats.h seq.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
+docs: pose.doxy adapt2.C adapt3.C adapt4.C adapt5.C eventID.C lbObject.C spec.C adapt2.h adapt3.h adapt4.h adapt5.h eventID.h lbObject.h pose.C spec.h pose.ci adapt.C ldbal.C srtable.C adapt.h memory_temporal.C mempool.C ldbal.ci srtable.h memory_temporal.ci mempool.ci pose.h cancel.C stats.C cancel.h ldbal.h pvtobj.C stats.ci memory_temporal.h mempool.h pvtobj.h chpt.h seq.C cons.C evq.C rep.C stats.h seq.h cons.h evq.h opt2.C rep.h opt2.h strat.C eqheap.C gvt.C sim.C strat.h eqheap.h gvt.ci opt3.C sim.ci opt3.h event.C gvt.h opt.C sim.h event.h opt.h
 	doxygen pose.doxy
 
 # HOUSE-KEEPING RULES
 #********************
 clean:
 	rm -f charmrun conv-host *.o
-	rm -f *.def.h *.decl.h
+	rm -f *.def.h *.decl.h *.stamp
 	rm -f gmon.out #*#
 	rm -f core *~
 	rm -f TAGS *.headers
 	rm -f libmodulepose.a
 	rm -f libmoduleseqpose.a
 
-include Make.depends
-
+CIDEPENDFILE = Make.cidepends
 DEPENDFILE = Make.depends
 
-depends:  $(CIFILES)
+include $(CHARM)/tmp/charm.mk
+include $(CIDEPENDFILE)
+include $(DEPENDFILE)
+
+depends: cidepends.default
+	echo "Building ci files ..."
+	for cifile in $(wildcard *.ci); do \
+	    $(CHARMC) $$cifile ; \
+	done
 	echo "Creating " $(DEPENDFILE) " ..."; 	\
 	if [ -f $(DEPENDFILE) ]; then \
            /bin/cp -f $(DEPENDFILE) $(DEPENDFILE).old; \

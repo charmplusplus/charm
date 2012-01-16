@@ -33,9 +33,9 @@ class CharmMessageHolder : public MessageHolder{
  public:
     /// An unused, and probably unnecessary array that was used to avoid a memory corruption that clobbers members in this class. The bug has likely been fixed.
 
-#define BUGTRAPSIZE 5000
+  //#define BUGTRAPSIZE 5000
 
-    int bug_trap[BUGTRAPSIZE];
+   //    int bug_trap[BUGTRAPSIZE];
 
     /// The section information for an enqueued multicast message
     CkSectionID *sec_id;
@@ -53,14 +53,17 @@ class CharmMessageHolder : public MessageHolder{
       type = t;
       sec_id = NULL;
       copy_of_sec_id = NULL;
+      /*
       for(int i=0;i<BUGTRAPSIZE;i++){
 	bug_trap[i] = 0;
       }
       
       checkme();
+      */
     }
     
     /// Verfiy that the bug_trap array has not been corrupted. Noone should ever write to that array.
+    /*
     void checkme() {
 	for(int i=0;i<BUGTRAPSIZE;i++){
 	  if(bug_trap[i] != 0){
@@ -69,31 +72,32 @@ class CharmMessageHolder : public MessageHolder{
 	  }
 	}
     }
-
+    */
 
     CharmMessageHolder(CkMigrateMessage *m) : MessageHolder(m) {
+      /*
       for(int i=0;i<BUGTRAPSIZE;i++){
 	bug_trap[i] = 0;
       }
       checkme();
+      */
     }
     
 
 
     ~CharmMessageHolder(){
-      checkme();
+      //      checkme();
     }
 
     inline char * getCharmMessage() {
         return (char *)EnvToUsr((envelope *) data);
-	checkme();
     }
     
     /// Store a local copy of the sec_id, so I can use it later.
     inline void saveCopyOf_sec_id(){
       //      ComlibPrintf("[%d] saveCopyOf_sec_id sec_id=%p NULL=%d\n", CkMyPe(), sec_id, NULL);
 
-      checkme();
+      //      checkme();
 
       if(sec_id!=NULL){
 
@@ -104,7 +108,7 @@ class CharmMessageHolder : public MessageHolder{
 
 	// Create a new CkSectionID, allocating its members
 	copy_of_sec_id = new CkSectionID();
-	copy_of_sec_id->_elems = new CkArrayIndexMax[sec_id->_nElems];
+	copy_of_sec_id->_elems = new CkArrayIndex[sec_id->_nElems];
 	copy_of_sec_id->pelist = new int[sec_id->npes];
 	
 	// Copy in the values
@@ -123,7 +127,7 @@ class CharmMessageHolder : public MessageHolder{
 	//	ComlibPrintf("saving copy of sec_id into %p\n", copy_of_sec_id);
       }
 
-      checkme();
+      //      checkme();
 
     }
 
@@ -136,7 +140,7 @@ class CharmMessageHolder : public MessageHolder{
 /* 	copy_of_sec_id = NULL; */
 /*       } */
 
-      checkme();
+//      checkme();
 
     }
 
@@ -218,24 +222,24 @@ class ComlibArrayInfo {
     /**  Destination indices that are local to this PE 
 	 (as determined by the bracketed counting scheme from a previous iteration)  
     */
-    CkVec<CkArrayIndexMax> src_elements; 
+    CkVec<CkArrayIndex> src_elements; 
 
     /**  Destination indices that are currently being updated. 
 	 At the beginning of the next iteration these will be 
 	 moved into dest_elements by useNewDestinationList()
     */
-    CkVec<CkArrayIndexMax> new_src_elements;
+    CkVec<CkArrayIndex> new_src_elements;
 
     /**  Destination indices that are local to this PE 
 	 (as determined by the bracketed counting scheme from a previous iteration)  
     */
-    CkVec<CkArrayIndexMax> dest_elements; 
+    CkVec<CkArrayIndex> dest_elements; 
 
     /**  Destination indices that are currently being updated. 
 	 At the beginning of the next iteration these will be 
 	 moved into dest_elements by useNewDestinationList()
     */
-    CkVec<CkArrayIndexMax> new_dest_elements;
+    CkVec<CkArrayIndex> new_dest_elements;
 
     int isSrcArray;
     int isDestArray;
@@ -253,32 +257,32 @@ class ComlibArrayInfo {
 	The list of array indices should be the whole portion of the array involved in the strategy.
 	The non-local array elements will be cleaned up inside purge() at migration of the strategy
     */
-    void setSourceArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
+    void setSourceArray(CkArrayID aid, CkArrayIndex *e=0, int nind=0);
     int isSourceArray(){return isSrcArray;}
     CkArrayID getSourceArrayID() {return src_aid;}
-    const CkVec<CkArrayIndexMax> & getSourceElements() {return src_elements;}
+    const CkVec<CkArrayIndex> & getSourceElements() {return src_elements;}
 
     /** Set the destination array used for this strategy. 
 	The list of array indices should be the whole portion of the array involved in the strategy.
 	The non-local array elements will be cleaned up inside purge() at migration of the strategy
     */
-    void setDestinationArray(CkArrayID aid, CkArrayIndexMax *e=0, int nind=0);
+    void setDestinationArray(CkArrayID aid, CkArrayIndex *e=0, int nind=0);
     int isDestinationArray(){return isDestArray;}
     CkArrayID getDestinationArrayID() {return dest_aid;}
-    const CkVec<CkArrayIndexMax> & getDestinationElements() {return dest_elements;}
+    const CkVec<CkArrayIndex> & getDestinationElements() {return dest_elements;}
 
     /// Get the number of source array elements
     int getTotalSrc() {return totalSrc;}
     int getLocalSrc() {return src_elements.size();}
 
     /** Add a destination object that is local to this PE to list used in future iterations */
-    void addNewLocalDestination(const CkArrayIndexMax &e) {
+    void addNewLocalDestination(const CkArrayIndex &e) {
         CkAssert(e.nInts > 0);
 	new_dest_elements.push_back(e);
     }
 
     /** Add a source object that is local to this PE to list used in future iterations */
-    void addNewLocalSource(const CkArrayIndexMax &e) {
+    void addNewLocalSource(const CkArrayIndex &e) {
         CkAssert(e.nInts > 0);
 	new_src_elements.push_back(e);
     }
@@ -307,7 +311,7 @@ class ComlibArrayInfo {
     void newElement(CkArrayID &id, const CkArrayIndex &idx);
 
     void localBroadcast(envelope *env);
-    static int localMulticast(CkVec<CkArrayIndexMax> *idx_vec,envelope *env);
+    static int localMulticast(CkVec<CkArrayIndex> *idx_vec,envelope *env);
     static void deliver(envelope *env);
 
     /// This routine is called only once at the beginning and will take the list
@@ -329,9 +333,9 @@ class ComlibArrayInfo {
     specified processor. Currently used by ComlibArrayInfo */
 class ComlibElementIterator : public CkLocIterator {
  public:
-  CkVec<CkArrayIndexMax> *list;
+  CkVec<CkArrayIndex> *list;
 
-  ComlibElementIterator(CkVec<CkArrayIndexMax> *l) : CkLocIterator() {
+  ComlibElementIterator(CkVec<CkArrayIndex> *l) : CkLocIterator() {
     list = l;
   }
 
@@ -360,10 +364,10 @@ class CharmStrategy {
 
 
     /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
-    int deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices );
+    int deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndex* indices );
     
     /** Deliver a message to a set of indices using the array manager. Indices can be local or remote. */
-    inline void deliverToIndices(void *msg, const CkVec< CkArrayIndexMax > &indices ){
+    inline void deliverToIndices(void *msg, const CkVec< CkArrayIndex > &indices ){
       deliverToIndices(msg, indices.size(), indices.getVec() );
     }
     
@@ -417,7 +421,7 @@ class CharmStrategy {
 
 //API calls which will be valid when communication library is not linked
 void ComlibNotifyMigrationDone();
-//int ComlibGetLastKnown(CkArrayID aid, CkArrayIndexMax idx);
+//int ComlibGetLastKnown(CkArrayID aid, CkArrayIndex idx);
 
 
 #endif

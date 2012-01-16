@@ -14,7 +14,6 @@
 #include <math.h>
 
 //#include "LBDatabase.h"
-#include "charm.h"
 #include "cklists.h"
 #include "topology.h"
 
@@ -153,16 +152,16 @@ public:
 	
 	int get_hop_count(int src,int dest){
 		
-		//CkPrintf("in smp get_hop_count\n");
+		//CmiPrintf("in smp get_hop_count\n");
 		int a = src/ppn;
 		int b = dest/ppn;
 		
 		if(a!=b){
-			//CkPrintf("2 returned\n");
+			//CmiPrintf("2 returned\n");
 			return 2;
 		}
 		else{
-			//CkPrintf("1 returned\n");
+			//CmiPrintf("1 returned\n");
 			return 1;
 		}
 	}
@@ -481,7 +480,7 @@ int LBTopo_torus3d::get_hop_count(int src,int dest){
 
 	int xdist=0,ydist=0,zdist=0;
 	
-	//CkPrintf("just a chk........\n");
+	//CmiPrintf("just a chk........\n");
 	xdist = x_dest-x_src;
 	if(xdist<0) xdist=-xdist;
 	if((width-xdist) < xdist)
@@ -661,13 +660,13 @@ public:
   }
   //Note: if abs(difference)*2 = cardinality, the difference is set to zero
   virtual bool coordinate_difference(const int* my_coordinates, const int* target_coordinates, int* difference) { 
-//    CkPrintf("[%d] coordiate_difference begin\n", CkMyPe());
+//    CmiPrintf("[%d] coordiate_difference begin\n", CkMyPe());
     CmiAssert( my_coordinates != NULL);
     CmiAssert( target_coordinates != NULL);
     CmiAssert( difference != NULL);
-//    CkPrintf("[%d] after assert\n", CkMyPe());
+//    CmiPrintf("[%d] after assert\n", CkMyPe());
     for(int i=0;i<dimension;i++) {
-//      CkPrintf("[%d] coordiate_difference iteration %d\n", i);
+//      CmiPrintf("[%d] coordiate_difference iteration %d\n", i);
       difference[i] = target_coordinates[i] - my_coordinates[i];
       if (abs(difference[i])*2 > Cardinality[i]) {
         difference[i] += (difference[i]>0) ? -Cardinality[i] : Cardinality[i];
@@ -675,7 +674,7 @@ public:
         difference[i] = 0;
       }
     }
-//    CkPrintf("[%d] coordiate_difference just before return\n");
+//    CmiPrintf("[%d] coordiate_difference just before return\n");
     return true;
   }
   //Note: if abs(difference)*2 = cardinality, the difference is set to zero
@@ -715,6 +714,8 @@ LBTOPO_MACRO(LBTopo_torus_nd_10)
 //  TORUS ND  and SMP Awareness
 //  added by Yanhua Sun 
 
+//#define YHDEBUG
+
 template <int dimension>
 class LBTopo_torus_nd_smp: public LBTopology {
 private:
@@ -748,8 +749,8 @@ public:
     CmiAssert(dimension>=1 && dimension<=32);
     CmiAssert(p>=1);
 
-    int ppn = CmiNumPesOnPhysicalNode(0);
-    int NumOfNodes = CmiNumPhysicalNodes();
+    ppn = CmiNumPesOnPhysicalNode(0);
+    NumOfNodes = CmiNumPhysicalNodes();
 
     Cardinality = new int[dimension];
     TempCo = new int[dimension];
@@ -771,7 +772,7 @@ public:
     delete[] TempCo;
   }
   virtual int max_neighbors() {
-    return dimension*2;
+    return (dimension+ppn)*2;
   }
   virtual void neighbors(int mype, int* _n, int &nb) {
     nb = 0;
@@ -782,7 +783,7 @@ public:
     int _ppn_ = CmiNumPesOnPhysicalNode(node);
     CmiGetPesOnPhysicalNode(node, &nodePeList, &numpes); 
 #ifdef YHDEBUG
-    CmiPrintf(" 22222222222222ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", _ppn_, NumOfNodes, rank, node, numpes);
+    CmiPrintf(" PE[%d] ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", mype, _ppn_, NumOfNodes, rank, node, numpes);
 #endif   
     for(int i=0; i<numpes; i++)
     {
@@ -799,14 +800,15 @@ public:
     {
         for(int j=0; j<dimension*2; j++)
         {
-            _n[nb] = (mype+1)%npes;//GetNeighborID(mype, j);
+            //_n[nb] = (mype+1)%npes;//GetNeighborID(mype, j);
+            _n[nb] = GetNeighborID(mype, j);
             /* the first processors in other nodes */
             if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
         }
     }
 
 #ifdef YHDEBUG
-  CmiPrintf(" Yes my neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", nb, _ppn_, NumOfNodes, rank, node, numpes);
+  CmiPrintf(" [%d] neighbor = %d ppn=%d, NumOfNodes=%d, rank=%d, node=%d, numpes=%d\n", mype, nb, _ppn_, NumOfNodes, rank, node, numpes);
 #endif
   }
   virtual int get_dimension() {
@@ -894,7 +896,7 @@ private:
 	
 public:
 	LBTopo_itorus_nd(int p): LBTopology(p) {
-  	CkPrintf("Irregular torus created\n");
+  	CmiPrintf("Irregular torus created\n");
   	dim = new int[dimension];
 		tempCoor = new int[dimension];
 
@@ -1002,7 +1004,7 @@ private:
 	
 public:
 	LBTopo_imesh_nd(int p): LBTopology(p) {
-  	CkPrintf("Irregular mesh created\n");
+  	CmiPrintf("Irregular mesh created\n");
   	dim = new int[dimension];
 	tempCoor = new int[dimension];
 
@@ -1043,10 +1045,10 @@ public:
       _n[nb] = GetNeighborID(mype, i);
       if (_n[nb]!=mype && (nb==0 || _n[nb-1]!=_n[nb]) ) nb++;
     }
-    /*CkPrintf("Nhs[%d]:",mype);
+    /*CmiPrintf("Nhs[%d]:",mype);
     for(int i=0;i<nb;i++)
-      CkPrintf("%d ",_n[i]);
-    CkPrintf("\n");*/
+      CmiPrintf("%d ",_n[i]);
+    CmiPrintf("\n");*/
   }
 
 	int GetNeighborID(int ProcessorID, int number) {

@@ -1,0 +1,94 @@
+Introduction
+------------
+
+This tool was developed in the context of BigSim. The BigSim framework
+can be used to predict the performance of a given application on a
+given target machine. One of the key steps in doing that is to develop
+model of execution times of the SEBs based on their inputs. Since an
+application may have a large number of SEBs, there is the choice of
+the SEBs that we would like to trace. Typically, these should be the
+SEBs which are computation intensive and account for a major fraction
+of the CPU time of the application. We can build models using the GNU
+library and/or by some other technique and supply them as an input to
+this tool.
+
+This tool takes such models, param files and tracefiles as input and
+rewrite new bglog files. This tool was used for the paper "Simulating
+Large Scale Parallel Applications using Statistical Models for
+Sequential Execution Blocks". Please read the paper for further
+details. Please contact if you have any questions.  Contact:
+gagan@uiuc.edu, idooley2@uiuc.edu
+
+Note: This code was derived from the rewrite log tool developed by issac.
+
+
+Building / Compiling :
+  
+  Install GSL, the GNU Scientific Library. This is required 
+  to perform least square curve fitting. Make sure the local
+  makefile points to your copy of gsl. Currently this is 
+  in the variable "LIBS"
+
+  Build charm/bigemulator
+
+  Modify the file interpolatelog.C to match your particular tastes.
+    OUTPUTDIR         specifies a directory for the new logfiles
+
+    CYCLE_TIMES_FILE  specifies the file which contains accurate 
+                      timing information
+
+    time_factor       specifies a multiplier used to scale any times 
+                      that are not replaced by times approximated
+                      from available cycle-accurate times
+
+  Make the interpolation tool: 
+    > make
+
+Modifying Application:
+
+  Insert startTraceBigSim() call before a compute kernel. Add an 
+  endTraceBigSim() call after the kernel. Currently the first call
+  takes no parameters, and the second takes a name for the event
+  that is being bracketed, followed by between 0 and 20 parameters 
+  describing the computation. 
+
+  You will find the definitions of these functions in traceBigSim/
+
+  startTraceBigSim();
+  // Some serial computational kernel goes here
+  endTraceBigSim("EventName",param1,param2,param3);
+
+  Thes calls will time and produce output(to STDOUT) that lists 
+  the time, parameters, and possibly some performance counters
+  for the code executed between the calls. 
+
+  A sample output file: traceBigSim/sample_namd_timings.txt
+
+  Run the application, in serial or parallel to produce a good
+  set of samples of the timings. These timings will be used 
+  to predict the performance for the events appearing in a
+  bgTrace log files. Put all of these timings in the file
+  reference by CYCLE_TIMES_FILE in interpolatelog.C. You can 
+  grep out only the lines containing TRACEBIGSIM, and can 
+  concatenate them all together into one big file.
+
+Format of the model file
+
+  We assume that the model is linear. Each line in this "model file"
+  contains the name of the function followed by the coefficient of the
+  parameters which are traced. The last term corresponds to the
+  constant term in the model.
+ 
+Running The interpolation tool:
+  
+  Run a parallel version of the application to generate the bgTrace* 
+  and param* files.
+
+  A sample model file is also provided corresponding to NAMD.
+
+  Run the interpolation tool from a directory containing the bgTrace*,
+  param*, model and CYCLE_TIMES_FILE files. If you want these files to
+  be located elsewhere, you should be able to modify interpolatelog.C
+  and EventInterpolator.C easily.
+
+  A new set of bgTrace files will be produced.

@@ -26,6 +26,13 @@ varsizetest.o: \
 	varsizetest.decl.h \
 	varsizetest.def.h
 	$(CHARMC) -o varsizetest.o varsizetest.C
+varsizetest2.o: \
+	varsizetest2.C \
+	varsizetest2.h \
+	megatest.h \
+	varsizetest2.decl.h \
+	varsizetest2.def.h
+	$(CHARMC) -o varsizetest2.o varsizetest2.C
 varraystest.o: \
 	varraystest.C \
 	varraystest.h \
@@ -198,3 +205,8 @@ inlineem.o: \
 	megatest.h \
 	inlineem.def.h
 	$(CHARMC) -o inlineem.o inlineem.C
+completion_test.o: \
+	completion_test.C \
+	completion_test.decl.h \
+	completion_test.def.h
+	$(CHARMC) -o completion_test.o completion_test.C

@@ -1,9 +1,9 @@
 #ifndef BLUE_DEFS_H
 #define BLUE_DEFS_H
 
-#define BLUEGENE_TIMING     	1
+#define BIGSIM_TIMING     	1
 
-#if CMK_HAS_VALUES_H
+#if (CMK_HAS_VALUES_H && (!CMK_BLUEGENEQ))
 #   include <values.h>
 #   define INVALIDTIME  MAXDOUBLE
 #   define CMK_MAXINT   MAXINT
@@ -55,7 +55,7 @@ inline int isEqual(double v1, double v2){
 }
 
 
-#if BLUEGENE_TIMING
+#if BIGSIM_TIMING
 
 #define BG_ENTRYSTART(m)  \
 	if (genTimeLog) tTIMELINEREC.logEntryStart(m);

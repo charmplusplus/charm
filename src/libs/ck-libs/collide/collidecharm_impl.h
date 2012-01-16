@@ -94,7 +94,7 @@ method to be called from each processor.  To handle
 non-autonomous cases, calls "pleaseAdvance" when an advance
 is first expected from that PE.
 */
-class syncReductionMgr : public Group 
+class syncReductionMgr : public CBase_syncReductionMgr
 {
 	CProxy_syncReductionMgr thisproxy;
 	void status(const char *msg) {
@@ -144,7 +144,7 @@ A single Collision operation consists of:
 	-client group accepts the CollisionLists
 */
 
-class collideMgr : public syncReductionMgr
+class collideMgr : public CBase_collideMgr
 {
 	CProxy_collideMgr thisproxy;
 private:
@@ -195,7 +195,7 @@ Collisions may occur.  Each step it accumulates triangle
 lists and then computes their intersection
 */
 
-class collideVoxel : public ArrayElement3D
+class collideVoxel : public CBase_collideVoxel
 {
 	growableBufferT<objListMsg *> msgs;
 	void status(const char *msg);

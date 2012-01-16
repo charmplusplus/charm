@@ -1,5 +1,9 @@
 extern void (*notify_crash_fn)(int);
 
+/**
+ * @brief Handles the crash announcement message.
+ * For double in-memory checkpoint, it calls the notify crash function.
+ */
 static void crash_node_handle(ChMessage *m){
 	ChMessageInt_t *d = (ChMessageInt_t *)m->data;
 	int crashed_node = ChMessageInt(d[0]);

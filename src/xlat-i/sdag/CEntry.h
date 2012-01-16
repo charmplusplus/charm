@@ -1,23 +1,16 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CEntry_H_
 #define _CEntry_H_
 
 #include "xi-util.h"
 #include "sdag-globals.h"
 #include "CList.h"
-#include "CStateVar.h"
 
 namespace xi {
 
 class Entry;
 class SdagConstruct;
 class ParamList;
+class CStateVar;
 
 class CEntry{
   public:

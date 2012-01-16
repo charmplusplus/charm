@@ -26,10 +26,10 @@ corresponding to the \index{chare}chare containing that entry method.  The
 syntax of this call is as follows:
 
 \begin{alltt}
-\kw{myIdx}=CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
+\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
-where \uw{ChareName} is the name of the chare containing
+where \uw{ChareClass} is the C++ class of the chare containing
 the desired entry method, \uw{EntryMethod} is the name of that entry method,
 and \uw{parameters} are the parameters taken by the method.
 These parameters are only used to resolve the proper \uw{EntryMethod};
@@ -62,3 +62,94 @@ method it would suspend the main thread of execution of the processor from
 which \kw{CkWaitQD} was called and the entire program would come to a grinding
 halt on that processor.
 
+\subsubsection{Completion Detection}
+
+Completion detection is a method for automatically detecting
+completion of a distributed process within an application. It is a
+module, and therefore is only included when ``-module completion'' is
+specified when linking your application.
+
+Completion is reached within a distributed process when the
+participating objects have produced and consumed an equal number of
+events globally. The number of global events that will be produced and
+consumed does not need to be known, just the number of producers is
+required.
+
+First, the detector should be constructed. This call would typically
+belong in application startup code (it initializes the group that
+keeps track of completion):
+
+\begin{alltt}
+CProxy_CompletionDetector detector = CProxy_CompletionDetector::ckNew();
+\end{alltt}
+
+When it is time to start completion detection, make the following call to the
+library:
+
+\begin{alltt}
+void start_detection(int num_producers, CkCallback start, CkCallback finish,
+int prio_)
+\end{alltt}
+
+\begin{alltt}
+detector.start_detection(10, CkCallback(CkIndex_chare1::start_test(0),
+                                       thisProxy),
+                             CkCallback(CkIndex_chare2::finish_test(0),
+                                       thisProxy), 0);
+\end{alltt}
+
+The \verb|num_producers| parameter is the number of objects (chares)
+that will produce elements. So if every array element will produce one
+event, then it would be the size of the array.
+
+The \verb|start| callback notifies your program that it is safe to
+begin producing and consuming (this state is reached when the module
+has finished its internal initialization).
+
+The \verb|finish| callback is instigated when completion has been
+detected (all objects participating have produced and consumed an
+equal number of elements globally).
+
+The \verb|prio| parameter is the priority that the detector will run
+at. This is still under development, but it should be set below the
+application's priority if possible.
+
+Once initialization is complete (the ``start'' callback is triggered),
+make the following call to the library:
+
+\begin{alltt}
+void CompletionDetector::produce(int events_produced)
+void CompletionDetector::produce() // 1 by default
+\end{alltt}
+
+\begin{alltt}
+detector.ckLocalBranch()->produce(4);
+\end{alltt}
+
+Once all the ``events'' that this chare is going to produce have been sent out,
+make the following call:
+
+\begin{alltt}
+void CompletionDetector::done(int producers_done)
+void CompletionDetector::done() // 1 by default
+\end{alltt}
+
+\begin{alltt}
+detector.ckLocalBranch()->done();
+\end{alltt}
+
+The application can now start consuming elements, using the following calls:
+
+\begin{alltt}
+void CompletionDetector::consume(int events_consumed)
+void CompletionDetector::consume() // 1 by default
+\end{alltt}
+
+\begin{alltt}
+detector.ckLocalBranch()->consume();
+\end{alltt}
+
+At some point, when everyone is consuming elements, completion will be
+reached. The system will detect that state and will trigger the \verb|finish|
+callback. At that point, \verb|start_detection| can be called again to restart
+the process.

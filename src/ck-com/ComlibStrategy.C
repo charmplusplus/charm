@@ -31,7 +31,7 @@ void CharmStrategy::pup(PUP::er &p) {
     @return the number of destination objects which were not local (information
     retrieved from the array/location manager)
 */
-int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndexMax* indices ){
+int CharmStrategy::deliverToIndices(void *msg, int numDestIdxs, const CkArrayIndex* indices ){
   int count = 0;
   
   envelope *env = UsrToEnv(msg);
@@ -246,7 +246,7 @@ ComlibArrayInfo::ComlibArrayInfo() {
 }
 
 
-void ComlibArrayInfo::setSourceArray(CkArrayID aid, CkArrayIndexMax *e, int nind){
+void ComlibArrayInfo::setSourceArray(CkArrayID aid, CkArrayIndex *e, int nind){
     src_aid = aid;
     isSrcArray = 1;
 
@@ -268,7 +268,7 @@ void ComlibArrayInfo::setSourceArray(CkArrayID aid, CkArrayIndexMax *e, int nind
 }
 
 
-void ComlibArrayInfo::setDestinationArray(CkArrayID aid, CkArrayIndexMax *e, int nind){
+void ComlibArrayInfo::setDestinationArray(CkArrayID aid, CkArrayIndex *e, int nind){
   ComlibPrintf("[%d] ComlibArrayInfo::setDestinationArray  dest_elements\n", CkMyPe());
     dest_aid = aid;
     isDestArray = 1;
@@ -417,7 +417,7 @@ void ComlibArrayInfo::localBroadcast(envelope *env) {
 
 */
 #include "register.h"
-int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
+int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndex>*vec,
                                      envelope *env){
   int count = 0;
     //Multicast the messages to all elements in vec
@@ -436,7 +436,7 @@ int ComlibArrayInfo::localMulticast(CkVec<CkArrayIndexMax>*vec,
     env->getsetArrayHops()=1;
     env->setUsed(0);
 
-    CkArrayIndexMax idx;
+    CkArrayIndex idx;
 
     //ComlibPrintf("sending to %d elements\n",nelements);
     for(int i = 0; i < nelements-1; i ++){

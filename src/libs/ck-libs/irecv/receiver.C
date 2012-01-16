@@ -17,7 +17,7 @@ receiver::receiver()
   startwaiting = 0;
 }
 
-receiver::receiver(CkMigrateMessage *m) : ArrayElement1D(m)
+receiver::receiver(CkMigrateMessage *m)
 {
   msgTbl = CmmNew();
   reqTbl = CmmNew();
@@ -27,7 +27,6 @@ receiver::receiver(CkMigrateMessage *m) : ArrayElement1D(m)
 
 void receiver::pup(PUP::er &p)
 {
-  ArrayElement1D::pup(p);
   p(counter);
   p(startwaiting);
   // pack CmmTable: msgTbl, reqTbl

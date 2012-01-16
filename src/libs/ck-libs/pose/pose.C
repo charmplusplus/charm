@@ -1,4 +1,9 @@
 /// Global POSE data and functions; includes and dependencies handled here
+
+#if ! defined(_WIN32) || defined(__CYGWIN__)
+#include "unistd.h"
+#endif
+
 #include "pose.h"
 #include "pose.def.h"
 
@@ -12,6 +17,7 @@ extern int com_debug;
 double busyWait;
 double sim_timer;
 int POSE_inactDetect;
+int totalNumPosers;
 POSE_TimeType POSE_endtime;
 POSE_TimeType POSE_GlobalClock;
 POSE_TimeType POSE_GlobalTS;
@@ -56,7 +62,20 @@ void POSE_init(int IDflag, int ET) // can specify both
   if (pose_config.checkpoint_time_interval) {
     CkPrintf("POSE checkpointing interval set to %d seconds\n", pose_config.checkpoint_time_interval);
   }
+  if (pose_config.dop) {
+    CkPrintf("POSE DOP analysis enabled...deleting dop log files...\n");
+    char fName[32];
+    for (int i = 0; i < CkNumPes(); i++) {
+      sprintf(fName, "dop%d.log", i);
+      unlink(fName);
+    }
+    sprintf(fName, "dop_mod.out");
+    unlink(fName);
+    sprintf(fName, "dop_sim.out");
+    unlink(fName);
+  }
   POSE_inactDetect = IDflag;
+  totalNumPosers = 0;
   POSE_endtime = ET;
 #ifdef SEQUENTIAL_POSE
   _POSE_SEQUENTIAL = 1;
@@ -200,7 +219,23 @@ void setPoseIndexOfStopEvent(int index) {
 /// Exit simulation program after terminus reduction
 void POSE_prepExit(void *param, void *msg)
 {
-  CkReductionMsg *m=(CkReductionMsg *)msg;
+  CkReductionMsg *m = (CkReductionMsg *)msg;
+  long long *finalBasicStats = ((long long*)m->getData());
+  CkPrintf("Final basic stats: Commits: %lld  Rollbacks: %lld\n", finalBasicStats[0], finalBasicStats[1]);
+  delete m;
+#ifdef SEQUENTIAL_POSE
+  CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
+  POSE_Coordinator.prepExit();
+#else
+  CProxy_GVT g(TheGVT);
+  g.sumGVTIterationCounts();
+#endif
+}
+
+/// Collect GVT iteration counts
+void POSE_sumGVTIterations(void *param, void *msg) {
+  CkReductionMsg *m = (CkReductionMsg *)msg;
+  CkPrintf("Final basic stats: GVT iterations: %d\n", *((int*)m->getData()));
   delete m;
   CProxy_pose POSE_Coordinator(POSE_Coordinator_ID);
   POSE_Coordinator.prepExit();
@@ -308,8 +343,22 @@ void POSEreadCmdLine()
   pose_config.trace=CmiGetArgFlagDesc(argv, "+trace_pose",
                         "Traces key POSE operations like Forward Execution, Rollback, Cancellation, Fossil Collection, etc. via user events for display in projections");
 
+  /* DOP command-line parameter truth table:
+     |---- Input ---|   |------------ Output --------------|
+     dop dopSkipCalcs   DOP logs written DOP calcs performed
+     --- ------------   ---------------- -------------------
+      F       F                 No                No
+      F       T                 Yes               No
+      T       F                 Yes               Yes
+      T       T                 Yes               No
+  */
   pose_config.dop=CmiGetArgFlagDesc(argv, "+dop_pose",
                         "Critical path analysis by measuring degree of parallelism");
+  pose_config.dopSkipCalcs=CmiGetArgFlagDesc(argv, "+dop_pose_skip_calcs",
+                        "Records degree of parallelism logs but doesn't perform end-of-simulation calculations");
+  if (pose_config.dopSkipCalcs) {
+    pose_config.dop = true;
+  }
 
   CmiGetArgIntDesc(argv, "+memman_pose", &pose_config.max_usage , "Coarse memory management: Restricts forward execution of objects with over <max_usage>/<checkpoint store_rate> checkpoints; default to 10");
   /*

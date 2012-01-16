@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,13 +6,9 @@
 #ifndef _REFINER_H_
 #define _REFINER_H_
 
-#include "CentralLB.h"
-
-class minheap;
-class maxheap;
-
 #include "elements.h"
 #include "ckheap.h"
+#include "CentralLB.h"
 
 class Refiner {
 public:

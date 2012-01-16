@@ -34,8 +34,14 @@
 
 *****************************************************************************/
 
+#include "conv-config.h"
+
 #ifndef __PERSISTENT_H__
 #define __PERSISTENT_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef void * PersistentHandle;
 
@@ -44,8 +50,7 @@ typedef void * PersistentHandle;
 typedef struct {
   int pe;
   int maxBytes;
-  void *messagePtr[2];
-  void *recvSizePtr[2];
+  void **bufPtr;
   PersistentHandle myHand;
 } PersistentReq;
 
@@ -68,6 +73,10 @@ typedef int PersistentRecvHandle;
 #define CmiUsePersistentHandle(x,y)
 #define CmiDestoryAllPersistent()
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

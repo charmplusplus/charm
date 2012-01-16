@@ -1,0 +1,171 @@
+\section{Multiphase Shared Arrays}
+\label{msa}
+
+Charm++ includes \emph{multiphase shared arrays} (MSA), a distributed
+shared array library designed to safely enable common patterns of
+shared-memory scientific applications while retaining the benefits of
+an asynchronous adaptive runtime system. The general pattern of usage
+that MSA supports is one in which the application does one sort of
+access on an array for a while, and then changes to another kind of
+access at some distinguished point in the execution. For instance, one
+part of the program might accumulate a physical quantity onto a grid
+representing the simulation space, and another part might read from
+that grid once it is fully calculated.
+
+MSA formalizes this pattern in its access modes and phases. This
+formality allows the runtime to optimize data movement and exclude
+race conditions and other hard-to-debug errors that can be common in
+shared-array programming.
+
+Development on MSA is ongoing. This means that its API may not be
+completely stable, but it also means that its developers are actively
+seeking suggestions of new use cases and features. At present, it is
+generic over element type, and supports 1, 2, and 3 dimensional
+rectangular arrays with row- and column-major element orderings.
+
+\subsection{Access Modes}
+
+At any given time, each MSA is in a particular \emph{access mode} that
+allows one kind of operation on the array. At present, MSA defines the
+following access modes:
+
+\begin{description}
+\item[Read-Only Mode]
+As its name suggests, read-only mode makes the array immutable,
+permitting reads of any element but writes to none.
+E.g. {\tt x = r(i, j, k);}
+
+\item[Write-Once Mode]
+MSA's write mode allows only direct assignment of values to elements
+of the array. E.g. {\tt w(i, j) = y;}
+
+When assigning values to elements of a shared array, the primary
+safety concern is write-after-write conflicts, in which some
+particular entry is assigned twice, possibly by different parallel
+entities. MSA checks for conflicting assignments at
+runtime\footnote{When {\tt CMK\_ERROR\_CHECKING} is defined}, and will
+raise an error on detection.
+
+\item[Accumulate Mode]
+
+Accumulation is the application of a commutative associative operator,
+such as addition or multiplication, to some entry in an
+array. E.g. {\tt a(i) += z;}. MSA allows arbitrary user-defined
+accumulation operations, including things like set union.
+
+Frequently, applications do a set of read-modify-write accesses across
+all or parts of a shared array. When the modification is an
+accumulation, the code that has the value to be contributed needn't
+actually read the current value, as long as all contributions to each
+element are accounted for before the next read from that element. As
+we will see, MSA's structure ensures that this is the case, without
+requiring atomic remote operations or locking.
+
+\end{description}
+
+To provide the guarantees described above, MSA requires that clients
+of an array collectively synchronize when they wish to change the mode
+in which the array will be accessed. Each period between
+synchronizations is called a \emph{phase}. At phase boundaries, writes
+are flushed and accumulations are totaled up.
+
+MSA enforces most of the restrictions of its access modes discipline
+at compile time through the static types of \emph{handle}
+objects. During a phase, each client of an array will hold an
+appropriately typed handle to that array, presenting only the allowed
+operations in its interface. At synchronization, clients ``trade in''
+the old handle to be invalidated, and receive a new one representing
+the array's mode for the upcoming phase.
+
+\subsection{Declaration and construction}
+
+The MSA package is defined as a set of C++ templates that make it
+generic over the type of its elements and the accumulation operation.
+The templates are named {\tt MSAKD<>}, where K is the number of
+dimensions in the array, and the template arguments are the contained
+type and a class defining the desired accumulation operator:
+
+\begin{verbatim}
+template<class ENTRY, class ENTRY_OPS_CLASS>
+class MSAKD { ... };
+\end{verbatim}
+
+The second argument must be a class (or class template) meeting the
+following interface for the corresponding type {\tt ENTRY}:
+\begin{verbatim}
+struct entry_ops {
+  /// Accumulate b into element a
+  static void accumulate(ENTRY &a, const ENTRY &b);
+  /// An identity value for the accumulate operation
+  static ENTRY getIdentity();
+  /// Should the MSA PUP its elements when shipping them around?
+  static bool pupEveryElement();
+};
+\end{verbatim}
+The library provides templated implementations of this interface for
+addition, multiplication, and maximum. See the MSA headers for details
+on these classes.
+
+When constructing an MSA, the application must specify the extent of
+the array in each dimension and the number of clients that will access
+the array (so that the library can tell when all clients have
+synchronized). The array creation constructors are as follows:
+\begin{verbatim}
+/// Indices range over [0, N]
+MSA1D(unsigned int num_entries, unsigned int num_workers);
+MSA2D(unsigned int rows, unsigned int cols, unsigned int num_workers);
+MSA3D(unsigned int x, unsigned int y, unsigned int z, unsigned int num_workers);
+/// Indices range over [da, db]
+MSA3D(int xa, int xb, int ya, int yb, int za, int zb, unsigned int num_wrkrs);
+\end{verbatim}
+At construction, the array is filled with its identity element.
+
+After construction, each client must call the {\tt enroll()} method on
+a copy of the MSA object. These clients must run all code operating on
+the MSA in a user-level thread, via entry methods with the {\tt
+  [threaded]} attribute, AMPI ranks, or explicitly created {\sc
+  TCharm} threads.
+
+Once enrollment is complete, each of the clients can get a handle to
+enter data into the array:
+\begin{verbatim}
+MYMSA::Write wMymsa = mymsa.getInitialWrite();
+// or
+MYMSA::Accum aMymsa = mymsa.getInitialAccum();
+\end{verbatim}
+
+When a client is done with its work on an array in a phase, it must
+call a synchronization method on its handle. If it will operate on the
+array in the next phase, it asks for a new handle, and if it won't, it
+simply indicates that it's done:
+\begin{verbatim}
+MYMSA::Read rMymsa = aMymsa.syncToRead();
+MYMSA::Write wMymsa = rMymsa.syncToWrite();
+MYMSA::Accum aMymsa = wMymsa.syncToAccum();
+aMymsa.syncDone();
+\end{verbatim}
+All clients must synchronize to the same mode in each phase. If the
+array sees clients synchronizing into different modes, it will raise
+an error at runtime.
+
+\subsection{MSA Usage Example}
+
+The constructs described so far are demonstrated in this example
+implementation of a parallel distributed $k$-means clustering
+algorithm:
+
+\lstset{language=c++, commentstyle=\textit, emphstyle=\textbf,
+  numbers=left, keywordstyle=, label=lst:kmeans, captionpos=b,
+  basicstyle=\small\tt,
+%
+caption={Parallel $k$-Means Clustering implemented using an MSA named
+  \textbf{clusters}. This function is run in a thread on every
+  processor. First, processors selected as initial `seeds' write their
+  locations into the array (call on line 5). Then, all the processors
+  iterate finding the closest seed (lines 14--20) and moving
+  themselves into it (22--33). They all test for convergence by
+  checking an entry indicating whether any processor moved (37). }
+%
+}
+\lstinputlisting{kmeans.cpp}
+

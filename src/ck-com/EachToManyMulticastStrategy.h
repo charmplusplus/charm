@@ -43,8 +43,8 @@ class EachToManyMulticastStrategy : public RouterStrategy, public CharmStrategy 
     /// TODO: Fix this to allow for the same parameters as would be given to an array section creation(ranges of indices).
     EachToManyMulticastStrategy(int substrategy, CkArrayID src, 
                                 CkArrayID dest, int nsrc=0, 
-                                CkArrayIndexMax *srcelements=0, int ndest=0, 
-                                CkArrayIndexMax *destelements=0);
+                                CkArrayIndex *srcelements=0, int ndest=0, 
+                                CkArrayIndex *destelements=0);
     
     EachToManyMulticastStrategy(CkMigrateMessage *m) : RouterStrategy(m), CharmStrategy(m) {
       ComlibPrintf("[%d] EachToManyMulticast migration constructor\n",CkMyPe());
@@ -53,7 +53,7 @@ class EachToManyMulticastStrategy : public RouterStrategy, public CharmStrategy 
     ~EachToManyMulticastStrategy();
 
     void insertMessage(MessageHolder *msg) {
-      ((CharmMessageHolder*)msg) -> checkme();
+      //      ((CharmMessageHolder*)msg) -> checkme();
       insertMessage((CharmMessageHolder*)msg);
     }
 

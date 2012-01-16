@@ -1,0 +1,16 @@
+NAME : albmy
+COMMENT : Hamiltonian cycle problem (Erbacci) 
+TYPE : HCP
+DIMENSION : 5
+EDGE_DATA_FORMAT : EDGE_LIST
+EDGE_DATA_SECTION
+1   2
+1   3
+1   5
+2   4
+2   5
+3   4
+3   5
+4   5
+-1
+EOF

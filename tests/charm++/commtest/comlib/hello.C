@@ -22,7 +22,7 @@ Migration test in commlib added on 2004/05/12, Sameer Kumar
 /*readonly*/ int nElements;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
   int **commMatrix; /* commMatrix[s][r]= # messages sent from s to r */
   int *commSend, *commRecv; /* temporary storage for "send" */
@@ -217,7 +217,7 @@ public:
   }
 
   void pup(PUP::er &p) {
-      ArrayElement1D::pup(p);
+      CBase_Hello::pup(p);
       p | comlib;
       p | verbose;
 

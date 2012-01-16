@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <comlib.h>
 #include "hello.decl.h"
 #include "StreamingStrategy.h"
 #include "MeshStreamingStrategy.h"
@@ -19,7 +20,7 @@ ComlibInstanceHandle dummy_inst;
 int bucketSize = 400;
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     double startTime;
     int recv_count;
@@ -46,10 +47,10 @@ public:
 	//strat->enableShortArrayMessagePacking();
 	//strat->disableIdleFlush();
 	
-	mstrat->enableShortArrayMessagePacking();
+//	mstrat->enableShortArrayMessagePacking();
 	
-	ComlibInstanceHandle cinst = CkGetComlibInstance();
-	cinst.setStrategy(strat); 
+//	ComlibInstanceHandle cinst = CkGetComlibInstance();
+	ss_inst = ComlibRegister(strat); 
 	
 	//ComlibInstanceHandle cinst1 = CkGetComlibInstance();
 	
@@ -96,7 +97,8 @@ public:
         
         // CkPrintf("Hi[%d] from element %d\n",hiNo,thisIndex);
         CProxy_Hello array_proxy = thisProxy;
-        ComlibDelegateProxy(&array_proxy);
+        //ComlibDelegateProxy(&array_proxy);
+ 		ComlibAssociateProxy(ss_inst, array_proxy);
         
         int next = thisIndex+1;
         if(next >= nElements)

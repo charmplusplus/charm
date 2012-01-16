@@ -1,0 +1,8 @@
+module ScotchRefineLB {
+  extern module CentralLB;
+  initnode void lbinit (void);
+
+  group [migratable] ScotchRefineLB : CentralLB {
+    entry void ScotchRefineLB(const CkLBOptions &);
+  };
+};

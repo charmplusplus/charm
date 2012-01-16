@@ -10,7 +10,7 @@ CkArrayID taskGraphInit() {
   return CProxy_taskGraphArray::ckNew();
 }
 
-void taskGraphDelete(CkArrayID id, CkArrayIndexMax taskID) {
+void taskGraphDelete(CkArrayID id, CkArrayIndex taskID) {
   CProxy_taskGraphArray array(id);
   array(taskID).deleteElement();
 }
@@ -19,7 +19,7 @@ void taskGraphDelete(CkArrayID id, CkArrayIndexMax taskID) {
  * Now define the taskGraphArray that actually handles doing all that work.
  */
 taskGraphArray::taskGraphArray(
-	CkVec<CkArrayIndexMax> deps,
+	CkVec<CkArrayIndex> deps,
 	taskGraphSolver *data,
 	CkCallback returnResults
 ) : Waiting() {
@@ -66,7 +66,7 @@ void taskGraphArray::tryToSolve() {
 }
 
 
-void taskGraphArray::requestData(CkArrayIndexMax from) {
+void taskGraphArray::requestData(CkArrayIndex from) {
   // If the problem isn't solved, kick this request onto the waiting queue
   if ( ! isSolved ) {
     Waiting.insertAtEnd(from);

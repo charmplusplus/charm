@@ -196,7 +196,7 @@ bool ComlibManager::shouldBufferMessagesNow(int instid){
 void ComlibManager::sendBufferedMessagesAllStrategies(){
   int nstrats = converseManager->getNumStrats();
   for(int i=0;i<nstrats;i++){
-    sendBufferedMessages(i);
+    sendBufferedMessages(i+1);
   }
 }
 
@@ -692,7 +692,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 
 	if (myInfo->isSourceArray()) {
 
-	  const CkVec<CkArrayIndexMax> & srcElements = myInfo->getSourceElements();
+	  const CkVec<CkArrayIndex> & srcElements = myInfo->getSourceElements();
 	  const int nelem = srcElements.size();
 	  const CkArrayID aid = myInfo->getSourceArrayID(); 
 	  const CkArray *a = (CkArray*)_localBranch(aid);
@@ -713,7 +713,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
 	if (myInfo->isDestinationArray()) {
 // 	  CkAssert(myInfo->newDestinationListSize() == 0);
 
-	  const CkVec<CkArrayIndexMax> & destElements = myInfo->getDestinationElements();
+	  const CkVec<CkArrayIndex> & destElements = myInfo->getDestinationElements();
 	  const int nelem = destElements.size();
 	  const CkArrayID aid = myInfo->getDestinationArrayID();
 	  const CkArray *a = (CkArray*)_localBranch(aid);
@@ -752,7 +752,7 @@ void ComlibManager::bracketedStartDiscovery(int instid) {
     known location for the element.
 
 */
-void ComlibManager::bracketedDiscover(int instid, CkArrayID aid, CkArrayIndexMax &idx, int isSrc) {
+void ComlibManager::bracketedDiscover(int instid, CkArrayID aid, CkArrayIndex &idx, int isSrc) {
 	ComlibManagerPrintf("[%d] bracketedDiscover\n", CkMyPe());
 	CkArray *a = (CkArray *)_localBranch(aid);
 	int pe = a->lastKnown(idx);
@@ -902,7 +902,7 @@ void msg_prepareSend_noinline(CkArrayMessage *msg, int ep,CkArrayID aid);
 
  */
 void ComlibManager::ArraySend(CkDelegateData *pd,int ep, void *msg, 
-		const CkArrayIndexMax &idx, CkArrayID a){
+		const CkArrayIndex &idx, CkArrayID a){
 
 	CkAssert(pd != NULL);
 	ComlibDelegateData *ci = static_cast<ComlibDelegateData *>(pd);
@@ -1033,10 +1033,10 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 	CharmMessageHolder *cmsg = new CharmMessageHolder((char *)m, IS_SECTION_MULTICAST, CMH_ARRAYSECTIONSEND);
 	cmsg->npes = 0;
 	cmsg->sec_id = s;
-	cmsg->array_id = s->_cookie.aid;
+	cmsg->array_id = s->_cookie.get_aid();
 	
 
-	msg_prepareSend_noinline((CkArrayMessage*)m, ep, s->_cookie.aid);
+	msg_prepareSend_noinline((CkArrayMessage*)m, ep, s->_cookie.get_aid());
 	
 	register envelope * env = UsrToEnv(m);
 	env->getsetArrayIndex()= dummyArrayIndex;
@@ -1049,11 +1049,11 @@ void ComlibManager::ArraySectionSend(CkDelegateData *pd,int ep, void *m,
 	
 
 	CkSectionInfo minfo;
-	minfo.type = COMLIB_MULTICAST_MESSAGE;
-	minfo.sInfo.cInfo.instId = ci->getID();
+	minfo.get_type() = COMLIB_MULTICAST_MESSAGE;
+	minfo.info.sInfo.cInfo.instId = ci->getID();
 	//minfo.sInfo.cInfo.status = COMLIB_MULTICAST_ALL;  
-	minfo.sInfo.cInfo.id = 0; 
-	minfo.pe = CkMyPe();
+	minfo.info.sInfo.cInfo.id = 0; 
+	minfo.get_pe() = CkMyPe();
 	((CkMcastBaseMsg *)env)->_cookie = minfo;    
 	
 	multicast(cmsg, instid);
@@ -1267,7 +1267,7 @@ int sfactor=0;
 
 /** A mainchare, used to initialize the comlib framework at the program startup.
     Its main purpose is to create the ComlibManager group. */
-class ComlibManagerMain {
+class ComlibManagerMain : public CBase_ComlibManagerMain {
 public:
 	ComlibManagerMain(CkArgMsg *msg) {
 
@@ -1295,10 +1295,10 @@ ComlibDelegateData::ComlibDelegateData(int instid) : CkDelegateData(), _instid(i
 
 void ComlibInitSectionID(CkSectionID &sid){
 
-	sid._cookie.type = COMLIB_MULTICAST_MESSAGE;
-	sid._cookie.pe = CkMyPe();
+	sid._cookie.get_type() = COMLIB_MULTICAST_MESSAGE;
+	sid._cookie.get_pe() = CkMyPe();
 
-	sid._cookie.sInfo.cInfo.id = 0;    
+	sid._cookie.info.sInfo.cInfo.id = 0;    
 	sid.npes = 0;
 	sid.pelist = NULL;
 }

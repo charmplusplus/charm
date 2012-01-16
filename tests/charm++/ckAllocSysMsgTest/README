@@ -1,0 +1,22 @@
+   This test is to demonstrate a race condition in the SMP build of
+   charm++.
+
+   Main launches a batch of Array and Group in a loop.
+   
+   The Array and group each engage in a ring and complete by reporting
+   to main.  Main will not start on the new batch until all elements
+   of the previous batch complete.
+   
+   This test is expected to hang in SMP mode if the bug is present.
+
+   By default a periodic timeout is registered which will trigger an abort
+   if the number of batches doesn't progress between periods. 
+
+   We do not construct the group or array inside main because the
+   CkAllocSysMsg race condition only affects group construction in
+   parallel execution.
+
+   The array must be multidimensional so that its indices will have
+   non zero values 
+
+   For sample usage, see make test.

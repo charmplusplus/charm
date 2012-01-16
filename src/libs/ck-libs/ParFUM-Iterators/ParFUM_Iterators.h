@@ -68,7 +68,9 @@ class MeshModel{
         MeshModel(){
             nodeIDHash = NULL;
             elemIDHash = NULL;
+#ifdef CUDA
 	    allocatedForCUDADevice = false;
+#endif
         }
 
 
@@ -103,8 +105,10 @@ class MeshModel{
 
 
 // 
+#ifdef CUDA
 void allocateModelForCUDADevice(MeshModel* model);
 void deallocateModelForCUDADevice(MeshModel* model);
+#endif
 
 
 

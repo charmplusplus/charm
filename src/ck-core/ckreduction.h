@@ -22,8 +22,13 @@ The calls needed to use the reduction manager are:
 
 #include "CkArrayReductionMgr.decl.h"
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM || CMK_MULTICORE || !CMK_SMP
 #define GROUP_LEVEL_REDUCTION           1
+#endif
+
+#ifdef _PIPELINED_ALLREDUCE_
+#define FRAG_SIZE 131072
+#define FRAG_THRESHOLD 131072
 #endif
 
 class CkReductionMsg; //See definition below
@@ -144,7 +149,7 @@ public:
 	void endArrayReduction();
 
 	virtual CmiBool isReductionMgr(void){ return CmiTrue; }
-	virtual void flushStates();
+	virtual void flushStates(int isgroup);
 	/*FAULT_EVAC: used to get the gcount on a processor when 
 		it is evacuated.
 		TODO: It needs to be fixed as it should return the gcount
@@ -154,6 +159,7 @@ public:
 		when there are no gcount
 	*/
 	int getGCount(){return gcount;};
+        static void sanitycheck();
 private:
 
 
@@ -229,6 +235,10 @@ private:
 	//Shift the list of countAdjustments down
 	void shiftAdjVec(void);
 
+protected:
+	//whether to notify children that reduction starts
+	CmiBool disableNotifyChildrenStart;
+
 //Checkpointing utilities
 public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -258,6 +268,10 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class CkNodeReductionMgr;
 	friend class CkArrayReductionMgr;
 	friend class CkMulticastMgr;
+#ifdef _PIPELINED_ALLREDUCE_
+	friend class ArrayElement;
+	friend class AllreduceMgr;
+#endif
     friend class ck::impl::XArraySectionReducer;
 public:
 
@@ -277,8 +291,8 @@ public:
 	inline CkReduction::reducerType getReducer(void){return reducer;}
 	inline int getRedNo(void){return redNo;}
 
-	inline int getUserFlag(void) const {return userFlag;}
-	inline void setUserFlag(int f) { userFlag=f;}
+	inline CMK_REFNUM_TYPE getUserFlag(void) const {return userFlag;}
+	inline void setUserFlag(CMK_REFNUM_TYPE f) { userFlag=f;}
 
 	inline void setCallback(const CkCallback &cb) { callback=cb; }
 
@@ -300,7 +314,7 @@ public:
 private:
 	int dataSize;//Length of array below, in bytes
 	void *data;//Reduction data
-	int userFlag; //Some sort of identifying flag, for client use
+	CMK_REFNUM_TYPE userFlag; //Some sort of identifying flag, for client use
 	CkCallback callback; //What to do when done
 	CkCallback secondaryCallback; // the group callback is piggybacked on the nodegrp reduction
 	bool migratableContributor; // are the contributors migratable
@@ -316,7 +330,7 @@ private:
     int fromPE;
 #endif
 private:
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         void *log;
 #endif
 	CkReduction::reducerType reducer;
@@ -342,14 +356,17 @@ private:
 //  Data is copied, not deleted.
 /*#define CK_REDUCTION_CONTRIBUTE_METHODS_DECL \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	int userFlag=-1); \
+	CMK_REFNUM_TYPE userFlag=-1); \
   void contribute(int dataSize,const void *data,CkReduction::reducerType type, \
-	const CkCallback &cb,int userFlag=-1); \
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag=-1); \
   void contribute(CkReductionMsg *msg);\*/
+
+#define CkReductionTarget(me, method) \
+    CkIndex_##me::method##_redn_wrapper(NULL)
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
-	int userFlag)\
+	CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
@@ -357,7 +374,7 @@ void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,
 	myRednMgr->contribute(&myRednInfo,msg);\
 }\
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\
-	const CkCallback &cb,int userFlag)\
+	const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(dataSize,data,type);\
 	msg->setUserFlag(userFlag);\
@@ -370,7 +387,7 @@ void me::contribute(CkReductionMsg *msg) \
 	msg->setMigratableContributor(migratable);\
 	myRednMgr->contribute(&myRednInfo,msg);\
 	}\
-void me::contribute(const CkCallback &cb,int userFlag)\
+void me::contribute(const CkCallback &cb,CMK_REFNUM_TYPE userFlag)\
 {\
 	CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
     msg->setUserFlag(userFlag);\
@@ -378,7 +395,7 @@ void me::contribute(const CkCallback &cb,int userFlag)\
     msg->setMigratableContributor(migratable);\
     myRednMgr->contribute(&myRednInfo,msg);\
 }\
-void me::contribute(int userFlag)\
+void me::contribute(CMK_REFNUM_TYPE userFlag)\
 {\
     CkReductionMsg *msg=CkReductionMsg::buildNew(0,NULL,CkReduction::random);\
     msg->setUserFlag(userFlag);\
@@ -397,7 +414,7 @@ class Group : public CkReductionMgr
 	virtual int isNodeGroup() { return 0; }
 	virtual void pup(PUP::er &p);
 	virtual void flushStates() {
-		CkReductionMgr::flushStates();
+		CkReductionMgr::flushStates(1);
 		reductionInfo.redNo = 0;
  	}
 	virtual void CkAddThreadListeners(CthThread tid, void *msg);
@@ -405,8 +422,39 @@ class Group : public CkReductionMgr
 	CK_REDUCTION_CONTRIBUTE_METHODS_DECL
 };
 
-
-
-
+#ifdef _PIPELINED_ALLREDUCE_
+class AllreduceMgr
+{
+public:
+	AllreduceMgr() { fragsRecieved=0; size=0; }
+	friend class ArrayElement;
+	// recieve an allreduce message
+	void allreduce_recieve(CkReductionMsg* msg)
+	{
+		// allred_msgs.enq(msg);
+		fragsRecieved++;
+		if(fragsRecieved==1)
+		{
+			data = new char[FRAG_SIZE*msg->nFrags];
+		}
+		memcpy(data+msg->fragNo*FRAG_SIZE, msg->data, msg->dataSize);
+		size += msg->dataSize;
+		
+		if(fragsRecieved==msg->nFrags) {
+			CkReductionMsg* ret = CkReductionMsg::buildNew(size, data);
+			cb.send(ret);
+			fragsRecieved=0; size=0;
+			delete [] data;
+		}
+		
+	}
+	// TODO: check for same reduction
+	CkCallback cb;	
+	int size;
+	char* data;
+	int fragsRecieved;
+	// CkMsgQ<CkReductionMsg> allred_msgs;
+};
+#endif // _PIPELINED_ALLREDUCE_
 
 #endif //_CKREDUCTION_H

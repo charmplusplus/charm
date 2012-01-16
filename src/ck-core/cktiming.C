@@ -7,7 +7,7 @@
 /*
  *
  * WITH_MAMBO:    when using mambo
- * CMK_BLUEGENE_CHARM:  when build with bigsim
+ * CMK_BIGSIM_CHARM:  when build with bigsim
  * SPLIT_APART_CYCLE_ACCURATE: parallelize Mambo run
  * */
 
@@ -27,7 +27,7 @@ CkpvDeclare(FILE*, bgfp);     // for bigsim run
 
 CkpvDeclare(int, outputParameters);
 
-static int outputTiming = 0;
+
 
 
 //======================PAPI======================= 
@@ -46,7 +46,7 @@ char errorstring[PAPI_MAX_STR_LEN+1];
 unsigned long bgTraceCounter;
 double startTime;
 
-CkpvDeclare(bool, insideTraceBracket);
+CkpvStaticDeclare(bool, insideTraceBracket);
 
 class StringPool {
  std::vector<char *> events;
@@ -64,7 +64,7 @@ public:
       CmiAbort("Failed to generated trace param file!");
       // write out
     for (int i=0; i<events.size(); i++)
-      fprintf(fp, events[i]);
+      fprintf(fp, "%s", events[i]);
     fclose(fp);
     dumped = 1;
   }
@@ -75,6 +75,10 @@ public:
 
 CkpvStaticDeclare(StringPool, eventsPool);
 
+#ifdef CMK_BIGSIM_CHARM
+static int outputTiming = 0;
+#endif
+
 // called on all PEs once
 extern "C"
 void initBigSimTrace(int outputParams, int _outputTiming)
@@ -83,11 +87,10 @@ void initBigSimTrace(int outputParams, int _outputTiming)
   CkpvAccess(outputParameters) = outputParams;
 
   bgTraceCounter = 0;
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   if (!BgIsReplay()) outputTiming = 0;
-#endif
   outputTiming = _outputTiming;
-
+#endif
   CkpvInitialize(bool, insideTraceBracket);
   CkpvAccess(insideTraceBracket) = false;
 
@@ -96,7 +99,7 @@ void initBigSimTrace(int outputParams, int _outputTiming)
 
   CkpvInitialize(FILE*, bgfp);
   CkpvAccess(bgfp) = NULL;
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   //   for bigsim emulation, write to files, one for each processor
   //   always write immediately, instead of store and dump at the end
   if (!outputTiming) {
@@ -114,7 +117,7 @@ void initBigSimTrace(int outputParams, int _outputTiming)
   if (CkpvAccess(outputParameters))  { 
     CkpvInitialize(StringPool, eventsPool);
     if (CkMyPe()==0) CmiPrintf("outputParameters enabled!\n");
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
     BgRegisterUserTracingFunction(finalizeBigSimTrace);
 #endif
   }
@@ -195,7 +198,7 @@ void startTraceBigSim(){
 #endif
 
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   BgMark("startTraceBigSim %f\n");
 #endif
 
@@ -221,10 +224,10 @@ void endTraceBigSim_20param(char * eventname, int stepno, int num_params, double
 
     CkAssert(CkpvAccess(insideTraceBracket) == true);
     CkpvAccess(insideTraceBracket) = false;
-
+#ifdef CMK_BIGSIM_CHARM
     char perfCountString[1024]; 
     perfCountString[0] = 0; 
- 
+#endif
 	char params[2048];
 
 if(num_params==0) sprintf(params, "");
@@ -278,7 +281,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
   stepString[0] = 0;
   sprintf(stepString, "step:{ %d }", stepno);
 
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 #if WITH_MAMBO
   //  sprintf(timeString, "time:{ %f }", endTime-startTime);
   sprintf(timeString, "time_in_cycles:{ %llu }",  end_time-start_time); 
@@ -309,11 +312,11 @@ if (t<0.0) {
 	}
   }
 #endif
+#ifdef CMK_BIGSIM_CHARM
 
   char sequenceString[128];
   sequenceString[0] = 0;
 
-#ifdef CMK_BLUEGENE_CHARM
   BgMark("endTraceBigSim %f\n");
   if (CkpvAccess(bgfp) != NULL) {
   // write event ID

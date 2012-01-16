@@ -11,7 +11,7 @@ class RotateLB : public CentralLB
     RotateLB (const CkLBOptions &opt);
     RotateLB (CkMigrateMessage *m) : CentralLB (m) { };
 
-    void work (BaseLB::LDStats *stats, int count);
+    void work(LDStats *stats);
 
     void pup (PUP::er &p) { CentralLB::pup(p); }
 

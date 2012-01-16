@@ -50,6 +50,21 @@
 
 #include "ParFUM_Adapt.decl.h"
 
+#if defined(WIN32)
+#include <iterator>
+#endif
+
+#if ! CMK_HAS_STD_INSERTER
+#include <list>
+namespace std {
+template<class Container, class Iterator>
+   insert_iterator<Container> inserter(
+      Container& _Cont, 
+      Iterator _It
+   );
+};
+#endif
+
 #if defined(WIN32) && defined(max)
 #undef max
 #endif
@@ -303,7 +318,7 @@ class AllocTable2d : public BasicTable2d<T> {
       delete[] allocTable;
     }else{
       for (int r=copyRows;r<max;r++)
-	setRow(r,fill);
+          this->setRow(r,fill);
     }
     allocTable = this->table;
   }
@@ -2038,6 +2053,9 @@ class FEM_ElemAdj_Layer : public CkNoncopyable {
 
 //#define PARALLEL_DEBUG
 
+#ifdef DEBUG
+#undef DEBUG
+#endif
 #ifdef PARALLEL_DEBUG
 #define DEBUG(x) x
 #else
@@ -2452,17 +2470,17 @@ public:
   }
 };
 
-typedef MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
+typedef MSA::MSA2D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE, MSA_ROW_MAJOR> MSA2DRM;
 
-typedef MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
+typedef MSA::MSA1D<int, DefaultEntry<int>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINT;
 
 typedef UniqElemList<int> IntList;
-typedef MSA1D<IntList, DefaultListEntry<IntList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINTLIST;
+typedef MSA::MSA1D<IntList, DefaultListEntry<IntList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DINTLIST;
 
 typedef UniqElemList<NodeElem> NodeList;
-typedef MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DNODELIST;
+typedef MSA::MSA1D<NodeList, DefaultListEntry<NodeList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DNODELIST;
 
-typedef MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
+typedef MSA::MSA1D<MeshElem,DefaultEntry<MeshElem,true>,1> MSA1DFEMMESH;
 
 
 
@@ -2827,7 +2845,7 @@ class FEM_MUtil {
   ///Add the element with this conn (indices, typeOfIndices) on this chunk (called from remote chunk)
   void addGhostElementRemote(FEM_Mesh *m, int chk, int elemType, int *indices, int *typeOfIndex, int connSize);
   ///Remove this element on this chunk (called from remote chunk)
-  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent);
+  void removeElemRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int permanent, bool aggressive_node_removal=false);
   ///Remove this ghost element on this chunk, also delete some ghost nodes and elements
   void removeGhostElementRemote(FEM_Mesh *m, int chk, int elementid, int elemtype, int numGhostIndex, int *ghostIndices, int numGhostRNIndex, int *ghostRNIndices, int numGhostREIndex, int *ghostREIndices, int numSharedIndex, int *sharedIndices);
 
@@ -2836,7 +2854,7 @@ class FEM_MUtil {
   ///Add this node to the shared Idxl list (called from remote chunk)
   void addToSharedList(FEM_Mesh *m, int fromChk, int sharedIdx);
   ///Acquire the element specified by this ghost index
-  int eatIntoElement(int localIdx);
+  int eatIntoElement(int localIdx, bool aggressive_node_removal=false);
 
   ///Does this chunk know about this node index (on any idxl list with 'chk')
   bool knowsAbtNode(int chk, int nodeId);
@@ -2885,6 +2903,8 @@ class FEM_MUtil {
   void verifyIdxlListRemote(FEM_Mesh *m, int fromChk, int fsize, int type);
   ///Test that there are no remaining acquired locks on this mesh
   int residualLockTest(FEM_Mesh *m);
+  /// Release all currently held locks on this partition
+  void unlockAll(FEM_Mesh* m);
 };
 
 

@@ -49,8 +49,8 @@ OPTS_CXX=""
 OPTS_F90=""
 OPTS_LD=""  
 OPTS_LDXX=""
-OPTS_PIC="$CMK_PIC"
-test -z "$OPTS_PIC" && OPTS_PIC='-fpic'
+OPTS_PIC=""
+USE_PIC="0"
 
 CHARMDEBUG=""
 LINK_PYTHON=""
@@ -74,6 +74,7 @@ DELETE=""
 MAINOBJ=""   
 GENCPM=""
 OPTIMIZE_MODE=""
+PRODUCTION_MODE=""
 USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
@@ -84,8 +85,9 @@ USE_BUILD_OPTIONS=0
 
 COPY_EXIT="true"
 CHARM_SHARED="0"
-BUILD_SHARE="1"
+BUILD_SHARE="0"
 SWAPGLOBALS="0"
+TLSGLOBALS="0"
 
 TAU_MAKEFILE=Make.tau
 TAU_TRACE_MPI=1
@@ -482,25 +484,21 @@ do
 	
 	"-swapglobal"|"-swapglobals")
 		SWAPGLOBALS="1"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
 		;;
 
 	"-copyglobal"|"-copyglobals")
 		SWAPGLOBALS="2"
-		OPTS_CC="$OPTS_CC $OPTS_PIC"
-		OPTS_CXX="$OPTS_CXX $OPTS_PIC"
-		OPTS_F90="$OPTS_F90 $OPTS_PIC"
-		OPTS_LD="$OPTS_LD $OPTS_PIC"
+		USE_PIC="1"
 		;;
 
 	"-tlsglobal"|"-tlsglobals")
 		TLSGLOBALS="1"
 		OPTS_CC="$OPTS_CC -mno-tls-direct-seg-refs"
 		OPTS_CXX="$OPTS_CXX -mno-tls-direct-seg-refs"
+		OPTS_F90="$OPTS_F90 -mno-tls-direct-seg-refs"
 		OPTS_LD="$OPTS_LD -static -Wl,--allow-multiple-definition"
+		OPTS_LDXX="$OPTS_LDXX -static -Wl,--allow-multiple-definition"
 		;;
 
 	"-verbose")
@@ -698,11 +696,11 @@ do
 	-charm-shared|-cs)
 		CHARM_SHARED="1"
 		;;
-	-build-shared|-bs)
+	-build-shared)
 		# used internally when building Charm++ to create lib_so
-		# obsolete, do nothing since BUILD_SHARE is on by default
+		BUILD_SHARE="1"
 		;;
-	-no-build-shared|-nobs)
+	-no-build-shared)
 		# used internally not to build Charm++ lib_so
 		BUILD_SHARE="0"
 		;;
@@ -712,6 +710,13 @@ do
 
 	"-no-optimize")
 		OPTIMIZE_MODE=false
+		;;
+
+	"-production")
+		PRODUCTION_MODE=true
+		;;
+	"-no-production")
+		PRODUCTION_MODE=false
 		;;
 	
 	"-pg"|"-g"|-W*|-O*)
@@ -860,12 +865,28 @@ Debugf "----------- Module dependency search complete ------------"
 ##############################################################################
 
 
+if [ x"$CMK_NO_BUILD_SHARED" = "xfalse" ]
+then
+ 	BUILD_SHARE="1"
+fi
+
 if [ "$BUILD_SHARE" = "1" ]
 then
 	if [ x"$CMK_NO_BUILD_SHARED" = "xtrue" -o -z "$CHARMLIBSO" ]
 	then
 		BUILD_SHARE="0"
+	else
+		USE_PIC="1"
 	fi
+fi
+
+OPTS_PIC="$CMK_PIC"
+if [ "$USE_PIC" = "1" ]
+then
+       OPTS_CC="$OPTS_CC $OPTS_PIC"
+       OPTS_CXX="$OPTS_CXX $OPTS_PIC"
+       OPTS_F90="$OPTS_F90 $OPTS_PIC"
+       OPTS_LD="$OPTS_LD $OPTS_PIC"
 fi
 
 if [ "$BUILD_SHARE" = "1" ]
@@ -983,6 +1004,16 @@ then
     OPTS_LDXX="$CMK_CXX_OPTIMIZE $OPTS_LDXX"
 fi
 
+# Pick up per-architecture production mode settings
+if [ "$PRODUCTION_MODE" = "true" ]
+then
+    OPTS_CC="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_CC"
+    OPTS_CXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_CXX"
+    OPTS_F90="$CMK_PRODUCTION $CMK_F90_PRODUCTION $OPTS_F90"
+    OPTS_LD="$CMK_PRODUCTION $CMK_C_PRODUCTION $OPTS_LD"
+    OPTS_LDXX="$CMK_PRODUCTION $CMK_CXX_PRODUCTION $OPTS_LDXX"
+fi
+
 if [ -n "$XI_INTERNAL" ]
 then
     CMK_XIOPTS="$CMK_XIOPTS -intrinsic"
@@ -1044,11 +1075,11 @@ case "$LANGUAGE" in
 esac
 
 # update charm to bgcharm
-if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BLUEGENE" ]
+if [ "$LANGUAGE" = "charm++" -a -n "$CMK_BIGSIM" ]
 then
         LANGUAGE="bgcharm++"
 fi
-if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BLUEGENE" ]
+if [ "$LANGUAGE" = "converse++" -a -n "$CMK_BIGSIM" ]
 then
         LANGUAGE="bgconverse++"
 fi
@@ -1161,11 +1192,14 @@ do
 	  	fi
         fi
 
-	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
-	then
+#	if [ "$FILE_EXT" != ".o" -a "$FILE_EXT" != ".co" -a "$FILE_EXT" != ".M" -a "$FILE_EXT" != ".ci" ]
+#	then
+        case "$FILE_EXT" in
+        .c|.s|.C|.cc|.cxx|.cpp|.c++|.cu|.f|.F|.f90|.F90)
 		[ $VERBOSE ] && echo "Compiling $FILE"
 		DoNoErrCheck $RM $BASEO $BASE.f.o
-	fi
+        esac
+#	fi
 	if [ ! -z "$SKIPLINK" ] 
 	then
 		DESTO=""
@@ -1270,7 +1304,7 @@ MakeSO() {
 	echo "!!  Failed to compile Charm++ shared library. You can disable shared  !!"
 	echo "!!  lib compilation by providing --no-build-shared build option like: !!"
 	echo "!!     ./build charm++ net-linux --no-build-shared -O                 !!"
-	echo "!!  or reexecute this charmc command with -nobs compile option        !!"
+	echo "!!  or reexecute this charmc command with --no-build-shared compile option        !!"
 	echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 	Abort "Command $soCmd returned error code $Do_res"
 	fi
@@ -1559,6 +1593,14 @@ esac
 if [ "$CHARM_SHARED" = "1" -a -n "$CMK_LD_SHARED_THREAD" -a "$THREAD" = "default" ]
 then
   THREAD=$CMK_LD_SHARED_THREAD
+fi
+if [ "$TLSGLOBALS"  = "1" ]
+then
+    # make sure we don't add an extra -tls
+  if ! echo $THREAD | grep '\-tls$' > /dev/null 2> /dev/null
+  then
+    THREAD=${THREAD}-tls
+  fi
 fi
 THREAD_OBJ="$CHARMLIB/libthreads-$THREAD.o"
 

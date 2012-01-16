@@ -6,18 +6,49 @@ AC_CONFIG_HEADER(conv-autoconfig.h)
 CHARMINC="."
 test -r ./conv-config.sh && . ./conv-config.sh
 
-#keep it a decimal
-VERSION=60301
+# Decimal representation of Charm++ release line and API revision
+# Increment the last 2 digits when making an API change
+# Increase the first three after branching for a release
+VERSION=60305
 echo $VERSION > ../include/VERSION
-AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ version number])
+AC_DEFINE_UNQUOTED([CHARM_VERSION], $VERSION, [Charm++ Release/API version number])
 
 charmout="charmconfig.out"
 /bin/rm -rf $charmout
+MAKEFILE_EXT=Make.extlib
 
 Echo() {
 	echo $* 
 	echo $* >> $charmout
 }
+
+# add into conv-mach-opt.sh
+# add_flag $1 $2
+# $2 is description
+add_flag() {
+        key=`echo $1 | cut -d'=' -f1`
+        last=`grep "$key=" ../include/conv-mach-opt.sh 2>/dev/null | tail -1 | sed -e 's/ *#.*$//'`
+        skip=0
+	if test -n "$last" -a  "$last" = "$1" 
+	then
+	  skip=1
+        fi
+	if test $skip = 0
+        then
+	  cat >> ../include/conv-mach-opt.sh << EOT
+
+$1   # Option added by configure script's $2 section
+EOT
+	fi
+}
+
+# remove_flag $1
+remove_flag() {
+     sed -e '/^'"$1"'=/d' ../include/conv-mach-opt.sh > tmp.$$
+     cp tmp.$$ ../include/conv-mach-opt.sh
+     /bin/rm -f tmp.$$
+}
+
 
 # enable/disable error checking
 AC_ARG_ENABLE([error-checking],
@@ -33,6 +64,20 @@ else
   AC_DEFINE_UNQUOTED(CMK_ERROR_CHECKING, 1, [enable error checking])
 fi
 
+# enable/disable statistics collection
+AC_ARG_ENABLE([stats],
+            [AS_HELP_STRING([--enable-stats],
+              [enable statistics collection])], ,
+            [enable_stats=yes])
+
+if test "$enable_stats" = "no"
+then
+  Echo "Statistics collection is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 0, [disable statistics collection])
+else
+  AC_DEFINE_UNQUOTED(CMK_WITH_STATS, 1, [enable statistics collection])
+fi
+
 # check enable/disable
 AC_ARG_ENABLE([tracing],
             [AS_HELP_STRING([--enable-tracing],
@@ -43,8 +88,10 @@ if test "$enable_tracing" = "no"
 then
   Echo "Charm tracing is disabled"
   AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 0, [disable tracing])
+  add_flag CMK_TRACE_ENABLED=0
 else
-  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [disable tracing])
+  AC_DEFINE_UNQUOTED(CMK_TRACE_ENABLED, 1, [enable tracing])
+  add_flag CMK_TRACE_ENABLED=1
 fi
 
 AC_ARG_ENABLE([charmdebug],
@@ -56,8 +103,10 @@ if test "$enable_charmdebug" = "no"
 then
   Echo "CharmDebug is disabled" 
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 0, [disable charmdebug])
+  add_flag CMK_CHARMDEBUG=0
 else
   AC_DEFINE_UNQUOTED(CMK_CHARMDEBUG, 1, [enable charmdebug])
+  add_flag CMK_CHARMDEBUG=1
 fi
 
 AC_ARG_ENABLE([replay],
@@ -72,14 +121,29 @@ then
   AC_DEFINE_UNQUOTED(CMK_REPLAYSYSTEM, 0, [disable replay])
 fi
 
+AC_ARG_ENABLE([ccs],
+            [AS_HELP_STRING([--enable-ccs],
+              [enable CCS])], ,
+            [enable_ccs=yes])
+
+if test "$enable_ccs" = "no"
+then
+  Echo "CCS is disabled" 
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 0, [disable ccs])
+else
+  AC_DEFINE_UNQUOTED(CMK_CCS_AVAILABLE, 1, [enable ccs])
+fi
+
 AC_ARG_ENABLE([controlpoint],
             [AS_HELP_STRING([--enable-controlpoint],
               [enable control point])],
             [enable_controlpoint=$enableval],
             [enable_controlpoint=yes])
 
-if test "$enable_controlpoint" = "no"
+if test "$enable_controlpoint" = "yes"
 then
+  AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 1, [enable controlpoint])
+else
   Echo "Charm control point is disabled"
   AC_DEFINE_UNQUOTED(CMK_WITH_CONTROLPOINT, 0, [disable controlpoint])
 fi
@@ -96,7 +160,26 @@ then
   Echo "Charm NUMA support is builtin"
   WITH_NUMA=yes
 fi
-          
+
+AC_ARG_WITH([lbtime-type],
+            [AS_HELP_STRING([--with-lbtime-type=type],
+                            [load balancing timer type])],
+            [], [with_lbtime_type=double])
+
+if test "$with_lbtime_type" = "float" -o "$with_lbtime_type" = "double"
+then
+  Echo "Setting load balancing timer type as '$with_lbtime_type'"
+  AC_DEFINE_UNQUOTED(CMK_LBTIME_TYPE, $with_lbtime_type, [Setting load balancing timer type])
+else
+  Echo "Invalid type specified for load balancing timer type"
+  test_finish 1
+fi
+
+#clean up conv-mach-opt.sh
+sed -e '/Option added by configure/d' ../include/conv-mach-opt.sh  | sed -e '/^$/d' > conv-mach-opt.sh.clean
+cp -f conv-mach-opt.sh.clean   ../include/conv-mach-opt.sh
+rm -f conv-mach-opt.sh.clean
+
 
 #
 AC_MSG_CHECKING(machine name)
@@ -256,8 +339,8 @@ test_linkso() {
         AC_MSG_CHECKING("$1")
 	echo $1 >> $charmout
 	cat $t >> $charmout
-	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 >> $charmout
-	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $t -o test.o $4 > out 2>&1
+	echo $CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX $CMK_PIC -c $t -o test.o $4 >> $charmout
+	$CMK_CXX -I../include -I. $CMK_INCDIR $OPTS_CXX -c $CMK_PIC $t -o test.o $4 > out 2>&1
         if test $? = 1
         then
           test_result 1 "$1" "$2" "$3"
@@ -268,28 +351,6 @@ test_linkso() {
 	fi
 	cat out >> $charmout
 	/bin/rm -f out testlink.$CMK_SHARED_SUF
-}
-
-# add into conv-mach-opt.sh
-# add_flag $1 $2
-# $2 is description
-add_flag() {
-        key=`echo $1 | cut -d'=' -f1`
-        last=`grep $key ../include/conv-mach-opt.sh 2>/dev/null | tail -1`
-        skip=0
-	if test -n "$last" -a  "$last" = "$1" 
-	then
-	  skip=1
-        fi
-	if test $skip = 0
-        then
-	  cat >> ../include/conv-mach-opt.sh << EOT
-
-# Option added by configure script's $2 section
-$1
-
-EOT
-	fi
 }
 
 test_finish() {
@@ -303,6 +364,15 @@ test_finish() {
 if cat /proc/cpuinfo 2>/dev/null | grep 'POWER7'  > /dev/null
 then
   AC_DEFINE_UNQUOTED(CMK_POWER7, 1, [whether is power7])
+fi
+
+# detect OS
+OSNAME=`uname -s`
+if test $OSNAME = "Linux"
+then
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 1, [OS is Linux])
+else
+  AC_DEFINE_UNQUOTED(CMK_OS_IS_LINUX, 0, [OS is Linux])
 fi
 
 # test cp -p
@@ -366,16 +436,50 @@ then
 	test_finish 1
 fi
 
+AC_MSG_CHECKING("Native C++ compiler as")
+AC_MSG_RESULT("$CMK_NATIVE_CXX")
+AC_MSG_CHECKING("Sequential C++ compiler as")
+AC_MSG_RESULT("$CMK_SEQ_CXX")
+
 if test "$base_version" = "net-linux" 
 then
   test_link "whether linker accept --allow-multiple-definition" "ok" "no" "-Wl,--allow-multiple-definition"
   if test $pass -eq 1
   then
+        remove_flag CMK_LDXX
 	add_flag CMK_LDXX='"$CMK_LDXX -Wl,--allow-multiple-definition"' "net-linux linker"
   fi
 fi
 
+if echo "$base_version" | grep "linux" > /dev/null 2> /dev/null
+then
+  test_link "whether compiler accept -fno-stack-protector" "ok" "no" "-fno-stack-protector"
+  if test $strictpass -eq 1
+  then
+	add_flag OPTS_CC='"$OPTS_CC -fno-stack-protector"' "linux compiler"
+	add_flag OPTS_CXX='"$OPTS_CXX -fno-stack-protector"' "linux compiler"
+  fi
+fi
+
 # Perform the tests
+
+AC_ARG_WITH([refnum-type],
+            [AS_HELP_STRING([--with-refnum-type=type],
+                            [size of the envelope refnum field])],
+            [], [with_refnum_type=no])
+
+if test "$with_refnum_type" = "no" -o "$with_refnum_type" = "short"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned short"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned short, [envelope refnum field set to UShort])
+elif test "$with_refnum_type" = "int"
+then
+  Echo "Setting charm++ envelop refnum field to unsigned int"
+  AC_DEFINE_UNQUOTED(CMK_REFNUM_TYPE, unsigned int, [envelope refnum field set to UInt])
+else
+  Echo "Invalid size specified for refnum field"
+  test_finish 1
+fi
 
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
@@ -383,11 +487,11 @@ cat > $t <<EOT
 
 int foo()
 {
-int x[[sizeof(void *) - 7]]={0};
+int x[[(int)(sizeof(void *) - 7)]]={0};
 return x[[0]];
 }
 EOT
-test_cxx "whether compiler is 64bit" "yes" "no" ""
+test_cxx "whether compiler generates code for 64-bit" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_SIZET_64BIT, $strictpass, [whether size_t 64bit])
 in64bit=$strictpass
 
@@ -585,30 +689,6 @@ EOT
 test_cxx "whether C++ allows declaration of varsize array" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_DECLARE_VARSIZE_ARRAY, $pass, [whether C++ allows declaration of variable sized array])
 
-##### check if the stl headers use .h #####
-cat > $t <<EOT
-#include <iostream>
-void foo(void) { std::cout<<"Hello, world"<<std::endl; }
-EOT
-test_cxx "whether including STL <foo> works" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_STL_USE_DOT_H, $fail, [including STL <foo> does not works])
-AC_DEFINE_UNQUOTED(CMK_STL_DONT_USE_DOT_H, $pass, [including STL <foo> works])
-
-#### check if std::vector works ######
-cat > $t <<EOT
-#include <vector>
-
-int foo(void) {
-  std::vector<int> v;      
-  v.push_back(2); v.push_back(3);
-  std::vector<int>::iterator it=v.begin();
-  it++;
-  return *it;
-}
-EOT
-test_cxx "whether the std:: names for STL work" "ok" "no" ""
-AC_DEFINE_UNQUOTED(CMK_USE_STL, $pass, [whether the std:: names for STL work])
-
 #### check if namespaces can be defined #####
 cat > $t <<EOT
 namespace foo {
@@ -660,6 +740,21 @@ EOT
 test_cxx "whether std::distance is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_DISTANCE, $pass, [whether std::distance works])
 
+#### check if std::inserter is defined #####
+cat > $t <<EOT
+#include <list>
+#include <iterator>
+
+void foo()
+{
+  using namespace std;
+  list<int> L;
+  inserter ( L, L.end ( ) ) = 500;
+}
+EOT
+test_cxx "whether std::inserter is defined" "ok" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_STD_INSERTER, $pass, [whether std::inserter works])
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
@@ -672,6 +767,23 @@ EOT
 test_cxx "whether operator delete can be overloaded in same class" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_MULTIPLE_DELETE, $strictpass, [whether operator delete can be overloaded in same class])
 
+#### test if offsetof exists ####
+cat > $t <<EOT
+#include <stddef.h>
+
+struct FooType {
+        int f1;
+        int f2;
+        double f3;
+};
+
+void foo()
+{
+  int off = offsetof(FooType, f2);
+}
+EOT
+test_cxx "whether offsetof is defined" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 
 #### test if we can use gcc x86 assembly like this ####
 cat > $t <<EOT
@@ -806,7 +918,7 @@ then
   test_finish 1
 fi
 
-if test $BUILD_MPI -eq 1
+if test $BUILD_MPI -eq 1 -a -z "$BGP_FLOOR"
 then
   test_link "whether need to specify MPI library" "no" "yes" ""
   if test $pass -ne 1
@@ -866,6 +978,22 @@ int main() {
 EOT
 test_linkc "whether getrusage accepts RUSAGE_THREAD" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_RUSAGE_THREAD, $pass, [whether getrusage accepts RUSAGE_THREAD])
+
+#### test for asctime ###
+
+cat > $tc <<EOT
+#include <time.h>
+int main() {
+  struct tm *local;
+  time_t t;
+  t = time(NULL);
+  local = localtime(&t);
+  asctime(local);
+  return 0;
+}
+EOT
+test_linkc "whether has asctime" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ASCTIME, $pass, [whether has asctime])
 
 #### test for log2 ###
 cat > $t <<EOT
@@ -934,6 +1062,18 @@ int main() {
 EOT
 test_link "whether has sbrk" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_SBRK, $pass, [whether has sbrk])
+
+#### test for _setjmp/_longjmp ###
+cat > $t <<EOT
+#include <setjmp.h>
+int main() {
+  jmp_buf buf;
+  _setjmp(buf);
+  _longjmp(buf, 0);
+}
+EOT
+test_link "whether has _setjmp/_longjmp" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_UNDERSCORE_SETJMP, $pass, [whether has _setjmp/_longjmp])
 
 #### test for mstats ###
 cat > $t <<EOT
@@ -1035,21 +1175,15 @@ AC_DEFINE_UNQUOTED(CMK_SIGSAFE_SYSTEM, $pass, [whether to use signal-safe system
 
 ### test sched_setaffinity ####
 cat > $tc <<EOT
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-
 #define _GNU_SOURCE
 #include <sched.h>
-long sched_setaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
-long sched_getaffinity(pid_t pid, unsigned int len, unsigned long *user_mask_ptr);
 
 int main()
 {
-  unsigned long mask = 0xffffffff;
-  unsigned int len = sizeof(mask);
-
-  if (sched_setaffinity(0, len, &mask) < 0) {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0) {
     return -1;
   }
   return 0;
@@ -1277,8 +1411,22 @@ void foo(void *a) {
     get_myaddress((struct sockaddr_in*)a);
 }
 EOT
-test_cxx "whether get_myaddress() exists" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether get_myaddress() exists])
+test_cxx "whether has get_myaddress" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_GET_MYADDRESS, $pass, [whether has get_myaddress])
+
+#### check if mprotect exists ####
+cat > $t <<EOT
+#include <stdio.h>
+#include <sys/mman.h>
+
+void foo(void *a,int l,int fd) {
+     void *pg = NULL;
+     size_t pagesize = 4096;
+     mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
+}
+EOT
+test_cxx "whether has mprotect" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_MPROTECT, $pass, [whether has mprotect])
 
 #### check if glibc backtrace exists ####
 cat > $t <<EOT
@@ -1427,8 +1575,7 @@ cat > $t <<EOT
 #include <papi.h>
                                                                                 
 int main() {
-    int Events[[1]] = { PAPI_TOT_CYC };
-    if (PAPI_start_counters(Events, 1) != PAPI_OK) return 1;
+    if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) return 1;
     return 0;
 }
 EOT
@@ -1463,6 +1610,72 @@ then
 	add_flag "CMK_BUILD_PYTHON=$PYTHON_VERSION" "python"
 fi
 
+#### Pick up METIS if the user asks for it ####
+
+AC_ARG_WITH([metis],
+	    [AS_HELP_STRING([--with-metis],
+	     [support the METIS graph partitioner and associated load balancer])],
+	    [],
+	    [with_metis=no])
+
+WITH_METIS=no
+if test "$with_metis" != "no"
+then
+  Echo "Compiling Charm with support for METIS"
+  WITH_METIS=yes
+  echo 'charm++: $(L)/libmoduleMetisLB.a $(L)/libmoduleTeamLB.a' >> $MAKEFILE_EXT
+  add_flag 'CMK_LIBS="$CMK_LIBS -lmetis"' "libmetis"
+  if test "$with_metis" != "yes"
+  then
+    add_flag "CMK_METIS=$with_metis" "Where to find METIS"
+    add_flag 'CMK_LIBDIR="$CMK_LIBDIR -L$CMK_METIS"' "Library path for METIS"
+    if test -r $with_metis/Lib/metis.h
+    then
+      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/Lib"' "Include path for METIS 4"
+    elif test -r $with_metis/../../include/metis.h
+    then
+      add_flag 'CMK_INCDIR="$CMK_INCDIR -I$CMK_METIS/../../include"' "Include path for METIS 5"
+    else
+      echo "I can't find metis.h, since the path you specified (which should point to the directory containing libmetis.a) is not laid out as I expect for version 4 or 5."
+      test_finish 1
+    fi
+  fi
+fi
+
+## Cray specific test
+if test "$CMK_BUILD_CRAY" = "1"
+then
+
+#### test if Cray node topology will work ####
+cat > $tc <<EOT
+#include <pmi.h>
+
+int main() {
+    int nid;
+    PMI_Get_nid(0, &nid);
+
+    return 0;
+}
+EOT
+test_linkc "whether PMI_Get_nid exists" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_PMI_GET_NID, $pass, [whether PMI_Get_nid exists])
+
+#### test if Cray mesh topology will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_meshcoord(0, &xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
+AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
+
+fi
+
 #### test if it can build shared library ####
 cat > $t <<EOT
 #include "stdlib.h"
@@ -1495,10 +1708,8 @@ EOT
 		test_linkso "whether can build shared library with MPI" "yes" "no" ""
 		BUILD_SHARED=$pass
 	fi
-	if test $BUILD_SHARED -eq 1
+	if test $BUILD_SHARED -eq 0
 	then
-		add_flag 'CMK_NO_BUILD_SHARED="false"' "build-shared"
-	else
 		add_flag 'CMK_NO_BUILD_SHARED="true"' "build-shared"
 	fi
 fi

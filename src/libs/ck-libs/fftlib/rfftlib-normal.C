@@ -353,7 +353,6 @@ NormalRealSlabArray::~NormalRealSlabArray()
 void NormalRealSlabArray::pup(PUP::er &p)
 {
     int i;
-    ArrayElement1D::pup(p);
 
 /*    for (i = 0; i < MAX_FFTS; i++) {
 	if (p.isUnpacking()) {

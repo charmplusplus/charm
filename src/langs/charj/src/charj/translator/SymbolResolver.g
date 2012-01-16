@@ -17,6 +17,7 @@ import java.util.Iterator;
     SymbolTable symtab;
     Scope currentScope;
     ClassSymbol currentClass = null;
+    MethodSymbol currentMethod = null;
 
     public SymbolResolver(TreeNodeStream input, SymbolTable symtab) {
         this(input);
@@ -36,20 +37,29 @@ topdown
 
 bottomup
     :   exitClass
+    |   exitMethod
     ;
 
 enterMethod
-@init {
-boolean entry = false;
-}
-    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL {entry = true;})
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            type IDENT .*)
-    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL {entry = true;})
+            type IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            IDENT .*)
+            IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+    ;
+
+exitMethod
+    :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
+            (^(MODIFIER_LIST .*))?
+            (^(GENERIC_TYPE_PARAM_LIST .*))? 
+            type IDENT .*) { currentMethod = null; }
+    |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
+            (^(MODIFIER_LIST .*))?
+            (^(GENERIC_TYPE_PARAM_LIST .*))? 
+            IDENT .*) { currentMethod = null; }
     ;
 
 enterClass
@@ -77,8 +87,9 @@ varDeclaration
             (^(MODIFIER_LIST .*))? type
             ^(VAR_DECLARATOR_LIST (^(VAR_DECLARATOR ^(IDENT .*) .*)
             {
-                //System.out.println("Resolved type of variable " + $IDENT.text + ": " +
-                //    $IDENT.def.type + ", symbol is " + $IDENT.def);
+                /*System.out.println("Resolved type of variable " + $IDENT.text + ": " +
+                    $IDENT.def.type + ", symbol is " + $IDENT.def);*/
+                Type varType = (Type)$IDENT.def.type;
                 if (currentClass != null) {
                     ClassSymbol declType = null;
                     if ($type.sym instanceof ClassSymbol) {
@@ -88,11 +99,15 @@ varDeclaration
                     }
 
                     if (declType != null) {
-                        //System.out.println("Looking to extern " + $IDENT.text + " as " + declType);
                         if (declType.isChare && declType != currentClass) {
-                            //System.out.println("extern added");
                             currentClass.addExtern(declType.getTypeName());
                         }
+                    }
+                    if (currentMethod != null && currentMethod.hasSDAG && varType != null) {
+                        String mangledName = "_sdag_" + currentMethod.getScopeName() + "_" + $IDENT.text;
+                        //System.out.println("var " + $IDENT.text + " is an sdag local; adding to class as " +
+                        //    varType.getTypeName() + " " + mangledName + "\n");
+                        currentClass.addSDAGLocal(varType.getTranslatedTypeName(), $IDENT.text, mangledName);
                     }
                 }
             }
@@ -203,17 +218,21 @@ primaryExpression returns [Type type]
                 $IDENT.symbolType = $type;
                 //System.out.println("Resolved type of " + $IDENT.text + ": " + $type + ", symbol is " + $IDENT.def);
             } else {
-                System.out.println("Couldn't resolve IDENT type: " + $IDENT.text);
+                if (!$IDENT.text.equals("thishandle") &&
+                        !$IDENT.text.equals("thisIndex") &&
+                        !$IDENT.text.equals("thisProxy")) {
+                    System.out.println("ERROR: Couldn't resolve IDENT type: " + $IDENT.text);
+                }
             }
         }
     |   THIS {
             $THIS.def = symtab.getEnclosingClass($THIS.scope);
-            $type = $THIS.def.type;
+            $type = new PointerType(symtab, $THIS.def.type);
             $THIS.symbolType = $type;
         }
     |   SUPER {
             $SUPER.def = symtab.getEnclosingClass($SUPER.scope).superClass;
-            $type = $SUPER.def.type;
+            $type = new PointerType(symtab, $SUPER.def.type);
             $SUPER.symbolType = $type;
         }
     |   ^((DOT { parentNode = $DOT; } | ARROW { parentNode = $ARROW; } ) e=expr
@@ -225,6 +244,7 @@ primaryExpression returns [Type type]
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
             if (et instanceof PointerType) et = ((PointerType)et).baseType;
+			if (et instanceof ProxySectionType) et = ((ProxySectionType)et).baseType;
             ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {
@@ -242,7 +262,7 @@ primaryExpression returns [Type type]
                 memberNode.symbolType = $type;
                 parentNode.def = s;
                 parentNode.symbolType = $type;
-            } else {
+            } else if (!(et instanceof ExternalSymbol)) {
                 System.out.println("Couldn't resolve access " + memberText);
             }
         }
@@ -349,34 +369,17 @@ type returns [Type sym]
 	boolean proxySection = false;
 }
 @after {
-    //System.out.println("\ntype string: " + typeText);
-    //System.out.println("direct scope: " + scope);
     $start.symbolType = scope.resolveType(typeText);
-    //System.out.println("symbolType: " + $start.symbolType);
     if (proxy && $start.symbolType != null) $start.symbolType = new ProxyType(symtab, $start.symbolType);
     if (pointer && $start.symbolType != null) $start.symbolType = new PointerType(symtab, $start.symbolType);
 	if (proxySection && $start.symbolType != null) $start.symbolType = new ProxySectionType(symtab, $start.symbolType);
-
-    // TODO: Special case for Arrays, change this?
-    if (typeText != null && typeText.size() > 0 &&
-        typeText.get(0).name.equals("Array") && $start.symbolType == null) {
-
-        int numDims = 1;
-
-        ClassSymbol cs = new ClassSymbol(symtab, "Array");
-        cs.templateArgs = typeText.get(0).parameters;
-
-        if (cs.templateArgs != null &&
-            cs.templateArgs.size() > 1) {
-            if (cs.templateArgs.get(1) instanceof LiteralType) {
-                numDims = Integer.valueOf(((LiteralType)cs.templateArgs.get(1)).literal);
-            }
-        }
-        $start.symbolType = new PointerType(symtab, cs);
-    }
-
     $sym = $start.symbolType;
-    if ($sym == null) System.out.println("Couldn't resolve type: " + typeText);
+    if ($sym == null) {
+        //System.out.println("type string: " + typeText);
+        //System.out.println("direct scope: " + scope);
+        //System.out.println("symbolType: " + $start.symbolType);
+        System.out.println("ERROR: Couldn't resolve type " + typeText);
+    }
 }
     :   VOID {
             scope = $VOID.scope;
@@ -389,17 +392,18 @@ type returns [Type sym]
     |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
                 (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-                {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
+                {typeText.add(new TypeName($IDENT.text, tparams)); }))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT  {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
 	|	^(ARRAY_SECTION_TYPE { scope = $ARRAY_SECTION_TYPE.scope; proxySection = true; }
 			^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
-            (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-            {typeText.add(new TypeName($IDENT.text, tparams));}))+) .*)
+                        (t1=type {tparams.add($t1.sym);}
+                        |lit1=literalVal {tparams.add($lit1.type);} )*))?)
+            {typeText.add(new TypeName($IDENT.text, tparams));})+) .*)
     ;
 
 classType

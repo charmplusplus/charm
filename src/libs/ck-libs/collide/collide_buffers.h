@@ -77,7 +77,7 @@ template <class T> class growableBufferT : public bufferT<T> {
   growableBufferT<T> &operator=(const growableBufferT<T> &in);
  public:
   growableBufferT<T>() :buf() {max=0;}
-  growableBufferT<T>(size_t Len) :buf(Len*sT) {set((T*)buf.getData(),Len);max=Len;}
+  growableBufferT<T>(size_t Len) :buf(Len*sT) {this->set((T*)buf.getData(),Len);max=Len;}
     
   inline int length(void) const {return super::length();}
   inline int size(void) const {return super::length();}
@@ -94,12 +94,12 @@ template <class T> class growableBufferT : public bufferT<T> {
   void empty(void) {reallocate(0);}
   void push_back(const T& v) {
     grow(length()+1);
-    at(this->getLength()++)=v;
+    this->at(this->getLength()++)=v;
   }
   //Push without checking bounds
   void push_fast(const T& v) {
     grow(length()+1);
-    at(this->getLength()++)=v;
+    this->at(this->getLength()++)=v;
   }
   void grow(int min) {
     if (min>max) {
@@ -117,7 +117,7 @@ template <class T> class growableBufferT : public bufferT<T> {
   }
   void resize(int Len) {
     buf.resize(Len*sT);
-    setData((T*)buf.getData());
+    this->setData((T*)buf.getData());
     max=Len;
   }
   void reallocate(int Len) {

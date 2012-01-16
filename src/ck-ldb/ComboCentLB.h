@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -29,7 +22,7 @@ public:
 
 protected:
   virtual CmiBool QueryBalanceNow(int) { return CmiTrue; };  
-  virtual void work(LDStats* stats,int count);
+  virtual void work(LDStats* stats);
 
 private:  
 //  CProxy_CentralLB thisProxy;

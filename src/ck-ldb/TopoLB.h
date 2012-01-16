@@ -50,7 +50,7 @@ class TopoLB : public CentralLB
     TopoLB (const CkLBOptions &opt);
     TopoLB (CkMigrateMessage *m) : CentralLB (m) { };
   
-    void work (CentralLB::LDStats *stats, int count);
+    void work (LDStats *stats);
    // void work_fromFile (char *filename);
     void pup (PUP::er &p) { CentralLB::pup(p); }
     	

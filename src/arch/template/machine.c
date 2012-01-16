@@ -313,7 +313,7 @@ void CmiDestroyLock(CmiNodeLock lock);
 /* If all the CMK_TIMER_USE_ are set to 0, the following timer functions are
    needed. */
 
-void   CmiTimerInit();
+void   CmiTimerInit(char **argv);
 double CmiTimer();
 double CmiWallTimer();
 double CmiCpuTimer();

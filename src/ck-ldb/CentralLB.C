@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -266,8 +259,14 @@ void CentralLB::BuildStatsMsg()
   theLbdb->IdleTime(&msg->idletime);
   theLbdb->BackgroundLoad(&msg->bg_walltime,&msg->bg_cputime);
 */
+#if CMK_LB_CPUTIMER
   theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
 		   &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
+#else
+  theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
+		   &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
+#endif
+
   msg->pe_speed = myspeed;
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
@@ -313,7 +312,7 @@ void CentralLB::SendStats()
 
   statsMsg = NULL;
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   BgEndStreaming();
 #endif
 
@@ -366,7 +365,7 @@ void CentralLB::MissMigrate(int waitForBarrier)
 // not used when USE_REDUCTION = 1
 void CentralLB::buildStats()
 {
-    statsData->count = stats_msg_count;
+    statsData->nprocs() = stats_msg_count;
     // allocate space
     statsData->objData.resize(statsData->n_objs);
     statsData->from_proc.resize(statsData->n_objs);
@@ -410,10 +409,12 @@ void CentralLB::depositData(CLBStatsMsg *m)
   struct ProcStats &procStat = statsData->procs[pe];
   procStat.pe = pe;
   procStat.total_walltime = m->total_walltime;
-  procStat.total_cputime = m->total_cputime;
   procStat.idletime = m->idletime;
   procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+  procStat.total_cputime = m->total_cputime;
   procStat.bg_cputime = m->bg_cputime;
+#endif
   procStat.pe_speed = m->pe_speed;
   //procStat.utilization = 1.0;
   procStat.available = CmiTrue;
@@ -486,10 +487,12 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
       struct ProcStats &procStat = statsData->procs[pe];
       procStat.pe = pe;
       procStat.total_walltime = m->total_walltime;
-      procStat.total_cputime = m->total_cputime;
       procStat.idletime = m->idletime;
       procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+      procStat.total_cputime = m->total_cputime;
       procStat.bg_cputime = m->bg_cputime;
+#endif
       procStat.pe_speed = m->pe_speed;
       //procStat.utilization = 1.0;
       procStat.available = CmiTrue;
@@ -507,7 +510,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &msg)
  
   if (stats_msg_count == clients) {
 	DEBUGF(("[%d] All stats messages received \n",CmiMyPe()));
-    statsData->count = stats_msg_count;
+    statsData->nprocs() = stats_msg_count;
     thisProxy[CkMyPe()].LoadBalance();
   }
 #endif
@@ -548,11 +551,12 @@ void CentralLB::LoadBalance()
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
 
+  if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
+
   if (_lb_args.debug()) 
-      CmiPrintf("[%s] Load balancing step %d starting at %f in PE%d Memory:%fMB\n",
-                 lbName(), step(),start_lb_time, cur_ld_balancer, CmiMemoryUsage()/(1024.0*1024.0));
- //     CmiPrintf("[%d] n_obj:%d migratable:%d n_comm:%d\n", CkMyPe(), statsData->n_objs, statsData->n_migrateobjs, statsData->n_comm);
-//    double strat_start_time = CkWallTimer();
+      CmiPrintf("\nCharmLB> %s: PE [%d] step %d starting at %f Memory: %f MB\n",
+		  lbname, cur_ld_balancer, step(), start_lb_time,
+		  CmiMemoryUsage()/(1024.0*1024.0));
 
   // if we are in simulation mode read data
   if (LBSimulation::doSimulation) simulationRead();
@@ -561,7 +565,7 @@ void CentralLB::LoadBalance()
   for(proc = 0; proc < clients; proc++)
       statsData->procs[proc].available = (CmiBool)availVector[proc];
 
-  preprocess(statsData, clients);
+  preprocess(statsData);
 
 //    CkPrintf("Before Calling Strategy\n");
 
@@ -569,7 +573,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       info.getInfo(statsData, clients, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
@@ -588,19 +592,10 @@ void CentralLB::LoadBalance()
   }
 #endif
   
-  double strat_start_time = CkWallTimer();
-  LBMigrateMsg* migrateMsg = Strategy(statsData, clients);
+  LBMigrateMsg* migrateMsg = Strategy(statsData);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	migrateMsg->step = step();
 #endif
-  if (_lb_args.debug()) {
-    CkPrintf("Strategy took %f seconds.\n", CkWallTimer()-strat_start_time);
-    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
-    CkPrintf("[%s] memUsage: LBManager:%dKB CentralLB:%dKB\n", 
-  	      lbName(), (int)lbdbMemsize, (int)(useMem()/1000));
-  }
-
-//    CkPrintf("returned successfully\n");
 
 #if CMK_REPLAYSYSTEM
   CpdHandleLBMessage(&migrateMsg);
@@ -622,7 +617,7 @@ void CentralLB::LoadBalance()
       LBInfo info(clients);
         // not take comm data
       getPredictedLoadWithMsg(statsData, clients, migrateMsg, info, 0);
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
@@ -658,8 +653,6 @@ void CentralLB::LoadBalance()
 #endif
 }
 
-//    double strat_end_time = CkWallTimer();
-//    CkPrintf("Strat elapsed time %f\n",strat_end_time-strat_start_time);
 // test if sender and receiver in a commData is nonmigratable.
 static int isMigratable(LDObjData **objData, int *len, int count, const LDCommData &commData)
 {
@@ -708,7 +701,9 @@ void CentralLB::removeNonMigratable(LDStats* stats, int count)
     }
     else {
       stats->procs[stats->from_proc[i]].bg_walltime += odata.wallTime;
+#if CMK_LB_CPUTIMER
       stats->procs[stats->from_proc[i]].bg_cputime += odata.cpuTime;
+#endif
     }
   }
   CmiAssert(stats->n_migrateobjs == n_objs);
@@ -911,6 +906,8 @@ void CentralLB::MigrationDone(int balancing)
     startLoadBalancingMlog(&resumeCentralLbAfterChkpt,(void *)this);
 #endif
 
+  LBDatabase::Object()->MigrationDone();    // call registered callbacks
+
   LoadbalanceDone(balancing);        // callback
 #if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
   // if sync resume invoke a barrier
@@ -1009,8 +1006,9 @@ void CentralLB::CheckMigrationComplete()
   if (lbdone == 2) {
     if (_lb_args.debug() && CkMyPe()==0) {
       double end_lb_time = CkWallTimer();
-      CkPrintf("[%s] Load balancing step %d finished at %f duration %f\n",
-                lbName(), step()-1,end_lb_time,end_lb_time - start_lb_time);
+      CkPrintf("CharmLB> %s: PE [%d] step %d finished at %f duration %f s\n\n",
+                lbname, cur_ld_balancer, step()-1, end_lb_time,
+		end_lb_time-start_lb_time);
     }
     lbdone = 0;
     future_migrates_expected = -1;
@@ -1027,7 +1025,7 @@ void CentralLB::CheckMigrationComplete()
 #endif
 }
 
-void CentralLB::preprocess(LDStats* stats,int count)
+void CentralLB::preprocess(LDStats* stats)
 {
   if (_lb_args.ignoreBgLoad())
     stats->clearBgLoad();
@@ -1037,25 +1035,33 @@ void CentralLB::preprocess(LDStats* stats,int count)
 }
 
 // default load balancing strategy
-LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
+  double strat_start_time = CkWallTimer();
   if (_lb_args.debug())
-    CkPrintf("[%d] %s started at: %f. \n",CkMyPe(), lbname, CmiWallTimer());
+    CkPrintf("CharmLB> %s: PE [%d] strategy starting at %f\n", lbname, cur_ld_balancer, strat_start_time);
 
-  work(stats, count);
+  work(stats);
 
-  if (_lb_args.debug()>1)  {
-    CkPrintf("Obj Map:\n");
+  if (_lb_args.debug()>2)  {
+    CkPrintf("CharmLB> Obj Map:\n");
     for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
     CkPrintf("\n");
   }
 
-  LBMigrateMsg *msg = createMigrateMsg(stats, count);
+  LBMigrateMsg *msg = createMigrateMsg(stats);
 
   if (_lb_args.debug()) {
+    double strat_end_time = CkWallTimer();
     envelope *env = UsrToEnv(msg);
-    CkPrintf("[%d] %s finished at: %f. %d objects migrating. Total LBMigrateMsg size:%.2fMB\n", CkMyPe(), lbname, CmiWallTimer(), msg->n_moves, env->getTotalsize()/1024.0/1024.0);
+
+    double lbdbMemsize = LBDatabase::Object()->useMem()/1000;
+    CkPrintf("CharmLB> %s: PE [%d] Memory: LBManager: %d KB CentralLB: %d KB\n",
+  	      lbname, cur_ld_balancer, (int)lbdbMemsize, (int)(useMem()/1000));
+    CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
+    CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
+	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
   }
 
   return msg;
@@ -1064,14 +1070,14 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats,int count)
 #endif
 }
 
-void CentralLB::work(LDStats* stats,int count)
+void CentralLB::work(LDStats* stats)
 {
   // does nothing but print the database
   stats->print();
 }
 
 // generate migrate message from stats->from_proc and to_proc
-LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
+LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats)
 {
   int i;
   CkVec<MigrateInfo*> migrateInfo;
@@ -1100,8 +1106,6 @@ LBMigrateMsg * CentralLB::createMigrateMsg(LDStats* stats,int count)
     delete item;
     migrateInfo[i] = 0;
   }
-  if (_lb_args.debug())
-    CkPrintf("%s: %d objects migrating.\n", lbname, migrate_count);
   return msg;
 }
 
@@ -1200,10 +1204,10 @@ void CentralLB::simulationRead() {
 
     // now pass it to the strategy routine
     double startT = CkWallTimer();
-    preprocess(statsData, LBSimulation::simProcs);
+    preprocess(statsData);
     CmiPrintf("%s> Strategy starts ... \n", lbname);
-    LBMigrateMsg* migrateMsg = Strategy(statsData, LBSimulation::simProcs);
-    CmiPrintf("%s> Strategy took %fs memory usage: CentralLB:%dKB. \n", 
+    LBMigrateMsg* migrateMsg = Strategy(statsData);
+    CmiPrintf("%s> Strategy took %fs memory usage: CentralLB: %d KB.\n",
                lbname, CkWallTimer()-startT, (int)(useMem()/1000));
 
     // now calculate the results of the load balancing simulation
@@ -1383,9 +1387,13 @@ void CLBStatsMsg::pup(PUP::er &p) {
   int i;
   p|from_pe;
   p|pe_speed;
-  p|total_walltime; p|total_cputime;
+  p|total_walltime;
   p|idletime;
-  p|bg_walltime;   p|bg_cputime;
+  p|bg_walltime;
+#if CMK_LB_CPUTIMER
+  p|total_cputime;
+  p|bg_cputime;
+#endif
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | step;
 #endif

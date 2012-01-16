@@ -26,7 +26,8 @@ int main(int argc, char * argv[]) {
   local = (char *)ARMCI_Malloc_local(MAX_BUF_SIZE*sizeof(char));
 
   ARMCI_Barrier();
-   
+  ARMCI_Migrate();
+
   if (thisImage == 0) {
     for(size = 1; size <= MAX_BUF_SIZE; size = size<<1){
       startTime = CkWallTimer();
@@ -42,7 +43,7 @@ int main(int argc, char * argv[]) {
     ARMCI_Barrier();
   }
 
-
+  
   ARMCI_Free(baseAddress[thisImage]);
   ARMCI_Free_local(local);
   // finalize

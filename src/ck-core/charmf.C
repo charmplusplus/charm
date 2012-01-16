@@ -40,15 +40,13 @@ extern "C" void FTN_NAME(CKNUMPES, cknumpes)(int *npe)
 
 extern "C" void FTN_NAME(CKPRINTF, ckprintf)(const char *format, ...)
 {
-  int ifmt, format_len, str_len=0, temp_len, flag;
+  int ifmt, str_len=0, temp_len, flag;
   int *i; float *f; double *d;
   char str[100], temp_fmt[10];
   int j;
 
   va_list args;
   va_start(args,format);
-  //format_len = strlen(format);
-  //for (ifmt=0; ifmt<format_len;) {
   for (ifmt=0;;) {
     if (format[ifmt]=='$') break; // $ is end of input
     if (format[ifmt]=='%') {

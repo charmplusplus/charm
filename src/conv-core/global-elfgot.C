@@ -59,10 +59,13 @@ A more readable summary is at:
 
 #define DEBUG_GOT_MANAGER 0
 
-#define UNPROTECT_GOT     0
+#define UNPROTECT_GOT     1
 
-#if UNPROTECT_GOT
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
 #include <sys/mman.h>
+#if CMK_HAS_GETPAGESIZE
+#include <unistd.h>
+#endif
 #endif
 
 #ifdef __INTEL_COMPILER
@@ -127,7 +130,7 @@ static void readBlacklist()
   printf("Loading blacklist from file \"%s\" ... \n", fname);
   while (!feof(bl)){
     char name[512];
-    fscanf(bl, "%s\n", &name);
+    fscanf(bl, "%s\n", name);
      _blacklist.push_back(strdup(name));
   }
   fclose(bl);
@@ -280,6 +283,13 @@ CtgGlobalList::CtgGlobalList() {
 
     int padding = 0;
 
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
+    size_t pagesize = CMK_MEMORY_PAGESIZE;
+#if CMK_HAS_GETPAGESIZE
+    pagesize = getpagesize();
+#endif
+#endif
+
     // Figure out which relocation data entries refer to global data:
     for(count = 0; count < relt_size; count ++) {
         type = ELFXX_R_TYPE(relt[count].r_info);
@@ -326,11 +336,11 @@ CtgGlobalList::CtgGlobalList() {
 	if ((void *)*gGot != (void *)symt[symindx].st_value)
 	    CmiAbort("CtgGlobalList: symbol table and GOT address mismatch!\n");
 
-#if UNPROTECT_GOT
+#if UNPROTECT_GOT && CMK_HAS_MPROTECT
 	static void *last = NULL;
-        void *pg = (void*)(((size_t)gGot) & ~(CMK_MEMORY_PAGESIZE-1));
+        void *pg = (void*)(((size_t)gGot) & ~(pagesize-1));
         if (pg != last) {
-            mprotect(pg, CMK_MEMORY_PAGESIZE, PROT_READ | PROT_WRITE);
+            mprotect(pg, pagesize, PROT_READ | PROT_WRITE);
             last = pg;
         }
 #endif
@@ -360,11 +370,11 @@ public:
     void *data_seg;  
     int seg_size; /* size in bytes of data segment */
     
-    void allocate(int size) {
+    void allocate(int size, CthThread tid) {
       seg_size=size;
         /* global data segment need to be isomalloc */
       if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-        data_seg=CmiIsomalloc(seg_size);
+        data_seg=CmiIsomalloc(seg_size,tid);
       else
         data_seg=malloc(seg_size);
     }
@@ -376,7 +386,11 @@ public:
     ~CtgGlobalStruct() {
       if (data_seg) {
         if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+        {
+#if !CMK_USE_MEMPOOL_ISOMALLOC
           CmiIsomallocFree(data_seg);
+#endif
+        }
         else
           free(data_seg);
         data_seg = NULL;
@@ -390,9 +404,13 @@ void CtgGlobalStruct::pup(PUP::er &p) {
     p | seg_size;
         /* global data segment need to be isomalloc pupped */
     if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+#if CMK_USE_MEMPOOL_ISOMALLOC
+      pup_bytes(&p, &data_seg, sizeof(void*));
+#else
       CmiIsomallocPup(&p, &data_seg);
-    else {
-      if (p.isUnpacking()) allocate(seg_size);
+#endif
+      else {
+      if (p.isUnpacking()) allocate(seg_size, NULL);
       p((char *)data_seg, seg_size);
     }
 }
@@ -420,7 +438,7 @@ void CtgInit(void) {
 			CmiPrintf("Charm++> -swapglobals enabled\n");
 		}
 		
-		g->allocate(l->getSize());
+		g->allocate(l->getSize(), NULL);
 		l->read(g->data_seg);
 		l->install(g->data_seg);
 		_ctgList=l;
@@ -431,9 +449,9 @@ void CtgInit(void) {
 }
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void) {
+CtgGlobals CtgCreate(CthThread tid) {
 	CtgGlobalStruct *g=new CtgGlobalStruct;
-	g->allocate(_ctgList->getSize());
+	g->allocate(_ctgList->getSize(), tid);
 	_ctgList->read(g->data_seg);
 	return g;
 }

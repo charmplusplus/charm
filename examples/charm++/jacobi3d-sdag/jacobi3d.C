@@ -2,8 +2,6 @@
  *  Author: Abhinav S Bhatele
  *  Date Created: June 01st, 2009
  *
- *  This does a topological placement for a 3d jacobi.
- *
  *	
  *	      *****************
  *	   *		   *  *
@@ -26,8 +24,6 @@
 #include "jacobi3d.decl.h"
 #include "TopoManager.h"
 
-// See README for documentation
-
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int arrayDimX;
 /*readonly*/ int arrayDimY;
@@ -40,8 +36,6 @@
 /*readonly*/ int num_chare_x;
 /*readonly*/ int num_chare_y;
 /*readonly*/ int num_chare_z;
-
-/*readonly*/ int globalBarrier;
 
 static unsigned long next = 1;
 
@@ -56,8 +50,7 @@ int myrand(int numpes) {
 #define wrap_y(a)	(((a)+num_chare_y)%num_chare_y)
 #define wrap_z(a)	(((a)+num_chare_z)%num_chare_z)
 
-//#define USE_3D_ARRAYS		0
-#define index(a, b, c)	( (a)*(blockDimY+2)*(blockDimZ+2) + (b)*(blockDimZ+2) + (c) )
+#define index(a,b,c)	((a)+(b)*(blockDimX+2)+(c)*(blockDimX+2)*(blockDimY+2))
 
 #define MAX_ITER		26
 #define WARM_ITER		5
@@ -124,39 +117,7 @@ class Main : public CBase_Main {
       CkPrintf("Block Dimensions: %d %d %d\n", blockDimX, blockDimY, blockDimZ);
 
       // Create new array of worker chares
-#if USE_TOPOMAP
-      CProxy_JacobiMap map = CProxy_JacobiMap::ckNew(num_chare_x, num_chare_y, num_chare_z);
-      CkPrintf("Topology Mapping is being done ... \n");
-      CkArrayOptions opts(num_chare_x, num_chare_y, num_chare_z);
-      opts.setMap(map);
-      array = CProxy_Jacobi::ckNew(opts);
-#else
       array = CProxy_Jacobi::ckNew(num_chare_x, num_chare_y, num_chare_z);
-#endif
-
-      TopoManager tmgr;
-      CkArray *jarr = array.ckLocalBranch();
-      int jmap[num_chare_x][num_chare_y][num_chare_z];
-
-      int hops=0, p;
-      for(int i=0; i<num_chare_x; i++)
-	for(int j=0; j<num_chare_y; j++)
-	  for(int k=0; k<num_chare_z; k++) {
-	    jmap[i][j][k] = jarr->procNum(CkArrayIndex3D(i, j, k));
-	  }
-
-      for(int i=0; i<num_chare_x; i++)
-	for(int j=0; j<num_chare_y; j++)
-	  for(int k=0; k<num_chare_z; k++) {
-	    p = jmap[i][j][k];
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i+1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[wrap_x(i-1)][j][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j+1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][wrap_y(j-1)][k]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k+1)]);
-	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
-	  }
-      CkPrintf("Total Hops: %d\n", hops);
 
       //Start the computation
       array.doStep();
@@ -196,20 +157,16 @@ class Jacobi: public CBase_Jacobi {
     // Constructor, initialize values
     Jacobi() {
       __sdag_init();
-      usesAtSync=CmiTrue;
 
       int i, j, k;
       // allocate a three dimensional array
       temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
       new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
 
-      for(i=0; i<blockDimX+2; ++i) {
-	for(j=0; j<blockDimY+2; ++j) {
-	  for(k=0; k<blockDimZ+2; ++k) {
+      for(k=0; k<blockDimZ+2; ++k)
+	for(j=0; j<blockDimY+2; ++j)
+	  for(i=0; i<blockDimX+2; ++i)
 	    temperature[index(i, j, k)] = 0.0;
-	  }
-	} 
-      }
 
       iterations = 0;
       imsg = 0;
@@ -241,7 +198,6 @@ class Jacobi: public CBase_Jacobi {
 
     // Send ghost faces to the six neighbors
     void begin_iteration(void) {
-      AtSync();
       if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
           CkPrintf("Start of iteration %d\n", iterations);
           //BgPrintf("BgPrint> Start of iteration at %f\n");
@@ -256,23 +212,23 @@ class Jacobi: public CBase_Jacobi {
       double *frontGhost =  new double[blockDimX*blockDimY];
       double *backGhost =  new double[blockDimX*blockDimY];
 
-      for(int j=0; j<blockDimY; ++j) 
-	for(int k=0; k<blockDimZ; ++k) {
+      for(int k=0; k<blockDimZ; ++k)
+	for(int j=0; j<blockDimY; ++j) {
 	  leftGhost[k*blockDimY+j] = temperature[index(1, j+1, k+1)];
 	  rightGhost[k*blockDimY+j] = temperature[index(blockDimX, j+1, k+1)];
-      }
+	}
 
-      for(int i=0; i<blockDimX; ++i) 
-	for(int k=0; k<blockDimZ; ++k) {
+      for(int k=0; k<blockDimZ; ++k)
+	for(int i=0; i<blockDimX; ++i) {
 	  topGhost[k*blockDimX+i] = temperature[index(i+1, 1, k+1)];
 	  bottomGhost[k*blockDimX+i] = temperature[index(i+1, blockDimY, k+1)];
-      }
+	}
 
-      for(int i=0; i<blockDimX; ++i) 
-	for(int j=0; j<blockDimY; ++j) {
+      for(int j=0; j<blockDimY; ++j)
+	for(int i=0; i<blockDimX; ++i) {
 	  frontGhost[j*blockDimX+i] = temperature[index(i+1, j+1, 1)];
 	  backGhost[j*blockDimX+i] = temperature[index(i+1, j+1, blockDimZ)];
-      }
+	}
 
       // Send my left face
       thisProxy(wrap_x(thisIndex.x-1), thisIndex.y, thisIndex.z)
@@ -280,57 +236,64 @@ class Jacobi: public CBase_Jacobi {
       // Send my right face
       thisProxy(wrap_x(thisIndex.x+1), thisIndex.y, thisIndex.z)
 	  .receiveGhosts(iterations, LEFT, blockDimY, blockDimZ, rightGhost);
-      // Send my top face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
-	  .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
       // Send my bottom face
-      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y-1), thisIndex.z)
 	  .receiveGhosts(iterations, TOP, blockDimX, blockDimZ, bottomGhost);
+      // Send my top face
+      thisProxy(thisIndex.x, wrap_y(thisIndex.y+1), thisIndex.z)
+	  .receiveGhosts(iterations, BOTTOM, blockDimX, blockDimZ, topGhost);
       // Send my front face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z-1))
 	  .receiveGhosts(iterations, BACK, blockDimX, blockDimY, frontGhost);
       // Send my back face
       thisProxy(thisIndex.x, thisIndex.y, wrap_z(thisIndex.z+1))
 	  .receiveGhosts(iterations, FRONT, blockDimX, blockDimY, backGhost);
+
+      delete[] leftGhost;
+      delete[] rightGhost;
+      delete[] bottomGhost;
+      delete[] topGhost;
+      delete[] frontGhost;
+      delete[] backGhost;
     }
 
     void processGhosts(int dir, int height, int width, double gh[]) {
       switch(dir) {
 	case LEFT:
-	  for(int j=0; j<height; ++j) 
-	    for(int k=0; k<width; ++k) {
+	  for(int k=0; k<width; ++k)
+	    for(int j=0; j<height; ++j) {
 	      temperature[index(0, j+1, k+1)] = gh[k*height+j];
-	  }
+	    }
 	  break;
 	case RIGHT:
-	  for(int j=0; j<height; ++j) 
-	    for(int k=0; k<width; ++k) {
+	  for(int k=0; k<width; ++k)
+	    for(int j=0; j<height; ++j) {
 	      temperature[index(blockDimX+1, j+1, k+1)] = gh[k*height+j];
-	  }
-	  break;
-	case TOP:
-	  for(int i=0; i<height; ++i) 
-	    for(int k=0; k<width; ++k) {
-	      temperature[index(i+1, 0, k+1)] = gh[k*height+i];
-	  }
+	    }
 	  break;
 	case BOTTOM:
-	  for(int i=0; i<height; ++i) 
-	    for(int k=0; k<width; ++k) {
+	  for(int k=0; k<width; ++k)
+	    for(int i=0; i<height; ++i) {
+	      temperature[index(i+1, 0, k+1)] = gh[k*height+i];
+	    }
+	  break;
+	case TOP:
+	  for(int k=0; k<width; ++k)
+	    for(int i=0; i<height; ++i) {
 	      temperature[index(i+1, blockDimY+1, k+1)] = gh[k*height+i];
-	  }
+	    }
 	  break;
 	case FRONT:
-	  for(int i=0; i<height; ++i) 
-	    for(int j=0; j<width; ++j) {
-	      temperature[index(i+1, j+1, blockDimZ+1)] = gh[j*height+i];
-	  }
+	  for(int j=0; j<width; ++j)
+	    for(int i=0; i<height; ++i) {
+	      temperature[index(i+1, j+1, 0)] = gh[j*height+i];
+	    }
 	  break;
 	case BACK:
-	  for(int i=0; i<height; ++i) 
-	    for(int j=0; j<width; ++j) {
-	      temperature[index(i+1, j+1, 0)] = gh[j*height+i];
-	  }
+	  for(int j=0; j<width; ++j)
+	    for(int i=0; i<height; ++i) {
+	      temperature[index(i+1, j+1, blockDimZ+1)] = gh[j*height+i];
+	    }
 	  break;
 	default:
           CkAbort("ERROR\n");
@@ -361,9 +324,9 @@ class Jacobi: public CBase_Jacobi {
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
 #pragma unroll    
-      for(int i=1; i<blockDimX+1; ++i) {
-	for(int j=1; j<blockDimY+1; ++j) {
-	  for(int k=1; k<blockDimZ+1; ++k) {
+      for(int k=1; k<blockDimZ+1; ++k)
+	for(int j=1; j<blockDimY+1; ++j)
+	  for(int i=1; i<blockDimX+1; ++i) {
 	    // update my value based on the surrounding values
 	    new_temperature[index(i, j, k)] = (temperature[index(i-1, j, k)] 
 					    +  temperature[index(i+1, j, k)]
@@ -372,119 +335,23 @@ class Jacobi: public CBase_Jacobi {
 					    +  temperature[index(i, j, k-1)]
 					    +  temperature[index(i, j, k+1)]
 					    +  temperature[index(i, j, k)] ) * DIVIDEBY7;
-	  }
-	}
-      }
+	  } // end for
     }
 
     // Enforce some boundary conditions
     void constrainBC() {
       // Heat left, top and front faces of each chare's block
-      for(int i=1; i<blockDimX+1; ++i)
-	for(int k=1; k<blockDimZ+1; ++k)
+      for(int k=1; k<blockDimZ+1; ++k)
+	for(int i=1; i<blockDimX+1; ++i)
 	  temperature[index(i, 1, k)] = 255.0;
-      for(int j=1; j<blockDimY+1; ++j)
-	for(int k=1; k<blockDimZ+1; ++k)
-	  temperature[index(1, j, k)] = 255.0;
-      for(int i=1; i<blockDimX+1; ++i)
+      for(int k=1; k<blockDimZ+1; ++k)
 	for(int j=1; j<blockDimY+1; ++j)
+	  temperature[index(1, j, k)] = 255.0;
+      for(int j=1; j<blockDimY+1; ++j)
+	for(int i=1; i<blockDimX+1; ++i)
 	  temperature[index(i, j, 1)] = 255.0;
     }
 
-};
-
-/** \class JacobiMap
- *
- */
-
-class JacobiMap : public CkArrayMap {
-  public:
-    int X, Y, Z;
-    int *mapping;
-
-    JacobiMap(int x, int y, int z) {
-      X = x; Y = y; Z = z;
-      mapping = new int[X*Y*Z];
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-
-      TopoManager tmgr;
-      int dimNX, dimNY, dimNZ, dimNT;
-
-      dimNX = tmgr.getDimNX();
-      dimNY = tmgr.getDimNY();
-      dimNZ = tmgr.getDimNZ();
-      dimNT = tmgr.getDimNT();
-
-      // we are assuming that the no. of chares in each dimension is a 
-      // multiple of the torus dimension
-      int numCharesPerPe = X*Y*Z/CkNumPes();
-
-      int numCharesPerPeX = X / dimNX;
-      int numCharesPerPeY = Y / dimNY;
-      int numCharesPerPeZ = Z / dimNZ;
-      int pe = 0, pes = CkNumPes();
-
-#if USE_BLOCK_RNDMAP
-      int used[pes];
-      for(int i=0; i<pes; i++)
-	used[i] = 0;
-#endif
-
-      if(dimNT < 2) {	// one core per node
-	if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ); 
-	for(int i=0; i<dimNX; i++)
-	  for(int j=0; j<dimNY; j++)
-	    for(int k=0; k<dimNZ; k++)
-	    {
-#if USE_BLOCK_RNDMAP
-	      pe = myrand(pes); 
-	      while(used[pe]!=0) {
-		pe = myrand(pes); 
-	      }
-	      used[pe] = 1;
-#endif
-
-	      for(int ci=i*numCharesPerPeX; ci<(i+1)*numCharesPerPeX; ci++)
-		for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		  for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-#if USE_TOPOMAP
-		    mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k);
-#elif USE_BLOCK_RNDMAP
-		    mapping[ci*Y*Z + cj*Z + ck] = pe;
-#endif
-		  }
-	    }
-      } else {		// multiple cores per node
-	// In this case, we split the chares in the X dimension among the
-	// cores on the same node. The strange thing I figured out is that
-	// doing this in the Z dimension is not as good.
-	numCharesPerPeX /= dimNT;
-	if(CkMyPe()==0) CkPrintf("%d %d %d %d : %d %d %d \n", dimNX, dimNY, dimNZ, dimNT, numCharesPerPeX, numCharesPerPeY, numCharesPerPeZ);
-
-	for(int i=0; i<dimNX; i++)
-	  for(int j=0; j<dimNY; j++)
-	    for(int k=0; k<dimNZ; k++)
-	      for(int l=0; l<dimNT; l++)
-		for(int ci=(dimNT*i+l)*numCharesPerPeX; ci<(dimNT*i+l+1)*numCharesPerPeX; ci++)
-		  for(int cj=j*numCharesPerPeY; cj<(j+1)*numCharesPerPeY; cj++)
-		    for(int ck=k*numCharesPerPeZ; ck<(k+1)*numCharesPerPeZ; ck++) {
-		      mapping[ci*Y*Z + cj*Z + ck] = tmgr.coordinatesToRank(i, j, k, l);
-		    }
-      } // end of if
-
-      if(CkMyPe() == 0) CkPrintf("Map generated ... \n");
-    }
-
-    ~JacobiMap() { 
-      delete [] mapping;
-    }
-
-    int procNum(int, const CkArrayIndex &idx) {
-      int *index = (int *)idx.data();
-      return mapping[index[0]*Y*Z + index[1]*Z + index[2]]; 
-    }
 };
 
 #include "jacobi3d.def.h"

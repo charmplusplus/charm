@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -14,6 +7,8 @@
  be rewritten to use this, so there is no code duplication
 */
 
+#include "elements.h"
+#include "ckheap.h"
 #include "RefinerComm.h"
 
 
@@ -124,7 +119,6 @@ void RefinerComm::assign(computeInfo *c, int processor)
 
 void RefinerComm::assign(computeInfo *c, processorInfo *p)
 {
-   int oldProc = c->processor;
    c->processor = p->Id;
    p->computeSet->insert((InfoRecord *) c);
    p->computeLoad += c->load;
@@ -293,7 +287,7 @@ int RefinerComm::refine()
   int done = 0;
 
   while (!done) {
-    double bestSize, bestComm;
+    double bestSize;
     computeInfo *bestCompute;
     processorInfo *bestP;
     
@@ -305,7 +299,6 @@ int RefinerComm::refine()
     processorInfo *p = (processorInfo *) 
       lightProcessors->iterator((Iterator *) &nextProcessor);
     bestSize = 0;
-    bestComm = -1e8;
     bestP = NULL;
     bestCompute = NULL;
 

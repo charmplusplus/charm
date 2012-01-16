@@ -43,8 +43,8 @@ checkpoint and restart calculations involving \uw{foo}s.
 \subsubsection{PUP contract}
 
 Your object's pup routine must save and restore all your object's data.
-As shown, you save and restore a class's contents by writing a routine c
-alled ``pup'' which passes all the parts of the class to an object of type 
+As shown, you save and restore a class's contents by writing a routine
+called ``pup'' which passes all the parts of the class to an object of type
 \index{PUP::er} \kw{PUP::er}, which does the saving or restoring.  
 We often use ``pup'' as a verb, meaning ``to save/restore the value of''
 or equivalently, ``to call the pup routine of''.

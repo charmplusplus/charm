@@ -18,12 +18,20 @@ public: static int __idx;
 };
 #define CK_ALIGN(val,to) (((val)+(to)-1)&~((to)-1))
 
+#ifdef __GNUC__
+#define UNUSED __attribute__ ((unused))
+#else
+#define UNUSED
+#endif
+
 #include "pup.h"
 #include "cklists.h"
 #include "ckbitvector.h"
 #include "init.h"
 #include "debug-charm.h"
+#ifndef __CUDACC__
 #include "simd.h"
+#endif
 
 PUPbytes(CkChareID)
 PUPbytes(CkGroupID)
@@ -55,6 +63,8 @@ class CMessage_CkMessage {
 public:
 	static int __idx;
 };
+
+CkpvExtern(size_t *, _offsets);
 
 /// CkArgMsg is passed to the mainchare's constructor.
 class CkArgMsg : public CkMessage {
@@ -100,7 +110,8 @@ public:
                               prioPtr(NULL), prioStore(0) { depGroupID.setZero(); }
 
 	~CkEntryOptions() {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -113,7 +124,8 @@ public:
 		prioStore=integerPrio;
 	}
 	inline void setPriority(int prioBits_,const prio_t *prioPtr_) {
-		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+		if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                     queueingtype != CK_QUEUEING_ILIFO ) {
 			delete [] prioPtr;
 			prioBits = 0;
 		}
@@ -126,7 +138,8 @@ public:
 	}
 	inline void setPriority(const CkBitVector &cbv) {
 		if ( cbv.data != NULL ) {
-			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO ) {
+			if ( prioPtr != NULL && queueingtype != CK_QUEUEING_IFIFO &&
+                             queueingtype != CK_QUEUEING_ILIFO ) {
 				delete [] prioPtr;
 				prioBits = 0;
 			}
@@ -146,7 +159,7 @@ public:
 	}
 	
 	inline void setQueueing(int queueingtype_) {queueingtype=queueingtype_;}
-	inline void setGroupDepID(CkGroupID &gid) { depGroupID = gid; }
+	inline void setGroupDepID(const CkGroupID &gid) { depGroupID = gid; }
 
 	///These are used by CkAllocateMarshallMsg, below:
 	inline int getQueueing(void) const {return queueingtype;}
@@ -185,178 +198,10 @@ public:
 	friend void operator|(PUP::er &p,CkMsgQ<MSG> &v) {v.pup(p);}
 };
 
-/*******************************************************
-Array Index class.  An array index is just a hash key-- 
-a run of integers used to look up an object in a hash table.
-*/
+
 
 #include "ckhashtable.h"
-
-#ifndef CK_ARRAYINDEX_MAXLEN 
-#define CK_ARRAYINDEX_MAXLEN 3 /*Max. # of integers in an array index*/
-#endif
-
-
-class CkArrayIndex
-{
-public:
-        ///Length of index in *integers*
-        short int nInts;
-        ///Number of dimensions in this index, not valid for user-defined indices
-        short int dimension; 
-        /// The actual index data
-        union {
-            int index[CK_ARRAYINDEX_MAXLEN];
-            short int indexShorts[2 * CK_ARRAYINDEX_MAXLEN];
-        };
-
-        /// Zero out the index bits upon construction
-        CkArrayIndex(): nInts(0), dimension(0) { bzero(index,CK_ARRAYINDEX_MAXLEN*sizeof(int)); }
-
-	int *data(void)             {return index; }
-	const int *data(void) const {return index; }
-
-        int getCombinedCount(void) const {
-          if (nInts == 1) return data()[0];
-          else if (nInts == 2) return data()[0] * data()[1];
-          else if (nInts == 3) return data()[0] * data()[1] * data()[2];
-          else return 0;
-        }
-
-	void pup(PUP::er &p);
-
-    //These routines allow CkArrayIndex to be used in
-    //  a CkHashtableT
-	CkHashCode hash(void) const;
-	static CkHashCode staticHash(const void *a,size_t);
-	int compare(const CkArrayIndex &ind) const;
-	static int staticCompare(const void *a,const void *b,size_t);
-};
-
-inline CkHashCode CkArrayIndex::hash(void) const
-{
-        register int i;
-	register const int *d=data();
-	register CkHashCode ret=d[0];
-	for (i=1;i<nInts;i++)
-		ret +=circleShift(d[i],10+11*i)+circleShift(d[i],9+7*i);
-	return ret;
-}
-inline int CkArrayIndex::compare(const CkArrayIndex &i2) const
-{
-	const CkArrayIndex &i1=*this;
-#if CMK_1D_ONLY
-	return i1.data()[0]==i2.data()[0];
-#else
-	const int *d1=i1.data();
-	const int *d2=i2.data();
-	int l=i1.nInts;
-	if (l!=i2.nInts) return 0;
-	for (int i=0;i<l;i++)
-		if (d1[i]!=d2[i])
-			return 0;
-	//If we got here, the two keys must have exactly the same data
-	return 1;
-#endif
-}
-
-
-//This class is as large as any CkArrayIndex
-class CkArrayIndexMax : public CkArrayIndex {
-	void copyFrom(const CkArrayIndex &that)
-	{
-		nInts=that.nInts;
-		dimension=that.dimension;
-		for (int i=0;i<nInts;i++) index[i]=that.data()[i];
-	}
-public:
-	CkArrayIndexMax(void) { nInts=0; dimension=0; }
-	CkArrayIndexMax(int i) { nInts=0; dimension=0; }   // used for CkVec
-	CkArrayIndexMax(const CkArrayIndex &that) 
-		{copyFrom(that);}
-	CkArrayIndexMax &operator=(const CkArrayIndex &that) 
-		{copyFrom(that); return *this;}
-        void print() { CmiPrintf("%d: %d %d %d\n", nInts,index[0], index[1], index[2]); }
-        void sprint(char *str) { sprintf(str, "%d: %d %d %d", nInts,index[0], index[1], index[2]); }
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
-	/*
-	 * Code for the previous attempt to introduce CkArrayID into CmiObjId
-	 * 
-	 * Turns out this:
-	 * i) does not appear to work right.
-	 * ii) does not result in the same ID as the ones used by the Load
-	 *     Balancer.
-	 *
-	 * FIXME **CWL** - temporary solution:
-	 * i) ignore the arrayID passed into the method.
-	 * ii) use exactly the same code as the 
-	 *     idx2LDObjid(const CkArrayIndex &idx) found in cklocation.C
-	 *     The only problem is that the code only exists when the
-	 *     CMK_LBDB_ON is set, so we cannot reuse the code and
-	 *     risk having to modify the code should idx2LDObjid be changed.
-	 *
-	CmiObjId *getProjectionID(int arrayID) { 
-	  CmiObjId *ret = new CmiObjId;
-	  for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) {
-	    ret->id[i] = index.data[i];
-	  }
-	  ret->id[CK_ARRAYINDEX_MAXLEN] = arrayID;
-	  return ret; 
-	}
-	*/
-	CmiObjId *getProjectionID(int arrayID) {
-	  CmiObjId *ret = new CmiObjId;
-	    int i;
-	    const int *data=this->data();
-	    if (OBJ_ID_SZ>=this->nInts) {
-	      for (i=0;i<this->nInts;i++)
-		ret->id[i]=data[i];
-	      for (i=this->nInts;i<OBJ_ID_SZ;i++)
-		ret->id[i]=0;
-	    } else {
-	      //Must hash array index into LBObjid
-	      int j;
-	      for (j=0;j<OBJ_ID_SZ;j++)
-		ret->id[j]=data[j];
-	      for (i=0;i<this->nInts;i++)
-		for (j=0;j<OBJ_ID_SZ;j++)
-		  ret->id[j]+=circleShift(data[i],22+11*i*(j+1))+
-		    circleShift(data[i],21-9*i*(j+1));
-	    }
-	    return ret;
-	}
-
-        CmiBool operator==(const CkArrayIndexMax& idx) const {
-          if (nInts != idx.nInts) return CmiFalse;
-          for (int i=0; i<nInts; i++)
-                if (index[i] != idx.index[i]) return CmiFalse;
-          return CmiTrue;
-        }
-};
-PUPmarshall(CkArrayIndexMax)
-
-//A layout-compatible version of a CkArrayIndexMax.
-//  Needed, e.g., for use in unions where a constructor is forbidden.
-class CkArrayIndexStruct {
-public:
-	short int nInts;
-	short int dimension;
-	int index[CK_ARRAYINDEX_MAXLEN];
-	CkArrayIndexMax &asMax(void) 
-		{return *(CkArrayIndexMax *)this;}
-	const CkArrayIndexMax &asMax(void) const
-		{return *(const CkArrayIndexMax *)this;}
-	void pup(PUP::er &p) {
-		p|nInts;
-		p|dimension;
-		for (int i=0;i<nInts;i++) p|index[i];
-	}
-};
-PUPmarshall(CkArrayIndexStruct)
+#include "ckarrayindex.h"
 
 class CkArrayID {
 	CkGroupID _gid;
@@ -403,6 +248,7 @@ PUPmarshall(CkArrayID)
 class ChareMlogData;
 #endif
 
+#define CHARE_MAGIC    0x201201
 
 /**
   The base class of all parallel objects in Charm++,
@@ -415,6 +261,9 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+#if CMK_ERROR_CHECKING
+    int magic;
+#endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
@@ -443,6 +292,12 @@ class Chare {
     virtual void ckDebugPup(PUP::er &p);
     /// Called when a [threaded] charm entry method is created:
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#if CMK_ERROR_CHECKING
+    inline void sanitycheck() { 
+        if (magic != CHARE_MAGIC)
+          CmiAbort("Charm++ Fatal Error> Chare magic number does not agree, possibly due to pup functions not calling parent class.");
+    }
+#endif
 };
 
 //Superclass of all Groups that cannot participate in reductions.
@@ -670,8 +525,8 @@ class CkDelegateMgr : public IrrGroup {
     virtual void NodeGroupBroadcast(CkDelegateData *pd,int ep,void *m,CkNodeGroupID g);
     virtual void NodeGroupSectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s);
 
-    virtual void ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,int onPE,CkArrayID a);
-    virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndexMax &idx,CkArrayID a);
+    virtual void ArrayCreate(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,int onPE,CkArrayID a);
+    virtual void ArraySend(CkDelegateData *pd,int ep,void *m,const CkArrayIndex &idx,CkArrayID a);
     virtual void ArrayBroadcast(CkDelegateData *pd,int ep,void *m,CkArrayID a);
     virtual void ArraySectionSend(CkDelegateData *pd,int ep,void *m,int nsid,CkSectionID *s,int opts);
     virtual void initDelegateMgr(CProxy *proxy)  {}
@@ -702,12 +557,6 @@ class CkDelegateMgr : public IrrGroup {
 
 /**************************** Proxies **************************/
 
-/*Message delegation support, where you send a message via
-a proxy normally, but the message ends up routed via a 
-special delegateMgr group.
-*/
-class CkDelegateMgr;
-
 /** 
   A proxy is a local handle to a remote object.  This is the superclass
   of all proxies: CProxy_Array, CProxy_Group, etc. inherit from this class.
@@ -717,10 +566,13 @@ class CkDelegateMgr;
 */
 class CProxy {
   private:
-    CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
+    CkGroupID delegatedGroupId;      
+    int isNodeGroup; 
+    mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
-    CProxy() :delegatedMgr(0), delegatedPtr(0) { }
+ CProxy() :  isNodeGroup(0), delegatedMgr(0), delegatedPtr(0)
+      {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
 #define CK_DELCTOR_ARGS dTo,dPtr
@@ -731,8 +583,11 @@ class CProxy {
 	:delegatedMgr(dTo)
         {
             delegatedPtr = NULL;
-            if(delegatedMgr != NULL && dPtr != NULL) 
-                delegatedPtr = dTo->ckCopyDelegateData(dPtr);            
+            if(delegatedMgr != NULL && dPtr != NULL) {
+                delegatedPtr = delegatedMgr->ckCopyDelegateData(dPtr);            
+		delegatedGroupId = delegatedMgr->CkGetGroupID();
+		isNodeGroup = delegatedMgr->isNodeGroup();
+	    }
         }
   public:
     /// Copy constructor.  Only needed for delegated proxies.
@@ -765,7 +620,23 @@ class CProxy {
     
     /// Return the delegator of this proxy, to which the proxies' messages
     ///  are actually sent.
-    inline CkDelegateMgr *ckDelegatedTo(void) const { return delegatedMgr; }
+    inline CkDelegateMgr *ckDelegatedTo(void) const { 
+
+      // needed if proxy was defined before group creation 
+      // (i.e. for delegated readonly proxies)
+      if (delegatedMgr == NULL && !delegatedGroupId.isZero()) {
+	if (isNodeGroup) {
+	  delegatedMgr=(CkDelegateMgr *)CkLocalNodeBranch(delegatedGroupId);
+	}
+	else {
+	  delegatedMgr=(CkDelegateMgr *)CkLocalBranch(delegatedGroupId);
+	}
+      }
+
+      return delegatedMgr; 
+    }
+
+    
     
     /// Return the delegator's local data associated with this proxy.
     inline CkDelegateData *ckDelegatedPtr(void) const {return delegatedPtr;}
@@ -994,7 +865,7 @@ public:
   inline CkSectionID *ckGetSectionIDs() {return _sid; }
   inline CkSectionID &ckGetSectionID() {return _sid[0]; }
   inline CkSectionID &ckGetSectionID(int i) {return _sid[i]; }
-  inline CkGroupID ckGetGroupIDn(int i) const {return (CkGroupID)_sid[i]._cookie.aid;}
+  inline CkGroupID ckGetGroupIDn(int i) const {return (CkGroupID)_sid[i]._cookie.info.aid;}
   inline int *ckGetElements() const {return _sid[0].pelist;}
   inline int *ckGetElements(int i) const {return _sid[i].pelist;}
   inline int ckGetNumElements() const { return _sid[0].npes; }
@@ -1142,7 +1013,7 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #include "readonly.h"
 #include "ckarray.h"
 #include "ckstream.h"
-#include "CkFutures.decl.h"
+#include "ckfutures.h"
 #include "charisma.h"
 #include "tempo.h"
 #include "waitqd.h"
@@ -1220,7 +1091,8 @@ static const char *idx2str(const CkArrayIndex &ind) {
   return retBuf;
 }
 
-static const char *idx2str(const ArrayElement *el) {
+static const char *idx2str(const ArrayElement *el) UNUSED;
+static const char *idx2str(const ArrayElement* el) {
   return idx2str(el->thisIndexMax);
 }
 
@@ -1247,7 +1119,6 @@ public:
     ++refcount;
   }
 };
-
 
 #endif
 

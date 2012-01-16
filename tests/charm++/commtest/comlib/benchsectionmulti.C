@@ -66,7 +66,7 @@ public:
 };
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     int pass, superpass;
     double curTime;
@@ -91,7 +91,7 @@ public:
 	arr = CProxy_Bench::ckNew();
                 
         int count = 0;
-        CkArrayIndexMax *elem_array = new CkArrayIndexMax[nElements];
+        CkArrayIndex *elem_array = new CkArrayIndex[nElements];
         for(count = 0; count < nElements; count ++) {
             elem_array[count] = CkArrayIndex1D(count);
         }
@@ -182,7 +182,7 @@ public:
         //if(p.isPacking())
         //            CkPrintf("Migrating from %d\n", CkMyPe());
 
-        ArrayElement1D::pup(p);
+        CBase_Bench::pup(p);
         p | pass ;
         p | mcount ;
         p | time;
@@ -202,7 +202,7 @@ public:
         firstEntryFlag = 0;
         sendFinishedFlag = 0;
 
-        CkArrayIndexMax *elem_array = new CkArrayIndexMax[nElements];
+        CkArrayIndex *elem_array = new CkArrayIndex[nElements];
         for(int count = 0; count < nElements; count ++) 
             elem_array[count] = CkArrayIndex1D(count);
         

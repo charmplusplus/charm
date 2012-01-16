@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _QD_H
 #define _QD_H
 
@@ -46,9 +39,13 @@ class QdCallback {
 //    void send(void) { CkSendMsg(ep,CkAllocMsg(0,0,0),&cid); }
     void send(void) {
       // pretending pe 0 in blue gene mode, switch back after the call.
+#if CMK_CONDS_USE_SPECIAL_CODE
       int old = CmiSwitchToPE(0);
+#endif
       cb.send(NULL);
+#if CMK_CONDS_USE_SPECIAL_CODE
       CmiSwitchToPE(old);
+#endif
     }
 };
 
@@ -83,7 +80,7 @@ class QdState {
       envelope *env = UsrToEnv((void *)msg);
       CmiSetHandler(env, _qdHandlerIdx);
       for(int i=0; i<nChildren; i++) {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
         CmiSyncSendFn(children[i], env->getTotalsize(), (char *)env);
 #else
         CmiSyncSend(children[i], env->getTotalsize(), (char *)env);

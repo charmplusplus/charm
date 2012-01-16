@@ -1,0 +1,26 @@
+mainmodule broadcast {
+			 
+  readonly CProxy_Main mainProxy;	
+  readonly CProxy_Broadcast broadcastProxy;
+  readonly int numEl;
+	readonly ComlibInstanceHandle stratBroadcast;
+
+  message broadcastMessage {
+    char msg[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void Intermediate(void);
+    entry void Intermediate1(void);
+    entry void exit();		
+  };
+
+group Broadcast {
+    entry Broadcast();			
+    entry void TestBroadcast(void);
+    entry void IntermediateCall(void);
+    entry void receive(broadcastMessage* m);
+  };
+
+};

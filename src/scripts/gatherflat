@@ -1,5 +1,7 @@
 #!/bin/sh
 
+[ -x ./gatherflat.local ]  && exec ./gatherflat.local $@
+
 if [ -d $1 ] ; then
 
 SRC=$1

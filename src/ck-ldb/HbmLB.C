@@ -1,18 +1,9 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
 #include <math.h>
-#include "charm++.h"
-#include "BaseLB.h"
 #include "HbmLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"
@@ -142,7 +133,7 @@ void HbmLB::ProcessAtSync()
   }
 
   // build LDStats
-  double total_walltime, total_cputime, idletime, bg_walltime, bg_cputime;
+  LBRealType total_walltime, total_cputime, idletime, bg_walltime, bg_cputime;
   theLbdb->TotalTime(&total_walltime,&total_cputime);
   theLbdb->IdleTime(&idletime);
   theLbdb->BackgroundLoad(&bg_walltime,&bg_cputime);
@@ -207,7 +198,6 @@ inline double mymax(double x, double y) { return x>y?x:y; }
 //  LDStats in parent should contain relative PE
 void HbmLB::Loadbalancing(int atlevel)
 {
-  int i;
 
   CmiAssert(atlevel >= 1);
 
@@ -222,10 +212,8 @@ void HbmLB::Loadbalancing(int atlevel)
   if (_lb_args.ignoreBgLoad()) statsData->clearBgLoad();
 
   currentLevel = atlevel;
-  int nclients = lData->nChildren;
 
-  double start_lb_time, strat_end_time;
-  start_lb_time = CkWallTimer();
+  double start_lb_time(CkWallTimer());
 
   double lload = lData->statsList[0];
   double rload = lData->statsList[1];
@@ -240,10 +228,8 @@ CkPrintf("[%d] lload: %f rload: %f atlevel: %d\n", CkMyPe(), lload, rload, atlev
     double delta = myabs(lload-rload) / numpes;
 
     int overloaded = lData->children[0];
-    int underloaded = lData->children[1];
     if (lload < rload) {
       overloaded = lData->children[1];
-      underloaded = lData->children[0];
     }
     DEBUGF(("[%d] branch %d is overloaded by %f... \n", CkMyPe(), overloaded, delta));
     thisProxy[overloaded].ReceiveMigrationDelta(delta, atlevel, atlevel);
@@ -309,7 +295,7 @@ void HbmLB::ReceiveMigrationDelta(double t, int lblevel, int fromlevel)
   }
 
   // I am leave, find objects to migrate
-  int done = 0;
+
   CkVec<int> migs;
   CkVec<LDObjData> &objData = myStats.objData;
   for (i=0; i<myStats.n_objs; i++) {
@@ -419,7 +405,7 @@ void HbmLB::Migrated(LDObjHandle h, int waitBarrier)
 
 void HbmLB::NotifyObjectMigrationDone(int fromlevel, int lblevel)
 {
-  int i;
+
   int atlevel = fromlevel + 1;
   LevelData *lData = levelData[atlevel];
 
@@ -526,7 +512,7 @@ void HbmLB::ResumeClients(int balancing)
       LBInfo info(count);
       LDStats *stats = &myStats;
       info.getInfo(stats, count, 0);	// no comm cost
-      double mLoad, mCpuLoad, totalLoad;
+      LBRealType mLoad, mCpuLoad, totalLoad;
       info.getSummary(mLoad, mCpuLoad, totalLoad);
       int nmsgs, nbytes;
       stats->computeNonlocalComm(nmsgs, nbytes);
@@ -563,7 +549,7 @@ void HbmLB::reportLBQulity(double mload, double mCpuLoad, double totalload, int 
   }
 }
 
-void HbmLB::work(LDStats* stats,int count)
+void HbmLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   CkPrintf("[%d] HbmLB::work called!\n", CkMyPe());

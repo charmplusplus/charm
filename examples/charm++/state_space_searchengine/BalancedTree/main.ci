@@ -1,0 +1,11 @@
+mainmodule main
+{
+    readonly int branchfactor;
+    readonly int depth;
+    readonly int  initial_grainsize;
+    readonly int target;
+    mainchare Main
+	{
+		entry Main(CkArgMsg *m);
+	}
+}

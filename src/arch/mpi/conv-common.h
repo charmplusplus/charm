@@ -5,12 +5,18 @@
 
 #define CMI_MPI_TRACE_USEREVENTS                           0
 
+#define CMK_STACKSIZE_DEFAULT                              65536
+
 #define CMK_HANDLE_SIGUSR                                  1
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, root, hdl,xhdl,info, stratid; unsigned char cksum, magic; CmiUInt2 redID;
+#if CMK_ERROR_CHECKING
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; unsigned char cksum, magic;
+#else
+#define CMK_MSG_HEADER_EXT_    CmiUInt2 rank, hdl,xhdl,info, stratid, redID; CmiInt4 root; 
+#endif
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }
-#define CMK_MSG_HEADER_BLUEGENE    { CMK_MSG_HEADER_EXT_ CMK_BLUEGENE_FIELDS }
+#define CMK_MSG_HEADER_BIGSIM_    { CMK_MSG_HEADER_EXT_ CMK_BIGSIM_FIELDS }
 
 #define CMK_MULTICAST_GROUP_TYPE                struct { unsigned pe, id; }
 #define CMK_MULTICAST_DEF_USE_COMMON_CODE                  1
@@ -33,4 +39,4 @@
 #define CMK_IMMEDIATE_MSG				   1
 #define CMK_MACHINE_PROGRESS_DEFINED                       1
 
-#define CMK_LBDB_CPUTIMER				   0
+#define CMK_LB_CPUTIMER					   0

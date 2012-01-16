@@ -1,11 +1,3 @@
-/*****************************************************************************
- * $Source: /cvsroot/charm/src/ck-perf/trace-projections.C,v $
- * $Author: gioachin $
- * $Date: 2009-08-20 01:09:41 $
- * $Revision: 2.134 $
- *****************************************************************************/
-
-
 /**
  * \addtogroup CkPerf
 */
@@ -18,11 +10,11 @@
 #include "trace-projectionsBOC.h"
 
 #if DEBUG_PROJ
-#define DEBUGF(format, ...) CkPrintf(format, ## __VA_ARGS__)
+#define DEBUGF(...) CkPrintf(__VA_ARGS__)
 #else
-#define DEBUGF(format, ...)           // CmiPrintf x
+#define DEBUGF(...)
 #endif
-#define DEBUGN(format, ...)  // easy way to selectively disable DEBUGs
+#define DEBUGN(...)  // easy way to selectively disable DEBUGs
 
 #define DefaultLogBufSize      1000000
 
@@ -64,6 +56,9 @@ public:
 };
 CkpvStaticDeclare(CkVec<UsrEvent *>*, usrEvents);
 
+// When tracing is disabled, these are defined as empty static inlines
+// in the header, to minimize overhead
+#if CMK_TRACE_ENABLED
 /// Disable the outputting of the trace logs
 void disableTraceLogOutput()
 { 
@@ -81,6 +76,7 @@ void flushTraceLog()
 {
   CkpvAccess(_trace)->traceFlushLog();
 }
+#endif
 
 #if ! CMK_TRACE_ENABLED
 static int warned=0;
@@ -103,9 +99,7 @@ On T3E, we need to have file number control by open/close files only when needed
 #endif //CMK_TRACE_LOGFILE_NUM_CONTROL
 
 #if CMK_HAS_COUNTER_PAPI
-int numPAPIEvents = 2;
-int papiEvents[] = { PAPI_L3_DCM, PAPI_FP_OPS };
-char *papiEventNames[] = {"PAPI_L3_DCM", "PAPI_FP_OPS"};
+int papiEvents[NUMPAPIEVENTS] = { PAPI_L2_DCM, PAPI_FP_OPS };
 #endif // CMK_HAS_COUNTER_PAPI
 
 /**
@@ -118,10 +112,10 @@ void _createTraceprojections(char **argv)
   CkpvInitialize(CkVec<char *>, usrEventlist);
   CkpvInitialize(CkVec<UsrEvent *>*, usrEvents);
   CkpvAccess(usrEvents) = new CkVec<UsrEvent *>();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   // CthRegister does not call the constructor
 //  CkpvAccess(usrEvents) = CkVec<UsrEvent *>();
-#endif //CMK_BLUEGENE_CHARM
+#endif //CMK_BIGSIM_CHARM
   CkpvInitialize(TraceProjections*, _trace);
   CkpvAccess(_trace) = new  TraceProjections(argv);
   CkpvAccess(_traces)->addTrace(CkpvAccess(_trace));
@@ -274,6 +268,7 @@ LogPool::LogPool(char *pgm) {
   // **CW** for simple delta encoding
   prevTime = 0.0;
   timeErr = 0.0;
+  globalStartTime = 0.0;
   globalEndTime = 0.0;
   headerWritten = 0;
   numPhases = 0;
@@ -377,8 +372,10 @@ void LogPool::createSts(const char *fix)
     {
       stsfp = fopen(fname, "w");
     } while (!stsfp && (errno == EINTR || errno == EMFILE));
-  if(stsfp==0)
-    CmiAbort("Cannot open projections sts file for writing.\n");
+  if(stsfp==0){
+    CmiPrintf("Cannot open projections sts file for writing due to %s\n", strerror(errno));
+    CmiAbort("Error!!\n");
+  }
   delete[] fname;
 }  
 
@@ -406,7 +403,7 @@ LogPool::~LogPool()
 #endif
   }
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   extern int correctTimeLog;
   if (correctTimeLog) {
     createFile("-bg");
@@ -540,17 +537,18 @@ void LogPool::writeSts(void)
 {
   // for whining compilers
   int i;
-  char name[30];
   // generate an automatic unique ID for each log
   fprintf(stsfp, "PROJECTIONS_ID %s\n", "");
   fprintf(stsfp, "VERSION %s\n", PROJECTION_VERSION);
   fprintf(stsfp, "TOTAL_PHASES %d\n", numPhases);
 #if CMK_HAS_COUNTER_PAPI
-  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", numPAPIEvents);
+  fprintf(stsfp, "TOTAL_PAPI_EVENTS %d\n", NUMPAPIEVENTS);
   // for now, use i, next time use papiEvents[i].
   // **CW** papi event names is a hack.
-  for (i=0;i<numPAPIEvents;i++) {
-    fprintf(stsfp, "PAPI_EVENT %d %s\n", i, papiEventNames[i]);
+  char eventName[PAPI_MAX_STR_LEN];
+  for (i=0;i<NUMPAPIEVENTS;i++) {
+    PAPI_event_code_to_name(papiEvents[i], eventName);
+    fprintf(stsfp, "PAPI_EVENT %d %s\n", i, eventName);
   }
 #endif
   traceWriteSTS(stsfp,CkpvAccess(usrEvents)->length());
@@ -581,7 +579,9 @@ void LogPool::writeRC(void)
     //CkPrintf("write RC is being executed\n");
 #ifdef PROJ_ANALYSIS  
     CkAssert(CkMyPe() == 0);
-    fprintf(rcfp,"RC_GLOBAL_END_TIME %lld\n",
+    fprintf(rcfp,"RC_GLOBAL_START_TIME %lld\n",
+  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalStartTime));
+    fprintf(rcfp,"RC_GLOBAL_END_TIME   %lld\n",
   	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
     /* //Yanhua comment it because isOutlierAutomatic is not a variable in trace
     if (CkpvAccess(_trace)->isOutlierAutomatic()) {
@@ -595,7 +595,7 @@ void LogPool::writeRC(void)
 }
 
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
 {
   LogEntry *log = (LogEntry *)data;
@@ -632,12 +632,12 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
   }
   if(poolSize==numEntries) {
     flushLogBuffer();
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     extern int correctTimeLog;
     if (correctTimeLog) CmiAbort("I/O interrupt!\n");
 #endif
   }
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   switch (type) {
     case BEGIN_PROCESSING:
       pool[numEntries-1].recvTime = BgGetRecvTime();
@@ -656,7 +656,7 @@ void LogPool::add(UChar type, UShort mIdx, UShort eIdx,
 }
 
 void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileName){
-#ifndef CMK_BLUEGENE_CHARM
+#ifndef CMK_BIGSIM_CHARM
   new (&pool[numEntries++])
 	LogEntry(time,type,funcID,lineNum,fileName);
   if(poolSize == numEntries){
@@ -668,7 +668,7 @@ void LogPool::add(UChar type,double time,UShort funcID,int lineNum,char *fileNam
 
   
 void LogPool::addMemoryUsage(unsigned char type,double time,double memUsage){
-#ifndef CMK_BLUEGENE_CHARM
+#ifndef CMK_BIGSIM_CHARM
   new (&pool[numEntries++])
 	LogEntry(type,time,memUsage);
   if(poolSize == numEntries){
@@ -699,8 +699,8 @@ void LogPool::addUserSuppliedNote(char *note){
 
 void LogPool::addUserSuppliedBracketedNote(char *note, int eventID, double bt, double et){
   //CkPrintf("LogPool::addUserSuppliedBracketedNote eventID=%d\n", eventID);
-#ifndef CMK_BLUEGENE_CHARM
-#if CMK_SMP_TRACE_COMMTHREAD && MPI_SMP_TRACE_COMMTHREAD_HACK
+#ifndef CMK_BIGSIM_CHARM
+#if MPI_TRACE_MACHINE_HACK
   //This part of code is used  to combine the contiguous
   //MPI_Test and MPI_Iprobe events to reduce the number of
   //entries
@@ -747,9 +747,15 @@ void LogPool::addCreationMulticast(UShort mIdx, UShort eIdx, double time,
 
 void LogPool::postProcessLog()
 {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   bgUpdateProj(1);   // event type
 #endif
+}
+
+void LogPool::modLastEntryTimestamp(double ts)
+{
+  pool[numEntries-1].time = ts;
+  //pool[numEntries-1].cputime = ts;
 }
 
 // /** Constructor for a multicast log entry */
@@ -774,20 +780,12 @@ void LogPool::postProcessLog()
 //     }
 // }
 
-void LogEntry::addPapi(int numPapiEvts, int *papi_ids, LONG_LONG_PAPI *papiVals)
-{
-#if CMK_HAS_COUNTER_PAPI
-  numPapiEvents = numPapiEvts;
-  if (papiVals != NULL) {
-    papiIDs = new int[numPapiEvents];
-    papiValues = new LONG_LONG_PAPI[numPapiEvents];
-    for (int i=0; i<numPapiEvents; i++) {
-      papiIDs[i] = papi_ids[i];
-      papiValues[i] = papiVals[i];
-    }
-  }
-#endif
-}
+//void LogEntry::addPapi(LONG_LONG_PAPI *papiVals)
+//{
+//#if CMK_HAS_COUNTER_PAPI
+//   memcpy(papiValues, papiVals, sizeof(LONG_LONG_PAPI)*NUMPAPIEVENTS);
+//#endif
+//}
 
 
 
@@ -824,15 +822,15 @@ void LogEntry::pup(PUP::er &p)
       p|id.id[0]; p|id.id[1]; p|id.id[2]; p|id.id[3];
       p|icputime;
 #if CMK_HAS_COUNTER_PAPI
-      p|numPapiEvents;
-      for (i=0; i<numPapiEvents; i++) {
+      //p|numPapiEvents;
+      for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i]; 
 	p|papiValues[i];
 	
       }
 #else
-      p|numPapiEvents;     // non papi version has value 0
+      //p|numPapiEvents;     // non papi version has value 0
 #endif
       if (p.isUnpacking()) {
 	recvTime = irecvtime/1.0e6;
@@ -843,14 +841,14 @@ void LogEntry::pup(PUP::er &p)
       if (p.isPacking()) icputime = (CMK_TYPEDEF_UINT8)(1.0e6*cputime);
       p|mIdx; p|eIdx; p|itime; p|event; p|pe; p|msglen; p|icputime;
 #if CMK_HAS_COUNTER_PAPI
-      p|numPapiEvents;
-      for (i=0; i<numPapiEvents; i++) {
+      //p|numPapiEvents;
+      for (i=0; i<NUMPAPIEVENTS; i++) {
 	// not yet!!!
 	//	p|papiIDs[i];
 	p|papiValues[i];
       }
 #else
-      p|numPapiEvents;  // non papi version has value 0
+      //p|numPapiEvents;  // non papi version has value 0
 #endif
       if (p.isUnpacking()) cputime = icputime/1.0e6;
       break;
@@ -1028,16 +1026,29 @@ TraceProjections::TraceProjections(char **argv):
 
 #if CMK_HAS_COUNTER_PAPI
   // We initialize and create the event sets for use with PAPI here.
-  int papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
-  if (papiRetValue != PAPI_VER_CURRENT) {
-    CmiAbort("PAPI Library initialization failure!\n");
+  int papiRetValue;
+  if(CkMyRank()==0){
+    papiRetValue = PAPI_library_init(PAPI_VER_CURRENT);
+    if (papiRetValue != PAPI_VER_CURRENT) {
+      CmiAbort("PAPI Library initialization failure!\n");
+    }
+#if CMK_SMP
+    if(PAPI_thread_init(pthread_self) != PAPI_OK){
+      CmiAbort("PAPI could not be initialized in SMP mode!\n");
+    }
+#endif
   }
+
+#if CMK_SMP
+  //PAPI_thread_init has to finish before calling PAPI_create_eventset
+  CmiNodeAllBarrier();
+#endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
   papiEventSet = PAPI_NULL; 
   if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
-  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, numPAPIEvents);
+  papiRetValue = PAPI_add_events(papiEventSet, papiEvents, NUMPAPIEVENTS);
   if (papiRetValue != PAPI_OK) {
     if (papiRetValue == PAPI_ECNFLCT) {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
@@ -1045,8 +1056,7 @@ TraceProjections::TraceProjections(char **argv):
       CmiAbort("PAPI failed to add designated events!\n");
     }
   }
-  papiValues = new long_long[numPAPIEvents];
-  memset(papiValues, 0, numPAPIEvents*sizeof(long_long));
+  memset(papiValues, 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
 #endif
 }
 
@@ -1115,6 +1125,12 @@ void TraceProjections::traceClose(void)
   if (CkMyPe() == 0) {
     CProxy_TraceProjectionsBOC bocProxy(traceProjectionsGID);
     bocProxy.traceProjectionsParallelShutdown(-1);
+  }
+  if(CkMyRank() == CkMyNodeSize()){ //communication thread
+    CkpvAccess(_trace)->endComputation();
+    delete _logPool;              // will write
+    // remove myself from traceArray so that no tracing will be called.
+    CkpvAccess(_traces)->removeTrace(this);
   }
 #else
   // we've already deleted the logpool, so multiple calls to traceClose
@@ -1236,6 +1252,24 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   }
 }
 
+//This function is only called from a comm thread in SMP mode. 
+void TraceProjections::creation(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+        // msg must be a charm message
+	envelope *e = (envelope *)msg;
+	int ep = e->getEpIdx();
+        if(ep==0) return;
+        int num = _entryTable.size();
+        CmiAssert(ep < num);
+	if(_entryTable[ep]->traceEnabled) {
+		creation(e, ep, 1);
+                e->setSrcPe(CkMyPe());              // pretend I am the sender
+        }
+#endif
+}
+
+
 /* **CW** Non-disruptive attempt to add destination PE knowledge to
    Communication Library-specific Multicasts via new event 
    CREATION_MULTICAST.
@@ -1288,7 +1322,7 @@ void TraceProjections::beginExecute(CmiObjId *tid)
   _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		execEvent,CkMyPe(), 0, tid);
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
+  _logPool->addPapi(papiValues);
 #endif
   inEntry = 1;
 }
@@ -1307,13 +1341,26 @@ void TraceProjections::beginExecute(envelope *e)
     _logPool->add(BEGIN_PROCESSING,ForChareMsg,_threadEP,TraceTimer(),
 		  execEvent,CkMyPe(), 0, NULL, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-    _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
+    _logPool->addPapi(papiValues);
 #endif
     inEntry = 1;
   } else {
     beginExecute(e->getEvent(),e->getMsgtype(),e->getEpIdx(),
 		 e->getSrcPe(),e->getTotalsize());
   }
+}
+
+void TraceProjections::beginExecute(char *msg){
+#if CMK_SMP_TRACE_COMMTHREAD
+	//This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if (ep == 0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled)
+		beginExecute(e);
+#endif
 }
 
 void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
@@ -1326,6 +1373,11 @@ void TraceProjections::beginExecute(int event, int msgType, int ep, int srcPe,
     nestedEvents.enq(NestedEvent(event, msgType, ep, srcPe, mlen, idx));
   }
   beginExecuteLocal(event, msgType, ep, srcPe, mlen, idx);
+}
+
+void TraceProjections::changeLastEntryTimestamp(double ts)
+{
+  _logPool->modLastEntryTimestamp(ts);
 }
 
 void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int srcPe,
@@ -1343,7 +1395,7 @@ void TraceProjections::beginExecuteLocal(int event, int msgType, int ep, int src
   _logPool->add(BEGIN_PROCESSING,msgType,ep,TraceTimer(),event,
 		srcPe, mlen, idx, 0.0, TraceCpuTimer());
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
+  _logPool->addPapi(papiValues);
 #endif
   inEntry = 1;
 }
@@ -1358,6 +1410,20 @@ void TraceProjections::endExecute(void)
       beginExecuteLocal(ne.event, ne.msgType, ne.ep, ne.srcPe, ne.ml, ne.idx);
     }
   }
+}
+
+void TraceProjections::endExecute(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+	//This function is called from comm thread in SMP mode
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if (ep == 0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled)
+		endExecute();
+#endif	
 }
 
 void TraceProjections::endExecuteLocal(void)
@@ -1377,7 +1443,7 @@ void TraceProjections::endExecuteLocal(void)
 		  execEvent, execPe, 0, NULL, 0.0, cputime);
   }
 #if CMK_HAS_COUNTER_PAPI
-  _logPool->addPapi(numPAPIEvents, papiEvents, papiValues);
+  _logPool->addPapi(papiValues);
 #endif
   inEntry = 0;
 }
@@ -1637,18 +1703,13 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
 
 void TraceProjections::endPhase() {
   double currentPhaseTime = TraceTimer();
-  double lastPhaseTime = 0.0;
-
   if (lastPhaseEvent != NULL) {
-    lastPhaseTime = lastPhaseEvent->time;
   } else {
     if (_logPool->pool != NULL) {
       // assumed to be BEGIN_COMPUTATION
-      lastPhaseTime = _logPool->pool[0].time;
     } else {
       CkPrintf("[%d] Warning: End Phase encountered in an empty log. Inserting BEGIN_COMPUTATION event\n", CkMyPe());
       _logPool->add(BEGIN_COMPUTATION, 0, 0, currentPhaseTime, -1, -1);
-      lastPhaseTime = currentPhaseTime;
     }
   }
 
@@ -1706,7 +1767,7 @@ extern "C" void TraceProjectionsExitHandler()
 void initTraceProjectionsBOC()
 {
   // CkPrintf("[%d] Trace Projections initialization called!\n", CkMyPe());
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if (BgNodeRank() == 0) {
 #else
     if (CkMyRank() == 0) {
@@ -1754,7 +1815,8 @@ TraceProjectionsInit::TraceProjectionsInit(CkArgMsg *msg) {
       findOutliers = true;
     }
   }
-  traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers);
+  bool findStartTime = (CmiTimerAbsolute()==1);
+  traceProjectionsGID = CProxy_TraceProjectionsBOC::ckNew(findOutliers, findStartTime);
   if (findOutliers) {
     kMeansGID = CProxy_KMeansBOC::ckNew(outlierAutomatic,
 					numKSeeds,
@@ -1791,6 +1853,9 @@ void TraceProjectionsBOC::traceProjectionsParallelShutdown(int pe) {
     kMeansProxy[CkMyPe()].startKMeansAnalysis();
   }
   parModulesRemaining++;
+  if (findStartTime) 
+  bocProxy[CkMyPe()].startTimeAnalysis();
+  else
   bocProxy[CkMyPe()].startEndTimeAnalysis();
 }
 
@@ -1893,7 +1958,6 @@ void KMeansBOC::getNextPhaseMetrics() {
   LogPool *pool = CkpvAccess(_trace)->_logPool;
   
   CkAssert(pool->numEntries > lastPhaseIdx);
-  double startPhaseTime = pool->pool[lastPhaseIdx].time;
   double totalPhaseTime = 0.0;
   double totalActiveTime = 0.0; // entry method + idle
 
@@ -2609,6 +2673,28 @@ void KMeansBOC::phaseDone() {
   }
 }
 
+void TraceProjectionsBOC::startTimeAnalysis()
+{
+  double startTime = 0.0;
+  if (CkpvAccess(_trace)->_logPool->numEntries>0)
+     startTime = CkpvAccess(_trace)->_logPool->pool[0].time;
+  CkCallback cb(CkIndex_TraceProjectionsBOC::startTimeDone(NULL), thisProxy);
+  contribute(sizeof(double), &startTime, CkReduction::min_double, cb);  
+}
+
+void TraceProjectionsBOC::startTimeDone(CkReductionMsg *msg)
+{
+  // CkPrintf("[%d] TraceProjectionsBOC::startTimeDone time=\t%g parModulesRemaining:%d\n", CkMyPe(), CkWallTimer(), parModulesRemaining);
+
+  if (CkpvAccess(_trace) != NULL) {
+    CkpvAccess(_trace)->_logPool->globalStartTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->setNewStartTime();
+    //if (CkMyPe() == 0) CkPrintf("Start time determined to be %lf us\n", (CkpvAccess(_trace)->_logPool->globalStartTime)*1e06);
+  }
+  delete msg;
+  thisProxy[CkMyPe()].startEndTimeAnalysis();
+}
+
 void TraceProjectionsBOC::startEndTimeAnalysis()
 {
  //CkPrintf("[%d] TraceProjectionsBOC::startEndTimeAnalysis time=\t%g\n", CkMyPe(), CkWallTimer() );
@@ -2628,7 +2714,7 @@ void TraceProjectionsBOC::endTimeDone(CkReductionMsg *msg)
   CkAssert(CkMyPe() == 0);
   parModulesRemaining--;
   if (CkpvAccess(_trace) != NULL) {
-    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData();
+    CkpvAccess(_trace)->_logPool->globalEndTime = *(double *)msg->getData() - CkpvAccess(_trace)->_logPool->globalStartTime;
     // CkPrintf("End time determined to be %lf us\n",
     //	     (CkpvAccess(_trace)->_logPool->globalEndTime)*1e06);
   }

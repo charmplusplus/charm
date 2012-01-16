@@ -11,6 +11,17 @@ extern void POSE_exit();
 /// Send local stats to global collector
 void localStat::SendStats()
 {
+  if (pose_config.dop) {
+    // This ensures everything is flushed to the file
+    fclose(dopFilePtr);
+    // Right now, SendStats is called only at the end of the
+    // simulation.  This is here in case that changes for some reason.
+    dopFilePtr = fopen(dopFileName, "a");
+    if (dopFilePtr == NULL) {
+      CkPrintf("WARNING: unable to open DOP file %s for append...this probably doesn't matter, though, as long as this is at the end of the simulation\n", 
+	       dopFileName);
+    }
+  }
   CProxy_globalStat gstat(theGlobalStats);
   localStatSummary *m = new localStatSummary;
   m->doTime = totalTime;
@@ -129,9 +140,18 @@ void globalStat::localStatReport(localStatSummary *m)
     //CkPrintf("Avg. Max# Checkpoints=%d Bytes checkpointed=%d\n", maxChkPts, cpBytes);
 
     if(pose_config.dop){
-      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%d\n",
-	     maxGRT, maxGVT);
-      DOPcalc(maxGVT, maxGRT);
+      CkPrintf("Overhead-free maximally parallel runtime=%f  Max GVT=%lld\n", maxGRT, maxGVT);
+      if (pose_config.dopSkipCalcs) {
+	CkPrintf("\n");
+	CkPrintf("WARNING: Skipping DOP calculations.  Not writing dop_mod.out or dop_sim.out files.\n");
+	CkPrintf("Save the following parameters for use with the DOPCalc tool in the\n");
+	CkPrintf("BigNetSim/trunk/tools/DOPCalc directory of the BigNetSim svn repository:\n");
+	CkPrintf("   #PEs=%d, maxGRT=%f, maxGVT=%lld, and the starting virtual time\n", CkNumPes(), maxGRT, maxGVT);
+	CkPrintf("   of the simulation (which should be 0 unless there are skip points)\n");
+	CkPrintf("\n");
+      } else {
+	DOPcalc(maxGVT, maxGRT);
+      }
     }
 
     POSE_exit();
@@ -147,15 +167,15 @@ void globalStat::localStatReport(localStatSummary *m)
 }
 
 
-void globalStat::DOPcalc(int gvt, double grt)
+void globalStat::DOPcalc(POSE_TimeType gvt, double grt)
 {
-  int vinStart, vinEnd, gvtp = gvt + 1, i;
+  CmiInt8 i, j;
+  POSE_TimeType vinStart, vinEnd, gvtp = gvt + 1;
   double rinStart, rinEnd;
   FILE *fp;
   char filename[20], line[80];
   unsigned short int *gvtDOP, *grtDOP;
-  unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, j, 
-    usStart, usEnd;
+  unsigned long int grtp = (unsigned long int)(grt*1000000.0) + 1, usStart, usEnd;
   int modelPEs=0, simulationPEs=0;
 
   CkPrintf("Generating DOP measures...\n");
@@ -164,16 +184,21 @@ void globalStat::DOPcalc(int gvt, double grt)
   for (i=0; i<gvtp; i++) gvtDOP[i] = 0;
   for (i=0; i<grtp; i++) grtDOP[i] = 0;
   for (i=0; i<CkNumPes(); i++) { // read each processor's log
-    sprintf(filename, "dop%d.log\0", i);
+    sprintf(filename, "dop%lld.log\0", i);
     fp = fopen(filename, "r");
     if (!fp) {
       CkPrintf("Cannot open file %s... exiting.\n", filename);
       POSE_exit();
+      return;
     }
     CkPrintf("Reading file %s...\n", filename);
+#if USE_LONG_TIMESTAMPS
+    const char* format = "%lf %lf %lld %lld\n";
+#else
+    const char* format = "%lf %lf %d %d\n";
+#endif
     while (fgets(line, 80, fp)) {
-      if (sscanf(line, "%lf %lf %d %d\n", &rinStart, &rinEnd, 
-		 &vinStart, &vinEnd) == 4) {
+      if (sscanf(line, format, &rinStart, &rinEnd, &vinStart, &vinEnd) == 4) {
 	usStart = (unsigned long int)(rinStart * 1000000.0);
 	usEnd = (unsigned long int)(rinEnd * 1000000.0);
 	for (j=usStart; j<usEnd; j++) grtDOP[j]++;
@@ -185,12 +210,14 @@ void globalStat::DOPcalc(int gvt, double grt)
     }
     fclose(fp);
   }
-  int avgPEs = 0;
+  CmiInt8 avgPEs = 0LL;
   int zed = 0;
   fp = fopen("dop_mod.out", "w");
   for (i=0; i<gvtp; i++) {
+    // print status every ~64M iterations
+    if ((i & 0x03FFFFFF) == 0) CkPrintf("   current index: %lld of %lld\n", i, gvtp);
     if ((gvtDOP[i] != 0) || (zed == 0))
-      fprintf(fp, "%d %d\n", i, gvtDOP[i]);
+      fprintf(fp, "%lld %d\n", i, gvtDOP[i]);
     if (gvtDOP[i] == 0) zed = 1;
     else zed = 0;
     avgPEs += gvtDOP[i];
@@ -200,10 +227,10 @@ void globalStat::DOPcalc(int gvt, double grt)
   fclose(fp);
   fp = fopen("dop_sim.out", "w");
   for (i=0; i<grtp; i++) {
-    fprintf(fp, "%d %d\n", i, grtDOP[i]);
+    fprintf(fp, "%lld %d\n", i, grtDOP[i]);
     if (grtDOP[i] > simulationPEs) simulationPEs = grtDOP[i];
   } 
   fclose(fp);
-  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %d\n",
+  CkPrintf("Max model PEs: %d  Max simulation PEs: %d  Recommended #PEs: %lld\n",
 	   modelPEs, simulationPEs, avgPEs);
 }

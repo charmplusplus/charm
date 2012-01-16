@@ -326,7 +326,6 @@ NormalSlabArray::~NormalSlabArray()
 
 void NormalSlabArray::pup(PUP::er &p)
 {
-    ArrayElement1D::pup(p);
     //FIXME: PUP for info and plans
 /*
     for (i = 0; i < MAX_FFTS; i++) {

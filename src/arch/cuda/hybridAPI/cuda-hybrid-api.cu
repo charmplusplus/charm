@@ -16,12 +16,27 @@
 
 #include "wrqueue.h"
 #include "cuda-hybrid-api.h"
-#include "stdio.h"
-#include <cutil.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #if defined GPU_MEMPOOL || defined GPU_INSTRUMENT_WRS
 #include "cklists.h"
 #endif
+
+void cudaErrorDie(int err,const char *code,const char *file,int line)
+{
+  fprintf(stderr,"Fatal CUDA Error at %s:%d.\n"
+	  " Return value %d from '%s'.  Exiting.\n",
+	  file,line,
+	  err,code);
+  abort();
+}
+
+#define cudaChk(code)							\
+  do { int e=(code); if (cudaSuccess!=e) {				\
+      cudaErrorDie(e,#code,__FILE__,__LINE__); } } while (0)
+
+
 
 /* A function in ck.C which casts the void * to a CkCallback object
  *  and executes the callback 
@@ -42,9 +57,8 @@ extern int CmiMyPe();
  *  completion of GPU events: memory allocation, transfer and
  *  kernel execution
  */  
-//#define GPU_PROFILE
-//#define GPU_DEBUG
 //#define GPU_TRACE
+//#define GPU_DEBUG
 //#define _DEBUG
 
 /* work request queue */
@@ -88,9 +102,7 @@ void **devBuffers = NULL;
    specifies an invalid bufferID */
 unsigned int nextBuffer; 
 
-unsigned int timerHandle; 
-
-#ifdef GPU_PROFILE
+#ifdef GPU_TRACE
 
 /* event types */
 #define DATA_SETUP          1            
@@ -98,15 +110,11 @@ unsigned int timerHandle;
 #define DATA_CLEANUP        3
 
 typedef struct gpuEventTimer {
-  float startTime; 
-  float endTime; 
-  int eventType;
-  int ID; 
-#ifdef GPU_TRACE
   int stage; 
   double cmistartTime; 
   double cmiendTime; 
-#endif
+  int eventType;
+  int ID; 
 } gpuEventTimer; 
 
 gpuEventTimer gpuEvents[QUEUE_SIZE_INIT * 3]; 
@@ -161,7 +169,7 @@ void pinnedMallocHost(pinnedMemReq *reqs) {
 
 
     for (int i=0; i<reqs->nBuffers; i++) {
-      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) reqs->hostPtrs[i], 
+      cudaChk(cudaMallocHost((void **) reqs->hostPtrs[i], 
 					    reqs->sizes[i])); 
     }
 
@@ -215,7 +223,7 @@ void flushPinnedMemQueue() {
   for (int i=0; i<pinnedMemQueueIndex; i++) {
     pinnedMemReq *req = &pinnedMemQueue[i]; 
     for (int j=0; j<req->nBuffers; j++) {
-      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **) req->hostPtrs[j], 
+      cudaChk(cudaMallocHost((void **) req->hostPtrs[j], 
 					    req->sizes[j])); 
     }
     free(req->hostPtrs);
@@ -293,7 +301,7 @@ void allocateBuffers(workRequest *wr) {
 
 #endif
 
-        CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
+        cudaChk(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
         printf("buffer %d allocated at time %.2f size: %d error string: %s\n", 
 	       index, cutGetTimerValue(timerHandle), size, 
@@ -320,7 +328,7 @@ void setupData(workRequest *wr) {
       /* allocate if the buffer for the corresponding index is NULL */
       /*
       if (devBuffers[index] == NULL) {
-	CUDA_SAFE_CALL_NO_SYNC(cudaMalloc((void **) &devBuffers[index], size));
+	cudaChk(cudaMalloc((void **) &devBuffers[index], size));
 #ifdef GPU_DEBUG
 	printf("buffer %d allocated %.2f\n", index,
 	       cutGetTimerValue(timerHandle)); 
@@ -329,7 +337,7 @@ void setupData(workRequest *wr) {
       */
       
       if (bufferInfo[i].transferToDevice && size > 0) {
-	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(devBuffers[index], 
+	cudaChk(cudaMemcpyAsync(devBuffers[index], 
           hostBuffers[index], size, cudaMemcpyHostToDevice, data_in_stream));
 #ifdef GPU_DEBUG
 	printf("transferToDevice bufId: %d at time %.2f size: %d " 
@@ -337,7 +345,7 @@ void setupData(workRequest *wr) {
 	       size, cudaGetErrorString( cudaGetLastError() )); 
 #endif	
 	/*
-	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpy(devBuffers[index], 
+	cudaChk(cudaMemcpy(devBuffers[index], 
           hostBuffers[index], size, cudaMemcpyHostToDevice));
 	*/
 
@@ -366,12 +374,12 @@ void copybackData(workRequest *wr) {
 	       size, cudaGetErrorString( cudaGetLastError() )); 
 #endif
 	
-	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpyAsync(hostBuffers[index], 
+	cudaChk(cudaMemcpyAsync(hostBuffers[index], 
           devBuffers[index], size, cudaMemcpyDeviceToHost,
           data_out_stream));
 	
 	/*
-	CUDA_SAFE_CALL_NO_SYNC(cudaMemcpy(hostBuffers[index], 
+	cudaChk(cudaMemcpy(hostBuffers[index], 
           devBuffers[index], size, cudaMemcpyDeviceToHost));
 	*/
       }
@@ -398,7 +406,7 @@ void freeMemory(workRequest *wr) {
 	       index, cutGetTimerValue(timerHandle),  
 	       cudaGetErrorString( cudaGetLastError() ));
 #endif 
-        CUDA_SAFE_CALL_NO_SYNC(cudaFree(devBuffers[index])); 
+        cudaChk(cudaFree(devBuffers[index])); 
         devBuffers[index] = NULL; 
       }
     }
@@ -438,14 +446,9 @@ void initHybridAPI(int myPe) {
     devBuffers[i] = NULL; 
   }
   
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&kernel_stream)); 
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&data_in_stream)); 
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamCreate(&data_out_stream)); 
-
-#ifdef GPU_PROFILE
-  CUT_SAFE_CALL(cutCreateTimer(&timerHandle));
-  CUT_SAFE_CALL(cutStartTimer(timerHandle));
-#endif
+  cudaChk(cudaStreamCreate(&kernel_stream)); 
+  cudaChk(cudaStreamCreate(&data_in_stream)); 
+  cudaChk(cudaStreamCreate(&data_out_stream)); 
 
   nextBuffer = NUM_BUFFERS;  
 
@@ -534,15 +537,12 @@ void gpuProgressFn() {
   workRequest *third = thirdElement(wrQueue); 
 
   if (head->state == QUEUED) {
-#ifdef GPU_PROFILE
-    gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
+#ifdef GPU_TRACE
+    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
     gpuEvents[timeIndex].eventType = DATA_SETUP; 
     gpuEvents[timeIndex].ID = head->id; 
     dataSetupIndex = timeIndex; 
-#ifdef GPU_TRACE
     gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
-    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
     timeIndex++; 
 #endif
 
@@ -556,14 +556,11 @@ void gpuProgressFn() {
   }  
   if (head->state == TRANSFERRING_IN) {
     if ((returnVal = cudaStreamQuery(data_in_stream)) == cudaSuccess) {
-#ifdef GPU_PROFILE
-      gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle);
 #ifdef GPU_TRACE
       gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
       traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
 			    gpuEvents[dataSetupIndex].cmistartTime, 
 			    gpuEvents[dataSetupIndex].cmiendTime); 
-#endif 
 #endif
 
 #ifdef GPU_INSTRUMENT_WRS
@@ -587,15 +584,12 @@ void gpuProgressFn() {
       if (second != NULL /*&& (second->state == QUEUED)*/) {
 	allocateBuffers(second); 
       }
-#ifdef GPU_PROFILE
-      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-      gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-      gpuEvents[timeIndex].ID = head->id; 
-      runningKernelIndex = timeIndex; 
 #ifdef GPU_TRACE
       gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
       gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+      gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
+      gpuEvents[timeIndex].ID = head->id; 
+      runningKernelIndex = timeIndex; 
       timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
@@ -608,15 +602,12 @@ void gpuProgressFn() {
 
       head->state = EXECUTING; 
       if (second != NULL) {
-#ifdef GPU_PROFILE
-	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = second->id; 
-	dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
 	gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+	gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	gpuEvents[timeIndex].ID = second->id; 
+	dataSetupIndex = timeIndex; 
 	timeIndex++; 
 #endif
 
@@ -636,14 +627,11 @@ void gpuProgressFn() {
   }
   if (head->state == EXECUTING) {
     if ((returnVal = cudaStreamQuery(kernel_stream)) == cudaSuccess) {
-#ifdef GPU_PROFILE
-      gpuEvents[runningKernelIndex].endTime = cutGetTimerValue(timerHandle); 
 #ifdef GPU_TRACE
       gpuEvents[runningKernelIndex].cmiendTime = CmiWallTimer();
       traceUserBracketEvent(gpuEvents[runningKernelIndex].stage, 
 			    gpuEvents[runningKernelIndex].cmistartTime, 
 			    gpuEvents[runningKernelIndex].cmiendTime); 
-#endif
 #endif
 #ifdef GPU_INSTRUMENT_WRS
       {
@@ -664,15 +652,12 @@ void gpuProgressFn() {
 #endif
 
       if (second != NULL && second->state == QUEUED) {
-#ifdef GPU_PROFILE
-	gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	gpuEvents[timeIndex].ID = second->id; 
-	dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
 	gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+	gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	gpuEvents[timeIndex].ID = second->id; 
+	dataSetupIndex = timeIndex; 
 	timeIndex++; 
 #endif
 
@@ -686,14 +671,11 @@ void gpuProgressFn() {
       } 
       if (second != NULL && second->state == TRANSFERRING_IN) {
 	if (cudaStreamQuery(data_in_stream) == cudaSuccess) {
-#ifdef GPU_PROFILE
-	  gpuEvents[dataSetupIndex].endTime = cutGetTimerValue(timerHandle); 
 #ifdef GPU_TRACE
 	  gpuEvents[dataSetupIndex].cmiendTime = CmiWallTimer();
 	  traceUserBracketEvent(gpuEvents[dataSetupIndex].stage, 
 				gpuEvents[dataSetupIndex].cmistartTime, 
 				gpuEvents[dataSetupIndex].cmiendTime); 
-#endif
 #endif
 #ifdef GPU_INSTRUMENT_WRS
           {
@@ -716,15 +698,12 @@ void gpuProgressFn() {
 	  if (third != NULL /*&& (third->state == QUEUED)*/) {
 	    allocateBuffers(third); 
 	  }
-#ifdef GPU_PROFILE
-	  gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	  gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
-	  gpuEvents[timeIndex].ID = second->id; 
-	  runningKernelIndex = timeIndex; 
 #ifdef GPU_TRACE
 	  gpuEvents[timeIndex].stage = GPU_KERNEL_EXEC; 
 	  gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+	  gpuEvents[timeIndex].eventType = KERNEL_EXECUTION; 
+	  gpuEvents[timeIndex].ID = second->id; 
+	  runningKernelIndex = timeIndex; 
 	  timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
@@ -735,15 +714,12 @@ void gpuProgressFn() {
 	  kernelSelect(second); 
 	  second->state = EXECUTING; 
 	  if (third != NULL) {
-#ifdef GPU_PROFILE
-	    gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-	    gpuEvents[timeIndex].eventType = DATA_SETUP; 
-	    gpuEvents[timeIndex].ID = third->id; 
-	    dataSetupIndex = timeIndex; 
 #ifdef GPU_TRACE
 	    gpuEvents[timeIndex].stage = GPU_MEM_SETUP; 
 	    gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+	    gpuEvents[timeIndex].eventType = DATA_SETUP; 
+	    gpuEvents[timeIndex].ID = third->id; 
+	    dataSetupIndex = timeIndex; 
 	    timeIndex++; 
 #endif
 
@@ -755,15 +731,12 @@ void gpuProgressFn() {
 	  }
 	}
       }
-#ifdef GPU_PROFILE
-      gpuEvents[timeIndex].startTime = cutGetTimerValue(timerHandle); 
-      gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
-      gpuEvents[timeIndex].ID = head->id; 
-      dataCleanupIndex = timeIndex; 	
 #ifdef GPU_TRACE
       gpuEvents[timeIndex].stage = GPU_MEM_CLEANUP; 
       gpuEvents[timeIndex].cmistartTime = CmiWallTimer();
-#endif
+      gpuEvents[timeIndex].eventType = DATA_CLEANUP; 
+      gpuEvents[timeIndex].ID = head->id; 
+      dataCleanupIndex = timeIndex; 	
       timeIndex++; 
 #endif
 #ifdef GPU_INSTRUMENT_WRS
@@ -784,14 +757,11 @@ void gpuProgressFn() {
 	cudaStreamQuery(data_out_stream) == cudaSuccess && 
 	cudaStreamQuery(kernel_stream) == cudaSuccess){
       freeMemory(head); 
-#ifdef GPU_PROFILE
-      gpuEvents[dataCleanupIndex].endTime = cutGetTimerValue(timerHandle);
 #ifdef GPU_TRACE
       gpuEvents[dataCleanupIndex].cmiendTime = CmiWallTimer();
       traceUserBracketEvent(gpuEvents[dataCleanupIndex].stage, 
 			    gpuEvents[dataCleanupIndex].cmistartTime, 
 			    gpuEvents[dataCleanupIndex].cmiendTime); 
-#endif
 #endif
 #ifdef GPU_INSTRUMENT_WRS
       {
@@ -845,11 +815,11 @@ void exitHybridAPI() {
 #endif
 
   deleteWRqueue(wrQueue); 
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(kernel_stream)); 
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(data_in_stream)); 
-  CUDA_SAFE_CALL_NO_SYNC(cudaStreamDestroy(data_out_stream)); 
+  cudaChk(cudaStreamDestroy(kernel_stream)); 
+  cudaChk(cudaStreamDestroy(data_in_stream)); 
+  cudaChk(cudaStreamDestroy(data_out_stream)); 
 
-#ifdef GPU_PROFILE
+#ifdef GPU_TRACE
   for (int i=0; i<timeIndex; i++) {
     switch (gpuEvents[i].eventType) {
     case DATA_SETUP:
@@ -864,11 +834,8 @@ void exitHybridAPI() {
     default:
       printf("Error, invalid timer identifier\n"); 
     }
-    printf(" %.2f:%.2f\n", gpuEvents[i].startTime-gpuEvents[0].startTime, gpuEvents[i].endTime-gpuEvents[0].startTime); 
+    printf(" %.2f:%.2f\n", gpuEvents[i].cmistartTime-gpuEvents[0].cmistartTime, gpuEvents[i].cmiendTime-gpuEvents[0].cmistartTime); 
   }
-
-  CUT_SAFE_CALL(cutStopTimer(timerHandle));
-  CUT_SAFE_CALL(cutDeleteTimer(timerHandle));  
 
 #endif
 
@@ -881,7 +848,7 @@ void releasePool(CkVec<BufferPool> &pools){
     Header *next;
     for(hdr = pools[i].head; hdr != NULL;){
       next = hdr->next; 
-      CUDA_SAFE_CALL_NO_SYNC(cudaFreeHost((void *)hdr));
+      cudaChk(cudaFreeHost((void *)hdr));
       hdr = next;
     }
   }
@@ -905,7 +872,7 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
     pools[i].head = NULL;
     
     /*
-    CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)(&pools[i].head), 
+    cudaChk(cudaMallocHost((void **)(&pools[i].head), 
                                           (sizeof(Header)+bufSize)*numBuffers));
     */
 
@@ -913,7 +880,7 @@ void createPool(int *nbuffers, int nslots, CkVec<BufferPool> &pools){
     Header *previous = NULL;
 
     for(int j = 0; j < numBuffers; j++){
-      CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&hd,
+      cudaChk(cudaMallocHost((void **)&hd,
                                             (sizeof(Header)+bufSize)));
       if(hd == NULL){
         printf("(%d) failed to allocate %dth block of size %d, slot %d\n", CmiMyPe(), j, bufSize, i);
@@ -945,7 +912,7 @@ int findPool(int size){
 #endif
 
     BufferPool newpool;
-    CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
+    cudaChk(cudaMallocHost((void **)&newpool.head, size+sizeof(Header)));
     if(newpool.head == NULL){
       printf("(%d) findPool: failed to allocate newpool %d head, size %d\n", CmiMyPe(), boundaryArrayLen, size);
       abort();
@@ -981,7 +948,7 @@ void *getBufferFromPool(int pool, int size){
   }
   else if (memPoolFreeBufs[pool].head == NULL){
     Header *hd;
-    CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&hd, sizeof(Header)+memPoolFreeBufs[pool].size));
+    cudaChk(cudaMallocHost((void **)&hd, sizeof(Header)+memPoolFreeBufs[pool].size));
     printf("(%d) getBufferFromPool, pool: %d, size: %d expand by 1\n", CmiMyPe(), pool, size);
     if(hd == NULL){
       abort();
@@ -1013,7 +980,7 @@ void *hapi_poolMalloc(int size){
   int pool = findPool(size);
   void *buf;
 #ifdef GPU_DUMMY_MEMPOOL
-  CUDA_SAFE_CALL_NO_SYNC(cudaMallocHost((void **)&buf, size+sizeof(Header)));
+  cudaChk(cudaMallocHost((void **)&buf, size+sizeof(Header)));
   if(pool < 0 || pool >= memPoolSize.length()){
     printf("(%d) need to create up to pool %d; malloc size: %d\n", CmiMyPe(), pool, size);
     abort();

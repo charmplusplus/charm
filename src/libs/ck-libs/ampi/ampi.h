@@ -121,11 +121,13 @@ typedef int MPI_Fint;
 #define MPI_LB                23
 #define MPI_UB                24
 #define MPI_LONG_LONG_INT     25
+#define MPI_LONG_LONG         MPI_LONG_LONG_INT
 #define MPI_DOUBLE_COMPLEX    26
 
 #define MPI_ANY_TAG      (-1)
 #define MPI_REQUEST_NULL (-1)
 #define MPI_GROUP_NULL   (-1)
+#define MPI_GROUP_EMPTY  0
 #define MPI_COMM_NULL    (-1)
 #define MPI_TYPE_NULL    (-1)
 #define MPI_PROC_NULL    (-2)
@@ -768,6 +770,10 @@ extern void traceEndFuncProj(char *);
 extern void traceBeginFuncIndexProj(int, char *, int);
 extern void traceEndFuncIndexProj(int);
 
+#if CMK_BIGSIM_CHARM
+#define MPI_Set_startevent AMPI_Set_startevent
+int AMPI_Set_startevent(MPI_Comm comm);
+#endif
 
 /* Determine approximate depth of stack at the point of this call */
 extern long ampiCurrentStackUsage();

@@ -436,7 +436,7 @@ void resetThisEntryPath(void) {
 
 
 /// A debugging routine that outputs critical path info as user events.
-void  saveCurrentPathAsUserEvent(char* prefix){
+void  saveCurrentPathAsUserEvent(const char* prefix){
   if(CkpvAccess(currentlyExecutingPath).getTotalTime() > 0.0){
     //traceUserEvent(5020);
 

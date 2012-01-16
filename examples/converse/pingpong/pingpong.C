@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <converse.h>
 
-enum {nCycles =4096};
-enum { maxMsgSize = 1 << 16 };
+enum {nCycles =1};
+enum { maxMsgSize = 1 << 14 };
 
 CpvDeclare(int,msgSize);
 CpvDeclare(int,cycleNum);
@@ -20,13 +20,19 @@ CpvDeclare(int,node1Handler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
+#define USE_PERSISTENT     0
+
+#if USE_PERSISTENT
+PersistentHandle h;
+#endif
+
 // Start the pingpong for each message size
 void startRing()
 {
   CpvAccess(cycleNum) = 0;
 
   //Increase message in powers of 4. Also add a converse header to that
-  CpvAccess(msgSize) = (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)*4 + 
+  CpvAccess(msgSize) = (CpvAccess(msgSize)-CmiMsgHeaderSizeBytes)*2 + 
       CmiMsgHeaderSizeBytes;
 
   char *msg = (char *)CmiAlloc(CpvAccess(msgSize));
@@ -81,7 +87,13 @@ CmiHandler node0HandlerFunc(char *msg)
         CmiSetHandler(msg,CpvAccess(node1Handler));
         *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
         
+#if USE_PERSISTENT
+        CmiUsePersistentHandle(&h, 1);
+#endif
         CmiSyncSendAndFree(1,CpvAccess(msgSize),msg);
+#if USE_PERSISTENT
+        CmiUsePersistentHandle(NULL, 0);
+#endif
     }
     return 0;
 }
@@ -91,7 +103,13 @@ CmiHandler node1HandlerFunc(char *msg)
     CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
     CmiSetHandler(msg,CpvAccess(node0Handler));
     
+#if USE_PERSISTENT
+    CmiUsePersistentHandle(&h, 1);
+#endif
     CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
+#if USE_PERSISTENT
+    CmiUsePersistentHandle(NULL, 0);
+#endif
     return 0;
 }
 
@@ -102,7 +120,7 @@ CmiStartFn mymain()
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     
-    CpvAccess(msgSize)= 4 + CmiMsgHeaderSizeBytes;
+    CpvAccess(msgSize)= 4096 + CmiMsgHeaderSizeBytes;
     
     CpvInitialize(int,exitHandler);
     CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
@@ -116,6 +134,9 @@ CmiStartFn mymain()
     
     int otherPe = CmiMyPe() ^ 1;
     
+#if USE_PERSISTENT
+    h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
+#endif
     
     if (CmiMyPe() == 0)
         startRing();

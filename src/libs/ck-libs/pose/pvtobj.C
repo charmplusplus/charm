@@ -16,7 +16,7 @@ void pvtObjectNode::sanitize()
 pvtObjects::pvtObjects() 
 { 
   register int i;
-  numObjs = numSpaces = firstEmpty = 0; 
+  numObjs = numSpaces = firstEmpty = stratIterCount = 0; 
   size = 100;
   if (!(objs = (pvtObjectNode *)malloc(100 * sizeof(pvtObjectNode)))) {
     CkPrintf("ERROR: pvtObjects::pvtObjects: OUT OF MEMORY!\n");
@@ -85,6 +85,41 @@ void pvtObjects::CheckpointCommit() {
   register int i;
   for (i=0; i<numSpaces; i++)
     if (objs[i].isPresent()) (objs[i].localObjPtr)->CheckpointCommit();
+}
+/// Perform synchronization strategy calculations
+void pvtObjects::StratCalcs() {
+  // don't perform calculations every GVT iteration
+  if (stratIterCount >= PVT_STRAT_CALC_PERIOD) {
+    // calculate the average number of rollbacks per GVT iteration on
+    // this PE (proportional to the fraction of posers on this PE) and
+    // send to all strat objects
+    long long totalRBs = 0LL;
+    int poserCount = 0;
+    for (int i = 0; i < numSpaces; i++) {
+      if (objs[i].isPresent()) {
+	totalRBs += (objs[i].localObjPtr)->basicStats[1];
+	poserCount++;
+      }
+    }
+    if (poserCount > 0) {
+      GVT *localGVT = (GVT *)CkLocalBranch(TheGVT);
+      // Each GVT iteration, a different GVT object computes the GVT and
+      // increments its GVT iteration count, hence the need for the
+      // number of PEs and the number of this PE to get the total GVT
+      // iteration count.  GVT objects are cycled through, starting with 0.
+      int gvtIterCount = localGVT->getGVTIterationCount() * CkNumPes() + CkMyPe();
+      int avgRBsPerGVTIter = (int)((totalRBs * (long long)totalNumPosers) / ((long long)gvtIterCount * (long long)poserCount));
+      for (int i = 0; i < numSpaces; i++) {
+	// ensure each sim is present, and only update if using adapt5
+	if (objs[i].isPresent() && (objs[i].localObjPtr->myStrat->STRAT_T == ADAPT5_T)) {
+	  ((adapt5 *)((objs[i].localObjPtr)->myStrat))->setAvgRBsPerGVTIter(avgRBsPerGVTIter);
+	}
+      }
+    }
+    stratIterCount = 0;
+  } else {
+    stratIterCount++;
+  }
 }
 
 /// Dump data fields

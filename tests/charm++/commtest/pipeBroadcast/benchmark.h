@@ -1,6 +1,6 @@
 # include "benchmark.decl.h"
 
-class TheMain : public Chare {
+class TheMain : public CBase_TheMain {
  public:
   TheMain(CkArgMsg *msg);
   void exit();

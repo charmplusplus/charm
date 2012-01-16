@@ -2,11 +2,7 @@
 #define _INIT_H
 
 #include "charm.h" // For CkNumPes
-#if CMK_STL_DONT_USE_DOT_H
 #include <new>   // for in-place new operator
-#else
-#include <new.h>   // for in-place new operator
-#endif
 #include "ckhashtable.h"
 
 typedef CkQ<void *> PtrQ;
@@ -36,6 +32,7 @@ class TableEntry {
       cIdx = cIdx_;
     }
     inline int getcIdx(void) const { return cIdx; }
+    inline int getmigCtor(void) const { return migCtor; }
 };
 
 template <class dtype>
@@ -50,7 +47,7 @@ class GroupIdxArray {
   //This non-inline version of "find", below, allows the (much simpler)
   // common case to be inlined.
   dtype& nonInlineFind(CkGroupID n) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
       if (n.idx==0) {CkAbort("Group ID is zero-- invalid!\n"); dtype *nul=NULL; return *nul;}
       else 
 #endif

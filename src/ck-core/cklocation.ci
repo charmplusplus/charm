@@ -6,11 +6,11 @@ module CkLocation {
   };
 
   group [migratable] CkLocMgr {
-	entry CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndexMax numInitial);
+	entry CkLocMgr(CkGroupID map,CkGroupID _lbdb,CkArrayIndex numInitial);
 	entry void deliverInline(CkMessage *m);
 	entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
-	entry [expedited] void updateLocation(CkArrayIndexMax idx,int nowOnPe);
-	entry void reclaimRemote(CkArrayIndexMax idx,int deletedOnPe);
+	entry [expedited] void updateLocation(CkArrayIndex idx,int nowOnPe);
+	entry void reclaimRemote(CkArrayIndex idx,int deletedOnPe);
 	
 	//Load balancing:
 	entry void dummyAtSync(void);
@@ -29,6 +29,10 @@ module CkLocation {
 
   group [migratable] DefaultArrayMap : RRMap {
     entry DefaultArrayMap(void);
+  };
+
+  group [migratable] FastArrayMap : DefaultArrayMap {
+    entry FastArrayMap(void);
   };
 
   group [migratable] ReadFileMap : DefaultArrayMap {

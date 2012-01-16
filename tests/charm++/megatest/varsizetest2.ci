@@ -1,0 +1,15 @@
+module varsizetest2 {
+  message varsizetest2_Msg {
+    int iarray[];
+    float farray[];
+  };
+
+  chare varsizetest2_main {
+    entry varsizetest2_main(void);
+    entry void exit(varsizetest2_Msg *);
+  };
+
+  chare varsizetest2_test {
+    entry varsizetest2_test(varsizetest2_Msg *);
+  };
+};

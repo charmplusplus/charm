@@ -93,7 +93,7 @@ extern "C" void isSane( void *, unsigned);
 CkpvExtern(CkGroupID, cmgrID);
 
 void *sourceOffRectstrategyHandler(void *msg) {
-    CmiMsgHeaderBasic *conv_header = (CmiMsgHeaderBasic *) msg;
+    CmiMsgHeaderExt *conv_header = (CmiMsgHeaderExt *) msg;
     int instid = conv_header->stratid;
     ComlibPrintf("sourceOff handler called on %d\n",CkMyPe(), instid);
 
@@ -271,7 +271,7 @@ void RectMulticastStrategy::insertSectionID(CkSectionID *sid) {
 
 
 ComlibRectSectionHashObject *
-RectMulticastStrategy::createObjectOnSrcPe(int nindices, CkArrayIndexMax *idxlist, unsigned int thisSectionID) {
+RectMulticastStrategy::createObjectOnSrcPe(int nindices, CkArrayIndex *idxlist, unsigned int thisSectionID) {
 
     ComlibPrintf("[%d] createObjectOnSrcPe \n", CkMyPe());   
     ComlibPrintf("[%d] Rect createObjectOnSrcPe \n", CkMyPe());   
@@ -373,7 +373,7 @@ void RectMulticastStrategy::sendRectDest(ComlibRectSectionHashObject *obj, int s
   //CmiSetHandler(env, handlerId);
   CmiSetHandler(env, CkpvAccess(strategy_handlerid));
 
-  ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+  ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
   //Collect Multicast Statistics
   RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, destpe);
@@ -488,7 +488,7 @@ BGTsRC_Geometry_t *RectMulticastStrategy::getRectGeometry(ComlibRectSectionHashO
 
 ComlibRectSectionHashObject *
 RectMulticastStrategy::createObjectOnIntermediatePe(int nindices,
-						      CkArrayIndexMax *idxlist,
+						      CkArrayIndex *idxlist,
 						      int npes,
 						      ComlibMulticastIndexCount *counts,
 						      int srcpe, int thisSectionID) {
@@ -608,7 +608,7 @@ void RectMulticastStrategy::remoteMulticast(envelope *env,
     //CmiSetHandler(env, handlerId);
     CmiSetHandler(env, CkpvAccess(strategy_handlerid));
 
-    ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+    ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
@@ -649,7 +649,7 @@ void RectMulticastStrategy::forwardMulticast(envelope *env,
     // handler is changed to special root handler
     CmiSetHandler(env, handlerId);
 
-    ((CmiMsgHeaderBasic *) env)->stratid = getInstance();
+    ((CmiMsgHeaderExt *) env)->stratid = getInstance();
 
     //Collect Multicast Statistics
     RECORD_SENDM_STATS(getInstance(), env->getTotalsize(), pelist, npes);
@@ -677,7 +677,7 @@ void RectMulticastStrategy::beginProcessing(int numElements){
     bgl_machine_RectBcastConfigure (rectRequest);
     CkArrayID dest;
     int nidx;
-    CkArrayIndexMax *idx_list;
+    CkArrayIndex *idx_list;
 
     ainfo.getDestinationArray(dest, idx_list, nidx);
     sinfo = ComlibSectionInfo(dest, myInstanceID);
@@ -756,7 +756,7 @@ void RectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     int sender=env->getSrcPe();
     int localElems;
     envelope *newenv;
-    CkArrayIndexMax *local_idx_list;    
+    CkArrayIndex *local_idx_list;    
     
     sinfo.unpack(env, localElems, local_idx_list, newenv);
 
@@ -773,7 +773,7 @@ void RectMulticastStrategy::handleNewMulticastMessage(envelope *env) {
     }
 
     /*
-    CkArrayIndexMax *idx_list_array = new CkArrayIndexMax[idx_list.size()];
+    CkArrayIndex *idx_list_array = new CkArrayIndex[idx_list.size()];
     for(int count = 0; count < idx_list.size(); count++)
         idx_list_array[count] = idx_list[count];
     */

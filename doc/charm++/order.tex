@@ -1,0 +1,206 @@
+\subsection{Delivery Order}
+
+By default, \charmpp\ will process the messages you send in roughly
+FIFO\index{message delivery order} order when they arrive at a PE.
+For most programs, this behavior is fine.  However, for optimal
+performance, some programs need more explicit control over the order
+in which messages are processed. \charmpp\ allows you to adjust
+delivery order on a per-message basis.
+
+% Example general use cases here
+
+\subsubsection{Queueing Strategies}
+\label{queueing strategies}
+
+The simplest call available to change the order in which messages
+are processed is \kw{CkSetQueueing}.
+
+\function{void CkSetQueueing(MsgType message, int queueingtype)}
+
+where \uw{queueingtype} is one of the following constants:
+
+\begin{alltt}
+  CK_QUEUEING_FIFO
+  CK_QUEUEING_LIFO
+  CK_QUEUEING_IFIFO
+  CK_QUEUEING_ILIFO
+  CK_QUEUEING_BFIFO
+  CK_QUEUEING_BLIFO
+  CK_QUEUEING_LFIFO
+  CK_QUEUEING_LLIFO
+\end{alltt}
+
+The first two options,  \kw{CK\_QUEUEING\_FIFO} and
+\kw{CK\_QUEUEING\_LIFO}, are used as follows:
+
+\begin{alltt}
+  MsgType *msg1 = new MsgType ;
+  CkSetQueueing(msg1, CK_QUEUEING_FIFO);
+
+  MsgType *msg2 = new MsgType ;
+  CkSetQueueing(msg2, CK_QUEUEING_LIFO);
+
+  CkEntryOptions opts1, opts2;
+  opts1.setQueueing(CK_QUEUEING_FIFO);
+  opts2.setQueueing(CK_QUEUEING_LIFO);
+
+  chare.entry_name(arg1, arg2, opts1);
+  chare.entry_name(arg1, arg2, opts2);
+\end{alltt}
+
+When message \kw{msg1} arrives at its destination, it will be pushed
+onto the end of the message queue as usual.  However, when \kw{msg2}
+arrives, it will be pushed onto the {\em front} of the message
+queue. Similarly, the two parameter-marshalled calls to \kw{chare}
+will be inserted at the end and beginning of the message queue,
+respectively.
+
+\subsubsection{Prioritized Execution}
+\label{prioritized message passing}
+\index{prioritized execution}
+\index{prioritized message passing}
+\index{priorities}
+
+The basic FIFO and LIFO strategies are sufficient to approximate
+parallel breadth-first and depth-first explorations of a problem
+space, but they don't admit more fine-grained control. To provide that
+degree of control, \charmpp\ also allows explicit prioritization of
+messages.
+
+The other six queueing strategies involve the use of
+priorities\index{priorities}.  There are two kinds of priorities which
+can be attached to a message: {\sl integer priorities}\index{integer
+  priorities} and {\sl bitvector priorities}\index{bitvector
+  priorities}. These correspond to the {\em I} and {\em B} queueing
+strategies, respectively. In both cases, numerically lower priorities
+will be dequeued and delivered before numerically greater
+priorities. The FIFO and LIFO queueing strategies then control the
+relative order in which messages of the same priority will be
+delivered.
+
+To attach a priority field to a
+message, one needs to set aside space in the message's buffer while
+allocating the message\index{message priority}.  To achieve this, the
+size of the priority field\index{priority field} in bits should be
+specified as a placement argument to the \kw{new} operator, as
+described in Section \ref{memory allocation}.  Although the size of
+the priority field is specified in bits, it is always padded to an
+integral number of {\tt int}s.  A pointer to the priority part of the
+message buffer can be obtained with this call:
+
+\function{void *CkPriorityPtr(MsgType msg)}
+\index{CkPriorityPtr}
+\index{priority pointer}
+
+Integer priorities are quite straightforward.  One allocates a message
+with an extra integer parameter to ``new'' (see the first line of the
+example below), which sets aside enough space (in bits) in the message
+to hold the priority.  One then stores the priority in the message.
+Finally, one informs the system that the message contains an integer
+priority using \kw{CkSetQueueing}:
+
+\begin{alltt}
+  MsgType *msg = new (8*sizeof(int)) MsgType;
+  *(int*)CkPriorityPtr(msg) = prio;
+  CkSetQueueing(msg, CK_QUEUEING_IFIFO);
+\end{alltt}
+
+Integer proiorities for parameter-marshalled messages can be achieved
+through {\tt CkEntryOptions::setPriority()}:
+
+\begin{alltt}
+  CkEntryOptions opts;
+  opts.setPriority(7);
+  chare.entry_name(arg1, arg2, &opts);
+\end{alltt}
+
+Bitvector priorities are somewhat more complicated.  Bitvector
+priorities are arbitrary-length bit-strings representing fixed-point
+numbers in the range 0 to 1.  For example, the bit-string ``001001''
+represents the number .001001\raisebox{-.5ex}{\scriptsize binary}.  As
+with the simpler kind of priority, higher numbers represent lower
+priorities.  Unlike the simpler kind of priority, bitvectors can be of
+arbitrary length, therefore, the priority numbers they represent can
+be of arbitrary precision.
+
+Arbitrary-precision priorities\index{arbitrary-precision priorities}
+are often useful in AI search-tree applications.  Suppose we have a
+heuristic suggesting that tree node $N_1$ should be searched before
+tree node $N_2$.  We therefore designate that node $N_1$ and its
+descendants will use high priorities, and that node $N_2$ and its
+descendants will use lower priorities.  We have effectively split the
+range of possible priorities in two.  If several such heuristics fire
+in sequence, we can easily split the priority range \index{priority
+range splitting} in two enough times that no significant bits remain,
+and the search begins to fail for lack of meaningful priorities to
+assign.  The solution is to use arbitrary-precision priorities,
+i.e. bitvector priorities.
+
+To assign a bitvector priority, two methods are available.  The
+first is to obtain a pointer to the priority field using  \kw{CkPriorityPtr},
+and then manually set the bits using the bit-setting operations
+inherent to C.  To achieve this, one must know the format
+\index{bitvector format} of the
+bitvector, which is as follows: the bitvector is represented as an
+array of unsigned integers.  The most significant bit of the first
+integer contains the first bit of the bitvector.  The remaining bits
+of the first integer contain the next 31 bits of the bitvector.
+Subsequent integers contain 32 bits each.  If the size of the
+bitvector is not a multiple of 32, then the last integer contains 0
+bits for padding in the least-significant bits of the integer.
+
+The second way to assign priorities is only useful for those who are
+using the priority range-splitting\index{priority range splitting}
+described above.  The root of the tree is assigned the null
+priority-string.  Each child is assigned its parent's priority with
+some number of bits concatenated.  The net effect is that the entire
+priority of a branch is within a small epsilon of the priority of its
+root.
+
+It is possible to utilize unprioritized messages, integer priorities,
+and bitvector priorities in the same program.  The messages will be
+processed in roughly the following order\index{multiple priority types}:
+
+\begin{itemize}
+
+\item Among messages enqueued with bitvector priorities, the
+messages are dequeued according to their priority.  The
+priority ``0000...'' is dequeued first, and ``1111...'' is
+dequeued last.
+
+\item Unprioritized messages are treated as if they had the
+priority ``1000...'' (which is the ``middle'' priority, it
+lies exactly halfway between ``0000...'' and ``1111...'').
+
+\item Integer priorities are converted to bitvector priorities.  They
+are normalized so that the integer priority of zero is converted to
+``1000...'' (the ``middle'' priority).  To be more specific, the
+conversion is performed by adding 0x80000000 to the integer, and then
+treating the resulting 32-bit quantity as a 32-bit bitvector priority.
+
+\item Among messages with the same priority, messages are
+dequeued in FIFO order or LIFO order, depending upon which
+queuing strategy was used.
+
+\end{itemize}
+
+Additionally, {\sl long integer priorities} can be specified by the {\em L} strategy. 
+
+A final reminder about prioritized execution: \charmpp\ processes
+messages in {\it roughly} the order you specify; it never guarantees
+that it will deliver the messages in {\it precisely} the
+order\index{message delivery order} you specify. Thus, the correctness
+of your program should never depend on the order in which the runtime
+delivers messages. However, it makes a serious attempt to be
+``close'', so priorities can strongly affect the efficiency of your
+program.
+
+\subsubsection{Skipping the Queue}
+
+Some operations that one might want to perform are sufficiently
+latency-sensitive that they should never wait in line behind other
+messages. The \charmpp\ runtime offers two attributes for entry
+methods, {\kw expedited} and {\kw immediate}, to serve these
+needs. For more information on these attributes, see
+Section~\ref{attributes} and the example in {\tt
+  charm/pgms/charm++/megatest/immediatering.C}.

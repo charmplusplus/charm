@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /**
  @defgroup CkEnvelope
  \brief  Charm++ message header.
@@ -164,7 +158,7 @@ public:
         UShort arrayEp;        ///< Used only for array broadcasts
       } group;
       struct s_array{             ///< For arrays only (ArrayEltInitMsg, ForArrayEltMsg)
-        CkArrayIndexStruct index; ///< Array element index
+        CkArrayIndexBase index; ///< Array element index
         int listenerData[CK_ARRAYLISTENER_MAXLEN]; ///< For creation
         CkGroupID arr;            ///< Array manager GID
         UChar hopCount;           ///< number of times message has been routed
@@ -190,13 +184,13 @@ public:
     MCount SN;
     MCount TN;
     MlogEntry *localMlogEntry;
-	bool freeMsg;
+    bool freeMsg;
 #endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
-    UShort ref;            ///< Used by futures
+    CMK_REFNUM_TYPE ref;            ///< Used by futures
     s_attribs attribs;
-    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(UShort)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
+    UChar align[CkMsgAlignOffset(CmiReservedHeaderSize+sizeof(u_type)+sizeof(CMK_REFNUM_TYPE)+sizeof(s_attribs))];    ///< padding to make sure sizeof(double) alignment
     
     //This struct should now be sizeof(void*) aligned.
     UShort priobits;   ///< Number of bits of priority data after user data
@@ -212,8 +206,8 @@ private:
     void pup(PUP::er &p);
     UInt   getEvent(void) const { return event; }
     void   setEvent(const UInt e) { event = e; }
-    UInt   getRef(void) const { return ref; }
-    void   setRef(const UShort r) { ref = r; }
+    CMK_REFNUM_TYPE   getRef(void) const { return ref; }
+    void   setRef(const CMK_REFNUM_TYPE r) { ref = r; }
     UChar  getQueueing(void) const { return attribs.queueing; }
     void   setQueueing(const UChar q) { attribs.queueing=q; }
     UChar  getMsgtype(void) const { return attribs.mtype; }
@@ -257,6 +251,7 @@ private:
       env->type.group.dep.setZero();
       _SET_USED(env, 0);
       env->setRef(0);
+      env->setEpIdx(0);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
       env->pathHistory.reset();
@@ -273,7 +268,10 @@ private:
       return env;
     }
     void reset() {
+#if CMK_REPLAYSYSTEM
       setEvent(++CkpvAccess(envelopeEventID));
+#endif
+      type.group.dep.setZero();
     }
     UShort getEpIdx(void) const { return epIdx; }
     void   setEpIdx(const UShort idx) { epIdx = idx; }
@@ -349,8 +347,8 @@ private:
     int getArrayIfNotThere(void) {return type.array.ifNotThere;}
     void setArrayIfNotThere(int nt) {type.array.ifNotThere=nt;}
     int *getsetArrayListenerData(void) {return type.array.listenerData;}
-    CkArrayIndexMax &getsetArrayIndex(void) 
-    	{return *(CkArrayIndexMax *)&type.array.index;}
+    CkArrayIndex &getsetArrayIndex(void) 
+    	{return *(CkArrayIndex *)&type.array.index;}
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
  public:

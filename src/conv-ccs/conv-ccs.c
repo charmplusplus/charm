@@ -266,7 +266,7 @@ void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData)
   }
 }
 
-#if ! NODE_0_IS_CONVHOST || CMK_BLUEGENE_CHARM
+#if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
 /* The followings are necessary to prevent CCS requests to be processed before
  * CCS has been initialized. Really it matters only when NODE_0_IS_CONVHOST=0, but
  * it doesn't hurt having it in the other case as well */
@@ -287,7 +287,7 @@ void CcsBufferMessage(char *msg) {
 /*Unpacks request message to call above routine*/
 int _ccsHandlerIdx = 0;/*Converse handler index of routine req_fw_handler*/
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
 CpvDeclare(int, _bgCcsHandlerIdx);
 CpvDeclare(int, _bgCcsAck);
 /* This routine is needed when the application is built on top of the bigemulator
@@ -324,8 +324,8 @@ static void bg_req_fw_handler(char *msg) {
 extern void req_fw_handler(char *msg);
 
 void CcsReleaseMessages() {
-#if ! NODE_0_IS_CONVHOST || CMK_BLUEGENE_CHARM
-#if CMK_BLUEGENE_CHARM
+#if ! NODE_0_IS_CONVHOST || CMK_BIGSIM_CHARM
+#if CMK_BIGSIM_CHARM
   if (CpvAccess(_bgCcsAck) == 0 || CpvAccess(_bgCcsAck) < BgNodeSize()) return;
 #endif
   if (CcsNumBufferedMsgs > 0) {
@@ -460,7 +460,7 @@ void CcsImpl_netRequest(CcsImplHeader *hdr,const void *reqData)
   char *msg;
   int len,repPE=ChMessageInt(hdr->pe);
   if (repPE<=-CmiNumPes() || repPE>=CmiNumPes()) {
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
     /*Treat out of bound values as errors. Helps detecting bugs*/
     if (repPE==-CmiNumPes()) CmiPrintf("Invalid processor index in CCS request: are you trying to do a broadcast instead?");
     else CmiPrintf("Invalid processor index in CCS request.");
@@ -537,7 +537,7 @@ void CcsInit(char **argv)
   CpvInitialize(CcsImplHeader *, ccsReq);
   CpvAccess(ccsReq) = NULL;
   _ccsHandlerIdx = CmiRegisterHandler((CmiHandler)req_fw_handler);
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
   CpvInitialize(int, _bgCcsHandlerIdx);
   CpvAccess(_bgCcsHandlerIdx) = 0;
   CpvInitialize(int, _bgCcsAck);

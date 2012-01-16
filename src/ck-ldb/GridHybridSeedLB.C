@@ -532,10 +532,8 @@ void GridHybridSeedLB::Examine_InterObject_Messages (CentralLB::LDStats *stats)
 {
   LDCommData *com_data;
   int send_object;
-  int send_pe;
   int send_cluster;
   int recv_object;
-  int recv_pe;
   int recv_cluster;
   LDObjKey *recv_objects;
   int num_objects;
@@ -993,7 +991,7 @@ void GridHybridSeedLB::Assign_Object_To_PE (int target_object, int target_pe)
 ** The Charm++ load balancing framework invokes this method to cause the
 ** load balancer to migrate objects to "better" PEs.
 */
-void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
+void GridHybridSeedLB::work (LDStats *stats)
 {
   int target_pe;
   int target_object;
@@ -1007,7 +1005,7 @@ void GridHybridSeedLB::work (CentralLB::LDStats *stats, int count)
   stats->makeCommHash ();
 
   // Initialize object variables for the number of PEs and number of objects.
-  Num_PEs = count;
+  Num_PEs = stats->nprocs();
   Num_Objects = stats->n_objs;
 
   if (_lb_args.debug() > 0) {

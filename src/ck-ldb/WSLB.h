@@ -1,17 +1,16 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
-*/
+ * This load balancer is a neighborLB and should inherit from NborBaseLB
+ * instead of incorrectly inheriting from BaseLB.
+ *
+ * Also struct LDStats in here should be removed and merged with the one
+ * in NborBaseLB. -- ASB
+ */
+
 /*@{*/
 
-#ifndef NEIGHBORLB_H
-#define NEIGHBORLB_H
+#ifndef _WSLB_H_
+#define _WSLB_H_
 
 #include "BaseLB.h"
 #include "WSLB.decl.h"
@@ -137,7 +136,7 @@ public:
 }; 
 
 
-#endif /* NEIGHBORLB_H */
+#endif /* _WSLB_H_ */
 
 
 /*@}*/

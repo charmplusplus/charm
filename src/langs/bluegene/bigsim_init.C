@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file: bigsim_init.C -- Converse BlueGene Emulator Code
  *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 5/16/2003
  */
@@ -13,14 +6,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if CMK_STL_USE_DOT_H  /* Pre-standard C++ */
-#  include <fstream.h>
-#  include <iostream.h>
-#else /* ISO C++ */
-#  include <fstream>
-#  include <iostream>
-   using namespace std;
-#endif
+#include <fstream>
+#include <iostream>
+using namespace std;
 
 #include "bigsim_debug.h"
 #undef DEBUGLEVEL
@@ -134,7 +122,7 @@ CmiPrintf("\n\n\nBroadcast begin EXIT\n");
   }
 }
 
-int BGMach::traceProejctions(int pe)
+int BGMach::traceProjections(int pe)
 {
   if (procList.isEmpty()) return 1;
   return procList.includes(pe);

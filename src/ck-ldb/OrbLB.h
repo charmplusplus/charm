@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -78,7 +71,7 @@ public:
   OrbLB(const CkLBOptions &);
   OrbLB(CkMigrateMessage *m):CentralLB(m) { lbname = "OrbLB"; }
 
-  void work(BaseLB::LDStats* stats, int count);
+  void work(LDStats* stats);
   CmiBool QueryBalanceNow(int step);
 };
 

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /**
 \file
 \brief Charm Kernel--the groups and chares level of Charm++.
@@ -253,7 +247,8 @@ typedef enum {
   NodeBocInitMsg =15,
   ForNodeBocMsg  =16,
   ArrayEltInitMsg =17,
-  ForArrayEltMsg  =18
+  ForArrayEltMsg  =18,
+  LAST_CK_ENVELOPE_TYPE =19
 } CkEnvelopeType;
 
 
@@ -292,8 +287,8 @@ extern int  CkChareMsgPrep(int eIdx, void *msg,const CkChareID *pCid);
 extern void CkGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
 extern void CkNodeGroupMsgPrep(int eIdx, void *msg, CkGroupID gID);
 
-extern void CkSetRefNum(void *msg, int ref);
-extern int  CkGetRefNum(void *msg);
+extern void CkSetRefNum(void *msg, CMK_REFNUM_TYPE ref);
+extern CMK_REFNUM_TYPE  CkGetRefNum(void *msg);
 extern int  CkGetSrcPe(void *msg);
 extern int  CkGetSrcNode(void *msg);
 
@@ -310,40 +305,6 @@ extern void CkArrayManagerDeliver(int onPe,void *msg, int opts CK_MSGOPTIONAL);
 /*@}*/
 
 
-
-/*********************************************************/
-/**
-\addtogroup CkFutures
-\brief Futures--ways to block Converse threads on remote events.
-
-These routines are implemented in ckfutures.C.
-*/
-/*@{*/
-typedef int CkFutureID;
-extern void* CkRemoteCall(int eIdx, void *msg,const CkChareID *chare);
-extern void* CkRemoteBranchCall(int eIdx, void *msg, CkGroupID gID, int pe);
-extern void* CkRemoteNodeBranchCall(int eIdx, void *msg, CkGroupID gID, int node);
-extern CkFutureID CkRemoteCallAsync(int eIdx, void *msg, const CkChareID *chare);
-extern CkFutureID CkRemoteBranchCallAsync(int eIdx, void *msg, CkGroupID gID, 
-                                          int pe);
-extern CkFutureID CkRemoteNodeBranchCallAsync(int eIdx, void *msg, 
-                                              CkGroupID gID, int node);
-
-extern void* CkWaitFuture(CkFutureID futNum);
-extern void CkWaitVoidFuture(CkFutureID futNum);
-extern void CkReleaseFuture(CkFutureID futNum);
-extern int CkProbeFuture(CkFutureID futNum);
-extern void  CkSendToFuture(CkFutureID futNum, void *msg, int pe);
-extern CkFutureID CkCreateAttachedFuture(void *msg);
-/* forward declare */
-struct CkArrayID;
-struct CkArrayIndexMax;
-extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep,
-struct CkArrayID id, struct CkArrayIndexMax idx, void(*fptr)(struct
-CkArrayID,struct CkArrayIndexMax,void*,int,int),int size CK_MSGOPTIONAL);
-/* extern CkFutureID CkCreateAttachedFutureSend(void *msg, int ep, void*,void(*fptr)(void*,void*,int,int)); */
-
-extern void *CkWaitReleaseFuture(CkFutureID futNum);
 
 /******************************************************************************
  *

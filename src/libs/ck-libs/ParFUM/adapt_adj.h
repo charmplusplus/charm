@@ -13,15 +13,15 @@
    
    TRIANGLES: Given nodes 0, 1, 2, the edges 0, 1, and 2 of a triangle are:
    (0, 1), (1, 2) and (2, 0), in that order.
-
-              0
-             / \
-            /   \
-          2/     \0
-          /       \
-         /         \
-        2-----------1
-              1
+                                                     // Avoid '\' line splicing
+              0                                                               *
+             / \                                                              *
+            /   \                                                             *
+          2/     \0                                                           *
+          /       \                                                           *
+         /         \                                                          *
+        2-----------1                                                         *
+              1                                                               *
    
    QUADS: Given nodes 0, 1, 2, 3, the edges 0, 1, 2 and 3 of a quad are:
    (0, 1), (1, 2), (2, 3) and (3, 0), in that order.
@@ -34,15 +34,15 @@
    The edges (0-5) are:
    (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3), in that order
 
-              0
-             /|\
-            / | \
-          1/  0  \2       Back Face: 2
-          / 0 | 1 \       Bottom Face: 3
-         /....|....\       
-        2-_   |   _-3     Back Edge: 5
-           -_ | _-  
-          3  -1-  4
+              0                                                               *
+             /|\                                                              *
+            / | \                                                             *
+          1/  0  \2       Back Face: 2                                        *
+          / 0 | 1 \       Bottom Face: 3                                      *
+         /....|....\                                                          *
+        2-_   |   _-3     Back Edge: 5                                        *
+           -_ | _-                                                            *
+          3  -1-  4                                                           *
 
    
    HEXES: Given nodes 0, 1, 2, 3, 4, 5, 6, 7, 
@@ -203,10 +203,10 @@ class adjReply {
 
 
 typedef ElemList<adjRequest> AdjRequestList;
-typedef MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
+typedef MSA::MSA1D<AdjRequestList, DefaultListEntry<AdjRequestList,true>,MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREQLIST;
 
 typedef ElemList<adjReply> AdjReplyList;
-typedef MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREPLYLIST;
+typedef MSA::MSA1D<AdjReplyList, DefaultListEntry<AdjReplyList,true>, MSA_DEFAULT_ENTRIES_PER_PAGE> MSA1DREPLYLIST;
 
 /** Create Adaptivity Adjacencies for elemType; dimension inferred. */
 void CreateAdaptAdjacencies(int meshid, int elemType);

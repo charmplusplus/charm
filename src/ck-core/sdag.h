@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _sdag_H_
 #define _sdag_H_
 
@@ -62,7 +55,8 @@ class CWhenTrigger {
       // since CCounter is not pup'ed
       // don't expect Overlap works with load balancer 
       // as well as checkpointing
-      if (p.isUnpacking()) args[1]=0;            // HACK for load balancer
+      p(args, MAXARG);
+      //if (p.isUnpacking()) args[0]=0;            // HACK for load balancer
     }
 };
 
@@ -83,7 +77,7 @@ class TListCWhenTrigger
 
     void pup(PUP::er& p) {
       int nEntries=0;
-      int cur=0;
+      int cur=-1;
       if (!p.isUnpacking()) { 
         for (CWhenTrigger *tmp = first; tmp; tmp=tmp->next, nEntries++)
           if (current == tmp) cur = nEntries;
@@ -100,7 +94,8 @@ class TListCWhenTrigger
           }
           first = unpackArray[0];
           last = unpackArray[nEntries-1];
-          current = unpackArray[cur];
+          last->next = NULL;
+          current = cur==-1?NULL:unpackArray[cur];
           delete [] unpackArray;
         }
       }

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -129,7 +122,7 @@ private:
   
   void Resize();
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   enum { initial_sz = 1 };
 #else
   enum { initial_sz = 10000 };

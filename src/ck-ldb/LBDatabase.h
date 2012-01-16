@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
@@ -13,7 +6,6 @@
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
-#include <math.h>
 #include "lbdb.h"
 #include "LBDBManager.h"
 #include "lbdb++.h"
@@ -36,14 +28,16 @@ private:
   int _lb_migObjOnly;		// only consider migratable objs
   int _lb_syncResume;
   int _lb_samePeSpeed;		// ignore cpu speed
+  int _lb_testPeSpeed;		// test cpu speed
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
   int _lb_central_pe;           // processor number for centralized startegy
   int _lb_percentMovesAllowed; //Specifies restriction on num of chares to be moved(as a percentage of total number of chares). Used by RefineKLB
+  int _lb_teamSize;		// specifies the team size for TeamLB
 public:
   CkLBArgs() {
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
     _autoLbPeriod = 0.02;       // bigsim needs it to be faster (lb may hang)
 #else
     _autoLbPeriod = 0.5;	// 0.5 second default
@@ -54,9 +48,11 @@ public:
     _lb_percentMovesAllowed=100;
     _lb_loop = 0;
     _lb_central_pe = 0;
+    _lb_teamSize = 1;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
+  inline int & teamSize() {return _lb_teamSize; }
   inline int & printSummary() { return _lb_printsumamry; }
   inline int & lbversion() { return _lb_version; }
   inline int & loop() { return _lb_loop; }
@@ -64,6 +60,7 @@ public:
   inline int & migObjOnly() { return _lb_migObjOnly; }
   inline int & syncResume() { return _lb_syncResume; }
   inline int & samePeSpeed() { return _lb_samePeSpeed; }
+  inline int & testPeSpeed() { return _lb_testPeSpeed; }
   inline int & useCpuTime() { return _lb_useCpuTime; }
   inline int & statsOn() { return _lb_statson; }
   inline int & traceComm() { return _lb_traceComm; }
@@ -208,11 +205,11 @@ public:
     LDObjTime(h,walltime,cputime);
   };
 
-  inline void GetObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+  inline void GetObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDGetObjLoad(h,&walltime,&cputime);
   };
 
-  inline void QueryKnownObjLoad(LDObjHandle &h, double &walltime, double &cputime) {
+  inline void QueryKnownObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LDQueryKnownObjLoad(h,&walltime,&cputime);
   };
 
@@ -270,8 +267,21 @@ public:
     LDRemoveStartLBFn(myLDHandle,fn);
   };
 
-public:
   inline void StartLB() { LDStartLB(myLDHandle); }
+
+  inline void AddMigrationDoneFn(LDMigrationDoneFn fn, void *data) 
+  {
+    LDAddMigrationDoneFn(myLDHandle,fn,data);
+  };
+
+  inline void RemoveMigrationDoneFn(LDMigrationDoneFn fn) 
+  {
+    LDRemoveMigrationDoneFn(myLDHandle,fn);
+  };
+
+  inline void MigrationDone() { LDMigrationDone(myLDHandle); }
+
+public:
   inline void TurnManualLBOn() { LDTurnManualLBOn(myLDHandle); }
   inline void TurnManualLBOff() { LDTurnManualLBOff(myLDHandle); }
  
@@ -291,20 +301,20 @@ public:
   inline int GetCommDataSz(void) { return LDGetCommDataSz(myLDHandle); };
   inline void GetCommData(LDCommData *data) { LDGetCommData(myLDHandle,data); };
 
-  inline void BackgroundLoad(double *walltime, double *cputime) {
+  inline void BackgroundLoad(LBRealType *walltime, LBRealType *cputime) {
     LDBackgroundLoad(myLDHandle,walltime,cputime);
   }
 
-  inline void IdleTime(double *walltime) {
+  inline void IdleTime(LBRealType *walltime) {
     LDIdleTime(myLDHandle,walltime);
   };
 
-  inline void TotalTime(double *walltime, double *cputime) {
+  inline void TotalTime(LBRealType *walltime, LBRealType *cputime) {
     LDTotalTime(myLDHandle,walltime,cputime);
   }
 
-  inline void GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime) {
+  inline void GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime) {
     LDGetTime(myLDHandle, total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
   }
 
@@ -360,12 +370,12 @@ public:
   int & new_lbbalancer() { return new_ld_balancer; }
 
   struct LastLBInfo {
-    double *expectedLoad;
+    LBRealType *expectedLoad;
     LastLBInfo();
   };
   LastLBInfo lastLBInfo;
-  inline double myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
-  inline double* expectedLoad() { return lastLBInfo.expectedLoad; }
+  inline LBRealType myExpectedLoad() { return lastLBInfo.expectedLoad[CkMyPe()]; }
+  inline LBRealType* expectedLoad() { return lastLBInfo.expectedLoad; }
   inline int useMem() { return LDMemusage(myLDHandle); }
 
   int getLoadbalancerTicket();

@@ -1,38 +1,48 @@
-ANT=ant -lib lib/ant-antlr3.jar
-# Ant does the actual building, just invoke it
-.DEFAULT_GOAL:dist
-dist:
+
+ANT := ant -lib lib/ant-antlr3.jar
+CLASSPATH := lib/antlr-3.2.jar:lib/JSAP-2.1.jar
+SRCDIR := src/charj/translator
+BUILDDIR := build/src/charj/translator
+ANTLRC := java -classpath $(CLASSPATH) org.antlr.Tool
+ANTLRFLAGS := -Xmultithreaded -o $(BUILDDIR) -lib $(BUILDDIR)
+
+SRC_GRAMMARS := $(wildcard $(SRCDIR)/*.g)
+BUILD_GRAMMARS := $(subst $(SRCDIR),$(BUILDDIR),$(SRC_GRAMMARS:.g=.d))
+
+.PHONY: all build grammars clean doc
+all: build grammars
 	$(ANT) dist
-compile:
-	$(ANT) compile
+
+# TODO: Maybe we should be using something like gathertree to create the
+# build directory instead of ad-hoc copying.
+build:
+	@echo "\ninit:"
+	@mkdir -p $(BUILDDIR)
+	@cp -p $(SRCDIR)/* $(BUILDDIR)
+	@cp -p $(SRCDIR)/../Main.java $(BUILDDIR)/../
+	@mkdir -p build/classes
+	@mkdir -p build/classes/META-INF
+	@mkdir -p build/lib
+	@mkdir -p docs
+	@echo "\nantlr:"
+
 clean:
 	$(ANT) clean
+
 doc:
 	$(ANT) doc
-all:
-	$(ANT) all
 
-# The lousy antlrv3 ant task won't give proper output from antlr errors, so
-# use these horrible direct invocations instead
-.PHONY: debug debug-charj debug-semantics debug-emitter
-debug: debug-charj debug-semantics debug-emitter
+grammars: build $(BUILD_GRAMMARS)
 
-CLASSPATH = lib/antlr-3.2.jar:lib/JSAP-2.1.jar
-debug-charj:
-	cp src/charj/translator/Charj.g build/src/charj/translator/Charj.g
-	java -classpath $(CLASSPATH) org.antlr.Tool \
-	    -o build/src/charj/translator -lib build/src/charj/translator \
-	    build/src/charj/translator/Charj.g
-debug-semantics:
-	cp src/charj/translator/CharjSemantics.g build/src/charj/translator/CharjSemantics.g	
-	java -classpath $(CLASSPATH) org.antlr.Tool \
-	    -o build/src/charj/translator -lib build/src/charj/translator \
-	    build/src/charj/translator/CharjSemantics.g
-debug-emitter:
-	cp src/charj/translator/CharjEmitter.g build/src/charj/translator/CharjEmitter.g
-	java -classpath $(CLASSPATH) org.antlr.Tool -o build/src/charj/translator \
-	    -lib build/src/charj/translator build/src/charj/translator/CharjEmitter.g
+# All grammar files depend on the Charj.g being compiled first,
+# so that the token list is available.
+$(BUILDDIR)/Charj.d: $(SRCDIR)/Charj.g
+	@echo "\n    [antlr] $(<F)"
+	$(ANTLRC) $(ANTLRFLAGS) $(BUILDDIR)/$(<F)
+	@touch $@
 
-# For any unrecognized rules, try to compile a test program with that name
-%:
-	./bin/charjc --debug --verbose --AST --stdout --translate-only tests/$@/$@.cj
+$(BUILDDIR)/%.d: $(SRCDIR)/%.g $(BUILDDIR)/Charj.d
+	@echo "\n    [antlr] $(<F)"
+	$(ANTLRC) $(ANTLRFLAGS) $(BUILDDIR)/$(<F)
+	@touch $@
+

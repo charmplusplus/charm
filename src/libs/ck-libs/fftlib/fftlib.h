@@ -214,7 +214,7 @@ class SlabArray: public CBase_SlabArray {
  * Normal, since the data is expected to be present all through the slab
  */
 
-class NormalSlabArray: public SlabArray {
+class NormalSlabArray: public CBase_NormalSlabArray {
  public:
 	NormalSlabArray(CkMigrateMessage *m): SlabArray(m) {CkPrintf("migrate constructor called\n");}
 	NormalSlabArray() {
@@ -252,7 +252,7 @@ protected:
 	void createPlans(NormalFFTinfo &info);
 };
 
-class NormalRealSlabArray: public SlabArray {
+class NormalRealSlabArray: public CBase_NormalRealSlabArray {
  public:
 	NormalRealSlabArray(CkMigrateMessage *m): SlabArray(m) {}
 	NormalRealSlabArray() {
@@ -339,7 +339,7 @@ class RunDescriptor {
 /*
  * Sparse, the data is represented as ``runs''
  */
-class SparseSlabArray: public SlabArray {
+class SparseSlabArray: public CBase_SparseSlabArray {
  public:
 	SparseSlabArray(CkMigrateMessage *m): SlabArray(m) {}
 	SparseSlabArray(): SlabArray() {}

@@ -15,6 +15,7 @@
 #define ADAPT2_T 5
 #define ADAPT3_T 6
 #define ADAPT4_T 7
+#define ADAPT5_T 8
 
 /// Base synchronization strategy class
 class strat
@@ -32,6 +33,10 @@ class strat
   /// Pointer to the poser wrapper
   sim *parent;      
  public:
+  //  /// Time leash accumulator
+  //  long long timeLeashTotal;
+  //  /// Number of times Step() is called
+  //  int stepCalls;
   /// Type of strategy; see #defines above
   int STRAT_T;      
   /// Target event pointer

@@ -239,8 +239,10 @@ class ArmciVirtualProcessor : public TCharmClient1D {
   ArmciVirtualProcessor(const CProxy_TCharm &_thr_proxy);
   ArmciVirtualProcessor(CkMigrateMessage *m);
   ~ArmciVirtualProcessor();
-  
-  pointer BlockMalloc(int bytes) { return (void *)CmiIsomallocBlockListMalloc(memBlock, bytes); }
+ 
+  pointer BlockMalloc(int bytes) { 
+    return (void *)CmiIsomallocBlockListMalloc(memBlock, bytes); 
+  }
   void getAddresses(AddressMsg *msg);
 
   void put(pointer src, pointer dst, int bytes, int dst_proc);

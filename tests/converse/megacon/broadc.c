@@ -34,11 +34,10 @@ void broadc_recv(mesg m)
 
 void broadc_start_cycle(bchare c)
 {
-  struct mesg m; struct mesg *mp; CmiCommHandle h;
+  struct mesg m={{0},CmiMyPe(),c,0x12345678}; struct mesg *mp; CmiCommHandle h;
   switch (c->totalsent) {
   case 0:
     CmiSetHandler(&m, CpvAccess(broadc_recv_idx));
-    m.reply_ptr = c; m.reply_pe = CmiMyPe(); m.magic = 0x12345678;
     CmiSyncBroadcastAll(sizeof(struct mesg),&m);
     c->totalsent++;
     break;
@@ -66,6 +65,7 @@ void broadc_reply(mesg m)
   c = m->reply_ptr;
   c->totalreplies++;
   if ((c->totalreplies % CmiNumPes())==0) broadc_start_cycle(c);
+  CmiFree(m);
 }
 
 void broadc_init(void)

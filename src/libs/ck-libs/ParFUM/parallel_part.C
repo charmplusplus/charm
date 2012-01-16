@@ -75,8 +75,8 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
 
   eptrMSA.enroll(numChunks);
   eindMSA.enroll(numChunks);
-  MSA1DINT::Write &wPtr = eptrMSA.getInitialWrite();
-  MSA1DINT::Write &wInd = eindMSA.getInitialWrite();
+  MSA1DINT::Write wPtr = eptrMSA.getInitialWrite();
+  MSA1DINT::Write wInd = eindMSA.getInitialWrite();
   int indcount=0,ptrcount=0;
   for(int t=0;t<m->elem.size();t++){
     if(m->elem.has(t)){
@@ -113,8 +113,8 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
     call parmetis
   */
   double  parStartTime = CkWallTimer();
-  MSA1DINT::Read &rPtr = eptrMSA.syncToRead(wPtr);
-  MSA1DINT::Read &rInd = eindMSA.syncToRead(wInd);
+  MSA1DINT::Read rPtr = wPtr.syncToRead();
+  MSA1DINT::Read rInd = wInd.syncToRead();
   printf("starting FEM_call_parmetis \n");
   struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 
@@ -129,12 +129,12 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DINTLIST nodepart(totalNodes,numChunks);
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
-  MSA1DINTLIST::Accum &nodepartAcc = nodepart.getInitialAccum();
+  MSA1DINTLIST::Accum nodepartAcc = nodepart.getInitialAccum();
 	
   FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
   printf("Creating mapping of node to partition took %.6lf\n",CkWallTimer()-dataArrangeStartTime);
   dataArrangeStartTime = CkWallTimer();
-  MSA1DINTLIST::Read &nodepartRead = nodepart.syncToRead(nodepartAcc);
+  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
 	
   /*
     Set up a msa to store the nodes that belong to a partition
@@ -142,7 +142,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DNODELIST part2node(numChunks,numChunks);
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
-  MSA1DNODELIST::Accum &part2nodeAcc = part2node.getInitialAccum();
+  MSA1DNODELIST::Accum part2nodeAcc = part2node.getInitialAccum();
 
   FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
 
@@ -150,7 +150,7 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   /*
     Get the list of elements and nodes that belong to this partition
   */
-  MSA1DNODELIST::Read &rPart2node = part2node.syncToRead(part2nodeAcc);
+  MSA1DNODELIST::Read rPart2node = part2nodeAcc.syncToRead();
   NodeList lnodes = rPart2node.get(masterRank);
   lnodes.uniquify();
 //  IntList lelems = part2elem.get(masterRank);
@@ -166,13 +166,13 @@ int FEM_master_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context
   MSA1DFEMMESH part2mesh(numChunks,numChunks);
   MPI_Bcast_pup(part2mesh,masterRank,(MPI_Comm)comm_context);
   part2mesh.enroll(numChunks);
-  MSA1DFEMMESH::Accum &aPart2mesh = part2mesh.getInitialAccum();
+  MSA1DFEMMESH::Accum aPart2mesh = part2mesh.getInitialAccum();
 
   FEM_write_part2mesh(aPart2mesh,partdata, &data,nodepartRead,numChunks,masterRank,&mypiece);
   /*
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
-  MSA1DFEMMESH::Read &rPart2mesh = part2mesh.syncToRead(aPart2mesh);
+  MSA1DFEMMESH::Read rPart2mesh = aPart2mesh.syncToRead();
   MeshElem me = rPart2mesh.get(masterRank);
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",masterRank,me.m->nElems(),me.m->node.size());
 	
@@ -257,8 +257,8 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   /*
     call parmetis and get the resuts back from it
   */
-  MSA1DINT::Read &rPtr = data.arr1.syncToRead(data.arr1.getInitialWrite());
-  MSA1DINT::Read &rInd = data.arr2.syncToRead(data.arr1.getInitialWrite());
+  MSA1DINT::Read rPtr = data.arr1.getInitialWrite().syncToRead();
+  MSA1DINT::Read rInd = data.arr1.getInitialWrite().syncToRead();
   struct partconndata *partdata = FEM_call_parmetis(data.nelem, rPtr, rInd, comm_context);
 	
   /*
@@ -267,7 +267,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DINTLIST nodepart;
   MPI_Bcast_pup(nodepart,masterRank,(MPI_Comm)comm_context);
   nodepart.enroll(numChunks);
-  MSA1DINTLIST::Accum &nodepartAcc = nodepart.getInitialAccum();
+  MSA1DINTLIST::Accum nodepartAcc = nodepart.getInitialAccum();
 	
   FEM_write_nodepart(nodepartAcc,partdata,(MPI_Comm)comm_context);
 	
@@ -278,8 +278,8 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DNODELIST part2node;
   MPI_Bcast_pup(part2node,masterRank,(MPI_Comm)comm_context);
   part2node.enroll(numChunks);
-  MSA1DNODELIST::Accum &part2nodeAcc = part2node.getInitialAccum();
-  MSA1DINTLIST::Read &nodepartRead = nodepart.syncToRead(nodepartAcc);
+  MSA1DNODELIST::Accum part2nodeAcc = part2node.getInitialAccum();
+  MSA1DINTLIST::Read nodepartRead = nodepartAcc.syncToRead();
 
 
   FEM_write_part2node(nodepartRead, part2nodeAcc, partdata, (MPI_Comm)comm_context);
@@ -287,7 +287,7 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   /*
     Get the list of elements and nodes that belong to this partition
   */
-  MSA1DNODELIST::Read &part2nodeRead = part2node.syncToRead(part2nodeAcc);
+  MSA1DNODELIST::Read part2nodeRead = part2nodeAcc.syncToRead();
   NodeList lnodes = part2nodeRead.get(myRank);
   lnodes.uniquify();
 //  IntList lelems = part2elem.get(myRank);
@@ -298,13 +298,13 @@ int FEM_slave_parallel_part(int fem_mesh,int masterRank,FEM_Comm_t comm_context)
   MSA1DFEMMESH part2mesh;
   MPI_Bcast_pup(part2mesh,masterRank,(MPI_Comm)comm_context);
   part2mesh.enroll(numChunks);
-  MSA1DFEMMESH::Accum &aPart2mesh = part2mesh.getInitialAccum();
+  MSA1DFEMMESH::Accum aPart2mesh = part2mesh.getInitialAccum();
   FEM_write_part2mesh(aPart2mesh, partdata, &data, nodepartRead,numChunks, myRank, &mypiece);
 	
   /*
     Get your mesh consisting of elements and nodes out of the mesh MSA
   */
-  MSA1DFEMMESH::Read &rPart2mesh = part2mesh.syncToRead(aPart2mesh);
+  MSA1DFEMMESH::Read rPart2mesh = aPart2mesh.syncToRead();
   MeshElem me = rPart2mesh.get(myRank);
   //printf("[%d] Number of elements in my partitioned mesh %d number of nodes %d \n",myRank,me.m->nElems(),me.m->node.size());
 	
@@ -440,7 +440,7 @@ void FEM_write_nodepart(MSA1DINTLIST::Accum &nodepart,struct partconndata *data,
     int start=data->eptr[i];
     int end = data->eptr[i+1];
     for(int j=start;j<end;j++){
-      nodepart.accumulate(data->eind[j],data->part[i]);
+	nodepart(data->eind[j]) += data->part[i];
      	DEBUG(printf(" write_nodepart %d %d \n",data->eind[j],data->part[i]));
     }
   }
@@ -481,7 +481,7 @@ void FEM_write_part2node(MSA1DINTLIST::Read &nodepart,
 
     for(int j=0;j<t.vec->size();j++){
       UniqElemList <NodeElem> en(n);
-      part2node.accumulate((*t.vec)[j],en);
+      part2node((*t.vec)[j]) += en;
     }
   }
   DEBUG(printf("done write_part2node\n"));
@@ -493,7 +493,7 @@ void FEM_write_part2node(MSA1DINTLIST::Read &nodepart,
 void FEM_write_part2elem(MSA1DINTLIST::Accum &part2elem,struct partconndata *data,MPI_Comm comm_context)
 {
   for(int i=0;i<data->nelem;i++){
-    part2elem.accumulate(data->part[i],data->startindex+i);
+      part2elem(data->part[i]) += data->startindex+i;
   }
 }
 
@@ -837,7 +837,7 @@ void makeGhost(FEM_Mesh *m,
 
 
   //	distTab->table.sync((numChunks == 1));
-  MsaHashtable::Add &aDistTab = distTab->getInitialAdd();
+  MsaHashtable::Add aDistTab = distTab->getInitialAdd();
 
   DEBUG(printf("Chunk %d Mesh: *********************************** \n",myChunk));
   //DEBUG(m->print(0));
@@ -940,8 +940,7 @@ void makeGhost(FEM_Mesh *m,
       }
     }
   }
-  MsaHashtable::Read &rDistTab = distTab->syncToRead(aDistTab);
-
+  MsaHashtable::Read rDistTab = aDistTab.syncToRead();
 
   //debug - print the whole table
   /*	printf("Ghosts chunk %d \n",myChunk);*/
@@ -961,7 +960,7 @@ void makeGhost(FEM_Mesh *m,
   ghostmeshes->enroll(numChunks);
   DEBUG(printf("[%d] id %d says ghostmeshes enroll done \n",CkMyPe(),myChunk));
 
-  MSA1DFEMMESH::Accum &aGhostMeshes = ghostmeshes->getInitialAccum();
+  MSA1DFEMMESH::Accum aGhostMeshes = ghostmeshes->getInitialAccum();
 
   DEBUG(printf("[%d] id %d says ghostmeshes sync done \n",CkMyPe(),myChunk));
   /*
@@ -1061,7 +1060,7 @@ void makeGhost(FEM_Mesh *m,
 
   DEBUG(printf("[%d] finished creating ghost mesh \n",myChunk));
 
-  MSA1DFEMMESH::Read& rGhostMeshes = ghostmeshes->syncToRead(aGhostMeshes);
+  MSA1DFEMMESH::Read rGhostMeshes = aGhostMeshes.syncToRead();
 
   /*
     Go through the ghost nodes and check for nodes that dont exist in the hashtable

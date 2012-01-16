@@ -353,7 +353,7 @@ static double CsiTimer() {
 static double Csi_global_time;
 static double Csi_start_time;
 
-void CmiTimerInit(void) { }
+void CmiTimerInit(char **argv) { }
 
 double CmiTimer()
 {

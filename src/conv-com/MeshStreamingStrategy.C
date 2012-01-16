@@ -91,9 +91,7 @@ void periodic_flush_handler (void *ptr, double curT)
 */
 void streaming_column_handler (void *msg)
 {
-    int dest_pe;
     int dest_row;
-    int msgsize;
     int my_pe;
     //int num_msgs;
     int row_length;
@@ -265,7 +263,6 @@ void MeshStreamingStrategy::insertMessage (MessageHolder *cmsg)
     int dest_row;
     int dest_col;
     int msg_size;
-    int misc_size;
     int total_size;
     char *msg;
     //char *env;
@@ -425,11 +422,7 @@ void MeshStreamingStrategy::FlushColumn (int column)
     int dest_column_pe;
     int num_msgs;
     int newmsgsize;
-    int msgsize;
     char *newmsg;
-    char *newmsgptr;
-    char *msgptr;
-    
 
     CmiAssert (column < num_columns);
     
@@ -662,7 +655,7 @@ int MeshStreamingStrategy::GetRowLength (void)
 */
 void MeshStreamingStrategy::pup (PUP::er &p)
 {
-  int i;
+
   ComlibPrintf ("[%d] MeshStreamingStrategy::pup() invoked.\n", CkMyPe());
 
   // Call the superclass method -- easy.

@@ -82,6 +82,8 @@ class ConvComlibManager {
   friend void *comlibReceiveTableHandler(void *msg);
  public:
   inline int getNumStrats() {return nstrats;}
+  inline void incrementNumStrats() {nstrats++;}
+  inline void decrementNumStrats() {nstrats--;}
   inline Strategy *getStrategy(int loc) {return strategyTable[loc].strategy;}
   inline int isReady(int loc) {return strategyTable[loc].isReady;}
   inline int isNew(int loc) {return strategyTable[loc].isNew;}
@@ -168,7 +170,7 @@ CkpvExtern(int, comlib_handler);
 // received the handleMessage method will be invoked.
 inline void ConvComlibSendMessage(int instance, int dest_pe, int size, char *msg) {
   CmiSetHandler(msg, CkpvAccess(strategy_handlerid));
-  ((CmiMsgHeaderBasic *) msg)->stratid = instance;
+  ((CmiMsgHeaderExt *) msg)->stratid = instance;
     
   CmiSyncSendAndFree(dest_pe, size, msg);
 }*/

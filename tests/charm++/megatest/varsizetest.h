@@ -20,14 +20,14 @@ class varsizetest_Msg : public CMessage_varsizetest_Msg {
   CkChareID myMain;
 }; 
 
-class varsizetest_main : public Chare {
+class varsizetest_main : public CBase_varsizetest_main {
  public:
   varsizetest_main(void);
   varsizetest_main(CkMigrateMessage *m) {}
   void exit(varsizetest_Msg *m);
 };
 
-class varsizetest_test : public Chare {
+class varsizetest_test : public CBase_varsizetest_test {
  public:
   varsizetest_test(varsizetest_Msg *m);
   varsizetest_test(CkMigrateMessage *m) {}

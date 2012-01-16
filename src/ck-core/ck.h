@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CK_H_
 #define _CK_H_
 
@@ -19,7 +12,7 @@
 #include "ckfutures.h"
 #include "charisma.h"
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 #define _CHECK_VALID(p, msg) do {if((p)==0){CkAbort(msg);}} while(0)
 #else
 #define _CHECK_VALID(p, msg) do { } while(0)
@@ -65,6 +58,10 @@ inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
 #define _CldNodeEnqueue   CldNodeEnqueue
 #endif
 
+#ifndef CMK_CHARE_USE_PTR
+CkpvExtern(CkVec<void *>, chare_objs);
+#endif
+
 /// A set of "Virtual ChareID"'s
 class VidBlock {
     enum VidState {FILLED, UNFILLED};
@@ -101,6 +98,16 @@ class VidBlock {
     void *getLocalChare(void) {
       if (state==FILLED && actualID.onPE==CkMyPe()) 
           return actualID.objPtr;
+      return NULL;
+    }
+    void *getLocalChareObj(void) {   
+         // returns actual object, different when CMK_CHARE_USE_PTR is false
+      if (state==FILLED && actualID.onPE==CkMyPe()) 
+#ifdef CMK_CHARE_USE_PTR
+          return actualID.objPtr;
+#else
+          return CkpvAccess(chare_objs)[(CmiIntPtr)actualID.objPtr];
+#endif
       return NULL;
     }
     void pup(PUP::er &p) {

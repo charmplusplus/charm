@@ -1,11 +1,12 @@
-CDIR=../../../..
-CHARMC=$(CDIR)/bin/charmc -cc $(CUDAC) -c++ $(CUDAC) $(OPTS) -nobs
+CDIR    = ../../../..
+
 CUDADIR = /usr/local/cuda
 CUDASDK = $(HOME)/TOPS-Tesla/NVIDIA_CUDA_SDK
-CUDAC = nvcc 
+CUDAC   = nvcc
 CUDAINC = -I$(CUDASDK)/common/inc -I$(CUDADIR)/include
-CCFLAGS = -DCUDA -DFP_TYPE_FLOAT  -O2 -DSHARED_NODES_ONLY_NEIGHBOR
-#CCFLAGS = -DCUDA -DFP_TYPE_DOUBLE -O2 -DSHARED_NODES_ONLY_NEIGHBOR
+
+CHARMC  = $(CDIR)/bin/charmc $(OPTS) #-nobs -cc $(CUDAC) -c++ $(CUDAC)
+CCFLAGS = -DFP_TYPE_FLOAT -DSHARED_NODES_ONLY_NEIGHBOR #-DCUDA
 
 #Headers to be copied to include directory so application users can see them
 HEADERS= ParFUM_TOPS.h ParFUM_TOPS_CUDA.h ParFUM_TOPS_Types.h $(INTERNALHEADERS)
@@ -15,7 +16,7 @@ GENHEADERS= ParFUM_TOPS.decl.h
 
 HEADDEP= $(GENHEADERS) $(HEADERS) $(INTERNALHEADERS)
 
-OBJS=ParFUM_TOPS.o ParFUM_TOPS_Iterators.o ParFUM_TOPS_CUDA.o
+OBJS=ParFUM_TOPS.o ParFUM_TOPS_Iterators.o #ParFUM_TOPS_CUDA.o
 
 LIB=libmoduleParFUM_TOPS
 
@@ -25,7 +26,6 @@ DEST=$(LIBDIR)/$(LIB).a
 INCS=-I. $(CUDAINC)
 
 all: $(DEST)
-
 
 ParFUM_TOPS.decl.h: ParFUM_TOPS.ci
 	$(CHARMC) ParFUM_TOPS.ci

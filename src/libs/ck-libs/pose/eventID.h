@@ -15,7 +15,7 @@ class eventID
 {
   /// PE identifier field ensures uniqueness across PEs
   int pe;
-  /// Control field for ordering events with same tiemstamp
+  /// Control field for ordering events with same timestamp
   int control;
  public:
   /// Large number for identifier unique on creation PE

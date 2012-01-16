@@ -4,10 +4,10 @@
  *  This version is quite different than the initial version.
  */	
 
-// CMK_BLUEGENE_CHARM is used during the emulation phase, 
+// CMK_BIGSIM_CHARM is used during the emulation phase, 
 // where you genereate the bgTrace logs and the parameter files
 
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
 #include "blue.h"
 #include "blue_impl.h"
 #endif
@@ -173,7 +173,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
 
   char sequenceString[1024];
   sequenceString[0] = 0;
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   sprintf();
 
   BgPrint("endTraceBigSim %f\n");
@@ -186,7 +186,7 @@ if(num_params==20) sprintf(params, "%f %f %f %f %f %f %f %f %f %f %f %f %f %f %f
   fprintf(CkpvAccess(bgfp),"%s\n",params);
 
   
-#ifdef CMK_BLUEGENE_CHARM
+#ifdef CMK_BIGSIM_CHARM
   printf(CkpvAccess(bgfp), "TRACEBIGSIM: event:{ %s } %s %s %s %s\n", eventname, sequenceString, timeString, perfCountString, paramString);
 #else
   printf("TRACEBIGSIM: event:{ %s } %s %s %s %s\n", eventname, sequenceString, timeString, perfCountString, paramString);  

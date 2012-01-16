@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /**
 \file
 \brief Charm++: Lists of possible Chares and Entry points.
@@ -270,7 +264,7 @@ public:
 	/// Add a heap-allocated registration record,
 	///  returning the index used.
 	int add(T *t) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		/* Make sure registrations only happen from rank 0: */
 		if (CkMyRank()!=0)
 			CkAbort("Can only do registrations from rank 0 processors");
@@ -285,7 +279,7 @@ public:
 	
 	/// Return the registered data at this index.
 	T *operator[](size_t idx) {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
 		/* Bounds-check the index: */
 		if (idx>=vec.size()) outOfBounds(idx);
 #endif

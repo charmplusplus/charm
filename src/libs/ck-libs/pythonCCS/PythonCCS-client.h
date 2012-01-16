@@ -90,19 +90,19 @@ class PythonExecute : private PythonAbstract {
      client does not need to read it), but it is to have a common interface with
      java */
   CmiUInt4 interpreter; /* request for an existing interpreter */
-  char flags;
+  unsigned char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: isPersistent
      bit 2: keepPrint
      bit 3: isHighLevel
      bit 4: isIterate
   */
-  static const char FLAG_PERSISTENT = 0x80;
-  static const char FLAG_KEEPPRINT = 0x40;
-  static const char FLAG_HIGHLEVEL = 0x20;
-  static const char FLAG_ITERATE = 0x10;
-  static const char FLAG_WAIT = 0x08;
-  static const char FLAG_NOCHECK = 0x04;
+  static const unsigned char FLAG_PERSISTENT = 0x80;
+  static const unsigned char FLAG_KEEPPRINT = 0x40;
+  static const unsigned char FLAG_HIGHLEVEL = 0x20;
+  static const unsigned char FLAG_ITERATE = 0x10;
+  static const unsigned char FLAG_WAIT = 0x08;
+  static const unsigned char FLAG_NOCHECK = 0x04;
  public:
   static const CmiUInt4 localmagic = 37492037;
 
@@ -143,13 +143,13 @@ class PythonPrint : private PythonAbstract {
   friend class PythonObject;
  private:
   CmiUInt4 interpreter;
-  char flags;
+  unsigned char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: noWait
      bit 2: kill previous request
   */
-  static const char FLAG_WAIT = 0x80;
-  static const char FLAG_KILL = 0x40;
+  static const unsigned char FLAG_WAIT = 0x80;
+  static const unsigned char FLAG_KILL = 0x40;
  public:
   static const CmiUInt4 localmagic = 989370215;
   PythonPrint(CmiUInt4 _interp, bool Wait=true, bool Kill=false);
@@ -173,11 +173,11 @@ class PythonFinished : private PythonAbstract {
   friend class PythonObject;
  private:
   CmiUInt4 interpreter;
-  char flags;
+  unsigned char flags;
   /* flags has the following parameters: (bit 1 is the MSB)
      bit 1: noWait
   */
-  static const char FLAG_WAIT = 0x80;
+  static const unsigned char FLAG_WAIT = 0x80;
  public:
   static const CmiUInt4 localmagic = 738963580;
   PythonFinished(CmiUInt4 _interp, bool Wait=true);

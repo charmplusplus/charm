@@ -1,4 +1,3 @@
-
 /**
  * \addtogroup CkLdb
    Load balancer that use Orthogonal Recursive Bisection(ORB) to partition
@@ -11,10 +10,6 @@
    3/26/2010:        added support for avail_vector
 */
 /*@{*/
-
-#include <charm++.h>
-
-#include "cklists.h"
 
 #include "OrbLB.h"
 
@@ -304,14 +299,14 @@ void OrbLB::mapPartitionsToNodes()
 
 }
 
-void OrbLB::work(BaseLB::LDStats* stats, int count)
+void OrbLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int i,j;
 
   statsData = stats;
 
-  P = count;
+  P = stats->nprocs();
 
   // calculate total number of migratable objects
   nObjs = stats->n_migrateobjs;
@@ -333,7 +328,11 @@ void OrbLB::work(BaseLB::LDStats* stats, int count)
     computeLoad[objIdx].v[XDIR] = odata.objID().id[0];
     computeLoad[objIdx].v[YDIR] = odata.objID().id[1];
     computeLoad[objIdx].v[ZDIR] = odata.objID().id[2];
+#if CMK_LB_CPUTIMER
     computeLoad[objIdx].load = _lb_args.useCpuTime()?odata.cpuTime:odata.wallTime;
+#else
+    computeLoad[objIdx].load = odata.wallTime;
+#endif
     computeLoad[objIdx].refno = 0;
     computeLoad[objIdx].partition = NULL;
     for (int k=XDIR; k<=ZDIR; k++) {

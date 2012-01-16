@@ -4,15 +4,7 @@
 /// Basic Constructor
 eventQueue::eventQueue()
 {
-  if(pose_config.dop){
-    sprintf(filename, "dop%d.log", CkMyPe());
-    fp = fopen(filename, "a");
-    if (fp == NULL) {
-      CkPrintf("ERROR: unable to open DOP file %s for append\n");
-      CkAbort("Error opening file");
-    }
-    lastLoggedVT = 0;
-  }
+  lastLoggedVT = 0;
   Event *e;
   eqh = new EqHeap();  // create the heap for incoming events
   largest = POSE_UnsetTS;
@@ -45,6 +37,15 @@ eventQueue::eventQueue()
   frontPtr->next = backPtr;
   backPtr->prev = frontPtr;
   RBevent = NULL;
+  // other variables
+  recentAvgEventSparsity = 1;
+  sparsityStartTime = 0;
+  sparsityCalcCount = 0;
+  tsDiffCount = 0;
+  lastCommittedTS = 0;
+  for (int i = 0; i < DIFFS_TO_STORE; i++) {
+    tsCommitDiffs[i] = 0;
+  }
 #ifdef MEM_TEMPORAL
   localTimePool = (TimePool *)CkLocalBranch(TempMemID);
 #endif
@@ -153,35 +154,76 @@ void eventQueue::InsertEventDeterministic(Event *e)
 #endif
 }
 
-void eventQueue::CommitStatsHelper(Event *commitPtr)
-{
+void eventQueue::CommitStatsHelper(sim *obj, Event *commitPtr) {
 #ifndef CMK_OPTIMIZE
   localStat *localStats = (localStat *)CkLocalBranch(theLocalStats);
-  if(pose_config.stats){
+  if (pose_config.stats) {
     localStats->Commit();
   }
 
-  if(pose_config.dop)
-    {
-      fpos_t fptr;
-      // if more than one event occurs at the same virtual time on this object, 
-      // only count the first event
-      if (lastLoggedVT >= commitPtr->svt)
-	commitPtr->svt = commitPtr->evt = -1;
-      else lastLoggedVT = commitPtr->evt;
-#if USE_LONG_TIMESTAMPS
-      while (!fprintf(fp, "%f %f %lld %lld\n", commitPtr->srt, commitPtr->ert, 
-		      commitPtr->svt, commitPtr->evt))
-	fsetpos(fp, &fptr);
-#else
-      while (!fprintf(fp, "%f %f %d %d\n", commitPtr->srt, commitPtr->ert, 
-		      commitPtr->svt, commitPtr->evt))
-	fsetpos(fp, &fptr);
-#endif
-      fgetpos(fp, &fptr);
-      localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+  if (pose_config.dop) {
+    // if more than one event occurs at the same virtual time on this object, 
+    // only count the first event
+    if (lastLoggedVT >= commitPtr->svt) {
+      commitPtr->svt = commitPtr->evt = -1;
+    } else {
+      lastLoggedVT = commitPtr->evt;
     }
+    localStats->WriteDopData(commitPtr->srt, commitPtr->ert, commitPtr->svt, commitPtr->evt);
+    localStats->SetMaximums(commitPtr->evt, commitPtr->ert);
+  }
 #endif
+
+  // only execute if sync strategy is adapt5
+  if (obj->myStrat->STRAT_T == ADAPT5_T) {
+
+    sparsityCalcCount++;
+    // run the sparsity calculation and store in strat
+    if (sparsityCalcCount >= EVQ_SPARSE_CALC_PERIOD) {
+      recentAvgEventSparsity = (int)((commitPtr->timestamp - sparsityStartTime) / sparsityCalcCount);
+      if (recentAvgEventSparsity < 1) {
+	recentAvgEventSparsity = 1;
+      }
+      ((adapt5 *)obj->myStrat)->setRecentAvgEventSparsity(recentAvgEventSparsity);
+      sparsityCalcCount = 0;
+      sparsityStartTime = commitPtr->timestamp;
+    }
+
+    // calculate the diffs for one of the adapt5 algorithms
+    POSE_TimeType diff = commitPtr->timestamp - lastCommittedTS;
+    lastCommittedTS = commitPtr->timestamp;
+    for (int i = 0; i < DIFFS_TO_STORE; i++) {
+      if (diff > tsCommitDiffs[i]) {
+	// insert in list
+	for (int j = DIFFS_TO_STORE - 2; j > i; j--) {
+	  tsCommitDiffs[j+1] = tsCommitDiffs[j];
+	}
+	if (i < DIFFS_TO_STORE - 1) {
+	  // not at the end of the array
+	  tsCommitDiffs[i+1] = tsCommitDiffs[i];
+	}
+	tsCommitDiffs[i] = diff;
+	break;
+      }
+    }
+    tsDiffCount++;
+
+    // calculate the timeleash and store in strat every TS_DIFF_WIN_SIZE events
+    if (tsDiffCount >= TS_DIFF_WIN_SIZE) {
+      POSE_TimeType totalDiff = 0;
+      for (int i = HIGHEST_DIFFS_TO_IGNORE; i < DIFFS_TO_STORE; i++) {
+	totalDiff += tsCommitDiffs[i];
+      }
+      POSE_TimeType avgDiff = totalDiff / NUM_DIFFS_TO_AVERAGE;
+      ((adapt5 *)obj->myStrat)->setTimeLeash(DIFFS_TO_STORE * avgDiff);
+      tsDiffCount = 0;
+      for (int i = 0; i < DIFFS_TO_STORE; i++) {
+	tsCommitDiffs[i] = 0;
+      }
+    }
+
+  }
+
 }
 
 /// Commit (delete) events before target timestamp ts
@@ -204,8 +246,10 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
   if (obj->objID->usesAntimethods()) {
     while ((commitPtr->timestamp < ts) && (commitPtr != backPtr) 
 	   && (commitPtr != currentPtr)) {
+      CmiAssert(commitPtr->done == 1); // only commit executed events
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg); // call commit fn
-      CommitStatsHelper(commitPtr);
+      obj->basicStats[0]++;
+      CommitStatsHelper(obj, commitPtr);
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
@@ -219,7 +263,8 @@ void eventQueue::CommitEvents(sim *obj, POSE_TimeType ts)
       while (commitPtr != target) { // commit upto next checkpoint
 	CmiAssert(commitPtr->done == 1); // only commit executed events
 	obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
-	CommitStatsHelper(commitPtr);
+	obj->basicStats[0]++;
+	CommitStatsHelper(obj, commitPtr);
 	if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	  CkPrintf("%s", commitPtr->commitBfr);
 	  if (commitPtr->commitErr) CmiAbort("Commit ERROR");
@@ -271,7 +316,8 @@ void eventQueue::CommitAll(sim *obj)
   while (commitPtr != backPtr) {
     if (commitPtr->done) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
-      CommitStatsHelper(commitPtr);
+      obj->basicStats[0]++;
+      CommitStatsHelper(obj, commitPtr);
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
@@ -316,7 +362,8 @@ void eventQueue::CommitDoneEvents(sim *obj) {
   while (commitPtr != backPtr) {
     if (commitPtr->done) {
       obj->ResolveCommitFn(commitPtr->fnIdx, commitPtr->msg);
-      CommitStatsHelper(commitPtr);
+      obj->basicStats[0]++;
+      CommitStatsHelper(obj, commitPtr);
       if (commitPtr->commitBfrLen > 0)  { // print buffered output
 	CkPrintf("%s", commitPtr->commitBfr);
 	if (commitPtr->commitErr) CmiAbort("Commit ERROR");
@@ -413,7 +460,7 @@ void eventQueue::dump()
   CkPrintf("[EVENTQUEUE: \n");
   while (e) {
 #if USE_LONG_TIMESTAMPS
-    CkPrintf("%lld[", e->timestamp); e->evID.dump(); CkPrintf("]");
+    CkPrintf("%lld[", e->timestamp); e->evID.dump(); CkPrintf(".%d", e->done); CkPrintf("]");
 #else
     CkPrintf("%d[", e->timestamp); e->evID.dump(); CkPrintf("]");
 #endif
@@ -428,10 +475,34 @@ void eventQueue::dump()
   CkPrintf("end EVENTQUEUE]\n");
 }
 
+/// Dump the event queue to a string
+char *eventQueue::dumpString() {
+  Event *e = frontPtr;
+  char str[PVT_DEBUG_BUFFER_LINE_LENGTH], tempStr[PVT_DEBUG_BUFFER_LINE_LENGTH];
+  sprintf(str, "[EVQ: ");
+  while (e) {
+#if USE_LONG_TIMESTAMPS
+    sprintf(tempStr, "%lld[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
+#else
+    sprintf(tempStr, "%d[%u.%d.%d]", e->timestamp, e->evID.id, e->evID.getPE(), e->done);
+#endif
+    strcat(str, tempStr);
+    if (e == frontPtr) strcat(str, "(FP)");
+    if (e == currentPtr) strcat(str, "(CP)");
+    if (e == backPtr) strcat(str, "(BP)");
+    strcat(str, " ");
+    e = e->next;
+  }
+  strcat(str, eqh->dumpString());
+  strcat(str, "end EVQ]");
+  return str;
+}
+
 /// Pack/unpack/sizing operator
 void eventQueue::pup(PUP::er &p) 
 {
-  p|tsOfLastInserted;
+  p|tsOfLastInserted; p|recentAvgEventSparsity;
+  p|sparsityStartTime; p|sparsityCalcCount;
   Event *tmp;
   register int i;
   int countlist = 0;

@@ -1,5 +1,5 @@
 \documentclass[10pt]{article}
-\usepackage{../pplmanual}
+\usepackage{../pplmanual,pst-node}
 \input{../pplmanual}
 
 \title{Adaptive MPI Manual}
@@ -19,42 +19,108 @@ version of AMPI is maintained by Chao Huang.
 This manual describes Adaptive MPI~(\ampi{}), which is an implementation of a
 significant subset\footnote{Currently, 110 MPI-1.1 Standard functions have 
 been implemented.} of MPI-1.1 Standard over \charmpp{}. \charmpp{} is a
-\CC{}-based parallel programming library developed by Prof. L. V. Kal\'{e} 
-and his students over the last 10 years at University of Illinois.
+\CC{}-based parallel programming library being developed by Prof. L. V. Kal\'{e} 
+and his students back from 1992 until now at University of Illinois.
 
 We first describe our philosophy behind this work (why we do what we do).
 Later we give a brief introduction to \charmpp{} and rationale for \ampi{}
-(tools of the trade). We describe \ampi{} in detail. Finally we summarize the
+(tools of the trade). We then describe \ampi{} in detail. Finally we summarize the
 changes required for original MPI codes to get them working with \ampi{}
 (current state of our work). Appendices contain the gory details of installing
 \ampi{}, building and running \ampi{} programs.
 
-\subsection{Our Philosophy}
+\subsection{Overview}
 
 Developing parallel Computational Science and Engineering (CSE) applications is
 a complex task. One has to implement the right physics, develop or choose and
 code appropriate numerical methods, decide and implement the proper input and
 output data formats, perform visualizations, and be concerned with correctness
 and efficiency of the programs. It becomes even more complex for multi-physics
-coupled simulations such as the solid propellant rocket simulation application.  
+coupled simulations such as the solid propellant rocket simulation application. In addition, many applications
+ are dynamic and adaptively refined so load imbalance is a major challenge.
 Our philosophy is to lessen the burden of the application developers by
 providing advanced programming paradigms and versatile runtime systems that can
-handle many common performance concerns automatically and let the application
+handle many common programming and performance concerns automatically and let the application
 programmers focus on the actual application content.
 
-One such concern is that of load imbalance. In a dynamic simulation application
+Many of these concerns can be addressed using processor virtualization and 
+over-decomposition philosophy of \charmpp{}. Thus, the developer only sees 
+virtual processors and lets the runtime system deal with underlying physical 
+processors. This is implemented in \ampi{} by mapping MPI ranks to \charmpp{} user-level
+ threads as illustrated in Figure\ref{fig_virt}. As an immediate and simple benefit, the programmer can use as 
+many virtual processors ("MPI ranks") as the problem can be easily decomposed
+ to them. For example, suppose the problem domain has $n*2^n$ parts that can be
+  easily distributed but programming for general number of MPI processes is burdensome, 
+  then the developer can have $n*2^n$ virtual processors on any number of physical ones using \ampi{}.
+  
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/virtualization.png}
+\caption{MPI processes are implemented as user-level threads in \ampi{}}
+\label{fig_virt}
+\end{figure}
+
+\ampi{}'s execution model consists of multiple user-level threads per process and,
+typically, there is one process per physical processor. \charmpp{} scheduler coordinates
+execution of these threads (also called Virtual Processors or VPs) and controls execution as shown in Figure \ref{fig_ratio}. These
+VPs can also migrate between processors because of load balancing or other reasons.
+The number of VPs per processor specifies the virtualization ratio (degree of over-decomposition). For example, in Figure \ref{fig_ratio} virtualization ratio is four (there are four VPs per each processor). Figure \ref{fig_prac} show how the problem domain is over-decomposed in \ampi{}'s VPs as opposed to other MPI implementations.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=1.8in]{figs/ratio.png}
+\caption{VPs are managed by \charmpp{} scheduler}
+\label{fig_ratio}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/prac.png}
+\caption{Problem domain is over-decomposed to more VPs}
+\label{fig_prac}
+\end{figure}
+
+Another benefit of virtualization is communication and computation overlap which 
+is automatically achieved without programming effort. Techniques such as software 
+pipelining require significant programming 
+effort to achieve this goal and improve performance. However, one can use \ampi{} to 
+have more virtual processors than physical processors to overlap communication and 
+computation. Each time a VP is blocked for communication, \charmpp{} scheduler
+ picks the next VP among those that are ready to execute. In this manner, while
+ some of the VPs of a physical processor are 
+waiting for a message to arrive, others can continue their execution. Thus, performance 
+will be improved without any change to the source code.
+
+A potential benefit is that of better cache utilization. With over-decomposition, a smaller subdomain is accessed by a VP repeatedly in different function calls before getting blocked by communication and switching to another VP. That smaller subdomain may fit into cache if over-decomposition is enough. This concept is illustrated in Figure \ref{fig_cache} where each \ampi{} subdomain (such as 12) is smaller than corresponding MPI subdomain (such as 3) and may fit into cache memory. Thus, there is a potential performance improvement without changing the source code.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/cache.png}
+\caption{Smaller subdomains may fit into cache and result in better performance}
+\label{fig_cache}
+\end{figure}
+
+One important concern is that of load imbalance. New generation parallel applications are 
+dynamically varying, meaning that processors' load is shifting during execution. In a dynamic simulation application
 such as rocket simulation, burning  solid fuel, sub-scaling for a certain part
 of the mesh, crack propagation, particle flows all contribute to load
 imbalance. Centralized load balancing strategy built into an application is
 impractical since each individual modules are developed almost independently by
-various developers. Thus, the runtime system support for load balancing becomes
-even more critical.
+various developers. In addition, embedding a load balancing strategy in the code 
+complicates it and programming effort increases significantly. Thus, the runtime 
+system support for load balancing becomes even more critical. Figure \ref{fig_migrate} shows migration of a VP because of load imbalance. For instance, this domain may correspond to a weather forecast model where there is a tornado in top-left side, which requires more computation to simulate. \ampi{} will then migrate VP 13 to balance the division of work across processors and improve performance. Note that incorporating this sort of load balancing inside the application code may take a lot of effort and complicates the code.
 
-Automatic load balancing is infeasible for a program about which nothing is
-known. Other approaches to automatic load balancing therefore require the
-applications to provide hints about the load to the runtime system, or restrict
-load balance to a certain kind of algorithms such as Adaptive Mesh Refinement
-or  to certain architectures such as shared memory machines. Our approach is
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/migrate.png}
+\caption{\ampi{} migrates VPs across processors for load balancing}
+\label{fig_migrate}
+\end{figure}
+
+There are different load balancing strategies built into \charmpp{} that can be 
+selected. Among those, some may fit better for an application depending on its 
+characteristics. Moreover, one can write a new load balancer, best suited for an 
+application, by the simple API provided inside \charmpp{} infrastructure. Our approach is
 based on actual measurement of load information at runtime, and on migrating
 computations from heavily loaded to lightly loaded processors.
 
@@ -63,8 +129,8 @@ pieces many more in number than available processors. This allows us to
 flexibly map and re-map these computational pieces to available processors.
 This approach is usually called ``multi-domain decomposition''.
 
-\charmpp{}, which we use as a runtime system layer for the work described here
-exemplifies our approach. It embeds an elaborate performance tracing mechanism,
+\charmpp{}, which we use as a runtime system layer for the work described here,
+simplifies our approach. It embeds an elaborate performance tracing mechanism,
 a suite of plug-in load balancing strategies, infrastructure for defining and
 migrating computational load, and is interoperable with other programming
 paradigms.
@@ -119,11 +185,11 @@ arrival of that message. The underlying runtime system of \charmpp{} is called
 schedule next (message-scheduling in \charmpp{} involves locating the object
 for which the message is intended, and executing the computation specified in
 the incoming message on that object). A parallel object in \charmpp{} is a
-\CC{} object on which a certain computations can be asked to performe from
+\CC{} object on which a certain computations can be asked to performed from
 remote processors.
 
 \charmpp{} programs exhibit latency tolerance since the scheduler always picks
-up the next available message rather than waiting for a particular messageto
+up the next available message rather than waiting for a particular message to
 arrive.  They also tend to be modular, because of their object-based nature.
 Most importantly, \charmpp{} programs can be \emph{dynamically load balanced},
 because the messages are directed at objects and not at processors; thus
@@ -133,7 +199,7 @@ we utilize for \ampi{}.
 
 Since many CSE applications are originally written using MPI, one would have to
 do a complete rewrite if they were to be converted to \charmpp{} to take
-advantage of dynamic load balancing. This is indeed impractical. However,
+advantage of dynamic load balancing and other \charmpp{} benefits. This is indeed impractical. However,
 \converse{} -- the runtime system of \charmpp{} -- came to our rescue here,
 since it supports interoperability between different parallel programming
 paradigms such as parallel objects and threads. Using this feature, we
@@ -142,7 +208,7 @@ standard over \charmpp{}.  \ampi{} is described in the next section.
 
 \section{AMPI}
 
-\ampi{} utilizes the dynamic load balancing capabilities of \charmpp{} by
+\ampi{} utilizes the dynamic load balancing and other capabilities of \charmpp{} by
 associating a ``user-level'' thread with each \charmpp{} migratable object.
 User's code runs inside this thread, so that it can issue blocking receive
 calls similar to MPI, and still present the underlying scheduler an opportunity
@@ -195,6 +261,13 @@ To convert an existing program to use AMPI, the main function or program may nee
 
 You must declare the main program as a subroutine called ``MPI\_MAIN''. Do not declare the main subroutine as a \textit{program} because it will never be called by the AMPI runtime.
 
+\begin{alltt}
+
+program pgm -> subroutine MPI_Main
+	...		    		      ...
+end program -> end subroutine
+\end{alltt}
+
 \subsubsection{C or C++}
 
 The main function can be left as is, if \texttt{mpi.h} is included before the main function. This header file has a preprocessor macro that renames main, and the renamed version is called by the AMPI runtime by each thread.
@@ -202,12 +275,29 @@ The main function can be left as is, if \texttt{mpi.h} is included before the ma
 
 \subsection{Global Variable Privatization}
 
-For dynamic load balancing to be effective, one needs to map multiple
-user-level threads onto a processor. Traditional MPI programs assume that the
+For the before-mentioned benefits to be effective, one needs to map multiple
+user-level threads onto each processor. 
+Traditional MPI programs assume that the
 entire processor is allocated to themselves, and that only one thread of
-control exists within the process's address space.  Thats where the need arises
+control exists within the process's address space. So, they may use global and static variables in the program.
+However, global and static variables are problematic for multi-threaded environments such as \ampi{} or OpenMP.
+This is because there is a single instance of those variables so they will be 
+shared among different threads in the single address space and a wrong result may be produced by the program.
+Figure \ref{fig_global} shows an example of a multi-threaded application with 
+two threads in a single process. $var$ is a global or static variable in this 
+example. Thread 1 assigns a value to it, then it gets blocked for communication 
+and another thread can continue. Thereby, thread 2 is scheduled next and 
+accesses $var$ which is wrong. Semantics of this program needs separate 
+instances of $var$ for each of the threads. Thats where the need arises
 to make some transformations to the original MPI program in order to run
 correctly with \ampi{}.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=4.6in]{figs/global.png}
+\caption{Global or static variables are an issue for \ampi{}}
+\label{fig_global}
+\end{figure}
 
 The basic transformation needed to port the MPI program to \ampi{} is
 privatization of global variables.\footnote{Typical Fortran MPI programs
@@ -245,14 +335,22 @@ global swapping and manual code modification.
 
 \subsubsection{Automatic Globals Swapping}
 Thanks to the ELF Object Format, we have successfully automated the procedure 
-of switching the set of user global variables when switching thread contexts. 
-The only thing that the user needs to do is to set flag {\tt -swapglobals} 
-at compile and link time. Currently this feature only works on x86 and x86\_64
- (i.e. amd64) platforms that fully support ELF. Thus it will not work on PPC or
-  Itanium, or on some microkernels such as Catamount.When this feature does
+of switching the set of user global variables when switching thread contexts.
+Executable and Linkable Format (ELF) is a common standard file format for Object Files in Unix-like operating systems.
+ELF maintains a Global Offset Table (GOT) for globals so it is possible to
+switch GOT contents at thread context-switch by the runtime system.
+
+
+The only thing that the user needs to do is to set flag {\tt -swapglobals}
+at compile and link time (e.g. ``ampicc Ðo prog prog.c -swapglobals"). It does not need 
+any change to the source code and works with any language (C, C++, Fortran, etc).
+However, it does not handle static variables and has a context switching overhead that grows with the number of global variables.
+Currently, this feature only works on x86 and x86\_64
+ (e.g. amd64) platforms that fully support ELF. Thus, it may not work on PPC or
+  Itanium, or on some microkernels such as Catamount. When this feature does
    not work for you,
-you are advised to make the modification manually, which is detailed in the
-following section.
+you can try other ways of handling global or static variables, which are detailed in the
+following sections.
 
 \subsubsection{Manual Change}
 We have employed a strategy of argument passing to do this privatization
@@ -305,7 +403,7 @@ void subA();
 int main(int argc, char** argv)\{
   int i;
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(MPI_COMM_WORLD, myrank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   for(i=0;i<100;i++)
     xyz[i] = i + myrank;
   subA();
@@ -400,8 +498,67 @@ For large shared data, it would be better to do heap allocation because in
 \ampi{}, the stack sizes are fixed at the beginning (can be specified from the
 command line) and stacks do not grow dynamically.
 
+\subsubsection{Source-to-source Transformation}
+Another approach is to do the changes described in the previous 
+scheme automatically. It means that we can use a tool to transform 
+the source code to move global or static variables in an object and pass them around.
+This approach is portable across systems and compilers and may also 
+improve locality and hence cache utilization. It also does not have the 
+context-switch overhead of swapping globals. However, it requires a new 
+implementation of the tool for each language. Currently, there is a tool called \emph{Photran}\footnote{http://www.eclipse.org/photran}
+for refactoring Fortran codes that can do this transformation. It is Eclipse-based and works by 
+constructing Abstract Syntax Trees (ASTs) of the program.
 
+\subsubsection{TLS-Globals}
+Thread Local Store (TLS) was originally employed in kernel threads to localize variables and thread safety.
+It can be used by annotating global/static variables with \emph{\_\_thread} in the source code.
+Thus, those variables will have one instance per extant thread. This keyword is not an official
+extension of the C language, however compiler writers are encouraged to
+implement this feature. Currently, the ELF file format supports Thread Local
+Storage.
 
+It handles both global and static variables and has no context-switching
+ overhead. Context-switching is just changing the TLS segment register
+ to point to the thread's local copy. However, although it is popular, it  
+is not supported by all compilers. Currently, \charmpp{} supports it for x86/x86\_64 platforms. 
+A modified \emph{gfortran} is also available to use this feature.
+To use TLS-Globals, one has to add \emph{\_\_thread} before all the global variables. For the example
+above, the following changes to the code handles the global variables:
+\begin{alltt}
+__thread int myrank;
+__thread double xyz[100];
+\end{alltt}
+
+The runtime system also should know that TLS-Globals is used at compile time:
+
+\begin{alltt}
+ampiCC -o example example.C -tlsglobals
+\end{alltt}
+Table \ref{tab:portability} shows portability of different schemes.
+
+\begin{table*}[!t]
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c|c|c|c|}
+\hline
+Privatization
+Scheme     & X86 & IA64 & Opteron & Mac OS X & IBM SP & SUN & BG/P & Cray/XT & Windows \\
+		   \hline
+		   \hline
+		   Transformation  & Yes  & Yes   & Yes     & Yes     & Yes  & Yes  & Yes & Yes & Yes  \\
+			   \hline
+			   GOT-Globals  & Yes  & Yes  & Yes     & No       & No    & Maybe  & No  & No  & No \\
+				   \hline
+				   TLS-Globals  &  Yes & Maybe  & Yes     & No    & Maybe & Maybe & No  & Yes & Maybe  \\
+					   \hline
+					   \end{tabular}
+					   \caption{Portability of current implementations of three privatization schemes.
+						   ``Yes'' means we have implemented this technique.
+							   ``Maybe'' indicates there are no theoretical problems, but no implementation exists.
+							   ``No'' indicates the technique is impossible on this platform.}
+							   \label{tab:portability}
+							   \vspace{-1.0cm}
+							   \end{center}
+							   \end{table*}
 \subsection{Extensions for Migrations}
 
 For MPI chunks to migrate, we have added a few calls to \ampi{}. These include
@@ -471,14 +628,14 @@ chunk-specific data that was registered with the system using
 \texttt{MPI\_Register}. This section explains how a subroutine should be
 written for performing pack/unpack.
 
-There are three steps to transporting the chunk's data to other processor.
+There are three steps for transporting the chunk's data to other processor.
 First, the system calls a subroutine to get the size of the buffer required to
 pack the chunk's data. This is called the ``sizing'' step. In the next step,
 which is called immediately afterward on the source processor, the system
 allocates the required buffer and calls the subroutine to pack the chunk's data
 into that buffer. This is called the ``packing'' step. This packed data is then
 sent as a message to the destination processor, where first a chunk is created
-(alongwith the thread) and a subroutine is called to unpack the chunk's data
+(along with the thread) and a subroutine is called to unpack the chunk's data
 from the buffer. This is called the ``unpacking'' step.
 
 Though the above description mentions three subroutines called by the \ampi{}

@@ -1,4 +1,4 @@
-LIBS = /usr/lib/python/config/libpython2.3.a -lpthread -lutil -ldl -lm
+LIBS = -lpython2.5 -lpthread -lutil -ldl -lm
 
 CHARMC=../../../bin/charmc -module liveViz -module PythonCCS $(OPTS)
 

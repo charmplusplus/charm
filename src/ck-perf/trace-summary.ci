@@ -25,6 +25,10 @@ module TraceSummary {
     entry void collectSummaryData(double startTime, double binSize, int numBins);
     entry void summaryDataCollected(CkReductionMsg *);
 
+    entry void traceSummaryParallelShutdown(int pe);
+    entry void maxBinSize(CkReductionMsg *msg);
+    entry void shrink(double _maxBinSize);
+    entry void sumData(CkReductionMsg *msg);
   };
 
 };

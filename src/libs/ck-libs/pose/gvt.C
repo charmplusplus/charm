@@ -8,6 +8,12 @@ CkGroupID ThePVT;
 CkGroupID TheGVT;
 CpvExtern(int, stateRecovery);
 CpvExtern(eventID, theEventID);
+
+static void staticDoneLB(void *data)
+{
+  ((PVT*)data)->doneLB();
+}
+
 /// Basic Constructor
 PVT::PVT() 
 {
@@ -28,10 +34,9 @@ PVT::PVT()
 #endif
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
-  if(pose_config.stats)
-    {
-      localStats->TimerStart(GVT_TIMER);
-    }
+  if (pose_config.stats) {
+    localStats->TimerStart(GVT_TIMER);
+  }
 #endif
 #ifdef MEM_TEMPORAL
   localTimePool = (TimePool *)CkLocalBranch(TempMemID);
@@ -77,10 +82,13 @@ PVT::PVT()
   parLastCheckpointTime = parStartTime = 0.0;
   parLBInProgress = 0;
   parLastLBGVT = 0;
+  //  debugBufferLoc = debugBufferWrapped = debugBufferDumped = 0;
 #ifndef CMK_OPTIMIZE
   if(pose_config.stats)
     localStats->TimerStop();
 #endif
+
+  LBDatabase::Object()->AddMigrationDoneFn(staticDoneLB, this);
 }
 
 /// PUP routine
@@ -154,6 +162,7 @@ void PVT::startPhase(prioBcMsg *m)
   }
 
   objs.Wake(); // wake objects to make sure all have reported
+
   // compute PVT
   optPVT = conPVT = POSE_UnsetTS;
   int end = objs.getNumSpaces();
@@ -189,6 +198,9 @@ void PVT::startPhase(prioBcMsg *m)
   }
 
   //  CkPrintf("[%d] pvt=%d gvt=%d optPVT=%d iterMin=%d\n", CkMyPe(), pvt, estGVT, optPVT, iterMin);
+  // ovt2 in each pvtobj is used to store the ovt from the rep if the
+  // poser is idle (i.e., it hasn't received any events since the last
+  // time it reported to its PVT)
   POSE_TimeType xt;
   if (pvt == POSE_UnsetTS) { // all are idle; find max ovt
     POSE_TimeType maxOVT = POSE_UnsetTS;
@@ -253,6 +265,7 @@ void PVT::setGVT(GVTMsg *m)
   CkFreeMsg(m);
   waitForFirst = 1;
   objs.Commit();
+  objs.StratCalcs();  // sync strategy calculations
 #ifdef MEM_TEMPORAL
   localTimePool->set_min_time(estGVT);
 #endif
@@ -298,10 +311,18 @@ void PVT::setGVT(GVTMsg *m)
     eventMsg *dummyMsg = new eventMsg();
     p[CkMyPe()].resumeAfterCheckpoint(dummyMsg);
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 /// ENTRY: begin checkpoint now that quiescence has been reached
 void PVT::beginCheckpoint(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   CkFreeMsg(m);
   if (parCheckpointInProgress) {  // ensure this only happens once
     CkPrintf("POSE: quiescence detected\n");
@@ -310,36 +331,52 @@ void PVT::beginCheckpoint(eventMsg *m) {
     CkCallback cb(CkIndex_PVT::resumeAfterCheckpoint(dummyMsg), CkMyPe(), ThePVT);
     CkStartCheckpoint(POSE_CHECKPOINT_DIRECTORY, cb);
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 void PVT::beginLoadbalancing(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   CkFreeMsg(m);
   if (parLBInProgress) {  // ensure this only happens once
     CProxy_PVT p(ThePVT);
     p.callAtSync();
   }
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
-void PVT::callAtSync()
-{
+void PVT::callAtSync() {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   objs.callAtSync();
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStop();
+#endif
 }
 
 void PVT::doneLB() {
-  static int count = 0;
-  count ++;
-  if (count == objs.getNumObjs()) {
-    count =0;
-    if (CkMyPe()==0) { 
-      eventMsg *dummyMsg = new eventMsg();
-      CProxy_PVT p(ThePVT);
-      p[0].resumeAfterLB(dummyMsg);
-    }
-  }
+  eventMsg *dummyMsg = new eventMsg();
+  CProxy_PVT p(ThePVT);
+  p[0].resumeAfterLB(dummyMsg);
 }
 
 /// ENTRY: resume after checkpointing, restarting, or if checkpointing doesn't occur
 void PVT::resumeAfterCheckpoint(eventMsg *m) {
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   if (parCheckpointInProgress) {
     CkPrintf("POSE: checkpoint/restart complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parCheckpointInProgress = 0;
@@ -359,7 +396,19 @@ void PVT::resumeAfterCheckpoint(eventMsg *m) {
 #endif
 }
 
+// called on PE 0
 void PVT::resumeAfterLB(eventMsg *m) {
+  static int count = 0;
+  count ++;
+  if (count != CkNumPes()) {
+    CkFreeMsg(m);
+    return;
+  }
+  count = 0;
+#ifndef CMK_OPTIMIZE
+  if(pose_config.stats)
+    localStats->TimerStart(GVT_TIMER);
+#endif
   if (parLBInProgress) {
     CkPrintf("POSE: load balancing complete on processor %d at GVT=%lld sim time=%.1f sec\n", CkMyPe(), estGVT, CmiWallTimer() + parStartTime);
     parLBInProgress = 0;
@@ -436,12 +485,20 @@ void PVT::objUpdateOVT(int pvtIdx, POSE_TimeType safeTime, POSE_TimeType ovt)
   // minimize the non-idle OVT
   //  if ((safeTime < estGVT) && (safeTime > POSE_UnsetTS)) 
 
+  // safeTime == -1 indicates the object (poser) is idle--i.e., it
+  // hasn't received any events since the last time it reported to the
+  // PVT.  If this is the case, and the ovt parameter (which comes
+  // from the rep) is more than ovt2 (which is set to -1 (idle) at the
+  // end of startPhase()), then the rep's ovt is stored in ovt2, which does
+  // not have to be more than the GVT (i.e., estGVT).
+
   CkAssert(simdone>0 || (safeTime >= estGVT) || (safeTime == POSE_UnsetTS));
-  if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt))
+  if ((safeTime == POSE_UnsetTS) && (objs.objs[index].getOVT2() < ovt)) {
     objs.objs[index].setOVT2(ovt);
-  else if ((safeTime > POSE_UnsetTS) && 
-	   ((objs.objs[index].getOVT() > safeTime) || (objs.objs[index].getOVT() == POSE_UnsetTS)))
+  } else if ((safeTime > POSE_UnsetTS) && 
+	     ((objs.objs[index].getOVT() > safeTime) || (objs.objs[index].getOVT() == POSE_UnsetTS))) {
     objs.objs[index].setOVT(safeTime);
+  }
 }
 
 /// Reduction point for PVT reports
@@ -469,6 +526,25 @@ void PVT::reportReduce(UpdateMsg *m)
     int entryCount = 0;
     // pack data into um
     SRentry *tmp = SRs;
+
+    while (tmp) {
+      if (((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS)) && (tmp->sends != tmp->recvs)) {
+	entryCount++;
+      }
+      tmp = tmp->next;
+    }
+    um = new (entryCount * sizeof(SRentry), 0) UpdateMsg;
+    tmp = SRs;
+    int i=0;
+    while (tmp) {
+      if (((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS)) && (tmp->sends != tmp->recvs)) {
+	um->SRs[i] = *tmp;
+	i++;
+      }
+      tmp = tmp->next;
+    }
+
+/*
     while (tmp && ((tmp->timestamp <= optGVT) || (optGVT == POSE_UnsetTS))
 	   && (tmp->sends != tmp->recvs)) {
       entryCount++;
@@ -483,6 +559,8 @@ void PVT::reportReduce(UpdateMsg *m)
       tmp = tmp->next;
       i++;
     }
+*/
+
     um->numEntries = entryCount;
     um->optPVT = optGVT;
     um->conPVT = conGVT;
@@ -529,6 +607,7 @@ GVT::GVT()
   done=0;
   SRs = NULL;
   startOffset = 0;
+  gvtIterationCount = 0;
 
 #ifndef CMK_OPTIMIZE
   localStats = (localStat *)CkLocalBranch(theLocalStats);
@@ -558,6 +637,7 @@ void GVT::pup(PUP::er &p) {
   p|estGVT; p|inactive; p|inactiveTime; p|nextLBstart;
   p|lastEarliest; p|lastSends; p|lastRecvs; p|reportsExpected;
   p|optGVT; p|conGVT; p|done; p|startOffset;
+  p|gvtIterationCount;
 
   if (p.isUnpacking()) {
 #ifndef CMK_OPTIMIZE
@@ -625,6 +705,7 @@ void GVT::computeGVT(UpdateMsg *m)
   GVTMsg *gmsg = new GVTMsg;
   POSE_TimeType lastGVT = 0, earliestMsg = POSE_UnsetTS, 
     earlyAny = POSE_UnsetTS;
+  SRentry *tmpSRs = SRs;
 
   if (CkMyPe() != 0) startOffset = 1;
   if (m->runGVTflag == 1) done++;
@@ -650,6 +731,7 @@ void GVT::computeGVT(UpdateMsg *m)
     if(pose_config.stats)
       localStats->GvtInc();
 #endif
+    gvtIterationCount++;
     done = 0;
     startOffset = 1;
     lastGVT = estGVT; // store previous estimate

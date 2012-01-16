@@ -27,7 +27,7 @@ friend class LBDB;
 public:
   LocalBarrier() { cur_refcount = 1; client_count = 0; max_client = 0;
                    max_receiver= 0; at_count = 0; on = CmiFalse; 
-	#if CMK_BLUEGENE_CHARM
+	#if CMK_BIGSIM_CHARM
 	first_free_client_slot = 0;
 	#endif
     };
@@ -69,7 +69,7 @@ private:
   int at_count;
   CmiBool on;
 
-  #if CMK_BLUEGENE_CHARM
+  #if CMK_BIGSIM_CHARM
   int first_free_client_slot;
   #endif
 };
@@ -165,13 +165,17 @@ public:
   void RemoveStartLBFn(LDStartLBFn fn);
   void StartLB();
 
-  inline void IdleTime(double* walltime) 
+  int AddMigrationDoneFn(LDMigrationDoneFn fn, void* data);
+  void RemoveMigrationDoneFn(LDMigrationDoneFn fn);
+  void MigrationDone();
+
+  inline void IdleTime(LBRealType* walltime) 
        { machineUtil.IdleTime(walltime); };
-  inline void TotalTime(double* walltime, double* cputime) 
+  inline void TotalTime(LBRealType* walltime, LBRealType* cputime) 
        { machineUtil.TotalTime(walltime,cputime); };
-  void BackgroundLoad(double* walltime, double* cputime);
-  void GetTime(double *total_walltime,double *total_cputime,
-                   double *idletime, double *bg_walltime, double *bg_cputime);
+  void BackgroundLoad(LBRealType* walltime, LBRealType* cputime);
+  void GetTime(LBRealType *total_walltime,LBRealType *total_cputime,
+                   LBRealType *idletime, LBRealType *bg_walltime, LBRealType *bg_cputime);
   void ClearLoads(void);
 
   /**
@@ -205,14 +209,21 @@ public:
        { if (useBarrier) localBarrier.AtBarrier(h); };
   inline void ResumeClients() 
        { localBarrier.ResumeClients(); };
-  inline void MeasuredObjTime(double wtime, double ctime) 
-       { if (statsAreOn) { obj_walltime += wtime; obj_cputime += ctime; } };
+  inline void MeasuredObjTime(double wtime, double ctime) {
+    if (statsAreOn) {
+      obj_walltime += wtime;
+#if CMK_LB_CPUTIMER
+      obj_cputime += ctime;
+#endif
+    }
+  };
 
   //This class controls the builtin-atsync frequency
   class batsyncer {
   private:
     LBDB *db; //Enclosing LBDB object
     double period;//Time (seconds) between builtin-atsyncs  
+    double nextT;
     LDBarrierClient BH;//Handle for the builtin-atsync barrier 
     static void gotoSync(void *bs);
     static void resumeFromSync(void *bs);
@@ -235,6 +246,11 @@ private:
     int on;
   };
 
+  struct MigrationDoneCB {
+    LDMigrationDoneFn fn;
+    void* data;
+  };
+
   struct PredictCB {
     LDPredictModelFn on;
     LDPredictWindowFn onWin;
@@ -247,6 +263,7 @@ private:
   typedef CkVec<LBObj*> ObjList;
   typedef CkVec<MigrateCB*> MigrateCBList;
   typedef CkVec<StartLBCB*> StartLBCBList;
+  typedef CkVec<MigrationDoneCB*> MigrationDoneCBList;
 
   LBCommTable* commTable;
   OMList oms;
@@ -258,6 +275,8 @@ private:
 
   CmiBool statsAreOn;
   MigrateCBList migrateCBList;
+
+  MigrationDoneCBList migrationDoneCBList;
 
   PredictCB* predictCBFn;
 
@@ -271,7 +290,9 @@ private:
 
   LBMachineUtil machineUtil;
   double obj_walltime;
+#if CMK_LB_CPUTIMER
   double obj_cputime;
+#endif
 
   StartLBCBList  startLBFnList;
   int            startLBFn_count;

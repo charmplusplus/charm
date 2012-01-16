@@ -43,7 +43,7 @@ void PipelineFragmentHandler(void *message) {
   int instid = CmiGetStrategy(message);
   PipeBroadcastConverse *myStrategy = (PipeBroadcastConverse*)ConvComlibGetStrategy(instid);
   ComlibPrintf("[%d] PipelineFragmentHandler: %d\n",CkMyPe(),instid);
-  PipeBcastInfo *info = (PipeBcastInfo*)(((char*)message)+CmiReservedHeaderSize);
+  //  PipeBcastInfo *info = (PipeBcastInfo*)(((char*)message)+CmiReservedHeaderSize);
   myStrategy->propagate((char*)message, true);//, info->srcPe, info->chunkSize+CmiReservedHeaderSize+sizeof(PipeBcastInfo), NULL);
 }
 
@@ -75,7 +75,7 @@ CmiFragmentHeader *PipeBroadcastConverse::getFragmentHeader(char *msg) {
 
 void PipeBroadcastConverse::propagate(char *msg, int isFragmented) {//, int srcPeNumber, int totalSendingSize, setFunction setPeNumber){
   // find destination processors and send
-  int destination, tmp, k, sizeToSend;
+  int destination, tmp, k; //, sizeToSend;
   int num_pes, *dest_pes;
   //int srcPeNumber = isFragmented ? info->srcPe : env->getSrcPe();
   //int totalSendingSize = isFragmented ? info->chunkSize+CmiReservedHeaderSize+sizeof(PipeBcastInfo) : env->getTotalsize();
@@ -149,7 +149,7 @@ void PipeBroadcastConverse::propagate(char *msg, int isFragmented) {//, int srcP
 
   default:
     // should NEVER reach here!
-    char *error_msg;
+    char error_msg[100];
     sprintf(error_msg, "Error, topology %d not known\n",topology);
     CmiAbort(error_msg);
   }

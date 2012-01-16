@@ -23,11 +23,13 @@ module gvt {
     entry void callAtSync();
     entry [expedited] void setGVT(GVTMsg *);
     entry [expedited] void reportReduce(UpdateMsg *);
+//    entry [expedited] void dumpDebugBuffer();
   };
 
   /// GVT chare group for estimating GVT
   group [migratable] GVT {
     entry GVT(void);
+    entry void sumGVTIterationCounts();
     entry [expedited] void runGVT(UpdateMsg *);
     entry [expedited] void computeGVT(UpdateMsg *);
   };

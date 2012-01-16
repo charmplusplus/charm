@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /** 
   @defgroup Converse
   \brief Converse--a parallel portability layer.
@@ -35,11 +29,12 @@
   the correspondent method in a remote processor. This is done through the
   converse header (which has few common fields, but is architecture dependent).
 
-  In converse the CsdScheduleForever() routine will run an infinite while loop that 
-  looks for available messages to processes from the message queue. Messages in the 
-  queue are dequeued by the CsdNextMessage() routine. When a 
-  message is taken from the queue it is then passed into CmiHandleMessage() which
-  calls the handler associated with the message.
+  In converse the CsdScheduleForever() routine will run an infinite while loop that
+  looks for available messages to process from the unprocessed message queues. The
+  details of the queues and the order in which they are emptied is hidden behind
+  CsdNextMessage(), which is used to dequeue the next message for processing by the
+  converse scheduler. When a message is taken from the queue it is then passed into
+  CmiHandleMessage() which calls the handler associated with the message.
 
   Incoming messages that are destined for Charm++ will be passed to the 
   \ref CharmScheduler "charm scheduling routines".
@@ -70,9 +65,13 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "memory-isomalloc.h"
+#if CMK_PROJECTOR
 #include "converseEvents.h"             /* projector */
 #include "traceCoreCommon.h"    /* projector */
 #include "machineEvents.h"     /* projector */
+#endif
+
+extern const char * const CmiCommitID;
 
 #if CMK_OUT_OF_CORE
 #include "conv-ooc.h"
@@ -123,14 +122,17 @@ extern void CldModuleInit(char **);
 #include <sys/timeb.h>
 #endif
 
+#ifdef CMK_HAS_ASCTIME
+#include <time.h>
+#endif
+
 #ifdef CMK_CUDA
 #include "cuda-hybrid-api.h"
 #endif
 
 #include "quiescence.h"
-
-int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
-
+//int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
+CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
@@ -211,6 +213,10 @@ CpvDeclare(void *, CkGridObject);
 CpvDeclare(void *, CsdGridQueue);
 #endif
 
+#if CMK_CRAYXE
+void* LrtsAlloc(int, int);
+void  LrtsFree(void*);
+#endif
 
 /*****************************************************************************
  *
@@ -588,6 +594,7 @@ int CmiIsFortranLibraryCall() {
       if (strncmp(trimmed, "for__", 5) == 0                /* ifort */
           || strncmp(trimmed, "_xlf", 4) == 0               /* xlf90 */
           || strncmp(trimmed, "_xlfBeginIO", 11) == 0 
+          || strncmp(trimmed, "_gfortran_", 10) == 0 
 	 )
           {  /* CmiPrintf("[%d] NAME:%s\n", CmiMyPe(), trimmed); */
              ret = 1; break; }
@@ -780,6 +787,29 @@ static void CmiHandlerInit()
  *
  *****************************************************************************/
 
+#if CMK_HAS_ASCTIME
+
+char *CmiPrintDate()
+{
+  struct tm *local;
+  time_t t;
+
+  t = time(NULL);
+  local = localtime(&t);
+  return asctime(local);
+}
+
+#else
+
+char *CmiPrintDate()
+{
+  return "N/A";
+}
+
+#endif
+
+static int _absoluteTime = 0;
+
 #if CMK_TIMER_USE_TIMES
 
 CpvStaticDeclare(double, clocktick);
@@ -791,7 +821,22 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
   struct tms temp;
   CpvInitialize(double, clocktick);
@@ -852,11 +897,28 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return _absoluteTime;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   struct timeval tv;
   struct rusage ru;
   CpvInitialize(double, inittime_virtual);
+
+  _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
 
 #if ! CMK_MEM_CHECKPOINT
   /* try to synchronize calling barrier */
@@ -894,6 +956,7 @@ double CmiCpuTimer()
   currenttime =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+  
   return currenttime - CpvAccess(inittime_virtual);
 #endif
 }
@@ -913,7 +976,7 @@ double CmiWallTimer()
   }
   lastT = currenttime;
 #endif
-  return currenttime - inittime_wallclock;
+  return _absoluteTime?currenttime:currenttime - inittime_wallclock;
 }
 
 double CmiTimer()
@@ -958,7 +1021,12 @@ double  CmiStartTimer(void)
   return CpvAccess(inittime_walltime);
 }
 
-void CmiTimerInit()
+double CmiInitTime()
+{
+  return CpvAccess(inittime_walltime);
+}
+
+void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 
@@ -1034,7 +1102,22 @@ int CmiTimerIsSynchronized()
   return 0;
 }
 
-void CmiTimerInit()
+int CmiTimerAbsolute()
+{
+  return 1;
+}
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   BGLPersonality dst;
   CpvInitialize(double, clocktick);
@@ -1072,73 +1155,94 @@ double CmiTimer()
 
 #if CMK_TIMER_USE_BLUEGENEP  /* This module just compiles with GCC charm. */
 
-void CmiTimerInit() {}
-
-#if 0
-#include "common/bgp_personality.h"
-#include <spi/bgp_SPI.h>
-
-#define SPRN_TBRL 0x10C  /* Time Base Read Lower Register (user & sup R/O) */
-#define SPRN_TBRU 0x10D  /* Time Base Read Upper Register (user & sup R/O) */
-#define SPRN_PIR  0x11E  /* CPU id */
-
-static inline unsigned long long BGPTimebase(void)
-{
-  unsigned volatile u1, u2, lo;
-  union
-  {
-    struct { unsigned hi, lo; } w;
-    unsigned long long d;
-  } result;
-                                                                         
-  do {
-    asm volatile ("mfspr %0,%1" : "=r" (u1) : "i" (SPRN_TBRU));
-    asm volatile ("mfspr %0,%1" : "=r" (lo) : "i" (SPRN_TBRL));
-    asm volatile ("mfspr %0,%1" : "=r" (u2) : "i" (SPRN_TBRU));
-  } while (u1!=u2);
-                                                                         
-  result.w.lo = lo;
-  result.w.hi = u2;
-  return result.d;
-}
-
-static unsigned long long inittime_wallclock = 0;
-CpvStaticDeclare(double, clocktick);
-
-int CmiTimerIsSynchronized()
+int CmiTimerAbsolute()
 {
   return 0;
 }
 
-void CmiTimerInit()
+double CmiStartTimer()
 {
-  _BGP_Personality_t dst;
-  CpvInitialize(double, clocktick);
-  int size = sizeof(_BGP_Personality_t);
-  rts_get_personality(&dst, size);
+  return 0.0;
+}
 
-  CpvAccess(clocktick) = 1.0 / (dst.Kernel_Config.FreqMHz * 1e6);
+double CmiInitTime()
+{
+  return 0.0;
+}
+
+void CmiTimerInit(char **argv) {}
+
+#include "dcmf.h"
+
+double CmiWallTimer () {
+  return DCMF_Timer();
+}
+
+double CmiCpuTimer()
+{
+  return CmiWallTimer();
+}
+
+double CmiTimer()
+{
+  return CmiWallTimer();
+}
+#endif
+
+
+#if CMK_TIMER_USE_BLUEGENEQ  /* This module just compiles with GCC charm. */
+
+CpvStaticDeclare(unsigned long, inittime);
+CpvStaticDeclare(double, clocktick);
+
+int CmiTimerIsSynchronized()
+{
+  return 1;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+#include "hwi/include/bqc/A2_inlines.h"
+#include "spi/include/kernel/process.h"
+
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime);
+}
+
+void CmiTimerInit(char **argv)
+{
+  CpvInitialize(double, clocktick);
+  CpvInitialize(unsigned long, inittime);
+
+  Personality_t  pers;
+  Kernel_GetPersonality(&pers, sizeof(pers));
+  uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
+  CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
+
+  fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);
 
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
   CmiBarrier();
 
-  inittime_wallclock = BGPTimebase (); 
+  CpvAccess(inittime) = GetTimeBase (); 
 }
 
 double CmiWallTimer()
 {
   unsigned long long currenttime;
-  currenttime = BGPTimebase();
-  return CpvAccess(clocktick)*(currenttime-inittime_wallclock);
-}
-#endif
-
-#include "dcmf.h"
-
-double CmiWallTimer () {
-  return DCMF_Timer();
+  currenttime = GetTimeBase();
+  return CpvAccess(clocktick)*(currenttime-CpvAccess(inittime));
 }
 
 double CmiCpuTimer()
@@ -1159,7 +1263,22 @@ double CmiTimer()
 CpvStaticDeclare(double, inittime_wallclock);
 CpvStaticDeclare(double, inittime_virtual);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
 #ifdef __CYGWIN__
 	struct timeb tv;
@@ -1220,11 +1339,26 @@ double CmiTimer()
 static double clocktick;
 CpvStaticDeclare(long long, inittime_wallclock);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return CpvAccess(inittime_wallclock);
+}
+
+void CmiTimerInit(char **argv)
 {
   CpvInitialize(long long, inittime_wallclock);
   CpvAccess(inittime_wallclock) = _rtc();
   clocktick = 1.0 / (double)(sysconf(_SC_SV2_USER_TIME_RATE));
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiWallTimer()
@@ -1255,7 +1389,17 @@ static timebasestruct_t inittime_wallclock;
 static double clocktick;
 CpvStaticDeclare(double, inittime_virtual);
 
-void CmiTimerInit()
+double CmiStartTimer()
+{
+  return 0.0;
+}
+
+double CmiInitTime()
+{
+  return inittime_wallclock;
+}
+
+void CmiTimerInit(char **argv)
 {
   struct rusage ru;
 
@@ -1269,6 +1413,11 @@ void CmiTimerInit()
   CpvAccess(inittime_virtual) =
     (ru.ru_utime.tv_sec * 1.0)+(ru.ru_utime.tv_usec * 0.000001) +
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
+}
+
+int CmiTimerAbsolute()
+{
+  return 0;
 }
 
 double CmiWallTimer()
@@ -1399,7 +1548,9 @@ void (*handler)();
 void CsdBeginIdle(void)
 {
   CcdCallBacks();
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1410,7 +1561,9 @@ void CsdStillIdle(void)
 
 void CsdEndIdle(void)
 {
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
+#endif
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -1423,7 +1576,7 @@ void CmiHandleMessage(void *msg)
  	CpvAccess(cQdState)->mProcessed++;
 */
 	CmiHandlerInfo *h;
-#if CMK_TRACE_ENABLED
+#if CMK_TRACE_ENABLED && CMK_PROJECTOR
 	CmiUInt2 handler=CmiGetHandler(msg); /* Save handler for use after msg is gone */
 	_LOG_E_HANDLER_BEGIN(handler); /* projector */
 	/* setMemoryStatus(1) */ /* charmdebug */
@@ -1479,7 +1632,56 @@ void CsdSchedulerState_new(CsdSchedulerState_t *s)
 }
 
 
-/** Dequeue and return the next message from the message queue. */
+/** Dequeue and return the next message from the unprocessed message queues.
+ *
+ * This function encapsulates the multiple queues that exist for holding unprocessed
+ * messages and the rules for the order in which to check them. There are five (5)
+ * different Qs that converse uses to store and retrieve unprocessed messages. These
+ * are:
+ *     Q Purpose                  Type      internal DeQ logic
+ * -----------------------------------------------------------
+ * - PE offnode                   pcQ             FIFO
+ * - PE onnode                    CkQ             FIFO
+ * - Node offnode                 pcQ             FIFO
+ * - Node onnode                  prioQ           prio-based
+ * - Scheduler                    prioQ           prio-based
+ *
+ * The PE queues hold messages that are destined for a specific PE. There is one such
+ * queue for every PE within a charm node. The node queues hold messages that are
+ * destined to that node. There is only one of each node queue within a charm node.
+ * Finally there is also a charm++ message queue for each PE.
+ *
+ * The offnode queues are meant for holding messages that arrive from outside the
+ * node. The onnode queues hold messages that are generated within the same charm
+ * node.
+ *
+ * The PE and node level offnode queues are accessed via functions CmiGetNonLocal()
+ * and CmiGetNonLocalNodeQ(). These are implemented separately by each machine layer
+ * and hide the implementation specifics for each layer.
+ *
+ * The PE onnode queue is implemented as a FIFO CkQ and is initialized via a call to
+ * CdsFifo_Create(). The node local queue and the scheduler queue are both priority
+ * queues. They are initialized via calls to CqsCreate() which gives each of them
+ * three separate internal queues for different priority ranges (-ve, 0 and +ve).
+ * Access to these queues is via pointers stored in the struct CsdSchedulerState that
+ * is passed into this function.
+ *
+ * The order in which these queues are checked is described below. The function
+ * proceeds to the next queue in the list only if it does not find any messages in
+ * the current queue. The first message that is found is returned, terminating the
+ * call.
+ * (1) offnode queue for this PE
+ * (2) onnode queue for this PE
+ * (3) offnode queue for this node
+ * (4) highest priority msg from onnode queue or scheduler queue
+ *
+ * @note: Across most (all?) machine layers, the two GetNonLocal functions simply
+ * access (after observing adequate locking rigor) structs representing the scheduler
+ * state, to dequeue from the queues stored within them. The structs (CmiStateStruct
+ * and CmiNodeStateStruct) implement these queues as \ref Machine "pc (producer-consumer)
+ * queues". The functions also perform other necessary actions like PumpMsgs() etc.
+ *
+ */
 void *CsdNextMessage(CsdSchedulerState_t *s) {
 	void *msg;
 	if((*(s->localCounter))-- >0)
@@ -2588,6 +2790,7 @@ extern void arena_free(void *blockPtr);
 
 void *CmiAlloc(int size)
 {
+
   char *res;
 
 #if CONVERSE_VERSION_ELAN
@@ -2598,6 +2801,8 @@ void *CmiAlloc(int size)
   res = (char*) arena_malloc(size+sizeof(CmiChunkHeader));
 #elif CMK_USE_IBVERBS | CMK_USE_IBUD
   res = (char *) infi_CmiAlloc(size+sizeof(CmiChunkHeader));
+#elif CMK_CONVERSE_GEMINI_UGNI
+  res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #else
@@ -2640,6 +2845,11 @@ static void *CmiAllocFindEnclosing(void *blk) {
     refCount = REFFIELD(blk);
   }
   return blk;
+}
+
+int CmiGetReference(void *blk)
+{
+  return REFFIELD(CmiAllocFindEnclosing(blk));
 }
 
 /** Increment the reference count for this block's owner.
@@ -2692,6 +2902,8 @@ void CmiFree(void *blk)
       }
 #endif
     infi_CmiFree(BLKSTART(parentBlk));
+#elif CMK_CONVERSE_GEMINI_UGNI
+    LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
 #else
@@ -3120,6 +3332,9 @@ extern void CmiIsomallocInit(char **argv);
 void CmiIOInit(char **argv);
 #endif
 
+/* defined in cpuaffinity.c */
+extern void CmiInitCPUAffinityUtil();
+
 static void CmiProcessPriority(char **argv)
 {
   int dummy, nicelevel=-100;      /* process priority */
@@ -3257,19 +3472,24 @@ void ConverseCommonInit(char **argv)
  */
 #if CMK_CCS_AVAILABLE
   CpvInitialize(int, cmiArgDebugFlag);
+  CpvAccess(cmiArgDebugFlag) = 0;
 #endif
-
+  CpvInitialize(int,_curRestartPhase);
+  CpvAccess(_curRestartPhase)=1;
   CmiArgInit(argv);
   CmiMemoryInit(argv);
 #if ! CMK_CMIPRINTF_IS_A_BUILTIN
   CmiIOInit(argv);
 #endif
-#if CONVERSE_POOL
+  if (CmiMyPe() == 0)
+      CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+/* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
-#endif
+/* #endif */
   CmiTmpInit(argv);
-  CmiTimerInit();
+  CmiTimerInit(argv);
   CstatsInit(argv);
+  CmiInitCPUAffinityUtil();
 
   CcdModuleInit(argv);
   CmiHandlerInit();
@@ -3320,7 +3540,7 @@ void ConverseCommonInit(char **argv)
   CthSetSuspendable(CthSelf(), 0);
 */
 
-#if CMK_BLUEGENE_CHARM
+#if CMK_BIGSIM_CHARM
    /* have to initialize QD here instead of _initCharm */
   extern void initQd(char **argv);
   initQd(argv);
@@ -3347,7 +3567,7 @@ void ConverseCommonExit(void)
 #if CMK_CUDA
   exitHybridAPI(); 
 #endif
-
+  seedBalancerExit();
   EmergencyExit();
 }
 
@@ -3504,12 +3724,15 @@ int _BgOutOfCoreFlag=0; /*indicate the type of memory operation (in or out) */
 int _BgInOutOfCoreMode=0; /*indicate whether the emulation is in the out-of-core emulation mode */
 
 #if !CMK_HAS_LOG2
-unsigned int CmiLog2(unsigned int val) {
+unsigned int CmiILog2(unsigned int val) {
   unsigned int log = 0u;
   if ( val != 0u ) {
       while ( val > (1u<<log) ) { log++; }
   }
   return log;
+}
+double CmiLog2(double x) {
+  return log(x)/log(2);
 }
 #endif
 

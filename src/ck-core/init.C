@@ -165,22 +165,23 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 	FAULT_EVAC
 */
 CpvCExtern(char *, _validProcessors);
-CpvDeclare(char ,startedEvac);
+CkpvDeclare(char ,startedEvac);
 
 int    _exitHandlerIdx;
 
+#if CMK_WITH_STATS
 static Stats** _allStats = 0;
-
+#endif
 static int   _numStatsRecd = 0;
 static int   _exitStarted = 0;
 
 static InitCallTable _initCallTable;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 #define _STATS_ON(x) (x) = 1
 #else
 #define _STATS_ON(x) \
-          CmiPrintf("stats unavailable in optimized version. ignoring...\n");
+          if (CkMyPe()==0) CmiPrintf("stats unavailable in optimized version. ignoring...\n");
 #endif
 
 // fault tolerance
@@ -248,7 +249,7 @@ static inline void _parseCommandLineOpts(char **argv)
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
 #if __FAULT__
-  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&cur_restart_phase,"restarting this processor after a crash")){	
+  if (CmiGetArgIntDesc(argv,"+restartaftercrash",&CpvAccess(_curRestartPhase),"restarting this processor after a crash")){	
 # if CMK_MEM_CHECKPOINT
       faultFunc = CkMemRestart;
 # endif
@@ -307,9 +308,14 @@ static inline void _parseCommandLineOpts(char **argv)
 
 #endif	
 	/* Anytime migration flag */
-	_isAnytimeMigration = CmiTrue;
+	_isAnytimeMigration = true;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {
-	  _isAnytimeMigration = CmiFalse;
+	  _isAnytimeMigration = false;
+	}
+	
+	_isNotifyChildInRed = true;
+	if (CmiGetArgFlagDesc(argv,"+noNotifyChildInReduction","The program has at least one element per processor for each charm array created")) {
+	  _isNotifyChildInRed = false;
 	}
 
 
@@ -364,7 +370,7 @@ static void _discardHandler(envelope *env)
   CmiFree(env);
 }
 
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
 static inline void _printStats(void)
 {
   DEBUGF(("[%d] _printStats\n", CkMyPe()));
@@ -415,7 +421,7 @@ static inline void _printStats(void) {}
 static inline void _sendStats(void)
 {
   DEBUGF(("[%d] _sendStats\n", CkMyPe()));
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
   envelope *env = UsrToEnv(CkpvAccess(_myStats));
 #else
   envelope *env = _allocEnv(StatMsg);
@@ -505,7 +511,7 @@ static void _exitHandler(envelope *env)
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
 		     // _mainDone is never set to 1 before the program exits.
-#ifndef CMK_OPTIMIZE
+#if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
       if (_ringexit) {
@@ -525,7 +531,7 @@ static void _exitHandler(envelope *env)
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
-#ifndef CMK_OPTIMIZE
+#if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
 #endif
       _numStatsRecd++;
@@ -794,7 +800,7 @@ void _CkExit(void)
     CmiSetHandler(env, _exitHandlerIdx);
     CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
   }
-#if ! CMK_BLUEGENE_THREAD
+#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
@@ -818,7 +824,7 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-#if ! CMK_BLUEGENE_THREAD
+#if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
   CsdScheduler(-1);
@@ -831,7 +837,7 @@ void CkExit(void)
    to the machine layer to call this function). */
 extern "C"
 void EmergencyExit(void) {
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
   /* Delete _coreState to force any CkMessageWatcher to close down. */
   if (CkpvAccess(_coreState) != NULL) {
     delete CkpvAccess(_coreState);
@@ -862,6 +868,7 @@ extern "C" void initCharmProjections();
 extern "C" void CmiInitCPUTopology(char **argv);
 extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
+extern "C" void CmiInitPxshm(char **argv);
 
 //extern "C" void CldCallback();
 
@@ -874,7 +881,7 @@ void _registerInitCall(CkInitCallFn fn, int isNodeCall)
 void InitCallTable::enumerateInitCalls()
 {
   int i;
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
   if(BgNodeRank()==0)        // called only once on an emulating node
 #else
   if(CkMyRank()==0) 
@@ -909,7 +916,7 @@ extern "C" void initQd(char **argv)
         }
 }
 
-#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
 void CpdBgInit();
 #endif
 void CpdBreakPointInit();
@@ -929,6 +936,8 @@ void _initCharm(int unused_argc, char **argv)
 
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
+	CkpvInitialize(size_t *, _offsets);
+	CkpvAccess(_offsets) = new size_t[32];
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
 	CkpvInitialize(void*, _currentChare);
@@ -947,10 +956,10 @@ void _initCharm(int unused_argc, char **argv)
 	/*
 		Added for evacuation-sayantan
 	*/
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
 	CpvInitialize(char *,_validProcessors);
-	CpvInitialize(char ,startedEvac);
 #endif
+	CkpvInitialize(char ,startedEvac);
 	CpvInitialize(int,serializer);
 
 	_initChareTables();            // for checkpointable plain chares
@@ -996,7 +1005,7 @@ void _initCharm(int unused_argc, char **argv)
 	
 	CmiNodeAllBarrier();
 
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	initQd(argv);         // bigsim calls it in ConverseCommonInit
 #endif
 
@@ -1015,7 +1024,7 @@ void _initCharm(int unused_argc, char **argv)
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #endif
 	_infoIdx = CldRegisterInfoFn((CldInfoFn)_infoFn);
@@ -1055,7 +1064,7 @@ void _initCharm(int unused_argc, char **argv)
 	  same order on every node, and *must not* be called by 
 	  multiple threads simultaniously.
 	*/
-#ifdef __BLUEGENE__
+#ifdef __BIGSIM__
 	if(BgNodeRank()==0) 
 #else
 	if(CkMyRank()==0)
@@ -1142,7 +1151,7 @@ void _initCharm(int unused_argc, char **argv)
 	// Execute the initcalls registered in modules
 	_initCallTable.enumerateInitCalls();
 
-#ifndef CMK_OPTIMIZE
+#if CMK_CHARMDEBUG
 	CpdFinishInitialization();
 #endif
 
@@ -1176,7 +1185,7 @@ void _initCharm(int unused_argc, char **argv)
     _messageLoggingInit();
 #endif
 
-#ifndef __BLUEGENE__
+#ifndef __BIGSIM__
 	/*
 		FAULT_EVAC
 	*/
@@ -1184,10 +1193,10 @@ void _initCharm(int unused_argc, char **argv)
 	for(int vProc=0;vProc<CkNumPes();vProc++){
 		CpvAccess(_validProcessors)[vProc]=1;
 	}
-	CpvAccess(startedEvac) = 0;
 	_ckEvacBcastIdx = CkRegisterHandler((CmiHandler)_ckEvacBcast);
 	_ckAckEvacIdx = CkRegisterHandler((CmiHandler)_ckAckEvac);
 #endif
+	CkpvAccess(startedEvac) = 0;
 	CpvAccess(serializer) = 0;
 
 	evacuate = 0;
@@ -1211,15 +1220,25 @@ void _initCharm(int unused_argc, char **argv)
     if (!_replaySystem) {
         if (faultFunc == NULL) {         // this is not restart
             // these two are blocking calls for non-bigsim
-#if ! CMK_BLUEGENE_CHARM
+#if ! CMK_BIGSIM_CHARM
 	  CmiInitCPUAffinity(argv);
           CmiInitMemAffinity(argv);
 #endif
         }
         CmiInitCPUTopology(argv);
     }
+
+#if CMK_USE_PXSHM && CMK_CRAYXE && CMK_SMP
+      // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
+      // again after cpuaffinity is done
+    if (CkMyRank() == 0) {
+      CmiInitPxshm(argv);
+    }
+    CmiNodeAllBarrier();
+#endif
+
     //CldCallback();
-#if CMK_BLUEGENE_CHARM && CMK_CHARMDEBUG
+#if CMK_BIGSIM_CHARM && CMK_CHARMDEBUG
       // Register the BG handler for CCS. Notice that this is put into a variable shared by
       // the whole real processor. This because converse needs to find it. We check that all
       // virtual processors register the same index for this handler.
@@ -1227,7 +1246,9 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 	if (faultFunc) {
+#if CMK_WITH_STATS
 		if (CkMyPe()==0) _allStats = new Stats*[CkNumPes()];
+#endif
 		if (!inCommThread) {
                   CkArgMsg *msg = (CkArgMsg *)CkAllocMsg(0, sizeof(CkArgMsg), 0);
                   msg->argc = CmiGetArgc(argv);
@@ -1236,7 +1257,9 @@ void _initCharm(int unused_argc, char **argv)
                   CkFreeMsg(msg);
                 }
 	}else if(CkMyPe()==0){
+#if CMK_WITH_STATS
 		_allStats = new Stats*[CkNumPes()];
+#endif
 		register size_t i, nMains=_mainTable.size();
 		for(i=0;i<nMains;i++)  /* Create all mainchares */
 		{

@@ -1,17 +1,8 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include "charm++.h"
-#include "BaseLB.h"
 #include "HybridBaseLB.h"
 #include "LBDBManager.h"
 #include "GreedyLB.h"
@@ -87,8 +78,14 @@ HybridBaseLB::HybridBaseLB(const CkLBOptions &opt): BaseLB(opt)
 
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
-  group1_created = 0;
-#if ! CMK_BLUEGENE_CHARM
+  group1_created = 0;             // base class need to call initTree()
+#endif
+}
+
+void HybridBaseLB::initTree()
+{
+#if CMK_LBDB_ON
+#if ! CMK_BIGSIM_CHARM
     // create a multicast group to optimize level 1 multicast
   if (tree->isroot(CkMyPe(), 1)) {
     int npes = tree->numChildren(CkMyPe(), 1);
@@ -203,8 +200,13 @@ CLBStatsMsg* HybridBaseLB::AssembleStats()
   msg->from_pe = CkMyPe();
 
   // Get stats
+#if CMK_LB_CPUTIMER
   theLbdb->GetTime(&msg->total_walltime,&msg->total_cputime,
                    &msg->idletime, &msg->bg_walltime,&msg->bg_cputime);
+#else
+  theLbdb->GetTime(&msg->total_walltime,&msg->total_walltime,
+                   &msg->idletime, &msg->bg_walltime,&msg->bg_walltime);
+#endif
 //  msg->pe_speed = myspeed;
   // number of pes
   msg->pe_speed = 1;
@@ -288,10 +290,12 @@ void HybridBaseLB::depositLBStatsMessage(CLBStatsMsg *m, int atlevel)
   struct ProcStats &procStat = statsData->procs[neighborIdx];
   procStat.pe = pe;	// real PE
   procStat.total_walltime = m->total_walltime;
-  procStat.total_cputime = m->total_cputime;
   procStat.idletime = m->idletime;
   procStat.bg_walltime = m->bg_walltime;
+#if CMK_LB_CPUTIMER
+  procStat.total_cputime = m->total_cputime;
   procStat.bg_cputime = m->bg_cputime;
+#endif
   procStat.pe_speed = m->pe_speed;		// important
   procStat.available = CmiTrue;
   procStat.n_objs = m->n_objs;
@@ -312,7 +316,7 @@ void HybridBaseLB::buildStats(int atlevel)
 
   // statsMsgsList
   DEBUGF(("[%d] buildStats for %d nobj:%d\n", CkMyPe(), stats_msg_count, statsData->n_objs));
-  statsData->count = stats_msg_count;
+  statsData->nprocs() = stats_msg_count;
   statsData->objData.resize(statsData->n_objs);
   statsData->commData.resize(statsData->n_comm);
   statsData->from_proc.resize(statsData->n_objs);
@@ -354,8 +358,10 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 {
 #if CMK_LBDB_ON
   int i;
-  double obj_walltime, obj_cputime;
-  double obj_nmwalltime, obj_nmcputime;
+  double obj_walltime, obj_nmwalltime;
+#if CMK_LB_CPUTIMER 
+  double obj_cputime, obj_nmcputime;
+#endif
 
   LDStats *statsData = levelData[atlevel]->statsData;
   CmiAssert(statsData);
@@ -369,16 +375,22 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   if ((statsStrategy == SHRINK || statsStrategy == SHRINK_NULL) && atlevel == tree->numLevels()-2) 
   {
     shrink = 1;
-    obj_walltime = obj_cputime = 0.0;
-    obj_nmwalltime = obj_nmcputime = 0.0;
+    obj_walltime = obj_nmwalltime = 0.0;
+#if CMK_LB_CPUTIMER
+    obj_cputime = obj_nmcputime = 0.0;
+#endif
     for (i=0; i<osz; i++)  {
       if (statsData->objData[i].migratable) {
         obj_walltime += statsData->objData[i].wallTime;
+#if CMK_LB_CPUTIMER
         obj_cputime += statsData->objData[i].cpuTime;
+#endif
       }
       else {
         obj_nmwalltime += statsData->objData[i].wallTime;
+#if CMK_LB_CPUTIMER
         obj_nmcputime += statsData->objData[i].cpuTime;
+#endif
       }
     }
       // skip obj and comm data
@@ -392,19 +404,23 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
   // Get stats
   cmsg->pe_speed = 0;
   cmsg->total_walltime = 0.0;
-  cmsg->total_cputime = 0.0;
   cmsg->idletime = 0.0;
   cmsg->bg_walltime = 0.0;
+#if CMK_LB_CPUTIMER
+  cmsg->total_cputime = 0.0;
   cmsg->bg_cputime = 0.0;
+#endif
 
-  for (int pe=0; pe<statsData->count; pe++) {
+  for (int pe=0; pe<statsData->nprocs(); pe++) {
         struct ProcStats &procStat = statsData->procs[pe];
         cmsg->pe_speed += procStat.pe_speed;		// important
         cmsg->total_walltime += procStat.total_walltime;
-        cmsg->total_cputime += procStat.total_cputime;
         cmsg->idletime += procStat.idletime;
         cmsg->bg_walltime += procStat.bg_walltime;
+#if CMK_LB_CPUTIMER
+        cmsg->total_cputime += procStat.total_cputime;
         cmsg->bg_cputime += procStat.bg_cputime;
+#endif
   }
 /*
   cmsg->idletime = 0.0;
@@ -429,9 +445,11 @@ CLBStatsMsg * HybridBaseLB::buildCombinedLBStatsMessage(int atlevel)
 
   if (shrink) {
     cmsg->total_walltime = obj_walltime;
-    cmsg->total_cputime = obj_cputime;
     cmsg->bg_walltime += obj_nmwalltime;
+#if CMK_LB_CPUTIMER
+    cmsg->total_cputime = obj_cputime;
     cmsg->bg_cputime += obj_nmcputime;
+#endif
   }
 
   return cmsg;
@@ -468,14 +486,14 @@ void HybridBaseLB::Loadbalancing(int atlevel)
 
   if ((statsStrategy == SHRINK || statsStrategy == SHRINK_NULL) && atlevel == tree->numLevels()-1) {
     // no obj and comm data
-    LBVectorMigrateMsg* migrateMsg = VectorStrategy(statsData, nclients);
+    LBVectorMigrateMsg* migrateMsg = VectorStrategy(statsData);
     strat_end_time = CkWallTimer();
 
     // send to children 
     thisProxy.ReceiveVectorMigration(migrateMsg, nclients, lData->children);
   }
   else {
-    LBMigrateMsg* migrateMsg = Strategy(statsData, nclients);
+    LBMigrateMsg* migrateMsg = Strategy(statsData);
     strat_end_time = CkWallTimer();
 
     // send to children 
@@ -513,10 +531,10 @@ void HybridBaseLB::Loadbalancing(int atlevel)
   }
 }
 
-LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
+LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
-  work(stats, count);
+  work(stats);
 
   if (_lb_args.debug()>2)  {
     CkPrintf("Obj Map:\n");
@@ -524,7 +542,7 @@ LBMigrateMsg* HybridBaseLB::Strategy(LDStats* stats,int count)
     CkPrintf("\n");
   }
 
-  return createMigrateMsg(stats, count);
+  return createMigrateMsg(stats);
 #else
   return NULL;
 #endif
@@ -600,9 +618,9 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
 #endif
 }
 
-extern LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats, int count);
+extern LBVectorMigrateMsg * VectorStrategy(BaseLB::LDStats *stats);
 
-LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats,int count)
+LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats)
 {
 #if CMK_LBDB_ON
   LBVectorMigrateMsg* msg;
@@ -612,7 +630,7 @@ LBVectorMigrateMsg* HybridBaseLB::VectorStrategy(LDStats* stats,int count)
     msg->level = currentLevel;
   }
   else {
-    msg = ::VectorStrategy(stats, count);
+    msg = ::VectorStrategy(stats);
     msg->level = currentLevel;
 
     // translate pe number
@@ -743,13 +761,13 @@ void HybridBaseLB::ObjsMigrated(LDObjData *datas, int m, LDCommData *cdata, int 
 void HybridBaseLB::VectorDone(int atlevel)
 {
   LevelData *lData = levelData[atlevel];
-  if (_lb_args.debug()>1)
-    CkPrintf("[%d] VectorDone %d at %f.\n", CkMyPe(), lData->vector_expected, CkWallTimer());
   lData->vector_expected = -1;
   lData->vector_completed = 0;
     // update the migration expected
   lData->migrates_expected = vector_n_moves;
   vector_n_moves = 0;
+  if (_lb_args.debug()>1)
+    CkPrintf("[%d] VectorDone %d %d at %f.\n", CkMyPe(), lData->vector_expected, lData->migrates_expected, CkWallTimer());
 }
 
 // one processor is going to send "count" objects to this processor
@@ -843,7 +861,6 @@ void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atl
 
 void HybridBaseLB::StatsDone(int atlevel)
 {
-  int i;
 
   LevelData *lData = levelData[atlevel];
   lData->obj_expected = -1;
@@ -856,10 +873,10 @@ void HybridBaseLB::StatsDone(int atlevel)
   thisProxy[lData->parent].NotifyObjectMigrationDone(atlevel);
 }
 
-// called one a parent node
+// called on a parent node
 void HybridBaseLB::NotifyObjectMigrationDone(int fromlevel)
 {
-  int i;
+
   int atlevel = fromlevel + 1;
   LevelData *lData = levelData[atlevel];
 
@@ -1142,14 +1159,14 @@ void HybridBaseLB::ResumeClients(int balancing)
 #endif
 }
 
-void HybridBaseLB::work(LDStats* stats,int count)
+void HybridBaseLB::work(LDStats* stats)
 {
 #if CMK_LBDB_ON
   CkPrintf("[%d] HybridBaseLB::work called!\n", CkMyPe());
 #endif
 }
   
-LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
+LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats)
 {
 #if CMK_LBDB_ON
   int i;
@@ -1219,26 +1236,7 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(LDStats* stats,int count)
     DEBUGF(("[%d] obj (%d %d %d %d) migrate from %d to %d\n", CkMyPe(), item->obj.objID().id[0], item->obj.objID().id[1], item->obj.objID().id[2], item->obj.objID().id[3], item->from_pe, item->to_pe));
   }
 
-  if (_lb_args.printSummary()) {
-    double stime = CkWallTimer();
-#if 0
-    if (currentLevel == 1) {
-      LBInfo info(count);
-      info.getInfo(stats, count, 1);	// no comm cost
-      double mLoad, mCpuLoad, totalLoad;
-      info.getSummary(mLoad, mCpuLoad, totalLoad);
-      int nmsgs, nbytes;
-      stats->computeNonlocalComm(nmsgs, nbytes);
-      //CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, mCpuLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
-      thisProxy[0].reportLBQulity(mLoad, mCpuLoad, totalLoad, nmsgs, nbytes/1024);
-    }
-#endif
-    if (currentLevel == tree->numLevels()-2) {
-      double mem = (1.0*useMem())/1024;
-      thisProxy[0].reportLBMem(mem);
-    }
-    CkPrintf("[%d] Print Summary takes %f seconds. \n", CkMyPe(), CkWallTimer()-stime);
-  }   // end print summary
+  if (_lb_args.printSummary())  printSummary(stats, stats->nprocs());
 
   // translate relative pe number to its real number
   for(i=0; i < migrate_count; i++) {
@@ -1278,6 +1276,8 @@ LBMigrateMsg * HybridBaseLB::createMigrateMsg(CkVec<MigrateInfo *> &migrateInfo,
     migrateInfo.insertAtEnd(migrateMe);
   }
 
+  if (_lb_args.printSummary())  printSummary(NULL, count);
+
   int migrate_count=migrateInfo.length();
   // ignore avail_vector, etc for now
   //LBMigrateMsg * msg = new(migrate_count,count,count,0) LBMigrateMsg;
@@ -1303,6 +1303,29 @@ int HybridBaseLB::NeighborIndex(int pe, int atlevel)
       }
     }
     return peslot;
+}
+
+void HybridBaseLB::printSummary(LDStats *stats, int count)
+{
+  double stime = CkWallTimer();
+#if 1
+  if (currentLevel == 1 && stats!=NULL) {
+      LBInfo info(count);
+      info.getInfo(stats, count, 1);	// no comm cost
+      double mLoad, mCpuLoad, totalLoad;
+      info.getSummary(mLoad, mCpuLoad, totalLoad);
+      int nmsgs, nbytes;
+      stats->computeNonlocalComm(nmsgs, nbytes);
+      //CkPrintf("[%d] Load Summary: max (with comm): %f max (obj only): %f total: %f on %d processors at step %d useMem: %fKB nonlocal: %d %dKB.\n", CkMyPe(), maxLoad, mCpuLoad, totalLoad, count, step(), (1.0*useMem())/1024, nmsgs, nbytes/1024);
+      thisProxy[0].reportLBQulity(mLoad, mCpuLoad, totalLoad, nmsgs, nbytes/1024);
+  }
+#endif
+
+  if (currentLevel == tree->numLevels()-2) {
+      double mem = (1.0*useMem())/1024;
+      thisProxy[0].reportLBMem(mem);
+  }
+  CkPrintf("[%d] Print Summary takes %f seconds. \n", CkMyPe(), CkWallTimer()-stime);
 }
 
 // only called on PE 0
