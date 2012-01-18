@@ -777,6 +777,7 @@ void CkArray::pup(PUP::er &p){
 	p|locMgrID;
 	p|listeners;
 	p|listenerDataOffset;
+        p|stableLocations;
 	testPup(p,1234);
 	if(p.isUnpacking()){
 		thisProxy=thisgroup;
