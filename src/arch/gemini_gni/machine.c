@@ -2644,7 +2644,6 @@ double CmiCpuTimer(void) {
 int CmiBarrier()
 {
     int status;
-    return status;
 
 #if CMK_SMP
     /* make sure all ranks reach here, otherwise comm threads may reach barrier ignoring other ranks  */

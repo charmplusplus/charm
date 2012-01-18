@@ -1161,6 +1161,9 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_msgPool) = new MsgPool();
 
 	CmiNodeAllBarrier();
+	CmiBarrier();
+	CmiBarrier();
+	CmiBarrier();
 #if CMK_SMP_TRACE_COMMTHREAD
 	_TRACE_BEGIN_COMPUTATION();	
 #else
