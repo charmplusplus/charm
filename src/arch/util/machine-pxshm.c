@@ -440,6 +440,8 @@ void calculateNodeSizeAndRank(char **argv){
 	MACHSTATE(3,"calculateNodeSizeAndRank start");
 	//CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node (for non-smp case).Used by the shared memory communication layer");
 	CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node");
+        if (_Cmi_mynode == 0 && pxshmContext->nodesize > 1)
+         CmiPrintf("Charm++> pxshm enabled: %d cores per node\n", pxshmContext->nodesize);
 	MACHSTATE1(3,"calculateNodeSizeAndRank argintdesc %d",pxshmContext->nodesize);
 
 	pxshmContext->noderank = _Cmi_mynode % (pxshmContext->nodesize);
