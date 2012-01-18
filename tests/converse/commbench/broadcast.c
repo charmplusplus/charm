@@ -86,8 +86,7 @@ static void bcast_handler(void *msg)
   CpvAccess(numiter)++;
   if(CpvAccess(numiter)<sizes[idx].numiter) {
     if(CmiMyPe() == 0) {
-      CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
-      CmiFree(msg);
+      CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[idx].size, msg);
     }else
         CmiFree(msg);
 
@@ -200,8 +199,7 @@ static void bcast_central(void *msg)
       CpvAccess(currentPe) = 0;
       CmiSetHandler(msg, CpvAccess(bcast_reply));
       CpvAccess(starttime) = CmiWallTimer();
-      CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[CpvAccess(nextidx)].size, msg);
-      CmiFree(msg);
+      CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[CpvAccess(nextidx)].size, msg);
     } else {
       CpvAccess(numiter) = 0;
       CpvAccess(nextidx)++;
@@ -215,9 +213,8 @@ static void bcast_central(void *msg)
         CpvAccess(currentPe) = 0;
         CmiSetHandler(msg, CpvAccess(bcast_reply));
         CpvAccess(starttime) = CmiWallTimer();
-        CmiSyncBroadcastAll(CmiMsgHeaderSizeBytes+sizes[CpvAccess(nextidx)].size, 
+        CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes+sizes[CpvAccess(nextidx)].size, 
                             msg);
-        CmiFree(msg);
       }
     }
   }
