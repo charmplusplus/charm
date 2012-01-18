@@ -2575,7 +2575,7 @@ static int _is_global = 0;
 static struct timespec start_ns;
 
 inline int CmiTimerIsSynchronized() {
-    return 1;
+    return 0;
 }
 
 inline int CmiTimerAbsolute() {
