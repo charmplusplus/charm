@@ -117,7 +117,7 @@ void Main::exitTest(){
 	//do some final output
 	qsort(mainTimes, TEST_REPEAT_TIMES, sizeof(double), cmpDFunc);
 	double sum = 0.0;
-	for(int i=0; i<TEST_REPEAT_TIMES; i++) sum += mainTimes[i];
+	for(int i=0; i<TEST_REPEAT_TIMES-3; i++) sum += mainTimes[i];
 	int maxi = TEST_REPEAT_TIMES;
 	CkPrintf("Global timestep info: avg time: %.3f [%.3f, %.3f, %.3f] (us)\n", sum/(maxi-3), mainTimes[0], mainTimes[maxi/2], mainTimes[maxi-1]);
 	
@@ -188,7 +188,7 @@ void TestInstance::reportSts(){
 		//do sts output
 		qsort(allTimes, TEST_REPEAT_TIMES, sizeof(double), cmpDFunc);
 		double sum = 0.0;
-		for(int i=0; i<TEST_REPEAT_TIMES; i++) sum += allTimes[i];
+		for(int i=0; i<TEST_REPEAT_TIMES-3; i++) sum += allTimes[i];
 		
 		double avgResult = 0.0;
 		for(int i=0; i<TEST_REPEAT_TIMES; i++) avgResult += allResults[i];
