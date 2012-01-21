@@ -1,7 +1,10 @@
-OPTS=-I../ -O3 -g -lpthread
-CHARMC=$(HOME)/charm/net-linux-x86_64-smp-prod/bin/charmc $(OPTS)
-CHARMLIB=$(HOME)/charm/net-linux-x86_64-smp-prod/lib
-CHARMINC=$(HOME)/charm/net-linux-x86_64-smp-prod/include
+OPTS=-I../ -O0 -g -lpthread
+
+CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-dbg
+CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+CHARMLIB=$(CHARMDIR)/lib
+CHARMINC=$(CHARMDIR)/include
+
 all: module
 
 clean:
@@ -23,9 +26,9 @@ NodeHelper.decl.h: NodeHelper.ci
 	$(CHARMC)  NodeHelper.ci
 
 
-NodeHelper.o: NodeHelper.C NodeHelper.decl.h
+NodeHelper.o: NodeHelper.C NodeHelper.decl.h NodeHelper.h NodeHelperAPI.h
 	$(CHARMC) -c NodeHelper.C
 
 install: $(CHARMLIB)/libmoduleNodeHelper.a
-	cp NodeHelper.h NodeHelper.decl.h NodeHelper.def.h $(CHARMINC)/
+	cp NodeHelperAPI.h NodeHelper.h NodeHelper.decl.h NodeHelper.def.h $(CHARMINC)/
 

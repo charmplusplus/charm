@@ -1,8 +1,12 @@
 #NOTE: to compile the example, the NodeHelper.decl/def.h should exist
-OPTS=-I../ -O3 -g -lpthread
-CHARMC=$(HOME)/curcvs/charm/net-linux-x86_64-smp-production/bin/charmc $(OPTS)
-CHARMLIB=$(HOME)/curcvs/charm/net-linux-x86_64-smp-production/lib
-#CHARMLIB=$(HOME)/workspace/charm/net-linux-x86_64/lib
+USEROPTS=-O0 -g -lpthread
+CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-dbg/
+CHARMINC=$(CHARMDIR)/include
+OPTS=-I$(CHARMINC) $(USEROPTS)
+CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+CHARMLIB=$(CHARMDIR)/lib
+
+
 all: hello
 
 hello: hello.o

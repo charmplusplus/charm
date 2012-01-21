@@ -1,8 +1,7 @@
 #include "NodeHelper.h"
-#define THRESHOLD 100
-#define WPSTHRESHOLD 400
-#define SMP_SUM 1
 
+//=======Beginning of pthread version of scheduling which is used in non-SMP =======//
+#if !CMK_SMP
 NodeQueue Q;
 
 //vars local to spawned threads
@@ -13,7 +12,7 @@ __thread pthread_cond_t condition;
 
 //vars to the main flow (master thread)
 pthread_t * threads;
-pthread_mutex_t **allLocks;	
+pthread_mutex_t **allLocks;
 pthread_cond_t **allConds;
 
 //global barrier
@@ -23,290 +22,359 @@ pthread_barrier_t barr;
 //testing counter
 volatile int finishedCnt;
 
-void * threadWork(void * id){
-	long my_id =(long) id;
-	//printf("thread :%ld\n",my_id);
-	CmiSetCPUAffinity(my_id+1);
-	
-	pthread_mutex_init(&lock, NULL);
-	pthread_cond_init(&condition, NULL);
-	
-	allLocks[my_id] = &lock;
-	allConds[my_id] = &condition;
-	
-	while(1){
-		pthread_mutex_lock(&lock);
-		pthread_cond_wait(&condition,&lock);
-		pthread_mutex_unlock(&lock);
-		void * r;
-		Task * one;
-		CmiLock(Q->lock);
-		CqsDequeue(Q->nodeQ,&r);
-		CmiUnlock(Q->lock);
-		one=(Task *)r;
-	    
-		while(one) {
-			//printf("starttime:%lf,id:%ld,proc:%d\n",CmiWallTimer(),my_id,CkMyPe());
-			(one->fnPtr)(one->first,one->last,one->result,one->paramNum, one->param);
-			pthread_barrier_wait(&barr);
-			//one->setFlag();
-			//printf
-			//printf("endtime:%lf,id:%ld\n",CmiWallTimer(),my_id);
-			
-			//Testing
-			//AtomicIncrement(finishedCnt);
-			if(my_id==0)
-				finishedCnt=4;
-			//printf("finishedCnt = %d\n", finishedCnt);
-			
-			CmiLock((Q->lock));
-			CqsDequeue(Q->nodeQ,&r);
-			CmiUnlock((Q->lock));
-			one=(Task *)r;
-			
-	 	}	
-	}
-	
+void * threadWork(void * id) {
+    long my_id =(long) id;
+    //printf("thread :%ld\n",my_id);
+    CmiSetCPUAffinity(my_id+1);
+
+    pthread_mutex_init(&lock, NULL);
+    pthread_cond_init(&condition, NULL);
+
+    allLocks[my_id] = &lock;
+    allConds[my_id] = &condition;
+
+    while (1) {
+        pthread_mutex_lock(&lock);
+        pthread_cond_wait(&condition,&lock);
+        pthread_mutex_unlock(&lock);
+        void * r;
+        Task * one;
+        CmiLock(Q->lock);
+        CqsDequeue(Q->nodeQ,&r);
+        CmiUnlock(Q->lock);
+        one=(Task *)r;
+
+        while (one) {
+            //printf("starttime:%lf,id:%ld,proc:%d\n",CmiWallTimer(),my_id,CkMyPe());
+            (one->fnPtr)(one->first, one->last, (void *)(one->redBuf), one->paramNum, one->param);
+            pthread_barrier_wait(&barr);
+            //one->setFlag();
+            //printf
+            //printf("endtime:%lf,id:%ld\n",CmiWallTimer(),my_id);
+
+            //Testing
+            //AtomicIncrement(finishedCnt);
+            if (my_id==0)
+                finishedCnt=4;
+            //printf("finishedCnt = %d\n", finishedCnt);
+
+            CmiLock((Q->lock));
+            CqsDequeue(Q->nodeQ,&r);
+            CmiUnlock((Q->lock));
+            one=(Task *)r;
+
+        }
+    }
+
 }
 
-FuncNodeHelper::FuncNodeHelper(int mode_o,int nElements, int threadNum_o){
-	mode=mode_o;
-	threadNum=threadNum_o;
-	numHelpers = CkMyNodeSize();
-		traceRegisterUserEvent("assign work",20);	
-		traceRegisterUserEvent("finish signal",21);	
-#if CMK_SMP
-	if(mode==1){
-		counter=new int[nElements];
-		reqLock=new  pthread_mutex_t *[nElements];
-		for(int i=0;i<nElements;i++){
-			counter[i]=0;
-			reqLock[i] = CmiCreateLock();
-		}
-	}else if(mode==2){
-		helperArr = new CkChareID[numHelpers];
-		helperPtr = new FuncSingleHelper *[numHelpers];
-		int pestart = CkNodeFirst(CkMyNode());
-		for(int i=0; i<numHelpers; i++) {
-			CProxy_FuncSingleHelper::ckNew(i, thisgroup, &helperArr[i], pestart+i);    
-			helperPtr[i] = NULL;
-		}
-		for(int i=0; i<numHelpers; i++) {
-			CProxy_FuncSingleHelper helpProxy(helperArr[i]);
-			helpProxy.reportCreated();
-		}
-	}
-#endif
+void FuncNodeHelper::createThread() {
+    int threadNum = numThds;
+    pthread_attr_t attr;
+    finishedCnt=0;
+    pthread_barrier_init(&barr,NULL,threadNum);
+    allLocks = (pthread_mutex_t **)malloc(sizeof(void *)*threadNum);
+    allConds = (pthread_cond_t **)malloc(sizeof(void *)*threadNum);
+    memset(allLocks, 0, sizeof(void *)*threadNum);
+    memset(allConds, 0, sizeof(void *)*threadNum);
+
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_JOINABLE);
+    Q=(NodeQueue )malloc(sizeof(struct SimpleQueue));
+    Q->nodeQ=CqsCreate();
+    Q->lock=CmiCreateLock();
+    /*for(int i=0;i<threadNum;i++){
+    	//Q[i]=
+    	Q[i]=(NodeQueue)malloc(sizeof(struct SimpleQueue));
+    	Q[i]->nodeQ=CqsCreate();
+    	Q[i]->lock=CmiCreateLock();
+    }*/
+    threads=(pthread_t *)malloc(threadNum*sizeof(pthread_t));
+
+
+    //create queue;
+    for (int i=0; i<threadNum; i++)
+        pthread_create(&threads[i],&attr,threadWork,(void *)i);
 }
-void FuncNodeHelper::createThread(){
+#endif //end of !CMK_SMP (definitions for vars and functions used in non-SMP)
 
-		pthread_attr_t attr;
-		finishedCnt=0;
-		pthread_barrier_init(&barr,NULL,threadNum);	
-		allLocks = (pthread_mutex_t **)malloc(sizeof(void *)*threadNum);
-		allConds = (pthread_cond_t **)malloc(sizeof(void *)*threadNum);
-		memset(allLocks, 0, sizeof(void *)*threadNum);	
-		memset(allConds, 0, sizeof(void *)*threadNum);	
-		
-		pthread_attr_init(&attr);
-		pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_JOINABLE);
-		Q=(NodeQueue )malloc(sizeof(struct SimpleQueue));
-			Q->nodeQ=CqsCreate();
-			Q->lock=CmiCreateLock();
-		/*for(int i=0;i<threadNum;i++){
-			//Q[i]=
-			Q[i]=(NodeQueue)malloc(sizeof(struct SimpleQueue));
-			Q[i]->nodeQ=CqsCreate();
-			Q[i]->lock=CmiCreateLock();
-		}*/
-		threads=(pthread_t *)malloc(threadNum*sizeof(pthread_t));
-		
-        
-		//create queue;
-		for(int i=0;i<threadNum;i++)
-			pthread_create(&threads[i],&attr,threadWork,(void *)i);
-		
-}
-void FuncNodeHelper::send(Task * msg){
-	(msg->fnPtr)(msg->first,msg->last,msg->result,msg->paramNum, msg->param);
-	CmiLock(reqLock[msg->master]);
-	counter[msg->master]++;
-	CmiUnlock(reqLock[msg->master]);
-}
+//=======End of pthread version of static scheduling=======//
 
-/**
-"func": the function that executes one partition of the task.
-
-"wps": the number of executions needed on this func (it is there for the purpose of testing.)
-"time": the time to finish this func, it is a user defined argument for testing, wps is calculated based on time.
-(the above two parameters could be ignored for real usage)
-
-"t": the priority bit for the nodegroup msg, it is the time initiating the nodehelper.
-
-"master": the arrayIndex of the array element that initiate the nodehelper, or the pe index if invoked on a group object. The master element is used to identify the corresponding lock and counter to find out whether all the partitioned tasks have been finished.
-
-"chunck": the number of tasks that the nodehelper will distribute among the nodegroup. If it not available through the user argument, it will calculate like:
-if(chunck==0){
-         if(time!=0)
-             chunck=(double)(time/THRESHOLD)+0.5;
-         else
-             chunck=(double)(wps/WPSTHRESHOLD)+0.5;
-  }
-
-"reduction": whether it is an reduction operation, it will return the reduction result if it is.
-"type": the reduction type.
-
-"MODE" means whether the scheduling is static or dynamic. If static, then the partitioned tasks will be assigned to threads evenly within the SMP nodes. If dynamic, then the threads will execute the task if they are idle at the time of the loop job. 
- * 
- */
-int FuncNodeHelper::parallelizeFunc(HelperFn func, int wps,unsigned int t, int master,int chunck,int time,int paramNum, void * param, int reduction, int type){
-	int result=0;
-	if(chunck==0){
-		if(time!=0)
-			chunck=(double)(time/THRESHOLD)+0.5;
-		else
-			chunck=(double)(wps/WPSTHRESHOLD)+0.5;
-	}
-	int unit=((double)wps)/(double)chunck+0.5;
-	//printf("use %d chuncks for testcase %d\n",chunck,master);
-	Task **task=new Task *[chunck];
-    //for using nodequeue 
-#if CMK_SMP
-	if(mode==1){
-#if 0
-//Note: CsdScheduleNodePoll has not been in the charm yet, so currently disable it
-		CProxy_FuncNodeHelper fh(thisgroup);
-		double _start=CmiWallTimer();
-		for(int i=0; i<chunck; i++) {
-			int first=unit*i;
-			int last= (i==chunck-1)?wps:(i+1)*unit-1;
-			task[i]=new (8*sizeof(int)) Task(func,first,last,master, paramNum, param);
-			*((int *)CkPriorityPtr(task[i]))=t;
-			CkSetQueueing(task[i],CK_QUEUEING_IFIFO);
-			fh[CkMyNode()].send(task[i]);
-			//send(task[i]);
-		}
-		traceUserBracketEvent(20,_start,CmiWallTimer());
-		_start=CmiWallTimer();
-		while(counter[master]!=chunck)
-			CsdScheduleNodePoll();
-		//CkPrintf("counter:%d,master:%d\n",counter[master],master);
-		traceUserBracketEvent(21,_start,CmiWallTimer());
-		counter[master]=0;
-		/*for(int i=0;i<chunck;i++){
-			result+=task[i]->result;
-		}*/
-#endif
-	}
-	else if(mode==2){
-	// for not using node queue
-		for(int i=0; i<chunck; i++) {
-		  	int first=unit*i;
-          		int last= (i==chunck-1)?wps:(i+1)*unit-1;
-    	  		task[i] = new Task(func,first,last,0,master,paramNum, param);
-          		//task[i]->UnsetFlag();
-          		helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i],t);
-    		}
-   		for(int i=0; i<numHelpers; i++) {        
-        		if(i!=CkMyRank()){
-           			CProxy_FuncSingleHelper helpProxy(helperArr[i]);
-            			helpProxy.processWork();
-        		}
-    		}
-   		helperPtr[CkMyRank()]->processWork();
-  
-   		waitDone(task,chunck);
-   		result=0;
-		
-   		/*for(int i=0;i<chunck;i++){
-	     	result+=(task[i]->result);
-    		}*/
-	}
-#else
-	if(mode==0){
-		for(int i=0;i<chunck;i++)
-		{
-			int first = unit*i;
-			int last=(i==chunck-1)?wps:(i+1)*unit-1;
-			task[i]=new Task(func,first,last,0,master, paramNum, param);
-			CmiLock((Q->lock));
-			unsigned int t=(int)(CmiWallTimer()*1000);
-			CqsEnqueueGeneral((Q->nodeQ), (void *)task[i],CQS_QUEUEING_IFIFO,0,&t);
-			CmiUnlock((Q->lock));				
-		}
-		//signal the thread
-		for(int i=0;i<threadNum;i++){
-			pthread_mutex_lock(allLocks[i]);
-			pthread_cond_signal(allConds[i]);
-			pthread_mutex_unlock(allLocks[i]);
-		}
-		//wait for the result
-		waitThreadDone(chunck);
-		//for(int i=0;i<threadNum;i++)
-		//	pthread_join(threads[i],NULL);
-		/*result=0;
-		for(int i=0;i<chunck;i++)
-			result+=task[i]->result;
-		*/
-	}
-#endif	
- 	if(reduction==1)
-		result=reduce(task, type,chunck);
-	delete task;
-	return result;
-}
-
-//======================================================================
-// Functions regarding helpers that parallelize a single function on a
-// single node (like OpenMP)
-void FuncSingleHelper::processWork(){
-    	//CmiLock(reqLock);
-	void *r;
-    Task *one; // = (WorkReqEntry *)SimpleQueuePop(reqQ);
-	CmiLock(reqLock);	
-	CqsDequeue(reqQ,&r);
-	CmiUnlock(reqLock);
-	one=(Task *)r;
+FuncNodeHelper::FuncNodeHelper(int mode_,int numThds_):
+    mode(mode_), numThds(numThds_)
+{   
     
-    while(one) {
-        (one->fnPtr)(one->first,one->last,one->result, one->paramNum, one->param);
-        one->setFlag();
-		CmiLock(reqLock);
-		CqsDequeue(reqQ,&r);
-		CmiUnlock(reqLock);
-		one=(Task *)r;
-		
+    //CkPrintf("FuncNodeHelper created on node %d\n", CkMyNode());
+         
+    traceRegisterUserEvent("assign work",20);
+    traceRegisterUserEvent("finish signal",21);
+    
+#if CMK_SMP
+    if (mode==NODEHELPER_DYNAMIC || 
+        mode==NODEHELPER_STATIC) {
+        numHelpers = CkMyNodeSize();
+        helperArr = new CkChareID[numHelpers];
+        helperPtr = new FuncSingleHelper *[numHelpers];
+        int pestart = CkNodeFirst(CkMyNode());
+        for (int i=0; i<numHelpers; i++) {
+            CProxy_FuncSingleHelper::ckNew(thisgroup, &helperArr[i], pestart+i);
+            helperPtr[i] = NULL;
+        }
+        for (int i=0; i<numHelpers; i++) {
+            CProxy_FuncSingleHelper helpProxy(helperArr[i]);
+            helpProxy.reportCreated();
+        }
+    }
+#else
+    CmiAssert(mode==NODEHELPER_PTHREAD);
+    createThread();    
+#endif
+}
+
+/* Used for dynamic scheduling as it's a node-level msg */
+/* So this function will be executed on any PE of this node */
+void FuncNodeHelper::send(Task * msg) {
+    (msg->fnPtr)(msg->first,msg->last,(void *)(msg->redBuf),msg->paramNum, msg->param);
+    CmiNodeLock lock = helperPtr[msg->originRank]->reqLock;
+    CmiLock(lock);
+    helperPtr[msg->originRank]->counter++;
+    CmiUnlock(lock);
+}
+
+int FuncNodeHelper::MAX_CHUNKS = 64;
+
+#if CMK_TRACE_ENABLED
+#define TRACE_START(id) _start = CmiWallTimer()
+#define TRACE_BRACKET(id) traceUserBracketEvent(id,_start,CmiWallTimer())
+#else
+#define TRACE_START(id)
+#define TRACE_BRACKET(id)
+#endif
+
+void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param, 
+                                    int msgPriority, int numChunks, int lowerRange, int upperRange, 
+                                    void *redResult, REDUCTION_TYPE type) {
+                                        
+    double _start; //may be used for tracing
+    
+    if(numChunks > MAX_CHUNKS){ 
+        CkPrintf("NodeHelper[%d]: WARNING! chunk is set to MAX_CHUNKS=%d\n", CmiMyPe(), MAX_CHUNKS);
+        numChunks = MAX_CHUNKS;
+    }
+    
+    Task **task = helperPtr[CkMyRank()]->getTasksMem();
+
+    int first = lowerRange;
+    int unit = (upperRange-lowerRange+1)/numChunks;
+    int remainder = (upperRange-lowerRange+1)-unit*numChunks;
+    
+    /* "stride" determines the number of loop iterations to be done in each chunk
+     * for chunk indexed at 0 to remainder-1, stride is "unit+1";
+     * for chunk indexed at remainder to numChunks-1, stride is "unit"
+     */
+     int stride;
+    
+    //for using nodequeue
+#if CMK_SMP
+    if (mode==NODEHELPER_DYNAMIC) {
+        CProxy_FuncNodeHelper fh(thisgroup);
+
+        TRACE_START(20);        
+        stride = unit+1;
+        for (int i=0; i<remainder; i++, first+=stride) {          
+            task[i]->init(func, first, first+stride, CkMyRank(), paramNum, param);
+            *((int *)CkPriorityPtr(task[i]))=msgPriority;
+            CkSetQueueing(task[i],CK_QUEUEING_IFIFO);
+            fh[CkMyNode()].send(task[i]);
+        }
+        
+        stride = unit;
+        for(int i=remainder; i<numChunks; i++, first+=stride) {
+            task[i]->init(func, first, first+stride, CkMyRank(), paramNum, param);
+            *((int *)CkPriorityPtr(task[i]))=msgPriority;
+            CkSetQueueing(task[i],CK_QUEUEING_IFIFO);
+            fh[CkMyNode()].send(task[i]);
+        }
+        TRACE_BRACKET(20);
+        
+        TRACE_START(21);
+        FuncSingleHelper *fs = helperPtr[CmiMyRank()];
+        while (fs->counter!=numChunks)
+            CsdScheduleNodePoll();
+        //CkPrintf("counter:%d,master:%d\n",counter[master],master);
+        fs->counter = 0;
+        TRACE_BRACKET(21);        
+    } else if (mode==NODEHELPER_STATIC) {
+        TRACE_START(20);
+                
+        stride = unit+1;
+        for (int i=0; i<remainder; i++, first+=stride) {
+            task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+            helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
+        }
+        
+        stride = unit;
+        for (int i=remainder; i<numChunks; i++, first+=stride) {
+            task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+            helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
+        }
+        
+        CkEntryOptions entOpts;
+        entOpts.setPriority(msgPriority);
+
+        for (int i=0; i<numHelpers; i++) {
+            if (i!=CkMyRank()) {
+                CProxy_FuncSingleHelper helpProxy(helperArr[i]);                
+                helpProxy.processWork(0, &entOpts);
+            }
+        }
+        helperPtr[CkMyRank()]->processWork(0);
+        
+        TRACE_BRACKET(20);
+        
+        TRACE_START(21);
+        waitDone(task,numChunks);
+        TRACE_BRACKET(21);
+    }
+#else
+//non-SMP case
+/* Only works in the non-SMP case */
+    CmiAssert(mode == NODEHELPER_PTHREAD);
+    
+    TRACE_START(20);
+    stride = unit+1;
+    for (int i=0; i<remainder; i++, first+=stride) {
+        task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+        CmiLock((Q->lock));
+        unsigned int t=(int)(CmiWallTimer()*1000);
+        CqsEnqueueGeneral((Q->nodeQ), (void *)task[i],CQS_QUEUEING_IFIFO,0,&t);
+        CmiUnlock((Q->lock));
+    }
+    
+    stride = unit;
+    for (int i=remainder; i<numChunks; i++, first+=stride) {
+        task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+        CmiLock((Q->lock));
+        unsigned int t=(int)(CmiWallTimer()*1000);
+        CqsEnqueueGeneral((Q->nodeQ), (void *)task[i],CQS_QUEUEING_IFIFO,0,&t);
+        CmiUnlock((Q->lock));
     }    
+    //signal the thread
+    for (int i=0; i<threadNum; i++) {
+        pthread_mutex_lock(allLocks[i]);
+        pthread_cond_signal(allConds[i]);
+        pthread_mutex_unlock(allLocks[i]);
+    }
+    TRACE_BRACKET(20);
+    
+    TRACE_START(21);
+    //wait for the result
+    waitThreadDone(numChunks);
+    TRACE_BRACKET(21);
+#endif
+
+    if (type!=NODEHELPER_NONE)
+        reduce(task, redResult, type, numChunks);            
+    return;
 }
 
-void FuncSingleHelper::reportCreated(){
-    CProxy_FuncNodeHelper fh(nodeHelperID);
-    CProxy_FuncSingleHelper thisproxy(thishandle);
-    fh[CkMyNode()].ckLocalBranch()->oneHelperCreated(id, thishandle, this);
+#define COMPUTE_REDUCTION(T) {\
+    for(int i=0; i<numChunks; i++) {\
+     result += *((T *)(thisReq[i]->redBuf)); \
+     /*CkPrintf("Nodehelper Reduce: %d\n", result);*/ \
+    }\
 }
 
-void FuncNodeHelper::waitDone(Task ** thisReq,int chunck){
+void FuncNodeHelper::reduce(Task ** thisReq, void *redBuf, REDUCTION_TYPE type, int numChunks) {
+    switch(type){
+        case NODEHELPER_INT_SUM:
+        {
+            int result=0;
+            COMPUTE_REDUCTION(int)
+            *((int *)redBuf) = result;
+            break;
+        }
+        case NODEHELPER_FLOAT_SUM:
+        {
+            float result=0;
+            COMPUTE_REDUCTION(float)
+            *((float *)redBuf) = result;
+            break;
+        }
+        case NODEHELPER_DOUBLE_SUM:
+        {
+            double result=0;
+            COMPUTE_REDUCTION(double)
+            *((double *)redBuf) = result;
+            break;
+        }
+        default:
+        break;
+    }
+}
+
+#if CMK_SMP
+void FuncNodeHelper::waitDone(Task ** thisReq,int chunck) {
     int flag = 1,i;
-    while(1) {
-        for(i=0; i<chunck; i++) 
+    while (1) {
+        for (i=0; i<chunck; i++)
             flag = flag & thisReq[i]->isFlagSet();
-        if(flag) break;
+        if (flag) break;
         flag = 1;
     }
 }
-int FuncNodeHelper::reduce(Task ** thisReq, int type,int chunck){
-	int result=0,i;
-	if(type==SMP_SUM){
-		for(i=0;i<chunck;i++){
-			result+=thisReq[i]->result;
-		//CkPrintf("result:%d\n",result);
-		}
-	}
-	return result;
+#else
+void FuncNodeHelper::waitThreadDone(int chunck) {
+    while (finishedCnt!=chunck);
+    finishedCnt=0;
 }
-void FuncNodeHelper::waitThreadDone(int chunck){
-	while(finishedCnt!=chunck);
-	finishedCnt=0;
+#endif
+
+//======================================================================//
+// Functions regarding helpers that parallelize a single function on a  //
+// single node (like OpenMP)                                            // 
+//======================================================================//
+void FuncSingleHelper::processWork(int filler) {
+    Task *one = NULL; // = (WorkReqEntry *)SimpleQueuePop(reqQ);    
+    void *tmp;
+    
+    CmiLock(reqLock);
+    CqsDequeue(reqQ, &tmp);
+    CmiUnlock(reqLock);    
+
+    one = (Task *)tmp;
+    while (one) {
+        (one->fnPtr)(one->first,one->last,(void *)(one->redBuf), one->paramNum, one->param);
+        int *partial = (int *)(one->redBuf);
+        //CkPrintf("SingleHelper[%d]: partial=%d\n", CkMyRank(), *partial);
+        one->setFlag();
+        CmiLock(reqLock);
+        CqsDequeue(reqQ, &tmp);
+        one = (Task *)tmp;
+        CmiUnlock(reqLock);
+    }
+}
+
+void FuncSingleHelper::reportCreated() {
+    //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());
+    CProxy_FuncNodeHelper fh(nodeHelperID);
+    CProxy_FuncSingleHelper thisproxy(thishandle);
+    fh[CkMyNode()].ckLocalBranch()->oneHelperCreated(CkMyRank(), thishandle, this);
+}
+//======================================================================//
+//   End of functions related with FuncSingleHelper                     //
+//======================================================================//
+
+CProxy_FuncNodeHelper NodeHelper_Init(int mode,int numThds){
+    return CProxy_FuncNodeHelper::ckNew(mode, numThds);
+}
+
+void NodeHelper_Parallelize(CProxy_FuncNodeHelper nodeHelper, HelperFn func, 
+                        int paramNum, void * param, int msgPriority,
+                        int numChunks, int lowerRange, int upperRange, 
+                        void *redResult, REDUCTION_TYPE type)
+{
+    nodeHelper[CkMyNode()].ckLocalBranch()->parallelizeFunc(func, paramNum, param, msgPriority, numChunks, lowerRange, upperRange, redResult, type);
 }
 
 #include "NodeHelper.def.h"

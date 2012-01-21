@@ -131,6 +131,7 @@ struct fft : public CBase_fft {
     plan= new fft_plan[numThreads];
     for(int i=0; i < numThreads; i++,offset+=nPerThread)
       {
+	/* ??? should the dist be nPerThread as the fft is performed as 1d of length nPerThread?? */
 	plan[i] = fft_plan_many_dft(1, length, N/numChunks/numThreads, out+offset, length, 1, N/numThreads,
                             out+offset, length, 1, N/numThreads, FFTW_FORWARD, FFTW_ESTIMATE);
       }

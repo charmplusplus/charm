@@ -2,132 +2,164 @@
 #define _NODEHELPER_H
 
 #include <pthread.h>
+#include <assert.h>
 
 #include "charm++.h"
-#include "NodeHelper.decl.h"
-#include <assert.h>
+#include "NodeHelperAPI.h"
 #include "queueing.h"
-#include <converse.h>
-#define AtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
-#define SMP_SUM 1
-typedef void (*HelperFn)(int first,int last, int &result, int paramNum, void * param_o);
 
-typedef struct SimpleQueue
-{
-	Queue nodeQ;
-	pthread_mutex_t * lock;
+#define AtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
+
+
+typedef struct SimpleQueue {
+    Queue nodeQ;
+    pthread_mutex_t * lock;
 }* NodeQueue;
-class Task:public CMessage_Task{
+
+class Task:public CMessage_Task {
 public:
-	HelperFn fnPtr;
-	int first;
-	int last;
-	int result;
-	int master;
-	int flag;
-	int reduction;
-	int paramNum;
-	void * param;
-	Task(HelperFn fn,int first_o,int last_o,int master_o){
-		fnPtr=fn;
-		first=first_o;
-		last=last_o;
-		master=master_o;
-	}
-	
-	Task(HelperFn fn,int first_o,int last_o,int flag_o,int master_o){
-		fnPtr=fn;
-		first=first_o;
-		last=last_o;
-		flag=flag_o;
-		master=master_o;
-	}
-	Task(HelperFn fn,int first_o,int last_o,int master_o, int paramNum_o, void * param_o){
-		fnPtr=fn;
-		first=first_o;
-		last=last_o;
-		master=master_o;
-		//reduction=reduction_o;
-		paramNum=paramNum_o;
-		param=param_o;
-	}
-	Task(HelperFn fn,int first_o,int last_o,int flag_o,int master_o, int paramNum_o, void * param_o){
-		fnPtr=fn;
-		first=first_o;
-		last=last_o;
-		master=master_o;
-		flag=flag_o;
-		//reduction=reduction_o;
-		paramNum=paramNum_o;
-		param=param_o;
-	}
-	void setFlag(){
-		flag=1;
-	}
-	int isFlagSet(){
-		return flag;
-	}
+    HelperFn fnPtr;
+    int first;
+    int last;
+    int originRank;
+    int flag;    
+    int paramNum;
+    void *param;
+    
+    //limitation: only allow single variable reduction!!!
+    char redBuf[sizeof(double)];
+    
+    //make sure 32-byte aligned so that each task doesn't cross cache lines
+    //char padding[32-(sizeof(int)*7+sizeof(void *)*2)%32];
+    
+    Task():fnPtr(NULL), param(NULL), paramNum(0) {}
+
+    void init(HelperFn fn,int first_,int last_,int rank){
+        fnPtr = fn;
+        first = first_;
+        last = last_;
+        originRank = rank;
+    }
+
+    void init(HelperFn fn,int first_,int last_,int flag_,int rank) {
+        init(fn, first_, last_, rank);
+        flag=flag_;
+    }
+    
+    void init(HelperFn fn,int first_,int last_,int rank, int paramNum_, void *param_) {
+        init(fn, first_, last_, rank); 
+        paramNum=paramNum_;
+        param=param_;
+    }
+    
+    void init(HelperFn fn,int first_,int last_,int flag_,int rank, int paramNum_, void *param_) {
+        init(fn, first_, last_, rank, paramNum_, param_);
+        flag=flag_;
+    }
+    
+    void setFlag() {
+        flag=1;
+    }
+    int isFlagSet() {
+        return flag;
+    }
 };
 
 
+/* FuncNodeHelper is a nodegroup object */
+class FuncSingleHelper;
 
-class FuncSingleHelper: public CBase_FuncSingleHelper{
+class FuncNodeHelper : public CBase_FuncNodeHelper {
+public:
+    static int MAX_CHUNKS;
+
+public:
+    int numHelpers;
+    int mode; /* determine whether using dynamic or static scheduling */
+    
+    int numThds; /* only used for pthread version in non-SMP case, the expected #pthreads to be created */
+    
+    CkChareID *helperArr; /* chare ids to the FuncSingleHelpers it manages */
+    FuncSingleHelper **helperPtr; /* ptrs to the FuncSingleHelpers it manages */
+    
+    ~FuncNodeHelper() {
+        delete [] helperArr;
+        delete [] helperPtr;        
+    }
+
+    void oneHelperCreated(int hid, CkChareID cid, FuncSingleHelper* cptr) {
+        helperArr[hid] = cid;
+        helperPtr[hid] = cptr;
+    }
+
+#if CMK_SMP
+    void  waitDone(Task ** thisReq,int chunck);
+#else	
+    void waitThreadDone(int chunck);
+    void createThread();
+#endif
+	
+	/* mode_: PTHREAD only available in non-SMP, while STATIC/DYNAMIC are available in SMP */
+	/* numThds: the expected number of pthreads to be spawned */
+    FuncNodeHelper(int mode_, int numThds_);
+    
+    void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
+                        int paramNum, void * param, /* the input parameters for the above func */
+                        int msgPriority, /* the priority of the intra-node msg, and node-level msg */
+                        int numChunks, /* number of chunks to be partitioned */
+                        int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */                        
+                        void *redResult=NULL, REDUCTION_TYPE type=NODEHELPER_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                        );
+    void send(Task *);
+    void reduce(Task **thisReq, void *redBuf, REDUCTION_TYPE type, int numChunks);
+
+};
+
+/* FuncSingleHelper is a chare located on every core of a node */
+class FuncSingleHelper: public CBase_FuncSingleHelper {
+	friend class FuncNodeHelper;
 private:
     CkGroupID nodeHelperID;
-    int id;
-    Queue reqQ;
-    pthread_mutex_t* reqLock;
+    Queue reqQ; /* The queue may be simplified for better performance */
+    
+    /* The following two vars are for usage of detecting completion in dynamic scheduling */
+    CmiNodeLock reqLock;
+    int counter; 
+    
+    /* To reuse such Task memory as each SingleHelper (i.e. a PE) will only
+     * process one node-level parallelization at a time */
+    Task **tasks; /* Note the Task type is a message */
 
 public:
-    FuncSingleHelper(int myid, CkGroupID nid):id(myid),nodeHelperID(nid){
- 	//CkPrintf("Single helper %d is created on rank %d\n", myid, CkMyRank());
+    FuncSingleHelper(CkGroupID nid):nodeHelperID(nid) {
         reqQ = CqsCreate();
+
         reqLock = CmiCreateLock();
+        counter = 0;
+        
+        tasks = new Task *[FuncNodeHelper::MAX_CHUNKS];
+        for(int i=0; i<FuncNodeHelper::MAX_CHUNKS; i++) tasks[i] = new (8*sizeof(int)) Task();
     }
 
-    ~FuncSingleHelper(){}
-    FuncSingleHelper(CkMigrateMessage *m){}
-    void enqueueWork(Task *one,unsigned int t){
-        //CmiLock(reqLock);
-		//unsigned int t;
-		//t=(int)(CmiWallTimer()*1000);
-		CmiLock(reqLock);
-		CqsEnqueueGeneral(reqQ, (void *)one,CQS_QUEUEING_IFIFO,0,&t);
-        //SimpleQueuePush(reqQ, (char *)one);
-        	CmiUnlock(reqLock);
+    ~FuncSingleHelper() {
+        for(int i=0; i<FuncNodeHelper::MAX_CHUNKS; i++) delete tasks[i];
+        delete [] tasks;        
+		CmiDestroyLock(reqLock);
     }
-    void processWork();
+    
+    FuncSingleHelper(CkMigrateMessage *m) {}
+    
+    Task **getTasksMem() { return tasks; }
+    
+    void enqueueWork(Task *one) {
+		unsigned int t = 0; /* default priority */
+        CmiLock(reqLock);
+        CqsEnqueueGeneral(reqQ, (void *)one,CQS_QUEUEING_IFIFO,0,&t);
+        //SimpleQueuePush(reqQ, (char *)one);
+        CmiUnlock(reqLock);
+    }
+    void processWork(int filler); /* filler is here in order to use CkEntryOptions for setting msg priority */
     void reportCreated();
 };
-class FuncNodeHelper : public CBase_FuncNodeHelper{  
 
-public:
-	int numHelpers;
-	int mode;
-	int * counter;
-	int threadNum;
-	pthread_mutex_t** reqLock;
-	CkChareID *helperArr;
-    	FuncSingleHelper **helperPtr;
-	~FuncNodeHelper(){
-        	delete [] helperArr;
-        	delete [] helperPtr;
-    	}
-    
-    	void oneHelperCreated(int hid, CkChareID cid, FuncSingleHelper* cptr){
-        	helperArr[hid] = cid;
-        	helperPtr[hid] = cptr;
-    	}
-    	
-	void  waitDone(Task ** thisReq,int chunck);
-	void waitThreadDone(int chunck);
-	void createThread();
-	FuncNodeHelper(int mode,int elements, int threadNum);
-	int parallelizeFunc(HelperFn func, int wps,unsigned int t, int master,int chunck,int time, int paramNum, void * param, int reduction, int type);
-	void send(Task *);
-	int reduce(Task ** thisReq, int type, int chunck);
-
-};
-
-	
 #endif
