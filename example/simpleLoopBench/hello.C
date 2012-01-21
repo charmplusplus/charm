@@ -86,8 +86,9 @@ Main::Main(CkArgMsg* m) {
 		endtime = CmiWallTimer();
 		CkPrintf("Calibration %d: the loop takes %.3f us with result %d\n", i+1,  (endtime-starttime)*1e6, result);
 	}
+	int results[5];
 	starttime = CmiWallTimer();
-	for(int i=0; i<5; i++) work(0, loopTimes, &result);
+	for(int i=0; i<5; i++) work(0, loopTimes, results+i);
 	endtime = CmiWallTimer();
 	double avgtime = (endtime-starttime)*1e6/5; //in the unit of us
 	CkPrintf("Calibration: avg time %.3f us of 5 consecutive runs, so a 100us-loop will iterate %d times\n", avgtime, (int)(loopTimes*100.0/avgtime));
