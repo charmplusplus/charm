@@ -12,6 +12,8 @@ private:
 	double timestamp;
 	int mainStep; //the global counter of timesteps
 	double *mainTimes; //record each timestep from test initiation to test finish (i.e. from the point of main)
+    
+    int curTestMode; //0: nodeHelper; 1: OpenMP
 
 public:
     Main(CkArgMsg* m) ;
@@ -19,7 +21,6 @@ public:
 	void exitTest();
     void doTests(CkQdMsg *msg);
     void processCommandLine(int argc,char ** argv);
-
 };
 
 class TestInstance : public CBase_TestInstance {
@@ -35,7 +36,7 @@ public:
 		delete [] allResults;
 	}
     TestInstance(CkMigrateMessage *m) {}
-    void doTest(int curstep);
+    void doTest(int curstep, int curTestMode);
 	void reportSts();
 };
 

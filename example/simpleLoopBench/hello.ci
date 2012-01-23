@@ -16,7 +16,7 @@ mainmodule hello {
 
   array [1D] TestInstance{
     entry TestInstance();
-    entry void doTest(int curstep);
+    entry void doTest(int curstep, int curTestMode);
 	entry void reportSts();
    };
 

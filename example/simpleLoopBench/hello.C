@@ -5,6 +5,8 @@
 
 #include "hello.decl.h"
 
+#include <omp.h>
+
 #define TEST_REPEAT_TIMES 10
 
 CProxy_Main mainProxy;
@@ -32,6 +34,18 @@ void work(int start, int end, void *result) {
     }
     *(int *)result = tmp;
 }
+
+int openMPWork(int start, int end) {
+    int result = 0;
+    
+    #pragma omp parallel for reduction (+:result)
+    for(int i=start; i<=end; i++) {
+        result += (int)(sqrt(1+cos(i*1.57)));
+    }
+    
+    return result;
+}
+
 extern "C" void doCalc(int first, int last, void *result, int paramNum, void * param) {    
     //double tstart = CmiWallTimer();
     
@@ -53,6 +67,8 @@ Main::Main(CkArgMsg* m) {
     mainStep = 0;
 	numElemFinished = 0;
 	
+    curTestMode = 0;
+    
     //process command line
     if (m->argc >1 ){
         processCommandLine(m->argc,m->argv);
@@ -62,6 +78,8 @@ Main::Main(CkArgMsg* m) {
 	}
     delete m;
 	
+    omp_set_num_threads(numChunks);    
+    
 	mainTimes = new double[loopTimes];
 	memset(mainTimes, 0, sizeof(double)*loopTimes);
 	
@@ -110,6 +128,7 @@ void Main::done(void) {
             return;
         }
     }	
+    
 	//do some final output
 	allTestsProxy[0].reportSts();
 };
@@ -122,17 +141,40 @@ void Main::exitTest(){
 	int maxi = TEST_REPEAT_TIMES;
 	CkPrintf("Global timestep info: avg time: %.3f [%.3f, %.3f, %.3f] (us)\n", sum/(maxi-3), mainTimes[0], mainTimes[maxi/2], mainTimes[maxi-1]);
 	
-	CkPrintf("All done\n");
-	CkExit();
+    if(curTestMode == 0){
+	    CkPrintf("Charm++ NodeHelper Test done\n\n");
+        curTestMode++;
+        mainStep = 0;
+        numElemFinished = 0;
+        doTests(NULL);
+    }else if(curTestMode == 1){        
+        CkPrintf("OpenMP Test done\n");
+        CkExit();
+    }
 }
 
 void Main::doTests(CkQdMsg *msg) {
     delete msg;
     
+    if(mainStep == 0){
+        if(curTestMode == 0){
+            CkPrintf("===Start NodeHelper Test===\n");
+        }else if(curTestMode == 1){
+            int numthds = 0;
+            int openmpid;
+            #pragma omp parallel private(openmpid)
+            {
+                openmpid = omp_get_thread_num();
+                if(openmpid == 0) numthds = omp_get_num_threads();
+            }
+            CkPrintf("===Start OpenMP Test with %d threads===\n", numthds);
+        }
+    }
+    
 	timestamp = CmiWallTimer(); //record the start time of the whole test
     for (int i=0; i<totalElems; i++) {
-        allTestsProxy[i].doTest(mainStep);
-        //allTestsProxy[8].doTest(mainStep);
+        allTestsProxy[i].doTest(mainStep, curTestMode);
+        //allTestsProxy[8].doTest(mainStep, curTestMode);
     }
 };
 
@@ -171,13 +213,19 @@ TestInstance::TestInstance() {
 	memset(allResults, 0, sizeof(int)*loopTimes);
 }
 
-void TestInstance::doTest(int curstep) {
+void TestInstance::doTest(int curstep, int curTestMode) {
     //printf("On proc %d node %d, begin parallel execution for test case %d %dth iteration\n", CkMyPe(), CkMyNode(), thisIndex,flag);
 	hasTest = 1;
-    double timerec = CmiWallTimer();
 	int result;
 	
-	NodeHelper_Parallelize(nodeHelperProxy, doCalc, 0, NULL, 0, numChunks, 0, loopTimes-1, &result, NODEHELPER_INT_SUM);
+    double timerec = CmiWallTimer();
+    
+    if(curTestMode == 0){
+	    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 0, NULL, 0, numChunks, 0, loopTimes-1, &result, NODEHELPER_INT_SUM);
+    }else if(curTestMode == 1){
+        result = openMPWork(0, loopTimes-1);
+    }
+    
     allTimes[curstep]=(CmiWallTimer()-timerec)*1e6;
 	allResults[curstep] = result;
 	
@@ -196,8 +244,8 @@ void TestInstance::reportSts(){
 		avgResult /= TEST_REPEAT_TIMES;
 		
 		int maxi = TEST_REPEAT_TIMES;
-		CkPrintf("Test instance[%d]: result:%.3f, avg time: %.3f [%.3f, %.3f, %.3f] (us)\n",thisIndex, avgResult, sum/(maxi-3), allTimes[0], allTimes[maxi/2], allTimes[maxi-1]);
-	}
+		CkPrintf("Test instance[%d]: result:%.3f, avg time: %.3f [%.3f, %.3f, %.3f] (us)\n",thisIndex, avgResult, sum/(maxi-3), allTimes[0], allTimes[maxi/2], allTimes[maxi-1]);	    
+    }
 	
 	if(thisIndex == totalElems-1) mainProxy.exitTest();
 	else thisProxy[thisIndex+1].reportSts();
