@@ -182,7 +182,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         TRACE_START(20);        
         stride = unit+1;
         for (int i=0; i<remainder; i++, first+=stride) {          
-            task[i]->init(func, first, first+stride, CkMyRank(), paramNum, param);
+            task[i]->init(func, first, first+stride-1, CkMyRank(), paramNum, param);
             *((int *)CkPriorityPtr(task[i]))=msgPriority;
             CkSetQueueing(task[i],CK_QUEUEING_IFIFO);
             fh[CkMyNode()].send(task[i]);
@@ -190,7 +190,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         
         stride = unit;
         for(int i=remainder; i<numChunks; i++, first+=stride) {
-            task[i]->init(func, first, first+stride, CkMyRank(), paramNum, param);
+            task[i]->init(func, first, first+stride-1, CkMyRank(), paramNum, param);
             *((int *)CkPriorityPtr(task[i]))=msgPriority;
             CkSetQueueing(task[i],CK_QUEUEING_IFIFO);
             fh[CkMyNode()].send(task[i]);
@@ -209,13 +209,13 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
                 
         stride = unit+1;
         for (int i=0; i<remainder; i++, first+=stride) {
-            task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+            task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
             helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
         }
         
         stride = unit;
         for (int i=remainder; i<numChunks; i++, first+=stride) {
-            task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+            task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
             helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
         }
         
@@ -244,7 +244,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
     TRACE_START(20);
     stride = unit+1;
     for (int i=0; i<remainder; i++, first+=stride) {
-        task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+        task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
         CmiLock((Q->lock));
         unsigned int t=(int)(CmiWallTimer()*1000);
         CqsEnqueueGeneral((Q->nodeQ), (void *)task[i],CQS_QUEUEING_IFIFO,0,&t);
@@ -253,7 +253,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
     
     stride = unit;
     for (int i=remainder; i<numChunks; i++, first+=stride) {
-        task[i]->init(func, first, first+stride, 0, CkMyRank(),paramNum, param);            
+        task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
         CmiLock((Q->lock));
         unsigned int t=(int)(CmiWallTimer()*1000);
         CqsEnqueueGeneral((Q->nodeQ), (void *)task[i],CQS_QUEUEING_IFIFO,0,&t);
