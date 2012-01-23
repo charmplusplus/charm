@@ -11,6 +11,7 @@ mainmodule fft1d {
   };
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void initDone(CkQdMsg *m);
     entry void startFFT();
     entry void doneFFT();
 

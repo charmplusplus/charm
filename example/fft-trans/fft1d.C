@@ -2,7 +2,7 @@
 #include <fftw3.h>
 #include <limits>
 #include "fileio.h"
-#include "NodeHelper.h"
+#include "NodeHelperAPI.h"
 
 #define TWOPI 6.283185307179586
 
@@ -12,14 +12,15 @@
 /*readonly*/ uint64_t N;
 static CmiNodeLock fft_plan_lock;
 #include "fftmacro.h"
+
 CProxy_FuncNodeHelper nodeHelperProxy;
 /** called by initnode once per node to support node level locking for
     fftw plan create/destroy operations */
-#define MODE 1
+#define NODEHELPER_MODE NODEHELPER_STATIC 
 
-extern "C" void doCalc(int first,int last, int & result, int paramNum, void * param)
+extern "C" void doCalc(int first,int last, void *result, int paramNum, void * param)
 {
-  result=first;
+  //result=first;
   fft_execute(((fft_plan*)param)[first]);
 }
 
@@ -77,11 +78,18 @@ struct Main : public CBase_Main {
 
     // Construct an array of fft chares to do the calculation
     fftProxy = CProxy_fft::ckNew(numChunks);
+
     // Construct a nodehelper to do the calculation
-    nodeHelperProxy = CProxy_FuncNodeHelper::ckNew(MODE, numChunks, numThreads);
+    nodeHelperProxy = NodeHelper_Init(NODEHELPER_MODE, numThreads);
     
+    CkStartQD(CkIndex_Main::initDone((CkQdMsg *)0), &thishandle);
   }
 
+  void initDone(CkQdMsg *msg){
+    delete msg;
+    startFFT();
+  }
+  
   void startFFT() {
     start = CkWallTimer();
     // Broadcast the 'go' signal to the fft chare array
@@ -149,7 +157,7 @@ struct fft : public CBase_fft {
     }
 
     // Reduction to the mainchare to signal that initialization is complete
-    contribute(CkCallback(CkIndex_Main::startFFT(), mainProxy));
+    //contribute(CkCallback(CkIndex_Main::startFFT(), mainProxy));
   }
 
   void sendTranspose(fft_complex *src_buf) {
@@ -208,8 +216,9 @@ struct fft : public CBase_fft {
   void fftHelperLaunch()
   {
     //kick off thread computation
-    FuncNodeHelper *nth = nodeHelperProxy[CkMyNode()].ckLocalBranch();
-    nth->parallelizeFunc(doCalc, numThreads, numThreads, thisIndex, numThreads, 1, 1, plan, 0, NULL);
+    //FuncNodeHelper *nth = nodeHelperProxy[CkMyNode()].ckLocalBranch();
+    //nth->parallelizeFunc(doCalc, numThreads, numThreads, thisIndex, numThreads, 1, 1, plan, 0, NULL);
+    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 0, NULL, 0, numChunks, 0, numChunks-1);
     
   }
 

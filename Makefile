@@ -1,11 +1,12 @@
-OPTS=-I../ -O0 -g -lpthread
+OPTS=-I../ -O3 -g -lpthread
 
-CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-dbg
+CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-opt
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 CHARMLIB=$(CHARMDIR)/lib
 CHARMINC=$(CHARMDIR)/include
 
 all: module
+	make install
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello charmrun *.log *.sum *.sts

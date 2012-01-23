@@ -1,5 +1,11 @@
-OPTS	= -O3
-CHARMC	= $(HOME)/charm/net-linux-x86_64-smp-prod/bin/charmc $(OPTS)
+USEROPTS	= -O3
+CHARMDIR = $(HOME)/curcvs/charm/net-linux-x86_64-smp-opt/
+
+CHARMINC = $(CHARMDIR)/include
+CHARMLIB = $(CHARMDIR)/lib
+OPTS = -I$(CHARMINC) $(USEROPTS)
+CHARMC	= $(CHARMDIR)bin/charmc $(OPTS)
+
 CC=mpicxx
 LIBS = -lfftw3 -lm
 SLIBS = -lfftw3f -lm
