@@ -8,7 +8,7 @@
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int numChunks;
-/*readonly*/ int numThreads;
+/*readonly*/ int numTasks;
 /*readonly*/ uint64_t N;
 static CmiNodeLock fft_plan_lock;
 #include "fftmacro.h"
@@ -44,9 +44,9 @@ struct Main : public CBase_Main {
     numChunks = atoi(m->argv[1]); //#1D partitions
     N = atol(m->argv[2]); //matrix size
     if(m->argc>=4)
-      numThreads = atol(m->argv[3]); //the number of tasks that 1D partition is splitted into
+      numTasks = atol(m->argv[3]); //the number of tasks that 1D partition is splitted into
     else
-      numThreads = CmiMyNodeSize();  //default to 1/core
+      numTasks = CmiMyNodeSize();  //default to 1/core
     delete m;
     
     mainProxy = thisProxy;
@@ -81,7 +81,7 @@ struct Main : public CBase_Main {
     fftProxy = CProxy_fft::ckNew(numChunks);
 
     // Construct a nodehelper to do the calculation
-    nodeHelperProxy = NodeHelper_Init(NODEHELPER_MODE, numThreads);
+    nodeHelperProxy = NodeHelper_Init(NODEHELPER_MODE, numTasks);
     
     CkStartQD(CkIndex_Main::initDone((CkQdMsg *)0), &thishandle);
   }
@@ -100,8 +100,8 @@ struct Main : public CBase_Main {
   void doneFFT() {
     double time = CkWallTimer() - start;
     double gflops = 5 * (double)N*N * log2((double)N*N) / (time * 1000000000);
-    CkPrintf("chares: %d\ncores: %d\nThreads: %d\nsize: %ld\ntime: %f sec\nrate: %f GFlop/s\n",
-             numChunks, CkNumPes(), numThreads, N*N, time, gflops);
+    CkPrintf("chares: %d\ncores: %d\nTasks: %d\nsize: %ld\ntime: %f sec\nrate: %f GFlop/s\n",
+             numChunks, CkNumPes(), numTasks, N*N, time, gflops);
 
     fftProxy.initValidation();
   }
@@ -133,22 +133,37 @@ struct fft : public CBase_fft {
 
     in = (fft_complex*) fft_malloc(sizeof(fft_complex) * n);
     out = (fft_complex*) fft_malloc(sizeof(fft_complex) * n);
-    nPerThread= n/numThreads;
-    CmiAssert(N/numChunks/numThreads >= 1);
-    int length[] = {nPerThread};
+    nPerThread= n/numTasks;
+    
+    int length[] = {N};
+    
+    /** Basically, we want to parallelize the following fftw function call
+     * which is to do fft on each row of a 2D array with #rows=N/numChunks, #cols=N;
+     * 1. create a plan: singlePlan = fft_plan_many_dft(1, len, N/numChunks, out, len,
+     *                                                  1, N, out, len, 1,
+     *                                                  N, FFTW_FORWARD, FFTW_ESTIMATE)
+     * where len is defined as int len[]={N}
+     * 2. execute the plan: fft_execute(singlePlan).
+     * 
+     * It's not a loop, we transformed it into a loop with N/numTasks plans so that 
+     * each task execute one plan. Each plan has N/numChunks/numTasks rows for fftw
+     * processing.
+     */
+    
     CmiLock(fft_plan_lock);
     size_t offset=0;
-    plan= new fft_plan[numThreads];
-    for(int i=0; i < numThreads; i++,offset+=nPerThread)
+    plan= new fft_plan[numTasks];
+    for(int i=0; i < numTasks; i++,offset+=nPerThread)
       {
 	/* ??? should the dist be nPerThread as the fft is performed as 1d of length nPerThread?? */
-	//plan[i] = fft_plan_many_dft(1, length, N/numChunks/numThreads, out+offset, length, 1, N/numThreads,
-    //                        out+offset, length, 1, N/numThreads, FFTW_FORWARD, FFTW_ESTIMATE);
+	//plan[i] = fft_plan_many_dft(1, length, N/numChunks/numTasks, out+offset, length, 1, N/numTasks,
+    //                        out+offset, length, 1, N/numTasks, FFTW_FORWARD, FFTW_ESTIMATE);
     
-    plan[i] = fft_plan_many_dft(1, length, N/numChunks/numThreads, out+offset, length, 1, nPerThread,
-                            out+offset, length, 1, nPerThread, FFTW_FORWARD, FFTW_ESTIMATE);                        
+    plan[i] = fft_plan_many_dft(1, length, N/numChunks/numTasks, out+offset, length, 1, N,
+                            out+offset, length, 1, N, FFTW_FORWARD, FFTW_ESTIMATE);                        
       }
     CmiUnlock(fft_plan_lock);
+    
     srand48(thisIndex);
     for(int i = 0; i < n; i++) {
       in[i][0] = drand48();
@@ -222,25 +237,27 @@ struct fft : public CBase_fft {
   {
     //kick off thread computation
     //FuncNodeHelper *nth = nodeHelperProxy[CkMyNode()].ckLocalBranch();
-    //nth->parallelizeFunc(doCalc, numThreads, numThreads, thisIndex, numThreads, 1, 1, plan, 0, NULL);
-    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 1, plan, 0, numThreads, 0, numThreads-1);    
+    //nth->parallelizeFunc(doCalc, numTasks, numTasks, thisIndex, numTasks, 1, 1, plan, 0, NULL);
+    double ffttime = CmiWallTimer();
+    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 1, plan, 0, numTasks, 0, numTasks-1);    
+    CkPrintf("FFT time: %.3f (ms)\n", (CmiWallTimer()-ffttime)*1e3);
   }
 
   void initValidation() {
     memcpy(in, out, sizeof(fft_complex) * n);
 
     validating = true;
-    int length[] = {nPerThread};
+    int length[] = {N};
     CmiLock(fft_plan_lock);
     size_t offset=0;
-    plan= new fft_plan[numThreads];
-    for(int i=0; i < numThreads; i++,offset+=nPerThread)
+    plan= new fft_plan[numTasks];
+    for(int i=0; i < numTasks; i++,offset+=nPerThread)
       {
 	//	fft_destroy_plan(plan[i]);
-	//plan[i] = fft_plan_many_dft(1, length, N/numChunks/numThreads, out+offset, length, 1, N/numThreads,
-    //                        out+offset, length, 1, N/numThreads, FFTW_BACKWARD, FFTW_ESTIMATE);
-    plan[i] = fft_plan_many_dft(1, length, N/numChunks/numThreads, out+offset, length, 1, nPerThread,
-                            out+offset, length, 1, nPerThread, FFTW_BACKWARD, FFTW_ESTIMATE);
+	//plan[i] = fft_plan_many_dft(1, length, N/numChunks/numTasks, out+offset, length, 1, N/numTasks,
+    //                        out+offset, length, 1, N/numTasks, FFTW_BACKWARD, FFTW_ESTIMATE);
+    plan[i] = fft_plan_many_dft(1, length, N/numChunks/numTasks, out+offset, length, 1, N,
+                            out+offset, length, 1, N, FFTW_BACKWARD, FFTW_ESTIMATE);
       }
     CmiUnlock(fft_plan_lock);
     contribute(CkCallback(CkIndex_Main::startFFT(), mainProxy));

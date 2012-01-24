@@ -3,7 +3,7 @@ mainmodule fft1d {
   readonly CProxy_Main mainProxy;
   readonly CProxy_FuncNodeHelper nodeHelperProxy;
   readonly int numChunks;
-  readonly int numThreads;
+  readonly int numTasks;
   readonly uint64_t N;
   initnode void initplanlock();
   message fftMsg {
