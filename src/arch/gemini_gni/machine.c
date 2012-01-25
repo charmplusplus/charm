@@ -541,6 +541,7 @@ allgather(void *in,void *out, int len)
 
     free(tmp_buf);
 }
+
 static void
 allgather_2(void *in,void *out, int len)
 {
@@ -859,6 +860,7 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     gni_post_descriptor_t *pd;
     gni_post_state_t      post_state;
     char                  *real_data; 
+
     if (useDynamicSMSG) {
         switch (smsg_connected_flag[destNode]) {
         case 0: 
@@ -1097,14 +1099,12 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
         buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
 #endif
-#else
+#else      /* non-smp case */
     if(size <= SMSG_MAX_MSG)
     {
         status = send_smsg_message( destNode, 0, 0, msg, size, SMALL_DATA_TAG, 0);  
         if(status == GNI_RC_SUCCESS)
-        {
             CmiFree(msg);
-        }
     }
     else
     {
@@ -1263,11 +1263,10 @@ static void PumpNetworkSmsg()
                 msg_nbytes = CmiGetMsgSize(header);
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
-                handleOneRecvedMsg(msg_nbytes, msg_data);
 #if CMK_SMP_TRACE_COMMTHREAD
                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
-                //TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
 #endif
+                handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
             }
             case LMSG_INIT_TAG:
@@ -1608,21 +1607,19 @@ static void PumpLocalRdmaTransactions()
                     START_EVENT();
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInFlight((void*)tmp_pd->local_addr);
-                    handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr );
-                   // TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
+                    handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if (tmp_pd->first_operand <= ONE_SEG) {
                     START_EVENT();
 #if PRINT_SYH
                     printf("Pipeline msg done [%d]\n", myrank);
 #endif
-                    handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG );
-                    //TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
 #endif
+                    handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
                 }
                     SendRdmaMsg();
             }
