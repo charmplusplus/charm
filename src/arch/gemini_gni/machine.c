@@ -19,7 +19,7 @@
 #include "pmi.h"
 
 #include "converse.h"
-
+#include <time.h>
 /*Support for ++debug: */
 #if defined(_WIN32) && ! defined(__CYGWIN__)
 #include <windows.h>
@@ -38,7 +38,7 @@ static void sleep(int secs) {
 
 // Trace communication thread
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
-#define TRACE_THRESHOLD     0.001
+#define TRACE_THRESHOLD     0.00005
 #define CMI_MPI_TRACE_MOREDETAILED 0
 #undef CMI_MPI_TRACE_USEREVENTS
 #define CMI_MPI_TRACE_USEREVENTS 1
@@ -64,6 +64,18 @@ CpvStaticDeclare(double, projTraceStart);
 #define  START_EVENT()
 #define  END_EVENT(x)
 #endif
+
+#define CMI_EXERT_SEND_CAP	0
+#define	CMI_EXERT_RECV_CAP	0
+
+#if CMI_EXERT_SEND_CAP
+#define SEND_CAP 16
+#endif
+
+#if CMI_EXERT_RECV_CAP
+#define RECV_CAP 2
+#endif
+
 
 
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
@@ -1715,6 +1727,10 @@ static int SendBufferMsg()
     void                *register_addr;
     int                 index_previous = -1;
     int                 index = smsg_head_index;
+#if CMI_EXERT_SEND_CAP
+    int			sent_cnt = 0;
+#endif
+
 #if !CMK_SMP
     index = smsg_head_index;
 #else
@@ -1816,6 +1832,11 @@ static int SendBufferMsg()
                 printf("[%d==>%d] buffered smsg sending done\n", myrank, ptr->destNode);
 #endif
                 FreeMsgList(ptr);
+#if CMI_EXERT_SEND_CAP
+		sent_cnt++;
+		if(sent_cnt == SEND_CAP)
+			break;
+#endif
             }else {
                 PCQueuePush(smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
                 done = 0;
@@ -1837,6 +1858,11 @@ static int SendBufferMsg()
         index = smsg_msglist_index[index].next;
 #else
         index++;
+#endif
+
+#if CMI_EXERT_SEND_CAP
+		if(sent_cnt == SEND_CAP)
+			break;
 #endif
     }   // end pooling for all cores
     return done;
@@ -2572,7 +2598,7 @@ void CmiAbort(const char *message) {
 static CmiNodeLock  timerLock = 0;
 static int _absoluteTime = 0;
 static int _is_global = 0;
-static struct timespec start_ns;
+static struct timespec start_ts;
 
 inline int CmiTimerIsSynchronized() {
     return 0;
@@ -2600,13 +2626,13 @@ void CmiTimerInit(char **argv) {
 
     if (_is_global) {
         if (CmiMyRank() == 0) {
-            clock_gettime(CLOCK_MONOTONIC, &start_ts)
+            clock_gettime(CLOCK_MONOTONIC, &start_ts);
         }
     } else { /* we don't have a synchronous timer, set our own start time */
         CmiBarrier();
         CmiBarrier();
         CmiBarrier();
-        clock_gettime(CLOCK_MONOTONIC, &start_ts)
+        clock_gettime(CLOCK_MONOTONIC, &start_ts);
     }
     CmiNodeAllBarrier();          /* for smp */
 }
@@ -2619,21 +2645,21 @@ void CmiTimerInit(char **argv) {
  */
 double CmiTimer(void) {
     struct timespec now_ts;
-    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    clock_gettime(CLOCK_MONOTONIC, &now_ts);
     return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
         : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
 
 double CmiWallTimer(void) {
     struct timespec now_ts;
-    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    clock_gettime(CLOCK_MONOTONIC, &now_ts);
     return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
         : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
 
 double CmiCpuTimer(void) {
     struct timespec now_ts;
-    clock_gettime(CLOCK_MONOTONIC, &now_ts)
+    clock_gettime(CLOCK_MONOTONIC, &now_ts);
     return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
         : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
 }
