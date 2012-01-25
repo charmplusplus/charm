@@ -7,7 +7,9 @@
 // reaching totalBufferCapacity_
 #define BUCKET_SIZE_FACTOR 4
 
-//#define DEBUG_STREAMER
+// #define DEBUG_STREAMER
+// #define CACHE_LOCATIONS
+// #define SUPPORT_INCOMPLETE_MESH
 
 enum MeshStreamerMessageType {PlaneMessage, ColumnMessage, PersonalizedMessage};
 
@@ -19,7 +21,6 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-// #define CACHE_LOCATIONS
 
 /*
 class LocalMessage : public CMessage_LocalMessage {
@@ -111,6 +112,12 @@ private:
 #ifdef CACHE_LOCATIONS
     MeshLocation *cachedLocations;
     bool *isCached; 
+#endif
+
+#ifdef SUPPORT_INCOMPLETE_MESH
+    int numNodesInLastPlane_;
+    int numFullRowsInLastPlane_;
+    int numColumnsInLastRow_;
 #endif
 
     void determineLocation(const int destinationPe, 
@@ -224,6 +231,11 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   std::fill(isCached, isCached + numNodes_, false);
 #endif
 
+#ifdef SUPPORT_INCOMPLETE_MESH
+  numNodesInLastPlane_ = numNodes_ % planeSize_; 
+  numFullRowsInLastPlane_ = numNodesInLastPlane_ / numColumns_;
+  numColumnsInLastRow_ = numNodesInLastPlane_ - numFullRowsInLastPlane_ * numColumns_;  
+#endif
 }
 
 template <class dtype>
@@ -318,11 +330,28 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
     case PlaneMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.planeIndex - myPlaneIndex_) * planeSize_;  
+#ifdef SUPPORT_INCOMPLETE_MESH
+      if (destinationIndex >= numNodes_) {
+	int numValidRows = numFullRowsInLastPlane_; 
+	if (numColumnsInLastRow_ > myColumnIndex_) {
+	  numValidRows++; 
+	}
+	destinationIndex = destinationCoordinates.planeIndex * planeSize_ + 
+	  myColumnIndex_ + (myRowIndex_ % numValidRows) * numColumns_; 
+      }
+#endif      
       this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case ColumnMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.columnIndex - myColumnIndex_);
+#ifdef SUPPORT_INCOMPLETE_MESH
+      if (destinationIndex >= numNodes_) {
+	destinationIndex = destinationCoordinates.planeIndex * planeSize_ + 
+	  destinationCoordinates.columnIndex + 
+	  (myColumnIndex_ % numFullRowsInLastPlane_) * numColumns_; 
+      }
+#endif      
       this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case PersonalizedMessage:
@@ -367,7 +396,6 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
     return;
   }
 
-  int indexWithinPlane; 
   MeshLocation destinationCoordinates;
 
   determineLocation(destinationPe, destinationCoordinates);
