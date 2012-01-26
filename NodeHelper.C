@@ -330,6 +330,16 @@ void FuncNodeHelper::waitThreadDone(int chunck) {
 }
 #endif
 
+void FuncNodeHelper::printMode(int mode) {
+    if(mode == NODEHELPER_PTHREAD){
+        CkPrintf("NodeHelperLib is used in non-SMP using pthread with a simple dynamic scheduling\n");
+    }else if(mode == NODEHELPER_DYNAMIC){
+        CkPrintf("NodeHelperLib is used in SMP with a simple dynamic scheduling\n");
+    }else if(mode == NODEHELPER_STATIC){
+        CkPrintf("NodeHelperLib is used in SMP with a simple static scheduling\n");
+    }
+}
+
 //======================================================================//
 // Functions regarding helpers that parallelize a single function on a  //
 // single node (like OpenMP)                                            // 
@@ -366,6 +376,7 @@ void FuncSingleHelper::reportCreated() {
 //======================================================================//
 
 CProxy_FuncNodeHelper NodeHelper_Init(int mode,int numThds){
+    FuncNodeHelper::printMode(mode);
     return CProxy_FuncNodeHelper::ckNew(mode, numThds);
 }
 

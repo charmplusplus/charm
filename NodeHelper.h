@@ -72,6 +72,7 @@ class FuncSingleHelper;
 class FuncNodeHelper : public CBase_FuncNodeHelper {
 public:
     static int MAX_CHUNKS;
+    static void printMode(int mode);
 
 public:
     int numHelpers;
@@ -112,7 +113,6 @@ public:
                         );
     void send(Task *);
     void reduce(Task **thisReq, void *redBuf, REDUCTION_TYPE type, int numChunks);
-
 };
 
 /* FuncSingleHelper is a chare located on every core of a node */
