@@ -115,6 +115,11 @@ FuncNodeHelper::FuncNodeHelper(int mode_,int numThds_):
         numHelpers = CkMyNodeSize();
         helperArr = new CkChareID[numHelpers];
         helperPtr = new FuncSingleHelper *[numHelpers];
+        
+#if USE_CONVERSE_MSG
+        notifyMsgs = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*numHelpers);
+#endif        
+        
         int pestart = CkNodeFirst(CkMyNode());
         for (int i=0; i<numHelpers; i++) {
             CProxy_FuncSingleHelper::ckNew(thisgroup, &helperArr[i], pestart+i);
@@ -161,7 +166,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         CkPrintf("NodeHelper[%d]: WARNING! chunk is set to MAX_CHUNKS=%d\n", CmiMyPe(), MAX_CHUNKS);
         numChunks = MAX_CHUNKS;
     }
-    
+        
     Task **task = helperPtr[CkMyRank()]->getTasksMem();
 
     int first = lowerRange;
@@ -210,15 +215,23 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         stride = unit+1;
         for (int i=0; i<remainder; i++, first+=stride) {
             task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
-            helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
+            helperPtr[i%numHelpers]->enqueueWork(task[i]);
         }
         
         stride = unit;
         for (int i=remainder; i<numChunks; i++, first+=stride) {
             task[i]->init(func, first, first+stride-1, 0, CkMyRank(),paramNum, param);            
-            helperPtr[i%CkMyNodeSize()]->enqueueWork(task[i]);
+            helperPtr[i%numHelpers]->enqueueWork(task[i]);
         }
         
+#if USE_CONVERSE_MSG
+        
+        for (int i=0; i<numHelpers; i++) {
+            if (i!=CkMyRank()) {
+                CmiPushPE(i, (void *)(notifyMsgs+i));
+            }
+        }
+#else
         CkEntryOptions entOpts;
         entOpts.setPriority(msgPriority);
 
@@ -227,13 +240,17 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
                 CProxy_FuncSingleHelper helpProxy(helperArr[i]);                
                 helpProxy.processWork(0, &entOpts);
             }
-        }
+        }    
+#endif        
         helperPtr[CkMyRank()]->processWork(0);
         
         TRACE_BRACKET(20);
         
         TRACE_START(21);
-        waitDone(task,numChunks);
+                
+        while(!__sync_bool_compare_and_swap(&(helperPtr[CkMyRank()]->counter), numChunks, 0));
+        //waitDone(task,numChunks);
+        
         TRACE_BRACKET(21);
     }
 #else
@@ -340,6 +357,13 @@ void FuncNodeHelper::printMode(int mode) {
     }
 }
 
+#if USE_CONVERSE_MSG
+void NotifySingleHelper(ConverseNotifyMsg *msg){
+    FuncSingleHelper *h = msg->ptr;
+    h->processWork(0);
+}
+#endif
+
 //======================================================================//
 // Functions regarding helpers that parallelize a single function on a  //
 // single node (like OpenMP)                                            // 
@@ -355,21 +379,18 @@ void FuncSingleHelper::processWork(int filler) {
     one = (Task *)tmp;
     while (one) {
         (one->fnPtr)(one->first,one->last,(void *)(one->redBuf), one->paramNum, one->param);
-        int *partial = (int *)(one->redBuf);
+        //int *partial = (int *)(one->redBuf);
         //CkPrintf("SingleHelper[%d]: partial=%d\n", CkMyRank(), *partial);
-        one->setFlag();
+        
+        //one->setFlag();
+        __sync_add_and_fetch(&(thisNodeHelper->helperPtr[one->originRank]->counter), 1);
+        
+        
         CmiLock(reqLock);
         CqsDequeue(reqQ, &tmp);
         one = (Task *)tmp;
         CmiUnlock(reqLock);
     }
-}
-
-void FuncSingleHelper::reportCreated() {
-    //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());
-    CProxy_FuncNodeHelper fh(nodeHelperID);
-    CProxy_FuncSingleHelper thisproxy(thishandle);
-    fh[CkMyNode()].ckLocalBranch()->oneHelperCreated(CkMyRank(), thishandle, this);
 }
 //======================================================================//
 //   End of functions related with FuncSingleHelper                     //

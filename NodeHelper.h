@@ -8,6 +8,9 @@
 #include "NodeHelperAPI.h"
 #include "queueing.h"
 
+#define USE_CONVERSE_MSG 1
+
+/* The following only works on X86_64 platform */
 #define AtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
 
 
@@ -68,8 +71,20 @@ public:
 
 /* FuncNodeHelper is a nodegroup object */
 class FuncSingleHelper;
+#if USE_CONVERSE_MSG
+typedef struct converseNotifyMsg{
+    char core[CmiMsgHeaderSizeBytes];
+    FuncSingleHelper *ptr;
+}ConverseNotifyMsg;
+#endif
 
 class FuncNodeHelper : public CBase_FuncNodeHelper {
+    friend class FuncSingleHelper;
+private:
+#if USE_CONVERSE_MSG
+    ConverseNotifyMsg *notifyMsgs;         
+#endif
+
 public:
     static int MAX_CHUNKS;
     static void printMode(int mode);
@@ -85,12 +100,20 @@ public:
     
     ~FuncNodeHelper() {
         delete [] helperArr;
-        delete [] helperPtr;        
+        delete [] helperPtr;
+    #if USE_CONVERSE_MSG
+        delete [] notifyMsgs;
+    #endif
     }
 
-    void oneHelperCreated(int hid, CkChareID cid, FuncSingleHelper* cptr) {
+    /* handler is only useful when converse msg is used to initiate tasks on the pseudo-thread */
+    void oneHelperCreated(int hid, CkChareID cid, FuncSingleHelper* cptr, int handler=0) {
         helperArr[hid] = cid;
         helperPtr[hid] = cptr;
+#if USE_CONVERSE_MSG        
+        notifyMsgs[hid].ptr = cptr;
+        CmiSetHandler(&(notifyMsgs[hid]), handler);
+#endif
     }
 
 #if CMK_SMP
@@ -115,21 +138,26 @@ public:
     void reduce(Task **thisReq, void *redBuf, REDUCTION_TYPE type, int numChunks);
 };
 
+#if USE_CONVERSE_MSG
+void NotifySingleHelper(ConverseNotifyMsg *msg);
+#endif
+
 /* FuncSingleHelper is a chare located on every core of a node */
 class FuncSingleHelper: public CBase_FuncSingleHelper {
 	friend class FuncNodeHelper;
-private:
+private: 
+    /* BE CAREFUL ABOUT THE FILEDS LAYOUT CONSIDERING CACHE EFFECTS */
+    volatile int counter;
+    int notifyHandler;
     CkGroupID nodeHelperID;
+    FuncNodeHelper *thisNodeHelper;
     Queue reqQ; /* The queue may be simplified for better performance */
     
     /* The following two vars are for usage of detecting completion in dynamic scheduling */
     CmiNodeLock reqLock;
-    int counter; 
-    
     /* To reuse such Task memory as each SingleHelper (i.e. a PE) will only
      * process one node-level parallelization at a time */
     Task **tasks; /* Note the Task type is a message */
-
 public:
     FuncSingleHelper(CkGroupID nid):nodeHelperID(nid) {
         reqQ = CqsCreate();
@@ -139,6 +167,15 @@ public:
         
         tasks = new Task *[FuncNodeHelper::MAX_CHUNKS];
         for(int i=0; i<FuncNodeHelper::MAX_CHUNKS; i++) tasks[i] = new (8*sizeof(int)) Task();
+        
+        CProxy_FuncNodeHelper fh(nodeHelperID);
+        thisNodeHelper = fh[CkMyNode()].ckLocalBranch();
+        CmiAssert(thisNodeHelper!=NULL);
+        
+        notifyHandler = 0;
+    #if USE_CONVERSE_MSG
+        notifyHandler = CmiRegisterHandler((CmiHandler)NotifySingleHelper);
+    #endif
     }
 
     ~FuncSingleHelper() {
@@ -159,7 +196,10 @@ public:
         CmiUnlock(reqLock);
     }
     void processWork(int filler); /* filler is here in order to use CkEntryOptions for setting msg priority */
-    void reportCreated();
+    void reportCreated() {
+        //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());        
+        thisNodeHelper->oneHelperCreated(CkMyRank(), thishandle, this, notifyHandler);
+    }
 };
 
 #endif
