@@ -68,22 +68,65 @@ public:
     }
 };
 
+class FuncSingleHelper;
+
+class CurLoopInfo{
+    friend class FuncSingleHelper;
+    
+private:
+    volatile int curChunkIdx;
+    int numChunks;
+    HelperFn fnPtr;
+    int lowerIndex;
+    int upperIndex;
+    int paramNum;
+    void *param;
+    //limitation: only allow single variable reduction of size numChunks!!!
+    void **redBufs;
+    
+    volatile int finishFlag;
+    
+public:    
+    CurLoopInfo():numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0), 
+    paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL) {}
+    
+    ~CurLoopInfo() { delete [] redBufs; }
+    
+    void set(int nc, HelperFn f, int lIdx, int uIdx, int numParams, void *p){        
+        numChunks = nc;
+        fnPtr = f;
+        lowerIndex = lIdx;
+        upperIndex = uIdx;
+        paramNum = numParams;
+        param = p;
+        curChunkIdx = -1;
+        finishFlag = 0;
+    }
+      
+    void waitLoopDone(){
+        while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
+    }
+    int getNextChunkIdx(){
+        return __sync_add_and_fetch(&curChunkIdx, 1);
+    }
+    void reportFinished(){
+        __sync_add_and_fetch(&finishFlag, 1);
+    }
+    
+    void stealWork();
+};
 
 /* FuncNodeHelper is a nodegroup object */
-class FuncSingleHelper;
-#if USE_CONVERSE_MSG
+
 typedef struct converseNotifyMsg{
     char core[CmiMsgHeaderSizeBytes];
-    FuncSingleHelper *ptr;
+    void *ptr;
 }ConverseNotifyMsg;
-#endif
 
 class FuncNodeHelper : public CBase_FuncNodeHelper {
     friend class FuncSingleHelper;
 private:
-#if USE_CONVERSE_MSG
-    ConverseNotifyMsg *notifyMsgs;         
-#endif
+    ConverseNotifyMsg *notifyMsgs;
 
 public:
     static int MAX_CHUNKS;
@@ -101,19 +144,18 @@ public:
     ~FuncNodeHelper() {
         delete [] helperArr;
         delete [] helperPtr;
-    #if USE_CONVERSE_MSG
-        delete [] notifyMsgs;
-    #endif
+        delete [] notifyMsgs;        
     }
 
     /* handler is only useful when converse msg is used to initiate tasks on the pseudo-thread */
     void oneHelperCreated(int hid, CkChareID cid, FuncSingleHelper* cptr, int handler=0) {
         helperArr[hid] = cid;
         helperPtr[hid] = cptr;
-#if USE_CONVERSE_MSG        
-        notifyMsgs[hid].ptr = cptr;
+
         CmiSetHandler(&(notifyMsgs[hid]), handler);
-#endif
+        if(mode == NODEHELPER_STATIC) {
+            notifyMsgs[hid].ptr = (void *)cptr;         
+        }
     }
 
 #if CMK_SMP
@@ -138,9 +180,8 @@ public:
     void reduce(Task **thisReq, void *redBuf, REDUCTION_TYPE type, int numChunks);
 };
 
-#if USE_CONVERSE_MSG
 void NotifySingleHelper(ConverseNotifyMsg *msg);
-#endif
+void SingleHelperStealWork(ConverseNotifyMsg *msg);
 
 /* FuncSingleHelper is a chare located on every core of a node */
 class FuncSingleHelper: public CBase_FuncSingleHelper {
@@ -149,6 +190,7 @@ private:
     /* BE CAREFUL ABOUT THE FILEDS LAYOUT CONSIDERING CACHE EFFECTS */
     volatile int counter;
     int notifyHandler;
+    int stealWorkHandler;
     CkGroupID nodeHelperID;
     FuncNodeHelper *thisNodeHelper;
     Queue reqQ; /* The queue may be simplified for better performance */
@@ -158,6 +200,9 @@ private:
     /* To reuse such Task memory as each SingleHelper (i.e. a PE) will only
      * process one node-level parallelization at a time */
     Task **tasks; /* Note the Task type is a message */
+    
+    CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
+    
 public:
     FuncSingleHelper(CkGroupID nid):nodeHelperID(nid) {
         reqQ = CqsCreate();
@@ -172,16 +217,19 @@ public:
         thisNodeHelper = fh[CkMyNode()].ckLocalBranch();
         CmiAssert(thisNodeHelper!=NULL);
         
-        notifyHandler = 0;
-    #if USE_CONVERSE_MSG
         notifyHandler = CmiRegisterHandler((CmiHandler)NotifySingleHelper);
-    #endif
+        stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
+            
+        curLoop = new CurLoopInfo();
+        curLoop->redBufs = new void *[FuncNodeHelper::MAX_CHUNKS];
+        for(int i=0; i<FuncNodeHelper::MAX_CHUNKS; i++) curLoop->redBufs[i] = (void *)(tasks[i]->redBuf);
     }
 
     ~FuncSingleHelper() {
         for(int i=0; i<FuncNodeHelper::MAX_CHUNKS; i++) delete tasks[i];
         delete [] tasks;        
 		CmiDestroyLock(reqLock);
+        delete curLoop;
     }
     
     FuncSingleHelper(CkMigrateMessage *m) {}
@@ -197,9 +245,14 @@ public:
     }
     void processWork(int filler); /* filler is here in order to use CkEntryOptions for setting msg priority */
     void reportCreated() {
-        //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());        
-        thisNodeHelper->oneHelperCreated(CkMyRank(), thishandle, this, notifyHandler);
-    }
+        //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());
+        if(thisNodeHelper->mode == NODEHELPER_DYNAMIC)
+            thisNodeHelper->oneHelperCreated(CkMyRank(), thishandle, this, -1);
+        else if(thisNodeHelper->mode == NODEHELPER_STATIC)
+            thisNodeHelper->oneHelperCreated(CkMyRank(), thishandle, this, notifyHandler);
+        else if(thisNodeHelper->mode == NODEHELPER_CHARE_DYNAMIC)
+            thisNodeHelper->oneHelperCreated(CkMyRank(), thishandle, this, stealWorkHandler);
+    }    
 };
 
 #endif

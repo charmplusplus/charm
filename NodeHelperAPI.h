@@ -9,6 +9,7 @@ typedef void (*HelperFn)(int first,int last, void *result, int paramNum, void *p
 #define NODEHELPER_PTHREAD 0
 #define NODEHELPER_DYNAMIC  1
 #define NODEHELPER_STATIC 2
+#define NODEHELPER_CHARE_DYNAMIC 3
 
 typedef enum REDUCTION_TYPE{
     NODEHELPER_NONE=0,

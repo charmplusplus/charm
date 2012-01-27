@@ -111,14 +111,13 @@ FuncNodeHelper::FuncNodeHelper(int mode_,int numThds_):
     
 #if CMK_SMP
     if (mode==NODEHELPER_DYNAMIC || 
-        mode==NODEHELPER_STATIC) {
+        mode==NODEHELPER_STATIC
+        || mode==NODEHELPER_CHARE_DYNAMIC) {
         numHelpers = CkMyNodeSize();
         helperArr = new CkChareID[numHelpers];
         helperPtr = new FuncSingleHelper *[numHelpers];
         
-#if USE_CONVERSE_MSG
         notifyMsgs = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*numHelpers);
-#endif        
         
         int pestart = CkNodeFirst(CkMyNode());
         for (int i=0; i<numHelpers; i++) {
@@ -168,10 +167,6 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
     }
         
     Task **task = helperPtr[CkMyRank()]->getTasksMem();
-
-    int first = lowerRange;
-    int unit = (upperRange-lowerRange+1)/numChunks;
-    int remainder = (upperRange-lowerRange+1)-unit*numChunks;
     
     /* "stride" determines the number of loop iterations to be done in each chunk
      * for chunk indexed at 0 to remainder-1, stride is "unit+1";
@@ -182,6 +177,9 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
     //for using nodequeue
 #if CMK_SMP
     if (mode==NODEHELPER_DYNAMIC) {
+        int first = lowerRange;
+        int unit = (upperRange-lowerRange+1)/numChunks;
+        int remainder = (upperRange-lowerRange+1)-unit*numChunks;        
         CProxy_FuncNodeHelper fh(thisgroup);
 
         TRACE_START(20);        
@@ -210,6 +208,10 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         fs->counter = 0;
         TRACE_BRACKET(21);        
     } else if (mode==NODEHELPER_STATIC) {
+        int first = lowerRange;
+        int unit = (upperRange-lowerRange+1)/numChunks;
+        int remainder = (upperRange-lowerRange+1)-unit*numChunks;
+
         TRACE_START(20);
                 
         stride = unit+1;
@@ -252,6 +254,25 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         //waitDone(task,numChunks);
         
         TRACE_BRACKET(21);
+    }else if(mode == NODEHELPER_CHARE_DYNAMIC){
+        TRACE_START(20);
+        
+        FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
+        CurLoopInfo *curLoop = thisHelper->curLoop;
+        curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
+        
+        for (int i=0; i<numHelpers; i++) {
+            if (i!=CkMyRank()) {
+                notifyMsgs[i].ptr = (void *)curLoop;
+                CmiPushPE(i, (void *)(notifyMsgs+i));
+            }
+        }        
+        curLoop->stealWork();
+        TRACE_BRACKET(20);
+        
+        TRACE_START(21);                
+        curLoop->waitLoopDone();
+        TRACE_BRACKET(21);        
     }
 #else
 //non-SMP case
@@ -348,21 +369,33 @@ void FuncNodeHelper::waitThreadDone(int chunck) {
 #endif
 
 void FuncNodeHelper::printMode(int mode) {
-    if(mode == NODEHELPER_PTHREAD){
-        CkPrintf("NodeHelperLib is used in non-SMP using pthread with a simple dynamic scheduling\n");
-    }else if(mode == NODEHELPER_DYNAMIC){
-        CkPrintf("NodeHelperLib is used in SMP with a simple dynamic scheduling\n");
-    }else if(mode == NODEHELPER_STATIC){
-        CkPrintf("NodeHelperLib is used in SMP with a simple static scheduling\n");
+    switch(mode){
+        case NODEHELPER_PTHREAD:
+            CkPrintf("NodeHelperLib is used in non-SMP using pthread with a simple dynamic scheduling\n");
+            break;
+        case NODEHELPER_DYNAMIC:
+            CkPrintf("NodeHelperLib is used in SMP with a simple dynamic scheduling\n");
+            break;
+        case NODEHELPER_STATIC:
+            CkPrintf("NodeHelperLib is used in SMP with a simple static scheduling\n");
+            break;
+        case NODEHELPER_CHARE_DYNAMIC:
+            CkPrintf("NodeHelperLib is used in SMP with a simple dynamic scheduling but not using node-level queue\n");
+            break;
+        default:
+            CkPrintf("ERROR: NodeHelperLib is used in unknown mode\n");
     }
 }
 
-#if USE_CONVERSE_MSG
 void NotifySingleHelper(ConverseNotifyMsg *msg){
-    FuncSingleHelper *h = msg->ptr;
+    FuncSingleHelper *h = (FuncSingleHelper *)msg->ptr;
     h->processWork(0);
 }
-#endif
+
+void SingleHelperStealWork(ConverseNotifyMsg *msg){
+    CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
+    loop->stealWork();
+}
 
 //======================================================================//
 // Functions regarding helpers that parallelize a single function on a  //
@@ -392,6 +425,30 @@ void FuncSingleHelper::processWork(int filler) {
         CmiUnlock(reqLock);
     }
 }
+
+void CurLoopInfo::stealWork(){
+    int first, last;
+    int unit = (upperIndex-lowerIndex+1)/numChunks;
+    int remainder = (upperIndex-lowerIndex+1)-unit*numChunks;
+    int markIdx = remainder*(unit+1);
+    
+    int nextChunkId = getNextChunkIdx();
+    while(nextChunkId < numChunks){
+        if(nextChunkId < remainder){
+            first = (unit+1)*nextChunkId;
+            last = first+unit;
+        }else{
+            first = (nextChunkId - remainder)*unit + markIdx;
+            last = first+unit-1;
+        }
+                
+        fnPtr(first, last, redBufs[nextChunkId], paramNum, param);
+        
+        nextChunkId = getNextChunkIdx();
+    }
+    reportFinished();    
+}
+
 //======================================================================//
 //   End of functions related with FuncSingleHelper                     //
 //======================================================================//
