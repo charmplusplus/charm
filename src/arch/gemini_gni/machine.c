@@ -1949,18 +1949,19 @@ static void _init_dynamic_smsg()
         smsg_attr_vector_local[i] = NULL;
         smsg_attr_vector_remote[i] = NULL;
     }
-
-    //pre-allocate some memory as mailbox for dynamic connection
-    if(mysize <=4096)
+    if(mysize <=512)
     {
-        SMSG_MAX_MSG = 1024;
-    }else if (mysize > 4096 && mysize <= 16384)
+        SMSG_MAX_MSG = 8192;
+    }else if (mysize <= 4096)
+    {
+        SMSG_MAX_MSG = 4096/mysize * 1024;
+    }else if (mysize <= 16384)
     {
         SMSG_MAX_MSG = 512;
     }else {
         SMSG_MAX_MSG = 256;
     }
-    
+
     send_smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
     send_smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
     send_smsg_attr.msg_maxsize = SMSG_MAX_MSG;
@@ -2006,18 +2007,17 @@ static void _init_static_smsg()
     uint32_t              vmdh_index = -1;
     mdh_addr_t            base_infor;
     mdh_addr_t            *base_addr_vec;
-    if(mysize <=4096)
+    if(mysize <=512)
     {
-        SMSG_MAX_MSG = 1024;
-        //log2_SMSG_MAX_MSG = 10;
-    }else if (mysize > 4096 && mysize <= 16384)
+        SMSG_MAX_MSG = 8192;
+    }else if (mysize <= 4096)
+    {
+        SMSG_MAX_MSG = 4096/mysize * 1024;
+    }else if (mysize <= 16384)
     {
         SMSG_MAX_MSG = 512;
-        //log2_SMSG_MAX_MSG = 9;
-
     }else {
         SMSG_MAX_MSG = 256;
-        //log2_SMSG_MAX_MSG = 8;
     }
     
     smsg_attr = malloc(mysize * sizeof(gni_smsg_attr_t));
