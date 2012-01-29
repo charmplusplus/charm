@@ -14,25 +14,13 @@
 #include <stdint.h>
 #include <errno.h>
 #include <malloc.h>
+#include <unistd.h>
 
 #include "gni_pub.h"
 #include "pmi.h"
 
 #include "converse.h"
 #include <time.h>
-/*Support for ++debug: */
-#if defined(_WIN32) && ! defined(__CYGWIN__)
-#include <windows.h>
-#include <wincon.h>
-#include <sys/types.h>
-#include <sys/timeb.h>
-
-static void sleep(int secs) {
-    Sleep(1000*secs);
-}
-#else
-#include <unistd.h> /*For getpid()*/
-#endif
 
 #define PRINT_SYH  0
 
@@ -121,8 +109,9 @@ static CmiInt8 _expand_mem =  4*oneMB;
 #define  MAX_BUFF_SEND      64*oneMB
 static CmiInt8 buffered_send_msg = 0;
 
-#define BIG_MSG       16*oneMB
-#define ONE_SEG       8*oneMB
+#define BIG_MSG                  16*oneMB
+#define ONE_SEG                  4*oneMB
+#define BIG_MSG_PIPELINE         4
 
 #if CMK_SMP
 #define COMM_THREAD_SEND 1
@@ -179,6 +168,8 @@ uint8_t   onesided_hnd, omdh;
 
 #define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
+#define CmiGetMsgSeq(m)  ((CmiMsgHeaderExt*)m)->seq
+#define CmiSetMsgSeq(m, s)  ((((CmiMsgHeaderExt*)m)->seq) = (s))
 
 #define ALIGNBUF                64
 
@@ -321,11 +312,12 @@ typedef struct medium_msg_list
 
 typedef struct control_msg
 {
-    uint64_t            source_addr;
-    uint64_t            dest_addr;
-    int                 source;               /* source rank */
-    int                 length;
-    int                 seq_id;                 //big message   -1 meaning single message
+    uint64_t            source_addr;    /* address from the start of buffer  */
+    uint64_t            dest_addr;      /* address from the start of buffer */
+    int                 source;         /* source rank */
+    int                 total_length;   /* total length */
+    int                 length;         /* length of this packet */
+    int                 seq_id;         //big message   0 meaning single message
     gni_mem_handle_t    source_mem_hndl;
     struct control_msg *next;
 }CONTROL_MSG;
@@ -970,14 +962,15 @@ static int send_medium_messages(int destNode, int size, char *msg)
 #endif
 }
 
-inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
+inline static CONTROL_MSG* construct_control_msg(int size, char *msg, int seqno)
 {
     /* construct a control message and send */
     CONTROL_MSG         *control_msg_tmp;
     MallocControlMsg(control_msg_tmp);
-    control_msg_tmp->source_addr    = (uint64_t)msg;
-    control_msg_tmp->source         = myrank;
-    control_msg_tmp->length         =ALIGN64(size); //for GET 4 bytes aligned 
+    control_msg_tmp->source_addr = (uint64_t)msg;
+    control_msg_tmp->seq_id    = seqno;
+    control_msg_tmp->source    = myrank;
+    control_msg_tmp->total_length = control_msg_tmp->length = ALIGN64(size); //for GET 4 bytes aligned 
 #if     USE_LRTS_MEMPOOL
     if(size < BIG_MSG)
     {
@@ -986,6 +979,8 @@ inline static CONTROL_MSG* construct_control_msg(int size, char *msg)
     else
     {
         SetMemHndlZero(control_msg_tmp->source_mem_hndl);
+        control_msg_tmp->length = size - (seqno-1)*ONE_SEG;
+        if (control_msg_tmp->length > ONE_SEG) control_msg_tmp->length = ONE_SEG;
     }
 #else
     SetMemHndlZero(control_msg_tmp->source_mem_hndl);
@@ -1000,8 +995,11 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint32_t            vmdh_index  = -1;
     int                 size;
+    int                 offset = 0;
+    uint64_t            source_addr;
 
-    size    =   control_msg_tmp->length;
+    size    =   control_msg_tmp->total_length;
+    source_addr = control_msg_tmp->source_addr;
 
     if(buffered_send_msg >= MAX_BUFF_SEND)
     {
@@ -1010,24 +1008,27 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
         return;
     }
 #if     USE_LRTS_MEMPOOL
-    if( control_msg_tmp ->seq_id == 0 ){
-        if(IsMemHndlZero(GetMemHndl(control_msg_tmp->source_addr))) //it is in mempool, it is possible to be de-registered by others
+    if( control_msg_tmp->seq_id == 0 ){
+        if(IsMemHndlZero(GetMemHndl(source_addr))) //it is in mempool, it is possible to be de-registered by others
         {
             //register the corresponding mempool
-            status = registerMempool((void*)(control_msg_tmp->source_addr));
+            status = registerMempool((void*)source_addr);
             if(status == GNI_RC_SUCCESS)
             {
-                control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+                control_msg_tmp->source_mem_hndl = GetMemHndl(source_addr);
             }
         }else
         {
-            control_msg_tmp->source_mem_hndl = GetMemHndl(control_msg_tmp->source_addr);
+            control_msg_tmp->source_mem_hndl = GetMemHndl(source_addr);
             status = GNI_RC_SUCCESS;
         }
-    }else 
+    }else    // BIG_MSG
     {
-        size = size>ONE_SEG?ONE_SEG:size;
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, control_msg_tmp->source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
+        int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
+        source_addr += offset;
+        size = control_msg_tmp->length;
+//printf("[%d] send_large_messages seq: %d  addr: %p size: %d %d\n", CmiMyPe(), control_msg_tmp->seq_id, source_addr, size, control_msg_tmp->length);
+        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     }
 
     if(status == GNI_RC_SUCCESS)
@@ -1037,7 +1038,7 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
         {
             buffered_send_msg += ALIGN64(size);
             if(control_msg_tmp->seq_id == 0)
-                IncreaseMsgInFlight(control_msg_tmp->source_addr);
+                IncreaseMsgInFlight(source_addr);
             FreeControlMsg(control_msg_tmp);
         }
     } else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
@@ -1047,7 +1048,6 @@ static void send_large_messages(int destNode, CONTROL_MSG  *control_msg_tmp)
     {
         buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
-
 #else
     status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     if(status == GNI_RC_SUCCESS)
@@ -1087,16 +1087,14 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 #if COMM_THREAD_SEND
     if(size <= SMSG_MAX_MSG)
         buffer_small_msgs(msg, size, destNode, SMALL_DATA_TAG);
-    else
-    {
-        control_msg_tmp =  construct_control_msg(size, msg);
-        if(size < BIG_MSG)
-            control_msg_tmp->seq_id = 0;
-        else
-        {
-            control_msg_tmp->seq_id = 1;
-        }
+    else if (size < BIG_MSG) {
+        control_msg_tmp =  construct_control_msg(size, msg, 0);
         buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+    }
+    else {
+          CmiSetMsgSeq(msg, 0);
+          control_msg_tmp =  construct_control_msg(size, msg, 1);
+          buffer_small_msgs(control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
 #endif
 #else      /* non-smp case */
@@ -1106,20 +1104,19 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
         if(status == GNI_RC_SUCCESS)
             CmiFree(msg);
     }
-    else
-    {
-        control_msg_tmp =  construct_control_msg(size, msg);
-#if     USE_LRTS_MEMPOOL
-        if(size < BIG_MSG)
-            control_msg_tmp->seq_id = 0;
-        else
-        {
-            control_msg_tmp->seq_id = 1;
-        }
-#else
-        control_msg_tmp->seq_id = 0;
-#endif
+    else if (size < BIG_MSG) {
+        control_msg_tmp =  construct_control_msg(size, msg, 0);
         send_large_messages(destNode, control_msg_tmp);
+    }
+    else {
+#if     USE_LRTS_MEMPOOL
+        CmiSetMsgSeq(msg, 0);
+        control_msg_tmp =  construct_control_msg(size, msg, 1);
+        send_large_messages(destNode, control_msg_tmp);
+#else
+        control_msg_tmp =  construct_control_msg(size, msg, 0);
+        send_large_messages(destNode, control_msg_tmp);
+#endif
     }
 #endif
     return 0;
@@ -1152,6 +1149,7 @@ void LrtsPostCommonInit(int everReturn)
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,(void *)s);
 #else
     CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE,(CcdVoidFn)CmiNotifyStillIdle,NULL);
+    if (useDynamicSMSG)
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
 #endif
 }
@@ -1240,6 +1238,8 @@ static void PumpNetworkSmsg()
     gni_smsg_attr_t     *remote_smsg_attr;
     int                 init_flag;
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
+    uint64_t            source_addr;
+
     while ((status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS)
     {
         inst_id = GNI_CQ_GET_INST_ID(event_data);
@@ -1293,21 +1293,43 @@ static void PumpNetworkSmsg()
             case BIG_MSG_TAG:  //big msg, de-register, transfer next seg
             {
                 header_tmp = (CONTROL_MSG *) header;
+                void *msg = (void*)(header_tmp->source_addr);
+                int cur_seq = CmiGetMsgSeq(header_tmp->source_addr);
+                int offset = ONE_SEG*(cur_seq+1);
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(header_tmp->source_mem_hndl), &omdh);
-                buffered_send_msg -= (((CONTROL_MSG *) header)->length >ONE_SEG?ONE_SEG:((CONTROL_MSG *) header)->length);
-                if(header_tmp->length <= ONE_SEG) //transaction done
+                buffered_send_msg -= ((CONTROL_MSG *) header)->length;
+                int remain_size = CmiGetMsgSize(msg) - header_tmp->length;
+                if (remain_size < 0) remain_size = 0;
+                CmiSetMsgSize(msg, remain_size);
+//printf("[%d] PumpNetworkSmsg: free %p len: %d offset: %d seq: %d msg size: %d %d\n", myrank, header_tmp->source_addr_orig, header_tmp->total_length, offset, cur_seq, CmiGetMsgSize(msg), header_tmp->length);
+                if(remain_size <= 0) //transaction done
                 {
-                    CmiFree((void*)(header_tmp->source_addr) - ONE_SEG*(header_tmp->seq_id-1));
-                }else
+                    CmiFree(msg);
+                }else if (header_tmp->total_length > offset)
                 {
+                    CmiSetMsgSeq(header_tmp->source_addr, cur_seq+1);
                     MallocControlMsg(control_msg_tmp);
+                    control_msg_tmp->source_addr = header_tmp->source_addr;
+                    control_msg_tmp->dest_addr    = header_tmp->dest_addr;
+                    control_msg_tmp->total_length   = header_tmp->total_length; 
                     control_msg_tmp->source         = myrank;
-                    control_msg_tmp->source_addr    = (uint64_t)((void*)(header_tmp->source_addr + ONE_SEG));
-                    control_msg_tmp->dest_addr      = (uint64_t)((void*)(header_tmp->dest_addr) + ONE_SEG);
-                    control_msg_tmp->length         = header_tmp->length-ONE_SEG; 
-                    control_msg_tmp->seq_id         = header_tmp->seq_id+1;
+                    control_msg_tmp->length         = header_tmp->total_length - offset;
+                    if (control_msg_tmp->length >= ONE_SEG) control_msg_tmp->length = ONE_SEG;
+                    control_msg_tmp->seq_id         = cur_seq+1+1;
                     //send next seg
                     send_large_messages(inst_id, control_msg_tmp);
+                         // pipelining
+                    if (header_tmp->seq_id == 1) {
+                      int i;
+                      for (i=1; i<BIG_MSG_PIPELINE; i++) {
+                        int seq = cur_seq+i+2;
+                        CmiSetMsgSeq(header_tmp->source_addr, seq-1);
+                        control_msg_tmp =  construct_control_msg(header_tmp->total_length, (char *)header_tmp->source_addr, seq);
+                        control_msg_tmp->dest_addr = header_tmp->dest_addr;
+                        send_large_messages(inst_id, control_msg_tmp);
+                        if (header_tmp->total_length <= ONE_SEG*seq) break;
+                      }
+                    }
                 }
                 SendRdmaMsg();
                 break;
@@ -1343,6 +1365,8 @@ static void printDesc(gni_post_descriptor_t *pd)
     printf(" addr=%p, ", pd->local_addr); 
 }
 
+// for BIG_MSG called on receiver side for receiving control message
+// LMSG_INIT_TAG
 static void getLargeMsgRequest(void* header, uint64_t inst_id )
 {
 #if     USE_LRTS_MEMPOOL
@@ -1352,16 +1376,22 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     gni_post_descriptor_t *pd;
     RDMA_REQUEST        *rdma_request_msg;
     gni_mem_handle_t    msg_mem_hndl;
-    int source, size, transaction_size;
+    int source, size, transaction_size, offset = 0;
+
     // initial a get to transfer data from the sender side */
     request_msg = (CONTROL_MSG *) header;
     source = request_msg->source;
-    size = request_msg->length; 
-    if(request_msg->seq_id < 2)  
+    size = request_msg->total_length; 
+//printf("[%d] getLargeMsgRequest seq: %d size: %d\n", CmiMyPe(), request_msg->seq_id , size);
+    if(request_msg->seq_id < 2)   {
         msg_data = CmiAlloc(size);
-    else
-        msg_data = (void*)request_msg-> dest_addr;
-    _MEMCHECK(msg_data);
+        CmiSetMsgSeq(msg_data, 0);
+        _MEMCHECK(msg_data);
+    }
+    else {
+        offset = ONE_SEG*(request_msg->seq_id-1);
+        msg_data = (char*)request_msg->dest_addr + offset;
+    }
    
     MallocPostDesc(pd);
     pd->cqwrite_value = request_msg->seq_id;
@@ -1383,16 +1413,17 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         }
     }
     else{
-        transaction_size = size > ONE_SEG?ONE_SEG: ALIGN64(size);
+        transaction_size = ALIGN64(request_msg->length);
+//printf("[%d] seq: %d msg_data: %p transaction_size: %d\n", CmiMyPe(), request_msg->seq_id, msg_data, transaction_size);
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &(pd->local_mem_hndl), &omdh);
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
         }
     }
-    pd->first_operand = ALIGN64(size);
+    pd->first_operand = ALIGN64(size);                   //  total length
 
-    if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
+    if(request_msg->total_length < LRTS_GNI_RDMA_THRESHOLD)
         pd->type            = GNI_POST_FMA_GET;
     else
         pd->type            = GNI_POST_RDMA_GET;
@@ -1404,7 +1435,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
     pd->length          = transaction_size;
     pd->local_addr      = (uint64_t) msg_data;
-    pd->remote_addr     = request_msg->source_addr;
+    pd->remote_addr     = request_msg->source_addr + offset;
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
     pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
     pd->rdma_mode       = 0;
@@ -1528,7 +1559,6 @@ static void PumpLocalSmsgTransactions()
     }
 }
 
-static void SendSmsgConnectMsg();
 static void PumpLocalRdmaTransactions()
 {
     gni_cq_entry_t          ev;
@@ -1566,22 +1596,25 @@ static void PumpLocalRdmaTransactions()
 #endif
             case GNI_POST_RDMA_GET:
             case GNI_POST_FMA_GET:
-#if     !USE_LRTS_MEMPOOL
+#if  ! USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
                 msg_tag = ACK_TAG;  
 #else
-                if(tmp_pd->cqwrite_value > 0)
+                ack_msg_tmp->seq_id = tmp_pd->cqwrite_value;
+//printf("[%d] PumpLocalRdma: seq: %d total size: %d\n", CmiMyPe(), ack_msg_tmp->seq_id, tmp_pd->first_operand);
+                if(ack_msg_tmp->seq_id > 0)      // BIG_MSG
                 {
                     msg_tag = BIG_MSG_TAG; 
                     MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                    ack_msg_tmp->dest_addr = tmp_pd->local_addr - ONE_SEG*(ack_msg_tmp->seq_id-1);
                 } 
                 else
                 {
                     msg_tag = ACK_TAG;  
+                    ack_msg_tmp->dest_addr = tmp_pd->local_addr;
                 }
-                ack_msg_tmp->seq_id = tmp_pd->cqwrite_value;
-                ack_msg_tmp->length = tmp_pd->first_operand;
-                ack_msg_tmp->dest_addr = tmp_pd->local_addr;
+                ack_msg_tmp->length = tmp_pd->length;
+                ack_msg_tmp->total_length = tmp_pd->first_operand;     // total size
 #endif
                 break;
             default:
@@ -1589,7 +1622,8 @@ static void PumpLocalRdmaTransactions()
                 CmiAbort("PumpLocalRdmaTransactions: unknown type!");
             }
             //ack_msg_tmp->source             = myrank;
-            ack_msg_tmp->source_addr        = tmp_pd->remote_addr;
+            ack_msg_tmp->source_addr     = tmp_pd->remote_addr;
+            if (ack_msg_tmp->seq_id > 0)  ack_msg_tmp->source_addr -= ONE_SEG*(ack_msg_tmp->seq_id-1);
             ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
             status = send_smsg_message(inst_id, 0, 0, ack_msg_tmp, sizeof(CONTROL_MSG), msg_tag, 0);  
             if(status == GNI_RC_SUCCESS)
@@ -1611,54 +1645,28 @@ static void PumpLocalRdmaTransactions()
                     TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
-                }else if (tmp_pd->first_operand <= ONE_SEG) {
+                }else {
+                  void *msg = (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
+                  CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
+                  if (tmp_pd->first_operand <= ONE_SEG*CmiGetMsgSeq(msg)) {
                     START_EVENT();
 #if PRINT_SYH
                     printf("Pipeline msg done [%d]\n", myrank);
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
 #endif
-                    handleOneRecvedMsg(tmp_pd->length + (tmp_pd->cqwrite_value-1)*ONE_SEG, (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG); 
+                    handleOneRecvedMsg(tmp_pd->first_operand, msg); 
+//printf("[%d] PUSH big message: %p size: %d seq: %d\n",  CmiMyPe(), msg, tmp_pd->first_operand, tmp_pd->cqwrite_value);
+                  }
                 }
-                    SendRdmaMsg();
+                SendRdmaMsg();
             }
             FreePostDesc(tmp_pd);
         }
     } //end while
 }
 
-#if DYNAMIC_SMSG
-static void SendSmsgConnectMsg()
-{
-    gni_return_t            status = GNI_RC_SUCCESS;
-    gni_mem_handle_t        msg_mem_hndl;
-
-    //RDMA_REQUEST *ptr = pending_smsg_conn_head;
-    RDMA_REQUEST *prev = NULL;
-
-    while (ptr != NULL)
-    {
-        gni_post_descriptor_t *pd = ptr->pd;
-        status = GNI_RC_SUCCESS;
-        status = GNI_PostFma(ep_hndl_array[ptr->destNode], pd);
-        if(status == GNI_RC_SUCCESS)
-        {
-            RDMA_REQUEST *tmp = ptr;
-            if (prev)
-                prev->next = ptr->next;
-            else
-                pending_smsg_conn_head = ptr->next;
-            printf("[%d=%d]OK send post FMA resend\n", myrank, ptr->destNode);
-            ptr = ptr->next;
-            FreeRdmaRequest(tmp);
-            continue;
-        }
-        prev = ptr;
-        ptr = ptr->next;
-    } //end while
-}
-#endif
 static void  SendRdmaMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
@@ -1773,6 +1781,8 @@ static int SendBufferMsg()
                 }
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
                 register_size = control_msg_tmp->length;
+                uint64_t            source_addr;
+                source_addr = control_msg_tmp->source_addr;
 #if     USE_LRTS_MEMPOOL
                 if(control_msg_tmp->seq_id ==0) //fit into memory
                 {
@@ -1790,8 +1800,11 @@ static int SendBufferMsg()
                 }
                 else if(control_msg_tmp->seq_id >0) //large msg
                 {
-                    register_size = control_msg_tmp->length>=ONE_SEG?ONE_SEG:control_msg_tmp->length;
-                    register_addr = (void*) (control_msg_tmp->source_addr);
+                    //register_size = control_msg_tmp->length>=ONE_SEG?ONE_SEG:control_msg_tmp->length;
+                    int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
+                    source_addr += offset;
+                    register_addr = (void*) source_addr;
+//printf("[%d] send_large_buffer messages seq: %d  addr: %p size: %d %d\n", CmiMyPe(), control_msg_tmp->seq_id, source_addr, register_size, control_msg_tmp->length);
                     status = MEMORY_REGISTER(onesided_hnd, nic_hndl, register_addr, register_size, &(control_msg_tmp->source_mem_hndl), &omdh);
                 }
 #else
@@ -1806,7 +1819,7 @@ static int SendBufferMsg()
                 {   
                     buffered_send_msg += ALIGN64(register_size);
                     if(control_msg_tmp->seq_id ==0)
-                        IncreaseMsgInFlight(control_msg_tmp->source_addr);
+                        IncreaseMsgInFlight(source_addr);
                     FreeControlMsg((CONTROL_MSG*)(ptr->msg));
                 }
                 break;
@@ -1911,7 +1924,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #endif
     /* Send buffered Message */
 #if CMK_SMP_TRACE_COMMTHREAD
-        startT = CmiWallTimer();
+    startT = CmiWallTimer();
 #endif
     SendBufferMsg();
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -1920,7 +1933,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
-        startT = CmiWallTimer();
+    startT = CmiWallTimer();
 #endif
     SendRdmaMsg();
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2080,7 +2093,7 @@ static void _init_static_smsg()
 
     free(smsg_attr);
     status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
-     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
+    GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
 } 
 
 inline
@@ -2384,8 +2397,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     
     if(myrank == 0)
     {
-        printf("Charm++> Running on Gemini (GNI) using %d cores\n", mysize);
-        printf("Charm++> use %s SMSG\n", useDynamicSMSG?"Dynamic":"Static");
+        printf("Charm++> Running on Gemini (GNI) with %d cores\n", mysize);
+        printf("Charm++> %s SMSG\n", useDynamicSMSG?"Dynamic":"Static");
     }
 #ifdef USE_ONESIDED
     onesided_init(NULL, &onesided_hnd);
@@ -2476,7 +2489,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
       }
     }
 
-    if (myrank==0) printf("Charm++> use memorypool size: %1.fMB\n", _mempool_size/1024.0/1024);
+    if (myrank==0) printf("Charm++> memory pool size: %1.fMB\n", _mempool_size/1024.0/1024);
 #endif
 
     /* init DMA buffer for medium message */
@@ -2651,7 +2664,7 @@ double CmiWallTimer(void) {
     struct timespec now_ts;
     clock_gettime(CLOCK_MONOTONIC, &now_ts);
     return _absoluteTime?((double)(now_ts.tv_sec)+(double)now_ts.tv_nsec/1000000000.0)
-        : (double)( now_ts.tv_sec - start_ts.tv_sec ) + (((double) now_ts.tv_nsec - (double) start_ts.tv_nsec)  / 1000000000.0);
+        : ( now_ts.tv_sec - start_ts.tv_sec ) + ((now_ts.tv_nsec - start_ts.tv_nsec)  / 1000000000.0);
 }
 
 double CmiCpuTimer(void) {
