@@ -289,6 +289,10 @@ int getDestHandler;
 #endif
 #endif
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#include "machine-commthd-util.c"
+#endif
+
 static void CommunicationServer(int withDelayMs, int where);
 
 void CmiHandleImmediate();
@@ -2542,6 +2546,14 @@ static void ConverseRunPE(int everReturn)
     }
 #endif
   }
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+  if(CmiMyRank() == CmiMyNodeSize()){
+    /* Comm thread */
+    CsvAccess(notifyCommThdQ) = PCQueueCreate();
+  }
+#endif
+
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
@@ -2641,7 +2653,12 @@ static void ConverseRunPE(int everReturn)
   if (CmiMyRank() == CmiMyNodeSize()) {
     if(!everReturn) Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
     if (Cmi_charmrun_fd!=-1)
-          while (1) CommunicationServer(5, COMM_SERVER_FROM_SMP);
+          while (1) {
+              CommunicationServer(5, COMM_SERVER_FROM_SMP);
+          #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+              CmiPollCommThdNotificationQ();
+          #endif
+          }
   }
   else{
     if (!everReturn) {
@@ -2850,6 +2867,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
  
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+  CsvInitialize(PCQueue, notifyCommThdQ);
+#endif
 
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/ 

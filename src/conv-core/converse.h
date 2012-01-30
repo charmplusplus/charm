@@ -1902,4 +1902,26 @@ extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#if defined(__cplusplus)
+#define EXTERN extern "C"
+#else
+#define EXTERN extern
+#endif
+typedef void (*CmiCommThdFnPtr)(int numParams, void *params);
+typedef struct CmiNotifyCommThdMsg {
+    CmiCommThdFnPtr fn;
+    int numParams;
+    void *params;
+    int toKeep; /* whether to free this msg by comm thread when the msg is processed */ 
+}CmiNotifyCommThdMsg;
+
+EXTERN CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+EXTERN void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg);
+/* Initialize a notification msg */
+EXTERN void CmiSetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+/* Enqueue the msg into the local comm thread, and wait for being processed */
+EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
+#endif
+
 #endif /* CONVERSE_H */

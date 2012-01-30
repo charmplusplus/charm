@@ -344,6 +344,7 @@ CsvDeclare(CmiNodeState, NodeState);
 /* ===== End of Processor/Node State-related Stuff =====*/
 
 #include "machine-broadcast.c"
+#include "machine-commthd-util.c"
 #include "immediate.c"
 
 /* ===== Beginning of Common Function Definitions ===== */
@@ -675,6 +676,10 @@ if (  MSG_STATISTIC)
 #endif
 #endif
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    CsvInitialize(PCQueue, notifyCommThdQ);
+#endif
+
     CmiStartThreads(argv);
 
     ConverseRunPE(initret);
@@ -702,6 +707,12 @@ static void ConverseRunPE(int everReturn) {
 #if CMK_NODE_QUEUE_AVAILABLE
         CsvAccess(nodeBcastQ) = PCQueueCreate();
 #endif
+    }
+#endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    if (CmiMyRank() == CmiMyNodeSize()) {
+        CsvAccess(notifyCommThdQ) = PCQueueCreate();
     }
 #endif
 
@@ -771,6 +782,10 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #if CMK_SMP && CMK_SMP_NO_COMMTHD
     if (CmiMyRank()==0) CmiHandleImmediate();
 #endif
+#endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    CmiPollCommThdNotificationQ();
 #endif
 
 }
