@@ -106,7 +106,7 @@ static CmiInt8 _expand_mem =  4*oneMB;
 #endif
 
 //Dynamic flow control about memory registration
-#define  MAX_BUFF_SEND      64*oneMB
+#define  MAX_BUFF_SEND      512*oneMB
 static CmiInt8 buffered_send_msg = 0;
 
 #define BIG_MSG                  16*oneMB
@@ -1670,6 +1670,10 @@ static void PumpLocalRdmaTransactions()
             FreePostDesc(tmp_pd);
         }
     } //end while
+    if(status == GNI_RC_ERROR_RESOURCE)
+    {
+        GNI_RC_CHECK("Smsg_sx_cq full", status);
+    }
 }
 
 static void  SendRdmaMsg()
