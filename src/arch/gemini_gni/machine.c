@@ -187,8 +187,13 @@ static int  SMSG_MAX_MSG = 1024;
 /* large message transfer with FMA or BTE */
 #define LRTS_GNI_RDMA_THRESHOLD  2048
 
-#define REMOTE_QUEUE_ENTRIES  20480 
-#define LOCAL_QUEUE_ENTRIES   20480 
+#if CMK_SMP
+static int  REMOTE_QUEUE_ENTRIES=163840; 
+static int LOCAL_QUEUE_ENTRIES=163840; 
+#else
+static int  REMOTE_QUEUE_ENTRIES=20480;
+static int LOCAL_QUEUE_ENTRIES=20480; 
+#endif
 
 #define BIG_MSG_TAG  0x26
 #define PUT_DONE_TAG      0x29
@@ -2390,6 +2395,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
 #endif
 
+    CmiGetArgInt(*argv,"+useRecvQueue", &REMOTE_QUEUE_ENTRIES);
+    CmiGetArgInt(*argv,"+useSendQueue", &LOCAL_QUEUE_ENTRIES);
     useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
     CmiGetArgIntDesc(*argv, "+smsgConnection", &avg_smsg_connection,"Initial number of SMSGS connection per code");
     if (avg_smsg_connection>mysize) avg_smsg_connection = mysize;
