@@ -1285,7 +1285,7 @@ static void PumpNetworkSmsg()
             case ACK_TAG:   //msg fit into mempool
             {
                 /* Get is done, release message . Now put is not used yet*/
-#if         !USE_LRTS_MEMPOOL
+#if ! USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh);
 #else
                 DecreaseMsgInFlight( ((void*)((CONTROL_MSG *) header)->source_addr));
@@ -1763,12 +1763,9 @@ static int SendBufferMsg()
               break;
             }
             ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
-#if         CMK_SMP
-            if(ptr == NULL)
-                break;
-#endif
             CmiAssert(ptr!=NULL);
             //CmiPrintf("SMSG[%d==>%d], tag=%d\n", myrank, ptr->destNode, ptr->tag);
+            status = GNI_RC_ERROR_RESOURCE;
             switch(ptr->tag)
             {
             case SMALL_DATA_TAG:
@@ -2703,6 +2700,7 @@ int CmiBarrier()
          */
         /*START_EVENT();*/
         status = PMI_Barrier();
+        GNI_RC_CHECK("PMI_Barrier", status);
         /*END_EVENT(10);*/
     }
     CmiNodeAllBarrier();
