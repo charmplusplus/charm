@@ -415,11 +415,12 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
     }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE){
         CmiPushNode(msg);
-    else
+        return;
+    }
 #endif
-        CmiPushPE(CMI_DEST_RANK(msg), msg);
+    CmiPushPE(CMI_DEST_RANK(msg), msg);
 
 }
 
