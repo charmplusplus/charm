@@ -295,6 +295,8 @@ static gni_cq_handle_t       post_tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
 #if CMK_SMP && !COMM_THREAD_SEND
 static CmiNodeLock           *ep_lock_array;
+static CmiNodeLock           tx_cq_lock; 
+static CmiNodeLock           rx_cq_lock; 
 #endif
 typedef struct msg_list
 {
@@ -655,7 +657,6 @@ void CmiMachineProgressImpl() {
 
 static void SendRdmaMsg();
 static void PumpNetworkSmsg();
-static void PumpLocalSmsgTransactions();
 static void PumpLocalRdmaTransactions();
 static int SendBufferMsg();
 
@@ -833,11 +834,13 @@ static int connect_to(int destNode)
     smsg_attr_vector_remote[destNode] = (gni_smsg_attr_t*) malloc (sizeof(gni_smsg_attr_t));
             
 #if CMK_SMP && !COMM_THREAD_SEND
-    CmiLock(ep_lock_array[destNode]);
+    //CmiLock(ep_lock_array[destNode]);
+    CmiLock(tx_cq_lock);
 #endif
     status = GNI_EpPostDataWId (ep_hndl_array[destNode], smsg_attr_vector_local[destNode], sizeof(gni_smsg_attr_t),smsg_attr_vector_remote[destNode] ,sizeof(gni_smsg_attr_t), destNode+mysize);
 #if CMK_SMP && !COMM_THREAD_SEND
-    CmiUnlock(ep_lock_array[destNode]);
+    //CmiUnlock(ep_lock_array[destNode]);
+    CmiUnlock(tx_cq_lock);
 #endif
     if (status == GNI_RC_ERROR_RESOURCE) {
       /* possibly destNode is making connection at the same time */
@@ -879,11 +882,13 @@ static gni_return_t send_smsg_message(int destNode, void *header, int size_heade
     if(PCQueueEmpty(smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
     {
 #if CMK_SMP && !COMM_THREAD_SEND
-        CmiLock(ep_lock_array[destNode]);
+        CmiLock(tx_cq_lock);
+        //CmiLock(ep_lock_array[destNode]);
 #endif
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], header, size_header, msg, size, 0, tag);
 #if CMK_SMP && !COMM_THREAD_SEND
-        CmiUnlock(ep_lock_array[destNode]);
+        CmiUnlock(tx_cq_lock);
+       // CmiUnlock(ep_lock_array[destNode]);
 #endif
         if(status == GNI_RC_SUCCESS)
         {
@@ -1137,11 +1142,13 @@ static void    PumpDatagramConnection()
        if (datagram_id >= mysize) {           /* bound endpoint */
            int pe = datagram_id - mysize;
 #if CMK_SMP && !COMM_THREAD_SEND
-           CmiLock(ep_lock_array[pe]);
+           CmiLock(tx_cq_lock);
+          // CmiLock(ep_lock_array[pe]);
 #endif
            status = GNI_EpPostDataTestById( ep_hndl_array[pe], datagram_id, &post_state, &remote_address, &remote_id);
 #if CMK_SMP && !COMM_THREAD_SEND
-           CmiUnlock(ep_lock_array[pe]);
+           CmiUnlock(tx_cq_lock);
+          // CmiUnlock(ep_lock_array[pe]);
 #endif
        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
        {
@@ -1202,8 +1209,17 @@ static void PumpNetworkSmsg()
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
 
-    while ((status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS)
+    while (1)
     {
+#if CMK_SMP && !COMM_THREAD_SEND
+        CmiLock(tx_cq_lock);
+#endif
+        status =GNI_CqGetEvent(smsg_rx_cqh, &event_data);
+#if CMK_SMP && !COMM_THREAD_SEND
+        CmiUnlock(tx_cq_lock);
+#endif
+        if(status != GNI_RC_SUCCESS)
+            break;
         inst_id = GNI_CQ_GET_INST_ID(event_data);
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
 #if PRINT_SYH
@@ -1217,11 +1233,13 @@ static void PumpNetworkSmsg()
         msg_tag = GNI_SMSG_ANY_TAG;
         while(1){
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(ep_lock_array[inst_id]);
+            CmiLock(tx_cq_lock);
+            //CmiLock(ep_lock_array[inst_id]);
 #endif
             status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(ep_lock_array[inst_id]);
+            CmiUnlock(tx_cq_lock);
+            //CmiUnlock(ep_lock_array[inst_id]);
 #endif
             if( status!= GNI_RC_SUCCESS)
                 break;
@@ -1321,11 +1339,13 @@ static void PumpNetworkSmsg()
                      }
             }
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(ep_lock_array[inst_id]);
+            CmiLock(tx_cq_lock);
+            //CmiLock(ep_lock_array[inst_id]);
 #endif
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(ep_lock_array[inst_id]);
+            CmiUnlock(tx_cq_lock);
+            //CmiUnlock(ep_lock_array[inst_id]);
 #endif
             msg_tag = GNI_SMSG_ANY_TAG;
         } //endwhile getNext
@@ -1421,14 +1441,16 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     {
        // CmiPrintf(" PE:%d reigster(size=%d)(%s) (%lld, %lld), (%lld, %lld)\n", myrank, pd->length, gni_err_str[status], (pd->local_mem_hndl).qword1, (pd->local_mem_hndl).qword2, (pd->remote_mem_hndl).qword1, (pd->remote_mem_hndl).qword2);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(ep_lock_array[source]);
+            CmiLock(tx_cq_lock);
+            //CmiLock(ep_lock_array[source]);
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
             status = GNI_PostRdma(ep_hndl_array[source], pd);
         else
             status = GNI_PostFma(ep_hndl_array[source],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(ep_lock_array[source]);
+            CmiUnlock(tx_cq_lock);
+            //CmiUnlock(ep_lock_array[source]);
 #endif
          
         if(status == GNI_RC_SUCCESS )
@@ -1495,14 +1517,16 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     {
         pd->local_mem_hndl  = msg_mem_hndl;
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(ep_lock_array[source]);
+            CmiLock(tx_cq_lock);
+            //CmiLock(ep_lock_array[source]);
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
             status = GNI_PostRdma(ep_hndl_array[source], pd);
         else
             status = GNI_PostFma(ep_hndl_array[source],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(ep_lock_array[source]);
+            CmiUnlock(tx_cq_lock);
+            //CmiUnlock(ep_lock_array[source]);
 #endif
     }else
     {
@@ -1522,31 +1546,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #endif
 }
 
-/* Check whether message send or get is confirmed by remote */
-static void PumpLocalSmsgTransactions()
-{
-    gni_return_t            status;
-    gni_cq_entry_t          ev;
-    uint64_t                type, inst_id;
-    while ((status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS)
-    {
-        type        = GNI_CQ_GET_TYPE(ev);
-#if PRINT_SYH
-        lrts_local_done_msg++;
-        printf("*[%d]  PumpLocalSmsgTransactions GNI_CQ_GET_TYPE %d. Localdone=%d\n", myrank, GNI_CQ_GET_TYPE(ev), lrts_local_done_msg);
-#endif
-        if(GNI_CQ_OVERRUN(ev))
-        {
-            printf("Overrun detected in local CQ");
-            CmiAbort("Overrun in TX");
-        }
-    }
-    if(status == GNI_RC_ERROR_RESOURCE)
-    {
-        GNI_RC_CHECK("Smsg_tx_cq full", status);
-    }
-}
-
 static void PumpLocalRdmaTransactions()
 {
     gni_cq_entry_t          ev;
@@ -1557,9 +1556,17 @@ static void PumpLocalRdmaTransactions()
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
 
-    //while ( (status = GNI_CqGetEvent(post_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
-    while ( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS) 
+    while (1)
     {
+#if CMK_SMP && !COMM_THREAD_SEND
+        CmiLock(tx_cq_lock);
+#endif
+        status = GNI_CqGetEvent(smsg_tx_cqh, &ev);
+#if CMK_SMP && !COMM_THREAD_SEND
+        CmiUnlock(tx_cq_lock);
+#endif
+        if (status != GNI_RC_SUCCESS)
+            break;
         type        = GNI_CQ_GET_TYPE(ev);
         if (type == GNI_CQ_EVENT_TYPE_POST)
         {
@@ -1568,7 +1575,13 @@ static void PumpLocalRdmaTransactions()
             printf("[%d] LocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
 #endif
             //status = GNI_GetCompleted(post_tx_cqh, ev, &tmp_pd);
+#if CMK_SMP && !COMM_THREAD_SEND
+            CmiLock(tx_cq_lock);
+#endif
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
+#if CMK_SMP && !COMM_THREAD_SEND
+            CmiUnlock(tx_cq_lock);
+#endif
             MallocControlMsg(ack_msg_tmp);
             ////Message is sent, free message , put is not used now
             switch (tmp_pd->type) {
@@ -1655,7 +1668,7 @@ static void PumpLocalRdmaTransactions()
     } //end while
     if(status == GNI_RC_ERROR_RESOURCE)
     {
-        GNI_RC_CHECK("Smsg_sx_cq full", status);
+        GNI_RC_CHECK("Smsg_tx_cq full", status);
     }
 }
 
@@ -1695,14 +1708,16 @@ static void  SendRdmaMsg()
         if(status == GNI_RC_SUCCESS)
         {
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(ep_lock_array[ptr->destNode]);
+            //CmiLock(ep_lock_array[ptr->destNode]);
+            CmiLock(tx_cq_lock);
 #endif
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
                 status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
             else
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(ep_lock_array[ptr->destNode]);
+            CmiUnlock(tx_cq_lock);
+            //CmiUnlock(ep_lock_array[ptr->destNode]);
 #endif
             if(status == GNI_RC_SUCCESS)
             {
@@ -2445,6 +2460,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     ep_hndl_array = (gni_ep_handle_t*)malloc(mysize * sizeof(gni_ep_handle_t));
     _MEMCHECK(ep_hndl_array);
 #if CMK_SMP && !COMM_THREAD_SEND
+    tx_cq_lock  = CmiCreateLock();
+    rx_cq_lock  = CmiCreateLock();
     ep_lock_array = (CmiNodeLock*)malloc(mysize*sizeof(CmiNodeLock));
 #endif
     for (i=0; i<mysize; i++) {
@@ -2591,7 +2608,6 @@ void LrtsDrainResources()
         PumpNetworkSmsg();
         //PumpNetworkRdmaMsgs();
         PumpLocalRdmaTransactions();
-        //PumpLocalSmsgTransactions();
         SendRdmaMsg();
     }
     PMI_Barrier();
