@@ -344,8 +344,8 @@ CsvDeclare(CmiNodeState, NodeState);
 /* ===== End of Processor/Node State-related Stuff =====*/
 
 #include "machine-broadcast.c"
-#include "machine-commthd-util.c"
 #include "immediate.c"
+#include "machine-commthd-util.c"
 
 /* ===== Beginning of Common Function Definitions ===== */
 static void PerrorExit(const char *msg) {
@@ -678,7 +678,7 @@ if (  MSG_STATISTIC)
 #endif
 
 #if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-    CsvInitialize(PCQueue, notifyCommThdQ);
+    CsvInitialize(PCQueue, notifyCommThdMsgBuffer);
 #endif
 
     CmiStartThreads(argv);
@@ -711,12 +711,6 @@ static void ConverseRunPE(int everReturn) {
     }
 #endif
 
-#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-    if (CmiMyRank() == CmiMyNodeSize()) {
-        CsvAccess(notifyCommThdQ) = PCQueueCreate();
-    }
-#endif
-
     CmiNodeAllBarrier();
 
     cs = CmiGetState();
@@ -740,6 +734,9 @@ static void ConverseRunPE(int everReturn) {
 
     LrtsPostCommonInit(everReturn);
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    CmiInitNotifyCommThdScheme();
+#endif
     /* Converse initialization finishes, immediate messages can be processed.
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
@@ -784,11 +781,6 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     if (CmiMyRank()==0) CmiHandleImmediate();
 #endif
 #endif
-
-#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
-    CmiPollCommThdNotificationQ();
-#endif
-
 }
 
 static void CommunicationServer(int sleepTime) {

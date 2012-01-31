@@ -17,23 +17,58 @@
  * the developer has to be responsible for freeing such message.
  */
 
-/* This queue is only created on comm thread, and it's multi-producer-single-consumer */
-CsvDeclare(PCQueue, notifyCommThdQ);
+/* This msg buffer pool is only created on comm thread, and it's multi-producer-single-consumer */
+CsvDeclare(PCQueue, notifyCommThdMsgBuffer);
+CpvDeclare(int, notifyCommThdHdlr);
 
+static void commThdHandleNotification(CmiNotifyCommThdMsg *msg){
+    msg->fn(msg->numParams, msg->params);
+    if(!msg->toKeep) CmiFreeNotifyCommThdMsg(msg);
+}
+
+/* Should be called in ConverseRunPE after ConverseCommonInit */
+void CmiInitNotifyCommThdScheme(){
+    CpvInitialize(int, notifyCommThdHdlr);
+    CpvAccess(notifyCommThdHdlr) = CmiRegisterHandler((CmiHandler)commThdHandleNotification);;
+    /* init the msg buffer */
+    if(CmiMyRank() == CmiMyNodeSize()){
+        int i;
+        CsvAccess(notifyCommThdMsgBuffer) = PCQueueCreate();
+        PCQueue q = CsvAccess(notifyCommThdMsgBuffer);
+        /* create init buffer of 16 msgs */
+        for(i=0; i<16; i++) {
+            CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)malloc(sizeof(CmiNotifyCommThdMsg));
+            CmiSetHandler(one, CpvAccess(notifyCommThdHdlr));
+            CmiBecomeImmediate(one);
+            PCQueuePush(q, (char *)one);
+        }
+    }
+    CmiNodeAllBarrier();
+}
+
+/* ============ Beginning of implementation for user APIs ============= */
 CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep){
-    CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)malloc(sizeof(CmiNotifyCommThdMsg));
+    CmiNotifyCommThdMsg *one = (CmiNotifyCommThdMsg *)PCQueuePop(CsvAccess(notifyCommThdMsgBuffer));
+    if(one == NULL) {
+        one = (CmiNotifyCommThdMsg *)malloc(sizeof(CmiNotifyCommThdMsg));
+        CmiSetHandler(one, CpvAccess(notifyCommThdHdlr));
+        CmiBecomeImmediate(one);
+    }
     one->fn = fn;
     one->numParams = numParams;
     one->params = params;
     one->toKeep = toKeep;
+    return one;
 }
 
 void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg){
     free(msg->params);
-    free(msg);
+    /* Recycle the msg */
+    PCQueuePush(CsvAccess(notifyCommThdMsgBuffer), (char *)msg);
 }
 
-void CmiSetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep){
+/* Note: the "msg" has to be created from function call "CmiCreateNotifyCommThdMsg" */
+void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep){
     msg->fn = fn;
     msg->numParams = numParams;
     msg->params = params;
@@ -41,18 +76,7 @@ void CmiSetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int nu
 }
 
 void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg){
-    PCQueuePush(CsvAccess(notifyCommThdQ), (char *)msg);
+   CmiPushImmediateMsg(msg);
 }
-
-void CmiPollCommThdNotificationQ(){
-    PCQueue q = CsvAccess(notifyCommThdQ);
-    CmiNotifyCommThdMsg *msg = (CmiNotifyCommThdMsg *)PCQueuePop(q);
-    
-    while(msg){
-        /* execute the function indicated by the msg */
-        (msg->fn)(msg->numParams, msg->params);
-        if(!msg->toKeep) CmiFreeNotifyCommThdMsg(msg);
-        msg = (CmiNotifyCommThdMsg *)PCQueuePop(q);
-    }
-}
+/* ============ End of implementation for user APIs ============= */
 #endif

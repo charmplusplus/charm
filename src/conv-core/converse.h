@@ -1910,6 +1910,7 @@ extern double CmiLog2(double);
 #endif
 typedef void (*CmiCommThdFnPtr)(int numParams, void *params);
 typedef struct CmiNotifyCommThdMsg {
+    char core[CmiMsgHeaderSizeBytes];
     CmiCommThdFnPtr fn;
     int numParams;
     void *params;
@@ -1919,7 +1920,7 @@ typedef struct CmiNotifyCommThdMsg {
 EXTERN CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
 EXTERN void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg);
 /* Initialize a notification msg */
-EXTERN void CmiSetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
 /* Enqueue the msg into the local comm thread, and wait for being processed */
 EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
