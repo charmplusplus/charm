@@ -34,6 +34,7 @@ There are three options here for synchronization:
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 
 
 /************** 
@@ -191,6 +192,13 @@ void calculateNodeSizeAndRank(char **);
 void setupSharedBuffers();
 void initAllSendQs();
 
+void CmiExitPxshm();
+
+static void cleanupOnAllSigs(int signo)
+{
+    CmiExitPxshm();
+}
+
 /******************
  * 	Initialization routine
  * 	currently just testing start up
@@ -239,6 +247,14 @@ void CmiInitPxshm(char **argv){
 	pxshmContext->commServerTime = 0;
 	pxshmContext->lockRecvCount = 0;
 #endif
+
+        signal(SIGSEGV, cleanupOnAllSigs);
+        signal(SIGFPE, cleanupOnAllSigs);
+        signal(SIGILL, cleanupOnAllSigs);
+        signal(SIGTERM, cleanupOnAllSigs);
+        signal(SIGABRT, cleanupOnAllSigs);
+        signal(SIGQUIT, cleanupOnAllSigs);
+        signal(SIGBUS, cleanupOnAllSigs);
 
 #if 0
         char name[64];
