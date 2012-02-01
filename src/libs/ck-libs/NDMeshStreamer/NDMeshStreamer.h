@@ -2,7 +2,7 @@
 #define _NDMESH_STREAMER_H_
 
 #include <algorithm>
-#include "MeshStreamer.decl.h"
+#include "NDMeshStreamer.decl.h"
 
 // allocate more total buffer space than the maximum buffering limit but flush 
 //   upon reaching totalBufferCapacity_
@@ -160,7 +160,7 @@ void MeshStreamerClient<dtype>::receiveCombinedData(
 template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(
 		     int totalBufferCapacity, int numDimensions, 
-                     int *dimensionSizes, 
+		     int *dimensionSizes, 
                      const CProxy_MeshStreamerClient<dtype> &clientProxy,
 		     int yieldFlag, 
                      double progressPeriodInMs)
@@ -179,7 +179,6 @@ MeshStreamer<dtype>::MeshStreamer(
   myLocationIndex_ = new int[numDimensions_];
   memcpy(individualDimensionSizes_, dimensionSizes, 
 	 numDimensions * sizeof(int)); 
-
   combinedDimensionSizes_[0] = 1; 
   for (int i = 0; i < numDimensions; i++) {
     sumAlongAllDimensions += individualDimensionSizes_[i];
@@ -197,6 +196,7 @@ MeshStreamer<dtype>::MeshStreamer(
   clientProxy_ = clientProxy; 
   clientObj_ = ((MeshStreamerClient<dtype> *)CkLocalBranch(clientProxy_));
 
+  dataBuffers_ = new MeshStreamerMessage<dtype> **[numDimensions_]; 
   for (int i = 0; i < numDimensions; i++) {
     int numNodesAlongDimension = individualDimensionSizes_[i]; 
     dataBuffers_[i] = new MeshStreamerMessage<dtype> *[numNodesAlongDimension];
@@ -581,7 +581,7 @@ void MeshStreamer<dtype>::registerPeriodicProgressFunction() {
 
 
 #define CK_TEMPLATES_ONLY
-#include "MeshStreamer.def.h"
+#include "NDMeshStreamer.def.h"
 #undef CK_TEMPLATES_ONLY
 
 #endif

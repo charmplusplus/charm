@@ -13,7 +13,7 @@ module NDMeshStreamer {
   template<class dtype> 
   group MeshStreamer {
     entry MeshStreamer(int totalBufferCapacity, int numDimensions, 
-		       int *dimensionSizes, 
+		       int dimensionSizes[numDimensions], 
 		       const CProxy_MeshStreamerClient<dtype> &clientProxy, 
                        int yieldFlag = 0, double progressPeriodInMs = -1.0);   
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
