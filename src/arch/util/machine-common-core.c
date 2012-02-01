@@ -468,6 +468,14 @@ inline void CommunicationServerPxshm();
 void CmiExitPxshm();
 #endif
 
+#if CMK_USE_XPMEM
+inline int CmiValidXpmem(int dst, int size);
+void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiInitXpmem(char **argv);
+inline void CommunicationServerXpmem();
+void CmiExitXpmem();
+#endif
+
 int refcount = 0;
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {
@@ -499,6 +507,17 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         int ret=CmiValidPxshm(destPE, size);
         if (ret) {
           CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+#if CMK_PERSISTENT_COMM
+          if (phs) curphs++;
+#endif
+          return;
+        }
+#endif
+#if CMK_USE_XPMEM
+        int ret=CmiValidXpmem(destPE, size);
+        if (ret) {
+          CmiSendMessageXpmem(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
 #if CMK_PERSISTENT_COMM
           if (phs) curphs++;
@@ -650,6 +669,9 @@ if (  MSG_STATISTIC)
 #if CMK_USE_PXSHM
     CmiInitPxshm(argv);
 #endif
+#if CMK_USE_XPMEM
+    CmiInitXpmem(argv);
+#endif
 
     /* CmiTimerInit(); */
 #if CMK_BROADCAST_HYPERCUBE
@@ -762,6 +784,9 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #if CMK_USE_PXSHM
     CommunicationServerPxshm();
 #endif
+#if CMK_USE_XPMEM
+    CommunicationServerXpmem();
+#endif
 
     LrtsAdvanceCommunication(whenidle);
 
@@ -796,6 +821,9 @@ static void CommunicationServer(int sleepTime) {
 
 #if CMK_USE_PXSHM
         CmiExitPxshm();
+#endif
+#if CMK_USE_XPMEM
+        CmiExitXpmem();
 #endif
         LrtsExit();
     }
@@ -838,6 +866,9 @@ if (MSG_STATISTIC)
 #if !CMK_SMP
 #if CMK_USE_PXSHM
     CmiExitPxshm();
+#endif
+#if CMK_USE_XPMEM
+    CmiExitXpmem();
 #endif
     LrtsExit();
 #else
@@ -967,6 +998,9 @@ static char *CopyMsg(char *msg, int len) {
 
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
+#endif
+#if CMK_USE_XPMEM
+#include "machine-xpmem.c"
 #endif
 
 

@@ -1,6 +1,7 @@
 #ifndef _CONV_MACH_XPMEM_
 #define  _CONV_MACH_XPMEM
 
+#undef CMK_USE_PXSHM
 #undef CMK_USE_XPMEM
 #define CMK_USE_XPMEM 			1
 
