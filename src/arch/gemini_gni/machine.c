@@ -184,7 +184,7 @@ static int  SMSG_MAX_MSG = 1024;
 
 #define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
-#define LRTS_GNI_RDMA_THRESHOLD  2048
+#define LRTS_GNI_RDMA_THRESHOLD  1024 
 
 #if CMK_SMP
 static int  REMOTE_QUEUE_ENTRIES=163840; 
@@ -332,21 +332,26 @@ typedef struct  rmda_msg
 {
     int                   destNode;
     gni_post_descriptor_t *pd;
+#if !CMK_SMP
     struct  rmda_msg      *next;
+#endif
 }RDMA_REQUEST;
 
-PCQueue sendRdmaBuf;
 #if CMK_SMP
+PCQueue sendRdmaBuf;
 typedef struct  msg_list_index
 {
     int         next;
     PCQueue     sendSmsgBuf;
 } MSG_LIST_INDEX;
 #else
+RDMA_REQUEST        *sendRdmaBuf;
+RDMA_REQUEST        *sendRdmaTail;
 typedef struct  msg_list_index
 {
     int         next;
     MSG_LIST    *sendSmsgBuf;
+    MSG_LIST    *tail;
 } MSG_LIST_INDEX;
 #endif
 /* reuse PendingMsg memory */
@@ -435,7 +440,8 @@ static RDMA_REQUEST         *rdma_freelist = NULL;
   d = rdma_freelist;\
   if (d==0) {d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));\
              _MEMCHECK(d);\
-  } else rdma_freelist = d->next;
+  } else rdma_freelist = d->next; \
+    d->next =0;
 #endif
 
 /* reuse gni_post_descriptor_t */
@@ -708,8 +714,13 @@ static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
     if (smsg_msglist_index[destNode].sendSmsgBuf == 0 ) {
         smsg_msglist_index[destNode].next = smsg_head_index;
         smsg_head_index = destNode;
-        smsg_msglist_index[destNode].sendSmsgBuf = msg_tmp;
+        smsg_msglist_index[destNode].tail = smsg_msglist_index[destNode].sendSmsgBuf = msg_tmp;
+    }else
+    {
+        smsg_msglist_index[destNode].tail->next = msg_tmp;
+        smsg_msglist_index[destNode].tail = msg_tmp;
     }
+
 #else
     PCQueuePush(smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
 #endif
@@ -772,7 +783,6 @@ static void setup_smsg_connection(int destNode)
     if(status == GNI_RC_ERROR_RESOURCE )
     {
         MallocRdmaRequest(rdma_request_msg);
-        rdma_request_msg->next = 0;
         rdma_request_msg->destNode = destNode;
         rdma_request_msg->pd = pd;
         /* buffer this request */
@@ -1461,10 +1471,19 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
     {
         MallocRdmaRequest(rdma_request_msg);
-        rdma_request_msg->next = 0;
         rdma_request_msg->destNode = inst_id;
         rdma_request_msg->pd = pd;
+#if CMK_SMP
         PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
+#else
+        if(sendRdmaBuf == 0)
+        {
+            sendRdmaBuf = sendRdmaTail = rdma_request_msg;
+        }else{
+            sendRdmaTail->next = rdma_request_msg;
+            sendRdmaTail =  rdma_request_msg;
+        }
+#endif
     }else {
         /* printf("source: %d pd:%p\n", source, pd); */
         GNI_RC_CHECK("AFter posting", status);
@@ -1671,15 +1690,17 @@ static void  SendRdmaMsg()
     gni_mem_handle_t        msg_mem_hndl;
 
     RDMA_REQUEST *ptr = NULL;
-
+#if CMK_SMP
     while (!(PCQueueEmpty(sendRdmaBuf)))
     {
-        ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
+        ptr = (RDMA_REQUEST*)PCQueueTop(sendRdmaBuf);
+#else
+     while( sendRdmaBuf != 0) {
+        ptr = sendRdmaBuf;
+#endif
         gni_post_descriptor_t *pd = ptr->pd;
         status = GNI_RC_SUCCESS;
         
-        //CmiPrintf("LLLLLLLLMSG[%d==>%d], tag=%lld\n", myrank, ptr->destNode, pd->cqwrite_value);
-        // register memory first
         if(pd->cqwrite_value == 0)
         {
             if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
@@ -1700,6 +1721,11 @@ static void  SendRdmaMsg()
         }
         if(status == GNI_RC_SUCCESS)
         {
+#if CMK_SMP
+            PCQueuePop(sendRdmaBuf);
+#else
+            sendRdmaBuf = sendRdmaBuf->next;
+#endif
 #if CMK_SMP && !COMM_THREAD_SEND
             //CmiLock(ep_lock_array[ptr->destNode]);
             CmiLock(tx_cq_lock);
@@ -1721,7 +1747,6 @@ static void  SendRdmaMsg()
             }
         }else
         {
-            PCQueuePush(sendRdmaBuf, (char*)ptr);
             break;
         }
     } //end while
@@ -2523,7 +2548,11 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     //_init_DMA_buffer();
     
     free(MPID_UGNI_AllAddr);
-    sendRdmaBuf = PCQueueCreate(); 
+#if CMK_SMP
+    sendRdmaBuf = PCQueueCreate();
+#else
+    sendRdmaBuf = 0;
+#endif
 }
 
 void* LrtsAlloc(int n_bytes, int header)
