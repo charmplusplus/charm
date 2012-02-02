@@ -9,6 +9,8 @@
 #include "queueing.h"
 
 #define USE_CONVERSE_MSG 1
+#define USE_TREE_BROADCAST 0
+#define TREE_BCAST_BRANCH (4)
 
 /* The following only works on X86_64 platform */
 #define AtomicIncrement(someInt)  __asm__ __volatile__("lock incl (%0)" :: "r" (&(someInt)))
@@ -120,6 +122,9 @@ public:
 
 typedef struct converseNotifyMsg{
     char core[CmiMsgHeaderSizeBytes];
+#if USE_TREE_BROADCAST
+    int srcRank;
+#endif    
     void *ptr;
 }ConverseNotifyMsg;
 

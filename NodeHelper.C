@@ -262,12 +262,20 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
         curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
         ConverseNotifyMsg *notifyMsg = &(notifyMsgs[CmiMyRank()]);
         notifyMsg->ptr = (void *)curLoop;
-        
+#if USE_TREE_BROADCAST        
+        notifyMsg->srcRank = CmiMyRank();
+        int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
+        //just implicit binary tree
+        int pe = CmiMyRank()+1;        
+        for(int i=0; i<loopTimes; i++, pe++){
+            if(pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
+            CmiPushPE(pe, (void *)(notifyMsg));    
+        }
+#else        
         for (int i=0; i<numHelpers; i++) {
-            if (i!=CkMyRank()) {                
-                CmiPushPE(i, (void *)(notifyMsg));
-            }
-        }        
+            if (i!=CkMyRank()) CmiPushPE(i, (void *)(notifyMsg));            
+        }
+#endif            
         curLoop->stealWork();
         TRACE_BRACKET(20);
         
@@ -394,6 +402,20 @@ void NotifySingleHelper(ConverseNotifyMsg *msg){
 }
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg){
+#if USE_TREE_BROADCAST
+    //int numHelpers = CmiMyNodeSize(); //the value of "numHelpers" should be obtained somewhere else
+    int relPE = CmiMyRank()-msg->srcRank;
+    if(relPE<0) relPE += CmiMyNodeSize();
+    
+    //CmiPrintf("Rank[%d]: got msg from src %d with relPE %d\n", CmiMyRank(), msg->srcRank, relPE);
+    relPE=relPE*TREE_BCAST_BRANCH+1;
+    for(int i=0; i<TREE_BCAST_BRANCH; i++, relPE++){
+        if(relPE >= CmiMyNodeSize()) break;
+        int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
+        //CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
+        CmiPushPE(pe, (void *)msg);
+    }
+#endif
     CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
     loop->stealWork();
 }
