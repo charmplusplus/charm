@@ -443,10 +443,10 @@ void CurLoopInfo::stealWork(){
         }
                 
         fnPtr(first, last, redBufs[nextChunkId], paramNum, param);
+        reportFinished();
         
         nextChunkId = getNextChunkIdx();
     }
-    reportFinished();    
 }
 
 //======================================================================//
