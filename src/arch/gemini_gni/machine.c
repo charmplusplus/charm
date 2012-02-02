@@ -357,7 +357,7 @@ typedef struct  msg_list_index
 /* reuse PendingMsg memory */
 static CONTROL_MSG          *control_freelist=0;
 static MSG_LIST             *msglist_freelist=0;
-static int                  smsg_head_index;
+static int                  smsg_head_index = -1;
 static MSG_LIST_INDEX       *smsg_msglist_index= 0;
 static MSG_LIST             *smsg_free_head=0;
 static MSG_LIST             *smsg_free_tail=0;
@@ -710,6 +710,7 @@ static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
     //msg_tmp->next   = 0;
+
 #if !CMK_SMP
     if (smsg_msglist_index[destNode].sendSmsgBuf == 0 ) {
         smsg_msglist_index[destNode].next = smsg_head_index;
@@ -720,7 +721,6 @@ static void buffer_small_msgs(void *msg, int size, int destNode, uint8_t tag)
         smsg_msglist_index[destNode].tail->next = msg_tmp;
         smsg_msglist_index[destNode].tail = msg_tmp;
     }
-
 #else
     PCQueuePush(smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
 #endif
@@ -1570,6 +1570,7 @@ static void PumpLocalRdmaTransactions()
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
+
     while( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS)
     {
 #if CMK_SMP && !COMM_THREAD_SEND
@@ -1688,14 +1689,14 @@ static void  SendRdmaMsg()
 {
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
-
     RDMA_REQUEST *ptr = NULL;
+
 #if CMK_SMP
     while (!(PCQueueEmpty(sendRdmaBuf)))
     {
         ptr = (RDMA_REQUEST*)PCQueueTop(sendRdmaBuf);
 #else
-     while( sendRdmaBuf != 0) {
+    while( sendRdmaBuf != 0) {
         ptr = sendRdmaBuf;
 #endif
         gni_post_descriptor_t *pd = ptr->pd;
@@ -1767,7 +1768,7 @@ static int SendBufferMsg()
     int			sent_cnt = 0;
 #endif
 
-#if !CMK_SMP
+#if ! CMK_SMP
     index = smsg_head_index;
 #else
     index = 0;
@@ -1909,8 +1910,8 @@ static int SendBufferMsg()
 #endif
 
 #if CMI_EXERT_SEND_CAP
-		if(sent_cnt == SEND_CAP)
-			break;
+	if(sent_cnt == SEND_CAP)
+		break;
 #endif
     }   // end pooling for all cores
     return done;
