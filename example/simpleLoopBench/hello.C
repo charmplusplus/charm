@@ -7,7 +7,7 @@
 
 #include <omp.h>
 
-#define TEST_REPEAT_TIMES 10
+#define TEST_REPEAT_TIMES 100
 
 CProxy_Main mainProxy;
 CProxy_TestInstance allTestsProxy;
@@ -33,6 +33,9 @@ void work(int start, int end, void *result) {
         tmp+=(int)(sqrt(1+cos(i*1.57)));
     }
     *(int *)result = tmp;
+    
+   //CkPrintf("From rank[%d]: start=%d, end=%d, result=%d\n", CkMyRank(), start, end, tmp);
+   //fflush(stdout);
 }
 
 int openMPWork(int start, int end) {
@@ -80,8 +83,8 @@ Main::Main(CkArgMsg* m) {
 	
     omp_set_num_threads(numChunks);    
     
-	mainTimes = new double[loopTimes];
-	memset(mainTimes, 0, sizeof(double)*loopTimes);
+	mainTimes = new double[TEST_REPEAT_TIMES];
+	memset(mainTimes, 0, sizeof(double)*TEST_REPEAT_TIMES);
 	
 	CkPrintf("Using NodeHelper Lib with mode: %d, nodesize=%d\n", runningMode, CkMyNodeSize());
 	CkPrintf("Testcase info: %d test instances where the loop iterates %d times, each work is partitioned into %d tasks\n", totalElems, loopTimes, numChunks);
@@ -155,7 +158,9 @@ void Main::exitTest(){
 
 void Main::doTests(CkQdMsg *msg) {
     delete msg;
-    
+
+    //CkPrintf("===========Starting mainstep %d===========\n", mainStep);    
+
     if(mainStep == 0){
         if(curTestMode == 0){
             CkPrintf("===Start NodeHelper Test===\n");
@@ -207,10 +212,10 @@ TestInstance::TestInstance() {
     CkPrintf("test case %d is created on proc %d node %d\n", thisIndex, CkMyPe(),CkMyNode());
     
 	hasTest = 0; 
-	allTimes = new double[loopTimes];
-	allResults = new int[loopTimes];
-	memset(allTimes, 0, sizeof(double)*loopTimes);
-	memset(allResults, 0, sizeof(int)*loopTimes);
+	allTimes = new double[TEST_REPEAT_TIMES];
+	allResults = new int[TEST_REPEAT_TIMES];
+	memset(allTimes, 0, sizeof(double)*TEST_REPEAT_TIMES);
+	memset(allResults, 0, sizeof(int)*TEST_REPEAT_TIMES);
 }
 
 void TestInstance::doTest(int curstep, int curTestMode) {
