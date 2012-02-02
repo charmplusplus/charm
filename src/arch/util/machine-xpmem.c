@@ -674,24 +674,25 @@ void removeXpmemFiles()
 }
 
 void tearDownSharedBuffers(){
+#if PXSHM_LOCK
 	int i;
-	for(i= 0;i<xpmemContext->nodesize;i++){
-		if(i != xpmemContext->noderank){
-#if 0
-			if(shm_unlink(xpmemContext->recvBufNames[i]) < 0) {
-				fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
-			}
-#endif
-
-#if XPMEM_LOCK
-			sem_close(xpmemContext->recvBufs[i].mutex);
-			//sem_unlink(xpmemContext->recvBufNames[i]);
-			sem_close(xpmemContext->sendBufs[i].mutex);
-#endif
-		}
+	for(i= 0;i<pxshmContext->nodesize;i++){
+	    if(i != pxshmContext->noderank){
+                if (pxshmContext->recvBufs[i].mutex != NULL)
+                {
+		    sem_close(pxshmContext->recvBufs[i].mutex);
+		    if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
+			fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
+		    }
+		    sem_close(pxshmContext->sendBufs[i].mutex);
+		    sem_unlink(pxshmContext->sendBufNames[i]);
+                    pxshmContext->recvBufs[i].mutex = NULL;
+                    pxshmContext->sendBufs[i].mutex = NULL;
+                }
+	    }
 	}
+#endif
 };
-
 
 void initSendQ(XpmemSendQ *q,int size);
 
