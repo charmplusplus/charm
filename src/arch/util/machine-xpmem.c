@@ -183,7 +183,7 @@ static void cleanupOnAllSigs(int signo)
     CmiExitXpmem();
 }
 
-int xpmem_fd;
+static int xpmem_fd;
 
 /******************
  * 	Initialization routine
@@ -555,12 +555,6 @@ void attachXpmemObject(__s64 segid, int size, char **pPtr)
        __s64 apid;
        struct xpmem_cmd_get get_info;
        struct xpmem_cmd_attach attach_info;
-       int *attached_buffer;
-
-       xpmem_fd = open("/dev/xpmem", O_RDWR);
-       if (xpmem_fd == -1) {
-               CmiAbort("Opening /dev/xpmem");
-       }
 
        get_info.segid = segid;
        get_info.flags = XPMEM_RDWR;
@@ -601,7 +595,6 @@ void createRecvXpmemAndSems(sharedBufData **bufs,char **bufNames){
 	for(i=0;i<xpmemContext->nodesize;i++){
 	    if(i != xpmemContext->noderank)  {
                 (*bufs)[i].segid = segid_arr[i] = createXpmemObject(size,(char **)&((*bufs)[i].header));
-		//	createShmObject(bufNames[i],SHMBUFLEN+sizeof(sharedBufHeader),(char **)&((*bufs)[i].header));
                 memset(((*bufs)[i].header), 0, size);
 		(*bufs)[i].data = ((char *)((*bufs)[i].header))+sizeof(sharedBufHeader);
 #if XPMEM_OSSPINLOCK
