@@ -1099,6 +1099,6 @@ HashIFDefComment: HASHIFDEF Name
 %%
 void yyerror(const char *mesg)
 {
-    std::cerr << cur_file<<":"<<lineno<<": Charmxi (version " << CmiCommitID << ") syntax error> "
+    std::cerr << cur_file<<":"<<lineno<<": Charmxi syntax error> "
 	      << mesg << std::endl;
 }

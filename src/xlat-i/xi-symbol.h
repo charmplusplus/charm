@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <list>
 
-extern "C" const char * const CmiCommitID;
 
 namespace xi {
 
