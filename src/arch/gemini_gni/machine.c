@@ -252,38 +252,6 @@ gni_msgq_handle_t       msgq_handle;
 gni_msgq_ep_attr_t      msgq_ep_attrs;
 gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 
-
-
-/* preallocated DMA buffer */
-int                     DMA_slots;
-uint64_t                DMA_avail_tag = 0;
-uint32_t                DMA_incoming_avail_tag = 0;
-uint32_t                DMA_outgoing_avail_tag = 0;
-void                    *DMA_incoming_base_addr;
-void                    *DMA_outgoing_base_addr;
-mdh_addr_t              DMA_buffer_base_mdh_addr;
-mdh_addr_t              *DMA_buffer_base_mdh_addr_vec;
-int                     DMA_buffer_size;
-int                     DMA_max_single_msg = 131072;//524288 ;
-
-#define                 DMA_SIZE_PER_SLOT       8192
-
-
-typedef struct dma_msgid_map
-{
-    uint64_t     msg_id;
-    int     msg_subid;
-} dma_msgid_map_t;
-
-dma_msgid_map_t         *dma_map_list;
-
-typedef struct msg_trace
-{
-    uint64_t    msg_id;
-    int         done_num;
-}msg_trace_t;
-
-msg_trace_t             *pending_msg_list;
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
@@ -320,13 +288,6 @@ typedef struct control_msg
     gni_mem_handle_t    source_mem_hndl;
     struct control_msg *next;
 }CONTROL_MSG;
-
-typedef struct medium_msg_control
-{
-    uint64_t            dma_offset;     //the dma_buffer for this block of msg
-    int                 msg_id;         //Id for the total index
-    int                 msg_subid;      //offset inside the message id 
-}MEDIUM_MSG_CONTROL;
 
 typedef struct  rmda_msg
 {
@@ -897,12 +858,10 @@ inline static gni_return_t send_smsg_message(int destNode, void *msg, int size, 
 #endif
 #if CMK_SMP && !COMM_THREAD_SEND
         CmiLock(tx_cq_lock);
-        //CmiLock(ep_lock_array[destNode]);
 #endif
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, msg, size, 0, tag);
 #if CMK_SMP && !COMM_THREAD_SEND
         CmiUnlock(tx_cq_lock);
-       // CmiUnlock(ep_lock_array[destNode]);
 #endif
         if(status == GNI_RC_SUCCESS)
         {
@@ -929,15 +888,6 @@ inline static gni_return_t send_smsg_message(int destNode, void *msg, int size, 
     return status;
 }
 
-// Get first 0 in DMA_tags starting from index
-static int get_first_avail_bit(uint64_t DMA_tags, int start_index)
-{
-
-    uint64_t         mask = 0x1;
-    register    int     i=0;
-    while((DMA_tags & mask) && i<DMA_slots) {mask << 1; i++;}
-
-}
 
 inline static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t seqno)
 {
@@ -1157,12 +1107,10 @@ static void    PumpDatagramConnection()
            int pe = datagram_id - mysize;
 #if CMK_SMP && !COMM_THREAD_SEND
            CmiLock(tx_cq_lock);
-          // CmiLock(ep_lock_array[pe]);
 #endif
            status = GNI_EpPostDataTestById( ep_hndl_array[pe], datagram_id, &post_state, &remote_address, &remote_id);
 #if CMK_SMP && !COMM_THREAD_SEND
            CmiUnlock(tx_cq_lock);
-          // CmiUnlock(ep_lock_array[pe]);
 #endif
        if(status == GNI_RC_SUCCESS && post_state == GNI_POST_COMPLETED)
        {
@@ -1223,13 +1171,17 @@ static void PumpNetworkSmsg()
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
 
+#if CMK_SMP && !COMM_THREAD_SEND
+    while(1)
+    {
+        CmiLock(tx_cq_lock);
+        status =GNI_CqGetEvent(smsg_rx_cqh, &event_data);
+        CmiUnlock(tx_cq_lock);
+        if(status != GNI_RC_SUCCESS)
+            break;
+#else
     while ( (status =GNI_CqGetEvent(smsg_rx_cqh, &event_data)) == GNI_RC_SUCCESS)
     {
-#if CMK_SMP && !COMM_THREAD_SEND
-        CmiLock(tx_cq_lock);
-#endif
-#if CMK_SMP && !COMM_THREAD_SEND
-        CmiUnlock(tx_cq_lock);
 #endif
         inst_id = GNI_CQ_GET_INST_ID(event_data);
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
@@ -1242,12 +1194,15 @@ static void PumpNetworkSmsg()
                PumpDatagramConnection();
         }
         msg_tag = GNI_SMSG_ANY_TAG;
-        while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS){
 #if CMK_SMP && !COMM_THREAD_SEND
+        while(1) {
             CmiLock(tx_cq_lock);
-#endif
-#if CMK_SMP && !COMM_THREAD_SEND
+            status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag);
             CmiUnlock(tx_cq_lock);
+            if (status != GNI_RC_SUCCESS)
+                break;
+#else
+        while( (status = GNI_SmsgGetNextWTag(ep_hndl_array[inst_id], &header, &msg_tag)) == GNI_RC_SUCCESS){
 #endif
             /* copy msg out and then put into queue (small message) */
             switch (msg_tag) {
@@ -1346,12 +1301,10 @@ static void PumpNetworkSmsg()
             }
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiLock(tx_cq_lock);
-            //CmiLock(ep_lock_array[inst_id]);
 #endif
             GNI_SmsgRelease(ep_hndl_array[inst_id]);
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiUnlock(tx_cq_lock);
-            //CmiUnlock(ep_lock_array[inst_id]);
 #endif
             msg_tag = GNI_SMSG_ANY_TAG;
         } //endwhile getNext
@@ -1416,7 +1369,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     }
     else{
         transaction_size = ALIGN64(request_msg->length);
-//printf("[%d] seq: %d msg_data: %p transaction_size: %d\n", CmiMyPe(), request_msg->seq_id, msg_data, transaction_size);
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &(pd->local_mem_hndl), &omdh);
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
@@ -1447,16 +1399,14 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     {
        // CmiPrintf(" PE:%d reigster(size=%d)(%s) (%lld, %lld), (%lld, %lld)\n", myrank, pd->length, gni_err_str[status], (pd->local_mem_hndl).qword1, (pd->local_mem_hndl).qword2, (pd->remote_mem_hndl).qword1, (pd->remote_mem_hndl).qword2);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiLock(tx_cq_lock);
-            //CmiLock(ep_lock_array[source]);
+        CmiLock(tx_cq_lock);
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
             status = GNI_PostRdma(ep_hndl_array[inst_id], pd);
         else
             status = GNI_PostFma(ep_hndl_array[inst_id],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
-            CmiUnlock(tx_cq_lock);
-            //CmiUnlock(ep_lock_array[source]);
+        CmiUnlock(tx_cq_lock);
 #endif
          
         if(status == GNI_RC_SUCCESS )
@@ -1533,7 +1483,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         pd->local_mem_hndl  = msg_mem_hndl;
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiLock(tx_cq_lock);
-            //CmiLock(ep_lock_array[source]);
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
             status = GNI_PostRdma(ep_hndl_array[inst_id], pd);
@@ -1541,7 +1490,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
             status = GNI_PostFma(ep_hndl_array[inst_id],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiUnlock(tx_cq_lock);
-            //CmiUnlock(ep_lock_array[source]);
 #endif
     }else
     {
@@ -1571,13 +1519,16 @@ static void PumpLocalRdmaTransactions()
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
 
+#if CMK_SMP && !COMM_THREAD_SEND
+    while(1) {
+        CmiLock(tx_cq_lock);
+        status = GNI_CqGetEvent(smsg_tx_cqh, &ev);
+        CmiUnlock(tx_cq_lock);
+        if(status != GNI_RC_SUCCESS)
+            break;
+#else
     while( (status = GNI_CqGetEvent(smsg_tx_cqh, &ev)) == GNI_RC_SUCCESS)
     {
-#if CMK_SMP && !COMM_THREAD_SEND
-        CmiLock(tx_cq_lock);
-#endif
-#if CMK_SMP && !COMM_THREAD_SEND
-        CmiUnlock(tx_cq_lock);
 #endif
         type = GNI_CQ_GET_TYPE(ev);
         if (type == GNI_CQ_EVENT_TYPE_POST)
@@ -1694,7 +1645,7 @@ static void  SendRdmaMsg()
 #if CMK_SMP
     while (!(PCQueueEmpty(sendRdmaBuf)))
     {
-        ptr = (RDMA_REQUEST*)PCQueueTop(sendRdmaBuf);
+        ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
 #else
     while( sendRdmaBuf != 0) {
         ptr = sendRdmaBuf;
@@ -1722,13 +1673,10 @@ static void  SendRdmaMsg()
         }
         if(status == GNI_RC_SUCCESS)
         {
-#if CMK_SMP
-            PCQueuePop(sendRdmaBuf);
-#else
+#if !CMK_SMP
             sendRdmaBuf = sendRdmaBuf->next;
 #endif
 #if CMK_SMP && !COMM_THREAD_SEND
-            //CmiLock(ep_lock_array[ptr->destNode]);
             CmiLock(tx_cq_lock);
 #endif
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
@@ -1737,7 +1685,6 @@ static void  SendRdmaMsg()
                 status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiUnlock(tx_cq_lock);
-            //CmiUnlock(ep_lock_array[ptr->destNode]);
 #endif
             if(status == GNI_RC_SUCCESS)
             {
@@ -1748,6 +1695,9 @@ static void  SendRdmaMsg()
             }
         }else
         {
+#if CMK_SMP
+            PCQueuePush(sendRdmaBuf, (char*)ptr);
+#endif
             break;
         }
     } //end while
@@ -1793,7 +1743,7 @@ static int SendBufferMsg()
               break;
             }
 #if CMK_SMP
-            ptr = (MSG_LIST*)PCQueueTop(smsg_msglist_index[index].sendSmsgBuf);
+            ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
 #else
             ptr = smsg_msglist_index[index].sendSmsgBuf;
 #endif
@@ -1872,9 +1822,7 @@ static int SendBufferMsg()
             }
             if(status == GNI_RC_SUCCESS)
             {
-#if CMK_SMP
-                (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
-#else
+#if !CMK_SMP
                 smsg_msglist_index[index].sendSmsgBuf = smsg_msglist_index[index].sendSmsgBuf->next;
 #endif
 #if PRINT_SYH
@@ -1888,6 +1836,9 @@ static int SendBufferMsg()
                     break;
 #endif
             }else {
+#if CMK_SMP
+                PCQueuePush(smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
+#endif
                 done = 0;
                 break;
             } 
@@ -2170,40 +2121,6 @@ static void _init_static_msgq()
     GNI_RC_CHECK("MSGQ Init", status);
 
 
-}
-
-static void _init_DMA_buffer()
-{
-    gni_return_t            status = GNI_RC_SUCCESS;
-    /*AUTO tuning */
-    /* suppose max_smsg is 1024, DMA buffer is split into 2048, 4096, 8192, ... */
-    /*  This method might be better for SMP, but it is bad for Nonsmp since msgs are sharing same slots */
-    /*
-     * DMA_slots = 19-log2_SMSG_MAX_MSG;
-    DMA_incoming_avail_tag = malloc(DMA_slots);
-    DMA_buffer_size = 2*(DMA_max_single_msg - SMSG_MAX_MSG); 
-    DMA_incoming_base_addr =  memalign(ALIGNBUF, DMA_buffer_size);
-    DMA_outgoing_base_addr =  memalign(ALIGNBUF, DMA_buffer_size);
-    
-    status = GNI_MemRegister(nic_hndl, (uint64_t)DMA_incoming_base_addr,
-            DMA_buffer_size, smsg_rx_cqh,
-            GNI_MEM_READWRITE ,   
-            vmdh_index,
-            &);
-            */
-    // one is reserved to avoid deadlock
-    DMA_slots           = 17; // each one is 8K  16*8K + 1 slot reserved to avoid deadlock
-    DMA_buffer_size     = DMA_max_single_msg + 8192;
-    DMA_buffer_base_mdh_addr.addr = (uint64_t)memalign(ALIGNBUF, DMA_buffer_size);
-    status = GNI_MemRegister(nic_hndl, DMA_buffer_base_mdh_addr.addr,
-        DMA_buffer_size, smsg_rx_cqh,
-        GNI_MEM_READWRITE ,   
-        -1,
-        &(DMA_buffer_base_mdh_addr.mdh));
-    GNI_RC_CHECK("GNI_MemRegister", status);
-    DMA_buffer_base_mdh_addr_vec = (mdh_addr_t*) malloc(sizeof(mdh_addr_t) * mysize);
-
-    allgather(&DMA_buffer_base_mdh_addr, DMA_buffer_base_mdh_addr_vec, sizeof(mdh_addr_t) );
 }
 
 #if CMK_SMP && STEAL_MEMPOOL
@@ -2495,7 +2412,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_SMP && !COMM_THREAD_SEND
     tx_cq_lock  = CmiCreateLock();
     rx_cq_lock  = CmiCreateLock();
-    ep_lock_array = (CmiNodeLock*)malloc(mysize*sizeof(CmiNodeLock));
 #endif
     for (i=0; i<mysize; i++) {
         if(i == myrank) continue;
@@ -2504,9 +2420,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         remote_addr = MPID_UGNI_AllAddr[i];
         status = GNI_EpBind(ep_hndl_array[i], remote_addr, i);
         GNI_RC_CHECK("GNI_EpBind ", status);   
-#if CMK_SMP && !COMM_THREAD_SEND
-        ep_lock_array[i] = CmiCreateLock(); 
-#endif
     }
     /* Depending on the number of cores in the job, decide different method */
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
