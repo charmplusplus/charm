@@ -1575,16 +1575,16 @@ static void PumpLocalRdmaTransactions()
             CmiUnlock(tx_cq_lock);
 #endif
             MallocControlMsg(ack_msg_tmp);
+            ack_msg_tmp->source_addr = tmp_pd->remote_addr;
             ////Message is sent, free message , put is not used now
             switch (tmp_pd->type) {
 #if CMK_PERSISTENT_COMM
             case GNI_POST_RDMA_PUT:
-#if     !USE_LRTS_MEMPOOL
+#if ! USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
 #endif
             case GNI_POST_FMA_PUT:
                 CmiFree((void *)tmp_pd->local_addr);
-            ack_msg_tmp->source_addr     = tmp_pd->remote_addr;
                 msg_tag = PUT_DONE_TAG;
                 break;
 #endif
@@ -1606,7 +1606,6 @@ static void PumpLocalRdmaTransactions()
                 {
                     msg_tag = ACK_TAG;  
                     ack_msg_tmp->dest_addr = tmp_pd->local_addr;
-                    ack_msg_tmp->source_addr     = tmp_pd->remote_addr;
                 }
                 ack_msg_tmp->length = tmp_pd->length;
                 ack_msg_tmp->total_length = tmp_pd->first_operand;     // total size
