@@ -537,7 +537,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-        LrtsSendNetworkFunc(destPE, size, msg, P2P_SYNC);
+        LrtsSendNetworkFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
