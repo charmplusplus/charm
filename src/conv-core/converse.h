@@ -392,7 +392,7 @@ for each processor in the node.
 #define CpvMemoryWriteFence() CmiMemoryWriteFence()
 #endif
 
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t ** CMK_TAG(Cpv_addr_,v);

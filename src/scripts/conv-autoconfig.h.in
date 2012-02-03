@@ -280,7 +280,7 @@
 #undef CMK_TLS_SWITCHING64
 
 /* Allows __thread. */
-#undef CMK_TLS_THREAD
+#undef CMK_HAS_TLS_VARIABLES
 
 /* enable tracing */
 #undef CMK_TRACE_ENABLED

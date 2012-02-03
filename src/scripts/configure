@@ -2821,7 +2821,7 @@ EOT
 test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 
 cat >>confdefs.h <<_ACEOF
-#define CMK_TLS_THREAD $strictpass
+#define CMK_HAS_TLS_VARIABLES $strictpass
 _ACEOF
 
 

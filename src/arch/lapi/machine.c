@@ -216,7 +216,7 @@ CpvDeclare(MsgOrderInfo, p2pMsgSeqInfo);
  * because there's charm proc-private variable access would be
  * incorrect in lapi's internal threads. -Chao Mei
  */
-#if (CMK_SMP && (!CMK_SMP_NO_COMMTHD || (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD))) || ENSURE_MSG_PAIRORDER
+#if (CMK_SMP && (!CMK_SMP_NO_COMMTHD || (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD))) || ENSURE_MSG_PAIRORDER
 #undef CMK_OFFLOAD_BCAST_PROCESS
 #define CMK_OFFLOAD_BCAST_PROCESS 1
 #endif

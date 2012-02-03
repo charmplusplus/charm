@@ -267,7 +267,7 @@ CmiNodeLock cmiMemoryLock;
 int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
 in smp*/
 
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 static __thread struct CmiStateStruct     Cmi_mystate;
 static CmiState     *Cmi_state_vector;
 
@@ -382,7 +382,7 @@ static void *call_startfn(void *vindex)
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
   if (index<_Cmi_mynodesize) 
     CmiStateInit(index+Cmi_nodestart, index, &Cmi_mystate);
   else
@@ -422,7 +422,7 @@ static void CmiStartThreads(char **argv)
   if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
 #endif
 
-#if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(_Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
@@ -462,7 +462,7 @@ static void CmiStartThreads(char **argv)
     if (ok<0) PerrorExit("pthread_create"); 
     pthread_attr_destroy(&attr);
   }
-#if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
 #if CMK_CONVERSE_MPI
   pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
 #else

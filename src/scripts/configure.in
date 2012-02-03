@@ -881,7 +881,7 @@ void foo(void)
 }
 EOT
 test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
-AC_DEFINE_UNQUOTED(CMK_TLS_THREAD, $strictpass, [Allows __thread.])
+AC_DEFINE_UNQUOTED(CMK_HAS_TLS_VARIABLES, $strictpass, [Allows __thread.])
 
 ### test if switching TLS register ###
 if test $in64bit = 1

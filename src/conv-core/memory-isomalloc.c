@@ -45,7 +45,7 @@ void CmiEnableIsomalloc()
 	rank_holding_CmiMemLock=-1;
 }
 
-#if CMK_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES
 /**
  * make sure isomalloc is only called in pthreads that is spawned by Charm++.
  * It is not safe to call isomalloc in system spawned pthreads for example
@@ -67,7 +67,7 @@ static void meta_init(char **argv)
    CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
    CpvInitialize(CmiIsomallocBlockList *,isomalloc_blocklist);
    CpvInitialize(CmiIsomallocBlockList *,pushed_blocklist);
-#if CMK_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES
    isomalloc_thread = 1;         /* isomalloc is allowed in this pthread */
 #endif
    CmiNodeAllBarrier();
@@ -77,12 +77,12 @@ static void meta_init(char **argv)
 static void *meta_malloc(size_t size)
 {
 	void *ret=NULL;
-#if CMK_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES
         int _isomalloc_thread = isomalloc_thread;
         if (CmiThreadIs(CMI_THREAD_IS_TLS)) _isomalloc_thread = 1;
 #endif
 	if (meta_inited && CpvInitialized(isomalloc_blocklist) && CpvAccess(isomalloc_blocklist)
-#if CMK_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES
              && _isomalloc_thread
 #endif
            )

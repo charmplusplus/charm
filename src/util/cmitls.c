@@ -4,7 +4,7 @@
 #include "converse.h"
 #include "cmitls.h"
 
-#if CMK_HAS_ELF_H && CMK_TLS_THREAD
+#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
 extern void* __executable_start;
 
