@@ -462,7 +462,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 
 #if CMK_USE_PXSHM
 inline int CmiValidPxshm(int dst, int size);
-void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount);
 void CmiInitPxshm(char **argv);
 inline void CommunicationServerPxshm();
 void CmiExitPxshm();
@@ -470,13 +470,44 @@ void CmiExitPxshm();
 
 #if CMK_USE_XPMEM
 inline int CmiValidXpmem(int dst, int size);
-void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount);
 void CmiInitXpmem(char **argv);
 inline void CommunicationServerXpmem();
 void CmiExitXpmem();
 #endif
 
 int refcount = 0;
+
+/* a wrapper of LrtsSendFunc */
+#if CMK_C_INLINE
+inline 
+#endif
+CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
+{
+        int rank;
+#if CMK_USE_PXSHM
+        if (CmiValidPxshm(destNode, size)) {
+          CmiSendMessagePxshm(msg, size, destNode, &refcount);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+          return 0;
+        }
+#endif
+#if CMK_USE_XPMEM
+        if (CmiValidXpmem(destNode, size)) {
+          CmiSendMessageXpmem(msg, size, destNode, &refcount);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+          return 0;
+        }
+#endif
+
+if (MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
+    return LrtsSendFunc(destNode, size, msg, mode);
+}
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
@@ -488,13 +519,16 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 #endif
     } else {
 #if CMK_PERSISTENT_COMM
-        if (phs && size > 8192) {
+        if (phs) {
+          if (size > 8192) {
             CmiAssert(curphs < phsSize);
             LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
             return;
+          }
+          else
+            curphs++;
         }
 #endif
-
         int destNode = CmiNodeOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
@@ -503,35 +537,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-#if CMK_USE_PXSHM
-        int ret=CmiValidPxshm(destPE, size);
-        if (ret) {
-          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
-          //for (int i=0; i<refcount; i++) CmiReference(msg);
-#if CMK_PERSISTENT_COMM
-          if (phs) curphs++;
-#endif
-          return;
-        }
-#endif
-#if CMK_USE_XPMEM
-        int ret=CmiValidXpmem(destPE, size);
-        if (ret) {
-          CmiSendMessageXpmem(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
-          //for (int i=0; i<refcount; i++) CmiReference(msg);
-#if CMK_PERSISTENT_COMM
-          if (phs) curphs++;
-#endif
-          return;
-        }
-#endif
-if (  MSG_STATISTIC)
-{
-    int ret_log = _cmi_log2(size);
-    if(ret_log >21) ret_log = 21;
-    msg_histogram[ret_log]++;
-}
-        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
+        LrtsSendNetworkFunc(destPE, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -882,6 +888,15 @@ if (MSG_STATISTIC)
 }
 /* ##### End of Functions Related with Machine Running ##### */
 
+void CmiAbort(const char *message) {
+#if CMK_USE_PXSHM
+    CmiExitPxshm();
+#endif
+#if CMK_USE_XPMEM
+    CmiExitXpmem();
+#endif
+    LrtsAbort(message);
+}
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */
 void *CmiGetNonLocal(void) {

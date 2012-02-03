@@ -255,6 +255,8 @@ void CmiInitPxshm(char **argv){
         signal(SIGABRT, cleanupOnAllSigs);
         signal(SIGQUIT, cleanupOnAllSigs);
         signal(SIGBUS, cleanupOnAllSigs);
+        signal(SIGINT, cleanupOnAllSigs);
+        signal(SIGTRAP, cleanupOnAllSigs);
 
 #if 0
         char name[64];
@@ -270,6 +272,7 @@ void CmiInitPxshm(char **argv){
 void tearDownSharedBuffers();
 
 void CmiExitPxshm(){
+        if (pxshmContext == NULL) return;
 	if(pxshmContext->nodesize != 1){
                 int i;
 		tearDownSharedBuffers();
@@ -293,13 +296,15 @@ void CmiExitPxshm(){
 CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6lf commServerTime %6lf lockRecvCount %d \n",_Cmi_mynode,pxshmContext->sendCount,pxshmContext->sendTime,pxshmContext->validCheckCount,pxshmContext->validCheckTime,pxshmContext->commServerTime,pxshmContext->lockRecvCount);
 #endif
 	free(pxshmContext);
+        pxshmContext = NULL;
 }
 
 /******************
  *Should this message be sent using PxShm or not ?
  * ***********************/
 
-inline int CmiValidPxshm(int dst, int size){
+/* dstNode is node number */
+inline int CmiValidPxshm(int node, int size){
 #if PXSHM_STATS
 	pxshmContext->validCheckCount++;
 #endif
@@ -309,17 +314,12 @@ inline int CmiValidPxshm(int dst, int size){
 	}*/
 	//replace by bitmap later
 	//if(ogm->dst >= pxshmContext->nodestart && ogm->dst <= pxshmContext->nodeend && ogm->size < SHMBUFLEN ){
-        int node = CmiNodeOf(dst);
-	if(node >= pxshmContext->nodestart && node <= pxshmContext->nodeend && size < SHMMAXSIZE ){
-		return 1;
-	}else{
-		return 0;
-	}
+	return (node >= pxshmContext->nodestart && node <= pxshmContext->nodeend && size <= SHMMAXSIZE )? 1: 0;
 };
 
 
-inline int PxshmRank(int dst){
-	return CmiNodeOf(dst) - pxshmContext->nodestart;
+inline int PxshmRank(int dstnode){
+	return dstnode - pxshmContext->nodestart;
 }
 
 inline void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount);
@@ -338,7 +338,7 @@ inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,PxshmSendQ 
  *
  * ****************************/
 
-void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot)
+void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 {
 
 #if PXSHM_STATS
@@ -347,7 +347,7 @@ void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank
 
         LrtsPrepareEnvelope(msg, size);
 	
-	int dstRank = PxshmRank(dstpe);
+	int dstRank = PxshmRank(dstnode);
 	MEMDEBUG(CmiMemoryCheck());
   
 	MACHSTATE4(3,"Send Msg Pxshm ogm %p size %d dst %d dstRank %d",ogm,ogm->size,ogm->dst,dstRank);
@@ -600,24 +600,23 @@ void createShmObject(char *name,int size,char **pPtr){
 }
 
 void tearDownSharedBuffers(){
-#if PXSHM_LOCK
 	int i;
 	for(i= 0;i<pxshmContext->nodesize;i++){
 	    if(i != pxshmContext->noderank){
-                if (pxshmContext->recvBufs[i].mutex != NULL)
-                {
-		    sem_close(pxshmContext->recvBufs[i].mutex);
-		    if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
-			fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
-		    }
-		    sem_close(pxshmContext->sendBufs[i].mutex);
-		    sem_unlink(pxshmContext->sendBufNames[i]);
-                    pxshmContext->recvBufs[i].mutex = NULL;
-                    pxshmContext->sendBufs[i].mutex = NULL;
-                }
+		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
+		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
+		}
+		sem_unlink(pxshmContext->sendBufNames[i]);
+#if PXSHM_LOCK
+		sem_close(pxshmContext->recvBufs[i].mutex);
+		sem_close(pxshmContext->sendBufs[i].mutex);
+		sem_unlink(pxshmContext->sendBufNames[i]);
+		sem_unlink(pxshmContext->recvBufNames[i]);
+                pxshmContext->recvBufs[i].mutex = NULL;
+                pxshmContext->sendBufs[i].mutex = NULL;
+#endif
 	    }
 	}
-#endif
 };
 
 

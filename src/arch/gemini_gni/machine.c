@@ -178,6 +178,7 @@ uint8_t   onesided_hnd, omdh;
 
 #define FMA_PER_CORE  1024
 #define FMA_BUFFER_SIZE 1024
+
 /* If SMSG is used */
 static int  SMSG_MAX_MSG = 1024;
 #define SMSG_MAX_CREDIT 72 
@@ -1001,10 +1002,10 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
 
 CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 {
-
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
     CONTROL_MSG         *control_msg_tmp;
+
     LrtsPrepareEnvelope(msg, size);
 
 #if PRINT_SYH
@@ -2010,6 +2011,8 @@ static void _init_static_smsg()
     uint32_t              vmdh_index = -1;
     mdh_addr_t            base_infor;
     mdh_addr_t            *base_addr_vec;
+    char *env;
+
     if(mysize <=512)
     {
         SMSG_MAX_MSG = 1024;
@@ -2023,6 +2026,10 @@ static void _init_static_smsg()
         SMSG_MAX_MSG = 256;
     }
     
+    env = getenv("CHARM_UGNI_SMSG_MAX_SIZE");
+    if (env) SMSG_MAX_MSG = atoi(env);
+    CmiAssert(SMSG_MAX_MSG > 0);
+
     smsg_attr = malloc(mysize * sizeof(gni_smsg_attr_t));
     
     smsg_attr[0].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
@@ -2033,7 +2040,7 @@ static void _init_static_smsg()
     ret = posix_memalign(&smsg_mailbox_base, 64, smsg_memlen*(mysize));
     CmiAssert(ret == 0);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
-    //if (myrank == 0) printf("Charm++> allocates %.2fMB for SMSG. \n", smsg_memlen*mysize/1e6);
+    //if (myrank == 0) printf("Charm++> allocates %.2fMB for SMSG mailbox. \n", smsg_memlen*mysize/1e6);
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,
@@ -2080,8 +2087,8 @@ static void _init_static_smsg()
     } //end initialization
 
     free(base_addr_vec);
-
     free(smsg_attr);
+
     status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
     GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
 } 
@@ -2325,6 +2332,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     unsigned int            local_addr, *MPID_UGNI_AllAddr;
     int                     first_spawned;
     int                     physicalID;
+    char                   *env;
+
     //void (*local_event_handler)(gni_cq_entry_t *, void *)       = &LocalEventHandle;
     //void (*remote_smsg_event_handler)(gni_cq_entry_t *, void *) = &RemoteSmsgEventHandle;
     //void (*remote_bte_event_handler)(gni_cq_entry_t *, void *)  = &RemoteBteEventHandle;
@@ -2350,8 +2359,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
 #endif
 
+    env = getenv("CHARM_UGNI_REMOTE_QUEUE_SIZE");
+    if (env) REMOTE_QUEUE_ENTRIES = atoi(env);
     CmiGetArgInt(*argv,"+useRecvQueue", &REMOTE_QUEUE_ENTRIES);
+
+    env = getenv("CHARM_UGNI_LOCAL_QUEUE_SIZE");
+    if (env) LOCAL_QUEUE_ENTRIES = atoi(env);
     CmiGetArgInt(*argv,"+useSendQueue", &LOCAL_QUEUE_ENTRIES);
+
     useDynamicSMSG = CmiGetArgFlag(*argv, "+useDynamicSmsg");
     CmiGetArgIntDesc(*argv, "+smsgConnection", &avg_smsg_connection,"Initial number of SMSGS connection per code");
     if (avg_smsg_connection>mysize) avg_smsg_connection = mysize;
@@ -2432,9 +2447,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         _init_smsg();
         PMI_Barrier();
     }
+
 #if     USE_LRTS_MEMPOOL
     char *str;
-    //if (CmiGetArgLong(*argv, "+useMemorypoolSize", &_mempool_size))
     if (CmiGetArgStringDesc(*argv,"+useMemorypoolSize",&str,"Set the memory pool size")) 
     {
       if (strpbrk(str,"G")) {
@@ -2563,10 +2578,9 @@ void LrtsDrainResources()
     PMI_Barrier();
 }
 
-void CmiAbort(const char *message) {
-
-    CmiPrintStackTrace(0);
+void LrtsAbort(const char *message) {
     printf("CmiAbort is calling on PE:%d\n", myrank);
+    CmiPrintStackTrace(0);
     PMI_Abort(-1, message);
 }
 

@@ -218,7 +218,7 @@ void CmiInitXpmem(char **argv){
 #elif !CMK_NET_VERSION
         #error "need a unique number"
 #endif
-	snprintf(&(xpmemContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_pxshm_%d",Cmi_charmrun_pid);
+	snprintf(&(xpmemContext->prefixStr[0]),PREFIXSTRLEN-1,"charm_xpmem_%d",Cmi_charmrun_pid);
 
 	MACHSTATE2(3,"CminitXpmem %s %d pre setupSharedBuffers",xpmemContext->prefixStr,xpmemContext->nodesize);
 
@@ -281,7 +281,8 @@ CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6
  *Should this message be sent using PxShm or not ?
  * ***********************/
 
-inline int CmiValidXpmem(int dst, int size){
+/* dstNode is node number */
+inline int CmiValidXpmem(int node, int size){
 #if XPMEM_STATS
 	xpmemContext->validCheckCount++;
 #endif
@@ -292,16 +293,12 @@ inline int CmiValidXpmem(int dst, int size){
 	//replace by bitmap later
 	//if(ogm->dst >= xpmemContext->nodestart && ogm->dst <= xpmemContext->nodeend && ogm->size < SHMBUFLEN ){
 	//if(dst >= xpmemContext->nodestart && dst <= xpmemContext->nodeend && size < XPMEMMAXSIZE && size > XPMEMMINSIZE){
-	if(dst >= xpmemContext->nodestart && dst <= xpmemContext->nodeend && size <= XPMEMMAXSIZE){
-		return 1;
-	}else{
-		return 0;
-	}
+	return (node >= xpmemContext->nodestart && node <= xpmemContext->nodeend && size <= XPMEMMAXSIZE )? 1: 0;
 };
 
 
-inline int XpmemRank(int dst){
-	return dst - xpmemContext->nodestart;
+inline int XpmemRank(int dstnode){
+	return dstnode - xpmemContext->nodestart;
 }
 
 inline void pushSendQ(XpmemSendQ *q, char *msg, int size, int *refcount);
@@ -320,7 +317,7 @@ inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,XpmemSendQ 
  *
  * ****************************/
 
-void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot)
+void CmiSendMessageXpmem(char *msg, int size, int dstnode, int *refcount)
 {
 
 #if XPMEM_STATS
@@ -329,7 +326,7 @@ void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount, int rank
 
         LrtsPrepareEnvelope(msg, size);
 	
-	int dstRank = XpmemRank(dstpe);
+	int dstRank = XpmemRank(dstnode);
 	MEMDEBUG(CmiMemoryCheck());
   
 	MACHSTATE4(3,"Send Msg Xpmem ogm %p size %d dst %d dstRank %d",ogm,ogm->size,ogm->dst,dstRank);
@@ -674,24 +671,19 @@ void removeXpmemFiles()
 }
 
 void tearDownSharedBuffers(){
-#if PXSHM_LOCK
 	int i;
-	for(i= 0;i<pxshmContext->nodesize;i++){
-	    if(i != pxshmContext->noderank){
-                if (pxshmContext->recvBufs[i].mutex != NULL)
-                {
-		    sem_close(pxshmContext->recvBufs[i].mutex);
-		    if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
-			fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
-		    }
-		    sem_close(pxshmContext->sendBufs[i].mutex);
-		    sem_unlink(pxshmContext->sendBufNames[i]);
-                    pxshmContext->recvBufs[i].mutex = NULL;
-                    pxshmContext->sendBufs[i].mutex = NULL;
-                }
+	for(i= 0;i<xpmemContext->nodesize;i++){
+	    if(i != xpmemContext->noderank){
+#if XPMEM_LOCK
+		sem_close(xpmemContext->recvBufs[i].mutex);
+		sem_close(xpmemContext->sendBufs[i].mutex);
+		sem_unlink(xpmemContext->sendBufNames[i]);
+		sem_unlink(xpmemContext->recvBufNames[i]);
+                xpmemContext->recvBufs[i].mutex = NULL;
+                xpmemContext->sendBufs[i].mutex = NULL;
+#endif
 	    }
 	}
-#endif
 };
 
 void initSendQ(XpmemSendQ *q,int size);
