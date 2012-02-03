@@ -1653,7 +1653,7 @@ static void MachinePostCommonInitForMPI(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     char *m;
     /* if CharmDebug is attached simply try to send a message to it */
 #if CMK_CCS_AVAILABLE
