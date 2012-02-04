@@ -3762,4 +3762,25 @@ int CmiMyRank_()
   return CmiMyRank();
 }
 
+int CmiReadSize(char *str)
+{
+    int val;
+    if (strpbrk(str,"G")) {
+        sscanf(str, "%lldG", &val);
+        val *= 1024ll*1024*1024;
+    }
+    else if (strpbrk(str,"M")) {
+        sscanf(str, "%lldM", &val);
+        val *= 1024*1024;
+    }
+    else if (strpbrk(str,"K")) {
+        sscanf(str, "%lldK", &val);
+        val *= 1024;
+    }
+    else {
+        sscanf(str, "%lld", &val);
+    }
+    return val;
+}
+
 /*@}*/
