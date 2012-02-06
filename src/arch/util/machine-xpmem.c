@@ -834,8 +834,9 @@ inline void flushAllSendQs(){
 		if(sendQ->numEntries > 0){
 #else
         for(i=0;i<xpmemContext->nodesize;i++) {
+                if (i == xpmemContext->noderank) continue;
                 XpmemSendQ *sendQ = xpmemContext->sendQs[i];
-                if(i != xpmemContext->noderank && sendQ->numEntries > 0) {
+                if(SendQ->numEntries > 0) {
 #endif
 	
 #if XPMEM_OSSPINLOCK

@@ -776,8 +776,9 @@ inline void flushAllSendQs(){
 		if(sendQ->numEntries > 0){
 #else
         for(i=0;i<pxshmContext->nodesize;i++) {
+                if (i == pxshmContext->noderank) continue;
                 PxshmSendQ *sendQ = pxshmContext->sendQs[i];
-                if(i != pxshmContext->noderank && sendQ->numEntries > 0) {
+                if(sendQ->numEntries > 0) {
 #endif
 	
 #if PXSHM_OSSPINLOCK
