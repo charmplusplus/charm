@@ -418,7 +418,7 @@ static int search_pemap(char *pecoremap, int pe)
 {
   int *map = (int *)malloc(CmiNumPes()*sizeof(int));
   char *ptr = NULL;
-  int i, j, count;
+  int i, j, k, count;
   char *str;
 
   char *mapstr = (char*)malloc(strlen(pecoremap)+1);
@@ -428,12 +428,21 @@ static int search_pemap(char *pecoremap, int pe)
   count = 0;
   while (str && count < CmiNumPes())
   {
-      int hasdash=0, hascolon=0, hasdot=0;
+      int hasdash=0, hascolon=0, hasdot=0, hasstar1=0, hasstar2 = 0;
       int start, end, stride=1, block=1;
+      int iter=1;
       for (i=0; i<strlen(str); i++) {
           if (str[i] == '-' && i!=0) hasdash=1;
-          if (str[i] == ':') hascolon=1;
-	  if (str[i] == '.') hasdot=1;
+          else if (str[i] == ':') hascolon=1;
+	  else if (str[i] == '.') hasdot=1;
+	  else if (str[i] == 'x') hasstar1=1;
+	  else if (str[i] == 'X') hasstar2=1;
+      }
+      if (hasstar1 || hasstar2) {
+          if (hasstar1) sscanf(str, "%dx", &iter);
+          if (hasstar2) sscanf(str, "%dX", &iter);
+          while (*str!='x' && *str!='X') str++;
+          str++;
       }
       if (hasdash) {
           if (hascolon) {
@@ -459,10 +468,14 @@ static int search_pemap(char *pecoremap, int pe)
         printf("Warning: invalid block size in \"%s\" ignored.\n", str);
         block=1;
       }
-      for (i = start; i<=end; i+=stride) {
-        for (j=0; j<block; j++) {
-          if (i+j>end) break;
-          map[count++] = i+j;
+      //if (CmiMyPe() == 0) printf("iter: %d start: %d end: %d stride: %d, block: %d.\n", iter, start, end, stride, block);
+      for (k = 0; k<iter; k++) {
+        for (i = start; i<=end; i+=stride) {
+          for (j=0; j<block; j++) {
+            if (i+j>end) break;
+            map[count++] = i+j;
+            if (count == CmiNumPes()) break;
+          }
           if (count == CmiNumPes()) break;
         }
         if (count == CmiNumPes()) break;
@@ -570,29 +583,38 @@ void CmiInitCPUAffinity(char **argv)
       if(CmiMyPe()-CmiNumPes()==0) printf("Charm++> set comm %d on node %d to core #%d\n", CmiMyPe()-CmiNumPes(), CmiMyNode(), mycore); 
       if (-1 == CmiSetCPUAffinity(mycore))
         CmiAbort("set_cpu_affinity abort!");
+      CmiNodeAllBarrier();
+      if (show_affinity_flag) CmiPrintCPUAffinity();
+      return;    /* comm thread return */
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-    }
 #if !CMK_CRAYXT && !CMK_CRAYXE
-    if (pemap == NULL) {
+      if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
-    while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
+        while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();
 #else
 #if CMK_SMP
-    #error "Machine progress call needs to be implemented for cpu affinity!"
+       #error "Machine progress call needs to be implemented for cpu affinity!"
 #endif
 #endif
+      }
+#endif
+#if CMK_CRAYXT || CMK_CRAYXE
+      /* if both pemap and commmap are NULL, will compute one */
+      if (pemap != NULL)      
+#endif
+      {
+      CmiNodeAllBarrier();
+      if (show_affinity_flag) CmiPrintCPUAffinity();
+      return;    /* comm thread return */
+      }
     }
-#endif
-    CmiNodeAllBarrier();
-    if (show_affinity_flag) CmiPrintCPUAffinity();
-    return;    /* comm thread return */
   }
 
-  if (pemap != NULL) {
+  if (pemap != NULL && CmiMyPe()<CmiNumPes()) {    /* work thread */
     int mycore = search_pemap(pemap, CmiMyPe());
-    if(show_affinity_flag && CmiMyNode()==0) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
+    if(show_affinity_flag) CmiPrintf("Charm++> set PE %d on node %d to core #%d\n", CmiMyPe(), CmiMyNode(), mycore); 
     if (mycore >= CmiNumCores()) {
       CmiPrintf("Error> Invalid core number %d, only have %d cores (0-%d) on the node. \n", mycore, CmiNumCores(), CmiNumCores()-1);
       CmiAbort("Invalid core number");
@@ -605,20 +627,35 @@ void CmiInitCPUAffinity(char **argv)
   }
 
 #if CMK_CRAYXT || CMK_CRAYXE
-//  if (CmiMyRank() == 0)
   {
     int numPes = CmiNumPes();
     int numNodes = CmiNumNodes();
+    int numCores = CmiNumCores();
 
     int myid = getXTNodeID(CmiMyNode(), CmiNumNodes());
     int myrank;
-    int pe = CmiMyPe();
-    pe --;
+    int pe, mype = CmiMyPe();
+    int node = CmiMyNode();
+    int nnodes = 0;
+#if CMK_SMP
+    if (CmiMyPe() >= CmiNumPes()) {         /* this is comm thread */
+      int node = CmiMyPe() - CmiNumPes();
+      mype = CmiNodeFirst(node) + CmiMyNodeSize() - 1; /* last pe on SMP node */
+    }
+#endif
+    pe = mype - 1;
     while (pe >= 0) {
-      if (getXTNodeID(CmiNodeOf(pe), numNodes) != myid) break;
+      int n = CmiNodeOf(pe);
+      if (n != node) { nnodes++; node = n; }
+      if (getXTNodeID(n, numNodes) != myid) break;
       pe --;
     }
-    myrank = CmiMyPe() - pe - 1;
+    CmiAssert(numCores > 0);
+    myrank = (mype - pe - 1 + nnodes)%numCores;
+#if CMK_SMP
+    if (CmiMyPe() >= CmiNumPes()) 
+        myrank = (myrank + 1)%numCores;
+#endif
 
     if (-1 != CmiSetCPUAffinity(myrank)) {
       DEBUGP(("Processor %d is bound to core #%d on node #%d\n", CmiMyPe(), myrank, mynode));
@@ -628,6 +665,7 @@ void CmiInitCPUAffinity(char **argv)
       CmiAbort("set cpu affinity abort!\n");
     }
   }
+  if (CmiMyPe() < CmiNumPes()) 
   CmiNodeAllBarrier();
   CmiNodeAllBarrier();
 #else

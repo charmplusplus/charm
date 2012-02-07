@@ -39,8 +39,9 @@ There are three options here for synchronization:
 
 #define MEMDEBUG(x) //x
 
-#define XPMEM_STATS 0
+#define XPMEM_STATS    0
 
+#define SENDQ_LIST     0
 
 /*** The following code was copied verbatim from pcqueue.h file ***/
 #undef CmiMemoryWriteFence
@@ -88,11 +89,11 @@ enum entities {SENDER,RECEIVER};
 #define NAMESTRLEN 60
 #define PREFIXSTRLEN 50 
 
-#define XPMEMBUFLEN      (1024*1024*4)
+static int XPMEMBUFLEN  =   (1024*1024*4);
 #define XPMEMMINSIZE     (1*1024)
 #define XPMEMMAXSIZE     (1024*1024)
 
-#define SENDQSTARTSIZE    256
+static int  SENDQSTARTSIZE  =  256;
 
 
 /// This struct is used as the first portion of a shared memory region, followed by data
@@ -133,11 +134,14 @@ typedef struct OutgoingMsgRec
 OutgoingMsgRec;
 
 typedef struct {
-	int size; //total size of data array
-	int begin; //position of first element
+	int size;       //total size of data array
+	int begin;      //position of first element
 	int end;	//position of next element
 	int numEntries; //number of entries
-
+        int rank;       // for dest rank
+#if SENDQ_LIST
+        int next;         // next dstrank of non-empty queue
+#endif
 	OutgoingMsgRec *data;
 
 } XpmemSendQ;
@@ -155,7 +159,6 @@ typedef struct {
 
 	XpmemSendQ **sendQs;
 
-
 #if XPMEM_STATS
 	int sendCount;
 	int validCheckCount;
@@ -168,6 +171,9 @@ typedef struct {
 } XpmemContext;
 
 
+#if SENDQ_LIST
+static int sendQ_head_index = -1;
+#endif
 
 XpmemContext *xpmemContext=NULL; //global context
 
@@ -191,6 +197,7 @@ static int xpmem_fd;
  * ****************/
 void CmiInitXpmem(char **argv){
         char input[32];
+        char *env;
 
 	MACHSTATE(3,"CminitXpmem start");
 	xpmemContext = (XpmemContext *)calloc(1,sizeof(XpmemContext));
@@ -201,15 +208,24 @@ void CmiInitXpmem(char **argv){
 	}
 #endif
 	calculateNodeSizeAndRank(argv);
+
+	MACHSTATE1(3,"CminitXpmem  %d calculateNodeSizeAndRank",xpmemContext->nodesize);
+
 	if(xpmemContext->nodesize == 1) return;
 	
-	MACHSTATE1(3,"CminitXpmem  %d calculateNodeSizeAndRank",xpmemContext->nodesize);
+        env = getenv("CHARM_XPMEM_SIZE");
+        if (env) {
+            XPMEMBUFLEN = CmiReadSize(env);
+        }
+        SENDQSTARTSIZE = 32 * xpmemContext->nodesize;
+
+        if (_Cmi_mynode == 0)
+            CmiPrintf("Charm++> xpmem enabled: %d cores per node, buffer size: %.1fMB\n", xpmemContext->nodesize, XPMEMBUFLEN/1024.0/1024.0);
 
         xpmem_fd = open("/dev/xpmem", O_RDWR);
         if (xpmem_fd == -1) {
             CmiAbort("Opening /dev/xpmem");
         }
-
 
 #if CMK_CRAYXE
         srand(getpid());
@@ -252,7 +268,7 @@ void CmiExitXpmem(){
 	
         if (xpmemContext == NULL) return;
 
-	if(xpmemContext->nodesize != 1){
+	if(xpmemContext->nodesize != 1) {
 		tearDownSharedBuffers();
 	
 		for(i=0;i<xpmemContext->nodesize;i++){
@@ -286,12 +302,7 @@ inline int CmiValidXpmem(int node, int size){
 #if XPMEM_STATS
 	xpmemContext->validCheckCount++;
 #endif
-
-/*	if(xpmemContext->nodesize == 1){
-		return 0;
-	}*/
 	//replace by bitmap later
-	//if(ogm->dst >= xpmemContext->nodestart && ogm->dst <= xpmemContext->nodeend && ogm->size < SHMBUFLEN ){
 	//if(dst >= xpmemContext->nodestart && dst <= xpmemContext->nodeend && size < XPMEMMAXSIZE && size > XPMEMMINSIZE){
 	return (node >= xpmemContext->nodestart && node <= xpmemContext->nodeend && size <= XPMEMMAXSIZE )? 1: 0;
 };
@@ -303,7 +314,7 @@ inline int XpmemRank(int dstnode){
 
 inline void pushSendQ(XpmemSendQ *q, char *msg, int size, int *refcount);
 inline int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,XpmemSendQ *dstSendQ);
-inline int flushSendQ(int dstRank);
+inline int flushSendQ(XpmemSendQ *sendQ);
 
 inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,XpmemSendQ *dstSendQ){
   return sendMessage(omg->data, omg->size, omg->refcount, dstBuf, dstSendQ);
@@ -319,7 +330,6 @@ inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,XpmemSendQ 
 
 void CmiSendMessageXpmem(char *msg, int size, int dstnode, int *refcount)
 {
-
 #if XPMEM_STATS
 	double _startSendTime = CmiWallTimer();
 #endif
@@ -335,7 +345,7 @@ void CmiSendMessageXpmem(char *msg, int size, int dstnode, int *refcount)
 	CmiAssert(dstRank >=0 && dstRank != xpmemContext->noderank);
 	
 	sharedBufData *dstBuf = &(xpmemContext->sendBufs[dstRank]);
-
+        XpmemSendQ *sendQ = xpmemContext->sendQs[dstRank];
 
 #if XPMEM_OSSPINLOCK
 	if(! OSSpinLockTry(&dstBuf->header->lock)){
@@ -352,28 +362,39 @@ void CmiSendMessageXpmem(char *msg, int size, int dstnode, int *refcount)
 #endif
 		/**failed to get the lock 
 		insert into q and retain the message*/
-
-		pushSendQ(xpmemContext->sendQs[dstRank], msg, size, refcount);
+#if SENDQ_LIST
+                if (sendQ->numEntries == 0 && sendQ->next == -2) {
+                    sendQ->next = sendQ_head_index;
+                    sendQ_head_index = dstRank;
+                }
+#endif
+		pushSendQ(sendQ, msg, size, refcount);
 		(*refcount)++;
 		MEMDEBUG(CmiMemoryCheck());
 		return;
 	}else{
-
 		/***
 		 * We got the lock for this buffer
 		 * first write all the messages in the sendQ and then write this guy
 		 * */
-		 if(xpmemContext->sendQs[dstRank]->numEntries == 0){
-		                // send message user event
-				int ret = sendMessage(msg,size,refcount,dstBuf,xpmemContext->sendQs[dstRank]);
-				MACHSTATE(3,"Xpmem Send succeeded immediately");
+		 if(sendQ->numEntries == 0){
+		 	// send message user event
+			int ret = sendMessage(msg,size,refcount,dstBuf,sendQ);
+#if SENDQ_LIST
+                        if (sendQ->numEntries > 0 && sendQ->next == -2) 
+                        {
+                        	sendQ->next = sendQ_head_index;
+                                sendQ_head_index = dstRank;
+                        }
+#endif
+			MACHSTATE(3,"Xpmem Send succeeded immediately");
 		 }else{
-				(*refcount)+=2;/*this message should not get deleted when the queue is flushed*/
-			 	pushSendQ(xpmemContext->sendQs[dstRank],msg,size,refcount);
-				MACHSTATE3(3,"Xpmem ogm %p pushed to sendQ length %d refcount %d",ogm,xpmemContext->sendQs[dstRank]->numEntries,ogm->refcount);
-				int sent = flushSendQ(dstRank);
-				(*refcount)--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
-				MACHSTATE1(3,"Xpmem flushSendQ sent %d messages",sent);
+			(*refcount)+=2;/*this message should not get deleted when the queue is flushed*/
+			pushSendQ(sendQ,msg,size,refcount);
+			MACHSTATE3(3,"Xpmem ogm %p pushed to sendQ length %d refcount %d",ogm,sendQ->numEntries,ogm->refcount);
+			int sent = flushSendQ(sendQ);
+			(*refcount)--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
+			MACHSTATE1(3,"Xpmem flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
 
@@ -402,20 +423,19 @@ inline void flushAllSendQs();
  * Extract all the messages from the recvBuffers you can
  * Flush all sendQs
  * ***/
-inline void CommunicationServerXpmem(){
-	
+inline void CommunicationServerXpmem()
+{
 #if XPMEM_STATS
 	double _startCommServerTime =CmiWallTimer();
 #endif	
-	
 	MEMDEBUG(CmiMemoryCheck());
+
 	emptyAllRecvBufs();
 	flushAllSendQs();
 
 #if XPMEM_STATS
 	xpmemContext->commServerTime += (CmiWallTimer()-_startCommServerTime);
 #endif
-
 	MEMDEBUG(CmiMemoryCheck());
 };
 
@@ -429,14 +449,12 @@ static void CmiNotifyBeginIdleXpmem(CmiIdleState *s)
 	CmiNotifyStillIdle(s);
 }
 
-
-void calculateNodeSizeAndRank(char **argv){
+void calculateNodeSizeAndRank(char **argv)
+{
 	xpmemContext->nodesize=1;
 	MACHSTATE(3,"calculateNodeSizeAndRank start");
 	//CmiGetArgIntDesc(argv, "+nodesize", &(xpmemContext->nodesize),"Number of cores in this node (for non-smp case).Used by the shared memory communication layer");
 	CmiGetArgIntDesc(argv, "+nodesize", &(xpmemContext->nodesize),"Number of cores in this node");
-        if (_Cmi_mynode == 0 && xpmemContext->nodesize > 1)
-         CmiPrintf("Charm++> xpmem enabled: %d cores per node\n", xpmemContext->nodesize);
 	MACHSTATE1(3,"calculateNodeSizeAndRank argintdesc %d",xpmemContext->nodesize);
 
 	xpmemContext->noderank = _Cmi_mynode % (xpmemContext->nodesize);
@@ -504,16 +522,15 @@ void setupSharedBuffers(){
 	}
 }
 
-void allocBufNameStrings(char ***bufName){
+void allocBufNameStrings(char ***bufName)
+{
 	int i,count;
-	
 	int totalAlloc = sizeof(char)*NAMESTRLEN*(xpmemContext->nodesize-1);
 	char *tmp = malloc(totalAlloc);
 	
 	MACHSTATE2(3,"allocBufNameStrings tmp %p totalAlloc %d",tmp,totalAlloc);
 
 	*bufName = (char **)malloc(sizeof(char *)*xpmemContext->nodesize);
-	
 	for(i=0,count=0;i<xpmemContext->nodesize;i++){
 		if(i != xpmemContext->noderank){
 			(*bufName)[i] = &(tmp[count*NAMESTRLEN*sizeof(char)]);
@@ -665,7 +682,7 @@ void createSendXpmemAndSems(sharedBufData **bufs,char **bufNames)
 
 void removeXpmemFiles()
 {
-        char fname[128];
+        char fname[64];
         sprintf(fname, ".xpmem.%d", xpmemContext->nodestart+xpmemContext->noderank);
         unlink(fname);
 }
@@ -686,17 +703,17 @@ void tearDownSharedBuffers(){
 	}
 };
 
-void initSendQ(XpmemSendQ *q,int size);
+void initSendQ(XpmemSendQ *q,int size,int rank);
 
 void initAllSendQs(){
 	int i=0;
 	xpmemContext->sendQs = (XpmemSendQ **) malloc(sizeof(XpmemSendQ *)*xpmemContext->nodesize);
 	for(i=0;i<xpmemContext->nodesize;i++){
 		if(i != xpmemContext->noderank){
-			(xpmemContext->sendQs)[i] = (XpmemSendQ *)calloc(1, sizeof(XpmemSendQ));
-			initSendQ((xpmemContext->sendQs)[i],SENDQSTARTSIZE);
+			xpmemContext->sendQs[i] = (XpmemSendQ *)calloc(1, sizeof(XpmemSendQ));
+			initSendQ((xpmemContext->sendQs)[i],SENDQSTARTSIZE,i);
 		}else{
-			(xpmemContext->sendQs)[i] = NULL;
+			xpmemContext->sendQs[i] = NULL;
 		}
 	}
 };
@@ -713,7 +730,7 @@ int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,XpmemS
 	if(dstBuf->header->bytes+size <= XPMEMBUFLEN){
 		/**copy  this message to sharedBuf **/
 		dstBuf->header->count++;
-		memcpy(dstBuf->data+dstBuf->header->bytes,msg,size);
+		CmiMemcpy(dstBuf->data+dstBuf->header->bytes,msg,size);
 		dstBuf->header->bytes += size;
 		MACHSTATE4(3,"Xpmem send done ogm %p size %d dstBuf->header->count %d dstBuf->header->bytes %d",ogm,ogm->size,dstBuf->header->count,dstBuf->header->bytes);
                 CmiFree(msg);
@@ -736,15 +753,14 @@ inline OutgoingMsgRec* popSendQ(XpmemSendQ *q);
  *NOTE: This method is called only after obtaining the corresponding mutex
  * ************/
 
-inline int flushSendQ(int dstRank){
-	sharedBufData *dstBuf = &(xpmemContext->sendBufs[dstRank]);
-	XpmemSendQ *dstSendQ = xpmemContext->sendQs[dstRank];
+inline int flushSendQ(XpmemSendQ  *dstSendQ){
+	sharedBufData *dstBuf = &(xpmemContext->sendBufs[dstSendQ->rank]);
 	int count=dstSendQ->numEntries;
 	int sent=0;
 	while(count > 0){
 		OutgoingMsgRec *ogm = popSendQ(dstSendQ);
 		(*ogm->refcount)--;
-		MACHSTATE4(3,"Xpmem trysending ogm %p size %d to dstRank %d refcount %d",ogm,ogm->size,dstRank,ogm->refcount);
+		MACHSTATE4(3,"Xpmem trysending ogm %p size %d to dstRank %d refcount %d",ogm,ogm->size,dstSendQ->rank,ogm->refcount);
 		int ret = sendMessageRec(ogm,dstBuf,dstSendQ);
 		if(ret==1){
 			sent++;
@@ -760,16 +776,15 @@ inline int flushSendQ(int dstRank){
 inline void emptyRecvBuf(sharedBufData *recvBuf);
 
 inline void emptyAllRecvBufs(){
-	int i;
-	for(i=0;i<xpmemContext->nodesize;i++){
-		if(i != xpmemContext->noderank){
+	int  i;
+        for(i=0;i<xpmemContext->nodesize;i++){
+                if(i != xpmemContext->noderank){
 			sharedBufData *recvBuf = &(xpmemContext->recvBufs[i]);
 			if(recvBuf->header->count > 0){
 
 #if XPMEM_STATS
 				xpmemContext->lockRecvCount++;
 #endif
-
 
 #if XPMEM_OSSPINLOCK
 				if(! OSSpinLockTry(&recvBuf->header->lock)){
@@ -808,10 +823,21 @@ inline void emptyAllRecvBufs(){
 };
 
 inline void flushAllSendQs(){
-	int i=0;
-	
-	for(i=0;i<xpmemContext->nodesize;i++){
-		if(i != xpmemContext->noderank && xpmemContext->sendQs[i]->numEntries > 0){
+	int i;
+#if SENDQ_LIST
+        int index_prev = -1;
+
+        i =  sendQ_head_index;
+        while (i!= -1) {
+                XpmemSendQ *sendQ = xpmemContext->sendQs[i];
+                CmiAssert(i !=  xpmemContext->noderank);
+		if(sendQ->numEntries > 0){
+#else
+        for(i=0;i<xpmemContext->nodesize;i++) {
+                if (i == xpmemContext->noderank) continue;
+                XpmemSendQ *sendQ = xpmemContext->sendQs[i];
+                if(SendQ->numEntries > 0) {
+#endif
 	
 #if XPMEM_OSSPINLOCK
 		        if(OSSpinLockTry(&xpmemContext->sendBufs[i].header->lock)){
@@ -826,10 +852,8 @@ inline void flushAllSendQs(){
 #endif
 
 				MACHSTATE1(3,"flushSendQ %d",i);
-				flushSendQ(i);
+				flushSendQ(sendQ);
 
-
-				
 #if XPMEM_OSSPINLOCK	
 				OSSpinLockUnlock(&xpmemContext->sendBufs[i].header->lock);
 #elif XPMEM_LOCK
@@ -846,8 +870,21 @@ inline void flushAllSendQs(){
 #endif				
 
 			}
-
 		}        
+#if SENDQ_LIST
+                if (sendQ->numEntries == 0) {
+                    if (index_prev != -1)
+                        xpmemContext->sendQs[index_prev]->next = sendQ->next;
+                    else
+                        sendQ_head_index = sendQ->next;
+                    i = sendQ->next;
+                    sendQ->next = -2;
+                }
+                else {
+                    index_prev = i;
+                    i = sendQ->next;
+                }
+#endif
 	}	
 };
 
@@ -855,7 +892,7 @@ void static inline handoverXpmemMessage(char *newmsg,int total_size,int rank,int
 
 void emptyRecvBuf(sharedBufData *recvBuf){
  	int numMessages = recvBuf->header->count;
-	int i=0;
+	int i;
 
 	char *ptr=recvBuf->data;
 
@@ -937,7 +974,7 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
  *sendQ helper functions
  * ****************/
 
-void initSendQ(XpmemSendQ *q,int size){
+void initSendQ(XpmemSendQ *q,int size,int rank){
 	q->data = (OutgoingMsgRec *)calloc(size, sizeof(OutgoingMsgRec));
 
 	q->size = size;
@@ -945,6 +982,11 @@ void initSendQ(XpmemSendQ *q,int size){
 
 	q->begin = 0;
 	q->end = 0;
+
+        q->rank = rank;
+#if SENDQ_LIST
+        q->next = -2;
+#endif
 }
 
 void pushSendQ(XpmemSendQ *q, char *msg, int size, int *refcount){

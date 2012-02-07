@@ -2430,7 +2430,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     
     if(myrank == 0)
     {
-        printf("Charm++> Running on Gemini (GNI) with %d cores\n", mysize);
+        printf("Charm++> Running on Gemini (GNI) with %d processes\n", mysize);
         printf("Charm++> %s SMSG\n", useDynamicSMSG?"Dynamic":"Static");
     }
 #ifdef USE_ONESIDED
