@@ -190,6 +190,11 @@ MeshStreamer<dtype>::MeshStreamer(
   //   same index as the sender's are not used
   bucketSize_ = BUCKET_SIZE_FACTOR * totalBufferCapacity 
     / (sumAlongAllDimensions - numDimensions_ + 1); 
+  if (bucketSize_ <= 0) {
+    bucketSize_ = 1; 
+    CkPrintf("Argument totalBufferCapacity to MeshStreamer constructor "
+	     "is invalid. Defaulting to a single buffer per destination.\n");
+  }
   totalBufferCapacity_ = totalBufferCapacity;
   numDataItemsBuffered_ = 0; 
   numNodes_ = CkNumPes(); 

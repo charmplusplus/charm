@@ -190,6 +190,11 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   //   advantage of nonuniform filling of buckets
   // the buffers for your own column and plane are never used
   bucketSize_ = BUCKET_SIZE_FACTOR * totalBufferCapacity / (numRows + numColumns + numPlanes - 2); 
+  if (bucketSize_ <= 0) {
+    bucketSize_ = 1; 
+    CkPrintf("Argument totalBufferCapacity to MeshStreamer constructor "
+	     "is invalid. Defaulting to a single buffer per destination.\n");
+  }
   totalBufferCapacity_ = totalBufferCapacity;
   numDataItemsBuffered_ = 0; 
   numRows_ = numRows; 
