@@ -196,7 +196,8 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #endif
 
 #define BIG_MSG_TAG  0x26
-#define PUT_DONE_TAG      0x29
+#define PUT_DONE_TAG      0x28
+#define DIRECT_PUT_DONE_TAG      0x29
 #define ACK_TAG           0x30
 /* SMSG is data message */
 #define SMALL_DATA_TAG          0x31
@@ -290,6 +291,13 @@ typedef struct control_msg
     struct control_msg *next;
 }CONTROL_MSG;
 
+#ifdef CMK_DIRECT
+typedef struct{
+    void *recverBuf;
+    void (*callbackFnPtr)(void *);
+    void *callbackData;
+}CMK_DIRECT_HEADER;
+#endif
 typedef struct  rmda_msg
 {
     int                   destNode;
@@ -1171,7 +1179,6 @@ static void PumpNetworkSmsg()
     int                 init_flag;
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
-
 #if CMK_SMP && !COMM_THREAD_SEND
     while(1)
     {
@@ -1287,13 +1294,16 @@ static void PumpNetworkSmsg()
 
 #if CMK_PERSISTENT_COMM
             case PUT_DONE_TAG: //persistent message
-            {
-                void *msg = (void *)((CONTROL_MSG *) header)->source_addr;
-                int size = ((CONTROL_MSG *) header)->length;
-                CmiReference(msg);
-                handleOneRecvedMsg(size, msg); 
-                break;
-            }
+            void *msg = (void *)((CONTROL_MSG *) header)->source_addr;
+            int size = ((CONTROL_MSG *) header)->length;
+            CmiReference(msg);
+            handleOneRecvedMsg(size, msg); 
+            break;
+#endif
+#ifdef CMK_DIRECT
+            case DIRECT_PUT_DONE_TAG:  //cmi direct 
+            (*(((CMK_DIRECT_HEADER*) header)->callbackFnPtr))(((CMK_DIRECT_HEADER*) header)->callbackData);
+           break;
 #endif
             default: {
                 printf("weird tag problem\n");
@@ -1319,6 +1329,8 @@ static void PumpNetworkSmsg()
 static void printDesc(gni_post_descriptor_t *pd)
 {
     printf(" addr=%p, ", pd->local_addr); 
+    printf(" remote addr=%p, ", pd->remote_addr);
+    printf(" local %lld %lld, remote %lld, %lld\n", pd->local_mem_hndl.qword1, pd->local_mem_hndl.qword2, pd->remote_mem_hndl.qword1, pd->remote_mem_hndl.qword2); 
 }
 
 // for BIG_MSG called on receiver side for receiving control message
@@ -1519,7 +1531,9 @@ static void PumpLocalRdmaTransactions()
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t             msg_tag;
-
+#ifdef CMK_DIRECT
+    CMK_DIRECT_HEADER       *cmk_direct_done_msg;
+#endif
 #if CMK_SMP && !COMM_THREAD_SEND
     while(1) {
         CmiLock(tx_cq_lock);
@@ -1546,8 +1560,24 @@ static void PumpLocalRdmaTransactions()
 #if CMK_SMP && !COMM_THREAD_SEND
             CmiUnlock(tx_cq_lock);
 #endif
+#ifdef CMK_DIRECT
+            if(tmp_pd->amo_cmd == 1)
+            {
+                cmk_direct_done_msg = (CMK_DIRECT_HEADER*) malloc(sizeof(CMK_DIRECT_HEADER));
+                cmk_direct_done_msg->callbackFnPtr = (void*)( tmp_pd->first_operand);
+                cmk_direct_done_msg->recverBuf = (void*)(tmp_pd->remote_addr);
+                cmk_direct_done_msg->callbackData = (void*)(tmp_pd->second_operand); 
+            }
+            else{
+                MallocControlMsg(ack_msg_tmp);
+                ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+            }
+#else
             MallocControlMsg(ack_msg_tmp);
             ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+            ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+#endif
             ////Message is sent, free message , put is not used now
             switch (tmp_pd->type) {
 #if CMK_PERSISTENT_COMM
@@ -1558,6 +1588,13 @@ static void PumpLocalRdmaTransactions()
             case GNI_POST_FMA_PUT:
                 CmiFree((void *)tmp_pd->local_addr);
                 msg_tag = PUT_DONE_TAG;
+                break;
+#endif
+#ifdef CMK_DIRECT
+            case GNI_POST_RDMA_PUT:
+            case GNI_POST_FMA_PUT:
+                //sender ACK to receiver to trigger it is done
+                msg_tag = DIRECT_PUT_DONE_TAG;
                 break;
 #endif
             case GNI_POST_RDMA_GET:
@@ -1587,11 +1624,20 @@ static void PumpLocalRdmaTransactions()
                 CmiPrintf("type=%d\n", tmp_pd->type);
                 CmiAbort("PumpLocalRdmaTransactions: unknown type!");
             }
-            ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-            status = send_smsg_message(inst_id, ack_msg_tmp, sizeof(CONTROL_MSG), msg_tag, 0);  
+#if CMK_DIRECT
+            if(tmp_pd->amo_cmd == 1)
+                status = send_smsg_message(inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0); 
+            else
+#endif
+                status = send_smsg_message(inst_id, ack_msg_tmp, sizeof(CONTROL_MSG), msg_tag, 0);  
             if(status == GNI_RC_SUCCESS)
             {
-                FreeControlMsg(ack_msg_tmp);
+#if CMK_DIRECT
+                if(tmp_pd->amo_cmd == 1)
+                    free(cmk_direct_done_msg); 
+                else
+#endif
+                    FreeControlMsg(ack_msg_tmp);
             }
 #if CMK_PERSISTENT_COMM
             if (tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
@@ -1817,6 +1863,16 @@ static int SendBufferMsg()
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
                 break;
+#ifdef CMK_DIRECT
+            case DIRECT_PUT_DONE_TAG:
+                status = send_smsg_message( ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1);  
+                if(status == GNI_RC_SUCCESS)
+                {
+                    free((CMK_DIRECT_HEADER*)ptr->msg);
+                }
+                break;
+
+#endif
             default:
                 printf("Weird tag\n");
                 CmiAbort("should not happen\n");
@@ -2671,8 +2727,9 @@ int CmiBarrier()
     return status;
 
 }
-
-
+#if CMK_DIRECT
+#include "machine-cmidirect.c"
+#endif
 #if CMK_PERSISTENT_COMM
 #include "machine-persistent.c"
 #endif
