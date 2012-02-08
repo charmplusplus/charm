@@ -76,8 +76,8 @@ public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
   {
-    if(CkNumPes()>2) {
       CkAbort("Run this program on 1 or 2 processors only.\n");
+    if(CkNumPes()>2) {
     }
 
     iterations=NITER;
@@ -108,7 +108,7 @@ public:
     arrF[CkArrayIndexFancy("first")].insert(P1);
     arrF[CkArrayIndexFancy("second")].insert(P2);
     arrF.doneInserting();
-    phase=6;
+    phase=0;
     mainProxy.maindone();
     delete m;
   };
@@ -140,7 +140,7 @@ public:
         break;
 #else
       case 6:
-        //ngid[0].startRDMA();
+        ngid[0].startRDMA();
 	  break;
 #endif
       default:
@@ -230,7 +230,7 @@ public:
     CmiDirectUserHandle *_shandle=(CmiDirectUserHandle *) ptr;
     shandle=_shandle;
     CmiDirect_assocLocalBuffer(shandle,sbuff,payload);
-    if(CkMyNode() == 0)
+    if(CkMyNode() == 1)
         startRDMA();
 #endif
   }
@@ -285,7 +285,6 @@ public:
 #ifdef USE_RDMA 
     CmiDirect_ready(rhandle);
 #endif
-    CkPrintf("Received on [%d]", CmiMyNode());
     if(me==0) {
       niter++;
       if(niter==iterations) {
