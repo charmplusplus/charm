@@ -42,7 +42,10 @@ main::main(CkArgMsg *m)
   wcb = CkCallback(CkIndex_main::written(NULL),  thishandle);
   rcb = CkCallback(CkIndex_main::read(NULL),  thishandle);
   vcb = CkCallback(CkIndex_main::done(NULL),  thishandle);
-  pupDiskProxy= CProxy_pupDisk::ckNew(size,numElements,maxFiles, maxFiles);
+  CProxy_pupDiskMap diskMapProxy = CProxy_pupDiskMap::ckNew(maxFiles);
+  CkArrayOptions mapOptions(maxFiles);
+  mapOptions.setMap(diskMapProxy);
+  pupDiskProxy= CProxy_pupDisk::ckNew(size,numElements,maxFiles,mapOptions);
   pupDiskProxy.doneInserting();
   userDataProxy= CProxy_userData::ckNew(size,numElements,maxFiles, numElements);
   userDataProxy.doneInserting();

@@ -26,6 +26,10 @@ mainmodule pupDisk {
     entry void read(CkReductionMsg *);
 
   };
+  group pupDiskMap : CkArrayMap {
+	   entry pupDiskMap(int maxFiles);
+  };
+
   array [1D] userData{
     entry userData(int howbig, int numElements, int maxFiles);
     entry void init();

@@ -26,6 +26,47 @@ public:
 
 };
 
+class pupDiskMap: public CkArrayMap
+{
+ public:
+  int maxFiles;
+ pupDiskMap(int _maxFiles):maxFiles(_maxFiles) {}
+  inline int procNum(int, const CkArrayIndex &iIndex)
+  {
+    int *index=(int *) iIndex.data();
+    int proc;
+    if(CmiCpuTopologyEnabled())
+      { // use physnode API
+	if(CmiNumPhysicalNodes() > maxFiles)
+	  {
+	    proc=CmiGetFirstPeOnPhysicalNode(index[0]);
+	  }
+	else
+	  { 
+	    //cleverness could be tried, but we really don't care because you 
+	    //want more files than is good for you.
+	    proc=index[0]%CmiNumPes();
+	  }
+      }
+    else
+      {
+	if(CmiNumNodes()>maxFiles)
+	  {// 
+	    proc=index[0]*CmiMyNodeSize();
+	  }
+	else if (CmiNumPes()>maxFiles)
+	  { //simple round robin because we don't really care
+	    proc=index[0];
+	  }
+	else //there is no good mapping
+	  {
+	    proc=index[0]%CkNumPes();
+	  }
+      }
+    return proc;
+  }
+  
+};
 
 class userData : public CBase_userData {
 public:
