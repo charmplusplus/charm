@@ -19,16 +19,16 @@ typedef struct {
 */
 #ifdef CMK_BLUEGENEP
 #include "dcmf.h"
-#elif CMK_CONVERSE_GEMINI_UGNI
+#elif  CMK_CONVERSE_GEMINI_UGNI
 #include "gni_pub.h"
 #endif
 typedef struct infiDirectUserHandle{
     int handle;
+#ifdef CMK_BLUEGENEP
     int senderNode;
     int recverNode;
     void *recverBuf;
     int recverBufSize;
-#ifdef CMK_BLUEGENEP
     void *senderBuf;
     void (*callbackFnPtr)(void *);
     void *callbackData;
@@ -39,16 +39,24 @@ typedef struct infiDirectUserHandle{
     DCMF_Memregion_t DCMF_senderMemregion;
     DCMF_Callback_t DCMF_notify_cb;
 #elif  CMK_CONVERSE_GEMINI_UGNI
-    void *senderBuf;
+    int localNode;
+    int remoteNode;
+    void *remoteBuf;
+    int transSize;
+    void *localBuf;
     void (*callbackFnPtr)(void *);
     void *callbackData;
-    gni_mem_handle_t    senderMdh;
-    gni_mem_handle_t    recverMdh;
+    gni_mem_handle_t    localMdh;
+    gni_mem_handle_t    remoteMdh;
 #else
+    int senderNode;
+    int recverNode;
+    void *recverBuf;
+    int recverBufSize;
 	char recverKey[64];
 #endif
 	double initialValue;
-} CmiDirectUserHandle;
+}CmiDirectUserHandle;
 
 
 /* functions */
@@ -59,7 +67,7 @@ extern "C" {
 /**
  To be called on the receiver to create a handle and return its number
 **/
-CmiDirectUserHandle* CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue);
+struct infiDirectUserHandle CmiDirect_createHandle(int senderNode,void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData,double initialValue);
 
 /****
  To be called on the sender to attach the sender's buffer to this handle

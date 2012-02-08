@@ -4,12 +4,12 @@
 #define NITER 1000
 #define PAYLOAD 100
 
-#if ! CMK_SMP            /* only test RDMA when non-SMP */
-
-#if defined(CMK_DIRECT) || defined(CMK_USE_IBVERBS)
+#ifdef CMK_DIRECT 
 #define USE_RDMA 1
 #endif
 
+#ifdef CMK_USE_IBVERBS 
+#define USE_RDMA 1
 #endif
 
 #ifdef USE_RDMA
@@ -62,7 +62,7 @@ int payload;
 #define P1 0
 #define P2 1%CkNumPes()
 
-class main : public CBase_main
+class main : public Chare
 {
   int phase;
   CProxy_Ping1 arr1;
@@ -76,8 +76,9 @@ public:
   main(CkMigrateMessage *m) {}
   main(CkArgMsg* m)
   {
-      CkAbort("Run this program on 1 or 2 processors only.\n");
+    delete m;
     if(CkNumPes()>2) {
+      CkAbort("Run this program on 1 or 2 processors only.\n");
     }
 
     iterations=NITER;
@@ -110,7 +111,6 @@ public:
     arrF.doneInserting();
     phase=0;
     mainProxy.maindone();
-    delete m;
   };
 
   void maindone(void)
@@ -140,7 +140,7 @@ public:
         break;
 #else
       case 6:
-        ngid[0].startRDMA();
+	  ngid[0].startRDMA();
 	  break;
 #endif
       default:
@@ -149,7 +149,7 @@ public:
   };
 };
 
-class PingG : public CBase_PingG
+class PingG : public Group
 {
   CProxyElement_PingG *pp;
   int niter;
@@ -190,17 +190,19 @@ public:
 };
 
 
-class PingN : public CBase_PingN
+class PingN : public NodeGroup
 {
+  CProxyElement_PingN *pp;
   int niter;
   int me, nbr;
 #ifdef USE_RDMA 
-  CmiDirectUserHandle *shandle,*rhandle;
+  struct infiDirectUserHandle shandle,rhandle;
   char *rbuff;
   char *sbuff;
 #endif
   double start_time, end_time;
 public:
+  CProxyElement_PingN *myProxy;
   PingN()
   {
     me = CkMyNode();    
@@ -210,16 +212,17 @@ public:
     // upstream and downstream which makes this an artificially simple
     // calculation.
 
+    pp = new CProxyElement_PingN(thisgroup,nbr);
+    myProxy = new CProxyElement_PingN(thisgroup,me);
     niter = 0;
 #ifdef USE_RDMA 
-    rbuff=(char *) CmiAlloc(payload*sizeof(char));
-    sbuff=(char *) CmiAlloc(payload*sizeof(char));
+    rbuff=(char *) malloc(payload*sizeof(char));
+    sbuff=(char *) malloc(payload*sizeof(char));
     bzero(sbuff,payload);
-    bzero(rbuff,payload);
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
     rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
-    thisProxy[nbr].recvHandle((char*) rhandle,sizeof(CmiDirectUserHandle));
+    (*pp).recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
 #endif
   }
   PingN(CkMigrateMessage *m) {}
@@ -227,24 +230,22 @@ public:
   {
 
 #ifdef USE_RDMA 
-    CmiDirectUserHandle *_shandle=(CmiDirectUserHandle *) ptr;
-    shandle=_shandle;
-    CmiDirect_assocLocalBuffer(shandle,sbuff,payload);
-    if(CkMyNode() == 1)
-        startRDMA();
+    struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
+    shandle=*_shandle;
+    CmiDirect_assocLocalBuffer(&shandle,sbuff,payload);
 #endif
   }
   void start(void)
   {
     start_time = CkWallTimer();
-    thisProxy[nbr].recv(new (payload) PingMsg);
+    (*pp).recv(new (payload) PingMsg);
   }
   void startRDMA(void)
   {
     niter=0;
     start_time = CkWallTimer();
 #ifdef USE_RDMA 
-    CmiDirect_put(shandle);
+    CmiDirect_put(&shandle);
 #else
     CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
@@ -262,10 +263,10 @@ public:
         delete msg;
         mainProxy.maindone();
       } else {
-        thisProxy[nbr].recv(msg);
+        (*pp).recv(msg);
       }
     } else {
-      thisProxy[nbr].recv(msg);
+      (*pp).recv(msg);
     }
   }
   static void Wrapper_To_CallBack(void* pt2Object){
@@ -276,14 +277,14 @@ public:
     if(CkNumNodes() == 0){
       mySelf->recvRDMA();
     }else{
-      (mySelf->thisProxy)[CkMyNode()].recvRDMA();   
+      (*mySelf->myProxy).recvRDMA();   
     }
   }
   // not an entry method, called via Wrapper_To_Callback
   void recvRDMA()
   {
 #ifdef USE_RDMA 
-    CmiDirect_ready(rhandle);
+    CmiDirect_ready(&rhandle);
 #endif
     if(me==0) {
       niter++;
@@ -295,14 +296,14 @@ public:
         mainProxy.maindone();
       } else {
 #ifdef USE_RDMA 
-	CmiDirect_put(shandle);
+	CmiDirect_put(&shandle);
 #else
 	CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
       }
     } else {
 #ifdef USE_RDMA 
-      CmiDirect_put(shandle);
+      CmiDirect_put(&shandle);
 #else
       CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
@@ -312,7 +313,7 @@ public:
 };
 
 
-class Ping1 : public CBase_Ping1
+class Ping1 : public ArrayElement1D
 {
   CProxy_Ping1 *pp;
   int niter;
@@ -366,7 +367,7 @@ public:
   }
 };
 
-class Ping2 : public CBase_Ping2
+class Ping2 : public ArrayElement2D
 {
   CProxy_Ping2 *pp;
   int niter;
@@ -401,7 +402,7 @@ public:
   }
 };
 
-class Ping3 : public CBase_Ping3
+class Ping3 : public ArrayElement3D
 {
   CProxy_Ping3 *pp;
   int niter;
@@ -475,7 +476,7 @@ public:
   }
 };
 
-class PingC : public CBase_PingC
+class PingC : public Chare
 {
   CProxy_PingC *pp;
   int niter;
