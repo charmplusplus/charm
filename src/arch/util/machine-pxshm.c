@@ -34,6 +34,7 @@ There are three options here for synchronization:
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <signal.h>
 
 
 /************** 
@@ -53,6 +54,7 @@ There are three options here for synchronization:
 
 #define PXSHM_STATS 0
 
+#define SENDQ_LIST     0
 
 /*** The following code was copied verbatim from pcqueue.h file ***/
 #if ! CMK_SMP
@@ -105,10 +107,10 @@ enum entities {SENDER,RECEIVER};
 #define NAMESTRLEN 60
 #define PREFIXSTRLEN 50 
 
-#define SHMBUFLEN (1024*1024*4)
+static int SHMBUFLEN = (1024*1024*4);
 #define SHMMAXSIZE     (1024*1024)
 
-#define SENDQSTARTSIZE    256
+static int SENDQSTARTSIZE  =  256;
 
 
 /// This struct is used as the first portion of a shared memory region, followed by data
@@ -152,7 +154,10 @@ typedef struct {
 	int begin; //position of first element
 	int end;	//position of next element
 	int numEntries; //number of entries
-
+        int rank;       // for dest rank
+#if SENDQ_LIST
+        int next;         // next dstrank of non-empty queue
+#endif
 	OutgoingMsgRec *data;
 
 } PxshmSendQ;
@@ -182,7 +187,9 @@ typedef struct {
 
 } PxshmContext;
 
-
+#if SENDQ_LIST
+static int sendQ_head_index = -1;
+#endif
 
 PxshmContext *pxshmContext=NULL; //global context
 
@@ -191,11 +198,19 @@ void calculateNodeSizeAndRank(char **);
 void setupSharedBuffers();
 void initAllSendQs();
 
+void CmiExitPxshm();
+
+static void cleanupOnAllSigs(int signo)
+{
+    CmiExitPxshm();
+}
+
 /******************
  * 	Initialization routine
  * 	currently just testing start up
  * ****************/
 void CmiInitPxshm(char **argv){
+        char *env;
         MACHSTATE(3,"CminitPxshm start");
 
 	pxshmContext = (PxshmContext *)calloc(1,sizeof(PxshmContext));
@@ -209,6 +224,15 @@ void CmiInitPxshm(char **argv){
 	if(pxshmContext->nodesize == 1) return;
 	
 	MACHSTATE1(3,"CminitPxshm  %d calculateNodeSizeAndRank",pxshmContext->nodesize);
+
+        env = getenv("CHARM_PXSHM_SIZE");
+        if (env) {
+            SHMBUFLEN = CmiReadSize(env);
+        }
+        SENDQSTARTSIZE = 32 * pxshmContext->nodesize;
+
+        if (_Cmi_mynode == 0)
+            CmiPrintf("Charm++> pxshm enabled: %d cores per node, buffer size: %.1fMB\n", pxshmContext->nodesize, SHMBUFLEN/1024.0/1024.0);
 
 #if CMK_CRAYXE
         srand(getpid());
@@ -240,6 +264,16 @@ void CmiInitPxshm(char **argv){
 	pxshmContext->lockRecvCount = 0;
 #endif
 
+        signal(SIGSEGV, cleanupOnAllSigs);
+        signal(SIGFPE, cleanupOnAllSigs);
+        signal(SIGILL, cleanupOnAllSigs);
+        signal(SIGTERM, cleanupOnAllSigs);
+        signal(SIGABRT, cleanupOnAllSigs);
+        signal(SIGQUIT, cleanupOnAllSigs);
+        signal(SIGBUS, cleanupOnAllSigs);
+        signal(SIGINT, cleanupOnAllSigs);
+        signal(SIGTRAP, cleanupOnAllSigs);
+
 #if 0
         char name[64];
         gethostname(name,64);
@@ -254,6 +288,7 @@ void CmiInitPxshm(char **argv){
 void tearDownSharedBuffers();
 
 void CmiExitPxshm(){
+        if (pxshmContext == NULL) return;
 	if(pxshmContext->nodesize != 1){
                 int i;
 		tearDownSharedBuffers();
@@ -277,13 +312,15 @@ void CmiExitPxshm(){
 CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6lf commServerTime %6lf lockRecvCount %d \n",_Cmi_mynode,pxshmContext->sendCount,pxshmContext->sendTime,pxshmContext->validCheckCount,pxshmContext->validCheckTime,pxshmContext->commServerTime,pxshmContext->lockRecvCount);
 #endif
 	free(pxshmContext);
+        pxshmContext = NULL;
 }
 
 /******************
  *Should this message be sent using PxShm or not ?
  * ***********************/
 
-inline int CmiValidPxshm(int dst, int size){
+/* dstNode is node number */
+inline int CmiValidPxshm(int node, int size){
 #if PXSHM_STATS
 	pxshmContext->validCheckCount++;
 #endif
@@ -293,22 +330,17 @@ inline int CmiValidPxshm(int dst, int size){
 	}*/
 	//replace by bitmap later
 	//if(ogm->dst >= pxshmContext->nodestart && ogm->dst <= pxshmContext->nodeend && ogm->size < SHMBUFLEN ){
-        int node = CmiNodeOf(dst);
-	if(node >= pxshmContext->nodestart && node <= pxshmContext->nodeend && size < SHMMAXSIZE ){
-		return 1;
-	}else{
-		return 0;
-	}
+	return (node >= pxshmContext->nodestart && node <= pxshmContext->nodeend && size <= SHMMAXSIZE )? 1: 0;
 };
 
 
-inline int PxshmRank(int dst){
-	return CmiNodeOf(dst) - pxshmContext->nodestart;
+inline int PxshmRank(int dstnode){
+	return dstnode - pxshmContext->nodestart;
 }
 
 inline void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount);
 inline int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmSendQ *dstSendQ);
-inline int flushSendQ(int dstRank);
+inline int flushSendQ(PxshmSendQ *q);
 
 inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,PxshmSendQ *dstSendQ){
   return sendMessage(omg->data, omg->size, omg->refcount, dstBuf, dstSendQ);
@@ -322,16 +354,15 @@ inline int sendMessageRec(OutgoingMsgRec *omg, sharedBufData *dstBuf,PxshmSendQ 
  *
  * ****************************/
 
-void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot)
+void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 {
-
 #if PXSHM_STATS
 	double _startSendTime = CmiWallTimer();
 #endif
 
         LrtsPrepareEnvelope(msg, size);
 	
-	int dstRank = PxshmRank(dstpe);
+	int dstRank = PxshmRank(dstnode);
 	MEMDEBUG(CmiMemoryCheck());
   
 	MACHSTATE4(3,"Send Msg Pxshm ogm %p size %d dst %d dstRank %d",ogm,ogm->size,ogm->dst,dstRank);
@@ -340,7 +371,7 @@ void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank
 	CmiAssert(dstRank >=0 && dstRank != pxshmContext->noderank);
 	
 	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
-
+        PxshmSendQ *sendQ = pxshmContext->sendQs[dstRank];
 
 #if PXSHM_OSSPINLOCK
 	if(! OSSpinLockTry(&dstBuf->header->lock)){
@@ -357,7 +388,12 @@ void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank
 #endif
 		/**failed to get the lock 
 		insert into q and retain the message*/
-
+#if SENDQ_LIST
+                if (sendQ->numEntries == 0 && sendQ->next == -2) {
+                    sendQ->next = sendQ_head_index;
+                    sendQ_head_index = dstRank;
+                }
+#endif
 		pushSendQ(pxshmContext->sendQs[dstRank], msg, size, refcount);
 		(*refcount)++;
 		MEMDEBUG(CmiMemoryCheck());
@@ -369,16 +405,23 @@ void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank
 		 * first write all the messages in the sendQ and then write this guy
 		 * */
 		 if(pxshmContext->sendQs[dstRank]->numEntries == 0){
-		                // send message user event
-				int ret = sendMessage(msg,size,refcount,dstBuf,pxshmContext->sendQs[dstRank]);
-				MACHSTATE(3,"Pxshm Send succeeded immediately");
+		 	// send message user event
+			int ret = sendMessage(msg,size,refcount,dstBuf,pxshmContext->sendQs[dstRank]);
+#if SENDQ_LIST
+                        if (sendQ->numEntries > 0 && sendQ->next == -2)
+                        {
+                                sendQ->next = sendQ_head_index;
+                                sendQ_head_index = dstRank;
+                        }
+#endif
+			MACHSTATE(3,"Pxshm Send succeeded immediately");
 		 }else{
-				(*refcount)+=2;/*this message should not get deleted when the queue is flushed*/
-			 	pushSendQ(pxshmContext->sendQs[dstRank],msg,size,refcount);
-				MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
-				int sent = flushSendQ(dstRank);
-				(*refcount)--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
-				MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
+			(*refcount)+=2;/*this message should not get deleted when the queue is flushed*/
+			pushSendQ(pxshmContext->sendQs[dstRank],msg,size,refcount);
+			MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
+			int sent = flushSendQ(sendQ);
+			(*refcount)--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
+			MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
 		 }
 		 /* unlock the recvbuffer*/
 
@@ -440,8 +483,6 @@ void calculateNodeSizeAndRank(char **argv){
 	MACHSTATE(3,"calculateNodeSizeAndRank start");
 	//CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node (for non-smp case).Used by the shared memory communication layer");
 	CmiGetArgIntDesc(argv, "+nodesize", &(pxshmContext->nodesize),"Number of cores in this node");
-        if (_Cmi_mynode == 0 && pxshmContext->nodesize > 1)
-         CmiPrintf("Charm++> pxshm enabled: %d cores per node\n", pxshmContext->nodesize);
 	MACHSTATE1(3,"calculateNodeSizeAndRank argintdesc %d",pxshmContext->nodesize);
 
 	pxshmContext->noderank = _Cmi_mynode % (pxshmContext->nodesize);
@@ -586,22 +627,25 @@ void createShmObject(char *name,int size,char **pPtr){
 void tearDownSharedBuffers(){
 	int i;
 	for(i= 0;i<pxshmContext->nodesize;i++){
-		if(i != pxshmContext->noderank){
-			if(	shm_unlink(pxshmContext->recvBufNames[i]) < 0){
-				fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
-			}
-
-#if PXSHM_LOCK
-			sem_close(pxshmContext->recvBufs[i].mutex);
-			//sem_unlink(pxshmContext->recvBufNames[i]);
-			sem_close(pxshmContext->sendBufs[i].mutex);
-#endif
+	    if(i != pxshmContext->noderank){
+		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
+		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
 		}
+		sem_unlink(pxshmContext->sendBufNames[i]);
+#if PXSHM_LOCK
+		sem_close(pxshmContext->recvBufs[i].mutex);
+		sem_close(pxshmContext->sendBufs[i].mutex);
+		sem_unlink(pxshmContext->sendBufNames[i]);
+		sem_unlink(pxshmContext->recvBufNames[i]);
+                pxshmContext->recvBufs[i].mutex = NULL;
+                pxshmContext->sendBufs[i].mutex = NULL;
+#endif
+	    }
 	}
 };
 
 
-void initSendQ(PxshmSendQ *q,int size);
+void initSendQ(PxshmSendQ *q,int size,int rank);
 
 void initAllSendQs(){
 	int i=0;
@@ -609,7 +653,7 @@ void initAllSendQs(){
 	for(i=0;i<pxshmContext->nodesize;i++){
 		if(i != pxshmContext->noderank){
 			(pxshmContext->sendQs)[i] = (PxshmSendQ *)calloc(1, sizeof(PxshmSendQ));
-			initSendQ((pxshmContext->sendQs)[i],SENDQSTARTSIZE);
+			initSendQ((pxshmContext->sendQs)[i],SENDQSTARTSIZE,i);
 		}else{
 			(pxshmContext->sendQs)[i] = NULL;
 		}
@@ -651,15 +695,14 @@ inline OutgoingMsgRec* popSendQ(PxshmSendQ *q);
  *NOTE: This method is called only after obtaining the corresponding mutex
  * ************/
 
-inline int flushSendQ(int dstRank){
-	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstRank]);
-	PxshmSendQ *dstSendQ = pxshmContext->sendQs[dstRank];
+inline int flushSendQ(PxshmSendQ *dstSendQ){
+	sharedBufData *dstBuf = &(pxshmContext->sendBufs[dstSendQ->rank]);
 	int count=dstSendQ->numEntries;
 	int sent=0;
 	while(count > 0){
 		OutgoingMsgRec *ogm = popSendQ(dstSendQ);
 		(*ogm->refcount)--;
-		MACHSTATE4(3,"Pxshm trysending ogm %p size %d to dstRank %d refcount %d",ogm,ogm->size,dstRank,ogm->refcount);
+		MACHSTATE4(3,"Pxshm trysending ogm %p size %d to dstRank %d refcount %d",ogm,ogm->size,dstSendQ->rank,ogm->refcount);
 		int ret = sendMessageRec(ogm,dstBuf,dstSendQ);
 		if(ret==1){
 			sent++;
@@ -684,7 +727,6 @@ inline void emptyAllRecvBufs(){
 #if PXSHM_STATS
 				pxshmContext->lockRecvCount++;
 #endif
-
 
 #if PXSHM_OSSPINLOCK
 				if(! OSSpinLockTry(&recvBuf->header->lock)){
@@ -723,10 +765,21 @@ inline void emptyAllRecvBufs(){
 };
 
 inline void flushAllSendQs(){
-	int i=0;
-	
-	for(i=0;i<pxshmContext->nodesize;i++){
-		if(i != pxshmContext->noderank && pxshmContext->sendQs[i]->numEntries > 0){
+	int i;
+#if SENDQ_LIST
+        int index_prev = -1;
+
+        i =  sendQ_head_index;
+        while (i!= -1) {
+                PxshmSendQ *sendQ = pxshmContext->sendQs[i];
+                CmiAssert(i !=  pxshmContext->noderank);
+		if(sendQ->numEntries > 0){
+#else
+        for(i=0;i<pxshmContext->nodesize;i++) {
+                if (i == pxshmContext->noderank) continue;
+                PxshmSendQ *sendQ = pxshmContext->sendQs[i];
+                if(sendQ->numEntries > 0) {
+#endif
 	
 #if PXSHM_OSSPINLOCK
 		        if(OSSpinLockTry(&pxshmContext->sendBufs[i].header->lock)){
@@ -741,9 +794,7 @@ inline void flushAllSendQs(){
 #endif
 
 				MACHSTATE1(3,"flushSendQ %d",i);
-				flushSendQ(i);
-
-
+				flushSendQ(sendQ);
 				
 #if PXSHM_OSSPINLOCK	
 				OSSpinLockUnlock(&pxshmContext->sendBufs[i].header->lock);
@@ -763,6 +814,20 @@ inline void flushAllSendQs(){
 			}
 
 		}        
+#if SENDQ_LIST
+                if (sendQ->numEntries == 0) {
+                    if (index_prev != -1)
+                        pxshmContext->sendQs[index_prev]->next = sendQ->next;
+                    else
+                        sendQ_head_index = sendQ->next;
+                    i = sendQ->next;
+                    sendQ->next = -2;
+                }
+                else {
+                    index_prev = i;
+                    i = sendQ->next;
+                }
+#endif
 	}	
 };
 
@@ -852,7 +917,7 @@ void static inline handoverPxshmMessage(char *newmsg,int total_size,int rank,int
  *sendQ helper functions
  * ****************/
 
-void initSendQ(PxshmSendQ *q,int size){
+void initSendQ(PxshmSendQ *q,int size, int rank){
 	q->data = (OutgoingMsgRec *)calloc(size, sizeof(OutgoingMsgRec));
 
 	q->size = size;
@@ -860,6 +925,11 @@ void initSendQ(PxshmSendQ *q,int size){
 
 	q->begin = 0;
 	q->end = 0;
+
+        q->rank = rank;
+#if SENDQ_LIST
+        q->next = -2;
+#endif
 }
 
 void pushSendQ(PxshmSendQ *q, char *msg, int size, int *refcount){

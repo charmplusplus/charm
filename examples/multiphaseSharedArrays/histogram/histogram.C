@@ -90,6 +90,10 @@ public:
     {
         // Just let one thread fill the whole data array
         // with random entries to be histogrammed.
+        // 
+        // Note: this is potentially a very inefficient access
+        // pattern, especially if the MSA doesn't fit into
+        // memory, but it can be convenient.
         for (unsigned int r = 0; r < data.getRows(); r++) {
             for (unsigned int c = 0; c < data.getCols(); c++) {
                 w.set(r, c) = random() % MAX_ENTRY;
@@ -105,8 +109,9 @@ public:
         unsigned int min_row = thisIndex * range;
         unsigned int max_row = (thisIndex + 1) * range;
         
-        // Count the entries that belong to each bin.
-        for (unsigned int r = 0; r < data.getRows(); r++) {
+        // Count the entries that belong to each bin and accumulate
+        // counts into the bins.
+        for (unsigned int r = min_row; r < max_row; r++) {
             for (unsigned int c = 0; c < data.getCols(); c++) {
                 unsigned int bin = d.get(r, c) / (MAX_ENTRY / BINS);
                 b(bin) += 1;

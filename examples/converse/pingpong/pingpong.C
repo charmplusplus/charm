@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <converse.h>
 
-enum {nCycles =1};
+enum {nCycles = 1000};
 enum { maxMsgSize = 1 << 14 };
 
 CpvDeclare(int,msgSize);
@@ -120,7 +120,7 @@ CmiStartFn mymain()
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     
-    CpvAccess(msgSize)= 4096 + CmiMsgHeaderSizeBytes;
+    CpvAccess(msgSize)= 512 + CmiMsgHeaderSizeBytes;
     
     CpvInitialize(int,exitHandler);
     CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);

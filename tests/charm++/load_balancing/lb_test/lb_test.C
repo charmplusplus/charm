@@ -1,5 +1,5 @@
 /** \file lb_test.C
- *  Load-balancing test program:
+*  Load-balancing test program:
  *  Orion Sky Lawlor, 1999/10/19
  *
  *  Added more complex comm patterns
@@ -190,7 +190,7 @@ public:
   }
 
   //Packing/migration utilities
-  Lb_array(CkMigrateMessage *m) {
+  Lb_array(CkMigrateMessage *m):CBase_Lb_array(m)  {
     DEBUGF(("Migrated element %d to processor %d\n",thisIndex,CkMyPe()));
     TopoMap = CProxy_Topo::ckLocalBranch(topoid);
     // Find out who to send to, and how many to receive
@@ -301,7 +301,7 @@ public:
 	} 
 #if DYNAMIC_IMBALANCE
 	else if(nTimes > n_loadbalance && (nTimes-(n_loadbalance/2)) % n_loadbalance == 0) {
-		// printf("Here at %d\n",nTimes);
+		//printf("Here at %d\n",nTimes);
 		contribute(CkCallback(CkIndex_Topo::shuffleLoad(),topoid));
 	} 
 #endif

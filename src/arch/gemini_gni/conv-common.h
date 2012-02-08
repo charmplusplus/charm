@@ -9,7 +9,7 @@
 
 #define CMK_HANDLE_SIGUSR                                  0
 
-#define CMK_MSG_HEADER_EXT_    CmiUInt8 size; CmiUInt2 rank,hdl,xhdl,info,stratid,redID; CmiInt4 root; 
+#define CMK_MSG_HEADER_EXT_    CmiUInt4 size; CmiUInt4 seq; CmiUInt2 rank,hdl,xhdl,info,stratid,redID; CmiInt4 root; 
 
 #define CMK_MSG_HEADER_BASIC  CMK_MSG_HEADER_EXT
 #define CMK_MSG_HEADER_EXT    { CMK_MSG_HEADER_EXT_ }

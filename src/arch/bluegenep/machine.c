@@ -875,7 +875,7 @@ static void MachinePostCommonInitForDCMF(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
              msgQueueLen, outstanding_recvs, message);
