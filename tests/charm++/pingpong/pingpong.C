@@ -108,7 +108,7 @@ public:
     arrF[CkArrayIndexFancy("first")].insert(P1);
     arrF[CkArrayIndexFancy("second")].insert(P2);
     arrF.doneInserting();
-    phase=6;
+    phase=0;
     mainProxy.maindone();
     delete m;
   };
@@ -140,7 +140,7 @@ public:
         break;
 #else
       case 6:
-        //ngid[0].startRDMA();
+	  ngid[0].startRDMA();
 	  break;
 #endif
       default:
@@ -195,7 +195,7 @@ class PingN : public CBase_PingN
   int niter;
   int me, nbr;
 #ifdef USE_RDMA 
-  CmiDirectUserHandle *shandle,*rhandle;
+  struct infiDirectUserHandle shandle,rhandle;
   char *rbuff;
   char *sbuff;
 #endif
@@ -212,14 +212,13 @@ public:
 
     niter = 0;
 #ifdef USE_RDMA 
-    rbuff=(char *) CmiAlloc(payload*sizeof(char));
-    sbuff=(char *) CmiAlloc(payload*sizeof(char));
+    rbuff=(char *) malloc(payload*sizeof(char));
+    sbuff=(char *) malloc(payload*sizeof(char));
     bzero(sbuff,payload);
-    bzero(rbuff,payload);
     // setup persistent comm sender and receiver side
     double OOB=9999999999.0;
     rhandle=CmiDirect_createHandle(nbr,rbuff,payload*sizeof(char),PingN::Wrapper_To_CallBack,(void *) this,OOB);
-    thisProxy[nbr].recvHandle((char*) rhandle,sizeof(CmiDirectUserHandle));
+    thisProxy[nbr].recvHandle((char*) &rhandle,sizeof(struct infiDirectUserHandle));
 #endif
   }
   PingN(CkMigrateMessage *m) {}
@@ -227,11 +226,9 @@ public:
   {
 
 #ifdef USE_RDMA 
-    CmiDirectUserHandle *_shandle=(CmiDirectUserHandle *) ptr;
-    shandle=_shandle;
-    CmiDirect_assocLocalBuffer(shandle,sbuff,payload);
-    if(CkMyNode() == 0)
-        startRDMA();
+    struct infiDirectUserHandle *_shandle=(struct infiDirectUserHandle *) ptr;
+    shandle=*_shandle;
+    CmiDirect_assocLocalBuffer(&shandle,sbuff,payload);
 #endif
   }
   void start(void)
@@ -244,7 +241,7 @@ public:
     niter=0;
     start_time = CkWallTimer();
 #ifdef USE_RDMA 
-    CmiDirect_put(shandle);
+    CmiDirect_put(&shandle);
 #else
     CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
@@ -283,9 +280,8 @@ public:
   void recvRDMA()
   {
 #ifdef USE_RDMA 
-    CmiDirect_ready(rhandle);
+    CmiDirect_ready(&rhandle);
 #endif
-    CkPrintf("Received on [%d]", CmiMyNode());
     if(me==0) {
       niter++;
       if(niter==iterations) {
@@ -296,14 +292,14 @@ public:
         mainProxy.maindone();
       } else {
 #ifdef USE_RDMA 
-	CmiDirect_put(shandle);
+	CmiDirect_put(&shandle);
 #else
 	CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif
       }
     } else {
 #ifdef USE_RDMA 
-      CmiDirect_put(shandle);
+      CmiDirect_put(&shandle);
 #else
       CkAbort("do not call startRDMA if you don't actually have RDMA");
 #endif

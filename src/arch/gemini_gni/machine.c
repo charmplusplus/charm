@@ -417,7 +417,7 @@ static RDMA_REQUEST         *rdma_freelist = NULL;
 /* reuse gni_post_descriptor_t */
 static gni_post_descriptor_t *post_freelist=0;
 
-#if !CMK_SMP
+#if  !CMK_SMP
 #define FreePostDesc(d)       \
     (d)->next_descr = post_freelist;\
     post_freelist = d;
@@ -1328,9 +1328,7 @@ static void PumpNetworkSmsg()
 
 static void printDesc(gni_post_descriptor_t *pd)
 {
-    printf(" addr=%p, ", pd->local_addr); 
-    printf(" remote addr=%p, ", pd->remote_addr);
-    printf(" local %lld %lld, remote %lld, %lld\n", pd->local_mem_hndl.qword1, pd->local_mem_hndl.qword2, pd->remote_mem_hndl.qword1, pd->remote_mem_hndl.qword2); 
+    printf(" Descriptor (%p===>%p)(%d)\n", pd->local_addr, pd->remote_addr, pd->length); 
 }
 
 // for BIG_MSG called on receiver side for receiving control message
@@ -1390,7 +1388,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     }
     pd->first_operand = ALIGN64(size);                   //  total length
 
-    if(request_msg->total_length < LRTS_GNI_RDMA_THRESHOLD)
+    if(request_msg->total_length <= LRTS_GNI_RDMA_THRESHOLD)
         pd->type            = GNI_POST_FMA_GET;
     else
         pd->type            = GNI_POST_RDMA_GET;
@@ -1406,6 +1404,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
     pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
     pd->rdma_mode       = 0;
+    pd->amo_cmd         = 0;
 
     //memory registration success
     if(status == GNI_RC_SUCCESS)
@@ -1473,7 +1472,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     }
 
     MallocPostDesc(pd);
-    if(request_msg->length < LRTS_GNI_RDMA_THRESHOLD) 
+    if(request_msg->length <= LRTS_GNI_RDMA_THRESHOLD) 
         pd->type            = GNI_POST_FMA_GET;
     else
         pd->type            = GNI_POST_RDMA_GET;
@@ -1489,6 +1488,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
     pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
     pd->rdma_mode       = 0;
+    pd->amo_cmd         = 0;
 
     //memory registration successful
     if(status == GNI_RC_SUCCESS)
@@ -1638,6 +1638,7 @@ static void PumpLocalRdmaTransactions()
                 else
 #endif
                     FreeControlMsg(ack_msg_tmp);
+
             }
 #if CMK_PERSISTENT_COMM
             if (tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
@@ -1656,7 +1657,7 @@ static void PumpLocalRdmaTransactions()
                     TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
-                }else {
+                }else if(msg_tag == BIG_MSG_TAG){
                   void *msg = (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
                   CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
                   if (tmp_pd->first_operand <= ONE_SEG*CmiGetMsgSeq(msg)) {
