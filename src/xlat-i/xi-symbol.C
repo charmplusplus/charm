@@ -67,6 +67,16 @@ char* fortranify(const char *s, const char *suff1="", const char *suff2="", cons
   return retVal;
 }
 
+void templateGuardBegin(bool templateOnly, XStr &str) {
+  if (templateOnly)
+    str << "#ifdef " << "CK_TEMPLATES_ONLY\n";
+  else
+    str << "#ifndef " << "CK_TEMPLATES_ONLY\n";
+}
+void templateGuardEnd(XStr &str) {
+  str << "#endif /* CK_TEMPLATES_ONLY */\n";
+}
+
 Value::Value(const char *s)
 {
   factor = 1;
@@ -482,8 +492,8 @@ Module::generate()
   // defstr << "#ifndef _DEFS_"<<name<<"_H_"<<endx;
   // defstr << "#define _DEFS_"<<name<<"_H_"<<endx;
   genDefs(defstr);
+  templateGuardBegin(false, defstr);
   defstr <<
-  "#ifndef CK_TEMPLATES_ONLY\n"
   "void _register"<<name<<"(void)\n"
   "{\n"
   "  static int _done = 0; if(_done) return; _done = 1;\n";
@@ -500,7 +510,7 @@ Module::generate()
     "  _register"<<name<<"();\n"
     "}\n";
   }
-  defstr << "#endif\n";
+  templateGuardEnd(defstr);
   // defstr << "#endif"<<endx;
 
 
@@ -860,11 +870,7 @@ Chare::genRegisterMethodDef(XStr& str)
 {
   if(external || type->isTemplated())
     return;
-  if(!templat) {
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
-  } else {
-    str << "#ifdef CK_TEMPLATES_ONLY\n";
-  }
+  templateGuardBegin(isTemplated(), str);
   str <<  tspec() <<
   "void "<<indexName()<<"::__register(const char *s, size_t size) {\n"
   "  __idx = CkRegisterChare(s, size,";
@@ -885,7 +891,7 @@ Chare::genRegisterMethodDef(XStr& str)
       str << "  " << baseName(0) << "::__sdag_register(); \n";
   }
   str << "}\n";
-  str << "#endif\n";
+  templateGuardEnd(str);
 }
 
 void
@@ -1804,25 +1810,15 @@ Chare::genDefs(XStr& str)
 
   }
 
+  templateGuardBegin(isTemplated(), str);
   if(!type->isTemplated()) {
-    if(!templat) {
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
-    } else {
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    }
     if(external) str << "extern ";
     str << tspec()<<" int "<<indexName()<<"::__idx";
     if(!external) str << "=0";
     str << ";\n";
-    str << "#endif\n";
   }
   if(list)
   {//Add definitions for all entry points
-    if(isTemplated())
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    else
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
-
     list->genDefs(str);
     if (hasElement)
     { //Define the entry points for the element
@@ -1834,21 +1830,15 @@ Chare::genDefs(XStr& str)
       }
       forElement=forIndividual;
     }
-    str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
   // define the python routines
   if (isPython()) {
-    if(isTemplated())
-      str << "#ifdef CK_TEMPLATES_ONLY\n";
-    else
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
     str << "/* ---------------- python wrapper -------------- */\n";
 
     // write CkPy_MethodsCustom
     genPythonDefs(str);
-
-    str << "#endif /*CK_TEMPLATES_ONLY*/\n";
   }
+  templateGuardEnd(str);
 
   if(!external && !type->isTemplated())
     genRegisterMethodDef(str);
@@ -1987,11 +1977,8 @@ Message::genDefs(XStr& str)
   if(templat) { templat->genSpec(tspec); tspec << " "; }
 
   str << "/* DEFS: "; print(str); str << " */\n";
-  if(!templat) {
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
-  } else {
-    str << "#ifdef CK_TEMPLATES_ONLY\n";
-  }
+
+  templateGuardBegin(templat, str);
   if(!(external||type->isTemplated())) {
 
     // new (size_t)
@@ -2159,7 +2146,7 @@ Message::genDefs(XStr& str)
   } else {
     str << tspec << "int "<< ptype <<"::__idx=0;\n";
   }
-  str << "#endif\n";
+  templateGuardEnd(str);
 }
 
 void
@@ -2341,9 +2328,7 @@ Module::genDefs(XStr& str)
   #if CMK_CELL != 0
 
     if (!external) {
-
-      // Protected this functioni with CK_TEMPLATES_ONLY check
-      str << "#ifndef CK_TEMPLATES_ONLY\n";
+      templateGuardBegin(false, str);
 
       // Create the registration function
       // NOTE: Add a check so modules won't register more than once.  It is possible that to modules
@@ -2365,7 +2350,7 @@ Module::genDefs(XStr& str)
 	    << "}\n";
       }
 
-      str << "#endif /*CK_TEMPLATES_ONLY*/\n";
+      templateGuardEnd(str);
     }
 
   #endif
@@ -2546,7 +2531,7 @@ Readonly::genDefs(XStr& str)
   }
 
   if (!msg) { //Generate a pup for this readonly
-    str << "#ifndef CK_TEMPLATES_ONLY\n";
+    templateGuardBegin(false, str);
     str << "extern \"C\" void __xlater_roPup_"<<makeIdent(qName());
     str <<    "(void *_impl_pup_er) {\n";
     str << "  PUP::er &_impl_p=*(PUP::er *)_impl_pup_er;\n";
@@ -2556,7 +2541,7 @@ Readonly::genDefs(XStr& str)
 	    str << "  _impl_p|"<<qName()<<";\n";
     }
     str << "}\n";
-    str << "#endif\n";
+    templateGuardEnd(str);
   }
 
   if (fortranMode) {
@@ -2752,7 +2737,7 @@ void CParsedFile::generateCode(XStr& op)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op);
+    cn->sdagCon->generateCode(op, cn);
   }
 }
 
@@ -5220,11 +5205,11 @@ void PUPableClass::print(XStr& str)
 void PUPableClass::genDefs(XStr& str)
 {
         if (type->isTemplated()) {
-                str << "#ifdef CK_TEMPLATES_ONLY\n";
+                templateGuardBegin(true, str);
                 str << "  #define _CHARMXI_CLASS_NAME " << type << "\n";
                 str << "  PUPable_def_template(_CHARMXI_CLASS_NAME)\n";
                 str << "  #undef _CHARMXI_CLASS_NAME\n";
-                str << "#endif\n";
+                templateGuardEnd(str);
         } else {
                 str<<"  PUPable_def(" << type << ")\n";
         }

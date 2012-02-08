@@ -1,6 +1,9 @@
 #ifndef __TREE_H__
 #define __TREE_H__
-#include <stdlib.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct _tree_t{
   struct _tree_t **child;
@@ -51,6 +54,12 @@ typedef struct{
   int j;
   double val;
 }adjacency_t;
+
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif
 

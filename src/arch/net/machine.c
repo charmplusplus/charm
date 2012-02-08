@@ -289,6 +289,7 @@ int getDestHandler;
 #endif
 #endif
 
+
 static void CommunicationServer(int withDelayMs, int where);
 
 void CmiHandleImmediate();
@@ -782,6 +783,10 @@ CsvDeclare(CmiNodeState, NodeState);
 #define CMI_DEST_RANK(msg)	*(int *)(msg)
 #include "immediate.c"
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#include "machine-commthd-util.c"
+#endif
+
 /******************************************************************************
  *
  * Packet Performance Logging
@@ -996,13 +1001,13 @@ CpvDeclare(void *, CmiLocalQueue);
 
 
 #ifndef CmiMyPe
-int CmiMyPe(void) 
+int CmiMyPe() 
 { 
   return CmiGetState()->pe; 
 }
 #endif
 #ifndef CmiMyRank
-int CmiMyRank(void)
+int CmiMyRank()
 {
   return CmiGetState()->rank;
 }
@@ -2542,6 +2547,11 @@ static void ConverseRunPE(int everReturn)
     }
 #endif
   }
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+  CmiInitNotifyCommThdScheme();
+#endif
+
 #if MEMORYUSAGE_OUTPUT
   memoryusage_counter = 0;
 #endif
@@ -2850,6 +2860,9 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usc, int everReturn)
   CsvInitialize(CmiNodeState, NodeState);
   CmiNodeStateInit(&CsvAccess(NodeState));
  
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+  CsvInitialize(PCQueue, notifyCommThdMsgBuffer);
+#endif
 
   /* Network progress function is used to poll the network when for
      messages. This flushes receive buffers on some  implementations*/ 

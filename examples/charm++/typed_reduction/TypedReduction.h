@@ -9,7 +9,6 @@ class Driver : public CBase_Driver {
         void typed_array_done3(int n, double* results);
     private:
         CProxy_Worker w;
-        int count;
 };
 
 class Worker : public CBase_Worker {

@@ -33,7 +33,7 @@ private:
 public:
   struct ProcStats {		// per processor data
     int n_objs;			// number of objects on the processor
-    int pe_speed;		// processor frequency
+    double pe_speed;		// processor frequency
     /// total time (total_walltime) = idletime + overhead (bg_walltime)
     ///                             + object load (obj_walltime)
     /// walltime and cputime may be different on shared compute nodes
@@ -132,6 +132,7 @@ public:
     }
     void computeNonlocalComm(int &nmsgs, int &nbytes);
     double computeAverageLoad();
+    void normalize_speed();
     void print();
     // edit functions
     void removeObject(int obj);

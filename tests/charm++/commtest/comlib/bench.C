@@ -71,7 +71,7 @@ public:
 };
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     int pass, superpass;
     double curTime;
@@ -183,7 +183,7 @@ public:
 
 /******** The all to all benchmar array *************/
 /*array [1D]*/
-class Bench : public ArrayElement1D
+class Bench : public CBase_Bench
 {
     int pass;
     int mcount;
@@ -297,7 +297,7 @@ public:
         //if(p.isPacking())
         //  CkPrintf("Migrating from %d\n", CkMyPe());
 
-        ArrayElement1D::pup(p);
+        CBase_Bench::pup(p);
         p | pass ;
         p | mcount ;
         p | ite ;

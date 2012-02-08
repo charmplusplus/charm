@@ -36,7 +36,7 @@ static const struct {
   { NULL, NULL, TopoError }
 };
 
-class Topo : public Group {
+class Topo : public CBase_Topo {
 public:
   struct MsgInfo {
     int obj;

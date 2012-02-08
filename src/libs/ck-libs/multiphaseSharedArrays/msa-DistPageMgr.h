@@ -458,7 +458,7 @@ public:
 //=============================== Cache Manager =================================
 
 template <class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE>
-class MSA_CacheGroup : public Group
+class MSA_CacheGroup : public CBase_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
     typedef MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> page_t;
 
@@ -507,7 +507,6 @@ protected:
     typedef CProxy_MSA_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_PageArray_t;
     CProxy_PageArray_t pageArray;     // a proxy to the page array
     typedef CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
-    CProxy_CacheGroup_t thisProxy; // a proxy to myself.
 
     std::map<CthThread, MSA_Thread_Listener *> threadList;
 
@@ -772,7 +771,6 @@ public:
 		  pageTable(nPages, NULL),
 		  pageStateStorage(nPages, NULL),
 		  pageArray(pageArrayID),
-		  thisProxy(thisgroup),
 		  max_resident_pages(max_bytes_/(sizeof(ENTRY_TYPE)*ENTRIES_PER_PAGE)),
 		  entryOpsObject(new ENTRY_OPS_CLASS),
 		  replacementPolicy(new vmPageReplacementPolicy(nPages, pageTable, pageStateStorage)),
@@ -936,7 +934,7 @@ public:
 			// @@ how to ensure that enroll is called only once?
 
 			//ckout << "[" << CkMyPe() << "] sending sync ack to PE 0" << endl;
-			thisProxy[0].enrollAck(CkMyPe());
+			this->thisProxy[0].enrollAck(CkMyPe());
 			//ckout << "[" << CkMyPe() << "] suspening thread in Sync() " << endl;
 			addAndSuspend(enrollWaiters);
 			//ckout << "[" << CkMyPe() << "] rsuming thread in Sync()" << endl;
@@ -968,7 +966,7 @@ public:
 				enrollDoneq = 1;
 				// What if fewer worker threads than pe's ?  Handled in
 				// enrollDone.
-				thisProxy.enrollDone();
+				this->thisProxy.enrollDone();
 			}
 		}
 
@@ -1002,7 +1000,7 @@ public:
 				return;
 			}
 
-			thisProxy[CkMyPe()].FinishSync();
+			this->thisProxy[CkMyPe()].FinishSync();
 		}
 
 	void syncDebug()
@@ -1046,7 +1044,7 @@ public:
 			// a reduction over a group)
 			if(CkMyPe() != 0)
 			{
-				thisProxy[0].SyncAck(clear);
+				this->thisProxy[0].SyncAck(clear);
 			}
 			else /* I *am* PE 0 */
 			{
@@ -1260,7 +1258,7 @@ public:
 // "owner" as well as the "manager" for that page.
 //
 template<class ENTRY_TYPE, class ENTRY_OPS_CLASS,unsigned int ENTRIES_PER_PAGE> 
-class MSA_PageArray : public ArrayElement1D
+class MSA_PageArray : public CBase_MSA_PageArray<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>
 {
     typedef CProxy_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> CProxy_CacheGroup_t;
     typedef MSA_PageT<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE> page_t;
@@ -1270,7 +1268,7 @@ protected:
     ENTRY_OPS_CLASS entryOpsObject;
     CProxy_CacheGroup_t cache;
 
-    unsigned int pageNo() { return thisIndex; }
+    unsigned int pageNo() { return this->thisIndex; }
 
     inline void allocatePage(MSA_Page_Fault_t access) // @@@
 		{
@@ -1315,9 +1313,8 @@ public:
 			cache=cache_;
 		}
     
-    virtual void pup(PUP::er& p)
+    void pup(PUP::er& p)
 		{
-			ArrayElement1D::pup(p);
 			int epage_present=(epage!=0);
 			p|epage_present;
 			if (epage_present) {
@@ -1366,7 +1363,7 @@ public:
 	
 			// send the acknowledgement to the sender that we received the page
 			//ckout << "Sending Ack to PE " << pe << endl;
-			cache[pe].AckPage(thisIndex);
+			cache[pe].AckPage(this->thisIndex);
 		}
 
     /// Receive a runlength encoded page from the network:
@@ -1398,7 +1395,7 @@ public:
 
 			// send the acknowledgement to the sender that we received the page
 			//ckout << "Sending AckRLE to PE " << pe << endl;
-			cache[pe].AckPage(thisIndex);
+			cache[pe].AckPage(this->thisIndex);
 		}
 
     // MSA_PageArray::
@@ -1408,7 +1405,7 @@ public:
 				writeIdentity();
 			MSADEBPRINT(printf("MSA_PageArray::Sync about to call contribute \n"););
 			CkCallback cb(CkIndex_MSA_CacheGroup<ENTRY_TYPE, ENTRY_OPS_CLASS, ENTRIES_PER_PAGE>::SyncDone(NULL), cache);
-			contribute(0, NULL, CkReduction::concat, cb);
+			this->contribute(0, NULL, CkReduction::concat, cb);
 		}
 
     inline void emit(int ID, int index)

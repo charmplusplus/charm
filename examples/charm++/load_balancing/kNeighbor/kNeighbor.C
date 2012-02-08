@@ -230,7 +230,7 @@ class Block: public CBase_Block {
     }
 
     void pup(PUP::er &p){
-      ArrayElement1D::pup(p); //pack our superclass
+      CBase_Block::pup(p);
       p(numNeighbors);
       p(numNborsRcvd);
 

@@ -36,7 +36,7 @@ public:
   int value;
 };
 
-class synctest_main : public Chare {
+class synctest_main : public CBase_synctest_main {
 private:
   int count;
   CkChareID children[NUMCHILDREN];
@@ -48,7 +48,7 @@ public:
   void doTest(void);
 };
 
-class synctest_chare : public Chare {
+class synctest_chare : public CBase_synctest_chare {
 private:
   int value;
   CkChareID myMain;
@@ -58,7 +58,7 @@ public:
   synctest_SyncRecvMsg *test(synctest_SyncSendMsg *s_ssm);
 };
 
-class synctest_arr : public ArrayElement1D {
+class synctest_arr : public CBase_synctest_arr {
 private:
   int value;
   CkChareID myMain;

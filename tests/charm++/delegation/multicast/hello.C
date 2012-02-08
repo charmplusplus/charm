@@ -33,7 +33,7 @@ public:
 };
 PUPbytes(myReductionCounter)
 
-class main : public Chare
+class main : public CBase_main
 {
 public:
   main(CkMigrateMessage *m) {}
@@ -204,7 +204,7 @@ CmiPrintf("start %d elements\n", nElements);
   }
 
   void pup(PUP::er &p) {
-    ArrayElement1D::pup(p);//Call superclass
+    CBase_Hello::pup(p);//Call superclass
     p|sid;
     p(init);
     p|cnt;

@@ -431,7 +431,7 @@ void SumLogPool::write(void)
     fprintf(fp, "\n");
   }
 
-  CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
+  //CkPrintf("writing to detail file:%d    %d \n", getNumEntries(), numBins);
   // write summary details
   if (sumDetail) {
         fprintf(sdfp, "ver:%3.1f cpu:%d/%d numIntervals:%d numEPs:%d intervalSize:%e\n",
@@ -657,6 +657,7 @@ TraceSummary::TraceSummary(char **argv):binStart(0.0),idleStart(0.0),
   execEp=INVALIDEP;
   inIdle = 0;
   inExec = 0;
+  depth = 0;
 }
 
 void TraceSummary::traceClearEps(void)
@@ -714,13 +715,22 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   if (execEp == TRACEON_EP) {
     endExecute();
   }
-  CmiAssert(inIdle == 0 && inExec == 0);
-  inExec = 1;
+  CmiAssert(inIdle == 0);
+  if (inExec == 0) {
+    CmiAssert(depth == 0);
+    inExec = 1;
+  }
+  depth ++;
+  // printf("BEGIN exec: %d %d %d\n", inIdle, inExec, depth);
 
+  if (depth > 1) return;          //  nested
+
+/*
   if (execEp != INVALIDEP) {
     TRACE_WARN("Warning: TraceSummary two consecutive BEGIN_PROCESSING!\n");
     return;
   }
+*/
   
   execEp=ep;
   double t = TraceTimer();
@@ -748,10 +758,15 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
   }
 }
 
-void TraceSummary::endExecute(void)
+void TraceSummary::endExecute()
 {
   CmiAssert(inIdle == 0 && inExec == 1);
-  inExec = 0;
+  depth --;
+  if (depth == 0) inExec = 0;
+  CmiAssert(depth >= 0);
+  // printf("END exec: %d %d %d\n", inIdle, inExec, depth);
+
+  if (depth != 0) return;
  
   double t = TraceTimer();
   double ts = start;
@@ -815,6 +830,8 @@ void TraceSummary::beginIdle(double currT)
 
   CmiAssert(inIdle == 0 && inExec == 0);
   inIdle = 1;
+  //printf("BEGIN idle: %d %d %d\n", inIdle, inExec, depth);
+
   double t = TraceTimer(currT);
   
   // mark the time of this idle period. Only the next endIdle should see
@@ -834,6 +851,8 @@ void TraceSummary::endIdle(double currT)
 {
   CmiAssert(inIdle == 1 && inExec == 0);
   inIdle = 0;
+  // printf("END idle: %d %d %d\n", inIdle, inExec, depth);
+
   double t = TraceTimer(currT);
   double t_idleStart = idleStart;
   double t_binStart = binStart;

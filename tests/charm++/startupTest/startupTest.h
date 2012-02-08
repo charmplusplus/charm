@@ -50,7 +50,7 @@ class main : public CBase_main
   void doneReport(CkReductionMsg *msg);
 };
 
-class groupTest : public Group
+class groupTest : public CBase_groupTest
 {
  public:
   int order;
@@ -69,7 +69,7 @@ class groupTest : public Group
     }
 };
 
-class groupTestX : public Group
+class groupTestX : public CBase_groupTestX
 {
  public:
   int order;

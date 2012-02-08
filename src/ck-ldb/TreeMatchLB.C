@@ -1,20 +1,11 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
 #include <charm++.h>
-extern "C"{
 #include "tm_tree.h"
 #include "tm_mapping.h"
-};
 #include "TreeMatchLB.h"
 #include "ckgraph.h"
 #include <algorithm>
@@ -62,7 +53,7 @@ tm_topology_t *build_abe_topology(int nb_procs){
 class ProcLoadGreater {
   public:
     bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() > p2.getTotalLoad());
+      return (p1.totalLoad() > p2.totalLoad());
     }
 };
 
@@ -102,7 +93,7 @@ void TreeMatchLB::work(BaseLB::LDStats* stats)
 
     // Increment the load of the least loaded processor by the load of the
     // 'heaviest' unmapped object
-    p.setTotalLoad(p.getTotalLoad() + ogr->vertices[vert].getVertexLoad());
+    p.totalLoad() += ogr->vertices[vert].getVertexLoad();
     ogr->vertices[vert].setNewPe(p.getProcId());
 
     // Insert the least loaded processor with load updated back into the heap

@@ -55,7 +55,7 @@ class rotest_msg : public CMessage_rotest_msg
     }
 };
 
-class rotest_group : public Group {
+class rotest_group : public CBase_rotest_group {
   int numdone;
   public:
     rotest_group(void){ numdone = 0; }

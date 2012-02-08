@@ -25,7 +25,7 @@ public:
   }
 };
 
-class groupcast_main : public Chare {
+class groupcast_main : public CBase_groupcast_main {
 private:
   CkGroupID gid;
   int count;
@@ -35,7 +35,7 @@ public:
   void groupReady(void);
 };
 
-class groupcast_group : public Group {
+class groupcast_group : public CBase_groupcast_group {
 private:
   CkChareID myMain;
 public:

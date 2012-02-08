@@ -28,6 +28,7 @@ private:
   int _lb_migObjOnly;		// only consider migratable objs
   int _lb_syncResume;
   int _lb_samePeSpeed;		// ignore cpu speed
+  int _lb_testPeSpeed;		// test cpu speed
   int _lb_useCpuTime;           // use cpu instead of wallclock time
   int _lb_statson;		// stats collection
   int _lb_traceComm;		// stats collection for comm
@@ -47,7 +48,7 @@ public:
     _lb_percentMovesAllowed=100;
     _lb_loop = 0;
     _lb_central_pe = 0;
-	_lb_teamSize = 1;
+    _lb_teamSize = 1;
   }
   inline double & lbperiod() { return _autoLbPeriod; }
   inline int & debug() { return _lb_debug; }
@@ -59,6 +60,7 @@ public:
   inline int & migObjOnly() { return _lb_migObjOnly; }
   inline int & syncResume() { return _lb_syncResume; }
   inline int & samePeSpeed() { return _lb_samePeSpeed; }
+  inline int & testPeSpeed() { return _lb_testPeSpeed; }
   inline int & useCpuTime() { return _lb_useCpuTime; }
   inline int & statsOn() { return _lb_statson; }
   inline int & traceComm() { return _lb_traceComm; }

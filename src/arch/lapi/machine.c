@@ -336,7 +336,7 @@ static void MachinePostCommonInitForLAPI(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForLAPI();
+static void AdvanceCommunicationForLAPI(int idle);
 #define LrtsAdvanceCommunication AdvanceCommunicationForLAPI
 
 static void DrainResourcesForLAPI(); /* used when exit */
@@ -781,7 +781,7 @@ static int checkMsgInOrder(char *msg, MsgOrderInfo *info) {
 
 /* ######Beginning of functions related with communication progress ###### */
 
-static INLINE_KEYWORD void AdvanceCommunicationForLAPI() {
+static INLINE_KEYWORD void AdvanceCommunicationForLAPI(int idle) {
     /* What about CMK_SMP_NO_COMMTHD in the original implementation?? */
     /* It does nothing but sleep */
     if (!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
@@ -975,7 +975,7 @@ static void MachinePostCommonInitForLAPI(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     CmiError(message);
     LAPI_Term(lapiContext);
     exit(1);

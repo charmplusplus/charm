@@ -55,8 +55,6 @@
 /* Tag variable y as being from unit x: */
 #define CMK_TAG(x,y) x##y##_
 
-#define USE_MEMPOOL_ISOMALLOC 1
-
 #include "pup_c.h"
 
 /* the following flags denote properties of the C compiler,  */
@@ -684,6 +682,7 @@ extern void* malloc_nomigrate(size_t size);
 */
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
+int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 
@@ -908,6 +907,7 @@ typedef struct {
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
 extern void *CsdNextMessage(CsdSchedulerState_t *state);
+extern void *CsdNextLocalNodeMessage(CsdSchedulerState_t *state);
 
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
@@ -917,6 +917,7 @@ extern  int CsdScheduler(int maxmsgs);
 extern void CsdScheduleForever(void);
 extern  int CsdScheduleCount(int maxmsgs);
 extern void CsdSchedulePoll(void);
+extern void CsdScheduleNodePoll(void);
 
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 /** @} */
@@ -1281,7 +1282,7 @@ void CtgInit(void);
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void);
+CtgGlobals CtgCreate(CthThread tid);
 /** Install this set of globals. If g==NULL, returns to original globals. */
 void CtgInstall(CtgGlobals g);
 /** PUP this (not currently installed) globals set */
@@ -1900,5 +1901,30 @@ typedef struct {
 extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#if defined(__cplusplus)
+#define EXTERN extern "C"
+#else
+#define EXTERN extern
+#endif
+typedef void (*CmiCommThdFnPtr)(int numParams, void *params);
+typedef struct CmiNotifyCommThdMsg {
+    char core[CmiMsgHeaderSizeBytes];
+    CmiCommThdFnPtr fn;
+    int numParams;
+    void *params;
+    int toKeep; /* whether to free this msg by comm thread when the msg is processed */ 
+}CmiNotifyCommThdMsg;
+
+EXTERN CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+EXTERN void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg);
+/* Initialize a notification msg */
+EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+/* Enqueue the msg into the local comm thread, and wait for being processed */
+EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
+#endif
+
+int CmiReadSize(char *str);
 
 #endif /* CONVERSE_H */

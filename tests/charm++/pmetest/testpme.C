@@ -13,7 +13,7 @@ double        startTime;
 
 CProxy_Patch  patch_proxy;
 
-class main : public Chare {
+class main : public CBase_main {
 public:
   main (CkArgMsg *m);
   main (CkMigrateMessage *m) {}

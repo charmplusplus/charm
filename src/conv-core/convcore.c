@@ -1735,6 +1735,24 @@ void *CsdNextMessage(CsdSchedulerState_t *s) {
 	return NULL;
 }
 
+
+void *CsdNextLocalNodeMessage(CsdSchedulerState_t *s) {
+	void *msg;
+#if CMK_NODE_QUEUE_AVAILABLE
+	/*#warning "CsdNextMessage: CMK_NODE_QUEUE_AVAILABLE" */
+	/*if (NULL!=(msg=CmiGetNonLocalNodeQ())) return msg;*/
+	if (!CqsEmpty(s->nodeQ))
+	{
+	  CmiLock(s->nodeLock);
+	  CqsDequeue(s->nodeQ,(void **)&msg);
+	  CmiUnlock(s->nodeLock);
+	  if (msg!=NULL) return msg;
+	}
+#endif
+	return NULL;
+
+}
+
 int CsdScheduler(int maxmsgs)
 {
 	if (maxmsgs<0) CsdScheduleForever();	
@@ -1858,6 +1876,21 @@ void CsdSchedulePoll(void)
 	CsdPeriodic();
         /*CmiMachineProgressImpl(); ??? */
 	if (NULL!=(msg = CsdNextMessage(&state)))
+	{
+	     SCHEDULE_MESSAGE 
+     	}
+	else break;
+  }
+}
+
+void CsdScheduleNodePoll(void)
+{
+  SCHEDULE_TOP
+  while (1)
+  {
+	/*CsdPeriodic();*/
+        /*CmiMachineProgressImpl(); ??? */
+	if (NULL!=(msg = CsdNextLocalNodeMessage(&state)))
 	{
 	     SCHEDULE_MESSAGE 
      	}
@@ -2605,9 +2638,20 @@ void CmiGroupInit()
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   int i;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  for(i=0;i<npes;i++) {
+    if (pes[i] == CmiMyPe())
+      CmiSyncSend(pes[i], len, msg);
+    else {
+      CmiReference(msg);
+      CmiSyncSendAndFree(pes[i], len, msg);
+    }
+  }
+#else
   for(i=0;i<npes;i++) {
     CmiSyncSend(pes[i], len, msg);
   }
+#endif
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
@@ -2619,6 +2663,14 @@ CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  if (npes == 1) {
+    CmiSyncSendAndFree(pes[0], len, msg);
+    return;
+  }
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
+#else
   int i;
   for(i=0;i<npes-1;i++) {
     CmiSyncSend(pes[i], len, msg);
@@ -2627,6 +2679,7 @@ void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiSyncSendAndFree(pes[npes-1], len, msg);
   else 
     CmiFree(msg);
+#endif
 }
 
 #endif
@@ -2812,6 +2865,11 @@ static void *CmiAllocFindEnclosing(void *blk) {
     refCount = REFFIELD(blk);
   }
   return blk;
+}
+
+int CmiGetReference(void *blk)
+{
+  return REFFIELD(CmiAllocFindEnclosing(blk));
 }
 
 /** Increment the reference count for this block's owner.
@@ -3702,6 +3760,27 @@ double CmiLog2(double x) {
 int CmiMyRank_()
 {
   return CmiMyRank();
+}
+
+int CmiReadSize(char *str)
+{
+    int val;
+    if (strpbrk(str,"G")) {
+        sscanf(str, "%lldG", &val);
+        val *= 1024ll*1024*1024;
+    }
+    else if (strpbrk(str,"M")) {
+        sscanf(str, "%lldM", &val);
+        val *= 1024*1024;
+    }
+    else if (strpbrk(str,"K")) {
+        sscanf(str, "%lldK", &val);
+        val *= 1024;
+    }
+    else {
+        sscanf(str, "%lld", &val);
+    }
+    return val;
 }
 
 /*@}*/

@@ -2,7 +2,7 @@
 #define __SIMDIA_H__
 
 
-#if defined(__SSE2__)
+#if defined(__SSE2__) && !defined(_CRAYC)
   #include "emmintrin.h"
 #endif
 
@@ -329,7 +329,7 @@ inline __simdia_veci __simdia_vcmplelf(const  __simdia_vecf a, const  __simdia_v
  ***** SSE Support
  *******************************************************************************
  *******************************************************************************/
-#if defined(__SSE2__) && (!(SIMDIA_FORCE_NO_SSE))
+#if defined(__SSE2__) && (!(SIMDIA_FORCE_NO_SSE)) && !defined(_CRAYC)
 
   /* NOTE | TODO | FIXME : Add checks for various version of SSE.  For now, only
    *   support and assume that minimum level SSE2.

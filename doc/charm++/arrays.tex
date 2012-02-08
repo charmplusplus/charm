@@ -299,8 +299,10 @@ home processor is the processor responsible for maintaining
 the location of the element.
 
 There is a default map object, which maps 1D array indices
-in a round-robin fashion to processors, and maps other array
-indices based on a hash function.
+in a block fashion to processors, and maps other array
+indices based on a hash function. Some other mappings such as round-robin
+(\kw{RRMap}) also exist, which can be used
+similar to custom ones described below.
 
 A custom map object is implemented as a group which inherits from
 \kw{CkArrayMap} and defines these virtual methods:
@@ -341,11 +343,11 @@ class BlockMap : public CkArrayMap
 Once you've instantiated a custom map object, you can use it to
 control the location of a new array's elements using the
 \kw{setMap} method of the \kw{CkArrayOptions} object described above.
-For example, if you've declared a map object named ``blockMap'':
+For example, if you've declared a map object named ``BlockMap'':
 
 \begin{alltt}
 //Create the map group
-  CProxy_blockMap myMap=CProxy_blockMap::ckNew();
+  CProxy_BlockMap myMap=CProxy_BlockMap::ckNew();
 //Make a new array using that map
   CkArrayOptions opts(nElements);
   opts.setMap(myMap);

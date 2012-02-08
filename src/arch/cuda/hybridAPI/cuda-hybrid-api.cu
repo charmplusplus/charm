@@ -29,9 +29,7 @@ void cudaErrorDie(int err,const char *code,const char *file,int line)
 	  " Return value %d from '%s'.  Exiting.\n",
 	  file,line,
 	  err,code);
-  int ret;
   abort();
-  exit(ret);
 }
 
 #define cudaChk(code)							\
@@ -951,7 +949,9 @@ void *getBufferFromPool(int pool, int size){
   else if (memPoolFreeBufs[pool].head == NULL){
     Header *hd;
     cudaChk(cudaMallocHost((void **)&hd, sizeof(Header)+memPoolFreeBufs[pool].size));
+#ifdef GPU_MEMPOOL_DEBUG
     printf("(%d) getBufferFromPool, pool: %d, size: %d expand by 1\n", CmiMyPe(), pool, size);
+#endif
     if(hd == NULL){
       abort();
     }

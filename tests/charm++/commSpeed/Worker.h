@@ -13,7 +13,7 @@ class WorkMsg : public CMessage_WorkMsg {
   int *data;
 };
 
-class worker : public ArrayElement1D {
+class worker : public CBase_worker {
   int numMsgs, msgSize, sent;
   double lsum, lmax, lmin, rsum, rmax, rmin;
  public:

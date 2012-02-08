@@ -2,7 +2,7 @@
 UNCOMMON_LDBS="TempAwareGreedyLB MetisLB ScotchLB TeamLB WSLB"
 COMMON_LDBS="BlockLB CommLB DummyLB GreedyAgentLB GreedyCommLB GreedyLB NeighborCommLB NeighborLB OrbLB PhasebyArrayLB RandCentLB RecBipartLB RefineLB RefineCommLB RotateLB TreeMatchLB"
 OTHER_LDBS="ComboCentLB GraphPartLB GraphBFTLB GridCommLB GridCommRefineLB GridHybridLB GridHybridSeedLB GridMetisLB HbmLB HybridLB RefineKLB RefineTopoLB TopoCentLB TopoLB"
-ALL_LDBS="$COMMON_LDBS $OTHER_LDBS RefineSwapLB"
+ALL_LDBS="$COMMON_LDBS $OTHER_LDBS"
 
 out="Make.lb"
 

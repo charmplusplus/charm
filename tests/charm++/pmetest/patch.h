@@ -23,7 +23,7 @@ PUPbytes(PatchInfo)
 
 #include "testpme.decl.h"
 
-class Patch : public Group {
+class Patch : public CBase_Patch {
   PatchInfo      _info;       //The info for this patch element
   LineFFTGrid  * _gridList;   //List of grid messages to send
   

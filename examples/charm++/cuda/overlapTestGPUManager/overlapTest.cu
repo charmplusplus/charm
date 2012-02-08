@@ -1,16 +1,9 @@
 #include "overlapTestConsts.h"
 #include "wr.h"
 #include <stdio.h>
+#include <math.h>
 
-#if CHECK_BANK_CONFLICTS
-#define AS(i, j) CUT_BANK_CHECKER(((float*)&As[0][0]), (BLOCK_SIZE * i + j))
-#define BS(i, j) CUT_BANK_CHECKER(((float*)&Bs[0][0]), (BLOCK_SIZE * i + j))
-#else
-#define AS(i, j) As[i][j]
-#define BS(i, j) Bs[i][j]
-#endif
-
-// matrix multiplication code taken from the CUDA SDK
+// matrix multiplication code adapted from the CUDA SDK
 
 __global__ void
 matrixMul(float* C, float* A, float* B, int wA, int wB)
@@ -59,8 +52,8 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         // Load the matrices from device memory
         // to shared memory; each thread loads
         // one element of each matrix
-        AS(ty, tx) = A[a + wA * ty + tx];
-        BS(ty, tx) = B[b + wB * ty + tx];
+        As[ty][tx] = A[a + wA * ty + tx];
+        Bs[ty][tx] = B[b + wB * ty + tx];
 
         // Synchronize to make sure the matrices are loaded
         __syncthreads();
@@ -69,7 +62,7 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         // each thread computes one element
         // of the block sub-matrix
         for (int k = 0; k < BLOCK_SIZE; ++k)
-            Csub += AS(ty, k) * BS(k, tx);
+            Csub += As[ty][k] * Bs[k][tx];
 
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
@@ -113,11 +106,6 @@ void hostMemoryCleanup(ElementType *h_A, ElementType *h_B, ElementType *h_C) {
   delayedFree(h_B); 
   delayedFree(h_C);
 
-  /*
-  cudaFreeHost(h_A); 
-  cudaFreeHost(h_B); 
-  cudaFreeHost(h_C); 
-  */
 }
 
 void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B, 
@@ -127,7 +115,8 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
 
   workRequest matmul; 
   dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
-  matmul.dimGrid = dim3(matrixSize / threads.x, matrixSize / threads.y);
+  matmul.dimGrid = dim3( ceil((float)matrixSize / threads.x), 
+			 ceil((float)matrixSize / threads.y) );
   matmul.dimBlock = dim3(BLOCK_SIZE, BLOCK_SIZE); 
   matmul.smemSize = 0; 
   matmul.nBuffers = 3; 
@@ -164,43 +153,6 @@ void cudaMatMul(int matrixSize, ElementType *h_A, ElementType *h_B,
   memcpy(matmul.userData, &matrixSize, sizeof(int)); 
 
   enqueue(wrQueue, &matmul); 
-
-  /*
-  cudaStream_t stream; 
-  cudaStreamCreate(&stream); 
-  ElementType *h_A, *h_B, *h_C; 
-  ElementType *d_A, *d_B, *d_C;
-
-
-  cudaMalloc((void **) &d_A, size);
-  cudaMalloc((void **) &d_B, size);
-  cudaMalloc((void **) &d_C, size);
-
-  cudaMemcpyAsync(d_A, A, size, cudaMemcpyHostToDevice, stream); 
-  cudaMemcpyAsync(d_B, B, size, cudaMemcpyHostToDevice, stream); 
-
-  dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
-  dim3 grid(matrixSize / threads.x, matrixSize / threads.y);
-  
-  // execute the kernel
-  matrixMul<<< grid, threads, 0, stream >>>(d_C, d_A, d_B, matrixSize, matrixSize);  
-
-  cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, stream); 
-
-  memcpy(C, h_C, size);
-
-  cudaStreamSynchronize(stream); 
-
-  cudaFreeHost(h_A);
-  cudaFreeHost(h_B);
-  cudaFreeHost(h_C);
-  
-  cudaFree(d_A);
-  cudaFree(d_B);
-  cudaFree(d_C);
-
-  cudaStreamDestroy(stream); 
-  */
 }
 
 void kernelSelect(workRequest *wr) {

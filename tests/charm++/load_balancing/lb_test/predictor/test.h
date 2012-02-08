@@ -2,7 +2,7 @@
 
 CProxy_Main mainhandle;
 
-class Main : public Chare {
+class Main : public CBase_Main {
   int el, called;
  public:
   Main(CkArgMsg *m);

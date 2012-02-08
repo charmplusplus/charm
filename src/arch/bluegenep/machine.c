@@ -293,7 +293,7 @@ static void MachinePostCommonInitForDCMF(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForDCMF();
+static void AdvanceCommunicationForDCMF(int whenidle);
 #define LrtsAdvanceCommunication AdvanceCommunicationForDCMF
 
 static void DrainResourcesForDCMF();
@@ -673,7 +673,7 @@ extern void        bgl_machine_RectBcastInit  (unsigned               commID,
 
 
 /* ######Beginning of functions related with communication progress ###### */
-static INLINE_KEYWORD void AdvanceCommunicationForDCMF() {
+static INLINE_KEYWORD void AdvanceCommunicationForDCMF(int whenidle) {
 #if CMK_SMP
     DCMF_CriticalSection_enter (0);
 #endif
@@ -695,7 +695,7 @@ static void MachinePostNonLocalForDCMF() {
    messages. This flushes receive buffers on some  implementations*/
 #if CMK_MACHINE_PROGRESS_DEFINED
 void CmiMachineProgressImpl() {
-    AdvanceCommunicationForDCMF();
+    AdvanceCommunicationForDCMF(0);
 #if CMK_IMMEDIATE_MSG
     CmiHandleImmediate();
 #endif
@@ -705,7 +705,7 @@ void CmiMachineProgressImpl() {
 /* ######Beginning of functions related with exiting programs###### */
 static void DrainResourcesForDCMF() {
     while (msgQueueLen > 0 || outstanding_recvs > 0) {
-        AdvanceCommunicationForDCMF();
+        AdvanceCommunicationForDCMF(0);
     }
 }
 
@@ -732,6 +732,7 @@ static void MachineInitForDCMF(int *argc, char ***argv, int *numNodes, int *myNo
 
     DCMF_Messager_configure(&config_in, &config_out);
     //assert (config_out.thread_level == DCMF_THREAD_MULTIPLE); //not supported in vn mode
+    Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
 #endif
 
     DCMF_Send_Configuration_t short_config, eager_config, rzv_config;
@@ -874,7 +875,7 @@ static void MachinePostCommonInitForDCMF(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     CmiError("------------- Processor %d Exiting: Called CmiAbort ------------\n"
              "{snd:%d,rcv:%d} Reason: %s\n",CmiMyPe(),
              msgQueueLen, outstanding_recvs, message);

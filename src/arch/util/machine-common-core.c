@@ -144,6 +144,16 @@ CpvDeclare(void*, CmiLocalQueue);
 #define BCAST_SYNC 0x3
 #define BCAST_ASYNC 0x4
 
+enum MACHINE_SMP_MODE {
+    INVALID_MODE,
+    COMM_THREAD_SEND_RECV = 0,
+    COMM_THREAD_ONLY_RECV, /* work threads will do the send */
+    COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
+};
+/* The default mode of smp charm runtime */
+static enum MACHINE_SMP_MODE Cmi_smp_mode_setting = COMM_THREAD_SEND_RECV;
+
+
 #if CMK_SMP
 static volatile int commThdExit = 0;
 static CmiNodeLock  commThdExitLock = 0;
@@ -244,7 +254,7 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 static void ConverseRunPE(int everReturn);
 
 /* Functions regarding machine running on every proc */
-static void AdvanceCommunication();
+static void AdvanceCommunication(int whenidle);
 static void CommunicationServer(int sleepTime);
 static void CommunicationServerThread(int sleepTime);
 void ConverseExit(void);
@@ -335,6 +345,7 @@ CsvDeclare(CmiNodeState, NodeState);
 
 #include "machine-broadcast.c"
 #include "immediate.c"
+#include "machine-commthd-util.c"
 
 /* ===== Beginning of Common Function Definitions ===== */
 static void PerrorExit(const char *msg) {
@@ -358,6 +369,10 @@ void CmiPushPE(int rank,void *msg) {
 #endif
 
     PCQueuePush(cs->recv,msg);
+
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+  if (_Cmi_noprocforcommthread)
+#endif
     CmiIdleLock_addMessage(&cs->idle);
     MACHSTATE1(3,"} Pushing message into rank %d's queue done",rank);
 }
@@ -376,6 +391,10 @@ void CmiPushNode(void *msg) {
     CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
     PCQueuePush(CsvAccess(NodeState).NodeRecv,msg);
     CmiUnlock(CsvAccess(NodeState).CmiNodeRecvLock);
+
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+    if (_Cmi_noprocforcommthread)
+#endif
     {
         CmiState cs=CmiGetStateN(0);
         CmiIdleLock_addMessage(&cs->idle);
@@ -396,11 +415,12 @@ static INLINE_KEYWORD void handleOneRecvedMsg(int size, char *msg) {
     }
 
 #if CMK_NODE_QUEUE_AVAILABLE
-    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE)
+    if (CMI_DEST_RANK(msg)==DGRAM_NODEMESSAGE){
         CmiPushNode(msg);
-    else
+        return;
+    }
 #endif
-        CmiPushPE(CMI_DEST_RANK(msg), msg);
+    CmiPushPE(CMI_DEST_RANK(msg), msg);
 
 }
 
@@ -442,13 +462,52 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 
 #if CMK_USE_PXSHM
 inline int CmiValidPxshm(int dst, int size);
-void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount, int rank,unsigned int broot);
+void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount);
 void CmiInitPxshm(char **argv);
 inline void CommunicationServerPxshm();
 void CmiExitPxshm();
 #endif
 
+#if CMK_USE_XPMEM
+inline int CmiValidXpmem(int dst, int size);
+void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount);
+void CmiInitXpmem(char **argv);
+inline void CommunicationServerXpmem();
+void CmiExitXpmem();
+#endif
+
 int refcount = 0;
+
+/* a wrapper of LrtsSendFunc */
+#if CMK_C_INLINE
+inline 
+#endif
+CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
+{
+        int rank;
+#if CMK_USE_PXSHM
+        if (CmiValidPxshm(destNode, size)) {
+          CmiSendMessagePxshm(msg, size, destNode, &refcount);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+          return 0;
+        }
+#endif
+#if CMK_USE_XPMEM
+        if (CmiValidXpmem(destNode, size)) {
+          CmiSendMessageXpmem(msg, size, destNode, &refcount);
+          //for (int i=0; i<refcount; i++) CmiReference(msg);
+          return 0;
+        }
+#endif
+
+if (MSG_STATISTIC)
+{
+    int ret_log = _cmi_log2(size);
+    if(ret_log >21) ret_log = 21;
+    msg_histogram[ret_log]++;
+}
+    return LrtsSendFunc(destNode, size, msg, mode);
+}
 
 void CmiFreeSendFn(int destPE, int size, char *msg) {
     CMI_SET_BROADCAST_ROOT(msg, 0);
@@ -460,13 +519,16 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 #endif
     } else {
 #if CMK_PERSISTENT_COMM
-        if (phs && size > 8192) {
+        if (phs) {
+          if (size > 8192) {
             CmiAssert(curphs < phsSize);
             LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
             return;
+          }
+          else
+            curphs++;
         }
 #endif
-
         int destNode = CmiNodeOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
@@ -475,24 +537,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         }
 #endif
         CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-#if CMK_USE_PXSHM
-        int ret=CmiValidPxshm(destPE, size);
-        if (ret) {
-          CmiSendMessagePxshm(msg, size, destPE, &refcount, CmiRankOf(destPE), 0);
-          //for (int i=0; i<refcount; i++) CmiReference(msg);
-#if CMK_PERSISTENT_COMM
-          if (phs) curphs++;
-#endif
-          return;
-        }
-#endif
-if (  MSG_STATISTIC)
-{
-    int ret_log = _cmi_log2(size);
-    if(ret_log >21) ret_log = 21;
-    msg_histogram[ret_log]++;
-}
-        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
+        LrtsSendNetworkFunc(destNode, size, msg, P2P_SYNC);
     }
 }
 #endif
@@ -603,12 +648,22 @@ if (  MSG_STATISTIC)
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
    
-if (_Cmi_mynode==0) 
+	if (_Cmi_mynode==0) {
 #if !CMK_SMP 
-    printf("Charm++> Running on Non-smp mode\n");
+		printf("Charm++> Running on non-SMP mode\n");
 #else
-    printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+		printf("Charm++> Running on SMP mode, %d worker threads per process\n", _Cmi_mynodesize);
+		if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+			printf("Charm++> The comm. thread both sends and receives messages\n");
+		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
+			printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
+		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
+			printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
+		} else {
+			CmiAbort("Charm++> Invalid SMP mode setting\n");
+		}
 #endif
+	}
 
     _Cmi_numpes = _Cmi_numnodes * _Cmi_mynodesize;
     Cmi_nodestart = _Cmi_mynode * _Cmi_mynodesize;
@@ -619,6 +674,9 @@ if (_Cmi_mynode==0)
 
 #if CMK_USE_PXSHM
     CmiInitPxshm(argv);
+#endif
+#if CMK_USE_XPMEM
+    CmiInitXpmem(argv);
 #endif
 
     /* CmiTimerInit(); */
@@ -645,6 +703,10 @@ if (_Cmi_mynode==0)
 #if CMK_NODE_QUEUE_AVAILABLE
     CsvInitialize(PCQueue, nodeBcastQ);
 #endif
+#endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    CsvInitialize(PCQueue, notifyCommThdMsgBuffer);
 #endif
 
     CmiStartThreads(argv);
@@ -700,6 +762,9 @@ static void ConverseRunPE(int everReturn) {
 
     LrtsPostCommonInit(everReturn);
 
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+    CmiInitNotifyCommThdScheme();
+#endif
     /* Converse initialization finishes, immediate messages can be processed.
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
@@ -719,14 +784,17 @@ static void ConverseRunPE(int everReturn) {
 /* ##### End of Functions Related with Machine Startup ##### */
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
-static INLINE_KEYWORD void AdvanceCommunication() {
+static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
     int doProcessBcast = 1;
 
 #if CMK_USE_PXSHM
     CommunicationServerPxshm();
 #endif
+#if CMK_USE_XPMEM
+    CommunicationServerXpmem();
+#endif
 
-    LrtsAdvanceCommunication();
+    LrtsAdvanceCommunication(whenidle);
 
 #if CMK_OFFLOAD_BCAST_PROCESS
 #if CMK_SMP_NO_COMMTHD
@@ -744,12 +812,11 @@ static INLINE_KEYWORD void AdvanceCommunication() {
     if (CmiMyRank()==0) CmiHandleImmediate();
 #endif
 #endif
-
 }
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP
-    AdvanceCommunication();
+    AdvanceCommunication(0);
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");
@@ -760,6 +827,9 @@ static void CommunicationServer(int sleepTime) {
 
 #if CMK_USE_PXSHM
         CmiExitPxshm();
+#endif
+#if CMK_USE_XPMEM
+        CmiExitXpmem();
 #endif
         LrtsExit();
     }
@@ -777,6 +847,10 @@ void ConverseExit(void) {
     int i;
 #if !CMK_SMP
     LrtsDrainResources();
+#else
+	if(Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV
+	   || Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST)
+		LrtsDrainResources();
 #endif
 
     ConverseCommonExit();
@@ -799,6 +873,9 @@ if (MSG_STATISTIC)
 #if CMK_USE_PXSHM
     CmiExitPxshm();
 #endif
+#if CMK_USE_XPMEM
+    CmiExitXpmem();
+#endif
     LrtsExit();
 #else
     /* In SMP, the communication thread will exit */
@@ -811,6 +888,15 @@ if (MSG_STATISTIC)
 }
 /* ##### End of Functions Related with Machine Running ##### */
 
+void CmiAbort(const char *message) {
+#if CMK_USE_PXSHM
+    CmiExitPxshm();
+#endif
+#if CMK_USE_XPMEM
+    CmiExitXpmem();
+#endif
+    LrtsAbort(message);
+}
 
 /* ##### Beginning of Functions Providing Incoming Network Messages ##### */
 void *CmiGetNonLocal(void) {
@@ -836,7 +922,7 @@ void *CmiGetNonLocal(void) {
     msg = PCQueuePop(cs->recv);
 #if !CMK_SMP
     if (!msg) {
-       AdvanceCommunication();
+       AdvanceCommunication(0);
        msg = PCQueuePop(cs->recv);
     }
 #else
@@ -883,6 +969,12 @@ static void CmiNotifyBeginIdle(CmiIdleState *s) {
 #define SPINS_BEFORE_SLEEP 20
 static void CmiNotifyStillIdle(CmiIdleState *s) {
     MACHSTATE1(2,"still idle (%d) begin {",CmiMyPe())
+#if !CMK_SMP
+    AdvanceCommunication(1);
+#else
+    LrtsPostNonLocal();
+
+    if (_Cmi_noprocforcommthread) {
     s->nIdles++;
     if (s->nIdles>SPINS_BEFORE_SLEEP) { /*Start giving some time back to the OS*/
         s->sleepMs+=2;
@@ -894,11 +986,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
         CmiIdleLock_sleep(&s->cs->idle,s->sleepMs);
         MACHSTATE1(2,"} idle lock(%d)",CmiMyPe())
     }
-
-#if !CMK_SMP
-    AdvanceCommunication();
-#else
-    LrtsPostNonLocal();
+    }
 #endif
 
     MACHSTATE1(2,"still idle (%d) end {",CmiMyPe())
@@ -906,7 +994,7 @@ static void CmiNotifyStillIdle(CmiIdleState *s) {
 
 /* usually called in non-smp mode */
 void CmiNotifyIdle(void) {
-    AdvanceCommunication();
+    AdvanceCommunication(1);
     CmiYield();
 }
 
@@ -925,6 +1013,9 @@ static char *CopyMsg(char *msg, int len) {
 
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
+#endif
+#if CMK_USE_XPMEM
+#include "machine-xpmem.c"
 #endif
 
 

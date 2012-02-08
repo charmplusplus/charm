@@ -30,7 +30,7 @@ int NUM_MSGS=80;    //Number of messages sent in each iteration
 #define MAX_PER_ITR NUM_MSGS
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
   double startTime;
   int recv_count;

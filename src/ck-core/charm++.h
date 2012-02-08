@@ -248,6 +248,7 @@ PUPmarshall(CkArrayID)
 class ChareMlogData;
 #endif
 
+#define CHARE_MAGIC    0x201201
 
 /**
   The base class of all parallel objects in Charm++,
@@ -260,6 +261,9 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
   public:
+#if CMK_ERROR_CHECKING
+    int magic;
+#endif
 #ifndef CMK_CHARE_USE_PTR
     int chareIdx;                  // index in the chare obj table (chare_objs)
 #endif
@@ -288,6 +292,12 @@ class Chare {
     virtual void ckDebugPup(PUP::er &p);
     /// Called when a [threaded] charm entry method is created:
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
+#if CMK_ERROR_CHECKING
+    inline void sanitycheck() { 
+        if (magic != CHARE_MAGIC)
+          CmiAbort("Charm++ Fatal Error> Chare magic number does not agree, possibly due to pup functions not calling parent class.");
+    }
+#endif
 };
 
 //Superclass of all Groups that cannot participate in reductions.
@@ -547,12 +557,6 @@ class CkDelegateMgr : public IrrGroup {
 
 /**************************** Proxies **************************/
 
-/*Message delegation support, where you send a message via
-a proxy normally, but the message ends up routed via a 
-special delegateMgr group.
-*/
-class CkDelegateMgr;
-
 /** 
   A proxy is a local handle to a remote object.  This is the superclass
   of all proxies: CProxy_Array, CProxy_Group, etc. inherit from this class.
@@ -567,7 +571,7 @@ class CProxy {
     mutable CkDelegateMgr *delegatedMgr; // can be either a group or a nodegroup
     CkDelegateData *delegatedPtr; // private data for use by delegatedMgr.
   protected: //Never allocate CProxy's-- only subclass them.
- CProxy() :delegatedMgr(0), delegatedPtr(0), isNodeGroup(0) 
+ CProxy() :  isNodeGroup(0), delegatedMgr(0), delegatedPtr(0)
       {delegatedGroupId.setZero(); }
 
 #define CK_DELCTOR_PARAM CkDelegateMgr *dTo,CkDelegateData *dPtr
