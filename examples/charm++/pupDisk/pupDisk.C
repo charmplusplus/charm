@@ -21,6 +21,10 @@ main::main(CkArgMsg *m)
   int size=20;
   bool skipToRead=false;
   int maxFiles=CkNumPes();
+  if(CmiCpuTopologyEnabled())
+    {
+      maxFiles=CmiNumPhysicalNodes();
+    }
   if(m->argc>1)
     numElements=atoi(m->argv[1]);
   if(m->argc>2)
