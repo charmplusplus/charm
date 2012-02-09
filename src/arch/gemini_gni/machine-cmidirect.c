@@ -48,7 +48,7 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     }
 
 #if CMI_DIRECT_DEBUG
-    printHandle(userHandle, "Create Handler");
+    printHandle(&userHandle, "Create Handler");
 #endif
     return userHandle;
 }
@@ -63,6 +63,7 @@ void CmiDirect_assocLocalBuffer(CmiDirectUserHandle *userHandle,void *sendBuf,in
     gni_return_t            status = GNI_RC_SUCCESS;
     
     userHandle->localBuf=sendBuf;
+
     if(userHandle->transSize <= SMSG_MAX_MSG)
     {
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh);
