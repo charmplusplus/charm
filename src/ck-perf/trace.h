@@ -60,10 +60,10 @@ class Trace {
     // is specified
     virtual void traceBegin() {}
     virtual void traceEnd() {}
-#if CMK_SMP_TRACE_COMMTHREAD		
+
+    // for tracing comm thread only
     virtual void traceBeginOnCommThread() {}   
     virtual void traceEndOnCommThread() {}
-#endif 
 		
     // registers user event trace module returns int identifier 
     virtual int traceRegisterUserEvent(const char* eventName, int e) { 
@@ -263,10 +263,9 @@ public:
     void traceBegin();    
     void traceEnd();
 
-#if CMK_SMP_TRACE_COMMTHREAD
+    // for tracing comm thread only
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
-#endif
 	
     /*Calls for tracing function begins and ends*/
     inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
