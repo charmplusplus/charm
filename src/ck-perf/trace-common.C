@@ -217,16 +217,16 @@ void TraceArray::traceBegin() {
   ALLDO(traceBegin());
 }
 
-#if CMK_SMP_TRACE_COMMTHREAD
 void TraceArray::traceBeginOnCommThread() {
+#if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
 /*#if ! CMK_TRACE_IN_CHARM	
   cancel_beginIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE,(CcdVoidFn)traceCommonBeginIdle,this);
   cancel_endIdle = CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY,(CcdVoidFn)traceCommonEndIdle,this);
 #endif*/
   ALLDO(traceBeginOnCommThread());
-}
 #endif
+}
 
 void TraceArray::traceEnd() {
   if (n==0) return; // No tracing modules registered.
@@ -237,16 +237,16 @@ void TraceArray::traceEnd() {
 #endif
 }
 
-#if CMK_SMP_TRACE_COMMTHREAD
 void TraceArray::traceEndOnCommThread() {
+#if CMK_SMP_TRACE_COMMTHREAD
   if (n==0) return; // No tracing modules registered.
   ALLDO(traceEndOnCommThread());
 /*#if ! CMK_TRACE_IN_CHARM
   CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, cancel_beginIdle);
   CcdCancelCallOnConditionKeep(CcdPROCESSOR_BEGIN_BUSY, cancel_endIdle);
 #endif*/
-}
 #endif
+}
 
 
 /*Install the beginIdle/endIdle condition handlers.*/

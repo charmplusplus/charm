@@ -896,6 +896,7 @@ void CkMemCheckPT::recoverArrayElements()
       imap[homePe].push_back(msg->index);
     }
 #endif
+	CkFreeMsg(msg);
     count ++;
   }
 #if STREAMING_INFORMHOME

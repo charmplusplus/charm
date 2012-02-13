@@ -2174,6 +2174,13 @@ static void _init_smsg()
 {
     int i;
 
+    if(mysize > 1) {
+        if (useDynamicSMSG)
+            _init_dynamic_smsg();
+        else
+            _init_static_smsg();
+    }
+
      smsg_msglist_index = (MSG_LIST_INDEX*)malloc(mysize*sizeof(MSG_LIST_INDEX));
      for(i =0; i<mysize; i++)
      {
@@ -2512,17 +2519,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         status = GNI_EpBind(ep_hndl_array[i], remote_addr, i);
         GNI_RC_CHECK("GNI_EpBind ", status);   
     }
-    /* Depending on the number of cores in the job, decide different method */
+
     /* SMSG is fastest but not scale; Msgq is scalable, FMA is own implementation for small message */
-    if(mysize > 1)
-    {
-        if (useDynamicSMSG)
-          _init_dynamic_smsg();
-        else
-          _init_static_smsg();
-        _init_smsg();
-        PMI_Barrier();
-    }
+    _init_smsg();
+    PMI_Barrier();
 
 #if     USE_LRTS_MEMPOOL
     char *str;
