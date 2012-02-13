@@ -106,7 +106,9 @@ static CmiInt8 _expand_mem =  4*oneMB;
 
 //Dynamic flow control about memory registration
 #define  MAX_BUFF_SEND      512*oneMB
+#define  MAX_BUFF_RECV      512*oneMB
 static CmiInt8 buffered_send_msg = 0;
+static CmiInt8 buffered_recv_msg = 0;
 
 #define BIG_MSG                  16*oneMB
 #define ONE_SEG                  4*oneMB
@@ -165,6 +167,7 @@ uint8_t   onesided_hnd, omdh;
 #define   GetMemHndlFromHeader(x) ((block_header*)x)->mem_hndl
 #define   GetSizeFromHeader(x) ((block_header*)x)->size
 #define   NoMsgInSend(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send == 0
+#define   NoMsgInRecv(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv == 0
 #define   NoMsgInFlight(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send + ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv  == 0
 #define   IsMemHndlZero(x)  (x.qword1 == 0 && x.qword2 == 0)
 #define   SetMemHndlZero(x)  x.qword1 = 0; x.qword2 = 0
@@ -1384,7 +1387,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     RDMA_REQUEST        *rdma_request_msg;
     gni_mem_handle_t    msg_mem_hndl;
     int source, size, transaction_size, offset = 0;
-
+    int     register_size = 0;
     // initial a get to transfer data from the sender side */
     request_msg = (CONTROL_MSG *) header;
     //source = request_msg->source;
@@ -1410,8 +1413,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         pd->local_mem_hndl= GetMemHndl(msg_data);
         transaction_size = ALIGN64(size);
         if(IsMemHndlZero(pd->local_mem_hndl))
-        {
-            status = registerMempool((void*)(msg_data));
+        {   
+            if(buffered_recv_msg >= MAX_BUFF_RECV)
+            { status = GNI_RC_ERROR_RESOURCE; printf("[%d] %lld buffered_recv_msg\n", myrank, buffered_recv_msg);}
+            else
+                status = registerMempool((void*)(msg_data));
             if(status == GNI_RC_SUCCESS)
             {
                 pd->local_mem_hndl = GetMemHndl(msg_data);
@@ -1421,6 +1427,10 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
                 SetMemHndlZero(pd->local_mem_hndl);
             }
         }
+        if(NoMsgInRecv( (void*)(msg_data)))
+            register_size = GetMempoolsize((void*)(msg_data));
+        else
+            register_size = 0;
     }
     else{
         transaction_size = ALIGN64(request_msg->length);
@@ -1467,6 +1477,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
          
         if(status == GNI_RC_SUCCESS )
         {
+            buffered_recv_msg += register_size;
             if(pd->cqwrite_value == 0)
             {
 #if         DEBUG_POOL
@@ -1706,6 +1717,8 @@ static void PumpLocalRdmaTransactions()
 #endif
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInRecv((void*)tmp_pd->local_addr);
+                    if(NoMsgInRecv((void*)(tmp_pd->local_addr)))
+                        buffered_recv_msg -= GetMempoolsize((void*)(tmp_pd->local_addr));
 #if CMK_SMP_TRACE_COMMTHREAD
                     TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
@@ -1742,7 +1755,7 @@ static void  SendRdmaMsg()
     gni_return_t            status = GNI_RC_SUCCESS;
     gni_mem_handle_t        msg_mem_hndl;
     RDMA_REQUEST *ptr = NULL;
-
+    int register_size = 0;
 #if CMK_SMP
     while (!(PCQueueEmpty(sendRdmaBuf)))
     {
@@ -1758,7 +1771,10 @@ static void  SendRdmaMsg()
         {
             if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
             {
-                status = registerMempool((void*)(pd->local_addr));
+                if(buffered_recv_msg >= MAX_BUFF_RECV)
+                { status = GNI_RC_ERROR_RESOURCE; printf("[%d] %lld buffered_recv_msg\n", myrank, buffered_recv_msg);}
+                else
+                    status = registerMempool((void*)(pd->local_addr));
                 if(status == GNI_RC_SUCCESS)
                 {
                     pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
@@ -1768,6 +1784,10 @@ static void  SendRdmaMsg()
                 pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
                 status = GNI_RC_SUCCESS;
             }
+            if(NoMsgInRecv( (void*)(pd->local_addr)))
+                register_size = GetMempoolsize((void*)(pd->local_addr));
+            else
+                register_size = 0;
         }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool
         {
             status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh);
@@ -1789,6 +1809,7 @@ static void  SendRdmaMsg()
 #if !CMK_SMP
                 sendRdmaBuf = sendRdmaBuf->next;
 #endif
+                buffered_recv_msg += register_size;
                 if(pd->cqwrite_value == 0)
                 {
                     IncreaseMsgInRecv(((void*)(pd->local_addr)));
