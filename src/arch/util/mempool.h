@@ -59,7 +59,8 @@ typedef struct block_header_
     size_t              freelists[cutOffNum];
     size_t          padding;    // fix for 32 bit machines
 #if CMK_CONVERSE_GEMINI_UGNI
-    int                 msgs_in_flight;
+    int                 msgs_in_send;
+    int                 msgs_in_recv;
 #endif
     void                *mempool_ptr;
 } block_header;
