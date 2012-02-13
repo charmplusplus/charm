@@ -786,6 +786,10 @@ void CkArray::pup(PUP::er &p){
 		/// Restore our default listeners:
 		broadcaster=(CkArrayBroadcaster *)(CkArrayListener *)(listeners[0]);
 		reducer=(CkArrayReducer *)(CkArrayListener *)(listeners[1]);
+                /// set up broadcast cleaner
+                if (!stableLocations)
+                    CcdCallOnConditionKeep(CcdPERIODIC_1minute,
+			                   staticSpringCleaning, (void *)this);
 	}
 }
 
