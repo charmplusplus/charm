@@ -1795,6 +1795,7 @@ static void  SendRdmaMsg()
     for (i=0; i<len; i++)
     {
         ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
+        if (ptr == NULL) break;
 #else
     ptr = sendRdmaBuf;
     while (ptr!=0)
@@ -1865,8 +1866,6 @@ static void  SendRdmaMsg()
             }
             ptr = ptr->next;
             FreeRdmaRequest(tmp_ptr);
-#else
-            ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
 #endif
 #if DEBUG_POOL
             MACHSTATE(8, "454545 noempty-rdma  \n"); 
