@@ -2692,6 +2692,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         MAX_BUFF_SEND = CmiReadSize(env);
         if (myrank==0) printf("Charm++> maximum pending memory pool usage: %1.fMB\n", MAX_BUFF_SEND/1024.0/1024);
     }
+
+    if (MAX_REG_MEM < _mempool_size) MAX_REG_MEM = _mempool_size;
+    if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
 #endif
 
     /* init DMA buffer for medium message */
