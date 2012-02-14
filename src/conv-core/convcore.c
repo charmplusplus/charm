@@ -3762,9 +3762,9 @@ int CmiMyRank_()
   return CmiMyRank();
 }
 
-int CmiReadSize(char *str)
+CmiInt8 CmiReadSize(char *str)
 {
-    int val;
+    CmiInt8 val;
     if (strpbrk(str,"G")) {
         sscanf(str, "%lldG", &val);
         val *= 1024ll*1024*1024;

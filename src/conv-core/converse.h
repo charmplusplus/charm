@@ -1925,6 +1925,6 @@ EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr f
 EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
 
-int CmiReadSize(char *str);
+CmiInt8 CmiReadSize(char *str);
 
 #endif /* CONVERSE_H */
