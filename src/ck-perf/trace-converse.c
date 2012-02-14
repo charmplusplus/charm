@@ -50,6 +50,14 @@ void traceBeginFuncProj(char *name,char *file,int line){}
 void traceEndFuncProj(char *name){}
 void traceUserSuppliedNote(char *note) {}
 
+#if CMK_SMP_TRACE_COMMTHREAD
+int traceBeginCommOp(char *msg){}
+void traceEndCommOp(char *msg) {}
+void traceSendMsgComm(char *msg) {}
+void traceChangeLastTimestamp(double ts) {}
+void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {}
+#endif
+
 /* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */
 void EmergencyExit(void) {}
