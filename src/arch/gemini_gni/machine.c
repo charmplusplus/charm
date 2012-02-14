@@ -1901,8 +1901,8 @@ static int SendBufferMsg()
     MSG_LIST            *ptr, *tmp_ptr, *pre=0, *current_head;
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status;
-    int done = 1;
-    register    int     i, register_size;
+    int                 done = 1;
+    int                 register_size;
     void                *register_addr;
     int                 index_previous = -1;
     int                 index = smsg_head_index;
@@ -1921,15 +1921,19 @@ static int SendBufferMsg()
 #if CMK_SMP
     while(index <mysize)
     {
-        ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
+        int i, len = PCQueueLength(smsg_msglist_index[index].sendSmsgBuf);
+        for (i=0; i<len; i++) 
+        {
+            ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
+            if (ptr == NULL) break;
 #else
     while(index != -1)
-        {
-            ptr = smsg_msglist_index[index].sendSmsgBuf;
-#endif
-            pre = 0;
+    {
+        ptr = smsg_msglist_index[index].sendSmsgBuf;
+        pre = 0;
         while(ptr != 0)
         {
+#endif
 #if DEBUG_POOL
             MACHSTATE5(8, "noempty-smsg  %d (%d,%d,%d) tag=%d \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_mempool, ptr->tag); 
 #endif
@@ -1989,10 +1993,8 @@ static int SendBufferMsg()
                     ptr = smsg_msglist_index[index].sendSmsgBuf = smsg_msglist_index[index].sendSmsgBuf->next;
                 }
                 FreeMsgList(tmp_ptr);
-
 #else
                 FreeMsgList(ptr);
-                ptr = (MSG_LIST*)PCQueuePop(smsg_msglist_index[index].sendSmsgBuf);
 #endif
 #if PRINT_SYH
                 buffered_smsg_counter--;
@@ -2012,7 +2014,6 @@ static int SendBufferMsg()
 #endif
                 done = 0;
             } 
-        
         } //end while
 #if !CMK_SMP
         smsg_msglist_index[index].tail = pre;
