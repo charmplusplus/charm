@@ -212,13 +212,6 @@ static int  REMOTE_QUEUE_ENTRIES=20480;
 static int LOCAL_QUEUE_ENTRIES=20480; 
 #endif
 
-typedef enum send_gni_return
-{
-    SEND_GNI_SUCCESS=10,
-    SEND_GNI_NO_RESOURCE,
-    SEND_GNI_NO_MEM
-}send_gni_return_t;
-
 #define BIG_MSG_TAG  0x26
 #define PUT_DONE_TAG      0x28
 #define DIRECT_PUT_DONE_TAG      0x29
@@ -892,8 +885,8 @@ inline static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, vo
 {
     unsigned int          remote_address;
     uint32_t              remote_id;
-    gni_return_t status = GNI_RC_NOT_DONE;
-    gni_smsg_attr_t      *smsg_attr;
+    gni_return_t          status = GNI_RC_ERROR_RESOURCE;
+    gni_smsg_attr_t       *smsg_attr;
     gni_post_descriptor_t *pd;
     gni_post_state_t      post_state;
     char                  *real_data; 
@@ -937,7 +930,8 @@ inline static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, vo
             }
 #endif
             return status;
-        }
+        }else
+            status = GNI_RC_ERROR_RESOURCE;
     }
     if(inbuff ==0)
         buffer_small_msgs(queue, msg, size, destNode, tag);
@@ -973,10 +967,9 @@ inline static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t se
 // Large message, send control to receiver, receiver register memory and do a GET, 
 // return 1 - send no success
 inline
-static send_gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff)
+static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff)
 {
     gni_return_t        status  =  GNI_RC_ERROR_NOMEM;
-    send_gni_return_t   send_status = SEND_GNI_NO_MEM;
     uint32_t            vmdh_index  = -1;
     int                 size;
     int                 offset = 0;
@@ -992,7 +985,7 @@ static send_gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CO
         {
             if(!inbuff)
                 buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
-            return SEND_GNI_NO_MEM;
+            return GNI_RC_ERROR_NOMEM;
         }
         if(IsMemHndlZero(GetMemHndl(source_addr))) //it is in mempool, it is possible to be de-registered by others
         {
@@ -1031,20 +1024,20 @@ static send_gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CO
                 IncreaseMsgInSend(source_addr);
             }
             FreeControlMsg(control_msg_tmp);
-            send_status = SEND_GNI_SUCCESS;
             MACHSTATE5(8, "GO SMSG LARGE to %d (%d,%d,%d) tag=%d\n", destNode, buffered_send_msg, buffered_recv_msg, register_mempool, LMSG_INIT_TAG); 
         }else
-            send_status = SEND_GNI_NO_RESOURCE;
+            status = GNI_RC_ERROR_RESOURCE;
 
     } else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
     {
         CmiAbort("Memory registor for large msg\n");
     }else 
     {
+        status = GNI_RC_ERROR_NOMEM; 
         if(!inbuff)
             buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
     }
-    return send_status;
+    return status;
 #else
     status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
     if(status == GNI_RC_SUCCESS)
@@ -1880,7 +1873,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 {
     MSG_LIST            *ptr, *tmp_ptr, *pre=0, *current_head;
     CONTROL_MSG         *control_msg_tmp;
-    send_gni_return_t  send_status = SEND_GNI_NO_RESOURCE;
     gni_return_t        status;
     int                 done = 1;
     int                 register_size;
@@ -1919,21 +1911,19 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
               break;
             }
             status = GNI_RC_ERROR_RESOURCE;
-            send_status = SEND_GNI_NO_RESOURCE;
             switch(ptr->tag)
             {
             case SMALL_DATA_TAG:
                 status = send_smsg_message(queue, ptr->destNode,  ptr->msg, ptr->size, ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
                 {
-                    send_status = SEND_GNI_SUCCESS;
                     CmiFree(ptr->msg);
                 }
                 break;
             case LMSG_INIT_TAG:
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
-                send_status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1);
-                if(send_status != SEND_GNI_SUCCESS)
+                status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1);
+                if(status != GNI_RC_SUCCESS)
                     done = 0;
                 break;
             case   ACK_TAG:
@@ -1941,7 +1931,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CONTROL_MSG), ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
                 {
-                    send_status = SEND_GNI_SUCCESS;
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }else
                     done = 0;
@@ -1951,7 +1940,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
                 {
-                    send_status = SEND_GNI_SUCCESS;
                     free((CMK_DIRECT_HEADER*)ptr->msg);
                 }
                 break;
@@ -1961,7 +1949,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 printf("Weird tag\n");
                 CmiAbort("should not happen\n");
             }
-            if(send_status == SEND_GNI_SUCCESS)
+            if(status == GNI_RC_SUCCESS)
             {
 #if !CMK_SMP
                 tmp_ptr = ptr;
@@ -1993,7 +1981,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 ptr=ptr->next;
 #endif
                 done = 0;
-                if(send_status == SEND_GNI_NO_RESOURCE)
+                if(status == GNI_RC_ERROR_RESOURCE)
                     break;
             } 
         } //end while
