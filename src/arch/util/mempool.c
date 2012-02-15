@@ -190,6 +190,7 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mempool_ptr = pool;
+  mptr->block_head.mptr = pool;
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
   mptr->block_head.block_next = 0;
@@ -272,6 +273,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       mptr->block_tail = tail->block_next;
 
       current->mempool_ptr = pool;
+      current->mptr = mptr;
       current->mem_hndl = mem_hndl;
       current->size = expand_size;
       current->block_next = 0;

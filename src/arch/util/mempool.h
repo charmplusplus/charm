@@ -63,6 +63,7 @@ typedef struct block_header_
     int                 msgs_in_recv;
 #endif
     void                *mempool_ptr;
+    void                *mptr;
 } block_header;
 
 // only at beginning of first block of mempool
