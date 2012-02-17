@@ -117,7 +117,7 @@ static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
 static CmiInt8  MAX_REG_MEM    =  200*oneMB;
 #else
 static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
-static CmiInt8  MAX_REG_MEM    =  20*oneMB;
+static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
 
 static CmiInt8 buffered_send_msg = 0;
@@ -162,11 +162,14 @@ onesided_md_t    omdh;
 #else
 uint8_t   onesided_hnd, omdh;
 #if REMOTE_EVENT
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl)
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status) status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
+      if(status == GNI_RC_SUCCESS) register_mempool += size; 
 #else
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh) GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl)
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status ) status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
+      if(status == GNI_RC_SUCCESS) register_mempool += size;
 #endif
-#define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh)  GNI_MemDeregister(nic_hndl, (mem_hndl))
+#define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh, size)  GNI_MemDeregister(nic_hndl, (mem_hndl)); \
+         register_mempool -= size;
 #endif
 
 #define   IncreaseMsgInRecv(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv)++
@@ -677,9 +680,7 @@ static  gni_return_t deregisterMempool(mempool_type *mptr, block_header **from)
 
     *from = current;
     if(current == NULL) return GNI_RC_ERROR_RESOURCE;
-    status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(GetMemHndlFromHeader(current)) , &omdh);
-    GNI_RC_CHECK("registerMemorypool de-register", status);
-    register_mempool -= GetSizeFromHeader(current);
+    MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(GetMemHndlFromHeader(current)) , &omdh, GetSizeFromHeader(current));
     SetMemHndlZero(GetMemHndlFromHeader(current));
     return GNI_RC_SUCCESS;
 }
@@ -702,10 +703,9 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *msg)
     MACHSTATE3(8, "mempool (%lld,%lld,%d) \n", buffered_send_msg, buffered_recv_msg, register_mempool); 
     while(1)
     {
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, blockaddr, size, memhndl, &omdh);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, blockaddr, size, memhndl, &omdh, status)
         if(status == GNI_RC_SUCCESS)
         {
-            register_mempool += size;
             break;
         }
         else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
@@ -1037,7 +1037,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
         source_addr += offset;
         size = control_msg_tmp->length;
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, status)
         register_size = 0;  
     }
 
@@ -1067,7 +1067,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     }
     return status;
 #else
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh);
+    MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, status)
     if(status == GNI_RC_SUCCESS)
     {
         status = send_smsg_message(queue, destNode, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
@@ -1351,7 +1351,7 @@ static void PumpNetworkSmsg()
                 /* Get is done, release message . Now put is not used yet*/
                 void *msg = (void*)(((CONTROL_MSG *)header)->source_addr);
 #if ! USE_LRTS_MEMPOOL
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh, header_tmp->length);
 #else
                 DecreaseMsgInSend(msg);
 #endif
@@ -1367,7 +1367,7 @@ static void PumpNetworkSmsg()
                 void *msg = (void*)(header_tmp->source_addr);
                 int cur_seq = CmiGetMsgSeq(msg);
                 int offset = ONE_SEG*(cur_seq+1);
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(header_tmp->source_mem_hndl), &omdh);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(header_tmp->source_mem_hndl), &omdh, header_tmp->length);
                 int remain_size = CmiGetMsgSize(msg) - header_tmp->length;
                 if (remain_size < 0) remain_size = 0;
                 CmiSetMsgSize(msg, remain_size);
@@ -1492,7 +1492,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     }
     else{
         transaction_size = ALIGN64(request_msg->length);
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &(pd->local_mem_hndl), &omdh);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, transaction_size, &(pd->local_mem_hndl), &omdh, status)
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
@@ -1568,7 +1568,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     msg_data = CmiAlloc(request_msg->length);
     _MEMCHECK(msg_data);
 
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, request_msg->length, &msg_mem_hndl, &omdh);
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, request_msg->length, &msg_mem_hndl, &omdh, status)
 
     if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
     {
@@ -1686,7 +1686,7 @@ static void PumpLocalRdmaTransactions()
 #if CMK_PERSISTENT_COMM
             case GNI_POST_RDMA_PUT:
 #if ! USE_LRTS_MEMPOOL
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length);
 #endif
             case GNI_POST_FMA_PUT:
                 CmiFree((void *)tmp_pd->local_addr);
@@ -1703,14 +1703,14 @@ static void PumpLocalRdmaTransactions()
             case GNI_POST_RDMA_GET:
             case GNI_POST_FMA_GET:
 #if  ! USE_LRTS_MEMPOOL
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length)
                 msg_tag = ACK_TAG;  
 #else
                 ack_msg_tmp->seq_id = tmp_pd->cqwrite_value;
                 if(ack_msg_tmp->seq_id > 0)      // BIG_MSG
                 {
                     msg_tag = BIG_MSG_TAG; 
-                    MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh);
+                    MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length)
                     ack_msg_tmp->dest_addr = tmp_pd->local_addr - ONE_SEG*(ack_msg_tmp->seq_id-1);
                     ack_msg_tmp->source_addr -= ONE_SEG*(ack_msg_tmp->seq_id-1);
                 } 
@@ -1833,7 +1833,7 @@ static void  SendRdmaMsg()
                 register_size = 0;
         }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool
         {
-            status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh);
+            MEMORY_REGISTER(onesided_hnd, nic_hndl, pd->local_addr, pd->length, &(pd->local_mem_hndl), &omdh, status)
         }
         if(status == GNI_RC_SUCCESS)        //mem register good
         {
@@ -2201,15 +2201,16 @@ static void _init_static_smsg()
     ret = posix_memalign(&smsg_mailbox_base, 64, smsg_memlen*(mysize));
     CmiAssert(ret == 0);
     bzero(smsg_mailbox_base, smsg_memlen*(mysize));
-    //if (myrank == 0) printf("Charm++> allocates %.2fMB for SMSG mailbox. \n", smsg_memlen*mysize/1e6);
     
     status = GNI_MemRegister(nic_hndl, (uint64_t)smsg_mailbox_base,
             smsg_memlen*(mysize), smsg_rx_cqh,
             GNI_MEM_READWRITE,   
             vmdh_index,
             &my_smsg_mdh_mailbox);
-
+    register_mempool += smsg_memlen*(mysize);
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
+
+    if (myrank == 0 && register_mempool>=MAX_REG_MEM ) printf("Charm++> FATAL ERROR your program has risk of hanging \n please set CHARM_UGNI_MEMPOOL_MAX  to a larger value or use Dynamic smsg\n");
 
     base_infor.addr =  (uint64_t)smsg_mailbox_base;
     base_infor.mdh =  my_smsg_mdh_mailbox;
@@ -2394,7 +2395,7 @@ printf("[%d:%d:%d] checking rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), 
             cur->next_free = header->next_free;
             if (header == free_header) mptr->freelist_head = header->next_free;
              // deregister
-            gni_return_t status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &current->mem_hndl, &omdh);
+            gni_return_t status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &current->mem_hndl, &omdh,0)
             GNI_RC_CHECK("steal Mempool de-register", status);
             mempool_block *ptr = current;
             current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
@@ -2408,7 +2409,7 @@ printf("[%d:%d:%d] free rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiM
                 int ret = posix_memalign(&pool, ALIGNBUF, *size);
                 CmiAssert(ret == 0);
               }
-              status = MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh);
+              MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh, status)
               if (status == GNI_RC_SUCCESS) {
                 if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
 printf("[%d:%d:%d] GOT IT rank: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, *size);
