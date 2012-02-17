@@ -107,17 +107,19 @@ static dynamic_smsg_mailbox_t  *mailbox_list;
 #endif
 
 #define oneMB (1024ll*1024)
-#if CMK_SMP
 static CmiInt8 _mempool_size = 8*oneMB;
-#else
-static CmiInt8 _mempool_size = 32*oneMB;
-#endif
 static CmiInt8 _expand_mem =  4*oneMB;
 #endif
 
+#if CMK_SMP
 //Dynamic flow control about memory registration
-static CmiInt8  MAX_BUFF_SEND  =  2*oneMB*oneMB;
-static CmiInt8  MAX_REG_MEM    =  2*oneMB*oneMB;
+static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
+static CmiInt8  MAX_REG_MEM    =  200*oneMB;
+#else
+static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
+static CmiInt8  MAX_REG_MEM    =  20*oneMB;
+#endif
+
 static CmiInt8 buffered_send_msg = 0;
 
 #define BIG_MSG                  16*oneMB
