@@ -248,7 +248,7 @@ MeshStreamer<dtype>::~MeshStreamer() {
 
 
 template <class dtype>
-inline 
+inline
 MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) { 
 
 #ifdef CACHE_LOCATIONS
@@ -420,49 +420,48 @@ void MeshStreamer<dtype>::flushLargestBuffer() {
   MeshStreamerMessage<dtype> ** messageBuffers; 
   MeshStreamerMessage<dtype> *destinationBuffer; 
 
-  maxSize = 0;    
   for (int i = 0; i < numDimensions_; i++) {
 
     messageBuffers = dataBuffers_[i]; 
     numBuffers = individualDimensionSizes_[i]; 
-    
+
+    flushDimension = i; 
+    maxSize = 0;    
     for (int j = 0; j < numBuffers; j++) {
       if (messageBuffers[j] != NULL && 
 	  messageBuffers[j]->numDataItems > maxSize) {
 	maxSize = messageBuffers[j]->numDataItems;
 	flushIndex = j; 
-	flushDimension = i; 
       }
     }
-    
+
+    if (maxSize > 0) {
+
+      messageBuffers = dataBuffers_[flushDimension]; 
+      destinationBuffer = messageBuffers[flushIndex];
+      destinationIndex = myNodeIndex_ + 
+	(flushIndex - myLocationIndex_[flushDimension]) * 
+	combinedDimensionSizes_[flushDimension] ;
+
+      if (destinationBuffer->numDataItems < bufferSize_) {
+	// not sending the full buffer, shrink the message size
+	envelope *env = UsrToEnv(destinationBuffer);
+	env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
+			  (bufferSize_ - destinationBuffer->numDataItems));
+      }
+      numDataItemsBuffered_ -= destinationBuffer->numDataItems;
+
+      if (flushDimension == 0) {
+	clientProxy_[destinationIndex].receiveCombinedData(destinationBuffer);
+      }
+      else {
+	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+      }
+      messageBuffers[flushIndex] = NULL;
+
+    }
+
   }
-
-  if (maxSize > 0) {
-
-    messageBuffers = dataBuffers_[flushDimension]; 
-    destinationBuffer = messageBuffers[flushIndex];
-    destinationIndex = myNodeIndex_ + 
-      (flushIndex - myLocationIndex_[flushDimension]) * 
-      combinedDimensionSizes_[flushDimension] ;
-
-    if (destinationBuffer->numDataItems < bufferSize_) {
-      // not sending the full buffer, shrink the message size
-      envelope *env = UsrToEnv(destinationBuffer);
-      env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
-			(bufferSize_ - destinationBuffer->numDataItems));
-    }
-    numDataItemsBuffered_ -= destinationBuffer->numDataItems;
-
-    if (flushDimension == 0) {
-      clientProxy_[destinationIndex].receiveCombinedData(destinationBuffer);
-    }
-    else {
-      this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
-    }
-    messageBuffers[flushIndex] = NULL;
-
-  }
-
 }
 
 template <class dtype>
