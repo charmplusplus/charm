@@ -683,14 +683,13 @@ static  gni_return_t deregisterMempool(mempool_type *mptr, block_header **from)
 }
 
 inline 
-static gni_return_t registerMempool(void *msg)
+static gni_return_t registerFromMempool(mempool_type *mptr, void *msg)
 {
     gni_return_t status = GNI_RC_SUCCESS;
     int size = GetMempoolsize(msg);
     void *blockaddr = GetMempoolBlockPtr(msg);
     gni_mem_handle_t  *memhndl =   &(GetMemHndl(msg));
    
-    mempool_type *mptr = (mempool_type*)GetMempoolPtr(msg);
     block_header *current = &(mptr->block_head);
 
     while(register_mempool > MAX_REG_MEM)
@@ -718,6 +717,29 @@ static gni_return_t registerMempool(void *msg)
         }
     }; 
     return status;
+}
+
+inline 
+static gni_return_t registerMempool(void *msg)
+{
+    static int rank = -1;
+    int i;
+    gni_return_t status;
+    mempool_type *mptr1 = (mempool_type*)GetMempoolPtr(msg);
+    mempool_type *mptr;
+
+    status = registerFromMempool(mptr1, msg);
+    if (status == GNI_RC_SUCCESS) return status;
+#if CMK_SMP
+    for (i=0; i<CmiMyNodeSize()+1; i++) {
+      rank = (rank+1)%(CmiMyNodeSize()+1);
+      mptr = CpvAccessOther(mempool, rank);
+      if (mptr == mptr1) continue;
+      status = registerFromMempool(mptr, msg);
+      if (status == GNI_RC_SUCCESS) return status;
+    }
+#endif
+    return  GNI_RC_ERROR_RESOURCE;
 }
 
 inline
