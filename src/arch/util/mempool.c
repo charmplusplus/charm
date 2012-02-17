@@ -190,11 +190,13 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mempool_ptr = pool;
+  mptr->block_head.mptr = pool;
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
   mptr->block_head.block_next = 0;
 #if CMK_CONVERSE_GEMINI_UGNI
-  mptr->block_head.msgs_in_flight = 0;
+  mptr->block_head.msgs_in_send= 0;
+  mptr->block_head.msgs_in_recv= 0;
 #endif
   fillblock(mptr,&mptr->block_head,pool_size,0);
   return mptr;
@@ -271,11 +273,13 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       mptr->block_tail = tail->block_next;
 
       current->mempool_ptr = pool;
+      current->mptr = mptr;
       current->mem_hndl = mem_hndl;
       current->size = expand_size;
       current->block_next = 0;
 #if CMK_CONVERSE_GEMINI_UGNI
-      current->msgs_in_flight = 0;
+      current->msgs_in_send= 0;
+      current->msgs_in_recv = 0;
 #endif
 
       fillblock(mptr,current,expand_size,1);

@@ -139,10 +139,11 @@ int               _Cmi_numpes;    /* Total number of processors */
 CpvDeclare(void*, CmiLocalQueue);
 
 /* different modes for sending a message */
-#define P2P_SYNC 0x1
-#define P2P_ASYNC 0x2
-#define BCAST_SYNC 0x3
-#define BCAST_ASYNC 0x4
+#define P2P_SYNC      0x1
+#define P2P_ASYNC     0x2
+#define BCAST_SYNC    0x4
+#define BCAST_ASYNC   0x8
+#define OUT_OF_BAND   0x10
 
 enum MACHINE_SMP_MODE {
     INVALID_MODE,

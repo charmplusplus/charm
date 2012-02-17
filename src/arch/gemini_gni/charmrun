@@ -67,8 +67,8 @@ then
   aprun=`which aprun 2>/dev/null`
   if test -n "$aprun"
   then
-    echo aprun -n $pes $args
-    $aprun -n $pes $args
+    echo  aprun -n $pes -d `expr $ppn + 1` $args
+    $aprun -n $pes -d `expr $ppn + 1` $args
   else
     mpirun_cmd=`which mpirun 2>/dev/null`
     if test -n "$mpirun_cmd"

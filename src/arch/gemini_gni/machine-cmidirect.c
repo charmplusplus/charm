@@ -48,7 +48,7 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     }
 
 #if CMI_DIRECT_DEBUG
-    printHandle(userHandle, "Create Handler");
+    printHandle(&userHandle, "Create Handler");
 #endif
     return userHandle;
 }
@@ -63,6 +63,7 @@ void CmiDirect_assocLocalBuffer(CmiDirectUserHandle *userHandle,void *sendBuf,in
     gni_return_t            status = GNI_RC_SUCCESS;
     
     userHandle->localBuf=sendBuf;
+
     if(userHandle->transSize <= SMSG_MAX_MSG)
     {
         status = MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh);
@@ -120,20 +121,7 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
             status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
-            MallocRdmaRequest(rdma_request_msg);
-            rdma_request_msg->destNode = userHandle->remoteNode;
-            rdma_request_msg->pd = pd;
-#if CMK_SMP
-            PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
-#else
-            if(sendRdmaBuf == 0)
-            {
-                sendRdmaBuf = sendRdmaTail = rdma_request_msg;
-            }else{
-                sendRdmaTail->next = rdma_request_msg;
-                sendRdmaTail =  rdma_request_msg;
-            }
-#endif
+            bufferRdmaMsg(userHandle->remoteNode, pd); 
         }else
             GNI_RC_CHECK("CMI_Direct_PUT", status);
     }
@@ -184,20 +172,7 @@ void CmiDirect_get(CmiDirectUserHandle *userHandle) {
             status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
-            MallocRdmaRequest(rdma_request_msg);
-            rdma_request_msg->destNode = userHandle->remoteNode;
-            rdma_request_msg->pd = pd;
-#if CMK_SMP
-            PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
-#else
-            if(sendRdmaBuf == 0)
-            {
-                sendRdmaBuf = sendRdmaTail = rdma_request_msg;
-            }else{
-                sendRdmaTail->next = rdma_request_msg;
-                sendRdmaTail =  rdma_request_msg;
-            }
-#endif
+            bufferRdmaMsg(userHandle->remoteNode, pd); 
         }else
             GNI_RC_CHECK("CMI_Direct_GET", status);
     }

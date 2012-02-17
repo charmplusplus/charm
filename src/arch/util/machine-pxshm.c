@@ -365,8 +365,10 @@ void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 	int dstRank = PxshmRank(dstnode);
 	MEMDEBUG(CmiMemoryCheck());
   
+/*
 	MACHSTATE4(3,"Send Msg Pxshm ogm %p size %d dst %d dstRank %d",ogm,ogm->size,ogm->dst,dstRank);
 	MACHSTATE4(3,"Send Msg Pxshm ogm %p size %d dst %d dstRank %d",ogm,ogm->size,ogm->dst,dstRank);
+*/
 
 	CmiAssert(dstRank >=0 && dstRank != pxshmContext->noderank);
 	
@@ -418,7 +420,7 @@ void CmiSendMessagePxshm(char *msg, int size, int dstnode, int *refcount)
 		 }else{
 			(*refcount)+=2;/*this message should not get deleted when the queue is flushed*/
 			pushSendQ(pxshmContext->sendQs[dstRank],msg,size,refcount);
-			MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
+//			MACHSTATE3(3,"Pxshm ogm %p pushed to sendQ length %d refcount %d",ogm,pxshmContext->sendQs[dstRank]->numEntries,ogm->refcount);
 			int sent = flushSendQ(sendQ);
 			(*refcount)--; /*if it has been sent, can be deleted by caller, if not will be deleted when queue is flushed*/
 			MACHSTATE1(3,"Pxshm flushSendQ sent %d messages",sent);
@@ -674,7 +676,7 @@ int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmS
 		dstBuf->header->count++;
 		memcpy(dstBuf->data+dstBuf->header->bytes,msg,size);
 		dstBuf->header->bytes += size;
-		MACHSTATE4(3,"Pxshm send done ogm %p size %d dstBuf->header->count %d dstBuf->header->bytes %d",ogm,ogm->size,dstBuf->header->count,dstBuf->header->bytes);
+//		MACHSTATE4(3,"Pxshm send done ogm %p size %d dstBuf->header->count %d dstBuf->header->bytes %d",ogm,ogm->size,dstBuf->header->count,dstBuf->header->bytes);
                 CmiFree(msg);
 		return 1;
 	}
@@ -684,7 +686,7 @@ int sendMessage(char *msg, int size, int *refcount, sharedBufData *dstBuf,PxshmS
 	//printf("[%d] send buffer is too full\n", CmiMyPe());
 	pushSendQ(dstSendQ,msg,size,refcount);
 	(*refcount)++;
-	MACHSTATE3(3,"Pxshm send ogm %p size %d queued refcount %d",ogm,ogm->size,ogm->refcount);
+//	MACHSTATE3(3,"Pxshm send ogm %p size %d queued refcount %d",ogm,ogm->size,ogm->refcount);
 	return 0;
 }
 

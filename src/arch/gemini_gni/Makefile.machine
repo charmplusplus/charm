@@ -1,2 +1,2 @@
-$(L)/libconv-cplus-n.a: machine.c machine-common-core.c machine-broadcast.c machine-lrts.h machine-pxshm.c machine-xpmem.c machine-persistent.c machine-commthd-util.c
+$(L)/libconv-cplus-n.a: machine.h machine.c machine-common-core.c machine-broadcast.c machine-lrts.h machine-pxshm.c machine-xpmem.c machine-persistent.c machine-commthd-util.c
 
