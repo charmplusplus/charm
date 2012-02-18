@@ -1811,7 +1811,7 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         sendTicketNodeGroupRequest(env,node,_infoIdx);
 #else
-  _TRACE_ONLY(numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1));
+  numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM) {
     _noCldNodeEnqueue(node, env);
