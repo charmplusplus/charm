@@ -8,7 +8,7 @@
  *
  *  Flow control by mem pool using environment variables:
 
-    export CHARM_UGNI_MEMPOOL_SIZE=8M
+    export CHARM_UGNI_MEMPOOL_INIT_SIZE=8M
     export CHARM_UGNI_MEMPOOL_MAX=20M
     export CHARM_UGNI_SEND_MAX=10M
 
@@ -122,8 +122,9 @@ static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
 
 static CmiInt8 buffered_send_msg = 0;
+static int register_memory_size = 0;
 
-#define BIG_MSG                  16*oneMB
+#define BIG_MSG                  8*oneMB
 #define ONE_SEG                  4*oneMB
 #define BIG_MSG_PIPELINE         4
 
@@ -657,7 +658,6 @@ static void SendRdmaMsg();
 static void PumpNetworkSmsg();
 static void PumpLocalRdmaTransactions();
 static int SendBufferMsg();
-static     int register_memory_size = 0;
 
 #if MACHINE_DEBUG_LOG
 FILE *debugLog = NULL;
@@ -670,12 +670,12 @@ static void sweep_mempool(mempool_type *mptr)
 {
     block_header *current = &(mptr->block_head);
 
-printf("[n %d] sweep_mempool slot START .\n", myrank);
+    printf("[n %d] sweep_mempool slot START.\n", myrank);
     while( current!= NULL) {
-printf("[n %d] sweep_mempool slot %p size: %d (%d %d) %lld %lld.\n", myrank, current, current->size, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
+        printf("[n %d] sweep_mempool slot %p size: %d (%d %d) %lld %lld.\n", myrank, current, current->size, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
         current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
-printf("[n %d] sweep_mempool slot END .\n", myrank);
+    printf("[n %d] sweep_mempool slot END.\n", myrank);
 }
 
 inline
@@ -2305,7 +2305,7 @@ static void _init_static_smsg()
     register_memory_size += smsg_memlen*(mysize);
     GNI_RC_CHECK("GNI_GNI_MemRegister mem buffer", status);
 
-    if (myrank == 0)  printf("Charm++> SMSG memory: %d\n", smsg_memlen*(mysize));
+    if (myrank == 0)  printf("Charm++> SMSG memory: %1.1fKB\n", 1.0*smsg_memlen*(mysize)/1024);
     if (myrank == 0 && register_memory_size>=MAX_REG_MEM ) printf("Charm++> FATAL ERROR your program has risk of hanging \n please set CHARM_UGNI_MEMPOOL_MAX  to a larger value or use Dynamic smsg\n");
 
     base_infor.addr =  (uint64_t)smsg_mailbox_base;
@@ -2553,7 +2553,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
       else
         CmiAbort("alloc_mempool_block: posix_memalign failed");
     }
-        SetMemHndlZero((*mem_hndl));
+    SetMemHndlZero((*mem_hndl));
     
     return pool;
 }
@@ -2704,27 +2704,34 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     PMI_Barrier();
 
 #if     USE_LRTS_MEMPOOL
-    env = getenv("CHARM_UGNI_MEMPOOL_SIZE");
+    env = getenv("CHARM_UGNI_MEMPOOL_INIT_SIZE");
     if (env) _mempool_size = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+useMemorypoolSize",&env,"Set the memory pool size")) 
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-init-size",&env,"Set the memory pool size")) 
         _mempool_size = CmiReadSize(env);
 
-    if (myrank==0) printf("Charm++> memory pool size: %1.fMB\n", _mempool_size/1024.0/1024);
 
     env = getenv("CHARM_UGNI_MEMPOOL_MAX");
-    if (env) {
+    if (env) MAX_REG_MEM = CmiReadSize(env);
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool size")) 
         MAX_REG_MEM = CmiReadSize(env);
-        if (myrank==0) printf("Charm++> memory pool maximum size: %1.fMB\n", MAX_REG_MEM/1024.0/1024);
-    }
 
     env = getenv("CHARM_UGNI_SEND_MAX");
-    if (env) {
+    if (env) MAX_BUFF_SEND = CmiReadSize(env);
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max-send",&env,"Set the memory pool max size for send")) 
         MAX_BUFF_SEND = CmiReadSize(env);
-        if (myrank==0) printf("Charm++> maximum pending memory pool for sending: %1.fMB\n", MAX_BUFF_SEND/1024.0/1024);
-    }
 
     if (MAX_REG_MEM < _mempool_size) MAX_REG_MEM = _mempool_size;
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
+
+    if (myrank==0) {
+        printf("Charm++> memory pool init size: %1.fMB\n", _mempool_size/1024.0/1024);
+        printf("Charm++> memory pool max size: %1.fMB, max for send: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
+        if (MAX_REG_MEM < BIG_MSG * 2 + oneMB)  {
+            /* memblock can expand to BIG_MSG * 2 size */
+            printf("Charm++ Error: The mempool maximum size is too small, please use command line option +gni-mempool-max or environment variable CHARM_UGNI_MEMPOOL_MAX to increase the value to at least %1.fMB.\n",  BIG_MSG * 2.0/1024/1024 + 1);
+            CmiAbort("mempool maximum size is too small. \n");
+        }
+    }
 #endif
 
     env = getenv("CHARM_UGNI_NO_DEADLOCK_CHECK");
