@@ -224,7 +224,7 @@ CpvStaticDeclare(ccd_cond_callbacks, conds);
 
 
 /*Make sure this matches the CcdPERIODIC_* list in converse.h*/
-#define CCD_PERIODIC_MAX 12
+#define CCD_PERIODIC_MAX 13
 const static double periodicCallInterval[CCD_PERIODIC_MAX]=
 {0.001, 0.010, 0.100, 1.0, 5.0, 10.0, 60.0, 2*60.0, 5*60.0, 10*60.0, 3600.0, 12*3600.0, 24*3600.0};
 
@@ -536,7 +536,7 @@ void CcdRaiseCondition(int condnum)
  * Trigger callbacks periodically, and also the time-indexed
  * functions if their time has arrived
  */
-void CcdCallBacks(void)
+void CcdCallBacks()
 {
   int i;
   ccd_periodic_callbacks *o=&CpvAccess(pcb);
