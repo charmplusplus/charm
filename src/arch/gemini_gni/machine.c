@@ -2541,6 +2541,10 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if (*size < default_size) *size = default_size;
     total_mempool_size += *size;
     total_mempool_calls += 1;
+    if (*size > MAX_REG_MEM) {
+        printf("Error: A mempool block with size %d is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX.", *size);
+        CmiAbort("alloc_mempool_block");
+    }
     ret = posix_memalign(&pool, ALIGNBUF, *size);
     if (ret != 0) {
 #if CMK_SMP && STEAL_MEMPOOL
@@ -2712,7 +2716,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
     env = getenv("CHARM_UGNI_MEMPOOL_MAX");
     if (env) MAX_REG_MEM = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool size")) 
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool max size")) 
         MAX_REG_MEM = CmiReadSize(env);
 
     env = getenv("CHARM_UGNI_SEND_MAX");
