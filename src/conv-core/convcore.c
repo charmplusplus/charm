@@ -189,6 +189,8 @@ CsvDeclare(CmiNodeLock, CsdNodeQueueLock);
 CpvDeclare(int,   CsdStopFlag);
 CpvDeclare(int,   CsdLocalCounter);
 
+CpvDeclare(int,   _urgentSend);
+
 CmiNodeLock _smp_mutex;               /* for smp */
 
 #if CONVERSE_VERSION_VMI
@@ -3490,6 +3492,8 @@ void ConverseCommonInit(char **argv)
  * initialized or not is not initialized, thus possibly causing another
  * bad memory access. --Chao Mei
  */
+  CpvInitialize(int, _urgentSend);
+  CpvAccess(_urgentSend) = 0;
 #if CMK_CCS_AVAILABLE
   CpvInitialize(int, cmiArgDebugFlag);
   CpvAccess(cmiArgDebugFlag) = 0;
