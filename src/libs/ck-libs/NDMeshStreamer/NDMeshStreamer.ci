@@ -12,13 +12,18 @@ module NDMeshStreamer {
 
   template<class dtype> 
   group MeshStreamer {
-    entry MeshStreamer(int totalBufferCapacity, int numDimensions, 
-		       int dimensionSizes[numDimensions], 
-		       const CProxy_MeshStreamerClient<dtype> &clientProxy, 
-                       int yieldFlag = 0, double progressPeriodInMs = -1.0);   
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     entry void flushDirect();
     entry void finish(CkReductionMsg *msg);
   };
 
+  template<class dtype>
+  group GroupMeshStreamer : MeshStreamer<dtype> {
+    entry GroupMeshStreamer(int totalBufferCapacity, int numDimensions, 
+			    int dimensionSizes[numDimensions], 
+			    const CProxy_MeshStreamerClient<dtype> &clientProxy,
+			    int yieldFlag = 0, 
+			    double progressPeriodInMs = -1.0);
+  };
 };
+

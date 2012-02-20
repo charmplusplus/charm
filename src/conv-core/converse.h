@@ -1524,11 +1524,12 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
 #define CcdPERIODIC_10s      21 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  22 /*every minute*/
-#define CcdPERIODIC_5minute  23 /*every 5 minute*/
-#define CcdPERIODIC_10minute 24 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    25 /*every hour*/
-#define CcdPERIODIC_12hour   26 /*every 12 hours*/
-#define CcdPERIODIC_1day     27 /*every day*/
+#define CcdPERIODIC_2minute  23 /*every 2 minute*/
+#define CcdPERIODIC_5minute  24 /*every 5 minute*/
+#define CcdPERIODIC_10minute 25 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    26 /*every hour*/
+#define CcdPERIODIC_12hour   27 /*every 12 hours*/
+#define CcdPERIODIC_1day     28 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
@@ -1853,8 +1854,10 @@ extern int numMemCriticalEntries;
 extern int *memCriticalEntries;
 #endif
 
+CmiInt8 CmiReadSize(char *str);
+
 #if defined(__cplusplus)
-}
+}                                         /* end of extern "C"  */
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1925,6 +1928,8 @@ EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr f
 EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
 
-CmiInt8 CmiReadSize(char *str);
+CpvCExtern(int, _urgentSend);
+#define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
+
 
 #endif /* CONVERSE_H */
