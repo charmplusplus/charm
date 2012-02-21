@@ -12,6 +12,86 @@ void CEntry::generateDeps(XStr& op)
   }
 }
 
+static void generateWhenCode(XStr& op, SdagConstruct *cn)
+{
+  XStr whenParams = "";
+  CStateVar *sv = cn->stateVars->begin();
+  int i = 0;
+  int iArgs = 0;
+  bool lastWasVoid = false;
+  bool paramMarshalling = false;
+
+#if CMK_BIGSIM_CHARM
+  // bgLog2 stores the parent dependence of when, e.g. for, olist
+  op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
+#endif
+
+  for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+    if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
+      paramMarshalling =1;
+      op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n";
+      op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
+      op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
+    }
+    if (sv->isMsg == 1) {
+      if((i!=0) && (lastWasVoid == 0))
+        whenParams.append(", ");
+#if CMK_BIGSIM_CHARM
+      if(i==1) {
+        whenParams.append(" NULL ");
+        lastWasVoid=0;
+        // skip this arg which is supposed to be _bgParentLog
+        iArgs++;
+        continue;
+      }
+#endif
+      whenParams.append("(");
+      whenParams.append(sv->type->charstar());
+      whenParams.append(") tr->args[");
+      whenParams<<iArgs;
+      whenParams.append("]");
+      iArgs++;
+    }
+    else if (sv->isVoid == 1)
+      // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
+      op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
+    else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
+      if((i > 0) && (lastWasVoid == 0))
+        whenParams.append(", ");
+      whenParams.append(*(sv->name));
+      if (sv->arrayLength != 0)
+        op<<"        int impl_off"<<cn->nodeNum <<"_"<<sv->name->charstar()<<"; implP"
+          <<cn->nodeNum <<"|impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<";\n";
+      else
+        op<<"        "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP"
+          <<cn->nodeNum <<"|"<<sv->name->charstar()<<";\n";
+    }
+    lastWasVoid = sv->isVoid;
+  }
+  if (paramMarshalling == 1)
+    op<<"        impl_buf"<<cn->nodeNum <<"+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
+  i = 0;
+  sv = (CStateVar *)cn->stateVars->begin();
+  for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
+    if (sv->arrayLength != 0)
+      op<<"        "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf" <<cn->nodeNum
+        <<"+impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<");\n";
+  }
+  if (paramMarshalling == 1)
+    op << "        delete (CkMarshallMsg *)impl_msg" <<cn->nodeNum <<";\n";
+  op << "        " << cn->label->charstar() << "(" << whenParams.charstar();
+  op << ");\n";
+  op << "        delete tr;\n";
+
+#if CMK_BIGSIM_CHARM
+  cn->generateTlineEndCall(op);
+  cn->generateBeginExec(op, "sdagholder");
+#endif
+  cn->generateDummyBeginExecute(op);
+
+  op << "        return;\n";
+}
+
 void CEntry::generateCode(XStr& op)
 {
   CStateVar *sv;
@@ -171,168 +251,19 @@ void CEntry::generateCode(XStr& op)
   SdagConstruct::generateEndExec(op);
 #endif
 
-  XStr *whenParams; 
-  int iArgs = 0;
   if(whenList.length() == 1) {
-    SdagConstruct *cn;
-    cn = whenList.begin();
-
-    whenParams = new XStr("");
-    sv = (CStateVar *)cn->stateVars->begin();
-    i = 0; iArgs = 0;
-    lastWasVoid = 0;
-    paramMarshalling = 0;
-
-#if CMK_BIGSIM_CHARM
-    op <<"    cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
-    //op << "    " << cn->label->charstar() << "(";    
-#endif
-
-    for( i=0; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-      if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
-          paramMarshalling =1;
-          op << "    CkMarshallMsg *impl_msg = (CkMarshallMsg *) tr->args[" <<iArgs <<"];\n"; 
-          op << "    char *impl_buf=((CkMarshallMsg *)impl_msg)->msgBuf;\n";
-          op << "    PUP::fromMem implP(impl_buf);\n";
-          iArgs++;
-      }
-      if (sv->isMsg == 1) {
-	  if((i!=0) && (lastWasVoid == 0))
-	     whenParams->append(", ");
-#if CMK_BIGSIM_CHARM
-	  if(i==1){   
-	    whenParams->append("NULL");
-	    lastWasVoid=0;
-	    iArgs++;
-	    continue;
-	  }
-#endif
-	  whenParams->append("(");
-	  whenParams->append(sv->type->charstar());
-	  whenParams->append(") tr->args[");
-	  *whenParams<<iArgs;
-	  whenParams->append("]");
-	  iArgs++;
-       }
-       else if (sv->isVoid == 1) 
-           // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
-           op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
-       else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-          if((i > 0) &&(lastWasVoid == 0)) 
-	     whenParams->append(", ");
-          whenParams->append(*(sv->name));
-          if (sv->arrayLength != 0) 
-             op<<"    int impl_off_"<<sv->name->charstar()<<"; implP|impl_off_"<<sv->name->charstar()<<";\n";
-          else
-             op<<"    "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP|"<<sv->name->charstar()<<";\n";
-       }
-       lastWasVoid = sv->isVoid;
-      
-    } 
-    if (paramMarshalling == 1) 
-        op<<"     impl_buf+=CK_ALIGN(implP.size(),16);\n";
-    i = 0;
-    sv = (CStateVar *)cn->stateVars->begin();
-    for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-       if (sv->arrayLength != 0) 
-          op<<"    "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf+impl_off_"<<sv->name->charstar()<<");\n";
-    }
-
-    if (paramMarshalling == 1) 
-       op << "    delete (CkMarshallMsg *)impl_msg;\n";
-    op << "    " << cn->label->charstar() << "(" << whenParams->charstar();
-    op << ");\n";
-  
-    op << "    delete tr;\n";
-#if CMK_BIGSIM_CHARM
-    cn->generateTlineEndCall(op);
-    cn->generateBeginExec(op, "sdagholder");
-#endif
-    cn->generateDummyBeginExecute(op);
-    op << "    return;\n";
+    op << "    {\n";
+    generateWhenCode(op, whenList.begin());
+    op << "    }\n";
   }
   else {   
     op << "    switch(tr->whenID) {\n";
     for(SdagConstruct *cn=whenList.begin(); !whenList.end(); cn=whenList.next())
     {
-      whenParams = new XStr("");
-      i = 0; iArgs = 0;
       op << "      case " << cn->nodeNum << ":\n";
       op << "      {\n";
-      
-#if CMK_BIGSIM_CHARM
-      // bgLog2 stores the parent dependence of when, e.g. for, olist
-      op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";	 
-#endif
-      sv = (CStateVar *)cn->stateVars->begin();
-      i = 0;
-      paramMarshalling = 0;
-      lastWasVoid = 0;
-
-      for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-         if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
-            paramMarshalling =1;
-            op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n"; 
-            op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
-            op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
-         }
-         if (sv->isMsg == 1) {
-	    if((i!=0) && (lastWasVoid == 0))
-	      whenParams->append(", ");
-#if CMK_BIGSIM_CHARM
-	    if(i==1) {
-	       whenParams->append(" NULL ");
-	       lastWasVoid=0;
-	       // skip this arg which is supposed to be _bgParentLog
-	       iArgs++;
-	       continue;
-	    }
-#endif
-	    whenParams->append("(");
-	    whenParams->append(sv->type->charstar());
-	    whenParams->append(" *) tr->args[");
-	    *whenParams<<iArgs;
-	    whenParams->append("]");
-	    iArgs++;
-         }
-         else if (sv->isVoid == 1) 
-            // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
-            op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
-         else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-            if((i > 0) && (lastWasVoid == 0))
-	       whenParams->append(", ");
-            whenParams->append(*(sv->name));
-            if (sv->arrayLength != 0) 
-               op<<"        int impl_off"<<cn->nodeNum <<"_"<<sv->name->charstar()<<"; implP"
-                 <<cn->nodeNum <<"|impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<";\n";
-            else
-               op<<"        "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP"
-                 <<cn->nodeNum <<"|"<<sv->name->charstar()<<";\n";
-         }
-         lastWasVoid = sv->isVoid;
-      } 
-      if (paramMarshalling == 1) 
-          op<<"        impl_buf"<<cn->nodeNum <<"+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
-      i = 0;
-      sv = (CStateVar *)cn->stateVars->begin();
-      for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-         if (sv->arrayLength != 0) 
-            op<<"        "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf" <<cn->nodeNum
-              <<"+impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<");\n";
-      }
-      if (paramMarshalling == 1) 
-         op << "        delete (CkMarshallMsg *)impl_msg" <<cn->nodeNum <<";\n";
-      op << "        " << cn->label->charstar() << "(" << whenParams->charstar();
-      op << ");\n";
-      op << "        delete tr;\n";
-
-#if CMK_BIGSIM_CHARM
-      cn->generateTlineEndCall(op);
-      cn->generateBeginExec(op, "sdagholder");
-#endif
-      cn->generateDummyBeginExecute(op);
-
-      op << "        return;\n";
+      // This emits a `return;', so no `break' is needed
+      generateWhenCode(op, cn);
       op << "      }\n";
     }
   op << "    }\n";
