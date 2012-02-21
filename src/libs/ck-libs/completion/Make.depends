@@ -13,13 +13,13 @@ completion.o: completion.C completion.h completion.decl.h \
  ../../../../tmp/middle-conv.h ../../../../tmp/cklists.h \
  ../../../../tmp/ckbitvector.h ../../../../tmp/ckstream.h \
  ../../../../tmp/init.h ../../../../tmp/ckhashtable.h \
- ../../../../tmp/debug-charm.h ../../../../tmp/simd.h \
- ../../../../tmp/CkMarshall.decl.h ../../../../tmp/charm++.h \
+ ../../../../tmp/debug-charm.h ../../../../tmp/debug-conv++.h \
+ ../../../../tmp/simd.h ../../../../tmp/CkMarshall.decl.h \
+ ../../../../tmp/charm++.h ../../../../tmp/ckarrayindex.h \
  ../../../../tmp/cksection.h ../../../../tmp/ckcallback.h \
  ../../../../tmp/conv-ccs.h ../../../../tmp/sockRoutines.h \
  ../../../../tmp/ccs-server.h ../../../../tmp/ckobjQ.h \
  ../../../../tmp/ckreduction.h ../../../../tmp/CkReduction.decl.h \
- ../../../../tmp/cknodegroupreduction.h \
  ../../../../tmp/CkArrayReductionMgr.decl.h \
  ../../../../tmp/ckmemcheckpoint.h ../../../../tmp/CkMemCheckpoint.decl.h \
  ../../../../tmp/readonly.h ../../../../tmp/ckarray.h \
@@ -29,13 +29,13 @@ completion.o: completion.C completion.h completion.decl.h \
  ../../../../tmp/LBMachineUtil.h ../../../../tmp/lbdb++.h \
  ../../../../tmp/LBDatabase.decl.h ../../../../tmp/NullLB.decl.h \
  ../../../../tmp/BaseLB.decl.h ../../../../tmp/CkLocation.decl.h \
- ../../../../tmp/CkArray.decl.h ../../../../tmp/CkFutures.decl.h \
- ../../../../tmp/charisma.h ../../../../tmp/charisma.decl.h \
- ../../../../tmp/tempo.h ../../../../tmp/tempo.decl.h \
- ../../../../tmp/waitqd.h ../../../../tmp/waitqd.decl.h \
- ../../../../tmp/sdag.h ../../../../tmp/ckcheckpoint.h \
- ../../../../tmp/CkCheckpoint.decl.h ../../../../tmp/ckevacuation.h \
- ../../../../tmp/ckarrayreductionmgr.h ../../../../tmp/trace.h \
- ../../../../tmp/trace-bluegene.h ../../../../tmp/envelope.h \
- completion.def.h
+ ../../../../tmp/CkArray.decl.h ../../../../tmp/ckfutures.h \
+ ../../../../tmp/CkFutures.decl.h ../../../../tmp/charisma.h \
+ ../../../../tmp/charisma.decl.h ../../../../tmp/tempo.h \
+ ../../../../tmp/tempo.decl.h ../../../../tmp/waitqd.h \
+ ../../../../tmp/waitqd.decl.h ../../../../tmp/sdag.h \
+ ../../../../tmp/ckcheckpoint.h ../../../../tmp/CkCheckpoint.decl.h \
+ ../../../../tmp/ckevacuation.h ../../../../tmp/ckarrayreductionmgr.h \
+ ../../../../tmp/trace.h ../../../../tmp/trace-bluegene.h \
+ ../../../../tmp/envelope.h completion.def.h
 	$(CHARMC) -I../../../../tmp -o completion.o completion.C
