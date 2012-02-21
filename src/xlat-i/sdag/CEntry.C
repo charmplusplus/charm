@@ -176,14 +176,12 @@ void CEntry::generateCode(XStr& op)
   if(whenList.length() == 1) {
     SdagConstruct *cn;
     cn = whenList.begin();
+
     whenParams = new XStr("");
     sv = (CStateVar *)cn->stateVars->begin();
     i = 0; iArgs = 0;
     lastWasVoid = 0;
-    sv = (CStateVar *)cn->stateVars->begin();
-    i = 0;
     paramMarshalling = 0;
-    lastWasVoid = 0;
 
 #if CMK_BIGSIM_CHARM
     op <<"    cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
