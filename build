@@ -81,8 +81,8 @@ syntax() {
   echo '  papi            compile with PAPI performance counter support (if any)'
   echo ''
   echo "Charm++ dynamic libraries:"
-  echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
-  echo "  --no-build-shared  don't build Charm++'s shared libraries"
+  echo "  --build-shared     build Charm++ dynamic libraries (.so) "
+  echo "  --no-build-shared  don't build Charm++'s shared libraries (default)"
   echo ''
   echo 'Enable/disable features:'
   src/scripts/configure --help | grep enable-
