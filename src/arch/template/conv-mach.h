@@ -38,8 +38,8 @@
    other must be 0. they differ in the fact that the second (_WITH_RESTART)
    enables retry on interrupt (a function is recalled upon interrupt and does
    not return EINTR as in the first case) */
-#define CMK_SIGNAL_USE_SIGACTION                           1
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION                           0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 /* specifies whether the CthCpv variables should be defined as Cpv (0) or
    directly as normal c variables (1) */
