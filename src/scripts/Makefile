@@ -212,7 +212,7 @@ UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwo
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckfutures.h ckIgetControl.h cktiming.h debug-charm.h\
 	  ckcallback.h CkCallback.decl.h ckcallback-ccs.h 	\
-	  ckarrayreductionmgr.h cknodegroupreduction.h cksection.h \
+	  ckarrayreductionmgr.h cksection.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
           ckmessagelogging.h ckobjid.h\
@@ -763,7 +763,7 @@ libtrace-Tau.o: trace-Tau.C charm++.h charm.h converse.h conv-config.h \
   middle.h middle-conv.h cklists.h ckbitvector.h ckstream.h init.h \
   ckhashtable.h debug-charm.h CkMarshall.decl.h cksection.h ckcallback.h \
   conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h ckreduction.h \
-  CkReduction.decl.h cknodegroupreduction.h CkArrayReductionMgr.decl.h \
+  CkReduction.decl.h CkArrayReductionMgr.decl.h \
   ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
   cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
   LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
