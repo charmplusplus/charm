@@ -977,14 +977,14 @@ Chare::genDecls(XStr& str)
     //handle the case that some of the entries may be sdag Entries
     int sdagPresent = 0;
     XStr sdagStr;
-    CParsedFile *myParsedFile = new CParsedFile(this);
-    list->collectSdagCode(myParsedFile, sdagPresent);
+    CParsedFile myParsedFile(this);
+    list->collectSdagCode(&myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
       XStr sdag_output;
       classname << baseName(0);
       resetNumbers();
-      myParsedFile->doProcess(classname, sdag_output);
+      myParsedFile.doProcess(classname, sdag_output);
       str << sdag_output;
     }
   }
