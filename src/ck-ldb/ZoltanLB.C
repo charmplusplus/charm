@@ -1,6 +1,8 @@
 /** \file ZoltanLB.C
  *
- *  Updated by Abhinav Bhatele, 2010-11-26 to use ckgraph
+ * Load balancer using Zoltan hypergraph partitioner. This is a multicast aware
+ * load balancer
+ * Harshitha, 2012/02/21
  */
 
 /**

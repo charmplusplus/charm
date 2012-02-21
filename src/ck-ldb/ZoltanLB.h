@@ -1,5 +1,8 @@
 /** \file ZoltanLB.h
  *
+ * Load balancer using Zoltan hypergraph partitioner. This is a multicast aware
+ * load balancer
+ * Harshitha, 2012/02/21
  */
 
 /**
@@ -12,9 +15,6 @@
 
 #include "CentralLB.h"
 #include "ZoltanLB.decl.h"
-
-#define WEIGHTED 1
-#define MULTI_CONSTRAINT 2
 
 void CreateZoltanLB();
 BaseLB * AllocateZoltanLB();
