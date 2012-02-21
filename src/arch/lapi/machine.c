@@ -975,7 +975,7 @@ static void MachinePostCommonInitForLAPI(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     CmiError(message);
     LAPI_Term(lapiContext);
     exit(1);

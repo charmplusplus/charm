@@ -540,6 +540,7 @@ static void CmiMachineInit(char **argv){
 		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 	}
 	
+        if (Cmi_charmrun_fd == -1) return;
 	
 	//TURN ON RDMA
 	rdma=1;
@@ -2503,6 +2504,7 @@ void * infi_CmiAlloc(int size){
 #if CMK_IBVERBS_STATS
 	numAlloc++;
 #endif
+        if (Cmi_charmrun_fd == -1) return malloc(size);
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
@@ -2648,6 +2650,7 @@ void infi_CmiFree(void *ptr){
 	numFree++;
 #endif
 	
+        if (Cmi_charmrun_fd == -1) return free(ptr);
 #if CMK_SMP	
 	CmiMemLock();
 #endif

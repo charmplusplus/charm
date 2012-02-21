@@ -103,4 +103,19 @@
 #define CMK_WITH_CONTROLPOINT            1
 #endif
 
+/* sanity checks */
+#if CMK_SMP_TRACE_COMMTHREAD && ! CMK_SMP
+#undef CMK_SMP_TRACE_COMMTHREAD
+#define CMK_SMP_TRACE_COMMTHREAD                               0
+#endif
+
+/**
+    CmiReference broadcast/multicast optimization does not work for SMP
+    due to race condition on memory reference counter, needs lock to protect
+ */
+#if CMK_SMP && CMK_BROADCAST_USE_CMIREFERENCE
+#undef CMK_BROADCAST_USE_CMIREFERENCE
+#define CMK_BROADCAST_USE_CMIREFERENCE                      0
+#endif
+
 #endif

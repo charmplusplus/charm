@@ -59,6 +59,8 @@ class CkMulticastMgr: public CkDelegateMgr
         void pup(PUP::er &p){ 
 		CkDelegateMgr::pup(p);
 		p|factor;
+		p|split_size;
+		p|split_threshold;
 	}
 
         // ------------------------- Spanning Tree Setup ------------------------

@@ -1,0 +1,30 @@
+Simple example of using PUP::toDisk and PUP::fromDisk for IO.
+
+The userData array represents a typical application chare array it has
+numElements and is constructed and placed without regard to I/O
+practicalities.  Each one contains a piece of data for which we want
+some file storage.
+
+Each pupDisk element is our intermediary to the file system. It has
+numFiles elements and should be placed one per node.  Numfiles could
+go as high as numcores, but at the limit that will not perform well.
+Each pupDisk will be responsible for output of numElements/numFiles
+elements.  Specifically it will handle the contiguous index space of
+[numElements/numFiles*thisIndex: numElements/numFiles*thisIndex +
+numElements/numFiles].  The last element may have fewer than
+numElements/numFiles and numElements will be tweaked to make this work.
+
+userData and pupDisk communicate using point to point sends.
+
+By default, the userData array will be initialized, pupped to disk, pupped from
+disk, and verified.
+
+If the 3rd command line argument is r, it will skip initialization and
+writing, to read from disk and verify.
+
+Make test embodies a simple working example of writing to disk and
+verifying that it works.  Theoretically the pup files should be
+portable across platforms, but I have not verified that for this
+example.
+
+

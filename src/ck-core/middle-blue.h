@@ -195,6 +195,9 @@ void CkReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 #undef CmiNodeAllBarrier
 #define CmiNodeAllBarrier()
 
+#undef CmiBarrier
+#define CmiBarrier()
+
 /** common functions for two versions */
 namespace BGConverse {
 

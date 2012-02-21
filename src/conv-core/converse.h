@@ -682,6 +682,7 @@ extern void* malloc_nomigrate(size_t size);
 */
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
+int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 
@@ -906,6 +907,7 @@ typedef struct {
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
 extern void *CsdNextMessage(CsdSchedulerState_t *state);
+extern void *CsdNextLocalNodeMessage(CsdSchedulerState_t *state);
 
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
@@ -915,6 +917,7 @@ extern  int CsdScheduler(int maxmsgs);
 extern void CsdScheduleForever(void);
 extern  int CsdScheduleCount(int maxmsgs);
 extern void CsdSchedulePoll(void);
+extern void CsdScheduleNodePoll(void);
 
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 /** @} */
@@ -1521,11 +1524,12 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
 #define CcdPERIODIC_10s      21 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  22 /*every minute*/
-#define CcdPERIODIC_5minute  23 /*every 5 minute*/
-#define CcdPERIODIC_10minute 24 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    25 /*every hour*/
-#define CcdPERIODIC_12hour   26 /*every 12 hours*/
-#define CcdPERIODIC_1day     27 /*every day*/
+#define CcdPERIODIC_2minute  23 /*every 2 minute*/
+#define CcdPERIODIC_5minute  24 /*every 5 minute*/
+#define CcdPERIODIC_10minute 25 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    26 /*every hour*/
+#define CcdPERIODIC_12hour   27 /*every 12 hours*/
+#define CcdPERIODIC_1day     28 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
@@ -1850,8 +1854,10 @@ extern int numMemCriticalEntries;
 extern int *memCriticalEntries;
 #endif
 
+CmiInt8 CmiReadSize(char *str);
+
 #if defined(__cplusplus)
-}
+}                                         /* end of extern "C"  */
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1898,5 +1904,32 @@ typedef struct {
 extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#if defined(__cplusplus)
+#define EXTERN extern "C"
+#else
+#define EXTERN extern
+#endif
+typedef void (*CmiCommThdFnPtr)(int numParams, void *params);
+typedef struct CmiNotifyCommThdMsg {
+    char core[CmiMsgHeaderSizeBytes];
+    CmiCommThdFnPtr fn;
+    int numParams;
+    void *params;
+    int toKeep; /* whether to free this msg by comm thread when the msg is processed */ 
+}CmiNotifyCommThdMsg;
+
+EXTERN CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+EXTERN void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg);
+/* Initialize a notification msg */
+EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+/* Enqueue the msg into the local comm thread, and wait for being processed */
+EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
+#endif
+
+CpvCExtern(int, _urgentSend);
+#define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
+
 
 #endif /* CONVERSE_H */

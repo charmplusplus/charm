@@ -1,2 +1,2 @@
 #  Bluegene/P specific Make rules
-
+$(L)/libconv-cplus-n.a: machine.c machine-common-core.c machine-broadcast.c machine-lrts.h machine-commthd-util.c

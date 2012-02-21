@@ -186,15 +186,32 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  CircQueue circ = Q->head;
-  char *data = circ->data[circ->pull];
-  return (data == 0);
+  return (Q->len == 0);
 }
 
 static int PCQueueLength(PCQueue Q)
 {
   return Q->len;
 }
+
+static char *PCQueueTop(PCQueue Q)
+{
+  CircQueue circ; int pull; char *data;
+
+#if CMK_PCQUEUE_LOCK
+    if (Q->len == 0) return 0;        /* If atomic increment are used, Q->len is always right */
+    CmiLock(Q->lock);
+#endif
+    circ = Q->head;
+    pull = circ->pull;
+    data = circ->data[pull];
+
+#if CMK_PCQUEUE_LOCK
+      CmiUnlock(Q->lock);
+#endif
+      return data;
+}
+
 
 static char *PCQueuePop(PCQueue Q)
 {
@@ -360,13 +377,31 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  return (*(Q->head) == 0);
+  return (Q->len == 0);
 }
 
 //not a thread-safe call
 static int PCQueueLength(PCQueue Q)
 {
   return Q->len;
+}
+static char *PCQueueTop(PCQueue Q)
+{
+
+    char *data;
+
+#if CMK_PCQUEUE_LOCK
+    CmiLock(Q->lock);
+#endif
+
+    data = *(Q->head);
+//    if(data == 0) return 0;
+     
+#if CMK_PCQUEUE_LOCK
+      CmiUnlock(Q->lock);
+#endif
+
+      return data;
 }
 
 static char *PCQueuePop(PCQueue Q)

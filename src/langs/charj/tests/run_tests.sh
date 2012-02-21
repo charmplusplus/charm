@@ -34,7 +34,7 @@ function test_file() {
 }
 
 rm -f run_tests.log
-TESTDIRS="unit"
+TESTDIRS="functional"
 for dir in $TESTDIRS; do
     pushd $dir > /dev/null
     rm -rf *.gen *.decl.h

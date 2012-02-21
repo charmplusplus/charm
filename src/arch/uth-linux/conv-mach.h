@@ -41,8 +41,8 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       1
 
-#define CMK_SIGNAL_NOT_NEEDED                              0
-#define CMK_SIGNAL_USE_SIGACTION                           1
+#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_SPANTREE_MAXSPAN                               4

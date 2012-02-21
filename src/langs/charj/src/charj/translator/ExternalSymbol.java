@@ -7,3 +7,4 @@ public class ExternalSymbol extends ClassSymbol implements Scope, Type {
         super(symtab, name);
     }
 }
+

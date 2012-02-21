@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 
 #ifndef _TRACE_H
 #define _TRACE_H
@@ -66,10 +60,10 @@ class Trace {
     // is specified
     virtual void traceBegin() {}
     virtual void traceEnd() {}
-#if CMK_SMP_TRACE_COMMTHREAD		
+
+    // for tracing comm thread only
     virtual void traceBeginOnCommThread() {}   
     virtual void traceEndOnCommThread() {}
-#endif 
 		
     // registers user event trace module returns int identifier 
     virtual int traceRegisterUserEvent(const char* eventName, int e) { 
@@ -80,18 +74,16 @@ class Trace {
     // a pair of begin/end user event has just occured
     virtual void userBracketEvent(int eventID, double bt, double et) {}
 
-	// a user supplied integer value(likely a timestep)
-	virtual void userSuppliedData(int e) {}
+    // a user supplied integer value(likely a timestep)
+    virtual void userSuppliedData(int e) {}
 
-	// a user supplied integer value(likely a timestep)
-	virtual void userSuppliedNote(char *note) {}
+    // a user supplied integer value(likely a timestep)
+    virtual void userSuppliedNote(char *note) {}
 
-	virtual void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
+    virtual void userSuppliedBracketedNote(char *note, int eventID, double bt, double et) {}
 
-
-	// the current memory usage as a double
-	virtual void memoryUsage(double currentMemUsage) {}
-	
+    // the current memory usage as a double
+    virtual void memoryUsage(double currentMemUsage) {}
 
     // creation of message(s)
     virtual void creation(envelope *, int epIdx, int num=1) {}
@@ -271,10 +263,9 @@ public:
     void traceBegin();    
     void traceEnd();
 
-#if CMK_SMP_TRACE_COMMTHREAD
+    // for tracing comm thread only
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
-#endif
 	
     /*Calls for tracing function begins and ends*/
     inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
@@ -342,7 +333,6 @@ extern "C" {
 /* Memory tracing */
 #define _TRACE_MALLOC(where, size, stack, stackSize) _TRACE_ONLY(CkpvAccess(_traces)->malloc(where,size,stack,stackSize))
 #define _TRACE_FREE(where, size) _TRACE_ONLY(CkpvAccess(_traces)->free(where, size))
-
 
 #include "trace-bluegene.h"
 

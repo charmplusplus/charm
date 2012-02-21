@@ -51,7 +51,7 @@ void noopck(const char*, ...)
 {}
 
 
-//#define DEBUGF      // CkPrintf
+//#define DEBUGF       CkPrintf
 #define DEBUGF noopck
 
 
@@ -151,7 +151,7 @@ void ArrayElement::init_checkpt() {
 // entry function invoked by checkpoint mgr asking for checkpoint data
 void ArrayElement::inmem_checkpoint(CkArrayCheckPTReqMessage *m) {
 #if CMK_MEM_CHECKPOINT
-  //DEBUGF("[p%d] HERE checkpoint to %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
+//  DEBUGF("[p%d] HERE checkpoint to PE %d %d \n", CkMyPe(), budPEs[0], budPEs[1]);
 //char index[128];   thisIndexMax.sprint(index);
 //printf("[%d] checkpointing %s\n", CkMyPe(), index);
   CkLocMgr *locMgr = thisArray->getLocMgr();
@@ -502,7 +502,7 @@ void CkMemCheckPT::sendProcData()
   }
   int packSize = size;
   CkProcCheckPTMessage *msg = new (packSize, 0) CkProcCheckPTMessage;
-  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %d\n", CkMyPe(), size);
+  DEBUGF("[%d] CkMemCheckPT::sendProcData - size: %d to %d\n", CkMyPe(), size, ChkptOnPe(CkMyPe()));
   {
     PUP::toMem p(msg->packData);
     _handleProcData(p);
@@ -618,7 +618,12 @@ inline int CkMemCheckPT::isMaster(int buddype)
   if (CkNumPes() - totalFailed() == 2) {
     return mype < buddype;
   }
+#if NODE_CHECKPOINT
+  int pe_per_node = CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(mype));
+  for (int i=pe_per_node; i<CkNumPes(); i+=pe_per_node) {
+#else
   for (int i=1; i<CkNumPes(); i++) {
+#endif
     int me = (mype+i)%CkNumPes();
     if (isFailed(me)) continue;
     if (me == buddype) return 1;
@@ -677,7 +682,7 @@ void CkMemCheckPT::resetLB(int diepe)
 #endif
 
   // if I am the crashed pe, rebuild my failedPEs array
-  if (CkMyPe() == diepe)
+  if (CkMyNode() == diepe)
     for (i=0; i<CkNumPes(); i++) 
       if (bitmap[i]==0) failed(i);
 
@@ -896,6 +901,7 @@ void CkMemCheckPT::recoverArrayElements()
       imap[homePe].push_back(msg->index);
     }
 #endif
+	CkFreeMsg(msg);
     count ++;
   }
 #if STREAMING_INFORMHOME
