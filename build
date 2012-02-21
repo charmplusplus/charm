@@ -31,9 +31,9 @@ syntax() {
   echo ''
   echo '<options>: compiler and platform specific options'
   echo 'cc cc64 cxx kcc pgcc acc icc ecc gcc3 gcc4 mpcc pathscale clang'
-  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft papi'
-  echo 'pthreads lam'
-  echo '--incdir --libdir --basedir --no-build-shared --destination --suffix -j'
+  echo 'help smp gm tcp vmi scyld clustermatic bigemulator ooc syncft mlogft causalft'
+  echo 'papi pthreads lam'
+  echo '--incdir --libdir --basedir --build-shared --destination --suffix -j'
   if test $more = 1
   then
   echo ''
@@ -81,8 +81,8 @@ syntax() {
   echo '  papi            compile with PAPI performance counter support (if any)'
   echo ''
   echo "Charm++ dynamic libraries:"
-  echo "  --build-shared     build Charm++ dynamic libraries (.so) (default)"
-  echo "  --no-build-shared  don't build Charm++'s shared libraries"
+  echo "  --no-build-shared  don't build Charm++'s shared libraries (default)"
+  echo "  --build-shared     build Charm++ dynamic libraries (.so) "
   echo ''
   echo 'Enable/disable features:'
   src/scripts/configure --help | grep enable-

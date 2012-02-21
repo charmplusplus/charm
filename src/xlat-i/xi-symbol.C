@@ -862,7 +862,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType *t, TypeList *b, MemberList *l)
 		}
 	}
 	if (bases==NULL) //Always add Chare as a base class
-		bases = new TypeList(new NamedType("Chare"), bases);
+		bases = new TypeList(new NamedType("Chare"), NULL);
 }
 
 void
@@ -977,14 +977,14 @@ Chare::genDecls(XStr& str)
     //handle the case that some of the entries may be sdag Entries
     int sdagPresent = 0;
     XStr sdagStr;
-    CParsedFile *myParsedFile = new CParsedFile(this);
-    list->collectSdagCode(myParsedFile, sdagPresent);
+    CParsedFile myParsedFile(this);
+    list->collectSdagCode(&myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
       XStr sdag_output;
       classname << baseName(0);
       resetNumbers();
-      myParsedFile->doProcess(classname, sdag_output);
+      myParsedFile.doProcess(classname, sdag_output);
       str << sdag_output;
     }
   }
@@ -1166,6 +1166,7 @@ Group::Group(int ln, attrib_t Nattr,
 	hasSection=1;
 	bases_CBase=NULL;
 	if (b==NULL) {//Add Group as a base class
+		delete bases;
 		if (isNodeGroup())
 			bases = new TypeList(new NamedType("NodeGroup"), NULL);
 		else {
@@ -1351,6 +1352,7 @@ Array::Array(int ln, attrib_t Nattr, NamedType *index,
 	else indexType<<"CkArrayIndex";
 
 	if(b==0) { //No other base class:
+		delete bases;
 		if (0==strcmp(type->getBaseName(),"ArrayElement"))
 			//ArrayElement has special "ArrayBase" superclass
 			bases = new TypeList(new NamedType("ArrayBase"), NULL);

@@ -186,9 +186,7 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  CircQueue circ = Q->head;
-  char *data = circ->data[circ->pull];
-  return (data == 0);
+  return (Q->len == 0);
 }
 
 static int PCQueueLength(PCQueue Q)
@@ -379,7 +377,7 @@ static void PCQueueDestroy(PCQueue Q)
 
 static int PCQueueEmpty(PCQueue Q)
 {
-  return (*(Q->head) == 0);
+  return (Q->len == 0);
 }
 
 //not a thread-safe call
