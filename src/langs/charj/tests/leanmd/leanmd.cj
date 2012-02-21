@@ -376,14 +376,15 @@ chare_array [3d] Cell {
     sdagentry void reduceForces(Array<vec3> forces);
     sdagentry void run() {
         if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) {
-            stepTime = CkWallTimer(); }
+            stepTime = CkWallTimer();
+        }
 
         for(int stepCount = 1; stepCount <= finalStepCount; stepCount++) {
             //send current atom positions to my computes 
             sendPositions();
 
             //update properties of atoms using new force values 
-            when reduceForces(vec3 forces[n], int n) updateProperties(forces, n);
+            when reduceForces(Array<vecc3> forces) updateProperties(forces);
 
             if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
                 //send atoms that have moved beyond my cell to neighbors
@@ -391,7 +392,7 @@ chare_array [3d] Cell {
 
                 //receive particles from my neighbors
                 for(int updateCount = 0; updateCount < inbrs; updateCount++) {
-                    when receiveParticles(CkVec<Particle> &updates) {
+                    when receiveParticles(Array<Particle> updates) {
                         for(int i=0; i < updates.length(); i++) {
                             particles.push_back(updates[i]);    //add particles that have moved from neighboring celles to my cell
                         }
@@ -415,7 +416,7 @@ chare_array [3d] Cell {
                 energy,
                 CkReduction::sum_double,
                 CkCallback(CkReductionTarget(Main,energySumK),
-                mainProxy)); }
+                mainProxy));
         */
     } 
 }
@@ -426,7 +427,7 @@ chare_array [6d] Compute {
         energy[0] = energy[1] = 0;
     }
 
-    void interact(ParticleDataMsg msg) {
+   // void interact(ParticleDataMsg msg) {
         /*
         double energyP = 0;
 
@@ -463,19 +464,23 @@ chare_array [6d] Compute {
             energy[1] = energyP;
         }
         */
-    }
+    //}
 
     sdagentry void ResumeFromSync();
-    sdagentry void calculateForces(ParticleDataMsg msg);
+    //sdagentry void calculateForces(ParticleDataMsg msg);
+    sdagentry void calculateForces_dummy();
     sdagentry void run() {
         for (stepCount = 1; stepCount <= finalStepCount; stepCount++) {
             //self interaction check
             if (thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
-                when calculateForces(ParticleDataMsg *msg) interact(msg);
+                //when calculateForces(ParticleDataMsg *msg) interact(msg);
+                when calculateForces_dummy() { }
             } else {
                 //receive positions from two cells
-                when calculateForces(ParticleDataMsg *msg) interact(msg);
-                when calculateForces(ParticleDataMsg *msg) interact(msg);
+                //when calculateForces(ParticleDataMsg *msg) interact(msg);
+                //when calculateForces(ParticleDataMsg *msg) interact(msg);
+                when calculateForces_dummy() { }
+                when calculateForces_dummy() { }
             }
             //periodically call load balancer
             if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
@@ -491,8 +496,6 @@ chare_array [6d] Compute {
             CkCallback(CkReductionTarget(Main,energySumP),
             mainProxy));
         */
-    }
-
     }
 }
 

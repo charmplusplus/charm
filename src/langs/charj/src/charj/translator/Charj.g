@@ -632,11 +632,15 @@ statement
     |   block
     ;
 
+sdagTrigger
+    : IDENT ('['! expression ']'!)? formalParameterList
+    ;
+
 sdagStatement
     :   OVERLAP block
         -> ^(OVERLAP block)
-    |   WHEN (IDENT ('[' expression ']')? formalParameterList)* block
-        -> ^(WHEN (IDENT expression? formalParameterList)* block)
+    |   WHEN (sdagTrigger (',' sdagTrigger)*)? block
+        -> ^(WHEN sdagTrigger* block)
     ;
 
 divconBlock
