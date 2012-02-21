@@ -2076,7 +2076,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             else
                 queue->smsg_head_index = queue->smsg_msglist_index[index].next;
         }else
-            index_previous = index;
+        {index_previous = index;
         }
         index = queue->smsg_msglist_index[index].next;
 #else
