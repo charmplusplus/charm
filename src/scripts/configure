@@ -602,6 +602,7 @@ enable_option_checking
 enable_error_checking
 enable_stats
 enable_tracing
+enable_tracing_commthread
 enable_charmdebug
 enable_replay
 enable_ccs
@@ -1225,6 +1226,8 @@ Optional Features:
   --enable-error-checking enable error checking
   --enable-stats          enable statistics collection
   --enable-tracing        enable tracing modules
+  --enable-tracing-commthread
+                          enable tracing communication thread
   --enable-charmdebug     enable charmDebug
   --enable-replay         enable record/replay
   --enable-ccs            enable CCS
@@ -1739,6 +1742,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 else
+  Echo "Error checking is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_ERROR_CHECKING 1
@@ -1764,6 +1768,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 else
+  Echo "Statistics collection is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_WITH_STATS 1
@@ -1790,6 +1795,7 @@ _ACEOF
 
   add_flag CMK_TRACE_ENABLED=0
 else
+  Echo "Charm tracing is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_TRACE_ENABLED 1
@@ -1797,6 +1803,32 @@ _ACEOF
 
   add_flag CMK_TRACE_ENABLED=1
 fi
+
+# Check whether --enable-tracing-commthread was given.
+if test "${enable_tracing_commthread+set}" = set; then :
+  enableval=$enable_tracing_commthread;
+else
+  enable_tracing_commthread=yes
+fi
+
+
+if test "$enable_tracing_commthread" = "yes"
+then
+  Echo "Charm tracing communication thread is enabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SMP_TRACE_COMMTHREAD 1
+_ACEOF
+
+else
+  Echo "Charm tracing communication thread is disabled"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_SMP_TRACE_COMMTHREAD 0
+_ACEOF
+
+fi
+
 
 # Check whether --enable-charmdebug was given.
 if test "${enable_charmdebug+set}" = set; then :
@@ -1816,6 +1848,7 @@ _ACEOF
 
   add_flag CMK_CHARMDEBUG=0
 else
+  Echo "CharmDebug is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_CHARMDEBUG 1
@@ -1840,6 +1873,8 @@ cat >>confdefs.h <<_ACEOF
 #define CMK_REPLAYSYSTEM 0
 _ACEOF
 
+else
+  Echo "Charm record/replay is enabled"
 fi
 
 # Check whether --enable-ccs was given.
@@ -1859,6 +1894,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 else
+  Echo "CCS is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_CCS_AVAILABLE 1
@@ -1876,6 +1912,7 @@ fi
 
 if test "$enable_controlpoint" = "yes"
 then
+  Echo "Charm control point is enabled"
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_WITH_CONTROLPOINT 1
