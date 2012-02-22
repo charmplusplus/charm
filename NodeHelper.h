@@ -88,9 +88,13 @@ private:
     
     volatile int finishFlag;
     
+    //a tag to indicate whether the task for this new loop has been inited
+    //this tag is needed to prevent other helpers to run the old task
+    int inited;
+    
 public:    
     CurLoopInfo():numChunks(0),fnPtr(NULL), lowerIndex(-1), upperIndex(0), 
-    paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL) {}
+    paramNum(0), param(NULL), curChunkIdx(-1), finishFlag(0), redBufs(NULL), inited(0) {}
     
     ~CurLoopInfo() { delete [] redBufs; }
     
@@ -103,10 +107,13 @@ public:
         param = p;
         curChunkIdx = -1;
         finishFlag = 0;
+        //needs to be set last
+        inited = 1;
     }
       
     void waitLoopDone(){
         while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
+        inited = 0;
     }
     int getNextChunkIdx(){
         return __sync_add_and_fetch(&curChunkIdx, 1);

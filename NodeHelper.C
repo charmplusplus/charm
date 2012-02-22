@@ -450,6 +450,10 @@ void FuncSingleHelper::processWork(int filler) {
 }
 
 void CurLoopInfo::stealWork(){
+    //indicate the current work hasn't been initialized
+    //or the old work has finished.
+    if(inited == 0) return;
+    
     int first, last;
     int unit = (upperIndex-lowerIndex+1)/numChunks;
     int remainder = (upperIndex-lowerIndex+1)-unit*numChunks;
