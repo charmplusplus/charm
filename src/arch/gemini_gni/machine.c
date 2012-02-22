@@ -17,7 +17,9 @@
 
     other environment variables:
 
-    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes      # disable checking deadlock
+    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes     # disable checking deadlock
+    export CHARM_UGNI_BIG_MSG_SIZE=4M           # set big message size protocol
+    export CHARM_UGNI_BIG_MSG_PIPELINE_LEN=4    # set big message pipe len
  */
 /*@{*/
 
@@ -100,8 +102,8 @@ static CmiInt8 buffered_send_msg = 0;
 static int register_memory_size = 0;
 
 static int BIG_MSG  =  4*oneMB;
-static int  ONE_SEG  = 2*oneMB;
-#define BIG_MSG_PIPELINE         2
+static int ONE_SEG  =  2*oneMB;
+static int BIG_MSG_PIPELINE = 4;
 
 #if CMK_SMP
 #define COMM_THREAD_SEND 1
@@ -2705,6 +2707,17 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
     }
 #endif
+
+    env = getenv("CHARM_UGNI_BIG_MSG_SIZE");
+    if (env) {
+        BIG_MSG = CmiReadSize(env);
+        if (BIG_MSG < ONE_SEG)
+          CmiAbort("BIG_MSG size is too small in the environment variable CHARM_UGNI_BIG_MSG_SIZE.");
+    }
+    env = getenv("CHARM_UGNI_BIG_MSG_PIPELINE_LEN");
+    if (env) {
+        BIG_MSG_PIPELINE = atoi(env);
+    }
 
     env = getenv("CHARM_UGNI_NO_DEADLOCK_CHECK");
     if (env) _checkProgress = 0;
