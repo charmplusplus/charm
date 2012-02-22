@@ -579,7 +579,7 @@ then
     echo '#define CMK_OPTIMIZE 1' >> $ConvHeader
     # Prepend optimize so that an explicit -no-optimize still works
     OPTS="-optimize -production $OPTS"
-    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
+    CONFIG_OPTS="--disable-controlpoint --disable-tracing --disable-tracing-commthread --disable-charmdebug --disable-replay --disable-error-checking --disable-stats $CONFIG_OPTS"
 fi
 
 # build with Tau
