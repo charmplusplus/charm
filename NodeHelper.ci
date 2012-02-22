@@ -1,14 +1,9 @@
 module NodeHelper{
-
-	message Task;
 	nodegroup FuncNodeHelper{
-		entry FuncNodeHelper(int mode, int numThds);
-		entry void send(Task * msg);
+		entry FuncNodeHelper();
 	};
 	chare FuncSingleHelper{
 		entry FuncSingleHelper(CkGroupID);
-   		entry void processWork(int);
    		entry void reportCreated();
-		
 	};
 };

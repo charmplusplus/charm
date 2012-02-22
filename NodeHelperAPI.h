@@ -6,11 +6,6 @@
 /* "result" is the buffer for reduction result on a single simple-type variable */
 typedef void (*HelperFn)(int first,int last, void *result, int paramNum, void *param);
 
-#define NODEHELPER_PTHREAD 0
-#define NODEHELPER_DYNAMIC  1
-#define NODEHELPER_STATIC 2
-#define NODEHELPER_CHARE_DYNAMIC 3
-
 typedef enum REDUCTION_TYPE{
     NODEHELPER_NONE=0,
     NODEHELPER_INT_SUM,
@@ -19,8 +14,8 @@ typedef enum REDUCTION_TYPE{
 }REDUCTION_TYPE;
 
 class CProxy_FuncNodeHelper;
-extern CProxy_FuncNodeHelper NodeHelper_Init(int mode, /* indicates the nodehelper running mode, pthread of non-SMP, dynamic/static of SMP */
-                                            int numThds /* only valid in non-SMP mode, indicating how many pthreads are going to be created*/);
+/* currently only thinking of SMP mode */
+extern CProxy_FuncNodeHelper NodeHelper_Init();
 extern void NodeHelper_Parallelize(
 						CProxy_FuncNodeHelper nodeHelper, /* the proxy to the FuncNodeHelper instance */
 						HelperFn func, /* the function that finishes a partial work on another thread */
