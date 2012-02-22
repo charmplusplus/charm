@@ -36,7 +36,6 @@
 #define CMK_RSH_NOT_NEEDED                                 1
 #define CMK_RSH_USE_REMSH                                  0
 
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       1
 #define CMK_SHARED_VARS_NT_THREADS                         0

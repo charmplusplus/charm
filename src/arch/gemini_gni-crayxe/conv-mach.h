@@ -32,7 +32,6 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0 /* SMP versions */
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_PTHREADS                           0
 #define CMK_SHARED_VARS_NT_THREADS                         0
 
