@@ -99,9 +99,9 @@ static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 static CmiInt8 buffered_send_msg = 0;
 static int register_memory_size = 0;
 
-#define BIG_MSG                  8*oneMB
-#define ONE_SEG                  4*oneMB
-#define BIG_MSG_PIPELINE         4
+static int BIG_MSG  =  4*oneMB;
+static int  ONE_SEG  = 2*oneMB;
+#define BIG_MSG_PIPELINE         2
 
 #if CMK_SMP
 #define COMM_THREAD_SEND 1
@@ -183,7 +183,7 @@ uint8_t   onesided_hnd, omdh;
 #else
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status ) \
     do {   \
-        if (register_memory_size>= MAX_REG_MEM) { \
+        if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
             if(status == GNI_RC_SUCCESS) register_memory_size += size; } \
@@ -1032,14 +1032,14 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     if( control_msg_tmp->seq_id == 0 ){
         if(IsMemHndlZero(GetMemHndl(source_addr))) //it is in mempool, it is possible to be de-registered by others
         {
+            msg = (void*)source_addr;
             //register the corresponding mempool
-            if(buffered_send_msg >= MAX_BUFF_SEND)
+            if(buffered_send_msg + GetMempoolsize(msg) >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
                     buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
-            msg = (void*)source_addr;
             status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)));
             if(status == GNI_RC_SUCCESS)
             {
@@ -1060,7 +1060,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         source_addr += offset;
         size = control_msg_tmp->length;
         if (IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
-            if(buffered_send_msg >= MAX_BUFF_SEND)
+            if(buffered_send_msg + size >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
                     buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
@@ -1202,6 +1202,7 @@ static void ProcessDeadlock()
     int i;
 
 //printf("[%d] comm thread detected hang %d %d %d\n", CmiMyPe(), smsg_send_count, smsg_recv_count, count);
+//sweep_mempool(CpvAccess(mempool));
     if (ptr == NULL) ptr = (CmiUInt8*)malloc(mysize * sizeof(CmiUInt8));
     mysum = smsg_send_count + smsg_recv_count;
     MACHSTATE5(9,"Before allgather Progress Deadlock (%d,%d)  (%d,%d)(%d)\n", buffered_send_msg, register_memory_size, last, sum, count); 
