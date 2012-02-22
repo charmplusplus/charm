@@ -176,7 +176,7 @@ onesided_md_t    omdh;
 #else
 uint8_t   onesided_hnd, omdh;
 #if REMOTE_EVENT
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status)    if(register_memory_size>= MAX_REG_MEM) { \
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status)    if(register_memory_size+size>= MAX_REG_MEM) { \
          status = GNI_RC_ERROR_NOMEM;} \
         else {status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
                 if(status == GNI_RC_SUCCESS) register_memory_size += size;} }
