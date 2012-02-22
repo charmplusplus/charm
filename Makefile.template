@@ -1,12 +1,11 @@
-OPTS=-I../ -O3 -g -lpthread
+OPTS=-I../ -O3 -g -lpthread 
 
-CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-opt
+#CHARMDIR=$(HOME)/curcvs/charm/net-linux-x86_64-smp-opt
 CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
 CHARMLIB=$(CHARMDIR)/lib
 CHARMINC=$(CHARMDIR)/include
 
-all: module
-	make install
+all: install
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o hello charmrun *.log *.sum *.sts
@@ -30,6 +29,6 @@ NodeHelper.decl.h: NodeHelper.ci
 NodeHelper.o: NodeHelper.C NodeHelper.decl.h NodeHelper.h NodeHelperAPI.h
 	$(CHARMC) -c NodeHelper.C
 
-install: $(CHARMLIB)/libmoduleNodeHelper.a
+install: module
 	cp NodeHelperAPI.h NodeHelper.h NodeHelper.decl.h NodeHelper.def.h $(CHARMINC)/
 
