@@ -135,13 +135,13 @@ message ParticleDataMsg {
 */
 
 chare_array [3d] Cell {
-    Array<Particle> particles;
+    Array<Particle, 1> particles;
     int stepCount;
     int myNumParts;
     int inbrs;
     int stepTime;
     int updateCount;
-    Array<double> energy;
+    Array<double, 1> energy;
 
     // CProxySection_Compute mCastSecProxy;
 
@@ -371,9 +371,9 @@ chare_array [3d] Cell {
         */
     }
 
-    sdagentry void receiveParticles(Array<Particle> updates);
+    sdagentry void receiveParticles(Array<Particle, 1> updates);
     sdagentry void ResumeFromSync();
-    sdagentry void reduceForces(Array<vec3> forces);
+    sdagentry void reduceForces(Array<vec3, 1> forces);
     sdagentry void run() {
         if(thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) {
             stepTime = CkWallTimer();
@@ -384,7 +384,7 @@ chare_array [3d] Cell {
             sendPositions();
 
             //update properties of atoms using new force values 
-            when reduceForces(Array<vecc3> forces) updateProperties(forces);
+            when reduceForces(Array<vec3, 1> forces) updateProperties(forces);
 
             if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
                 //send atoms that have moved beyond my cell to neighbors
@@ -392,7 +392,7 @@ chare_array [3d] Cell {
 
                 //receive particles from my neighbors
                 for(int updateCount = 0; updateCount < inbrs; updateCount++) {
-                    when receiveParticles(Array<Particle> updates) {
+                    when receiveParticles(Array<Particle, 1> updates) {
                         for(int i=0; i < updates.length(); i++) {
                             particles.push_back(updates[i]);    //add particles that have moved from neighboring celles to my cell
                         }
