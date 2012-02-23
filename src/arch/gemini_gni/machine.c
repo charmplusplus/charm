@@ -87,8 +87,6 @@ CpvStaticDeclare(double, projTraceStart);
 static CmiInt8 _mempool_size = 8*oneMB;
 static CmiInt8 _expand_mem =  4*oneMB;
 
-#endif
-
 #if CMK_SMP && COMM_THREAD_SEND 
 //Dynamic flow control about memory registration
 static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
@@ -97,9 +95,12 @@ static CmiInt8  MAX_REG_MEM    =  200*oneMB;
 static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
 static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
+static int      user_set_flag  = 0;
 
 static CmiInt8 buffered_send_msg = 0;
 static int register_memory_size = 0;
+
+#endif     /* end USE_LRTS_MEMPOOL */
 
 static int BIG_MSG  =  4*oneMB;
 static int ONE_SEG  =  2*oneMB;
@@ -1261,14 +1262,14 @@ static void CheckProgress()
 
 static void set_limit()
 {
-    if (CmiMyRank() == 0) {
+    if (!user_set_flag && CmiMyRank() == 0) {
         int mynode = CmiPhysicalNodeID(CmiMyPe());
         int numpes = CmiNumPesOnPhysicalNode(mynode);
         int numprocesses = numpes / CmiMyNodeSize();
-        int totalmem = 1024*1024*1024*0.9;
+        int totalmem = 1024*1024*1024*0.8;
         MAX_REG_MEM  = totalmem / numprocesses;
-        MAX_BUFF_SEND = MAX_REG_MEM/ 2;
-       if(CmiMyPe() == 0)
+        MAX_BUFF_SEND = MAX_REG_MEM / 2;
+        if (CmiMyPe() == 0)
            printf("mem_max = %d, send_max =%d\n", MAX_REG_MEM, MAX_BUFF_SEND);
     }
 }
@@ -2708,14 +2709,24 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 
     env = getenv("CHARM_UGNI_MEMPOOL_MAX");
-    if (env) MAX_REG_MEM = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool max size")) 
+    if (env) {
         MAX_REG_MEM = CmiReadSize(env);
+        user_set_flag = 1;
+    }
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool max size"))  {
+        MAX_REG_MEM = CmiReadSize(env);
+        user_set_flag = 1;
+    }
 
     env = getenv("CHARM_UGNI_SEND_MAX");
-    if (env) MAX_BUFF_SEND = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max-send",&env,"Set the memory pool max size for send")) 
+    if (env) {
         MAX_BUFF_SEND = CmiReadSize(env);
+        user_set_flag = 1;
+    }
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max-send",&env,"Set the memory pool max size for send"))  {
+        MAX_BUFF_SEND = CmiReadSize(env);
+        user_set_flag = 1;
+    }
 
     if (MAX_REG_MEM < _mempool_size) MAX_REG_MEM = _mempool_size;
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
