@@ -1819,7 +1819,7 @@ extern int numMemCriticalEntries;
 extern int *memCriticalEntries;
 #endif
 
-CmiInt8 CmiReadSize(char *str);
+double CmiReadSize(const char *str);
 
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */

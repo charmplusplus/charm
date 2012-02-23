@@ -3766,23 +3766,25 @@ int CmiMyRank_()
   return CmiMyRank();
 }
 
-CmiInt8 CmiReadSize(char *str)
+double CmiReadSize(const char *str)
 {
-    CmiInt8 val;
-    if (strpbrk(str,"G")) {
-        sscanf(str, "%lldG", &val);
+    double val;
+    if (strpbrk(str,"Gg")) {
+        //sscanf(str, "%llf", &val);
+        //val = strtod(str, &p);
+        val = atof(str);
         val *= 1024ll*1024*1024;
     }
-    else if (strpbrk(str,"M")) {
-        sscanf(str, "%lldM", &val);
+    else if (strpbrk(str,"Mm")) {
+        val = atof(str);
         val *= 1024*1024;
     }
-    else if (strpbrk(str,"K")) {
-        sscanf(str, "%lldK", &val);
+    else if (strpbrk(str,"Kk")) {
+        val = atof(str);
         val *= 1024;
     }
     else {
-        sscanf(str, "%lld", &val);
+        val = atof(str);
     }
     return val;
 }
