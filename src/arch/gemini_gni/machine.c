@@ -1254,10 +1254,10 @@ static void set_limit()
         int numpes = CmiNumPesOnPhysicalNode(mynode);
         int numprocesses = numpes / CmiMyNodeSize();
         int totalmem = 1024*1024*1024*0.9;
-        int mem_max = totalmem / numprocesses;
-        int send_max = mem_max / 2;
+        MAX_REG_MEM  = totalmem / numprocesses;
+        MAX_BUFF_SEND = MAX_REG_MEM/ 2;
        if(CmiMyPe() == 0)
-           printf("mem_max = %d, send_max =%d\n", mem_max, send_max);
+           printf("mem_max = %d, send_max =%d\n", MAX_REG_MEM, MAX_BUFF_SEND);
     }
 }
 
