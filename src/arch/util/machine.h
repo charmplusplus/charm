@@ -50,7 +50,7 @@ extremely verbose, 2 shows most procedure entrance/exits,
 3 shows most communication, and 5 only shows rare or unexpected items.
 Displaying lower priority messages doesn't stop higher priority ones.
 */
-#define MACHINE_DEBUG_PRIO 8
+#define MACHINE_DEBUG_PRIO 3
 #define MACHINE_DEBUG_LOG 1 /**Controls whether output goes to log file*/
 
 extern FILE *debugLog;
