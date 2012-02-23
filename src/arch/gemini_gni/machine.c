@@ -17,9 +17,10 @@
 
     other environment variables:
 
-    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes     # disable checking deadlock
-    export CHARM_UGNI_BIG_MSG_SIZE=4M           # set big message size protocol
-    export CHARM_UGNI_BIG_MSG_PIPELINE_LEN=4    # set big message pipe len
+    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes    # disable checking deadlock
+    export CHARM_UGNI_MAX_MEMORY_ON_NODE=0.8G  # max memory per node for mempool
+    export CHARM_UGNI_BIG_MSG_SIZE=4M          # set big message size protocol
+    export CHARM_UGNI_BIG_MSG_PIPELINE_LEN=4   # set big message pipe len
  */
 /*@{*/
 
@@ -84,8 +85,12 @@ CpvStaticDeclare(double, projTraceStart);
 #if USE_LRTS_MEMPOOL
 
 #define oneMB (1024ll*1024)
+#define oneGB (1024ll*1024*1024)
+
 static CmiInt8 _mempool_size = 8*oneMB;
 static CmiInt8 _expand_mem =  4*oneMB;
+
+static CmiInt8 _totalmem = 0.8*oneGB;
 
 #if CMK_SMP && COMM_THREAD_SEND 
 //Dynamic flow control about memory registration
@@ -1264,8 +1269,7 @@ static void set_limit()
         int mynode = CmiPhysicalNodeID(CmiMyPe());
         int numpes = CmiNumPesOnPhysicalNode(mynode);
         int numprocesses = numpes / CmiMyNodeSize();
-        int totalmem = 1024*1024*1024*0.8;
-        MAX_REG_MEM  = totalmem / numprocesses;
+        MAX_REG_MEM  = _totalmem / numprocesses;
         MAX_BUFF_SEND = MAX_REG_MEM / 2;
         if (CmiMyPe() == 0)
            printf("mem_max = %d, send_max =%d\n", MAX_REG_MEM, MAX_BUFF_SEND);
@@ -2700,6 +2704,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     PMI_Barrier();
 
 #if     USE_LRTS_MEMPOOL
+    env = getenv("CHARM_UGNI_MAX_MEMORY_ON_NODE");
+    if (env) {
+        _totalmem = CmiReadSize(env);
+        if (myrank == 0)
+            printf("Charm++> total registered memory available per node is %.1fGB\n", (float)(_totalmem*1.0/oneGB));
+    }
+
     env = getenv("CHARM_UGNI_MEMPOOL_INIT_SIZE");
     if (env) _mempool_size = CmiReadSize(env);
     if (CmiGetArgStringDesc(*argv,"+gni-mempool-init-size",&env,"Set the memory pool size")) 
@@ -2743,7 +2754,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         printf("Charm++> only comm thread send/recv messages\n");
 #endif
     }
-#endif
+
+#endif     /* end of USE_LRTS_MEMPOOL */
 
     env = getenv("CHARM_UGNI_BIG_MSG_SIZE");
     if (env) {
