@@ -1221,7 +1221,7 @@ static void ProcessDeadlock()
     if (count == 2) { 
         /* detected twice, it is a real deadlock */
         if (myrank == 0)  {
-            CmiPrintf("Charm++> network progress engine stalled, program may hang. Try set environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX to limit the registered memory usage.\n");
+            CmiPrintf("Charm++> network progress engine stalled, program may hang. Try set environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX to limit the registered memory usage. (%d, %d)\n", buffered_send_msg, register_memory_size);
             CmiAbort("Fatal> Deadlock detected.");
         }
     }
@@ -1253,9 +1253,11 @@ static void set_limit()
         int mynode = CmiPhysicalNodeID(CmiMyPe());
         int numpes = CmiNumPesOnPhysicalNode(mynode);
         int numprocesses = numpes / CmiMyNodeSize();
-        int totalmem = 1024*1024*1024;
+        int totalmem = 1024*1024*1024*0.9;
         int mem_max = totalmem / numprocesses;
         int send_max = mem_max / 2;
+       if(CmiMyPe() == 0)
+           printf("mem_max = %d, send_max =%d\n", mem_max, send_max);
     }
 }
 
