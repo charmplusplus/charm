@@ -60,7 +60,9 @@ public:
     }
       
     void waitLoopDone(){
-        while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
+        //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
+	while(finishFlag!=numChunks);
+	finishFlag = 0;
         inited = 0;
     }
     int getNextChunkIdx(){
