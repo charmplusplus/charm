@@ -107,8 +107,8 @@ enum entities {SENDER,RECEIVER};
 #define NAMESTRLEN 60
 #define PREFIXSTRLEN 50 
 
-static int SHMBUFLEN = (1024*1024*4);
-#define SHMMAXSIZE     (1024*1024)
+static int SHMBUFLEN   = (1024*1024*4);
+static int SHMMAXSIZE  = (1024*1024);
 
 static int SENDQSTARTSIZE  =  256;
 
@@ -225,10 +225,17 @@ void CmiInitPxshm(char **argv){
 	
 	MACHSTATE1(3,"CminitPxshm  %d calculateNodeSizeAndRank",pxshmContext->nodesize);
 
-        env = getenv("CHARM_PXSHM_SIZE");
+        env = getenv("CHARM_PXSHM_POOL_SIZE");
         if (env) {
             SHMBUFLEN = CmiReadSize(env);
         }
+        env = getenv("CHARM_PXSHM_MESSAGE_MAX_SIZE");
+        if (env) {
+            SHMMAXSIZE = CmiReadSize(env);
+        }
+        if (SHMMAXSIZE > SHMBUFLEN)
+            CmiAbort("Error> Pxshm pool size is set too small in env variable CHARM_PXSHM_POOL_SIZE");
+
         SENDQSTARTSIZE = 32 * pxshmContext->nodesize;
 
         if (_Cmi_mynode == 0)

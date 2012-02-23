@@ -8,15 +8,43 @@
   Yanhua Sun, 2/5/2012
 */
 
-//#define     CMI_DIRECT_DEBUG    0
+#define     CMI_DIRECT_DEBUG    1
 #include "cmidirect.h"
 
+CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size)
+{
+    CmiDirectMemoryHandler mem_hndl; 
+    gni_return_t        status;
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, buff, size, &mem_hndl, &omdh, status);
+    GNI_RC_CHECK("cmidirect register memory fails\n", status);
+    return mem_hndl;
+}
 static void printHandle(CmiDirectUserHandle *userHandle, char *s)
 {
     CmiPrintf( "[%d]%s(%p)(%p,%p,%p)==>(%p,%p,%p)(%d)(%p,%p)\n", CmiMyPe(), s, userHandle, userHandle->localBuf, userHandle->localMdh.qword1, userHandle->localMdh.qword2, 
         userHandle->remoteBuf, userHandle->remoteMdh.qword1, userHandle->remoteMdh.qword2, userHandle->transSize, userHandle->callbackFnPtr, userHandle->callbackData );
 }
 
+struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *mem_hndl, void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData)
+{
+    gni_return_t            status = GNI_RC_SUCCESS;
+    CmiDirectUserHandle userHandle;
+    userHandle.handle=1; 
+    
+    userHandle.remoteNode= CmiMyNode();
+    userHandle.transSize=recvBufSize;
+    userHandle.remoteBuf=recvBuf;
+    userHandle.callbackFnPtr=callbackFnPtr;
+    userHandle.callbackData=callbackData;
+    userHandle.remoteMdh = *mem_hndl;
+
+    userHandle.initialValue=0;
+#if CMI_DIRECT_DEBUG
+    printHandle(&userHandle, "Create Handler");
+#endif
+    return userHandle;
+
+}
 /**
  To be called on the receiver to create a handle and return its number
 **/
@@ -26,7 +54,7 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     CmiDirectUserHandle userHandle;
     userHandle.handle=1; 
     userHandle.localNode=localNode;
-    userHandle.remoteNode=_Cmi_mynode;
+    userHandle.remoteNode= CmiMyNode();
     userHandle.transSize=recvBufSize;
     userHandle.remoteBuf=recvBuf;
     userHandle.initialValue=initialValue;
@@ -35,10 +63,10 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
 
     if(recvBufSize <= SMSG_MAX_MSG)
     {
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle.remoteBuf, recvBufSize, &(userHandle.remoteMdh), &omdh);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle.remoteBuf, recvBufSize, &(userHandle.remoteMdh), &omdh, status);
     }
     else if(IsMemHndlZero((GetMemHndl(userHandle.remoteBuf)))){
-        status = registerMempool(userHandle.remoteBuf);
+        //status = registerMempool(userHandle.remoteBuf);
         userHandle.remoteMdh = GetMemHndl(userHandle.remoteBuf);
     } else
         userHandle.remoteMdh = GetMemHndl(userHandle.remoteBuf);
@@ -53,6 +81,18 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     return userHandle;
 }
 
+void CmiDirect_assocLocalBuffer_mem(CmiDirectUserHandle *userHandle, CmiDirectMemoryHandler *mem_hndl, void *sendBuf,int sendBufSize) {
+    gni_return_t            status = GNI_RC_SUCCESS;
+    
+    userHandle->localNode=CmiMyNode();
+    userHandle->localBuf=sendBuf;
+
+    userHandle->localMdh = *mem_hndl;
+ 
+#if CMI_DIRECT_DEBUG
+    printHandle(userHandle, "Associate Handler");
+#endif
+}
 /****
  To be called on the local to attach the local's buffer to this handle
 ******/
@@ -62,14 +102,15 @@ void CmiDirect_assocLocalBuffer(CmiDirectUserHandle *userHandle,void *sendBuf,in
     /* one-sided primitives would require registration of memory */
     gni_return_t            status = GNI_RC_SUCCESS;
     
+    userHandle->localNode=CmiMyNode();
     userHandle->localBuf=sendBuf;
 
     if(userHandle->transSize <= SMSG_MAX_MSG)
     {
-        status = MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, userHandle->localBuf, userHandle->transSize, &userHandle->localMdh, &omdh, status);
     }
     else if(IsMemHndlZero((GetMemHndl(userHandle->localBuf)))){
-        status = registerMempool(userHandle->localBuf);
+        //status = registerMempool(userHandle->localBuf);
         userHandle->localMdh = GetMemHndl(userHandle->localBuf);
     } else
         userHandle->localMdh = GetMemHndl(userHandle->localBuf);
@@ -115,15 +156,16 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 1;
-        if(pd->type == GNI_POST_RDMA_PUT) 
-            status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
-        if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
-        {
+        pd->cqwrite_value   = 0;        
+       // if(pd->type == GNI_POST_RDMA_PUT) 
+       //     status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
+       // else
+       //     status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
+        //if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
+        //{
             bufferRdmaMsg(userHandle->remoteNode, pd); 
-        }else
-            GNI_RC_CHECK("CMI_Direct_PUT", status);
+        //}else
+        //    GNI_RC_CHECK("CMI_Direct_PUT", status);
     }
 #else
     CmiPrintf("Normal Send in CmiDirect Put\n");
@@ -166,15 +208,15 @@ void CmiDirect_get(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 2;
-        if(pd->type == GNI_POST_RDMA_GET) 
-            status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
-        if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
-        {
+   //     if(pd->type == GNI_POST_RDMA_GET) 
+   //         status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
+   //     else
+   //         status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
+   //     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
+   //     {
             bufferRdmaMsg(userHandle->remoteNode, pd); 
-        }else
-            GNI_RC_CHECK("CMI_Direct_GET", status);
+   //     }else
+   //         GNI_RC_CHECK("CMI_Direct_GET", status);
     }
 #else
     CmiPrintf("Normal Send in CmiDirect Get\n");

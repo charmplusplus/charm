@@ -60,7 +60,7 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
     block_head->freelists[i] = 0;
   }
 
-  pool = block_head->mempool_ptr;
+  pool = block_head;
   if(expansion) {
     left = pool_size-sizeof(block_header);
     loc = (char*)pool+sizeof(block_header)-(char*)mptr;
@@ -90,9 +90,7 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
       head = (slot_header*)((char*)mptr+block_head->freelists[i]);
       head->size = i;
       head->status = 1;
-#if CMK_CONVERSE_GEMINI_UGNI
-      head->mempool_ptr = pool;
-#endif
+      head->block_ptr = block_head;
       head->prev = head->next = 0;
       head->gprev = prev;
       if(i!=power) {
@@ -140,9 +138,7 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
         }
         head->size = i;
         head->status = 1;
-#if CMK_CONVERSE_GEMINI_UGNI
-        head->mempool_ptr = current->mempool_ptr;
-#endif
+        head->block_ptr = current;
         head->prev = head->next = 0;
         head->gprev = prev;
         ((slot_header*)((char*)mptr+prev))->gnext = (char*)head-(char*)mptr;
@@ -189,7 +185,6 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
-  mptr->block_head.mempool_ptr = pool;
   mptr->block_head.mptr = pool;
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
@@ -215,7 +210,7 @@ void mempool_destroy(mempool_type *mptr)
   while(current != NULL) {
     tofree = current;
     current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
-    freefn(tofree->mempool_ptr, tofree->mem_hndl);
+    freefn(tofree, tofree->mem_hndl);
   }
 }
 
@@ -272,7 +267,6 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       tail->block_next = ((char*)current-(char*)mptr);
       mptr->block_tail = tail->block_next;
 
-      current->mempool_ptr = pool;
       current->mptr = mptr;
       current->mem_hndl = mem_hndl;
       current->size = expand_size;
@@ -299,8 +293,8 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         head_next->prev = 0;
       }
 
+      head_free->block_ptr = current;
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
-      head_free->pool_addr = mptr;
       CmiUnlock(mptr->mempoolLock);
 #endif
       return (char*)head_free + sizeof(used_header);
@@ -317,7 +311,7 @@ void mempool_free_thread( void *ptr_free)
     mempool_type *mptr;
 
     to_free = (slot_header *)((char*)ptr_free - sizeof(used_header));
-    mptr = (mempool_type*)(to_free->pool_addr);
+    mptr = (mempool_type*)(((block_header*)(to_free->block_ptr))->mptr);
     CmiLock(mptr->mempoolLock);
     mempool_free(mptr,  ptr_free);
     CmiUnlock(mptr->mempoolLock);
@@ -343,8 +337,8 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     //currently doing it by linear search for gemini
     block_head = &mptr->block_head;
     while(block_head != NULL) {
-      if((size_t)ptr_free >= (size_t)(block_head->mempool_ptr)
-        && (size_t)ptr_free < (size_t)((char*)block_head->mempool_ptr 
+      if((size_t)ptr_free >= (size_t)(block_head)
+        && (size_t)ptr_free < (size_t)((char*)block_head
         + block_head->size)) {
         break;
       }
@@ -418,9 +412,7 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
         current = (slot_header*)((char*)mptr+loc);
         current->size = i;
         current->status = 1;
-#if CMK_CONVERSE_GEMINI_UGNI
-      	current->mempool_ptr = block_head->mempool_ptr;
-#endif
+      	current->block_ptr = block_head;
         if(i!=power) {
           current->gprev = prev;
         }

@@ -20,53 +20,45 @@ typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
 #define cutOffNum 24 
 
+struct block_header;
+struct mempool_type;
+
 //header of an free slot
 typedef struct slot_header_
 {
-#if CMK_USE_MEMPOOL_ISOMALLOC ||  (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
-  void*			pool_addr;
-#endif
-#if CMK_CONVERSE_GEMINI_UGNI
-  void              *mempool_ptr;
-#endif
+  struct block_header  *block_ptr;     // block_header
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
   size_t      		prev,next;    //link list for freelists slots
-  size_t          padding;    // fix for 32 bit machines
+  size_t                padding;      // fix for 32 bit machines
 } slot_header;
 
 typedef struct used_header_
 {
-#if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_GEMINI_UGNI)
-  void*			pool_addr;
-#endif
-#if CMK_CONVERSE_GEMINI_UGNI
-  void              *mempool_ptr;
-#endif
+  struct block_header  *block_ptr;     // block_header
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
-  size_t          padding;    // fix for 32 bit machines
+  size_t                padding;      // fix for 32 bit machines
 } used_header;
 
 typedef used_header mempool_header;
 
 // multiple mempool for different size allocation
-typedef struct block_header_
+typedef struct block_header
 {
     mem_handle_t        mem_hndl;
     size_t              size;
-    size_t              block_next;     // offset to next memblock
+    size_t              block_next;           // offset to next memblock
     size_t              freelists[cutOffNum];
-    size_t          padding;    // fix for 32 bit machines
+    struct mempool_type  *mptr;               // mempool_type
+    size_t              padding;              // fix for 32 bit machines
 #if CMK_CONVERSE_GEMINI_UGNI
     int                 msgs_in_send;
     int                 msgs_in_recv;
 #endif
-    void                *mempool_ptr;
-    void                *mptr;
 } block_header;
 
-// only at beginning of first block of mempool
+// only at beginning of first block of mempool, representing the mempool
 typedef struct mempool_type
 {
   block_header           block_head;
@@ -74,7 +66,7 @@ typedef struct mempool_type
   mempool_freeblock      freeblockfn;
   size_t                 block_tail;
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
-    CmiNodeLock		mempoolLock;
+  CmiNodeLock		 mempoolLock;
 #endif
 } mempool_type;
 

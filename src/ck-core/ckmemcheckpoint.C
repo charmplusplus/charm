@@ -901,7 +901,7 @@ void CkMemCheckPT::recoverArrayElements()
       imap[homePe].push_back(msg->index);
     }
 #endif
-	CkFreeMsg(msg);
+    CkFreeMsg(msg);
     count ++;
   }
 #if STREAMING_INFORMHOME
@@ -1252,24 +1252,13 @@ void notify_crash(int node)
   CmiAssert(CmiMyNode() !=CpvAccess( _crashedNode));
   CkMemCheckPT::inRestarting = 1;
 
-/*
-#ifdef CMK_SMP
-*/
+    // this may be in interrupt handler, send a message to reset QD
   int pe = CmiNodeFirst(CkMyNode());
   for(int i=0;i<CkMyNodeSize();i++){
   	char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
   	CmiSetHandler(msg, notifyHandlerIdx);
   	CmiSyncSendAndFree(pe+i, CmiMsgHeaderSizeBytes, (char *)msg);
   }
-/*
- return;
-#else 
-    // this may be in interrupt handler, send a message to reset QD
-  char *msg = (char*)CmiAlloc(CmiMsgHeaderSizeBytes);
-  CmiSetHandler(msg, notifyHandlerIdx);
-  CmiSyncSendAndFree(CkMyPe(), CmiMsgHeaderSizeBytes, (char *)msg);
-#endif
-*/
 #endif
 }
 

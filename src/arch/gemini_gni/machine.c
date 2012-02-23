@@ -17,7 +17,9 @@
 
     other environment variables:
 
-    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes      # disable checking deadlock
+    export CHARM_UGNI_NO_DEADLOCK_CHECK=yes     # disable checking deadlock
+    export CHARM_UGNI_BIG_MSG_SIZE=4M           # set big message size protocol
+    export CHARM_UGNI_BIG_MSG_PIPELINE_LEN=4    # set big message pipe len
  */
 /*@{*/
 
@@ -85,8 +87,6 @@ CpvStaticDeclare(double, projTraceStart);
 static CmiInt8 _mempool_size = 8*oneMB;
 static CmiInt8 _expand_mem =  4*oneMB;
 
-#endif
-
 #if CMK_SMP && COMM_THREAD_SEND 
 //Dynamic flow control about memory registration
 static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
@@ -95,13 +95,16 @@ static CmiInt8  MAX_REG_MEM    =  200*oneMB;
 static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
 static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
+static int      user_set_flag  = 0;
 
 static CmiInt8 buffered_send_msg = 0;
 static int register_memory_size = 0;
 
-#define BIG_MSG                  8*oneMB
-#define ONE_SEG                  4*oneMB
-#define BIG_MSG_PIPELINE         4
+#endif     /* end USE_LRTS_MEMPOOL */
+
+static int BIG_MSG  =  4*oneMB;
+static int ONE_SEG  =  2*oneMB;
+static int BIG_MSG_PIPELINE = 4;
 
 #if CMK_SMP
 #define COMM_THREAD_SEND 1
@@ -176,14 +179,14 @@ onesided_md_t    omdh;
 #else
 uint8_t   onesided_hnd, omdh;
 #if REMOTE_EVENT
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status)    if(register_memory_size>= MAX_REG_MEM) { \
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status)    if(register_memory_size+size>= MAX_REG_MEM) { \
          status = GNI_RC_ERROR_NOMEM;} \
         else {status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
                 if(status == GNI_RC_SUCCESS) register_memory_size += size;} }
 #else
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status ) \
     do {   \
-        if (register_memory_size>= MAX_REG_MEM) { \
+        if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
             if(status == GNI_RC_SUCCESS) register_memory_size += size; } \
@@ -196,29 +199,27 @@ uint8_t   onesided_hnd, omdh;
     } while (0)
 #endif
 
-#define   IncreaseMsgInRecv(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv)++
-#define   DecreaseMsgInRecv(x)   (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv)--
-#define   IncreaseMsgInSend(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send)++
-                                   //printf("++++[%d]%p   ----- %d\n", myrank, ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr)), (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send ));
-#define   DecreaseMsgInSend(x)   (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send)--
-                                     //printf("---[%d]%p   ----- %d\n", myrank,((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr)), (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send ));
-#define   GetMempoolBlockPtr(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr
-#define   GetMempoolPtr(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->mptr
-#define   GetMempoolsize(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->size
-#define   GetMemHndl(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->mem_hndl
+#define   GetMempoolBlockPtr(x)  (((mempool_header*)((char*)(x)-ALIGNBUF))->block_ptr)
+#define   IncreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)++
+#define   DecreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)--
+#define   IncreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)++
+#define   DecreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)--
+#define   GetMempoolPtr(x)        GetMempoolBlockPtr(x)->mptr
+#define   GetMempoolsize(x)       GetMempoolBlockPtr(x)->size
+#define   GetMemHndl(x)           GetMempoolBlockPtr(x)->mem_hndl
 #define   GetMemHndlFromHeader(x) ((block_header*)x)->mem_hndl
-#define   GetSizeFromHeader(x) ((block_header*)x)->size
-#define   NoMsgInSend(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send == 0
-#define   NoMsgInRecv(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv == 0
-#define   NoMsgInFlight(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send + ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv  == 0
-#define   IsMemHndlZero(x)  ((x).qword1 == 0 && (x).qword2 == 0)
-#define   SetMemHndlZero(x)  do { (x).qword1 = 0; (x).qword2 = 0; } while (0)
-#define   NotRegistered(x)  IsMemHndlZero(((block_header*)x)->mem_hndl)
+#define   GetSizeFromHeader(x)    ((block_header*)x)->size
+#define   NoMsgInSend(x)          GetMempoolBlockPtr(x)->msgs_in_send == 0
+#define   NoMsgInRecv(x)          GetMempoolBlockPtr(x)->msgs_in_recv == 0
+#define   NoMsgInFlight(x)        (GetMempoolBlockPtr(x)->msgs_in_send + GetMempoolBlockPtr(x)->msgs_in_recv  == 0)
+#define   IsMemHndlZero(x)        ((x).qword1 == 0 && (x).qword2 == 0)
+#define   SetMemHndlZero(x)       do {(x).qword1 = 0;(x).qword2 = 0;} while (0)
+#define   NotRegistered(x)        IsMemHndlZero(((block_header*)x)->mem_hndl)
 
-#define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
-#define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
-#define CmiGetMsgSeq(m)  ((CmiMsgHeaderExt*)m)->seq
-#define CmiSetMsgSeq(m, s)  ((((CmiMsgHeaderExt*)m)->seq) = (s))
+#define CmiGetMsgSize(m)     ((CmiMsgHeaderExt*)m)->size
+#define CmiSetMsgSize(m,s)   ((((CmiMsgHeaderExt*)m)->size)=(s))
+#define CmiGetMsgSeq(m)      ((CmiMsgHeaderExt*)m)->seq
+#define CmiSetMsgSeq(m, s)   ((((CmiMsgHeaderExt*)m)->seq) = (s))
 
 #define ALIGNBUF                64
 
@@ -1030,16 +1031,22 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
 
 #if     USE_LRTS_MEMPOOL
     if( control_msg_tmp->seq_id == 0 ){
+#if 0
+        if (inbuff == 0 && IsMemHndlZero(GetMemHndl(source_addr))) {
+            while (IsMemHndlZero(GetMemHndl(source_addr)) && buffered_send_msg + GetMempoolsize((void*)source_addr) >= MAX_BUFF_SEND)
+                LrtsAdvanceCommunication(0);
+        }
+#endif
         if(IsMemHndlZero(GetMemHndl(source_addr))) //it is in mempool, it is possible to be de-registered by others
         {
-            //register the corresponding mempool
-            if(buffered_send_msg >= MAX_BUFF_SEND)
+            msg = (void*)source_addr;
+            if(buffered_send_msg + GetMempoolsize(msg) >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
                     buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
-            msg = (void*)source_addr;
+            //register the corresponding mempool
             status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)));
             if(status == GNI_RC_SUCCESS)
             {
@@ -1059,8 +1066,14 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
         source_addr += offset;
         size = control_msg_tmp->length;
+#if 0
+        if (inbuff == 0 && IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
+            while (IsMemHndlZero(control_msg_tmp->source_mem_hndl) && buffered_send_msg + size >= MAX_BUFF_SEND)
+                LrtsAdvanceCommunication(0);
+        }
+#endif
         if (IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
-            if(buffered_send_msg >= MAX_BUFF_SEND)
+            if(buffered_send_msg + size >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
                     buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
@@ -1202,6 +1215,7 @@ static void ProcessDeadlock()
     int i;
 
 //printf("[%d] comm thread detected hang %d %d %d\n", CmiMyPe(), smsg_send_count, smsg_recv_count, count);
+//sweep_mempool(CpvAccess(mempool));
     if (ptr == NULL) ptr = (CmiUInt8*)malloc(mysize * sizeof(CmiUInt8));
     mysum = smsg_send_count + smsg_recv_count;
     MACHSTATE5(9,"Before allgather Progress Deadlock (%d,%d)  (%d,%d)(%d)\n", buffered_send_msg, register_memory_size, last, sum, count); 
@@ -1218,7 +1232,7 @@ static void ProcessDeadlock()
     if (count == 2) { 
         /* detected twice, it is a real deadlock */
         if (myrank == 0)  {
-            CmiPrintf("Charm++> network progress engine stalled, program may hang. Try set environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX to limit the registered memory usage.\n");
+            CmiPrintf("Charm++> Network progress engine appears to have stalled, possibly because registered memory limits have been exceeded or are too low.  Try adjusting environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX (current limits are %d and %d).\n", MAX_REG_MEM, MAX_BUFF_SEND);
             CmiAbort("Fatal> Deadlock detected.");
         }
     }
@@ -1241,6 +1255,20 @@ static void CheckProgress()
         last_smsg_send_count = smsg_send_count;
         last_smsg_recv_count = smsg_recv_count;
         _detected_hang = 0;
+    }
+}
+
+static void set_limit()
+{
+    if (!user_set_flag && CmiMyRank() == 0) {
+        int mynode = CmiPhysicalNodeID(CmiMyPe());
+        int numpes = CmiNumPesOnPhysicalNode(mynode);
+        int numprocesses = numpes / CmiMyNodeSize();
+        int totalmem = 1024*1024*1024*0.8;
+        MAX_REG_MEM  = totalmem / numprocesses;
+        MAX_BUFF_SEND = MAX_REG_MEM / 2;
+        if (CmiMyPe() == 0)
+           printf("mem_max = %d, send_max =%d\n", MAX_REG_MEM, MAX_BUFF_SEND);
     }
 }
 
@@ -1269,6 +1297,8 @@ void LrtsPostCommonInit(int everReturn)
     if (CmiMyRank() == 0)
 #endif
     CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdVoidFn) CheckProgress, NULL);
+
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)set_limit, NULL);
 }
 
 /* this is called by worker thread */
@@ -2503,7 +2533,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if (*size < default_size) *size = default_size;
     total_mempool_size += *size;
     total_mempool_calls += 1;
-    if (*size > MAX_REG_MEM) {
+    if (*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) {
         printf("Error: A mempool block with size %d is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX.", *size);
         CmiAbort("alloc_mempool_block");
     }
@@ -2677,14 +2707,24 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 
     env = getenv("CHARM_UGNI_MEMPOOL_MAX");
-    if (env) MAX_REG_MEM = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool max size")) 
+    if (env) {
         MAX_REG_MEM = CmiReadSize(env);
+        user_set_flag = 1;
+    }
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max",&env,"Set the memory pool max size"))  {
+        MAX_REG_MEM = CmiReadSize(env);
+        user_set_flag = 1;
+    }
 
     env = getenv("CHARM_UGNI_SEND_MAX");
-    if (env) MAX_BUFF_SEND = CmiReadSize(env);
-    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max-send",&env,"Set the memory pool max size for send")) 
+    if (env) {
         MAX_BUFF_SEND = CmiReadSize(env);
+        user_set_flag = 1;
+    }
+    if (CmiGetArgStringDesc(*argv,"+gni-mempool-max-send",&env,"Set the memory pool max size for send"))  {
+        MAX_BUFF_SEND = CmiReadSize(env);
+        user_set_flag = 1;
+    }
 
     if (MAX_REG_MEM < _mempool_size) MAX_REG_MEM = _mempool_size;
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
@@ -2704,6 +2744,17 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
     }
 #endif
+
+    env = getenv("CHARM_UGNI_BIG_MSG_SIZE");
+    if (env) {
+        BIG_MSG = CmiReadSize(env);
+        if (BIG_MSG < ONE_SEG)
+          CmiAbort("BIG_MSG size is too small in the environment variable CHARM_UGNI_BIG_MSG_SIZE.");
+    }
+    env = getenv("CHARM_UGNI_BIG_MSG_PIPELINE_LEN");
+    if (env) {
+        BIG_MSG_PIPELINE = atoi(env);
+    }
 
     env = getenv("CHARM_UGNI_NO_DEADLOCK_CHECK");
     if (env) _checkProgress = 0;

@@ -33,14 +33,13 @@
 
 #define CMK_CONV_HOST_CSH_UNAVAILABLE			   1
 
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_NT_THREADS                         0
 
-#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_NOT_NEEDED                              0
 #define CMK_SIGNAL_USE_SIGACTION                           0
-#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
+#define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              1
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0
 #define CMK_THREADS_COPY_STACK                             0
