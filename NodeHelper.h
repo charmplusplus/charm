@@ -46,7 +46,15 @@ public:
 		delete [] bufSpace;
 	}
     
-    void set(int nc, HelperFn f, int lIdx, int uIdx, int numParams, void *p){        
+    void set(int nc, HelperFn f, int lIdx, int uIdx, int numParams, void *p){        /*
+      * WARNING: there's a rare data-racing case here. The current loop is
+      * about to finish (just before setting inited to 0; A helper (say B) 
+      * just enters the stealWork and passes the inited check. The helper 
+      * (say A) is very fast, and starts the next loop, and happens enter
+      * into the middle of this function. Then helper B will face corrupted
+      * task info as it is trying to execute the old loop task!
+      * In reality for user cases, this case happens very rarely!! -Chao Mei
+      */
         numChunks = nc;
         fnPtr = f;
         lowerIndex = lIdx;
@@ -62,7 +70,7 @@ public:
     void waitLoopDone(){
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
 	while(finishFlag!=numChunks);
-	finishFlag = 0;
+	//finishFlag = 0;
         inited = 0;
     }
     int getNextChunkIdx(){
