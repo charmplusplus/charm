@@ -1032,16 +1032,22 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
 
 #if     USE_LRTS_MEMPOOL
     if( control_msg_tmp->seq_id == 0 ){
+#if 0
+        if (inbuff == 0 && IsMemHndlZero(GetMemHndl(source_addr))) {
+            while (IsMemHndlZero(GetMemHndl(source_addr)) && buffered_send_msg + GetMempoolsize((void*)source_addr) >= MAX_BUFF_SEND)
+                LrtsAdvanceCommunication(0);
+        }
+#endif
         if(IsMemHndlZero(GetMemHndl(source_addr))) //it is in mempool, it is possible to be de-registered by others
         {
             msg = (void*)source_addr;
-            //register the corresponding mempool
             if(buffered_send_msg + GetMempoolsize(msg) >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
                     buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
+            //register the corresponding mempool
             status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)));
             if(status == GNI_RC_SUCCESS)
             {
@@ -1061,6 +1067,12 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
         source_addr += offset;
         size = control_msg_tmp->length;
+#if 0
+        if (inbuff == 0 && IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
+            while (IsMemHndlZero(control_msg_tmp->source_mem_hndl) && buffered_send_msg + size >= MAX_BUFF_SEND)
+                LrtsAdvanceCommunication(0);
+        }
+#endif
         if (IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
             if(buffered_send_msg + size >= MAX_BUFF_SEND)
             {
@@ -1221,7 +1233,7 @@ static void ProcessDeadlock()
     if (count == 2) { 
         /* detected twice, it is a real deadlock */
         if (myrank == 0)  {
-            CmiPrintf("Charm++> network progress engine stalled, program may hang. Try set environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX to limit the registered memory usage. (%d, %d)\n", buffered_send_msg, register_memory_size);
+            CmiPrintf("Charm++> Network progress engine appears to have stalled, possibly because registered memory limits have been exceeded or are too low.  Try adjusting environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX (current limits are %d and %d).\n", MAX_REG_MEM, MAX_BUFF_SEND);
             CmiAbort("Fatal> Deadlock detected.");
         }
     }
@@ -2522,7 +2534,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     if (*size < default_size) *size = default_size;
     total_mempool_size += *size;
     total_mempool_calls += 1;
-    if (*size > MAX_REG_MEM) {
+    if (*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) {
         printf("Error: A mempool block with size %d is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX.", *size);
         CmiAbort("alloc_mempool_block");
     }
