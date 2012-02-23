@@ -3,7 +3,6 @@ module NodeHelper{
 		entry FuncNodeHelper();
 	};
 	chare FuncSingleHelper{
-		entry FuncSingleHelper(CkGroupID);
-   		entry void reportCreated();
+		entry FuncSingleHelper(size_t);
 	};
 };

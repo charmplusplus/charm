@@ -98,11 +98,6 @@ public:
     ~FuncNodeHelper() {
         delete [] helperPtr;
     }
-
-    /* handler is only useful when converse msg is used to initiate tasks on the pseudo-thread */
-    void oneHelperCreated(int hid, FuncSingleHelper* cptr) {
-        helperPtr[hid] = cptr;
-    }
     
     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
                         int paramNum, void * param, /* the input parameters for the above func */
@@ -125,9 +120,8 @@ private:
     CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
     
 public:
-    FuncSingleHelper(CkGroupID nid) {        
-        CProxy_FuncNodeHelper fh(nid);
-        thisNodeHelper = fh[CkMyNode()].ckLocalBranch();
+    FuncSingleHelper(size_t ndhPtr) {
+        thisNodeHelper = (FuncNodeHelper *)ndhPtr;
         CmiAssert(thisNodeHelper!=NULL);        
         int stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
         curLoop = new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS);
@@ -140,6 +134,7 @@ public:
         }
         notifyMsg->ptr = (void *)curLoop;
         CmiSetHandler(notifyMsg, stealWorkHandler);
+        thisNodeHelper->helperPtr[CkMyRank()] = this;
     }
 
     ~FuncSingleHelper() {
@@ -147,12 +142,7 @@ public:
         delete notifyMsg;
     }
     
-    FuncSingleHelper(CkMigrateMessage *m) {}
-		
-    void reportCreated() {
-        //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());
-		thisNodeHelper->oneHelperCreated(CkMyRank(), this);
-    }    
+    FuncSingleHelper(CkMigrateMessage *m) {}		
 };
 
 #endif

@@ -13,17 +13,11 @@ FuncNodeHelper::FuncNodeHelper()
 	useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
 	
 	int pestart = CkNodeFirst(CkMyNode());
-	
-	CkChareID *helperArr = new CkChareID[numHelpers];
+		
 	for (int i=0; i<numHelpers; i++) {
-		CProxy_FuncSingleHelper::ckNew(thisgroup, &helperArr[i], pestart+i);
-		helperPtr[i] = NULL;
-	}
-	for (int i=0; i<numHelpers; i++) {
-		CProxy_FuncSingleHelper helpProxy(helperArr[i]);
-		helpProxy.reportCreated();
-	}
-	delete [] helperArr;
+        CkChareID helper;
+        CProxy_FuncSingleHelper::ckNew((size_t)this, &helper, pestart+i);
+	}	
 #endif
 }
 
