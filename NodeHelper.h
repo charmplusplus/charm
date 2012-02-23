@@ -66,8 +66,9 @@ public:
     int getNextChunkIdx(){
         return __sync_add_and_fetch(&curChunkIdx, 1);
     }
-    void reportFinished(){
-        __sync_add_and_fetch(&finishFlag, 1);
+    void reportFinished(int counter){
+	if(counter==0) return;
+        __sync_add_and_fetch(&finishFlag, counter);
     }
     
 	void **getRedBufs() { return redBufs; }

@@ -151,6 +151,7 @@ void CurLoopInfo::stealWork(){
     int markIdx = remainder*(unit+1);
     
     int nextChunkId = getNextChunkIdx();
+    int execTimes = 0;
     while(nextChunkId < numChunks){
         if(nextChunkId < remainder){
             first = (unit+1)*nextChunkId;
@@ -161,10 +162,10 @@ void CurLoopInfo::stealWork(){
         }
                 
         fnPtr(first, last, redBufs[nextChunkId], paramNum, param);
-        reportFinished();
-        
+        execTimes++;
         nextChunkId = getNextChunkIdx();
     }
+    reportFinished(execTimes);
 }
 
 //======================================================================//
