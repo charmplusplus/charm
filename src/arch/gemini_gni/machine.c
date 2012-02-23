@@ -1247,6 +1247,18 @@ static void CheckProgress()
     }
 }
 
+static void set_limit()
+{
+    if (CmiMyRank() == 0) {
+        int mynode = CmiPhysicalNodeID(CmiMyPe());
+        int numpes = CmiNumPesOnPhysicalNode(mynode);
+        int numprocesses = numpes / CmiMyNodeSize();
+        int totalmem = 1024*1024*1024;
+        int mem_max = totalmem / numprocesses;
+        int send_max = mem_max / 2;
+    }
+}
+
 void LrtsPostCommonInit(int everReturn)
 {
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
@@ -1272,6 +1284,8 @@ void LrtsPostCommonInit(int everReturn)
     if (CmiMyRank() == 0)
 #endif
     CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdVoidFn) CheckProgress, NULL);
+
+    CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)set_limit, NULL);
 }
 
 /* this is called by worker thread */
