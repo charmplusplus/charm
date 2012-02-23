@@ -10,10 +10,6 @@ FuncNodeHelper::FuncNodeHelper()
     
 	numHelpers = CkMyNodeSize();
 	helperPtr = new FuncSingleHelper *[numHelpers];
-	
-	notifyMsgs = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*numHelpers);
-	for(int i=0; i<numHelpers; i++) notifyMsgs[i].srcRank = -1;
-	
 	useTreeBcast = (numHelpers >= USE_TREE_BROADCAST_THRESHOLD);
 	
 	int pestart = CkNodeFirst(CkMyNode());
@@ -64,11 +60,8 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
 	CurLoopInfo *curLoop = thisHelper->curLoop;
 	curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
-	ConverseNotifyMsg *notifyMsg = &(notifyMsgs[CmiMyRank()]);
-	notifyMsg->ptr = (void *)curLoop;
-	
-	if(useTreeBcast){
-		notifyMsg->srcRank = CmiMyRank();
+    ConverseNotifyMsg *notifyMsg = thisHelper->notifyMsg;	
+	if(useTreeBcast){		
 		int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
 		//just implicit binary tree
 		int pe = CmiMyRank()+1;        

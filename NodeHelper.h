@@ -88,8 +88,7 @@ class FuncNodeHelper : public CBase_FuncNodeHelper {
 	
 public:
     static int MAX_CHUNKS;
-private:
-    ConverseNotifyMsg *notifyMsgs;
+private:    
     int numHelpers;    
     FuncSingleHelper **helperPtr; /* ptrs to the FuncSingleHelpers it manages */
 	int useTreeBcast;
@@ -98,13 +97,11 @@ public:
 	FuncNodeHelper();
     ~FuncNodeHelper() {
         delete [] helperPtr;
-        delete [] notifyMsgs;
     }
 
     /* handler is only useful when converse msg is used to initiate tasks on the pseudo-thread */
-    void oneHelperCreated(int hid, FuncSingleHelper* cptr, int handler) {
+    void oneHelperCreated(int hid, FuncSingleHelper* cptr) {
         helperPtr[hid] = cptr;
-        CmiSetHandler(&(notifyMsgs[hid]), handler);
     }
     
     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
@@ -123,8 +120,8 @@ void SingleHelperStealWork(ConverseNotifyMsg *msg);
 class FuncSingleHelper: public CBase_FuncSingleHelper {
 	friend class FuncNodeHelper;
 private: 
-    int stealWorkHandler;
     FuncNodeHelper *thisNodeHelper;
+    ConverseNotifyMsg *notifyMsg;
     CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
     
 public:
@@ -132,19 +129,29 @@ public:
         CProxy_FuncNodeHelper fh(nid);
         thisNodeHelper = fh[CkMyNode()].ckLocalBranch();
         CmiAssert(thisNodeHelper!=NULL);        
-        stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
+        int stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
         curLoop = new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS);
+        
+        notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg));
+        if(thisNodeHelper->useTreeBcast){
+            notifyMsg->srcRank = CmiMyRank();
+        }else{
+            notifyMsg->srcRank = -1;
+        }
+        notifyMsg->ptr = (void *)curLoop;
+        CmiSetHandler(notifyMsg, stealWorkHandler);
     }
 
     ~FuncSingleHelper() {
         delete curLoop;
+        delete notifyMsg;
     }
     
     FuncSingleHelper(CkMigrateMessage *m) {}
 		
     void reportCreated() {
         //CkPrintf("Single helper %d is created on rank %d\n", CkMyPe(), CkMyRank());
-		thisNodeHelper->oneHelperCreated(CkMyRank(), this, stealWorkHandler);
+		thisNodeHelper->oneHelperCreated(CkMyRank(), this);
     }    
 };
 
