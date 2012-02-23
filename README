@@ -132,7 +132,7 @@ development and testing.
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
 machines with a good MPI implementation (such as the Origin 2000).
 
-	"exemplar", "ncube-2", "paragon-red", "sp3", and "t3e" Charm++
+	"gemini", "bluegene[lpq]", Charm++
 communicates using direct calls to the machine's communication primitives.
 
 	"sim-" and "uth-" are not actively maintained.  These are

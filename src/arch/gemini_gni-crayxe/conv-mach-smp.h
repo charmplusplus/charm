@@ -12,4 +12,3 @@
 #define CMK_THREADS_USE_CONTEXT                            1
 
 
-#define CMK_SMP_TRACE_COMMTHREAD                           0

@@ -16,13 +16,13 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
  ../../../../include/ckstream.h ../../../../include/init.h \
  ../../../../include/ckhashtable.h ../../../../include/debug-charm.h \
- ../../../../include/simd.h ../../../../include/CkMarshall.decl.h \
- ../../../../include/charm++.h ../../../../include/cksection.h \
+ ../../../../include/debug-conv++.h ../../../../include/simd.h \
+ ../../../../include/CkMarshall.decl.h ../../../../include/charm++.h \
+ ../../../../include/ckarrayindex.h ../../../../include/cksection.h \
  ../../../../include/ckcallback.h ../../../../include/conv-ccs.h \
  ../../../../include/sockRoutines.h ../../../../include/ccs-server.h \
  ../../../../include/ckobjQ.h ../../../../include/ckreduction.h \
  ../../../../include/CkReduction.decl.h \
- ../../../../include/cknodegroupreduction.h \
  ../../../../include/CkArrayReductionMgr.decl.h \
  ../../../../include/ckmemcheckpoint.h \
  ../../../../include/CkMemCheckpoint.decl.h \
@@ -34,11 +34,11 @@ tcharm.o: tcharm.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/lbdb++.h ../../../../include/LBDatabase.decl.h \
  ../../../../include/NullLB.decl.h ../../../../include/BaseLB.decl.h \
  ../../../../include/CkLocation.decl.h ../../../../include/CkArray.decl.h \
- ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
- ../../../../include/charisma.decl.h ../../../../include/tempo.h \
- ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
- ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
- ../../../../include/ckcheckpoint.h \
+ ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
+ ../../../../include/charisma.h ../../../../include/charisma.decl.h \
+ ../../../../include/tempo.h ../../../../include/tempo.decl.h \
+ ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
+ ../../../../include/sdag.h ../../../../include/ckcheckpoint.h \
  ../../../../include/CkCheckpoint.decl.h \
  ../../../../include/ckevacuation.h \
  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \
@@ -63,13 +63,13 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/cklists.h ../../../../include/ckbitvector.h \
  ../../../../include/ckstream.h ../../../../include/init.h \
  ../../../../include/ckhashtable.h ../../../../include/debug-charm.h \
- ../../../../include/simd.h ../../../../include/CkMarshall.decl.h \
- ../../../../include/charm++.h ../../../../include/cksection.h \
+ ../../../../include/debug-conv++.h ../../../../include/simd.h \
+ ../../../../include/CkMarshall.decl.h ../../../../include/charm++.h \
+ ../../../../include/ckarrayindex.h ../../../../include/cksection.h \
  ../../../../include/ckcallback.h ../../../../include/conv-ccs.h \
  ../../../../include/sockRoutines.h ../../../../include/ccs-server.h \
  ../../../../include/ckobjQ.h ../../../../include/ckreduction.h \
  ../../../../include/CkReduction.decl.h \
- ../../../../include/cknodegroupreduction.h \
  ../../../../include/CkArrayReductionMgr.decl.h \
  ../../../../include/ckmemcheckpoint.h \
  ../../../../include/CkMemCheckpoint.decl.h \
@@ -81,11 +81,11 @@ tcharmmain.o: tcharmmain.C tcharm_impl.h ../../../../include/pup.h \
  ../../../../include/lbdb++.h ../../../../include/LBDatabase.decl.h \
  ../../../../include/NullLB.decl.h ../../../../include/BaseLB.decl.h \
  ../../../../include/CkLocation.decl.h ../../../../include/CkArray.decl.h \
- ../../../../include/CkFutures.decl.h ../../../../include/charisma.h \
- ../../../../include/charisma.decl.h ../../../../include/tempo.h \
- ../../../../include/tempo.decl.h ../../../../include/waitqd.h \
- ../../../../include/waitqd.decl.h ../../../../include/sdag.h \
- ../../../../include/ckcheckpoint.h \
+ ../../../../include/ckfutures.h ../../../../include/CkFutures.decl.h \
+ ../../../../include/charisma.h ../../../../include/charisma.decl.h \
+ ../../../../include/tempo.h ../../../../include/tempo.decl.h \
+ ../../../../include/waitqd.h ../../../../include/waitqd.decl.h \
+ ../../../../include/sdag.h ../../../../include/ckcheckpoint.h \
  ../../../../include/CkCheckpoint.decl.h \
  ../../../../include/ckevacuation.h \
  ../../../../include/ckarrayreductionmgr.h ../../../../include/trace.h \

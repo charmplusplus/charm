@@ -225,41 +225,6 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
 
-#if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
-
-#include <spp_prog_model.h>
-#include <cps.h>
-
-extern int _Cmi_numpes;
-extern int _Cmi_mynodesize;
-
-#define CmiMyPe()           (my_thread())
-#define CmiMyRank()         (my_thread())
-#define CmiNumPes()         _Cmi_numpes
-#define CmiMyNodeSize()     _Cmi_numpes
-#define CmiMyNode()         0
-#define CmiNumNodes()       1
-#define CmiNodeFirst(node)  0
-#define CmiNodeSize(node)   _Cmi_numpes
-#define CmiNodeOf(pe)       0
-#define CmiRankOf(pe)       (pe)
-
-#define CMK_CPV_IS_SMP {} 
-
-extern void CmiMemLock();
-extern void CmiMemUnlock();
-extern void CmiNodeBarrier(void);
-extern void *CmiSvAlloc(int);
-
-typedef cps_mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock(void);
-#define CmiLock(lock) (cps_mutex_lock(lock))
-#define CmiUnlock(lock) (cps_mutex_unlock(lock))
-#define CmiTryLock(lock) (cps_mutex_trylock(lock))
-#define CmiDestroyLock(lock) (cps_mutex_free(lock))
-
-#endif
-
 #if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
 
 extern int _Cmi_mype;

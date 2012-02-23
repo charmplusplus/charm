@@ -58,7 +58,12 @@ typedef struct infiDirectUserHandle{
 	double initialValue;
 }CmiDirectUserHandle;
 
-
+#ifdef  CMK_CONVERSE_GEMINI_UGNI
+typedef gni_mem_handle_t    CmiDirectMemoryHandler;
+CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size);
+struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *mem_hndl, void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
+void CmiDirect_assocLocalBuffer_mem(struct infiDirectUserHandle *userHandle, CmiDirectMemoryHandler *mem_hndl, void *sendBuf,int sendBufSize);
+#endif
 /* functions */
 
 #ifdef __cplusplus

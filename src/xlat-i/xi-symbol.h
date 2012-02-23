@@ -237,6 +237,7 @@ class TypeList : public Printable {
     TypeList *next;
   public:
     TypeList(Type *t, TypeList *n=0) : type(t), next(n) {}
+    ~TypeList() { delete type; delete next; }
     int length(void) const;
     Type *getFirst(void) {return type;}
     void print(XStr& str);
