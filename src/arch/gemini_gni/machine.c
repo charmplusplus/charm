@@ -199,29 +199,27 @@ uint8_t   onesided_hnd, omdh;
     } while (0)
 #endif
 
-#define   IncreaseMsgInRecv(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv)++
-#define   DecreaseMsgInRecv(x)   (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv)--
-#define   IncreaseMsgInSend(x) (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send)++
-                                   //printf("++++[%d]%p   ----- %d\n", myrank, ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr)), (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send ));
-#define   DecreaseMsgInSend(x)   (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send)--
-                                     //printf("---[%d]%p   ----- %d\n", myrank,((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr)), (((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send ));
-#define   GetMempoolBlockPtr(x)  ((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr
-#define   GetMempoolPtr(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->mptr
-#define   GetMempoolsize(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->size
-#define   GetMemHndl(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->mem_hndl
+#define   GetMempoolBlockPtr(x)  (((mempool_header*)((char*)(x)-ALIGNBUF))->block_ptr)
+#define   IncreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)++
+#define   DecreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)--
+#define   IncreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)++
+#define   DecreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)--
+#define   GetMempoolPtr(x)        GetMempoolBlockPtr(x)->mptr
+#define   GetMempoolsize(x)       GetMempoolBlockPtr(x)->size
+#define   GetMemHndl(x)           GetMempoolBlockPtr(x)->mem_hndl
 #define   GetMemHndlFromHeader(x) ((block_header*)x)->mem_hndl
-#define   GetSizeFromHeader(x) ((block_header*)x)->size
-#define   NoMsgInSend(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send == 0
-#define   NoMsgInRecv(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv == 0
-#define   NoMsgInFlight(x)  ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_send + ((block_header*)(((mempool_header*)((char*)x-ALIGNBUF))->mempool_ptr))->msgs_in_recv  == 0
-#define   IsMemHndlZero(x)  ((x).qword1 == 0 && (x).qword2 == 0)
-#define   SetMemHndlZero(x)  do { (x).qword1 = 0; (x).qword2 = 0; } while (0)
-#define   NotRegistered(x)  IsMemHndlZero(((block_header*)x)->mem_hndl)
+#define   GetSizeFromHeader(x)    ((block_header*)x)->size
+#define   NoMsgInSend(x)          GetMempoolBlockPtr(x)->msgs_in_send == 0
+#define   NoMsgInRecv(x)          GetMempoolBlockPtr(x)->msgs_in_recv == 0
+#define   NoMsgInFlight(x)        (GetMempoolBlockPtr(x)->msgs_in_send + GetMempoolBlockPtr(x)->msgs_in_recv  == 0)
+#define   IsMemHndlZero(x)        ((x).qword1 == 0 && (x).qword2 == 0)
+#define   SetMemHndlZero(x)       do {(x).qword1 = 0;(x).qword2 = 0;} while (0)
+#define   NotRegistered(x)        IsMemHndlZero(((block_header*)x)->mem_hndl)
 
-#define CmiGetMsgSize(m)  ((CmiMsgHeaderExt*)m)->size
-#define CmiSetMsgSize(m,s)  ((((CmiMsgHeaderExt*)m)->size)=(s))
-#define CmiGetMsgSeq(m)  ((CmiMsgHeaderExt*)m)->seq
-#define CmiSetMsgSeq(m, s)  ((((CmiMsgHeaderExt*)m)->seq) = (s))
+#define CmiGetMsgSize(m)     ((CmiMsgHeaderExt*)m)->size
+#define CmiSetMsgSize(m,s)   ((((CmiMsgHeaderExt*)m)->size)=(s))
+#define CmiGetMsgSeq(m)      ((CmiMsgHeaderExt*)m)->seq
+#define CmiSetMsgSeq(m, s)   ((((CmiMsgHeaderExt*)m)->seq) = (s))
 
 #define ALIGNBUF                64
 
