@@ -299,7 +299,6 @@ classScopeDeclaration
             sdagMethod = currentMethod.hasSDAG;
             }
             ^(BLOCK (sdg+=sdagBasicBlock)*))
-            //sdgb=nakedSdagBlock?) 
         -> {emitCI()}? funcMethodDecl_sdag_ci(
                 classSym={currentClass},
                 methodSym={currentMethod},
@@ -683,21 +682,15 @@ block
         { emptyBlock = ($b == null || $b.size() == 0); }
         -> {((emitCC() && (currentMethod == null || !currentMethod.hasSDAG)) ||
             (emitCI() && (currentMethod != null && currentMethod.hasSDAG))) && emptyBlock}? template(bsl={$b}) "{ }"
-        -> {emitCC() && (currentMethod == null || !currentMethod.hasSDAG)}? block_cc(bsl={$b})
-        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_cc(bsl={$b})
+        -> {emitCC() && (currentMethod == null || !currentMethod.hasSDAG)}? block_cc(bsl={$b}, braces={true})
+        -> {emitCI() && (currentMethod != null && currentMethod.hasSDAG)}? block_cc(bsl={$b}, braces={true})
         ->
-    ;
-
-
-nakedSdagBlock
-    :   ^(BLOCK (sdg+=sdagBasicBlock)*)
-        -> template(sdg={$sdg}) "<sdg>"
     ;
 
 
 sdagBlock
     :   ^(BLOCK (sdg+=sdagBasicBlock)*)
-        -> block_cc(bsl={$sdg})
+        -> block_cc(bsl={$sdg}, braces={true})
     ;
 
 sdagBasicBlock
@@ -761,8 +754,8 @@ divconExpr
 sdagStatement
     :   ^(OVERLAP sdagBlock)
         -> template(b={$sdagBlock.st}) "overlap <b>"
-    |   ^(WHEN (wa+=whenArgument)* nakedSdagBlock)
-        -> template(w={wa}, b={$nakedSdagBlock.st}) "when <w> <b>"
+    |   ^(WHEN (wa+=whenArgument)* sdagBlock)
+        -> template(w={wa}, b={$sdagBlock.st}) "when <w> <b>"
     |   ^(SDAG_IF pe=parenthesizedExpression
             ifblock=sdagBlock elseblock=sdagBlock?)
         -> if(cond={$pe.st}, then={$ifblock.st}, else_={$elseblock.st})
@@ -835,7 +828,7 @@ forInit
     :   localVariableDeclaration
         -> template(lvd={$localVariableDeclaration.st}) "<lvd>"
     |   (ex+=expression)+
-        -> template(ex={$ex}) "<ex; separator=\", \">"
+        -> template(ex={$ex}) "<ex; separator=\", \">;"
     ;
 
 // EXPRESSIONS
