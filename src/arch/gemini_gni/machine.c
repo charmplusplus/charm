@@ -30,14 +30,33 @@
 #include <errno.h>
 #include <malloc.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <gni_pub.h>
 #include <pmi.h>
-#include <time.h>
 
 #include "converse.h"
 
 #define PRINT_SYH  0
+
+#define USE_LRTS_MEMPOOL                  1
+#define REMOTE_EVENT                      0
+
+#define CMI_EXERT_SEND_CAP	0
+#define	CMI_EXERT_RECV_CAP	0
+
+#if CMI_EXERT_SEND_CAP
+#define SEND_CAP 16
+#endif
+
+#if CMI_EXERT_RECV_CAP
+#define RECV_CAP 2
+#endif
+
+#if CMK_SMP
+#define COMM_THREAD_SEND 1
+//#define MULTI_THREAD_SEND 1
+#endif
 
 // Trace communication thread
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
@@ -68,20 +87,6 @@ CpvStaticDeclare(double, projTraceStart);
 #define  END_EVENT(x)
 #endif
 
-#define CMI_EXERT_SEND_CAP	0
-#define	CMI_EXERT_RECV_CAP	0
-
-#if CMI_EXERT_SEND_CAP
-#define SEND_CAP 16
-#endif
-
-#if CMI_EXERT_RECV_CAP
-#define RECV_CAP 2
-#endif
-
-#define REMOTE_EVENT                      0
-#define USE_LRTS_MEMPOOL                  1
-
 #if USE_LRTS_MEMPOOL
 
 #define oneMB (1024ll*1024)
@@ -92,6 +97,14 @@ static CmiInt8 _expand_mem =  4*oneMB;
 
 static CmiInt8 _totalmem = 0.8*oneGB;
 
+static int BIG_MSG  =  4*oneMB;
+static int ONE_SEG  =  2*oneMB;
+static int BIG_MSG_PIPELINE = 4;
+
+// dynamic flow control
+static CmiInt8 buffered_send_msg = 0;
+static int   register_memory_size = 0;
+
 #if CMK_SMP && COMM_THREAD_SEND 
 //Dynamic flow control about memory registration
 static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
@@ -100,21 +113,8 @@ static CmiInt8  MAX_REG_MEM    =  200*oneMB;
 static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
 static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
-static int      user_set_flag  = 0;
-
-static CmiInt8 buffered_send_msg = 0;
-static int register_memory_size = 0;
 
 #endif     /* end USE_LRTS_MEMPOOL */
-
-static int BIG_MSG  =  4*oneMB;
-static int ONE_SEG  =  2*oneMB;
-static int BIG_MSG_PIPELINE = 4;
-
-#if CMK_SMP
-#define COMM_THREAD_SEND 1
-//#define MULTI_THREAD_SEND 1
-#endif
 
 #if CMK_SMP && MULTI_THREAD_SEND
 #define     CMI_GNI_LOCK        CmiLock(tx_cq_lock);
@@ -123,6 +123,8 @@ static int BIG_MSG_PIPELINE = 4;
 #define     CMI_GNI_LOCK
 #define     CMI_GNI_UNLOCK
 #endif
+
+static int   user_set_flag  = 0;
 
 static int _checkProgress = 1;             /* check deadlock */
 static int _detected_hang = 0;
@@ -323,6 +325,7 @@ static CmiNodeLock           tx_cq_lock;
 static CmiNodeLock           rx_cq_lock;
 static CmiNodeLock           *mempool_lock;
 #endif
+
 typedef struct msg_list
 {
     uint32_t destNode;
@@ -385,6 +388,7 @@ typedef struct  msg_list_index
 static CONTROL_MSG          *control_freelist=0;
 static MSG_LIST             *msglist_freelist=0;
 
+// buffered send queue
 typedef struct smsg_queue
 {
     MSG_LIST_INDEX   *smsg_msglist_index;
@@ -1017,6 +1021,8 @@ inline static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t se
     return control_msg_tmp;
 }
 
+#define BLOCKING_SEND_CONTROL    0
+
 // Large message, send control to receiver, receiver register memory and do a GET, 
 // return 1 - send no success
 inline
@@ -1034,9 +1040,9 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     source_addr = control_msg_tmp->source_addr;
     register_size = control_msg_tmp->length;
 
-#if     USE_LRTS_MEMPOOL
+#if  USE_LRTS_MEMPOOL
     if( control_msg_tmp->seq_id == 0 ){
-#if 0
+#if BLOCKING_SEND_CONTROL
         if (inbuff == 0 && IsMemHndlZero(GetMemHndl(source_addr))) {
             while (IsMemHndlZero(GetMemHndl(source_addr)) && buffered_send_msg + GetMempoolsize((void*)source_addr) >= MAX_BUFF_SEND)
                 LrtsAdvanceCommunication(0);
@@ -1071,7 +1077,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         int offset = ONE_SEG*(control_msg_tmp->seq_id-1);
         source_addr += offset;
         size = control_msg_tmp->length;
-#if 0
+#if BLOCKING_SEND_CONTROL
         if (inbuff == 0 && IsMemHndlZero(control_msg_tmp->source_mem_hndl)) {
             while (IsMemHndlZero(control_msg_tmp->source_mem_hndl) && buffered_send_msg + size >= MAX_BUFF_SEND)
                 LrtsAdvanceCommunication(0);
