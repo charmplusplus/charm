@@ -1550,6 +1550,7 @@ static void PumpNetworkSmsg()
     }   //end while GetEvent
     if(status == GNI_RC_ERROR_RESOURCE)
     {
+        printf("charm> Please use +useRecvQueue 204800 in your command line, if the error comes again, increase this number\n");  
         GNI_RC_CHECK("Smsg_rx_cq full", status);
     }
 }
@@ -1889,6 +1890,7 @@ static void PumpLocalRdmaTransactions()
     } //end while
     if(status == GNI_RC_ERROR_RESOURCE)
     {
+        printf("charm> Please use +useSendQueue 204800 in your command line, if the error comes again, increase this number\n");  
         GNI_RC_CHECK("Smsg_tx_cq full", status);
     }
 }
