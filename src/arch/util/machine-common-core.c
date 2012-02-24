@@ -466,19 +466,10 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 }
 
 #if CMK_USE_PXSHM
-inline int CmiValidPxshm(int dst, int size);
-void CmiSendMessagePxshm(char *msg, int size, int dstpe, int *refcount);
-void CmiInitPxshm(char **argv);
-inline void CommunicationServerPxshm();
-void CmiExitPxshm();
+#include "machine-pxshm.c"
 #endif
-
 #if CMK_USE_XPMEM
-inline int CmiValidXpmem(int dst, int size);
-void CmiSendMessageXpmem(char *msg, int size, int dstpe, int *refcount);
-void CmiInitXpmem(char **argv);
-inline void CommunicationServerXpmem();
-void CmiExitXpmem();
+#include "machine-xpmem.c"
 #endif
 
 int refcount = 0;
@@ -738,6 +729,9 @@ if (  MSG_STATISTIC)
     ConverseRunPE(initret);
 }
 
+extern void ConverseCommonInit(char **argv);
+extern void CthInit(char **argv);
+
 static void ConverseRunPE(int everReturn) {
     CmiState cs;
     char** CmiMyArgv;
@@ -837,6 +831,8 @@ static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {
 #endif
 #endif
 }
+
+extern void ConverseCommonExit();
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP
@@ -1037,12 +1033,5 @@ static char *CopyMsg(char *msg, int len) {
     return copy;
 }
 
-
-#if CMK_USE_PXSHM
-#include "machine-pxshm.c"
-#endif
-#if CMK_USE_XPMEM
-#include "machine-xpmem.c"
-#endif
 
 

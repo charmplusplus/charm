@@ -298,7 +298,8 @@ CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6
  * ***********************/
 
 /* dstNode is node number */
-inline int CmiValidXpmem(int node, int size){
+inline 
+static int CmiValidXpmem(int node, int size){
 #if XPMEM_STATS
 	xpmemContext->validCheckCount++;
 #endif

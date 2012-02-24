@@ -327,7 +327,8 @@ CmiPrintf("[%d] sendCount %d sendTime %6lf validCheckCount %d validCheckTime %.6
  * ***********************/
 
 /* dstNode is node number */
-inline int CmiValidPxshm(int node, int size){
+inline 
+static int CmiValidPxshm(int node, int size){
 #if PXSHM_STATS
 	pxshmContext->validCheckCount++;
 #endif

@@ -66,6 +66,8 @@ static INLINE_KEYWORD void processProcBcastMsg(int size, char *msg) {
 
 }
 
+
+#if CMK_NODE_QUEUE_AVAILABLE
 static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
 #if CMK_BROADCAST_SPANNING_TREE
     SendSpanningChildrenNode(size, msg);
@@ -82,6 +84,7 @@ static INLINE_KEYWORD void processNodeBcastMsg(int size, char *msg) {
      */
     CmiPushNode(msg);
 }
+#endif
 
 static void SendSpanningChildren(int size, char *msg, int rankToAssign, int startNode) {
 #if CMK_BROADCAST_SPANNING_TREE
