@@ -94,7 +94,7 @@ bool _isNotifyChildInRed;
 class CkArrayBroadcaster : public CkArrayListener {
   inline int &getData(ArrayElement *el) {return *ckGetData(el);}
 public:
-  CkArrayBroadcaster(bool _stableLocations);
+  CkArrayBroadcaster(bool _stableLocations, bool _broadcastViaScheduler);
   CkArrayBroadcaster(CkMigrateMessage *m);
   virtual void pup(PUP::er &p);
   virtual ~CkArrayBroadcaster();
@@ -126,6 +126,7 @@ private:
   // and needs to be brought up to date)
   CkQ<CkArrayMessage *> oldBcasts;
   bool stableLocations;
+  bool broadcastViaScheduler;
 
   CmiBool bringUpToDate(ArrayElement *el);
 };
@@ -549,6 +550,7 @@ void CkArrayOptions::init()
     staticInsertion = false;
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
+    broadcastViaScheduler = false;
 }
 
 CkArrayOptions &CkArrayOptions::setStaticInsertion(bool b)
@@ -583,6 +585,7 @@ void CkArrayOptions::pup(PUP::er &p) {
 	p|anytimeMigration;
 	p|disableNotifyChildInRed;
 	p|staticInsertion;
+	p|broadcastViaScheduler;
 }
 
 CkArrayListener::CkArrayListener(int nInts_) 
@@ -724,7 +727,7 @@ CkArray::CkArray(CkArrayOptions &opts,
   
   //Find, register, and initialize the arrayListeners
   listenerDataOffset=0;
-  broadcaster=new CkArrayBroadcaster(stableLocations);
+  broadcaster=new CkArrayBroadcaster(stableLocations, opts.broadcastViaScheduler);
   addListener(broadcaster);
   reducer=new CkArrayReducer(thisgroup);
   addListener(reducer);
@@ -1071,12 +1074,13 @@ CkArrayReducer::~CkArrayReducer() {}
 
 /*********************** CkArray Broadcast ******************/
 
-CkArrayBroadcaster::CkArrayBroadcaster(bool stableLocations_)
+CkArrayBroadcaster::CkArrayBroadcaster(bool stableLocations_, bool broadcastViaScheduler_)
     :CkArrayListener(1), //Each array element carries a broadcast number
-     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_)
+     bcastNo(0), oldBcastNo(0), stableLocations(stableLocations_), broadcastViaScheduler(broadcastViaScheduler_)
 { }
+
 CkArrayBroadcaster::CkArrayBroadcaster(CkMigrateMessage *m)
-    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1)
+    :CkArrayListener(m), bcastNo(-1), oldBcastNo(-1), broadcastViaScheduler(false)
 { }
 
 void CkArrayBroadcaster::pup(PUP::er &p) {
@@ -1085,6 +1089,7 @@ void CkArrayBroadcaster::pup(PUP::er &p) {
      save old broadcasts. */
   p|bcastNo;
   p|stableLocations;
+  p|broadcastViaScheduler;
   if (p.isUnpacking()) {
     oldBcastNo=bcastNo; /* because we threw away oldBcasts */
   }
@@ -1123,7 +1128,20 @@ CmiBool CkArrayBroadcaster::deliver(CkArrayMessage *bcast, ArrayElement *el,
   DEBUG(printf("[%d] elBcastNo %d bcastNo %d \n",CmiMyPe(),bcastNo));
   return CmiTrue;
 #else
-  return el->ckInvokeEntry(epIdx, bcast, doFree);
+  if (!broadcastViaScheduler)
+    return el->ckInvokeEntry(epIdx, bcast, doFree);
+  else {
+    if (!doFree) {
+      CkArrayMessage *newMsg = (CkArrayMessage *)CkCopyMsg((void **)&bcast);
+      bcast = newMsg;
+    }
+    envelope *env = UsrToEnv(bcast);
+    env->getsetArrayEp() = epIdx;
+    env->getsetArrayMgr() = el->ckGetArrayID();
+    env->getsetArrayIndex() = el->ckGetArrayIndex();
+    CkArrayManagerDeliver(CkMyPe(), bcast, 0);
+    return true;
+  }
 #endif
 }
 
