@@ -248,6 +248,9 @@ void TraceArray::traceEndOnCommThread() {
 #endif
 }
 
+#if CMK_MULTICORE
+extern int Cmi_commthread;
+#endif
 
 /*Install the beginIdle/endIdle condition handlers.*/
 extern "C" void traceBegin(void) {
@@ -256,6 +259,9 @@ extern "C" void traceBegin(void) {
   
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
+#if CMK_MULTICORE
+  if (Cmi_commthread)
+#endif
   if(CmiMyRank()==0){
 	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
