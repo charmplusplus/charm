@@ -67,9 +67,9 @@ public:
         inited = 1;
     }
       
-    void waitLoopDone(){
+    void waitLoopDone(int sync){
         //while(!__sync_bool_compare_and_swap(&finishFlag, numChunks, 0));
-	while(finishFlag!=numChunks);
+	if(sync) while(finishFlag!=numChunks);
 	//finishFlag = 0;
         inited = 0;
     }

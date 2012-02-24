@@ -73,10 +73,8 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	curLoop->stealWork();
 	TRACE_BRACKET(20);
 	
-	if(!sync) return;
-
 	TRACE_START(21);                
-	curLoop->waitLoopDone();
+	curLoop->waitLoopDone(sync);
 	TRACE_BRACKET(21);        
 
     if (type!=NODEHELPER_NONE)
