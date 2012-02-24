@@ -32,7 +32,8 @@ int FuncNodeHelper::MAX_CHUNKS = 64;
 #endif
 
 void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param, 
-                                    int msgPriority, int numChunks, int lowerRange, int upperRange, 
+                                    int numChunks, int lowerRange, 
+				    int upperRange, int sync,
                                     void *redResult, REDUCTION_TYPE type) {
                                         
     double _start; //may be used for tracing
@@ -72,6 +73,8 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	curLoop->stealWork();
 	TRACE_BRACKET(20);
 	
+	if(!sync) return;
+
 	TRACE_START(21);                
 	curLoop->waitLoopDone();
 	TRACE_BRACKET(21);        
@@ -178,11 +181,12 @@ CProxy_FuncNodeHelper NodeHelper_Init(){
 }
 
 void NodeHelper_Parallelize(CProxy_FuncNodeHelper nodeHelper, HelperFn func, 
-                        int paramNum, void * param, int msgPriority,
-                        int numChunks, int lowerRange, int upperRange, 
+                        int paramNum, void * param, 
+                        int numChunks, int lowerRange, int upperRange,
+			int sync,
                         void *redResult, REDUCTION_TYPE type)
 {
-    nodeHelper[CkMyNode()].ckLocalBranch()->parallelizeFunc(func, paramNum, param, msgPriority, numChunks, lowerRange, upperRange, redResult, type);
+    nodeHelper[CkMyNode()].ckLocalBranch()->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
 }
 
 #include "NodeHelper.def.h"

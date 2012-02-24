@@ -112,9 +112,9 @@ public:
     
     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
                         int paramNum, void * param, /* the input parameters for the above func */
-                        int msgPriority, /* the priority of the intra-node msg, and node-level msg */
                         int numChunks, /* number of chunks to be partitioned */
                         int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */                        
+			int sync=1, /* whether the flow will continue until all chunks have finished */
                         void *redResult=NULL, REDUCTION_TYPE type=NODEHELPER_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
                         );
     void reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, int numChunks);

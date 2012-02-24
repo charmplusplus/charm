@@ -228,7 +228,7 @@ void TestInstance::doTest(int curstep, int curTestMode) {
     double timerec = CmiWallTimer();
     
     if(curTestMode == 0){
-	    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 0, NULL, 0, numChunks, 0, loopTimes-1, &result, NODEHELPER_INT_SUM);
+	    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 0, NULL, numChunks, 0, loopTimes-1, 1, &result, NODEHELPER_INT_SUM);
     }else if(curTestMode == 1){
         result = openMPWork(0, loopTimes-1);
     }

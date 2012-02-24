@@ -81,7 +81,8 @@ struct Main : public CBase_Main {
     fftProxy = CProxy_fft::ckNew(numChunks);
 
     // Construct a nodehelper to do the calculation
-    nodeHelperProxy = NodeHelper_Init(NODEHELPER_MODE, numTasks);
+    //nodeHelperProxy = NodeHelper_Init(NODEHELPER_MODE, numTasks);
+    nodeHelperProxy = NodeHelper_Init();
     
     CkStartQD(CkIndex_Main::initDone((CkQdMsg *)0), &thishandle);
   }
@@ -239,7 +240,7 @@ struct fft : public CBase_fft {
     //FuncNodeHelper *nth = nodeHelperProxy[CkMyNode()].ckLocalBranch();
     //nth->parallelizeFunc(doCalc, numTasks, numTasks, thisIndex, numTasks, 1, 1, plan, 0, NULL);
     double ffttime = CmiWallTimer();
-    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 1, plan, 0, numTasks, 0, numTasks-1);    
+    NodeHelper_Parallelize(nodeHelperProxy, doCalc, 1, plan, numTasks, 0, numTasks-1);    
     CkPrintf("FFT time: %.3f (ms)\n", (CmiWallTimer()-ffttime)*1e3);
   }
 
