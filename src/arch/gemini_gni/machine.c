@@ -1869,7 +1869,7 @@ static void PumpLocalRdmaTransactions()
 #endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if(msg_tag == BIG_MSG_TAG){
-                    void *msg = (void*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
+                    void *msg = (char*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
                     CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
                     if (tmp_pd->first_operand <= ONE_SEG*CmiGetMsgSeq(msg)) {
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2010,12 +2010,8 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     int			sent_cnt = 0;
 #endif
 
-#if !CMK_SMP
-    index = queue->smsg_head_index;
-#else
-    index = 0;
-#endif
 #if CMK_SMP
+    index = 0;
     while(index <mysize)
     {
         int i, len = PCQueueLength(queue->smsg_msglist_index[index].sendSmsgBuf);
@@ -2024,6 +2020,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             ptr = (MSG_LIST*)PCQueuePop(queue->smsg_msglist_index[index].sendSmsgBuf);
             if (ptr == 0) break;
 #else
+    index = queue->smsg_head_index;
     while(index != -1)
     {
         ptr = queue->smsg_msglist_index[index].sendSmsgBuf;
