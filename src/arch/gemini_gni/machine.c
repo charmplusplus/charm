@@ -2005,14 +2005,14 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     int                 register_size;
     void                *register_addr;
     int                 index_previous = -1;
-    int                 index = queue->smsg_head_index;
 #if CMI_EXERT_SEND_CAP
     int			sent_cnt = 0;
 #endif
 
 #if CMK_SMP
-    index = 0;
-    while(index <mysize)
+    static int          index = 0;
+    int                 idx;
+    for (idx=0; idx<mysize; idx++)
     {
         int i, len = PCQueueLength(queue->smsg_msglist_index[index].sendSmsgBuf);
         for (i=0; i<len; i++) 
@@ -2020,7 +2020,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             ptr = (MSG_LIST*)PCQueuePop(queue->smsg_msglist_index[index].sendSmsgBuf);
             if (ptr == 0) break;
 #else
-    index = queue->smsg_head_index;
+    int index = queue->smsg_head_index;
     while(index != -1)
     {
         ptr = queue->smsg_msglist_index[index].sendSmsgBuf;
@@ -2114,12 +2114,13 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 queue->smsg_msglist_index[index_previous].next = queue->smsg_msglist_index[index].next;
             else
                 queue->smsg_head_index = queue->smsg_msglist_index[index].next;
-        }else
-        {index_previous = index;
+        }
+        else {
+            index_previous = index;
         }
         index = queue->smsg_msglist_index[index].next;
 #else
-        index++;
+        index = (index+1)%mysize;
 #endif
 
 #if CMI_EXERT_SEND_CAP
