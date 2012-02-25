@@ -31,6 +31,7 @@ int FuncNodeHelper::MAX_CHUNKS = 64;
 #define TRACE_BRACKET(id)
 #endif
 
+#define ALLOW_MULTIPLE_UNSYNC 1
 void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param, 
                                     int numChunks, int lowerRange, 
 				    int upperRange, int sync,
@@ -53,9 +54,13 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	TRACE_START(20);
 	
 	FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
-	CurLoopInfo *curLoop = thisHelper->curLoop;
-	curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
-    ConverseNotifyMsg *notifyMsg = thisHelper->notifyMsg;	
+#if ALLOW_MULTIPLE_UNSYNC
+    ConverseNotifyMsg *notifyMsg = thisHelper->getNotifyMsg();
+#else
+    ConverseNotifyMsg *notifyMsg = thisHelper->notifyMsg;
+#endif
+    CurLoopInfo *curLoop = (CurLoopInfo *)(notifyMsg->ptr);
+	curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);	
 	if(useTreeBcast){		
 		int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
 		//just implicit binary tree
@@ -69,7 +74,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 			if (i!=CkMyRank()) CmiPushPE(i, (void *)(notifyMsg));            
 		}
 	}
-
+    
 	curLoop->stealWork();
 	TRACE_BRACKET(20);
 	

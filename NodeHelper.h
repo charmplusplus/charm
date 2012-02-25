@@ -81,6 +81,8 @@ public:
         __sync_add_and_fetch(&finishFlag, counter);
     }
     
+    int isFree() { return finishFlag == numChunks; }
+    
 	void **getRedBufs() { return redBufs; }
 	
     void stealWork();
@@ -123,34 +125,54 @@ public:
 void SingleHelperStealWork(ConverseNotifyMsg *msg);
 
 /* FuncSingleHelper is a chare located on every core of a node */
+//allowing arbitrary combination of sync and unsync parallelizd loops
+#define MSG_BUFFER_SIZE (3)
 class FuncSingleHelper: public CBase_FuncSingleHelper {
 	friend class FuncNodeHelper;
 private: 
     FuncNodeHelper *thisNodeHelper;
     ConverseNotifyMsg *notifyMsg;
-    CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
+    int nextFreeNotifyMsg;
+    //CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
     
 public:
     FuncSingleHelper(size_t ndhPtr) {
         thisNodeHelper = (FuncNodeHelper *)ndhPtr;
         CmiAssert(thisNodeHelper!=NULL);        
         int stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
-        curLoop = new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS);
         
-        notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg));
-        if(thisNodeHelper->useTreeBcast){
-            notifyMsg->srcRank = CmiMyRank();
-        }else{
-            notifyMsg->srcRank = -1;
+	nextFreeNotifyMsg = 0;
+        notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*MSG_BUFFER_SIZE);
+        for(int i=0; i<MSG_BUFFER_SIZE; i++){
+            ConverseNotifyMsg *tmp = notifyMsg+i;
+            if(thisNodeHelper->useTreeBcast){
+                tmp->srcRank = CmiMyRank();
+            }else{
+                tmp->srcRank = -1;
+            }            
+            tmp->ptr = (void *)(new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS));
+            CmiSetHandler(tmp, stealWorkHandler);
         }
-        notifyMsg->ptr = (void *)curLoop;
-        CmiSetHandler(notifyMsg, stealWorkHandler);
         thisNodeHelper->helperPtr[CkMyRank()] = this;
     }
 
     ~FuncSingleHelper() {
-        delete curLoop;
-        delete notifyMsg;
+        for(int i=0; i<MSG_BUFFER_SIZE; i++){
+            ConverseNotifyMsg *tmp = notifyMsg+i;
+            CurLoopInfo *loop = (CurLoopInfo *)(tmp->ptr);
+            delete loop;
+        }
+        free(notifyMsg);
+    }
+    
+    ConverseNotifyMsg *getNotifyMsg(){
+        while(1){
+            ConverseNotifyMsg *cur = notifyMsg+nextFreeNotifyMsg;
+            CurLoopInfo *loop = (CurLoopInfo *)(cur->ptr);
+            nextFreeNotifyMsg = (nextFreeNotifyMsg+1)%MSG_BUFFER_SIZE;
+            if(loop->isFree()) return cur;
+        }
+        return NULL;
     }
     
     FuncSingleHelper(CkMigrateMessage *m) {}		
