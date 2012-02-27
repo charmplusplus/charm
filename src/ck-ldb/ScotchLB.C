@@ -119,7 +119,6 @@ void ScotchLB::work(LDStats *stats) {
   CkAssert(edgeNum == edgenbr);
 
   SCOTCH_Graph graph;		// Graph to partition
-  SCOTCH_Arch  arch;            // Target architecture
   SCOTCH_Strat strat;		// Strategy to achieve partitioning
 
   /* Initialize data structures */
@@ -136,7 +135,6 @@ void ScotchLB::work(LDStats *stats) {
 
 
   SCOTCH_graphExit (&graph);
-  SCOTCH_archExit  (&arch);
   SCOTCH_stratExit (&strat);
 
   free(verttab);
@@ -152,6 +150,7 @@ void ScotchLB::work(LDStats *stats) {
   free(pemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete ogr;
 }
 
 #include "ScotchLB.def.h"
