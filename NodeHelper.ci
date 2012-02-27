@@ -1,4 +1,5 @@
 module NodeHelper{
+    initproc void RegisterNodeHelperHdlrs(void);
 	nodegroup FuncNodeHelper{
 		entry FuncNodeHelper();
 	};

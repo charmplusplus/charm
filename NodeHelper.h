@@ -136,25 +136,7 @@ private:
     //CurLoopInfo *curLoop; /* Points to the current loop that is being processed */
     
 public:
-    FuncSingleHelper(size_t ndhPtr) {
-        thisNodeHelper = (FuncNodeHelper *)ndhPtr;
-        CmiAssert(thisNodeHelper!=NULL);        
-        int stealWorkHandler = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
-        
-	nextFreeNotifyMsg = 0;
-        notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*MSG_BUFFER_SIZE);
-        for(int i=0; i<MSG_BUFFER_SIZE; i++){
-            ConverseNotifyMsg *tmp = notifyMsg+i;
-            if(thisNodeHelper->useTreeBcast){
-                tmp->srcRank = CmiMyRank();
-            }else{
-                tmp->srcRank = -1;
-            }            
-            tmp->ptr = (void *)(new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS));
-            CmiSetHandler(tmp, stealWorkHandler);
-        }
-        thisNodeHelper->helperPtr[CkMyRank()] = this;
-    }
+    FuncSingleHelper(size_t ndhPtr);
 
     ~FuncSingleHelper() {
         for(int i=0; i<MSG_BUFFER_SIZE; i++){

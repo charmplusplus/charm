@@ -122,6 +122,32 @@ void FuncNodeHelper::reduce(void **redBufs, void *redBuf, REDUCTION_TYPE type, i
     }
 }
 
+CpvStaticDeclare(int, NdhStealWorkHandler);
+static void RegisterNodeHelperHdlrs(){
+    CpvInitialize(int, NdhStealWorkHandler);
+    CpvAccess(NdhStealWorkHandler) = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
+}
+
+FuncSingleHelper::FuncSingleHelper(size_t ndhPtr) {
+    thisNodeHelper = (FuncNodeHelper *)ndhPtr;
+    CmiAssert(thisNodeHelper!=NULL);
+        
+	nextFreeNotifyMsg = 0;
+    notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*MSG_BUFFER_SIZE);
+    for(int i=0; i<MSG_BUFFER_SIZE; i++){
+        ConverseNotifyMsg *tmp = notifyMsg+i;
+        if(thisNodeHelper->useTreeBcast){
+            tmp->srcRank = CmiMyRank();
+        }else{
+            tmp->srcRank = -1;
+        }            
+        tmp->ptr = (void *)(new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS));
+        CmiSetHandler(tmp, CpvAccess(NdhStealWorkHandler));
+    }
+    thisNodeHelper->helperPtr[CkMyRank()] = this;
+}
+
+
 void SingleHelperStealWork(ConverseNotifyMsg *msg){
 	
 	int srcRank = msg->srcRank;
