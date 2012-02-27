@@ -478,7 +478,8 @@ static gni_post_descriptor_t *post_freelist=0;
   d = post_freelist;\
   if (d==0) { \
      d = ((gni_post_descriptor_t*)malloc(sizeof(gni_post_descriptor_t)));\
-     _MEMCHECK(d);\
+     d->next_descr = 0;\
+      _MEMCHECK(d);\
   } else post_freelist = d->next_descr;
 #else
 
@@ -1936,7 +1937,7 @@ static void  SendRdmaMsg()
                 register_size = GetMempoolsize((void*)(pd->local_addr));
             else
                 register_size = 0;
-        }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool
+        }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool, or CmiDirect Msg (which is not from mempool)
         {
             status = registerMemory((void*)(pd->local_addr), pd->length, &(pd->local_mem_hndl)); 
         }

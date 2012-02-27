@@ -8,7 +8,7 @@
   Yanhua Sun, 2/5/2012
 */
 
-#define     CMI_DIRECT_DEBUG    1
+#define     CMI_DIRECT_DEBUG    0
 #include "cmidirect.h"
 
 CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size)
@@ -40,7 +40,7 @@ struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *m
 
     userHandle.initialValue=0;
 #if CMI_DIRECT_DEBUG
-    printHandle(&userHandle, "Create Handler");
+    //printHandle(&userHandle, "Create Handler");
 #endif
     return userHandle;
 
@@ -76,7 +76,7 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     }
 
 #if CMI_DIRECT_DEBUG
-    printHandle(&userHandle, "Create Handler");
+    //printHandle(&userHandle, "Create Handler");
 #endif
     return userHandle;
 }
@@ -156,26 +156,18 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 1;
-        pd->cqwrite_value   = 0;        
-       // if(pd->type == GNI_POST_RDMA_PUT) 
-       //     status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
-       // else
-       //     status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
-        //if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
-        //{
-            bufferRdmaMsg(userHandle->remoteNode, pd); 
-        //}else
-        //    GNI_RC_CHECK("CMI_Direct_PUT", status);
+        pd->cqwrite_value   = 1;        
+        bufferRdmaMsg(userHandle->remoteNode, pd); 
+#if CMI_DIRECT_DEBUG
+        printHandle(userHandle, "After Direct_put");
+        CmiPrintf("[%d] RDMA put %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
+#endif
     }
 #else
     CmiPrintf("Normal Send in CmiDirect Put\n");
     CmiAbort("");
 #endif
 
-#if CMI_DIRECT_DEBUG
-    printHandle(userHandle, "After Direct_put");
-    CmiPrintf("[%d] RDMA put %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
-#endif
 
 }
 
@@ -208,24 +200,17 @@ void CmiDirect_get(CmiDirectUserHandle *userHandle) {
         pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
         pd->second_operand  = (uint64_t) (userHandle->callbackData);
         pd->amo_cmd         = 2;
-   //     if(pd->type == GNI_POST_RDMA_GET) 
-   //         status = GNI_PostRdma(ep_hndl_array[userHandle->remoteNode], pd);
-   //     else
-   //         status = GNI_PostFma(ep_hndl_array[userHandle->remoteNode],  pd);
-   //     if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
-   //     {
-            bufferRdmaMsg(userHandle->remoteNode, pd); 
-   //     }else
-   //         GNI_RC_CHECK("CMI_Direct_GET", status);
+        pd->cqwrite_value   = 1;
+        bufferRdmaMsg(userHandle->remoteNode, pd); 
+#if CMI_DIRECT_DEBUG
+    CmiPrintf("[%d] RDMA get %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
+#endif
     }
 #else
     CmiPrintf("Normal Send in CmiDirect Get\n");
     CmiAbort("");
 #endif
 
-#if CMI_DIRECT_DEBUG
-    CmiPrintf("[%d] RDMA get %d,%d bytes addr %p to remoteNode %d:%p \n\n",CmiMyPe(), userHandle->transSize, pd->length, (void*)(pd->local_addr), userHandle->remoteNode, (void*) (pd->remote_addr));
-#endif
 
 
 }
