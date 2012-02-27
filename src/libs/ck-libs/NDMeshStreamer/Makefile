@@ -1,7 +1,7 @@
 CDIR=../../../..
 CHARMC=$(CDIR)/bin/charmc $(OPTS)
 
-HEADERS=NDMeshStreamer.h NDMeshStreamer.decl.h NDMeshStreamer.def.h
+HEADERS=NDMeshStreamer.h DataItemTypes.h NDMeshStreamer.decl.h NDMeshStreamer.def.h
 OBJS=NDMeshStreamer.o
 LIB=libmoduleNDMeshStreamer
 
