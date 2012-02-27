@@ -169,7 +169,39 @@ int checkblock(mempool_type *mptr,block_header *current,int power)
   }
 }
 
-mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn)
+void removeblocks(mempool_type *mptr)
+{
+  block_header *current,*prev,*tofree,*tail;
+  mempool_freeblock freefn = mptr->freeblockfn;
+
+  if(mptr == NULL)
+    return;
+
+  tail = (block_header*)((char*)mptr+mptr->block_tail);
+  current = prev = &(mptr->block_head);
+  current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+
+  while(current != NULL) {
+    if(current->used <= 0) {
+      tofree = current;
+      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+      if(tail == tofree) {
+        mptr->block_tail = tofree->block_prev;
+      }
+      prev->block_next = tofree->block_next;
+      if(current != NULL) {
+        current->block_prev = tofree->block_prev;
+      }
+      mptr->size -= tofree->size;
+      freefn(tofree, tofree->mem_hndl);
+    } else {
+      prev = current;
+      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+    }
+  }
+}
+
+mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool_freeblock freefn, size_t limit)
 {
   int i,power;
   size_t end,left,prev,next;
@@ -182,12 +214,16 @@ mempool_type *mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
   mptr->newblockfn = allocfn;
   mptr->freeblockfn = freefn;
   mptr->block_tail = 0;
+  mptr->limit = limit;
+  mptr->size = pool_size;
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
   mptr->mempoolLock = CmiCreateLock();
 #endif
   mptr->block_head.mptr = pool;
   mptr->block_head.mem_hndl = mem_hndl;
   mptr->block_head.size = pool_size;
+  mptr->block_head.used = 0;
+  mptr->block_head.block_prev = 0;
   mptr->block_head.block_next = 0;
 #if CMK_CONVERSE_GEMINI_UGNI
   mptr->block_head.msgs_in_send= 0;
@@ -252,8 +288,12 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       if (!expand) return NULL;
 
 #if MEMPOOL_DEBUG
-      CmiPrintf("Expanding\n");
+      CmiPrintf("Expanding size %lld limit %lld\n",mptr->size,mptr->limit);
 #endif
+      //free blocks which are not being used
+      if((mptr->size > mptr->limit) && (mptr->limit > 0)) {
+        removeblocks(mptr);
+      }
 
       tail = (block_header*)((char*)mptr+mptr->block_tail);
       expand_size = 2*bestfit_size + sizeof(block_header); 
@@ -263,12 +303,15 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         return NULL;
       }
 
+      mptr->size += expand_size;
       current = (block_header*)pool; 
       tail->block_next = ((char*)current-(char*)mptr);
+      current->block_prev = mptr->block_tail;
       mptr->block_tail = tail->block_next;
 
       current->mptr = mptr;
       current->mem_hndl = mem_hndl;
+      current->used = 0;
       current->size = expand_size;
       current->block_next = 0;
 #if CMK_CONVERSE_GEMINI_UGNI
@@ -294,6 +337,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
       }
 
       head_free->block_ptr = current;
+      current->used += power;
 #if CMK_USE_MEMPOOL_ISOMALLOC || (CMK_SMP && CMK_CONVERSE_GEMINI_UGNI)
       CmiUnlock(mptr->mempoolLock);
 #endif
@@ -332,25 +376,11 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
               ((char*)ptr_free - (char*)mptr - sizeof(used_header)));
 #endif
 
-    //find which block this slot belonged to, can be done
-    //by maintaining extra 8 bytes in slot_header but I am
-    //currently doing it by linear search for gemini
-    block_head = &mptr->block_head;
-    while(block_head != NULL) {
-      if((size_t)ptr_free >= (size_t)(block_head)
-        && (size_t)ptr_free < (size_t)((char*)block_head
-        + block_head->size)) {
-        break;
-      }
-      block_head = block_head->block_next?(block_header *)((char*)mptr+block_head->block_next):NULL;
-    }
-    if(block_head==NULL) {
-      CmiPrintf("[%d] Mempool-Free request pointer was not in mempool range %lld\n",CthSelf(),ptr_free);
-      return;
-    }
 
     to_free = (slot_header *)((char*)ptr_free - sizeof(used_header));
     to_free->status = 1;
+    block_head = to_free->block_ptr;
+    block_head->used -= to_free->size;
 
     //find the neighborhood of to_free which is also free and
     //can be merged to get larger free slots 

@@ -2579,7 +2579,7 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 void LrtsPreCommonInit(int everReturn){
 #if USE_LRTS_MEMPOOL
     CpvInitialize(mempool_type*, mempool);
-    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block);
+    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, 0);
     MACHSTATE2(8, "mempool_init %d %p\n", CmiMyRank(), CpvAccess(mempool)) ; 
 #endif
 }

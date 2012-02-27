@@ -2307,7 +2307,7 @@ void *CmiIsomalloc(int size, CthThread tid)
 #if ISOMALLOC_DEBUG
       printf("Init Mempool in %d for %d\n",CthSelf(), tid);
 #endif
-      CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
+      CtvAccessOther(tid,threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccessOther(tid,threadpool),size+sizeof(CmiIsomallocBlock),1);
   } else {
@@ -2315,7 +2315,7 @@ void *CmiIsomalloc(int size, CthThread tid)
 #if ISOMALLOC_DEBUG
       printf("Init Mempool in %d\n",CthSelf());
 #endif
-      CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn);
+      CtvAccess(threadpool) = mempool_init(2*(size+sizeof(CmiIsomallocBlock)+sizeof(mempool_header))+sizeof(mempool_type), isomallocfn, isofreefn,0);
     }
     blk = (CmiIsomallocBlock*)mempool_malloc(CtvAccess(threadpool),size+sizeof(CmiIsomallocBlock),1);
   }
