@@ -194,6 +194,7 @@ void removeblocks(mempool_type *mptr)
       }
       mptr->size -= tofree->size;
       freefn(tofree, tofree->mem_hndl);
+      if(mptr->size < mptr->limit) return;
     } else {
       prev = current;
       current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
