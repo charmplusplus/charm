@@ -8,12 +8,15 @@
  *
  *  Flow control by mem pool using environment variables:
 
+    # CHARM_UGNI_MEMPOOL_MAX can be maximum_register_mem/number_of_processes
+    # CHARM_UGNI_SEND_MAX can be half of CHARM_UGNI_MEMPOOL_MAX
     export CHARM_UGNI_MEMPOOL_INIT_SIZE=8M
     export CHARM_UGNI_MEMPOOL_MAX=20M
     export CHARM_UGNI_SEND_MAX=10M
 
-    CHARM_UGNI_MEMPOOL_MAX can be maximum_register_mem/number_of_processes
-    CHARM_UGNI_SEND_MAX can be half of CHARM_UGNI_MEMPOOL_MAX
+    # limit on total mempool size allocated, this is to prevent mempool
+    # uses too much memory
+    export CHARM_UGNI_MEMPOOL_SIZE_LIMIT=512M 
 
     other environment variables:
 
@@ -94,6 +97,7 @@ CpvStaticDeclare(double, projTraceStart);
 
 static CmiInt8 _mempool_size = 8*oneMB;
 static CmiInt8 _expand_mem =  4*oneMB;
+static CmiInt8 _mempool_size_limit = 0;
 
 static CmiInt8 _totalmem = 0.8*oneGB;
 
@@ -214,14 +218,15 @@ uint8_t   onesided_hnd, omdh;
 #define   GetMempoolPtr(x)        GetMempoolBlockPtr(x)->mptr
 #define   GetMempoolsize(x)       GetMempoolBlockPtr(x)->size
 #define   GetMemHndl(x)           GetMempoolBlockPtr(x)->mem_hndl
-#define   GetMemHndlFromHeader(x) ((block_header*)x)->mem_hndl
-#define   GetSizeFromHeader(x)    ((block_header*)x)->size
 #define   NoMsgInSend(x)          GetMempoolBlockPtr(x)->msgs_in_send == 0
 #define   NoMsgInRecv(x)          GetMempoolBlockPtr(x)->msgs_in_recv == 0
 #define   NoMsgInFlight(x)        (GetMempoolBlockPtr(x)->msgs_in_send + GetMempoolBlockPtr(x)->msgs_in_recv  == 0)
 #define   IsMemHndlZero(x)        ((x).qword1 == 0 && (x).qword2 == 0)
 #define   SetMemHndlZero(x)       do {(x).qword1 = 0;(x).qword2 = 0;} while (0)
 #define   NotRegistered(x)        IsMemHndlZero(((block_header*)x)->mem_hndl)
+
+#define   GetMemHndlFromBlockHeader(x) ((block_header*)x)->mem_hndl
+#define   GetSizeFromBlockHeader(x)    ((block_header*)x)->size
 
 #define CmiGetMsgSize(m)     ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)   ((((CmiMsgHeaderExt*)m)->size)=(s))
@@ -717,8 +722,8 @@ static  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
 
         *from = current;
         if(current == NULL) return GNI_RC_ERROR_RESOURCE;
-        MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(GetMemHndlFromHeader(current)) , &omdh, GetSizeFromHeader(current));
-        SetMemHndlZero(GetMemHndlFromHeader(current));
+        MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(GetMemHndlFromBlockHeader(current)) , &omdh, GetSizeFromBlockHeader(current));
+        SetMemHndlZero(GetMemHndlFromBlockHeader(current));
     //}
     return GNI_RC_SUCCESS;
 }
@@ -2565,12 +2570,12 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     return pool;
 }
 
+// ptr is a block head pointer
 void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 {
     if(!(IsMemHndlZero(mem_hndl)))
     {
-        gni_return_t status = GNI_MemDeregister(nic_hndl, &mem_hndl);
-        GNI_RC_CHECK("free_mempool_block Mempool de-register", status);
+        MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &mem_hndl, &omdh, GetSizeFromBlockHeader(ptr));
     }
     free(ptr);
 }
@@ -2579,7 +2584,7 @@ void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
 void LrtsPreCommonInit(int everReturn){
 #if USE_LRTS_MEMPOOL
     CpvInitialize(mempool_type*, mempool);
-    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, 0);
+    CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, _mempool_size_limit);
     MACHSTATE2(8, "mempool_init %d %p\n", CmiMyRank(), CpvAccess(mempool)) ; 
 #endif
 }
@@ -2744,11 +2749,16 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         user_set_flag = 1;
     }
 
+    env = getenv("CHARM_UGNI_MEMPOOL_SIZE_LIMIT");
+    if (env) {
+        _mempool_size_limit = CmiReadSize(env);
+    }
+
     if (MAX_REG_MEM < _mempool_size) MAX_REG_MEM = _mempool_size;
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
 
     if (myrank==0) {
-        printf("Charm++> memory pool init size: %1.fMB\n", _mempool_size/1024.0/1024);
+        printf("Charm++> memory pool init size: %1.fMB, max size: %1.fMB\n", _mempool_size/1024.0/1024, _mempool_size_limit/1024.0/1024);
         printf("Charm++> memory pool max size: %1.fMB, max for send: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
         if (MAX_REG_MEM < BIG_MSG * 2 + oneMB)  {
             /* memblock can expand to BIG_MSG * 2 size */
