@@ -13,5 +13,16 @@ Urbana-Champaign.
 \maketitle
 
 \chapter{Introduction}
+\lstdefinelanguage{pseudo}{
+morekeywords={if, else, for, in, remove, from, case, do, forever, to, False, True},
+sensitive=true,%
+morecomment=[l]\#,%
+morestring=[b]',%
+}
+\begin{figure}
+\lstinputlisting[language=pseudo,basicstyle=\small,numbers=left,escapechar=\%]{code/pingpong.pseudo}
+\caption{A Pingpong Example using Converse Handler}
+\label{fig:converse-pingpong}
+\end{figure}
 
 \end{document}
