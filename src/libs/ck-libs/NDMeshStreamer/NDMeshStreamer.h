@@ -94,7 +94,11 @@ private:
 
     void storeMessage(int destinationPe, 
 		      const MeshLocation &destinationCoordinates, 
-		      const dtype &dataItem);
+		      void *dataItem);
+
+    virtual int copyDataItemIntoMessage(
+		MeshStreamerMessage<dtype> *destinationBuffer, 
+		void *dataItemHandle);
 
     virtual void deliverToDestination(
                  int destinationPe, 
@@ -121,6 +125,7 @@ public:
       return isPeriodicFlushEnabled_;
     }
     virtual void insertData(dtype &dataItem, int destinationPe); 
+    void insertData(void *dataItem, int destinationPe);
     void doneInserting();
     void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
       userCallback_ = cb;
@@ -144,7 +149,7 @@ template <class dtype>
 void MeshStreamerGroupClient<dtype>::receiveCombinedData(
                                 MeshStreamerMessage<dtype> *msg) {
   for (int i = 0; i < msg->numDataItems; i++) {
-    dtype data = msg->getDataItem(i);
+    dtype &data = msg->getDataItem(i);
     process(data);
   }
   delete msg;
@@ -276,15 +281,25 @@ MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) {
 }
 
 template <class dtype>
+inline 
+int MeshStreamer<dtype>::copyDataItemIntoMessage(
+			 MeshStreamerMessage<dtype> *destinationBuffer,
+			 void *dataItemHandle) {
+  return destinationBuffer->addDataItem(*((dtype *)dataItemHandle)); 
+}
+
+template <class dtype>
 inline
 void MeshStreamer<dtype>::storeMessage(
 			  int destinationPe, 
 			  const MeshLocation& destinationLocation,
-			  const dtype &dataItem) {
+			  void *dataItem) {
 
   int dimension = destinationLocation.dimension;
   int bufferIndex = destinationLocation.bufferIndex; 
   MeshStreamerMessage<dtype> ** messageBuffers = dataBuffers_[dimension];   
+
+
 
   // allocate new message if necessary
   if (messageBuffers[bufferIndex] == NULL) {
@@ -303,14 +318,14 @@ void MeshStreamer<dtype>::storeMessage(
   }
   
   MeshStreamerMessage<dtype> *destinationBuffer = messageBuffers[bufferIndex];
-  
-  int numBuffered = destinationBuffer->addDataItem(dataItem); 
+  int numBuffered = 
+    copyDataItemIntoMessage(destinationBuffer, dataItem);
   if (dimension != 0) {
     destinationBuffer->markDestination(numBuffered-1, destinationPe);
-  }
+  }  
   numDataItemsBuffered_++;
 
-  // copy data into message and send if buffer is full
+  // send if buffer is full
   if (numBuffered == bufferSize_) {
 
     int destinationIndex;
@@ -335,6 +350,7 @@ void MeshStreamer<dtype>::storeMessage(
 
   }
 
+  // send if total buffering capacity has been reached
   if (numDataItemsBuffered_ == totalBufferCapacity_) {
     flushLargestBuffer();
     if (isPeriodicFlushEnabled_) {
@@ -345,13 +361,8 @@ void MeshStreamer<dtype>::storeMessage(
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
+void MeshStreamer<dtype>::insertData(void *dataItem, int destinationPe) {
   static int count = 0;
-
-  if (destinationPe == CkMyPe()) {
-    localDeliver(dataItem);
-    return;
-  }
 
   MeshLocation destinationLocation = determineLocation(destinationPe);
   storeMessage(destinationPe, destinationLocation, dataItem); 
@@ -362,6 +373,19 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
     count = 0; 
     CthYield();
   }
+
+}
+
+template <class dtype>
+inline
+void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
+
+  if (destinationPe == CkMyPe()) {
+    localDeliver(dataItem);
+    return;
+  }
+
+  insertData((void *) &dataItem, destinationPe);
 }
 
 template <class dtype>
@@ -399,7 +423,7 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
       localDeliver(dataItem);
     }
     else {
-      storeMessage(destinationPe, destinationLocation, dataItem);   
+      storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
   }
 
@@ -585,7 +609,8 @@ private:
   void deliverToDestination(
        int destinationPe, 
        MeshStreamerMessage<ArrayDataItem<dtype> > *destinationBuffer) { 
-    ( (CProxy_ArrayMeshStreamer<dtype>) this->thisProxy[destinationPe]).receiveArrayData(destinationBuffer);
+    ( (CProxy_ArrayMeshStreamer<dtype>) 
+      this->thisProxy[destinationPe]).receiveArrayData(destinationBuffer);
   }
 
   void localDeliver(ArrayDataItem<dtype> &packedDataItem) {
@@ -604,6 +629,11 @@ private:
 
 public:
 
+  struct DataItemHandle {
+    int arrayIndex; 
+    dtype *dataItem;
+  };
+
   ArrayMeshStreamer(int totalBufferCapacity, int numDimensions,
 		    int *dimensionSizes, 
 		    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
@@ -618,20 +648,50 @@ public:
 
   void receiveArrayData(MeshStreamerMessage<ArrayDataItem<dtype> > *msg) {
     for (int i = 0; i < msg->numDataItems; i++) {
-      ArrayDataItem<dtype> &data = msg->getDataItem(i);
-      localDeliver(data);
+      ArrayDataItem<dtype> &packedData = msg->getDataItem(i);
+      localDeliver(packedData);
     }
     delete msg;
   }
 
   void insertData(dtype &dataItem, int arrayIndex) {
-    // simple implementation to test functionality
-    // TODO - reimplement to avoid copying item before transfer into message
-    ArrayDataItem<dtype> packedDataItem;
-    packedDataItem.arrayIndex = arrayIndex; 
-    packedDataItem.dataItem = dataItem;
-    MeshStreamer<ArrayDataItem<dtype> >::insertData(packedDataItem, clientArrayMgr->lastKnown(clientProxy_[arrayIndex].ckGetIndex()));
+
+    int destinationPe = 
+      clientArrayMgr->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
+
+    static ArrayDataItem<dtype> packedDataItem;
+    if (destinationPe == CkMyPe()) {
+      // copying here is necessary - user code should not be 
+      // passed back a reference to the original item
+      packedDataItem.arrayIndex = arrayIndex; 
+      packedDataItem.dataItem = dataItem;
+      localDeliver(packedDataItem);
+      return;
+    }
+
+    // this implementation avoids copying an item before transfer into message
+
+    static DataItemHandle tempHandle; 
+    tempHandle.arrayIndex = arrayIndex; 
+    tempHandle.dataItem = &dataItem;
+
+    MeshStreamer<ArrayDataItem<dtype> >::insertData(&tempHandle, destinationPe);
+
   }
+
+  int copyDataItemIntoMessage(
+      MeshStreamerMessage<ArrayDataItem <dtype> > *destinationBuffer, 
+      void *dataItemHandle) {
+
+    int numDataItems = destinationBuffer->numDataItems;
+    DataItemHandle *tempHandle = (DataItemHandle *) dataItemHandle;
+    (destinationBuffer->data)[numDataItems].dataItem = 
+      *(tempHandle->dataItem);
+    (destinationBuffer->data)[numDataItems].arrayIndex = 
+      tempHandle->arrayIndex;
+    return ++destinationBuffer->numDataItems;
+  }
+
 };
 
 #define CK_TEMPLATES_ONLY
