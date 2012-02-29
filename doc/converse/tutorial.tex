@@ -19,10 +19,46 @@ sensitive=true,%
 morecomment=[l]\#,%
 morestring=[b]',%
 }
+
+\section{CthThreads}
+
+The CthThread package, like most thread packages, provides basic functionality
+for creating threads, destroying threads, yielding, suspending, and awakening a
+suspended thread. In addition, it provides facilities whereby you can write
+your own thread schedulers.
+
+Figure~\ref{fig:converse-cth} demonstrates how to write a simple program that
+creates CthThreads. The \texttt{CthCreateMigratable} is used and it takes a
+handler, an argument pointer, and the stack size for the thread. This is
+demonstrated in the \texttt{initThreads} function on line number 43. Once the
+threads are created, they are pushed on the scheduler queue with the
+\texttt{CthAwaken} call, which only takes the \texttt{CthThread} as an
+argument. On being scheduled, the handler function is called.
+
+In the example, each thread then calls \texttt{CthYield}, which directs control
+back to the scheduler and pushes the thread back onto the queue. Then in a
+loop, each thread calls \texttt{CthYieldPrio} \texttt{NUM\_YIELD} times, with
+the queuing strategy and necessary parameters. The threads call this with
+priority $0$ and $1$, lower integers (but non-negative) indicating higher
+priority. The effect of yielding with priority is that the higher priority
+thread on the queue has precedence over the other threads and hence will be
+scheduled first, based on the greedy decision the scheduler makes.
+
+After this loop completes, the \texttt{threadDone} is called by each
+thread, which increments a counter and quits the program when all threads are
+done.
+
 \begin{figure}
 \lstinputlisting[language=pseudo,basicstyle=\footnotesize,numbers=left,escapechar=\%]{code/pingpong.pseudo}
 \caption{A Pingpong Example using Converse Handler}
 \label{fig:converse-pingpong}
 \end{figure}
+
+\begin{figure}
+ \VerbatimInput[numbers=left,frame=single,firstline=1,lastline=53]{code/cth-tutorial/pgm.C}
+ \caption{CthThread Example}
+ \label{fig:converse-cth}
+\end{figure}
+
 
 \end{document}

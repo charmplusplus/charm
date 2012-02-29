@@ -10,13 +10,10 @@ int endCounter = 0;
 //determine completion based on threads calling it
 void threadDone() {
   endCounter++;
-  if(endCounter == 2) {
-    CsdExitScheduler();
-  }
+  if (endCounter == 2) CsdExitScheduler();
 }
 
-//worker function for worker1
-//yields with a low priority
+//worker function for worker1, yields with a low priority
 void worker1Work(void* msg) {
   printf("start worker1\n");
   CthYield();
@@ -29,8 +26,7 @@ void worker1Work(void* msg) {
   threadDone();
 }
 
-//worker function for worker2
-//yields with a high priority
+//worker function for worker2, yields with a high priority
 void worker2Work(void* msg) {
   printf("start worker2\n");
   CthYield();
@@ -48,11 +44,9 @@ void initThreads(int argc, char* argv[]) {
   printf("called initThreads\n");
   CthThread worker1 = CthCreateMigratable((CthVoidFn)worker1Work, 0, 160000);
   CthThread worker2 = CthCreateMigratable((CthVoidFn)worker2Work, 0, 160000);
-  CthAwaken(worker1);
-  CthAwaken(worker2);
+  CthAwaken(worker1); CthAwaken(worker2);
 }
 
 int main(int argc, char* argv[]) {
-  //initialize converse and calls initThreads
   ConverseInit(argc, argv, initThreads, 0, 0);
 }
