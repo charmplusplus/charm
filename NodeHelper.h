@@ -101,16 +101,24 @@ class FuncNodeHelper : public CBase_FuncNodeHelper {
 	
 public:
     static int MAX_CHUNKS;
-private:    
-    int numHelpers;    
+private:
+    int mode;
+        
+    int numHelpers; //in pthread mode, the counter includes itself    
     FuncSingleHelper **helperPtr; /* ptrs to the FuncSingleHelpers it manages */
 	int useTreeBcast;
     
 public:
-	FuncNodeHelper();
+	FuncNodeHelper(int mode_, int numThreads_);
     ~FuncNodeHelper() {
         delete [] helperPtr;
     }
+	
+	void createPThreads();
+	void exit();
+	
+	int getNumHelpers() { return numHelpers; }
+	int needTreeBcast() { return useTreeBcast; }
     
     void parallelizeFunc(HelperFn func, /* the function that finishes a partial work on another thread */
                         int paramNum, void * param, /* the input parameters for the above func */

@@ -65,8 +65,7 @@ Main::Main(CkArgMsg* m) {
     totalElems = 1;
 	numChunks = CkMyNodeSize();
 	loopTimes = 1000;
-	//runningMode = NODEHELPER_STATIC;
-	runningMode = 3; 
+	runningMode = NODEHELPER_USECHARM; 
 	
     mainStep = 0;
 	numElemFinished = 0;
@@ -78,7 +77,7 @@ Main::Main(CkArgMsg* m) {
         processCommandLine(m->argc,m->argv);
 	}
     else{		
-		CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 0 (non-SMP) or 1|2 (SMP))  -p(#threads)\n");
+		CkPrintf("Usage: -t(#iterations) -c(#chunks) -a(#test instances) -m(running mode, 1 for use Charm threads; 2 for use pthreads )  -p(#threads)\n");
 	}
     delete m;
 	
@@ -90,8 +89,8 @@ Main::Main(CkArgMsg* m) {
 	CkPrintf("Using NodeHelper Lib with mode: %d, nodesize=%d\n", runningMode, CkMyNodeSize());
 	CkPrintf("Testcase info: %d test instances where the loop iterates %d times, each work is partitioned into %d tasks\n", totalElems, loopTimes, numChunks);
 	
-	//nodeHelperProxy = NodeHelper_Init(runningMode, threadNum);
-	nodeHelperProxy = NodeHelper_Init();
+	nodeHelperProxy = NodeHelper_Init(runningMode, threadNum);
+	//nodeHelperProxy = NodeHelper_Init();
     mainProxy = thishandle;
     
 	//create test instances

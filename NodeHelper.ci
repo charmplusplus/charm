@@ -1,7 +1,8 @@
 module NodeHelper{
     initproc void RegisterNodeHelperHdlrs(void);
 	nodegroup FuncNodeHelper{
-		entry FuncNodeHelper();
+		entry FuncNodeHelper(int mode, int numThreads);
+		entry void exit();
 	};
 	chare FuncSingleHelper{
 		entry FuncSingleHelper(size_t);
