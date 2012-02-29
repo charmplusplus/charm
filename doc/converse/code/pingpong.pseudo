@@ -1,3 +1,5 @@
+#include <converse.h>
+#include <stdlib.h>
 CpvDeclare(int,msgSize);
 CpvDeclare(int,exitHandler);
 CpvDeclare(int,node0Handler);
@@ -27,8 +29,8 @@ CmiHandler exitHandlerFunc(char *msg)
 //Handler on Node 0
 CmiHandler node0HandlerFunc(char *msg)
 {
-        ringFinished(msg);
-		return 0;
+	ringFinished(msg);
+	return 0;
 }
 CmiHandler node1HandlerFunc(char *msg)
 {
