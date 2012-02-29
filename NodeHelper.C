@@ -17,6 +17,26 @@ static pthread_t *ndhThreads = NULL;
 static volatile int gCrtCnt = 0;
 static volatile int exitFlag = 0;
 
+#if CMK_OS_IS_LINUX
+#include <sys/syscall.h>
+#endif
+
+static int HelperOnCore(){
+#if CMK_OS_IS_LINUX
+	char fname[64];
+	sprintf(fname, "/proc/%ld/task/%ld/stat", getpid(), syscall(SYS_gettid));
+	FILE *ifp = fopen(fname, "r");
+	if(ifp == NULL) return -1;
+	fseek(ifp, 0, SEEK_SET);
+	char str[128];
+	for(int i=0; i<39; i++) fscanf(ifp, "%s", str);
+	fclose(ifp);
+	return atoi(str);
+#else
+	return -1;
+#endif
+}
+
 static void *ndhThreadWork(void *id) {
 	size_t myId = (size_t) id;
 	
@@ -35,6 +55,7 @@ static void *ndhThreadWork(void *id) {
 	__sync_add_and_fetch(&gCrtCnt, 1);
 	
 	while(1){
+		//printf("thread[%ld]: on core %d with main %d\n", myId, HelperOnCore(), mainHelperPhyRank);
 		if(exitFlag) break;
 		pthread_mutex_lock(&thdLock);
 		pthread_cond_wait(&thdCondition, &thdLock);
@@ -66,8 +87,9 @@ void FuncNodeHelper::createPThreads() {
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 	ndhThreads = new pthread_t[numThreads];
-	mainHelperPhyRank = CmiPhysicalRank(CmiMyPe());
-	numPhysicalPEs = CmiNumPesOnPhysicalNode(CmiPhysicalNodeID(CmiMyPe()));
+	mainHelperPhyRank = CmiOnCore();
+	numPhysicalPEs = CmiNumCores();
+	if(mainHelperPhyRank == -1) mainHelperPhyRank = 0;
 	for(int i=1; i<=numThreads; i++){
 		pthread_create(ndhThreads+i, &attr, ndhThreadWork, (void *)i);
 	}
