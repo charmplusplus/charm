@@ -1,6 +1,6 @@
-                           Charm++ CVS Version
+                           Charm++
 
-       Copyright (C) 1989-2000 Regents of the University of Illinois
+       Copyright (C) 1989-2012 Regents of the University of Illinois
 
 INTRODUCTION
 ============
@@ -14,23 +14,10 @@ Source code is provided, and non-commercial use is free.
 GETTING THE LATEST CHARM SOURCE
 ===============================
 
-You can use our anonymous cvs server to checkout the latest charm++ source code.
-(It may not be the latest stable version though) 
-What you need to do is as following:
+You can use anonymous Git access to obtain the latest Charm++ source
+code, as follows:
 
-1. login the cvs server:
-
-      cvs -d :pserver:checkout@charm.cs.illinois.edu:/cvsroot login
-
-      when CVS password is prompted, just press enter.
-2. checkout charm:
-
-      cvs co -P charm
-
-      You should get latest charm source tree.
-3. logout the cvs server:
-
-      cvs logout
+    git clone git://charm.cs.illinois.edu/charm.git
 
 
 PICKING A VERSION
@@ -40,9 +27,11 @@ First, you need to decide which version of charm++ to use. The "build"
 script in charm source directory takes several command line options to
 compile Charm++. The command line syntax is:
 
-build <target> <version> [options ...] [--basedir=dir] [--libdir=dir] [--incdir=dir] [charmc-options ...]
+build <target> <version> [options ...]
+                         [--basedir=dir] [--libdir=dir] [--incdir=dir]
+                         [charmc-options ...]
 
-for detailed help messages, use -h or --help to the build script, i.e.
+For detailed help messages, pass -h or --help to the build script, i.e.
 ./build --help
 
 REQUIRED:
@@ -132,8 +121,11 @@ development and testing.
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
 machines with a good MPI implementation (such as the Origin 2000).
 
-	"gemini", "bluegene[lpq]", Charm++
+	"gemini_gni-", "bluegene[lpq]-", Charm++
 communicates using direct calls to the machine's communication primitives.
+
+	"multicore-" Charm++ communicates using shared memory within a
+	single node
 
 	"sim-" and "uth-" are not actively maintained.  These are
 single-processor versions: "uth-" simulates processors as user-level
@@ -142,30 +134,32 @@ threads; "sim-" switches between processors and counts communications.
 
 2.)  Your operating system:
 
-	"linux"   Linux 
-	"win32"   MS Windows with MS Visual C++ compiler
-	"cygwin"  MS Windows with Cygnus' Cygwin Unix layer
-	"irix"    SGI IRIX
-	"origin"  SGI Origin 2000 IRIX
-	"sol"     Solaris
-	"sun"     SunOS
-	"rs6k"    IBM R/S 6000 A/IX 
-	"sp"      IBM SP A/IX
-	"hp"      Hewlett-Packard HP-UX
-	"axp"     DEC Alpha DECUNIX
-	
+	"linux"       Linux
+	"win{32,64}"  MS Windows with MS Visual C++ compiler (32/64-bit, resp.)
+	"cygwin"      MS Windows with Cygnus' Cygwin Unix layer
+	"darwin"      Apple Mac OS X
+	"sol"         Solaris
+	"aix"         IBM A/IX
+	"sp"          IBM SP A/IX
 
-3.)  Some operating systems have other options, such as:
-	"-x86"     For Solaris, use PC hardware (instead of Sun).
-	"-axp"     For Linux, use Alpha hardware (instead of PC).
-        "-ia64"    Use Itanium(tm) instructions (instead of x86).
-        "-x86_64"  Use AMD Opteron instructions (instead of x86).
+
+3.)  Some operating systems have other architecture options, such as:
+
+	"-x86"     For Solaris and Mac OS X, target x86 hardware (instead of
+	           SPARC or PPC).
+	"-ppc"     POWER/PowerPC
+	"-mips64"  MIPS, such as for SiCortex systems
+        "-ia64"    Use Itanium(tm) IA-64 instructions (instead of x86).
+        "-x86_64"  Use AMD64/EM64T 64-bit x86 instructions (instead of 32 bit).
+	"-cell"    Sony/Toshiba/IBM Cell PPE (e.g. Playstation 3,
+	           Mercury blades, Roadrunner)
 
 Your Charm++ version is made by concatenating the options, e.g.:
 
-"net-linux"     Charm++ for a network of Linux workstations, compiled
-                using g++.
-"mpi-origin"    Charm++ for SGI Origin 2000, compiled using SGI CC.
+"net-linux-x86_64"   Charm++ for a network of 64-bit Linux workstations,
+                     compiled using g++.
+
+"mpi-crayxt"         Charm++ for Cray XT4/5 systems using the system's compiler.
 
 
 **** How to choose <options> ****
