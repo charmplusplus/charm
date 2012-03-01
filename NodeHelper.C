@@ -110,10 +110,15 @@ void FuncNodeHelper::exit(){
 
 /*====End of pthread-related variables and impelementation====*/
 
+
+/* Note: Those event ids should be unique globally!! */
+#define NDH_TOTAL_WORK_EVENTID  139
+#define NDH_FINISH_SIGNAL_EVENTID 143
+
 FuncNodeHelper::FuncNodeHelper(int mode_, int numThreads_)
 {  
-    traceRegisterUserEvent("nodehelper total work",20);
-    traceRegisterUserEvent("nodehlelper finish signal",21);
+    traceRegisterUserEvent("nodehelper total work",NDH_TOTAL_WORK_EVENTID);
+    traceRegisterUserEvent("nodehlelper finish signal",NDH_FINISH_SIGNAL_EVENTID);
 
     mode = mode_;
 
@@ -171,7 +176,7 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	 CurLoopInfo *curLoop = NULL;
     
     //for using nodequeue
-	TRACE_START(20);
+	TRACE_START(NDH_TOTAL_WORK_EVENTID);
 	if(mode == NODEHELPER_USECHARM){	
 		FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
 	#if ALLOW_MULTIPLE_UNSYNC
@@ -212,11 +217,11 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	}
 	
 	curLoop->stealWork();
-	TRACE_BRACKET(20);
+	TRACE_BRACKET(NDH_TOTAL_WORK_EVENTID);
 	
-	TRACE_START(21);                
+	TRACE_START(NDH_FINISH_SIGNAL_EVENTID);
 	curLoop->waitLoopDone(sync);
-	TRACE_BRACKET(21);        
+	TRACE_BRACKET(NDH_FINISH_SIGNAL_EVENTID);
 
     if (type!=NODEHELPER_NONE)
         reduce(curLoop->getRedBufs(), redResult, type, numChunks);            
