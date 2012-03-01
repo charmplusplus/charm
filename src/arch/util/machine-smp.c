@@ -215,7 +215,7 @@ static void CmiStartThreads(char **argv)
   barrier_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
+  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
   Cmi_state_key = TlsAlloc();
@@ -414,12 +414,13 @@ static void CmiStartThreads(char **argv)
   int ok, tocreate;
   pthread_attr_t attr;
 
+  MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
+  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
 #if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
@@ -470,6 +471,7 @@ static void CmiStartThreads(char **argv)
 #endif
 #endif
 
+  MACHSTATE(4,"CmiStartThreads done")
 }
 
 static void CmiDestoryLocks()
@@ -638,8 +640,8 @@ void CmiStateInit(int pe, int rank, CmiState state)
 
 void CmiNodeStateInit(CmiNodeState *nodeState)
 {
+  MACHSTATE1(4,"NodeStateInit %p", nodeState)
 #if CMK_IMMEDIATE_MSG
-  MACHSTATE(4,"NodeStateInit")
   nodeState->immSendLock = CmiCreateLock();
   nodeState->immRecvLock = CmiCreateLock();
   nodeState->immQ = PCQueueCreate();
@@ -649,6 +651,7 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
   nodeState->CmiNodeRecvLock = CmiCreateLock();
   nodeState->NodeRecv = PCQueueCreate();
 #endif
+  MACHSTATE(4,"NodeStateInit done")
 }
 
 /*@}*/

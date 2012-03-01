@@ -12,3 +12,6 @@
 #define CMK_THREADS_USE_CONTEXT                            1
 
 
+#if ! CMK_GCC_X86_ASM
+#define CMK_PCQUEUE_LOCK                                   1
+#endif
