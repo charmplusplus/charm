@@ -23,7 +23,7 @@ module CkMulticast {
     // multicast
     entry [expedited, notrace] void recvMsg(multicastGrpMsg *m);
     entry [expedited, notrace] void sendToLocal(multicastGrpMsg *m);
-    entry [expedited, notrace] void recvPacket(CkSectionInfo _cookie, int n, char data[n], int seqno, int count, int totalsize, int frombufer);
+    entry [expedited, notrace] void recvPacket(CkSectionInfo _cookie, int offset, int n, char data[n], int seqno, int count, int totalsize, int frombufer);
     // reduction
     entry [expedited, notrace] void recvRedMsg(CkReductionMsg *msg);
     entry void updateRedNo(mCastEntryPtr e, int no);

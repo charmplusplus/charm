@@ -80,14 +80,15 @@ class reductionInfo {
 class mCastPacket {
 public:
   CkSectionInfo cookie;
+  int offset;
   int n;
   char *data;
   int seqno;
   int count;
   int totalsize;
 
-  mCastPacket(CkSectionInfo &_cookie, int _n, char *_d, int _s, int _c, int _t):
-		cookie(_cookie), n(_n), data(_d), seqno(_s), count(_c), totalsize(_t) {}
+  mCastPacket(CkSectionInfo &_cookie, int _offset, int _n, char *_d, int _s, int _c, int _t):
+		cookie(_cookie), offset(_offset), n(_n), data(_d), seqno(_s), count(_c), totalsize(_t) {}
 };
 
 typedef CkQ<mCastPacket *> multicastGrpPacketBuf;
@@ -612,7 +613,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     {
         mCastPacket *packet = entry->packetBuf.deq();
         packet->cookie.get_val() = entry;
-        mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
+        mCastGrp[CkMyPe()].recvPacket(packet->cookie, packet->offset, packet->n, packet->data, packet->seqno, packet->count, packet->totalsize, 1);
         delete [] packet->data;
         delete packet;
     }
@@ -802,7 +803,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       mysize = totalsize-sizesofar;
     }
     //CmiPrintf("[%d] send to %d : mysize: %d total: %d \n", CkMyPe(), s.get_pe(), mysize, totalsize);
-    mCastGrp[s.get_pe()].recvPacket(s, mysize, data, i, totalcount, totalsize, 0);
+    mCastGrp[s.get_pe()].recvPacket(s, sizesofar, mysize, data, i, totalcount, totalsize, 0);
     sizesofar += mysize;
     data += mysize;
   }
@@ -818,7 +819,7 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
 #endif
 }
 
-void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int seqno, int count, int totalsize, int fromBuffer)
+void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int offset, int n, char *data, int seqno, int count, int totalsize, int fromBuffer)
 {
   int i;
   mCastEntry *entry = (mCastEntry *)_cookie.get_val();
@@ -827,7 +828,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int s
   if (!fromBuffer && (entry->notReady() || !entry->packetBuf.isEmpty())) {
     char *newdata = new char[n];
     memcpy(newdata, data, n);
-    entry->packetBuf.enq(new mCastPacket(_cookie, n, newdata, seqno, count, totalsize));
+    entry->packetBuf.enq(new mCastPacket(_cookie, offset, n, newdata, seqno, count, totalsize));
 //CmiPrintf("[%d] Buffered recvPacket: seqno: %d %d frombuf:%d empty:%d entry:%p\n", CkMyPe(), seqno, count, fromBuffer, entry->packetBuf.isEmpty(),entry);
     return;
   }
@@ -838,20 +839,16 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &_cookie, int n, char *data, int s
   // can not optimize using list send because the difference in cookie
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.length(); i++) {
-    mCastGrp[entry->children[i].get_pe()].recvPacket(entry->children[i], n, data, seqno, count, totalsize, 0);
+    mCastGrp[entry->children[i].get_pe()].recvPacket(entry->children[i], offset, n, data, seqno, count, totalsize, 0);
   }
 
-  if (seqno == 0) {
-    if (entry->asm_msg != NULL || entry->asm_fill != 0) {
-      entry->print();
-      CmiAssert(entry->asm_msg == NULL && entry->asm_fill==0);
-    }
+  if (entry->asm_msg == NULL) {
+    CmiAssert(entry->asm_fill == 0);
     entry->asm_msg = (char *)CmiAlloc(totalsize);
   }
-  memcpy(entry->asm_msg+entry->asm_fill, data, n);
+  memcpy(entry->asm_msg+offset, data, n);
   entry->asm_fill += n;
-  if (seqno + 1 == count) {
-    CmiAssert(entry->asm_fill == totalsize);
+  if (entry->asm_fill == totalsize) {
     CkUnpackMessage((envelope **)&entry->asm_msg);
     multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
     msg->_cookie = _cookie;
