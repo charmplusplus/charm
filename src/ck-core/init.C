@@ -507,7 +507,7 @@ static void _exitHandler(envelope *env)
 #endif
 	/*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
-         _sendStats();
+      //   _sendStats();
       }
 #if !CMK_INTER_OPERATE
       _mainDone = 1; // This is needed because the destructors for
@@ -529,9 +529,10 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-      if(CkMyPe()){
+      if(1 || CkMyPe()){
 	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
 #if CMK_INTER_OPERATE
+        _exitStarted = 0;
         CpvAccess(charmLibExitFlag) = 1;
 #else
         ConverseExit();
