@@ -1454,7 +1454,9 @@ static void PumpNetworkSmsg()
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
     SMSG_QUEUE         *queue = &smsg_queue;
+#if     CMK_DIRECT
     cmidirectMsg        *direct_msg;
+#endif
     while(1)
     {
         CMI_GNI_LOCK
