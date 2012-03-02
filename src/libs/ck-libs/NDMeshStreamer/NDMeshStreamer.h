@@ -602,7 +602,7 @@ class ArrayMeshStreamer : public MeshStreamer<ArrayDataItem<dtype> > {
 private:
 
   CProxy_MeshStreamerArrayClient<dtype> clientProxy_;
-  CkArray *clientArrayMgr;
+  CkArray *clientArrayMgr_;
   MeshStreamerArrayClient<dtype> *clientObj_;
 
 
@@ -610,7 +610,7 @@ private:
        int destinationPe, 
        MeshStreamerMessage<ArrayDataItem<dtype> > *destinationBuffer) { 
     ( (CProxy_ArrayMeshStreamer<dtype>) 
-      this->thisProxy[destinationPe]).receiveArrayData(destinationBuffer);
+      this->thisProxy )[destinationPe].receiveArrayData(destinationBuffer);
   }
 
   void localDeliver(ArrayDataItem<dtype> &packedDataItem) {
@@ -643,7 +643,7 @@ public:
 					progressPeriodInMs) 
   {
     clientProxy_ = clientProxy; 
-    clientArrayMgr = clientProxy_.ckLocalBranch();
+    clientArrayMgr_ = clientProxy_.ckLocalBranch();
   }
 
   void receiveArrayData(MeshStreamerMessage<ArrayDataItem<dtype> > *msg) {
@@ -657,8 +657,7 @@ public:
   void insertData(dtype &dataItem, int arrayIndex) {
 
     int destinationPe = 
-      clientArrayMgr->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
-
+      clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
     static ArrayDataItem<dtype> packedDataItem;
     if (destinationPe == CkMyPe()) {
       // copying here is necessary - user code should not be 
