@@ -30,14 +30,13 @@ struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *m
     gni_return_t            status = GNI_RC_SUCCESS;
     CmiDirectUserHandle userHandle;
     userHandle.handle=1; 
-    
     userHandle.remoteNode= CmiMyNode();
+    userHandle.remoteRank = CmiMyRank();
     userHandle.transSize=recvBufSize;
     userHandle.remoteBuf=recvBuf;
     userHandle.callbackFnPtr=callbackFnPtr;
     userHandle.callbackData=callbackData;
     userHandle.remoteMdh = *mem_hndl;
-
     userHandle.initialValue=0;
 #if CMI_DIRECT_DEBUG
     //printHandle(&userHandle, "Create Handler");
@@ -79,6 +78,11 @@ CmiDirectUserHandle CmiDirect_createHandle(int localNode,void *recvBuf, int recv
     //printHandle(&userHandle, "Create Handler");
 #endif
     return userHandle;
+}
+
+void CmiDirect_saveHandler(CmiDirectUserHandle* h, void *ptr)
+{
+    h->remoteHandler = ptr;
 }
 
 void CmiDirect_assocLocalBuffer_mem(CmiDirectUserHandle *userHandle, CmiDirectMemoryHandler *mem_hndl, void *sendBuf,int sendBufSize) {
@@ -153,8 +157,7 @@ void CmiDirect_put(CmiDirectUserHandle *userHandle) {
         pd->remote_mem_hndl = userHandle->remoteMdh;
         pd->src_cq_hndl     = 0;
         pd->rdma_mode       = 0;
-        pd->first_operand   = (uint64_t) (userHandle->callbackFnPtr);
-        pd->second_operand  = (uint64_t) (userHandle->callbackData);
+        pd->first_operand   = (uint64_t)(userHandle->remoteHandler);
         pd->amo_cmd         = 1;
         pd->cqwrite_value   = 1;        
         bufferRdmaMsg(userHandle->remoteNode, pd); 

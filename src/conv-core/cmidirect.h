@@ -40,8 +40,10 @@ typedef struct infiDirectUserHandle{
     DCMF_Callback_t DCMF_notify_cb;
 #elif  CMK_CONVERSE_GEMINI_UGNI
     int localNode;
+    int remoteRank;
     int remoteNode;
     void *remoteBuf;
+    void *remoteHandler;
     int transSize;
     void *localBuf;
     void (*callbackFnPtr)(void *);
@@ -63,6 +65,7 @@ typedef gni_mem_handle_t    CmiDirectMemoryHandler;
 CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size);
 struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *mem_hndl, void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
 void CmiDirect_assocLocalBuffer_mem(struct infiDirectUserHandle *userHandle, CmiDirectMemoryHandler *mem_hndl, void *sendBuf,int sendBufSize);
+void CmiDirect_saveHandler(CmiDirectUserHandle* h, void *ptr);
 #endif
 /* functions */
 

@@ -40,6 +40,9 @@
 
 #include "converse.h"
 
+#if CMK_DIRECT
+#include "cmidirect.h"
+#endif
 #define PRINT_SYH  0
 
 #define USE_LRTS_MEMPOOL                  1
@@ -355,12 +358,32 @@ typedef struct control_msg
     struct control_msg *next;
 }CONTROL_MSG;
 
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
 typedef struct{
-    void *recverBuf;
-    void (*callbackFnPtr)(void *);
-    void *callbackData;
+    uint64_t    handler_addr;
 }CMK_DIRECT_HEADER;
+
+typedef struct {
+    char core[CmiMsgHeaderSizeBytes];
+    uint64_t handler;
+}cmidirectMsg;
+
+//SYH
+CpvDeclare(int, CmiHandleDirectIdx);
+void CmiHandleDirectMsg(cmidirectMsg* msg)
+{
+
+    CmiDirectUserHandle *_handle= (CmiDirectUserHandle*)(msg->handler);
+   (*(_handle->callbackFnPtr))(_handle->callbackData);
+   CmiFree(msg);
+}
+
+void CmiDirectInit()
+{
+    CpvInitialize(int,  CmiHandleDirectIdx);
+    CpvAccess(CmiHandleDirectIdx) = CmiRegisterHandler( (CmiHandler) CmiHandleDirectMsg);
+}
+
 #endif
 typedef struct  rmda_msg
 {
@@ -1290,6 +1313,9 @@ static void set_limit()
 
 void LrtsPostCommonInit(int everReturn)
 {
+#if CMK_DIRECT
+    CmiDirectInit();
+#endif
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);
     /* only PE 0 needs to care about registration (to generate sts file). */
@@ -1428,7 +1454,7 @@ static void PumpNetworkSmsg()
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
     SMSG_QUEUE         *queue = &smsg_queue;
-
+    cmidirectMsg        *direct_msg;
     while(1)
     {
         CMI_GNI_LOCK
@@ -1534,9 +1560,14 @@ static void PumpNetworkSmsg()
                 handleOneRecvedMsg(size, msg); 
                 break;
 #endif
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
             case DIRECT_PUT_DONE_TAG:  //cmi direct 
-                (*(((CMK_DIRECT_HEADER*) header)->callbackFnPtr))(((CMK_DIRECT_HEADER*) header)->callbackData);
+                //create a trigger message
+                direct_msg = (cmidirectMsg*)CmiAlloc(sizeof(cmidirectMsg));
+                direct_msg->handler = ((CMK_DIRECT_HEADER*)header)->handler_addr;
+                CmiSetHandler(direct_msg, CpvAccess(CmiHandleDirectIdx));
+                CmiPushPE(((CmiDirectUserHandle*)direct_msg->handler)->remoteRank, direct_msg);
+                //(*(((CMK_DIRECT_HEADER*) header)->callbackFnPtr))(((CMK_DIRECT_HEADER*) header)->callbackData);
                 break;
 #endif
             default: {
@@ -1751,7 +1782,7 @@ static void PumpLocalRdmaTransactions()
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
     uint8_t                 msg_tag;
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
     CMK_DIRECT_HEADER       *cmk_direct_done_msg;
 #endif
     SMSG_QUEUE         *queue = &smsg_queue;
@@ -1772,13 +1803,11 @@ static void PumpLocalRdmaTransactions()
             CMI_GNI_LOCK
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
             CMI_GNI_UNLOCK
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
             if(tmp_pd->amo_cmd == 1)
             {
                 cmk_direct_done_msg = (CMK_DIRECT_HEADER*) malloc(sizeof(CMK_DIRECT_HEADER));
-                cmk_direct_done_msg->callbackFnPtr = (void*)( tmp_pd->first_operand);
-                cmk_direct_done_msg->recverBuf = (void*)(tmp_pd->remote_addr);
-                cmk_direct_done_msg->callbackData = (void*)(tmp_pd->second_operand); 
+                cmk_direct_done_msg->handler_addr= (tmp_pd->first_operand); 
             }
             else{
                 MallocControlMsg(ack_msg_tmp);
@@ -1802,7 +1831,7 @@ static void PumpLocalRdmaTransactions()
                 msg_tag = PUT_DONE_TAG;
                 break;
 #endif
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
             case GNI_POST_RDMA_PUT:
             case GNI_POST_FMA_PUT:
                 //sender ACK to receiver to trigger it is done
@@ -2061,7 +2090,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
                 break;
-#ifdef CMK_DIRECT
+#if CMK_DIRECT
             case DIRECT_PUT_DONE_TAG:
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
