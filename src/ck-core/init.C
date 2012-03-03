@@ -497,21 +497,19 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
+#if !CMK_INTER_OPERATE
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
-#if !CMK_INTER_OPERATE
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-#endif
-	/*FAULT_EVAC*/
+	    /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
-      //   _sendStats();
+         _sendStats();
       }
-#if !CMK_INTER_OPERATE
       _mainDone = 1; // This is needed because the destructors for
-#endif   // readonly variables will be called when the program
+         // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
@@ -519,6 +517,7 @@ static void _exitHandler(envelope *env)
 #if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
+#endif //!CMK_INTER_OPERATE
       if (_ringexit) {
         int stride = CkNumPes()/_ringtoken;
         int pe = CkMyPe()+1;
@@ -529,17 +528,20 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-      if(1 || CkMyPe()){
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+//everyone exits here - there may be issues with leftover messages in the queue
 #if CMK_INTER_OPERATE
-        _exitStarted = 0;
-        CpvAccess(charmLibExitFlag) = 1;
+	    DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+      _exitStarted = 0;
+      CpvAccess(charmLibExitFlag) = 1;
 #else
+      if(CkMyPe()){
+	      DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
-#endif
       }	
+#endif
       break;
     case StatMsg:
+// shouldn't reach here in interoperate mode
       CkAssert(CkMyPe()==0);
 #if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
@@ -548,17 +550,9 @@ static void _exitHandler(envelope *env)
       DEBUGF(("StatMsg on %d with %d\n", CkMyPe(), _numStatsRecd));
 			/*FAULT_EVAC*/
       if(_numStatsRecd==CkNumValidPes()) {
-#if CMK_INTER_OPERATE
-        _numStatsRecd = 0;
-#endif
         _printStats();
 	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-#if CMK_INTER_OPERATE
-        _exitStarted = 0;
-        CpvAccess(charmLibExitFlag) = 1;
-#else
         ConverseExit();
-#endif
       }
       break;
     default:

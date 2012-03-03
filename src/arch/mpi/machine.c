@@ -906,12 +906,10 @@ static void PumpMsgsBlocking(void) {
     char *msg;
     int recd=0;
 
-#if !CMK_INTER_OPERATE
     if (!PCQueueEmpty(CmiGetState()->recv)) return;
     if (!CdsFifo_Empty(CpvAccess(CmiLocalQueue))) return;
     if (!CqsEmpty(CpvAccess(CsdSchedQueue))) return;
     if (CpvAccess(sent_msgs))  return;
-#endif
 
 #if 0
     CmiPrintf("[%d] PumpMsgsBlocking. \n", CmiMyPe());
