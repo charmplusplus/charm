@@ -1395,15 +1395,12 @@ void registerExitFn(CkExitFn fn)
   _CkExitFnVec.enq(fn);
 }
 
-#if CMK_INTER_OPERATE
 void CharmLibInit(int peid, int numpes, int argc, char **argv){
     //note CmiNumNodes and CmiMyNode should just be macros
     _Cmi_numnodes = numpes; 
     _Cmi_mynode = peid;
 
-
     ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
     printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes()); 
 }
-#endif
 /*@}*/
