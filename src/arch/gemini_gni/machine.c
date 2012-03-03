@@ -246,7 +246,11 @@ uint8_t   onesided_hnd, omdh;
 
 /* If SMSG is used */
 static int  SMSG_MAX_MSG = 1024;
+#if CMK_SMP
+#define SMSG_MAX_CREDIT 144
+#else
 #define SMSG_MAX_CREDIT 72 
+#endif
 
 #define MSGQ_MAXSIZE       2048
 /* large message transfer with FMA or BTE */
@@ -350,13 +354,26 @@ typedef struct control_msg
 {
     uint64_t            source_addr;    /* address from the start of buffer  */
     uint64_t            dest_addr;      /* address from the start of buffer */
-    //int                 source;         /* source rank */
     int                 total_length;   /* total length */
     int                 length;         /* length of this packet */
     uint8_t             seq_id;         //big message   0 meaning single message
     gni_mem_handle_t    source_mem_hndl;
     struct control_msg *next;
-}CONTROL_MSG;
+} CONTROL_MSG;
+
+#define CONTROL_MSG_SIZE       (sizeof(CONTROL_MSG)-sizeof(void*))
+
+typedef struct ack_msg
+{
+    uint64_t            source_addr;    /* address from the start of buffer  */
+#if ! USE_LRTS_MEMPOOL
+    gni_mem_handle_t    source_mem_hndl;
+    int                 length;          /* total length */
+#endif
+    struct ack_msg     *next;
+} ACK_MSG;
+
+#define ACK_MSG_SIZE       (sizeof(ACK_MSG)-sizeof(void*))
 
 #if CMK_DIRECT
 typedef struct{
@@ -414,6 +431,7 @@ typedef struct  msg_list_index
 
 /* reuse PendingMsg memory */
 static CONTROL_MSG          *control_freelist=0;
+static ACK_MSG              *ack_freelist=0;
 static MSG_LIST             *msglist_freelist=0;
 
 // buffered send queue
@@ -461,6 +479,25 @@ SMSG_QUEUE                  smsg_oob_queue;
   if (d==0) {d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));\
              _MEMCHECK(d);\
   } else control_freelist = d->next;
+
+#endif
+
+#if CMK_SMP
+
+#define FreeAckMsg(d)      free(d);
+#define MallocAckMsg(d)    d = ((ACK_MSG*)malloc(sizeof(ACK_MSG)));
+
+#else
+
+#define FreeAckMsg(d)       \
+  (d)->next = ack_freelist;\
+  ack_freelist = d;
+
+#define MallocAckMsg(d) \
+  d = ack_freelist;\
+  if (d==0) {d = ((ACK_MSG*)malloc(sizeof(ACK_MSG)));\
+             _MEMCHECK(d);\
+  } else ack_freelist = d->next;
 
 #endif
 
@@ -1024,8 +1061,8 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
     return status;
 }
 
-
-inline static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t seqno)
+inline 
+static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t seqno)
 {
     /* construct a control message and send */
     CONTROL_MSG         *control_msg_tmp;
@@ -1083,7 +1120,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
             if(buffered_send_msg + GetMempoolsize(msg) >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
-                    buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+                    buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
             //register the corresponding mempool
@@ -1116,7 +1153,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
             if(buffered_send_msg + size >= MAX_BUFF_SEND)
             {
                 if(!inbuff)
-                    buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+                    buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
             status = registerMemory((void*)source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl));
@@ -1131,7 +1168,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
 
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message(queue, destNode, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, inbuff);  
+        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, inbuff);  
         if(status == GNI_RC_SUCCESS)
         {
             buffered_send_msg += register_size;
@@ -1151,14 +1188,14 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     {
         status = GNI_RC_ERROR_NOMEM; 
         if(!inbuff)
-            buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+            buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
     }
     return status;
 #else
     MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, status)
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message(queue, destNode, control_msg_tmp, sizeof(CONTROL_MSG), LMSG_INIT_TAG, 0);  
+        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, 0);  
         if(status == GNI_RC_SUCCESS)
         {
             FreeControlMsg(control_msg_tmp);
@@ -1168,7 +1205,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
         CmiAbort("Memory registor for large msg\n");
     }else 
     {
-        buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+        buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
     }
     return status;
 #endif
@@ -1204,12 +1241,12 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
         buffer_small_msgs(queue, msg, size, destNode, SMALL_DATA_TAG);
     else if (size < BIG_MSG) {
         control_msg_tmp =  construct_control_msg(size, msg, 0);
-        buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+        buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
     }
     else {
           CmiSetMsgSeq(msg, 0);
           control_msg_tmp =  construct_control_msg(size, msg, 1);
-          buffer_small_msgs(queue, control_msg_tmp, sizeof(CONTROL_MSG), destNode, LMSG_INIT_TAG);
+          buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
     }
 #else   //non-smp, smp(worker sending)
     if(size <= SMSG_MAX_MSG)
@@ -1506,16 +1543,16 @@ static void PumpNetworkSmsg()
             case ACK_TAG:   //msg fit into mempool
             {
                 /* Get is done, release message . Now put is not used yet*/
-                void *msg = (void*)(((CONTROL_MSG *)header)->source_addr);
+                void *msg = (void*)(((ACK_MSG *)header)->source_addr);
 #if ! USE_LRTS_MEMPOOL
-                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((CONTROL_MSG *)header)->source_mem_hndl), &omdh, header_tmp->length);
+                MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
 #else
                 DecreaseMsgInSend(msg);
 #endif
                 if(NoMsgInSend(msg))
                     buffered_send_msg -= GetMempoolsize(msg);
                 MACHSTATE5(8, "GO send done to %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
-                CmiFree((void*)((CONTROL_MSG *) header)->source_addr);
+                CmiFree(msg);
                 break;
             }
             case BIG_MSG_TAG:  //big msg, de-register, transfer next seg
@@ -1783,6 +1820,7 @@ static void PumpLocalRdmaTransactions()
     gni_post_descriptor_t   *tmp_pd;
     MSG_LIST                *ptr;
     CONTROL_MSG             *ack_msg_tmp;
+    ACK_MSG                 *ack_msg;
     uint8_t                 msg_tag;
 #if CMK_DIRECT
     CMK_DIRECT_HEADER       *cmk_direct_done_msg;
@@ -1805,83 +1843,81 @@ static void PumpLocalRdmaTransactions()
             CMI_GNI_LOCK
             status = GNI_GetCompleted(smsg_tx_cqh, ev, &tmp_pd);
             CMI_GNI_UNLOCK
-#if CMK_DIRECT
-            if(tmp_pd->amo_cmd == 1)
-            {
-                cmk_direct_done_msg = (CMK_DIRECT_HEADER*) malloc(sizeof(CMK_DIRECT_HEADER));
-                cmk_direct_done_msg->handler_addr= (tmp_pd->first_operand); 
-            }
-            else{
-                MallocControlMsg(ack_msg_tmp);
-                ack_msg_tmp->source_addr = tmp_pd->remote_addr;
-                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-            }
-#else
-            MallocControlMsg(ack_msg_tmp);
-            ack_msg_tmp->source_addr = tmp_pd->remote_addr;
-            ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
-#endif
-            ////Message is sent, free message , put is not used now
+
             switch (tmp_pd->type) {
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COMM || CMK_DIRECT
             case GNI_POST_RDMA_PUT:
-#if ! USE_LRTS_MEMPOOL
+#if CMK_PERSISTENT_COMM && ! USE_LRTS_MEMPOOL
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length);
 #endif
             case GNI_POST_FMA_PUT:
-                CmiFree((void *)tmp_pd->local_addr);
-                msg_tag = PUT_DONE_TAG;
-                break;
-#endif
-#if CMK_DIRECT
-            case GNI_POST_RDMA_PUT:
-            case GNI_POST_FMA_PUT:
-                //sender ACK to receiver to trigger it is done
-                msg_tag = DIRECT_PUT_DONE_TAG;
+                if(tmp_pd->amo_cmd == 1) {
+                    //sender ACK to receiver to trigger it is done
+                    cmk_direct_done_msg = (CMK_DIRECT_HEADER*) malloc(sizeof(CMK_DIRECT_HEADER));
+                    cmk_direct_done_msg->handler_addr = tmp_pd->first_operand;
+                    msg_tag = DIRECT_PUT_DONE_TAG;
+                }
+                else {
+                    CmiFree((void *)tmp_pd->local_addr);
+                    MallocControlMsg(ack_msg_tmp);
+                    ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+                    ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+                    msg_tag = PUT_DONE_TAG;
+                }
                 break;
 #endif
             case GNI_POST_RDMA_GET:
-            case GNI_POST_FMA_GET:
+            case GNI_POST_FMA_GET:  {
 #if  ! USE_LRTS_MEMPOOL
+                MallocControlMsg(ack_msg_tmp);
+                ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+                ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length)
                 msg_tag = ACK_TAG;  
 #else
-                ack_msg_tmp->seq_id = tmp_pd->cqwrite_value;
-                if(ack_msg_tmp->seq_id > 0)      // BIG_MSG
+                int seq_id = tmp_pd->cqwrite_value;
+                if(seq_id > 0)      // BIG_MSG
                 {
-                    msg_tag = BIG_MSG_TAG; 
                     MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length);
+                    MallocControlMsg(ack_msg_tmp);
+                    ack_msg_tmp->source_addr = tmp_pd->remote_addr;
+                    ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+                    ack_msg_tmp->seq_id = seq_id;
                     ack_msg_tmp->dest_addr = tmp_pd->local_addr - ONE_SEG*(ack_msg_tmp->seq_id-1);
                     ack_msg_tmp->source_addr -= ONE_SEG*(ack_msg_tmp->seq_id-1);
+                    ack_msg_tmp->length = tmp_pd->length;
+                    ack_msg_tmp->total_length = tmp_pd->first_operand;     // total size
+                    msg_tag = BIG_MSG_TAG; 
                 } 
                 else
                 {
+                    MallocAckMsg(ack_msg);
+                    ack_msg->source_addr = tmp_pd->remote_addr;
                     msg_tag = ACK_TAG;  
-                    ack_msg_tmp->dest_addr = tmp_pd->local_addr;
+                    // ack_msg_tmp->dest_addr = tmp_pd->local_addr; ???
                 }
-                ack_msg_tmp->length = tmp_pd->length;
-                ack_msg_tmp->total_length = tmp_pd->first_operand;     // total size
 #endif
                 break;
+            }
             default:
                 CmiPrintf("type=%d\n", tmp_pd->type);
                 CmiAbort("PumpLocalRdmaTransactions: unknown type!");
-            }
+            }      /* end of switch */
+
 #if CMK_DIRECT
-            if(tmp_pd->amo_cmd == 1)
+            if (tmp_pd->amo_cmd == 1) {
                 status = send_smsg_message(queue, inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0); 
+                if (status == GNI_RC_SUCCESS) free(cmk_direct_done_msg); 
+            }
             else
 #endif
-                status = send_smsg_message(queue, inst_id, ack_msg_tmp, sizeof(CONTROL_MSG), msg_tag, 0); 
-            if(status == GNI_RC_SUCCESS)
-            {
-#if CMK_DIRECT
-                if(tmp_pd->amo_cmd == 1)
-                    free(cmk_direct_done_msg); 
-                else
-#endif
-                    FreeControlMsg(ack_msg_tmp);
-
+            if (msg_tag == ACK_TAG) {
+                status = send_smsg_message(queue, inst_id, ack_msg, ACK_MSG_SIZE, msg_tag, 0); 
+                if (status == GNI_RC_SUCCESS) FreeAckMsg(ack_msg);
+            }
+            else {
+                status = send_smsg_message(queue, inst_id, ack_msg_tmp, CONTROL_MSG_SIZE, msg_tag, 0); 
+                if (status == GNI_RC_SUCCESS) FreeControlMsg(ack_msg_tmp);
             }
 #if CMK_PERSISTENT_COMM
             if (tmp_pd->type == GNI_POST_RDMA_GET || tmp_pd->type == GNI_POST_FMA_GET)
@@ -2084,9 +2120,12 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
                 status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1);
                 break;
-            case   ACK_TAG:
-            case   BIG_MSG_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CONTROL_MSG), ptr->tag, 1);  
+            case ACK_TAG:
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(ACK_MSG), ptr->tag, 1);  
+                if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
+                break;
+            case BIG_MSG_TAG:
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, CONTROL_MSG_SIZE, ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
                 {
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
