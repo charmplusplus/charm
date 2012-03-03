@@ -1318,32 +1318,32 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
     }
 #endif
-
-#if !CMK_INTER_OPERATE
+  
+    if(!CpvAccess(interOperate)) {
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
     if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV)
-      thread_level = MPI_THREAD_FUNNELED;
-    else
-      thread_level = MPI_THREAD_MULTIPLE;
+        thread_level = MPI_THREAD_FUNNELED;
+      else
+        thread_level = MPI_THREAD_MULTIPLE;
 #else
-    thread_level = MPI_THREAD_SINGLE;
+      thread_level = MPI_THREAD_SINGLE;
 #endif
-    MPI_Init_thread(argc, argv, thread_level, &provided);
-    _thread_provided = provided;
+      MPI_Init_thread(argc, argv, thread_level, &provided);
+      _thread_provided = provided;
 #else
-    MPI_Init(argc, argv);
-    thread_level = 0;
-    _thread_provided = -1;
+      MPI_Init(argc, argv);
+      thread_level = 0;
+      _thread_provided = -1;
 #endif
-#endif
+    }
 
     largc = *argc;
     largv = *argv;
-#if !CMK_INTER_OPERATE
-    MPI_Comm_size(MPI_COMM_WORLD, numNodes);
-    MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
-#endif
+    if(!CpvAccess(interOperate)) {
+      MPI_Comm_size(MPI_COMM_WORLD, numNodes);
+      MPI_Comm_rank(MPI_COMM_WORLD, myNodeID);
+    }
 
     myNID = *myNodeID;
 
@@ -1354,12 +1354,12 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 
     MPI_Get_version(&ver, &subver);
-#if !CMK_INTER_OPERATE
-    if (myNID == 0) {
+    if(!CpvAccess(interOperate)) {
+      if (myNID == 0) {
         printf("Charm++> Running on MPI version: %d.%d\n", ver, subver);
         printf("Charm++> level of thread support used: %s (desired: %s)\n", thread_level_tostring(_thread_provided), thread_level_tostring(thread_level));
-        }
-#endif
+      }
+    }
 
     {
         int debug = CmiGetArgFlag(largv,"++debug");

@@ -603,6 +603,10 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
 
+    //initialize interOperate
+    CpvInitialize(int,interOperate);
+    CpvAccess(interOperate) = 1;
+
     /* Network progress function is used to poll the network when for
     messages. This flushes receive buffers on some  implementations*/
     networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
@@ -732,31 +736,31 @@ static void ConverseRunPE(int everReturn) {
     _immediateReady = 1;
 
     /* communication thread */
-#if CMK_INTER_OPERATE
-		Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-    CsdScheduler(-1);
-#else
-    if (CmiMyRank() == CmiMyNodeSize()) {
+    if(CpvAccess(interOperate)) {
+		  Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+      CsdScheduler(-1);
+    } else {
+      if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         while (1) CommunicationServerThread(5);
-    } else { /* worker thread */
+      } else { /* worker thread */
         if (!everReturn) {
-            Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-            if (Cmi_usrsched==0) CsdScheduler(-1);
-            ConverseExit();
+          Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+          if (Cmi_usrsched==0) CsdScheduler(-1);
+          ConverseExit();
         }
+      }
     }
-#endif
 }
 /* ##### End of Functions Related with Machine Startup ##### */
 
-#if CMK_INTER_OPERATE
+//used in interoperability mode
+extern void _initCharm(int argc, char **argv);
 void CharmLibInit(int peid, int numpes, int argc, char **argv, CmiStartFn fn) {
 	  _Cmi_numnodes = numpes;
 	  _Cmi_mynode = peid;
     ConverseInit(argc, argv, fn, 1, 0);
 }
-#endif
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
 static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {

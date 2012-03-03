@@ -476,10 +476,10 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
-#if !CMK_INTER_OPERATE
-      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-#endif
+      if(!CpvAccess(interOperate)) {
+        CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+        CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      }
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -497,7 +497,7 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
-#if !CMK_INTER_OPERATE
+    if(!CpvAccess(interOperate)) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
@@ -517,7 +517,7 @@ static void _exitHandler(envelope *env)
 #if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
-#endif //!CMK_INTER_OPERATE
+    }
       if (_ringexit) {
         int stride = CkNumPes()/_ringtoken;
         int pe = CkMyPe()+1;
@@ -529,16 +529,16 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
 //everyone exits here - there may be issues with leftover messages in the queue
-#if CMK_INTER_OPERATE
+    if(CpvAccess(interOperate)) {
 	    DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
       _exitStarted = 0;
       CpvAccess(charmLibExitFlag) = 1;
-#else
+    } else {
       if(CkMyPe()){
 	      DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
       }	
-#endif
+    }
       break;
     case StatMsg:
 // shouldn't reach here in interoperate mode
@@ -836,13 +836,13 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-#if !CMK_INTER_OPERATE
+  if(!CpvAccess(interOperate)) {
 #if ! CMK_BIGSIM_THREAD
-  _TRACE_END_EXECUTE();
-  //Wait for stats, which will call ConverseExit when finished:
-  CsdScheduler(-1);
+    _TRACE_END_EXECUTE();
+    //Wait for stats, which will call ConverseExit when finished:
+    CsdScheduler(-1);
 #endif
-#endif
+  }
 }
 
 /* This is a routine called in case the application is closing due to a signal.

@@ -135,9 +135,8 @@ extern void CldModuleInit(char **);
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
-#if CMK_INTER_OPERATE
+CpvDeclare(int,interOperate);
 CpvDeclare(int,charmLibExitFlag);
-#endif
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
@@ -1795,12 +1794,12 @@ void CsdScheduleForever(void)
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
-#if CMK_INTER_OPERATE
-    if(CpvAccess(charmLibExitFlag)) {
-      CpvAccess(charmLibExitFlag) = 0;
-      break;
+    if(CpvAccess(interOperate)) {
+      if(CpvAccess(charmLibExitFlag)) {
+        CpvAccess(charmLibExitFlag) = 0;
+        break;
+      }
     }
-#endif
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
@@ -3446,10 +3445,8 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
   CpvAccess(cmiArgDebugFlag) = 0;
 #endif
-#if CMK_INTER_OPERATE
   CpvInitialize(int,charmLibExitFlag);
   CpvAccess(charmLibExitFlag) = 0;
-#endif
 
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;
