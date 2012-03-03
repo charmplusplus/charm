@@ -737,8 +737,9 @@ static void ConverseRunPE(int everReturn) {
 
     /* communication thread */
     if(CpvAccess(interOperate)) {
-		  Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-      CsdScheduler(-1);
+	/* Not considering SMP mode now */
+	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+	CsdScheduler(-1);
     } else {
       if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
@@ -753,14 +754,6 @@ static void ConverseRunPE(int everReturn) {
     }
 }
 /* ##### End of Functions Related with Machine Startup ##### */
-
-//used in interoperability mode
-extern void _initCharm(int argc, char **argv);
-void CharmLibInit(int peid, int numpes, int argc, char **argv, CmiStartFn fn) {
-	  _Cmi_numnodes = numpes;
-	  _Cmi_mynode = peid;
-    ConverseInit(argc, argv, fn, 1, 0);
-}
 
 /* ##### Beginning of Functions Related with Machine Running ##### */
 static INLINE_KEYWORD void AdvanceCommunication(int whenidle) {

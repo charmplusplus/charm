@@ -130,6 +130,8 @@ extern int CmiMyRank_();
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
 extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
+extern int _Cmi_mynode;
+extern int _Cmi_numnodes;
 
 #define CmiMyPe()           _Cmi_mype
 #define CmiMyRank()         0
