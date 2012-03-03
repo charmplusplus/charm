@@ -476,7 +476,7 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
-      if(!CpvAccess(interOperate)) {
+      if(!CharmLibInterOperate) {
         CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
         CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       }
@@ -497,7 +497,7 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
-    if(!CpvAccess(interOperate)) {
+    if(!CharmLibInterOperate) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
@@ -529,7 +529,7 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
 //everyone exits here - there may be issues with leftover messages in the queue
-    if(CpvAccess(interOperate)) {
+    if(CharmLibInterOperate) {
 	    DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
       _exitStarted = 0;
       CpvAccess(charmLibExitFlag) = 1;
@@ -836,7 +836,7 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-  if(!CpvAccess(interOperate)) {
+  if(!CharmLibInterOperate) {
 #if ! CMK_BIGSIM_THREAD
     _TRACE_END_EXECUTE();
     //Wait for stats, which will call ConverseExit when finished:
@@ -1400,6 +1400,7 @@ void CharmLibInit(int peid, int numpes, int argc, char **argv){
     _Cmi_numnodes = numpes; 
     _Cmi_mynode = peid;
 
+    CharmLibInterOperate = 1;
     ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
     printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes()); 
 }

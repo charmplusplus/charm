@@ -135,7 +135,7 @@ extern void CldModuleInit(char **);
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
-CpvDeclare(int,interOperate);
+int CharmLibInterOperate = 0;
 CpvDeclare(int,charmLibExitFlag);
 
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
@@ -1794,7 +1794,8 @@ void CsdScheduleForever(void)
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
-    if(CpvAccess(interOperate)) {
+    /* The interoperation will cost this little overhead in scheduling */
+    if(CharmLibInterOperate) {
       if(CpvAccess(charmLibExitFlag)) {
         CpvAccess(charmLibExitFlag) = 0;
         break;

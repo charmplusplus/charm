@@ -1901,7 +1901,10 @@ extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
 
-CpvExtern(int,interOperate);
+/* CharmLibInterOperate should be a global variable as it will be
+ * set only once by MPI ranks respectively.
+ */
+extern int CharmLibInterOperate;
 CpvExtern(int,charmLibExitFlag);
 
 #endif /* CONVERSE_H */

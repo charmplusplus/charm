@@ -603,10 +603,6 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         CmiAbort("+ppn cannot be used in non SMP version!\n");
 #endif
 
-    //initialize interOperate
-    CpvInitialize(int,interOperate);
-    CpvAccess(interOperate) = 1;
-
     /* Network progress function is used to poll the network when for
     messages. This flushes receive buffers on some  implementations*/
     networkProgressPeriod = NETWORK_PROGRESS_PERIOD_DEFAULT;
@@ -735,12 +731,13 @@ static void ConverseRunPE(int everReturn) {
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
-    /* communication thread */
-    if(CpvAccess(interOperate)) {
-	/* Not considering SMP mode now */
+    if(CharmLibInterOperate) {
+	/* !!! Not considering SMP mode now */
+	/* TODO: make interoperability working in SMP!!! */
 	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
 	CsdScheduler(-1);
     } else {
+      /* communication thread */
       if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         while (1) CommunicationServerThread(5);
