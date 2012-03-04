@@ -84,7 +84,6 @@ public:
 
   static void staticAtSync(void*);
   void AtSync(void); // Everything is at the PE barrier
-  void ProcessAtSync(int lb_period);
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
   void ProcessAtSyncMin(void);
@@ -98,9 +97,11 @@ public:
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
+
+  void LoadBalanceDecision(int);
+  void ReceiveIterationNo(CkReductionMsg *msg);
 	                                        // to be resumed via message
   void ResumeClients(CkReductionMsg *);
-  void ResumeClients(int, int);
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
