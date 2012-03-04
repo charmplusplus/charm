@@ -46,7 +46,6 @@ int load_balancer_created;
 
 double lb_migration_cost = 0.0;
 double lb_strategy_cost = 0.0;
-
 int lb_no_iterations = -1;
 double cur_max_pe_load = 0.0;
 double cur_avg_pe_load = 0.0;
