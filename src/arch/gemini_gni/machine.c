@@ -1043,10 +1043,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         }
     }
 #if CMK_SMP
-#if ONE_SEND_QUEUE
-    //if(PCQueueEmpty(queue->sendMsgBuf) || inbuff==1)
-    //if( inbuff==1)
-#else
+#if ! ONE_SEND_QUEUE
     if(PCQueueEmpty(queue->smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
 #endif
     {
@@ -2105,9 +2102,9 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     static int          index = 0;
     int                 idx;
 #if ONE_SEND_QUEUE
-    int                 *destpe;
-    destpe = (int*)CmiTmpAlloc(mysize * sizeof(int));
-    memset(destpe, 0, mysize * sizeof(int));
+    char                *destpe;
+    destpe = (char*)CmiTmpAlloc(mysize * sizeof(char));
+    memset(destpe, 0, mysize * sizeof(char));
     for (idx=0; idx<1; idx++)
     {
         int i, len = PCQueueLength(queue->sendMsgBuf);
@@ -2115,7 +2112,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
         {
             ptr = (MSG_LIST*)PCQueuePop(queue->sendMsgBuf);
             if (ptr == 0) break;
-            if (destpe[ptr->destNode] != 0) {       /* can't send to this pe */
+            if (destpe[ptr->destNode] == 1) {       /* can't send to this pe */
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
                 continue;
             }
