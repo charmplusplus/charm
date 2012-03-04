@@ -100,8 +100,8 @@ public:
 
   void LoadBalanceDecision(int);
   void ReceiveIterationNo(CkReductionMsg *msg); // Receives the current iter no
-	                                        // to be resumed via message
-  void ResumeClients(CkReductionMsg *);
+
+  void ResumeClients(CkReductionMsg *); // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
   void ProcessReceiveMigration(CkReductionMsg  *);
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
