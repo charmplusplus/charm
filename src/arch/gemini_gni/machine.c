@@ -430,11 +430,6 @@ typedef struct  msg_list_index
 
 #endif
 
-/* reuse PendingMsg memory */
-static CONTROL_MSG          *control_freelist=0;
-static ACK_MSG              *ack_freelist=0;
-static MSG_LIST             *msglist_freelist=0;
-
 // buffered send queue
 #if ! ONE_SEND_QUEUE
 typedef struct smsg_queue
@@ -461,16 +456,23 @@ SMSG_QUEUE                  smsg_oob_queue;
 
 #else
 
+static MSG_LIST       *msglist_freelist=0;
+
 #define FreeMsgList(d)  \
+  do { \
   (d)->next = msglist_freelist;\
-  msglist_freelist = d;
+  msglist_freelist = d; \
+  } while (0)
 
 #define MallocMsgList(d) \
+  do {  \
   d = msglist_freelist;\
   if (d==0) {d = ((MSG_LIST*)malloc(sizeof(MSG_LIST)));\
              _MEMCHECK(d);\
   } else msglist_freelist = d->next; \
-  d->next =0;
+  d->next =0;  \
+  } while (0)
+
 #endif
 
 #if CMK_SMP
@@ -480,15 +482,21 @@ SMSG_QUEUE                  smsg_oob_queue;
 
 #else
 
+static CONTROL_MSG    *control_freelist=0;
+
 #define FreeControlMsg(d)       \
+  do { \
   (d)->next = control_freelist;\
-  control_freelist = d;
+  control_freelist = d; \
+  } while (0);
 
 #define MallocControlMsg(d) \
+  do {  \
   d = control_freelist;\
   if (d==0) {d = ((CONTROL_MSG*)malloc(sizeof(CONTROL_MSG)));\
              _MEMCHECK(d);\
-  } else control_freelist = d->next;
+  } else control_freelist = d->next;  \
+  } while (0);
 
 #endif
 
@@ -499,46 +507,46 @@ SMSG_QUEUE                  smsg_oob_queue;
 
 #else
 
+static ACK_MSG        *ack_freelist=0;
+
 #define FreeAckMsg(d)       \
+  do { \
   (d)->next = ack_freelist;\
-  ack_freelist = d;
+  ack_freelist = d; \
+  } while (0)
 
 #define MallocAckMsg(d) \
+  do { \
   d = ack_freelist;\
   if (d==0) {d = ((ACK_MSG*)malloc(sizeof(ACK_MSG)));\
              _MEMCHECK(d);\
-  } else ack_freelist = d->next;
+  } else ack_freelist = d->next; \
+  } while (0)
 
 #endif
 
-static RDMA_REQUEST         *rdma_freelist = NULL;
-
-#define FreeMediumControlMsg(d)       \
-  (d)->next = medium_control_freelist;\
-  medium_control_freelist = d;
-
-
-#define MallocMediumControlMsg(d) \
-    d = medium_control_freelist;\
-    if (d==0) {d = ((MEDIUM_MSG_CONTROL*)malloc(sizeof(MEDIUM_MSG_CONTROL)));\
-    _MEMCHECK(d);\
-} else mediumcontrol_freelist = d->next;
 
 # if CMK_SMP
 #define FreeRdmaRequest(d)       free(d);
 #define MallocRdmaRequest(d)     d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));   
 #else
 
+static RDMA_REQUEST         *rdma_freelist = NULL;
+
 #define FreeRdmaRequest(d)       \
+  do {  \
   (d)->next = rdma_freelist;\
-  rdma_freelist = d;
+  rdma_freelist = d;    \
+  } while (0)
 
 #define MallocRdmaRequest(d) \
+  do {   \
   d = rdma_freelist;\
   if (d==0) {d = ((RDMA_REQUEST*)malloc(sizeof(RDMA_REQUEST)));\
              _MEMCHECK(d);\
   } else rdma_freelist = d->next; \
-    d->next =0;
+  d->next =0;   \
+  } while (0)
 #endif
 
 /* reuse gni_post_descriptor_t */
@@ -2154,11 +2162,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1);
                 break;
             case ACK_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(ACK_MSG), ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
                 break;
             case BIG_MSG_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, CONTROL_MSG_SIZE, ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1);  
                 if(status == GNI_RC_SUCCESS)
                 {
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
