@@ -2104,6 +2104,9 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     static int          index = 0;
     int                 idx;
 #if ONE_SEND_QUEUE
+    int                 *destpe;
+    destpe = (int*)CmiTmpAlloc(mysize * sizeof(int));
+    memset(destpe, 0, mysize * sizeof(int));
     for (idx=0; idx<1; idx++)
     {
         int i, len = PCQueueLength(queue->sendMsgBuf);
@@ -2111,6 +2114,10 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
         {
             ptr = (MSG_LIST*)PCQueuePop(queue->sendMsgBuf);
             if (ptr == 0) break;
+            if (destpe[ptr->destNode] != 0) {       /* can't send to this pe */
+                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+                continue;
+            }
 #else
     for (idx=0; idx<mysize; idx++)
     {
@@ -2201,6 +2208,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #if CMK_SMP
 #if ONE_SEND_QUEUE
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+                destpe[ptr->destNode] = 1;
 #else
                 PCQueuePush(queue->smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
 #endif
@@ -2236,6 +2244,9 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 		break;
 #endif
     }   // end pooling for all cores
+#if ONE_SEND_QUEUE
+    CmiTmpFree(destpe);
+#endif
     return done;
 }
 
