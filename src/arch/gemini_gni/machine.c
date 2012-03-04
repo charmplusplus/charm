@@ -407,14 +407,18 @@ typedef struct  rmda_msg
 #endif
 }RDMA_REQUEST;
 
+
 #if CMK_SMP
+
+#define ONE_SEND_QUEUE                  0
 PCQueue sendRdmaBuf;
 typedef struct  msg_list_index
 {
-    int         next;
     PCQueue     sendSmsgBuf;
 } MSG_LIST_INDEX;
-#else
+
+#else         /* non-smp */
+
 static RDMA_REQUEST        *sendRdmaBuf = 0;
 static RDMA_REQUEST        *sendRdmaTail = 0;
 typedef struct  msg_list_index
@@ -423,6 +427,7 @@ typedef struct  msg_list_index
     MSG_LIST    *sendSmsgBuf;
     MSG_LIST    *tail;
 } MSG_LIST_INDEX;
+
 #endif
 
 /* reuse PendingMsg memory */
@@ -431,11 +436,20 @@ static ACK_MSG              *ack_freelist=0;
 static MSG_LIST             *msglist_freelist=0;
 
 // buffered send queue
+#if ! ONE_SEND_QUEUE
 typedef struct smsg_queue
 {
     MSG_LIST_INDEX   *smsg_msglist_index;
+#if ! CMK_SMP
     int               smsg_head_index;
+#endif
 } SMSG_QUEUE;
+#else
+typedef struct smsg_queue
+{
+    PCQueue       sendMsgBuf;
+}  SMSG_QUEUE;
+#endif
 
 SMSG_QUEUE                  smsg_queue;
 SMSG_QUEUE                  smsg_oob_queue;
@@ -866,7 +880,11 @@ static void buffer_small_msgs(SMSG_QUEUE *queue, void *msg, int size, int destNo
         queue->smsg_msglist_index[destNode].tail = msg_tmp;
     }
 #else
+#if ONE_SEND_QUEUE
+    PCQueuePush(queue->sendMsgBuf, (char*)msg_tmp);
+#else
     PCQueuePush(queue->smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
+#endif
 #endif
 #if PRINT_SYH
     buffered_smsg_counter++;
@@ -1025,7 +1043,11 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         }
     }
 #if CMK_SMP
+#if ONE_SEND_QUEUE
+    if(PCQueueEmpty(queue->sendMsgBuf) || inbuff==1)
+#else
     if(PCQueueEmpty(queue->smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
+#endif
     {
 #else
     if(queue->smsg_msglist_index[destNode].sendSmsgBuf == 0 || inbuff==1)
@@ -2081,6 +2103,15 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #if CMK_SMP
     static int          index = 0;
     int                 idx;
+#if ONE_SEND_QUEUE
+    for (idx=0; idx<1; idx++)
+    {
+        int i, len = PCQueueLength(queue->sendMsgBuf);
+        for (i=0; i<len; i++) 
+        {
+            ptr = (MSG_LIST*)PCQueuePop(queue->sendMsgBuf);
+            if (ptr == 0) break;
+#else
     for (idx=0; idx<mysize; idx++)
     {
         int i, len = PCQueueLength(queue->smsg_msglist_index[index].sendSmsgBuf);
@@ -2088,6 +2119,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
         {
             ptr = (MSG_LIST*)PCQueuePop(queue->smsg_msglist_index[index].sendSmsgBuf);
             if (ptr == 0) break;
+#endif
 #else
     int index = queue->smsg_head_index;
     while(index != -1)
@@ -2167,7 +2199,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #endif
             }else {
 #if CMK_SMP
+#if ONE_SEND_QUEUE
+                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+#else
                 PCQueuePush(queue->smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
+#endif
 #else
                 pre = ptr;
                 ptr=ptr->next;
@@ -2429,18 +2465,24 @@ inline
 static void _init_send_queue(SMSG_QUEUE *queue)
 {
      int i;
+#if ONE_SEND_QUEUE
+     queue->sendMsgBuf = PCQueueCreate();
+#else
      queue->smsg_msglist_index = (MSG_LIST_INDEX*)malloc(mysize*sizeof(MSG_LIST_INDEX));
      for(i =0; i<mysize; i++)
      {
-        queue->smsg_msglist_index[i].next = -1;
 #if CMK_SMP
         queue->smsg_msglist_index[i].sendSmsgBuf = PCQueueCreate();
 #else
         queue->smsg_msglist_index[i].sendSmsgBuf = 0; 
+        queue->smsg_msglist_index[i].next = -1;
 #endif
         
      }
+#if ! CMK_SMP
      queue->smsg_head_index = -1;
+#endif
+#endif
 }
 
 inline
