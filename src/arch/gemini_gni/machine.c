@@ -1044,7 +1044,8 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
     }
 #if CMK_SMP
 #if ONE_SEND_QUEUE
-    if(PCQueueEmpty(queue->sendMsgBuf) || inbuff==1)
+    //if(PCQueueEmpty(queue->sendMsgBuf) || inbuff==1)
+    //if( inbuff==1)
 #else
     if(PCQueueEmpty(queue->smsg_msglist_index[destNode].sendSmsgBuf) || inbuff==1)
 #endif
@@ -2207,7 +2208,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             }else {
 #if CMK_SMP
 #if ONE_SEND_QUEUE
-                destpe[ptr->destNode] = 1;
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
 #else
                 PCQueuePush(queue->smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
@@ -2218,7 +2218,13 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #endif
                 done = 0;
                 if(status == GNI_RC_ERROR_RESOURCE)
+                {
+#if CMK_SMP && ONE_SEND_QUEUE 
+                    destpe[ptr->destNode] = 1;
+#else
                     break;
+#endif
+                }
             } 
         } //end while
 #if !CMK_SMP
