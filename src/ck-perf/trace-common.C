@@ -282,7 +282,10 @@ extern "C" void traceEnd(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD
 //the first core of this node controls the condition of comm thread
-if(CmiMyRank()==0){
+#if CMK_MULTICORE
+  if (Cmi_commthread)
+#endif
+  if(CmiMyRank()==0){
 	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=0){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
 		CkpvAccessOther(traceOn, CmiMyNodeSize()) = 0;
