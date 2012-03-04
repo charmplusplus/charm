@@ -2207,8 +2207,8 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             }else {
 #if CMK_SMP
 #if ONE_SEND_QUEUE
-                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
                 destpe[ptr->destNode] = 1;
+                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
 #else
                 PCQueuePush(queue->smsg_msglist_index[index].sendSmsgBuf, (char*)ptr);
 #endif
