@@ -52,7 +52,6 @@ int lb_no_iterations = -1;
 double cur_max_pe_load = 0.0;
 double cur_avg_pe_load = 0.0;
 double prev_load = 0.0;
-bool informed = false;
 
 struct AdaptiveData {
   int iteration;
@@ -244,7 +243,6 @@ void CentralLB::ProcessAtSync()
   prev_load = 0.0;
   lb_ideal_period = INT_MAX;
   local_state = OFF;
-  informed = false;
 
 
 #if CMK_LBDB_ON
@@ -373,7 +371,6 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   // step immediately after load balancing, carry out load balancing
   if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step\n");
-    informed = true;
     lb_ideal_period = iteration_n + 1;
     thisProxy.LoadBalanceDecision(lb_ideal_period);
     return;
@@ -381,7 +378,6 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
 
   // Generate the plan for the adaptive strategy
   if (generatePlan()) {
-    informed = true;
     thisProxy.LoadBalanceDecision(lb_ideal_period);
   }
 }
