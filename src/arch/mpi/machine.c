@@ -433,28 +433,29 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
         /*END_EVENT(40);*/
     } else {
         START_EVENT();
-		if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
-            CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
+	if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,node,TAG,MPI_COMM_WORLD,&(smsg->req)))
+        CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         /*END_EVENT(40);*/
     }
 #else
-
-#if CMK_SMP_TRACE_COMMTHREAD
-    START_EVENT();
-    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
-#endif
+/* branch not using MPI_POST_RECV */
 
 #if CMK_MEM_CHECKPOINT
 	dstrank = petorank[node];
 #else
 	dstrank=node;
 #endif
+    START_EVENT();
     if (MPI_SUCCESS != MPI_Isend((void *)msg,size,MPI_BYTE,dstrank,TAG,MPI_COMM_WORLD,&(smsg->req)))
         CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
     /*END_EVENT(40);*/
+#endif /* end of #if MPI_POST_RECV */
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
 #endif
 
-#if CMI_MPI_TRACE_MOREDETAILED && CMI_MPI_TRACE_MOREDETAILED
+#if CMI_MPI_TRACE_MOREDETAILED 
     char tmp[64];
     sprintf(tmp, "MPI_Isend: from proc %d to proc %d", smsg->srcpe, CmiNodeFirst(node)+CMI_DEST_RANK(msg));
     traceUserSuppliedBracketedNote(tmp, 40, CpvAccess(projTraceStart), CmiWallTimer());
@@ -756,7 +757,7 @@ static int PumpMsgs(void) {
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
-        TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+        TRACE_COMM_RECV(CpvAccess(projTraceStart), msg);
 #if CMI_MPI_TRACE_MOREDETAILED
         char tmp[32];
         sprintf(tmp, "MPI_Recv: to proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
@@ -865,7 +866,7 @@ static int PumpMsgs(void) {
         if(!irecvDone) break; /* in-order recv */
 
 #if CMK_SMP_TRACE_COMMTHREAD
-        TRACE_COMM_CREATION(CpvAccess(projTraceStart), irecvEnt->msg);
+        TRACE_COMM_RECV(CpvAccess(projTraceStart), irecvEnt->msg);
 #endif
     
         /*printf("PE[%d]: irecv entry=%p finished with size=%d, msg=%p\n", CmiMyPe(), irecvEnt, irecvEnt->size, irecvEnt->msg);*/
@@ -926,7 +927,7 @@ static void PumpMsgsBlocking(void) {
     memcpy(msg, buf, nbytes);
 
 #if CMK_SMP_TRACE_COMMTHREAD
-    TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+    TRACE_COMM_RECV(CpvAccess(projTraceStart), msg);
 #if CMI_MPI_TRACE_MOREDETAILED
     char tmp[32];
     sprintf(tmp, "To proc %d", CmiNodeFirst(CmiMyNode())+CMI_DEST_RANK(msg));
