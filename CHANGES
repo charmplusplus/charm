@@ -1,6 +1,46 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 
+
+================================================================================
+What's new in Charm++ 6.4.0
+================================================================================
+
+--------------------------------------------------------------------------------
+Platform Support
+--------------------------------------------------------------------------------
+
+- Cray XE and XK systems using the Gemini network via either MPI
+  (mpi-crayxe) or the native uGNI (gemini_gni-crayxe)
+
+- IBM Blue Gene Q, using MPI (mpi-bluegeneq)
+
+- Fujitsu and Clang compilers
+
+- MPI-based machine layers can now run on >64k PEs
+
+--------------------------------------------------------------------------------
+General Changes
+--------------------------------------------------------------------------------
+
+- Added a new [reductiontarget] attribute to enable
+  parameter-marshaled recipients of reduction messages
+
+- Enabled pipelining of large messages in CkMulticast by default
+
+- New load balancers added: TreeMatch, Zoltan, Scotch{Refine,Topo}, RefineSwap
+
+- Load balancing improvements:
+
+  * Allow reduced load database size using floats instead of doubles
+  * Improved hierarchical balancer
+  * Periodic balancing adapts its interval dynamically
+  * User code can request a callback when migration is complete
+  * More balancers properly consider object migratability and PE
+    availability and speed
+
+- Array options
+
 ================================================================================
 What's new in Charm++ 6.2.1 (since 6.2.0)
 ================================================================================
