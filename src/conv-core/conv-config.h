@@ -104,7 +104,8 @@
 #endif
 
 /* sanity checks */
-#if ! CMK_TRACE_ENABLED
+#if ! CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
+#undef CMK_SMP_TRACE_COMMTHREAD
 #define CMK_SMP_TRACE_COMMTHREAD                               0
 #endif
 
