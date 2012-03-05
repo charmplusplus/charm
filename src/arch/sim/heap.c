@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #define PARENT(i) i>>1;
 #define EVENT_TIME(i) pe_table[event[i]].etime
 #define INDEX(i)      pe_table[i].index

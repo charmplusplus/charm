@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** \file: blue.C -- Converse BlueGene Emulator Code
  *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
  */

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /*
 _setjmp/_longjmp is much light weighted than setjmp/longjmp
 because it does not store signal mask, which is not a problem for netpoll

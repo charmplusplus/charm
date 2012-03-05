@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /*
  a cldb which does nothing. Just send the messge locally if the destination 
  processor is not specified.
