@@ -247,7 +247,6 @@ class Block: public CBase_Block {
       p(sum);
       if(p.isUnpacking()) iterMsg = new toNeighborMsg *[numNeighbors];
       for(int i=0; i<numNeighbors; i++){
-	if(p.isUnpacking()) iterMsg[i] = new(curIterMsgSize/4, 0) toNeighborMsg(curIterMsgSize/4);
 	CkPupMessage(p, (void **)&iterMsg[i]);
       }
     }
