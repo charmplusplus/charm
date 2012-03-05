@@ -131,6 +131,8 @@ static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #define     CMI_GNI_UNLOCK
 #endif
 
+static int _tlbpagesize = 4096;
+
 static int   user_set_flag  = 0;
 
 static int _checkProgress = 1;             /* check deadlock */
@@ -2719,7 +2721,6 @@ void LrtsPreCommonInit(int everReturn){
 #endif
 }
 
-
 void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 {
     register int            i;
@@ -2918,6 +2919,18 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     env = getenv("CHARM_UGNI_NO_DEADLOCK_CHECK");
     if (env) _checkProgress = 0;
     if (mysize == 1) _checkProgress = 0;
+
+    
+    /*
+    env = getenv("HUGETLB_DEFAULT_PAGE_SIZE");
+    if (env) 
+        _tlbpagesize = CmiReadSize(env);
+    */
+    /* real gethugepagesize() is only available when hugetlb module linked */
+    _tlbpagesize = gethugepagesize();
+    if (myrank == 0) {
+        printf("Charm++> Cray TLB page size: %1.fK\n", _tlbpagesize/1024.0);
+    }
 
     /* init DMA buffer for medium message */
 
