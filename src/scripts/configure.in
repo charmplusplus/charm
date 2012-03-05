@@ -1557,8 +1557,9 @@ cat > $t <<EOT
 #if defined(_WIN32) && ! defined(__CYGWIN__) || defined(__MINGW_H)
 #include <winsock.h>
 #else
-#include <netinet/in.h>
+#include <stdint.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #endif
 
 int main() {
