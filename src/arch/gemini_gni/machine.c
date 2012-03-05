@@ -1570,7 +1570,7 @@ static void PumpNetworkSmsg()
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
 #if CMK_SMP_TRACE_COMMTHREAD
-                TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
+                TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
 #endif
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
@@ -1978,7 +1978,7 @@ static void PumpLocalRdmaTransactions()
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if(msg_tag == BIG_MSG_TAG){
@@ -1992,7 +1992,7 @@ static void PumpLocalRdmaTransactions()
                         printf("Pipeline msg done [%d]\n", myrank);
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-                        TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+                        TRACE_COMM_RECV(CpvAccess(projTraceStart), msg);
 #endif
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
                     }
