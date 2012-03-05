@@ -99,7 +99,7 @@ public:
   void ResumeClients(int);                      // Resuming clients needs
 
   void LoadBalanceDecision(int);
-  void ReceiveIterationNo(CkReductionMsg *msg); // Receives the current iter no
+  void ReceiveIterationNo(int); // Receives the current iter no
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data
