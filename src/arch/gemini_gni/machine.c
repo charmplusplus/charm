@@ -2711,12 +2711,13 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     void *pool;
     int ret;
 
-    int default_size =  expand_flag? _expand_mem : _mempool_size;
+    size_t default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
     total_mempool_size += *size;
     total_mempool_calls += 1;
-    if (*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) {
-        printf("Error: A mempool block with size %d is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX.", *size);
+    if (*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) 
+    {
+        printf("Error: A mempool block with size %lld is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX. (current=%lld, %lld)\n", *size, MAX_REG_MEM, MAX_BUFF_SEND);
         CmiAbort("alloc_mempool_block");
     }
     ret = posix_memalign(&pool, ALIGNBUF, *size);
