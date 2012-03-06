@@ -110,17 +110,12 @@ static int BIG_MSG_PIPELINE = 4;
 
 // dynamic flow control
 static CmiInt8 buffered_send_msg = 0;
-static CmiInt8  register_memory_size = 0;
+static CmiInt8 register_memory_size = 0;
 
 #define     LARGEPAGE           0
 #if LARGEPAGE
-#if CMK_SMP && COMM_THREAD_SEND 
 static CmiInt8  MAX_BUFF_SEND  =  100000*oneMB;
 static CmiInt8  MAX_REG_MEM    =  200000*oneMB;
-#else
-static CmiInt8  MAX_BUFF_SEND  =  100000*oneMB;
-static CmiInt8  MAX_REG_MEM    =  200000*oneMB;
-#endif
 #else
 #if CMK_SMP && COMM_THREAD_SEND 
 static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
@@ -217,7 +212,7 @@ uint8_t   onesided_hnd, omdh;
         if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
-            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \ 
+            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \
     } while(0)
 #endif
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh, size)  \
@@ -824,7 +819,7 @@ static  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
 }
 
 inline 
-static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, int size, gni_mem_handle_t  *memhndl)
+static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, size_t size, gni_mem_handle_t  *memhndl)
 {
     gni_return_t status = GNI_RC_SUCCESS;
     //int size = GetMempoolsize(msg);
@@ -861,7 +856,7 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, int
 }
 
 inline 
-static gni_return_t registerMemory(void *msg, int size, gni_mem_handle_t *t)
+static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t)
 {
     static int rank = -1;
     int i;
@@ -1701,7 +1696,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     gni_post_descriptor_t *pd;
     gni_mem_handle_t    msg_mem_hndl;
     int source, size, transaction_size, offset = 0;
-    int     register_size = 0;
+    size_t     register_size = 0;
 
     // initial a get to transfer data from the sender side */
     request_msg = (CONTROL_MSG *) header;
@@ -2028,8 +2023,9 @@ static void  SendRdmaMsg()
     gni_mem_handle_t        msg_mem_hndl;
     RDMA_REQUEST            *ptr = 0, *tmp_ptr;
     RDMA_REQUEST            *pre = 0;
-    int i, register_size = 0;
+    uint64_t                register_size = 0;
     void                    *msg;
+    int                     i;
 #if CMK_SMP
     int len = PCQueueLength(sendRdmaBuf);
     for (i=0; i<len; i++)
@@ -2129,7 +2125,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     CONTROL_MSG         *control_msg_tmp;
     gni_return_t        status;
     int                 done = 1;
-    int                 register_size;
+    uint64_t            register_size;
     void                *register_addr;
     int                 index_previous = -1;
 #if CMI_EXERT_SEND_CAP
@@ -2716,8 +2712,8 @@ printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(),
 }
 #endif
 
-static long long int total_mempool_size = 0;
-static long long int total_mempool_calls = 0;
+static CmiUInt8 total_mempool_size = 0;
+static CmiUInt8 total_mempool_calls = 0;
 
 #if USE_LRTS_MEMPOOL
 void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
@@ -2949,8 +2945,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (MAX_BUFF_SEND > MAX_REG_MEM)  MAX_BUFF_SEND = MAX_REG_MEM;
 
     if (myrank==0) {
-        printf("Charm++> memory pool init size: %1.fMB, max size: %1.fMB\n", _mempool_size/1024.0/1024, _mempool_size_limit/1024.0/1024);
-        printf("Charm++> memory pool max size: %1.fMB, max for send: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
+        printf("Charm++> memory pool init block size: %1.fMB, total registered memory per node: %1.fMB\n", _mempool_size/1024.0/1024, _mempool_size_limit/1024.0/1024);
+        printf("Charm++> memory pool registered memory limit: %1.fMB, send limit: %1.fMB\n", MAX_REG_MEM/1024.0/1024, MAX_BUFF_SEND/1024.0/1024);
         if (MAX_REG_MEM < BIG_MSG * 2 + oneMB)  {
             /* memblock can expand to BIG_MSG * 2 size */
             printf("Charm++ Error: The mempool maximum size is too small, please use command line option +gni-mempool-max or environment variable CHARM_UGNI_MEMPOOL_MAX to increase the value to at least %1.fMB.\n",  BIG_MSG * 2.0/1024/1024 + 1);
