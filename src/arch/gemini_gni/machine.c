@@ -110,15 +110,27 @@ static int BIG_MSG_PIPELINE = 4;
 
 // dynamic flow control
 static CmiInt8 buffered_send_msg = 0;
-static int   register_memory_size = 0;
+static CmiInt8  register_memory_size = 0;
 
+#define     LARGEPAGE           0
+#if LARGEPAGE
 #if CMK_SMP && COMM_THREAD_SEND 
-//Dynamic flow control about memory registration
+static CmiInt8  MAX_BUFF_SEND  =  100000*oneMB;
+static CmiInt8  MAX_REG_MEM    =  200000*oneMB;
+#else
+static CmiInt8  MAX_BUFF_SEND  =  100000*oneMB;
+static CmiInt8  MAX_REG_MEM    =  200000*oneMB;
+#endif
+#else
+#if CMK_SMP && COMM_THREAD_SEND 
 static CmiInt8  MAX_BUFF_SEND  =  100*oneMB;
 static CmiInt8  MAX_REG_MEM    =  200*oneMB;
 #else
 static CmiInt8  MAX_BUFF_SEND  =  16*oneMB;
 static CmiInt8  MAX_REG_MEM    =  25*oneMB;
+#endif
+
+
 #endif
 
 #endif     /* end USE_LRTS_MEMPOOL */
@@ -198,14 +210,14 @@ uint8_t   onesided_hnd, omdh;
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status)    if(register_memory_size+size>= MAX_REG_MEM) { \
          status = GNI_RC_ERROR_NOMEM;} \
         else {status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, smsg_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
-                if(status == GNI_RC_SUCCESS) register_memory_size += size;} }
+                if(status == GNI_RC_SUCCESS) register_memory_size += size; }  
 #else
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status ) \
     do {   \
         if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
-            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \
+            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \ 
     } while(0)
 #endif
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh, size)  \
@@ -1348,7 +1360,7 @@ static void ProcessDeadlock()
     if (count == 2) { 
         /* detected twice, it is a real deadlock */
         if (myrank == 0)  {
-            CmiPrintf("Charm++> Network progress engine appears to have stalled, possibly because registered memory limits have been exceeded or are too low.  Try adjusting environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX (current limits are %d and %d).\n", MAX_REG_MEM, MAX_BUFF_SEND);
+            CmiPrintf("Charm++> Network progress engine appears to have stalled, possibly because registered memory limits have been exceeded or are too low.  Try adjusting environment variables CHARM_UGNI_MEMPOOL_MAX and CHARM_UGNI_SEND_MAX (current limits are %lld and %lld).\n", MAX_REG_MEM, MAX_BUFF_SEND);
             CmiAbort("Fatal> Deadlock detected.");
         }
 
@@ -1377,14 +1389,15 @@ static void CheckProgress()
 
 static void set_limit()
 {
-    if (!user_set_flag && CmiMyRank() == 0) {
+    //if (!user_set_flag && CmiMyRank() == 0) {
+    if (CmiMyRank() == 0) {
         int mynode = CmiPhysicalNodeID(CmiMyPe());
         int numpes = CmiNumPesOnPhysicalNode(mynode);
         int numprocesses = numpes / CmiMyNodeSize();
         MAX_REG_MEM  = _totalmem / numprocesses;
         MAX_BUFF_SEND = MAX_REG_MEM / 2;
         if (CmiMyPe() == 0)
-           printf("mem_max = %d, send_max =%d\n", MAX_REG_MEM, MAX_BUFF_SEND);
+           printf("mem_max = %lld, send_max =%lld\n", MAX_REG_MEM, MAX_BUFF_SEND);
     }
 }
 
@@ -1416,8 +1429,9 @@ void LrtsPostCommonInit(int everReturn)
     if (CmiMyRank() == 0)
 #endif
     CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdVoidFn) CheckProgress, NULL);
-
+#if !LARGEPAGE
     CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)set_limit, NULL);
+#endif
 }
 
 /* this is called by worker thread */
@@ -2710,16 +2724,19 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
 {
     void *pool;
     int ret;
+    gni_return_t status = GNI_RC_SUCCESS;
 
     size_t default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
     total_mempool_size += *size;
     total_mempool_calls += 1;
-    if (*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) 
+#if   !LARGEPAGE
+    if ((*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) && expand_flag) 
     {
         printf("Error: A mempool block with size %lld is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX. (current=%lld, %lld)\n", *size, MAX_REG_MEM, MAX_BUFF_SEND);
         CmiAbort("alloc_mempool_block");
     }
+#endif
     ret = posix_memalign(&pool, ALIGNBUF, *size);
     if (ret != 0) {
 #if CMK_SMP && STEAL_MEMPOOL
@@ -2732,8 +2749,16 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
       else
         CmiAbort("alloc_mempool_block: posix_memalign failed");
     }
+#if LARGEPAGE
+    CmiMemLock();
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, status);
+    CmiMemUnlock();
+    if(status != GNI_RC_SUCCESS)
+        printf("[%d, %d] memory reigstration fails %lld ask for %lld\n", myrank, CmiMyRank(), register_memory_size, *size);
+    GNI_RC_CHECK("MEMORY_REGISTER", status);
+#else
     SetMemHndlZero((*mem_hndl));
-    
+#endif
     return pool;
 }
 
@@ -3046,6 +3071,7 @@ void LrtsExit()
 {
     /* free memory ? */
 #if USE_LRTS_MEMPOOL
+    //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
     PMI_Finalize();
