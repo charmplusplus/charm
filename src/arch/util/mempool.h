@@ -10,8 +10,8 @@
 #include "pmi.h"
 typedef gni_mem_handle_t    mem_handle_t;
 #else
-  // in uGNI, it is memory handler, other versions, this is an integer
-  // a unique integer to represent the memory block
+// in uGNI, it is memory handler, other versions, this is an integer
+// a unique integer to represent the memory block
 typedef CmiInt8   mem_handle_t;
 #endif
 
@@ -46,15 +46,15 @@ typedef used_header mempool_header;
 // multiple mempool for different size allocation
 typedef struct block_header
 {
-    mem_handle_t        mem_hndl;
-    size_t              size, used;
-    size_t              block_prev,block_next;   // offset to next memblock
-    size_t              freelists[cutOffNum];
-    struct mempool_type  *mptr;               // mempool_type
-    size_t              padding;              // fix for 32 bit machines
+  mem_handle_t        mem_hndl;
+  size_t              size, used;
+  size_t              block_prev,block_next;   // offset to next memblock
+  size_t              freelists[cutOffNum];
+  struct mempool_type  *mptr;               // mempool_type
+  size_t              padding;              // fix for 32 bit machines
 #if CMK_CONVERSE_GEMINI_UGNI
-    int                 msgs_in_send;
-    int                 msgs_in_recv;
+  int                 msgs_in_send;
+  int                 msgs_in_recv;
 #endif
 } block_header;
 

@@ -268,6 +268,10 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
 
     bestfit_size = size + sizeof(used_header);
     power = which_pow2(bestfit_size);
+    if(power == cutOffNum) {
+      CmiAbort("Mempool-requested slot is more than what mempool can provide as\
+      one chunk, increase cutOffNum and cutoffPoints in mempool\n");
+    }
     bestfit_size = cutOffPoints[power];
 #if MEMPOOL_DEBUG
     CmiPrintf("Request size is %d, power value is %d, size is %d\n",size,power,cutOffPoints[power]);
@@ -365,9 +369,8 @@ void mempool_free_thread( void *ptr_free)
 
 void mempool_free(mempool_type *mptr, void *ptr_free)
 {
-    int           i,size;
-    int           left,power;
-    size_t        prev,loc;
+    int           i,power;
+    size_t        prev,loc,size,left;
     block_header  *block_head;
     slot_header   *to_free, *first, *current;
     slot_header   *used_next,*temp;
@@ -376,7 +379,6 @@ void mempool_free(mempool_type *mptr, void *ptr_free)
     CmiPrintf("Free request for %lld\n",
               ((char*)ptr_free - (char*)mptr - sizeof(used_header)));
 #endif
-
 
     to_free = (slot_header *)((char*)ptr_free - sizeof(used_header));
     to_free->status = 1;
