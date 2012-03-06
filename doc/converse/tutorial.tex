@@ -61,4 +61,31 @@ done.
 \end{figure}
 
 
+\section{Interprocessor Messaging}
+
+Figure~\ref{fig:converse-msg} illustrates how to write a simple program that sends a message from one processor to other. In the example program, function \textttP{sendData} shows how to send a message. First, one must create a buffer to hold the message. The buffer must be large enough to hold the header and the data. This is done by \texttt{CmiAlloc} call. \texttt{CmiMsgHeaderSizeBytes} is a constant which contains the size of the header. Next, the handler method should be set for the outgoing message using \texttt{CmiSetHandler} call. User data can be set after the header. In this example, we use \texttt{CmiSyncSendAndFree} call to send the message. This function sends the message and frees the buffer. There are various alternatives. The first argument of this function call is the processor number where we want to send the message, second argument is the size of the message (including header) and the last argument is a pointer to the message.
+\begin{itemize}
+\item
+sync: a version that is as simple as possible, pushing the data into the network and not returning until the data is ``in the network''. As soon as a sync function returns, you can reuse the message buffer.
+
+\item
+async: a version that returns almost instantaneously, and then continues working in the background. The background job transfers the data from the message buffer into the network. Since the background job is still using the message buffer when the function returns, you can't reuse the message buffer immediately. The background job sets a flag when it is done and you can then reuse the message buffer.
+
+\item
+send and free: a version that returns almost instantaneously, and then continues working in the background. The background job transfers the data from the message buffer into the network. When the background job finishes, it CmiFrees the message buffer. In this situation, you can't reuse the message buffer at all. To use a function of this type, you must allocate the message buffer using CmiAlloc.
+
+\item
+node: a version that send a message to a node instead of a specific processor. This means that when the message is received, any ``free'' processor within than node can handle it. 
+\end{itemize}
+
+On the receiver, appropiate handler function is called and a pointer to the message (starting from the header) is provided to the user. User must free the message after using the data using \texttt{CmiFree} call. Finally we also illustrate a broadcast message using \texttt{CmiSyncBroadcastAllAndFree}
+
+TODO: Examples of other modes
+
+\begin{figure}
+\lstinputlisting[language=pseudo,basicstyle=\footnotesize,numbers=left,escapechar=\%]{code/interNodeMsg.C}
+\caption{Sending Message across Converse Processes}
+\label{fig:converse-pingpong}
+\end{figure}
+
 \end{document}
