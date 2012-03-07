@@ -12,6 +12,7 @@
 // #define DEBUG_STREAMER
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
+#define CACHE_ARRAY_METADATA
 
 struct MeshLocation {
   int dimension; 
@@ -86,8 +87,8 @@ private:
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
 #ifdef CACHE_LOCATIONS
-    MeshLocation *cachedLocations;
-    bool *isCached; 
+    MeshLocation *cachedLocations_;
+    bool *isCached_; 
 #endif
 
     MeshLocation determineLocation(int destinationPe);
@@ -218,9 +219,9 @@ MeshStreamer<dtype>::MeshStreamer(
   isPeriodicFlushEnabled_ = false; 
 
 #ifdef CACHE_LOCATIONS
-  cachedLocations = new MeshLocation[numMembers_];
-  isCached = new bool[numMembers_];
-  std::fill(isCached, isCached + numMembers_, false);
+  cachedLocations_ = new MeshLocation[numMembers_];
+  isCached_ = new bool[numMembers_];
+  std::fill(isCached_, isCached_ + numMembers_, false);
 #endif
 
 }
@@ -240,8 +241,8 @@ MeshStreamer<dtype>::~MeshStreamer() {
   delete[] myLocationIndex_;
 
 #ifdef CACHE_LOCATIONS
-  delete[] cachedLocations;
-  delete[] isCached; 
+  delete[] cachedLocations_;
+  delete[] isCached_; 
 #endif
 
 }
@@ -252,8 +253,8 @@ inline
 MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) { 
 
 #ifdef CACHE_LOCATIONS
-  if (isCached[destinationPe]) {    
-    return cachedLocations[destinationPe]; 
+  if (isCached_[destinationPe]) {    
+    return cachedLocations_[destinationPe]; 
   }
 #endif
 
@@ -267,8 +268,8 @@ MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) {
       destinationLocation.dimension = i; 
       destinationLocation.bufferIndex = dimensionIndex; 
 #ifdef CACHE_LOCATIONS
-      cachedLocations[destinationPe] = destinationLocation;
-      isCached[destinationPe] = true; 
+      cachedLocations_[destinationPe] = destinationLocation;
+      isCached_[destinationPe] = true; 
 #endif
       return destinationLocation;
     }
@@ -363,6 +364,7 @@ void MeshStreamer<dtype>::storeMessage(
 }
 
 template <class dtype>
+inline
 void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
   static int count = 0;
   const static bool copyIndirectly = true;
@@ -610,8 +612,12 @@ private:
 
   CProxy_MeshStreamerArrayClient<dtype> clientProxy_;
   CkArray *clientArrayMgr_;
-  MeshStreamerArrayClient<dtype> *clientObj_;
-
+  int numArrayElements_;
+  MeshStreamerArrayClient<dtype> **clientObjs_;
+#ifdef CACHE_ARRAY_METADATA
+  int *destinationPes_;
+  bool *isCachedArrayMetadata_;
+#endif
 
   void deliverToDestination(
        int destinationPe, 
@@ -622,13 +628,11 @@ private:
 
   void localDeliver(ArrayDataItem<dtype> &packedDataItem) {
     int arrayId = packedDataItem.arrayIndex; 
-    MeshStreamerArrayClient<dtype> *clientObj = 
-      clientProxy_[arrayId].ckLocal();
 
-    if (clientObj != NULL) {
-      clientObj->process(packedDataItem.dataItem);
+    if (clientObjs_[arrayId] != NULL) {
+      clientObjs_[arrayId]->process(packedDataItem.dataItem);
     }
-    else {
+    else { 
       // array element is no longer present locally - redeliver using proxy
       clientProxy_[arrayId].process(packedDataItem.dataItem);
     }
@@ -651,6 +655,27 @@ public:
   {
     clientProxy_ = clientProxy; 
     clientArrayMgr_ = clientProxy_.ckLocalBranch();
+
+    numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
+
+    clientObjs_ = new MeshStreamerArrayClient<dtype>*[numArrayElements_];
+    for (int i = 0; i < numArrayElements_; i++) {
+      clientObjs_[i] = clientProxy_[i].ckLocal();
+    }
+
+#ifdef CACHE_ARRAY_METADATA
+    destinationPes_ = new int[numArrayElements_];
+    isCachedArrayMetadata_ = new bool[numArrayElements_];
+    std::fill(isCachedArrayMetadata_, isCachedArrayMetadata_ + numArrayElements_, false);
+#endif
+  }
+
+  ~ArrayMeshStreamer() {
+    delete [] clientObjs_;
+#ifdef CACHE_ARRAY_METADATA
+    delete [] destinationPes_;
+    delete [] isCachedArrayMetadata_; 
+#endif
   }
 
   void receiveArrayData(MeshStreamerMessage<ArrayDataItem<dtype> > *msg) {
@@ -663,8 +688,22 @@ public:
 
   void insertData(dtype &dataItem, int arrayIndex) {
 
-    int destinationPe = 
+    int destinationPe; 
+#ifdef CACHE_ARRAY_METADATA
+  if (isCachedArrayMetadata_[arrayIndex]) {    
+    destinationPe =  destinationPes_[arrayIndex];
+  }
+  else {
+    destinationPe = 
       clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
+    isCachedArrayMetadata_[arrayIndex] = true;
+    destinationPes_[arrayIndex] = destinationPe;
+  }
+#else 
+  destinationPe = 
+    clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
+#endif
+
     static ArrayDataItem<dtype> packedDataItem;
     if (destinationPe == CkMyPe()) {
       // copying here is necessary - user code should not be 
