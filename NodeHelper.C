@@ -195,8 +195,11 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 				CmiPushPE(pe, (void *)(notifyMsg));    
 			}
 		}else{
-			for (int i=0; i<numHelpers; i++) {
-				if (i!=CkMyRank()) CmiPushPE(i, (void *)(notifyMsg));            
+			for (int i=CmiMyRank()+1; i<numHelpers; i++) {
+				CmiPushPE(i, (void *)(notifyMsg));
+			}
+			for (int i=0; i<CmiMyRank(); i++) {
+				CmiPushPE(i, (void *)(notifyMsg));
 			}
 		}
 	}else if(mode == NODEHELPER_PTHREAD){
