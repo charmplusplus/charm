@@ -38,6 +38,8 @@
 #include <gni_pub.h>
 #include <pmi.h>
 
+//#include <numatoolkit.h>
+
 #include "converse.h"
 
 #if CMK_DIRECT
@@ -113,6 +115,7 @@ static CmiInt8 buffered_send_msg = 0;
 static CmiInt8 register_memory_size = 0;
 
 #define     LARGEPAGE           0
+
 #if LARGEPAGE
 static CmiInt8  MAX_BUFF_SEND  =  100000*oneMB;
 static CmiInt8  MAX_REG_MEM    =  200000*oneMB;
@@ -139,6 +142,8 @@ static CmiInt8  MAX_REG_MEM    =  25*oneMB;
 #endif
 
 static int _tlbpagesize = 4096;
+
+//static int _smpd_count  = 0;
 
 static int   user_set_flag  = 0;
 
@@ -790,11 +795,12 @@ int         lrts_received_msg = 0;
 
 static void sweep_mempool(mempool_type *mptr)
 {
+    int n = 0;
     block_header *current = &(mptr->block_head);
 
-    printf("[n %d] sweep_mempool slot START.\n", myrank);
+    printf("[n %d %d] sweep_mempool slot START.\n", myrank, n++);
     while( current!= NULL) {
-        printf("[n %d] sweep_mempool slot %p size: %d (%d %d) %lld %lld.\n", myrank, current, current->size, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
+        printf("[n %d %d] sweep_mempool slot %p size: %d (%d %d) %lld %lld.\n", myrank, n++, current, current->size, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
         current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
     printf("[n %d] sweep_mempool slot END.\n", myrank);
@@ -2749,8 +2755,10 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     CmiMemLock();
     MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, status);
     CmiMemUnlock();
-    if(status != GNI_RC_SUCCESS)
+    if(status != GNI_RC_SUCCESS) {
         printf("[%d, %d] memory reigstration fails %lld ask for %lld\n", myrank, CmiMyRank(), register_memory_size, *size);
+sweep_mempool(CpvAccess(mempool));
+    }
     GNI_RC_CHECK("MEMORY_REGISTER", status);
 #else
     SetMemHndlZero((*mem_hndl));
@@ -3004,6 +3012,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     debugLog=fopen(ln,"w");
 #endif
 
+//    NTK_Init();
+//    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 }
 
 void* LrtsAlloc(int n_bytes, int header)
