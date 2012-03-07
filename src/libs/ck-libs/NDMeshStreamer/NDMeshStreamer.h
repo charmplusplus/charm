@@ -1,5 +1,5 @@
-#ifndef NDMESH_STREAMER_H_
-#define NDMESH_STREAMER_H_
+#ifndef NDMESH_STREAMER_H
+#define NDMESH_STREAMER_H
 
 #include <algorithm>
 #include "NDMeshStreamer.decl.h"
@@ -385,7 +385,10 @@ inline
 void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 
   if (destinationPe == CkMyPe()) {
-    localDeliver(dataItem);
+    // copying here is necessary - user code should not be 
+    // passed back a reference to the original item
+    dtype dataItemCopy = dataItem;
+    localDeliver(dataItemCopy);
     return;
   }
 
