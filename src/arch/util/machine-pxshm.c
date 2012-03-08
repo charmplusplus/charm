@@ -595,6 +595,7 @@ void createShmObjectsAndSems(sharedBufData **bufs,char **bufNames){
 			(*bufs)[i].header->lock = 0; // by convention(see man page) 0 means unlocked
 #elif PXSHM_LOCK
 			(*bufs)[i].mutex = sem_open(bufNames[i],O_CREAT, S_IRUSR | S_IWUSR,1);
+//                        sem_unlink(bufNames[i]);
 #endif
 		}else{
 			(*bufs)[i].header = NULL;
@@ -632,6 +633,7 @@ void createShmObject(char *name,int size,char **pPtr){
 	CmiAssert(*pPtr != NULL);
 
 	close(fd);
+        unlink(name);
 }
 
 void tearDownSharedBuffers(){
