@@ -649,7 +649,7 @@ void freeSharedBuffers(){
 		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
 		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
 		}
-		sem_unlink(pxshmContext->sendBufNames[i]);
+		shm_unlink(pxshmContext->sendBufNames[i]);
 #if PXSHM_LOCK
 		sem_unlink(pxshmContext->sendBufNames[i]);
 		sem_unlink(pxshmContext->recvBufNames[i]);
@@ -665,7 +665,7 @@ void tearDownSharedBuffers(){
 		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
 		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
 		}
-		sem_unlink(pxshmContext->sendBufNames[i]);
+		shm_unlink(pxshmContext->sendBufNames[i]);
 #if PXSHM_LOCK
 		sem_close(pxshmContext->recvBufs[i].mutex);
 		sem_close(pxshmContext->sendBufs[i].mutex);
