@@ -1200,7 +1200,6 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         }
 #endif
         CMI_GNI_LOCK
-<<<<<<< HEAD
 #if CMK_SMP_TRACE_COMMTHREAD
         int oldpe = -1;
         int oldeventid = -1;
@@ -1215,13 +1214,10 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
             TRACE_COMM_SET_COMM_MSGID(real_data);
         }
 #endif
-        status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, msg, size, 0, tag);
+        status = GNI_SmsgSendWTag(ep_hndl_array[destNode], buf, bufsize, msg, size, 0, tag);
 #if CMK_SMP_TRACE_COMMTHREAD
         if (oldpe != -1)  TRACE_COMM_SET_MSGID(real_data, oldpe, oldeventid);
 #endif
-=======
-        status = GNI_SmsgSendWTag(ep_hndl_array[destNode], buf, bufsize, msg, size, 0, tag);
->>>>>>> 6bc5ef7da3aa42d00053cc7680a14257efe4ee42
         CMI_GNI_UNLOCK
         if(status == GNI_RC_SUCCESS)
         {
