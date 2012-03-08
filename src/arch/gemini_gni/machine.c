@@ -116,8 +116,13 @@ static CmiInt8 _mempool_size_limit = 0;
 
 static CmiInt8 _totalmem = 0.8*oneGB;
 
+#if LARGEPAGE
+static int BIG_MSG  =  16*oneMB;
+static int ONE_SEG  =  4*oneMB;
+#else
 static int BIG_MSG  =  4*oneMB;
 static int ONE_SEG  =  2*oneMB;
+#endif
 static int BIG_MSG_PIPELINE = 4;
 
 // dynamic flow control
@@ -783,6 +788,7 @@ static uint32_t get_cookie(void)
 #include <fcntl.h>
 #include <sys/mman.h>
 
+// size must be _tlbpagesize aligned
 void *my_get_huge_pages(size_t size)
 {
     char filename[512];
@@ -791,13 +797,13 @@ void *my_get_huge_pages(size_t size)
     void *ptr = NULL;
 
     snprintf(filename, sizeof(filename), "%s/charm_mempool.%d.%d", hugetlbfs_find_path_for_size(_tlbpagesize), getpid(), rand());
-//printf("[%d] my_get_huge_pages: %s %d\n", myrank, filename, size);
     fd = open(filename, O_RDWR | O_CREAT, mode);
     if (fd == -1) {
         CmiAbort("my_get_huge_pages: open filed");
     }
     ptr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
     if (ptr == MAP_FAILED) ptr = NULL;
+//printf("[%d] my_get_huge_pages: %s %d %p\n", myrank, filename, size, ptr);
     close(fd);
     unlink(filename);
     return ptr;
@@ -805,7 +811,9 @@ void *my_get_huge_pages(size_t size)
 
 void my_free_huge_pages(void *ptr, int size)
 {
-    munmap(ptr, size);
+//printf("[%d] my_free_huge_pages: %p %d\n", myrank, ptr, size);
+    int ret = munmap(ptr, size);
+    if (ret == -1) CmiAbort("munmap failed in my_free_huge_pages");
 }
 
 #endif
@@ -2447,7 +2455,6 @@ static void ProcessDeadlock();
 void LrtsAdvanceCommunication(int whileidle)
 {
     static int count = 0;
-    count++;
     /*  Receive Msg first */
 #if CMK_SMP_TRACE_COMMTHREAD
     double startT, endT;
@@ -2493,8 +2500,10 @@ void LrtsAdvanceCommunication(int whileidle)
     {
 #if PIGGYBACK_ACK
     //if (count%10 == 0) SendBufferMsg(&smsg_ack_queue);
-    if (SendBufferMsg(&smsg_queue) == 1)
+    if (SendBufferMsg(&smsg_queue) == 1) {
+        //if (count++ % 10 == 0) 
         SendBufferMsg(&smsg_ack_queue);
+    }
 #else
     SendBufferMsg(&smsg_queue);
 #endif
@@ -2880,7 +2889,9 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     size_t default_size =  expand_flag? _expand_mem : _mempool_size;
     if (*size < default_size) *size = default_size;
 #if LARGEPAGE
-    *size = _tlbpagesize;
+    // round up to be multiple of _tlbpagesize
+    //*size = (*size + _tlbpagesize - 1)/_tlbpagesize*_tlbpagesize;
+    *size = ALIGNHUGEPAGE(*size);
 #endif
     total_mempool_size += *size;
     total_mempool_calls += 1;
@@ -2912,7 +2923,6 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
     CmiMemLock();
     register_count++;
     MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, status);
-        printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
     CmiMemUnlock();
     if(status != GNI_RC_SUCCESS) {
         printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
@@ -3159,6 +3169,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
         printf("Charm++> Cray TLB page size: %1.fK\n", _tlbpagesize/1024.0);
     }
 
+#if LARGEPAGE
+    if (_tlbpagesize == 4096) {
+        CmiAbort("Hugepage module, e.g. craype-hugepages8M must be loaded.");
+    }
+#endif
+
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
@@ -3201,6 +3217,7 @@ void* LrtsAlloc(int n_bytes, int header)
         }else 
         {
 #if LARGEPAGE
+            //printf("[%d] LrtsAlloc a big_msg: %d %d\n", myrank, n_bytes, ALIGNHUGEPAGE(n_bytes+ALIGNBUF));
             n_bytes = ALIGNHUGEPAGE(n_bytes+ALIGNBUF);
             char *res = my_get_huge_pages(n_bytes);
 #else
@@ -3251,7 +3268,7 @@ void LrtsExit()
 {
     /* free memory ? */
 #if USE_LRTS_MEMPOOL
-    printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
+    //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
     mempool_destroy(CpvAccess(mempool));
 #endif
     PMI_Finalize();
