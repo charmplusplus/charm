@@ -261,7 +261,9 @@ void CmiInitXpmem(char **argv){
  * shutdown shmem objects and semaphores
  *
  * *******************/
+static int pxshm_freed = 0;
 void tearDownSharedBuffers();
+void freeSharedBuffers();
 
 void CmiExitXpmem(){
 	int i=0;
@@ -269,7 +271,7 @@ void CmiExitXpmem(){
         if (xpmemContext == NULL) return;
 
 	if(xpmemContext->nodesize != 1) {
-		tearDownSharedBuffers();
+                //tearDownSharedBuffers();
 	
 		for(i=0;i<xpmemContext->nodesize;i++){
 			if(i != xpmemContext->noderank){
@@ -513,6 +515,7 @@ void setupSharedBuffers(){
 	createSendXpmemAndSems(&(xpmemContext->sendBufs),xpmemContext->sendBufNames);
         CmiBarrier();
         removeXpmemFiles();
+        freeSharedBuffers();
 	
 	for(i=0;i<xpmemContext->nodesize;i++){
 		if(i != xpmemContext->noderank){
@@ -688,6 +691,18 @@ void removeXpmemFiles()
         unlink(fname);
 }
 
+void freeSharedBuffers(){
+	int i;
+	for(i= 0;i<xpmemContext->nodesize;i++){
+	    if(i != xpmemContext->noderank){
+#if XPMEM_LOCK
+		sem_unlink(xpmemContext->sendBufNames[i]);
+		sem_unlink(xpmemContext->recvBufNames[i]);
+#endif
+	    }
+	}
+}
+
 void tearDownSharedBuffers(){
 	int i;
 	for(i= 0;i<xpmemContext->nodesize;i++){
@@ -837,7 +852,7 @@ inline void flushAllSendQs(){
         for(i=0;i<xpmemContext->nodesize;i++) {
                 if (i == xpmemContext->noderank) continue;
                 XpmemSendQ *sendQ = xpmemContext->sendQs[i];
-                if(SendQ->numEntries > 0) {
+                if(sendQ->numEntries > 0) {
 #endif
 	
 #if XPMEM_OSSPINLOCK
