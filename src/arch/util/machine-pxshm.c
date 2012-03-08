@@ -292,13 +292,16 @@ void CmiInitPxshm(char **argv){
  * shutdown shmem objects and semaphores
  *
  * *******************/
+static int pxshm_freed = 0;
 void tearDownSharedBuffers();
+void freeSharedBuffers();
 
 void CmiExitPxshm(){
         if (pxshmContext == NULL) return;
 	if(pxshmContext->nodesize != 1){
                 int i;
-		tearDownSharedBuffers();
+		if (!pxshm_freed)
+                    tearDownSharedBuffers();
 	
 		for(i=0;i<pxshmContext->nodesize;i++){
 			if(i != pxshmContext->noderank){
@@ -557,6 +560,11 @@ void setupSharedBuffers(){
 			pxshmContext->sendBufs[i].header->bytes = 0;
 		}
 	}
+
+        if (CmiBarrier() == 0) {
+            freeSharedBuffers();
+            pxshm_freed = 1;
+        }
 }
 
 void allocBufNameStrings(char ***bufName){
@@ -634,6 +642,20 @@ void createShmObject(char *name,int size,char **pPtr){
 	close(fd);
 }
 
+void freeSharedBuffers(){
+	int i;
+	for(i= 0;i<pxshmContext->nodesize;i++){
+	    if(i != pxshmContext->noderank){
+		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
+		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
+		}
+#if PXSHM_LOCK
+		sem_unlink(pxshmContext->recvBufNames[i]);
+#endif
+	    }
+	}
+};
+
 void tearDownSharedBuffers(){
 	int i;
 	for(i= 0;i<pxshmContext->nodesize;i++){
@@ -641,11 +663,9 @@ void tearDownSharedBuffers(){
 		if(shm_unlink(pxshmContext->recvBufNames[i]) < 0){
 		    fprintf(stderr,"Error from shm_unlink %s \n",strerror(errno));
 		}
-		sem_unlink(pxshmContext->sendBufNames[i]);
 #if PXSHM_LOCK
 		sem_close(pxshmContext->recvBufs[i].mutex);
 		sem_close(pxshmContext->sendBufs[i].mutex);
-		sem_unlink(pxshmContext->sendBufNames[i]);
 		sem_unlink(pxshmContext->recvBufNames[i]);
                 pxshmContext->recvBufs[i].mutex = NULL;
                 pxshmContext->sendBufs[i].mutex = NULL;
