@@ -217,7 +217,7 @@ uint8_t   onesided_hnd, omdh;
         if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
-            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \ 
+            if(status == GNI_RC_SUCCESS) register_memory_size += size; } \
     } while(0)
 #endif
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh, size)  \
@@ -1087,18 +1087,30 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
     {
 #endif
         CMI_GNI_LOCK
+#if CMK_SMP_TRACE_COMMTHREAD
+        int oldpe = -1;
+        int oldeventid = -1;
+        if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG)
+        { 
+            START_EVENT();
+            if ( tag == SMALL_DATA_TAG)
+                real_data = (char*)msg; 
+            else 
+                real_data = (char*)(((CONTROL_MSG*)msg)->source_addr);
+            TRACE_COMM_GET_MSGID(real_data, &oldpe, &oldeventid);
+            TRACE_COMM_SET_COMM_MSGID(real_data);
+        }
+#endif
         status = GNI_SmsgSendWTag(ep_hndl_array[destNode], 0, 0, msg, size, 0, tag);
+#if CMK_SMP_TRACE_COMMTHREAD
+        if (oldpe != -1)  TRACE_COMM_SET_MSGID(real_data, oldpe, oldeventid);
+#endif
         CMI_GNI_UNLOCK
         if(status == GNI_RC_SUCCESS)
         {
 #if CMK_SMP_TRACE_COMMTHREAD
             if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG)
             { 
-                START_EVENT();
-                if ( tag == SMALL_DATA_TAG)
-                    real_data = (char*)msg; 
-                else 
-                    real_data = (char*)(((CONTROL_MSG*)msg)->source_addr);
                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), real_data);
             }
 #endif
@@ -1584,7 +1596,7 @@ static void PumpNetworkSmsg()
                 msg_data    = CmiAlloc(msg_nbytes);
                 memcpy(msg_data, (char*)header, msg_nbytes);
 #if CMK_SMP_TRACE_COMMTHREAD
-                TRACE_COMM_RECV(CpvAccess(projTraceStart), msg_data);
+                TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
 #endif
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
@@ -1981,9 +1993,7 @@ static void PumpLocalRdmaTransactions()
 #if PRINT_SYH
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
-#if CMK_SMP_TRACE_COMMTHREAD
                     START_EVENT();
-#endif
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInRecv((void*)tmp_pd->local_addr);
 #if MACHINE_DEBUG_LOG
@@ -1992,21 +2002,19 @@ static void PumpLocalRdmaTransactions()
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-                    TRACE_COMM_RECV(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
 #endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if(msg_tag == BIG_MSG_TAG){
                     void *msg = (char*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
                     CmiSetMsgSeq(msg, CmiGetMsgSeq(msg)+1);
                     if (tmp_pd->first_operand <= ONE_SEG*CmiGetMsgSeq(msg)) {
-#if CMK_SMP_TRACE_COMMTHREAD
                         START_EVENT();
-#endif
 #if PRINT_SYH
                         printf("Pipeline msg done [%d]\n", myrank);
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-                        TRACE_COMM_RECV(CpvAccess(projTraceStart), msg);
+                        TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
 #endif
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
                     }

@@ -695,7 +695,35 @@ void traceSendMsgComm(char *msg){
     CkpvAccess(_traces)->creation(msg);
 #endif
 }
+
+extern "C"
+void traceCommSetMsgID(char *msg){
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+    CkpvAccess(_traces)->traceCommSetMsgID(msg);
 #endif
+}
+
+#endif
+
+extern "C"
+void traceGetMsgID(char *msg, int *pe, int *event)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+    CkpvAccess(_traces)->traceGetMsgID(msg, pe, event);
+#endif
+}
+
+extern "C"
+void traceSetMsgID(char *msg, int pe, int event)
+{
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && CkpvAccess(_traces) && CkIsCharmMessage(msg))
+    CkpvAccess(_traces)->traceSetMsgID(msg, pe, event);
+#endif
+}
+
 
 extern "C"
 void traceChangeLastTimestamp(double ts){

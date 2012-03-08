@@ -1259,16 +1259,60 @@ void TraceProjections::creation(char *msg)
         // msg must be a charm message
 	envelope *e = (envelope *)msg;
 	int ep = e->getEpIdx();
-        if(ep==0) return;
-        int num = _entryTable.size();
-        CmiAssert(ep < num);
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
 	if(_entryTable[ep]->traceEnabled) {
 		creation(e, ep, 1);
-                e->setSrcPe(CkMyPe());              // pretend I am the sender
-        }
+        e->setSrcPe(CkMyPe());              // pretend I am the sender
+    }
 #endif
 }
 
+void TraceProjections::traceCommSetMsgID(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+        // msg must be a charm message
+	envelope *e = (envelope *)msg;
+	int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+	if(_entryTable[ep]->traceEnabled) {
+        e->setSrcPe(CkMyPe());              // pretend I am the sender
+        e->setEvent(curevent);
+    }
+#endif
+}
+
+void TraceProjections::traceGetMsgID(char *msg, int *pe, int *event)
+{
+    // msg must be a charm message
+    *pe = *event = -1;
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled) {
+        *pe = e->getSrcPe();
+        *event = e->getEvent();
+    }
+}
+
+void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
+{
+       // msg must be a charm message
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled) {
+        e->setSrcPe(pe);
+        e->setEvent(event);
+    }
+}
 
 /* **CW** Non-disruptive attempt to add destination PE knowledge to
    Communication Library-specific Multicasts via new event 

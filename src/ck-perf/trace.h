@@ -64,6 +64,9 @@ class Trace {
     // for tracing comm thread only
     virtual void traceBeginOnCommThread() {}   
     virtual void traceEndOnCommThread() {}
+    virtual void traceCommSetMsgID(char *) {}
+    virtual void traceGetMsgID(char *msg, int *pe, int *event) {}
+    virtual void traceSetMsgID(char *msg, int pe, int event) {}
 		
     // registers user event trace module returns int identifier 
     virtual int traceRegisterUserEvent(const char* eventName, int e) { 
@@ -266,7 +269,9 @@ public:
     // for tracing comm thread only
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
-	
+    void traceCommSetMsgID(char *msg)  { ALLDO(traceCommSetMsgID(msg)); }
+    void traceGetMsgID(char *msg, int *pe, int *event) { ALLDO(traceGetMsgID(msg, pe, event)); }
+    void traceSetMsgID(char *msg, int pe, int event) { ALLDO(traceSetMsgID(msg, pe, event)); }
     /*Calls for tracing function begins and ends*/
     inline void regFunc(const char *name, int &idx, int idxSpecifiedByUser=0){ ALLDO(regFunc(name, idx, idxSpecifiedByUser)); }
     inline void beginFunc(char *name,char *file,int line){ ALLDO(beginFunc(name,file,line)); };

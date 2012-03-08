@@ -56,7 +56,11 @@ void traceEndCommOp(char *msg) {}
 void traceSendMsgComm(char *msg) {}
 void traceChangeLastTimestamp(double ts) {}
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)()) {}
+void traceCommSetMsgID(char *msg) {}
 #endif
+
+void traceGetMsgID(char *msg, int *pe, int *event) {}
+void traceSetMsgID(char *msg, int pe, int event) {}
 
 /* This routine, included in Charm++ programs from init.C, needs to be present in converse as well.
    Here is a place where it gets included only in converse, and not in Charm++ (thus not generating conflicts). */

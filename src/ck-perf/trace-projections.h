@@ -501,7 +501,10 @@ class TraceProjections : public Trace {
 #if CMK_SMP_TRACE_COMMTHREAD
     void traceBeginOnCommThread();
     void traceEndOnCommThread();
+    void traceCommSetMsgID(char *msg);
 #endif
+    void traceGetMsgID(char *msg, int *pe, int *event);
+    void traceSetMsgID(char *msg, int pe, int event);
     void traceFlushLog() { _logPool->flushLogBuffer(); }
 
     //functions that perform function tracing

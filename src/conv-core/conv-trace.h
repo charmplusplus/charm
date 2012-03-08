@@ -32,8 +32,11 @@ int  traceRegisterUserEvent(const char*, int e
 int  traceBeginCommOp(char *msg);
 void traceEndCommOp(char *msg);
 void traceSendMsgComm(char *msg);
+void traceCommSetMsgID(char *msg);
 #endif
 void traceChangeLastTimestamp(double ts);
+void traceGetMsgID(char *msg, int *pe, int *event);
+void traceSetMsgID(char *msg, int pe, int event);
 
 /* Support for machine layers to register their user events to projections */
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
@@ -70,14 +73,14 @@ int  traceAvailable();
                       traceSendMsgComm(msg);   \
                       traceEndCommOp(msg);    \
                     }
-#define  TRACE_COMM_RECV(time, msg)   \
-                    if (traceBeginCommOp(msg)) {   \
-                      traceChangeLastTimestamp(time);    \
-                      traceEndCommOp(msg);    \
-                    }
+#define TRACE_COMM_SET_MSGID(msg, pe, event)  traceSetMsgID(msg, pe, event)
+#define TRACE_COMM_GET_MSGID(msg, pe, event)  traceGetMsgID(msg, pe, event)
+#define TRACE_COMM_SET_COMM_MSGID(msg)  traceCommSetMsgID(msg)
 #else
 #define TRACE_COMM_CREATION(time, msg)
-#define TRACE_COMM_RECV(time, msg)
+#define TRACE_COMM_SET_MSGID(msg, pe, event) 
+#define TRACE_COMM_GET_MSGID(msg, pe, event) 
+#define TRACE_COMM_SET_COMM_MSGID(msg)
 #endif
 
 #endif
