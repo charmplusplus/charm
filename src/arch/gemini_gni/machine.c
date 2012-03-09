@@ -68,7 +68,7 @@
 #endif
 
 #if CMK_SMP
-//#define MULTI_THREAD_SEND 1
+#define MULTI_THREAD_SEND 0
 #define COMM_THREAD_SEND 1
 #endif
 
@@ -362,7 +362,7 @@ static gni_cq_handle_t       smsg_tx_cqh = NULL;
 static gni_cq_handle_t       post_rx_cqh = NULL;
 static gni_cq_handle_t       post_tx_cqh = NULL;
 static gni_ep_handle_t       *ep_hndl_array;
-#if CMK_SMP && MULTI_THREAD_SEND
+#if MULTI_THREAD_SEND
 static CmiNodeLock           *ep_lock_array;
 static CmiNodeLock           tx_cq_lock; 
 static CmiNodeLock           rx_cq_lock;
@@ -3205,9 +3205,9 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
             printf("Charm++ Error: The mempool maximum size is too small, please use command line option +gni-mempool-max or environment variable CHARM_UGNI_MEMPOOL_MAX to increase the value to at least %1.fMB.\n",  BIG_MSG * 2.0/1024/1024 + 1);
             CmiAbort("mempool maximum size is too small. \n");
         }
-#if CMK_SMP && MULTI_THREAD_SEND
+#if MULTI_THREAD_SEND
         printf("Charm++> worker thread sending messages\n");
-#elif CMK_SMP && COMM_THREAD_SEND
+#elif COMM_THREAD_SEND
         printf("Charm++> only comm thread send/recv messages\n");
 #endif
     }
