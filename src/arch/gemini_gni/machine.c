@@ -34,14 +34,14 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <time.h>
+
 #include <gni_pub.h>
 #include <pmi.h>
-
 //#include <numatoolkit.h>
 
 #include "converse.h"
 
-#define     LARGEPAGE             0
+#define     LARGEPAGE              0
 
 #if LARGEPAGE
 #include <hugetlbfs.h>
@@ -52,9 +52,14 @@
 #endif
 #define PRINT_SYH  0
 
-#define USE_LRTS_MEMPOOL                  1
+#if CMK_SMP
+#define MULTI_THREAD_SEND          0
+#define COMM_THREAD_SEND           1
+#endif
 
-#define REMOTE_EVENT                      0
+#if CMK_SMP && COMM_THREAD_SEND
+#define PIGGYBACK_ACK              0
+#endif
 
 #define CMI_EXERT_SEND_CAP	0
 #define	CMI_EXERT_RECV_CAP	0
@@ -67,14 +72,9 @@
 #define RECV_CAP 2
 #endif
 
-#if CMK_SMP
-#define MULTI_THREAD_SEND 0
-#define COMM_THREAD_SEND 1
-#endif
+#define USE_LRTS_MEMPOOL                  1
 
-#if CMK_SMP
-#define PIGGYBACK_ACK              0
-#endif
+#define REMOTE_EVENT                      0
 
 // Trace communication thread
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
@@ -1128,19 +1128,18 @@ static void * piggyback_ack(int destNode, int msgsize, int *count)
     if (piggycount <= 5) return NULL;
     uint64_t * buf = (uint64_t*)CmiTmpAlloc(piggycount * sizeof(uint64_t));
     CmiAssert(buf != NULL);
-    buf[0] = piggycount-1;
 //printf("[%d] piggyback_ack: %d\n", myrank, piggycount);
     for (i=0; i<piggycount-1; i++) {
         CMI_PCQUEUEPOP_LOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
         MSG_LIST *ptr = (MSG_LIST*)PCQueuePop(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf);
         CMI_PCQUEUEPOP_UNLOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
-        CmiAssert(ptr != NULL);
         ACK_MSG *msg = ptr->msg;
         buf[i+1] = msg->source_addr;
         FreeAckMsg(msg);
         FreeMsgList(ptr);
     }
-    *count = piggycount;
+    buf[0] = i;
+    *count = i + 1;
     return buf;
 }
 
@@ -1759,7 +1758,6 @@ static void PumpNetworkSmsg()
             {
                 int piggycount = processPiggybackAckHeader(header);
                 header = (uint64_t*)header + piggycount + 1;
-                msg_nbytes -= (piggycount+1)*sizeof(uint64_t);
             }
 #endif
             case SMALL_DATA_TAG:
@@ -1781,16 +1779,21 @@ static void PumpNetworkSmsg()
             {
                 int piggycount = processPiggybackAckHeader(header);
                 header = (uint64_t*)header + piggycount + 1;
-                msg_nbytes -= (piggycount+1)*sizeof(uint64_t);
             }
 #endif
             case LMSG_INIT_TAG:
             {
+#if MULTI_THREAD_SEND
                 MallocControlMsg(control_msg_tmp);
-                memcpy(control_msg_tmp, header, sizeof(CONTROL_MSG));
+                memcpy(control_msg_tmp, header, CONTROL_MSG_SIZE);
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK
                 getLargeMsgRequest(control_msg_tmp, inst_id);
+                FreeControlMsg(control_msg_tmp);
+#else
+                getLargeMsgRequest(header, inst_id);
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+#endif
                 break;
             }
             case ACK_TAG:   //msg fit into mempool
@@ -1812,10 +1815,15 @@ static void PumpNetworkSmsg()
             }
             case BIG_MSG_TAG:  //big msg, de-register, transfer next seg
             {
+#if MULTI_THREAD_SEND
                 MallocControlMsg(header_tmp);
-                memcpy(header_tmp, header, sizeof(CONTROL_MSG));
+                memcpy(header_tmp, header, CONTROL_MSG_SIZE);
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK
+                   /* FIXME: leak */
+#else
+                header_tmp = (CONTROL_MSG *) header;
+#endif
                 void *msg = (void*)(header_tmp->source_addr);
                 int cur_seq = CmiGetMsgSeq(msg);
                 int offset = ONE_SEG*(cur_seq+1);
@@ -1847,6 +1855,11 @@ static void PumpNetworkSmsg()
                       }
                     }
                 }
+#if MULTI_THREAD_SEND
+                FreeControlMsg(header_tmp);
+#else
+                GNI_SmsgRelease(ep_hndl_array[inst_id]);
+#endif
                 break;
             }
 #if CMK_PERSISTENT_COMM
@@ -2572,8 +2585,7 @@ void LrtsAdvanceCommunication(int whileidle)
     {
 #if PIGGYBACK_ACK
     //if (count%10 == 0) SendBufferMsg(&smsg_ack_queue);
-    if (SendBufferMsg(&smsg_queue) == 1) {
-        //if (count++ % 10 == 0) 
+    if (SendBufferMsg(&smsg_queue) == 1 || count++ % 10 == 0) {
         SendBufferMsg(&smsg_ack_queue);
     }
 #else
