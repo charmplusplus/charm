@@ -68,11 +68,8 @@
 #endif
 
 #if CMK_SMP
-#if LARGEPAGE
-#define MULTI_THREAD_SEND 1
-#else
+//#define MULTI_THREAD_SEND 1
 #define COMM_THREAD_SEND 1
-#endif
 #endif
 
 #if CMK_SMP
@@ -1134,7 +1131,9 @@ static void * piggyback_ack(int destNode, int msgsize, int *count)
     buf[0] = piggycount-1;
 //printf("[%d] piggyback_ack: %d\n", myrank, piggycount);
     for (i=0; i<piggycount-1; i++) {
+        CMI_PCQUEUEPOP_LOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
         MSG_LIST *ptr = (MSG_LIST*)PCQueuePop(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf);
+        CMI_PCQUEUEPOP_UNLOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
         CmiAssert(ptr != NULL);
         ACK_MSG *msg = ptr->msg;
         buf[i+1] = msg->source_addr;
