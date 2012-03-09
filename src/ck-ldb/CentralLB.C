@@ -70,10 +70,13 @@ struct AdaptiveLBStructure {
   int lb_no_iterations;
   int global_max_iter_no;
   int global_recv_iter_counter;
+  bool in_progress;
   double prev_load;
   double lb_strategy_cost;
   double lb_migration_cost;
   bool lb_period_informed;
+  int lb_msg_send_no;
+  int lb_msg_recv_no;
 } adaptive_struct;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
@@ -181,9 +184,12 @@ void CentralLB::initLB(const CkLBOptions &opt)
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.in_progress = false;
   adaptive_struct.prev_load = 0.0;
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
   local_state = OFF;
 #endif
 }
@@ -392,6 +398,11 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   data.avg_load = avg;
   adaptive_lbdb.history_data.push_back(data);
 
+  // If lb period inform is in progress, dont inform again
+  if (adaptive_struct.in_progress) {
+    return;
+  }
+
 //  if (adaptive_struct.lb_period_informed) {
 //    return;
 //  }
@@ -413,7 +424,8 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
     if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
       adaptive_struct.lb_calculated_period = iteration_n + 1;
       adaptive_struct.lb_period_informed = true;
-      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+      adaptive_struct.in_progress = true;
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
     return;
   }
@@ -426,8 +438,9 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > period) {
       adaptive_struct.lb_calculated_period = period;
+      adaptive_struct.in_progress = true;
       adaptive_struct.lb_period_informed = true;
-      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
   }
 }
@@ -473,17 +486,20 @@ bool CentralLB::generatePlan(int& period) {
   
   if (mslope < 0) {
     if (period > (-mc/mslope)) {
+      CkPrintf("Max < 0 Period set when max load is -ve\n");
       return false;
     }
   }
 
   if (aslope < 0) {
     if (period > (-ac/aslope)) {
+      CkPrintf("Avg < 0 Period set when avg load is -ve\n");
       return false;
     }
   }
 
   if (period > ((mc - ac)/(aslope - mslope))) {
+    CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
   }
   return true;
@@ -547,7 +563,10 @@ bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc
   return true;
 }
 
-void CentralLB::LoadBalanceDecision(int period) {
+void CentralLB::LoadBalanceDecision(int req_no, int period) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
+    return;
+  }
   CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
   adaptive_struct.lb_ideal_period = period;
 
@@ -572,20 +591,23 @@ void CentralLB::LoadBalanceDecision(int period) {
 
 //  if (local_state == OFF) {
     local_state = ON;
-    thisProxy[0].ReceiveIterationNo(adaptive_struct.lb_no_iterations);
+    adaptive_struct.lb_msg_recv_no = req_no;
+    thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
 //    return;
 //  }
 }
 
-void CentralLB::ReceiveIterationNo(int local_iter_no) {
+void CentralLB::ReceiveIterationNo(int req_no, int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
+
   adaptive_struct.global_recv_iter_counter++;
   if (local_iter_no > adaptive_struct.global_max_iter_no) {
     adaptive_struct.global_max_iter_no = local_iter_no;
   }
   if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
     adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
-    thisProxy.LoadBalanceDecision(adaptive_struct.lb_ideal_period);
+    thisProxy.LoadBalanceDecision(req_no, adaptive_struct.lb_ideal_period);
+    adaptive_struct.in_progress = false;
     adaptive_struct.global_max_iter_no = 0;
     adaptive_struct.global_recv_iter_counter = 0;
   }
@@ -1150,6 +1172,8 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   adaptive_struct.lb_period_informed = false;
   adaptive_struct.lb_ideal_period = INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)

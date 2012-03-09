@@ -23,8 +23,8 @@ group [migratable] CentralLB : BaseLB {
   entry void ReceiveMinStats(CkReductionMsg *msg);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveCounts(CkReductionMsg *);
-  entry void LoadBalanceDecision(int period);
-  entry void ReceiveIterationNo(int);
+  entry void LoadBalanceDecision(int req_no, int period);
+  entry void ReceiveIterationNo(int, int);
   entry void LoadBalance(void);
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);
