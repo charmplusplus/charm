@@ -98,6 +98,10 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     if (i == 0) {
       lb_data[3] = m[3];
     }
+    if (m[3] != lb_data[3]) {
+      CkPrintf("Error!!! Reduction is intermingled between iteration %lf and\
+      %lf\n", lb_data[3], m[3]);
+    }
   }
   return CkReductionMsg::buildNew(4*sizeof(double), lb_data);
 }
