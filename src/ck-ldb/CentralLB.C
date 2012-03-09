@@ -366,6 +366,7 @@ void CentralLB::SendMinStats() {
   lb_data[1] = total_load;
   lb_data[2] = 1;
   lb_data[3] = adaptive_struct.lb_no_iterations;
+  CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load, adaptive_struct.lb_no_iterations);
 
   if (adaptive_struct.lb_no_iterations != 0) {
     CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
@@ -582,8 +583,10 @@ void CentralLB::LoadBalanceDecision(int req_no, int period) {
   if (local_state == PAUSE) {
     if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
       local_state = DECIDED;
+      SendMinStats();
       ResumeClients(0);
     } else {
+      local_state = LOAD_BALANCE;
       ProcessAtSync();
     }
     return;
