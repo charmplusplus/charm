@@ -11,6 +11,7 @@
 #include "LBDBManager.h"
 #include "LBSimulation.h"
 
+#include "limits.h"
 #include <vector>
 
 #define  DEBUGF(x)       // CmiPrintf x;
@@ -45,19 +46,6 @@ CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
 
-double lb_migration_cost = 0.0;
-double lb_strategy_cost = 0.0;
-
-int lb_no_iterations = -1;
-double cur_max_pe_load = 0.0;
-double cur_avg_pe_load = 0.0;
-double prev_load = 0.0;
-
-bool lb_period_informed = false;
-
-int global_max_iter_no = 0;
-int global_recv_iter_counter = 0;
-
 struct AdaptiveData {
   int iteration;
   double max_load;
@@ -75,6 +63,18 @@ enum state {
   DECIDED,
   LOAD_BALANCE
 } local_state;
+
+struct AdaptiveLBStructure {
+  int lb_ideal_period;
+  int lb_calculated_period;
+  int lb_no_iterations;
+  int global_max_iter_no;
+  int global_recv_iter_counter;
+  double prev_load;
+  double lb_strategy_cost;
+  double lb_migration_cost;
+  bool lb_period_informed;
+} adaptive_struct;
 
 CreateLBFunc_Def(CentralLB, "CentralLB base class")
 
@@ -99,23 +99,9 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   return CkReductionMsg::buildNew(4*sizeof(double), lb_data);
 }
 
-CkReductionMsg* lbIterMax(int nMsg, CkReductionMsg** msgs) {
-  int max[1];
-  //CkPrintf("\tReduction type no of msg %d\n", nMsg);
-  max[0] = 0;
-  for (int i = 0; i < nMsg; i++) {
-    int *m = (int *)msgs[i]->getData();
-    max[0] = ((m[0] > max[0]) ? m[0] : max[0]);
-  //  CkPrintf("\tReduction type msg %d\n", *m);
-  }
-  return CkReductionMsg::buildNew(sizeof(int), max);
-}
-
 /*global*/ CkReduction::reducerType lbDataCollectionType;
-/*global*/ CkReduction::reducerType lbIterMaxType;
 /*initcall*/ void registerLBDataCollection(void) {
   lbDataCollectionType = CkReduction::addReducer(lbDataCollection);
-  lbIterMaxType = CkReduction::addReducer(lbIterMax);
 }
 
 /*
@@ -188,6 +174,17 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (_lb_args.statsOn()) theLbdb->CollectStatsOn();
 
   load_balancer_created = 1;
+
+  // If metabalancer enabled, initialize the variables
+  adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_no_iterations = -1;
+  adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.prev_load = 0.0;
+  adaptive_struct.lb_strategy_cost = 0.0;
+  adaptive_struct.lb_migration_cost = 0.0;
+  local_state = OFF;
 #endif
 }
 
@@ -306,14 +303,14 @@ void CentralLB::ProcessAtSyncMin()
 	initMlogLBStep(thisgroup);
 #endif
   
-  lb_no_iterations++;
- // CkPrintf("[%d] ProcessAtSyncMin lb_iteration [%d] lb_ideal_period [%d]\n", CkMyPe(),
- //     lb_no_iterations, lb_ideal_period);
+  adaptive_struct.lb_no_iterations++;
+ // CkPrintf("[%d] ProcessAtSyncMin lb_iteration [%d] adaptive_struct.lb_ideal_period [%d]\n", CkMyPe(),
+ //     adaptive_struct.lb_no_iterations, adaptive_struct.lb_ideal_period);
 
   // If decision has been made and has reached the lb_period, then do load
   // balancing, else if hasn't reached ideal_period, then resume.
   if (local_state == DECIDED) {
-    if (lb_no_iterations < lb_ideal_period) {
+    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
  //     CkPrintf("[%d] Decision is made but lagging\n", CkMyPe());
       SendMinStats();
       ResumeClients(0);
@@ -329,7 +326,7 @@ void CentralLB::ProcessAtSyncMin()
   // move ahead. If has reached lb_ideal_period, then change state to PAUSE and
   // dont resume client.
   if (local_state == ON) {
-    if (lb_no_iterations < lb_ideal_period) {
+    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
       SendMinStats();
       ResumeClients(0);
     } else {
@@ -355,20 +352,22 @@ void CentralLB::SendMinStats() {
   // Hence it is subtracted from the previous load.
   total_load -= idle_time;
   double tmp = total_load;
-  total_load -= prev_load;
-  prev_load = tmp; 
+  total_load -= adaptive_struct.prev_load;
+  adaptive_struct.prev_load = tmp; 
 
   double lb_data[4];
   lb_data[0] = total_load;
   lb_data[1] = total_load;
   lb_data[2] = 1;
-  lb_data[3] = lb_no_iterations;
+  lb_data[3] = adaptive_struct.lb_no_iterations;
 
-  CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
-                  thisProxy[0]);
-  contribute(4*sizeof(double), lb_data, lbDataCollectionType, cb);
+  if (adaptive_struct.lb_no_iterations != 0) {
+    CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
+        thisProxy[0]);
+    contribute(4*sizeof(double), lb_data, lbDataCollectionType, cb);
+  }
 
-//    int tmp1 = lb_no_iterations;
+//    int tmp1 = adaptive_struct.lb_no_iterations;
 //    CkPrintf("[%d] contribution iteration_no: %d\n",CkMyPe(), tmp1);
 //    // Send the current iteration no
 //    CkCallback cb1(CkIndex_CentralLB::ReceiveIterationNo((CkReductionMsg*)NULL), 
@@ -382,41 +381,59 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
   double max = load[1];
   double avg = load[0]/load[2];
   int iteration_n = load[3];
-  //CkPrintf("Iteration %d Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
+  CkPrintf("Iteration %d Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
+  CkPrintf("Current calculated period %d\n", adaptive_struct.lb_calculated_period);
   delete msg;
 
   // Store the data for this iteration
   AdaptiveData data;
-  data.iteration = lb_no_iterations;
+  data.iteration = adaptive_struct.lb_no_iterations;
   data.max_load = max;
   data.avg_load = avg;
   adaptive_lbdb.history_data.push_back(data);
 
-  if (lb_period_informed) {
-    return;
-  }
+//  if (adaptive_struct.lb_period_informed) {
+//    return;
+//  }
 
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-    //CkPrintf("Carry out load balancing step at iter\n");
-    lb_ideal_period = iteration_n + 1;
-    lb_period_informed = true;
-    thisProxy.LoadBalanceDecision(lb_ideal_period);
+  if (max/avg >= 1.5 && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) > 1.1\n", max/avg);
+//    if (!adaptive_struct.lb_period_informed) {
+//      // Just for testing
+//      adaptive_struct.lb_calculated_period = 40;
+//      adaptive_struct.lb_period_informed = true;
+//      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+//      return;
+//    }
+
+    // If the new lb period is less than current set lb period
+    if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
+      adaptive_struct.lb_calculated_period = iteration_n + 1;
+      adaptive_struct.lb_period_informed = true;
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+    }
     return;
   }
 
   // Generate the plan for the adaptive strategy
-  if (generatePlan()) {
+  int period;
+  if (generatePlan(period)) {
     //CkPrintf("Carry out load balancing step at iter\n");
-    lb_period_informed = true;
-    thisProxy.LoadBalanceDecision(lb_ideal_period);
+
+    // If the new lb period is less than current set lb period
+    if (adaptive_struct.lb_calculated_period > period) {
+      adaptive_struct.lb_calculated_period = period;
+      adaptive_struct.lb_period_informed = true;
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+    }
   }
 }
 
-bool CentralLB::generatePlan() {
-  if (adaptive_lbdb.history_data.size() <= 4) {
+bool CentralLB::generatePlan(int& period) {
+  if (adaptive_lbdb.history_data.size() <= 8) {
     return false;
   }
 
@@ -426,43 +443,75 @@ bool CentralLB::generatePlan() {
   double max = 0.0;
   double avg = 0.0;
   AdaptiveData data;
-  for (int i = 1; i < adaptive_lbdb.history_data.size(); i++) {
+  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
     data = adaptive_lbdb.history_data[i];
     max += data.max_load;
     avg += data.avg_load;
-    //CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
   }
-//  max /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
-//  avg /= (lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//  max /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//  avg /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
 //
-//  lb_ideal_period = (lb_strategy_cost + lb_migration_cost) / (max - avg);
+//  adaptive_struct.lb_ideal_period = (adaptive_struct.lb_strategy_cost +
+//  adaptive_struct.lb_migration_cost) / (max - avg);
 //  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
-//      max, avg, lb_strategy_cost, lb_migration_cost, lb_ideal_period);
+//      max, avg, adaptive_struct.lb_strategy_cost, adaptive_struct.lb_migration_cost, adaptive_struct.lb_ideal_period);
 //
   // If linearly varying load, then find lb_period
   // area between the max and avg curve 
   double mslope, aslope, mc, ac;
   getLineEq(aslope, ac, mslope, mc);
-  //CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
+  CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
   double a = (mslope - aslope)/2;
   double b = (mc - ac);
-  double c = -(lb_strategy_cost + lb_migration_cost);
+  double c = -(adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost);
   //c = -2.5;
-  lb_ideal_period = getPeriodForLinear(a, b, c);
-  //CkPrintf("Ideal period for linear load %d\n", lb_ideal_period);
+  bool got_period = getPeriodForLinear(a, b, c, period);
+  if (!got_period) {
+    return false;
+  }
+  
+  if (mslope < 0) {
+    if (period > (-mc/mslope)) {
+      return false;
+    }
+  }
 
+  if (aslope < 0) {
+    if (period > (-ac/aslope)) {
+      return false;
+    }
+  }
+
+  if (period > ((mc - ac)/(aslope - mslope))) {
+    return false;
+  }
   return true;
 }
 
-int CentralLB::getPeriodForLinear(double a, double b, double c) {
+bool CentralLB::getPeriodForLinear(double a, double b, double c, int& period) {
+  CkPrintf("Quadratic Equation %lf X^2 + %lf X + %lf\n", a, b, c);
   if (a == 0.0) {
-    return (-c / b);
+    period = (-c / b);
+    CkPrintf("Ideal period for linear load %d\n", period);
+    return true;
   }
   int x;
   double t = (b * b) - (4*a*c);
+  if (t < 0) {
+    CkPrintf("(b * b) - (4*a*c) is -ve sqrt : %lf\n", sqrt(t));
+    return false;
+  }
   t = (-b + sqrt(t)) / (2*a);
   x = t;
-  return x;
+  if (x < 0) {
+    CkPrintf("boo!!! x (%d) < 0\n", x);
+    x = 0;
+    return false;
+  }
+  period = x;
+  CkPrintf("Ideal period for linear load %d\n", period);
+  return true;
 }
 
 bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc) {
@@ -499,16 +548,11 @@ bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc
 }
 
 void CentralLB::LoadBalanceDecision(int period) {
-  //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), lb_no_iterations, period, local_state);
-  lb_ideal_period = period;
-  if (local_state == OFF) {
-    local_state = ON;
-    thisProxy[0].ReceiveIterationNo(lb_no_iterations);
-    return;
-  }
+  CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  adaptive_struct.lb_ideal_period = period;
 
   if (local_state == ON) {
-    CkPrintf("lb will happen at %d\n", lb_ideal_period);
+    CkPrintf("lb will happen at %d\n", adaptive_struct.lb_ideal_period);
     local_state = DECIDED;
     return;
   }
@@ -517,26 +561,33 @@ void CentralLB::LoadBalanceDecision(int period) {
   // processor. If the decision is that the ideal period is in the future,
   // resume. If the ideal period is now, then carry out load balancing.
   if (local_state == PAUSE) {
-    if (lb_no_iterations < lb_ideal_period) {
+    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
       local_state = DECIDED;
       ResumeClients(0);
     } else {
       ProcessAtSync();
     }
+    return;
   }
+
+//  if (local_state == OFF) {
+    local_state = ON;
+    thisProxy[0].ReceiveIterationNo(adaptive_struct.lb_no_iterations);
+//    return;
+//  }
 }
 
 void CentralLB::ReceiveIterationNo(int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
-  global_recv_iter_counter++;
-  if (local_iter_no > global_max_iter_no) {
-    global_max_iter_no = local_iter_no;
+  adaptive_struct.global_recv_iter_counter++;
+  if (local_iter_no > adaptive_struct.global_max_iter_no) {
+    adaptive_struct.global_max_iter_no = local_iter_no;
   }
-  if (CkNumPes() == global_recv_iter_counter) {
-    lb_ideal_period = (lb_ideal_period > global_max_iter_no) ? lb_ideal_period : global_max_iter_no + 1;
-    thisProxy.LoadBalanceDecision(lb_ideal_period);
-    global_max_iter_no = 0;
-    global_recv_iter_counter = 0;
+  if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
+    adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
+    thisProxy.LoadBalanceDecision(adaptive_struct.lb_ideal_period);
+    adaptive_struct.global_max_iter_no = 0;
+    adaptive_struct.global_recv_iter_counter = 0;
   }
 }
 
@@ -1092,12 +1143,13 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
   contribute(0, NULL, CkReduction::max_int, cb);
 
   // Reset all adaptive lb related fields since load balancing is being done.
-  lb_no_iterations = -1;
+  adaptive_struct.lb_no_iterations = -1;
   adaptive_lbdb.history_data.clear();
-  prev_load = 0.0;
-  lb_ideal_period = INT_MAX;
+  adaptive_struct.prev_load = 0.0;
   local_state = OFF;
-  lb_period_informed = false;
+  adaptive_struct.lb_period_informed = false;
+  adaptive_struct.lb_ideal_period = INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
@@ -1343,7 +1395,7 @@ void CentralLB::CheckMigrationComplete()
 		end_lb_time-start_lb_time);
     }
 
-    lb_migration_cost = (CkWallTimer() - start_lb_time);
+    adaptive_struct.lb_migration_cost = (CkWallTimer() - start_lb_time);
 
     lbdone = 0;
     future_migrates_expected = -1;
@@ -1399,8 +1451,8 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
-    lb_strategy_cost = (strat_end_time - strat_start_time);
-    CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, lb_strategy_cost);
+    adaptive_struct.lb_strategy_cost = (strat_end_time - strat_start_time);
+    CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, adaptive_struct.lb_strategy_cost);
   }
   return msg;
 #else
@@ -1688,7 +1740,6 @@ void CentralLB::pup(PUP::er &p) {
       statsMsg = new CLBStatsMsg;
     statsMsg->pup(p);
   }
-  p|lb_ideal_period;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
   p | lbDecisionCount;
   p | resumeCount;

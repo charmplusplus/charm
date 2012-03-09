@@ -63,13 +63,11 @@ class CentralLB : public BaseLB
 private:
   CLBStatsMsg *statsMsg;
   int count_msgs;
-  int lb_ideal_period; 
   void initLB(const CkLBOptions &);
 public:
   CkMarshalledCLBStatsMessage bufMsg;
   SpanningTree st;
   CentralLB(const CkLBOptions & opt):BaseLB(opt) { initLB(opt); 
-    lb_ideal_period = 0;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         lbDecisionCount= resumeCount=0;
 #endif
@@ -259,9 +257,9 @@ private:
 
   void BuildStatsMsg();
   void buildStats();
-  bool generatePlan();
+  bool generatePlan(int& period);
   bool getLineEq(double& aslope, double& ac, double& mslope, double& mc);
-  int getPeriodForLinear(double a, double b, double c);
+  bool getPeriodForLinear(double a, double b, double c, int& period);
 
 public:
   int useMem();
