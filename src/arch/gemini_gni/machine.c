@@ -41,7 +41,7 @@
 
 #include "converse.h"
 
-#define     LARGEPAGE           0
+#define     LARGEPAGE             0
 
 #if LARGEPAGE
 #include <hugetlbfs.h>
@@ -73,7 +73,7 @@
 #endif
 
 #if CMK_SMP
-#define PIGGYBACK_ACK                        0
+#define PIGGYBACK_ACK              0
 #endif
 
 // Trace communication thread
@@ -297,6 +297,7 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define SMALL_DATA_ACK_TAG      0x32
 /* SMSG is a control message to initialize a BTE */
 #define LMSG_INIT_TAG           0x39 
+#define LMSG_INIT_ACK_TAG       0x3a 
 
 #define DEBUG
 #ifdef GNI_RC_CHECK
@@ -1190,11 +1191,11 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         uint64_t *buf = NULL;
         int bufsize = 0;
 #if PIGGYBACK_ACK
-        if (tag == SMALL_DATA_TAG) {
+        if (tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG) {
             int nack = 0;
             buf = piggyback_ack(destNode, size, &nack);
             if (buf) {
-                tag = SMALL_DATA_ACK_TAG;
+                tag = (tag == SMALL_DATA_TAG) ? SMALL_DATA_ACK_TAG : LMSG_INIT_ACK_TAG;
                 bufsize = nack * sizeof(uint64_t);
             }
         }
@@ -1222,7 +1223,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         if(status == GNI_RC_SUCCESS)
         {
 #if CMK_SMP_TRACE_COMMTHREAD
-            if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG || tag == SMALL_DATA_ACK_TAG)
+            if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG || tag == SMALL_DATA_ACK_TAG || tag == LMSG_INIT_ACK_TAG)
             { 
                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), real_data);
             }
@@ -1233,7 +1234,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
 #if PIGGYBACK_ACK
         if (buf) {
             piggyback_ack_done(destNode, buf, status==GNI_RC_SUCCESS);
-            tag = SMALL_DATA_TAG;
+            tag = (tag == SMALL_DATA_ACK_TAG) ? SMALL_DATA_TAG : LMSG_INIT_TAG;
         }
 #endif
     }
@@ -1661,7 +1662,27 @@ static void bufferRdmaMsg(int inst_id, gni_post_descriptor_t *pd)
 
 }
 
+#if PIGGYBACK_ACK
+int processPiggybackAckHeader(void *header)
+{
+    int i;
+    uint64_t *buf = (uint64_t*)header;
+    int piggycount = buf[0];
+//printf("[%d] got piggyback msg: %d\n", myrank, piggycount);
+    for (i=0; i<piggycount; i++) {
+        void *msg = (void*)(buf[i+1]);
+        CmiAssert(msg != NULL);
+        DecreaseMsgInSend(msg);
+        if(NoMsgInSend(msg))
+            buffered_send_msg -= GetMempoolsize(msg);
+        CmiFree(msg);
+    }
+    return piggycount;
+}
+#endif
+
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
+
 static void PumpNetworkSmsg()
 {
     uint64_t            inst_id;
@@ -1714,19 +1735,8 @@ static void PumpNetworkSmsg()
 #if PIGGYBACK_ACK
             case SMALL_DATA_ACK_TAG:
             {
-                int i;
-                uint64_t *buf = (uint64_t*)header;
-                int piggycount = buf[0];
-//printf("[%d] got piggyback msg: %d\n", myrank, piggycount);
-                for (i=0; i<piggycount; i++) {
-                    void *msg = (void*)(buf[i+1]);
-                    CmiAssert(msg != NULL);
-                    DecreaseMsgInSend(msg);
-                    if(NoMsgInSend(msg))
-                        buffered_send_msg -= GetMempoolsize(msg);
-                    CmiFree(msg);
-                }
-                header = buf + piggycount + 1;
+                int piggycount = processPiggybackAckHeader(header);
+                header = (uint64_t*)header + piggycount + 1;
                 msg_nbytes -= (piggycount+1)*sizeof(uint64_t);
             }
 #endif
@@ -1742,6 +1752,14 @@ static void PumpNetworkSmsg()
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
             }
+#if PIGGYBACK_ACK
+            case LMSG_INIT_ACK_TAG:
+            {
+                int piggycount = processPiggybackAckHeader(header);
+                header = (uint64_t*)header + piggycount + 1;
+                msg_nbytes -= (piggycount+1)*sizeof(uint64_t);
+            }
+#endif
             case LMSG_INIT_TAG:
             {
                 getLargeMsgRequest(header, inst_id);
@@ -3409,7 +3427,7 @@ int CmiBarrier()
         /*END_EVENT(10);*/
     }
     CmiNodeAllBarrier();
-    return status;
+    return 0;
 
 }
 #if CMK_DIRECT
