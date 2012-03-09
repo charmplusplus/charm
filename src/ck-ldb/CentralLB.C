@@ -370,7 +370,7 @@ void CentralLB::SendMinStats() {
   lb_data[1] = total_load;
   lb_data[2] = 1;
   lb_data[3] = adaptive_struct.lb_no_iterations;
-  CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load, adaptive_struct.lb_no_iterations);
+  //CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load, adaptive_struct.lb_no_iterations);
 
   if (adaptive_struct.lb_no_iterations != 0) {
     CkCallback cb(CkIndex_CentralLB::ReceiveMinStats((CkReductionMsg*)NULL), 
@@ -572,11 +572,10 @@ void CentralLB::LoadBalanceDecision(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-  CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
   adaptive_struct.lb_ideal_period = period;
 
   if (local_state == ON) {
-    CkPrintf("lb will happen at %d\n", adaptive_struct.lb_ideal_period);
     local_state = DECIDED;
     return;
   }
