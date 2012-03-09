@@ -284,19 +284,19 @@ class Block: public CBase_Block {
       //int N = (thisIndex * thisIndex / num_chares) * 100;
       int N = 2;
       if (currentStep < numSteps/4) {
-        if (thisIndex >= num_chares/8 && thisIndex < num_chares/4) {
+        if (thisIndex >= num_chares/4 && thisIndex < num_chares/2) {
           N = 500;
         }
       } else if(currentStep < numSteps/2) {
-        if (thisIndex >= num_chares/num_chares && thisIndex < num_chares/8) {
+        if (thisIndex >= num_chares/num_chares && thisIndex < num_chares/4) {
           N = 500;
         }
       } else if (currentStep < 3*numSteps/2) {
-        if (thisIndex >= num_chares/4 && thisIndex < 24) {
+        if (thisIndex >= num_chares/2 && thisIndex < 3*(num_chares/4)) {
           N = 500;
         }
       } else {
-        if (thisIndex >= 3*(num_chares/8) && thisIndex < num_chares/2) {
+        if (thisIndex >= 3*(num_chares/4) && thisIndex < num_chares) {
           N = 500;
         }
       }
