@@ -503,7 +503,8 @@ bool CentralLB::generatePlan(int& period) {
     }
   }
 
-  if (period > ((mc - ac)/(aslope - mslope))) {
+  int intersection_t = (mc-ac) / (aslope - mslope);
+  if (intersection_t > 0 && period > intersection_t) {
     CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
   }
