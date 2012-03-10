@@ -665,6 +665,7 @@ static void print_comm_stats()
 #define STATS_ACK_TIME(x)            x
 #endif
 
+static int print_stats = 0;
 
 static void
 allgather(void *in,void *out, int len)
@@ -3282,6 +3283,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     }
 #endif
 
+    print_stats = CmiGetArgFlag(*argv, "+print_stats");
+
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
@@ -3378,7 +3381,7 @@ void  LrtsFree(void *msg)
 void LrtsExit()
 {
 #if CMK_WITH_STATS
-    print_comm_stats();
+    if (print_stats) print_comm_stats();
 #endif
     /* free memory ? */
 #if USE_LRTS_MEMPOOL
