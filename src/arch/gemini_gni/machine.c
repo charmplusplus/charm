@@ -50,7 +50,6 @@
 #if CMK_DIRECT
 #include "cmidirect.h"
 #endif
-#define PRINT_SYH  0
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -75,6 +74,8 @@
 #define USE_LRTS_MEMPOOL                  1
 
 #define REMOTE_EVENT                      0
+
+#define PRINT_SYH  0
 
 // Trace communication thread
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
@@ -195,8 +196,6 @@ typedef struct _dynamic_smsg_mailbox{
 
 static dynamic_smsg_mailbox_t  *mailbox_list;
 
-int         rdma_id = 0;
-
 static CmiUInt8  smsg_send_count = 0,  last_smsg_send_count = 0;
 static CmiUInt8  smsg_recv_count = 0,  last_smsg_recv_count = 0;
 
@@ -250,13 +249,13 @@ uint8_t   onesided_hnd, omdh;
 #endif
 
 #define   GetMempoolBlockPtr(x)  (((mempool_header*)((char*)(x)-ALIGNBUF))->block_ptr)
-#define   IncreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)++
-#define   DecreaseMsgInRecv(x)   (GetMempoolBlockPtr(x)->msgs_in_recv)--
-#define   IncreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)++
-#define   DecreaseMsgInSend(x)   (GetMempoolBlockPtr(x)->msgs_in_send)--
 #define   GetMempoolPtr(x)        GetMempoolBlockPtr(x)->mptr
 #define   GetMempoolsize(x)       GetMempoolBlockPtr(x)->size
 #define   GetMemHndl(x)           GetMempoolBlockPtr(x)->mem_hndl
+#define   IncreaseMsgInRecv(x)    (GetMempoolBlockPtr(x)->msgs_in_recv)++
+#define   DecreaseMsgInRecv(x)    (GetMempoolBlockPtr(x)->msgs_in_recv)--
+#define   IncreaseMsgInSend(x)    (GetMempoolBlockPtr(x)->msgs_in_send)++
+#define   DecreaseMsgInSend(x)    (GetMempoolBlockPtr(x)->msgs_in_send)--
 #define   NoMsgInSend(x)          GetMempoolBlockPtr(x)->msgs_in_send == 0
 #define   NoMsgInRecv(x)          GetMempoolBlockPtr(x)->msgs_in_recv == 0
 #define   NoMsgInFlight(x)        (GetMempoolBlockPtr(x)->msgs_in_send + GetMempoolBlockPtr(x)->msgs_in_recv  == 0)
@@ -324,7 +323,7 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 static int useStaticMSGQ = 0;
 static int useStaticFMA = 0;
 static int mysize, myrank;
-gni_nic_handle_t      nic_hndl;
+static gni_nic_handle_t   nic_hndl;
 
 typedef struct {
     gni_mem_handle_t mdh;
@@ -629,28 +628,43 @@ static MSG_LIST *buffered_fma_tail = 0;
 
 CpvDeclare(mempool_type*, mempool);
 
-/* get the upper bound of log 2 */
-int mylog2(int size)
+#if CMK_WITH_STATS
+typedef struct comm_thread_stats
 {
-    int op = size;
-    unsigned int ret=0;
-    unsigned int mask = 0;
-    int i;
-    while(op>0)
-    {
-        op = op >> 1;
-        ret++;
+int      count_in_send_buffered_ack;
+double   time_in_send_buffered_ack;
+double   max_time_in_send_buffered_ack;
+int      count_in_send_buffered_smsg;
+double   time_in_send_buffered_smsg;
+double   max_time_in_send_buffered_smsg;
+} Comm_Thread_Stats;
 
-    }
-    for(i=1; i<ret; i++)
-    {
-        mask = mask << 1;
-        mask +=1;
-    }
+static Comm_Thread_Stats   comm_stats;
 
-    ret -= ((size &mask) ? 0:1);
-    return ret;
+static void init_comm_stats()
+{
+  memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
 }
+
+#define STATS_ACK_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_send_buffered_ack ++;        \
+          comm_stats.time_in_send_buffered_ack += t;   \
+          if (t>comm_stats.max_time_in_send_buffered_ack)      \
+              comm_stats.max_time_in_send_buffered_ack = t;    \
+        }
+
+static void print_comm_stats()
+{
+    printf("PE[%d]  count/time in send buffered ack:   %d %f\n",  myrank, comm_stats.count_in_send_buffered_ack, comm_stats.time_in_send_buffered_ack);
+    printf("PE[%d]  max time in send buffered ack:     %f\n",  myrank, comm_stats.max_time_in_send_buffered_ack);
+}
+#else
+#define STATS_ACK_TIME(x)            x
+#endif
+
 
 static void
 allgather(void *in,void *out, int len)
@@ -793,6 +807,9 @@ static uint32_t get_cookie(void)
 }
 
 #if LARGEPAGE
+
+/* directly mmap memory from hugetlbfs for large pages */
+
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -1578,6 +1595,9 @@ void LrtsPostCommonInit(int everReturn)
 void LrtsPostNonLocal(){
 #if MULTI_THREAD_SEND
     if(mysize == 1) return;
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceEndIdle();
+#endif
     //printf("[%d,%d] worker call communication\n", CmiMyNode(), CmiMyRank());
     PumpNetworkSmsg();
     PumpLocalRdmaTransactions();
@@ -1599,6 +1619,9 @@ void LrtsPostNonLocal(){
 
     SendRdmaMsg();
     //LrtsAdvanceCommunication(1);
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceBeginIdle();
+#endif
 #endif
 }
 
@@ -2586,7 +2609,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if PIGGYBACK_ACK
     //if (count%10 == 0) SendBufferMsg(&smsg_ack_queue);
     if (SendBufferMsg(&smsg_queue) == 1 || count++ % 10 == 0) {
-        SendBufferMsg(&smsg_ack_queue);
+        STATS_ACK_TIME(SendBufferMsg(&smsg_ack_queue));
     }
 #else
     SendBufferMsg(&smsg_queue);
@@ -3277,6 +3300,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 
 //    NTK_Init();
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
+
+#if CMK_WITH_STATS
+    init_comm_stats();
+#endif
 }
 
 void* LrtsAlloc(int n_bytes, int header)
@@ -3350,6 +3377,9 @@ void  LrtsFree(void *msg)
 
 void LrtsExit()
 {
+#if CMK_WITH_STATS
+    print_comm_stats();
+#endif
     /* free memory ? */
 #if USE_LRTS_MEMPOOL
     //printf("FINAL [%d, %d]  register=%lld, send=%lld\n", myrank, CmiMyRank(), register_memory_size, buffered_send_msg); 
