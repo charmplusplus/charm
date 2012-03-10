@@ -431,7 +431,7 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.lb_period_informed = true;
       adaptive_struct.in_progress = true;
       CkPrintf("Informing everyone the lb period is %d\n",
-          adaptive_struct.lb_calculated_period)
+          adaptive_struct.lb_calculated_period);
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
     return;
@@ -448,7 +448,7 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.in_progress = true;
       adaptive_struct.lb_period_informed = true;
       CkPrintf("Informing everyone the lb period is %d\n",
-          adaptive_struct.lb_calculated_period)
+          adaptive_struct.lb_calculated_period);
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
   }
@@ -625,6 +625,7 @@ void CentralLB::ReceiveIterationNo(int req_no, int local_iter_no) {
   if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
     adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
     thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
+    CkPrintf("Final lb_period %d\n", adaptive_struct.lb_ideal_period);
     adaptive_struct.in_progress = false;
     adaptive_struct.global_max_iter_no = 0;
     adaptive_struct.global_recv_iter_counter = 0;
