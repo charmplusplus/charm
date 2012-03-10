@@ -430,6 +430,8 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.lb_calculated_period = iteration_n + 1;
       adaptive_struct.lb_period_informed = true;
       adaptive_struct.in_progress = true;
+      CkPrintf("Informing everyone the lb period is %d\n",
+          adaptive_struct.lb_calculated_period)
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
     return;
@@ -445,6 +447,8 @@ void CentralLB::ReceiveMinStats(CkReductionMsg *msg) {
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
       adaptive_struct.lb_period_informed = true;
+      CkPrintf("Informing everyone the lb period is %d\n",
+          adaptive_struct.lb_calculated_period)
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
   }
@@ -571,9 +575,21 @@ bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc
 
 void CentralLB::LoadBalanceDecision(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
+    CkPrintf("Error!!! Received a request which was already sent or old\n");
     return;
   }
   //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  adaptive_struct.lb_ideal_period = period;
+  local_state = ON;
+  adaptive_struct.lb_msg_recv_no = req_no;
+  thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
+}
+
+void CentralLB::LoadBalanceDecisionFinal(int req_no, int period) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
+    return;
+  }
+  //CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
   adaptive_struct.lb_ideal_period = period;
 
   if (local_state == ON) {
@@ -595,14 +611,9 @@ void CentralLB::LoadBalanceDecision(int req_no, int period) {
     }
     return;
   }
-
-//  if (local_state == OFF) {
-    local_state = ON;
-    adaptive_struct.lb_msg_recv_no = req_no;
-    thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
-//    return;
-//  }
+  CkPrintf("Error!!! Final decision received but the state is invalid %d\n", local_state);
 }
+
 
 void CentralLB::ReceiveIterationNo(int req_no, int local_iter_no) {
   CmiAssert(CkMyPe() == 0);
@@ -613,7 +624,7 @@ void CentralLB::ReceiveIterationNo(int req_no, int local_iter_no) {
   }
   if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
     adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
-    thisProxy.LoadBalanceDecision(req_no, adaptive_struct.lb_ideal_period);
+    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
     adaptive_struct.in_progress = false;
     adaptive_struct.global_max_iter_no = 0;
     adaptive_struct.global_recv_iter_counter = 0;
