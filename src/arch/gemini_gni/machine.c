@@ -1596,9 +1596,9 @@ void LrtsPostCommonInit(int everReturn)
 void LrtsPostNonLocal(){
 #if MULTI_THREAD_SEND
     if(mysize == 1) return;
-#if CMK_SMP_TRACE_COMMTHREAD
-    traceEndIdle();
-#endif
+//#if CMK_SMP_TRACE_COMMTHREAD
+//    traceEndIdle();
+//#endif
     //printf("[%d,%d] worker call communication\n", CmiMyNode(), CmiMyRank());
     PumpNetworkSmsg();
     PumpLocalRdmaTransactions();
@@ -1620,9 +1620,9 @@ void LrtsPostNonLocal(){
 
     SendRdmaMsg();
     //LrtsAdvanceCommunication(1);
-#if CMK_SMP_TRACE_COMMTHREAD
-    traceBeginIdle();
-#endif
+//#if CMK_SMP_TRACE_COMMTHREAD
+//    traceBeginIdle();
+//#endif
 #endif
 }
 
