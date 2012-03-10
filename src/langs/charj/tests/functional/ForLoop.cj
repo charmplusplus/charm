@@ -12,5 +12,6 @@ public class ForLoop {
         for (;;) break;
         for (int i=0;;++i) {}
         for (int i=0, j=1;;++i, ++j) break;
+        for (j=0; j<10; ++j) break;
     }
 }

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 //Contains the structures for bg logs and timelines
 #ifndef BLUE_LOGS_H
 #define BLUE_LOGS_H

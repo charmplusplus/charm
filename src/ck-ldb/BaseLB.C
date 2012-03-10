@@ -295,6 +295,17 @@ void BaseLB::LDStats::computeNonlocalComm(int &nmsgs, int &nbytes)
 #endif
 }
 
+void BaseLB::LDStats::normalize_speed() {
+  int pe;
+  double maxspeed = 0.0;
+
+  for(int pe=0; pe < nprocs(); pe++) {
+    if (procs[pe].pe_speed > maxspeed) maxspeed = procs[pe].pe_speed;
+  }
+  for(int pe=0; pe < nprocs(); pe++)
+    procs[pe].pe_speed /= maxspeed;
+}
+
 void BaseLB::LDStats::print()
 {
 #if CMK_LBDB_ON

@@ -53,7 +53,7 @@ public:
 };
 
 
-class receiver: public ArrayElement1D
+class receiver: public CBase_receiver
 {
 private:
   CmmTable  msgTbl;

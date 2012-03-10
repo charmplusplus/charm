@@ -1,12 +1,15 @@
 #ifndef _MESH_STREAMER_H_
 #define _MESH_STREAMER_H_
 
+#include <algorithm>
 #include "MeshStreamer.decl.h"
 // allocate more total buffer space than the maximum buffering limit but flush upon
 // reaching totalBufferCapacity_
 #define BUCKET_SIZE_FACTOR 4
 
-//#define DEBUG_STREAMER
+// #define DEBUG_STREAMER
+// #define CACHE_LOCATIONS
+// #define SUPPORT_INCOMPLETE_MESH
 
 enum MeshStreamerMessageType {PlaneMessage, ColumnMessage, PersonalizedMessage};
 
@@ -18,11 +21,6 @@ class MeshLocation {
   MeshStreamerMessageType msgType;
 };
 
-//#define HASH_LOCATIONS
-
-#ifdef HASH_LOCATIONS
-#include <map>
-#endif
 
 /*
 class LocalMessage : public CMessage_LocalMessage {
@@ -72,14 +70,14 @@ public:
 };
 
 template <class dtype>
-class MeshStreamerClient : public Group {
+class MeshStreamerClient : public CBase_MeshStreamerClient<dtype> {
  public:
      virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
      virtual void process(dtype &data)=0; 
 };
 
 template <class dtype>
-class MeshStreamer : public Group {
+class MeshStreamer : public CBase_MeshStreamer<dtype> {
 
 private:
     int bucketSize_; 
@@ -111,8 +109,15 @@ private:
     MeshStreamerMessage<dtype> **columnBuffers_; 
     MeshStreamerMessage<dtype> **planeBuffers_;
 
-#ifdef HASH_LOCATIONS
-    std::map<int, MeshLocation> hashedLocations; 
+#ifdef CACHE_LOCATIONS
+    MeshLocation *cachedLocations;
+    bool *isCached; 
+#endif
+
+#ifdef SUPPORT_INCOMPLETE_MESH
+    int numNodesInLastPlane_;
+    int numFullRowsInLastPlane_;
+    int numColumnsInLastRow_;
 #endif
 
     void determineLocation(const int destinationPe, 
@@ -150,7 +155,7 @@ public:
     void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
       userCallback_ = cb;
       if (automaticFinish) {
-        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), this->thisProxy));
       }
     }
 
@@ -185,6 +190,11 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   //   advantage of nonuniform filling of buckets
   // the buffers for your own column and plane are never used
   bucketSize_ = BUCKET_SIZE_FACTOR * totalBufferCapacity / (numRows + numColumns + numPlanes - 2); 
+  if (bucketSize_ <= 0) {
+    bucketSize_ = 1; 
+    CkPrintf("Argument totalBufferCapacity to MeshStreamer constructor "
+	     "is invalid. Defaulting to a single buffer per destination.\n");
+  }
   totalBufferCapacity_ = totalBufferCapacity;
   numDataItemsBuffered_ = 0; 
   numRows_ = numRows; 
@@ -219,6 +229,18 @@ MeshStreamer<dtype>::MeshStreamer(int totalBufferCapacity, int numRows,
   myColumnIndex_ = indexWithinPlane - myRowIndex_ * numColumns_; 
 
   isPeriodicFlushEnabled_ = false; 
+
+#ifdef CACHE_LOCATIONS
+  cachedLocations = new MeshLocation[numNodes_];
+  isCached = new bool[numNodes_];
+  std::fill(isCached, isCached + numNodes_, false);
+#endif
+
+#ifdef SUPPORT_INCOMPLETE_MESH
+  numNodesInLastPlane_ = numNodes_ % planeSize_; 
+  numFullRowsInLastPlane_ = numNodesInLastPlane_ / numColumns_;
+  numColumnsInLastRow_ = numNodesInLastPlane_ - numFullRowsInLastPlane_ * numColumns_;  
+#endif
 }
 
 template <class dtype>
@@ -245,10 +267,9 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe,
 
   int nodeIndex, indexWithinPlane; 
 
-#ifdef HASH_LOCATIONS
-  std::map<int, MeshLocation>::iterator it;
-  if ((it = hashedLocations.find(destinationPe)) != hashedLocations.end()) {
-    destinationCoordinates = it->second;
+#ifdef CACHE_LOCATIONS
+  if (isCached[destinationPe] == true) {
+    destinationCoordinates = cachedLocations[destinationPe]; 
     return;
   }
 #endif
@@ -272,8 +293,8 @@ void MeshStreamer<dtype>::determineLocation(const int destinationPe,
     }
   }
 
-#ifdef HASH_LOCATIONS
-  hashedLocations[destinationPe] = destinationCoordinates;
+#ifdef CACHE_LOCATIONS
+  cachedLocations[destinationPe] = destinationCoordinates;
 #endif
 
 }
@@ -309,24 +330,40 @@ void MeshStreamer<dtype>::storeMessage(MeshStreamerMessage<dtype> ** const messa
   // copy data into message and send if buffer is full
   if (numBuffered == bucketSize_) {
     int destinationIndex;
-    CProxy_MeshStreamer<dtype> thisProxy(thisgroup);
     switch (destinationCoordinates.msgType) {
 
     case PlaneMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.planeIndex - myPlaneIndex_) * planeSize_;  
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+#ifdef SUPPORT_INCOMPLETE_MESH
+      if (destinationIndex >= numNodes_) {
+	int numValidRows = numFullRowsInLastPlane_; 
+	if (numColumnsInLastRow_ > myColumnIndex_) {
+	  numValidRows++; 
+	}
+	destinationIndex = destinationCoordinates.planeIndex * planeSize_ + 
+	  myColumnIndex_ + (myRowIndex_ % numValidRows) * numColumns_; 
+      }
+#endif      
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case ColumnMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.columnIndex - myColumnIndex_);
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+#ifdef SUPPORT_INCOMPLETE_MESH
+      if (destinationIndex >= numNodes_) {
+	destinationIndex = destinationCoordinates.planeIndex * planeSize_ + 
+	  destinationCoordinates.columnIndex + 
+	  (myColumnIndex_ % numFullRowsInLastPlane_) * numColumns_; 
+      }
+#endif      
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
       break;
     case PersonalizedMessage:
       destinationIndex = myNodeIndex_ + 
 	(destinationCoordinates.rowIndex - myRowIndex_) * numColumns_;
       clientProxy_[destinationIndex].receiveCombinedData(destinationBucket);      
-      //      thisProxy[destinationIndex].receivePersonalizedData(destinationBucket);
+      //      this->thisProxy[destinationIndex].receivePersonalizedData(destinationBucket);
       break;
     default: 
       CkError("Incorrect MeshStreamer message type\n");
@@ -364,7 +401,6 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
     return;
   }
 
-  int indexWithinPlane; 
   MeshLocation destinationCoordinates;
 
   determineLocation(destinationPe, destinationCoordinates);
@@ -396,12 +432,15 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, const int destinationPe) {
 
     // release control to scheduler if requested by the user, 
     //   assume caller is threaded entry
-  if (yieldFlag_ && ++count % 1024 == 0) CthYield();
+  if (yieldFlag_ && ++count == 1024) {
+    count = 0; 
+    CthYield();
+  }
 }
 
 template <class dtype>
 void MeshStreamer<dtype>::doneInserting() {
-  contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), thisProxy));
+  this->contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), this->thisProxy));
 }
 
 template <class dtype>
@@ -528,8 +567,7 @@ void MeshStreamer<dtype>::flushLargestBucket(MeshStreamerMessage<dtype> ** const
       clientProxy_[destinationIndex].receiveCombinedData(destinationBucket);
     }
     else {
-      CProxy_MeshStreamer<dtype> thisProxy(thisgroup);
-      thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
+      this->thisProxy[destinationIndex].receiveAggregateData(destinationBucket);
     }
     messageBuffers[flushIndex] = NULL;
   }

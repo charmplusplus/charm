@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CONV_TRACE_H
 #define _CONV_TRACE_H
 
@@ -36,11 +29,14 @@ int  traceRegisterUserEvent(const char*, int e
 );
 
 #if CMK_SMP_TRACE_COMMTHREAD
-void traceBeginCommOp(char *msg);
+int  traceBeginCommOp(char *msg);
 void traceEndCommOp(char *msg);
 void traceSendMsgComm(char *msg);
+void traceCommSetMsgID(char *msg);
 #endif
 void traceChangeLastTimestamp(double ts);
+void traceGetMsgID(char *msg, int *pe, int *event);
+void traceSetMsgID(char *msg, int pe, int event);
 
 /* Support for machine layers to register their user events to projections */
 void registerMachineUserEventsFunction(void (*eventRegistrationFunc)());
@@ -68,5 +64,23 @@ CpvExtern(int, traceOn);
 #endif
 
 int  traceAvailable();
+
+/* Comm thread tracing */
+#if CMK_SMP_TRACE_COMMTHREAD
+#define  TRACE_COMM_CREATION(time, msg)   \
+                    if (traceBeginCommOp(msg)) {   \
+                      traceChangeLastTimestamp(time);    \
+                      traceSendMsgComm(msg);   \
+                      traceEndCommOp(msg);    \
+                    }
+#define TRACE_COMM_SET_MSGID(msg, pe, event)  traceSetMsgID(msg, pe, event)
+#define TRACE_COMM_GET_MSGID(msg, pe, event)  traceGetMsgID(msg, pe, event)
+#define TRACE_COMM_SET_COMM_MSGID(msg)  traceCommSetMsgID(msg)
+#else
+#define TRACE_COMM_CREATION(time, msg)
+#define TRACE_COMM_SET_MSGID(msg, pe, event) 
+#define TRACE_COMM_GET_MSGID(msg, pe, event) 
+#define TRACE_COMM_SET_COMM_MSGID(msg)
+#endif
 
 #endif

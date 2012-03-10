@@ -55,7 +55,6 @@
 /* Tag variable y as being from unit x: */
 #define CMK_TAG(x,y) x##y##_
 
-
 #include "pup_c.h"
 
 /* the following flags denote properties of the C compiler,  */
@@ -226,41 +225,6 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
 
-#if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
-
-#include <spp_prog_model.h>
-#include <cps.h>
-
-extern int _Cmi_numpes;
-extern int _Cmi_mynodesize;
-
-#define CmiMyPe()           (my_thread())
-#define CmiMyRank()         (my_thread())
-#define CmiNumPes()         _Cmi_numpes
-#define CmiMyNodeSize()     _Cmi_numpes
-#define CmiMyNode()         0
-#define CmiNumNodes()       1
-#define CmiNodeFirst(node)  0
-#define CmiNodeSize(node)   _Cmi_numpes
-#define CmiNodeOf(pe)       0
-#define CmiRankOf(pe)       (pe)
-
-#define CMK_CPV_IS_SMP {} 
-
-extern void CmiMemLock();
-extern void CmiMemUnlock();
-extern void CmiNodeBarrier(void);
-extern void *CmiSvAlloc(int);
-
-typedef cps_mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock(void);
-#define CmiLock(lock) (cps_mutex_lock(lock))
-#define CmiUnlock(lock) (cps_mutex_unlock(lock))
-#define CmiTryLock(lock) (cps_mutex_trylock(lock))
-#define CmiDestroyLock(lock) (cps_mutex_free(lock))
-
-#endif
-
 #if CMK_SHARED_VARS_UNIPROCESSOR /*Used only by uth- and sim- versions*/
 
 extern int _Cmi_mype;
@@ -428,7 +392,7 @@ for each processor in the node.
 #define CpvMemoryWriteFence() CmiMemoryWriteFence()
 #endif
 
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 #define CpvDeclare(t,v) __thread t* CMK_TAG(Cpv_,v) = NULL;   \
                         int CMK_TAG(Cpv_inited_,v) = 0;  \
                         t ** CMK_TAG(Cpv_addr_,v);
@@ -683,6 +647,7 @@ extern void* malloc_nomigrate(size_t size);
 */
 void    *CmiAlloc(int size);
 void     CmiReference(void *blk);
+int      CmiGetReference(void *blk);
 int      CmiSize(void *blk);
 void     CmiFree(void *blk);
 
@@ -907,6 +872,7 @@ typedef struct {
 } CsdSchedulerState_t;
 extern void CsdSchedulerState_new(CsdSchedulerState_t *state);
 extern void *CsdNextMessage(CsdSchedulerState_t *state);
+extern void *CsdNextLocalNodeMessage(CsdSchedulerState_t *state);
 
 extern void  *CmiGetNonLocal(void);
 extern void   CmiNotifyIdle(void);
@@ -916,6 +882,7 @@ extern  int CsdScheduler(int maxmsgs);
 extern void CsdScheduleForever(void);
 extern  int CsdScheduleCount(int maxmsgs);
 extern void CsdSchedulePoll(void);
+extern void CsdScheduleNodePoll(void);
 
 #define CsdExitScheduler()  (CpvAccess(CsdStopFlag)++)
 /** @} */
@@ -1211,36 +1178,6 @@ void   CmiHandleMessage(void *msg);
 /** @} */
 
 
-/****** Isomalloc: Migratable Memory Allocation ********/
-/*Simple block-by-block interface:*/
-void *CmiIsomalloc(int sizeInBytes);
-void *CmiIsomallocAlign(size_t align, size_t size);
-void  CmiIsomallocPup(pup_er p,void **block);
-void  CmiIsomallocFree(void *block);
-int   CmiIsomallocEnabled();
-void  CmiEnableIsomalloc();
-void  CmiDisableIsomalloc();
-
-CmiInt8   CmiIsomallocLength(void *block);
-int   CmiIsomallocInRange(void *addr);
-
-/*List-of-blocks interface:*/
-struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
-	struct CmiIsomallocBlockList *prev,*next;
-	/*actual data of block follows here...*/
-};
-typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
-
-/*Build/pup/destroy an entire blockList.*/
-CmiIsomallocBlockList *CmiIsomallocBlockListNew(void);
-void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l);
-void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
-
-/*Allocate/free a block from this blockList*/
-void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
-void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
-void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
-
 /****** CTH: THE LOW-LEVEL THREADS PACKAGE ******/
 
 typedef struct CthThreadStruct *CthThread;
@@ -1310,7 +1247,7 @@ void CtgInit(void);
 CpvExtern(int, CmiPICMethod);
 
 /** Copy the current globals into this new set */
-CtgGlobals CtgCreate(void);
+CtgGlobals CtgCreate(CthThread tid);
 /** Install this set of globals. If g==NULL, returns to original globals. */
 void CtgInstall(CtgGlobals g);
 /** PUP this (not currently installed) globals set */
@@ -1374,6 +1311,36 @@ void CthAddListener(CthThread th,struct CthThreadListener *l);
   as needed. User has to implement this somewhere in the system.
 */
 void CthUserAddListeners(CthThread th);
+
+/****** Isomalloc: Migratable Memory Allocation ********/
+/*Simple block-by-block interface:*/
+void *CmiIsomalloc(int sizeInBytes, CthThread tid);
+void *CmiIsomallocAlign(size_t align, size_t size, CthThread t);
+void  CmiIsomallocPup(pup_er p,void **block);
+void  CmiIsomallocFree(void *block);
+int   CmiIsomallocEnabled();
+void  CmiEnableIsomalloc();
+void  CmiDisableIsomalloc();
+
+CmiInt8   CmiIsomallocLength(void *block);
+int   CmiIsomallocInRange(void *addr);
+
+/*List-of-blocks interface:*/
+struct CmiIsomallocBlockList {/*Circular doubly-linked list of blocks:*/
+	struct CmiIsomallocBlockList *prev,*next;
+	/*actual data of block follows here...*/
+};
+typedef struct CmiIsomallocBlockList CmiIsomallocBlockList;
+
+/*Build/pup/destroy an entire blockList.*/
+CmiIsomallocBlockList *CmiIsomallocBlockListNew(CthThread t);
+void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **l, CthThread tid);
+void CmiIsomallocBlockListDelete(CmiIsomallocBlockList *l);
+
+/*Allocate/free a block from this blockList*/
+void *CmiIsomallocBlockListMalloc(CmiIsomallocBlockList *l,size_t nBytes);
+void *CmiIsomallocBlockListMallocAlign(CmiIsomallocBlockList *l,size_t align,size_t nBytes);
+void CmiIsomallocBlockListFree(void *doomedMallocedBlock);
 
 
 /****** CTH: THREAD-PRIVATE VARIABLES ******/
@@ -1522,11 +1489,12 @@ typedef void (*CcdVoidFn)(void *userParam,double curWallTime);
 #define CcdPERIODIC_10seconds 21 /*every 10 seconds*/
 #define CcdPERIODIC_10s      21 /*every 10 seconds*/
 #define CcdPERIODIC_1minute  22 /*every minute*/
-#define CcdPERIODIC_5minute  23 /*every 5 minute*/
-#define CcdPERIODIC_10minute 24 /*every 10 minutes*/
-#define CcdPERIODIC_1hour    25 /*every hour*/
-#define CcdPERIODIC_12hour   26 /*every 12 hours*/
-#define CcdPERIODIC_1day     27 /*every day*/
+#define CcdPERIODIC_2minute  23 /*every 2 minute*/
+#define CcdPERIODIC_5minute  24 /*every 5 minute*/
+#define CcdPERIODIC_10minute 25 /*every 10 minutes*/
+#define CcdPERIODIC_1hour    26 /*every hour*/
+#define CcdPERIODIC_12hour   27 /*every 12 hours*/
+#define CcdPERIODIC_1day     28 /*every day*/
 
 /*Other conditions*/
 #define CcdQUIESCENCE 30
@@ -1851,8 +1819,10 @@ extern int numMemCriticalEntries;
 extern int *memCriticalEntries;
 #endif
 
+double CmiReadSize(const char *str);
+
 #if defined(__cplusplus)
-}
+}                                         /* end of extern "C"  */
 #endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -1899,5 +1869,32 @@ typedef struct {
 extern unsigned int CmiILog2(unsigned int);
 extern double CmiLog2(double);
 #endif
+
+#if CMK_SMP && CMK_LEVERAGE_COMMTHREAD
+#if defined(__cplusplus)
+#define EXTERN extern "C"
+#else
+#define EXTERN extern
+#endif
+typedef void (*CmiCommThdFnPtr)(int numParams, void *params);
+typedef struct CmiNotifyCommThdMsg {
+    char core[CmiMsgHeaderSizeBytes];
+    CmiCommThdFnPtr fn;
+    int numParams;
+    void *params;
+    int toKeep; /* whether to free this msg by comm thread when the msg is processed */ 
+}CmiNotifyCommThdMsg;
+
+EXTERN CmiNotifyCommThdMsg *CmiCreateNotifyCommThdMsg(CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+EXTERN void CmiFreeNotifyCommThdMsg(CmiNotifyCommThdMsg *msg);
+/* Initialize a notification msg */
+EXTERN void CmiResetNotifyCommThdMsg(CmiNotifyCommThdMsg *msg, CmiCommThdFnPtr fn, int numParams, void *params, int toKeep);
+/* Enqueue the msg into the local comm thread, and wait for being processed */
+EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
+#endif
+
+CpvCExtern(int, _urgentSend);
+#define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
+
 
 #endif /* CONVERSE_H */

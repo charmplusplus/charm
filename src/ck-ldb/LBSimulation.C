@@ -1,8 +1,4 @@
 /* Implementation of the CLBSimResults class
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
  */
 #include "LBSimulation.h"
 

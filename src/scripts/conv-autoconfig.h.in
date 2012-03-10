@@ -270,6 +270,9 @@
 /* whether size_t 64bit */
 #undef CMK_SIZET_64BIT
 
+/* disable tracing comm thread */
+#undef CMK_SMP_TRACE_COMMTHREAD
+
 /* Allows switching TLS in 32-bit. */
 #undef CMK_TLS_SWITCHING32
 
@@ -277,7 +280,7 @@
 #undef CMK_TLS_SWITCHING64
 
 /* Allows __thread. */
-#undef CMK_TLS_THREAD
+#undef CMK_HAS_TLS_VARIABLES
 
 /* enable tracing */
 #undef CMK_TRACE_ENABLED

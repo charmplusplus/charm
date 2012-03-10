@@ -15,7 +15,6 @@ void Driver::untyped_done(CkReductionMsg* m) {
     int* output = (int*)m->getData();
     CkPrintf("Untyped Sum: %d\n", output[0]);
     delete m;
-
     CkCallback *cb = new CkCallback(
             CkReductionTarget(Driver, typed_done), thisProxy);
     w.ckSetReductionClient(cb);
@@ -62,18 +61,18 @@ void Driver::typed_array_done3(int n, double* results)
 Worker::Worker() { }
 
 void Worker::reduce() {
-    int contribution = 1;
+    int contribution=1;
     contribute(1*sizeof(int), &contribution, CkReduction::sum_int); 
 }
 
 void Worker::reduce_array() {
-    int contribution[3] = { 1, 2, 3 };
-    contribute(3*sizeof(int), &contribution, CkReduction::sum_int); 
+    int contribution[3]={1,2,3};
+    contribute(3*sizeof(int), contribution, CkReduction::sum_int); 
 }
 
 void Worker::reduce_array_doubles() {
     double contribution[3] = { 0.16180, 0.27182, 0.31415 };
-    contribute(3*sizeof(double), &contribution, CkReduction::sum_double);
+    contribute(3*sizeof(double), contribution, CkReduction::sum_double);
 }
 
 #include "TypedReduction.def.h"

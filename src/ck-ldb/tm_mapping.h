@@ -1,3 +1,10 @@
+#ifndef TM_MAPPING_H
+#define TM_MAPPING_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "tm_tree.h"
 int  build_comm(char *filename,double ***pcomm);
 void TreeMatchMapping(int nb_obj, int nb_proc,double **comm_mat,  double * obj_weigth, double *com_speed, int d, int *sol);
@@ -23,3 +30,10 @@ void print_1D_tab(int *tab,int N);
 void   build_synthetic_proc_id(tm_topology_t *topology);
 void display_topology(tm_topology_t *topology);
 tm_topology_t  *build_synthetic_topology(int *arity, int nb_levels, int *core_numbering, int nb_core_per_node);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

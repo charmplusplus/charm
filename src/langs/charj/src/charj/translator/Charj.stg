@@ -485,12 +485,11 @@ ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
 >>
 
 
-block_cc(bsl) ::=
+block_cc(bsl, braces) ::=
 <<
-{
+<if(braces)>{<endif>
     <bsl; separator="\n">
-}
-
+<if(braces)>}<endif>
 >>
 
 block_atomic(s) ::=

@@ -1,0 +1,91 @@
+\documentclass[10pt]{report}
+\usepackage{../pplmanual}
+\input{../pplmanual}
+
+\title{\converse{}\\Programming\\Tutorial}
+\version{1.0}
+\credits{
+\converse{} Parallel Programming Environment was developed as a group
+effort at Parallel Programming Laboratory, University of Illinois at
+Urbana-Champaign.
+}
+\begin{document}
+\maketitle
+
+\chapter{Introduction}
+\lstdefinelanguage{pseudo}{
+morekeywords={if, else, for, in, remove, from, case, do, forever, to, False, True},
+sensitive=true,%
+morecomment=[l]\#,%
+morestring=[b]',%
+}
+
+\section{CthThreads}
+
+The CthThread package, like most thread packages, provides basic functionality
+for creating threads, destroying threads, yielding, suspending, and awakening a
+suspended thread. In addition, it provides facilities whereby you can write
+your own thread schedulers.
+
+Figure~\ref{fig:converse-cth} demonstrates how to write a simple program that
+creates CthThreads. The \texttt{CthCreateMigratable} is used and it takes a
+handler, an argument pointer, and the stack size for the thread. This is
+demonstrated in the \texttt{initThreads} function on line number 43. Once the
+threads are created, they are pushed on the scheduler queue with the
+\texttt{CthAwaken} call, which only takes the \texttt{CthThread} as an
+argument. On being scheduled, the handler function is called.
+
+In the example, each thread then calls \texttt{CthYield}, which directs control
+back to the scheduler and pushes the thread back onto the queue. Then in a
+loop, each thread calls \texttt{CthYieldPrio} \texttt{NUM\_YIELD} times, with
+the queuing strategy and necessary parameters. The threads call this with
+priority $0$ and $1$, lower integers (but non-negative) indicating higher
+priority. The effect of yielding with priority is that the higher priority
+thread on the queue has precedence over the other threads and hence will be
+scheduled first, based on the greedy decision the scheduler makes.
+
+After this loop completes, the \texttt{threadDone} is called by each
+thread, which increments a counter and quits the program when all threads are
+done.
+
+\begin{figure}
+\lstinputlisting[language=pseudo,basicstyle=\footnotesize,numbers=left,escapechar=\%]{code/pingpong.pseudo}
+\caption{A Pingpong Example using Converse Handler}
+\label{fig:converse-pingpong}
+\end{figure}
+
+\begin{figure}
+ \VerbatimInput[numbers=left,frame=single,firstline=1,lastline=53]{code/cth-tutorial/pgm.C}
+ \caption{CthThread Example}
+ \label{fig:converse-cth}
+\end{figure}
+
+
+\section{Interprocessor Messaging}
+
+Figure~\ref{fig:converse-msg} illustrates how to write a simple program that sends a message from one processor to other. In the example program, function \textttP{sendData} shows how to send a message. First, one must create a buffer to hold the message. The buffer must be large enough to hold the header and the data. This is done by \texttt{CmiAlloc} call. \texttt{CmiMsgHeaderSizeBytes} is a constant which contains the size of the header. Next, the handler method should be set for the outgoing message using \texttt{CmiSetHandler} call. User data can be set after the header. In this example, we use \texttt{CmiSyncSendAndFree} call to send the message. This function sends the message and frees the buffer. There are various alternatives. The first argument of this function call is the processor number where we want to send the message, second argument is the size of the message (including header) and the last argument is a pointer to the message.
+\begin{itemize}
+\item
+sync: a version that is as simple as possible, pushing the data into the network and not returning until the data is ``in the network''. As soon as a sync function returns, you can reuse the message buffer.
+
+\item
+async: a version that returns almost instantaneously, and then continues working in the background. The background job transfers the data from the message buffer into the network. Since the background job is still using the message buffer when the function returns, you can't reuse the message buffer immediately. The background job sets a flag when it is done and you can then reuse the message buffer.
+
+\item
+send and free: a version that returns almost instantaneously, and then continues working in the background. The background job transfers the data from the message buffer into the network. When the background job finishes, it CmiFrees the message buffer. In this situation, you can't reuse the message buffer at all. To use a function of this type, you must allocate the message buffer using CmiAlloc.
+
+\item
+node: a version that send a message to a node instead of a specific processor. This means that when the message is received, any ``free'' processor within than node can handle it. 
+\end{itemize}
+
+On the receiver, appropiate handler function is called and a pointer to the message (starting from the header) is provided to the user. User must free the message after using the data using \texttt{CmiFree} call. Finally we also illustrate a broadcast message using \texttt{CmiSyncBroadcastAllAndFree}
+
+TODO: Examples of other modes
+
+\begin{figure}
+\lstinputlisting[language=pseudo,basicstyle=\footnotesize,numbers=left,escapechar=\%]{code/interNodeMsg.C}
+\caption{Sending Message across Converse Processes}
+\label{fig:converse-pingpong}
+\end{figure}
+
+\end{document}

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /***********************************************************************************************************
 Callbacks for converse messages. Sameer Paranjpye 2/24/2000.
 This module defines an interface for registering callbacks for converse messages. 

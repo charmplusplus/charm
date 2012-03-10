@@ -12,7 +12,7 @@ class IdMsg : public CMessage_IdMsg
     IdMsg(CkChareID _id) : id(_id) {}
 };
 
-class tempotest_UserClass : public TempoChare
+class tempotest_UserClass : public CBase_tempotest_UserClass
 {
   CkChareID mainid;
   public :
@@ -21,7 +21,7 @@ class tempotest_UserClass : public TempoChare
     void doSendRecv(void);
 };
 
-class tempotest_UserGroup : public TempoGroup
+class tempotest_UserGroup : public CBase_tempotest_UserGroup
 {
   CkChareID mainid;
   public :
@@ -30,7 +30,7 @@ class tempotest_UserGroup : public TempoGroup
     void doSendRecv(void);
 };
  
-class tempotest_main : public Chare
+class tempotest_main : public CBase_tempotest_main
 {
   IdMsg *id1, *id2;
   void sendids(void);

@@ -155,6 +155,7 @@ void ScotchTopoLB::work(LDStats *stats) {
   free(pemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete ogr;
 }
 
 #include "ScotchTopoLB.def.h"

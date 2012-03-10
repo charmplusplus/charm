@@ -30,7 +30,11 @@ public class TypeName {
             }
             params = sb.toString();
         }
-        return name + "<" + params + ">";
+        if (params != "") {
+          return name + "<" + params + ">";
+        } else {
+          return name;
+        }
     }
 
     public static List<TypeName> createTypeName(String name) {

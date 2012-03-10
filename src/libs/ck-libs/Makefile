@@ -4,7 +4,7 @@ CHARMINC=.
 SIMPLE_DIRS = completion cache sparseContiguousReducer tcharm ampi idxl \
               parmetis multiphaseSharedArrays fem ParFUM \
               ifem armci collide mblock barrier irecv netfem liveViz \
-              taskGraph search datatransfer MeshStreamer pose \
+              taskGraph search datatransfer MeshStreamer NDMeshStreamer pose \
               state_space_searchengine
 DIRS = $(SIMPLE_DIRS) pythonCCS
 

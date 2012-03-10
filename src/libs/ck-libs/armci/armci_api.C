@@ -371,13 +371,17 @@ CDECL int ARMCI_Free(void *address) {
   return 0;
 }
 CDECL void *ARMCI_Malloc_local(armci_size_t bytes){
+  ArmciVirtualProcessor *vp = CtvAccess(_armci_ptr);
+  pointer ptr = vp->BlockMalloc(bytes);
   TCHARM_API_TRACE("ARMCI_Malloc_local", "armci");
-  return malloc(bytes);
+  //return malloc(bytes);
+  return ptr;
 }
 
 CDECL int ARMCI_Free_local(void *ptr){
+  CmiIsomallocBlockListFree(ptr);
   TCHARM_API_TRACE("ARMCI_Free_local", "armci");
-  free(ptr);
+  //free(ptr);
   return 0;
 }
 

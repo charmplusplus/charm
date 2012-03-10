@@ -5,7 +5,7 @@
 #define CMK_USE_PXSHM 			1
 
 #undef CMK_IMMEDIATE_MSG
-#define CMK_IMMEDIATE_MSG       0
+#define CMK_IMMEDIATE_MSG       1
 
 #undef CMK_BROADCAST_HYPERCUBE
 #define CMK_BROADCAST_HYPERCUBE        			   1

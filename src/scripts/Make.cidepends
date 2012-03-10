@@ -53,6 +53,8 @@ RefineLB.decl.h RefineLB.def.h: RefineLB.ci.stamp
 RefineTopoLB.decl.h RefineTopoLB.def.h: RefineTopoLB.ci.stamp
 RotateLB.decl.h RotateLB.def.h: RotateLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
+ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
+ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
 TeamLB.decl.h TeamLB.def.h: TeamLB.ci.stamp
 TempAwareGreedyLB.decl.h TempAwareGreedyLB.def.h: TempAwareGreedyLB.ci.stamp
 tempo.decl.h tempo.def.h: tempo.ci.stamp

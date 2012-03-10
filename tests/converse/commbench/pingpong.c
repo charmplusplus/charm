@@ -10,22 +10,27 @@ static struct testdata {
   int size;
   int numiter;
 } sizes[] = {
-    {16,      4000},
-    {32,      4000},
-    {128,      4000},
-    {256,     1000},
-    {512,     1000},
-    {1024,    1000},
-    {2048,    1000},
-    {4096,    1000},
-    {8192,    1000},
-    {16384,   1000},
-    {32768,   1000},
-    {65536,   1000},
-    {131072,   400},
-    {524288,   400},
-    {1048576, 100},
-    {4194304, 40},
+ {16,      1},
+ {32,      4000},
+ {128,      4000},
+ {256,     1000},
+ {512,     1000},
+ {1024,    1000},
+ {2048,    1000},
+ {4096,    1000},
+ {8192,    1000},
+ {16384,   1000},
+ {32768,   1000},
+ {65536,   100},
+ {131072,   40},
+ {524288,   40},
+ {1048576, 10},
+ {4194304,  10},
+ {8388608,  10},
+ {16777216,  4},
+/*
+ {33554432,  4},
+*/
     {-1,      -1},
 };
 
@@ -95,7 +100,7 @@ static void recvTime(TimeMessage *msg)
   double time;
 
   pva(numRecv)++;
-  for(i=0;i<CmiNumNodes();i++) {
+  for(i=0;i<CmiNumPes();i++) {
     if(i==msg->srcNode)
       continue;
     for(j=0;j<pva(numSizes);j++) {
@@ -113,9 +118,9 @@ static void recvTime(TimeMessage *msg)
       }
     }
   }
-  if(pva(numRecv)==CmiNumNodes()){
+  if(pva(numRecv)==CmiNumPes()){
     for(j=0;j<pva(numSizes);j++)
-      pva(gavg)[j] /= (CmiNumNodes()*(CmiNumNodes()-1));
+      pva(gavg)[j] /= (CmiNumPes()*(CmiNumPes()-1));
     CmiPrintf("[pingpong] CmiSyncSend\n");
     for(j=0;j<pva(numSizes);j++) {
       CmiPrintf("[pingpong] size=%d\taverageTime=%le seconds\n",
@@ -135,9 +140,9 @@ static void startNextNode(EmptyMsg *msg)
 {
   EmptyMsg m;
   CmiFree(msg);
-  if((CmiMyNode()+1) != CmiNumNodes()) {
+  if((CmiMyPe()+1) != CmiNumPes()) {
     CmiSetHandler(&m, pva(nbrHandler));
-    CmiSyncSend(pva(nodeList)[CmiMyNode()+1], sizeof(EmptyMsg), &m);
+    CmiSyncSend(pva(nodeList)[CmiMyPe()+1], sizeof(EmptyMsg), &m);
   }
 }
 
@@ -149,21 +154,21 @@ static void startNextNbr(EmptyMsg *msg)
 
   CmiFree(msg);
   pva(nextNbr)++;
-  if(pva(nextNbr) == CmiMyNode()) {
+  if(pva(nextNbr) == CmiMyPe()) {
     CmiSetHandler(&m, pva(nbrHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
     return;
   }
-  if(pva(nextNbr) == CmiNumNodes()) {
+  if(pva(nextNbr) == CmiNumPes()) {
     pva(nextNbr) = -1;
     CmiSetHandler(&m, pva(nodeHandler));
     CmiSyncSend(CmiMyPe(), sizeof(EmptyMsg), &m);
-    size = sizeof(TimeMessage)+pva(numSizes)*CmiNumNodes()*sizeof(double);
+    size = sizeof(TimeMessage)+pva(numSizes)*CmiNumPes()*sizeof(double);
     tm = (TimeMessage *) CmiAlloc(size);
-    for(i=0;i<CmiNumNodes();i++)
+    for(i=0;i<CmiNumPes();i++)
       memcpy(tm->data+i*pva(numSizes),pva(times)[i],
              sizeof(double)*pva(numSizes));
-    tm->srcNode = CmiMyNode();
+    tm->srcNode = CmiMyPe();
     CmiSetHandler(tm, pva(timeHandler));
     CmiSyncSendAndFree(0, size, tm);
   } else {
@@ -225,7 +230,7 @@ void pingpong_init(void)
 {
   EmptyMsg m;
 
-  if(CmiNumNodes()==1) {
+  if(CmiNumPes()==1) {
     CmiPrintf("[pingpong] This benchmark requires > 1 nodes.\n");
     CmiSetHandler(&m, pva(ack_handler));
     CmiSyncSend(0, sizeof(EmptyMsg), &m);
@@ -254,16 +259,16 @@ void pingpong_moduleinit(void)
   for(i=0; sizes[i].size != (-1); i++);
   pva(numSizes) = i;
   pvi(double **, times);
-  pva(times) = (double **) malloc(CmiNumNodes()*sizeof(double *));
-  for(i=0;i<CmiNumNodes();i++)
+  pva(times) = (double **) malloc(CmiNumPes()*sizeof(double *));
+  for(i=0;i<CmiNumPes();i++)
     pva(times)[i] = (double *) malloc(pva(numSizes)*sizeof(double));
-  for(i=0;i<CmiNumNodes();i++)
+  for(i=0;i<CmiNumPes();i++)
     for(j=0;j<pva(numSizes);j++)
       pva(times)[i][j] = 0.0;
   pvi(int *, nodeList);
-  pva(nodeList) = (int *) malloc(CmiNumNodes()*sizeof(int));
-  for(i=0;i<CmiNumNodes();i++)
-    pva(nodeList)[i] = CmiNodeFirst(i);
+  pva(nodeList) = (int *) malloc(CmiNumPes()*sizeof(int));
+  for(i=0;i<CmiNumPes();i++)
+    pva(nodeList)[i] = i; /*CmiNodeFirst(i);*/
   pvi(double *, gavg);
   pva(gavg) = (double *) malloc(sizeof(double)*pva(numSizes));
   pvi(double *, gmax);

@@ -14,7 +14,7 @@ void CtgInit(void) {
         CpvAccess(CmiPICMethod) = 0;
 }
 void CtgInstall(CtgGlobals g) {}
-CtgGlobals CtgCreate(void) {return 0;}
+CtgGlobals CtgCreate(CthThread tid) {return 0;}
 CtgGlobals CtgPup(pup_er p,CtgGlobals g) { return 0;}
 void CtgFree(CtgGlobals g) {}
 CtgGlobals CtgCurrentGlobals(void) { return 0; }

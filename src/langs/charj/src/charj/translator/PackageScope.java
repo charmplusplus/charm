@@ -33,15 +33,14 @@ public class PackageScope extends SymbolWithScope {
     public ClassSymbol resolveType(List<TypeName> type) {
         if (type == null) return null;
 
-        String typeStr = "";
+        String typeStr = TypeName.typeToString(type);
 
         if (debug()) { 
-            typeStr = TypeName.typeToString(type);
             System.out.println(" PackageScope.resolveType(" + typeStr + 
                                 "): examine " + toString());
         }
 
-        ClassSymbol cs = symtab.primitiveTypes.get(type);
+        ClassSymbol cs = symtab.primitiveTypes.get(typeStr);
         if (cs != null) return cs;
 
         if (type.size() == 1) return (ClassSymbol)members.get(type.get(0).name);

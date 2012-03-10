@@ -1,21 +1,26 @@
-/** \file GreedyLB.C
- *
- *  Written by Gengbin Zheng
- *  Updated by Abhinav Bhatele, 2010-12-09 to use ckgraph
- *
- *  Status:
- *    -- Does not support pe_speed's currently
- *    -- Does not support nonmigratable attribute
- */
-
 /**
  * \addtogroup CkLdb
 */
 /*@{*/
 
-#include "GreedyLB.h"
-#include "ckgraph.h"
+/*
+ status:
+  * support processor avail bitvector
+  * support nonmigratable attrib
+      nonmigratable object load is added to its processor's background load
+      and the nonmigratable object is not taken in the objData array
+*/
+
 #include <algorithm>
+
+#include "charm++.h"
+
+
+#include "ckgraph.h"
+#include "cklists.h"
+#include "GreedyLB.h"
+
+using namespace std;
 
 CreateLBFunc_Def(GreedyLB, "always assign the heaviest obj onto lightest loaded processor.")
 
@@ -35,7 +40,7 @@ CmiBool GreedyLB::QueryBalanceNow(int _step)
 class ProcLoadGreater {
   public:
     bool operator()(ProcInfo p1, ProcInfo p2) {
-      return (p1.getTotalLoad() > p2.getTotalLoad());
+      return (p1.totalLoad() > p2.totalLoad());
     }
 };
 
@@ -48,44 +53,111 @@ class ObjLoadGreater {
 
 void GreedyLB::work(LDStats* stats)
 {
-  /** ========================== INITIALIZATION ============================= */
-  ProcArray *parr = new ProcArray(stats);       // Processor Array
-  ObjGraph *ogr = new ObjGraph(stats);          // Object Graph
+  int  obj, objCount, pe;
+  int n_pes = stats->nprocs();
+  int *map = new int[n_pes];
 
-  /** ============================= STRATEGY ================================ */
-  parr->resetTotalLoad();
+  std::vector<ProcInfo>  procs;
+  for(pe = 0; pe < n_pes; pe++) {
+    map[pe] = -1;
+    if (stats->procs[pe].available) {
+      map[pe] = procs.size();
+      procs.push_back(ProcInfo(pe, stats->procs[pe].bg_walltime, 0.0, stats->procs[pe].pe_speed, true));
+    }
+  }
+
+  // take non migratbale object load as background load
+  for (obj = 0; obj < stats->n_objs; obj++)
+  {
+      LDObjData &oData = stats->objData[obj];
+      if (!oData.migratable)  {
+        int pe = stats->from_proc[obj];
+        pe = map[pe];
+        if (pe==-1)
+          CmiAbort("GreedyLB: nonmigratable object on an unavail processor!\n");
+        procs[pe].totalLoad() += oData.wallTime;
+      }
+  }
+  delete [] map;
+
+  // considering cpu speed
+  for (pe = 0; pe<procs.size(); pe++) {
+    procs[pe].totalLoad() +=  procs[pe].overhead();
+    procs[pe].totalLoad() *= procs[pe].pe_speed();
+  }
+
+  // build object array
+  std::vector<Vertex> objs;
+
+  for(int obj = 0; obj < stats->n_objs; obj++) {
+    LDObjData &oData = stats->objData[obj];
+    int pe = stats->from_proc[obj];
+    if (!oData.migratable) {
+      if (!stats->procs[pe].available) 
+        CmiAbort("GreedyLB cannot handle nonmigratable object on an unavial processor!\n");
+      continue;
+    }
+    double load = oData.wallTime * stats->procs[pe].pe_speed;
+    objs.push_back(Vertex(obj, load, stats->objData[obj].migratable, stats->from_proc[obj]));
+  }
+
+  // max heap of objects
+  sort(objs.begin(), objs.end(), ObjLoadGreater());
+  // min heap of processors
+  make_heap(procs.begin(), procs.end(), ProcLoadGreater());
 
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In GreedyLB strategy\n",CkMyPe());
 
-  int vert;
 
-  // max heap of objects
-  std::sort(ogr->vertices.begin(), ogr->vertices.end(), ObjLoadGreater());
-  // min heap of processors
-  std::make_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    // greedy algorithm
+  int nmoves = 0;
+  for (obj=0; obj < objs.size(); obj++) {
+    ProcInfo p = procs.front();
+    pop_heap(procs.begin(), procs.end(), ProcLoadGreater());
+    procs.pop_back();
 
-  for(vert = 0; vert < ogr->vertices.size(); vert++) {
-    // Pop the least loaded processor
-    ProcInfo p = parr->procs.front();
-    std::pop_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
-    parr->procs.pop_back();
+    // Increment the time of the least loaded processor by the cpuTime of
+    // the `heaviest' object
+    p.totalLoad() += objs[obj].getVertexLoad();
 
-    // Increment the load of the least loaded processor by the load of the
-    // 'heaviest' unmapped object
-    p.setTotalLoad(p.getTotalLoad() + ogr->vertices[vert].getVertexLoad());
-    ogr->vertices[vert].setNewPe(p.getProcId());
+    //Insert object into migration queue if necessary
+    const int dest = p.getProcId();
+    const int pe   = objs[obj].getCurrentPe();
+    const int id   = objs[obj].getVertexId();
+    if (dest != pe) {
+      stats->to_proc[id] = dest;
+      nmoves ++;
+      if (_lb_args.debug()>2) 
+        CkPrintf("[%d] Obj %d migrating from %d to %d\n", CkMyPe(),objs[obj].getVertexId(),pe,dest);
+    }
 
-    // Insert the least loaded processor with load updated back into the heap
-    parr->procs.push_back(p);
-    std::push_heap(parr->procs.begin(), parr->procs.end(), ProcLoadGreater());
+    //Insert the least loaded processor with load updated back into the heap
+    procs.push_back(p);
+    push_heap(procs.begin(), procs.end(), ProcLoadGreater());
   }
 
-  /** ============================== CLEANUP ================================ */
-  ogr->convertDecisions(stats);         // Send decisions back to LDStats
+  if (_lb_args.debug()>0) 
+    CkPrintf("[%d] %d objects migrating.\n", CkMyPe(), nmoves);
+
+  if (_lb_args.debug()>1)  {
+    CkPrintf("CharmLB> Min obj: %f  Max obj: %f\n", objs[objs.size()-1].getVertexLoad(), objs[0].getVertexLoad());
+    CkPrintf("CharmLB> PE speed:\n");
+    for (pe = 0; pe<procs.size(); pe++)
+      CkPrintf("%f ", procs[pe].pe_speed());
+    CkPrintf("\n");
+    CkPrintf("CharmLB> PE Load:\n");
+    for (pe = 0; pe<procs.size(); pe++)
+      CkPrintf("%f (%f)  ", procs[pe].totalLoad(), procs[pe].overhead());
+    CkPrintf("\n");
+  }
+
 }
 
 #include "GreedyLB.def.h"
 
 /*@}*/
+
+
+
 

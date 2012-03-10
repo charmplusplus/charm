@@ -2,3 +2,4 @@ build
 .vimproject
 *.gen
 run_tests.log
+run_tests.log.tmp

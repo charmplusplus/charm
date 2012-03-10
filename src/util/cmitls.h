@@ -1,7 +1,7 @@
 
 #include "conv-config.h"
 
-#if CMK_HAS_ELF_H && CMK_TLS_THREAD
+#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
 #include <elf.h>
 #include <string.h>

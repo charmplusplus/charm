@@ -19,14 +19,16 @@ typedef struct {
 */
 #ifdef CMK_BLUEGENEP
 #include "dcmf.h"
+#elif  CMK_CONVERSE_GEMINI_UGNI
+#include "gni_pub.h"
 #endif
-struct infiDirectUserHandle{
+typedef struct infiDirectUserHandle{
     int handle;
+#ifdef CMK_BLUEGENEP
     int senderNode;
     int recverNode;
     void *recverBuf;
     int recverBufSize;
-#ifdef CMK_BLUEGENEP
     void *senderBuf;
     void (*callbackFnPtr)(void *);
     void *callbackData;
@@ -36,13 +38,35 @@ struct infiDirectUserHandle{
     DCMF_Memregion_t DCMF_recverMemregion;
     DCMF_Memregion_t DCMF_senderMemregion;
     DCMF_Callback_t DCMF_notify_cb;
+#elif  CMK_CONVERSE_GEMINI_UGNI
+    int localNode;
+    int remoteRank;
+    int remoteNode;
+    void *remoteBuf;
+    void *remoteHandler;
+    int transSize;
+    void *localBuf;
+    void (*callbackFnPtr)(void *);
+    void *callbackData;
+    gni_mem_handle_t    localMdh;
+    gni_mem_handle_t    remoteMdh;
 #else
+    int senderNode;
+    int recverNode;
+    void *recverBuf;
+    int recverBufSize;
 	char recverKey[64];
 #endif
 	double initialValue;
-};
+}CmiDirectUserHandle;
 
-
+#ifdef  CMK_CONVERSE_GEMINI_UGNI
+typedef gni_mem_handle_t    CmiDirectMemoryHandler;
+CmiDirectMemoryHandler CmiDirect_registerMemory(void *buff, int size);
+struct infiDirectUserHandle CmiDirect_createHandle_mem(CmiDirectMemoryHandler *mem_hndl, void *recvBuf, int recvBufSize, void (*callbackFnPtr)(void *), void *callbackData);
+void CmiDirect_assocLocalBuffer_mem(struct infiDirectUserHandle *userHandle, CmiDirectMemoryHandler *mem_hndl, void *sendBuf,int sendBufSize);
+void CmiDirect_saveHandler(CmiDirectUserHandle* h, void *ptr);
+#endif
 /* functions */
 
 #ifdef __cplusplus

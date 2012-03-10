@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /*This file describes the CCS Server-side handler
 interface.  A CCS handler is just a CMI handler,
 but it can use the CcsSendReply function.

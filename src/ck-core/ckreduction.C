@@ -780,12 +780,11 @@ void CkReductionMgr::finishReduction(void)
   redNo++;
   //Shift the count adjustment vector down one slot (to match new redNo)
   int i;
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-	if(CkMyPe()!=0){
-#else
-    {
+#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_)) && !GROUP_LEVEL_REDUCTION
+    /* nodegroup reduction will adjust adjVec in endArrayReduction on PE 0 */
+  if(CkMyPe()!=0)
 #endif
-//	int i;
+  {
 	completedRedNo++;
   	for (i=1;i<(int)(adjVec.length());i++){
 	   adjVec[i-1]=adjVec[i];
@@ -953,7 +952,7 @@ CkReductionMsg *CkReductionMgr::reduceMessages(void)
 
 	//Go back through the vector, deleting old messages
   for (i=0;i<nMsgs;i++) if (msgArr[i]!=ret) delete msgArr[i];
-	delete [] msgArr;
+  delete [] msgArr;
 
   //Set the message counts
   ret->redNo=redNo;

@@ -50,7 +50,7 @@ main::main(CkArgMsg *msg)
   arrSize= 30;
   nBatches =6;
   batchSize=10;
-  period=1;
+  period=2;
   if(msg->argc>1)
     arrSize =atoi(msg->argv[1]);
   if(msg->argc>2)

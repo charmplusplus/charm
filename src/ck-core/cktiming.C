@@ -46,7 +46,7 @@ char errorstring[PAPI_MAX_STR_LEN+1];
 unsigned long bgTraceCounter;
 double startTime;
 
-CkpvDeclare(bool, insideTraceBracket);
+CkpvStaticDeclare(bool, insideTraceBracket);
 
 class StringPool {
  std::vector<char *> events;

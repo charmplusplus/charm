@@ -968,6 +968,8 @@ void CentralLB::LoadBalance()
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
 
+  if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
+
   if (_lb_args.debug()) 
       CmiPrintf("\nCharmLB> %s: PE [%d] step %d starting at %f Memory: %f MB\n",
 		  lbname, cur_ld_balancer, step(), start_lb_time,
@@ -1476,7 +1478,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 
   work(stats);
 
-  if (_lb_args.debug()>1)  {
+  if (_lb_args.debug()>2)  {
     CkPrintf("CharmLB> Obj Map:\n");
     for (int i=0; i<stats->n_objs; i++) CkPrintf("%d ", stats->to_proc[i]);
     CkPrintf("\n");

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /****
   converse ldb for Blue Gene, this is the first version, full of hack and 
   need more work.

@@ -66,7 +66,7 @@ public:
 };
 
 /*mainchare*/
-class Main : public Chare
+class Main : public CBase_Main
 {
     int pass, superpass;
     double curTime;
@@ -182,7 +182,7 @@ public:
         //if(p.isPacking())
         //            CkPrintf("Migrating from %d\n", CkMyPe());
 
-        ArrayElement1D::pup(p);
+        CBase_Bench::pup(p);
         p | pass ;
         p | mcount ;
         p | time;

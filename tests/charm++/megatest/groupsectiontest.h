@@ -17,7 +17,7 @@ class groupsectiontest_msg : public CMessage_groupsectiontest_msg, CkMcastBaseMs
   bool side;
 };
 
-class groupsectiontest : public Group
+class groupsectiontest : public CBase_groupsectiontest
 {
   private:
     bool low;

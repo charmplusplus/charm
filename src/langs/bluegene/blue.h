@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /*
   File: Blue.h -- header file defines the user API for Converse Bluegene 
         Emulator application. 

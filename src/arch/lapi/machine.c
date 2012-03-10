@@ -216,7 +216,7 @@ CpvDeclare(MsgOrderInfo, p2pMsgSeqInfo);
  * because there's charm proc-private variable access would be
  * incorrect in lapi's internal threads. -Chao Mei
  */
-#if (CMK_SMP && (!CMK_SMP_NO_COMMTHD || (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD))) || ENSURE_MSG_PAIRORDER
+#if (CMK_SMP && (!CMK_SMP_NO_COMMTHD || (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD))) || ENSURE_MSG_PAIRORDER
 #undef CMK_OFFLOAD_BCAST_PROCESS
 #define CMK_OFFLOAD_BCAST_PROCESS 1
 #endif
@@ -336,7 +336,7 @@ static void MachinePostCommonInitForLAPI(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForLAPI();
+static void AdvanceCommunicationForLAPI(int idle);
 #define LrtsAdvanceCommunication AdvanceCommunicationForLAPI
 
 static void DrainResourcesForLAPI(); /* used when exit */
@@ -781,7 +781,7 @@ static int checkMsgInOrder(char *msg, MsgOrderInfo *info) {
 
 /* ######Beginning of functions related with communication progress ###### */
 
-static INLINE_KEYWORD void AdvanceCommunicationForLAPI() {
+static INLINE_KEYWORD void AdvanceCommunicationForLAPI(int idle) {
     /* What about CMK_SMP_NO_COMMTHD in the original implementation?? */
     /* It does nothing but sleep */
     if (!CsvAccess(lapiInterruptMode)) check_lapi(LAPI_Probe,(lapiContext));
@@ -975,7 +975,7 @@ static void MachinePostCommonInitForLAPI(int everReturn) {
  *
  ************************************************************************/
 
-void CmiAbort(const char *message) {
+void LrtsAbort(const char *message) {
     CmiError(message);
     LAPI_Term(lapiContext);
     exit(1);

@@ -14,7 +14,7 @@ class groupring_message : public CMessage_groupring_message {
   groupring_message(CkMigrateMessage *m) {}
 };
 
-class groupring_main : public Chare {
+class groupring_main : public CBase_groupring_main {
   public:
     groupring_main(CkArgMsg *m) {
       delete m;
@@ -22,7 +22,7 @@ class groupring_main : public Chare {
     groupring_main(CkMigrateMessage *m) {}
 };
 
-class groupring_group : public Group {
+class groupring_group : public CBase_groupring_group {
   public:
     groupring_group(void) {}
     groupring_group(CkMigrateMessage *m) {}

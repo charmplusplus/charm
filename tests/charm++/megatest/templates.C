@@ -26,7 +26,7 @@ void templates_moduleinit(void)
 template <class dtype> void 
 templates_Reduction<dtype>::submit(templates_Single<dtype> *msg)
 {
-  CProxy_templates_Reduction<dtype> red(thisgroup);
+  CProxy_templates_Reduction<dtype> red(this->Group::thisgroup);
   red[0].remoteRecv(msg);
 }
 
@@ -57,7 +57,7 @@ templates_Collector<dtype>::templates_Collector(void)
 {
   CProxy_templates_Reduction<dtype> red(templates_redid);
   if(CkMyPe()==0) {
-    templates_ClientMsg *cmsg = new templates_ClientMsg(thishandle);
+    templates_ClientMsg *cmsg = new templates_ClientMsg(this->Chare::thishandle);
     red[0].Register(cmsg);
   }
   templates_Single<dtype> *m = new templates_Single<dtype>((dtype)(CkMyPe()+1));

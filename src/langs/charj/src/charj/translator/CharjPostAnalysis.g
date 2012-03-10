@@ -2,7 +2,7 @@
  *  TODO add a description
  */
 
-tree grammar CharjASTModifier2;
+tree grammar CharjPostAnalysis;
 
 options {
     backtrack = true; 
@@ -88,9 +88,9 @@ externDeclaration
 
 typeDeclaration returns [ClassSymbol sym]
     :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
-            (^('extends' parent=type))? (^('implements' type+))?
+            (^(EXTENDS parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
-    |   ^('interface' IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
+    |   ^('interface' IDENT (^(EXTENDS type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     ;
 
@@ -520,10 +520,10 @@ primaryExpression returns [Type type]
 			$type = $ARRAY_ELEMENT_ACCESS.symbolType; // TODO this is not correct, as it's always null
 			if($pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1)
 			{
-				System.out.println("creating a new ArraySectionInitializer");
+				//System.out.println("creating a new ArraySectionInitializer");
 				ArraySectionInitializer asi = new ArraySectionInitializer($domainExpression.ranges, ((ProxyType)$pe.type).baseType.getTypeName());
 				currentClass.sectionInitializers.add(asi);
-				System.out.println(asi);
+				//System.out.println(asi);
 			}
 		}
 			->	{ $pe.type instanceof ProxyType && $domainExpression.ranges.get(0).size() > 1 }? ^(METHOD_CALL IDENT["arraySectionInitializer" + (ArraySectionInitializer.getCount() - 1)] ^(ARGUMENT_LIST ^(EXPR primaryExpression)))

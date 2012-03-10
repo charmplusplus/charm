@@ -251,7 +251,7 @@ class sim : public CBase_sim {
   /// Destructor
   virtual ~sim();
   /// Pack/unpack/sizing operator
-  virtual void pup(PUP::er &p);
+  void pup(PUP::er &p);
   /// Start a forward execution step on myStrat
   void Step();                 
   /// Start a prioritized forward execution step on myStrat

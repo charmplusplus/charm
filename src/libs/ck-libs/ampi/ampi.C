@@ -4200,7 +4200,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
     //posted_ireqs stores the index (an integer) to ampiReqs. 
     //The index is 1-based rather 0-based because when pulling entries from posted_ireqs,
     //if not found, a "0"(i.e. NULL) is returned, this confuses the indexing of ampiReqs. 
-    CmmPut(ptr->posted_ireqs, 3, tags, (void *)((*request)+1));
+    CmmPut(ptr->posted_ireqs, 3, tags, (void *)(CmiIntPtr)((*request)+1));
 #endif
   }
 

@@ -32,7 +32,6 @@
 #define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0 /* SMP versions */
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_PTHREADS                           0
 #define CMK_SHARED_VARS_NT_THREADS                         0
 
@@ -44,10 +43,6 @@
 #define CMK_SIGNAL_NOT_NEEDED                              1
 #define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
-
-/* specifies whether the CthCpv variables should be defined as Cpv (0) or
-   directly as normal c variables (1) */
-#define CMK_THREADS_REQUIRE_NO_CPV                         0
 
 /* decide which is the default implementation of the threads (see threads.c)
    Only one of the following can be 1. If none of them is selected, qthreads
@@ -62,8 +57,8 @@
    implement the timer primitives. */
 #define CMK_TIMER_USE_RTC                                  0
 #define CMK_TIMER_USE_RDTSC                                0
-#define CMK_TIMER_USE_GETRUSAGE                            1
-#define CMK_TIMER_USE_SPECIAL                              0
+#define CMK_TIMER_USE_GETRUSAGE                            0
+#define CMK_TIMER_USE_SPECIAL                              1
 #define CMK_TIMER_USE_TIMES                                0
 #define CMK_TIMER_USE_BLUEGENEL                            0
 

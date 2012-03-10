@@ -1,0 +1,14 @@
+mainmodule iotest {
+  readonly CkGroupID mgr;
+  include "ckio.h";
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void ready(Ck::IO::FileReadyMsg *m);
+    entry void test_written();
+  };
+
+  array [1D] test {
+    entry test(Ck::IO::Token token);
+  }
+}

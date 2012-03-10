@@ -1,0 +1,60 @@
+#include <converse.h>
+#include <stdlib.h>
+CpvDeclare(int,msgSize);
+CpvDeclare(int,exitHandler);
+CpvDeclare(int,node0Handler);
+CpvDeclare(int,node1Handler);
+void startRing()
+{
+  char *msg = (char *)CmiAlloc(CpvAccess(msgSize));
+  *((int *)(msg+CmiMsgHeaderSizeBytes)) = CpvAccess(msgSize);
+  CmiSetHandler(msg,CpvAccess(node1Handler));
+  CmiSyncSendAndFree(1, CpvAccess(msgSize), msg);
+}
+void ringFinished(char *msg)
+{
+  CmiFree(msg);
+  //exit
+  void *sendmsg = CmiAlloc(CmiMsgHeaderSizeBytes);
+  CmiSetHandler(sendmsg,CpvAccess(exitHandler));
+  CmiSyncBroadcastAllAndFree(CmiMsgHeaderSizeBytes,sendmsg);
+}
+//We finished for all message sizes. Exit now
+CmiHandler exitHandlerFunc(char *msg)
+{
+    CmiFree(msg);
+    CsdExitScheduler();
+    return 0;
+}
+//Handler on Node 0
+CmiHandler node0HandlerFunc(char *msg)
+{
+	ringFinished(msg);
+	return 0;
+}
+CmiHandler node1HandlerFunc(char *msg)
+{
+    CpvAccess(msgSize) = *((int *)(msg+CmiMsgHeaderSizeBytes));
+    CmiSetHandler(msg,CpvAccess(node0Handler));
+    CmiSyncSendAndFree(0,CpvAccess(msgSize),msg);
+    return 0;
+}
+CmiStartFn mymain()
+{
+    CpvInitialize(int,msgSize);
+    CpvAccess(msgSize)= 512 + CmiMsgHeaderSizeBytes;
+    CpvInitialize(int,exitHandler);
+    CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);
+    CpvInitialize(int,node0Handler);
+    CpvAccess(node0Handler) = CmiRegisterHandler((CmiHandler) node0HandlerFunc);
+    CpvInitialize(int,node1Handler);
+    CpvAccess(node1Handler) = CmiRegisterHandler((CmiHandler) node1HandlerFunc);
+    if (CmiMyPe() == 0)
+        startRing();
+    return 0;
+}
+int main(int argc,char *argv[])
+{
+    ConverseInit(argc,argv,(CmiStartFn)mymain,0,0);
+    return 0;
+}

@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /**
  * \addtogroup CkPerf
 */
@@ -265,6 +258,7 @@ class TraceSummary : public Trace {
     int msgNum; /* used to handle multiple endComputation calls?? */
     int inIdle;
     int inExec;
+    int depth;
   public:
     TraceSummary(char **argv);
     void creation(envelope *e, int epIdx, int num=1) {}

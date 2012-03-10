@@ -2,7 +2,7 @@
 # needs $(PGM)
 
 OPTS=
-CDIR=../../../..
+CDIR=../../..
 CHARMC=$(CDIR)/bin/charmc -language charm++ $(OPTS)
 
 # Rules to convert .ci to .decl.h and .def.h

@@ -15,7 +15,7 @@ class priolongtest_msg : public CMessage_priolongtest_msg
     priolongtest_msg(CmiInt8 p) : prio(p) {}
 };
 
-class priolongtest_chare : public Chare
+class priolongtest_chare : public CBase_priolongtest_chare
 {
   private:
     CmiInt8 lastprio;

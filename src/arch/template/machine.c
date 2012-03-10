@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /** @file
  * Templated machine layer
  * @ingroup Machine
@@ -214,24 +207,6 @@ void CmiNodeBarrier(void);
 void CmiNodeAllBarrier(void);
 CmiNodeLock CmiCreateLock();
 void CmiDestroyLock(CmiNodeLock lock);
-
-#endif
-
-/* NOT VERY USEFUL */
-#if CMK_SHARED_VARS_EXEMPLAR /* Used only by HP Exemplar version */
-
-int _Cmi_numpes;
-int _Cmi_mynodesize;
-
-void CmiMemLock();
-void CmiMemUnlock();
-void *CmiSvAlloc(int);
-
-/* optional, these functions are implemented in "machine-smp.c", so including
-   this file avoid the necessity to reimplement them.
- */
-void CmiNodeBarrier(void);
-CmiNodeLock CmiCreateLock(void);
 
 #endif
 

@@ -10,11 +10,11 @@
 #include "trace-projectionsBOC.h"
 
 #if DEBUG_PROJ
-#define DEBUGF(format, ...) CkPrintf(format, ## __VA_ARGS__)
+#define DEBUGF(...) CkPrintf(__VA_ARGS__)
 #else
-#define DEBUGF(format, ...)           // CmiPrintf x
+#define DEBUGF(...)
 #endif
-#define DEBUGN(format, ...)  // easy way to selectively disable DEBUGs
+#define DEBUGN(...)  // easy way to selectively disable DEBUGs
 
 #define DefaultLogBufSize      1000000
 
@@ -1252,20 +1252,67 @@ void TraceProjections::creation(envelope *e, int ep, int num)
   }
 }
 
+//This function is only called from a comm thread in SMP mode. 
 void TraceProjections::creation(char *msg)
 {
 #if CMK_SMP_TRACE_COMMTHREAD
-	//This function is only called from a comm thread
-	//in SMP mode. So, it is possible the msg is not
-	//a charm msg that contains an envelope, ep idx.
+        // msg must be a charm message
 	envelope *e = (envelope *)msg;
 	int ep = e->getEpIdx();
-	int num = _entryTable.size();
-	if(ep<num && ep>=0 && _entryTable[ep]->traceEnabled)
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+	if(_entryTable[ep]->traceEnabled) {
 		creation(e, ep, 1);
+        e->setSrcPe(CkMyPe());              // pretend I am the sender
+    }
 #endif
 }
 
+void TraceProjections::traceCommSetMsgID(char *msg)
+{
+#if CMK_SMP_TRACE_COMMTHREAD
+        // msg must be a charm message
+	envelope *e = (envelope *)msg;
+	int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+	if(_entryTable[ep]->traceEnabled) {
+        e->setSrcPe(CkMyPe());              // pretend I am the sender
+        e->setEvent(curevent);
+    }
+#endif
+}
+
+void TraceProjections::traceGetMsgID(char *msg, int *pe, int *event)
+{
+    // msg must be a charm message
+    *pe = *event = -1;
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled) {
+        *pe = e->getSrcPe();
+        *event = e->getEvent();
+    }
+}
+
+void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
+{
+       // msg must be a charm message
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(ep==0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
+    if(_entryTable[ep]->traceEnabled) {
+        e->setSrcPe(pe);
+        e->setEvent(event);
+    }
+}
 
 /* **CW** Non-disruptive attempt to add destination PE knowledge to
    Communication Library-specific Multicasts via new event 
@@ -1351,9 +1398,10 @@ void TraceProjections::beginExecute(char *msg){
 #if CMK_SMP_TRACE_COMMTHREAD
 	//This function is called from comm thread in SMP mode
     envelope *e = (envelope *)msg;
-    int num = _entryTable.size();
     int ep = e->getEpIdx();
-    if(ep<0 || ep>=num) return;
+    if (ep == 0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
     if(_entryTable[ep]->traceEnabled)
 		beginExecute(e);
 #endif
@@ -1413,9 +1461,10 @@ void TraceProjections::endExecute(char *msg)
 #if CMK_SMP_TRACE_COMMTHREAD
 	//This function is called from comm thread in SMP mode
     envelope *e = (envelope *)msg;
-    int num = _entryTable.size();
     int ep = e->getEpIdx();
-    if(ep<0 || ep>=num) return;
+    if (ep == 0) return;
+    int num = _entryTable.size();
+    CmiAssert(ep < num);
     if(_entryTable[ep]->traceEnabled)
 		endExecute();
 #endif	

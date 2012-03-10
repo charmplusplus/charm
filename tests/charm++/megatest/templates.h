@@ -23,7 +23,7 @@ class templates_ClientMsg: public CMessage_templates_ClientMsg {
 };
 
 template <class dtype>
-class templates_Array : public ArrayElement1D {
+class templates_Array : public CBase_templates_Array<dtype> {
   private:
     dtype data;
   public:
@@ -34,7 +34,7 @@ class templates_Array : public ArrayElement1D {
 };
 
 template <class dtype>
-class templates_Reduction : public Group {
+class templates_Reduction : public CBase_templates_Reduction<dtype> {
   private:
     dtype data;
     int nreported;
@@ -48,7 +48,7 @@ class templates_Reduction : public Group {
 };
 
 template <class dtype>
-class templates_Collector : public Chare {
+class templates_Collector : public CBase_templates_Collector<dtype> {
   public:
     templates_Collector(void);
     templates_Collector(CkMigrateMessage *m) {}

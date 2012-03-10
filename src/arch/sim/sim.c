@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #define TRACE_ELAPSED_TIME 0
 #define TRACE_SENDCP_TIME 0
 #define TRACE_RECVCP_TIME 0

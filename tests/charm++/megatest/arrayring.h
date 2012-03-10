@@ -12,7 +12,7 @@ public:
   int check(void) { return !strcmp(data, "Array!"); }
 };
 
-class arrayRing_array : public ArrayElement1D
+class arrayRing_array : public CBase_arrayRing_array
 {
  public:
   arrayRing_array();

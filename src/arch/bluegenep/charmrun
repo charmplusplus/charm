@@ -49,8 +49,8 @@ printf "\nRunning on $pes processors: $args\n"
 if test -n "$COBALT_JOBID"
 then
   # charmrun called from script
-  echo "Running> cobalt-mpirun -np $pes $args"
-  cobalt-mpirun -np $pes $args
+  echo "Running> cobalt-mpirun -nofree -env BG_MAXALIGNEXP=0 -np $pes $args"
+  cobalt-mpirun -nofree -env BG_MAXALIGNEXP=0 -np $pes $args
 else
 
 queue_stat=qstat

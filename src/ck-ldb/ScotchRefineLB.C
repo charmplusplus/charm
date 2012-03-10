@@ -119,7 +119,6 @@ void ScotchRefineLB::work(LDStats *stats) {
   CkAssert(edgeNum == edgenbr);
 
   SCOTCH_Graph graph;		// Graph to partition
-  SCOTCH_Arch  arch;            // Target architecture
   SCOTCH_Strat strat;		// Strategy to achieve partitioning
 
   /* Initialize data structures */
@@ -137,9 +136,6 @@ void ScotchRefineLB::work(LDStats *stats) {
       SCOTCH_stratGraphMapBuild (&strat, SCOTCH_STRATBALANCE | SCOTCH_STRATREMAP, parr->procs.size (), 0.01);
     }
 
-  SCOTCH_archInit (&arch);
-  SCOTCH_archCmplt (&arch, parr->procs.size ());
-
   SCOTCH_Num *pemap = (SCOTCH_Num *)malloc(sizeof(SCOTCH_Num) * vertnbr);
 
   // Takes as input the graph, arch graph, strategy, migration cost in
@@ -152,7 +148,6 @@ void ScotchRefineLB::work(LDStats *stats) {
   }
   
   SCOTCH_graphExit (&graph);
-  SCOTCH_archExit  (&arch);
   SCOTCH_stratExit (&strat);
 
   free(verttab);
@@ -169,6 +164,7 @@ void ScotchRefineLB::work(LDStats *stats) {
   free(oldpemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete ogr;
 }
 
 #include "ScotchRefineLB.def.h"

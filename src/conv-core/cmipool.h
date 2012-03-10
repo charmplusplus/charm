@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$ 
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 /* Sanjay's pooling allocator adapted for cmialloc usage*/
 #ifndef CMIPOOL_H
 #define CMIPOOL_H  

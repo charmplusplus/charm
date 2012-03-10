@@ -19,11 +19,13 @@ public class CharjAST extends CommonTree
     public Symbol def;
     public Type symbolType;
     
-    public CharjAST(Token t) {
+    public CharjAST(Token t)
+	{
         super(t);
     }
 
-    public CharjAST(int type, String text) {
+    public CharjAST(int type, String text)
+	{
         super(new CommonToken(type, text));
     }
 
@@ -39,20 +41,18 @@ public class CharjAST extends CommonTree
 
     public CharjAST getChild(int index)
     {
-        try
-        {
+        try {
             return (CharjAST) super.getChild(index);
-        }
-        catch(ClassCastException e)
-        {
+        } catch(ClassCastException e) {
             Tree child = super.getChild(index);
-            System.out.println("possible error node: " + child);
+            System.out.println("WARNING, possible error node: " + child);
             return new CharjAST(child.getType(), child.getText());
         }
     }
     
     @Override
-    public String toString() {
+    public String toString()
+	{
         String s = super.toString();
         if (symbolType != null) {
             s += "(" + symbolType + ")" ;
@@ -122,53 +122,41 @@ public class CharjAST extends CommonTree
     @Override
     public boolean equals(Object o)
     {
-        if(o == null)
-            return false;
-        if(!(o instanceof CharjAST))
-            return false;
+        if (o == null) return false;
+        if (!(o instanceof CharjAST)) return false;
         CharjAST other = (CharjAST)o;
-        return other.getType() == this.getType() && other.getText().equals(this.getText());
+        return other.getType() == this.getType() &&
+			other.getText().equals(this.getText());
     }
 
     public void insertChild(int index, CharjAST node)
     {
-        try
-        {
+        try {
             List<CharjAST> children = new ArrayList<CharjAST>();
 
-            for(int i=0; i<index; i++)
-                children.add(getChild(i));
+            for(int i=0; i<index; i++) children.add(getChild(i));
                 
             children.add(node);
 
-            for(int i=index; i < getChildCount(); i++)
-                children.add(getChild(i));
+            for(int i=index; i < getChildCount(); i++) children.add(getChild(i));
 
             getChildren().clear();
 
-            for(CharjAST c : children)
-               addChild(c);
-        }
-        //TODO: fix this bad code, do not catch an NPE and act on it
-        catch(NullPointerException npe)
-        {
+            for(CharjAST c : children) addChild(c);
+        } catch(NullPointerException npe) {
+			//TODO: fix this bad code, do not catch an NPE and act on it
             //npe.printStackTrace();
-            if(index == 0)
-                addChild(node);
-            else
-                throw new ArrayIndexOutOfBoundsException(index);
+            if(index == 0) addChild(node);
+            else throw new ArrayIndexOutOfBoundsException(index);
         }
     }
 
     public void setType(int type, String name)
     {
-        try
-        {
+        try {
             Field tokenField = getClass().getSuperclass().getDeclaredField("token");
             tokenField.set(this, new CommonToken(type, name));
-        }
-        catch(Exception e)
-        {
+        } catch(Exception e) {
             System.err.println("debugging, this should never happen");
             e.printStackTrace();
         }

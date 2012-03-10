@@ -4,7 +4,7 @@
 #include "converse.h"
 #include "cmitls.h"
 
-#if CMK_HAS_ELF_H && CMK_TLS_THREAD
+#if CMK_HAS_ELF_H && CMK_HAS_TLS_VARIABLES
 
 extern void* __executable_start;
 
@@ -38,15 +38,14 @@ Phdr* getTLSPhdrEntry() {
   return NULL;
 }
 
-void allocNewTLSSeg(tlsseg_t* t) {
+void allocNewTLSSeg(tlsseg_t* t, CthThread th) {
   Phdr* phdr;
 
   phdr = getTLSPhdrEntry();
   if (phdr != NULL) {
     t->size = phdr->p_memsz;
     t->align = phdr->p_align;
-    t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size);
-    //t->memseg = memalign(t->align, t->size);
+    t->memseg = (Addr)CmiIsomallocAlign(t->align, t->size, th);
     memset((void*)t->memseg, 0, t->size);
     memcpy((void*)t->memseg, (void*) (phdr->p_vaddr), (size_t)(phdr->p_filesz));
     t->memseg = (Addr)( ((void*)(t->memseg)) + t->size );

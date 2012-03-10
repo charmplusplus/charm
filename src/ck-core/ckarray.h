@@ -218,6 +218,7 @@ class CkArrayOptions {
 	bool anytimeMigration; // Elements are allowed to move freely
 	bool disableNotifyChildInRed; //Child elements are not notified when reduction starts
 	bool staticInsertion; // Elements are only inserted at construction
+        bool broadcastViaScheduler;     // broadcast inline or through scheduler
 
 	/// Set various safe defaults for all the constructors
 	void init();
@@ -274,6 +275,7 @@ class CkArrayOptions {
 
 	CkArrayOptions &setAnytimeMigration(bool b) { anytimeMigration = b; return *this; }
 	CkArrayOptions &setStaticInsertion(bool b);
+	CkArrayOptions &setBroadcastViaScheduler(bool b) { broadcastViaScheduler = b; return *this; }
 	CkArrayOptions &setReductionClient(CkCallback cb)
 	{ reductionClient = cb; return *this; }
 
@@ -635,6 +637,7 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
+private:
   bool stableLocations;
 
 public:

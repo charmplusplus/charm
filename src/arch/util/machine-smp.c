@@ -215,7 +215,7 @@ static void CmiStartThreads(char **argv)
   barrier_mutex = CmiCreateLock();
 #ifdef CMK_NO_ASM_AVAILABLE
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
+  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
   Cmi_state_key = TlsAlloc();
@@ -267,7 +267,7 @@ CmiNodeLock cmiMemoryLock;
 int _Cmi_noprocforcommthread=0;/*this variable marks if there is an extra processor for comm thread
 in smp*/
 
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
 static __thread struct CmiStateStruct     Cmi_mystate;
 static CmiState     *Cmi_state_vector;
 
@@ -382,7 +382,7 @@ static void *call_startfn(void *vindex)
 static void *call_startfn(void *vindex)
 {
   size_t index = (size_t)vindex;
-#if CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD
+#if CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD
   if (index<_Cmi_mynodesize) 
     CmiStateInit(index+Cmi_nodestart, index, &Cmi_mystate);
   else
@@ -414,15 +414,16 @@ static void CmiStartThreads(char **argv)
   int ok, tocreate;
   pthread_attr_t attr;
 
+  MACHSTATE(4,"CmiStartThreads")
   CmiMemLock_lock=CmiCreateLock();
   comm_mutex=CmiCreateLock();
   _smp_mutex = CmiCreateLock();
-#ifdef CMK_NO_ASM_AVAILABLE
+#if defined(CMK_NO_ASM_AVAILABLE) && CMK_PCQUEUE_LOCK
   cmiMemoryLock = CmiCreateLock();
-  if (CmiMyNode()==0) CmiPrintf("CmiMemory: fences and atomic operations not available in native assembly\n");
+  if (CmiMyNode()==0) printf("Charm++ warning> fences and atomic operations not available in native assembly\n");
 #endif
 
-#if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
   pthread_key_create(&Cmi_state_key, 0);
   Cmi_state_vector =
     (CmiState)calloc(_Cmi_mynodesize+1, sizeof(struct CmiStateStruct));
@@ -462,7 +463,7 @@ static void CmiStartThreads(char **argv)
     if (ok<0) PerrorExit("pthread_create"); 
     pthread_attr_destroy(&attr);
   }
-#if ! (CMK_TLS_THREAD && !CMK_NOT_USE_TLS_THREAD)
+#if ! (CMK_HAS_TLS_VARIABLES && !CMK_NOT_USE_TLS_THREAD)
 #if CMK_CONVERSE_MPI
   pthread_setspecific(Cmi_state_key, Cmi_state_vector+_Cmi_mynodesize);
 #else
@@ -470,6 +471,7 @@ static void CmiStartThreads(char **argv)
 #endif
 #endif
 
+  MACHSTATE(4,"CmiStartThreads done")
 }
 
 static void CmiDestoryLocks()
@@ -638,8 +640,8 @@ void CmiStateInit(int pe, int rank, CmiState state)
 
 void CmiNodeStateInit(CmiNodeState *nodeState)
 {
+  MACHSTATE1(4,"NodeStateInit %p", nodeState)
 #if CMK_IMMEDIATE_MSG
-  MACHSTATE(4,"NodeStateInit")
   nodeState->immSendLock = CmiCreateLock();
   nodeState->immRecvLock = CmiCreateLock();
   nodeState->immQ = PCQueueCreate();
@@ -649,6 +651,7 @@ void CmiNodeStateInit(CmiNodeState *nodeState)
   nodeState->CmiNodeRecvLock = CmiCreateLock();
   nodeState->NodeRecv = PCQueueCreate();
 #endif
+  MACHSTATE(4,"NodeStateInit done")
 }
 
 /*@}*/

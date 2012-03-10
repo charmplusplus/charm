@@ -1,8 +1,4 @@
 /* Declaration of the class that represents the results of the simulation process
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
  */
 #ifndef SIMRESULTS_H
 #define SIMRESULTS_H

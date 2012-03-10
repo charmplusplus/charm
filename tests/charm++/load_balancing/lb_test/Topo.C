@@ -94,7 +94,7 @@ Topo::Topo(TopoInitMsg* _m)
 // Function to change loads in all the elements
 void Topo::shuffleLoad(){
 
-	printf("[%d] At shuffleLoad\n",CkMyPe());
+	//printf("[%d] At shuffleLoad\n",CkMyPe());
 	
 	// calling function to assign new loads
 	FindComputeTimes();

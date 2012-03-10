@@ -161,7 +161,6 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
-  threadGlobals=CtgCreate();
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -178,6 +177,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
     BgUnsetStartOutOfCore();
 #endif
   }
+  threadGlobals=CtgCreate(tid);
   CtvAccessOther(tid,_curTCharm)=this;
   isStopped=true;
   resumeAfterMigration=false;
@@ -189,9 +189,9 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
   threadInfo.thisElement=thisIndex;
   threadInfo.numElements=initMsg->numElements;
-  if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-  	heapBlocks=CmiIsomallocBlockListNew();
-  else
+  if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)) {
+  	heapBlocks=CmiIsomallocBlockListNew(tid);
+  } else
   	heapBlocks=0;
   nUd=0;
   usesAtSync=CmiTrue;
@@ -316,6 +316,8 @@ void TCharm::pup(PUP::er &p) {
 void TCharm::pupThread(PUP::er &pc) {
     pup_er p=(pup_er)&pc;
     checkPupMismatch(pc,5138,"before TCHARM thread");
+    if (1 || CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+      CmiIsomallocBlockListPup(p,&heapBlocks,tid);
     tid = CthPup(p, tid);
     if (pc.isUnpacking()) {
       CtvAccessOther(tid,_curTCharm)=this;
@@ -323,8 +325,6 @@ void TCharm::pupThread(PUP::er &pc) {
       BgAttach(tid);
 #endif
     }
-    if (CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
-      CmiIsomallocBlockListPup(p,&heapBlocks);
     threadGlobals=CtgPup(p,threadGlobals);
     checkPupMismatch(pc,5139,"after TCHARM thread");
 }
@@ -366,7 +366,9 @@ TCharm::~TCharm()
   //BIGSIM_OOC DEBUGGING
   //CmiPrintf("TCharm destructor called with heapBlocks=%p!\n", heapBlocks);
   
+#if !CMK_USE_MEMPOOL_ISOMALLOC
   if (heapBlocks) CmiIsomallocBlockListDelete(heapBlocks);
+#endif
   CthFree(tid);
   CtgFree(threadGlobals);
   delete initMsg;
@@ -525,7 +527,6 @@ void TCharm::evacuate(){
 	*/
 	//CkClearAllArrayElementsCPP();
 	if(CkpvAccess(startedEvac)){
-		int nextPE = getNextPE(CkArrayIndex1D(thisIndex));
 //		resumeAfterMigration=true;
 		CcdCallFnAfter((CcdVoidFn)CkEmmigrateElement, (void *)myRec, 1);
 		suspend();
@@ -744,8 +745,6 @@ CkGroupID CkCreatePropMap(void);
 
 static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
 {
-  char *tmp;
-  char **argv=CkGetArgv();
   CkArrayOptions opts(msg->numElements);
   CkAssert(CkpvAccess(mapCreated)==1);
 
@@ -775,7 +774,6 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
     mapID = CkCreatePropMap();
   }
   opts.setMap(mapID);
-  int nElem=msg->numElements; //<- save it because msg will be deleted.
   return CProxy_TCharm::ckNew(msg,opts);
 }
 
@@ -1004,7 +1002,7 @@ FDECL void FTN_NAME(TCHARM_INIT,tcharm_init)(void)
 */
 /// Find this semaphore, or insert if there isn't one:
 TCharm::TCharmSemaphore *TCharm::findSema(int id) {
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) 
 			return &sema[s];
 	sema.push_back(TCharmSemaphore(id));
@@ -1013,7 +1011,7 @@ TCharm::TCharmSemaphore *TCharm::findSema(int id) {
 /// Remove this semaphore from the list
 void TCharm::freeSema(TCharmSemaphore *doomed) {
 	int id=doomed->id;
-	for (int s=0;s<sema.size();s++)
+	for (unsigned int s=0;s<sema.size();s++)
 		if (sema[s].id==id) {
 			sema[s]=sema[sema.length()-1];
 			sema.length()--;

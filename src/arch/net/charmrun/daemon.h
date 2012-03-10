@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #define DAEMON_IP_PORT 12396
 
 /*This is the structure that is passed to the Daemon when

@@ -42,7 +42,7 @@ int n_loadbalance;
 int cycle_count,element_count,step_count,print_count,processor_count;
 int min_us,max_us;
 
-class main : public Chare {
+class main : public CBase_main {
 public:
   int nDone;
 

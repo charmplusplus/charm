@@ -28,26 +28,22 @@ class AstModifier
     protected boolean isEntry(CharjAST funcdecl)
     {
         CharjAST mods = funcdecl.getChildOfType(CharjParser.MODIFIER_LIST);
-        if(mods.getChildOfType(CharjParser.ENTRY) != null)
-            return true;
+        if(mods.getChildOfType(CharjParser.ENTRY) != null) return true;
         CharjAST charjmods = mods.getChildOfType(CharjParser.CHARJ_MODIFIER_LIST);
-        if(charjmods == null)
-            return false;
+        if(charjmods == null) return false;
         return charjmods.getChildOfType(CharjParser.ENTRY) != null;
     }
 
     protected void dealWithEntryMethodParam(CharjAST pointertype, CharjAST pointertypetree)
     {
-        try
-        {
+        try {
             CharjAST funcdecl = pointertype.getParent().getParent().getParent();
             if(funcdecl.getType() == CharjParser.FUNCTION_METHOD_DECL && isEntry(funcdecl))
                 pointertypetree.setType(CharjParser.OBJECT_TYPE, "OBJECT_TYPE");
-        }
-        catch(NullPointerException npe)
-        {
+        } catch(NullPointerException npe) {
             // do nothing, it's just not a method parameter
         }
     }
 
 }
+

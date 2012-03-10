@@ -40,7 +40,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public ClassSymbol(
             SymbolTable symtab,
-            String name) {
+            String name)
+	{
         super(symtab, name);
         type = this;
         for (String pkg : SymbolTable.AUTO_IMPORTS) {
@@ -52,7 +53,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
             SymbolTable symtab,
             String name,
             ClassSymbol superClass,
-            Scope scope) {
+            Scope scope)
+	{
         this(symtab, name);
         this.superClass = superClass;
         this.scope = scope;
@@ -191,7 +193,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public MethodSymbol resolveMethodLocally(
             String name,
-            int numargs) {
+            int numargs)
+	{
         if (numargs > 0) {
             name += numargs;
         }
@@ -199,7 +202,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return methods.get(name);
     }
 
-    public boolean isMethod(String name) {
+    public boolean isMethod(String name)
+	{
         if ( methods.containsKey(name) ) {
             return true;
         }
@@ -211,7 +215,8 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
 
     public Symbol define(
             String name,
-            Symbol sym) {
+            Symbol sym)
+	{
         if (sym == null) {
             System.out.println("ClassSymbol.define: Uh oh, defining null symbol");
         }
@@ -224,12 +229,14 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         return super.define(name, sym);
     }
 
-    public String toString() {
+    public String toString()
+	{
         if (isPrimitive) return name;
         else return getFullyQualifiedName() + members + (templateArgs != null ? templateArgs : "");
     }
 
-    public String getFullyQualifiedName() {
+    public String getFullyQualifiedName()
+	{
         String parent = null;
         if ( scope!=null ) { // in a package?
             parent = scope.getFullyQualifiedName();
@@ -252,18 +259,15 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         usings.add(usingName);
     }
 
-    public List<String> getIncludes()
-    {
+    public List<String> getIncludes() {
         return includes;
     }
 
-    public List<String> getUsings()
-    {
+    public List<String> getUsings() {
         return usings;
     }
 
-    public Set<String> getExterns()
-    {
+    public Set<String> getExterns() {
         return externs;
     }
 

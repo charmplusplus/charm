@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
@@ -35,14 +28,13 @@
 
 #define CMK_CONV_HOST_CSH_UNAVAILABLE			   1
 
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        0
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 #define CMK_SHARED_VARS_NT_THREADS                         1
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0
 
-#define CMK_SIGNAL_NOT_NEEDED                              0
-#define CMK_SIGNAL_USE_SIGACTION                           1
+#define CMK_SIGNAL_NOT_NEEDED                              1
+#define CMK_SIGNAL_USE_SIGACTION                           0
 #define CMK_SIGNAL_USE_SIGACTION_WITH_RESTART              0
 
 #define CMK_THREADS_REQUIRE_NO_CPV                         0

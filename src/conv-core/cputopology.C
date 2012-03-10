@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #include <map>
 #include "converse.h"
 #include "sockRoutines.h"
@@ -213,7 +206,7 @@ CkVec<int> *CpuTopology::bynodes = NULL;
 int CpuTopology::supported = 0;
 
 static CpuTopology cpuTopo;
-static CmiNodeLock topoLock = NULL;
+static CmiNodeLock topoLock = 0; /* Not spelled 'NULL' to quiet warnings when CmiNodeLock is just 'int' */
 static int done = 0;
 
 /* called on PE 0 */

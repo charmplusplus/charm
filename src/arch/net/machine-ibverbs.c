@@ -540,6 +540,7 @@ static void CmiMachineInit(char **argv){
 		createLocalQps(dev,ibPort,_Cmi_mynode,_Cmi_numnodes,context->localAddr);
 	}
 	
+        if (Cmi_charmrun_fd == -1) return;
 	
 	//TURN ON RDMA
 	rdma=1;
@@ -2503,6 +2504,7 @@ void * infi_CmiAlloc(int size){
 #if CMK_IBVERBS_STATS
 	numAlloc++;
 #endif
+        if (Cmi_charmrun_fd == -1) return malloc(size);
 #if THREAD_MULTI_POOL
 	res = getInfiCmiChunkThread(size-sizeof(CmiChunkHeader));
 	res -= sizeof(CmiChunkHeader);
@@ -2547,51 +2549,51 @@ void infi_CmiFreeDirect(void *ptr){
         freePtr = ptr - sizeof(infiCmiChunkHeader);
         metaData = METADATAFIELD(ptr);
         poolIdx = metaData->poolIdx;
-
+	infiCmiChunkPool *pool = infiCmiChunkPools[CmiMyRank()] + poolIdx;
         MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //      CmiAssert(poolIdx >= 0);
-        if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[CmiMyRank()][poolIdx].count <= INFIMAXPERPOOL/((1<<poolIdx)*firstBinSize)){
-                metaData->nextBuf = infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf;
-                infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf = freePtr;
-                        infiCmiChunkPools[CmiMyRank()][poolIdx].count++;
-
-                        MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[CmiMyRank()][poolIdx].startBuf,infiCmiChunkPools[CmiMyRank()][poolIdx].count);
-                }else{
-                        MACHSTATE2(2,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
-                        metaData->owner->metaData->count--;
-                        if(metaData->owner->metaData == metaData){
-                                //I am the owner
-                                if(metaData->owner->metaData->count == 0){
-				  //all the chunks have been freed
-				  int unregstat=ibv_dereg_mr(metaData->key);
+	if(poolIdx < INFINUMPOOLS && pool->count < INFIMAXPERPOOL &&
+	   pool->count < ((1 << INFINUMPOOLS) >> poolIdx) ){
+	  metaData->nextBuf = pool->startBuf;
+	  pool->startBuf = freePtr;
+	  pool->count++;
+	  MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,pool->startBuf,pool->count);
+	}else{
+	  MACHSTATE2(2,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
+	  metaData->owner->metaData->count--;
+	  if(metaData->owner->metaData == metaData){
+	    //I am the owner
+	    if(metaData->owner->metaData->count == 0){
+	      //all the chunks have been freed
+	      int unregstat=ibv_dereg_mr(metaData->key);
 #if CMK_IBVERBS_STATS
-                                  numUnReg++;
-                                  numCurReg--;
+	      numUnReg++;
+	      numCurReg--;
 #endif
 
-				  CmiAssert(unregstat==0);
-				  free(freePtr);
-				  free(metaData);
-                                }
-                                //if I am the owner and all the chunks have not been
-                                // freed dont free my metaData. will need later
-                        }else{
-                                if(metaData->owner->metaData->count == 0){
-                                        //need to free the owner's buffer and metadata
-                                        freePtr = metaData->owner;
-                                        int unregstat=ibv_dereg_mr(metaData->key);
+	      CmiAssert(unregstat==0);
+	      free(freePtr);
+	      free(metaData);
+	    }
+	    //if I am the owner and all the chunks have not been
+	    // freed dont free my metaData. will need later
+	  }else{
+	    if(metaData->owner->metaData->count == 0){
+	      //need to free the owner's buffer and metadata
+	      freePtr = metaData->owner;
+	      int unregstat=ibv_dereg_mr(metaData->key);
 #if CMK_IBVERBS_STATS
-                                        numUnReg++;
-                                        numCurReg--;
+	      numUnReg++;
+	      numCurReg--;
 #endif
 
-					CmiAssert(unregstat==0);
-                                        free(metaData->owner->metaData);
-                                        free(freePtr);
-                                }
-                                free(metaData);
-                        }
-                }
+	      CmiAssert(unregstat==0);
+	      free(metaData->owner->metaData);
+	      free(freePtr);
+	    }
+	    free(metaData);
+	  }
+	}
 }
 
 
@@ -2648,6 +2650,7 @@ void infi_CmiFree(void *ptr){
 	numFree++;
 #endif
 	
+        if (Cmi_charmrun_fd == -1) return free(ptr);
 #if CMK_SMP	
 	CmiMemLock();
 #endif
@@ -2671,12 +2674,14 @@ void infi_CmiFree(void *ptr){
 		}
 		MACHSTATE2(1,"CmiFree buf %p goes back to pool %d",ptr,poolIdx);
 //		CmiAssert(poolIdx >= 0);
-		if(poolIdx < INFINUMPOOLS && infiCmiChunkPools[poolIdx].count <= INFIMAXPERPOOL/((1<<poolIdx)*firstBinSize)){
-			metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
-			infiCmiChunkPools[poolIdx].startBuf = freePtr;
-			infiCmiChunkPools[poolIdx].count++;
+		if(poolIdx < INFINUMPOOLS &&
+		   infiCmiChunkPools[poolIdx].count <= INFIMAXPERPOOL &&
+		   infiCmiChunkPools[poolIdx].count < ((1 << INFINUMPOOLS) >> poolIdx) ){
+		  metaData->nextBuf = infiCmiChunkPools[poolIdx].startBuf;
+		  infiCmiChunkPools[poolIdx].startBuf = freePtr;
+		  infiCmiChunkPools[poolIdx].count++;
 			
-			MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[poolIdx].startBuf,infiCmiChunkPools[poolIdx].count);
+		  MACHSTATE3(2,"Pool %d now has startBuf at %p count %d",poolIdx,infiCmiChunkPools[poolIdx].startBuf,infiCmiChunkPools[poolIdx].count);
 		}else{
 			MACHSTATE2(2,"Freeing up buf %p poolIdx %d",ptr,poolIdx);
 			metaData->owner->metaData->count--;

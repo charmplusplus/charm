@@ -1,10 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
-
 #ifndef _CONV_MACH_H
 #define _CONV_MACH_H
 
@@ -16,8 +9,8 @@
 
 #define CMK_IS_HETERO                                      0
 
-#define CMK_MALLOC_USE_GNU_MALLOC                          0
-#define CMK_MALLOC_USE_OS_BUILTIN                          1
+#define CMK_MALLOC_USE_GNU_MALLOC                          1
+#define CMK_MALLOC_USE_OS_BUILTIN                          0
 
 #define CMK_MEMORY_PAGESIZE                                4096
 #define CMK_MEMORY_PROTECTABLE                             0
@@ -26,7 +19,6 @@
 
 #define CMK_NODE_QUEUE_AVAILABLE                           0
 
-#define CMK_SHARED_VARS_EXEMPLAR                           0
 #define CMK_SHARED_VARS_UNAVAILABLE                        1
 #define CMK_SHARED_VARS_UNIPROCESSOR                       0
 

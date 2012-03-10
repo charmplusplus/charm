@@ -5,6 +5,7 @@ void LrtsPrepareEnvelope(char *msg, int size);
 
 /* The machine-specific send function */
 CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode);
+CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode);
 
 #if CMK_PERSISTENT_COMM
 void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
@@ -18,9 +19,10 @@ void LrtsPostCommonInit(int everReturn);
 /* ### End of Machine-startup Related Functions ### */
 
 /* ### Beginning of Machine-running Related Functions ### */
-void LrtsAdvanceCommunication();
+void LrtsAdvanceCommunication(int whileidle);
 void LrtsDrainResources(); /* used when exit */
 void LrtsExit();
+void LrtsAbort(const char *message);
 /* ### End of Machine-running Related Functions ### */
 void LrtsPostNonLocal();
 

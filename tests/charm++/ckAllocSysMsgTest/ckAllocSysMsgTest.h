@@ -22,7 +22,7 @@ class RaceMeArr : public CBase_RaceMeArr
   int nElements;
 };
 
-class RaceMeGrp : public Group
+class RaceMeGrp : public CBase_RaceMeGrp
 {
  public:
   RaceMeGrp(){}

@@ -59,7 +59,7 @@ public class ArraySectionInitializer
 	public String getForLoop()
 	{
 		ArrayList<String> indicies = new ArrayList<String>();
-/*
+		/*
 		StringTemplate st = new StringTemplate("$signature$\n{\n\t$forLoop$\n}\nreturn CProxySection_$type$::ckNew(proxyObject, elems.getVec(), elems.size());");
 
 		st.setAttribute("signature", emitH());
@@ -67,17 +67,15 @@ public class ArraySectionInitializer
 		st.setAttribute("type", classType);
 
 		return st.toString();
-*/
+		*/
 		return emitCC(indicies, 0);
 	}
 	
 	private String emitCC(ArrayList<String> indicies, int dim)
 	{
-		if(dim >= ranges.size())
-		{
+		if (dim >= ranges.size()) {
 			String ind = "";
-			if(indicies.size() >= 1)
-			{
+			if (indicies.size() >= 1) {
 				ind += indicies.get(0);
 				for(int i = 1; i < indicies.size(); i++)
 					ind += (", " + indicies.get(1));
@@ -87,11 +85,8 @@ public class ArraySectionInitializer
 			st.setAttribute("DIM", ranges.size());
 			st.setAttribute("indices", ind);
 			return st.toString();
-		}
-		else
-		{
+		} else {
 			StringTemplate st = new StringTemplate("for(int $coord$ = $start$; $coord$ < $end$; $coord$ += $step$)\n\t$body$\n");
-
 			ArrayList<Object> range = ranges.get(dim);
 
 			Object start = range.get(0);
@@ -103,11 +98,8 @@ public class ArraySectionInitializer
 			st.setAttribute("end", end);
 			st.setAttribute("step", step);
 			st.setAttribute("coord", coord);
-
 			indicies.add(coord);
-
 			st.setAttribute("body", emitCC(indicies, dim + 1));
-
 			return st.toString();
 		}
 	}

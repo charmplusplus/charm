@@ -1,13 +1,5 @@
 #include "overlapTestConsts.h"
 
-#if CHECK_BANK_CONFLICTS
-#define AS(i, j) CUT_BANK_CHECKER(((float*)&As[0][0]), (BLOCK_SIZE * i + j))
-#define BS(i, j) CUT_BANK_CHECKER(((float*)&Bs[0][0]), (BLOCK_SIZE * i + j))
-#else
-#define AS(i, j) As[i][j]
-#define BS(i, j) Bs[i][j]
-#endif
-
 // matrix multiplication code taken from the CUDA SDK
 
 __global__ void
@@ -57,8 +49,8 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         // Load the matrices from device memory
         // to shared memory; each thread loads
         // one element of each matrix
-        AS(ty, tx) = A[a + wA * ty + tx];
-        BS(ty, tx) = B[b + wB * ty + tx];
+        As[ty][tx] = A[a + wA * ty + tx];
+        Bs[ty][tx] = B[b + wB * ty + tx];
 
         // Synchronize to make sure the matrices are loaded
         __syncthreads();
@@ -67,7 +59,7 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
         // each thread computes one element
         // of the block sub-matrix
         for (int k = 0; k < BLOCK_SIZE; ++k)
-            Csub += AS(ty, k) * BS(k, tx);
+            Csub += As[ty][k] * Bs[k][tx];
 
         // Synchronize to make sure that the preceding
         // computation is done before loading two new
@@ -82,8 +74,8 @@ matrixMul(float* C, float* A, float* B, int wA, int wB)
 }
 
 void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C) {
-  cudaStream_t stream; 
-  cudaStreamCreate(&stream); 
+  cudaStream_t matMulStream; 
+  cudaStreamCreate(&matMulStream); 
   ElementType *h_A, *h_B, *h_C; 
   ElementType *d_A, *d_B, *d_C;
   int size = matrixSize * matrixSize * sizeof(ElementType);
@@ -99,18 +91,18 @@ void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C) 
   memcpy(h_A, A, size);
   memcpy(h_B, B, size); 
 
-  cudaMemcpyAsync(d_A, h_A, size, cudaMemcpyHostToDevice, stream); 
-  cudaMemcpyAsync(d_B, h_B, size, cudaMemcpyHostToDevice, stream); 
+  cudaMemcpyAsync(d_A, h_A, size, cudaMemcpyHostToDevice, matMulStream); 
+  cudaMemcpyAsync(d_B, h_B, size, cudaMemcpyHostToDevice, matMulStream); 
 
   dim3 threads(BLOCK_SIZE, BLOCK_SIZE);
   dim3 grid(matrixSize / threads.x, matrixSize / threads.y);
   
   // execute the kernel
-  matrixMul<<< grid, threads, 0, stream >>>(d_C, d_A, d_B, matrixSize, matrixSize);  
+  matrixMul<<< grid, threads, 0, matMulStream >>>(d_C, d_A, d_B, matrixSize, matrixSize);  
 
-  cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, stream); 
+  cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, matMulStream); 
 
-  cudaStreamSynchronize(stream); 
+  cudaStreamSynchronize(matMulStream); 
 
   memcpy(C, h_C, size);
 
@@ -122,5 +114,5 @@ void cudaMatMul(int matrixSize, ElementType *A, ElementType *B, ElementType *C) 
   cudaFree(d_B);
   cudaFree(d_C);
 
-  cudaStreamDestroy(stream); 
+  cudaStreamDestroy(matMulStream); 
 }

@@ -1,9 +1,3 @@
-/*****************************************************************************
- * $Source$
- * $Author$
- * $Date$
- * $Revision$
- *****************************************************************************/
 /*
 Converse Client-Server:
   Lets you execute, from an arbitrary program on the network, 

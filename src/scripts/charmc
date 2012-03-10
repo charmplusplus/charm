@@ -808,6 +808,12 @@ if [ -n "$CHARMDEBUG" ]; then
     	OPTS_CPP="$OPTS_CPP -O0 -g"
 fi
 
+if [ -z "$NATIVE" -a -n "$UGNI_CFLAGS" ]
+then
+    linkopt=`env | grep  "HUGETLB[0-9]*[MKG]_POST_LINK_OPTS" 2> /dev/null`
+    test -z "$linkopt" && POST_LIBRARIES=`AddList $POST_LIBRARIES $CHARMLIB/cray_tlbhack.o`
+fi
+
 PROCESSED_MODULES=""
 
 # Look up and add the dependencies for module $1
