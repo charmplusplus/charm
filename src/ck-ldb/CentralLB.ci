@@ -24,6 +24,7 @@ group [migratable] CentralLB : BaseLB {
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveCounts(CkReductionMsg *);
   entry void LoadBalanceDecision(int req_no, int period);
+  entry void LoadBalanceDecisionFinal(int req_no, int period);
   entry void ReceiveIterationNo(int, int);
   entry void LoadBalance(void);
   entry void ResumeClients(int);

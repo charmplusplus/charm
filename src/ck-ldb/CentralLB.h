@@ -97,6 +97,7 @@ public:
   void ResumeClients(int);                      // Resuming clients needs
 
   void LoadBalanceDecision(int, int);
+  void LoadBalanceDecisionFinal(int, int);
   void ReceiveIterationNo(int, int); // Receives the current iter no
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
