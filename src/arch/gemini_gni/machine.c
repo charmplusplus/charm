@@ -1792,9 +1792,7 @@ static void PumpNetworkSmsg()
                 memcpy(msg_data, (char*)header, msg_nbytes);
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK
-#if CMK_SMP_TRACE_COMMTHREAD
                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
-#endif
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
             }
@@ -1952,8 +1950,10 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     size = request_msg->total_length;
     MACHSTATE4(8, "GO Get request from %d (%d,%d, %d) \n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
     if(request_msg->seq_id < 2)   {
+        //START_EVENT();
         msg_data = CmiAlloc(size);
         CmiSetMsgSeq(msg_data, 0);
+        //TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
         _MEMCHECK(msg_data);
     }
     else {
@@ -2237,9 +2237,7 @@ static void PumpLocalRdmaTransactions()
                         buffered_recv_msg -= GetMempoolsize((void*)(tmp_pd->local_addr));
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
-#if CMK_SMP_TRACE_COMMTHREAD
                     TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
-#endif
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if(msg_tag == BIG_MSG_TAG){
                     void *msg = (char*)tmp_pd->local_addr-(tmp_pd->cqwrite_value-1)*ONE_SEG;
@@ -2249,9 +2247,7 @@ static void PumpLocalRdmaTransactions()
 #if PRINT_SYH
                         printf("Pipeline msg done [%d]\n", myrank);
 #endif
-#if CMK_SMP_TRACE_COMMTHREAD
                         TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
-#endif
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
                     }
                 }
