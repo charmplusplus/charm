@@ -1482,13 +1482,20 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 }
 
 static void    PumpDatagramConnection();
+static      int         event_SetupConnect = 111;
+static      int         event_PumpSmsg = 222 ;
+static      int         event_PumpTransaction = 333;
+static      int         event_SendBufferSmsg = 444;
+static      int         event_SendFmaRdmaMsg = 555;
+static      int         event_AdvanceCommunication = 666;
 static void registerUserTraceEvents() {
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
-    traceRegisterUserEvent("setting up connections", 10);
-    traceRegisterUserEvent("Receiving small msgs", 20);
-    traceRegisterUserEvent("Release local transaction", 30);
-    traceRegisterUserEvent("Sending buffered small msgs", 40);
-    traceRegisterUserEvent("Sending buffered rdma msgs", 50);
+    event_SetupConnect = traceRegisterUserEvent("setting up connections", -1 );
+    event_PumpSmsg = traceRegisterUserEvent("Pump network small msgs", -1);
+    event_PumpTransaction = traceRegisterUserEvent("Pump FMA/RDMA local transaction" , -1);
+    event_SendBufferSmsg = traceRegisterUserEvent("Sending buffered small msgs", -1);
+    event_SendFmaRdmaMsg = traceRegisterUserEvent("Sending buffered fma/rdma transactions", -1);
+    event_AdvanceCommunication = traceRegisterUserEvent("Worker thread in sending/receiving", -1);
 #endif
 }
 
@@ -1567,7 +1574,8 @@ void LrtsPostCommonInit(int everReturn)
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     CpvInitialize(double, projTraceStart);
     /* only PE 0 needs to care about registration (to generate sts file). */
-    if (CmiMyPe() == 0) {
+    //if (CmiMyPe() == 0) 
+    {
         registerMachineUserEventsFunction(&registerUserTraceEvents);
     }
 #endif
@@ -1582,11 +1590,12 @@ void LrtsPostCommonInit(int everReturn)
     CcdCallOnConditionKeep(CcdPERIODIC_10ms, (CcdVoidFn) PumpDatagramConnection, NULL);
 #endif
 
-    if (_checkProgress)
+   /* if (_checkProgress)
 #if CMK_SMP
     if (CmiMyRank() == 0)
 #endif
     CcdCallOnConditionKeep(CcdPERIODIC_2minute, (CcdVoidFn) CheckProgress, NULL);
+    */
 #if !LARGEPAGE
     CcdCallOnCondition(CcdTOPOLOGY_AVAIL, (CcdVoidFn)set_limit, NULL);
 #endif
@@ -1594,12 +1603,18 @@ void LrtsPostCommonInit(int everReturn)
 
 /* this is called by worker thread */
 void LrtsPostNonLocal(){
+#if CMK_SMP_TRACE_COMMTHREAD
+    double startT, endT;
+#endif
 #if MULTI_THREAD_SEND
     if(mysize == 1) return;
-//#if CMK_SMP_TRACE_COMMTHREAD
-//    traceEndIdle();
-//#endif
-    //printf("[%d,%d] worker call communication\n", CmiMyNode(), CmiMyRank());
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceEndIdle();
+#endif
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    startT = CmiWallTimer();
+#endif
     PumpNetworkSmsg();
     PumpLocalRdmaTransactions();
     
@@ -1619,10 +1634,14 @@ void LrtsPostNonLocal(){
     }
 
     SendRdmaMsg();
-    //LrtsAdvanceCommunication(1);
-//#if CMK_SMP_TRACE_COMMTHREAD
-//    traceBeginIdle();
-//#endif
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    traceUserBracketEvent(event_AdvanceCommunication, startT, endT);
+#endif
+#if CMK_SMP_TRACE_COMMTHREAD
+    traceBeginIdle();
+#endif
 #endif
 }
 
@@ -2572,7 +2591,7 @@ void LrtsAdvanceCommunication(int whileidle)
         PumpDatagramConnection();
 #if CMK_SMP_TRACE_COMMTHREAD
         endT = CmiWallTimer();
-        if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(10, startT, endT);
+        if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SetupConnect, startT, endT);
 #endif
     }
 
@@ -2583,7 +2602,7 @@ void LrtsAdvanceCommunication(int whileidle)
     //MACHSTATE(8, "after PumpNetworkSmsg \n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
-    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(20, startT, endT);
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpSmsg, startT, endT);
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2593,7 +2612,7 @@ void LrtsAdvanceCommunication(int whileidle)
     //MACHSTATE(8, "after PumpLocalRdmaTransactions\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
-    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(30, startT, endT);
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpTransaction, startT, endT);
 #endif
     /* Send buffered Message */
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2615,7 +2634,7 @@ void LrtsAdvanceCommunication(int whileidle)
     //MACHSTATE(8, "after SendBufferMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
-    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(40, startT, endT);
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendBufferSmsg, startT, endT);
 #endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2625,12 +2644,12 @@ void LrtsAdvanceCommunication(int whileidle)
     //MACHSTATE(8, "after SendRdmaMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
-    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(50, startT, endT);
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendFmaRdmaMsg, startT, endT);
 #endif
 
-#if CMK_SMP
-    if (_detected_hang)  ProcessDeadlock();
-#endif
+//#if CMK_SMP
+//    if (_detected_hang)  ProcessDeadlock();
+//#endif
 }
 
 /* useDynamicSMSG */
