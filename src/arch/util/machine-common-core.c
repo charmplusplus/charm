@@ -153,6 +153,7 @@ enum MACHINE_SMP_MODE {
     INVALID_MODE,
     COMM_THREAD_SEND_RECV = 0,
     COMM_THREAD_ONLY_RECV, /* work threads will do the send */
+    COMM_WORK_THREADS_SEND_RECV, /* work and comm threads do the both send/recv */
     COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
 };
 /* The default mode of smp charm runtime */
@@ -672,6 +673,8 @@ if (  MSG_STATISTIC)
 			printf("Charm++> The comm. thread both sends and receives messages\n");
 		} else if (Cmi_smp_mode_setting == COMM_THREAD_ONLY_RECV) {
 			printf("Charm++> The comm. thread only receives messages, while work threads send messages\n");
+		} else if (Cmi_smp_mode_setting == COMM_WORK_THREADS_SEND_RECV) {
+			printf("Charm++> Both  comm. thread and worker thread send and messages\n");
 		} else if (Cmi_smp_mode_setting == COMM_THREAD_NOT_EXIST) {
 			printf("Charm++> There's no comm. thread. Work threads both send and receive messages\n");
 		} else {

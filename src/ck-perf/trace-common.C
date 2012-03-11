@@ -406,6 +406,18 @@ void traceMessageRecv(char *msg, int pe)
 #endif
 }
 
+extern "C" 
+void traceBeginIdle()
+{
+    _TRACE_ONLY(CkpvAccess(_traces)->beginIdle(CmiWallTimer()));
+}
+
+extern "C" 
+void traceEndIdle()
+{
+    _TRACE_ONLY(CkpvAccess(_traces)->endIdle(CmiWallTimer()));
+}
+
 // CMK_TRACE_ENABLED is already guarded in convcore.c
 // converse thread tracing is not supported in blue gene simulator
 // in BigSim, threads need to be traced manually (because virtual processors
