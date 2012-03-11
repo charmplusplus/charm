@@ -154,43 +154,16 @@ public:
       // entry
     void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     void flushDirect();
-    void finish(CkReductionMsg *msg);
+    void finish();
 
-      // non entry
+    // non entry
     bool isPeriodicFlushEnabled() {
       return isPeriodicFlushEnabled_;
     }
     virtual void insertData(dtype &dataItem, int destinationPe); 
     void insertData(void *dataItemHandle, int destinationPe);
-    void doneInserting();
-    void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
-      userCallback_ = cb;
-      if (automaticFinish) {
-        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), 
-			     this->thisProxy));
-      }
-    }
-
     void associateCallback(CkCallback startCb, CkCallback endCb, 
-			   CProxy_CompletionDetector detector) {
-      userCallback_ = endCb; 
-      static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(NULL), this->thisProxy);
-      detector_ = detector;      
-      detectorLocalObj_ = detector_.ckLocalBranch();
-      setDetectorInClient();
-      detectorLocalObj_->start_detection(numElementsInClient(), 
-					 startCb, finish , 0);
-
-      if (progressPeriodInMs_ <= 0) {
-	CkPrintf("Using completion detection in NDMeshStreamer requires"
-		 " setting a valid periodic flush period. Defaulting"
-                 " to 10 ms\n");
-	progressPeriodInMs_ = 10;
-      }
-      enablePeriodicFlushing();
-
-    }
-
+			   CProxy_CompletionDetector detector);
     void flushAllBuffers();
     void registerPeriodicProgressFunction();
 
@@ -448,24 +421,36 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::doneInserting() {
-  this->contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), 
-			      this->thisProxy));
+void MeshStreamer<dtype>::associateCallback(
+			  CkCallback startCb, CkCallback endCb, 
+			  CProxy_CompletionDetector detector) {
+  userCallback_ = endCb; 
+  static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), this->thisProxy);
+  detector_ = detector;      
+  detectorLocalObj_ = detector_.ckLocalBranch();
+  setDetectorInClient();
+  detectorLocalObj_->start_detection(numElementsInClient(), 
+				     startCb, finish , 0);
+  
+  if (progressPeriodInMs_ <= 0) {
+    CkPrintf("Using completion detection in NDMeshStreamer requires"
+	     " setting a valid periodic flush period. Defaulting"
+	     " to 10 ms\n");
+    progressPeriodInMs_ = 10;
+  }
+  enablePeriodicFlushing();
+      
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
+void MeshStreamer<dtype>::finish() {
   isPeriodicFlushEnabled_ = false; 
-  // flushDirect();
 
   if (!userCallback_.isInvalid()) {
     this->contribute(userCallback_);
-    //CkStartQD(userCallback_);
     userCallback_ = CkCallback();      // nullify the current callback
   }
 
-  // TODO: TEST IF THIS DELETE STILL CAUSES UNEXPLAINED CRASHES
-  //  delete msg; 
 }
 
 template <class dtype>
