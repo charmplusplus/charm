@@ -15,7 +15,7 @@ Platform Support
 
 - IBM Blue Gene Q, using MPI (mpi-bluegeneq)
 
-- Fujitsu and Clang compilers
+- Clang, Cray, and Fujitsu compilers
 
 - MPI-based machine layers can now run on >64k PEs
 
@@ -28,7 +28,11 @@ General Changes
 
 - Enabled pipelining of large messages in CkMulticast by default
 
-- New load balancers added: TreeMatch, Zoltan, Scotch{Refine,Topo}, RefineSwap
+- New load balancers added:
+  * TreeMatch
+  * Zoltan
+  * Scotch graph paritioning based: ScotchLB and Refine and Topo variants
+  * RefineSwap
 
 - Load balancing improvements:
 
@@ -38,8 +42,19 @@ General Changes
   * User code can request a callback when migration is complete
   * More balancers properly consider object migratability and PE
     availability and speed
+  * Instrumentation records multicasts
 
 - Array options
+
+- New 'completion detection' library for parallel process termination
+  detection, when the need for modularity excludes full quiescence
+  detection
+
+- New 'mesh streamer' library for fine-grain many-to-many collectives,
+  handling message bundling and network topology
+
+- Memory pooling allocator performance and resource usage improved
+  substantially
 
 ================================================================================
 What's new in Charm++ 6.2.1 (since 6.2.0)
