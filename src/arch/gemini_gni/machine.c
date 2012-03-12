@@ -56,9 +56,6 @@
 #define COMM_THREAD_SEND           1
 #endif
 
-#if CMK_SMP && COMM_THREAD_SEND
-#define PIGGYBACK_ACK              0
-#endif
 
 #define CMI_EXERT_SEND_CAP	0
 #define	CMI_EXERT_RECV_CAP	0
@@ -73,7 +70,7 @@
 
 #define USE_LRTS_MEMPOOL                  1
 
-#define CQWRITE                     1
+#define CQWRITE                     0
 #define REMOTE_EVENT                      1
 
 #define PRINT_SYH  0
@@ -488,9 +485,6 @@ typedef struct smsg_queue
 #endif
 
 SMSG_QUEUE                  smsg_queue;
-#if PIGGYBACK_ACK
-SMSG_QUEUE                  smsg_ack_queue;
-#endif
 #if CMK_USE_OOB
 SMSG_QUEUE                  smsg_oob_queue;
 #endif
@@ -1141,55 +1135,6 @@ static int connect_to(int destNode)
     return 1;
 }
 
-#if PIGGYBACK_ACK
-static void * piggyback_ack(int destNode, int msgsize, int *count)
-{
-    int i;
-    if (PCQueueEmpty(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)) return NULL;
-    int len = PCQueueLength(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf);
-    int piggycount = (SMSG_MAX_MSG - msgsize)/sizeof(uint64_t);
-    if (piggycount > len+1) piggycount = len + 1;
-    if (piggycount <= 5) return NULL;
-    uint64_t * buf = (uint64_t*)CmiTmpAlloc(piggycount * sizeof(uint64_t));
-    CmiAssert(buf != NULL);
-//printf("[%d] piggyback_ack: %d\n", myrank, piggycount);
-    for (i=0; i<piggycount-1; i++) {
-        CMI_PCQUEUEPOP_LOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
-        MSG_LIST *ptr = (MSG_LIST*)PCQueuePop(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf);
-        CMI_PCQUEUEPOP_UNLOCK(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf)
-        ACK_MSG *msg = ptr->msg;
-        buf[i+1] = msg->source_addr;
-        FreeAckMsg(msg);
-        FreeMsgList(ptr);
-    }
-    buf[0] = i;
-    *count = i + 1;
-    return buf;
-}
-
-
-static void piggyback_ack_done(int destNode, uint64_t *buf, int done)
-{
-    if (!done)
-    {
-        int i;
-        for (i=0; i<buf[0]; i++) {
-            MSG_LIST *msg_tmp;
-            MallocMsgList(msg_tmp);
-            ACK_MSG  *ack_msg;
-            MallocAckMsg(ack_msg);
-            ack_msg->source_addr = buf[i+1];
-            msg_tmp->size = ACK_MSG_SIZE;
-            msg_tmp->msg = ack_msg;
-            msg_tmp->tag = ACK_TAG;
-            msg_tmp->destNode = destNode;
-            PCQueuePush(smsg_ack_queue.smsg_msglist_index[destNode].sendSmsgBuf, (char*)msg_tmp);
-        }
-    }
-    CmiTmpFree(buf);
-}
-#endif
-
 inline 
 static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg, int size, uint8_t tag, int inbuff )
 {
@@ -1223,16 +1168,6 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
 #endif
         uint64_t *buf = NULL;
         int bufsize = 0;
-#if PIGGYBACK_ACK
-        if (tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG) {
-            int nack = 0;
-            buf = piggyback_ack(destNode, size, &nack);
-            if (buf) {
-                tag = (tag == SMALL_DATA_TAG) ? SMALL_DATA_ACK_TAG : LMSG_INIT_ACK_TAG;
-                bufsize = nack * sizeof(uint64_t);
-            }
-        }
-#endif
         //CMI_GNI_LOCK(smsg_mailbox_lock)
         CMI_GNI_LOCK(default_tx_cq_lock)
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -1266,12 +1201,6 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
             smsg_send_count ++;
         }else
             status = GNI_RC_ERROR_RESOURCE;
-#if PIGGYBACK_ACK
-        if (buf) {
-            piggyback_ack_done(destNode, buf, status==GNI_RC_SUCCESS);
-            tag = (tag == SMALL_DATA_ACK_TAG) ? SMALL_DATA_TAG : LMSG_INIT_TAG;
-        }
-#endif
     }
     if(status != GNI_RC_SUCCESS && inbuff ==0)
         buffer_small_msgs(queue, msg, size, destNode, tag);
@@ -1632,15 +1561,7 @@ void LrtsPostNonLocal(){
     if (SendBufferMsg(&smsg_oob_queue) == 1)
 #endif
     {
-#if PIGGYBACK_ACK
-    //if (count%10 == 0) SendBufferMsg(&smsg_ack_queue);
-    if (SendBufferMsg(&smsg_queue) == 1) {
-        //if (count++ % 10 == 0) 
-        SendBufferMsg(&smsg_ack_queue);
-    }
-#else
     SendBufferMsg(&smsg_queue);
-#endif
     }
 
     SendRdmaMsg();
@@ -1733,25 +1654,6 @@ static void bufferRdmaMsg(int inst_id, gni_post_descriptor_t *pd)
 
 }
 
-#if PIGGYBACK_ACK
-int processPiggybackAckHeader(void *header)
-{
-    int i;
-    uint64_t *buf = (uint64_t*)header;
-    int piggycount = buf[0];
-//printf("[%d] got piggyback msg: %d\n", myrank, piggycount);
-    for (i=0; i<piggycount; i++) {
-        void *msg = (void*)(buf[i+1]);
-        CmiAssert(msg != NULL);
-        DecreaseMsgInSend(msg);
-        if(NoMsgInSend(msg))
-            buffered_send_msg -= GetMempoolsize(msg);
-        CmiFree(msg);
-    }
-    return piggycount;
-}
-#endif
-
 static void getLargeMsgRequest(void* header, uint64_t inst_id);
 
 static void PumpNetworkSmsg()
@@ -1805,13 +1707,6 @@ static void PumpNetworkSmsg()
 #endif
             /* copy msg out and then put into queue (small message) */
             switch (msg_tag) {
-#if PIGGYBACK_ACK
-            case SMALL_DATA_ACK_TAG:
-            {
-                int piggycount = processPiggybackAckHeader(header);
-                header = (uint64_t*)header + piggycount + 1;
-            }
-#endif
             case SMALL_DATA_TAG:
             {
                 START_EVENT();
@@ -1824,13 +1719,6 @@ static void PumpNetworkSmsg()
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
             }
-#if PIGGYBACK_ACK
-            case LMSG_INIT_ACK_TAG:
-            {
-                int piggycount = processPiggybackAckHeader(header);
-                header = (uint64_t*)header + piggycount + 1;
-            }
-#endif
             case LMSG_INIT_TAG:
             {
 #if MULTI_THREAD_SEND
@@ -2297,12 +2185,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #endif
             if (msg_tag == ACK_TAG) {
 #if         !CQWRITE
-#if ! PIGGYBACK_ACK
                 status = send_smsg_message(queue, inst_id, ack_msg, ACK_MSG_SIZE, msg_tag, 0); 
                 if (status == GNI_RC_SUCCESS) FreeAckMsg(ack_msg);
-#else
-                buffer_small_msgs(&smsg_ack_queue, ack_msg, ACK_MSG_SIZE, inst_id, msg_tag);
-#endif
 #else
                 sendCqWrite(inst_id, tmp_pd->remote_addr, tmp_pd->remote_mem_hndl); 
 #endif
@@ -2715,14 +2599,7 @@ void LrtsAdvanceCommunication(int whileidle)
     if (SendBufferMsg(&smsg_oob_queue) == 1)
 #endif
     {
-#if PIGGYBACK_ACK
-    //if (count%10 == 0) SendBufferMsg(&smsg_ack_queue);
-    if (SendBufferMsg(&smsg_queue) == 1 || count++ % 10 == 0) {
-        STATS_ACK_TIME(SendBufferMsg(&smsg_ack_queue));
-    }
-#else
     SendBufferMsg(&smsg_queue);
-#endif
     }
     //MACHSTATE(8, "after SendBufferMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -2941,9 +2818,6 @@ static void _init_smsg()
     }
 
     _init_send_queue(&smsg_queue);
-#if PIGGYBACK_ACK
-    _init_send_queue(&smsg_ack_queue);
-#endif
 #if CMK_USE_OOB
     _init_send_queue(&smsg_oob_queue);
 #endif
@@ -3512,9 +3386,6 @@ void LrtsDrainResources()
            !SendBufferMsg(&smsg_oob_queue) ||
 #endif
            !SendBufferMsg(&smsg_queue) 
-#if PIGGYBACK_ACK
-        || !SendBufferMsg(&smsg_ack_queue)
-#endif
           )
     {
         if (useDynamicSMSG)
