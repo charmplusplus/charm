@@ -88,7 +88,7 @@ int  traceAvailable();
 #define TRACE_COMM_SET_COMM_MSGID(msg)  traceCommSetMsgID(msg)
 #else
 #define TRACE_COMM_CREATION(time, msg)
-#define TRACE_COMM_CONTROL_CREATION(time, msg)
+#define TRACE_COMM_CONTROL_CREATION(time0, time1, time2, msg)
 #define TRACE_COMM_SET_MSGID(msg, pe, event) 
 #define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)
