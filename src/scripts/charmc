@@ -683,6 +683,14 @@ do
    		fi
 		;;
 
+        -Werror)
+                WERROR="1"
+                ;;
+
+        -Wno-error)
+                WERROR="0"
+                ;;
+
 	-LANG*)
 		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS $arg"
@@ -815,6 +823,11 @@ then
 fi
 
 PROCESSED_MODULES=""
+
+if [ "$WERROR" = "1" ]
+then
+    OPTS="$OPTS $CMK_WARNINGS_ARE_ERRORS"
+fi
 
 # Look up and add the dependencies for module $1
 findModuleDep() {
