@@ -1,0 +1,9 @@
+module AdaptiveLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] AdaptiveLB : CentralLB {
+  entry void AdaptiveLB(const CkLBOptions &);  
+};
+
+};
