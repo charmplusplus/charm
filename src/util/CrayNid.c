@@ -128,7 +128,7 @@ void pidtonid(int numpes) {
     }
   }
   
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   int i, l, nid;
   pid2nid = (int *)malloc(sizeof(int) * numpes);
 

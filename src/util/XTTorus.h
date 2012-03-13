@@ -33,7 +33,7 @@
 #define TDIM 12
 
 #elif XE6_TOPOLOGY
-   /* hopper */
+/* hopper */
 #define MAXNID 6384
 #define XDIM 17
 #define YDIM 8
@@ -66,7 +66,7 @@ class XTTorusManager {
 
     int torus[4];
     int procsPerNode;   // number of cores per node
-    
+
     int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
     struct loc *pid2coords;                     // rank to coordinates
     struct loc origin;
@@ -84,29 +84,29 @@ class XTTorusManager {
       pidtonid(numPes);
 
       for(i=0; i<XDIM; i++)
-	for(j=0; j<YDIM; j++)
-	  for(k=0; k<ZDIM; k++)
-	    for(l=0; l<TDIM; l++)
-	      coords2pid[i][j][k][l] = -1;
+        for(j=0; j<YDIM; j++)
+          for(k=0; k<ZDIM; k++)
+            for(l=0; l<TDIM; l++)
+              coords2pid[i][j][k][l] = -1;
 
       dimNT = 1;			// assume SN mode first
       // now fill the coords2pid and pid2coords data structures
       for(i=0; i<numPes; i++)
       {
         nid = pid2nid[i];
-	if (nid != oldnid)
-	  getMeshCoord(nid, &lx, &ly, &lz);
-	oldnid = nid;
+        if (nid != oldnid)
+          getMeshCoord(nid, &lx, &ly, &lz);
+        oldnid = nid;
 
         pid2coords[i].x = lx;      
         pid2coords[i].y = ly;
         pid2coords[i].z = lz;
 
-	l = 0;
-	while(coords2pid[lx][ly][lz][l] != -1)
-	  l++;
-	coords2pid[lx][ly][lz][l] = i;
-	pid2coords[i].t = l;
+        l = 0;
+        while(coords2pid[lx][ly][lz][l] != -1)
+          l++;
+        coords2pid[lx][ly][lz][l] = i;
+        pid2coords[i].t = l;
 
         if (lx<minX) minX = lx; if (lx>maxX) maxX = lx;
         if (ly<minY) minY = ly; if (ly>maxY) maxY = ly;
@@ -118,7 +118,7 @@ class XTTorusManager {
       origin.y =  minY;
       origin.z =  minZ;
       origin.t =  minT;
-      
+
       // assuming a contiguous allocation find the dimensions of 
       // the torus
       dimNX = maxX - minX + 1;
@@ -135,8 +135,8 @@ class XTTorusManager {
       ly = pid2coords[1].y;
       lz = pid2coords[1].z;
       for(l=0; l<TDIM; l++) {
-	if(coords2pid[lx][ly][lz][l] == -1)
-	  break;
+        if(coords2pid[lx][ly][lz][l] == -1)
+          break;
       }
       dimNT = l;
 
@@ -159,7 +159,7 @@ class XTTorusManager {
     inline int getDimNT() { return dimNT; }
 
     inline int getProcsPerNode() { return procsPerNode; }
-    
+
     inline int* isTorus() { return torus; }
 
     inline void rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
