@@ -41,7 +41,7 @@
 
 #include "converse.h"
 
-#define     LARGEPAGE              1
+#define     LARGEPAGE              0
 
 #if LARGEPAGE
 #include <hugetlbfs.h>
