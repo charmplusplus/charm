@@ -34,7 +34,7 @@ int problem::depth() {
 }
 
 int problem::depthToSolution() {
-  return (1<<(sizeof(int)*8-1))-1;
+  return (1<<(sizeof(int)*8-2))-1;
 }
 
 void problem::print() {
