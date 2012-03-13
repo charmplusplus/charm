@@ -15,6 +15,7 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 CMK_LIBS="-lckqt"
 CMK_RANLIB="ranlib"
 CMK_CC64=true
+CMK_WARNINGS_ARE_ERRORS="-Werror"
 
 # native compiler for compiling charmxi, etc
 CMK_NATIVE_CC="$CMK_CC $CMK_AMD64 -fPIC $CMK_DEFS "
