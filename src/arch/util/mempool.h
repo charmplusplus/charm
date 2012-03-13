@@ -18,7 +18,7 @@ typedef CmiInt8   mem_handle_t;
 typedef void * (* mempool_newblockfn)(size_t *size, mem_handle_t *mem_hndl, int expand_flag);
 typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
-#define cutOffNum 24 
+#define cutOffNum 25 
 
 struct block_header;
 struct mempool_type;
