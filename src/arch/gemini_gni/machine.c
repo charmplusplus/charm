@@ -41,7 +41,7 @@
 
 #include "converse.h"
 
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 
 #if LARGEPAGE
 #include <hugetlbfs.h>
@@ -75,7 +75,7 @@
 #define USE_LRTS_MEMPOOL                  1
 
 #define CQWRITE                           0
-#define REMOTE_EVENT                      1
+#define REMOTE_EVENT                      0
 
 #define PRINT_SYH                         0
 
@@ -120,7 +120,7 @@ static CmiInt8 _mempool_size_limit = 0;
 static CmiInt8 _totalmem = 0.8*oneGB;
 
 #if LARGEPAGE
-static CmiInt8 BIG_MSG  =  10024*oneMB;
+static CmiInt8 BIG_MSG  =  16*oneMB;
 static CmiInt8 ONE_SEG  =  4*oneMB;
 #else
 static CmiInt8 BIG_MSG  =  4*oneMB;
@@ -229,19 +229,21 @@ onesided_md_t    omdh;
 
 #else
 uint8_t   onesided_hnd, omdh;
+
 #if REMOTE_EVENT
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status) \
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdhh, cqh, status) \
     if(register_memory_size+size>= MAX_REG_MEM) { \
         status = GNI_RC_ERROR_NOMEM;} \
-    else {status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, rdma_rx_cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
+    else {status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, cqh,  GNI_MEM_READWRITE, -1, mem_hndl); \
         if(status == GNI_RC_SUCCESS) register_memory_size += size; }  
 #else
-#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, status ) \
+#define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdh, cqh, status ) \
         if (register_memory_size + size >= MAX_REG_MEM) { \
             status = GNI_RC_ERROR_NOMEM; \
         } else { status = GNI_MemRegister(nic_hndl, (uint64_t)msg,  (uint64_t)size, NULL,  GNI_MEM_READWRITE, -1, mem_hndl); \
             if(status == GNI_RC_SUCCESS) register_memory_size += size; } 
 #endif
+
 #define  MEMORY_DEREGISTER(handler, nic_hndl, mem_hndl, myomdh, size)  \
     do { if (GNI_MemDeregister(nic_hndl, (mem_hndl) ) == GNI_RC_SUCCESS) \
              register_memory_size -= size; \
@@ -994,7 +996,7 @@ static  gni_return_t deregisterMemory(mempool_type *mptr, block_header **from)
 }
 
 inline 
-static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, size_t size, gni_mem_handle_t  *memhndl)
+static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, size_t size, gni_mem_handle_t  *memhndl, gni_cq_handle_t cqh )
 {
     gni_return_t status = GNI_RC_SUCCESS;
     //int size = GetMempoolsize(msg);
@@ -1012,7 +1014,7 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, siz
     MACHSTATE3(8, "mempool (%lld,%lld,%d) \n", buffered_send_msg, buffered_recv_msg, register_memory_size); 
     while(1)
     {
-        MEMORY_REGISTER(onesided_hnd, nic_hndl, blockaddr, size, memhndl, &omdh, status);
+        MEMORY_REGISTER(onesided_hnd, nic_hndl, blockaddr, size, memhndl, &omdh, cqh, status);
         if(status == GNI_RC_SUCCESS)
         {
             break;
@@ -1031,7 +1033,7 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, siz
 }
 
 inline 
-static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t)
+static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t, gni_cq_handle_t cqh )
 {
     static int rank = -1;
     int i;
@@ -1040,14 +1042,14 @@ static gni_return_t registerMemory(void *msg, size_t size, gni_mem_handle_t *t)
     //mempool_type *mptr1 = (mempool_type*)GetMempoolPtr(msg);
     mempool_type *mptr;
 
-    status = registerFromMempool(mptr1, msg, size, t);
+    status = registerFromMempool(mptr1, msg, size, t, cqh);
     if (status == GNI_RC_SUCCESS) return status;
 #if CMK_SMP 
     for (i=0; i<CmiMyNodeSize()+1; i++) {
       rank = (rank+1)%(CmiMyNodeSize()+1);
       mptr = CpvAccessOther(mempool, rank);
       if (mptr == mptr1) continue;
-      status = registerFromMempool(mptr, msg, size, t);
+      status = registerFromMempool(mptr, msg, size, t, cqh);
       if (status == GNI_RC_SUCCESS) return status;
     }
 #endif
@@ -1372,7 +1374,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
                 return GNI_RC_ERROR_NOMEM;
             }
             //register the corresponding mempool
-            status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)));
+            status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)), rdma_rx_cqh);
             if(status == GNI_RC_SUCCESS)
             {
                 control_msg_tmp->source_mem_hndl = GetMemHndl(source_addr);
@@ -1404,7 +1406,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
                     buffer_small_msgs(queue, control_msg_tmp, CONTROL_MSG_SIZE, destNode, LMSG_INIT_TAG);
                 return GNI_RC_ERROR_NOMEM;
             }
-            status = registerMemory((void*)source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl));
+            status = registerMemory((void*)source_addr, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), NULL);
             if(status == GNI_RC_SUCCESS) buffered_send_msg += ALIGN64(size);
         }
         else
@@ -1440,7 +1442,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     }
     return status;
 #else
-    MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, status)
+    MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, NULL, status)
     if(status == GNI_RC_SUCCESS)
     {
         status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, 0);  
@@ -2041,7 +2043,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
         transaction_size = ALIGN64(size);
         if(IsMemHndlZero(pd->local_mem_hndl))
         {   
-            status = registerMemory( GetMempoolBlockPtr(msg_data), GetMempoolsize(msg_data), &(GetMemHndl(msg_data)));
+            status = registerMemory( GetMempoolBlockPtr(msg_data), GetMempoolsize(msg_data), &(GetMemHndl(msg_data)), rdma_rx_cqh);
             if(status == GNI_RC_SUCCESS)
             {
                 pd->local_mem_hndl = GetMemHndl(msg_data);
@@ -2058,7 +2060,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     }
     else{
         transaction_size = ALIGN64(request_msg->length);
-        status = registerMemory(msg_data, transaction_size, &(pd->local_mem_hndl)); 
+        status = registerMemory(msg_data, transaction_size, &(pd->local_mem_hndl), NULL); 
         if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
         {
             GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
@@ -2147,7 +2149,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     msg_data = CmiAlloc(request_msg->length);
     _MEMCHECK(msg_data);
 
-    MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, request_msg->length, &msg_mem_hndl, &omdh, status)
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, msg_data, request_msg->length, &msg_mem_hndl, &omdh, NULL,  status)
 
     if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
     {
@@ -2465,7 +2467,7 @@ static void  SendRdmaMsg()
             if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
             {
                 msg = (void*)(pd->local_addr);
-                status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)));
+                status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)), rdma_rx_cqh);
                 if(status == GNI_RC_SUCCESS)
                 {
                     pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
@@ -2480,7 +2482,7 @@ static void  SendRdmaMsg()
                 register_size = 0;
         }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool, or CmiDirect Msg (which is not from mempool)
         {
-            status = registerMemory((void*)(pd->local_addr), pd->length, &(pd->local_mem_hndl)); 
+            status = registerMemory((void*)(pd->local_addr), pd->length, &(pd->local_mem_hndl), NULL); 
         }
         if(status == GNI_RC_SUCCESS)        //mem register good
         {
@@ -3056,130 +3058,6 @@ static void _init_static_msgq()
 
 }
 
-#if CMK_SMP && STEAL_MEMPOOL
-void *steal_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl)
-{
-    void *pool = NULL;
-    int i, k;
-    // check other ranks
-    for (k=0; k<CmiMyNodeSize()+1; k++) {
-        i = (CmiMyRank()+k)%CmiMyNodeSize();
-        if (i==CmiMyRank()) continue;
-        mempool_type *mptr = CpvAccessOther(mempool, i);
-        CmiLock(mptr->mempoolLock);
-        mempool_block *tail =  (mempool_block *)((char*)mptr + mptr->memblock_tail);
-        if ((char*)tail == (char*)mptr) {     /* this is the only memblock */
-            CmiUnlock(mptr->mempoolLock);
-            continue;
-        }
-        mempool_header *header = (mempool_header*)((char*)tail + sizeof(mempool_block));
-        if (header->size >= *size && header->size == tail->size - sizeof(mempool_block)) {
-            /* search in the free list */
-          mempool_header *free_header = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
-          mempool_header *current = free_header;
-          while (current) {
-            if (current->next_free == (char*)header-(char*)mptr) break;
-            current = current->next_free?(mempool_header*)((char*)mptr + current->next_free):NULL;
-          }
-          if (current == NULL) {         /* not found in free list */
-            CmiUnlock(mptr->mempoolLock);
-            continue;
-          }
-printf("[%d:%d:%d] steal from %d tail: %p size: %d %d %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, tail, header->size, tail->size, sizeof(mempool_block));
-            /* search the previous memblock, and remove the tail */
-          mempool_block *ptr = (mempool_block *)mptr;
-          while (ptr) {
-            if (ptr->memblock_next == mptr->memblock_tail) break;
-            ptr = ptr->memblock_next?(mempool_block *)((char*)mptr + ptr->memblock_next):NULL;
-          }
-          CmiAssert(ptr!=NULL);
-          ptr->memblock_next = 0;
-          mptr->memblock_tail = (char*)ptr - (char*)mptr;
-
-            /* remove memblock from the free list */
-          current->next_free = header->next_free;
-          if (header == free_header) mptr->freelist_head = header->next_free;
-
-          CmiUnlock(mptr->mempoolLock);
-
-          pool = (void*)tail;
-          *mem_hndl = tail->mem_hndl;
-          *size = tail->size;
-          return pool;
-        }
-        CmiUnlock(mptr->mempoolLock);
-    }
-
-      /* steal failed, deregister and free memblock now */
-    int freed = 0;
-    for (k=0; k<CmiMyNodeSize()+1; k++) {
-        i = (CmiMyRank()+k)%CmiMyNodeSize();
-        mempool_type *mptr = CpvAccessOther(mempool, i);
-        if (i!=CmiMyRank()) CmiLock(mptr->mempoolLock);
-
-        mempool_block *mempools_head = &(mptr->mempools_head);
-        mempool_block *current = mempools_head;
-        mempool_block *prev = NULL;
-
-        while (current) {
-          int isfree = 0;
-          mempool_header *free_header = mptr->freelist_head?(mempool_header*)((char*)mptr+mptr->freelist_head):NULL;
-printf("[%d:%d:%d] checking rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, current, current->size, *size);
-          mempool_header *cur = free_header;
-          mempool_header *header;
-          if (current != mempools_head) {
-            header = (mempool_header*)((char*)current + sizeof(mempool_block));
-             /* search in free list */
-            if (header->size == current->size - sizeof(mempool_block)) {
-              cur = free_header;
-              while (cur) {
-                if (cur->next_free == (char*)header-(char*)mptr) break;
-                cur = cur->next_free?(mempool_header*)((char*)mptr + cur->next_free):NULL;
-              }
-              if (cur != NULL) isfree = 1;
-            }
-          }
-          if (isfree) {
-              /* remove from free list */
-            cur->next_free = header->next_free;
-            if (header == free_header) mptr->freelist_head = header->next_free;
-             // deregister
-            gni_return_t status = MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &current->mem_hndl, &omdh,0)
-            GNI_RC_CHECK("steal Mempool de-register", status);
-            mempool_block *ptr = current;
-            current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
-            prev->memblock_next = current?(char*)current - (char*)mptr:0;
-printf("[%d:%d:%d] free rank: %d ptr: %p size: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, ptr, ptr->size, *size);
-            freed += ptr->size;
-            free(ptr);
-             // try now
-            if (freed > *size) {
-              if (pool == NULL) {
-                int ret = posix_memalign(&pool, ALIGNBUF, *size);
-                CmiAssert(ret == 0);
-              }
-              MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size,  mem_hndl, &omdh, status)
-              if (status == GNI_RC_SUCCESS) {
-                if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
-printf("[%d:%d:%d] GOT IT rank: %d wanted: %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, *size);
-                return pool;
-              }
-printf("[%d:%d:%d] TRIED but fails: %d wanted: %d %d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), i, *size, status);
-            }
-          }
-          else {
-             prev = current;
-             current = current->memblock_next?(mempool_block *)((char*)mptr+current->memblock_next):NULL;
-          }
-        }
-
-        if (i!=CmiMyRank()) CmiUnlock(mptr->mempoolLock);
-    }
-      /* still no luck registering pool */
-    if (pool) free(pool);
-    return NULL;
-}
-#endif
 
 static CmiUInt8 total_mempool_size = 0;
 static CmiUInt8 total_mempool_calls = 0;
@@ -3227,7 +3105,7 @@ void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_f
 #if LARGEPAGE
     CmiMemLock();
     register_count++;
-    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, status);
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, rdma_rx_cqh, status);
     CmiMemUnlock();
     if(status != GNI_RC_SUCCESS) {
         printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
