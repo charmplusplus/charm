@@ -419,7 +419,7 @@ LIBCONV_UTILF=pup_f.o
 converse: fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
-	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' -j1 ) ; fi
+	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS) -Wno-error' -j1 ) ; fi
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 fmain-ok: fmain.f90
@@ -430,7 +430,7 @@ fmain-ok: fmain.f90
 QUICK_THREADS: $(CVHEADERS)
 	-( cd QuickThreads && $(MAKE) clean )
 	( cd QuickThreads;./configure )
-	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
+	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
