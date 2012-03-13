@@ -580,9 +580,9 @@ void LogPool::writeRC(void)
 #ifdef PROJ_ANALYSIS  
     CkAssert(CkMyPe() == 0);
     fprintf(rcfp,"RC_GLOBAL_START_TIME %lld\n",
-  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalStartTime));
+            (CMK_PUP_LONG_LONG)(1.0e6*globalStartTime));
     fprintf(rcfp,"RC_GLOBAL_END_TIME   %lld\n",
-  	  (CMK_TYPEDEF_UINT8)(1.0e6*globalEndTime));
+            (CMK_PUP_LONG_LONG)(1.0e6*globalEndTime));
     /* //Yanhua comment it because isOutlierAutomatic is not a variable in trace
     if (CkpvAccess(_trace)->isOutlierAutomatic()) {
       fprintf(rcfp,"RC_OUTLIER_FILTERED true\n");
@@ -1683,8 +1683,8 @@ void toProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tfloat: CheckAndFPrintF(f," %.7g",((float *)p)[i]); break;
     case Tdouble: CheckAndFPrintF(f," %.15g",((double *)p)[i]); break;
 #ifdef CMK_PUP_LONG_LONG
-    case Tlonglong: CheckAndFPrintF(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
-    case Tulonglong: CheckAndFPrintF(f," %llu",((CMK_TYPEDEF_UINT8 *)p)[i]); break;
+    case Tlonglong: CheckAndFPrintF(f," %lld",((CMK_PUP_LONG_LONG *)p)[i]); break;
+    case Tulonglong: CheckAndFPrintF(f," %llu",((unsigned CMK_PUP_LONG_LONG *)p)[i]); break;
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
@@ -1713,8 +1713,8 @@ void fromProjectionsFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tfloat: ((float *)p)[i]=(float)readDouble(); break;
     case Tdouble:((double *)p)[i]=readDouble(); break;
 #ifdef CMK_PUP_LONG_LONG
-    case Tlonglong: ((CMK_TYPEDEF_INT8 *)p)[i]=readLongInt(); break;
-    case Tulonglong: ((CMK_TYPEDEF_UINT8 *)p)[i]=readLongInt(); break;
+    case Tlonglong: ((CMK_PUP_LONG_LONG *)p)[i]=readLongInt(); break;
+    case Tulonglong: ((unsigned CMK_PUP_LONG_LONG *)p)[i]=readLongInt(); break;
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
@@ -1737,8 +1737,8 @@ void toProjectionsGZFile::bytes(void *p,int n,size_t itemSize,dataType t)
     case Tfloat: gzprintf(f," %.7g",((float *)p)[i]); break;
     case Tdouble: gzprintf(f," %.15g",((double *)p)[i]); break;
 #ifdef CMK_PUP_LONG_LONG
-    case Tlonglong: gzprintf(f," %lld",((CMK_TYPEDEF_INT8 *)p)[i]); break;
-    case Tulonglong: gzprintf(f," %llu",((CMK_TYPEDEF_UINT8 *)p)[i]); break;
+    case Tlonglong: gzprintf(f," %lld",((CMK_PUP_LONG_LONG *)p)[i]); break;
+    case Tulonglong: gzprintf(f," %llu",((unsigned CMK_PUP_LONG_LONG *)p)[i]); break;
 #endif
     default: CmiAbort("Unrecognized pup type code!");
     };
