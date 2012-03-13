@@ -66,6 +66,9 @@ extern int cutOffPoints[cutOffNum];
 #endif 
 
 static int _sync_iso = 0;
+#if __FAULT__
+static int _restart = 0;
+#endif
 static int _mmap_probe = 0;
 
 static int read_randomflag(void)
@@ -2078,6 +2081,34 @@ static void init_ranges(char **argv)
      */
   if (_sync_iso == 1)
   {
+#ifdef __FAULT__
+        if(_restart == 1){
+            CmiUInt8 s = (CmiUInt8)freeRegion.start;
+            CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+            CmiUInt8 ss, ee;
+            int try_count, fd;
+            char fname[128];
+            sprintf(fname,".isomalloc");
+            try_count = 0;
+            while ((fd = open(fname, O_RDONLY)) == -1 && try_count<10000){
+                try_count++;
+            }
+            if (fd == -1) {
+                CmiAbort("isomalloc_sync failed during restart, make sure you have a shared file system.");
+            }
+            read(fd, &ss, sizeof(CmiUInt8));
+            read(fd, &ee, sizeof(CmiUInt8));
+            close(fd);
+            if (ss < s || ee > e)
+                CmiAbort("isomalloc_sync failed during restart, virtual memory regions do not overlap.");
+            else {
+                freeRegion.start = (void *)ss;
+                freeRegion.len = (char *)ee -(char *)ss;
+            }
+            CmiPrintf("[%d] consolidated Isomalloc memory region at restart: %p - %p (%d megs)\n",CmiMyPe(),freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);
+            goto AFTER_SYNC;
+        }
+#endif
     if (CmiMyRank() == 0 && freeRegion.len > 0u) {
       if (CmiBarrier() == -1 && CmiMyPe()==0) 
         CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
@@ -2163,6 +2194,19 @@ static void init_ranges(char **argv)
           CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
               freeRegion.start,freeRegion.start+freeRegion.len,
               freeRegion.len/meg);
+#if __FAULT__
+                if(CmiMyPe() == 0){
+                    int fd;
+                    char fname[128];
+                    CmiUInt8 s = (CmiUInt8)freeRegion.start;
+                    CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+                    sprintf(fname,".isomalloc");
+                    while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1);
+                    write(fd, &s, sizeof(CmiUInt8));
+                    write(fd, &e, sizeof(CmiUInt8));
+                    close(fd);
+                }
+#endif
       }   /* end of barrier test */
     } /* end of rank 0 */
     else {
@@ -2172,6 +2216,10 @@ static void init_ranges(char **argv)
       CmiBarrier();
     }
   }
+
+#ifdef __FAULT__
+    AFTER_SYNC:
+#endif
 
   if (CmiMyRank() == 0 && freeRegion.len > 0u)
   {
@@ -2487,6 +2535,11 @@ void CmiIsomallocInit(char **argv)
     _mmap_probe = 0;
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
+#if __FAULT__
+  int resPhase;
+  if (CmiGetArgFlagDesc(argv,"+restartisomalloc","restarting isomalloc on this processor after a crash"))
+    _restart = 1;
+#endif
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
