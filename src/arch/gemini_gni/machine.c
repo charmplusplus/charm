@@ -1883,19 +1883,20 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     request_msg = (CONTROL_MSG *) header;
     size = request_msg->total_length;
     MACHSTATE4(8, "GO Get request from %d (%d,%d, %d) \n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
+    MallocPostDesc(pd);
     if(request_msg->seq_id < 2)   {
-        //START_EVENT();
         msg_data = CmiAlloc(size);
         CmiSetMsgSeq(msg_data, 0);
-        //TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
         _MEMCHECK(msg_data);
+#if CMK_SMP_TRACE_COMMTHREAD
+        pd->second_operand = 1000000 * CmiWallTimer(); //microsecond
+#endif
     }
     else {
         offset = ONE_SEG*(request_msg->seq_id-1);
         msg_data = (char*)request_msg->dest_addr + offset;
     }
    
-    MallocPostDesc(pd);
     pd->cqwrite_value = request_msg->seq_id;
     if( request_msg->seq_id == 0)
     {
@@ -2203,6 +2204,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #if PRINT_SYH
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
+                    TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (void*)tmp_pd->local_addr); 
+
                     START_EVENT();
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
                     DecreaseMsgInRecv((void*)tmp_pd->local_addr);
@@ -2220,6 +2223,10 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         START_EVENT();
 #if PRINT_SYH
                         printf("Pipeline msg done [%d]\n", myrank);
+#endif
+#if                 CMK_SMP_TRACE_COMMTHREAD
+                        if( tmp_pd->cqwrite_value == 1)
+                            TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
                         TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
