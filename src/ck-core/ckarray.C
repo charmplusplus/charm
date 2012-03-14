@@ -61,6 +61,7 @@ Orion Sky Lawlor, olawlor@acm.org
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
+bool _isStaticInsertion;
 bool _isNotifyChildInRed;
 
 #define ARRAY_DEBUG_OUTPUT 0
@@ -547,7 +548,7 @@ void CkArrayOptions::init()
 {
     locMgr.setZero();
     anytimeMigration = _isAnytimeMigration;
-    staticInsertion = false;
+    staticInsertion = _isStaticInsertion;
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
     broadcastViaScheduler = false;
