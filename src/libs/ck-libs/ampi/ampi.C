@@ -546,6 +546,10 @@ static void ampiNodeInit(void)
   AMPI_threadstart_idx = TCHARM_Register_thread_function(AMPI_threadstart);
 
   nodeinit_has_been_called=1;
+
+   // ASSUME NO ANYTIME MIGRATION and STATIC INSERTON
+  _isAnytimeMigration = false;
+  _isStaticInsertion = true;
 }
 
 #if PRINT_IDLE
@@ -790,7 +794,6 @@ static ampi *ampiInit(char **argv)
       CkpvAccess(conv_com_object).doneCreating();
 #else
       arr=CProxy_ampi::ckNew(parent,worldComm,opts);
-
 #endif
 
       //Broadcast info. to the mpi_worlds array
