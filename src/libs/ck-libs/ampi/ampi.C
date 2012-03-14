@@ -27,10 +27,6 @@ static CkDDT *getDDT(void) {
   return getAmpiParent()->myDDT;
 }
 
-inline int errorCheck(MPI_Comm comm, int ifComm, int count, int ifCount, 
-    MPI_Datatype data, int ifData, int tag, int ifTag, 
-    int rank, int ifRank, void *buf, int ifBuf);
-
   inline int checkCommunicator(MPI_Comm comm) {
     if(comm == MPI_COMM_NULL)
       return MPI_ERR_COMM;
