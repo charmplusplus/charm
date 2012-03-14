@@ -2997,6 +2997,10 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 {
   AMPIAPI("AMPI_Reduce");
 
+  if (inbuf == MPI_IN_PLACE) inbuf = outbuf;
+  if (outbuf == MPI_IN_PLACE) outbuf = inbuf;
+  CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
+
 #if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, inbuf, 1,
@@ -3015,10 +3019,6 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
     return 0;
   }
 #endif
-
-  if (inbuf == MPI_IN_PLACE) inbuf = outbuf;
-  if (outbuf == MPI_IN_PLACE) outbuf = inbuf;
-  CmiAssert(inbuf != MPI_IN_PLACE && outbuf != MPI_IN_PLACE);
 
   ampi *ptr = getAmpiInstance(comm);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
