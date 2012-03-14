@@ -15,17 +15,17 @@ initcall void registerLBDataCollection(void);
 
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
-  entry void ProcessAtSyncMin(void);
+  entry [immediate] void ProcessAtSyncMin(void);
   entry void ProcessAtSync(void);
   entry void SendStats();
-  entry void SendMinStats();
+  entry [immediate] void SendMinStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
-  entry void ReceiveMinStats(CkReductionMsg *msg);
+  entry [immediate] void ReceiveMinStats(CkReductionMsg *msg);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
   entry void ReceiveCounts(CkReductionMsg *);
-  entry void LoadBalanceDecision(int req_no, int period);
-  entry void LoadBalanceDecisionFinal(int req_no, int period);
-  entry void ReceiveIterationNo(int, int);
+  entry [immediate] void LoadBalanceDecision(int req_no, int period);
+  entry [immediate] void LoadBalanceDecisionFinal(int req_no, int period);
+  entry [immediate] void ReceiveIterationNo(int, int);
   entry void LoadBalance(void);
   entry void ResumeClients(int);
   entry void ResumeClients(CkReductionMsg *);

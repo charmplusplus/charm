@@ -550,7 +550,7 @@ bool CentralLB::getLineEq(double& aslope, double& ac, double& mslope, double& mc
   double m2 = 0;
   AdaptiveData data;
   int i = 0;
-  for (i = 0; i <= total/2; i++) {
+  for (i = 0; i < total/2; i++) {
     data = adaptive_lbdb.history_data[i];
     m1 += data.max_load;
     a1 += data.avg_load;
