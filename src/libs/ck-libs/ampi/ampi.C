@@ -67,8 +67,9 @@ inline int checkRank(int rank, MPI_Comm comm) {
   }
 
 inline int errorCheck(MPI_Comm comm, int ifComm, int count, int ifCount,
-    MPI_Datatype data, int ifData, int tag, int ifTag,
-    int rank, int ifRank, void *buf, int ifBuf) {
+                      MPI_Datatype data, int ifData, int tag, int ifTag,
+                      int rank, int ifRank,
+                      void *buf1, int ifBuf1, void *buf2 = 0, int ifBuf2 = 0) {
   int ret;
   if(ifComm) { 
     ret = checkCommunicator(comm);
@@ -95,8 +96,13 @@ inline int errorCheck(MPI_Comm comm, int ifComm, int count, int ifCount,
     if(ret != MPI_SUCCESS)
       return ret;
   }
-  if(ifBuf) {
-    ret = checkBuf(buf,count);
+  if(ifBuf1) {
+    ret = checkBuf(buf1,count);
+    if(ret != MPI_SUCCESS)
+      return ret;
+  }
+  if(ifBuf2) {
+    ret = checkBuf(buf2,count);
     if(ret != MPI_SUCCESS)
       return ret;
   }
