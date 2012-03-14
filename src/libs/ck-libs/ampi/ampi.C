@@ -2261,7 +2261,7 @@ void AmpiSeqQ::pup(PUP::er &p) {
 void AmpiSeqQ::putOutOfOrder(int srcIdx, AmpiMsg *msg)
 {
   AmpiOtherElement &el=elements[srcIdx];
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (msg->seq<el.seqIncoming)
     CkAbort("AMPI Logic error: received late out-of-order message!\n");
 #endif
@@ -2362,7 +2362,7 @@ void AmpiRequestList::pup(PUP::er &p) {
 //------------------ External Interface -----------------
 ampiParent *getAmpiParent(void) {
   ampiParent *p = CtvAccess(ampiPtr);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (p==NULL) CkAbort("Cannot call MPI routines before AMPI is initialized.\n");
 #endif
   return p;
@@ -2370,7 +2370,7 @@ ampiParent *getAmpiParent(void) {
 
 ampi *getAmpiInstance(MPI_Comm comm) {
   ampi *ptr=getAmpiParent()->comm2ampi(comm);
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if (ptr==NULL) CkAbort("AMPI's getAmpiInstance> null pointer\n");
 #endif
   return ptr;
@@ -2381,19 +2381,19 @@ inline static AmpiRequestList *getReqs(void) {
 }
 
 inline void checkComm(MPI_Comm comm){
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   getAmpiParent()->checkComm(comm);
 #endif
 }
 
 inline void checkRequest(MPI_Request req){
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   getReqs()->checkRequest(req);
 #endif
 }
 
 inline void checkRequests(int n, MPI_Request* reqs){
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   AmpiRequestList* reqlist = getReqs();
   for(int i=0;i<n;i++)
     reqlist->checkRequest(reqs[i]);
@@ -2530,7 +2530,7 @@ CDECL int AMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
   //AMPIAPI("AMPI_Comm_rank");
 
-#ifndef CMK_OPTIMIZE 
+#if CMK_ERROR_CHECKING 
   if(checkCommunicator(comm) != MPI_SUCCESS)
     return checkCommunicator(comm);
 #endif
@@ -2558,7 +2558,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
 {
   //AMPIAPI("AMPI_Comm_size");
 
-#ifndef CMK_OPTIMIZE 
+#if CMK_ERROR_CHECKING 
   if(checkCommunicator(comm) != MPI_SUCCESS)
     return checkCommunicator(comm);
 #endif
@@ -2586,7 +2586,7 @@ int AMPI_Comm_size(MPI_Comm comm, int *size)
 int AMPI_Comm_compare(MPI_Comm comm1,MPI_Comm comm2, int *result)
 {
 
-#ifndef CMK_OPTIMIZE 
+#if CMK_ERROR_CHECKING 
   if(checkCommunicator(comm1) != MPI_SUCCESS)
     return checkCommunicator(comm1);
   if(checkCommunicator(comm2) != MPI_SUCCESS)
@@ -2651,7 +2651,7 @@ CDECL
 int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
     int tag, MPI_Comm comm) {
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
   if(ret != MPI_SUCCESS)
@@ -2687,7 +2687,7 @@ int AMPI_Send(void *msg, int count, MPI_Datatype type, int dest,
 int AMPI_Ssend(void *msg, int count, MPI_Datatype type, int dest,
     int tag, MPI_Comm comm)
 {
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, msg, 1);
   if(ret != MPI_SUCCESS)
@@ -2722,7 +2722,7 @@ int AMPI_Issend(void *buf, int count, MPI_Datatype type, int dest,
 {
   AMPIAPI("AMPI_Issend");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -2767,7 +2767,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 {
   AMPIAPI("AMPI_Recv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, src, 1, msg, 1);
   if(ret != MPI_SUCCESS)
@@ -2807,7 +2807,7 @@ int AMPI_Recv(void *msg, int count, MPI_Datatype type, int src, int tag,
 int AMPI_Probe(int src, int tag, MPI_Comm comm, MPI_Status *status)
 {
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, 0, 0, tag, 1, src, 1, 0, 0);
   if(ret != MPI_SUCCESS)
@@ -2825,7 +2825,7 @@ int AMPI_Iprobe(int src,int tag,MPI_Comm comm,int *flag,MPI_Status *status)
 {
   AMPIAPI("AMPI_Iprobe");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, 0, 0, tag, 1, src, 1, 0, 0);
   if(ret != MPI_SUCCESS)
@@ -2844,7 +2844,7 @@ int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
 {
   AMPIAPI("AMPI_Sendrecv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, scount, 1, stype, 1, stag, 1, dest, 1, sbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -2876,7 +2876,7 @@ int AMPI_Barrier(MPI_Comm comm)
 {
   AMPIAPI("AMPI_Barrier");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   if(checkCommunicator(comm) != MPI_SUCCESS)
     return checkCommunicator(comm);
 #endif
@@ -2902,7 +2902,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
 {
   AMPIAPI("AMPI_Bcast");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -2995,7 +2995,7 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 {
   AMPIAPI("AMPI_Reduce");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, 0, 0);
   if(ret != MPI_SUCCESS)
@@ -3065,7 +3065,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 {
   AMPIAPI("AMPI_Allreduce");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, 0, 0);
   if(ret != MPI_SUCCESS)
@@ -3129,7 +3129,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
 {
   AMPIAPI("AMPI_Iallreduce");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, inbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -3164,7 +3164,7 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 {
   AMPIAPI("AMPI_Reduce_scatter");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, datatype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -3228,7 +3228,7 @@ CDECL
 int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ){
   AMPIAPI("AMPI_Scan");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -3956,7 +3956,7 @@ int AMPI_Recv_init(void *buf, int count, int type, int src, int tag,
 {
   AMPIAPI("AMPI_Recv_init");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, src, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -3978,7 +3978,7 @@ int AMPI_Send_init(void *buf, int count, int type, int dest, int tag,
 {
   AMPIAPI("AMPI_Send_init");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -4000,7 +4000,7 @@ int AMPI_Ssend_init(void *buf, int count, int type, int dest, int tag,
 {
   AMPIAPI("AMPI_Ssend_init");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -4108,7 +4108,7 @@ int AMPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
 {
   AMPIAPI("AMPI_Isend");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -4155,7 +4155,7 @@ int AMPI_Irecv(void *buf, int count, MPI_Datatype type, int src,
 {
   AMPIAPI("AMPI_Irecv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, tag, 1, src, 1, buf, 1);
   if(ret != MPI_SUCCESS)
@@ -4226,7 +4226,7 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
 {
   AMPIAPI("AMPI_Ireduce");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4261,7 +4261,7 @@ int AMPI_Allgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgather");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4319,7 +4319,7 @@ int AMPI_Iallgather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Iallgather");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4380,7 +4380,7 @@ int AMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Allgatherv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4430,12 +4430,9 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Gather");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
-  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4454,6 +4451,13 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Gather not allowed for Inter-communicator!");
 
   ampi *ptr = getAmpiInstance(comm);
+
+#if CMK_ERROR_CHECKING
+  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, ptr->getRank(comm)==root);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
   int size = ptr->getSize(comm);
   int i;
   AMPI_Send(sendbuf, sendcount, sendtype, root, MPI_GATHER_TAG, comm);
@@ -4490,7 +4494,7 @@ int AMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Gatherv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4551,7 +4555,7 @@ int AMPI_Scatter(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Scatter");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4613,7 +4617,7 @@ int AMPI_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype send
 {
   AMPIAPI("AMPI_Scatterv");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4675,7 +4679,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Alltoall");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -4959,7 +4963,7 @@ int AMPI_Alltoall2(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Alltoall2");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -5020,7 +5024,7 @@ int AMPI_Ialltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 {
   AMPIAPI("AMPI_Ialltoall");
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, sendcount, 1, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
@@ -5081,7 +5085,7 @@ int AMPI_Alltoallv(void *sendbuf, int *sendcounts_, int *sdispls_,
   if(getAmpiParent()->isInter(comm)) CkAbort("MPI_Alltoallv not allowed for Inter-communicator!");
   if(comm==MPI_COMM_SELF) return 0;
 
-#ifndef CMK_OPTIMIZE
+#if CMK_ERROR_CHECKING
   int ret;
   ret = errorCheck(comm, 1, 0, 0, sendtype, 1, 0, 0, 0, 0, sendbuf, 1);
   if(ret != MPI_SUCCESS)
