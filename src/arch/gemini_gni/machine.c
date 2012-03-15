@@ -1617,6 +1617,11 @@ static void set_limit()
         MAX_BUFF_SEND = MAX_REG_MEM / 2;
         if (CmiMyPe() == 0)
            printf("mem_max = %lld, send_max =%lld\n", MAX_REG_MEM, MAX_BUFF_SEND);
+        if(CmiMyPe() == 0 && (smsg_memlen*mysize + _expand_mem > MAX_BUFF_SEND ||  smsg_memlen*mysize + _mempool_size > MAX_BUFF_SEND))
+        {
+             printf("Charm++> FATAL ERROR your program has risk of hanging \n please try large page or use Dynamic smsg +useDynamicSmsg or contact Charm++ developers\n");
+             CmiAbort("memory registration\n");
+        }
     }
 }
 
