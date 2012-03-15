@@ -84,11 +84,11 @@ public:
   void AtSync(void); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
-  void ProcessAtSyncMin(void);
+  //void ProcessAtSyncMin(void);
   void SendStats();
-  void SendMinStats();
+  //void SendMinStats();
   void ReceiveCounts(CkReductionMsg *);
-  void ReceiveMinStats(CkReductionMsg *);
+  //void ReceiveMinStats(CkReductionMsg *);
   void ReceiveStats(CkMarshalledCLBStatsMessage &msg);	// Receive stats on PE 0
   void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &msg); // Receive stats using a tree structure  
   
@@ -96,9 +96,9 @@ public:
   void LoadBalance(void); 
   void ResumeClients(int);                      // Resuming clients needs
 
-  void LoadBalanceDecision(int, int);
-  void LoadBalanceDecisionFinal(int, int);
-  void ReceiveIterationNo(int, int); // Receives the current iter no
+ // void LoadBalanceDecision(int, int);
+ // void LoadBalanceDecisionFinal(int, int);
+ // void ReceiveIterationNo(int, int); // Receives the current iter no
 
   void ResumeClients(CkReductionMsg *); // to be resumed via message
   void ReceiveMigration(LBMigrateMsg *); 	// Receive migration data

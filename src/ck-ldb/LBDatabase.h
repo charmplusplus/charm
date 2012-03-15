@@ -6,13 +6,20 @@
 #ifndef LBDATABASE_H
 #define LBDATABASE_H
 
+
+//#include <charm++.h>
+//#include "ckreduction.h" 
 #include "lbdb.h"
 #include "LBDBManager.h"
 #include "lbdb++.h"
 
+#include <vector>
+
 #define LB_FORMAT_VERSION     2
 
 extern int _lb_version;
+
+
 
 // command line options
 class CkLBArgs
@@ -161,7 +168,7 @@ class DefaultFunction : public LBPredictorFunction {
 };
 
 
-class LBDatabase : public IrrGroup {
+class LBDatabase : public CBase_LBDatabase {
 public:
   LBDatabase(void)  { init(); }
   LBDatabase(CkMigrateMessage *m)  { init(); }
@@ -348,13 +355,29 @@ public:
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 
+  bool AddLoad(int iteration, double load);
+  void ReceiveMinStats(CkReductionMsg *);
+  void LoadBalanceDecision(int, int);
+  void LoadBalanceDecisionFinal(int, int);
+  void ReceiveIterationNo(int, int); // Receives the current iter no
+
+  bool generatePlan(int& period);
+  bool getLineEq(double& aslope, double& ac, double& mslope, double& mc);
+  bool getPeriodForLinear(double a, double b, double c, int& period);
+  int getPredictedLBPeriod();
+
 private:
+  //CProxy_LBDatabase thisProxy;
   int mystep;
   LDHandle myLDHandle;
   static char *avail_vector;	// processor bit vector
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
+  std::vector<double> max_load_vec;
+  std::vector<double> total_load_vec;
+  std::vector<double> total_contrib_vec;
+  int max_iteration;
 
 public:
   BaseLB** getLoadBalancers() {return loadbalancers.getVec();}

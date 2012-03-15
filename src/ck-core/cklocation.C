@@ -973,6 +973,7 @@ void CkMigratable::commonInit(void) {
 	usesAtSync=CmiFalse;
 	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
+  atsync_iteration = -1;
 	/*
 	FAULT_EVAC
 	*/
@@ -1099,7 +1100,17 @@ void CkMigratable::AtSync(int waitForMigration)
 	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
           // model-based load balancing, ask user to provide cpu load
         if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
-	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+//	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+  atsync_iteration++;
+  myRec->getLBDB()->AddLoad(atsync_iteration, myRec->getObjTime());
+  CkPrintf("atsync_iter %d && predicted period %d\n", atsync_iteration,
+    myRec->getLBDB()->getPredictedLBPeriod());
+  if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod()) {
+    ResumeFromSync();
+  } else {
+	  myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+  }
+
 }
 void CkMigratable::ReadyMigrate(CmiBool ready)
 {

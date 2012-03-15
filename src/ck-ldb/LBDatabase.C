@@ -13,7 +13,70 @@
 #include "LBSimulation.h"
 #include "topology.h"
 
+#include "limits.h"
+
 #include "NullLB.h"
+
+struct AdaptiveData {
+  int iteration;
+  double max_load;
+  double avg_load;
+};
+
+struct AdaptiveLBDatabase {
+  std::vector<AdaptiveData> history_data;
+} adaptive_lbdb;
+
+enum state {
+  OFF,
+  ON,
+  PAUSE,
+  DECIDED,
+  LOAD_BALANCE
+} local_state;
+
+struct AdaptiveLBStructure {
+  int lb_ideal_period;
+  int lb_calculated_period;
+  int lb_no_iterations;
+  int global_max_iter_no;
+  int global_recv_iter_counter;
+  bool in_progress;
+  double prev_load;
+  double lb_strategy_cost;
+  double lb_migration_cost;
+  bool lb_period_informed;
+  int lb_msg_send_no;
+  int lb_msg_recv_no;
+} adaptive_struct;
+
+
+CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
+  double lb_data[4];
+  lb_data[0] = 0;
+  lb_data[1] = 0;
+  lb_data[2] = 0;
+  for (int i = 0; i < nMsg; i++) {
+    CkAssert(msgs[i]->getSize() == 4*sizeof(double));
+    double* m = (double *)msgs[i]->getData();
+    lb_data[0] += m[0];
+    lb_data[1] = ((m[1] > lb_data[1])? m[1] : lb_data[1]);
+    lb_data[2] += m[2];
+    if (i == 0) {
+      lb_data[3] = m[3];
+    }
+    if (m[3] != lb_data[3]) {
+      CkPrintf("Error!!! Reduction is intermingled between iteration %lf and\
+      %lf\n", lb_data[3], m[3]);
+    }
+  }
+  return CkReductionMsg::buildNew(4*sizeof(double), lb_data);
+}
+
+/*global*/ CkReduction::reducerType lbDataCollectionType;
+/*initcall*/ void registerLBDataCollection(void) {
+  lbDataCollectionType = CkReduction::addReducer(lbDataCollection);
+}
 
 CkGroupID _lbdb;
 
@@ -94,6 +157,7 @@ void LBDefaultCreate(const char *lbname)
 // default is to show the helper
 void LBRegisterBalancer(const char *name, LBCreateFn fn, LBAllocFn afn, const char *help, int shown)
 {
+  CkPrintf("Adding to registr %s \n", name);
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
 
@@ -101,9 +165,14 @@ LBAllocFn getLBAllocFn(char *lbname) {
     return lbRegistry.getLBAllocFn(lbname);
 }
 
+LBCreateFn getLBCreateFn(const char *lbname) {
+    return lbRegistry.search(lbname);
+}
 // create a load balancer group using the strategy name
 static void createLoadBalancer(const char *lbname)
 {
+  CkPrintf("Creating load balancer '%s'\n", lbname);
+      lbRegistry.displayLBs();    // display help page
     LBCreateFn fn = lbRegistry.search(lbname);
     if (!fn) {    // invalid lb name
       CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
@@ -330,6 +399,7 @@ void LBDatabase::initnodeFn()
 // called my constructor
 void LBDatabase::init(void) 
 {
+  //thisProxy = CProxy_LBDatabase(thisgroup);
   myLDHandle = LDCreate();
   mystep = 0;
   nloadbalancers = 0;
@@ -339,6 +409,26 @@ void LBDatabase::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+  
+  max_load_vec.resize(100);
+  total_load_vec.resize(100);
+  total_contrib_vec.resize(100);
+  max_iteration = -1;
+
+  // If metabalancer enabled, initialize the variables
+  adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_no_iterations = -1;
+  adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.in_progress = false;
+  adaptive_struct.prev_load = 0.0;
+  adaptive_struct.lb_strategy_cost = 0.0;
+  adaptive_struct.lb_migration_cost = 0.0;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
+  local_state = OFF;
+
 }
 
 LBDatabase::LastLBInfo::LastLBInfo()
@@ -465,6 +555,279 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
 #endif
+}
+
+bool LBDatabase::AddLoad(int iteration, double load) {
+  total_contrib_vec[iteration]++;
+
+  if (iteration > adaptive_struct.lb_no_iterations) {
+    adaptive_struct.lb_no_iterations = iteration;
+  }
+  total_load_vec[iteration] += load;
+  if (max_load_vec[iteration] < load) {
+    max_load_vec[iteration] = load;
+  }
+  if (total_contrib_vec[iteration] == getLBDB()->getObjCount()) {
+    double lb_data[4];
+    lb_data[0] = total_load_vec[iteration];
+    lb_data[1] = max_load_vec[iteration];
+    lb_data[2] = getLBDB()->getObjCount();
+    lb_data[3] = iteration;
+    //CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load, adaptive_struct.lb_no_iterations);
+
+    CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
+    contribute(4*sizeof(double), lb_data, lbDataCollectionType, cb);
+  }
+  return true;
+}
+
+void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
+  double* load = (double *) msg->getData();
+  double max = load[1];
+  double avg = load[0]/load[2];
+  int iteration_n = load[3];
+  CkPrintf("[%d] Iteration Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
+  delete msg;
+
+  // Store the data for this iteration
+  adaptive_struct.lb_no_iterations = iteration_n;
+  AdaptiveData data;
+  data.iteration = adaptive_struct.lb_no_iterations;
+  data.max_load = max;
+  data.avg_load = avg;
+  adaptive_lbdb.history_data.push_back(data);
+
+  // If lb period inform is in progress, dont inform again
+  if (adaptive_struct.in_progress) {
+    return;
+  }
+
+//  if (adaptive_struct.lb_period_informed) {
+//    return;
+//  }
+
+  // If the max/avg ratio is greater than the threshold and also this is not the
+  // step immediately after load balancing, carry out load balancing
+  //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
+  if (max/avg >= 1.5 && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) > 1.1\n", max/avg);
+//    if (!adaptive_struct.lb_period_informed) {
+//      // Just for testing
+//      adaptive_struct.lb_calculated_period = 40;
+//      adaptive_struct.lb_period_informed = true;
+//      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
+//      return;
+//    }
+
+    // If the new lb period is less than current set lb period
+    if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
+      adaptive_struct.lb_calculated_period = iteration_n + 1;
+      adaptive_struct.lb_period_informed = true;
+      adaptive_struct.in_progress = true;
+      CkPrintf("Informing everyone the lb period is %d\n",
+          adaptive_struct.lb_calculated_period);
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
+    }
+    return;
+  }
+
+  // Generate the plan for the adaptive strategy
+  int period;
+  if (generatePlan(period)) {
+    //CkPrintf("Carry out load balancing step at iter\n");
+
+    // If the new lb period is less than current set lb period
+    if (adaptive_struct.lb_calculated_period > period) {
+      adaptive_struct.lb_calculated_period = period;
+      adaptive_struct.in_progress = true;
+      adaptive_struct.lb_period_informed = true;
+      CkPrintf("Informing everyone the lb period is %d\n",
+          adaptive_struct.lb_calculated_period);
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
+    }
+  }
+}
+
+bool LBDatabase::generatePlan(int& period) {
+  if (adaptive_lbdb.history_data.size() <= 8) {
+    return false;
+  }
+
+  // Some heuristics for lbperiod
+  // If constant load or almost constant,
+  // then max * new_lb_period > avg * new_lb_period + lb_cost
+  double max = 0.0;
+  double avg = 0.0;
+  AdaptiveData data;
+  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
+    max += data.max_load;
+    avg += data.avg_load;
+    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+  }
+//  max /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//  avg /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
+//
+//  adaptive_struct.lb_ideal_period = (adaptive_struct.lb_strategy_cost +
+//  adaptive_struct.lb_migration_cost) / (max - avg);
+//  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
+//      max, avg, adaptive_struct.lb_strategy_cost, adaptive_struct.lb_migration_cost, adaptive_struct.lb_ideal_period);
+//
+  // If linearly varying load, then find lb_period
+  // area between the max and avg curve 
+  double mslope, aslope, mc, ac;
+  getLineEq(aslope, ac, mslope, mc);
+  CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
+  double a = (mslope - aslope)/2;
+  double b = (mc - ac);
+  double c = -(adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost);
+  //c = -2.5;
+  bool got_period = getPeriodForLinear(a, b, c, period);
+  if (!got_period) {
+    return false;
+  }
+  
+  if (mslope < 0) {
+    if (period > (-mc/mslope)) {
+      CkPrintf("Max < 0 Period set when max load is -ve\n");
+      return false;
+    }
+  }
+
+  if (aslope < 0) {
+    if (period > (-ac/aslope)) {
+      CkPrintf("Avg < 0 Period set when avg load is -ve\n");
+      return false;
+    }
+  }
+
+  int intersection_t = (mc-ac) / (aslope - mslope);
+  if (intersection_t > 0 && period > intersection_t) {
+    CkPrintf("Avg | Max Period set when curves intersect\n");
+    return false;
+  }
+  return true;
+}
+
+bool LBDatabase::getPeriodForLinear(double a, double b, double c, int& period) {
+  CkPrintf("Quadratic Equation %lf X^2 + %lf X + %lf\n", a, b, c);
+  if (a == 0.0) {
+    period = (-c / b);
+    CkPrintf("Ideal period for linear load %d\n", period);
+    return true;
+  }
+  int x;
+  double t = (b * b) - (4*a*c);
+  if (t < 0) {
+    CkPrintf("(b * b) - (4*a*c) is -ve sqrt : %lf\n", sqrt(t));
+    return false;
+  }
+  t = (-b + sqrt(t)) / (2*a);
+  x = t;
+  if (x < 0) {
+    CkPrintf("boo!!! x (%d) < 0\n", x);
+    x = 0;
+    return false;
+  }
+  period = x;
+  CkPrintf("Ideal period for linear load %d\n", period);
+  return true;
+}
+
+bool LBDatabase::getLineEq(double& aslope, double& ac, double& mslope, double& mc) {
+  int total = adaptive_lbdb.history_data.size();
+  int iterations = 1 + adaptive_lbdb.history_data[total - 1].iteration -
+      adaptive_lbdb.history_data[0].iteration;
+  double a1 = 0;
+  double m1 = 0;
+  double a2 = 0;
+  double m2 = 0;
+  AdaptiveData data;
+  int i = 0;
+  for (i = 0; i < total/2; i++) {
+    data = adaptive_lbdb.history_data[i];
+    m1 += data.max_load;
+    a1 += data.avg_load;
+  }
+  m1 /= i;
+  a1 /= i;
+
+  for (i = total/2; i < total; i++) {
+    data = adaptive_lbdb.history_data[i];
+    m2 += data.max_load;
+    a2 += data.avg_load;
+  }
+  m2 /= (i - total/2);
+  a2 /= (i - total/2);
+
+  aslope = 2 * (a2 - a1) / iterations;
+  mslope = 2 * (m2 - m1) / iterations;
+  ac = adaptive_lbdb.history_data[0].avg_load;
+  mc = adaptive_lbdb.history_data[0].max_load;
+  return true;
+}
+
+void LBDatabase::LoadBalanceDecision(int req_no, int period) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
+    CkPrintf("Error!!! Received a request which was already sent or old\n");
+    return;
+  }
+  //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  adaptive_struct.lb_ideal_period = period;
+  local_state = ON;
+  adaptive_struct.lb_msg_recv_no = req_no;
+  thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
+}
+
+void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
+  if (req_no < adaptive_struct.lb_msg_recv_no) {
+    return;
+  }
+  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  adaptive_struct.lb_ideal_period = period;
+
+  if (local_state == ON) {
+    local_state = DECIDED;
+    return;
+  }
+
+  // If the state is PAUSE, then its waiting for the final decision from central
+  // processor. If the decision is that the ideal period is in the future,
+  // resume. If the ideal period is now, then carry out load balancing.
+  if (local_state == PAUSE) {
+    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
+      local_state = DECIDED;
+      //SendMinStats();
+      //FIX ME!!! ResumeClients(0);
+    } else {
+      local_state = LOAD_BALANCE;
+      //FIX ME!!! ProcessAtSync();
+    }
+    return;
+  }
+  CkPrintf("Error!!! Final decision received but the state is invalid %d\n", local_state);
+}
+
+
+void LBDatabase::ReceiveIterationNo(int req_no, int local_iter_no) {
+  CmiAssert(CkMyPe() == 0);
+
+  adaptive_struct.global_recv_iter_counter++;
+  if (local_iter_no > adaptive_struct.global_max_iter_no) {
+    adaptive_struct.global_max_iter_no = local_iter_no;
+  }
+  if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
+    adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
+    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
+    CkPrintf("Final lb_period %d\n", adaptive_struct.lb_ideal_period);
+    adaptive_struct.in_progress = false;
+    adaptive_struct.global_max_iter_no = 0;
+    adaptive_struct.global_recv_iter_counter = 0;
+  }
+}
+
+int LBDatabase::getPredictedLBPeriod() {
+  return adaptive_struct.lb_ideal_period;
 }
 
 /*

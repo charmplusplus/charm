@@ -271,6 +271,7 @@ private:
   int thisChareType;//My chare type
   void commonInit(void);
   CmiBool asyncEvacuate;
+  int atsync_iteration;
 public:
   CkArrayIndex thisIndexMax;
 
