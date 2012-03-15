@@ -61,7 +61,7 @@ inline int checkRank(int rank, MPI_Comm comm) {
 }
 
   inline int checkBuf(void *buf, int count) {
-    if((count != 0 && buf == NULL))
+    if((count != 0 && buf == NULL) || buf == MPI_IN_PLACE)
       return MPI_ERR_BUFFER;
     return MPI_SUCCESS;
   }
