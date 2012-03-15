@@ -2906,7 +2906,7 @@ int AMPI_Bcast(void *buf, int count, MPI_Datatype type, int root,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, buf, 1);
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, buf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -2999,7 +2999,8 @@ int AMPI_Reduce(void *inbuf, void *outbuf, int count, int type, MPI_Op op,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, 0, 0);
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, inbuf, 1,
+                   outbuf, getAmpiInstance(comm)->getRank(comm) == root);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -3069,7 +3070,7 @@ int AMPI_Allreduce(void *inbuf, void *outbuf, int count, int type,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, 0, 0);
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, inbuf, 1, outbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -3133,7 +3134,7 @@ int AMPI_Iallreduce(void *inbuf, void *outbuf, int count, int type,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, inbuf, 1);
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, 0, 0, inbuf, 1, outbuf, 1);
   if(ret != MPI_SUCCESS)
   {
     *request = MPI_REQUEST_NULL;
@@ -3168,7 +3169,7 @@ int AMPI_Reduce_scatter(void* sendbuf, void* recvbuf, int *recvcounts,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, 0, 0, datatype, 1, 0, 0, 0, 0, sendbuf, 1);
+  ret = errorCheck(comm, 1, 0, 0, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -3232,7 +3233,7 @@ int AMPI_Scan(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MP
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1);
+  ret = errorCheck(comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -4230,7 +4231,8 @@ int AMPI_Ireduce(void *sendbuf, void *recvbuf, int count, int type, MPI_Op op,
 
 #if CMK_ERROR_CHECKING
   int ret;
-  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, sendbuf, 1);
+  ret = errorCheck(comm, 1, count, 1, type, 1, 0, 0, root, 1, sendbuf, 1,
+                   recvbuf, getAmpiInstance(comm)->getRank(comm) == root);
   if(ret != MPI_SUCCESS)
   {
     *request = MPI_REQUEST_NULL;
@@ -4455,7 +4457,8 @@ int AMPI_Gather(void *sendbuf, int sendcount, MPI_Datatype sendtype,
   ampi *ptr = getAmpiInstance(comm);
 
 #if CMK_ERROR_CHECKING
-  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0, recvbuf, ptr->getRank(comm)==root);
+  ret = errorCheck(comm, 1, recvcount, 1, recvtype, 1, 0, 0, 0, 0,
+                   recvbuf, ptr->getRank(comm) == root);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
