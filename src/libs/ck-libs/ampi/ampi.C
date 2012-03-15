@@ -2847,6 +2847,9 @@ int AMPI_Sendrecv(void *sbuf, int scount, int stype, int dest,
   AMPIAPI("AMPI_Sendrecv");
 
 #if CMK_ERROR_CHECKING
+  if (sbuf == MPI_IN_PLACE || rbuf == MPI_IN_PLACE)
+    CmiAbort("MPI_sendrecv does not accept MPI_IN_PLACE; use MPI_Sendrecv_replace instead");
+
   int ret;
   ret = errorCheck(comm, 1, scount, 1, stype, 1, stag, 1, dest, 1, sbuf, 1);
   if(ret != MPI_SUCCESS)
