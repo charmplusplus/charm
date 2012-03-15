@@ -225,7 +225,7 @@ onesided_md_t    omdh;
 #else
 uint8_t   onesided_hnd, omdh;
 
-#if REMOTE_EVENT
+#if REMOTE_EVENT || CQWRITE 
 #define  MEMORY_REGISTER(handler, nic_hndl, msg, size, mem_hndl, myomdhh, cqh, status) \
     if(register_memory_size+size>= MAX_REG_MEM) { \
         status = GNI_RC_ERROR_NOMEM;} \
@@ -2011,7 +2011,8 @@ static void sendCqWrite(int destNode, uint64_t data, gni_mem_handle_t mem_hndl)
     
     MallocPostDesc(pd);
     pd->type = GNI_POST_CQWRITE;
-    pd->cq_mode = GNI_CQMODE_GLOBAL_EVENT | GNI_CQMODE_REMOTE_EVENT ;
+    pd->cq_mode = GNI_CQMODE_SILENT;
+    //pd->cq_mode = GNI_CQMODE_GLOBAL_EVENT | GNI_CQMODE_REMOTE_EVENT ;
     pd->dlvr_mode = GNI_DLVMODE_PERFORMANCE;
     pd->cqwrite_value = data;
     pd->remote_mem_hndl = mem_hndl;
