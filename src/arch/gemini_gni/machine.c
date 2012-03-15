@@ -678,7 +678,7 @@ inline  int  AckPool_getslot(void *addr)
     if (s == -1) {
         // printf("[%d] AckPool_getslot expand: %d\n", myrank, ackpoolsize);
         int newsize = ackpoolsize * 2;
-        if (ackpoolsize == 1<<(32-ACK_SHIFT)) CmiAbort("AckPool too large");
+        if (newsize >= 1<<(32-ACK_SHIFT)) CmiAbort("AckPool too large");
         struct AckPool   *old_ackpool = ackpool;
         ackpool = (struct AckPool *)malloc(newsize*sizeof(struct AckPool));
         memcpy(ackpool, old_ackpool, ackpoolsize*sizeof(struct AckPool));
