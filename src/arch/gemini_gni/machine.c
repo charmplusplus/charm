@@ -656,6 +656,8 @@ static CmiNodeLock  ackpool_lock;
 static void AckPool_init()
 {
     int i;
+    if ((1<<ACK_SHIFT) < mysize) 
+        CmiAbort("Charm++ Error: Remote event's rank field overflow.");
     ackpoolsize = 2048;
     ackpool = (struct AckPool *)malloc(ackpoolsize*sizeof(struct AckPool));
     for (i=0; i<ackpoolsize-1; i++) {
@@ -669,17 +671,17 @@ static void AckPool_init()
 }
 
 static
-inline  int  AckPool_getslot(void *addr)
+inline int AckPool_getslot(void *addr)
 {
     int i;
     int s;
     CMI_GNI_LOCK(ackpool_lock);
     s = ackpool_freehead;
     if (s == -1) {
-        // printf("[%d] AckPool_getslot expand: %d\n", myrank, ackpoolsize);
         int newsize = ackpoolsize * 2;
-        if (newsize > 1<<(32-ACK_SHIFT)) CmiAbort("AckPool too large");
-        struct AckPool   *old_ackpool = ackpool;
+        printf("[%d] AckPool_getslot expand to: %d\n", myrank, newsize);
+        if (newsize > (1<<(32-ACK_SHIFT))) CmiAbort("AckPool too large");
+        struct AckPool *old_ackpool = ackpool;
         ackpool = (struct AckPool *)malloc(newsize*sizeof(struct AckPool));
         memcpy(ackpool, old_ackpool, ackpoolsize*sizeof(struct AckPool));
         for (i=ackpoolsize; i<newsize-1; i++) {
