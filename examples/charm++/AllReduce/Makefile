@@ -20,4 +20,4 @@ test: all
 	./charmrun ./AllReduce 20 100000 +p4 $(TESTOPTS)
 
 bgtest: all
-	./charmrun ./AllReduce 20 100000 +p4 +x2 +y2 +z2
+	./charmrun ./AllReduce 20 100000 +p4 +x2 +y2 +z2 $(TESTOPTS)
