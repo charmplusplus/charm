@@ -2093,12 +2093,12 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     MACHSTATE4(8, "GO Get request from %d (%d,%d, %d) \n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
     MallocPostDesc(pd);
     if(request_msg->seq_id < 2)   {
-        msg_data = CmiAlloc(size);
-        CmiSetMsgSeq(msg_data, 0);
-        _MEMCHECK(msg_data);
 #if CMK_SMP_TRACE_COMMTHREAD
         pd->second_operand = 1000000 * CmiWallTimer(); //microsecond
 #endif
+        msg_data = CmiAlloc(size);
+        CmiSetMsgSeq(msg_data, 0);
+        _MEMCHECK(msg_data);
     }
     else {
         offset = ONE_SEG*(request_msg->seq_id-1);
@@ -2604,6 +2604,9 @@ static void  SendRdmaMsg()
 #endif
                 if(pd->cqwrite_value == 0)
                 {
+#if CMK_SMP_TRACE_COMMTHREAD
+                    pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+#endif
                     IncreaseMsgInRecv(((void*)(pd->local_addr)));
                 }
 #if MACHINE_DEBUG_LOG
