@@ -30,7 +30,9 @@ typedef struct slot_header_
   int          		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
   size_t      		prev,next;    //link list for freelists slots
+#if ! CMK_64BIT
   size_t                padding;      // fix for 32 bit machines
+#endif
 } slot_header;
 
 typedef struct used_header_
@@ -38,7 +40,9 @@ typedef struct used_header_
   struct block_header  *block_ptr;     // block_header
   int         		size,status;  //status is 1 for free, 0 for used
   size_t      		gprev,gnext;  //global slot list within a block
+#if ! CMK_64BIT
   size_t                padding;      // fix for 32 bit machines
+#endif
 } used_header;
 
 typedef used_header mempool_header;
@@ -51,10 +55,12 @@ typedef struct block_header
   size_t              block_prev,block_next;   // offset to next memblock
   size_t              freelists[cutOffNum];
   struct mempool_type  *mptr;               // mempool_type
-  size_t              padding;              // fix for 32 bit machines
 #if CMK_CONVERSE_GEMINI_UGNI
   int                 msgs_in_send;
   int                 msgs_in_recv;
+#endif
+#if ! CMK_64BIT
+  size_t              padding;              // fix for 32 bit machines
 #endif
 } block_header;
 
