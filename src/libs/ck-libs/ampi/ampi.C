@@ -1934,7 +1934,7 @@ AmpiMsg *ampi::makeAmpiMsg(int destIdx,
   int len = ddt->getSize(count);
   int sIdx=thisIndex;
   int seq = -1;
-  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_TAG_UB_VALUE) //Not cross-module: set seqno
+  if (destIdx>=0 && destcomm<=MPI_COMM_WORLD && t<=MPI_ATA_SEQ_TAG) //Not cross-module: set seqno
     seq = oorder.nextOutgoing(destIdx);
   AmpiMsg *msg = new (len, 0) AmpiMsg(seq, t, sIdx, sRank, len, destcomm);
   if (sync) UsrToEnv(msg)->setRef(sync);
@@ -4837,11 +4837,11 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
         MPI_Sendrecv(((char *)tmp_buf +
               my_tree_root*sendbuf_extent),
             curr_cnt, sendtype,
-            dst, MPI_ATA_TAG, 
+            dst, MPI_ATA_SEQ_TAG, 
             ((char *)tmp_buf +
              dst_tree_root*sendbuf_extent),
             sendcount*comm_size*mask,
-            sendtype, dst, MPI_ATA_TAG, 
+            sendtype, dst, MPI_ATA_SEQ_TAG, 
             comm, &status);
 
         /* in case of non-power-of-two nodes, less data may be
@@ -4889,7 +4889,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
             MPI_Send(((char *)tmp_buf +
                   dst_tree_root*sendbuf_extent),
                 last_recv_cnt, sendtype,
-                dst, MPI_ATA_TAG,
+                dst, MPI_ATA_SEQ_TAG,
                 comm);  
           }
           /* recv only if this proc. doesn't have data and sender
@@ -4901,7 +4901,7 @@ int AMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   dst_tree_root*sendbuf_extent),
                 sendcount*comm_size*mask, 
                 sendtype,   
-                dst, MPI_ATA_TAG,
+                dst, MPI_ATA_SEQ_TAG,
                 comm, &status); 
             MPI_Get_count(&status, sendtype, &last_recv_cnt);
             curr_cnt += last_recv_cnt;
