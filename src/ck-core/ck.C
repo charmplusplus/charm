@@ -662,6 +662,7 @@ void CkCreateChare(int cIdx, int eIdx, void *msg, CkChareID *pCid, int destPE)
 #endif
   }
   env->setEpIdx(eIdx);
+  env->setByPe(CkMyPe());
   env->setSrcPe(CkMyPe());
   CmiSetHandler(env, _charmHandlerIdx);
   _TRACE_CREATION_1(env);
@@ -921,7 +922,7 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
   // pCid->magic = _GETIDX(_entryTable[env->getEpIdx()]->chareIdx);
   register envelope *ret = UsrToEnv(pCid);
   ret->setVidPtr(env->getVidPtr());
-  register int srcPe = env->getSrcPe();
+  register int srcPe = env->getByPe();
   ret->setSrcPe(CkMyPe());
   CmiSetHandler(ret, _charmHandlerIdx);
   CmiSyncSendAndFree(srcPe, ret->getTotalsize(), (char *)ret);
