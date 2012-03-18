@@ -579,9 +579,6 @@ void MeshStreamer<dtype>::flushDirect(){
     if (!isPeriodicFlushEnabled_ || 
 	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
       flushAllBuffers();
-    }
-
-    if (isPeriodicFlushEnabled_) {
       timeOfLastSend_ = CkWallTimer();
     }
 
