@@ -299,10 +299,8 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #define ACK_TAG                 0x30
 /* SMSG is data message */
 #define SMALL_DATA_TAG          0x31
-#define SMALL_DATA_ACK_TAG      0x32
 /* SMSG is a control message to initialize a BTE */
 #define LMSG_INIT_TAG           0x39 
-#define LMSG_INIT_ACK_TAG       0x3a 
 
 #define DEBUG
 #ifdef GNI_RC_CHECK
@@ -369,7 +367,7 @@ static CmiNodeLock           rx_cq_lock;
 static CmiNodeLock           smsg_mailbox_lock;
 static CmiNodeLock           smsg_rx_cq_lock;
 static CmiNodeLock           *mempool_lock;
-
+//#define     CMK_WITH_STATS      0
 typedef struct msg_list
 {
     uint32_t destNode;
@@ -378,6 +376,9 @@ typedef struct msg_list
     uint8_t tag;
 #if !CMK_SMP
     struct msg_list *next;
+#endif
+#if CMK_WITH_STATS
+    double  creation_time;
 #endif
 }MSG_LIST;
 
@@ -715,12 +716,20 @@ inline  void AckPool_freeslot(int s)
 #if CMK_WITH_STATS
 typedef struct comm_thread_stats
 {
-int      count_in_send_buffered_ack;
-double   time_in_send_buffered_ack;
-double   max_time_in_send_buffered_ack;
-int      count_in_send_buffered_smsg;
-double   time_in_send_buffered_smsg;
-double   max_time_in_send_buffered_smsg;
+    uint64_t  smsg_data_count;
+    uint64_t  lmsg_init_count;
+    uint64_t  ack_count;
+    uint64_t  big_msg_ack_count;
+    uint64_t  smsg_count;
+    //times of calling SmsgSend
+    uint64_t  try_smsg_data_count;
+    uint64_t  try_lmsg_init_count;
+    uint64_t  try_ack_count;
+    uint64_t  try_big_msg_ack_count;
+    uint64_t  try_smsg_count;
+    
+    double    max_time_in_send_buffered_smsg;
+    double    all_time_in_send_buffered_smsg;
 } Comm_Thread_Stats;
 
 static Comm_Thread_Stats   comm_stats;
@@ -730,32 +739,38 @@ static void init_comm_stats()
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
 }
 
-#define STATS_ACK_TIME(x)   \
-        { double t = CmiWallTimer(); \
-          x;        \
-          t = CmiWallTimer() - t;          \
-          comm_stats.count_in_send_buffered_ack ++;        \
-          comm_stats.time_in_send_buffered_ack += t;   \
-          if (t>comm_stats.max_time_in_send_buffered_ack)      \
-              comm_stats.max_time_in_send_buffered_ack = t;    \
+#define SMSG_CREATION( x )  x->creation_time = CmiWallTimer();
+
+#define SMSG_SENT_DONE(creation_time, tag)  \
+        {   if( tag == SMALL_DATA_TAG) comm_stats.smsg_data_count++;  \
+            else  if( tag == LMSG_INIT_TAG) comm_stats.lmsg_init_count++;  \
+            else  if( tag == ACK_TAG) comm_stats.ack_count++;  \
+            else  if( tag == BIG_MSG_TAG) comm_stats.big_msg_ack_count++;  \
+            comm_stats.smsg_count++; \
+            double inbuff_time = CmiWallTimer() - creation_time;   \
+            if(inbuff_time > comm_stats.max_time_in_send_buffered_smsg) comm_stats.max_time_in_send_buffered_smsg= inbuff_time; \
+            comm_stats.all_time_in_send_buffered_smsg += inbuff_time;  \
         }
 
-#define STATS_SEND_SMSGS_TIME(x)   \
-        { double t = CmiWallTimer(); \
-          x;        \
-          t = CmiWallTimer() - t;          \
-          comm_stats.count_in_send_buffered_smsg ++;        \
-          comm_stats.time_in_send_buffered_smsg += t;   \
-          if (t>comm_stats.max_time_in_send_buffered_smsg)      \
-              comm_stats.max_time_in_send_buffered_smsg = t;    \
+#define SMSG_TRY_SEND(tag)  \
+        {   if( tag == SMALL_DATA_TAG) comm_stats.try_smsg_data_count++;  \
+            else  if( tag == LMSG_INIT_TAG) comm_stats.try_lmsg_init_count++;  \
+            else  if( tag == ACK_TAG) comm_stats.try_ack_count++;  \
+            else  if( tag == BIG_MSG_TAG) comm_stats.try_big_msg_ack_count++;  \
+            comm_stats.try_smsg_count++; \
         }
+
 
 static void print_comm_stats()
 {
-    if (myrank == 0) 
-    printf("PE[%d]                    count\ttime\tmax \n", myrank);
-    printf("PE[%d]  send buffered ack:   %d\t%f\t%f\n",  myrank, comm_stats.count_in_send_buffered_ack, comm_stats.time_in_send_buffered_ack, comm_stats.max_time_in_send_buffered_ack);
-    printf("PE[%d]  send smsgs:          %d\t%f\t%f\n",  myrank, comm_stats.count_in_send_buffered_smsg, comm_stats.time_in_send_buffered_smsg, comm_stats.max_time_in_send_buffered_smsg);
+    printf("PE[%d]SMSG\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    printf("PE[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+            comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
+            comm_stats.ack_count, comm_stats.big_msg_ack_count);
+    
+    printf("PE[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+            comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
+            comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count);
 }
 #else
 #define STATS_ACK_TIME(x)            x
@@ -1077,7 +1092,9 @@ static void buffer_small_msgs(SMSG_QUEUE *queue, void *msg, int size, int destNo
     msg_tmp->size   = size;
     msg_tmp->msg    = msg;
     msg_tmp->tag    = tag;
-
+#if CMK_WITH_STATS
+    SMSG_CREATION(msg_tmp)
+#endif
 #if !CMK_SMP
     if (queue->smsg_msglist_index[destNode].sendSmsgBuf == 0 ) {
         queue->smsg_msglist_index[destNode].next = queue->smsg_head_index;
@@ -1241,7 +1258,7 @@ static int connect_to(int destNode)
 }
 
 inline 
-static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg, int size, uint8_t tag, int inbuff )
+static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg, int size, uint8_t tag, int inbuff, MSG_LIST *ptr )
 {
     unsigned int          remote_address;
     uint32_t              remote_id;
@@ -1271,8 +1288,6 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
     if(queue->smsg_msglist_index[destNode].sendSmsgBuf == 0 || inbuff==1)
     {
 #endif
-        uint64_t *buf = NULL;
-        int bufsize = 0;
         //CMI_GNI_LOCK(smsg_mailbox_lock)
         CMI_GNI_LOCK(default_tx_cq_lock)
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -1297,7 +1312,18 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         }
         // GNI_EpSetEventData(ep_hndl_array[destNode], destNode, myrank);
 #endif
-        status = GNI_SmsgSendWTag(ep_hndl_array[destNode], buf, bufsize, msg, size, 0, tag);
+#if     CMK_WITH_STATS
+        SMSG_TRY_SEND(tag)
+#endif
+#if CMK_WITH_STATS
+    double              creation_time;
+    if (ptr == NULL)
+        creation_time = CmiWallTimer();
+    else
+        creation_time = ptr->creation_time;
+#endif
+
+    status = GNI_SmsgSendWTag(ep_hndl_array[destNode], NULL, 0, msg, size, 0, tag);
 #if CMK_SMP_TRACE_COMMTHREAD
         if (oldpe != -1)  TRACE_COMM_SET_MSGID(real_data, oldpe, oldeventid);
 #endif
@@ -1305,13 +1331,15 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         //CMI_GNI_UNLOCK(smsg_mailbox_lock)
         if(status == GNI_RC_SUCCESS)
         {
+#if     CMK_WITH_STATS
+            SMSG_SENT_DONE(creation_time,tag) 
+#endif
 #if CMK_SMP_TRACE_COMMTHREAD
-            if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG || tag == SMALL_DATA_ACK_TAG || tag == LMSG_INIT_ACK_TAG)
+            if(tag == SMALL_DATA_TAG || tag == LMSG_INIT_TAG )
             { 
                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), real_data);
             }
 #endif
-            smsg_send_count ++;
         }else
             status = GNI_RC_ERROR_RESOURCE;
     }
@@ -1353,8 +1381,7 @@ static CONTROL_MSG* construct_control_msg(int size, char *msg, uint8_t seqno)
 
 // Large message, send control to receiver, receiver register memory and do a GET, 
 // return 1 - send no success
-inline
-static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff)
+inline static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL_MSG  *control_msg_tmp, int inbuff, MSG_LIST *smsg_ptr)
 {
     gni_return_t        status  =  GNI_RC_ERROR_NOMEM;
     uint32_t            vmdh_index  = -1;
@@ -1430,7 +1457,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
 
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, inbuff);  
+        status = send_smsg_message( queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, inbuff, smsg_ptr); 
         if(status == GNI_RC_SUCCESS)
         {
             buffered_send_msg += register_size;
@@ -1457,7 +1484,7 @@ static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, CONTROL
     MEMORY_REGISTER(onesided_hnd, nic_hndl,msg, ALIGN64(size), &(control_msg_tmp->source_mem_hndl), &omdh, NULL, status)
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, 0);  
+        status = send_smsg_message(queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, 0, NULL);  
         if(status == GNI_RC_SUCCESS)
         {
             FreeControlMsg(control_msg_tmp);
@@ -1513,21 +1540,21 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
 #else   //non-smp, smp(worker sending)
     if(size <= SMSG_MAX_MSG)
     {
-        if (GNI_RC_SUCCESS == send_smsg_message(queue, destNode,  msg, size, SMALL_DATA_TAG, 0))
+        if (GNI_RC_SUCCESS == send_smsg_message(queue, destNode,  msg, size, SMALL_DATA_TAG, 0, NULL))
             CmiFree(msg);
     }
     else if (size < BIG_MSG) {
         control_msg_tmp =  construct_control_msg(size, msg, 0);
-        send_large_messages(queue, destNode, control_msg_tmp, 0);
+        send_large_messages(queue, destNode, control_msg_tmp, 0, NULL);
     }
     else {
 #if     USE_LRTS_MEMPOOL
         CmiSetMsgSeq(msg, 0);
         control_msg_tmp =  construct_control_msg(size, msg, 1);
-        send_large_messages(queue, destNode, control_msg_tmp, 0);
+        send_large_messages(queue, destNode, control_msg_tmp, 0, NULL);
 #else
         control_msg_tmp =  construct_control_msg(size, msg, 0);
-        send_large_messages(queue, destNode, control_msg_tmp, 0);
+        send_large_messages(queue, destNode, control_msg_tmp, 0, NULL);
 #endif
     }
 #endif
@@ -1936,7 +1963,7 @@ static void PumpNetworkSmsg()
                     control_msg_tmp = construct_control_msg(header_tmp->total_length, msg, cur_seq+1+1);
                     control_msg_tmp->dest_addr = header_tmp->dest_addr;
                     //send next seg
-                    send_large_messages(queue, inst_id, control_msg_tmp, 0);
+                    send_large_messages( queue, inst_id, control_msg_tmp, 0, NULL);
                          // pipelining
                     if (header_tmp->seq_id == 1) {
                       int i;
@@ -1945,7 +1972,7 @@ static void PumpNetworkSmsg()
                         CmiSetMsgSeq(msg, seq-1);
                         control_msg_tmp =  construct_control_msg(header_tmp->total_length, (char *)msg, seq);
                         control_msg_tmp->dest_addr = header_tmp->dest_addr;
-                        send_large_messages(queue, inst_id, control_msg_tmp, 0);
+                        send_large_messages( queue, inst_id, control_msg_tmp, 0, NULL);
                         if (header_tmp->total_length <= ONE_SEG*seq) break;
                       }
                     }
@@ -2394,7 +2421,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 
 #if CMK_DIRECT
             if (tmp_pd->amo_cmd == 1) {
-                status = send_smsg_message(queue, inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0); 
+                status = send_smsg_message(queue, inst_id, cmk_direct_done_msg, sizeof(CMK_DIRECT_HEADER), msg_tag, 0, NULL); 
                 if (status == GNI_RC_SUCCESS) free(cmk_direct_done_msg); 
             }
             else
@@ -2402,7 +2429,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
             if (msg_tag == ACK_TAG) {
 #if !REMOTE_EVENT
 #if   !CQWRITE
-                status = send_smsg_message(queue, inst_id, ack_msg, ACK_MSG_SIZE, msg_tag, 0); 
+                status = send_smsg_message(queue, inst_id, ack_msg, ACK_MSG_SIZE, msg_tag, 0, NULL); 
                 if (status == GNI_RC_SUCCESS) FreeAckMsg(ack_msg);
 #else
                 sendCqWrite(inst_id, tmp_pd->remote_addr, tmp_pd->remote_mem_hndl); 
@@ -2410,7 +2437,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #endif
             }
             else {
-                status = send_smsg_message(queue, inst_id, ack_msg_tmp, CONTROL_MSG_SIZE, msg_tag, 0); 
+                status = send_smsg_message(queue, inst_id, ack_msg_tmp, CONTROL_MSG_SIZE, msg_tag, 0, NULL); 
                 if (status == GNI_RC_SUCCESS) FreeControlMsg(ack_msg_tmp);
             }
 #if CMK_PERSISTENT_COMM
@@ -2657,7 +2684,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             switch(ptr->tag)
             {
             case SMALL_DATA_TAG:
-                status = send_smsg_message(queue, ptr->destNode,  ptr->msg, ptr->size, ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode,  ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS)
                 {
                     CmiFree(ptr->msg);
@@ -2665,14 +2692,14 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 break;
             case LMSG_INIT_TAG:
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
-                status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1);
+                status = send_large_messages( queue, ptr->destNode, control_msg_tmp, 1, ptr);
                 break;
             case ACK_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
                 break;
             case BIG_MSG_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS)
                 {
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
@@ -2680,7 +2707,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 break;
 #if CMK_DIRECT
             case DIRECT_PUT_DONE_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1);  
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS)
                 {
                     free((CMK_DIRECT_HEADER*)ptr->msg);
@@ -3487,6 +3514,9 @@ void  LrtsFree(void *msg)
 void LrtsExit()
 {
 #if CMK_WITH_STATS
+#if CMK_SMP
+    if(CmiMyRank() == CmiMyNodeSize())
+#endif
     if (print_stats) print_comm_stats();
 #endif
     /* free memory ? */
