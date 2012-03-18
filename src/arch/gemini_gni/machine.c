@@ -730,6 +730,14 @@ typedef struct comm_thread_stats
     
     double    max_time_in_send_buffered_smsg;
     double    all_time_in_send_buffered_smsg;
+
+    uint64_t  rdma_count;
+    uint64_t  try_rdma_count;
+    double    max_time_from_control_to_rdma_init;
+    double    all_time_from_control_to_rdma_init;
+
+    double    max_time_from_rdma_init_to_rdma_done;
+    double    all_time_from_rdma_init_to_rdma_done;
 } Comm_Thread_Stats;
 
 static Comm_Thread_Stats   comm_stats;
@@ -759,6 +767,22 @@ static void init_comm_stats()
             else  if( tag == BIG_MSG_TAG) comm_stats.try_big_msg_ack_count++;  \
             comm_stats.try_smsg_count++; \
         }
+
+#define  RDMA_TRY_SEND()        comm_stats.try_rdma_count++;
+
+#define  RDMA_Trans_DONE(x)      \
+         {  comm_stats.rdma_count++;  \
+             double rdma_trans_time = CmiWallTimer() - x ; \
+             if(rdma_trans_time > comm_stats.max_time_from_rdma_init_to_rdma_done) comm_stats.max_time_from_rdma_init_to_rdma_done = rdma_trans_time; \
+             comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
+         }
+
+#define  RDMA_Trans_INIT(x)      \
+         {  double rdma_trans_time = CmiWallTimer() - x ; \
+             if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
+             comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
+         }
+
 
 
 static void print_comm_stats()
@@ -2163,6 +2187,9 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
                 MACHSTATE4(8, "GO request from %d (%d,%d, %d)\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
 #endif
                 IncreaseMsgInRecv(msg_data);
+#if CMK_SMP_TRACE_COMMTHREAD
+                pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+#endif
             }
         }
     }else
@@ -2448,7 +2475,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #if PRINT_SYH
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
-                    TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (void*)tmp_pd->local_addr); 
+                    //TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (void*)tmp_pd->local_addr); 
+                    //TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_value/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (void*)tmp_pd->local_addr); 
 
                     START_EVENT();
                     CmiAssert(SIZEFIELD((void*)(tmp_pd->local_addr)) <= tmp_pd->length);
@@ -2469,8 +2497,8 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         printf("Pipeline msg done [%d]\n", myrank);
 #endif
 #if                 CMK_SMP_TRACE_COMMTHREAD
-                        if( tmp_pd->cqwrite_value == 1)
-                            TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+2)/1000000.0), (void*)tmp_pd->local_addr); 
+                        //if( tmp_pd->cqwrite_value == 1)
+                        //    TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
                         TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
