@@ -521,18 +521,20 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
     if (CmiMyPe()==destPE) {
         CmiSendSelf(msg);
 #if CMK_PERSISTENT_COMM
-        if (phs) curphs++;
+        if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
     } else {
 #if CMK_PERSISTENT_COMM
-        if (phs) {
+        if (CpvAccess(phs)) {
           if (size > 8192) {
-            CmiAssert(curphs < phsSize);
-            LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
+            CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
+            int destNode = CmiNodeOf(destPE);
+            CMI_DEST_RANK(msg) = CmiRankOf(destPE);
+            LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)++], destNode, size, msg);
             return;
           }
           else
-            curphs++;
+            CpvAccess(curphs)++;
         }
 #endif
         int destNode = CmiNodeOf(destPE);
