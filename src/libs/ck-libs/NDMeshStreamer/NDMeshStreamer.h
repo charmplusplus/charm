@@ -438,6 +438,9 @@ void MeshStreamer<dtype>::associateCallback(
 	     " to 10 ms\n");
     progressPeriodInMs_ = 10;
   }
+
+  // initialize to prevent comparison against uninitialized value
+  timeOfLastSend_ = CkWallTimer();
   enablePeriodicFlushing();
       
 }
