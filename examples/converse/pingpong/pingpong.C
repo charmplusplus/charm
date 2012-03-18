@@ -135,6 +135,7 @@ CmiStartFn mymain()
     int otherPe = CmiMyPe() ^ 1;
     
 #if USE_PERSISTENT
+    if (CmiMyPe() < CmiNumPes())
     h = CmiCreatePersistent(otherPe, maxMsgSize+1024);
 #endif
     
