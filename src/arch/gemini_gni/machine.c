@@ -2192,41 +2192,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     if (status == GNI_RC_SUCCESS && request_msg->seq_id == 0) {
         if(NoMsgInRecv( (void*)(msg_data)))
             register_size = GetMempoolsize((void*)(msg_data));
-        else
-            register_size = 0;
     }
 
-#if 0
-    if( request_msg->seq_id == 0)
-    {
-        pd->local_mem_hndl= GetMemHndl(msg_data);
-        transaction_size = ALIGN64(size);
-        if(IsMemHndlZero(pd->local_mem_hndl))
-        {   
-            status = registerMemory( GetMempoolBlockPtr(msg_data), GetMempoolsize(msg_data), &(GetMemHndl(msg_data)), rdma_rx_cqh);
-            if(status == GNI_RC_SUCCESS)
-            {
-                pd->local_mem_hndl = GetMemHndl(msg_data);
-            }
-            else
-            {
-                SetMemHndlZero(pd->local_mem_hndl);
-            }
-        }
-        if(NoMsgInRecv( (void*)(msg_data)))
-            register_size = GetMempoolsize((void*)(msg_data));
-        else
-            register_size = 0;
-    }
-    else{
-        transaction_size = ALIGN64(request_msg->length);
-        status = registerMemory(msg_data, transaction_size, &(pd->local_mem_hndl), NULL); 
-        if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
-        {
-            GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
-        }
-    }
-#endif
     pd->first_operand = ALIGN64(size);                   //  total length
 
     if(request_msg->total_length <= LRTS_GNI_RDMA_THRESHOLD)
@@ -2664,42 +2631,15 @@ static void  SendRdmaMsg()
 #endif 
         MACHSTATE4(8, "noempty-rdma  %d (%lld,%lld,%d) \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size); 
         gni_post_descriptor_t *pd = ptr->pd;
-        status = GNI_RC_SUCCESS;
         
         msg = (void*)(pd->local_addr);
         status = registerMessage(msg, pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
+        register_size = 0;
         if(pd->cqwrite_value == 0) {
             if(NoMsgInRecv(msg))
-                register_size = GetMempoolsize((void*)(pd->local_addr));
-            else
-                register_size = 0;
+                register_size = GetMempoolsize(msg);
         }
-        else
-            register_size = 0;
-#if 0
-        if(pd->cqwrite_value == 0)
-        {
-            if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
-            {
-                msg = (void*)(pd->local_addr);
-                status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)), rdma_rx_cqh);
-                if(status == GNI_RC_SUCCESS)
-                {
-                    pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
-                }
-            }else
-            {
-                pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
-            }
-            if(NoMsgInRecv( (void*)(pd->local_addr)))
-                register_size = GetMempoolsize((void*)(pd->local_addr));
-            else
-                register_size = 0;
-        }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool, or CmiDirect Msg (which is not from mempool)
-        {
-            status = registerMemory((void*)(pd->local_addr), pd->length, &(pd->local_mem_hndl), NULL); 
-        }
-#endif
+
         if(status == GNI_RC_SUCCESS)        //mem register good
         {
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
