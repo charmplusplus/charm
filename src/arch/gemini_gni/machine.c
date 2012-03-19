@@ -34,7 +34,8 @@
 #include <malloc.h>
 #include <unistd.h>
 #include <time.h>
-
+#include <sys/dir.h>
+#include <sys/stat.h>
 #include <gni_pub.h>
 #include <pmi.h>
 //#include <numatoolkit.h>
@@ -736,6 +737,7 @@ static int checksum_flag = 0;
 /* =====End of Definitions of Message-Corruption Related Macros=====*/
 
 #if CMK_WITH_STATS
+FILE *counterLog = NULL;
 typedef struct comm_thread_stats
 {
     uint64_t  smsg_data_count;
@@ -793,14 +795,14 @@ static void init_comm_stats()
 #define  RDMA_TRY_SEND()        comm_stats.try_rdma_count++;
 
 #define  RDMA_TRANS_DONE(x)      \
-         {  comm_stats.rdma_count++;  \
-             double rdma_trans_time = CmiWallTimer() - x ; \
+         {  double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_rdma_init_to_rdma_done) comm_stats.max_time_from_rdma_init_to_rdma_done = rdma_trans_time; \
              comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
          }
 
 #define  RDMA_TRANS_INIT(x)      \
-         {  double rdma_trans_time = CmiWallTimer() - x ; \
+         {   comm_stats.rdma_count++;  \
+             double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
          }
@@ -808,18 +810,18 @@ static void init_comm_stats()
 
 static void print_comm_stats()
 {
-    printf("Node[%d]SMSG\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
-    printf("Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+    fprintf(counterLog, "Node[%d]SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    fprintf(counterLog, "Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
             comm_stats.ack_count, comm_stats.big_msg_ack_count);
     
-    printf("Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n\n", myrank, 
+    fprintf(counterLog, "Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n\n", myrank, 
             comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
             comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count);
 
-    printf("Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
-    printf("Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
-    printf("Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
+    fprintf(counterLog, "Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
+    fprintf(counterLog, "Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
+    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
 }
 
 #else
@@ -3579,6 +3581,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     debugLog=fopen(ln,"w");
 #endif
 
+#if CMK_WITH_STATS
+    char ln[200];
+    int code = mkdir("counters", 00777); 
+    sprintf(ln,"counters/statistics.%d",myrank);
+    counterLog=fopen(ln,"w");
+#endif
 //    NTK_Init();
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
