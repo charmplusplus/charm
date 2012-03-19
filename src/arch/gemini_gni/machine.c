@@ -652,6 +652,7 @@ CpvDeclare(mempool_type*, mempool);
 struct IndexStruct {
 void *addr;
 int next;
+int type;     // 1: ACK   2: Persistent
 };
 
 typedef struct IndexPool {
@@ -664,7 +665,8 @@ typedef struct IndexPool {
 static IndexPool  ackPool;
 
 
-#define  GetAckAddress(s)          (ackPool.indexes[s].addr)
+#define  GetIndexType(s)             (ackPool.indexes[s].type)
+#define  GetIndexAddress(s)          (ackPool.indexes[s].addr)
 
 static void IndexPool_init(IndexPool *pool)
 {
@@ -684,7 +686,7 @@ static void IndexPool_init(IndexPool *pool)
 }
 
 static
-inline int IndexPool_getslot(IndexPool *pool, void *addr)
+inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int i;
     int s;
@@ -708,6 +710,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr)
     }
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
+    pool->indexes[s].type = type;
     CMI_GNI_UNLOCK(pool->lock);
     return s;
 }
@@ -1371,7 +1374,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         if (tag == LMSG_INIT_TAG) {
             CONTROL_MSG *control_msg_tmp = (CONTROL_MSG*)msg;
             if (control_msg_tmp->seq_id == 0 && control_msg_tmp->ack_index == -1)
-                control_msg_tmp->ack_index = IndexPool_getslot(&ackPool, (void*)control_msg_tmp->source_addr);
+                control_msg_tmp->ack_index = IndexPool_getslot(&ackPool, (void*)control_msg_tmp->source_addr, 1);
         }
         // GNI_EpSetEventData(ep_hndl_array[destNode], destNode, myrank);
 #endif
@@ -2129,9 +2132,9 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
     if (!IsMemHndlZero(*memh)) return GNI_RC_SUCCESS;
 
 #if CMK_PERSISTENT_COMM
-        // persistent message is always registered
-        // BIG_MSG small pieces do not have malloc chunk header
-    if (seqno == PERSIST_SEQ && !IsMemHndlZero(MEMHFIELD(msg))) {
+      // persistent message is always registered
+      // BIG_MSG small pieces do not have malloc chunk header
+    if ((seqno <= 1 || seqno == PERSIST_SEQ) && !IsMemHndlZero(MEMHFIELD(msg))) {
         *memh = MEMHFIELD(msg);
         return GNI_RC_SUCCESS;
     }
@@ -2398,7 +2401,7 @@ static void PumpRemoteTransactions()
     gni_cq_entry_t          ev;
     gni_return_t            status;
     void                    *msg;   
-    int                     slot;
+    int                     slot, type, size;
 
     while(1) {
         CMI_GNI_LOCK(global_gni_lock)
@@ -2413,19 +2416,32 @@ static void PumpRemoteTransactions()
         //slot = GNI_CQ_GET_DATA(ev) & 0xFFFFFFFFL;
 
         //CMI_GNI_LOCK(ackpool_lock);
-        msg = GetAckAddress(slot);
+        type = GetIndexType(slot);
+        msg = GetIndexAddress(slot);
         //CMI_GNI_UNLOCK(ackpool_lock);
 
-        DecreaseMsgInSend(msg);
+        switch (type) {
+        case 1:    // ACK
+            DecreaseMsgInSend(msg);
 #if ! USE_LRTS_MEMPOOL
-       // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
+           // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
 #else
-        DecreaseMsgInSend(msg);
+            DecreaseMsgInSend(msg);
 #endif
-        if(NoMsgInSend(msg))
-            buffered_send_msg -= GetMempoolsize(msg);
-        CmiFree(msg);
-        IndexPool_freeslot(&ackPool, slot);
+            if(NoMsgInSend(msg))
+                buffered_send_msg -= GetMempoolsize(msg);
+            CmiFree(msg);
+            IndexPool_freeslot(&ackPool, slot);
+            break;
+        case 2:     // PERSISTENT
+            size = CmiGetMsgSize(msg);
+            CmiReference(msg);
+            CMI_CHECK_CHECKSUM(msg, size);
+            handleOneRecvedMsg(size, msg); 
+            break;
+        default:
+            CmiAbort("PumpRemoteTransactions: unknown type");
+        }
     }
     if(status == GNI_RC_ERROR_RESOURCE)
     {
@@ -2483,16 +2499,19 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                 }
                 else {
                     CmiFree((void *)tmp_pd->local_addr);
-#if     !CQWRITE
+#if REMOTE_EVENT
+                    FreePostDesc(tmp_pd);
+                    continue;
+#elif CQWRITE
+                    sendCqWrite(inst_id, tmp_pd->remote_addr, tmp_pd->remote_mem_hndl);
+                    FreePostDesc(tmp_pd);
+                    continue;
+#else
                     MallocControlMsg(ack_msg_tmp);
                     ack_msg_tmp->source_addr = tmp_pd->remote_addr;
                     ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
                     ack_msg_tmp->length  = tmp_pd->length;
                     msg_tag = PUT_DONE_TAG;
-#else
-                    sendCqWrite(inst_id, tmp_pd->remote_addr, tmp_pd->remote_mem_hndl);
-                    FreePostDesc(tmp_pd);
-                    continue;
 #endif
                 }
                 break;
@@ -2651,7 +2670,7 @@ static void  SendRdmaMsg()
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
             CMI_GNI_LOCK(lock);
 #if REMOTE_EVENT
-            if( pd->cqwrite_value == 0)
+            if( pd->cqwrite_value == 0 || pd->cqwrite_value == PERSIST_SEQ)
             {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
                 int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, ACK_EVENT(ptr->ack_index));

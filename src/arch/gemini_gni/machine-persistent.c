@@ -64,8 +64,18 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 
         SetMemHndlZero(pd->local_mem_hndl);
 #if CMK_SMP
-        bufferRdmaMsg(destNode, pd, -1);
+#if REMOTE_EVENT
+        bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
 #else
+        bufferRdmaMsg(destNode, pd, -1);
+#endif
+#else
+#if REMOTE_EVENT
+        pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], inst_id, ACK_EVENT((int)(slot->destHandle)));
+        GNI_RC_CHECK("GNI_EpSetEventData", sts);
+#endif
+
         status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
         if (status == GNI_RC_SUCCESS) 
         {
@@ -196,10 +206,10 @@ void *PerAlloc(int size)
   char *ptr = (char*)res+sizeof(CmiChunkHeader);
   SIZEFIELD(ptr)=size;
   REFFIELD(ptr)=1;
-#if  CQWRITE
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, rdma_rx_cqh, status);
+#if  CQWRITE || CMK_PERSISTENT_COMM
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, rdma_rx_cqh, status);
 #else
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, NULL, status);
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, NULL, status);
 #endif
   GNI_RC_CHECK("Mem Register before post", status);
   return ptr;
@@ -216,6 +226,39 @@ void PerFree(char *msg)
 /* machine dependent init call */
 void persist_machine_init(void)
 {
+}
+
+void initSendSlot(PersistentSendsTable *slot)
+{
+  int i;
+  slot->used = 0;
+  slot->destPE = -1;
+  slot->sizeMax = 0;
+  slot->destHandle = 0; 
+#if 0
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    slot->destAddress[i] = NULL;
+    slot->destSizeAddress[i] = NULL;
+  }
+#endif
+  memset(&slot->destBuf, 0, sizeof(PersistentBuf)*PERSIST_BUFFERS_NUM);
+  slot->messageBuf = 0;
+  slot->messageSize = 0;
+}
+
+void initRecvSlot(PersistentReceivesTable *slot)
+{
+  int i;
+#if 0
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    slot->messagePtr[i] = NULL;
+    slot->recvSizePtr[i] = NULL;
+  }
+#endif
+  memset(&slot->destBuf, 0, sizeof(PersistentBuf)*PERSIST_BUFFERS_NUM);
+  slot->sizeMax = 0;
+  slot->index = -1;
+  slot->prev = slot->next = NULL;
 }
 
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
@@ -236,6 +279,17 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     // FIXME:  assume always succeed
   }
   slot->sizeMax = maxBytes;
+#if REMOTE_EVENT
+  slot->index = IndexPool_getslot(&ackPool, slot->destBuf[0].destAddress, 2);
+#endif
 }
 
 
+PersistentHandle getPersistentHandle(PersistentHandle h)
+{
+#if REMOTE_EVENT
+  return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
+#else
+  return h;
+#endif
+}

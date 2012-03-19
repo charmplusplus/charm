@@ -37,16 +37,18 @@ typedef struct _PersistentReceivesTable {
 #endif
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   int sizeMax;
+  size_t               index;
   struct _PersistentReceivesTable *prev, *next;
 } PersistentReceivesTable;
 
-extern PersistentReceivesTable *persistentReceivesTableHead;
-extern PersistentReceivesTable *persistentReceivesTableTail;
+CpvExtern(PersistentReceivesTable *, persistentReceivesTableHead);
+CpvExtern(PersistentReceivesTable *, persistentReceivesTableTail);
 
 CpvExtern(PersistentHandle *, phs);
 CpvExtern(int, phsSize);
 CpvExtern(int, curphs);
 
+PersistentHandle getPersistentHandle(PersistentHandle h);
 void *PerAlloc(int size);
 void PerFree(char *msg);
 int PumpPersistent();
