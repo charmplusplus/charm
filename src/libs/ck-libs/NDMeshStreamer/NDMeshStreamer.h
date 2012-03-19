@@ -108,7 +108,7 @@ private:
 
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
-    double timeOfLastSend_; 
+    bool hasSentRecently_;
 
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
@@ -369,19 +369,13 @@ void MeshStreamer<dtype>::storeMessage(
 
     messageBuffers[bufferIndex] = NULL;
     numDataItemsBuffered_ -= numBuffered; 
-
-    if (isPeriodicFlushEnabled_) {
-      timeOfLastSend_ = CkWallTimer();
-    }
+    hasSentRecently_ = true; 
 
   }
-
   // send if total buffering capacity has been reached
-  if (numDataItemsBuffered_ == totalBufferCapacity_) {
+  else if (numDataItemsBuffered_ == totalBufferCapacity_) {
     flushLargestBuffer();
-    if (isPeriodicFlushEnabled_) {
-      timeOfLastSend_ = CkWallTimer();
-    }
+    hasSentRecently_ = true; 
   }
 
 }
@@ -438,9 +432,8 @@ void MeshStreamer<dtype>::associateCallback(
 	     " to 10 ms\n");
     progressPeriodInMs_ = 10;
   }
-
-  // initialize to prevent comparison against uninitialized value
-  timeOfLastSend_ = CkWallTimer();
+  
+  hasSentRecently_ = false; 
   enablePeriodicFlushing();
       
 }
@@ -576,16 +569,21 @@ void MeshStreamer<dtype>::flushAllBuffers() {
 template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
 
-    if (!isPeriodicFlushEnabled_ || 
-	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
-      flushAllBuffers();
-      timeOfLastSend_ = CkWallTimer();
-    }
+  // flush if (1) this is not a periodic call or 
+  //          (2) this is a periodic call and no sending took place
+  //              since the last time the function was invoked
+  if (!isPeriodicFlushEnabled_ || !hasSentRecently_) {
 
+    if (numDataItemsBuffered_ != 0) {
+      flushAllBuffers();
+    }    
 #ifdef DEBUG_STREAMER
-    //CkPrintf("[%d] numDataItemsBuffered_: %d\n", CkMyPe(), numDataItemsBuffered_);
     CkAssert(numDataItemsBuffered_ == 0); 
 #endif
+    
+  }
+
+  hasSentRecently_ = false; 
 
 }
 
