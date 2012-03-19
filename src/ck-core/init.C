@@ -67,6 +67,7 @@ never be excluded...
 #include "trace.h"
 
 void CkRestartMain(const char* dirname);
+int storeInterOperateStatus = 0;
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
@@ -467,10 +468,12 @@ static void _exitHandler(envelope *env)
   switch(env->getMsgtype()) {
     case StartExitMsg:
       CkAssert(CkMyPe()==0);
-      if (!_CkExitFnVec.isEmpty()) {
-        CkExitFn fn = _CkExitFnVec.deq();
-        fn();
-        break;
+      if(!CharmLibInterOperate) {
+        if (!_CkExitFnVec.isEmpty()) {
+          CkExitFn fn = _CkExitFnVec.deq();
+          fn();
+          break;
+        }
       }
       // else goto next
     case ExitMsg:
@@ -480,8 +483,10 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
-      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      if(!CharmLibInterOperate) {
+        CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+        CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
+      }
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -499,16 +504,17 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
+    if(!CharmLibInterOperate) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
         _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-	/*FAULT_EVAC*/
+      /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
-      }	
+      }
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
@@ -518,6 +524,7 @@ static void _exitHandler(envelope *env)
 #if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
+    }
       if (_ringexit) {
         int stride = CkNumPes()/_ringtoken;
         int pe = CkMyPe()+1;
@@ -528,12 +535,22 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-      if(CkMyPe()){
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-        ConverseExit();
-      }	
+      //everyone exits here - there may be issues with leftover messages in the queue
+      if(CharmLibInterOperate) {
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        _exitStarted = 0;
+        CpvAccess(charmLibExitFlag) = 1;
+      } else {
+        if(CkMyPe()){
+          DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+          CharmLibInterOperate = storeInterOperateStatus;
+          CpvAccess(charmLibExitFlag) = 1;
+          ConverseExit();
+        }
+      }
       break;
     case StatMsg:
+// shouldn't reach here in interoperate mode
       CkAssert(CkMyPe()==0);
 #if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
@@ -543,7 +560,9 @@ static void _exitHandler(envelope *env)
 			/*FAULT_EVAC*/
       if(_numStatsRecd==CkNumValidPes()) {
         _printStats();
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        CharmLibInterOperate = storeInterOperateStatus;
+        CpvAccess(charmLibExitFlag) = 1;
         ConverseExit();
       }
       break;
@@ -828,11 +847,14 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
+  if(!CharmLibInterOperate) {
 #if ! CMK_BIGSIM_THREAD
-  _TRACE_END_EXECUTE();
-  //Wait for stats, which will call ConverseExit when finished:
-  CsdScheduler(-1);
+    _TRACE_END_EXECUTE();
+    //Wait for stats, which will call ConverseExit when finished:
+    if(!storeInterOperateStatus)
+      CsdScheduler(-1);
 #endif
+  }
 }
 
 /* This is a routine called in case the application is closing due to a signal.
@@ -1391,4 +1413,22 @@ void registerExitFn(CkExitFn fn)
   _CkExitFnVec.enq(fn);
 }
 
+void CharmLibInit(int peid, int numpes, int argc, char **argv){
+    //note CmiNumNodes and CmiMyNode should just be macros
+    _Cmi_numnodes = numpes;
+    _Cmi_mynode = peid;
+
+  CharmLibInterOperate = 1;
+  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+  printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes());
+}
+
+void CharmLibExit() {
+  storeInterOperateStatus = 1;
+  CharmLibInterOperate = 0;
+  if(CkMyPe() == 0) {
+    CkExit();
+  }
+  CsdScheduler(-1);
+}
 /*@}*/

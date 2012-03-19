@@ -130,6 +130,8 @@ extern int CmiMyRank_();
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
 extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
+extern int _Cmi_mynode;
+extern int _Cmi_numnodes;
 
 #define CmiMyPe()           _Cmi_mype
 #define CmiMyRank()         0
@@ -1904,5 +1906,11 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
 
+
+/* CharmLibInterOperate should be a global variable as it will be
+ * set only once by MPI ranks respectively.
+ */
+extern int CharmLibInterOperate;
+CpvExtern(int,charmLibExitFlag);
 
 #endif /* CONVERSE_H */
