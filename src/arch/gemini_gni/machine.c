@@ -2553,7 +2553,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                 else
                 {
                     msg_tag = ACK_TAG; 
-#if  !REMOTE_EVENT && !inst_id, CQWRITE
+#if  !REMOTE_EVENT && !CQWRITE
                     MallocAckMsg(ack_msg);
                     ack_msg->source_addr = tmp_pd->remote_addr;
 #endif
