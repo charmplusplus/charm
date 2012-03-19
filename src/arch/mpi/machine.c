@@ -1204,11 +1204,13 @@ void MachineExitForMPI() {
 #endif
 #endif
 
+   if(!CharmLibInterOperate) {
 #if ! CMK_AUTOBUILD
-    signal(SIGINT, signal_int);
-    MPI_Finalize();
+      signal(SIGINT, signal_int);
+      MPI_Finalize();
 #endif
-    exit(0);
+      exit(0);
+    }
 }
 
 static int machine_exit_idx;

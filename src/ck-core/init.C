@@ -67,6 +67,7 @@ never be excluded...
 #include "trace.h"
 
 void CkRestartMain(const char* dirname);
+int storeInterOperateStatus = 0;
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
@@ -463,10 +464,12 @@ static void _exitHandler(envelope *env)
   switch(env->getMsgtype()) {
     case StartExitMsg:
       CkAssert(CkMyPe()==0);
-      if (!_CkExitFnVec.isEmpty()) {
-        CkExitFn fn = _CkExitFnVec.deq();
-        fn();
-        break;
+      if(!CharmLibInterOperate) {
+        if (!_CkExitFnVec.isEmpty()) {
+          CkExitFn fn = _CkExitFnVec.deq();
+          fn();
+          break;
+        }
       }
       // else goto next
     case ExitMsg:
@@ -528,17 +531,19 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
-//everyone exits here - there may be issues with leftover messages in the queue
-    if(CharmLibInterOperate) {
-	    DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-      _exitStarted = 0;
-      CpvAccess(charmLibExitFlag) = 1;
-    } else {
-      if(CkMyPe()){
-	      DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-        ConverseExit();
-      }	
-    }
+      //everyone exits here - there may be issues with leftover messages in the queue
+      if(CharmLibInterOperate) {
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        _exitStarted = 0;
+        CpvAccess(charmLibExitFlag) = 1;
+      } else {
+        if(CkMyPe()){
+          DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+          CharmLibInterOperate = storeInterOperateStatus;
+          CpvAccess(charmLibExitFlag) = 1;
+          ConverseExit();
+        }	
+      }
       break;
     case StatMsg:
 // shouldn't reach here in interoperate mode
@@ -551,7 +556,9 @@ static void _exitHandler(envelope *env)
 			/*FAULT_EVAC*/
       if(_numStatsRecd==CkNumValidPes()) {
         _printStats();
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        CharmLibInterOperate = storeInterOperateStatus;
+        CpvAccess(charmLibExitFlag) = 1;
         ConverseExit();
       }
       break;
@@ -840,7 +847,8 @@ void CkExit(void)
 #if ! CMK_BIGSIM_THREAD
     _TRACE_END_EXECUTE();
     //Wait for stats, which will call ConverseExit when finished:
-    CsdScheduler(-1);
+    if(!storeInterOperateStatus)
+      CsdScheduler(-1);
 #endif
   }
 }
@@ -1400,8 +1408,17 @@ void CharmLibInit(int peid, int numpes, int argc, char **argv){
     _Cmi_numnodes = numpes; 
     _Cmi_mynode = peid;
 
-    CharmLibInterOperate = 1;
-    ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-    printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes()); 
+  CharmLibInterOperate = 1;
+  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+  printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes()); 
+}
+
+void CharmLibExit() {
+  storeInterOperateStatus = 1;
+  CharmLibInterOperate = 0;
+  if(CkMyPe() == 0) {
+    CkExit();
+  } 
+  CsdScheduler(-1);
 }
 /*@}*/
