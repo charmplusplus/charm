@@ -526,7 +526,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
     } else {
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) {
-          if (size > 8192) {
+          if (size > 1024) {
             CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
             int destNode = CmiNodeOf(destPE);
             CMI_DEST_RANK(msg) = CmiRankOf(destPE);

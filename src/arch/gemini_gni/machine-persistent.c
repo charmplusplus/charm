@@ -193,9 +193,12 @@ void *PerAlloc(int size)
   if (0 != posix_memalign(&res, 64, size))
       CmiAbort("PerAlloc: failed to allocate memory.");
   //printf("[%d] PerAlloc %p. \n", myrank, res);
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, NULL, status);
+  char *ptr = (char*)res+sizeof(CmiChunkHeader);
+  SIZEFIELD(ptr)=size;
+  REFFIELD(ptr)=1;
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, NULL, status);
   GNI_RC_CHECK("Mem Register before post", status);
-  return (char*)res+sizeof(CmiChunkHeader);
+  return ptr;
 }
                                                                                 
 void PerFree(char *msg)

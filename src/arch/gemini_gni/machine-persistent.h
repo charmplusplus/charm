@@ -12,7 +12,7 @@
 
 #define PERSIST_BUFFERS_NUM             1
 
-#define PERSIST_SEQ                     0xFFFFFFFFFFFF
+#define PERSIST_SEQ                     0xFFFFFFF
 
 typedef struct  _PersistentBuf {
   void *destAddress;

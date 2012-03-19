@@ -2047,6 +2047,9 @@ static void PumpNetworkSmsg()
                 CmiReference(msg);
                 CMI_CHECK_CHECKSUM(msg, size);
                 handleOneRecvedMsg(size, msg); 
+#if PRINT_SYH
+                printf("[%d] PUT_DONE_TAG hand over one message, size: %d. \n", myrank, size);
+#endif
                 break;
             }
 #endif
@@ -2070,7 +2073,7 @@ static void PumpNetworkSmsg()
                      }
             }               // end switch
 #if PRINT_SYH
-            printf("[%d] from %d after switch request for Large msg is received, messageid: tag=%d\n", myrank, inst_id, msg_tag);
+            printf("[%d] from %d after switch request for smsg is received, messageid: tag=%d\n", myrank, inst_id, msg_tag);
 #endif
             smsg_recv_count ++;
             msg_tag = GNI_SMSG_ANY_TAG;
@@ -2116,12 +2119,9 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
 
 #if CMK_PERSISTENT_COMM
         // persistent message is always registered
-    if (seqno == PERSIST_SEQ) {
-        if (!IsMemHndlZero(MEMHFIELD(msg))) {
-            *memh = MEMHFIELD(msg);
-            return GNI_RC_SUCCESS;
-        }
-        CmiAbort("registerMessage> persistent memory should already be registered.");
+    if (!IsMemHndlZero(MEMHFIELD(msg))) {
+        *memh = MEMHFIELD(msg);
+        return GNI_RC_SUCCESS;
     }
 #endif
     if(seqno == 0)
@@ -2496,6 +2496,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                     MallocControlMsg(ack_msg_tmp);
                     ack_msg_tmp->source_addr = tmp_pd->remote_addr;
                     ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
+                    ack_msg_tmp->length  = tmp_pd->length;
                     msg_tag = PUT_DONE_TAG;
                 }
                 break;
@@ -2733,6 +2734,9 @@ static void  SendRdmaMsg()
                 buffered_recv_msg += register_size;
                 MACHSTATE(8, "GO request from buffered\n"); 
 #endif
+#if PRINT_SYH
+                printf("[%d] SendRdmaMsg: post succeed. seqno: %d\n", myrank, pd->cqwrite_value);
+#endif
             }else           // cannot post
             {
 #if CMK_SMP
@@ -2740,6 +2744,9 @@ static void  SendRdmaMsg()
 #else
                 pre = ptr;
                 ptr = ptr->next;
+#endif
+#if PRINT_SYH
+                printf("[%d] SendRdmaMsg: post failed. seqno: %d\n", myrank, pd->cqwrite_value);
 #endif
                 break;
             }
