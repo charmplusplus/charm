@@ -649,72 +649,77 @@ CpvDeclare(mempool_type*, mempool);
 #define ACK_GET_RANK(evt)          (evt & ((1<<ACK_SHIFT)-1))
 #define ACK_GET_INDEX(evt)         (evt >> ACK_SHIFT)
 
-struct AckPool {
+struct IndexStruct {
 void *addr;
 int next;
 };
 
-static struct AckPool   *ackpool;
-static int    ackpoolsize;
-static int    ackpool_freehead;
-static CmiNodeLock  ackpool_lock;
+typedef struct IndexPool {
+    struct IndexStruct   *indexes;
+    int                   size;
+    int                   freehead;
+    CmiNodeLock           lock;
+} IndexPool;
 
-#define  GetAckAddress(s)          (ackpool[s].addr)
+static IndexPool  ackPool;
 
-static void AckPool_init()
+
+#define  GetAckAddress(s)          (ackPool.indexes[s].addr)
+
+static void IndexPool_init(IndexPool *pool)
 {
     int i;
     if ((1<<ACK_SHIFT) < mysize) 
         CmiAbort("Charm++ Error: Remote event's rank field overflow.");
-    ackpoolsize = 2048;
-    ackpool = (struct AckPool *)malloc(ackpoolsize*sizeof(struct AckPool));
-    for (i=0; i<ackpoolsize-1; i++) {
-        ackpool[i].next = i+1;
+    pool->size = 2048;
+    pool->indexes = (struct IndexStruct *)malloc(pool->size*sizeof(struct IndexStruct));
+    for (i=0; i<pool->size-1; i++) {
+        pool->indexes[i].next = i+1;
     }
-    ackpool[i].next = -1;
-    ackpool_freehead = 0;
+    pool->indexes[i].next = -1;
+    pool->freehead = 0;
 #if MULTI_THREAD_SEND 
-    ackpool_lock  = CmiCreateLock();
+    pool->lock  = CmiCreateLock();
 #endif
 }
 
 static
-inline int AckPool_getslot(void *addr)
+inline int IndexPool_getslot(IndexPool *pool, void *addr)
 {
     int i;
     int s;
-    CMI_GNI_LOCK(ackpool_lock);
-    s = ackpool_freehead;
+    CMI_GNI_LOCK(pool->lock);
+    s = pool->freehead;
     if (s == -1) {
-        int newsize = ackpoolsize * 2;
+        int newsize = pool->size * 2;
         printf("[%d] AckPool_getslot expand to: %d\n", myrank, newsize);
         if (newsize > (1<<(32-ACK_SHIFT))) CmiAbort("AckPool too large");
-        struct AckPool *old_ackpool = ackpool;
-        ackpool = (struct AckPool *)malloc(newsize*sizeof(struct AckPool));
-        memcpy(ackpool, old_ackpool, ackpoolsize*sizeof(struct AckPool));
-        for (i=ackpoolsize; i<newsize-1; i++) {
-            ackpool[i].next = i+1;
+        struct IndexStruct *old_ackpool = pool->indexes;
+        pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
+        memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
+        for (i=pool->size; i<newsize-1; i++) {
+            pool->indexes[i].next = i+1;
         }
-        ackpool[i].next = -1;
-        ackpool_freehead = ackpoolsize;
-        s = ackpoolsize;
-        ackpoolsize = newsize;
+        pool->indexes[i].next = -1;
+        pool->freehead = pool->size;
+        s = pool->size;
+        pool->size = newsize;
         free(old_ackpool);
     }
-    ackpool_freehead = ackpool[s].next;
-    ackpool[s].addr = addr;
-    CMI_GNI_UNLOCK(ackpool_lock);
+    pool->freehead = pool->indexes[s].next;
+    pool->indexes[s].addr = addr;
+    CMI_GNI_UNLOCK(pool->lock);
     return s;
 }
 
 static
-inline  void AckPool_freeslot(int s)
+inline  void IndexPool_freeslot(IndexPool *pool, int s)
 {
-    CmiAssert(s>=0 && s<ackpoolsize);
-    CMI_GNI_LOCK(ackpool_lock);
-    ackpool[s].next = ackpool_freehead;
-    ackpool_freehead = s;
-    CMI_GNI_UNLOCK(ackpool_lock);
+    CmiAssert(s>=0 && s<pool->size);
+    CMI_GNI_LOCK(pool->lock);
+    pool->indexes[s].next = pool->freehead;
+    pool->freehead = s;
+    CMI_GNI_UNLOCK(pool->lock);
 }
 
 
@@ -1366,7 +1371,7 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         if (tag == LMSG_INIT_TAG) {
             CONTROL_MSG *control_msg_tmp = (CONTROL_MSG*)msg;
             if (control_msg_tmp->seq_id == 0 && control_msg_tmp->ack_index == -1)
-                control_msg_tmp->ack_index = AckPool_getslot((void*)control_msg_tmp->source_addr);
+                control_msg_tmp->ack_index = IndexPool_getslot(&ackPool, (void*)control_msg_tmp->source_addr);
         }
         // GNI_EpSetEventData(ep_hndl_array[destNode], destNode, myrank);
 #endif
@@ -2125,7 +2130,8 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
 
 #if CMK_PERSISTENT_COMM
         // persistent message is always registered
-    if (!IsMemHndlZero(MEMHFIELD(msg))) {
+        // BIG_MSG small pieces do not have malloc chunk header
+    if (seqno == PERSIST_SEQ && !IsMemHndlZero(MEMHFIELD(msg))) {
         *memh = MEMHFIELD(msg);
         return GNI_RC_SUCCESS;
     }
@@ -2160,8 +2166,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     void                *msg_data;
     gni_post_descriptor_t *pd;
     gni_mem_handle_t    msg_mem_hndl;
-    int source, size, transaction_size, offset = 0;
-    size_t     register_size = 0;
+    int                 size, transaction_size, offset = 0;
+    size_t              register_size = 0;
 
     // initial a get to transfer data from the sender side */
     request_msg = (CONTROL_MSG *) header;
@@ -2186,47 +2192,14 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
    
     pd->cqwrite_value = request_msg->seq_id;
 
-    SetMemHndlZero(pd->local_mem_hndl);
     transaction_size = request_msg->seq_id == 0? ALIGN64(size) : ALIGN64(request_msg->length);
+    SetMemHndlZero(pd->local_mem_hndl);
     status = registerMessage(msg_data, transaction_size, request_msg->seq_id, &pd->local_mem_hndl);
     if (status == GNI_RC_SUCCESS && request_msg->seq_id == 0) {
         if(NoMsgInRecv( (void*)(msg_data)))
             register_size = GetMempoolsize((void*)(msg_data));
-        else
-            register_size = 0;
     }
 
-#if 0
-    if( request_msg->seq_id == 0)
-    {
-        pd->local_mem_hndl= GetMemHndl(msg_data);
-        transaction_size = ALIGN64(size);
-        if(IsMemHndlZero(pd->local_mem_hndl))
-        {   
-            status = registerMemory( GetMempoolBlockPtr(msg_data), GetMempoolsize(msg_data), &(GetMemHndl(msg_data)), rdma_rx_cqh);
-            if(status == GNI_RC_SUCCESS)
-            {
-                pd->local_mem_hndl = GetMemHndl(msg_data);
-            }
-            else
-            {
-                SetMemHndlZero(pd->local_mem_hndl);
-            }
-        }
-        if(NoMsgInRecv( (void*)(msg_data)))
-            register_size = GetMempoolsize((void*)(msg_data));
-        else
-            register_size = 0;
-    }
-    else{
-        transaction_size = ALIGN64(request_msg->length);
-        status = registerMemory(msg_data, transaction_size, &(pd->local_mem_hndl), NULL); 
-        if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR) 
-        {
-            GNI_RC_CHECK("Invalid/permission Mem Register in post", status);
-        }
-    }
-#endif
     pd->first_operand = ALIGN64(size);                   //  total length
 
     if(request_msg->total_length <= LRTS_GNI_RDMA_THRESHOLD)
@@ -2299,8 +2272,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #else
         bufferRdmaMsg(inst_id, pd, -1); 
 #endif
-    }else {
-         //printf("source: %d pd:(%p,%p)(%p,%p)\n", source, (pd->local_mem_hndl).qword1, (pd->local_mem_hndl).qword2, (pd->remote_mem_hndl).qword1, (pd->remote_mem_hndl).qword2);
+    }else if (status != GNI_RC_SUCCESS) {
+        // printf("source: %d pd:(%p,%p)(%p,%p) len:%d local:%x remote:%x\n", (int)inst_id, (pd->local_mem_hndl).qword1, (pd->local_mem_hndl).qword2, (pd->remote_mem_hndl).qword1, (pd->remote_mem_hndl).qword2, pd->length, pd->local_addr, pd->remote_addr);
         GNI_RC_CHECK("GetLargeAFter posting", status);
     }
 #else
@@ -2452,7 +2425,7 @@ static void PumpRemoteTransactions()
         if(NoMsgInSend(msg))
             buffered_send_msg -= GetMempoolsize(msg);
         CmiFree(msg);
-        AckPool_freeslot(slot);
+        IndexPool_freeslot(&ackPool, slot);
     }
     if(status == GNI_RC_ERROR_RESOURCE)
     {
@@ -2664,42 +2637,15 @@ static void  SendRdmaMsg()
 #endif 
         MACHSTATE4(8, "noempty-rdma  %d (%lld,%lld,%d) \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size); 
         gni_post_descriptor_t *pd = ptr->pd;
-        status = GNI_RC_SUCCESS;
         
         msg = (void*)(pd->local_addr);
         status = registerMessage(msg, pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
+        register_size = 0;
         if(pd->cqwrite_value == 0) {
             if(NoMsgInRecv(msg))
-                register_size = GetMempoolsize((void*)(pd->local_addr));
-            else
-                register_size = 0;
+                register_size = GetMempoolsize(msg);
         }
-        else
-            register_size = 0;
-#if 0
-        if(pd->cqwrite_value == 0)
-        {
-            if(IsMemHndlZero((GetMemHndl(pd->local_addr))))
-            {
-                msg = (void*)(pd->local_addr);
-                status = registerMemory(GetMempoolBlockPtr(msg), GetMempoolsize(msg), &(GetMemHndl(msg)), rdma_rx_cqh);
-                if(status == GNI_RC_SUCCESS)
-                {
-                    pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
-                }
-            }else
-            {
-                pd->local_mem_hndl = GetMemHndl((void*)(pd->local_addr));
-            }
-            if(NoMsgInRecv( (void*)(pd->local_addr)))
-                register_size = GetMempoolsize((void*)(pd->local_addr));
-            else
-                register_size = 0;
-        }else if( IsMemHndlZero(pd->local_mem_hndl)) //big msg, can not fit into memory pool, or CmiDirect Msg (which is not from mempool)
-        {
-            status = registerMemory((void*)(pd->local_addr), pd->length, &(pd->local_mem_hndl), NULL); 
-        }
-#endif
+
         if(status == GNI_RC_SUCCESS)        //mem register good
         {
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
@@ -3619,7 +3565,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
 #if  REMOTE_EVENT
-    AckPool_init();
+    IndexPool_init(&ackPool);
 #endif
 
 #if CMK_WITH_STATS
