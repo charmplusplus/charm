@@ -16,8 +16,8 @@ public:
     delete m;
 
     //Start the computation
-    CkPrintf("Running Hello on %d processors for %d elements, physical nodes=%d\n",
-	     CkNumPes(),nElements,CmiNumPhysicalNodes());
+    CkPrintf("Running Hello on %d processors for %d elements\n",
+	     CkNumPes(),nElements);
     mainProxy = thisProxy;
 
     CProxy_Hello arr = CProxy_Hello::ckNew(nElements);
