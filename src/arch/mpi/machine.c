@@ -1320,7 +1320,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
       Cmi_smp_mode_setting = COMM_THREAD_ONLY_RECV;
     }
 #endif
-  
+
     if(!CharmLibInterOperate) {
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP

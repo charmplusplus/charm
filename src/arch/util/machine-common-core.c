@@ -588,7 +588,7 @@ if (  MSG_STATISTIC)
 }
 #endif
 #endif
-    
+
 /* ##### Beginning of Functions Related with Machine Startup ##### */
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int _ii;
@@ -620,7 +620,7 @@ if (  MSG_STATISTIC)
 }
 
     LrtsInit(&argc, &argv, &_Cmi_numnodes, &_Cmi_mynode);
-  
+   
 	if (_Cmi_mynode==0) {
 #if !CMK_SMP 
 		printf("Charm++> Running on Non-smp mode\n");
@@ -676,6 +676,7 @@ if (  MSG_STATISTIC)
 #endif
 
     CmiStartThreads(argv);
+
     ConverseRunPE(initret);
 }
 
@@ -966,4 +967,5 @@ static char *CopyMsg(char *msg, int len) {
 #if CMK_USE_PXSHM
 #include "machine-pxshm.c"
 #endif
+
 

@@ -507,12 +507,12 @@ static void _exitHandler(envelope *env)
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-	    /*FAULT_EVAC*/
+      /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
       }
       _mainDone = 1; // This is needed because the destructors for
-         // readonly variables will be called when the program
+                     // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
 		     // is 0, it will assume that the readonly variable was
 		     // declared locally. On all processors other than 0, 
@@ -542,7 +542,7 @@ static void _exitHandler(envelope *env)
           CharmLibInterOperate = storeInterOperateStatus;
           CpvAccess(charmLibExitFlag) = 1;
           ConverseExit();
-        }	
+        }
       }
       break;
     case StatMsg:
@@ -1405,12 +1405,12 @@ void registerExitFn(CkExitFn fn)
 
 void CharmLibInit(int peid, int numpes, int argc, char **argv){
     //note CmiNumNodes and CmiMyNode should just be macros
-    _Cmi_numnodes = numpes; 
+    _Cmi_numnodes = numpes;
     _Cmi_mynode = peid;
 
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes()); 
+  printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes());
 }
 
 void CharmLibExit() {
@@ -1418,7 +1418,7 @@ void CharmLibExit() {
   CharmLibInterOperate = 0;
   if(CkMyPe() == 0) {
     CkExit();
-  } 
+  }
   CsdScheduler(-1);
 }
 /*@}*/
