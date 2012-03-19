@@ -792,32 +792,36 @@ static void init_comm_stats()
 
 #define  RDMA_TRY_SEND()        comm_stats.try_rdma_count++;
 
-#define  RDMA_Trans_DONE(x)      \
+#define  RDMA_TRANS_DONE(x)      \
          {  comm_stats.rdma_count++;  \
              double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_rdma_init_to_rdma_done) comm_stats.max_time_from_rdma_init_to_rdma_done = rdma_trans_time; \
              comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
          }
 
-#define  RDMA_Trans_INIT(x)      \
+#define  RDMA_TRANS_INIT(x)      \
          {  double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
          }
 
 
-
 static void print_comm_stats()
 {
-    printf("PE[%d]SMSG\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
-    printf("PE[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+    printf("Node[%d]SMSG\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    printf("Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
             comm_stats.ack_count, comm_stats.big_msg_ack_count);
     
-    printf("PE[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+    printf("Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n\n", myrank, 
             comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
             comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count);
+
+    printf("Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
+    printf("Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
+    printf("Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
 }
+
 #else
 #define STATS_ACK_TIME(x)            x
 #define STATS_SEND_SMSGS_TIME(x)     x
@@ -2156,9 +2160,12 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     size = request_msg->total_length;
     MACHSTATE4(8, "GO Get request from %d (%d,%d, %d) \n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
     MallocPostDesc(pd);
+#if CMK_WITH_STATS 
+    pd->sync_flag_addr = 1000000 * CmiWallTimer(); //microsecond
+#endif
     if(request_msg->seq_id < 2)   {
-#if CMK_SMP_TRACE_COMMTHREAD
-        pd->second_operand = 1000000 * CmiWallTimer(); //microsecond
+#if CMK_SMP_TRACE_COMMTHREAD 
+        pd->sync_flag_addr = 1000000 * CmiWallTimer(); //microsecond
 #endif
         msg_data = CmiAlloc(size);
         CmiSetMsgSeq(msg_data, 0);
@@ -2245,6 +2252,10 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
             GNI_RC_CHECK("GNI_EpSetEventData", sts);
         }
 #endif
+
+#if CMK_WITH_STATS
+        RDMA_TRY_SEND()
+#endif
         if(pd->type == GNI_POST_RDMA_GET) 
         {
             status = GNI_PostRdma(ep_hndl_array[inst_id], pd);
@@ -2264,10 +2275,14 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
                 MACHSTATE4(8, "GO request from %d (%d,%d, %d)\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size); 
 #endif
                 IncreaseMsgInRecv(msg_data);
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD 
                 pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
 #endif
             }
+#if  CMK_WITH_STATS
+                pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+#endif
         }
     }else
     {
@@ -2492,6 +2507,9 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                 MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &tmp_pd->local_mem_hndl, &omdh, tmp_pd->length)
                 msg_tag = ACK_TAG;  
 #else
+#if CMK_WITH_STATS
+                RDMA_TRANS_DONE(tmp_pd->sync_flag_value/1000000.0)
+#endif
                 int seq_id = tmp_pd->cqwrite_value;
                 if(seq_id > 0)      // BIG_MSG
                 {
@@ -2554,7 +2572,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #if PRINT_SYH
                     printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
-                    TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (void*)tmp_pd->local_addr); 
+                    TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (void*)tmp_pd->local_addr); 
                     TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_value/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (void*)tmp_pd->local_addr); 
 
                     START_EVENT();
@@ -2578,7 +2596,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #endif
 #if                 CMK_SMP_TRACE_COMMTHREAD
                         if( tmp_pd->cqwrite_value == 1)
-                            TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->second_operand/1000000.0), (double)((tmp_pd->second_operand+1)/1000000.0), (double)((tmp_pd->second_operand+2)/1000000.0), (void*)tmp_pd->local_addr); 
+                            TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
                         TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
                         CMI_CHECK_CHECKSUM(msg, tmp_pd->first_operand);
@@ -2672,6 +2690,9 @@ static void  SendRdmaMsg()
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
 #endif
+#if CMK_WITH_STATS
+            RDMA_TRY_SEND()
+#endif
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
             {
                 status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
@@ -2697,11 +2718,15 @@ static void  SendRdmaMsg()
 #endif
                 if(pd->cqwrite_value == 0)
                 {
-#if CMK_SMP_TRACE_COMMTHREAD
+#if CMK_SMP_TRACE_COMMTHREAD 
                     pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
 #endif
                     IncreaseMsgInRecv(((void*)(pd->local_addr)));
                 }
+#if  CMK_WITH_STATS
+                pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+#endif
 #if MACHINE_DEBUG_LOG
                 buffered_recv_msg += register_size;
                 MACHSTATE(8, "GO request from buffered\n"); 
