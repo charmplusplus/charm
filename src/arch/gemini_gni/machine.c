@@ -2377,14 +2377,29 @@ static void PumpCqWriteTransactions()
 
     gni_cq_entry_t          ev;
     gni_return_t            status;
-    void                    *msg;   
+    void                    *msg;  
+    int                     msg_size;
     while(1) {
         //CMI_GNI_LOCK(my_cq_lock) 
         status = GNI_CqGetEvent(rdma_rx_cqh, &ev);
         //CMI_GNI_UNLOCK(my_cq_lock)
         if(status != GNI_RC_SUCCESS) break;
         msg = (void*) ( GNI_CQ_GET_DATA(ev) & 0xFFFFFFFFFFFFL);
-
+#if CMK_PERSISTENT_COMM
+#if PRINT_SYH
+        printf(" %d CQ write event %p\n", myrank, msg);
+#endif
+        if (!IsMemHndlZero(MEMHFIELD(msg))) {
+#if PRINT_SYH
+            printf(" %d Persistent CQ write event %p\n", myrank, msg);
+#endif
+            CmiReference(msg);
+            msg_size = CmiGetMsgSize(msg);
+            CMI_CHECK_CHECKSUM(msg, msg_size);
+            handleOneRecvedMsg(msg_size, msg); 
+            continue;
+        }
+#endif
         DecreaseMsgInSend(msg);
 #if ! USE_LRTS_MEMPOOL
        // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
@@ -2493,11 +2508,17 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                 }
                 else {
                     CmiFree((void *)tmp_pd->local_addr);
+#if     !CQWRITE
                     MallocControlMsg(ack_msg_tmp);
                     ack_msg_tmp->source_addr = tmp_pd->remote_addr;
                     ack_msg_tmp->source_mem_hndl    = tmp_pd->remote_mem_hndl;
                     ack_msg_tmp->length  = tmp_pd->length;
                     msg_tag = PUT_DONE_TAG;
+#else
+                    sendCqWrite(inst_id, tmp_pd->remote_addr, tmp_pd->remote_mem_hndl);
+                    FreePostDesc(tmp_pd);
+                    continue;
+#endif
                 }
                 break;
 #endif
@@ -2530,7 +2551,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                 else
                 {
                     msg_tag = ACK_TAG; 
-#if  !REMOTE_EVENT && !CQWRITE
+#if  !REMOTE_EVENT && !inst_id, CQWRITE
                     MallocAckMsg(ack_msg);
                     ack_msg->source_addr = tmp_pd->remote_addr;
 #endif

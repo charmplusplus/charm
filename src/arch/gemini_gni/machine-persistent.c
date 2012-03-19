@@ -196,7 +196,11 @@ void *PerAlloc(int size)
   char *ptr = (char*)res+sizeof(CmiChunkHeader);
   SIZEFIELD(ptr)=size;
   REFFIELD(ptr)=1;
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, NULL, status);
+#if  CQWRITE
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, rdma_rx_cqh, status);
+#else
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, NULL, status);
+#endif
   GNI_RC_CHECK("Mem Register before post", status);
   return ptr;
 }
