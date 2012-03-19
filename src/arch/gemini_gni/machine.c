@@ -283,8 +283,14 @@ static int  SMSG_MAX_MSG = 1024;
 #define SMSG_MAX_CREDIT 72 
 
 #define MSGQ_MAXSIZE       2048
+
 /* large message transfer with FMA or BTE */
+#if ! REMOTE_EVENT
 #define LRTS_GNI_RDMA_THRESHOLD  1024 
+#else
+   /* remote events only work with RDMA */
+#define LRTS_GNI_RDMA_THRESHOLD  0 
+#endif
 
 #if CMK_SMP
 static int  REMOTE_QUEUE_ENTRIES=163840; 
@@ -2249,10 +2255,6 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
             int sts = GNI_EpSetEventData(ep_hndl_array[inst_id], inst_id, ACK_EVENT(request_msg->ack_index));
             GNI_RC_CHECK("GNI_EpSetEventData", sts);
         }
-        else {
-            int sts = GNI_EpSetEventData(ep_hndl_array[inst_id], inst_id, myrank);
-            GNI_RC_CHECK("GNI_EpSetEventData", sts);
-        }
 #endif
 
 #if CMK_WITH_STATS
@@ -2686,10 +2688,6 @@ static void  SendRdmaMsg()
             {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
                 int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, ACK_EVENT(ptr->ack_index));
-                GNI_RC_CHECK("GNI_EpSetEventData", sts);
-            }
-            else {
-                int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, myrank);
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
 #endif
