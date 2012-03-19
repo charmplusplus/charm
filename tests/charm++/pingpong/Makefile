@@ -8,6 +8,9 @@ all:	pgm
 pgm: $(OBJS)
 	$(CHARMC) -language charm++ -o pgm $(OBJS)
 
+pgm.prj: $(OBJS)
+	$(CHARMC) -tracemode projections -language charm++ -o pgm.prj $(OBJS)
+
 cifiles: pingpong.ci
 	$(CHARMC)  pingpong.ci
 	touch cifiles

@@ -41,6 +41,11 @@ CpvExtern (int ,serializer);
  *  (in which case it can only happen between AtSync and ResumeFromSync). */
 extern bool _isAnytimeMigration;
 
+/**
+  Array elements are only inserted at construction
+ */
+extern bool _isStaticInsertion;
+
 /** This flag is true when users are sure there is at least one charm array element
  *  per processor. In such case, when doing reduction on the array, the children
  *  don't need to be notified that reduction starts

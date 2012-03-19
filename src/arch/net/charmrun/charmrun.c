@@ -4674,7 +4674,7 @@ void restart_node(int crashed_node){
 	while(arg_argv[i]!= NULL){
 		i++;
 	}
-	restart_argv = (char **)malloc(sizeof(char *)*(i+3));
+	restart_argv = (char **)malloc(sizeof(char *)*(i+4));
 	i=0;
 	while(arg_argv[i]!= NULL){
 		restart_argv[i] = arg_argv[i];
@@ -4683,7 +4683,8 @@ void restart_node(int crashed_node){
 	restart_argv[i] = "+restartaftercrash";
         sprintf(phase_str,"%d", ++current_restart_phase);
 	restart_argv[i+1]=phase_str;
-	restart_argv[i+2]=NULL;
+	restart_argv[i+2] = "+restartisomalloc";
+	restart_argv[i+3]=NULL;
 
 	rsh_script(f,pe,crashed_node,restart_argv,1);
   	fclose(f);

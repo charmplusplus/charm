@@ -31,12 +31,12 @@
 
 // Macro to make projections check for errors before an fprintf succeeds.
 #define CheckAndFPrintF(f,string,data) \
-{ \
+do { \
   int result = fprintf(f,string,data); \
   if (result == -1) { \
     CmiAbort("Projections I/O error!"); \
   } \
-}
+} while(false)
 
 /// a log entry in trace projection
 class LogEntry {

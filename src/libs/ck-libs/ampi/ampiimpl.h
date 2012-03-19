@@ -516,6 +516,7 @@ inline groupStruct rangeExclOp(int n, int ranges[][3], groupStruct vec){
 
 extern int _mpi_nworlds;
 
+#define MPI_ATA_SEQ_TAG	MPI_TAG_UB_VALUE+1
 #define MPI_BCAST_TAG   MPI_TAG_UB_VALUE+10
 #define MPI_BARR_TAG    MPI_TAG_UB_VALUE+11
 #define MPI_REDUCE_TAG  MPI_TAG_UB_VALUE+12

@@ -17,8 +17,13 @@
   * persist_machine_init  // machine specific initialization call
 */
 
+#if USE_LRTS_MEMPOOL
 #define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
-void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
+#else
+#define LRTS_GNI_RDMA_PUT_THRESHOLD  16384
+#endif
+
+void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 {
     gni_post_descriptor_t *pd;
     gni_return_t status;
@@ -27,56 +32,56 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m)
     CmiAssert(h!=NULL);
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
     CmiAssert(slot->used == 1);
-    CmiAssert(slot->destPE == destPE);
+    CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
         CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
         CmiAbort("Abort: Invalid size\n");
     }
 
-    /* CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destPE=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destPE, slot->destBuf[0].destAddress, size); */
+    // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
 
     if (slot->destBuf[0].destAddress) {
         // uGNI part
         MallocPostDesc(pd);
-#if USE_LRTS_MEMPOOL
-        if(size <= 2048){
-#else
-        if(size <= 16384){
-#endif
+        if(size <= LRTS_GNI_RDMA_PUT_THRESHOLD) {
             pd->type            = GNI_POST_FMA_PUT;
         }
         else
         {
             pd->type            = GNI_POST_RDMA_PUT;
-#if USE_LRTS_MEMPOOL
-            pd->local_mem_hndl  = GetMemHndl(m);
-#else
-            status = MEMORY_REGISTER(onesided_hnd, nic_hndl,  m, size, &(pd->local_mem_hndl), &omdh);
-#endif
-            GNI_RC_CHECK("Mem Register before post", status);
         }
         pd->cq_mode         = GNI_CQMODE_GLOBAL_EVENT;
         pd->dlvr_mode       = GNI_DLVMODE_PERFORMANCE;
-        pd->length          = size;
+        pd->length          = ALIGN64(size);
         pd->local_addr      = (uint64_t) m;
        
         pd->remote_addr     = (uint64_t)slot->destBuf[0].destAddress;
         pd->remote_mem_hndl = slot->destBuf[0].mem_hndl;
         pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
         pd->rdma_mode       = 0;
+        pd->cqwrite_value   = PERSIST_SEQ;
+        pd->amo_cmd         = 0;
 
+        SetMemHndlZero(pd->local_mem_hndl);
+#if CMK_SMP
+        bufferRdmaMsg(destNode, pd, -1);
+#else
+        status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
+        if (status == GNI_RC_SUCCESS) 
+        {
         if(pd->type == GNI_POST_RDMA_PUT) 
-            status = GNI_PostRdma(ep_hndl_array[destPE], pd);
+            status = GNI_PostRdma(ep_hndl_array[destNode], pd);
         else
-            status = GNI_PostFma(ep_hndl_array[destPE],  pd);
+            status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+        }
+        else
+            status = GNI_RC_ERROR_RESOURCE;
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
-            MallocRdmaRequest(rdma_request_msg);
-            rdma_request_msg->destNode = destPE;
-            rdma_request_msg->pd = pd;
-            PCQueuePush(sendRdmaBuf, (char*)rdma_request_msg);
+            bufferRdmaMsg(destNode, pd, -1);
         }else
             GNI_RC_CHECK("AFter posting", status);
+#endif
     }
   else {
 #if 1
@@ -181,13 +186,31 @@ int PumpPersistent()
 
 void *PerAlloc(int size)
 {
-  return CmiAlloc(size);
+//  return CmiAlloc(size);
+  gni_return_t status;
+  void *res = NULL;
+  size = ALIGN64(size) + sizeof(CmiChunkHeader);
+  if (0 != posix_memalign(&res, 64, size))
+      CmiAbort("PerAlloc: failed to allocate memory.");
+  //printf("[%d] PerAlloc %p. \n", myrank, res);
+  char *ptr = (char*)res+sizeof(CmiChunkHeader);
+  SIZEFIELD(ptr)=size;
+  REFFIELD(ptr)=1;
+#if  CQWRITE
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, rdma_rx_cqh, status);
+#else
+  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, NULL, status);
+#endif
+  GNI_RC_CHECK("Mem Register before post", status);
+  return ptr;
 }
                                                                                 
 void PerFree(char *msg)
 {
-  //elan_CmiStaticFree(msg);
-  CmiFree(msg);
+//  CmiFree(msg);
+  char *ptr = msg-sizeof(CmiChunkHeader);
+  MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &MEMHFIELD(msg) , &omdh, SIZEFIELD(msg));
+  free(ptr);
 }
 
 /* machine dependent init call */
@@ -198,20 +221,19 @@ void persist_machine_init(void)
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
 {
   int i;
-  gni_return_t status;
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
     char *buf = PerAlloc(maxBytes+sizeof(int)*2);
     _MEMCHECK(buf);
     memset(buf, 0, maxBytes+sizeof(int)*2);
+    slot->destBuf[i].mem_hndl = MEMHFIELD(buf);
     slot->destBuf[i].destAddress = buf;
     /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
 #if USE_LRTS_MEMPOOL
-    slot->destBuf[i].mem_hndl = GetMemHndl(buf);
-#else
-    status = MEMORY_REGISTER(onesided_hnd, nic_hndl,  buf, maxBytes+sizeof(int)*2 , &(slot->destBuf[i].mem_hndl), &omdh);
-    GNI_RC_CHECK("Mem Register before post", status);
+    // assume already registered from mempool
+    // slot->destBuf[i].mem_hndl = GetMemHndl(buf);
 #endif
+    // FIXME:  assume always succeed
   }
   slot->sizeMax = maxBytes;
 }

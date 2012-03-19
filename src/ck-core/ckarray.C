@@ -61,6 +61,7 @@ Orion Sky Lawlor, olawlor@acm.org
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
+bool _isStaticInsertion;
 bool _isNotifyChildInRed;
 
 #define ARRAY_DEBUG_OUTPUT 0
@@ -547,7 +548,7 @@ void CkArrayOptions::init()
 {
     locMgr.setZero();
     anytimeMigration = _isAnytimeMigration;
-    staticInsertion = false;
+    staticInsertion = _isStaticInsertion;
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
     broadcastViaScheduler = false;
@@ -1299,7 +1300,7 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0, len=0;
+	int idx=0, len=0, count=0;
         if (stableLocations) {            /* remove all NULLs in the array */
           len = 0;
           while (elements->next(idx)!=NULL) len++;
@@ -1323,7 +1324,7 @@ void CkArray::recvBroadcast(CkMessage *m)
   		startVTimer();
 #endif
 		CmiBool doFree = CmiFalse;
-		if (stableLocations && idx == len) doFree = CmiTrue;
+		if (stableLocations && ++count == len) doFree = CmiTrue;
 		broadcaster->deliver(msg, el, doFree);
 	}
 #endif

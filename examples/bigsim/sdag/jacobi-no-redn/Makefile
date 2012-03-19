@@ -44,7 +44,7 @@ bglog: jacobi
 #	./charmrun +p4 ./jacobi 16 10 4 +x2 +y2 +z2 +cth1 +wth1 +bglog
 
 bgtest: jacobi
-	./charmrun +p4 ./jacobi 64 10 32 +bgconfig ./bg_config +bgstacksize 102400
+	./charmrun +p4 ./jacobi 64 10 32 +bgconfig ./bg_config +bgstacksize 102400 $(TESTOPTS)
 
 clean:
 	rm -f *.sts *.log C *.o *.def.h *.decl.h *~ jacobi bgTraceFile

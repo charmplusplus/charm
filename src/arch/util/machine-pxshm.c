@@ -239,7 +239,7 @@ void CmiInitPxshm(char **argv){
         SENDQSTARTSIZE = 32 * pxshmContext->nodesize;
 
         if (_Cmi_mynode == 0)
-            CmiPrintf("Charm++> pxshm enabled: %d cores per node, buffer size: %.1fMB\n", pxshmContext->nodesize, SHMBUFLEN/1024.0/1024.0);
+            printf("Charm++> pxshm enabled: %d cores per node, buffer size: %.1fMB\n", pxshmContext->nodesize, SHMBUFLEN/1024.0/1024.0);
 
 #if CMK_CRAYXE
         srand(getpid());
@@ -561,10 +561,13 @@ void setupSharedBuffers(){
 		}
 	}
 
-        if (CmiBarrier() == 0) {
-            freeSharedBuffers();
-            pxshm_freed = 1;
-        }
+#if CMK_SMP && CMK_CRAYXE
+        if (PMI_Barrier() != GNI_RC_SUCCESS) return;
+#else
+        if (CmiBarrier() != 0) return;
+#endif
+        freeSharedBuffers();
+        pxshm_freed = 1;
 }
 
 void allocBufNameStrings(char ***bufName){

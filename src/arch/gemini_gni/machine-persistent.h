@@ -12,6 +12,8 @@
 
 #define PERSIST_BUFFERS_NUM             1
 
+#define PERSIST_SEQ                     0xFFFFFFF
+
 typedef struct  _PersistentBuf {
   void *destAddress;
   void *destSizeAddress;
@@ -41,9 +43,9 @@ typedef struct _PersistentReceivesTable {
 extern PersistentReceivesTable *persistentReceivesTableHead;
 extern PersistentReceivesTable *persistentReceivesTableTail;
 
-extern PersistentHandle  *phs;
-extern int phsSize;
-extern int curphs;
+CpvExtern(PersistentHandle *, phs);
+CpvExtern(int, phsSize);
+CpvExtern(int, curphs);
 
 void *PerAlloc(int size);
 void PerFree(char *msg);

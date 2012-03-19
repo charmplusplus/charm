@@ -56,6 +56,9 @@ General Changes
 - Memory pooling allocator performance and resource usage improved
   substantially
 
+- AMPI: More routines support MPI_IN_PLACE, and those that don't check
+  for it
+
 ================================================================================
 What's new in Charm++ 6.2.1 (since 6.2.0)
 ================================================================================

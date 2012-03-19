@@ -18,5 +18,5 @@ test: pgm
 	./charmrun ./pgm +p2 1000 10 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun ./pgm +p2 1000 10 +x2 +y2 +z1
+	./charmrun ./pgm +p2 1000 10 +x2 +y2 +z1 $(TESTOPTS)
 

@@ -50,9 +50,9 @@ int persistentRequestHandlerIdx;
 int persistentReqGrantedHandlerIdx;
 int persistentDestoryHandlerIdx;
 
-PersistentHandle  *phs = NULL;
-int phsSize;
-int curphs = 0;
+CpvDeclare(PersistentHandle *, phs);
+CpvDeclare(int, phsSize);
+CpvDeclare(int, curphs);
 
 /******************************************************************************
      Utilities
@@ -231,13 +231,14 @@ static void persistentReqGrantedHandler(void *env)
 {
   int i;
 
-
   PersistentReqGrantedMsg *msg = (PersistentReqGrantedMsg *)env;
   PersistentHandle h = msg->sourceHandlerIndex;
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  CmiAssert(slot->used == 1);
 
   /* CmiPrintf("[%d] Persistent handler granted  h:%p\n", CmiMyPe(), h); */
+
+  CmiAssert(slot->used == 1);
+
 
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
 #if 0
@@ -250,7 +251,7 @@ static void persistentReqGrantedHandler(void *env)
   slot->destHandle = msg->destHandlerIndex;
 
   if (slot->messageBuf) {
-    LrtsSendPersistentMsg(h, slot->destPE, slot->messageSize, slot->messageBuf);
+    LrtsSendPersistentMsg(h, CmiNodeOf(slot->destPE), slot->messageSize, slot->messageBuf);
     slot->messageBuf = NULL;
   }
   CmiFree(msg);
@@ -400,6 +401,12 @@ void CmiPersistentInit()
   persistentDestoryHandlerIdx = 
        CmiRegisterHandler((CmiHandler)persistentDestoryHandler);
 
+  CpvInitialize(PersistentHandle*, phs);
+  CpvAccess(phs) = NULL;
+  CpvInitialize(int, phsSize);
+  CpvInitialize(int, curphs);
+  CpvAccess(curphs) = 0;
+
   persist_machine_init();
 
   for (i=0; i<TABLESIZE; i++) {
@@ -421,9 +428,9 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n)
     if (p[i] == NULL) CmiAbort("CmiUsePersistentHandle: invalid PersistentHandle.\n");
   }
 #endif
-  phs = p;
-  phsSize = n;
-  curphs = 0;
+  CpvAccess(phs) = p;
+  CpvAccess(phsSize) = n;
+  CpvAccess(curphs) = 0;
 }
 
 #endif

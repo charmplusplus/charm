@@ -438,6 +438,9 @@ void MeshStreamer<dtype>::associateCallback(
 	     " to 10 ms\n");
     progressPeriodInMs_ = 10;
   }
+
+  // initialize to prevent comparison against uninitialized value
+  timeOfLastSend_ = CkWallTimer();
   enablePeriodicFlushing();
       
 }
@@ -576,9 +579,6 @@ void MeshStreamer<dtype>::flushDirect(){
     if (!isPeriodicFlushEnabled_ || 
 	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
       flushAllBuffers();
-    }
-
-    if (isPeriodicFlushEnabled_) {
       timeOfLastSend_ = CkWallTimer();
     }
 
