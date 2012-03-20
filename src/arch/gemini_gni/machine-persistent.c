@@ -66,7 +66,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #else
 #if REMOTE_EVENT
         pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT((int)(slot->destHandle)));
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT((int)(size_t)(slot->destHandle)));
         GNI_RC_CHECK("GNI_EpSetEventData", sts);
 #endif
 
@@ -82,7 +82,11 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
             status = GNI_RC_ERROR_RESOURCE;
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
+#if REMOTE_EVENT
+            bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
+#else
             bufferRdmaMsg(destNode, pd, -1);
+#endif
         }else
             GNI_RC_CHECK("AFter posting", status);
 #endif
@@ -274,15 +278,19 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   }
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT
-  slot->index = IndexPool_getslot(&ackPool, slot->destBuf[0].destAddress, 2);
+  slot->index = IndexPool_getslot(&ackPool, slot, 2);
 #endif
 }
 
 
-PersistentHandle getPersistentHandle(PersistentHandle h)
+PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
 {
 #if REMOTE_EVENT
-  return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
+  if (toindex)
+    return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
+  else {
+    return (PersistentHandle)GetIndexAddress((int)(size_t)h);
+  }
 #else
   return h;
 #endif

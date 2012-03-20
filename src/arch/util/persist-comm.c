@@ -193,7 +193,7 @@ static void persistentRequestHandler(void *env)
   }
 
   gmsg->sourceHandler = msg->sourceHandler;
-  gmsg->destHandler = getPersistentHandle(h);
+  gmsg->destHandler = getPersistentHandle(h, 1);
 
   CmiSetHandler(gmsg, persistentReqGrantedHandlerIdx);
   CmiSyncSendAndFree(msg->requestorPE,sizeof(PersistentReqGrantedMsg),gmsg);
@@ -293,7 +293,7 @@ void persistentDestoryHandler(void *env)
 {             
   int i;
   PersistentDestoryMsg *msg = (PersistentDestoryMsg *)env;
-  PersistentHandle h = msg->destHandlerIndex;
+  PersistentHandle h = getPersistentHandle(msg->destHandlerIndex, 0);
   CmiAssert(h!=NULL);
   CmiFree(msg);
   PersistentReceivesTable *slot = (PersistentReceivesTable *)h;
@@ -323,7 +323,7 @@ void CmiDestoryPersistent(PersistentHandle h)
   if (h == 0) CmiAbort("CmiDestoryPersistent: not a valid PersistentHandle\n");
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  CmiAssert(slot->destHandle != 0);
+  //CmiAssert(slot->destHandle != 0);
 
   PersistentDestoryMsg *msg = (PersistentDestoryMsg *)
                               CmiAlloc(sizeof(PersistentDestoryMsg));

@@ -48,7 +48,7 @@ CpvExtern(PersistentHandle *, phs);
 CpvExtern(int, phsSize);
 CpvExtern(int, curphs);
 
-PersistentHandle getPersistentHandle(PersistentHandle h);
+PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
 void *PerAlloc(int size);
 void PerFree(char *msg);
 int PumpPersistent();
@@ -57,3 +57,4 @@ void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
 
 /*@}*/
+

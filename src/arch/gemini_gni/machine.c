@@ -645,9 +645,9 @@ CpvDeclare(mempool_type*, mempool);
 /* ack pool for remote events */
 
 #define ACK_SHIFT                  19
-#define ACK_EVENT(idx)             ((idx<<ACK_SHIFT) | myrank)
-#define ACK_GET_RANK(evt)          (evt & ((1<<ACK_SHIFT)-1))
-#define ACK_GET_INDEX(evt)         (evt >> ACK_SHIFT)
+#define ACK_EVENT(idx)             (((idx)<<ACK_SHIFT) | myrank)
+#define ACK_GET_RANK(evt)          ((evt) & ((1<<ACK_SHIFT)-1))
+#define ACK_GET_INDEX(evt)         ((evt) >> ACK_SHIFT)
 
 struct IndexStruct {
 void *addr;
@@ -1074,7 +1074,7 @@ static void sweep_mempool(mempool_type *mptr)
 
     printf("[n %d %d] sweep_mempool slot START.\n", myrank, n++);
     while( current!= NULL) {
-        printf("[n %d %d] sweep_mempool slot %p size: %d (%d %d) %lld %lld.\n", myrank, n++, current, current->size, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
+        printf("[n %d %d] sweep_mempool slot %p size: %lld used: %d (%d %d) %lld %lld.\n", myrank, n++, current, current->size, 1<<current->used, current->msgs_in_send, current->msgs_in_recv, current->mem_hndl.qword1, current->mem_hndl.qword2);
         current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
     }
     printf("[n %d] sweep_mempool slot END.\n", myrank);
@@ -2149,7 +2149,11 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
         return GNI_RC_SUCCESS;
     }
 #endif
-    if(seqno == 0)
+    if(seqno == 0 
+#if CMK_PERSISTENT_COMM
+         || seqno == PERSIST_SEQ
+#endif
+      )
     {
         if(IsMemHndlZero((GetMemHndl(msg))))
         {
@@ -2443,14 +2447,19 @@ static void PumpRemoteTransactions()
             CmiFree(msg);
             IndexPool_freeslot(&ackPool, slot);
             break;
+#if CMK_PERSISTENT_COMM
         case 2:     // PERSISTENT
+            msg = ((PersistentReceivesTable*)msg)->destBuf[0].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);
             handleOneRecvedMsg(size, msg); 
             break;
-        default:
+#endif
+        default: {
+            fprintf(stderr, "[%d] PumpRemoteTransactions: unknown type: %d\n", myrank, type);
             CmiAbort("PumpRemoteTransactions: unknown type");
+            }
         }
     }
     if(status == GNI_RC_ERROR_RESOURCE)
@@ -2680,7 +2689,11 @@ static void  SendRdmaMsg()
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
             CMI_GNI_LOCK(lock);
 #if REMOTE_EVENT
-            if( pd->cqwrite_value == 0 || pd->cqwrite_value == PERSIST_SEQ)
+            if( pd->cqwrite_value == 0
+#if CMK_PERSISTENT_COMM
+                || pd->cqwrite_value == PERSIST_SEQ
+#endif
+              )
             {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
                 int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, ACK_EVENT(ptr->ack_index));
@@ -3726,7 +3739,7 @@ void LrtsDrainResources()
 }
 
 void LrtsAbort(const char *message) {
-    printf("CmiAbort is calling on PE:%d\n", myrank);
+    fprintf(stderr, "[%d] CmiAbort: %s\n", myrank, message);
     CmiPrintStackTrace(0);
     PMI_Abort(-1, message);
 }
