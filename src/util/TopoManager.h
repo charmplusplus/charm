@@ -18,6 +18,8 @@
 #include "BGLTorus.h"
 #elif CMK_BLUEGENEP
 #include "BGPTorus.h"
+#elif CMK_BLUEGENEQ
+#include "BGQTorus.h"
 #elif XT3_TOPOLOGY
 #include "XT3Torus.h"
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
@@ -37,13 +39,22 @@ class TopoManager {
     inline int getDimNX() const { return dimNX; }
     inline int getDimNY() const { return dimNY; }
     inline int getDimNZ() const { return dimNZ; }
+#if CMK_BLUEGENEQ
+    inline int getDimNA() const { return dimNA; }
+    inline int getDimNB() const { return dimNB; }
+    inline int getDimNC() const { return dimNC; }
+    inline int getDimND() const { return dimND; }
+    inline int getDimNE() const { return dimNE; }
+#endif
     inline int getDimNT() const { return dimNT; }
 
     inline int getProcsPerNode() const { return procsPerNode; }
 
     int hasMultipleProcsPerNode() const;
     void rankToCoordinates(int pe, int &x, int &y, int &z, int &t);
+    void rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t);
     int coordinatesToRank(int x, int y, int z, int t);
+    int coordinatesToRank(int a, int b, int c, int d, int e, int t);
     int getHopsBetweenRanks(int pe1, int pe2);
     void sortRanksByHops(int pe, int *pes, int *idx, int n);
     int pickClosestRank(int mype, int *pes, int n);
@@ -86,7 +97,54 @@ class TopoManager {
       else
         return pz;
     }
+#if CMK_BLUEGENEQ
+    inline int absA(int a) {
+      int pa = abs(a);
+      int sa = dimNA - pa;
+      CmiAssert(sa>=0);
+      if(torusA)
+        return ((pa>sa) ? sa : pa);
+      else
+        return pa;
+    }
 
+    inline int absB(int b) {
+      int pb = abs(b);
+      int sb = dimNB - pb;
+      CmiAssert(sb>=0);
+      if(torusB)
+        return ((pb>sb) ? sb : pb);
+      else
+        return pb;
+    }
+
+    inline int absC(int c) {
+      int pc = abs(c);
+      int sc = dimNC - pc;
+      CmiAssert(sc>=0);
+      if(torusC)
+        return ((pc>sc) ? sc : pc);
+      else
+        return pc;
+    }
+
+    inline int absD(int d) {
+      int pd = abs(d);
+      int sd = dimND - pd;
+      CmiAssert(sd>=0);
+      if(torusD)
+        return ((pd>sd) ? sd : pd);
+      else
+        return pd;
+    }
+
+    inline int absE(int e) {
+      int pe = abs(e);
+      int se = dimNE - pe;
+      CmiAssert(se>=0);
+        return ((pe>se) ? se : pe);
+    }
+#endif
   private:
     int dimX;	// dimension of the allocation in X (no. of processors)
     int dimY;	// dimension of the allocation in Y (no. of processors)
@@ -97,12 +155,17 @@ class TopoManager {
     int dimNT;  // dimension of the allocation in T (no. of processors per node)
     int numPes;
     int torusX, torusY, torusZ, torusT;
+#if CMK_BLUEGENEQ
+    int dimNA, dimNB, dimNC, dimND, dimNE;
+    int torusA, torusB, torusC, torusD, torusE;
+#endif
     int procsPerNode;
-
 #if CMK_BLUEGENEL
     BGLTorusManager bgltm;
 #elif CMK_BLUEGENEP
     BGPTorusManager bgptm;
+#elif CMK_BLUEGENEQ
+    BGQTorusManager bgqtm;
 #elif XT3_TOPOLOGY
     XT3TorusManager xt3tm;
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY

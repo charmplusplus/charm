@@ -47,6 +47,25 @@ TopoManager::TopoManager() {
   torusZ = torus[2];
   torusT = torus[3];
 
+#elif CMK_BLUEGENEQ
+  dimX = bgqtm.getDimX();
+  dimY = bgqtm.getDimY();
+  dimZ = bgqtm.getDimZ();
+
+  dimNX = bgqtm.getDimNX();
+  dimNY = bgqtm.getDimNY();
+  dimNZ = bgqtm.getDimNZ();
+  dimNT = bgqtm.getDimNT();
+
+  procsPerNode = bgqtm.getProcsPerNode();
+  int *torus;
+  torus = bgqtm.isTorus();
+  torusA = torus[0];
+  torusB = torus[1];
+  torusC = torus[2]; 
+  torusD = torus[3];
+  torusE = torus[4];
+
 #elif XT3_TOPOLOGY
   dimX = xt3tm.getDimX();
   dimY = xt3tm.getDimY();
@@ -125,6 +144,13 @@ TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY),
   torusX = true;
   torusY = true;
   torusZ = true;
+#if CMK_BLUEGENEQ
+  torusA = true;
+  torusB = true;
+  torusC = true;
+  torusD = true;
+  torusE = true;
+#endif
   numPes = dimNX * dimNY * dimNZ * dimNT;
 }
 
@@ -178,6 +204,8 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   bgltm.rankToCoordinates(pe, x, y, z, t);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z, t);
+#elif CMK_BLUEGENEQ
+  bgqtm.rankToCoordinates(pe, x, y, z, t);
 #elif XT3_TOPOLOGY
   xt3tm.rankToCoordinates(pe, x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
@@ -210,6 +238,11 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   }
 #endif
 }
+
+void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
+  CmiAssert( pe >= 0 && pe < numPes );
+  bgqtm.rankToCoordinates(pe, a, b, c, d, e, t);
+}  
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
   CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
@@ -248,6 +281,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
   return bgltm.coordinatesToRank(x, y, z, t);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z, t);
+#elif CMK_BLUEGENEQ
+  return bgqtm.coordinatesToRank(x, y, z, t);
 #elif XT3_TOPOLOGY
   return xt3tm.coordinatesToRank(x, y, z, t);
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY
@@ -260,13 +295,27 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 #endif
 }
 
+#if CMK_BLUEGENEQ
+int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
+  CmiAssert( a>=0 && x<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
+  return bgqtm.coordinatesToRank(a, b, c, d, e, t);
+}
+#endif
+
 int TopoManager::getHopsBetweenRanks(int pe1, int pe2) {
   CmiAssert( pe1 >= 0 && pe1 < numPes );
   CmiAssert( pe2 >= 0 && pe2 < numPes );
+#if CMK_BLUEGENEQ
+  int a1, b1, c1, d1, e1, t1, a2, b2, c2, d2, e2, t2; 
+  rankToCoordinates(pe1, a1, b1, c1, d1, e1, t1);
+  rankToCoordinates(pe2, a2, b2, c2, d2, e2, t2);
+  return (absA(a2-a1)+absB(b2-b1)+absC(c2-c1)+absD(d2-d1)+absE(e2-e1));  
+#else
   int x1, y1, z1, x2, y2, z2, t1, t2;
   rankToCoordinates(pe1, x1, y1, z1, t1);
   rankToCoordinates(pe2, x2, y2, z2, t2);
   return (absX(x2-x1)+absY(y2-y1)+absZ(z2-z1));
+#endif
 }
 
 void TopoManager::sortRanksByHops(int pe, int *pes, int *idx, int n) {
@@ -306,6 +355,19 @@ int TopoManager::pickClosestRank(int mype, int *pes, int n){
 }
 
 int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
+#if CMK_BLUEGENEQ
+  int pe1_a, pe1_b, pe1_c, pe1_d, pe1_e, pe1_t;
+  int pe2_a, pe2_b, pe2_c, pe2_d, pe2_e, pe2_t;
+  int pe3_a, pe3_b, pe3_c, pe3_d, pe3_e, pe3_t;
+  rankToCoordinates(pe1, pe1_a, pe1_b, pe1_c, pe1_d, pe1_e, pe1_t);
+  rankToCoordinates(pe2, pe2_a, pe2_b, pe2_c, pe2_d, pe2_e, pe2_t);
+  rankToCoordinates(pe3, pe3_a, pe3_b, pe3_c, pe3_d, pe3_e, pe3_t);
+
+  if ( (absA(pe1_a - (pe2_a+pe3_a)/2) + absB(pe1_b - (pe2_b+pe3_b)/2)+absC(pe1_c - (pe2_c+pe3_c)/2)+absD(pe1_d - (pe2_d+pe3_d)/2)+absE(pe1_e - (pe2_e+pe3_e)/2)) <= distance )
+    return 1;
+  else
+    return 0;
+#else
   int pe1_x, pe1_y, pe1_z, pe1_t;
   int pe2_x, pe2_y, pe2_z, pe2_t;
   int pe3_x, pe3_y, pe3_z, pe3_t;
@@ -318,6 +380,7 @@ int TopoManager::areNeighbors(int pe1, int pe2, int pe3, int distance) {
     return 1;
   else
     return 0;
+#endif
 }
 
 void TopoManager::quicksort(int pe, int *pes, int *arr, int left, int right) {

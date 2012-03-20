@@ -13,9 +13,10 @@ then
 fi
 
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
-BGQ_INC="-I$BGQ_INSTALL/comm/xl/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk/"
+BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk/"
 
-BGQ_LIB="-L$BGQ_INSTALL/comm/xl/lib -lmpich -lopa -lmpl -ldl -L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -lSPI -lSPI_cnk -lpthread -lrt"
+BGQ_LIB="-L$BGQ_INSTALL/comm/sys/lib -lpami -L$BGQ_INSTALL/spi/lib -lSPI -lSPI_cnk -lpthread -lrt" 
+#"-pg -L/bghome/boger/sandbox/src-110606/bgq/work/gnu-linux/powerpc64-bgq-linux/lib -lc"
 
 # test if compiler binary present
 if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++
@@ -25,7 +26,7 @@ then
 fi
 
 OPTS_CPP="$OPTS_CPP"
-GCC_OPTS="-Wno-deprecated -mminimal-toc $BGQ_INC"
+GCC_OPTS="-Wno-deprecated $BGQ_INC"
 OPTS_LD="$OPTS_LD"
 
 CMK_CPP_CHARM="$BGQ_BIN/powerpc64-bgq-linux-cpp -P"
@@ -40,8 +41,6 @@ CMK_RANLIB="$BGQ_BIN/powerpc64-bgq-linux-ranlib "
 CMK_AR="$BGQ_BIN/powerpc64-bgq-linux-ar q "
 CMK_SYSLIBS="$BGQ_LIB"
 CMK_LIBS='-lckqt'
-#CMK_LD="$BGQ_INSTALL/comm/gcc/bin/mpicc"
-#CMK_LDXX="$BGQ_INSTALL/comm/gcc/bin/mpicxx"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
