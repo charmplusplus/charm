@@ -17,12 +17,6 @@
   * persist_machine_init  // machine specific initialization call
 */
 
-#if USE_LRTS_MEMPOOL
-#define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
-#else
-#define LRTS_GNI_RDMA_PUT_THRESHOLD  16384
-#endif
-
 void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 {
     gni_post_descriptor_t *pd;
@@ -43,7 +37,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     if (slot->destBuf[0].destAddress) {
         // uGNI part
         MallocPostDesc(pd);
-        if(size <= LRTS_GNI_RDMA_PUT_THRESHOLD) {
+        if(size <= LRTS_GNI_RDMA_THRESHOLD) {
             pd->type            = GNI_POST_FMA_PUT;
         }
         else
@@ -72,7 +66,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #else
 #if REMOTE_EVENT
         pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], inst_id, ACK_EVENT((int)(slot->destHandle)));
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT((int)(slot->destHandle)));
         GNI_RC_CHECK("GNI_EpSetEventData", sts);
 #endif
 

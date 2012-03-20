@@ -1829,6 +1829,14 @@ extern int *memCriticalEntries;
 
 double CmiReadSize(const char *str);
 
+#if  CMK_CONVERSE_GEMINI_UGNI
+void CmiTurnOnStats();
+void CmiTurnOffStats();
+#else
+#define CmiTurnOnStats()
+#define CmiTurnOffStats()
+#endif
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -1903,6 +1911,5 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 
 CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
-
 
 #endif /* CONVERSE_H */

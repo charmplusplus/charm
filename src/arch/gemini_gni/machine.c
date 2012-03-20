@@ -750,6 +750,18 @@ static int checksum_flag = 0;
 #endif
 /* =====End of Definitions of Message-Corruption Related Macros=====*/
 
+static int print_stats = 0;
+static int stats_off = 0;
+void CmiTurnOnStats()
+{
+    stats_off = 0;
+}
+
+void CmiTurnOffStats()
+{
+    stats_off = 1;
+}
+
 #if CMK_WITH_STATS
 FILE *counterLog = NULL;
 typedef struct comm_thread_stats
@@ -785,10 +797,10 @@ static void init_comm_stats()
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
 }
 
-#define SMSG_CREATION( x ) if(print_stats) { x->creation_time = CmiWallTimer(); }
+#define SMSG_CREATION( x ) if(print_stats && !stats_off) { x->creation_time = CmiWallTimer(); }
 
 #define SMSG_SENT_DONE(creation_time, tag)  \
-        if (print_stats) {   if( tag == SMALL_DATA_TAG) comm_stats.smsg_data_count++;  \
+        if (print_stats && !stats_off) {   if( tag == SMALL_DATA_TAG) comm_stats.smsg_data_count++;  \
             else  if( tag == LMSG_INIT_TAG) comm_stats.lmsg_init_count++;  \
             else  if( tag == ACK_TAG) comm_stats.ack_count++;  \
             else  if( tag == BIG_MSG_TAG) comm_stats.big_msg_ack_count++;  \
@@ -799,23 +811,23 @@ static void init_comm_stats()
         }
 
 #define SMSG_TRY_SEND(tag)  \
-        if (print_stats){   if( tag == SMALL_DATA_TAG) comm_stats.try_smsg_data_count++;  \
+        if (print_stats && !stats_off){   if( tag == SMALL_DATA_TAG) comm_stats.try_smsg_data_count++;  \
             else  if( tag == LMSG_INIT_TAG) comm_stats.try_lmsg_init_count++;  \
             else  if( tag == ACK_TAG) comm_stats.try_ack_count++;  \
             else  if( tag == BIG_MSG_TAG) comm_stats.try_big_msg_ack_count++;  \
             comm_stats.try_smsg_count++; \
         }
 
-#define  RDMA_TRY_SEND()        if (print_stats) {comm_stats.try_rdma_count++;}
+#define  RDMA_TRY_SEND()        if (print_stats && !stats_off) {comm_stats.try_rdma_count++;}
 
 #define  RDMA_TRANS_DONE(x)      \
-         if (print_stats) {  double rdma_trans_time = CmiWallTimer() - x ; \
+         if (print_stats && !stats_off) {  double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_rdma_init_to_rdma_done) comm_stats.max_time_from_rdma_init_to_rdma_done = rdma_trans_time; \
              comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
          }
 
 #define  RDMA_TRANS_INIT(x)      \
-         if (print_stats) {   comm_stats.rdma_count++;  \
+         if (print_stats && !stats_off) {   comm_stats.rdma_count++;  \
              double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
@@ -842,8 +854,6 @@ static void print_comm_stats()
 #define STATS_ACK_TIME(x)            x
 #define STATS_SEND_SMSGS_TIME(x)     x
 #endif
-
-static int print_stats = 0;
 
 static void
 allgather(void *in,void *out, int len)
@@ -2847,6 +2857,15 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
                 break;
+#if CMK_PERSISTENT_COMM
+            case PUT_DONE_TAG:
+                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+                if(status == GNI_RC_SUCCESS)
+                {
+                    FreeControlMsg((CONTROL_MSG*)ptr->msg);
+                }
+                break;
+#endif
 #if CMK_DIRECT
             case DIRECT_PUT_DONE_TAG:
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr);  
@@ -3555,6 +3574,8 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 
     print_stats = CmiGetArgFlag(*argv, "+print_stats");
+    
+    stats_off = CmiGetArgFlag(*argv, "+stats_off");
 
     /* init DMA buffer for medium message */
 
