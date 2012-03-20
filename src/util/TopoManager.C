@@ -239,10 +239,12 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
 #endif
 }
 
+#if CMK_BLUEGENEQ
 void TopoManager::rankToCoordinates(int pe, int &a, int &b, int &c, int &d, int &e, int &t) {
   CmiAssert( pe >= 0 && pe < numPes );
   bgqtm.rankToCoordinates(pe, a, b, c, d, e, t);
-}  
+}
+#endif
 
 int TopoManager::coordinatesToRank(int x, int y, int z) {
   CmiAssert( x>=0 && x<dimX && y>=0 && y<dimY && z>=0 && z<dimZ );
