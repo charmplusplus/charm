@@ -680,7 +680,7 @@ static void IndexPool_init(IndexPool *pool)
     }
     pool->indexes[i].next = -1;
     pool->freehead = 0;
-#if MULTI_THREAD_SEND 
+#if MULTI_THREAD_SEND  || REMOTE_EVENT
     pool->lock  = CmiCreateLock();
 #endif
 }
@@ -690,11 +690,13 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int i;
     int s;
-    CMI_GNI_LOCK(pool->lock);
+#if MULTI_THREAD_SEND  || REMOTE_EVENT
+    CmiLock(pool->lock);
+#endif
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
-        printf("[%d] AckPool_getslot expand to: %d\n", myrank, newsize);
+        printf("[%d] IndexPool_getslot expand to: %d\n", myrank, newsize);
         if (newsize > (1<<(32-ACK_SHIFT))) CmiAbort("AckPool too large");
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
@@ -711,7 +713,9 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
     pool->indexes[s].type = type;
-    CMI_GNI_UNLOCK(pool->lock);
+#if MULTI_THREAD_SEND  || REMOTE_EVENT
+    CmiUnlock(pool->lock);
+#endif
     return s;
 }
 
@@ -719,10 +723,14 @@ static
 inline  void IndexPool_freeslot(IndexPool *pool, int s)
 {
     CmiAssert(s>=0 && s<pool->size);
-    CMI_GNI_LOCK(pool->lock);
+#if MULTI_THREAD_SEND  || REMOTE_EVENT
+    CmiLock(pool->lock);
+#endif
     pool->indexes[s].next = pool->freehead;
     pool->freehead = s;
-    CMI_GNI_UNLOCK(pool->lock);
+#if MULTI_THREAD_SEND  || REMOTE_EVENT
+    CmiUnlock(pool->lock);
+#endif
 }
 
 
