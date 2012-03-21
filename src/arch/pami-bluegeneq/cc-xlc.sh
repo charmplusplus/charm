@@ -3,7 +3,7 @@ XLC_PRE=$XLC_TYPICAL_PRE
 
 XLC_TYPICAL_POST_BG=vacpp/bg/12.1/bin/bg
 XLC_TYPICAL_POST=vacpp/bg/12.1/bin
-XLC_POST=$XLC_TYPICAL_POST
+XLC_POST=$XLC_TYPICAL_POST_BG
 
 # if no floor set, use typical floor path
 if test -n "$BGQ_XLC_PRE"
