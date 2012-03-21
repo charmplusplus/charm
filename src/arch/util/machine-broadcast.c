@@ -1,3 +1,9 @@
+/**
+ *        functions for broadcast
+**/
+
+CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode);
+
 static void handleOneBcastMsg(int size, char *msg) {
     CmiAssert(CMI_BROADCAST_ROOT(msg)!=0);
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -106,10 +112,10 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
-        LrtsSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -154,10 +160,10 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
 #else
         char *newmsg = CopyMsg(msg, size);
-        LrtsSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -354,3 +360,74 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 }
 #endif
 /* ##### End of Functions Related with Message Sending OPs ##### */
+
+#if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+
+void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  int i;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  for(i=0;i<npes;i++) {
+    if (pes[i] == CmiMyPe())
+      CmiSyncSend(pes[i], len, msg);
+    else {
+      CmiReference(msg);
+      CmiSyncSendAndFree(pes[i], len, msg);
+    }
+  }
+#else
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+#endif
+}
+
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  /* A better asynchronous implementation may be wanted, but at least it works */
+  CmiSyncListSendFn(npes, pes, len, msg);
+  return (CmiCommHandle) 0;
+}
+
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+  if (npes == 1) {
+      CmiSyncSendAndFree(pes[0], len, msg);
+      return;
+  }
+#if CMK_PERSISTENT_COMM
+  if (CpvAccess(phs) && len > 1024) {
+      int i;
+      for(i=0;i<npes;i++) {
+        if (pes[i] == CmiMyPe())
+          CmiSyncSend(pes[i], len, msg);
+        else {
+          CmiReference(msg);
+          CmiSyncSendAndFree(pes[i], len, msg);
+        }
+      }
+      CmiFree(msg);
+      return;
+  }
+#endif
+  
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  if (npes == 1) {
+    CmiSyncSendAndFree(pes[0], len, msg);
+    return;
+  }
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
+#else
+  int i;
+  for(i=0;i<npes-1;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  if (npes>0)
+    CmiSyncSendAndFree(pes[npes-1], len, msg);
+  else 
+    CmiFree(msg);
+#endif
+}
+
+#endif

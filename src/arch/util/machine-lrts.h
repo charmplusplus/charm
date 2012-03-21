@@ -5,7 +5,6 @@ void LrtsPrepareEnvelope(char *msg, int size);
 
 /* The machine-specific send function */
 CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode);
-CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode);
 
 #if CMK_PERSISTENT_COMM
 void LrtsSendPersistentMsg(PersistentHandle h, int destPE, int size, void *m);
