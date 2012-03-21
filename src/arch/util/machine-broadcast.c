@@ -365,69 +365,17 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 
 void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
-  int i;
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  for(i=0;i<npes;i++) {
-    if (pes[i] == CmiMyPe())
-      CmiSyncSend(pes[i], len, msg);
-    else {
-      CmiReference(msg);
-      CmiSyncSendAndFree(pes[i], len, msg);
-    }
-  }
-#else
-  for(i=0;i<npes;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-#endif
+    LrtsSyncListSendFn(npes, pes, len, msg);
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
 {
-  /* A better asynchronous implementation may be wanted, but at least it works */
-  CmiSyncListSendFn(npes, pes, len, msg);
-  return (CmiCommHandle) 0;
+    return LrtsAsyncListSendFn(npes, pes, len, msg);
 }
 
 void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
 {
-  if (npes == 1) {
-      CmiSyncSendAndFree(pes[0], len, msg);
-      return;
-  }
-#if CMK_PERSISTENT_COMM
-  if (CpvAccess(phs) && len > 1024) {
-      int i;
-      for(i=0;i<npes;i++) {
-        if (pes[i] == CmiMyPe())
-          CmiSyncSend(pes[i], len, msg);
-        else {
-          CmiReference(msg);
-          CmiSyncSendAndFree(pes[i], len, msg);
-        }
-      }
-      CmiFree(msg);
-      return;
-  }
-#endif
-  
-#if CMK_BROADCAST_USE_CMIREFERENCE
-  if (npes == 1) {
-    CmiSyncSendAndFree(pes[0], len, msg);
-    return;
-  }
-  CmiSyncListSendFn(npes, pes, len, msg);
-  CmiFree(msg);
-#else
-  int i;
-  for(i=0;i<npes-1;i++) {
-    CmiSyncSend(pes[i], len, msg);
-  }
-  if (npes>0)
-    CmiSyncSendAndFree(pes[npes-1], len, msg);
-  else 
-    CmiFree(msg);
-#endif
+    LrtsFreeListSendFn(npes, pes, len, msg);
 }
 
 #endif

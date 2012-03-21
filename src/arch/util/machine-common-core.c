@@ -506,7 +506,7 @@ CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode)
 #endif
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) {
-          if (size > 1024) {
+          if (size > PERSIST_MIN_SIZE) {
             CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
             LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)], destNode, size, msg);
             return 0;

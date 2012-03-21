@@ -314,7 +314,7 @@ static int LOCAL_QUEUE_ENTRIES=20480;
 #undef GNI_RC_CHECK
 #endif
 #ifdef DEBUG
-#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           printf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); CmiAbort("GNI_RC_CHECK"); } } while(0)
+#define GNI_RC_CHECK(msg,rc) do { if(rc != GNI_RC_SUCCESS) {           printf("[%d] %s; err=%s\n",CmiMyPe(),msg,gni_err_str[rc]); fflush(stdout); CmiAbort("GNI_RC_CHECK"); } } while(0)
 #else
 #define GNI_RC_CHECK(msg,rc)
 #endif
@@ -792,6 +792,19 @@ typedef struct comm_thread_stats
 
     double    max_time_from_rdma_init_to_rdma_done;
     double    all_time_from_rdma_init_to_rdma_done;
+
+    int      count_in_PumpNetwork;
+    double   time_in_PumpNetwork;
+    double   max_time_in_PumpNetwork;
+    int      count_in_SendBufferMsg_smsg;
+    double   time_in_SendBufferMsg_smsg;
+    double   max_time_in_SendBufferMsg_smsg;
+    int      count_in_PumpRemoteTransactions;
+    double   time_in_PumpRemoteTransactions;
+    double   max_time_in_PumpRemoteTransactions;
+    int      count_in_PumpLocalTransactions_rdma;
+    double   time_in_PumpLocalTransactions_rdma;
+    double   max_time_in_PumpLocalTransactions_rdma;
 } Comm_Thread_Stats;
 
 static Comm_Thread_Stats   comm_stats;
@@ -841,6 +854,45 @@ static void init_comm_stats()
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
          }
 
+#define STATS_PUMPNETWORK_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_PumpNetwork++;        \
+          comm_stats.time_in_PumpNetwork += t;   \
+          if (t>comm_stats.max_time_in_PumpNetwork)      \
+              comm_stats.max_time_in_PumpNetwork = t;    \
+        }
+
+#define STATS_PUMPREMOTETRANSACTIONS_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_PumpRemoteTransactions ++;        \
+          comm_stats.time_in_PumpRemoteTransactions += t;   \
+          if (t>comm_stats.max_time_in_PumpRemoteTransactions)      \
+              comm_stats.max_time_in_PumpRemoteTransactions = t;    \
+        }
+
+#define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_PumpLocalTransactions_rdma ++;        \
+          comm_stats.time_in_PumpLocalTransactions_rdma += t;   \
+          if (t>comm_stats.max_time_in_PumpLocalTransactions_rdma)      \
+              comm_stats.max_time_in_PumpLocalTransactions_rdma = t;    \
+        }
+
+#define STATS_SEND_SMSGS_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_SendBufferMsg_smsg ++;        \
+          comm_stats.time_in_SendBufferMsg_smsg += t;   \
+          if (t>comm_stats.max_time_in_SendBufferMsg_smsg)      \
+              comm_stats.max_time_in_SendBufferMsg_smsg = t;    \
+        }
 
 static void print_comm_stats()
 {
@@ -856,11 +908,20 @@ static void print_comm_stats()
     fprintf(counterLog, "Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
     fprintf(counterLog, "Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
     fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
+
+    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
+    fprintf(counterLog, "                          count\ttotal time\tmax \n", myrank);
+    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
+    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
+    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
+    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.3f\t%.3f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
 }
 
 #else
-#define STATS_ACK_TIME(x)            x
-#define STATS_SEND_SMSGS_TIME(x)     x
+#define STATS_PUMPNETWORK_TIME(x)                  x
+#define STATS_SEND_SMSGS_TIME(x)                   x
+#define STATS_PUMPREMOTETRANSACTIONS_TIME(x)       x
+#define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   x
 #endif
 
 static void
@@ -1644,6 +1705,73 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     }
 #endif
     return 0;
+}
+
+void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  int i;
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  for(i=0;i<npes;i++) {
+    if (pes[i] == CmiMyPe())
+      CmiSyncSend(pes[i], len, msg);
+    else {
+      CmiReference(msg);
+      CmiSyncSendAndFree(pes[i], len, msg);
+    }
+  }
+#else
+  for(i=0;i<npes;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+#endif
+}
+
+CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+  /* A better asynchronous implementation may be wanted, but at least it works */
+  CmiSyncListSendFn(npes, pes, len, msg);
+  return (CmiCommHandle) 0;
+}
+
+void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+  if (npes == 1) {
+      CmiSyncSendAndFree(pes[0], len, msg);
+      return;
+  }
+#if CMK_PERSISTENT_COMM
+  if (CpvAccess(phs) && len > 1024) {
+      int i;
+      for(i=0;i<npes;i++) {
+        if (pes[i] == CmiMyPe())
+          CmiSyncSend(pes[i], len, msg);
+        else {
+          CmiReference(msg);
+          CmiSyncSendAndFree(pes[i], len, msg);
+        }
+      }
+      CmiFree(msg);
+      return;
+  }
+#endif
+  
+#if CMK_BROADCAST_USE_CMIREFERENCE
+  if (npes == 1) {
+    CmiSyncSendAndFree(pes[0], len, msg);
+    return;
+  }
+  CmiSyncListSendFn(npes, pes, len, msg);
+  CmiFree(msg);
+#else
+  int i;
+  for(i=0;i<npes-1;i++) {
+    CmiSyncSend(pes[i], len, msg);
+  }
+  if (npes>0)
+    CmiSyncSendAndFree(pes[npes-1], len, msg);
+  else 
+    CmiFree(msg);
+#endif
 }
 
 static void    PumpDatagramConnection();
@@ -3004,7 +3132,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
 #endif
-    PumpNetworkSmsg();
+    STATS_PUMPNETWORK_TIME(PumpNetworkSmsg());
     //MACHSTATE(8, "after PumpNetworkSmsg \n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
@@ -3024,14 +3152,14 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
 #endif
-    PumpLocalTransactions(rdma_tx_cqh,  rdma_tx_cq_lock);
+    STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(PumpLocalTransactions(rdma_tx_cqh,  rdma_tx_cq_lock));
 
 #if CQWRITE
     PumpCqWriteTransactions();
 #endif
 
 #if REMOTE_EVENT
-    PumpRemoteTransactions();
+    STATS_PUMPREMOTETRANSACTIONS_TIME(PumpRemoteTransactions());
 #endif
 
     //MACHSTATE(8, "after PumpLocalTransactions\n") ; 
@@ -3048,7 +3176,7 @@ void LrtsAdvanceCommunication(int whileidle)
     if (SendBufferMsg(&smsg_oob_queue) == 1)
 #endif
     {
-    SendBufferMsg(&smsg_queue);
+        STATS_SEND_SMSGS_TIME(SendBufferMsg(&smsg_queue));
     }
     //MACHSTATE(8, "after SendBufferMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD

@@ -10,6 +10,8 @@
 
 #include "gni_pub.h"
 
+#define PERSIST_MIN_SIZE                1024
+
 #define PERSIST_BUFFERS_NUM             1
 
 #define PERSIST_SEQ                     0xFFFFFFF
