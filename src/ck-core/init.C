@@ -1420,7 +1420,6 @@ void CharmLibInit(int peid, int numpes, int argc, char **argv){
 
   CharmLibInterOperate = 1;
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-  printf("node[%d]: called CharmLibInit with %d nodes\n", CmiMyPe(), CmiNumNodes());
 }
 
 void CharmLibExit() {
