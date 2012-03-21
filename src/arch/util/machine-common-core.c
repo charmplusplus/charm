@@ -477,7 +477,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 #include "machine-xpmem.c"
 #endif
 
-int refcount = 0;
+static int refcount = 0;
 
 #if CMK_USE_OOB
 CpvExtern(int, _urgentSend);
@@ -487,7 +487,7 @@ CpvExtern(int, _urgentSend);
 #if CMK_C_INLINE
 inline 
 #endif
-CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode)
 {
         int rank;
 #if CMK_USE_PXSHM
@@ -502,6 +502,15 @@ CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
           CmiSendMessageXpmem(msg, size, destNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
+        }
+#endif
+#if CMK_PERSISTENT_COMM
+        if (CpvAccess(phs)) {
+          if (size > PERSIST_MIN_SIZE) {
+            CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
+            LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)], destNode, size, msg);
+            return 0;
+          }
         }
 #endif
 
@@ -527,29 +536,24 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
 #if CMK_PERSISTENT_COMM
         if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
-    } else {
-#if CMK_PERSISTENT_COMM
-        if (CpvAccess(phs)) {
-          if (size > 1024) {
-            CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
-            int destNode = CmiNodeOf(destPE);
-            CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-            LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)++], destNode, size, msg);
-            return;
-          }
-          else
-            CpvAccess(curphs)++;
-        }
-#endif
+    } 
+    else {
         int destNode = CmiNodeOf(destPE);
+        int destRank = CmiRankOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
-            CmiPushPE(CmiRankOf(destPE), msg);
+            CmiPushPE(destRank, msg);
+#if CMK_PERSISTENT_COMM
+        if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
             return;
         }
 #endif
-        CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-        LrtsSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+        CMI_DEST_RANK(msg) = destRank;
+        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+#if CMK_PERSISTENT_COMM
+        if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
     }
 }
 #endif

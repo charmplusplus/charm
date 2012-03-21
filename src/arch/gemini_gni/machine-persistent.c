@@ -23,16 +23,16 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     gni_return_t status;
     RDMA_REQUEST        *rdma_request_msg;
     
-    CmiAssert(h!=NULL);
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
+    if (h==NULL) CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
     CmiAssert(slot->used == 1);
     CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
-        CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
+        CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);
         CmiAbort("Abort: Invalid size\n");
     }
 
-    // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
+     //CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
 
     if (slot->destBuf[0].destAddress) {
         // uGNI part
@@ -56,8 +56,11 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         pd->cqwrite_value   = PERSIST_SEQ;
         pd->amo_cmd         = 0;
 
+#if CMK_WITH_STATS 
+        pd->sync_flag_addr = 1000000 * CmiWallTimer(); //microsecond
+#endif
         SetMemHndlZero(pd->local_mem_hndl);
-#if CMK_SMP
+#if CMK_SMP || 1
 #if REMOTE_EVENT
         bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
 #else
@@ -73,7 +76,10 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
         if (status == GNI_RC_SUCCESS) 
         {
-        if(pd->type == GNI_POST_RDMA_PUT) 
+#if CMK_WITH_STATS
+            RDMA_TRY_SEND()
+#endif
+         if(pd->type == GNI_POST_RDMA_PUT) 
             status = GNI_PostRdma(ep_hndl_array[destNode], pd);
         else
             status = GNI_PostFma(ep_hndl_array[destNode],  pd);
@@ -88,7 +94,13 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
             bufferRdmaMsg(destNode, pd, -1);
 #endif
         }else
+        {
             GNI_RC_CHECK("AFter posting", status);
+#if  CMK_WITH_STATS
+            pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+            RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+#endif
+        }
 #endif
     }
   else {

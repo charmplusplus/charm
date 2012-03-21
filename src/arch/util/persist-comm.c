@@ -149,9 +149,13 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
 
+  if (CmiMyNode() == CmiNodeOf(destPE)) return NULL;
+
+/*
   if (CmiMyPe() == destPE) {
     CmiAbort("CmiCreatePersistent Error: setting up persistent communication to the same processor is not allowed.");
   }
+*/
 
   slot->used = 1;
   slot->destPE = destPE;
@@ -320,10 +324,10 @@ void persistentDestoryHandler(void *env)
 /* FIXME: need to buffer until ReqGranted message come back? */
 void CmiDestoryPersistent(PersistentHandle h)
 {
-  if (h == 0) CmiAbort("CmiDestoryPersistent: not a valid PersistentHandle\n");
+  if (h == NULL) return;
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  //CmiAssert(slot->destHandle != 0);
+  /* CmiAssert(slot->destHandle != 0); */
 
   PersistentDestoryMsg *msg = (PersistentDestoryMsg *)
                               CmiAlloc(sizeof(PersistentDestoryMsg));
@@ -407,7 +411,7 @@ void CmiPersistentInit()
 void CmiUsePersistentHandle(PersistentHandle *p, int n)
 {
   if (n==1 && *p == NULL) { p = NULL; n = 0; }
-#if  CMK_ERROR_CHECKING
+#if  CMK_ERROR_CHECKING && 0
   {
   int i;
   for (i=0; i<n; i++)

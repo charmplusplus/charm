@@ -13,7 +13,7 @@ Platform Support
 - Cray XE and XK systems using the Gemini network via either MPI
   (mpi-crayxe) or the native uGNI (gemini_gni-crayxe)
 
-- IBM Blue Gene Q, using MPI (mpi-bluegeneq)
+- IBM Blue Gene Q, using MPI (mpi-bluegeneq) or PAMI (pami-bluegeneq)
 
 - Clang, Cray, and Fujitsu compilers
 
@@ -44,7 +44,7 @@ General Changes
     availability and speed
   * Instrumentation records multicasts
 
-- Array options
+- Chare arrays support options that can enable some optimizations
 
 - New 'completion detection' library for parallel process termination
   detection, when the need for modularity excludes full quiescence
