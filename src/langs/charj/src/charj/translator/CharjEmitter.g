@@ -238,8 +238,9 @@ classScopeDeclaration
     boolean sdagMethod = false;
 }
     :   ^(FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList
+            ty=type IDENT
             { currentMethod = (MethodSymbol)$IDENT.def; }
+            f=formalParameterList
             b=block?)
         -> {emitCC()}? funcMethodDecl_cc(
                 classSym={currentClass},
@@ -260,44 +261,46 @@ classScopeDeclaration
         -> {emitCI()}? // do nothing, since it's not an entry method
         ->
     |   ^(ENTRY_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=domainExpression[null]? 
+            ty=type IDENT
             {
                 currentMethod = (MethodSymbol)$IDENT.def;
                 sdagMethod = currentMethod.hasSDAG;
             }
+            ef=entryFormalParameterList a=domainExpression[null]? 
             b=block?) 
-        -> {emitCC()}? funcMethodDecl_cc(
+        -> {emitCC()}? entryMethodDecl_cc(
                 classSym={currentClass},
                 methodSym={currentMethod},
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitH()}? funcMethodDecl_h(
+        -> {emitH()}? entryMethodDecl_h(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 adl={$a.st},
                 block={$b.st})
-        -> {emitCI()}? funcMethodDecl_ci(
+        -> {emitCI()}? entryMethodDecl_ci(
                 modl={$m.st}, 
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 block={$b.st})
         ->
     |   ^(SDAG_FUNCTION_DECL m=modifierList? g=genericTypeParameterList? 
-            ty=type IDENT f=formalParameterList a=domainExpression[null]? 
+            ty=type IDENT
             {
             currentMethod = (MethodSymbol)$IDENT.def;
             sdagMethod = currentMethod.hasSDAG;
             }
+            ef=entryFormalParameterList a=domainExpression[null]? 
             ^(BLOCK (sdg+=sdagBasicBlock)*))
         -> {emitCI()}? funcMethodDecl_sdag_ci(
                 classSym={currentClass},
@@ -306,7 +309,7 @@ classScopeDeclaration
                 gtpl={$g.st}, 
                 ty={$ty.st},
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 adl={$a.st},
                 block={$sdg})
         ->
@@ -342,29 +345,29 @@ classScopeDeclaration
                 fpl={$f.st}, 
                 block={$b.st})
         ->
-    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT f=formalParameterList
+    |   ^(ENTRY_CONSTRUCTOR_DECL m=modifierList? g=genericTypeParameterList? IDENT ef=entryFormalParameterList
             {
                 currentMethod = (MethodSymbol)$IDENT.def;
                 migrationCtor = currentClass.migrationCtor == $ENTRY_CONSTRUCTOR_DECL;
             }
             b=block)
-        -> {emitCC()}? ctorDecl_cc(
+        -> {emitCC()}? entryCtorDecl_cc(
                 modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 block={$b.st})
-        -> {emitCI() && !migrationCtor}? ctorDecl_ci(
+        -> {emitCI() && !migrationCtor}? entryCtorDecl_ci(
                 modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 block={$b.st})
-        -> {emitH()}? ctorDecl_h(
+        -> {emitH()}? entryCtorDecl_h(
                 modl={$m.st},
                 gtpl={$g.st}, 
                 id={$IDENT.text}, 
-                fpl={$f.st}, 
+                fpl={$ef.st}, 
                 block={$b.st})
         ->
     ;
@@ -562,18 +565,27 @@ type
         -> {$simpleType.st}
     |   objectType 
         -> {$objectType.st}
-    |   VOID
-        {
-            $st = %{"void"};
-        }
+    |   VOID { $st = %{"void"}; }
     ;
+
+typeInEntryDecl
+    :   ^(SIMPLE_TYPE primitiveType domainExpression[null]?)
+        -> simple_type(typeID={$primitiveType.st}, arrDeclList={$domainExpression.st})
+    |   ^(OBJECT_TYPE qualifiedTypeIdent domainExpression[null]?)
+        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+    |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression[null]?)
+        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+    |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression[null]?)
+        -> obj_type(typeID={$qualifiedTypeIdent.st}, arrDeclList={$domainExpression.st})
+    ;
+
 
 simpleType
     :   ^(SIMPLE_TYPE primitiveType domainExpression[null]?)
         -> simple_type(typeID={$primitiveType.st}, arrDeclList={$domainExpression.st})
     ;
 
-objectType //[boolean forNewExpression]
+objectType
     : proxyType -> {$proxyType.st;}
     | nonProxyType -> {$nonProxyType.st}
     ;
@@ -652,10 +664,24 @@ genericTypeArgument
         -> template(t={$text}) "/* genericTypeArgument: wildcard bound types not implemented */ <t>"
     ;
 
+
+entryFormalParameterList
+    :   ^(FORMAL_PARAM_LIST (efp+=entryFormalParameter)*)
+        -> entry_formal_param_list(sdecl={$efp})
+    ;
+
+
+entryFormalParameter
+    :   ^(FORMAL_PARAM_STD_DECL t=typeInEntryDecl vdid=variableDeclaratorId)
+        -> entry_formal_param_decl(type={$t.st}, declID={$vdid.st})
+    ;
+
+
 formalParameterList
     :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)* fpvd=formalParameterVarargDecl?)
         -> formal_param_list(sdecl={$fpsd}, vdecl={$fpvd.st})
     ;
+
     
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
@@ -968,7 +994,7 @@ primaryExpression
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
-        -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
+        -> entry_method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {

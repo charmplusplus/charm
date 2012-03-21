@@ -423,7 +423,19 @@ funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <modl><ty><gtpl> <id><fpl><adl>;
 >>
 
+
+entryMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl>;
+>>
+
+
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl>;
+>>
+
+entryMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <modl><ty><gtpl> <id><fpl><adl>;
 >>
@@ -466,6 +478,24 @@ funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
+entryMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<if(block)>
+<modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
+{
+    <methodSym.entryArgInitializers; separator="\n">
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    <block>
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
+}
+<endif>
+>>
+
+
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
 <modl><gtpl><id><fpl>;
@@ -479,6 +509,25 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><id>::<id><fpl>
+<block>
+>>
+
+
+entryCtorDecl_ci(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><gtpl><id><fpl>;
+>>
+
+
+entryCtorDecl_h(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><id><fpl>;
+>>
+
+
+entryCtorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
 <modl><id>::<id><fpl>
 <block>
@@ -643,11 +692,22 @@ formal_param_list(sdecl, vdecl) ::=
 >>
 
 
+entry_formal_param_list(sdecl) ::=
+<<
+(<sdecl; separator=", ">)
+>>
+
+
 formal_param_decl(modList, type, declID) ::=
 <<
 <if(modList)><modList> <endif><type> <declID>
 >>
 
+
+entry_formal_param_decl(modList, type, declID) ::=
+<<
+<if(modList)><modList> <endif><type> __<declID>
+>>
 
 assert(cond, msg) ::=
 <<

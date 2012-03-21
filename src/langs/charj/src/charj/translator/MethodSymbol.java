@@ -4,6 +4,8 @@ package charj.translator;
 import org.antlr.stringtemplate.StringTemplate;
 import org.antlr.stringtemplate.language.AngleBracketTemplateLexer;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -18,6 +20,7 @@ public class MethodSymbol
 
     /** The list of local variables defined anywhere in the method */
     LocalScope locals;
+    Map<String, String> entryArgs = new LinkedHashMap();
 
     public boolean isEntry = false;
     public boolean isStatic = false;
@@ -153,5 +156,21 @@ public class MethodSymbol
             mangled += numargs;
         }
         return mangled;
+    }
+
+    public void addEntryArg(String type, String name)
+    {
+        entryArgs.put(type, name);
+    }
+
+    public List<String> getEntryArgInitializers()
+    {
+        List<String> inits = new ArrayList<String>();
+        for (Map.Entry<String, String> entry : entryArgs.entrySet()) {
+            String name = entry.getValue();
+            String type = entry.getKey();
+            inits.add(type + "* " + name + " = &__" + name + ";");
+        }
+        return inits;
     }
 }
