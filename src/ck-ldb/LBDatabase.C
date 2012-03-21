@@ -27,14 +27,6 @@ struct AdaptiveLBDatabase {
   std::vector<AdaptiveData> history_data;
 } adaptive_lbdb;
 
-enum state {
-  OFF,
-  ON,
-  PAUSE,
-  DECIDED,
-  LOAD_BALANCE
-} local_state;
-
 struct AdaptiveLBStructure {
   int lb_ideal_period;
   int lb_calculated_period;
@@ -427,7 +419,6 @@ void LBDatabase::init(void)
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
   adaptive_struct.lb_msg_recv_no = 0;
-  local_state = OFF;
 
 }
 
@@ -555,6 +546,23 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
 #endif
+}
+
+void LBDatabase::ResumeClients() {
+  // If metabalancer enabled, initialize the variables
+  adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.lb_calculated_period = INT_MAX;
+  adaptive_struct.lb_no_iterations = -1;
+  adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.global_recv_iter_counter = 0;
+  adaptive_struct.in_progress = false;
+  adaptive_struct.prev_load = 0.0;
+  adaptive_struct.lb_strategy_cost = 0.0;
+  adaptive_struct.lb_migration_cost = 0.0;
+  adaptive_struct.lb_msg_send_no = 0;
+  adaptive_struct.lb_msg_recv_no = 0;
+
+  LDResumeClients(myLDHandle);
 }
 
 bool LBDatabase::AddLoad(int iteration, double load) {
@@ -774,7 +782,7 @@ void LBDatabase::LoadBalanceDecision(int req_no, int period) {
   }
   //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
   adaptive_struct.lb_ideal_period = period;
-  local_state = ON;
+  //local_state = ON;
   adaptive_struct.lb_msg_recv_no = req_no;
   thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
 }
@@ -783,29 +791,30 @@ void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
+  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period);
   adaptive_struct.lb_ideal_period = period;
+  LDOMAdaptResumeSync(myLDHandle, period);
 
-  if (local_state == ON) {
-    local_state = DECIDED;
-    return;
-  }
+//  if (local_state == ON) {
+//    local_state = DECIDED;
+//    return;
+//  }
 
   // If the state is PAUSE, then its waiting for the final decision from central
   // processor. If the decision is that the ideal period is in the future,
   // resume. If the ideal period is now, then carry out load balancing.
-  if (local_state == PAUSE) {
-    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
-      local_state = DECIDED;
-      //SendMinStats();
-      //FIX ME!!! ResumeClients(0);
-    } else {
-      local_state = LOAD_BALANCE;
-      //FIX ME!!! ProcessAtSync();
-    }
-    return;
-  }
-  CkPrintf("Error!!! Final decision received but the state is invalid %d\n", local_state);
+//  if (local_state == PAUSE) {
+//    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
+//      local_state = DECIDED;
+//      //SendMinStats();
+//      //FIX ME!!! ResumeClients(0);
+//    } else {
+//      local_state = LOAD_BALANCE;
+//      //FIX ME!!! ProcessAtSync();
+//    }
+//    return;
+//  }
+//  CkPrintf("Error!!! Final decision received but the state is invalid %d\n", local_state);
 }
 
 

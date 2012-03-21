@@ -35,6 +35,9 @@ private:
 
   void DepositHandle(LDOMHandle _h) { myhandle = _h; };
   void Migrate(LDObjHandle _h, int dest) { callbacks.migrate(_h,dest); };
+  void AdaptResumeSync(LDObjHandle _h, int lb_ideal_period) {
+    callbacks.adaptResumeSync(_h, lb_ideal_period);
+  }
   CmiBool RegisteringObjs() { return registering_objs; };
   void SetRegisteringObjs(CmiBool _set) { registering_objs = _set; };
 

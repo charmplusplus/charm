@@ -48,6 +48,8 @@ typedef enum {
 	CkDeliver_inline=1  //Deliver via a regular call
 } CkDeliver_t;
 
+
+
 #include "CkLocation.decl.h"
 
 /************************** Array Messages ****************************/
@@ -173,6 +175,7 @@ public:
   CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,CmiBool ignoreArrival,
   	const CkArrayIndex &idx_,int localIdx_);
   void migrateMe(int toPe); //Leave this processor
+  void informIdealLBPeriod(int lb_ideal_period);
   void destroy(void); //User called destructor
   virtual ~CkLocRec_local();
 
@@ -215,6 +218,8 @@ public:
   inline LBDatabase *getLBDB(void) const {return the_lbdb;}
   inline LDObjHandle getLdHandle() const{return ldHandle;}
   static void staticMigrate(LDObjHandle h, int dest);
+  static void staticAdaptResumeSync(LDObjHandle h, int lb_ideal_period);
+  void adaptResumeSync(int lb_ideal_period);
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void AsyncMigrate(CmiBool use);
@@ -305,6 +310,8 @@ public:
   /// Called by the system just before and after migration to another processor:  
   virtual void ckAboutToMigrate(void); /*default is empty*/
   virtual void ckJustMigrated(void); /*default is empty*/
+
+  void recvLBPeriod(void *data);
 
   //used for out-of-core emulation
   virtual void ckJustRestored(void); /*default is empty*/
@@ -581,6 +588,7 @@ public:
 
 	//Migrate us to another processor
 	void emigrate(CkLocRec_local *rec,int toPe);
+  void informLBPeriod(CkLocRec_local *rec, int lb_ideal_period);
 
 #if CMK_LBDB_ON
 	LBDatabase *getLBDB(void) const { return the_lbdb; }
@@ -671,6 +679,9 @@ private:
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
 	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
+
+	typedef void (CkMigratable::* CkMigratable_voidfn_arg_t)(void*);
+	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn, void*);
 
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 

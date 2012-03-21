@@ -328,7 +328,9 @@ public:
   inline void ClearLoads(void) { LDClearLoads(myLDHandle); };
   inline int Migrate(LDObjHandle h, int dest) { return LDMigrate(h,dest); };
 
-  inline void Migrated(LDObjHandle h, int waitBarrier=1) { LDMigrated(h, waitBarrier); };
+  inline void Migrated(LDObjHandle h, int waitBarrier=1) {
+    LDMigrated(h, waitBarrier);
+  };
 
   inline LDBarrierClient AddLocalBarrierClient(LDResumeFn fn, void* data) {
     return LDAddLocalBarrierClient(myLDHandle,fn,data);
@@ -349,8 +351,7 @@ public:
   inline void AtLocalBarrier(LDBarrierClient h) { LDAtLocalBarrier(myLDHandle,h); }
   inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
   inline void LocalBarrierOff(void) { LDLocalBarrierOn(myLDHandle); };
-  inline void ResumeClients() { LDResumeClients(myLDHandle); }
-
+  void ResumeClients();
   inline int ProcessorSpeed() { return LDProcessorSpeed(); };
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}

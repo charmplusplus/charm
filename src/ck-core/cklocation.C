@@ -55,6 +55,13 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBUG(x)   /**/
 #endif
 
+enum state {
+  OFF,
+  ON,
+  PAUSE,
+  DECIDED,
+  LOAD_BALANCE
+} local_state;
 
 
 #if CMK_LBDB_ON
@@ -974,6 +981,7 @@ void CkMigratable::commonInit(void) {
 	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
   atsync_iteration = -1;
+  local_state = OFF;
 	/*
 	FAULT_EVAC
 	*/
@@ -1073,6 +1081,26 @@ double CkMigratable::getObjTime() {
 	return myRec->getObjTime();
 }
 
+void CkMigratable::recvLBPeriod(void *data) {
+  int lb_period = *((int *) data);
+  CkPrintf("Received the LB Period %d\n", lb_period);
+  if (local_state == PAUSE) {
+    if (atsync_iteration < lb_period) {
+      local_state = DECIDED;
+      ResumeFromSync();
+      return;
+    }
+    local_state = LOAD_BALANCE;
+
+    local_state = OFF;
+    atsync_iteration = -1;
+
+    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+    return;
+  }
+  local_state = DECIDED;
+}
+
 void CkMigratable::ckFinishConstruction(void)
 {
 //	if ((!usesAtSync) || barrierRegistered) return;
@@ -1087,6 +1115,7 @@ void CkMigratable::ckFinishConstruction(void)
 		(LDBarrierFn)staticResumeFromSync,(void*)(this));
 	barrierRegistered=CmiTrue;
 }
+
 void CkMigratable::AtSync(int waitForMigration)
 {
 	if (!usesAtSync)
@@ -1097,21 +1126,27 @@ void CkMigratable::AtSync(int waitForMigration)
 	myRec->AsyncMigrate(!waitForMigration);
 	if (waitForMigration) ReadyMigrate(CmiTrue);
 	ckFinishConstruction();
-	DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
-          // model-based load balancing, ask user to provide cpu load
-        if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
-//	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+  DEBL((AA"Element %s going to sync\n"AB,idx2str(thisIndexMax)));
+  // model-based load balancing, ask user to provide cpu load
+  if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
+  //	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   atsync_iteration++;
   myRec->getLBDB()->AddLoad(atsync_iteration, myRec->getObjTime());
-  CkPrintf("atsync_iter %d && predicted period %d\n", atsync_iteration,
-    myRec->getLBDB()->getPredictedLBPeriod());
+  //CkPrintf("atsync_iter %d && predicted period %d state: %d\n", atsync_iteration,
+   //   myRec->getLBDB()->getPredictedLBPeriod(), local_state);
+  // register handle as myRec->getLdHandle()
   if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod()) {
     ResumeFromSync();
+  } else if (local_state == DECIDED) {
+    local_state = LOAD_BALANCE;
+    local_state = OFF;
+    atsync_iteration = -1;
+    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   } else {
-	  myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
+    local_state = PAUSE;
   }
-
 }
+
 void CkMigratable::ReadyMigrate(CmiBool ready)
 {
 	myRec->ReadyMigrate(ready);
@@ -1275,6 +1310,10 @@ void CkLocRec_local::migrateMe(int toPe) //Leaving this processor
 	//This will pack us up, send us off, and delete us
 //	printf("[%d] migrating migrateMe to %d \n",CkMyPe(),toPe);
 	myLocMgr->emigrate(this,toPe);
+}
+
+void CkLocRec_local::informIdealLBPeriod(int lb_ideal_period) {
+  myLocMgr->informLBPeriod(this, lb_ideal_period);
 }
 
 #if CMK_LBDB_ON
@@ -1495,6 +1534,17 @@ CmiBool CkLocRec_local::deliver(CkArrayMessage *msg,CkDeliver_t type,int opts)
 }
 
 #if CMK_LBDB_ON
+
+void CkLocRec_local::staticAdaptResumeSync(LDObjHandle h, int lb_ideal_period) {
+	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
+	DEBL((AA"Load balancer wants to migrate %s to %d\n"AB,idx2str(el->idx),dest));
+	el->adaptResumeSync(lb_ideal_period);
+}
+
+void CkLocRec_local::adaptResumeSync(int lb_ideal_period) {
+  informIdealLBPeriod(lb_ideal_period);
+}
+
 void CkLocRec_local::staticMigrate(LDObjHandle h, int dest)
 {
 	CkLocRec_local *el=(CkLocRec_local *)LDObjUserData(h);
@@ -2543,6 +2593,16 @@ void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn)
 	}
 }
 
+/// Call this member function on each element of this location:
+void CkLocMgr::callMethod(CkLocRec_local *rec,CkMigratable_voidfn_arg_t fn,     void * data)
+{
+	int localIdx=rec->getLocalIndex();
+	for (ManagerRec *m=firstManager;m!=NULL;m=m->next) {
+		CkMigratable *el=m->element(localIdx);
+		if (el) (el->* fn)(data);
+	}
+}
+
 /// return a list of migratables in this local record
 void CkLocMgr::migratableList(CkLocRec_local *rec, CkVec<CkMigratable *> &list)
 {
@@ -2641,6 +2701,10 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	informHome(idx,toPe);
 #endif
 	CK_MAGICNUMBER_CHECK
+}
+
+void CkLocMgr::informLBPeriod(CkLocRec_local *rec, int lb_ideal_period) {
+	callMethod(rec,&CkMigratable::recvLBPeriod, (void *)&lb_ideal_period);
 }
 
 /**
@@ -2932,6 +2996,8 @@ void CkLocMgr::initLB(CkGroupID lbdbID_)
 	myCallbacks.migrate = (LDMigrateFn)CkLocRec_local::staticMigrate;
 	myCallbacks.setStats = NULL;
 	myCallbacks.queryEstLoad = NULL;
+  myCallbacks.adaptResumeSync =
+      (LDAdaptResumeSyncFn)CkLocRec_local::staticAdaptResumeSync;
 	myLBHandle = the_lbdb->RegisterOM(myId,this,myCallbacks);
 
 	// Tell the lbdb that I'm registering objects

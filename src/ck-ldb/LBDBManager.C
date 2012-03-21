@@ -324,6 +324,17 @@ int LBDB::Migrate(LDObjHandle h, int dest)
   return 1;
 }
 
+void LBDB::AdaptResumeSync(int lb_ideal_period) {
+  for (int i = 0; i < objs.length(); i++) {
+    LBObj* obj = objs[i];
+    if (obj) {
+      LBOM *om = oms[obj->parentOM().handle];
+      LDObjHandle h = obj->GetLDObjHandle();
+      om->AdaptResumeSync(h, lb_ideal_period);
+    }
+  }
+}
+
 void LBDB::Migrated(LDObjHandle h, int waitBarrier)
 {
   // Object migrated, inform load balancers
@@ -337,6 +348,7 @@ void LBDB::Migrated(LDObjHandle h, int waitBarrier)
   }
   
 }
+
 
 int LBDB::NotifyMigrated(LDMigratedFn fn, void* data)
 {

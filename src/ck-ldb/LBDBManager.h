@@ -78,6 +78,8 @@ public:
   void insert(LBOM *om);
 
   LDOMHandle AddOM(LDOMid _userID, void* _userData, LDCallbacks _callbacks);
+  
+
   LDObjHandle AddObj(LDOMHandle _h, LDObjid _id, void *_userData,
 		     CmiBool _migratable);
   void UnregisterObj(LDObjHandle _h);
@@ -136,6 +138,7 @@ public:
   inline void GetCommData(LDCommData *data) 
        { if (commTable) commTable->GetCommData(data); };
 
+  void AdaptResumeSync(int lb_ideal_period);
   int  Migrate(LDObjHandle h, int dest);
   void Migrated(LDObjHandle h, int waitBarrier=1);
   int  NotifyMigrated(LDMigratedFn fn, void* data);
