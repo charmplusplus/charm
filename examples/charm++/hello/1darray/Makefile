@@ -7,9 +7,6 @@ all: hello
 hello: $(OBJS)
 	$(CHARMC) -language charm++ -o hello $(OBJS)
 
-hello.prj: $(OBJS)
-	$(CHARMC) -language charm++ -o hello.prj -tracemode projections  $(OBJS)
-
 hello.decl.h: hello.ci
 	$(CHARMC)  hello.ci
 

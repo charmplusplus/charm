@@ -10,7 +10,7 @@
 #include <converse.h>
 
 enum {nCycles = 1000};
-enum { maxMsgSize = 1 << 18 };
+enum { maxMsgSize = 1 << 14 };
 
 CpvDeclare(int,msgSize);
 CpvDeclare(int,cycleNum);
@@ -20,7 +20,7 @@ CpvDeclare(int,node1Handler);
 CpvStaticDeclare(double,startTime);
 CpvStaticDeclare(double,endTime);
 
-#define USE_PERSISTENT     1
+#define USE_PERSISTENT     0
 
 #if USE_PERSISTENT
 PersistentHandle h;
@@ -120,7 +120,7 @@ CmiStartFn mymain()
     CpvInitialize(int,msgSize);
     CpvInitialize(int,cycleNum);
     
-    CpvAccess(msgSize)= 1024 + CmiMsgHeaderSizeBytes;
+    CpvAccess(msgSize)= 512 + CmiMsgHeaderSizeBytes;
     
     CpvInitialize(int,exitHandler);
     CpvAccess(exitHandler) = CmiRegisterHandler((CmiHandler) exitHandlerFunc);

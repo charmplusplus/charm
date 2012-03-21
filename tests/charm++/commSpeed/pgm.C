@@ -51,8 +51,8 @@ void main::finish(double avgLocal, double avgRemote)
     iterations++;
     localAvg = localAvg / (CkNumPes()*2*numMsgs);
     remoteAvg = remoteAvg / (CkNumPes()*2*numMsgs);
-    //CkPrintf("%d PE Time for Iteration %d= %3.9f\nREMOTE: Avg=%3.9f  LOCAL: Avg=%3.9f\n",
-	//     CkNumPes(), iterations, CkWallTimer()-startTime, remoteAvg, localAvg);
+    CkPrintf("%d PE Time for Iteration %d= %3.9f\nREMOTE: Avg=%3.9f  LOCAL: Avg=%3.9f\n",
+	     CkNumPes(), iterations, CkWallTimer()-startTime, remoteAvg, localAvg);
     if (iterations == numIter) {
       CkPrintf("%d PE Time for all %d iterations: %3.9f\n", CkNumPes(), numIter, CkWallTimer()-initTime);
       CkExit();
