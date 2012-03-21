@@ -582,6 +582,8 @@ entryArguments
 
 entryArgExpr
     :   ^(EXPR entryExpr)
+        -> {$EXPR.symbolType instanceof PointerType}? ^(EXPR ^(POINTER_DEREFERENCE entryExpr))
+        -> ^(EXPR entryExpr)
     ;
 
 entryExpr

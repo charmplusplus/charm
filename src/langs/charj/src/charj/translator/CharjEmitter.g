@@ -994,7 +994,7 @@ primaryExpression
     |   ^(METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   ^(ENTRY_METHOD_CALL pe=primaryExpression gtal=genericTypeArgumentList? args=arguments)
-        -> entry_method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
+        -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {

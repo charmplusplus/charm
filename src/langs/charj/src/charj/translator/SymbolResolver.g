@@ -50,8 +50,6 @@ enterMethod
                 if (currentMethod.isEntry) {
                     Type argType = (Type)$argid.def.type;
                     currentMethod.addEntryArg(argType.getTypeName(), $argid.text);
-                    System.out.println("processing method argument " + $argid.text);
-                    System.out.println("type is " + argType.getTypeName());
                 }
             }
             ))*)
