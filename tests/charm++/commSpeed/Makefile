@@ -5,6 +5,9 @@ all: commSpeed
 commSpeed: pgm.o Worker.o
 	$(CHARMC) -language charm++ -o commSpeed pgm.o Worker.o
 
+commSpeed.prj: pgm.o Worker.o
+	$(CHARMC) -language charm++ -o commSpeed.prj -tracemode projections pgm.o Worker.o
+
 Pgm.decl.h: pgm.ci 
 	$(CHARMC)  pgm.ci
 

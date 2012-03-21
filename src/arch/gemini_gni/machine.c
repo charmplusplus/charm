@@ -374,7 +374,7 @@ static CmiNodeLock           rx_cq_lock;
 static CmiNodeLock           smsg_mailbox_lock;
 static CmiNodeLock           smsg_rx_cq_lock;
 static CmiNodeLock           *mempool_lock;
-//#define     CMK_WITH_STATS      0
+//#define     CMK_WITH_STATS      1
 typedef struct msg_list
 {
     uint32_t destNode;
@@ -771,11 +771,15 @@ typedef struct comm_thread_stats
     uint64_t  ack_count;
     uint64_t  big_msg_ack_count;
     uint64_t  smsg_count;
+    uint64_t  direct_put_done_count;
+    uint64_t  put_done_count;
     //times of calling SmsgSend
     uint64_t  try_smsg_data_count;
     uint64_t  try_lmsg_init_count;
     uint64_t  try_ack_count;
     uint64_t  try_big_msg_ack_count;
+    uint64_t  try_direct_put_done_count;
+    uint64_t  try_put_done_count;
     uint64_t  try_smsg_count;
     
     double    max_time_in_send_buffered_smsg;
@@ -804,6 +808,8 @@ static void init_comm_stats()
             else  if( tag == LMSG_INIT_TAG) comm_stats.lmsg_init_count++;  \
             else  if( tag == ACK_TAG) comm_stats.ack_count++;  \
             else  if( tag == BIG_MSG_TAG) comm_stats.big_msg_ack_count++;  \
+            else  if( tag == PUT_DONE_TAG ) comm_stats.put_done_count++;  \
+            else  if( tag == DIRECT_PUT_DONE_TAG ) comm_stats.direct_put_done_count++;  \
             comm_stats.smsg_count++; \
             double inbuff_time = CmiWallTimer() - creation_time;   \
             if(inbuff_time > comm_stats.max_time_in_send_buffered_smsg) comm_stats.max_time_in_send_buffered_smsg= inbuff_time; \
@@ -815,6 +821,8 @@ static void init_comm_stats()
             else  if( tag == LMSG_INIT_TAG) comm_stats.try_lmsg_init_count++;  \
             else  if( tag == ACK_TAG) comm_stats.try_ack_count++;  \
             else  if( tag == BIG_MSG_TAG) comm_stats.try_big_msg_ack_count++;  \
+            else  if( tag == PUT_DONE_TAG ) comm_stats.try_put_done_count++;  \
+            else  if( tag == DIRECT_PUT_DONE_TAG ) comm_stats.try_direct_put_done_count++;  \
             comm_stats.try_smsg_count++; \
         }
 
@@ -837,13 +845,13 @@ static void init_comm_stats()
 static void print_comm_stats()
 {
     fprintf(counterLog, "Node[%d]SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
-    fprintf(counterLog, "Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n", myrank, 
+    fprintf(counterLog, "Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
-            comm_stats.ack_count, comm_stats.big_msg_ack_count);
+            comm_stats.ack_count, comm_stats.big_msg_ack_count, comm_stats.direct_put_done_count, comm_stats.put_done_count);
     
-    fprintf(counterLog, "Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld]\n\n", myrank, 
+    fprintf(counterLog, "Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n\n", myrank, 
             comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
-            comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count);
+            comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count, comm_stats.try_direct_put_done_count, comm_stats.try_put_done_count);
 
     fprintf(counterLog, "Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
     fprintf(counterLog, "Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
