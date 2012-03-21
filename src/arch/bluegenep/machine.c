@@ -897,9 +897,8 @@ void LrtsAbort(const char *message) {
  * In relations to some flags, some other delivery functions may be needed.
  */
 
-#if !CMK_MULTICAST_LIST_USE_COMMON_CODE
 
-void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
+void LrtsSyncListSendFn(int npes, int *pes, int size, char *msg) {
     char *copymsg = CopyMsg(msg, size);
     CmiFreeListSendFn(npes, pes, size, copymsg);
 }
@@ -914,7 +913,7 @@ void CmiSyncListSendFn(int npes, int *pes, int size, char *msg) {
 #warning "Using Optimized Multicast"
 #endif
 
-void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
+void LrtsFreeListSendFn(int npes, int *pes, int size, char *msg) {
     CmiAssert(npes>=1);
     if (npes==1) {
         CmiFreeSendFn(pes[0], size, msg);
@@ -993,7 +992,12 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
 #endif
 #endif /* end of #if OPTIMIZED_MULTICAST */
 }
-#endif /* end of #if !CMK_MULTICAST_LIST_USE_COMMON_CODE */
+
+CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+    CmiAbort("LrtsAsyncListSendFn not implemented.");
+    return 0;
+}
 
 /*********** End of MULTICAST/VECTOR SENDING FUNCTIONS **************/
 
