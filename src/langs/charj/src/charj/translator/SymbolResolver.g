@@ -44,7 +44,16 @@ enterMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            type IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+            type funcid=IDENT { currentMethod = (MethodSymbol)$funcid.def; }
+            ^(FORMAL_PARAM_LIST (^(FORMAL_PARAM_STD_DECL type ^(argid=IDENT .*)
+            {
+                if (currentMethod.isEntry) {
+                    Type argType = (Type)$argid.def.type;
+                    currentMethod.addEntryArg(argType.getTypeName(), $argid.text);
+                }
+            }
+            ))*)
+            .*)
     |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
