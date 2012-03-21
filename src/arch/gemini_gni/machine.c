@@ -820,6 +820,12 @@ static Comm_Thread_Stats   comm_stats;
 static void init_comm_stats()
 {
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
+  if (print_stats){
+      char ln[200];
+      int code = mkdir("counters", 00777); 
+      sprintf(ln,"counters/statistics.%d.%d", mysize, myrank);
+      counterLog=fopen(ln,"w");
+  }
 }
 
 #define SMSG_CREATION( x ) if(print_stats && !stats_off) { x->creation_time = CmiWallTimer(); }
@@ -3750,14 +3756,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     debugLog=fopen(ln,"w");
 #endif
 
-#if CMK_WITH_STATS
-    if (print_stats){
-        char ln[200];
-        int code = mkdir("counters", 00777); 
-        sprintf(ln,"counters/statistics.%d.%d", mysize, myrank);
-        counterLog=fopen(ln,"w");
-    }
-#endif
 //    NTK_Init();
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
