@@ -704,12 +704,8 @@ void SdagConstruct::generateWhen(XStr& op)
 
   op << "       ";
 
-  if (constructs != 0) {
-    if (!constructs->empty() ) {
-       generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-    } else {
-       generateCall(op, *stateVarsChildren, label->charstar(), "_end");
-    }
+  if (constructs && !constructs->empty()) {
+    generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   } else {
     generateCall(op, *stateVarsChildren, label->charstar(), "_end");
   }
