@@ -32,9 +32,9 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         CmiAbort("Abort: Invalid size\n");
     }
 
-     //CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
-
     if (slot->destBuf[0].destAddress) {
+        // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
+
         // uGNI part
         MallocPostDesc(pd);
         if(size <= LRTS_GNI_RDMA_THRESHOLD) {
@@ -60,29 +60,32 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         pd->sync_flag_addr = 1000000 * CmiWallTimer(); //microsecond
 #endif
         SetMemHndlZero(pd->local_mem_hndl);
+
+         /* always buffer */
 #if CMK_SMP || 1
 #if REMOTE_EVENT
         bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
 #else
         bufferRdmaMsg(destNode, pd, -1);
 #endif
-#else
+
+#else                      /* non smp */
+
 #if REMOTE_EVENT
         pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT((int)(size_t)(slot->destHandle)));
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, PERSIST_EVENT((int)(size_t)(slot->destHandle)));
         GNI_RC_CHECK("GNI_EpSetEventData", sts);
 #endif
-
         status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
         if (status == GNI_RC_SUCCESS) 
         {
 #if CMK_WITH_STATS
-            RDMA_TRY_SEND()
+            RDMA_TRY_SEND(pd->type)
 #endif
-         if(pd->type == GNI_POST_RDMA_PUT) 
-            status = GNI_PostRdma(ep_hndl_array[destNode], pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+            if(pd->type == GNI_POST_RDMA_PUT) 
+                status = GNI_PostRdma(ep_hndl_array[destNode], pd);
+            else
+                status = GNI_PostFma(ep_hndl_array[destNode],  pd);
         }
         else
             status = GNI_RC_ERROR_RESOURCE;
@@ -93,16 +96,16 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #else
             bufferRdmaMsg(destNode, pd, -1);
 #endif
-        }else
-        {
+        }
+        else {
             GNI_RC_CHECK("AFter posting", status);
 #if  CMK_WITH_STATS
             pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-            RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+            RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
         }
 #endif
-    }
+  }
   else {
 #if 1
     if (slot->messageBuf != NULL) {
@@ -290,10 +293,20 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   }
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT
-  slot->index = IndexPool_getslot(&ackPool, slot, 2);
+  CmiLock(persistPool.lock);
+  slot->index = IndexPool_getslot(&persistPool, slot, 2);
+  CmiUnlock(persistPool.lock);
 #endif
 }
 
+void clearRecvSlot(PersistentReceivesTable *slot)
+{
+#if REMOTE_EVENT
+  CmiLock(persistPool.lock);
+  IndexPool_freeslot(&persistPool, slot->index);
+  CmiUnlock(persistPool.lock);
+#endif
+}
 
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
 {
@@ -301,7 +314,7 @@ PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
   if (toindex)
     return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
   else {
-    return (PersistentHandle)GetIndexAddress((int)(size_t)h);
+    return (PersistentHandle)GetIndexAddress(persistPool, (int)(size_t)h);
   }
 #else
   return h;

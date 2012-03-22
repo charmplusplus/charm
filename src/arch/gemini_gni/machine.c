@@ -644,10 +644,16 @@ CpvDeclare(mempool_type*, mempool);
 #if REMOTE_EVENT
 /* ack pool for remote events */
 
-#define ACK_SHIFT                  19
-#define ACK_EVENT(idx)             (((idx)<<ACK_SHIFT) | myrank)
-#define ACK_GET_RANK(evt)          ((evt) & ((1<<ACK_SHIFT)-1))
-#define ACK_GET_INDEX(evt)         ((evt) >> ACK_SHIFT)
+#define SHIFT                   18
+#define INDEX_MASK              ((1<<(32-SHIFT-1)) - 1)
+#define RANK_MASK               ((1<<SHIFT) - 1)
+#define ACK_EVENT(idx)          ((((idx) & INDEX_MASK)<<SHIFT) | myrank)
+
+#define GET_TYPE(evt)           (((evt) >> 31) & 1)
+#define GET_RANK(evt)           ((evt) & RANK_MASK)
+#define GET_INDEX(evt)          (((evt) >> SHIFT) & INDEX_MASK)
+
+#define PERSIST_EVENT(idx)      (1<<31 | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
 
 struct IndexStruct {
 void *addr;
@@ -663,25 +669,30 @@ typedef struct IndexPool {
 } IndexPool;
 
 static IndexPool  ackPool;
+#if CMK_PERSISTENT_COMM
+static IndexPool  persistPool;
+#endif
 
-
-#define  GetIndexType(s)             (ackPool.indexes[s].type)
-#define  GetIndexAddress(s)          (ackPool.indexes[s].addr)
+#define  GetIndexType(pool, s)             (pool.indexes[s].type)
+#define  GetIndexAddress(pool, s)          (pool.indexes[s].addr)
 
 static void IndexPool_init(IndexPool *pool)
 {
     int i;
-    if ((1<<ACK_SHIFT) < mysize) 
+    if ((1<<SHIFT) < mysize) 
         CmiAbort("Charm++ Error: Remote event's rank field overflow.");
-    pool->size = 2048;
+    pool->size = 1024;
     pool->indexes = (struct IndexStruct *)malloc(pool->size*sizeof(struct IndexStruct));
     for (i=0; i<pool->size-1; i++) {
         pool->indexes[i].next = i+1;
+        pool->indexes[i].type = -1;
     }
     pool->indexes[i].next = -1;
     pool->freehead = 0;
-#if MULTI_THREAD_SEND  || REMOTE_EVENT
+#if MULTI_THREAD_SEND || CMK_PERSISTENT_COMM
     pool->lock  = CmiCreateLock();
+#else
+    pool->lock  = NULL;
 #endif
 }
 
@@ -690,19 +701,20 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int i;
     int s;
-#if MULTI_THREAD_SEND  || REMOTE_EVENT
+#if MULTI_THREAD_SEND
     CmiLock(pool->lock);
 #endif
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
         printf("[%d] IndexPool_getslot expand to: %d\n", myrank, newsize);
-        if (newsize > (1<<(32-ACK_SHIFT))) CmiAbort("AckPool too large");
+        if (newsize > (1<<(32-SHIFT-1))) CmiAbort("IndexPool too large");
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
         memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
         for (i=pool->size; i<newsize-1; i++) {
             pool->indexes[i].next = i+1;
+            pool->indexes[i].type = -1;
         }
         pool->indexes[i].next = -1;
         pool->freehead = pool->size;
@@ -713,7 +725,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
     pool->indexes[s].type = type;
-#if MULTI_THREAD_SEND  || REMOTE_EVENT
+#if MULTI_THREAD_SEND
     CmiUnlock(pool->lock);
 #endif
     return s;
@@ -723,12 +735,13 @@ static
 inline  void IndexPool_freeslot(IndexPool *pool, int s)
 {
     CmiAssert(s>=0 && s<pool->size);
-#if MULTI_THREAD_SEND  || REMOTE_EVENT
+#if MULTI_THREAD_SEND
     CmiLock(pool->lock);
 #endif
     pool->indexes[s].next = pool->freehead;
+    pool->indexes[s].type = -1;
     pool->freehead = s;
-#if MULTI_THREAD_SEND  || REMOTE_EVENT
+#if MULTI_THREAD_SEND
     CmiUnlock(pool->lock);
 #endif
 }
@@ -770,6 +783,8 @@ void CmiTurnOffStats()
     stats_off = 1;
 }
 
+#define IS_PUT(type)    (type == GNI_POST_FMA_PUT || type == GNI_POST_RDMA_PUT)
+
 #if CMK_WITH_STATS
 FILE *counterLog = NULL;
 typedef struct comm_thread_stats
@@ -793,8 +808,8 @@ typedef struct comm_thread_stats
     double    max_time_in_send_buffered_smsg;
     double    all_time_in_send_buffered_smsg;
 
-    uint64_t  rdma_count;
-    uint64_t  try_rdma_count;
+    uint64_t  rdma_get_count, rdma_put_count;
+    uint64_t  try_rdma_get_count, try_rdma_put_count;
     double    max_time_from_control_to_rdma_init;
     double    all_time_from_control_to_rdma_init;
 
@@ -807,6 +822,9 @@ typedef struct comm_thread_stats
     int      count_in_SendBufferMsg_smsg;
     double   time_in_SendBufferMsg_smsg;
     double   max_time_in_SendBufferMsg_smsg;
+    int      count_in_SendRdmaMsg;
+    double   time_in_SendRdmaMsg;
+    double   max_time_in_SendRdmaMsg;
     int      count_in_PumpRemoteTransactions;
     double   time_in_PumpRemoteTransactions;
     double   max_time_in_PumpRemoteTransactions;
@@ -820,6 +838,12 @@ static Comm_Thread_Stats   comm_stats;
 static void init_comm_stats()
 {
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
+  if (print_stats){
+      char ln[200];
+      int code = mkdir("counters", 00777); 
+      sprintf(ln,"counters/statistics.%d.%d", mysize, myrank);
+      counterLog=fopen(ln,"w");
+  }
 }
 
 #define SMSG_CREATION( x ) if(print_stats && !stats_off) { x->creation_time = CmiWallTimer(); }
@@ -847,7 +871,7 @@ static void init_comm_stats()
             comm_stats.try_smsg_count++; \
         }
 
-#define  RDMA_TRY_SEND()        if (print_stats && !stats_off) {comm_stats.try_rdma_count++;}
+#define  RDMA_TRY_SEND(type)        if (print_stats && !stats_off) {IS_PUT(type)?comm_stats.try_rdma_put_count++:comm_stats.try_rdma_get_count++;}
 
 #define  RDMA_TRANS_DONE(x)      \
          if (print_stats && !stats_off) {  double rdma_trans_time = CmiWallTimer() - x ; \
@@ -855,8 +879,8 @@ static void init_comm_stats()
              comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
          }
 
-#define  RDMA_TRANS_INIT(x)      \
-         if (print_stats && !stats_off) {   comm_stats.rdma_count++;  \
+#define  RDMA_TRANS_INIT(type, x)      \
+         if (print_stats && !stats_off) {   IS_PUT(type)?comm_stats.rdma_put_count++:comm_stats.rdma_get_count++;  \
              double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
@@ -902,27 +926,38 @@ static void init_comm_stats()
               comm_stats.max_time_in_SendBufferMsg_smsg = t;    \
         }
 
+#define STATS_SENDRDMAMSG_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_SendRdmaMsg ++;        \
+          comm_stats.time_in_SendRdmaMsg += t;   \
+          if (t>comm_stats.max_time_in_SendRdmaMsg)      \
+              comm_stats.max_time_in_SendRdmaMsg = t;    \
+        }
+
 static void print_comm_stats()
 {
-    fprintf(counterLog, "Node[%d]SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
-    fprintf(counterLog, "Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
+    fprintf(counterLog, "Node[%d] SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    fprintf(counterLog, "Node[%d] Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
             comm_stats.ack_count, comm_stats.big_msg_ack_count, comm_stats.direct_put_done_count, comm_stats.put_done_count);
     
-    fprintf(counterLog, "Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n\n", myrank, 
+    fprintf(counterLog, "Node[%d] SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n\n", myrank, 
             comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
             comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count, comm_stats.try_direct_put_done_count, comm_stats.try_put_done_count);
 
-    fprintf(counterLog, "Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
-    fprintf(counterLog, "Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
-    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
+    fprintf(counterLog, "Node[%d] Rdma Transaction [count (GET/PUT):%lld %lld\t calls (GET/PUT):%lld %lld]\n", myrank, comm_stats.rdma_get_count, comm_stats.rdma_put_count, comm_stats.try_rdma_get_count, comm_stats.try_rdma_put_count);
+    fprintf(counterLog, "Node[%d] Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/(comm_stats.rdma_get_count+comm_stats.rdma_put_count)); 
+    fprintf(counterLog, "Node[%d] Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/(comm_stats.rdma_get_count+comm_stats.rdma_put_count));
 
-    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
-    fprintf(counterLog, "                          count\ttotal time\tmax \n", myrank);
-    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
-    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
-    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
-    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.3f\t%.3f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
+
+    fprintf(counterLog, "                             count\ttotal_time\tmax \n", myrank);
+    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
+    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
+    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
+    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
+    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg);
 }
 
 #else
@@ -930,6 +965,7 @@ static void print_comm_stats()
 #define STATS_SEND_SMSGS_TIME(x)                   x
 #define STATS_PUMPREMOTETRANSACTIONS_TIME(x)       x
 #define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   x
+#define STATS_SENDRDMAMSG_TIME(x)                  x
 #endif
 
 static void
@@ -2087,7 +2123,7 @@ static void PumpNetworkSmsg()
             break;
         inst_id = GNI_CQ_GET_INST_ID(event_data);
 #if REMOTE_EVENT
-        inst_id = ACK_GET_RANK(inst_id);
+        inst_id = GET_RANK(inst_id);      /* important */
 #endif
         // GetEvent returns success but GetNext return not_done. caused by Smsg out-of-order transfer
 #if PRINT_SYH
@@ -2392,7 +2428,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #endif
 
 #if CMK_WITH_STATS
-        RDMA_TRY_SEND()
+        RDMA_TRY_SEND(pd->type)
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
         {
@@ -2418,8 +2454,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #endif
             }
 #if  CMK_WITH_STATS
-                pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+            pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+            RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
         }
     }else
@@ -2559,27 +2595,23 @@ static void PumpRemoteTransactions()
     gni_cq_entry_t          ev;
     gni_return_t            status;
     void                    *msg;   
-    int                     slot, type, size;
+    int                     inst_id, index, type, size;
 
     while(1) {
         CMI_GNI_LOCK(global_gni_lock)
         status = GNI_CqGetEvent(rdma_rx_cqh, &ev);
         CMI_GNI_UNLOCK(global_gni_lock)
-        if(status != GNI_RC_SUCCESS) {
-            break;
-        }
 
-        slot = GNI_CQ_GET_INST_ID(ev);
-        slot = ACK_GET_INDEX(slot);
-        //slot = GNI_CQ_GET_DATA(ev) & 0xFFFFFFFFL;
+        if(status != GNI_RC_SUCCESS) break;
 
-        //CMI_GNI_LOCK(ackpool_lock);
-        type = GetIndexType(slot);
-        msg = GetIndexAddress(slot);
-        //CMI_GNI_UNLOCK(ackpool_lock);
+        inst_id = GNI_CQ_GET_INST_ID(ev);
+        index = GET_INDEX(inst_id);
+        type = GET_TYPE(inst_id);
 
         switch (type) {
-        case 1:    // ACK
+        case 0:    // ACK
+            CmiAssert(GetIndexType(ackPool, index) == 1);
+            msg = GetIndexAddress(ackPool, index);
             DecreaseMsgInSend(msg);
 #if ! USE_LRTS_MEMPOOL
            // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
@@ -2589,21 +2621,23 @@ static void PumpRemoteTransactions()
             if(NoMsgInSend(msg))
                 buffered_send_msg -= GetMempoolsize(msg);
             CmiFree(msg);
-            IndexPool_freeslot(&ackPool, slot);
+            IndexPool_freeslot(&ackPool, index);
             break;
 #if CMK_PERSISTENT_COMM
-        case 2:     // PERSISTENT
-            msg = ((PersistentReceivesTable*)msg)->destBuf[0].destAddress;
+        case 1:  {    // PERSISTENT
+            CmiAssert(GetIndexType(persistPool, index) == 2);
+            PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
+            msg = slot->destBuf[0].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);
             handleOneRecvedMsg(size, msg); 
             break;
+            }
 #endif
-        default: {
+        default:
             fprintf(stderr, "[%d] PumpRemoteTransactions: unknown type: %d\n", myrank, type);
             CmiAbort("PumpRemoteTransactions: unknown type");
-            }
         }
     }
     if(status == GNI_RC_ERROR_RESOURCE)
@@ -2833,19 +2867,21 @@ static void  SendRdmaMsg()
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
             CMI_GNI_LOCK(lock);
 #if REMOTE_EVENT
-            if( pd->cqwrite_value == 0
-#if CMK_PERSISTENT_COMM
-                || pd->cqwrite_value == PERSIST_SEQ
-#endif
-              )
-            {
+            if( pd->cqwrite_value == 0) {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
                 int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, ACK_EVENT(ptr->ack_index));
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
+#if CMK_PERSISTENT_COMM
+            else if (pd->cqwrite_value == PERSIST_SEQ) {
+                pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
+                int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, PERSIST_EVENT(ptr->ack_index));
+                GNI_RC_CHECK("GNI_EpSetEventData", sts);
+            }
+#endif
 #endif
 #if CMK_WITH_STATS
-            RDMA_TRY_SEND()
+            RDMA_TRY_SEND(pd->type)
 #endif
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
             {
@@ -2879,7 +2915,7 @@ static void  SendRdmaMsg()
                 }
 #if  CMK_WITH_STATS
                 pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+                RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
 #if MACHINE_DEBUG_LOG
                 buffered_recv_msg += register_size;
@@ -3195,7 +3231,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
 #endif
-    SendRdmaMsg();
+    STATS_SENDRDMAMSG_TIME(SendRdmaMsg());
     //MACHSTATE(8, "after SendRdmaMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
@@ -3750,19 +3786,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     debugLog=fopen(ln,"w");
 #endif
 
-#if CMK_WITH_STATS
-    if (print_stats){
-        char ln[200];
-        int code = mkdir("counters", 00777); 
-        sprintf(ln,"counters/statistics.%d.%d", mysize, myrank);
-        counterLog=fopen(ln,"w");
-    }
-#endif
 //    NTK_Init();
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
 #if  REMOTE_EVENT
     IndexPool_init(&ackPool);
+#if CMK_PERSISTENT_COMM
+    IndexPool_init(&persistPool);
+#endif
 #endif
 
 #if CMK_WITH_STATS

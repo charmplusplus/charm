@@ -145,17 +145,20 @@ PersistentHandle getFreeRecvSlot()
 
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
 {
-  PersistentHandle h = getFreeSendSlot();
-
-  PersistentSendsTable *slot = (PersistentSendsTable *)h;
+  PersistentHandle h;
+  PersistentSendsTable *slot;
 
   if (CmiMyNode() == CmiNodeOf(destPE)) return NULL;
 
 /*
   if (CmiMyPe() == destPE) {
-    CmiAbort("CmiCreatePersistent Error: setting up persistent communication to the same processor is not allowed.");
+    CmiPrintf("[%d] CmiCreatePersistent Error>  setting up persistent communication to the same processor is not allowed.\n", CmiMyPe());
+    CmiAbort("CmiCreatePersistent");
   }
 */
+
+  h = getFreeSendSlot();
+  slot = (PersistentSendsTable *)h;
 
   slot->used = 1;
   slot->destPE = destPE;
@@ -317,6 +320,8 @@ void persistentDestoryHandler(void *env)
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) 
     if (slot->destBuf[i].destAddress) /*elan_CmiStaticFree(slot->messagePtr);*/
       PerFree((char*)slot->destBuf[i].destAddress);
+
+  clearRecvSlot(slot);
 
   CmiFree(slot);
 }
