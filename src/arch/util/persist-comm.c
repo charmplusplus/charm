@@ -321,6 +321,8 @@ void persistentDestoryHandler(void *env)
     if (slot->destBuf[i].destAddress) /*elan_CmiStaticFree(slot->messagePtr);*/
       PerFree((char*)slot->destBuf[i].destAddress);
 
+  clearRecvSlot(slot);
+
   CmiFree(slot);
 }
 

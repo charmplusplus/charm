@@ -68,23 +68,24 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #else
         bufferRdmaMsg(destNode, pd, -1);
 #endif
-#else
+
+#else                      /* non smp */
+
 #if REMOTE_EVENT
         pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT((int)(size_t)(slot->destHandle)));
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, PERSIST_EVENT((int)(size_t)(slot->destHandle)));
         GNI_RC_CHECK("GNI_EpSetEventData", sts);
 #endif
-
         status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
         if (status == GNI_RC_SUCCESS) 
         {
 #if CMK_WITH_STATS
             RDMA_TRY_SEND(pd->type)
 #endif
-         if(pd->type == GNI_POST_RDMA_PUT) 
-            status = GNI_PostRdma(ep_hndl_array[destNode], pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+            if(pd->type == GNI_POST_RDMA_PUT) 
+                status = GNI_PostRdma(ep_hndl_array[destNode], pd);
+            else
+                status = GNI_PostFma(ep_hndl_array[destNode],  pd);
         }
         else
             status = GNI_RC_ERROR_RESOURCE;
@@ -95,8 +96,8 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #else
             bufferRdmaMsg(destNode, pd, -1);
 #endif
-        }else
-        {
+        }
+        else {
             GNI_RC_CHECK("AFter posting", status);
 #if  CMK_WITH_STATS
             pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
@@ -104,7 +105,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #endif
         }
 #endif
-    }
+  }
   else {
 #if 1
     if (slot->messageBuf != NULL) {
@@ -292,10 +293,20 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   }
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT
-  slot->index = IndexPool_getslot(&ackPool, slot, 2);
+  CmiLock(persistPool.lock);
+  slot->index = IndexPool_getslot(&persistPool, slot, 2);
+  CmiUnlock(persistPool.lock);
 #endif
 }
 
+void clearRecvSlot(PersistentReceivesTable *slot)
+{
+#if REMOTE_EVENT
+  CmiLock(persistPool.lock);
+  IndexPool_freeslot(&persistPool, slot->index);
+  CmiUnlock(persistPool.lock);
+#endif
+}
 
 PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
 {
@@ -303,7 +314,7 @@ PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
   if (toindex)
     return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
   else {
-    return (PersistentHandle)GetIndexAddress((int)(size_t)h);
+    return (PersistentHandle)GetIndexAddress(persistPool, (int)(size_t)h);
   }
 #else
   return h;

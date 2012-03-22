@@ -57,6 +57,7 @@ int PumpPersistent();
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
+void clearRecvSlot(PersistentReceivesTable *slot);
 
 /*@}*/
 
