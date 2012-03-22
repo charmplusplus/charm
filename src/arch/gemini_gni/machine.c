@@ -822,6 +822,9 @@ typedef struct comm_thread_stats
     int      count_in_SendBufferMsg_smsg;
     double   time_in_SendBufferMsg_smsg;
     double   max_time_in_SendBufferMsg_smsg;
+    int      count_in_SendRdmaMsg;
+    double   time_in_SendRdmaMsg;
+    double   max_time_in_SendRdmaMsg;
     int      count_in_PumpRemoteTransactions;
     double   time_in_PumpRemoteTransactions;
     double   max_time_in_PumpRemoteTransactions;
@@ -923,6 +926,16 @@ static void init_comm_stats()
               comm_stats.max_time_in_SendBufferMsg_smsg = t;    \
         }
 
+#define STATS_SENDRDMAMSG_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_SendRdmaMsg ++;        \
+          comm_stats.time_in_SendRdmaMsg += t;   \
+          if (t>comm_stats.max_time_in_SendRdmaMsg)      \
+              comm_stats.max_time_in_SendRdmaMsg = t;    \
+        }
+
 static void print_comm_stats()
 {
     fprintf(counterLog, "Node[%d] SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
@@ -944,6 +957,7 @@ static void print_comm_stats()
     fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
     fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
     fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
+    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg);
 }
 
 #else
@@ -951,6 +965,7 @@ static void print_comm_stats()
 #define STATS_SEND_SMSGS_TIME(x)                   x
 #define STATS_PUMPREMOTETRANSACTIONS_TIME(x)       x
 #define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   x
+#define STATS_SENDRDMAMSG_TIME(x)                  x
 #endif
 
 static void
@@ -3216,7 +3231,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
 #endif
-    SendRdmaMsg();
+    STATS_SENDRDMAMSG_TIME(SendRdmaMsg());
     //MACHSTATE(8, "after SendRdmaMsg\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
