@@ -46,7 +46,7 @@
 #include "cmidirect.h"
 #endif
 
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -377,7 +377,7 @@ static CmiNodeLock           rx_cq_lock;
 static CmiNodeLock           smsg_mailbox_lock;
 static CmiNodeLock           smsg_rx_cq_lock;
 static CmiNodeLock           *mempool_lock;
-//#define     CMK_WITH_STATS      1
+#define     CMK_WITH_STATS      1
 typedef struct msg_list
 {
     uint32_t destNode;
@@ -704,7 +704,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 {
     int i;
     int s;
-#if MULTI_THREAD_SEND
+#if MULTI_THREAD_SEND  
     CmiLock(pool->lock);
 #endif
     s = pool->freehead;
@@ -2871,7 +2871,7 @@ static void  SendRdmaMsg()
         if (ptr == NULL) break;
 #else
     ptr = sendRdmaBuf;
-    while (ptr!=0 && RDMA_pending < RDMA_cap)
+    while (ptr!=0 )
     {
 #if USE_RDMA_CAP
          if( RDMA_pending >= RDMA_cap) break;
