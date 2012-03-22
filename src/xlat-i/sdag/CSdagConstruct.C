@@ -663,7 +663,7 @@ void SdagConstruct::generateWhen(XStr& op)
 
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              op <<"      int impl_off_"<<sv->name->charstar()
+              op <<"       int impl_off_"<<sv->name->charstar()
 	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
 		 <<sv->name->charstar()<<";\n";
            else
@@ -675,7 +675,7 @@ void SdagConstruct::generateWhen(XStr& op)
 	   <<e->getEntryName() <<"_implP.size(),16);\n";
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              op << "    "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
+              op << "       "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
 		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
 		 <<sv->name->charstar()<<");\n";
         }
@@ -955,7 +955,7 @@ void SdagConstruct::generateFor(XStr& op)
   generateBeginTime(op);
 #endif
   // actual code here 
-  op << con3->text->charstar() << ";\n";
+  op << "   " << con3->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
   op << "      ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
@@ -1006,7 +1006,7 @@ void SdagConstruct::generateIf(XStr& op)
   generateEventBracket(op,SIF_END);
 #endif
   // actual code here 
-  op << "      ";
+  op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "  }\n\n";
