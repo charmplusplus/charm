@@ -46,7 +46,7 @@
 #include "cmidirect.h"
 #endif
 
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -57,7 +57,7 @@
 #define CMK_WORKER_SINGLE_TASK     0
 #endif
 
-#define REMOTE_EVENT               0
+#define REMOTE_EVENT               1
 #define CQWRITE                    0
 
 #define CMI_EXERT_SEND_CAP	0
@@ -770,6 +770,8 @@ void CmiTurnOffStats()
     stats_off = 1;
 }
 
+#define IS_PUT(type)    (type == GNI_POST_FMA_PUT || type == GNI_POST_RDMA_PUT)
+
 #if CMK_WITH_STATS
 FILE *counterLog = NULL;
 typedef struct comm_thread_stats
@@ -793,8 +795,8 @@ typedef struct comm_thread_stats
     double    max_time_in_send_buffered_smsg;
     double    all_time_in_send_buffered_smsg;
 
-    uint64_t  rdma_count;
-    uint64_t  try_rdma_count;
+    uint64_t  rdma_get_count, rdma_put_count;
+    uint64_t  try_rdma_get_count, try_rdma_put_count;
     double    max_time_from_control_to_rdma_init;
     double    all_time_from_control_to_rdma_init;
 
@@ -847,7 +849,7 @@ static void init_comm_stats()
             comm_stats.try_smsg_count++; \
         }
 
-#define  RDMA_TRY_SEND()        if (print_stats && !stats_off) {comm_stats.try_rdma_count++;}
+#define  RDMA_TRY_SEND(type)        if (print_stats && !stats_off) {IS_PUT(type)?comm_stats.try_rdma_put_count++:comm_stats.try_rdma_get_count++;}
 
 #define  RDMA_TRANS_DONE(x)      \
          if (print_stats && !stats_off) {  double rdma_trans_time = CmiWallTimer() - x ; \
@@ -855,8 +857,8 @@ static void init_comm_stats()
              comm_stats.all_time_from_rdma_init_to_rdma_done += rdma_trans_time; \
          }
 
-#define  RDMA_TRANS_INIT(x)      \
-         if (print_stats && !stats_off) {   comm_stats.rdma_count++;  \
+#define  RDMA_TRANS_INIT(type, x)      \
+         if (print_stats && !stats_off) {   IS_PUT(type)?comm_stats.rdma_put_count++:comm_stats.rdma_get_count++;  \
              double rdma_trans_time = CmiWallTimer() - x ; \
              if(rdma_trans_time > comm_stats.max_time_from_control_to_rdma_init) comm_stats.max_time_from_control_to_rdma_init = rdma_trans_time; \
              comm_stats.all_time_from_control_to_rdma_init += rdma_trans_time; \
@@ -904,25 +906,25 @@ static void init_comm_stats()
 
 static void print_comm_stats()
 {
-    fprintf(counterLog, "Node[%d]SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
-    fprintf(counterLog, "Node[%d]Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
+    fprintf(counterLog, "Node[%d] SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    fprintf(counterLog, "Node[%d] Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
             comm_stats.ack_count, comm_stats.big_msg_ack_count, comm_stats.direct_put_done_count, comm_stats.put_done_count);
     
-    fprintf(counterLog, "Node[%d]SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n\n", myrank, 
+    fprintf(counterLog, "Node[%d] SmsgSendCalls\t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n\n", myrank, 
             comm_stats.try_smsg_count, comm_stats.try_smsg_data_count, comm_stats.try_lmsg_init_count, 
             comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count, comm_stats.try_direct_put_done_count, comm_stats.try_put_done_count);
 
-    fprintf(counterLog, "Node[%d]Rdma Transaction [count:%lld\t calls:%lld]\n", myrank, comm_stats.rdma_count, comm_stats.try_rdma_count);
-    fprintf(counterLog, "Node[%d]Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/comm_stats.rdma_count); 
-    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
+    fprintf(counterLog, "Node[%d] Rdma Transaction [count (GET/PUT):%lld %lld\t calls (GET/PUT):%lld %lld]\n", myrank, comm_stats.rdma_get_count, comm_stats.rdma_put_count, comm_stats.try_rdma_get_count, comm_stats.try_rdma_put_count);
+    fprintf(counterLog, "Node[%d] Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/(comm_stats.rdma_get_count+comm_stats.rdma_put_count)); 
+    fprintf(counterLog, "Node[%d] Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/(comm_stats.rdma_get_count+comm_stats.rdma_put_count));
 
-    fprintf(counterLog, "Node[%d]Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/comm_stats.rdma_count); 
-    fprintf(counterLog, "                          count\ttotal time\tmax \n", myrank);
-    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
-    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
-    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.3f\t%.3f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
-    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.3f\t%.3f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
+
+    fprintf(counterLog, "                             count\ttotal_time\tmax \n", myrank);
+    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
+    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
+    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
+    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
 }
 
 #else
@@ -2392,7 +2394,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #endif
 
 #if CMK_WITH_STATS
-        RDMA_TRY_SEND()
+        RDMA_TRY_SEND(pd->type)
 #endif
         if(pd->type == GNI_POST_RDMA_GET) 
         {
@@ -2418,8 +2420,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 #endif
             }
 #if  CMK_WITH_STATS
-                pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+            pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+            RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
         }
     }else
@@ -2845,7 +2847,7 @@ static void  SendRdmaMsg()
             }
 #endif
 #if CMK_WITH_STATS
-            RDMA_TRY_SEND()
+            RDMA_TRY_SEND(pd->type)
 #endif
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
             {
@@ -2879,7 +2881,7 @@ static void  SendRdmaMsg()
                 }
 #if  CMK_WITH_STATS
                 pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-                RDMA_TRANS_INIT(pd->sync_flag_addr/1000000.0)
+                RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
 #if MACHINE_DEBUG_LOG
                 buffered_recv_msg += register_size;
