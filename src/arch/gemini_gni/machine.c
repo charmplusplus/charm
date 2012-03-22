@@ -57,18 +57,18 @@
 #define CMK_WORKER_SINGLE_TASK     0
 #endif
 
-#define REMOTE_EVENT               0
+#define REMOTE_EVENT               1
 #define CQWRITE                    0
 
 #define CMI_EXERT_SEND_CAP	0
 #define	CMI_EXERT_RECV_CAP	0
 
 #if CMI_EXERT_SEND_CAP
-#define SEND_CAP 16
+#define SEND_CAP  32
 #endif
 
 #if CMI_EXERT_RECV_CAP
-#define RECV_CAP 2
+#define RECV_CAP  4                  /* cap <= 2 sometimes hang */
 #endif
 
 #define USE_LRTS_MEMPOOL                  1
@@ -280,7 +280,7 @@ uint8_t   onesided_hnd, omdh;
 
 /* If SMSG is used */
 static int  SMSG_MAX_MSG = 1024;
-#define SMSG_MAX_CREDIT 72 
+#define SMSG_MAX_CREDIT    72
 
 #define MSGQ_MAXSIZE       2048
 
@@ -2111,8 +2111,11 @@ static void PumpNetworkSmsg()
     CONTROL_MSG         *control_msg_tmp, *header_tmp;
     uint64_t            source_addr;
     SMSG_QUEUE         *queue = &smsg_queue;
-#if     CMK_DIRECT
+#if   CMK_DIRECT
     cmidirectMsg        *direct_msg;
+#endif
+#if CMI_EXERT_RECV_CAP
+    int                  recv_cnt = 0;
 #endif
     while(1)
     {
@@ -2269,19 +2272,21 @@ static void PumpNetworkSmsg()
                 //(*(((CMK_DIRECT_HEADER*) header)->callbackFnPtr))(((CMK_DIRECT_HEADER*) header)->callbackData);
                 break;
 #endif
-            default: {
+            default:
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
                 printf("weird tag problem\n");
                 CmiAbort("Unknown tag\n");
-                     }
             }               // end switch
 #if PRINT_SYH
             printf("[%d] from %d after switch request for smsg is received, messageid: tag=%d\n", myrank, inst_id, msg_tag);
 #endif
             smsg_recv_count ++;
             msg_tag = GNI_SMSG_ANY_TAG;
-        } //endwhile getNext
+#if CMI_EXERT_RECV_CAP
+            if (status == GNI_RC_SUCCESS && ++recv_cnt == RECV_CAP) return;
+#endif
+        } //endwhile GNI_SmsgGetNextWTag
     }   //end while GetEvent
     if(status == GNI_RC_ERROR_RESOURCE)
     {
@@ -3001,6 +3006,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #else
     for(index =0; index<mysize; index++)
     {
+        //if (index == myrank) continue;
         PCQueue current_queue = queue->smsg_msglist_index[index].sendSmsgBuf;
         int i, len = PCQueueLength(current_queue);
 #endif
@@ -3093,9 +3099,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 FreeMsgList(ptr);
 #endif
 #if CMI_EXERT_SEND_CAP
-                sent_cnt++;
-                if(sent_cnt == SEND_CAP)
-                    break;
+                if(++sent_cnt == SEND_CAP) break;
 #endif
             }else {
 #if CMK_SMP
@@ -3146,8 +3150,10 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #endif
 
 #if CMI_EXERT_SEND_CAP
-	if(sent_cnt == SEND_CAP)
-		break;
+	if(sent_cnt == SEND_CAP) {
+            done = 0;
+	    break;
+        }
 #endif
     }   // end pooling for all cores
     return done;
@@ -3212,6 +3218,16 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpRdmaTransaction, startT, endT);
 #endif
  
+#if CMK_SMP_TRACE_COMMTHREAD
+    startT = CmiWallTimer();
+#endif
+    STATS_SENDRDMAMSG_TIME(SendRdmaMsg());
+    //MACHSTATE(8, "after SendRdmaMsg\n") ; 
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendFmaRdmaMsg, startT, endT);
+#endif
+
     /* Send buffered Message */
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
@@ -3226,16 +3242,6 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendBufferSmsg, startT, endT);
-#endif
-
-#if CMK_SMP_TRACE_COMMTHREAD
-    startT = CmiWallTimer();
-#endif
-    STATS_SENDRDMAMSG_TIME(SendRdmaMsg());
-    //MACHSTATE(8, "after SendRdmaMsg\n") ; 
-#if CMK_SMP_TRACE_COMMTHREAD
-    endT = CmiWallTimer();
-    if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendFmaRdmaMsg, startT, endT);
 #endif
 
 #if CMK_SMP && ! LARGEPAGE
@@ -3908,6 +3914,7 @@ void LrtsDrainResources()
         PumpNetworkSmsg();
         PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
         PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
+        PumpRemoteTransactions();
         SendRdmaMsg();
     }
     PMI_Barrier();
