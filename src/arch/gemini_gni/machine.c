@@ -70,6 +70,9 @@
 #if CMI_EXERT_RECV_CAP
 #define RECV_CAP  4                  /* cap <= 2 sometimes hang */
 #endif
+//#define USE_RDMA_CAP   0 
+int   RDMA_cap =   100;
+int   RDMA_pending = 0;
 
 #define USE_LRTS_MEMPOOL                  1
 
@@ -846,7 +849,7 @@ static void init_comm_stats()
   }
 }
 
-#define SMSG_CREATION( x ) if(print_stats && !stats_off) { x->creation_time = CmiWallTimer(); }
+#define SMSG_CREATION( x ) if(print_stats) { x->creation_time = CmiWallTimer(); }
 
 #define SMSG_SENT_DONE(creation_time, tag)  \
         if (print_stats && !stats_off) {   if( tag == SMALL_DATA_TAG) comm_stats.smsg_data_count++;  \
@@ -938,7 +941,7 @@ static void init_comm_stats()
 
 static void print_comm_stats()
 {
-    fprintf(counterLog, "Node[%d] SMSG time in buffer\t[max:%f\tAverage:%f](milisecond)\n", myrank, 1000*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
+    fprintf(counterLog, "Node[%d] SMSG time in buffer\t[total:%f\tmax:%f\tAverage:%f](milisecond)\n", myrank, 1000.0*comm_stats.all_time_in_send_buffered_smsg, 1000.0*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
     fprintf(counterLog, "Node[%d] Smsg  Msgs  \t[Total:%lld\t Data:%lld\t Lmsg_Init:%lld\t ACK:%lld\t BIG_MSG_ACK:%lld Direct_put_done:%lld\t Persistent_put_done:%lld]\n", myrank, 
             comm_stats.smsg_count, comm_stats.smsg_data_count, comm_stats.lmsg_init_count, 
             comm_stats.ack_count, comm_stats.big_msg_ack_count, comm_stats.direct_put_done_count, comm_stats.put_done_count);
@@ -948,16 +951,16 @@ static void print_comm_stats()
             comm_stats.try_ack_count, comm_stats.try_big_msg_ack_count, comm_stats.try_direct_put_done_count, comm_stats.try_put_done_count);
 
     fprintf(counterLog, "Node[%d] Rdma Transaction [count (GET/PUT):%lld %lld\t calls (GET/PUT):%lld %lld]\n", myrank, comm_stats.rdma_get_count, comm_stats.rdma_put_count, comm_stats.try_rdma_get_count, comm_stats.try_rdma_put_count);
-    fprintf(counterLog, "Node[%d] Rdma time from control arrives to rdma init [MAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/(comm_stats.rdma_get_count+comm_stats.rdma_put_count)); 
-    fprintf(counterLog, "Node[%d] Rdma time from init to rdma done [MAX:%f\t Average:%f](milisecond)\n\n", myrank, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/(comm_stats.rdma_get_count+comm_stats.rdma_put_count));
+    fprintf(counterLog, "Node[%d] Rdma time from control arrives to rdma init [Total:%f\tMAX:%f\t Average:%f](milisecond)\n", myrank, 1000.0*comm_stats.all_time_from_control_to_rdma_init, 1000.0*comm_stats.max_time_from_control_to_rdma_init, 1000.0*comm_stats.all_time_from_control_to_rdma_init/(comm_stats.rdma_get_count+comm_stats.rdma_put_count)); 
+    fprintf(counterLog, "Node[%d] Rdma time from init to rdma done [Total:%f\tMAX:%f\t Average:%f](milisecond)\n\n", myrank,1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/(comm_stats.rdma_get_count+comm_stats.rdma_put_count));
 
 
-    fprintf(counterLog, "                             count\ttotal_time\tmax \n", myrank);
-    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork);
-    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions);
-    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma);
-    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg);
-    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg);
+    fprintf(counterLog, "                             count\ttotal_time\tmax\taverage\n", myrank);
+    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork, comm_stats.time_in_PumpNetwork/comm_stats.count_in_PumpNetwork);
+    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions/comm_stats.count_in_PumpRemoteTransactions);
+    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma/comm_stats.count_in_PumpLocalTransactions_rdma);
+    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.9f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg/comm_stats.count_in_SendBufferMsg_smsg);
+    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.9f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg/comm_stats.count_in_SendRdmaMsg);
 }
 
 #else
@@ -2180,6 +2183,7 @@ static void PumpNetworkSmsg()
 #endif
                 break;
             }
+#if !REMOTE_EVENT && !CQWRITE
             case ACK_TAG:   //msg fit into mempool
             {
                 /* Get is done, release message . Now put is not used yet*/
@@ -2197,6 +2201,7 @@ static void PumpNetworkSmsg()
                 CmiFree(msg);
                 break;
             }
+#endif
             case BIG_MSG_TAG:  //big msg, de-register, transfer next seg
             {
 #if MULTI_THREAD_SEND
@@ -2245,7 +2250,7 @@ static void PumpNetworkSmsg()
 #endif
                 break;
             }
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COMM && !REMOTE_EVENT && !CQWRITE
             case PUT_DONE_TAG:  {   //persistent message
                 void *msg = (void *)(((CONTROL_MSG *) header)->source_addr);
                 int size = ((CONTROL_MSG *) header)->length;
@@ -2417,9 +2422,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->src_cq_hndl     = rdma_tx_cqh;
     pd->rdma_mode       = 0;
     pd->amo_cmd         = 0;
-
+#if USE_RDMA_CAP
+    if(status == GNI_RC_SUCCESS && RDMA_pending >= RDMA_cap ) status = GNI_RC_ERROR_RESOURCE; 
+#endif
     //memory registration success
-    if(status == GNI_RC_SUCCESS)
+    if(status == GNI_RC_SUCCESS )
     {
         CmiNodeLock lock = pd->type == GNI_POST_RDMA_GET?rdma_tx_cq_lock:default_tx_cq_lock;
         CMI_GNI_LOCK(lock)
@@ -2447,6 +2454,9 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 
         if(status == GNI_RC_SUCCESS )
         {
+#if USE_RDMA_CAP
+            RDMA_pending++;
+#endif
             if(pd->cqwrite_value == 0)
             {
 #if MACHINE_DEBUG_LOG
@@ -2676,6 +2686,11 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
         type = GNI_CQ_GET_TYPE(ev);
         if (type == GNI_CQ_EVENT_TYPE_POST)
         {
+
+#if USE_RDMA_CAP
+            if(RDMA_pending <=0) CmiAbort(" pending error\n");
+            RDMA_pending--;
+#endif
             inst_id     = GNI_CQ_GET_INST_ID(ev);
 #if PRINT_SYH
             printf("[%d] LocalTransactions localdone=%d\n", myrank,  lrts_local_done_msg);
@@ -2847,14 +2862,20 @@ static void  SendRdmaMsg()
     int len = PCQueueLength(sendRdmaBuf);
     for (i=0; i<len; i++)
     {
+#if USE_RDMA_CAP
+         if( RDMA_pending >= RDMA_cap) break;
+#endif
         CMI_PCQUEUEPOP_LOCK(sendRdmaBuf)
         ptr = (RDMA_REQUEST*)PCQueuePop(sendRdmaBuf);
         CMI_PCQUEUEPOP_UNLOCK(sendRdmaBuf)
         if (ptr == NULL) break;
 #else
     ptr = sendRdmaBuf;
-    while (ptr!=0)
+    while (ptr!=0 && RDMA_pending < RDMA_cap)
     {
+#if USE_RDMA_CAP
+         if( RDMA_pending >= RDMA_cap) break;
+#endif
 #endif 
         MACHSTATE4(8, "noempty-rdma  %d (%lld,%lld,%d) \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size); 
         gni_post_descriptor_t *pd = ptr->pd;
@@ -2900,6 +2921,9 @@ static void  SendRdmaMsg()
             
             if(status == GNI_RC_SUCCESS)    //post good
             {
+#if USE_RDMA_CAP
+                RDMA_pending ++;
+#endif
 #if !CMK_SMP
                 tmp_ptr = ptr;
                 if(pre != 0) {
@@ -3045,10 +3069,12 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 control_msg_tmp = (CONTROL_MSG*)ptr->msg;
                 status = send_large_messages( queue, ptr->destNode, control_msg_tmp, 1, ptr);
                 break;
+#if !REMOTE_EVENT && !CQWRITE
             case ACK_TAG:
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
                 break;
+#endif
             case BIG_MSG_TAG:
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS)
@@ -3056,7 +3082,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                     FreeControlMsg((CONTROL_MSG*)ptr->msg);
                 }
                 break;
-#if CMK_PERSISTENT_COMM
+#if CMK_PERSISTENT_COMM && !REMOTE_EVENT && !CQWRITE 
             case PUT_DONE_TAG:
                 status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
                 if(status == GNI_RC_SUCCESS)
