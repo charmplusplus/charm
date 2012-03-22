@@ -524,16 +524,11 @@ void SdagConstruct::generateForward(XStr& op) {
   generatePrototype(op, *stateVars);
   op << ") {\n";
   for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    op << "    { "<<cn->text->charstar()<<"(";
-    generateCall(op, *stateVarsChildren);
-    op<<"); }\n";
+    op << "    { ";
+    generateCall(op, *stateVarsChildren, cn->text->charstar());
+    op<<" }\n";
   }
-  if(nextBeginOrEnd == 1)
-    op << "    " << next->label->charstar() << "(";
-  else
-    op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  generateCall(op, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "  }\n\n";
 }
 
@@ -707,22 +702,16 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
+  op << "       ";
+
   if (constructs != 0) {
     if (!constructs->empty() ) {
-       op << "       " << constructs->front()->label->charstar() << "(";
-       generateCall(op, *stateVarsChildren);
-       op << ");\n";
+       generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
+    } else {
+       generateCall(op, *stateVarsChildren, label->charstar(), "_end");
     }
-    else {
-       op << "       " << label->charstar() << "_end(";
-       generateCall(op, *stateVarsChildren);
-       op << ");\n";
-    }
-  }
-  else {
-     op << "       " << label->charstar() << "_end(";
-     generateCall(op, *stateVarsChildren);
-     op << ");\n";
+  } else {
+    generateCall(op, *stateVarsChildren, label->charstar(), "_end");
   }
 
   el = elist;
@@ -884,17 +873,9 @@ void SdagConstruct::generateWhen(XStr& op)
   generateEventBracket(op,SWHEN_END);
 #endif
   // actual code here 
-  if(nextBeginOrEnd == 1)
-   op << "    " << next->label->charstar();
-  else 
-    op << "    " << next->label->charstar() << "_end";
-
-  op << "(";
-
-  generateCall(op, *stateVars); 
+  op << "    ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   
-  op << ");\n";
-
   el = elist;
   while (el) {
     e = el->entry;
@@ -918,17 +899,11 @@ void SdagConstruct::generateWhile(XStr& op)
   op << ") {\n";
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << constructs->front()->label->charstar() << 
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    } else {\n";
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
@@ -938,17 +913,11 @@ void SdagConstruct::generateWhile(XStr& op)
   op << ") {\n";
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    } else {\n";
-  if(nextBeginOrEnd == 1)
-   op << "      " <<  next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
@@ -971,17 +940,11 @@ void SdagConstruct::generateFor(XStr& op)
   generateEventBracket(op,SFOR);
 #endif
   op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    } else {\n";
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
   // end actual code
   op << "  }\n";
@@ -998,20 +961,14 @@ void SdagConstruct::generateFor(XStr& op)
   // actual code here 
   op << con3->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    } else {\n";
 #if CMK_BIGSIM_CHARM
   generateEventBracket(op,SFOR_END);
 #endif
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-   generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
   // end actual code
   op << "  }\n";
@@ -1030,19 +987,14 @@ void SdagConstruct::generateIf(XStr& op)
 #endif
   // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    } else {\n";
+  op << "      ";
   if (con2 != 0) {
-    op << "      " << con2->label->charstar() << "(";
-    generateCall(op, *stateVarsChildren);
-    op << ");\n";
+    generateCall(op, *stateVarsChildren, con2->label->charstar());
   } else {
-    op << "      " << label->charstar() << "_end(";
-    generateCall(op, *stateVarsChildren);
-    op << ");\n";
+    generateCall(op, *stateVarsChildren, label->charstar(), "_end");
   }
   op << "    }\n";
   // end actual code
@@ -1058,12 +1010,8 @@ void SdagConstruct::generateIf(XStr& op)
   generateEventBracket(op,SIF_END);
 #endif
   // actual code here 
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "  }\n\n";
 }
@@ -1079,10 +1027,8 @@ void SdagConstruct::generateElse(XStr& op)
   generateBeginTime(op);
   generateEventBracket(op,SELSE);
   // actual code here 
-  op << "    " << constructs->front()->label->charstar() << 
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   // end actual code
   op << "  }\n\n";
   // inlined end function
@@ -1097,12 +1043,8 @@ void SdagConstruct::generateElse(XStr& op)
   generateEventBracket(op,SELSE_END);
 #endif
   // actual code here 
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "  }\n\n";
 }
@@ -1126,10 +1068,8 @@ void SdagConstruct::generateForall(XStr& op)
   op << "    for(int " << con1->text->charstar() << 
         "=__first;" << con1->text->charstar() <<
         "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
-  op << "      " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    }\n";
   // end actual code
   op << "  }\n\n";
@@ -1141,12 +1081,8 @@ void SdagConstruct::generateForall(XStr& op)
   op << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "    }\n  }\n\n";
 }
@@ -1163,9 +1099,8 @@ void SdagConstruct::generateOlist(XStr& op)
         constructs->length() << ");\n";
   for(cn=constructs->begin(); 
                      !constructs->end(); cn=constructs->next()) {
-    op << "    " << cn->label->charstar() << "(";
-    generateCall(op, *stateVarsChildren);
-    op << ");\n";
+    op << "    ";
+    generateCall(op, *stateVarsChildren, cn->label->charstar());
   }
   // end actual code
   op << "  }\n";
@@ -1206,12 +1141,8 @@ void SdagConstruct::generateOlist(XStr& op)
   op << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
 #endif
 
-  if(nextBeginOrEnd == 1)
-   op << "      " << next->label->charstar() << "(";
-  else
-   op << "      " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "      ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "    }\n";
   op << "  }\n";
@@ -1229,10 +1160,8 @@ void SdagConstruct::generateOverlap(XStr& op)
   generateEventBracket(op,SOVERLAP);
 #endif
   // actual code here 
-  op << "    " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   // end actual code
   op << "  }\n";
   // trace
@@ -1247,11 +1176,8 @@ void SdagConstruct::generateOverlap(XStr& op)
   generateEventBracket(op,SOVERLAP_END);
 #endif
   // actual code here 
-  if(nextBeginOrEnd == 1)
-   op << "    " << next->label->charstar() << "(";
-  else
-   op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
+  op << "    ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << ");\n";
   // end actual code
   op << "  }\n";
@@ -1264,10 +1190,8 @@ void SdagConstruct::generateSlist(XStr& op)
   generatePrototype(op, *stateVars);
   op << ") {\n";
   // actual code here 
-  op << "    " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   // end actual code
   op << "  }\n";
   // inlined end function
@@ -1275,12 +1199,8 @@ void SdagConstruct::generateSlist(XStr& op)
   generatePrototype(op, *stateVarsChildren); 
   op << ") {\n";
   // actual code here 
-  if(nextBeginOrEnd == 1)
-   op << "    " << next->label->charstar() << "(";
-  else
-   op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   // end actual code
   op << "  }\n";
 }
@@ -1305,10 +1225,8 @@ void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
   if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateTraceEndCall(op);
 
   // actual code here 
-  op << "    " << constructs->front()->label->charstar() <<
-        "(";
-  generateCall(op, *stateVarsChildren);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
 
 #if CMK_BIGSIM_CHARM
   generateTlineEndCall(op);
@@ -1345,12 +1263,8 @@ void SdagConstruct::generateAtomic(XStr& op)
 #if CMK_BIGSIM_CHARM
   generateEndExec(op);
 #endif
-  if(nextBeginOrEnd == 1)
-    op << "    " << next->label->charstar() << "(";
-  else
-    op << "    " << next->label->charstar() << "_end(";
-  generateCall(op, *stateVars);
-  op << ");\n";
+  op << "    ";
+  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "  }\n\n";
 }
 
@@ -1406,7 +1320,10 @@ void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
   }
 }
 
-void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list) {
+void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
+                                 const char* name, const char* nameSuffix) {
+  op << name << (nameSuffix ? nameSuffix : "") << "(";
+
   CStateVar *sv;
   int isVoid;
   int count;
@@ -1421,6 +1338,8 @@ void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list) {
        count++;
     sv = list.next();
   }
+
+  op << ");\n";
 }
 
 // boe = 1, if the next call is to begin construct

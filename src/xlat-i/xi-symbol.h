@@ -1234,7 +1234,8 @@ private:
   void generateConnect(XStr& op);
   void generatePrototype(XStr& op, ParamList *list);
   void generatePrototype(XStr& op, TList<CStateVar*>&);
-  void generateCall(XStr& op, TList<CStateVar*>&);
+  void generateCall(XStr& op, TList<CStateVar*>&,
+                    const char* name, const char* nameSuffix = 0);
 
   void generateTraceBeginCall(XStr& op);          // for trace
   void generateBeginTime(XStr& op);               //for Event Bracket
