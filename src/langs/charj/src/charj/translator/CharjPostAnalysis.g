@@ -553,6 +553,7 @@ primaryExpression returns [Type type]
 			$type = $THISPROXY.symbolType;
 		}
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
     
 explicitConstructorCall
@@ -673,6 +674,7 @@ entryPrimaryExpression
     |   GETMYNODE
     |   GETMYRANK
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
 
 literal 

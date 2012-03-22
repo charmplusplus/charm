@@ -469,6 +469,7 @@ primaryExpression
 	|	THISINDEX
 	|	THISPROXY
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
     
 explicitConstructorCall

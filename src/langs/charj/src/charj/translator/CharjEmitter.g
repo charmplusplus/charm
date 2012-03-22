@@ -796,8 +796,8 @@ sdagStatement
     ;
 
 whenArgument
-    :   IDENT expression? formalParameterList
-        -> template(i={$IDENT}, e={$expression.st}, f={$formalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
+    :   IDENT expression? entryFormalParameterList
+        -> template(i={$IDENT}, e={$expression.st}, f={$entryFormalParameterList.st}) "<i> <if(e)>[<e>] <endif><f>"
     ;
 
 nonBlockStatement
@@ -1041,6 +1041,10 @@ primaryExpression
 		->	template() "thisProxy"
     |   domainExpression[null]
         ->  {$domainExpression.st}
+    |   ^(SIZEOF e=expression)
+        -> template(ex={$e.st}) "sizeof(<ex>)"
+    |   ^(SIZEOF t=type)
+        -> template(ty={$t.st}) "sizeof(<ty>)"
     ;
     
 explicitConstructorCall
