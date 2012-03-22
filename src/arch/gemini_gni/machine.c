@@ -46,7 +46,7 @@
 #include "cmidirect.h"
 #endif
 
-#define     LARGEPAGE              1
+#define     LARGEPAGE              0
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -377,7 +377,7 @@ static CmiNodeLock           rx_cq_lock;
 static CmiNodeLock           smsg_mailbox_lock;
 static CmiNodeLock           smsg_rx_cq_lock;
 static CmiNodeLock           *mempool_lock;
-#define     CMK_WITH_STATS      1
+//#define     CMK_WITH_STATS      1
 typedef struct msg_list
 {
     uint32_t destNode;
