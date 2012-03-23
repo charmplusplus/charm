@@ -250,6 +250,7 @@ primaryExpression returns [Type type]
             |   SUPER { memberNode = $SUPER; memberText = "super"; }
             ))
         {
+            String parentText = $e.text;
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
             if (et instanceof PointerType) et = ((PointerType)et).baseType;
@@ -271,7 +272,8 @@ primaryExpression returns [Type type]
                 memberNode.symbolType = $type;
                 parentNode.def = s;
                 parentNode.symbolType = $type;
-            } else if (!(et instanceof ExternalSymbol)) {
+            } else if (!(et instanceof ExternalSymbol) &&
+                       !parentText.equals("thisIndex")) {
                 System.out.println("Couldn't resolve access " + memberText);
             }
         }
