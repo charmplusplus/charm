@@ -916,8 +916,6 @@ postfixedExpression
             )
         |   (AT templateInstantiation? IDENT arguments)
             ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
-        |   '[' expression ']'
-            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         |   domainExpression
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression domainExpression)
         )*

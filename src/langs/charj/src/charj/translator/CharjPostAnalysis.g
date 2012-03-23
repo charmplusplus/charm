@@ -511,10 +511,6 @@ primaryExpression returns [Type type]
 			$type = $ENTRY_METHOD_CALL.symbolType;
 		}
     |   explicitConstructorCall
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
-		{
-			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
-		}
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression domainExpression)
 		{
 			$type = $ARRAY_ELEMENT_ACCESS.symbolType; // TODO this is not correct, as it's always null
