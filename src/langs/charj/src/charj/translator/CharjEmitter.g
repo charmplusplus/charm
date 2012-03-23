@@ -142,6 +142,7 @@ typeDeclaration
     boolean needsMigration = false;
     List<String> inits = new ArrayList<String>();
     List<String> pupInits = new ArrayList<String>();
+    List<String> sdagEntries = new ArrayList<String>();
 }
     :   ^(TYPE CLASS IDENT (^('extends' su=type))? (^('implements' type+))?
         {
@@ -181,7 +182,7 @@ typeDeclaration
         {
             currentClass = (ClassSymbol)$IDENT.def;
             needsMigration = currentClass.isChareArray && !currentClass.hasMigrationCtor;
-
+            sdagEntries = currentClass.generateSDAGEntries();
             inits = currentClass.generateInits(currentClass.initializers);
             pupInits = currentClass.generateInits(currentClass.pupInitializers);
         }
@@ -202,7 +203,8 @@ typeDeclaration
                 arrayDim={null},
                 ident={$IDENT.text}, 
                 ext={$su.st}, 
-                csds={$csds})
+                csds={$csds},
+                entries={sdagEntries})
         -> {emitH()}? chareDeclaration_h(
                 sym={currentClass},
                 ident={$IDENT.text}, 

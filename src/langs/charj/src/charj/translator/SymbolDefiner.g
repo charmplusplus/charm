@@ -359,8 +359,36 @@ atoms
             assert currentScope != null;
             t.scope = currentScope;
        }
-    |  (WHEN|OVERLAP) {
+    |  ^(WHEN sdagTrigger+ ^(BLOCK .*)) {
             assert currentMethod != null;
             currentMethod.hasSDAG = true;
        }
+    |  OVERLAP {
+            assert currentMethod != null;
+            currentMethod.hasSDAG = true;
+       }
+    ;
+
+sdagTrigger
+    :  IDENT .* ^(FORMAL_PARAM_LIST .*) {
+         ArrayList<TypeName> typeName = new ArrayList<TypeName>();
+         typeName.add(new TypeName("void"));
+         Type returnType = currentScope.resolveType(typeName);
+         MethodSymbol sym = new MethodSymbol(symtab, $IDENT.text, currentClass, returnType);
+         sym.sdagFPL = $FORMAL_PARAM_LIST;
+         sym.isEntry = true;
+         // @todo fix this??
+         sym.isTraced = false;
+         //sym.definition = $IDENT.start;
+         sym.hasSDAG = true;
+         sym.definitionTokenStream = input.getTokenStream();
+         currentScope.define($IDENT.text, sym);
+         currentScope = sym;
+         //currentMethod = sym;
+         $IDENT.def = sym;
+         $IDENT.symbolType = sym.type;
+         $IDENT.scope = currentScope;
+         currentClass.sdagMethods.put($IDENT.text, sym);
+         currentScope.define($IDENT.text, sym);
+      }
     ;

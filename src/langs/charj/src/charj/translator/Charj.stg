@@ -383,7 +383,7 @@ class <ident>: public CBase_<ident> {
 <endif>
 >>
 
-chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds, entries) ::=
 <<
 <if(sym.isMainChare)>main<endif>module <ident> {
 <if(ext)>
@@ -394,20 +394,21 @@ chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
 extern module <basename>_readonly;
 <endif>
     }>
-    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds, entries = entries)>
 }
 >>
 
 
-chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds, entries) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds, entries = entries)>
 } // namespace <first(pds)>
 <else>
 <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
     <csds; separator="\n">
+    <entries; separator="\n">
 };
 <endif>
 >>

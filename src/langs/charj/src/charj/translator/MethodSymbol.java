@@ -28,6 +28,8 @@ public class MethodSymbol
     public boolean isTraced = false;
     public boolean hasSDAG = false;
 
+    public CharjAST sdagFPL;
+
     public MethodSymbol(SymbolTable symtab) {
         super(symtab);
     }
