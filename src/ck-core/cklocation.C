@@ -55,15 +55,6 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBUG(x)   /**/
 #endif
 
-enum state {
-  OFF,
-  ON,
-  PAUSE,
-  DECIDED,
-  LOAD_BALANCE
-} local_state;
-
-
 #if CMK_LBDB_ON
 /*LBDB object handles are fixed-sized, and not necc.
 the same size as ArrayIndices.
@@ -981,6 +972,7 @@ void CkMigratable::commonInit(void) {
 	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
   atsync_iteration = -1;
+  //CkPrintf("%s in init and off\n", idx2str(thisIndexMax));
   local_state = OFF;
 	/*
 	FAULT_EVAC
@@ -1083,13 +1075,16 @@ double CkMigratable::getObjTime() {
 
 void CkMigratable::recvLBPeriod(void *data) {
   int lb_period = *((int *) data);
-  CkPrintf("Received the LB Period %d\n", lb_period);
+//  CkPrintf("--[pe %s] Received the LB Period %d current iter %d state %d\n",
+//      idx2str(thisIndexMax), lb_period, atsync_iteration, local_state);
   if (local_state == PAUSE) {
     if (atsync_iteration < lb_period) {
+//      CkPrintf("---[pe %s] decided\n", idx2str(thisIndexMax));
       local_state = DECIDED;
       ResumeFromSync();
       return;
     }
+//    CkPrintf("---[pe %s] load balance\n", idx2str(thisIndexMax));
     local_state = LOAD_BALANCE;
 
     local_state = OFF;
@@ -1098,6 +1093,7 @@ void CkMigratable::recvLBPeriod(void *data) {
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
+//  CkPrintf("---[pe %s] decided\n", idx2str(thisIndexMax));
   local_state = DECIDED;
 }
 
@@ -1131,18 +1127,21 @@ void CkMigratable::AtSync(int waitForMigration)
   if (usesAutoMeasure == CmiFalse) UserSetLBLoad();
   //	myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   atsync_iteration++;
+//  CkPrintf("[pe %s] atsync_iter %d && predicted period %d state: %d\n",
+//      idx2str(thisIndexMax), atsync_iteration,
+//      myRec->getLBDB()->getPredictedLBPeriod(), local_state);
   myRec->getLBDB()->AddLoad(atsync_iteration, myRec->getObjTime());
-  //CkPrintf("atsync_iter %d && predicted period %d state: %d\n", atsync_iteration,
-   //   myRec->getLBDB()->getPredictedLBPeriod(), local_state);
   // register handle as myRec->getLdHandle()
   if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod()) {
     ResumeFromSync();
   } else if (local_state == DECIDED) {
+//    CkPrintf("[pe %s] Went to load balance\n", idx2str(thisIndexMax));
     local_state = LOAD_BALANCE;
     local_state = OFF;
     atsync_iteration = -1;
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   } else {
+//    CkPrintf("[pe %s] Went to pause state\n", idx2str(thisIndexMax));
     local_state = PAUSE;
   }
 }

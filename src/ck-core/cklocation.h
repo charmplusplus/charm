@@ -277,6 +277,15 @@ private:
   void commonInit(void);
   CmiBool asyncEvacuate;
   int atsync_iteration;
+
+  enum state {
+    OFF,
+    ON,
+    PAUSE,
+    DECIDED,
+    LOAD_BALANCE
+  } local_state;
+
 public:
   CkArrayIndex thisIndexMax;
 

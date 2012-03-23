@@ -402,9 +402,9 @@ void LBDatabase::init(void)
   if (manualOn) TurnManualLBOn();
 #endif
   
-  max_load_vec.resize(100);
-  total_load_vec.resize(100);
-  total_contrib_vec.resize(100);
+  max_load_vec.resize(100, 0);
+  total_load_vec.resize(100, 0);
+  total_contrib_vec.resize(100, 0);
   max_iteration = -1;
 
   // If metabalancer enabled, initialize the variables
@@ -561,12 +561,22 @@ void LBDatabase::ResumeClients() {
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
   adaptive_struct.lb_msg_recv_no = 0;
+  
+  max_load_vec.clear();
+  total_load_vec.clear();
+  total_contrib_vec.clear();
+
+  max_load_vec.resize(100, 0.0);
+  total_load_vec.resize(100, 0.0);
+  total_contrib_vec.resize(100, 0.0);
 
   LDResumeClients(myLDHandle);
 }
 
 bool LBDatabase::AddLoad(int iteration, double load) {
   total_contrib_vec[iteration]++;
+  //CkPrintf("At PE %d Total contribution for iteration %d is %lf total objs %d\n", CkMyPe(), iteration,
+  //total_contrib_vec[iteration], getLBDB()->ObjDataCount());
 
   if (iteration > adaptive_struct.lb_no_iterations) {
     adaptive_struct.lb_no_iterations = iteration;
@@ -575,13 +585,13 @@ bool LBDatabase::AddLoad(int iteration, double load) {
   if (max_load_vec[iteration] < load) {
     max_load_vec[iteration] = load;
   }
-  if (total_contrib_vec[iteration] == getLBDB()->getObjCount()) {
+  if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double lb_data[4];
     lb_data[0] = total_load_vec[iteration];
     lb_data[1] = max_load_vec[iteration];
-    lb_data[2] = getLBDB()->getObjCount();
+    lb_data[2] = getLBDB()->ObjDataCount();
     lb_data[3] = iteration;
-    //CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load, adaptive_struct.lb_no_iterations);
+    //CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load_vec[iteration], adaptive_struct.lb_no_iterations);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(4*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -791,7 +801,7 @@ void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period);
+//  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period);
   adaptive_struct.lb_ideal_period = period;
   LDOMAdaptResumeSync(myLDHandle, period);
 
