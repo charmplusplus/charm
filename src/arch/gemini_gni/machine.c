@@ -24,6 +24,7 @@
     export CHARM_UGNI_MAX_MEMORY_ON_NODE=0.8G  # max memory per node for mempool
     export CHARM_UGNI_BIG_MSG_SIZE=4M          # set big message size protocol
     export CHARM_UGNI_BIG_MSG_PIPELINE_LEN=4   # set big message pipe len
+    export CHARM_UGNI_RDMA_MAX=100             # max pending RDMA operations
  */
 /*@{*/
 
@@ -62,6 +63,7 @@
 
 #define CMI_EXERT_SEND_CAP	0
 #define	CMI_EXERT_RECV_CAP	0
+#define CMI_EXERT_RDMA_CAP      0
 
 #if CMI_EXERT_SEND_CAP
 #define SEND_CAP  32
@@ -70,9 +72,11 @@
 #if CMI_EXERT_RECV_CAP
 #define RECV_CAP  4                  /* cap <= 2 sometimes hang */
 #endif
-//#define USE_RDMA_CAP   0 
+
+#if CMI_EXERT_RDMA_CAP
 int   RDMA_cap =   100;
 int   RDMA_pending = 0;
+#endif
 
 #define USE_LRTS_MEMPOOL                  1
 
@@ -955,12 +959,12 @@ static void print_comm_stats()
     fprintf(counterLog, "Node[%d] Rdma time from init to rdma done [Total:%f\tMAX:%f\t Average:%f](milisecond)\n\n", myrank,1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.max_time_from_rdma_init_to_rdma_done, 1000.0*comm_stats.all_time_from_rdma_init_to_rdma_done/(comm_stats.rdma_get_count+comm_stats.rdma_put_count));
 
 
-    fprintf(counterLog, "                             count\ttotal_time\tmax\taverage\n", myrank);
-    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork, comm_stats.time_in_PumpNetwork/comm_stats.count_in_PumpNetwork);
-    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions/comm_stats.count_in_PumpRemoteTransactions);
-    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.9f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma/comm_stats.count_in_PumpLocalTransactions_rdma);
-    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.9f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg/comm_stats.count_in_SendBufferMsg_smsg);
-    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.9f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg/comm_stats.count_in_SendRdmaMsg);
+    fprintf(counterLog, "                             count\ttotal(s)\tmax(s)\taverage(us)\n");
+    fprintf(counterLog, "PumpNetworkSmsg:              %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpNetwork, comm_stats.time_in_PumpNetwork, comm_stats.max_time_in_PumpNetwork, comm_stats.time_in_PumpNetwork*1e6/comm_stats.count_in_PumpNetwork);
+    fprintf(counterLog, "PumpRemoteTransactions:       %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions, comm_stats.max_time_in_PumpRemoteTransactions, comm_stats.time_in_PumpRemoteTransactions*1e6/comm_stats.count_in_PumpRemoteTransactions);
+    fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma*1e6/comm_stats.count_in_PumpLocalTransactions_rdma);
+    fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg*1e6/comm_stats.count_in_SendBufferMsg_smsg);
+    fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg*1e6/comm_stats.count_in_SendRdmaMsg);
 }
 
 #else
@@ -2422,7 +2426,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->src_cq_hndl     = rdma_tx_cqh;
     pd->rdma_mode       = 0;
     pd->amo_cmd         = 0;
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
     if(status == GNI_RC_SUCCESS && RDMA_pending >= RDMA_cap ) status = GNI_RC_ERROR_RESOURCE; 
 #endif
     //memory registration success
@@ -2454,7 +2458,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
 
         if(status == GNI_RC_SUCCESS )
         {
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
             RDMA_pending++;
 #endif
             if(pd->cqwrite_value == 0)
@@ -2689,7 +2693,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
         if (type == GNI_CQ_EVENT_TYPE_POST)
         {
 
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
             if(RDMA_pending <=0) CmiAbort(" pending error\n");
             RDMA_pending--;
 #endif
@@ -2864,7 +2868,7 @@ static void  SendRdmaMsg()
     int len = PCQueueLength(sendRdmaBuf);
     for (i=0; i<len; i++)
     {
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
          if( RDMA_pending >= RDMA_cap) break;
 #endif
         CMI_PCQUEUEPOP_LOCK(sendRdmaBuf)
@@ -2875,7 +2879,7 @@ static void  SendRdmaMsg()
     ptr = sendRdmaBuf;
     while (ptr!=0 )
     {
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
          if( RDMA_pending >= RDMA_cap) break;
 #endif
 #endif 
@@ -2923,7 +2927,7 @@ static void  SendRdmaMsg()
             
             if(status == GNI_RC_SUCCESS)    //post good
             {
-#if USE_RDMA_CAP
+#if CMI_EXERT_RDMA_CAP
                 RDMA_pending ++;
 #endif
 #if !CMK_SMP
@@ -3782,6 +3786,14 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     if (env) _checkProgress = 0;
     if (mysize == 1) _checkProgress = 0;
 
+#if CMI_EXERT_RDMA_CAP
+    env = getenv("CHARM_UGNI_RDMA_MAX");
+    if (env)  {
+        RDMA_pending = atoi(env);
+        if (myrank == 0)
+            printf("Charm++> Max pending RDMA set to: %d\n", RDMA_pending);
+    }
+#endif
     
     /*
     env = getenv("HUGETLB_DEFAULT_PAGE_SIZE");
