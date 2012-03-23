@@ -40,7 +40,7 @@ public class PackageScope extends SymbolWithScope {
                                 "): examine " + toString());
         }
 
-        ClassSymbol cs = symtab.primitiveTypes.get(typeStr);
+        ClassSymbol cs = symtab.lookupPrimitive(type);
         if (cs != null) return cs;
 
         if (type.size() == 1) return (ClassSymbol)members.get(type.get(0).name);
