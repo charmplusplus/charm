@@ -125,6 +125,8 @@ namespace CharjArray {
       block = new type[domain.size()];
     }
 
+    type* raw() { return block; }
+
     ~Array() {
       delete[] block;
     }
