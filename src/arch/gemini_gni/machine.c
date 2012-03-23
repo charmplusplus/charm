@@ -2641,11 +2641,13 @@ static void PumpRemoteTransactions()
 #if CMK_PERSISTENT_COMM
         case 1:  {    // PERSISTENT
             CmiAssert(GetIndexType(persistPool, index) == 2);
+            START_EVENT();
             PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
             msg = slot->destBuf[0].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);
+            TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
             handleOneRecvedMsg(size, msg); 
             break;
             }
