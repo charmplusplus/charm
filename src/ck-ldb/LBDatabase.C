@@ -38,6 +38,7 @@ struct AdaptiveLBStructure {
   double lb_strategy_cost;
   double lb_migration_cost;
   bool lb_period_informed;
+  bool isRefine;
   int lb_msg_send_no;
   int lb_msg_recv_no;
 } adaptive_struct;
@@ -604,9 +605,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double max = load[1];
   double avg = load[0]/load[2];
   int iteration_n = load[3];
-  CkPrintf("[%d] Iteration Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
+  CkPrintf("** [%d] Iteration Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
   delete msg;
-
+ 
   // Store the data for this iteration
   adaptive_struct.lb_no_iterations = iteration_n;
   AdaptiveData data;
@@ -691,14 +692,49 @@ bool LBDatabase::generatePlan(int& period) {
 //  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
 //      max, avg, adaptive_struct.lb_strategy_cost, adaptive_struct.lb_migration_cost, adaptive_struct.lb_ideal_period);
 //
+
   // If linearly varying load, then find lb_period
   // area between the max and avg curve 
+  // If we can attain perfect balance, then the new load is close to the
+  // average. Hence we pass 1, else pass in some other value which would be the
+  // new max_load after load balancing.
+  int refine_period, scratch_period;
+  bool obtained_refine, obtained_scratch;
+  obtained_refine = getPeriodForStrategy(1, 1, refine_period);
+  obtained_scratch = getPeriodForStrategy(1, 1, scratch_period);
+
+  if (obtained_refine) {
+    if (!obtained_scratch) {
+      period = refine_period;
+      adaptive_struct.isRefine = true;
+      return true;
+    }
+    if (scratch_period < 1.1*refine_period) {
+      adaptive_struct.isRefine = false;
+      period = scratch_period;
+      return true;
+    }
+    period = refine_period;
+    adaptive_struct.isRefine = true;
+    return true;
+  }
+
+  if (obtained_scratch) {
+    period = scratch_period;
+    adaptive_struct.isRefine = false;
+    return true;
+  }
+  return false;
+}
+
+bool LBDatabase::getPeriodForStrategy(double new_load_percent, double overhead_percent, int& period) {
   double mslope, aslope, mc, ac;
-  getLineEq(aslope, ac, mslope, mc);
+  getLineEq(new_load_percent, aslope, ac, mslope, mc);
   CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
   double a = (mslope - aslope)/2;
   double b = (mc - ac);
-  double c = -(adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost);
+  double c = -(adaptive_struct.lb_strategy_cost +
+      adaptive_struct.lb_migration_cost) * overhead_percent;
   //c = -2.5;
   bool got_period = getPeriodForLinear(a, b, c, period);
   if (!got_period) {
@@ -752,7 +788,7 @@ bool LBDatabase::getPeriodForLinear(double a, double b, double c, int& period) {
   return true;
 }
 
-bool LBDatabase::getLineEq(double& aslope, double& ac, double& mslope, double& mc) {
+bool LBDatabase::getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc) {
   int total = adaptive_lbdb.history_data.size();
   int iterations = 1 + adaptive_lbdb.history_data[total - 1].iteration -
       adaptive_lbdb.history_data[0].iteration;
@@ -768,7 +804,7 @@ bool LBDatabase::getLineEq(double& aslope, double& ac, double& mslope, double& m
     a1 += data.avg_load;
   }
   m1 /= i;
-  a1 /= i;
+  a1 = (a1 * new_load_percent) / i;
 
   for (i = total/2; i < total; i++) {
     data = adaptive_lbdb.history_data[i];
@@ -776,11 +812,11 @@ bool LBDatabase::getLineEq(double& aslope, double& ac, double& mslope, double& m
     a2 += data.avg_load;
   }
   m2 /= (i - total/2);
-  a2 /= (i - total/2);
+  a2 = (a2 * new_load_percent) / (i - total/2);
 
   aslope = 2 * (a2 - a1) / iterations;
   mslope = 2 * (m2 - m1) / iterations;
-  ac = adaptive_lbdb.history_data[0].avg_load;
+  ac = adaptive_lbdb.history_data[0].avg_load * new_load_percent;
   mc = adaptive_lbdb.history_data[0].max_load;
   return true;
 }
@@ -847,6 +883,10 @@ void LBDatabase::ReceiveIterationNo(int req_no, int local_iter_no) {
 
 int LBDatabase::getPredictedLBPeriod() {
   return adaptive_struct.lb_ideal_period;
+}
+
+bool LBDatabase::isStrategyRefine() {
+  return adaptive_struct.isRefine;
 }
 
 /*
