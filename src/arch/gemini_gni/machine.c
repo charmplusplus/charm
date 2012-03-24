@@ -3855,7 +3855,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     SHIFT = 1;
     while (1<<SHIFT < mysize) SHIFT++;
     CmiAssert(SHIFT < 31);
-printf("SHIFT: %d\n", SHIFT);
 #endif
 
 #if CMK_WITH_STATS
