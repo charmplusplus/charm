@@ -214,28 +214,24 @@ void *PerAlloc(int size)
 //  return CmiAlloc(size);
   gni_return_t status;
   void *res = NULL;
-  size = ALIGN64(size) + sizeof(CmiChunkHeader);
-  if (0 != posix_memalign(&res, 64, size))
-      CmiAbort("PerAlloc: failed to allocate memory.");
-  //printf("[%d] PerAlloc %p. \n", myrank, res);
-  char *ptr = (char*)res+sizeof(CmiChunkHeader);
+  char *ptr;
+  size = ALIGN64(size + sizeof(CmiChunkHeader));
+  //printf("[%d] PerAlloc %p %p %d. \n", myrank, res, ptr, size);
+  res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
+  if (res) ptr = (char*)res - sizeof(mempool_header) + ALIGNBUF;
   SIZEFIELD(ptr)=size;
   REFFIELD(ptr)=1;
-#if  CQWRITE || CMK_PERSISTENT_COMM
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, rdma_rx_cqh, status);
-#else
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD(ptr), &omdh, NULL, status);
-#endif
-  GNI_RC_CHECK("Mem Register before post", status);
+  MEMHFIELD(ptr) = GetMemHndl(ptr);
   return ptr;
 }
                                                                                 
 void PerFree(char *msg)
 {
-//  CmiFree(msg);
-  char *ptr = msg-sizeof(CmiChunkHeader);
-  MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &MEMHFIELD(msg) , &omdh, SIZEFIELD(msg));
-  free(ptr);
+#if CMK_SMP
+  mempool_free_thread((char*)msg - ALIGNBUF + sizeof(mempool_header));
+#else
+  mempool_free(CpvAccess(mempool), (char*)msg - ALIGNBUF + sizeof(mempool_header));
+#endif
 }
 
 /* machine dependent init call */
