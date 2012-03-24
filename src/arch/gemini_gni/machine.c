@@ -699,7 +699,7 @@ static void IndexPool_init(IndexPool *pool)
 #if MULTI_THREAD_SEND || CMK_PERSISTENT_COMM
     pool->lock  = CmiCreateLock();
 #else
-    pool->lock  = NULL;
+    pool->lock  = 0;
 #endif
 }
 
@@ -2591,7 +2591,6 @@ static void PumpCqWriteTransactions()
             continue;
         }
 #endif
-        DecreaseMsgInSend(msg);
 #if ! USE_LRTS_MEMPOOL
        // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
 #else
@@ -2626,12 +2625,14 @@ static void PumpRemoteTransactions()
         inst_id = GNI_CQ_GET_INST_ID(ev);
         index = GET_INDEX(inst_id);
         type = GET_TYPE(inst_id);
-
         switch (type) {
         case 0:    // ACK
+            CmiAssert(index>=0 && index<ackPool.size);
             CmiAssert(GetIndexType(ackPool, index) == 1);
             msg = GetIndexAddress(ackPool, index);
-            DecreaseMsgInSend(msg);
+#if PRINT_SYH
+        printf("[%d] PumpRemoteTransactions: ack: %p index: %d type: %d.\n", myrank, GetMempoolBlockPtr(msg), index, type);
+#endif
 #if ! USE_LRTS_MEMPOOL
            // MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &(((ACK_MSG *)header)->source_mem_hndl), &omdh, ((ACK_MSG *)header)->length);
 #else
@@ -2644,6 +2645,7 @@ static void PumpRemoteTransactions()
             break;
 #if CMK_PERSISTENT_COMM
         case 1:  {    // PERSISTENT
+            CmiAssert(index>=0 && index<persistPool.size);
             CmiAssert(GetIndexType(persistPool, index) == 2);
             START_EVENT();
             PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
@@ -2811,7 +2813,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
             {
                 if( msg_tag == ACK_TAG){    //msg fit in mempool 
 #if PRINT_SYH
-                    printf("Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
+                    printf("PumpLocalTransactions: Normal msg transaction PE:%d==>%d\n", myrank, inst_id);
 #endif
                     TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (void*)tmp_pd->local_addr); 
                     TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_value/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (double)((tmp_pd->sync_flag_value+1)/1000000.0), (void*)tmp_pd->local_addr); 
@@ -3954,7 +3956,9 @@ void LrtsDrainResources()
         PumpNetworkSmsg();
         PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
         PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
+#if REMOTE_EVENT
         PumpRemoteTransactions();
+#endif
         SendRdmaMsg();
     }
     PMI_Barrier();
