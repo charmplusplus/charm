@@ -24,7 +24,10 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     RDMA_REQUEST        *rdma_request_msg;
     
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
-    if (h==NULL) CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
+    if (h==NULL) {
+        printf("[%d] LrtsSendPersistentMsg: handle from node %d to node %d is NULL. \n", CmiMyPe(), myrank, destNode);
+        CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
+    }
     CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
         CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);

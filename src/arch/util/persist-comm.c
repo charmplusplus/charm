@@ -432,6 +432,11 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n)
   CpvAccess(curphs) = 0;
 }
 
+void CmiPersistentOneSend()
+{
+  if (CpvAccess(phs)) CpvAccess(curphs)++;
+}
+
 #endif
 
 /*@}*/

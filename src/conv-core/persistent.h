@@ -62,6 +62,7 @@ void CmiUsePersistentHandle(PersistentHandle *p, int n);
 void CmiDestoryPersistent(PersistentHandle h);
 void CmiDestoryAllPersistent();
 
+void CmiPersistentOneSend();
 #else
 
 typedef int PersistentRecvHandle;

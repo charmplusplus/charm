@@ -721,7 +721,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
-        printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
+        //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
         if (newsize > (1<<(32-SHIFT-1))) CmiAbort("IndexPool too large");
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
