@@ -651,7 +651,7 @@ CpvDeclare(mempool_type*, mempool);
 #if REMOTE_EVENT
 /* ack pool for remote events */
 
-#define SHIFT                   18
+static int  SHIFT   =           18;
 #define INDEX_MASK              ((1<<(32-SHIFT-1)) - 1)
 #define RANK_MASK               ((1<<SHIFT) - 1)
 #define ACK_EVENT(idx)          ((((idx) & INDEX_MASK)<<SHIFT) | myrank)
@@ -660,7 +660,13 @@ CpvDeclare(mempool_type*, mempool);
 #define GET_RANK(evt)           ((evt) & RANK_MASK)
 #define GET_INDEX(evt)          (((evt) >> SHIFT) & INDEX_MASK)
 
-#define PERSIST_EVENT(idx)      (1<<31 | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
+#define PERSIST_EVENT(idx)      ( (1<<31) | (((idx) & INDEX_MASK)<<SHIFT) | myrank)
+
+#if CMK_SMP
+#define INIT_SIZE                4096
+#else
+#define INIT_SIZE                1024
+#endif
 
 struct IndexStruct {
 void *addr;
@@ -688,11 +694,12 @@ static void IndexPool_init(IndexPool *pool)
     int i;
     if ((1<<SHIFT) < mysize) 
         CmiAbort("Charm++ Error: Remote event's rank field overflow.");
-    pool->size = 1024;
+    pool->size = INIT_SIZE;
+    if ( (1<<(31-SHIFT)) < pool->size) CmiAbort("IndexPool_init: pool initial size is too big.");
     pool->indexes = (struct IndexStruct *)malloc(pool->size*sizeof(struct IndexStruct));
     for (i=0; i<pool->size-1; i++) {
         pool->indexes[i].next = i+1;
-        pool->indexes[i].type = -1;
+        pool->indexes[i].type = 0;
     }
     pool->indexes[i].next = -1;
     pool->freehead = 0;
@@ -714,16 +721,17 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
-        printf("[%d] IndexPool_getslot expand to: %d\n", myrank, newsize);
+        printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
         if (newsize > (1<<(32-SHIFT-1))) CmiAbort("IndexPool too large");
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
         memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
         for (i=pool->size; i<newsize-1; i++) {
             pool->indexes[i].next = i+1;
-            pool->indexes[i].type = -1;
+            pool->indexes[i].type = 0;
         }
         pool->indexes[i].next = -1;
+        pool->indexes[i].type = 0;
         pool->freehead = pool->size;
         s = pool->size;
         pool->size = newsize;
@@ -731,6 +739,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     }
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
+    CmiAssert(pool->indexes[s].type == 0 && (type == 1 || type == 2));
     pool->indexes[s].type = type;
 #if MULTI_THREAD_SEND
     CmiUnlock(pool->lock);
@@ -746,7 +755,7 @@ inline  void IndexPool_freeslot(IndexPool *pool, int s)
     CmiLock(pool->lock);
 #endif
     pool->indexes[s].next = pool->freehead;
-    pool->indexes[s].type = -1;
+    pool->indexes[s].type = 0;
     pool->freehead = s;
 #if MULTI_THREAD_SEND
     CmiUnlock(pool->lock);
@@ -2645,10 +2654,11 @@ static void PumpRemoteTransactions()
             break;
 #if CMK_PERSISTENT_COMM
         case 1:  {    // PERSISTENT
-            CmiAssert(index>=0 && index<persistPool.size);
+            CmiLock(persistPool.lock);
             CmiAssert(GetIndexType(persistPool, index) == 2);
-            START_EVENT();
             PersistentReceivesTable *slot = GetIndexAddress(persistPool, index);
+            CmiUnlock(persistPool.lock);
+            START_EVENT();
             msg = slot->destBuf[0].destAddress;
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
@@ -3842,6 +3852,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_PERSISTENT_COMM
     IndexPool_init(&persistPool);
 #endif
+    SHIFT = 1;
+    while (1<<SHIFT < mysize) SHIFT++;
+    CmiAssert(SHIFT < 31);
+printf("SHIFT: %d\n", SHIFT);
 #endif
 
 #if CMK_WITH_STATS

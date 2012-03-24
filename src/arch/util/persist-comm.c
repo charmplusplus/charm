@@ -14,9 +14,8 @@
 
 #include "machine-persistent.h"
 
-CpvDeclare(int, TABLESIZE);
-
-CpvDeclare(PersistentSendsTable *, persistentSendsTable);
+CpvDeclare(PersistentSendsTable *, persistentSendsTableHead);
+CpvDeclare(PersistentSendsTable *, persistentSendsTableTail);
 CpvDeclare(int, persistentSendsTableCount);
 CpvDeclare(PersistentReceivesTable *, persistentReceivesTableHead);
 CpvDeclare(PersistentReceivesTable *, persistentReceivesTableTail);
@@ -100,19 +99,23 @@ void swapRecvSlotBuffers(PersistentReceivesTable *slot)
 
 PersistentHandle getFreeSendSlot()
 {
-  int i;
-  if (CpvAccess(persistentSendsTableCount) == CpvAccess(TABLESIZE)) {
-    CmiAbort("Charm++> too many persistent channels on sender.");
+  PersistentSendsTable *slot = (PersistentSendsTable *)malloc(sizeof(PersistentSendsTable));
+  initSendSlot(slot);
+  if (CpvAccess(persistentSendsTableHead) == NULL) {
+    CpvAccess(persistentSendsTableHead) = CpvAccess(persistentSendsTableTail) = slot;
+  }
+  else {
+    CpvAccess(persistentSendsTableTail)->next = slot;
+    slot->prev = CpvAccess(persistentSendsTableTail);
+    CpvAccess(persistentSendsTableTail) = slot;
   }
   CpvAccess(persistentSendsTableCount)++;
-  for (i=1; i<CpvAccess(TABLESIZE); i++)
-    if (CpvAccess(persistentSendsTable)[i].used == 0) break;
-  return &CpvAccess(persistentSendsTable)[i];
+  return slot;
 }
 
 PersistentHandle getFreeRecvSlot()
 {
-  PersistentReceivesTable *slot = (PersistentReceivesTable *)CmiAlloc(sizeof(PersistentReceivesTable));
+  PersistentReceivesTable *slot = (PersistentReceivesTable *)malloc(sizeof(PersistentReceivesTable));
   initRecvSlot(slot);
   if (CpvAccess(persistentReceivesTableHead) == NULL) {
     CpvAccess(persistentReceivesTableHead) = CpvAccess(persistentReceivesTableTail) = slot;
@@ -160,7 +163,6 @@ PersistentHandle CmiCreatePersistent(int destPE, int maxBytes)
   h = getFreeSendSlot();
   slot = (PersistentSendsTable *)h;
 
-  slot->used = 1;
   slot->destPE = destPE;
   slot->sizeMax = maxBytes;
 
@@ -218,9 +220,6 @@ static void persistentReqGrantedHandler(void *env)
 
   /* CmiPrintf("[%d] Persistent handler granted  h:%p\n", CmiMyPe(), h); */
 
-  CmiAssert(slot->used == 1);
-
-
   for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
 #if 0
     slot->destAddress[i] = msg->msgAddr[i];
@@ -275,7 +274,6 @@ PersistentHandle CmiRegisterReceivePersistent(PersistentReq recvHand)
   PersistentHandle h = getFreeSendSlot();
 
   PersistentSendsTable *slot = (PersistentSendsTable *)h;
-  slot->used = 1;
   slot->destPE = recvHand.pe;
   slot->sizeMax = recvHand.maxBytes;
 
@@ -323,7 +321,7 @@ void persistentDestoryHandler(void *env)
 
   clearRecvSlot(slot);
 
-  CmiFree(slot);
+  free(slot);
 }
 
 /* FIXME: need to buffer until ReqGranted message come back? */
@@ -342,7 +340,17 @@ void CmiDestoryPersistent(PersistentHandle h)
   CmiSyncSendAndFree(slot->destPE,sizeof(PersistentDestoryMsg),msg);
 
   /* free this slot */
-  initSendSlot(slot);
+  if (slot->prev) {
+    slot->prev->next = slot->next;
+  }
+  else
+    CpvAccess(persistentSendsTableHead) = slot->next;
+  if (slot->next) {
+    slot->next->prev = slot->prev;
+  }
+  else
+    CpvAccess(persistentSendsTableTail) = slot->prev;
+  free(slot);
 
   CpvAccess(persistentSendsTableCount) --;
 }
@@ -350,12 +358,13 @@ void CmiDestoryPersistent(PersistentHandle h)
 
 void CmiDestoryAllPersistent()
 {
-  int i;
-  for (i=0; i<CpvAccess(TABLESIZE); i++) {
-    if (CpvAccess(persistentSendsTable)[i].messageBuf) 
-      CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered unsend message.\n");
-    initSendSlot(&CpvAccess(persistentSendsTable)[i]);
+  PersistentSendsTable *sendslot = CpvAccess(persistentSendsTableHead);
+  while (sendslot) {
+    PersistentSendsTable *next = sendslot->next;
+    free(sendslot);
+    sendslot = next;
   }
+  CpvAccess(persistentSendsTableHead) = CpvAccess(persistentSendsTableTail) = NULL;
   CpvAccess(persistentSendsTableCount) = 0;
 
   PersistentReceivesTable *slot = CpvAccess(persistentReceivesTableHead);
@@ -367,7 +376,7 @@ void CmiDestoryAllPersistent()
         CmiPrintf("Warning: CmiDestoryAllPersistent destoried buffered undelivered message.\n");
       if (slot->destBuf[i].destAddress) PerFree((char*)slot->destBuf[i].destAddress);
     }
-    CmiFree(slot);
+    free(slot);
     slot = next;
   }
   CpvAccess(persistentReceivesTableHead) = CpvAccess(persistentReceivesTableTail) = NULL;
@@ -394,14 +403,9 @@ void CmiPersistentInit()
 
   persist_machine_init();
 
-  CpvInitialize(int, TABLESIZE);
-  CpvAccess(TABLESIZE) = 512;
-
-  CpvInitialize(PersistentSendsTable *, persistentSendsTable);
-  CpvAccess(persistentSendsTable) = (PersistentSendsTable *)malloc(CpvAccess(TABLESIZE) * sizeof(PersistentSendsTable));
-  for (i=0; i<CpvAccess(TABLESIZE); i++) {
-    initSendSlot(&CpvAccess(persistentSendsTable)[i]);
-  }
+  CpvInitialize(PersistentSendsTable *, persistentSendsTableHead);
+  CpvInitialize(PersistentSendsTable *, persistentSendsTableTail);
+  CpvAccess(persistentSendsTableHead) = CpvAccess(persistentSendsTableTail) = NULL;
   CpvInitialize(int, persistentSendsTableCount);
   CpvAccess(persistentSendsTableCount) = 0;
 

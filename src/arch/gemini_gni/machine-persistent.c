@@ -25,7 +25,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
     
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
     if (h==NULL) CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
-    CmiAssert(slot->used == 1);
     CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
         CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);
@@ -242,7 +241,6 @@ void persist_machine_init(void)
 void initSendSlot(PersistentSendsTable *slot)
 {
   int i;
-  slot->used = 0;
   slot->destPE = -1;
   slot->sizeMax = 0;
   slot->destHandle = 0; 
@@ -255,6 +253,7 @@ void initSendSlot(PersistentSendsTable *slot)
   memset(&slot->destBuf, 0, sizeof(PersistentBuf)*PERSIST_BUFFERS_NUM);
   slot->messageBuf = 0;
   slot->messageSize = 0;
+  slot->prev = slot->next = NULL;
 }
 
 void initRecvSlot(PersistentReceivesTable *slot)

@@ -29,7 +29,7 @@ typedef struct _PersistentSendsTable {
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   void *messageBuf;
   int messageSize;
-  char used;
+  struct _PersistentSendsTable *prev, *next;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
