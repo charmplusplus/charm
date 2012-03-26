@@ -616,7 +616,11 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     lb_data[3] = total_load_vec[iteration];
     //lb_data[3] = getLBDB()->ObjDataCount();
     lb_data[4] = idle_time;
-    lb_data[5] = idle_time/total_load_vec[iteration];
+    if (total_load_vec[iteration] == 0.0) {
+      lb_data[5] = idle_time;
+    } else {
+      lb_data[5] = idle_time/total_load_vec[iteration];
+    }
 
     CkPrintf("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
         total_load_vec[iteration], idle_time,
@@ -670,13 +674,15 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 //      return;
 //    }
 
-    adaptive_struct.isCommLB = false;
 
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
       if (max/avg < 1.5) {
         adaptive_struct.isCommLB = true;
         CkPrintf("No load imbalance but idle time\n");
+      } else {
+        adaptive_struct.isCommLB = false;
+        CkPrintf("load imbalance \n");
       }
       adaptive_struct.lb_calculated_period = iteration_n + 1;
       adaptive_struct.lb_period_informed = true;
@@ -695,6 +701,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > period) {
+      adaptive_struct.isCommLB = false;
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
       adaptive_struct.lb_period_informed = true;
