@@ -228,25 +228,29 @@ void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct 
 }
  
 void SdagConstruct::generateConnectEntries(XStr& op){
-   op << "  void " <<connectEntry->charstar() <<'(';
+   op << "  void " <<connectEntry->charstar() << "(";
    ParamList *pl = param;
    XStr msgParams;
    if (pl->isVoid() == 1) {
-     op << "void) {\n"; 
+     op << "void";
    }
    else if (pl->isMessage() == 1){
-     op << pl->getBaseName() <<" *" <<pl->getGivenName() <<") {\n";
+     op << pl->getBaseName() <<" *" <<pl->getGivenName();
    }
    else {
-    op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg) {\n";
+    op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg";
+   }
+   op << ") {\n";
+
+   if (!pl->isVoid() && !pl->isMessage()) {
     msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
     param->beginUnmarshall(msgParams);
    }
+
    op << msgParams.charstar() <<"\n"; 
    op << "  " <<text->charstar() <<"\n";
 
    op << "  }\n";
-   
 }
 
 void SdagConstruct::generateConnectEntryList(TList<SdagConstruct*>& ConnectEList) {
