@@ -54,7 +54,7 @@ static void generateWhenCode(XStr& op, SdagConstruct *cn)
     }
     else if (sv->isVoid == 1)
       // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
-      op <<"    tr->args[" <<iArgs++ <<"] = 0;\n";
+      op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
     else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
       if((i > 0) && (lastWasVoid == 0))
         whenParams.append(", ");
@@ -87,6 +87,7 @@ static void generateWhenCode(XStr& op, SdagConstruct *cn)
   cn->generateTlineEndCall(op);
   cn->generateBeginExec(op, "sdagholder");
 #endif
+  op << "    ";
   cn->generateDummyBeginExecute(op);
 
   op << "        return;\n";

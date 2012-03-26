@@ -1223,7 +1223,7 @@ void SdagConstruct::generateSignature(XStr& op, const char* returnType,
 }
 void SdagConstruct::endMethod(XStr& op)
 {
-  op << "}\n\n";
+  op << "  }\n\n";
 }
 
 void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
