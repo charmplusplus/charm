@@ -163,7 +163,7 @@ public:
       for (i=0;i<n_objs;++i) delete[] parameters[i];
       for (i=0;i<n_objs;++i) {
 	parameters[i] = new double[new_predictor->num_params];
-	model_valid = false;
+	model_valid[i] = false;
       }
     }
   };
