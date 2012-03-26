@@ -23,7 +23,8 @@ module NDMeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     entry void flushDirect();
     entry void finish();
-    entry void associateCallback(CkCallback startCb, CkCallback endCb, 
+    entry void associateCallback(int numContributors, 
+				 CkCallback startCb, CkCallback endCb, 
 				 CProxy_CompletionDetector detector);
   };
 
