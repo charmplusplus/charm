@@ -1267,14 +1267,13 @@ void SdagConstruct::generateAtomic(XStr& op)
 void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
 {
   CStateVar *sv;
-  int isVoid;
-  int count;
-  count = 0;
+  int count = 0;
+
   for(sv=list.begin(); !list.end(); ) {
-    isVoid = sv->isVoid;
-    if ((count != 0) && (isVoid != 1))
-       op << ", ";
     if (sv->isVoid != 1) {
+      if (count != 0)
+        op << ", ";
+
       if (sv->type != 0) 
          op <<sv->type->charstar() <<" ";
       if (sv->byRef != 0)
@@ -1283,9 +1282,10 @@ void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
         op <<"* ";
       if (sv->name != 0)
          op <<sv->name->charstar();
+
+      count++;
     }
-    if (sv->isVoid != 1)
-       count++;
+
     sv = list.next();
   }
 }
