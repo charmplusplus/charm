@@ -524,7 +524,7 @@ void SdagConstruct::generateConnect(XStr& op) {
 
 void SdagConstruct::generateForward(XStr& op) {
   SdagConstruct *cn;
-  generateSignature(op, "void", false, label, stateVars);
+  generateSignature(op, "void", label, false, stateVars);
   for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     op << "    { ";
     generateCall(op, *stateVarsChildren, cn->text->charstar());
