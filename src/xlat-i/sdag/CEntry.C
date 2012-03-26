@@ -230,18 +230,17 @@ void CEntry::generateCode(XStr& op)
        }
      }
      
-     if(refNumNeeded) {
-     // When a reference number is needed and there are parameters that need marshalling 
-     // (in other words the parameters of the entry method are not messages) 
-     // then the first parameter of the entry method is an integer that specifies the 
-     // reference number
-          sv = (CStateVar *)myParameters->begin();
-          op << "   cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) impl_msg1, (void*) _bgParentLog,"<<sv->name->charstar()<<");\n";
-          op << "    tr = __cDep->getTrigger("<<entryNum<<","<<sv->name->charstar()<<");\n"; 
-     } else {
-       op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) impl_msg1, (void*) _bgParentLog, 0);\n";
-       op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
-     }
+     // When a reference number is needed and there are parameters
+     // that need marshalling (in other words the parameters of the
+     // entry method are not messages) then the first parameter of the
+     // entry method is an integer that specifies the reference number
+     const char* refNumArg = refNumNeeded ? myParameters->begin()->name->charstar() : "0";
+
+     op << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
+        << ", (void *) impl_msg1, (void*) _bgParentLog, "
+        << refNumArg <<  ");\n";
+     op << "    tr = __cDep->getTrigger(" << entryNum << ", "
+        << refNumArg << ");\n";
    }
 
   op << "    if (tr == 0)\n";
