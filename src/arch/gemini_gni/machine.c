@@ -254,23 +254,23 @@ uint8_t   onesided_hnd, omdh;
     } while (0)
 #endif
 
-#define   GetMempoolBlockPtr(x)  (((mempool_header*)((char*)(x)-ALIGNBUF))->block_ptr)
-#define   GetMempoolPtr(x)        GetMempoolBlockPtr(x)->mptr
-#define   GetMempoolsize(x)       GetMempoolBlockPtr(x)->size
-#define   GetMemHndl(x)           GetMempoolBlockPtr(x)->mem_hndl
-#define   IncreaseMsgInRecv(x)    (GetMempoolBlockPtr(x)->msgs_in_recv)++
-#define   DecreaseMsgInRecv(x)    (GetMempoolBlockPtr(x)->msgs_in_recv)--
-#define   IncreaseMsgInSend(x)    (GetMempoolBlockPtr(x)->msgs_in_send)++
-#define   DecreaseMsgInSend(x)    (GetMempoolBlockPtr(x)->msgs_in_send)--
-#define   NoMsgInSend(x)          GetMempoolBlockPtr(x)->msgs_in_send == 0
-#define   NoMsgInRecv(x)          GetMempoolBlockPtr(x)->msgs_in_recv == 0
-#define   NoMsgInFlight(x)        (GetMempoolBlockPtr(x)->msgs_in_send + GetMempoolBlockPtr(x)->msgs_in_recv  == 0)
+#define   GetMempoolBlockPtr(x)   MEMPOOL_GetBlockPtr(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   GetMempoolPtr(x)        MEMPOOL_GetMempoolPtr(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   GetMempoolsize(x)       MEMPOOL_GetSize(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   GetMemHndl(x)           MEMPOOL_GetMemHndl(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   IncreaseMsgInRecv(x)    MEMPOOL_IncMsgInRecv(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   DecreaseMsgInRecv(x)    MEMPOOL_DecMsgInRecv(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   IncreaseMsgInSend(x)    MEMPOOL_IncMsgInSend(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   DecreaseMsgInSend(x)    MEMPOOL_DecMsgInSend(MEMPOOL_GetMempoolHeader(x,ALIGNBUF))
+#define   NoMsgInSend(x)          MEMPOOL_GetMsgInSend(MEMPOOL_GetMempoolHeader(x,ALIGNBUF)) == 0
+#define   NoMsgInRecv(x)          MEMPOOL_GetMsgInRecv(MEMPOOL_GetMempoolHeader(x,ALIGNBUF)) == 0
+#define   NoMsgInFlight(x)        (NoMsgInSend(x) && NoMsgInRecv(x))
 #define   IsMemHndlZero(x)        ((x).qword1 == 0 && (x).qword2 == 0)
 #define   SetMemHndlZero(x)       do {(x).qword1 = 0;(x).qword2 = 0;} while (0)
-#define   NotRegistered(x)        IsMemHndlZero(((block_header*)x)->mem_hndl)
+#define   NotRegistered(x)        IsMemHndlZero(GetMemHndl(x))
 
-#define   GetMemHndlFromBlockHeader(x) ((block_header*)x)->mem_hndl
-#define   GetSizeFromBlockHeader(x)    ((block_header*)x)->size
+#define   GetMemHndlFromBlockHeader(x) MEMPOOL_GetBlockMemHndl(x)
+#define   GetSizeFromBlockHeader(x)    MEMPOOL_GetBlockSize(x)
 
 #define CmiGetMsgSize(m)     ((CmiMsgHeaderExt*)m)->size
 #define CmiSetMsgSize(m,s)   ((((CmiMsgHeaderExt*)m)->size)=(s))

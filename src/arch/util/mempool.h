@@ -20,6 +20,29 @@ typedef void (* mempool_freeblock)(void *ptr, mem_handle_t mem_hndl);
 
 #define cutOffNum 25 
 
+//given x as mptr get
+#define   MEMPOOL_GetBlockHead(x)   (block_header*)&(x->block_head)	
+//given x as block header, get ...
+#define   MEMPOOL_GetBlockSize(x)    (((block_header*)x)->size)
+#define   MEMPOOL_GetBlockMemHndl(x) (((block_header*)x)->mem_hndl)
+#define   MEMPOOL_GetBlockNext(x)    (((block_header*)x)->block_next)     
+//given x as user pointer, get mempool_header/slot_header
+#define   MEMPOOL_GetMempoolHeader(x,align) \
+                                  ((mempool_header*)((char*)(x)-align))
+//given x as mempool_header/slot_header, get ...
+#define   MEMPOOL_GetBlockPtr(x)    ((block_header*)(x->block_ptr))
+#define   MEMPOOL_GetMempoolPtr(x)  ((mempool_type*)(MEMPOOL_GetBlockPtr(x)->mptr))
+#define   MEMPOOL_GetSize(x)      (MEMPOOL_GetBlockPtr(x)->size)
+#define   MEMPOOL_GetMemHndl(x)   (MEMPOOL_GetBlockPtr(x)->mem_hndl)
+#define   MEMPOOL_GetMsgInRecv(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_recv)
+#define   MEMPOOL_GetMsgInSend(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_send)
+#define   MEMPOOL_IncMsgInRecv(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_recv)++
+#define   MEMPOOL_DecMsgInRecv(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_recv)--
+#define   MEMPOOL_IncMsgInSend(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_send)++
+#define   MEMPOOL_DecMsgInSend(x) (MEMPOOL_GetBlockPtr(x)->msgs_in_send)--
+#define   MEMPOOL_GetSlotGNext(x)     (x->gnext)
+#define   MEMPOOL_GetSlotStatus(x)    (x->status)
+#define	  MEMPOOL_GetSlotSize(x)      (cutOffPoints[x->size])
 struct block_header;
 struct mempool_type;
 
