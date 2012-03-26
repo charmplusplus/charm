@@ -32,7 +32,7 @@
 // We want to wrap entries around, and because mod operator % 
 // sometimes misbehaves on negative values. -1 maps to the highest value.
 #define wrap_y(a)  (((a)+num_chares)%num_chares)
-#define index(a,b) ((a) + (b)*(blockDimX+2))
+#define index(a,b) ((b) + (a)*(arrayDimY))
 
 #define MAX_ITER	100
 #define WARM_ITER	5
@@ -87,8 +87,12 @@ class Main : public CBase_Main
       double error = *((double *)msg->getData());
 
       if(iterations < MAX_ITER) {
-        CkPrintf("Start of iteration %d\n", iterations);
-        array.begin_iteration();
+        if (iterations % LBPERIOD == 0) {
+          array.pause_for_lb();
+        } else {
+          CkPrintf("Start of iteration %d\n", iterations);
+          array.begin_iteration();
+        }
       } else {
         CkPrintf("Completed %d iterations\n", MAX_ITER-1);
         endTime = CmiWallTimer();
@@ -108,7 +112,6 @@ class Jacobi: public CBase_Jacobi {
     double *new_temperature;
     void *sendLogs[4];
     void *ackLogs[5];
-    int iterations;
     int work;
 
     // Constructor, initialize values
@@ -131,7 +134,6 @@ class Jacobi: public CBase_Jacobi {
 
       arrived_top = 0;
       arrived_bottom = 0;
-      iterations = 0;
 
       //work = thisIndex;
       work = 1;
@@ -155,10 +157,11 @@ class Jacobi: public CBase_Jacobi {
         temperature = new double[(blockDimX+2) * arrayDimY];
         new_temperature = new double[(blockDimX+2) * arrayDimY];
       }
+      p|arrived_top;
+      p|arrived_bottom;
       p(temperature, (blockDimX+2) * arrayDimY);
       p(new_temperature, (blockDimX+2) * arrayDimY);
 
-      p|iterations;
       p|work;
     }
 
@@ -170,16 +173,10 @@ class Jacobi: public CBase_Jacobi {
 
     // Perform one iteration of work
     void begin_iteration(void) {
-      if (iterations % LBPERIOD == 0) {
-        AtSync();
-        return;
-      }
-
       // Send my top edge
       thisProxy(wrap_y(thisIndex)).receiveGhosts(BOTTOM, arrayDimY, &temperature[index(1, 1)]);
       // Send my bottom edge
       thisProxy(wrap_y(thisIndex)).receiveGhosts(TOP, arrayDimY, &temperature[index(blockDimX,1)]);
-      iterations++;
     }
 
     void receiveGhosts(int dir, int size, double gh[]) {
@@ -188,18 +185,22 @@ class Jacobi: public CBase_Jacobi {
       switch(dir) {
         case TOP:
           arrived_top++;
-          for(j=0; j<size; j++)
+          for(j=0; j<(size-1); j++)
             temperature[index(0,j+1)] = gh[j];
           break;
         case BOTTOM:
           arrived_bottom++;
-          for(j=0; j<size; j++)
+          for(j=0; j<(size-1); j++)
             temperature[index(blockDimX+1,j+1)] = gh[j];
           break;
         default:
           CkAbort("ERROR\n");
       }
       check_and_compute();
+    }
+
+    void pause_for_lb() {
+      AtSync();
     }
 
     void check_and_compute() {
@@ -232,8 +233,7 @@ class Jacobi: public CBase_Jacobi {
         contribute(sizeof(double), &max_error, CkReduction::max_double,
             CkCallback(CkIndex_Main::report(NULL), mainProxy));
       }
-    }
-
+    } 
     // Check to see if we have received all neighbor values yet
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel()
