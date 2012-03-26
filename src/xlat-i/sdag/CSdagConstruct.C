@@ -1264,32 +1264,6 @@ void SdagConstruct::generateAtomic(XStr& op)
   op << "  }\n\n";
 }
 
-void SdagConstruct::generatePrototype(XStr& op, ParamList *list)
-{
-   ParamList *pl = list;
-   int count = 0;
-
-   if (pl->isVoid() == 1) {
-     op << "void"; 
-   }
-   else {
-     while(pl != NULL) {
-       if (count > 0)
-          op <<", ";
-       op << pl->param->getType();
-
-       if (pl->isReference())
-         op << "&";
-
-       op << pl->getGivenName();
-
-       pl = pl->next;
-       count++;
-     }
-   }
-}
-
-
 void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
 {
   CStateVar *sv;
