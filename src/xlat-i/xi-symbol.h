@@ -1232,8 +1232,11 @@ private:
   void generateAtomic(XStr& op);
   void generateForward(XStr& op);
   void generateConnect(XStr& op);
-  void generatePrototype(XStr& op, TList<CStateVar*>&);
-  void generateCall(XStr& op, TList<CStateVar*>&,
+  void generateSignature(XStr& op, const char* returnType,
+                         const XStr* name, bool isEnd,
+                         TList<CStateVar*>* params);
+  void endMethod(XStr& op);
+  void generateCall(XStr& op, TList<CStateVar*>& args,
                     const char* name, const char* nameSuffix = 0);
 
   void generateTraceBeginCall(XStr& op);          // for trace

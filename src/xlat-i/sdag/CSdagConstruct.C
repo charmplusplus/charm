@@ -515,30 +515,26 @@ void SdagConstruct::generateConnect(XStr& op) {
   }
   op << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
 
-  op << "  }\n\n";  
+  endMethod(op);
 }
 
 void SdagConstruct::generateForward(XStr& op) {
   SdagConstruct *cn;
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "void", false, label, stateVars);
   for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     op << "    { ";
     generateCall(op, *stateVarsChildren, cn->text->charstar());
     op<<" }\n";
   }
   generateCall(op, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "  }\n\n";
+  endMethod(op);
 }
 
 
 void SdagConstruct::generateWhen(XStr& op)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  op << "  int " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "int", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
@@ -853,22 +849,17 @@ void SdagConstruct::generateWhen(XStr& op)
   op << "       return 0;\n";
   op << "    }\n";
 
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 
-  // end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SWHEN_END);
 #endif
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   
@@ -883,17 +874,12 @@ void SdagConstruct::generateWhen(XStr& op)
     el = el->next;
   }
 
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateWhile(XStr& op)
 {
-  // inlined start function
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
-  // actual code here 
+  generateSignature(op, "void", label, false, stateVars);
   op << "    if (" << con1->text->charstar() << ") {\n";
   op << "      ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
@@ -901,13 +887,9 @@ void SdagConstruct::generateWhile(XStr& op)
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
-  // end actual code
-  op << "  }\n\n";
-  // inlined end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
-  // actual code here 
+  endMethod(op);
+
+  generateSignature(op, "void", label, true, stateVarsChildren);
   op << "    if (" << con1->text->charstar() << ") {\n";
   op << "      ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
@@ -915,19 +897,15 @@ void SdagConstruct::generateWhile(XStr& op)
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateFor(XStr& op)
 {
-  // inlined start function
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+
+  generateSignature(op, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
-  // actual code here 
   generateBeginTime(op);
 #endif
   op << "    " << con1->text->charstar() << ";\n";
@@ -942,19 +920,16 @@ void SdagConstruct::generateFor(XStr& op)
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
-  // end actual code
-  op << "  }\n";
-  // inlined end function
+  endMethod(op);
+
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
 #endif
-  // actual code here 
   op << "   " << con3->text->charstar() << ";\n";
   op << "    if (" << con2->text->charstar() << ") {\n";
   op << "      ";
@@ -966,22 +941,17 @@ void SdagConstruct::generateFor(XStr& op)
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << "    }\n";
-  // end actual code
-  op << "  }\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateIf(XStr& op)
 {
-  // inlined start function
   strcpy(nameStr,label->charstar());
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF);
 #endif
-  // actual code here 
   op << "    if (" << con1->text->charstar() << ") {\n";
   op << "      ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
@@ -993,65 +963,47 @@ void SdagConstruct::generateIf(XStr& op)
     generateCall(op, *stateVarsChildren, label->charstar(), "_end");
   }
   op << "    }\n";
-  // end actual code
-  op << "  }\n\n";
-  // inlined end function
+  endMethod(op);
+
   strcpy(nameStr,label->charstar());
   strcat(nameStr,"_end");
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SIF_END);
 #endif
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateElse(XStr& op)
 {
-  // inlined start function
   strcpy(nameStr,label->charstar());
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "void", label, false, stateVars);
   // trace
   generateBeginTime(op);
   generateEventBracket(op,SELSE);
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  // end actual code
-  op << "  }\n\n";
-  // inlined end function
+  endMethod(op);
+
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SELSE_END);
 #endif
-  // actual code here 
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateForall(XStr& op)
 {
-  // inlined start function
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
-  // actual code here 
+  generateSignature(op, "void", label, false, stateVars);
   op << "    int __first = (" << con2->text->charstar() <<
         "), __last = (" << con3->text->charstar() << 
         "), __stride = (" << con4->text->charstar() << ");\n";
@@ -1067,30 +1019,22 @@ void SdagConstruct::generateForall(XStr& op)
   op << "      ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
   op << "    }\n";
-  // end actual code
-  op << "  }\n\n";
-  // inlined end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
-  // actual code here 
+  endMethod(op);
+
+  generateSignature(op, "void", label, true, stateVarsChildren);
   op << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
   op << "    if (" << counter->charstar() << "->isDone()) {\n";
   op << "      delete " << counter->charstar() << ";\n";
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  // end actual code
-  op << "    }\n  }\n\n";
+  op << "    }\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateOlist(XStr& op)
 {
   SdagConstruct *cn;
-  // inlined start function
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
-  // actual code here 
+  generateSignature(op, "void", label, false, stateVars);
   op << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
         constructs->length() << ");\n";
   for(cn=constructs->begin(); 
@@ -1098,8 +1042,7 @@ void SdagConstruct::generateOlist(XStr& op)
     op << "    ";
     generateCall(op, *stateVarsChildren, cn->label->charstar());
   }
-  // end actual code
-  op << "  }\n";
+  endMethod(op);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
@@ -1107,15 +1050,11 @@ void SdagConstruct::generateOlist(XStr& op)
   op << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
 #endif
 
-  // inlined end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   op << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
-  // actual code here 
   //Accumulate all the bgParent pointers that the calling when_end functions give
   op << "    " << counter->charstar() << "->decrement();\n";
  
@@ -1139,75 +1078,54 @@ void SdagConstruct::generateOlist(XStr& op)
 
   op << "      ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  // end actual code
   op << "    }\n";
-  op << "  }\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateOverlap(XStr& op)
 {
-  // inlined start function
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP);
 #endif
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  // end actual code
-  op << "  }\n";
+  endMethod(op);
+
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  // inlined end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren);
-  op << ") {\n";
+  generateSignature(op, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(op);
   generateEventBracket(op,SOVERLAP_END);
 #endif
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   op << ");\n";
-  // end actual code
-  op << "  }\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateSlist(XStr& op)
 {
-  // inlined start function
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
-  // actual code here 
+  generateSignature(op, "void", label, false, stateVars);
   op << "    ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  // end actual code
-  op << "  }\n";
-  // inlined end function
-  op << "  void " << label->charstar() << "_end(";
-  generatePrototype(op, *stateVarsChildren); 
-  op << ") {\n";
-  // actual code here 
+  endMethod(op);
+
+  generateSignature(op, "void", label, true, stateVarsChildren);
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  // end actual code
-  op << "  }\n";
+  endMethod(op);
 }
 
 void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
 {
   // header file
   op << "public:\n";
-  op << "  void " << con1->text->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+  generateSignature(op, "void", con1->text, false, stateVars);
   SdagConstruct *sc;
   SdagConstruct *sc1;
   for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
@@ -1218,9 +1136,9 @@ void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
 #if CMK_BIGSIM_CHARM
   generateEndSeq(op);
 #endif
-  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateTraceEndCall(op);
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor())
+    generateTraceEndCall(op);
 
-  // actual code here 
   op << "    ";
   generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
 
@@ -1230,46 +1148,54 @@ void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
 #endif
   if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateDummyBeginExecute(op);
 
-  // end actual code
-  op << "  }\n\n";
+  endMethod(op);
+
   op << "private:\n";
-  op << "  void " << con1->text->charstar() << "_end(";
+  generateSignature(op, "void", con1->text, true,
 #if CMK_BIGSIM_CHARM
-  generatePrototype(op, *stateVarsChildren);
+  stateVarsChildren
 #else
-  generatePrototype(op, *stateVars);
+  stateVars
 #endif
-  op << ") {\n";
-  op << "  }\n\n";
+);
+  endMethod(op);
 }
 
 void SdagConstruct::generateAtomic(XStr& op)
-{ 
-  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  op << "  void " << label->charstar() << "(";
-  generatePrototype(op, *stateVars);
-  op << ") {\n";
+{
+  generateSignature(op, "void", label, false, stateVars);
+
 #if CMK_BIGSIM_CHARM
+  sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   generateBeginExec(op, nameStr);
 #endif
   generateTraceBeginCall(op);
+
   op << "    " << text->charstar() << "\n";
-  // trace
+
   generateTraceEndCall(op);
 #if CMK_BIGSIM_CHARM
   generateEndExec(op);
 #endif
+
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "  }\n\n";
+  endMethod(op);
 }
 
-void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
+void SdagConstruct::generateSignature(XStr& op, const char* returnType,
+                                      const XStr* name, bool isEnd,
+                                      TList<CStateVar*>* params)
 {
+  op << "  " << returnType << " " << name;
+  if (isEnd)
+    op << "_end";
+  op << "(";
+
   CStateVar *sv;
   int count = 0;
 
-  for(sv=list.begin(); !list.end(); ) {
+  for (sv = params->begin(); !params->end(); ) {
     if (sv->isVoid != 1) {
       if (count != 0)
         op << ", ";
@@ -1286,8 +1212,14 @@ void SdagConstruct::generatePrototype(XStr& op, TList<CStateVar*>& list)
       count++;
     }
 
-    sv = list.next();
+    sv = params->next();
   }
+
+  op << ") {\n";
+}
+void SdagConstruct::endMethod(XStr& op)
+{
+  op << "}\n\n";
 }
 
 void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
