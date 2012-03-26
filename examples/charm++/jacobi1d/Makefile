@@ -1,4 +1,5 @@
-OPTS	= -g
+OPTS	= -O3
+#CHARMC	= $(HOME)/charm/bin/charmc $(OPTS)
 CHARMC	= ../../../bin/charmc $(OPTS)
 
 OBJS = jacobi1d.o
@@ -6,7 +7,7 @@ OBJS = jacobi1d.o
 all: jacobi1d
 
 jacobi1d: $(OBJS)
-	$(CHARMC) -language charm++ -o jacobi1d $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -o jacobi1d  $(OBJS)
 
 proj: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -o jacobi1d.prj $(OBJS)
