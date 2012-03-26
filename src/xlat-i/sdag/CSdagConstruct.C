@@ -501,7 +501,7 @@ void SdagConstruct::generateCode(XStr& op, Entry *entry)
 }
 
 void SdagConstruct::generateConnect(XStr& op) {
-  op << "  void " << label->charstar() << "() {\n";
+  generateSignature(op, "void", label, false, NULL);
   op << "    int index;\n";
   if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
      op << "    CkMarshallMsg *x;\n";  
@@ -1196,27 +1196,28 @@ void SdagConstruct::generateSignature(XStr& op, const char* returnType,
     op << "_end";
   op << "(";
 
-  CStateVar *sv;
-  int count = 0;
+  if (params) {
+    CStateVar *sv;
+    int count = 0;
+    for (sv = params->begin(); !params->end(); ) {
+      if (sv->isVoid != 1) {
+        if (count != 0)
+          op << ", ";
 
-  for (sv = params->begin(); !params->end(); ) {
-    if (sv->isVoid != 1) {
-      if (count != 0)
-        op << ", ";
+        if (sv->type != 0) 
+          op <<sv->type->charstar() <<" ";
+        if (sv->byRef != 0)
+          op <<" &";
+        if (sv->arrayLength != NULL) 
+          op <<"* ";
+        if (sv->name != 0)
+          op <<sv->name->charstar();
 
-      if (sv->type != 0) 
-         op <<sv->type->charstar() <<" ";
-      if (sv->byRef != 0)
-         op <<" &";
-      if (sv->arrayLength != NULL) 
-        op <<"* ";
-      if (sv->name != 0)
-         op <<sv->name->charstar();
+        count++;
+      }
 
-      count++;
+      sv = params->next();
     }
-
-    sv = params->next();
   }
 
   op << ") {\n";
