@@ -12,7 +12,7 @@ CreateLBFunc_Def(RefineLB, "Move objects away from overloaded processor to reach
 RefineLB::RefineLB(const CkLBOptions &opt): CentralLB(opt)
 {
   lbname = (char *)"RefineLB";
-  if (CkMyPe() == 0)
+//  if (CkMyPe() == 0)
     CkPrintf("[%d] RefineLB created\n",CkMyPe());
 }
 
@@ -50,6 +50,12 @@ void RefineLB::work(LDStats* stats)
 	stats->to_proc[obj] = to_procs[obj];
       }
   }
+
+  stats->is_prev_lb_refine = 1;
+  stats->after_lb_avg = refiner.computeAverageLoad();
+  stats->after_lb_max = refiner.computeMax();
+
+  CkPrintf("RefineLB> Max load %lf Avg load %lf\n", stats->after_lb_max, stats->after_lb_avg);
 
   // Free the refine buffers
   Refiner::FreeProcs(from_procs);

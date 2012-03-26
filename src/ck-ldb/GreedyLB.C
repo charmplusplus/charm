@@ -58,6 +58,7 @@ void GreedyLB::work(LDStats* stats)
   int *map = new int[n_pes];
 
   ProcArray *parr = new ProcArray(stats);
+  double bg_load = 0.0;
 
   std::vector<ProcInfo>  procs;
   for(pe = 0; pe < n_pes; pe++) {
@@ -65,6 +66,7 @@ void GreedyLB::work(LDStats* stats)
     if (stats->procs[pe].available) {
       map[pe] = procs.size();
       procs.push_back(ProcInfo(pe, stats->procs[pe].bg_walltime, 0.0, stats->procs[pe].pe_speed, true));
+      bg_load = stats->procs[pe].bg_walltime;
     }
   }
 
@@ -96,7 +98,7 @@ void GreedyLB::work(LDStats* stats)
     }
     avg_load += parr->procs[pe].totalLoad();
   }
-  CkPrintf("Before GreedyLB max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
+  CkPrintf("Before GreedyLB max load: %lf avg load: %lf bg load: %lf\n", max_load, avg_load/procs.size(), bg_load/procs.size());
 
   // build object array
   std::vector<Vertex> objs;
@@ -160,7 +162,7 @@ void GreedyLB::work(LDStats* stats)
     }
     avg_load += procs[pe].totalLoad();
   }
-  CkPrintf("GreedyLB max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
+  CkPrintf("GreedyLB> After lb max load: %lf avg load: %lf\n", max_load, avg_load/procs.size());
 
   if (_lb_args.debug()>1)  {
     CkPrintf("CharmLB> Min obj: %f  Max obj: %f\n", objs[objs.size()-1].getVertexLoad(), objs[0].getVertexLoad());
@@ -173,6 +175,10 @@ void GreedyLB::work(LDStats* stats)
       CkPrintf("%f (%f)  ", procs[pe].totalLoad(), procs[pe].overhead());
     CkPrintf("\n");
   }
+
+  stats->after_lb_max = max_load;
+  stats->after_lb_avg = avg_load/procs.size();
+  stats->is_prev_lb_refine = 0;
 
 }
 

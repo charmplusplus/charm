@@ -369,6 +369,17 @@ public:
   int getPredictedLBPeriod();
 
   bool isStrategyRefine();
+  void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg) {
+    is_prev_lb_refine = is_lb_refine;
+    after_lb_avg = lb_avg;
+    after_lb_max = lb_max;
+  }
+
+  void GetPrevLBData(int& is_lb_refine, double& lb_max, double& lb_avg) {
+    is_lb_refine = is_prev_lb_refine;
+    lb_max = after_lb_max;
+    lb_avg = after_lb_avg;
+  }
 
 private:
   //CProxy_LBDatabase thisProxy;
@@ -381,7 +392,13 @@ private:
   std::vector<double> max_load_vec;
   std::vector<double> total_load_vec;
   std::vector<double> total_contrib_vec;
+  std::vector<int> total_msg_vec;
+  std::vector<int> total_bytes_vec;
   int max_iteration;
+
+  double after_lb_max;
+  double after_lb_avg;
+  int is_prev_lb_refine;
 
 public:
   BaseLB** getLoadBalancers() {return loadbalancers.getVec();}

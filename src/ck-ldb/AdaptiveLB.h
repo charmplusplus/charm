@@ -29,7 +29,7 @@ private:
 //  CProxy_CentralLB thisProxy;
   CentralLB *greedyLB;
   CentralLB *refineLB;
-  CentralLB *scotchLB;
+  CentralLB *metisLB;
 };
 
 #endif /* CENTRAL_ADAPTIVE_LB_H */

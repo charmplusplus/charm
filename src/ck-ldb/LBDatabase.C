@@ -21,6 +21,8 @@ struct AdaptiveData {
   int iteration;
   double max_load;
   double avg_load;
+  double max_idle_time;
+  double idle_time;
 };
 
 struct AdaptiveLBDatabase {
@@ -41,29 +43,34 @@ struct AdaptiveLBStructure {
   bool isRefine;
   int lb_msg_send_no;
   int lb_msg_recv_no;
+  int total_syncs_called;
 } adaptive_struct;
 
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
-  double lb_data[4];
-  lb_data[0] = 0;
-  lb_data[1] = 0;
-  lb_data[2] = 0;
+  double lb_data[6];
+  lb_data[1] = 0.0;
+  lb_data[2] = 0.0;
+  lb_data[3] = 0.0;
+  lb_data[4] = 0.0;
+  lb_data[5] = 0.0;
   for (int i = 0; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == 4*sizeof(double));
     double* m = (double *)msgs[i]->getData();
-    lb_data[0] += m[0];
-    lb_data[1] = ((m[1] > lb_data[1])? m[1] : lb_data[1]);
-    lb_data[2] += m[2];
+    lb_data[1] += m[1];
+    lb_data[2] = ((m[2] > lb_data[2])? m[2] : lb_data[2]);
+    lb_data[3] += m[3];
+    lb_data[4] = ((m[4] > lb_data[4]) ? m[4] : lb_data[4]);
+    lb_data[5] += m[5];
     if (i == 0) {
-      lb_data[3] = m[3];
+      lb_data[0] = m[0];
     }
-    if (m[3] != lb_data[3]) {
+    if (m[0] != lb_data[0]) {
       CkPrintf("Error!!! Reduction is intermingled between iteration %lf and\
-      %lf\n", lb_data[3], m[3]);
+      %lf\n", lb_data[0], m[0]);
     }
   }
-  return CkReductionMsg::buildNew(4*sizeof(double), lb_data);
+  return CkReductionMsg::buildNew(6*sizeof(double), lb_data);
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
@@ -403,9 +410,9 @@ void LBDatabase::init(void)
   if (manualOn) TurnManualLBOn();
 #endif
   
-  max_load_vec.resize(100, 0);
-  total_load_vec.resize(100, 0);
-  total_contrib_vec.resize(100, 0);
+  max_load_vec.resize(100, 0.0);
+  total_load_vec.resize(100, 0.0);
+  total_contrib_vec.resize(100, 0.0);
   max_iteration = -1;
 
   // If metabalancer enabled, initialize the variables
@@ -420,7 +427,9 @@ void LBDatabase::init(void)
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
   adaptive_struct.lb_msg_recv_no = 0;
+  adaptive_struct.total_syncs_called = 0;
 
+  is_prev_lb_refine = -1;
 }
 
 LBDatabase::LastLBInfo::LastLBInfo()
@@ -551,6 +560,8 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
 void LBDatabase::ResumeClients() {
   // If metabalancer enabled, initialize the variables
+  adaptive_lbdb.history_data.clear();
+
   adaptive_struct.lb_ideal_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
@@ -562,6 +573,7 @@ void LBDatabase::ResumeClients() {
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
   adaptive_struct.lb_msg_recv_no = 0;
+  adaptive_struct.total_syncs_called = 0;
   
   max_load_vec.clear();
   total_load_vec.clear();
@@ -576,6 +588,7 @@ void LBDatabase::ResumeClients() {
 
 bool LBDatabase::AddLoad(int iteration, double load) {
   total_contrib_vec[iteration]++;
+  adaptive_struct.total_syncs_called++;
   //CkPrintf("At PE %d Total contribution for iteration %d is %lf total objs %d\n", CkMyPe(), iteration,
   //total_contrib_vec[iteration], getLBDB()->ObjDataCount());
 
@@ -587,25 +600,37 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     max_load_vec[iteration] = load;
   }
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
-    double lb_data[4];
-    lb_data[0] = total_load_vec[iteration];
-    lb_data[1] = max_load_vec[iteration];
-    lb_data[2] = getLBDB()->ObjDataCount();
-    lb_data[3] = iteration;
-    //CkPrintf("[%d] sends total load %lf at iter %d\n", CkMyPe(), total_load_vec[iteration], adaptive_struct.lb_no_iterations);
+    double idle_time;
+    double tmp;
+    GetTime(&tmp, &tmp, &idle_time, &tmp, &tmp);
+    idle_time = idle_time * iteration * getLBDB()->ObjDataCount() /
+      adaptive_struct.total_syncs_called;
+
+    double lb_data[6];
+    lb_data[0] = iteration;
+    lb_data[1] = total_load_vec[iteration];
+    lb_data[2] = max_load_vec[iteration];
+    lb_data[3] = getLBDB()->ObjDataCount();
+    lb_data[4] = idle_time;
+    lb_data[5] = idle_time;
+
+    CkPrintf("[%d] sends total load %lf idle time %lf at iter %d\n", CkMyPe(),
+        total_load_vec[iteration], idle_time, adaptive_struct.lb_no_iterations);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-    contribute(4*sizeof(double), lb_data, lbDataCollectionType, cb);
+    contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
   return true;
 }
 
 void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double* load = (double *) msg->getData();
-  double max = load[1];
-  double avg = load[0]/load[2];
-  int iteration_n = load[3];
-  CkPrintf("** [%d] Iteration Total load : %lf Avg load: %lf Max load: %lf for %lf procs\n",iteration_n, load[0], load[0]/load[2], load[1], load[2]);
+  double max = load[2];
+  double avg = load[1]/load[3];
+  double max_idle = load[5];
+  double avg_idle = load[4]/load[3];
+  int iteration_n = load[0];
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle, load[3]);
   delete msg;
  
   // Store the data for this iteration
@@ -614,6 +639,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   data.iteration = adaptive_struct.lb_no_iterations;
   data.max_load = max;
   data.avg_load = avg;
+  data.max_idle_time = max_idle;
+  data.idle_time = avg_idle;
   adaptive_lbdb.history_data.push_back(data);
 
   // If lb period inform is in progress, dont inform again
@@ -628,8 +655,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if (max/avg >= 1.5 && adaptive_lbdb.history_data.size() > 4) {
-    CkPrintf("Carry out load balancing step at iter max/avg(%lf) > 1.1\n", max/avg);
+  if ((avg_idle >= 0.1*avg || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and avg_idle/avg_load (%lf)\n", max/avg, avg_idle/avg);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
 //      adaptive_struct.lb_calculated_period = 40;
@@ -698,33 +725,37 @@ bool LBDatabase::generatePlan(int& period) {
   // If we can attain perfect balance, then the new load is close to the
   // average. Hence we pass 1, else pass in some other value which would be the
   // new max_load after load balancing.
-  int refine_period, scratch_period;
-  bool obtained_refine, obtained_scratch;
-  obtained_refine = getPeriodForStrategy(1, 1, refine_period);
-  obtained_scratch = getPeriodForStrategy(1, 1, scratch_period);
 
-  if (obtained_refine) {
-    if (!obtained_scratch) {
-      period = refine_period;
-      adaptive_struct.isRefine = true;
-      return true;
-    }
-    if (scratch_period < 1.1*refine_period) {
-      adaptive_struct.isRefine = false;
-      period = scratch_period;
-      return true;
-    }
-    period = refine_period;
-    adaptive_struct.isRefine = true;
-    return true;
-  }
 
-  if (obtained_scratch) {
-    period = scratch_period;
-    adaptive_struct.isRefine = false;
-    return true;
-  }
-  return false;
+  return getPeriodForStrategy(1, 1, period);
+
+//  int refine_period, scratch_period;
+//  bool obtained_refine, obtained_scratch;
+//  obtained_refine = getPeriodForStrategy(1, 1, refine_period);
+//  obtained_scratch = getPeriodForStrategy(1, 1, scratch_period);
+//
+//  if (obtained_refine) {
+//    if (!obtained_scratch) {
+//      period = refine_period;
+//      adaptive_struct.isRefine = true;
+//      return true;
+//    }
+//    if (scratch_period < 1.1*refine_period) {
+//      adaptive_struct.isRefine = false;
+//      period = scratch_period;
+//      return true;
+//    }
+//    period = refine_period;
+//    adaptive_struct.isRefine = true;
+//    return true;
+//  }
+//
+//  if (obtained_scratch) {
+//    period = scratch_period;
+//    adaptive_struct.isRefine = false;
+//    return true;
+//  }
+//  return false;
 }
 
 bool LBDatabase::getPeriodForStrategy(double new_load_percent, double overhead_percent, int& period) {

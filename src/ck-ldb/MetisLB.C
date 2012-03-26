@@ -10,9 +10,11 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
-#include "metis.h"
+//#include "metis.h"
 
-/*extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
+typedef int idxtype;
+
+extern "C" void METIS_PartGraphRecursive(int*, int*, int*, int*, int*,
 			      int*, int*, int*, int*, int*, int*);
 extern "C" void METIS_PartGraphKway(int*, int*, int*, int*, int*,
                               int*, int*, int*, int*, int*, int*);
@@ -31,7 +33,7 @@ extern "C" void METIS_mCPartGraphRecursive(int*, int*, int*, int*, int*, int*,
 			      int*, int*, int*, int*, int*, int*);
 extern "C" void METIS_mCPartGraphKway(int*, int*, int*, int*, int*, int*,
                               int*, int*, int*, int*, int*, int*, int*);
-*/
+
 
 CreateLBFunc_Def(MetisLB, "Use Metis(tm) to partition object graph")
 
@@ -170,6 +172,9 @@ void MetisLB::work(LDStats* stats)
     if(pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
+  stats->is_prev_lb_refine = 3;
+  stats->after_lb_max = 0;
+  stats->after_lb_avg = 0;
 
   delete[] pemap;
 
