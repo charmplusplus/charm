@@ -7,7 +7,7 @@ OBJS = jacobi1d.o
 all: jacobi1d
 
 jacobi1d: $(OBJS)
-	$(CHARMC) -language charm++ -module CommonLBs -o jacobi1d  $(OBJS)
+	$(CHARMC) -language charm++ -module CommonLBs -module AdaptiveLB -module MetisLB -o jacobi1d  $(OBJS)
 
 proj: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -o jacobi1d.prj $(OBJS)

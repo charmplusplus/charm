@@ -34,7 +34,7 @@
 #define wrap_y(a)  (((a)+num_chares)%num_chares)
 #define index(a,b) ((a) + (b)*(blockDimX+2))
 
-#define MAX_ITER	26
+#define MAX_ITER	100
 #define WARM_ITER	5
 #define TOP		1
 #define BOTTOM		2
@@ -133,7 +133,8 @@ class Jacobi: public CBase_Jacobi {
       arrived_bottom = 0;
       iterations = 0;
 
-      work = thisIndex;
+      //work = thisIndex;
+      work = 1;
       constrainBC();
     }
 

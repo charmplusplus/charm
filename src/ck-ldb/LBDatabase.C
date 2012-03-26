@@ -40,7 +40,7 @@ struct AdaptiveLBStructure {
   double lb_strategy_cost;
   double lb_migration_cost;
   bool lb_period_informed;
-  bool isRefine;
+  bool isCommLB;
   int lb_msg_send_no;
   int lb_msg_recv_no;
   int total_syncs_called;
@@ -157,7 +157,6 @@ void LBDefaultCreate(const char *lbname)
 // default is to show the helper
 void LBRegisterBalancer(const char *name, LBCreateFn fn, LBAllocFn afn, const char *help, int shown)
 {
-  CkPrintf("Adding to registr %s \n", name);
   lbRegistry.addEntry(name, fn, afn, help, shown);
 }
 
@@ -171,8 +170,6 @@ LBCreateFn getLBCreateFn(const char *lbname) {
 // create a load balancer group using the strategy name
 static void createLoadBalancer(const char *lbname)
 {
-  CkPrintf("Creating load balancer '%s'\n", lbname);
-      lbRegistry.displayLBs();    // display help page
     LBCreateFn fn = lbRegistry.search(lbname);
     if (!fn) {    // invalid lb name
       CmiPrintf("Abort: Unknown load balancer: '%s'!\n", lbname);
@@ -596,9 +593,9 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     adaptive_struct.lb_no_iterations = iteration;
   }
   total_load_vec[iteration] += load;
-  if (max_load_vec[iteration] < load) {
-    max_load_vec[iteration] = load;
-  }
+ // if (max_load_vec[iteration] < load) {
+ //   max_load_vec[iteration] = load;
+ // }
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double idle_time;
     double tmp;
@@ -609,8 +606,10 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     double lb_data[6];
     lb_data[0] = iteration;
     lb_data[1] = total_load_vec[iteration];
-    lb_data[2] = max_load_vec[iteration];
-    lb_data[3] = getLBDB()->ObjDataCount();
+    //lb_data[2] = max_load_vec[iteration];
+    lb_data[2] = total_load_vec[iteration];
+    //lb_data[3] = getLBDB()->ObjDataCount();
+    lb_data[3] = 1;
     lb_data[4] = idle_time;
     lb_data[5] = idle_time;
 
@@ -655,7 +654,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if ((avg_idle >= 0.1*avg || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
+  if ((max_idle >= 0.1*avg || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and avg_idle/avg_load (%lf)\n", max/avg, avg_idle/avg);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
@@ -667,6 +666,13 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
+      if (max/avg < 1.5) {
+        adaptive_struct.isCommLB = true;
+        CkPrintf("No load imbalance but idle time\n");
+      } else {
+        adaptive_struct.isCommLB = false;
+        CkPrintf("Has load imbalance\n");
+      }
       adaptive_struct.lb_calculated_period = iteration_n + 1;
       adaptive_struct.lb_period_informed = true;
       adaptive_struct.in_progress = true;
@@ -916,8 +922,8 @@ int LBDatabase::getPredictedLBPeriod() {
   return adaptive_struct.lb_ideal_period;
 }
 
-bool LBDatabase::isStrategyRefine() {
-  return adaptive_struct.isRefine;
+bool LBDatabase::isStrategyComm() {
+  return adaptive_struct.isCommLB;
 }
 
 /*

@@ -368,7 +368,7 @@ public:
   bool getPeriodForStrategy(double new_load, double overhead_percent, int& period);
   int getPredictedLBPeriod();
 
-  bool isStrategyRefine();
+  bool isStrategyComm();
   void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg) {
     is_prev_lb_refine = is_lb_refine;
     after_lb_avg = lb_avg;
