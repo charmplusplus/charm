@@ -1108,7 +1108,6 @@ void SdagConstruct::generateOverlap(XStr& op)
 #endif
   op << "    ";
   generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << ");\n";
   endMethod(op);
 }
 
