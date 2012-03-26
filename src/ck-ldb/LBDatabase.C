@@ -49,7 +49,6 @@ struct AdaptiveLBStructure {
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   double lb_data[6];
-  lb_data[1] = 0.0;
   lb_data[2] = 0.0;
   lb_data[3] = 0.0;
   lb_data[4] = 0.0;
@@ -57,12 +56,18 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   for (int i = 0; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == 4*sizeof(double));
     double* m = (double *)msgs[i]->getData();
+    // Total count
     lb_data[1] += m[1];
-    lb_data[2] = ((m[2] > lb_data[2])? m[2] : lb_data[2]);
-    lb_data[3] += m[3];
-    lb_data[4] = ((m[4] > lb_data[4]) ? m[4] : lb_data[4]);
+    // Avg load
+    lb_data[2] += m[2];
+    // Max load
+    lb_data[3] = ((m[3] > lb_data[3])? m[3] : lb_data[3]);
+    // Avg idle
     lb_data[5] += m[5];
+    // Max idle
+    lb_data[5] = ((m[5] > lb_data[5]) ? m[5] : lb_data[5]);
     if (i == 0) {
+      // Iteration no
       lb_data[0] = m[0];
     }
     if (m[0] != lb_data[0]) {
@@ -605,13 +610,13 @@ bool LBDatabase::AddLoad(int iteration, double load) {
 
     double lb_data[6];
     lb_data[0] = iteration;
-    lb_data[1] = total_load_vec[iteration];
-    //lb_data[2] = max_load_vec[iteration];
+    lb_data[1] = 1;
     lb_data[2] = total_load_vec[iteration];
+    //lb_data[2] = max_load_vec[iteration];
+    lb_data[3] = total_load_vec[iteration];
     //lb_data[3] = getLBDB()->ObjDataCount();
-    lb_data[3] = 1;
     lb_data[4] = idle_time;
-    lb_data[5] = idle_time;
+    lb_data[5] = idle_time/total_load_vec[iteration];
 
     CkPrintf("[%d] sends total load %lf idle time %lf at iter %d\n", CkMyPe(),
         total_load_vec[iteration], idle_time, adaptive_struct.lb_no_iterations);
@@ -624,10 +629,10 @@ bool LBDatabase::AddLoad(int iteration, double load) {
 
 void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double* load = (double *) msg->getData();
-  double max = load[2];
-  double avg = load[1]/load[3];
+  double avg = load[2]/load[1];
+  double max = load[3];
+  double avg_idle = load[4]/load[1];
   double max_idle = load[5];
-  double avg_idle = load[4]/load[3];
   int iteration_n = load[0];
   CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle, load[3]);
   delete msg;
@@ -654,8 +659,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if ((max_idle >= 0.1*avg || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
-    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and avg_idle/avg_load (%lf)\n", max/avg, avg_idle/avg);
+  if ((max_idle >= 0.1 || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle ratio (%lf)\n", max/avg, max_idle);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
 //      adaptive_struct.lb_calculated_period = 40;
@@ -664,14 +669,13 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 //      return;
 //    }
 
+    adaptive_struct.isCommLB = false;
+
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
       if (max/avg < 1.5) {
         adaptive_struct.isCommLB = true;
         CkPrintf("No load imbalance but idle time\n");
-      } else {
-        adaptive_struct.isCommLB = false;
-        CkPrintf("Has load imbalance\n");
       }
       adaptive_struct.lb_calculated_period = iteration_n + 1;
       adaptive_struct.lb_period_informed = true;
