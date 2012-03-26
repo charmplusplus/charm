@@ -63,7 +63,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     // Max load
     lb_data[3] = ((m[3] > lb_data[3])? m[3] : lb_data[3]);
     // Avg idle
-    lb_data[5] += m[5];
+    lb_data[4] += m[4];
     // Max idle
     lb_data[5] = ((m[5] > lb_data[5]) ? m[5] : lb_data[5]);
     if (i == 0) {
@@ -618,8 +618,9 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     lb_data[4] = idle_time;
     lb_data[5] = idle_time/total_load_vec[iteration];
 
-    CkPrintf("[%d] sends total load %lf idle time %lf at iter %d\n", CkMyPe(),
-        total_load_vec[iteration], idle_time, adaptive_struct.lb_no_iterations);
+    CkPrintf("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
+        total_load_vec[iteration], idle_time,
+        idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -634,7 +635,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double avg_idle = load[4]/load[1];
   double max_idle = load[5];
   int iteration_n = load[0];
-  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle, load[3]);
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle, load[1]);
   delete msg;
  
   // Store the data for this iteration
