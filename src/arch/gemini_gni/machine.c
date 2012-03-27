@@ -3848,13 +3848,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 //    ntk_return_t sts = NTK_System_GetSmpdCount(&_smpd_count);
 
 #if  REMOTE_EVENT
+    SHIFT = 1;
+    while (1<<SHIFT < mysize) SHIFT++;
+    CmiAssert(SHIFT < 31);
     IndexPool_init(&ackPool);
 #if CMK_PERSISTENT_COMM
     IndexPool_init(&persistPool);
 #endif
-    SHIFT = 1;
-    while (1<<SHIFT < mysize) SHIFT++;
-    CmiAssert(SHIFT < 31);
 #endif
 
 #if CMK_WITH_STATS

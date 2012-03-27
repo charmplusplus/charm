@@ -544,7 +544,7 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
         if (CmiMyNode()==destNode) {
             CmiPushPE(destRank, msg);
 #if CMK_PERSISTENT_COMM
-        if (CpvAccess(phs)) CpvAccess(curphs)++;
+            if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
             return;
         }
