@@ -3830,13 +3830,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #endif
 
       /* stats related arguments */
+#if CMK_WITH_STATS
     CmiGetArgStringDesc(*argv,"+gni_stats_root",&counters_dirname,"counter directory name, default counters");
 
     print_stats = CmiGetArgFlag(*argv, "+print_stats");
     
     stats_off = CmiGetArgFlag(*argv, "+stats_off");
 
-#if CMK_WITH_STATS
     init_comm_stats();
 #endif
 
