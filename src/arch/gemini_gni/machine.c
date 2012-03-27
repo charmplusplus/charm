@@ -181,7 +181,7 @@ static int _detected_hang = 0;
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 
 // dynamic SMSG
-static int useDynamicSMSG  =0;               /* dynamic smsgs setup */
+static int useDynamicSMSG = 0;               /* dynamic smsgs setup */
 
 static int avg_smsg_connection = 32;
 static int                 *smsg_connected_flag= 0;
@@ -1460,10 +1460,16 @@ static int connect_to(int destNode)
       free(smsg_attr_vector_remote[destNode]);
       smsg_attr_vector_remote[destNode] = NULL;
       mailbox_list->offset -= smsg_memlen;
+#if PRINT_SYH
+    printf("[%d] send connect_to request to %d failed\n", myrank, destNode);
+#endif
       return 0;
     }
     GNI_RC_CHECK("GNI_Post", status);
     smsg_connected_flag[destNode] = 1;
+#if PRINT_SYH
+    printf("[%d] send connect_to request to %d done\n", myrank, destNode);
+#endif
     return 1;
 }
 
@@ -3077,6 +3083,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             status = GNI_RC_ERROR_RESOURCE;
             if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   
                 /* connection not exists yet */
+#if CMK_SMP
+                  /* non-smp case, connect is issued in send_smsg_message */
+                if (smsg_connected_flag[index] == 0)
+                    connect_to(ptr->destNode); 
+#endif
             }
             else
             switch(ptr->tag)
