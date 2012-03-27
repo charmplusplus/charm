@@ -913,6 +913,7 @@ class Entry : public Member {
 
     XStr epStr(void);
     XStr epIdx(int fromProxy=1);
+    XStr epRegFn(int fromProxy=1);
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);

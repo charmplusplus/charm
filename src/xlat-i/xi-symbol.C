@@ -3017,6 +3017,15 @@ XStr Entry::epIdx(int fromProxy)
   return str;
 }
 
+XStr Entry::epRegFn(int fromProxy)
+{
+  XStr str;
+  if (fromProxy)
+    str << indexName() << "::";
+  str << "reg_"<<epStr()<<"()";
+  return str;
+}
+
 XStr Entry::chareIdx(int fromProxy)
 {
   XStr str;
@@ -4177,8 +4186,11 @@ void Entry::genIndexDecls(XStr& str)
   str << "/* DECLS: "; print(str); str << " */";
 
   // Entry point index storage
-  str << "\n    inline static int "<<epIdx(0)<<"{"
-      << "\n      static int __epidx = " << genRegEp()
+  str << "\n    // Entry point registration at startup"
+      << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
+      << "\n    // Entry point index lookup"
+      << "\n    inline static int "<<epIdx(0)<<"{"
+      << "\n      static int __epidx = " << epRegFn(0) << ";"
       << "\n      return __epidx;"
       << "\n    }\n";
 
@@ -4204,16 +4216,16 @@ void Entry::genIndexDecls(XStr& str)
   }
 
   if (isReductionTarget()) {
-      str << "    inline static int idx_" << name << "_redn_wrapper() {"
-          << "\n        static int __epidx = CkRegisterEp(\""
-          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
-          << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
-          << " CMessage_CkReductionMsg::__idx, __idx, 0);"
-          << "\n        return __epidx;"
-          << "\n    }\n"
-          << "    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }\n"
-          << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
+      str << "\n    // Entry point registration at startup"
+          << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
+          << "\n    // Entry point index lookup"
+          << "\n    inline static int idx_" << name << "_redn_wrapper() {"
+          << "\n      static int __epidx = reg_"<<name<<"_redn_wrapper();"
+          << "\n      return __epidx;"
+          << "\n    }"
+          << "\n    static int " << name << "_redn_wrapper"
+          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
+          << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
 
@@ -4528,6 +4540,22 @@ void Entry::genDefs(XStr& str)
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
 
+  // Define the entry point registration functions
+  str << "\n// Entry point registration function"
+      << "\n" << makeDecl("int") << "::" << epRegFn(0) << " {"
+      << "\n  return " << genRegEp() << ";"
+      << "\n}\n\n";
+
+  if (isReductionTarget())
+  {
+    str << "\n// Redn wrapper registration function"
+        << "\n" << makeDecl("int") << "::reg_"<< name <<"_redn_wrapper() {"
+        << "\n  return CkRegisterEp(\""  << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
+        << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
+        << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n}\n\n";
+  }
+
   // DMK - Accel Support
   #if CMK_CELL != 0
     if (isAccel()) {
@@ -4698,7 +4726,7 @@ XStr Entry::genRegEp()
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
   
   if (internalMode) str << "+CK_EP_INTRINSIC";
-  str << ");";
+  str << ")";
   return str;
 }
 
