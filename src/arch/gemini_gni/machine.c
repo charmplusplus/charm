@@ -847,6 +847,9 @@ typedef struct comm_thread_stats
     int      count_in_PumpLocalTransactions_rdma;
     double   time_in_PumpLocalTransactions_rdma;
     double   max_time_in_PumpLocalTransactions_rdma;
+    int      count_in_PumpDatagramConnection;
+    double   time_in_PumpDatagramConnection;
+    double   max_time_in_PumpDatagramConnection;
 } Comm_Thread_Stats;
 
 static Comm_Thread_Stats   comm_stats;
@@ -955,6 +958,16 @@ static void init_comm_stats()
               comm_stats.max_time_in_SendRdmaMsg = t;    \
         }
 
+#define STATS_PUMPDATAGRAMCONNECTION_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_PumpDatagramConnection ++;        \
+          comm_stats.time_in_PumpDatagramConnection += t;   \
+          if (t>comm_stats.max_time_in_PumpDatagramConnection)      \
+              comm_stats.max_time_in_PumpDatagramConnection = t;    \
+        }
+
 static void print_comm_stats()
 {
     fprintf(counterLog, "Node[%d] SMSG time in buffer\t[total:%f\tmax:%f\tAverage:%f](milisecond)\n", myrank, 1000.0*comm_stats.all_time_in_send_buffered_smsg, 1000.0*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
@@ -977,6 +990,8 @@ static void print_comm_stats()
     fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma*1e6/comm_stats.count_in_PumpLocalTransactions_rdma);
     fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg*1e6/comm_stats.count_in_SendBufferMsg_smsg);
     fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg*1e6/comm_stats.count_in_SendRdmaMsg);
+    if (useDynamicSMSG)
+    fprintf(counterLog, "PumpDatagramConnection:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_PumpDatagramConnection, comm_stats.time_in_PumpDatagramConnection, comm_stats.max_time_in_PumpDatagramConnection, comm_stats.time_in_PumpDatagramConnection*1e6/comm_stats.count_in_PumpDatagramConnection);
 
     fclose(counterLog);
 }
@@ -987,6 +1002,7 @@ static void print_comm_stats()
 #define STATS_PUMPREMOTETRANSACTIONS_TIME(x)       x
 #define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   x
 #define STATS_SENDRDMAMSG_TIME(x)                  x
+#define STATS_PUMPDATAGRAMCONNECTION_TIME(x)       x
 #endif
 
 static void
@@ -3232,7 +3248,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
         startT = CmiWallTimer();
 #endif
-        PumpDatagramConnection();
+        STATS_PUMPDATAGRAMCONNECTION_TIME(PumpDatagramConnection());
 #if CMK_SMP_TRACE_COMMTHREAD
         endT = CmiWallTimer();
         if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SetupConnect, startT, endT);
