@@ -4190,8 +4190,8 @@ void Entry::genIndexDecls(XStr& str)
       << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
       << "\n    // Entry point index lookup"
       << "\n    inline static int "<<epIdx(0)<<"{"
-      << "\n      static int __epidx = " << epRegFn(0) << ";"
-      << "\n      return __epidx;"
+      << "\n      static int epidx = " << epRegFn(0) << ";"
+      << "\n      return epidx;"
       << "\n    }\n";
 
   // DMK - Accel Support - Also declare the function index for the Offload API call
@@ -4220,8 +4220,8 @@ void Entry::genIndexDecls(XStr& str)
           << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
           << "\n    // Entry point index lookup"
           << "\n    inline static int idx_" << name << "_redn_wrapper() {"
-          << "\n      static int __epidx = reg_"<<name<<"_redn_wrapper();"
-          << "\n      return __epidx;"
+          << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
+          << "\n      return epidx;"
           << "\n    }"
           << "\n    static int " << name << "_redn_wrapper"
           << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
