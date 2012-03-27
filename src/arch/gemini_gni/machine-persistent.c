@@ -211,6 +211,10 @@ int PumpPersistent()
 
 #endif
 
+#if ! LARGEPAGE
+#error "Persistent communication must be compiled with LARGEPAGE on"
+#endif
+
 void *PerAlloc(int size)
 {
 //  return CmiAlloc(size);

@@ -1379,7 +1379,7 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
 #if CMK_PERSISTENT_COMM
-        CmiPersistentOneSend();
+    CmiPersistentOneSend();
 #endif
   } else {
     if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
