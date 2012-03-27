@@ -1,0 +1,35 @@
+mainmodule pgm {
+  mainchare main {
+    entry main(CkArgMsg *m);
+    entry void run() {
+      atomic {
+        cint = CProxy_tchare<int>::ckNew(0);
+        cdouble = CProxy_tchare<double>::ckNew(0.1);
+
+        cint.foo(CkCallback(CkIndex_main::firstDone(), thisProxy));
+      }
+      when firstDone() atomic {
+        cdouble.foo(CkCallback(CkIndex_main::firstDone(), thisProxy));
+      }
+      when firstDone() atomic {
+        CkExit();
+      }
+    };
+    entry void firstDone();
+  };
+
+  template <typename T>
+  chare tchare {
+    entry tchare(T arg);
+    entry void foo(CkCallback cb) {
+      atomic {
+        //CkAbort("fail");
+        std::cout << val << std::endl;
+        cb.send();
+      }
+    };
+  };
+
+  chare tchare<int>;
+  chare tchare<double>;
+}

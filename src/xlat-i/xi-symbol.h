@@ -17,6 +17,16 @@
 
 namespace xi {
 
+extern void generateSignature(XStr& decls, XStr& defs,
+                              const Entry* entry, bool declareStatic,
+                              const char* returnType, const XStr* name, bool isEnd,
+                              TList<CStateVar*>* params);
+extern void generateSignature(XStr& decls, XStr& defs,
+                              const Chare* chare, bool declareStatic,
+                              const char* returnType, const XStr* name, bool isEnd,
+                              TList<CStateVar*>* params);
+extern void endMethod(XStr& op);
+
 class CStateVar;
 
 /******************* Utilities ****************/
@@ -549,12 +559,12 @@ class TEntity : public Construct {
     Template *templat;
   public:
     void setTemplate(Template *t) { templat = t; }
-    virtual XStr tspec(void) { 
+    virtual XStr tspec(void) const {
     	XStr str; 
     	if (templat) templat->genSpec(str); 
     	return str;
     }
-    virtual XStr tvars(void) { 
+    virtual XStr tvars(void) const {
     	XStr str;
     	if (templat) templat->genVars(str); 
     	return str;
@@ -620,7 +630,7 @@ class Member : public Construct {
   protected:
     Chare *container;
   public:
-    inline Chare *getContainer() { return container; }
+    inline Chare *getContainer() const { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
     virtual void collectSdagCode(CParsedFile *, int&) { return; }
@@ -690,6 +700,7 @@ class Chare : public TEntity {
     
     int entryCount;
     int hasSdagEntry;
+    XStr sdagDefs;
 
     void genTypedefs(XStr& str);
     void genRegisterMethodDef(XStr& str);
@@ -704,7 +715,7 @@ class Chare : public TEntity {
     XStr proxyName(int withTemplates=1); 
     XStr indexName(int withTemplates=1); 
     XStr indexList();
-    XStr baseName(int withTemplates=1) 
+    XStr baseName(int withTemplates=1) const
     {
     	XStr str;
     	str<<type->getBaseName();
@@ -1221,30 +1232,26 @@ public:
 /******************* Structured Dagger Constructs ***************/
 class SdagConstruct { 
 private:
-  void generateWhen(XStr& op);
-  void generateOverlap(XStr& op);
-  void generateWhile(XStr& op);
-  void generateFor(XStr& op);
-  void generateIf(XStr& op);
-  void generateElse(XStr& op);
-  void generateForall(XStr& op);
-  void generateOlist(XStr& op);
-  void generateSdagEntry(XStr& op, Entry *entry);
-  void generateSlist(XStr& op);
-  void generateAtomic(XStr& op);
-  void generateForward(XStr& op);
-  void generateConnect(XStr& op);
-  void generateSignature(XStr& op, const char* returnType,
-                         const XStr* name, bool isEnd,
-                         TList<CStateVar*>* params);
-  void endMethod(XStr& op);
-  void generateCall(XStr& op, TList<CStateVar*>& args,
+  void generateWhen(XStr& decls, XStr& defs, Entry* entry);
+  void generateOverlap(XStr& decls, XStr& defs, Entry* entry);
+  void generateWhile(XStr& decls, XStr& defs, Entry* entry);
+  void generateFor(XStr& decls, XStr& defs, Entry* entry);
+  void generateIf(XStr& decls, XStr& defs, Entry* entry);
+  void generateElse(XStr& decls, XStr& defs, Entry* entry);
+  void generateForall(XStr& decls, XStr& defs, Entry* entry);
+  void generateOlist(XStr& decls, XStr& defs, Entry* entry);
+  void generateSdagEntry(XStr& decls, XStr& defs, Entry *entry);
+  void generateSlist(XStr& decls, XStr& defs, Entry* entry);
+  void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
+  void generateForward(XStr& decls, XStr& defs, Entry* entry);
+  void generateConnect(XStr& decls, XStr& defs, Entry* entry);
+  void generateCall(XStr& defs, TList<CStateVar*>& args,
                     const char* name, const char* nameSuffix = 0);
 
-  void generateTraceBeginCall(XStr& op);          // for trace
-  void generateBeginTime(XStr& op);               //for Event Bracket
-  void generateEventBracket(XStr& op, int eventType);     //for Event Bracket
-  void generateListEventBracket(XStr& op, int eventType);
+  void generateTraceBeginCall(XStr& defs);          // for trace
+  void generateBeginTime(XStr& defs);               //for Event Bracket
+  void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
+  void generateListEventBracket(XStr& defs, int eventType);
 public:
   int nodeNum;
   XStr *label;
@@ -1290,20 +1297,19 @@ public:
   void generateEntryList(TList<CEntry*>&, SdagConstruct *);
   void propagateState(int);
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
-  void generateCode(XStr& output, Entry *entry);
+  void generateCode(XStr& decls, XStr& defs, Entry *entry);
   void setNext(SdagConstruct *, int);
 
   // for trace
   void generateTrace();          
-  void generateRegisterEp(XStr& output);          
-  void generateTraceEpDecl(XStr& output);         
-  void generateTraceEpDef(XStr& output);          
-  static void generateTraceEndCall(XStr& op);            
-  static void generateTlineEndCall(XStr& op);
-  static void generateBeginExec(XStr& op, const char *name);
-  static void generateEndExec(XStr& op);
-  static void generateEndSeq(XStr& op);
-  static void generateDummyBeginExecute(XStr& op);
+  void generateRegisterEp(XStr& defs);
+  void generateTraceEp(XStr& decls, XStr& defs, Chare* chare);
+  static void generateTraceEndCall(XStr& defs);
+  static void generateTlineEndCall(XStr& defs);
+  static void generateBeginExec(XStr& defs, const char *name);
+  static void generateEndExec(XStr& defs);
+  static void generateEndSeq(XStr& defs);
+  static void generateDummyBeginExecute(XStr& defs);
 
 };
 

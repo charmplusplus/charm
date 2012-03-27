@@ -227,30 +227,30 @@ void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct 
   }
 }
  
-void SdagConstruct::generateConnectEntries(XStr& op){
-   op << "  void " <<connectEntry->charstar() << "(";
+void SdagConstruct::generateConnectEntries(XStr& decls) {
+   decls << "  void " <<connectEntry->charstar() << "(";
    ParamList *pl = param;
    XStr msgParams;
    if (pl->isVoid() == 1) {
-     op << "void";
+     decls << "void";
    }
    else if (pl->isMessage() == 1){
-     op << pl->getBaseName() <<" *" <<pl->getGivenName();
+     decls << pl->getBaseName() <<" *" <<pl->getGivenName();
    }
    else {
-    op << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg";
+    decls << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg";
    }
-   op << ") {\n";
+   decls << ") {\n";
 
    if (!pl->isVoid() && !pl->isMessage()) {
     msgParams <<"   char *impl_buf= _msg->msgBuf;\n";
     param->beginUnmarshall(msgParams);
    }
 
-   op << msgParams.charstar() <<"\n"; 
-   op << "  " <<text->charstar() <<"\n";
+   decls << msgParams.charstar() <<"\n"; 
+   decls << "  " <<text->charstar() <<"\n";
 
-   op << "  }\n";
+   decls << "  }\n";
 }
 
 void SdagConstruct::generateConnectEntryList(TList<SdagConstruct*>& ConnectEList) {
@@ -445,49 +445,49 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
  } 
 }
 
-void SdagConstruct::generateCode(XStr& op, Entry *entry)
+void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
 {
   switch(type) {
     case SSDAGENTRY:
-      generateSdagEntry(op, entry);
+      generateSdagEntry(decls, defs, entry);
       break;
     case SSLIST:
-      generateSlist(op);
+      generateSlist(decls, defs, entry);
       break;
     case SOLIST:
-      generateOlist(op);
+      generateOlist(decls, defs, entry);
       break;
     case SFORALL:
-      generateForall(op);
+      generateForall(decls, defs, entry);
       break;
     case SATOMIC:
-      generateAtomic(op);
+      generateAtomic(decls, defs, entry);
       break;
     case SIF:
-      generateIf(op);
+      generateIf(decls, defs, entry);
       if(con2 != 0)
-        con2->generateCode(op, entry);
+        con2->generateCode(decls, defs, entry);
       break;
     case SELSE:
-      generateElse(op);
+      generateElse(decls, defs, entry);
       break;
     case SWHILE:
-      generateWhile(op);
+      generateWhile(decls, defs, entry);
       break;
     case SFOR:
-      generateFor(op);
+      generateFor(decls, defs, entry);
       break;
     case SOVERLAP:
-      generateOverlap(op);
+      generateOverlap(decls, defs, entry);
       break;
     case SWHEN:
-      generateWhen(op);
+      generateWhen(decls, defs, entry);
       break;
     case SFORWARD:
-      generateForward(op);
+      generateForward(decls, defs, entry);
       break;
     case SCONNECT:
-      generateConnect(op);
+      generateConnect(decls, defs, entry);
       break;
     default:
       break;
@@ -495,52 +495,52 @@ void SdagConstruct::generateCode(XStr& op, Entry *entry)
   SdagConstruct *cn;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateCode(op, entry);
+      cn->generateCode(decls, defs, entry);
     }
   }
 }
 
-void SdagConstruct::generateConnect(XStr& op) {
-  generateSignature(op, "void", label, false, NULL);
-  op << "    int index;\n";
+void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
+  generateSignature(decls, defs, entry, false, "void", label, false, NULL);
+  defs << "    int index;\n";
   if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
-     op << "    CkMarshallMsg *x;\n";  
-     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
-     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+     defs << "    CkMarshallMsg *x;\n";
+     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else if (param->isVoid() == 1) {
-     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(void);\n";  //replace
-     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(void);\n";  //replace
+     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else {
-     op << "    " << param->getBaseName() <<" *x;\n";  // replace
-     op << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
-     op << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace 
+     defs << "    " << param->getBaseName() <<" *x;\n";  // replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
-  op << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
+  defs << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
 
-  endMethod(op);
+  endMethod(defs);
 }
 
-void SdagConstruct::generateForward(XStr& op) {
+void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
   SdagConstruct *cn;
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    op << "    { ";
-    generateCall(op, *stateVarsChildren, cn->text->charstar());
-    op<<" }\n";
+    defs << "    { ";
+    generateCall(defs, *stateVarsChildren, cn->text->charstar());
+    defs<<" }\n";
   }
-  generateCall(op, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  generateCall(defs, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
 
-void SdagConstruct::generateWhen(XStr& op)
+void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateSignature(op, "int", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "int", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
+  generateBeginTime(defs);
 #endif
 
   CStateVar *sv;
@@ -551,34 +551,34 @@ void SdagConstruct::generateWhen(XStr& op)
   while (el != NULL){
     e = el->entry;
     if (e->param->isVoid() == 1)
-        op << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
+        defs << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
     else if (e->paramIsMarshalled() == 1) {
 
-        op << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
-        op << "    CkMarshallMsg *" <<
+        defs << "    CMsgBuffer *"<<e->getEntryName()<<"_buf;\n";
+        defs << "    CkMarshallMsg *" <<
                         e->getEntryName() << "_msg;\n";
     }
     else {
         for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
-          op << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
-          op << "    " << sv->type->charstar() << " " <<
+          defs << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
+          defs << "    " << sv->type->charstar() << " " <<
                           sv->name->charstar() << ";\n";
         } 
     }
     el = el->next;
   }
 
-  op << "\n";
+  defs << "\n";
   el = elist;
   while (el != NULL) {
      e = el->entry;
      if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1)) {
         if((e->intExpr == 0) || (e->param->isVoid() == 1)) {   // DOUBLE CHECK THIS LOGIC
-           op << "    " << e->getEntryName(); 
-           op << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
+           defs << "    " << e->getEntryName();
+           defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
         }	    
         else {
-           op << "    " << e->getEntryName() << 
+           defs << "    " << e->getEntryName() <<
                  "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
                  ", " << e->intExpr << ");\n";
         }
@@ -586,11 +586,11 @@ void SdagConstruct::generateWhen(XStr& op)
      else { // The parameter is a message
         sv = e->stateVars->begin();
         if(e->intExpr == 0) {
-           op << "    " << sv->name->charstar(); 
-           op << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
+           defs << "    " << sv->name->charstar();
+           defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
         }	    
         else {
-           op << "    " << sv->name->charstar() << 
+           defs << "    " << sv->name->charstar() <<
                  "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
                  ", " << e->intExpr << ");\n";
         }
@@ -598,23 +598,23 @@ void SdagConstruct::generateWhen(XStr& op)
     el = el->next;
   }
 
-  op << "\n";
-  op << "    if (";
+  defs << "\n";
+  defs << "    if (";
   el = elist;
   while (el != NULL)  {
      e = el->entry;
      if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-        op << "(" << e->getEntryName() << "_buf != 0)";
+        defs << "(" << e->getEntryName() << "_buf != 0)";
      }
      else {
         sv = e->stateVars->begin();
-        op << "(" << sv->name->charstar() << "_buf != 0)";
+        defs << "(" << sv->name->charstar() << "_buf != 0)";
      }
      el = el->next;
      if (el != NULL)
-        op << "&&";
+        defs << "&&";
   }
-  op << ") {\n";
+  defs << ") {\n";
 
 #if CMK_BIGSIM_CHARM
   // for tracing
@@ -622,104 +622,104 @@ void SdagConstruct::generateWhen(XStr& op)
   int elen=0;
   for(el=elist; el!=NULL; el=elist->next) elen++;
  
-  op << "         void * logs1["<< elen << "]; \n";
-  op << "         void * logs2["<< elen + 1<< "]; \n";
+  defs << "         void * logs1["<< elen << "]; \n";
+  defs << "         void * logs2["<< elen + 1<< "]; \n";
   int localnum = 0;
   for(el=elist; el!=NULL; el=elist->next) {
     e = el->entry;
        if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-	op << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog1; \n";
-	op << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog2; \n";
 	localnum++;
       }
       else{
-	op << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar()<< "_buf->bgLog1; \n";
-	op << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar()<< "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar() << "_buf->bgLog2; \n";
 	localnum++;
       }
   }
       
-  op << "       logs2[" << localnum << "] = " << "_bgParentLog; \n";
-  generateEventBracket(op,SWHEN);
-  op << "       _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
+  defs << "       logs2[" << localnum << "] = " << "_bgParentLog; \n";
+  generateEventBracket(defs,SWHEN);
+  defs << "       _TRACE_BG_FORWARD_DEPS(logs1,logs2,"<< localnum << ",_bgParentLog);\n";
 #endif
 
   el = elist;
   while (el != NULL) {
      e = el->entry;
      if (e->param->isVoid() == 1) {
-        op <<"       CkFreeSysMsg((void *) "<<e->getEntryName() <<"_buf->msg);\n";
-        op << "       __cDep->removeMessage(" << e->getEntryName() <<
+        defs <<"       CkFreeSysMsg((void *) "<<e->getEntryName() <<"_buf->msg);\n";
+        defs << "       __cDep->removeMessage(" << e->getEntryName() <<
               "_buf);\n";
-        op << "      delete " << e->getEntryName() << "_buf;\n";
+        defs << "      delete " << e->getEntryName() << "_buf;\n";
      }
      else if (e->paramIsMarshalled() == 1) {
-        op << "       " << e->getEntryName() << "_msg = (CkMarshallMsg *)"  
+        defs << "       " << e->getEntryName() << "_msg = (CkMarshallMsg *)"
                << e->getEntryName() << "_buf->msg;\n";
-        op << "       char *"<<e->getEntryName() <<"_impl_buf=((CkMarshallMsg *)"
+        defs << "       char *"<<e->getEntryName() <<"_impl_buf=((CkMarshallMsg *)"
 	   <<e->getEntryName() <<"_msg)->msgBuf;\n";
-        op <<"       PUP::fromMem " <<e->getEntryName() <<"_implP(" 
+        defs <<"       PUP::fromMem " <<e->getEntryName() <<"_implP("
 	   <<e->getEntryName() <<"_impl_buf);\n";
 
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              op <<"       int impl_off_"<<sv->name->charstar()
+              defs <<"       int impl_off_"<<sv->name->charstar()
 	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
 		 <<sv->name->charstar()<<";\n";
            else
-               op <<"       "<<sv->type->charstar()<<" "<<sv->name->charstar()
+               defs <<"       "<<sv->type->charstar()<<" "<<sv->name->charstar()
 	       <<"; " <<e->getEntryName() <<"_implP|"
 	       <<sv->name->charstar()<<";\n";
 	}
-        op << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
+        defs << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
 	   <<e->getEntryName() <<"_implP.size(),16);\n";
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              op << "       "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
+              defs << "       "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
 		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
 		 <<sv->name->charstar()<<");\n";
         }
-        op << "       __cDep->removeMessage(" << e->getEntryName() <<
+        defs << "       __cDep->removeMessage(" << e->getEntryName() <<
               "_buf);\n";
-        op << "       delete " << e->getEntryName() << "_buf;\n";
+        defs << "       delete " << e->getEntryName() << "_buf;\n";
      }
      else {  // There was a message as the only parameter
         sv = e->stateVars->begin();
-        op << "       " << sv->name->charstar() << " = (" << 
+        defs << "       " << sv->name->charstar() << " = (" <<
               sv->type->charstar() << ") " <<
               sv->name->charstar() << "_buf->msg;\n";
-        op << "       __cDep->removeMessage(" << sv->name->charstar() <<
+        defs << "       __cDep->removeMessage(" << sv->name->charstar() <<
               "_buf);\n";
-        op << "       delete " << sv->name->charstar() << "_buf;\n";
+        defs << "       delete " << sv->name->charstar() << "_buf;\n";
      }
      el = el->next;
   }
 
   // max(current,merge) --> current, then reset the mergepath
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
-  op << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-  op << "       ";
+  defs << "       ";
 
   if (constructs && !constructs->empty()) {
-    generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
+    generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   } else {
-    generateCall(op, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
   }
 
   el = elist;
   while (el != NULL){
     e = el->entry;
     if (e->paramIsMarshalled() == 1) {
-        op << "       delete " << e->getEntryName() << "_msg;\n";
+        defs << "       delete " << e->getEntryName() << "_msg;\n";
     }
     el = el->next;
   }
-  op << "       return 1;\n";
-  op << "    } else {\n";
+  defs << "       return 1;\n";
+  defs << "    } else {\n";
 
   int nRefs=0, nAny=0;
   el = elist;
@@ -752,28 +752,28 @@ void SdagConstruct::generateWhen(XStr& op)
 		     MAXANY);
     exit(1);
   }
-  op << "       CWhenTrigger *tr;\n";
-  op << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
+  defs << "       CWhenTrigger *tr;\n";
+  defs << "       tr = new CWhenTrigger(" << nodeNum << ", " <<
         stateVars->length() << ", " << nRefs << ", " << nAny << ");\n";
   int iArgs=0;
  
-//  op << "       int impl_off=0;\n";
+//  defs << "       int impl_off=0;\n";
   int hasArray = 0;
   int numParamsNeedingMarshalling = 0;
   int paramIndex =0;
   for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
     if (sv->isVoid == 1) {
-       // op <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
-       op <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
+       // defs <<"       tr->args[" <<iArgs++ <<"] = (size_t) CkAllocSysMsg();\n";
+       defs <<"       tr->args[" <<iArgs++ <<"] = (size_t)0xFF;\n";
     }
     else {
       if (sv->isMsg == 1) {
-         op << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
+         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
       }
       else {
          numParamsNeedingMarshalling++;
          if (numParamsNeedingMarshalling == 1) {
-           op << "       int impl_off=0;\n";
+           defs << "       int impl_off=0;\n";
            paramIndex = iArgs;
            iArgs++;
          }
@@ -781,50 +781,50 @@ void SdagConstruct::generateWhen(XStr& op)
       if (sv->arrayLength !=NULL) {
          hasArray++;
          if (hasArray == 1)
-      	   op<< "       int impl_arrstart=0;\n";
-         op <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-         op <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-         op <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+           defs<< "       int impl_arrstart=0;\n";
+         defs <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
+         defs <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
+         defs <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
       }
     }
   }
   if (numParamsNeedingMarshalling > 0) {
-     op << "       { \n";
-     op << "         PUP::sizer implP;\n";
+     defs << "       { \n";
+     defs << "         PUP::sizer implP;\n";
      for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
        if (sv->arrayLength !=NULL)
-         op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+         defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
-         op << "         implP|" <<sv->name->charstar() <<";\n";
+         defs << "         implP|" <<sv->name->charstar() <<";\n";
      }
      if (hasArray > 0) {
-        op <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
-        op <<"         impl_off+=impl_arrstart;\n";
+        defs <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
+        defs <<"         impl_off+=impl_arrstart;\n";
      }
      else {
-        op << "         impl_off+=implP.size();\n";
+        defs << "         impl_off+=implP.size();\n";
      }
-     op << "       }\n";
-     op << "       CkMarshallMsg *impl_msg;\n";
-     op << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
-     op << "       {\n";
-     op << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
+     defs << "       }\n";
+     defs << "       CkMarshallMsg *impl_msg;\n";
+     defs << "       impl_msg = CkAllocateMarshallMsg(impl_off,NULL);\n";
+     defs << "       {\n";
+     defs << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
      for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
        if (sv->arrayLength !=NULL)
-          op << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+          defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
-          op << "         implP|" <<sv->name->charstar() <<";\n";
+          defs << "         implP|" <<sv->name->charstar() <<";\n";
      }
-     op << "       }\n";
+     defs << "       }\n";
      if (hasArray > 0) {
-        op <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
+        defs <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
         for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
            if (sv->arrayLength !=NULL)
-              op << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
+              defs << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
 	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
         }  
      }
-  op << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
+  defs << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
   }
   int iRef=0, iAny=0;
 
@@ -832,12 +832,12 @@ void SdagConstruct::generateWhen(XStr& op)
   while (el != NULL) {
     e = el->entry;
     if(e->intExpr == 0) {
-      op << "       tr->anyEntries[" << iAny++ << "] = " <<
+      defs << "       tr->anyEntries[" << iAny++ << "] = " <<
             e->entryPtr->entryNum << ";\n";
     } else {
-      op << "       tr->entries[" << iRef << "] = " << 
+      defs << "       tr->entries[" << iRef << "] = " <<
             e->entryPtr->entryNum << ";\n";
-      op << "       tr->refnums[" << iRef++ << "] = " <<
+      defs << "       tr->refnums[" << iRef++ << "] = " <<
             e->intExpr << ";\n";
     }
     el = el->next;
@@ -845,352 +845,368 @@ void SdagConstruct::generateWhen(XStr& op)
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   // max(current,merge) --> current
-  op << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  op << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
 #endif
 
-  op << "       __cDep->Register(tr);\n";
-  op << "       return 0;\n";
-  op << "    }\n";
+  defs << "       __cDep->Register(tr);\n";
+  defs << "       return 0;\n";
+  defs << "    }\n";
 
-  endMethod(op);
+  endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SWHEN_END);
+  generateBeginTime(defs);
+  generateEventBracket(defs, SWHEN_END);
 #endif
-  op << "    ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   
   el = elist;
   while (el) {
     e = el->entry;
     if (e->param->isMessage() == 1) {
       sv = e->stateVars->begin();
-      op << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
+      defs << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
     }
 
     el = el->next;
   }
 
-  endMethod(op);
+  endMethod(defs);
 }
 
-void SdagConstruct::generateWhile(XStr& op)
+void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(op, "void", label, false, stateVars);
-  op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    } else {\n";
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    } else {\n";
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
-  op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    } else {\n";
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    } else {\n";
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 }
 
-void SdagConstruct::generateFor(XStr& op)
+void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
 
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
+  generateBeginTime(defs);
 #endif
-  op << "    " << con1->text->charstar() << ";\n";
+  defs << "    " << con1->text->charstar() << ";\n";
   //Record only the beginning for FOR
 #if CMK_BIGSIM_CHARM
-  generateEventBracket(op,SFOR);
+  generateEventBracket(defs, SFOR);
 #endif
-  op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    } else {\n";
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    } else {\n";
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
+  generateBeginTime(defs);
 #endif
-  op << "   " << con3->text->charstar() << ";\n";
-  op << "    if (" << con2->text->charstar() << ") {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    } else {\n";
+  defs << "   " << con3->text->charstar() << ";\n";
+  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    } else {\n";
 #if CMK_BIGSIM_CHARM
-  generateEventBracket(op,SFOR_END);
+  generateEventBracket(defs, SFOR_END);
 #endif
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 }
 
-void SdagConstruct::generateIf(XStr& op)
+void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
 {
   strcpy(nameStr,label->charstar());
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SIF);
+  generateBeginTime(defs);
+  generateEventBracket(defs, SIF);
 #endif
-  op << "    if (" << con1->text->charstar() << ") {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    } else {\n";
-  op << "      ";
+  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    } else {\n";
+  defs << "      ";
   if (con2 != 0) {
-    generateCall(op, *stateVarsChildren, con2->label->charstar());
+    generateCall(defs, *stateVarsChildren, con2->label->charstar());
   } else {
-    generateCall(op, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
   }
-  op << "    }\n";
-  endMethod(op);
+  defs << "    }\n";
+  endMethod(defs);
 
   strcpy(nameStr,label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SIF_END);
+  generateBeginTime(defs);
+  generateEventBracket(defs,SIF_END);
 #endif
-  op << "    ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
-void SdagConstruct::generateElse(XStr& op)
+void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
 {
   strcpy(nameStr,label->charstar());
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   // trace
-  generateBeginTime(op);
-  generateEventBracket(op,SELSE);
-  op << "    ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  endMethod(op);
+  generateBeginTime(defs);
+  generateEventBracket(defs, SELSE);
+  defs << "    ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SELSE_END);
+  generateBeginTime(defs);
+  generateEventBracket(defs,SELSE_END);
 #endif
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
-void SdagConstruct::generateForall(XStr& op)
+void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(op, "void", label, false, stateVars);
-  op << "    int __first = (" << con2->text->charstar() <<
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  defs << "    int __first = (" << con2->text->charstar() <<
         "), __last = (" << con3->text->charstar() << 
         "), __stride = (" << con4->text->charstar() << ");\n";
-  op << "    if (__first > __last) {\n";
-  op << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
-  op << "      __stride = -__stride;\n";
-  op << "    }\n";
-  op << "    CCounter *" << counter->charstar() << 
+  defs << "    if (__first > __last) {\n";
+  defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
+  defs << "      __stride = -__stride;\n";
+  defs << "    }\n";
+  defs << "    CCounter *" << counter->charstar() <<
         " = new CCounter(__first,__last,__stride);\n"; 
-  op << "    for(int " << con1->text->charstar() << 
+  defs << "    for(int " << con1->text->charstar() <<
         "=__first;" << con1->text->charstar() <<
         "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
-  op << "      ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  op << "    }\n";
-  endMethod(op);
+  defs << "      ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    }\n";
+  endMethod(defs);
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
-  op << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
-  op << "    if (" << counter->charstar() << "->isDone()) {\n";
-  op << "      delete " << counter->charstar() << ";\n";
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  defs << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
+  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
+  defs << "      delete " << counter->charstar() << ";\n";
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 }
 
-void SdagConstruct::generateOlist(XStr& op)
+void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 {
   SdagConstruct *cn;
-  generateSignature(op, "void", label, false, stateVars);
-  op << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  defs << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
         constructs->length() << ");\n";
   for(cn=constructs->begin(); 
                      !constructs->end(); cn=constructs->next()) {
-    op << "    ";
-    generateCall(op, *stateVarsChildren, cn->label->charstar());
+    defs << "    ";
+    generateCall(defs, *stateVarsChildren, cn->label->charstar());
   }
-  endMethod(op);
+  endMethod(defs);
 
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 #if CMK_BIGSIM_CHARM
-  op << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
+  defs << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
 #endif
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  op << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
+  generateBeginTime(defs);
+  defs << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
   //Accumulate all the bgParent pointers that the calling when_end functions give
-  op << "    " << counter->charstar() << "->decrement();\n";
+  defs << "    " << counter->charstar() << "->decrement();\n";
  
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
- op << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+ defs << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
 #endif
 
-  op << "    if (" << counter->charstar() << "->isDone()) {\n";
+  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  op << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
-  op << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-  op << "      delete " << counter->charstar() << ";\n";
+  defs << "      delete " << counter->charstar() << ";\n";
 
 #if CMK_BIGSIM_CHARM
-  generateListEventBracket(op,SOLIST_END);
-  op << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
+  generateListEventBracket(defs, SOLIST_END);
+  defs << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
 #endif
 
-  op << "      ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  op << "    }\n";
-  endMethod(op);
+  defs << "      ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  defs << "    }\n";
+  endMethod(defs);
 }
 
-void SdagConstruct::generateOverlap(XStr& op)
+void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SOVERLAP);
+  generateBeginTime(defs);
+  generateEventBracket(defs, SOVERLAP);
 #endif
-  op << "    ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  endMethod(op);
+  defs << "    ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  endMethod(defs);
 
   // trace
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
-  generateSignature(op, "void", label, true, stateVarsChildren);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
-  generateBeginTime(op);
-  generateEventBracket(op,SOVERLAP_END);
+  generateBeginTime(defs);
+  generateEventBracket(defs, SOVERLAP_END);
 #endif
-  op << "    ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
-void SdagConstruct::generateSlist(XStr& op)
+void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(op, "void", label, false, stateVars);
-  op << "    ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
-  endMethod(op);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
+  defs << "    ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  endMethod(defs);
 
-  generateSignature(op, "void", label, true, stateVarsChildren);
-  op << "    ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
-void SdagConstruct::generateSdagEntry(XStr& op, Entry *entry)
+void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
 {
-  // header file
-  op << "public:\n";
-  generateSignature(op, "void", con1->text, false, stateVars);
+  decls << "public:\n";
+  generateSignature(decls, defs, entry, false, "void", con1->text, false, stateVars);
   SdagConstruct *sc;
   SdagConstruct *sc1;
   for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-        op << "    _connect_" << sc1->text->charstar() <<"();\n";
+        defs << "    _connect_" << sc1->text->charstar() <<"();\n";
   }
 
 #if CMK_BIGSIM_CHARM
-  generateEndSeq(op);
+  generateEndSeq(defs);
 #endif
   if (!entry->getContainer()->isGroup() || !entry->isConstructor())
-    generateTraceEndCall(op);
+    generateTraceEndCall(defs);
 
-  op << "    ";
-  generateCall(op, *stateVarsChildren, constructs->front()->label->charstar());
+  defs << "    ";
+  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
 
 #if CMK_BIGSIM_CHARM
-  generateTlineEndCall(op);
-  generateBeginExec(op, "spaceholder");
+  generateTlineEndCall(defs);
+  generateBeginExec(defs, "spaceholder");
 #endif
-  if (!entry->getContainer()->isGroup() || !entry->isConstructor()) generateDummyBeginExecute(op);
+  if (!entry->getContainer()->isGroup() || !entry->isConstructor())
+    generateDummyBeginExecute(defs);
 
-  endMethod(op);
+  endMethod(defs);
 
-  op << "private:\n";
-  generateSignature(op, "void", con1->text, true,
+  decls << "private:\n";
+  generateSignature(decls, defs, entry, false, "void", con1->text, true,
 #if CMK_BIGSIM_CHARM
   stateVarsChildren
 #else
   stateVars
 #endif
 );
-  endMethod(op);
+  endMethod(defs);
 }
 
-void SdagConstruct::generateAtomic(XStr& op)
+void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
 {
-  generateSignature(op, "void", label, false, stateVars);
+  generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
 
 #if CMK_BIGSIM_CHARM
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
-  generateBeginExec(op, nameStr);
+  generateBeginExec(defs, nameStr);
 #endif
-  generateTraceBeginCall(op);
+  generateTraceBeginCall(defs);
 
-  op << "    " << text->charstar() << "\n";
+  defs << "    " << text->charstar() << "\n";
 
-  generateTraceEndCall(op);
+  generateTraceEndCall(defs);
 #if CMK_BIGSIM_CHARM
-  generateEndExec(op);
+  generateEndExec(defs);
 #endif
 
-  op << "    ";
-  generateCall(op, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
-  endMethod(op);
+  defs << "    ";
+  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  endMethod(defs);
 }
 
-void SdagConstruct::generateSignature(XStr& op, const char* returnType,
-                                      const XStr* name, bool isEnd,
-                                      TList<CStateVar*>* params)
+void generateSignature(XStr& decls, XStr& defs,
+                       const Entry* entry, bool declareStatic, const char* returnType,
+                       const XStr* name, bool isEnd,
+                       TList<CStateVar*>* params)
 {
-  op << "  " << returnType << " " << name;
+  generateSignature(decls, defs, entry->getContainer(), declareStatic, returnType,
+                    name, isEnd, params);
+}
+void generateSignature(XStr& decls, XStr& defs,
+                       const Chare* chare, bool declareStatic, const char* returnType,
+                       const XStr* name, bool isEnd,
+                       TList<CStateVar*>* params)
+{
+  decls << "  " << (declareStatic ? "static " : "") << returnType << " ";
+
+  templateGuardBegin(false, defs);
+  defs << chare->tspec() << returnType << " " << chare->baseName() << "::";
+
+  XStr op;
+
+  op << name;
   if (isEnd)
     op << "_end";
   op << "(";
@@ -1219,11 +1235,16 @@ void SdagConstruct::generateSignature(XStr& op, const char* returnType,
     }
   }
 
-  op << ") {\n";
+  op << ")";
+
+  decls << op << ";\n";
+  defs << op << " {\n";
 }
-void SdagConstruct::endMethod(XStr& op)
+void endMethod(XStr& op)
 {
-  op << "  }\n\n";
+  op << "}\n";
+  templateGuardEnd(op);
+  op << "\n\n";
 }
 
 void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
@@ -1338,7 +1359,7 @@ void SdagConstruct::generateTrace()
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
 {
   if(traceName)
-    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, " << "__idx_" << traceName->charstar() << ", CkMyPe(), 0, NULL); \n";
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, " << "_sdag_idx_" << traceName->charstar() << "(), CkMyPe(), 0, NULL); \n";
 }
 
 void SdagConstruct::generateDummyBeginExecute(XStr& op)
@@ -1397,52 +1418,47 @@ void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
      << "_bgLogList);\n";
 }
 
-void SdagConstruct::generateRegisterEp(XStr& op)          // for trace
+void SdagConstruct::generateRegisterEp(XStr& defs)
 {
   if (traceName) {
-    op << "    __idx_" << traceName->charstar()
-       << " = CkRegisterEp(\"" << traceName->charstar()
-       << "(void)\", NULL, 0, CkIndex_" << CParsedFile::className->charstar()
-       << "::__idx, 0);\n";
+    defs << "    (void)_sdag_idx_" << traceName << "();\n";
   }
 
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateRegisterEp(op);
+    cn->generateRegisterEp(defs);
   }
-  if (con1) con1->generateRegisterEp(op);
-  if (con2) con2->generateRegisterEp(op);
-  if (con3) con3->generateRegisterEp(op);
+  if (con1) con1->generateRegisterEp(defs);
+  if (con2) con2->generateRegisterEp(defs);
+  if (con3) con3->generateRegisterEp(defs);
 }
 
-void SdagConstruct::generateTraceEpDecl(XStr& op)          // for trace
+void SdagConstruct::generateTraceEp(XStr& decls, XStr& defs, Chare* chare)
 {
   if (traceName) {
-    op << "  static int __idx_" << traceName->charstar() << ";\n"; 
+    XStr regName, idxName;
+
+    idxName << "_sdag_idx_" << traceName;
+    regName << "_sdag_reg_" << traceName;
+    generateSignature(decls, defs, chare, true, "int", &idxName, false, NULL);
+    defs << "  static int epidx = " << regName << "();\n"
+         << "  return epidx;\n";
+    endMethod(defs);
+
+    generateSignature(decls, defs, chare, true, "int", &regName, false, NULL);
+    defs << "  return CkRegisterEp(\""
+         << traceName << "\", NULL, 0, " << chare->indexName() << "::__idx, 0"
+         << ");\n";
+    endMethod(defs);
   }
+
   SdagConstruct *cn;
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTraceEpDecl(op);
+    cn->generateTraceEp(decls, defs, chare);
   }
-  if (con1) con1->generateTraceEpDecl(op);
-  if (con2) con2->generateTraceEpDecl(op);
-  if (con3) con3->generateTraceEpDecl(op);
-}
-
-
-void SdagConstruct::generateTraceEpDef(XStr& op)          // for trace
-{
-  if (traceName) {
-    op << "  int " << CParsedFile::className->charstar()
-       << "::__idx_" << traceName->charstar() << "=0;\\\n";
-  }
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTraceEpDef(op);
-  }
-  if (con1) con1->generateTraceEpDef(op);
-  if (con2) con2->generateTraceEpDef(op);
-  if (con3) con3->generateTraceEpDef(op);
+  if (con1) con1->generateTraceEp(decls, defs, chare);
+  if (con2) con2->generateTraceEp(decls, defs, chare);
+  if (con3) con3->generateTraceEp(decls, defs, chare);
 }
 
 
