@@ -309,7 +309,7 @@ CmiNodeLock CmiCreateLock()
 void CmiDestroyLock(CmiNodeLock lk)
 {
   pthread_spin_destroy(lk);
-  free(lk);
+  free((void*)lk);
 }
 #else
 CmiNodeLock CmiCreateLock()
@@ -492,8 +492,8 @@ static void CmiStartThreads(char **argv)
 
 static void CmiDestoryLocks()
 {
-  pthread_mutex_destroy(comm_mutex);
-  pthread_mutex_destroy(CmiMemLock_lock);
+  CmiDestroyLock(comm_mutex);
+  CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   pthread_mutex_destroy(&barrier_mutex);
 #ifdef CMK_NO_ASM_AVAILABLE
