@@ -3013,7 +3013,7 @@ XStr Entry::epIdx(int fromProxy)
   XStr str;
   if (fromProxy)
     str << indexName()<<"::";
-  str << "__idx_"<<epStr();
+  str << "idx_"<<epStr()<<"()";
   return str;
 }
 
@@ -4174,10 +4174,13 @@ void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
 /******************* Shared Entry Point Code **************************/
 void Entry::genIndexDecls(XStr& str)
 {
-  str << "/* DECLS: "; print(str); str << " */\n";
+  str << "/* DECLS: "; print(str); str << " */";
 
   // Entry point index storage
-  str << "    static int "<<epIdx(0)<<";\n";
+  str << "\n    inline static int "<<epIdx(0)<<"{"
+      << "\n      static int __epidx = " << genRegEp()
+      << "\n      return __epidx;"
+      << "\n    }\n";
 
   // DMK - Accel Support - Also declare the function index for the Offload API call
   #if CMK_CELL != 0
@@ -4201,9 +4204,15 @@ void Entry::genIndexDecls(XStr& str)
   }
 
   if (isReductionTarget()) {
-      str << "    static int __idx_" << name << "_redn_wrapper;\n"
+      str << "    inline static int idx_" << name << "_redn_wrapper() {"
+          << "\n        static int __epidx = CkRegisterEp(\""
+          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
+          << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
+          << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+          << "\n        return __epidx;"
+          << "\n    }\n"
           << "    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return __idx_" << name << "_redn_wrapper; }\n"
+          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }\n"
           << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
@@ -4519,12 +4528,6 @@ void Entry::genDefs(XStr& str)
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
 
-  //Define storage for entry point number
-  str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
-  if (isReductionTarget()) {
-      str << " int " << indexName() << "::__idx_" << name <<"_redn_wrapper=0;\n";
-  }
-
   // DMK - Accel Support
   #if CMK_CELL != 0
     if (isAccel()) {
@@ -4668,11 +4671,11 @@ void Entry::genDefs(XStr& str)
   }
 }
 
-void Entry::genReg(XStr& str)
+XStr Entry::genRegEp()
 {
-  str << "// REG: "<<*this;
-  str << "  "<<epIdx(0)<<" = CkRegisterEp(\""<<name<<"("<<paramType(0)<<")\",\n"
-  	"     (CkCallFnPtr)_call_"<<epStr()<<", ";
+  XStr str;
+  str << "CkRegisterEp(\"" << name << "("<<paramType(0)<<")\",\n"
+      << "      (CkCallFnPtr)_call_" << epStr() << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
@@ -4695,7 +4698,16 @@ void Entry::genReg(XStr& str)
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
   
   if (internalMode) str << "+CK_EP_INTRINSIC";
-  str << ");\n";
+  str << ");";
+  return str;
+}
+
+void Entry::genReg(XStr& str)
+{
+  str << "  // REG: "<<*this;
+  str << "  " << epIdx(0) << ";\n";
+  if (isReductionTarget())
+    str << "  idx_" << name << "_redn_wrapper();\n";
   if (isConstructor()) {
     if(container->isMainChare()&&!(attribs&SMIGRATE))
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
@@ -4715,12 +4727,6 @@ void Entry::genReg(XStr& str)
   else if (param->isMessage() && !attribs&SMIGRATE) {
       str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
       str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
-  }
-  if (isReductionTarget()) {
-      str << "  " << "__idx_" << name << "_redn_wrapper = CkRegisterEp(\""
-          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\",\n"
-          << "     (CkCallFnPtr)_" << name << "_redn_wrapper, "
-          << "CMessage_CkReductionMsg::__idx, __idx, 0);";
   }
 }
 
