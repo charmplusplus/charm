@@ -851,14 +851,17 @@ typedef struct comm_thread_stats
 
 static Comm_Thread_Stats   comm_stats;
 
+static char *counters_dirname = "counters";
+
 static void init_comm_stats()
 {
   memset(&comm_stats, 0, sizeof(Comm_Thread_Stats));
   if (print_stats){
       char ln[200];
-      int code = mkdir("counters", 00777); 
-      sprintf(ln,"counters/statistics.%d.%d", mysize, myrank);
+      int code = mkdir(counters_dirname, 00777); 
+      sprintf(ln,"%s/statistics.%d.%d", counters_dirname, mysize, myrank);
       counterLog=fopen(ln,"w");
+      if (counterLog == NULL) CmiAbort("Counter files open failed");
   }
 }
 
@@ -974,6 +977,8 @@ static void print_comm_stats()
     fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma*1e6/comm_stats.count_in_PumpLocalTransactions_rdma);
     fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg*1e6/comm_stats.count_in_SendBufferMsg_smsg);
     fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg*1e6/comm_stats.count_in_SendRdmaMsg);
+
+    fclose(counterLog);
 }
 
 #else
@@ -3824,20 +3829,29 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     }
 #endif
 
+      /* stats related arguments */
+    CmiGetArgStringDesc(*argv,"+gni_stats_root",&counters_dirname,"counter directory name, default counters");
+
     print_stats = CmiGetArgFlag(*argv, "+print_stats");
     
     stats_off = CmiGetArgFlag(*argv, "+stats_off");
+
+#if CMK_WITH_STATS
+    init_comm_stats();
+#endif
 
     /* init DMA buffer for medium message */
 
     //_init_DMA_buffer();
     
     free(MPID_UGNI_AllAddr);
+
 #if CMK_SMP
     sendRdmaBuf = PCQueueCreate();
 #else
     sendRdmaBuf = 0;
 #endif
+
 #if MACHINE_DEBUG_LOG
     char ln[200];
     sprintf(ln,"debugLog.%d",myrank);
@@ -3855,10 +3869,6 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
 #if CMK_PERSISTENT_COMM
     IndexPool_init(&persistPool);
 #endif
-#endif
-
-#if CMK_WITH_STATS
-    init_comm_stats();
 #endif
 }
 
