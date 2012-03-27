@@ -1,5 +1,6 @@
 /// Sim is the base class for all poser entities
 #include "pose.h"
+#include "poseMsgs.def.h"
 #include "sim.def.h"
 
 /// Global readonly proxy to array containing all posers in a simulation
