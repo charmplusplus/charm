@@ -202,11 +202,18 @@ extern void CmiNodeBarrier(void);
 extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
+#if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
+typedef pthread_spinlock_t *CmiNodeLock;
+#define CmiLock(lock) (pthread_spin_lock(lock))
+#define CmiUnlock(lock) (pthread_spin_unlock(lock))
+#define CmiTryLock(lock) (pthread_spin_trylock(lock))
+#else
 typedef pthread_mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock();
 #define CmiLock(lock) (pthread_mutex_lock(lock))
 #define CmiUnlock(lock) (pthread_mutex_unlock(lock))
 #define CmiTryLock(lock) (pthread_mutex_trylock(lock))
+#endif
+extern CmiNodeLock CmiCreateLock();
 extern void CmiDestroyLock(CmiNodeLock lock);
 
 extern CmiNodeLock CmiMemLock_lock;
