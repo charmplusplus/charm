@@ -285,6 +285,7 @@ private:
     DECIDED,
     LOAD_BALANCE
   } local_state;
+  double  prev_load;
 
 public:
   CkArrayIndex thisIndexMax;

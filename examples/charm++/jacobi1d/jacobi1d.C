@@ -135,7 +135,7 @@ class Jacobi: public CBase_Jacobi {
       arrived_top = 0;
       arrived_bottom = 0;
 
-      //work = thisIndex;
+      work = thisIndex/num_chares * 10 + 1;
       work = 1;
       constrainBC();
     }
@@ -174,9 +174,10 @@ class Jacobi: public CBase_Jacobi {
     // Perform one iteration of work
     void begin_iteration(void) {
       // Send my top edge
-      thisProxy(wrap_y(thisIndex)).receiveGhosts(BOTTOM, arrayDimY, &temperature[index(1, 1)]);
-      // Send my bottom edge
-      thisProxy(wrap_y(thisIndex)).receiveGhosts(TOP, arrayDimY, &temperature[index(blockDimX,1)]);
+    //  thisProxy(wrap_y(thisIndex)).receiveGhosts(BOTTOM, arrayDimY, &temperature[index(1, 1)]);
+    //  // Send my bottom edge
+    //  thisProxy(wrap_y(thisIndex)).receiveGhosts(TOP, arrayDimY, &temperature[index(blockDimX,1)]);
+    check_and_compute();
     }
 
     void receiveGhosts(int dir, int size, double gh[]) {
@@ -205,6 +206,7 @@ class Jacobi: public CBase_Jacobi {
 
     void check_and_compute() {
       double error = 0.0, max_error = 0.0;
+      arrived_top = 1; arrived_bottom = 1;
 
       if (arrived_top >=1 && arrived_bottom >= 1) {
         arrived_top--;

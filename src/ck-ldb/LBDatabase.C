@@ -603,10 +603,10 @@ bool LBDatabase::AddLoad(int iteration, double load) {
  // }
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double idle_time;
-    double tmp;
-    GetTime(&tmp, &tmp, &idle_time, &tmp, &tmp);
-    idle_time = idle_time * iteration * getLBDB()->ObjDataCount() /
-      adaptive_struct.total_syncs_called;
+    IdleTime(&idle_time);
+    CkPrintf("Idle time %lf for iteration %d\n", idle_time, iteration);
+    idle_time = idle_time * getLBDB()->ObjDataCount() /
+       adaptive_struct.total_syncs_called;
 
     double lb_data[6];
     lb_data[0] = iteration;

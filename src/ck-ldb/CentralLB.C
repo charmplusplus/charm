@@ -272,6 +272,13 @@ void CentralLB::ProcessAtSync()
   if (CkMyPe() == cur_ld_balancer) {
     start_lb_time = CkWallTimer();
   }
+ double total_load;
+ double idle_time;
+ double bg_walltime;
+ theLbdb->GetTime(&total_load,&total_load, &idle_time, &bg_walltime, &bg_walltime);
+ theLbdb->IdleTime(&idle_time);
+ CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(), total_load, idle_time, bg_walltime, (total_load - idle_time));
+
 
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
