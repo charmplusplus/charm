@@ -572,29 +572,17 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   el = elist;
   while (el != NULL) {
      e = el->entry;
-     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1)) {
-        if((e->intExpr == 0) || (e->param->isVoid() == 1)) {   // DOUBLE CHECK THIS LOGIC
-           defs << "    " << e->getEntryName();
-           defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
-        }	    
-        else {
-           defs << "    " << e->getEntryName() <<
-                 "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
-                 ", " << e->intExpr << ");\n";
-        }
-     }
-     else { // The parameter is a message
-        sv = e->stateVars->begin();
-        if(e->intExpr == 0) {
-           defs << "    " << sv->name->charstar();
-           defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum << ");\n";
-        }	    
-        else {
-           defs << "    " << sv->name->charstar() <<
-                 "_buf = __cDep->getMessage(" << e->entryPtr->entryNum <<
-                 ", " << e->intExpr << ");\n";
-        }
-     }  
+
+     defs << "    ";
+     if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
+       defs << e->getEntryName();
+     else
+       defs << sv->name->charstar();
+     defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum;
+     if (e->intExpr)
+       defs << ", " << e->intExpr;
+     defs << "); // SEGFAULT? __cDep = 0x0? Did you call __sdag_init() in your constructor?\n";
+
     el = el->next;
   }
 
