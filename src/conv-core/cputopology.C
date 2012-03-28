@@ -37,6 +37,7 @@
 
 #if CMK_CRAYXT || CMK_CRAYXE
 extern "C" int getXTNodeID(int mpirank, int nummpiranks);
+extern "C" void getDimension(int maxnid);
 #endif
 
 #if defined(__APPLE__)  && CMK_HAS_MULTIPROCESSING_H
@@ -512,6 +513,9 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     }
     cpuTopo.sort();
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
+
+    /* find dimension */
+    getDimension(83);
   }
   CmiNodeAllBarrier();
 

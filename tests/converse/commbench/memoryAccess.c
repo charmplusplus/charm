@@ -20,8 +20,10 @@
 #define CLUBMALLOC 1000
 #define RANDMALLOC 1000
 #define RANDOPS 1000
-#define POWER 15
-#define MAXSIZE 16384
+//#define POWER 15
+//#define MAXSIZE 16384
+#define POWER 20 
+#define MAXSIZE 1024*1024
 typedef double myType;
 myType value = 10;
 int dist[] = {1,5,9,10};

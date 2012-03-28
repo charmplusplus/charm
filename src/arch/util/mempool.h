@@ -74,7 +74,8 @@ typedef used_header mempool_header;
 typedef struct block_header
 {
   mem_handle_t        mem_hndl;
-  size_t              size, used;
+  int                 used;
+  size_t              size;
   size_t              block_prev,block_next;   // offset to next memblock
   size_t              freelists[cutOffNum];
   struct mempool_type  *mptr;               // mempool_type
