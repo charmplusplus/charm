@@ -47,7 +47,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   return nid;
 }
 
-#endif /* CMK_CRAYXT */
+#endif /* CMK_CRAYXT || CMK_CRAYXE */
 
 #if XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
@@ -69,6 +69,14 @@ int getXTNodeID(int mpirank, int nummpiranks) {
     /* hopper */
   #define MAXNID 6384
   #define TDIM 24
+#if 0
+    /* ESS */
+  #define MAXNID 4608
+  #define TDIM 32
+    /* JYC */
+  #define MAXNID 83
+  #define TDIM 32
+#endif
   #endif
 
 int *pid2nid;                   /* rank to node ID */
@@ -146,6 +154,24 @@ void pidtonid(int numpes) {
     nid2pid[nid][l] = i;
   }
 #endif
+}
+
+/* get dimension for XE machine */
+void getDimension(int maxnid, int *xdim, int *ydim, int *zdim)
+{
+  int i;
+
+  *xdim = *ydim = *zdim = 0;
+  for (i=0; i<maxnid; i++) {
+      int x, y, z;
+      getMeshCoord(i, &x, &y, &z);
+      if (x>*xdim) *xdim = x;
+      if (y>*ydim) *ydim = y;
+      if (z>*zdim) *zdim = z;
+  }
+  *xdim++;
+  *ydim++;
+  *zdim++;
 }
 
 #endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY */
