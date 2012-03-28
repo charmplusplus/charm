@@ -169,9 +169,9 @@ void getDimension(int maxnid, int *xdim, int *ydim, int *zdim)
       if (y>*ydim) *ydim = y;
       if (z>*zdim) *zdim = z;
   }
-  *xdim++;
-  *ydim++;
-  *zdim++;
+  *xdim = *xdim+1;
+  *ydim = *ydim+1;
+  *zdim = *zdim+1;
 }
 
 #endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY */
