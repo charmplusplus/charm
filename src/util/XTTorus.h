@@ -24,6 +24,7 @@
 #define YDIM 16
 #define ZDIM 24
 #define TDIM 4
+#define CPU_FACTOR 1
 
 #elif XT5_TOPOLOGY
 #define MAXNID 22020
@@ -31,8 +32,10 @@
 #define YDIM 32
 #define ZDIM 24
 #define TDIM 12
+#define CPU_FACTOR 1
 
 #elif XE6_TOPOLOGY
+#define CPU_FACTOR 2
 /* hopper */
 #define MAXNID 6384
 #define XDIM 17
@@ -59,7 +62,6 @@
 #define ZDIM 8
 #define TDIM 32
 #endif
-
 #endif
 
 extern "C" int *pid2nid;
@@ -87,7 +89,7 @@ class XTTorusManager {
     int torus[4];
     int procsPerNode;   // number of cores per node
 
-    int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
+    int coords2pid[XDIM][YDIM][ZDIM][TDIM*CPU_FACTOR];     // coordinates to rank
     struct loc *pid2coords;                     // rank to coordinates
     struct loc origin;
 
@@ -106,7 +108,7 @@ class XTTorusManager {
       for(i=0; i<XDIM; i++)
         for(j=0; j<YDIM; j++)
           for(k=0; k<ZDIM; k++)
-            for(l=0; l<TDIM; l++)
+            for(l=0; l<TDIM*CPU_FACTOR; l++)
               coords2pid[i][j][k][l] = -1;
 
       dimNT = 1;			// assume SN mode first
@@ -127,6 +129,8 @@ class XTTorusManager {
           l++;
         coords2pid[lx][ly][lz][l] = i;
         pid2coords[i].t = l;
+				if((l+1) > dimNT)
+					dimNT = l+1;
 
         if (lx<minX) minX = lx; if (lx>maxX) maxX = lx;
         if (ly<minY) minY = ly; if (ly>maxY) maxY = ly;
@@ -149,16 +153,18 @@ class XTTorusManager {
       dimY = dimNY;
       dimZ = dimNZ;
 
+			/* Not needed now
       // pick a random node (1) to find the number of cores per node being
       // actually used - assumes same number of cores per node
       lx = pid2coords[1].x;
       ly = pid2coords[1].y;
       lz = pid2coords[1].z;
-      for(l=0; l<TDIM; l++) {
+      for(l=0; l<TDIM*CPU_FACTOR; l++) {
         if(coords2pid[lx][ly][lz][l] == -1)
           break;
       }
       dimNT = l;
+			*/
 
       // we get a torus only if the size of the dimension is the biggest
       torus[0] = 0;		// Jaguar is a mesh in X dimension always
@@ -186,7 +192,7 @@ class XTTorusManager {
       x = pid2coords[pe].x - origin.x; 
       y = pid2coords[pe].y - origin.y; 
       z = pid2coords[pe].z - origin.z; 
-      t = pid2coords[pe].t - origin.t; 
+      t = pid2coords[pe].t - origin.t;
     }
 
     inline void realRankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
@@ -197,9 +203,13 @@ class XTTorusManager {
     }
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
+      if(coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t] == -1) {
+				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t-TDIM]; 
+			} else {
+				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
+			}
     }
 };
 
-#endif // XT4_TOPOLOGY || XT5_TOPOLOGY
+#endif // XT4_TOPOLOGY || XT5_TOPOLOGY ||XE6_TOPOLOGY
 #endif //_XT_TORUS_H_

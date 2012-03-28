@@ -84,7 +84,7 @@ TopoManager::TopoManager() {
   torusZ = torus[2];
   torusT = torus[3];
 
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   dimX = xttm.getDimX();
   dimY = xttm.getDimY();
   dimZ = xttm.getDimZ();
@@ -167,8 +167,9 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z) {
   bgltm.rankToCoordinates(pe, x, y, z);
 #elif CMK_BLUEGENEP
   bgptm.rankToCoordinates(pe, x, y, z);
-#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
-  CmiAbort("This function should not be called on Cray XT machines\n");
+#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+	int t;
+  xttm.rankToCoordinates(pe, x, y, z, t);
 #else
   if(dimY > 1){
     // Assumed TXYZ
@@ -208,7 +209,7 @@ void TopoManager::rankToCoordinates(int pe, int &x, int &y, int &z, int &t) {
   bgqtm.rankToCoordinates(pe, x, y, z, t);
 #elif XT3_TOPOLOGY
   xt3tm.rankToCoordinates(pe, x, y, z, t);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   xttm.rankToCoordinates(pe, x, y, z, t);
 #else
   if(dimNY > 1) {
@@ -259,9 +260,8 @@ int TopoManager::coordinatesToRank(int x, int y, int z) {
   return bgltm.coordinatesToRank(x, y, z);
 #elif CMK_BLUEGENEP
   return bgptm.coordinatesToRank(x, y, z);
-#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY
-  CmiAbort("This function should not be called on Cray XT machines\n");
-  return -1;
+#elif XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+  return xttm.coordinatesToRank(x, y, z, 0);
 #else
   if(dimY > 1)
     return x + y*dimX + z*dimX*dimY;
@@ -287,7 +287,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
   return bgqtm.coordinatesToRank(x, y, z, t);
 #elif XT3_TOPOLOGY
   return xt3tm.coordinatesToRank(x, y, z, t);
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
   return xttm.coordinatesToRank(x, y, z, t);
 #else
   if(dimNY > 1)

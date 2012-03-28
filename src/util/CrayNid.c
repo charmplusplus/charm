@@ -17,7 +17,7 @@
 #define MAXNID 2784
 #define TDIM 2
 
-#else	/* if it is a XT4/5 */
+#else	/* if it is a XT4/5 or XE */
 #include <pmi.h>
 #endif
 
@@ -38,7 +38,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   nid = nidpid[mpirank].nid;
   /* free(nidpid); */
 
-#elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 */
+#elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
   PMI_Get_nid(mpirank, &nid);
 #else
 #error "Cannot get network topology information on a Cray build. Swap current module xt-mpt with xt-mpt/5.0.0 or higher and xt-asyncpe with xt-asyncpe/4.0 or higher and then rebuild"
@@ -70,6 +70,9 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define MAXNID 6384
   #define TDIM 24
 #if 0
+		/* titan */
+	#define MAXNID 9600
+#define TDIM 16
     /* ESS */
   #define MAXNID 4608
   #define TDIM 32
