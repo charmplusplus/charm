@@ -39,26 +39,6 @@
 #define YDIM 8
 #define ZDIM 24
 #define TDIM 24
-#if 0
-/* titan */
-#define MAXNID 9600
-#define XDIM 25
-#define YDIM 16
-#define ZDIM 24
-#define TDIM 16
-/* ESS */
-#define MAXNID 4608
-#define XDIM 12
-#define YDIM 8
-#define ZDIM 24
-#define TDIM 32
-/* JYC */
-#define MAXNID 83
-#define XDIM 1
-#define YDIM 6
-#define ZDIM 8
-#define TDIM 32
-#endif
 
 #endif
 

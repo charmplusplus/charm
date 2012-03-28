@@ -46,15 +46,15 @@ struct testinfo
   void (*initiator)(void);
   void (*initializer)(void);
 } tests[] = {
-//  { "memoryAccess",  memoryAccess_init,  memoryAccess_moduleinit },
-//  { "overhead",  overhead_init,  overhead_moduleinit },
-//  { "timer",     timer_init,     timer_moduleinit },
-//  { "proc",      proc_init,      proc_moduleinit },
-//  { "smputil",   smputil_init,   smputil_moduleinit },
+  { "memoryAccess",  memoryAccess_init,  memoryAccess_moduleinit },
+  { "overhead",  overhead_init,  overhead_moduleinit },
+  { "timer",     timer_init,     timer_moduleinit },
+  { "proc",      proc_init,      proc_moduleinit },
+  { "smputil",   smputil_init,   smputil_moduleinit },
   { "pingpong",  pingpong_init,  pingpong_moduleinit },
-//  { "broadcast", broadcast_init, broadcast_moduleinit },
-//  { "reduction", reduction_init, reduction_moduleinit },
-//  { "ctxt",      ctxt_init,      ctxt_moduleinit },
+  { "broadcast", broadcast_init, broadcast_moduleinit },
+  { "reduction", reduction_init, reduction_moduleinit },
+  { "ctxt",      ctxt_init,      ctxt_moduleinit },
   { 0,0,0 },
 };
 
