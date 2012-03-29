@@ -70,8 +70,8 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define MAXNID 6384
   #define TDIM 24
 #if 0
-		/* titan */
-	#define MAXNID 9600
+    /* titan */
+  #define MAXNID 9600
 #define TDIM 16
     /* ESS */
   #define MAXNID 4608
@@ -87,13 +87,21 @@ int nid2pid[MAXNID][TDIM];      /* node ID to rank */
 
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
+ *  0: success,   -1: failure
  */
 int getMeshCoord(int nid, int *x, int *y, int *z) {
+#if CMK_HAS_RCALIB
   rca_mesh_coord_t xyz;
-  rca_get_meshcoord(nid, &xyz);
+  int ret;
+  ret = rca_get_meshcoord(nid, &xyz);
   *x = xyz.mesh_x;
   *y = xyz.mesh_y;
   *z = xyz.mesh_z;
+  return ret;
+#else
+  CmiAbort("rca_get_meshcoord not exist");
+  return -1;
+#endif
 }
 
 /** \function pidtonid
@@ -159,19 +167,22 @@ void pidtonid(int numpes) {
 #endif
 }
 
-/* get dimension for XE machine */
-void getDimension(int maxnid, int *xdim, int *ydim, int *zdim)
+/* get size and dimension for XE machine */
+void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
-  int i;
+  int i = 0, ret;
 
   *xdim = *ydim = *zdim = 0;
-  for (i=0; i<maxnid; i++) {
+    /* loop until fails to find the max */ 
+  do {
       int x, y, z;
-      getMeshCoord(i, &x, &y, &z);
+      ret = getMeshCoord(i, &x, &y, &z);
       if (x>*xdim) *xdim = x;
       if (y>*ydim) *ydim = y;
       if (z>*zdim) *zdim = z;
-  }
+      i++;
+  } while (ret == 0);
+  *maxnid = i;
   *xdim = *xdim+1;
   *ydim = *ydim+1;
   *zdim = *zdim+1;
