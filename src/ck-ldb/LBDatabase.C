@@ -17,11 +17,13 @@
 
 #include "NullLB.h"
 
+#define VEC_SIZE 500
+
 struct AdaptiveData {
   int iteration;
   double max_load;
   double avg_load;
-  double max_idle_time;
+  double max_idle_load_ratio;
   double idle_time;
 };
 
@@ -36,7 +38,6 @@ struct AdaptiveLBStructure {
   int global_max_iter_no;
   int global_recv_iter_counter;
   bool in_progress;
-  double prev_load;
   double lb_strategy_cost;
   double lb_migration_cost;
   bool lb_period_informed;
@@ -412,9 +413,9 @@ void LBDatabase::init(void)
   if (manualOn) TurnManualLBOn();
 #endif
   
-  max_load_vec.resize(100, 0.0);
-  total_load_vec.resize(100, 0.0);
-  total_contrib_vec.resize(100, 0.0);
+  max_load_vec.resize(VEC_SIZE, 0.0);
+  total_load_vec.resize(VEC_SIZE, 0.0);
+  total_contrib_vec.resize(VEC_SIZE, 0.0);
   max_iteration = -1;
 
   // If metabalancer enabled, initialize the variables
@@ -424,7 +425,6 @@ void LBDatabase::init(void)
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
-  adaptive_struct.prev_load = 0.0;
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
@@ -570,7 +570,6 @@ void LBDatabase::ResumeClients() {
   adaptive_struct.global_max_iter_no = 0;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
-  adaptive_struct.prev_load = 0.0;
   adaptive_struct.lb_strategy_cost = 0.0;
   adaptive_struct.lb_migration_cost = 0.0;
   adaptive_struct.lb_msg_send_no = 0;
@@ -581,9 +580,9 @@ void LBDatabase::ResumeClients() {
   total_load_vec.clear();
   total_contrib_vec.clear();
 
-  max_load_vec.resize(100, 0.0);
-  total_load_vec.resize(100, 0.0);
-  total_contrib_vec.resize(100, 0.0);
+  max_load_vec.resize(VEC_SIZE, 0.0);
+  total_load_vec.resize(VEC_SIZE, 0.0);
+  total_contrib_vec.resize(VEC_SIZE, 0.0);
 
   LDResumeClients(myLDHandle);
 }
@@ -637,9 +636,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double avg = load[2]/load[1];
   double max = load[3];
   double avg_idle = load[4]/load[1];
-  double max_idle = load[5];
+  double max_idle_load_ratio = load[5];
   int iteration_n = load[0];
-  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle, load[1]);
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]);
   delete msg;
  
   // Store the data for this iteration
@@ -648,7 +647,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   data.iteration = adaptive_struct.lb_no_iterations;
   data.max_load = max;
   data.avg_load = avg;
-  data.max_idle_time = max_idle;
+  data.max_idle_load_ratio = max_idle_load_ratio;
   data.idle_time = avg_idle;
   adaptive_lbdb.history_data.push_back(data);
 
@@ -664,8 +663,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if ((max_idle >= 0.1 || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
-    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle ratio (%lf)\n", max/avg, max_idle);
+  if ((max_idle_load_ratio >= 0.1 || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
 //      adaptive_struct.lb_calculated_period = 40;
@@ -936,6 +935,14 @@ int LBDatabase::getPredictedLBPeriod() {
 
 bool LBDatabase::isStrategyComm() {
   return adaptive_struct.isCommLB;
+}
+
+void LBDatabase::SetMigrationCost(double lb_migration_cost) {
+  adaptive_struct.lb_migration_cost = lb_migration_cost;
+}
+
+void LBDatabase::SetStrategyCost(double lb_strategy_cost) {
+  adaptive_struct.lb_strategy_cost = lb_strategy_cost;
 }
 
 /*

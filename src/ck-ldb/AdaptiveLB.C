@@ -91,6 +91,8 @@ void AdaptiveLB::work(LDStats* stats)
 
   CkPrintf("AdaptiveLB> Previous LB %d\n", is_prev_lb_refine);
 
+  refineLB->work(stats);
+  return;
   // Choose the right LB
   //
   // If communication overhead is 10% computation, then choose Scotch LB

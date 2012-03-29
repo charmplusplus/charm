@@ -381,6 +381,9 @@ public:
     lb_avg = after_lb_avg;
   }
 
+  void SetMigrationCost(double lb_migration_cost);
+  void SetStrategyCost(double lb_strategy_cost);
+
 private:
   //CProxy_LBDatabase thisProxy;
   int mystep;

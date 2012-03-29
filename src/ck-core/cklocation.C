@@ -1136,10 +1136,11 @@ void CkMigratable::AtSync(int waitForMigration)
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
-  myRec->getLBDB()->AddLoad(atsync_iteration, current_load);
 
-  myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
-  return;
+  if (atsync_iteration != 0) {
+    myRec->getLBDB()->AddLoad(atsync_iteration, current_load);
+  }
+
 //
 //  if (atsync_iteration == 3) {
 //    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);

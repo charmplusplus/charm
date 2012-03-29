@@ -1448,6 +1448,7 @@ void CentralLB::CheckMigrationComplete()
     }
 
     //FIX ME!!! adaptive_struct.lb_migration_cost = (CkWallTimer() - start_lb_time);
+    theLbdb->SetMigrationCost(CkWallTimer() - start_lb_time);
 
     lbdone = 0;
     future_migrates_expected = -1;
@@ -1505,6 +1506,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
     // FIX ME!!! adaptive_struct.lb_strategy_cost = (strat_end_time - strat_start_time);
     //CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, adaptive_struct.lb_strategy_cost);
+    theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }
   return msg;
 #else
