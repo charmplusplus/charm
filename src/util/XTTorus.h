@@ -92,6 +92,7 @@ class XTTorusManager {
     int dimNY;	// dimension of the allocation in Y (nodes)
     int dimNZ;	// dimension of the allocation in Z (nodes)
     int dimNT;  // number of processors per node (2 for XT3)
+    int xDIM, yDIM, zDIM, maxNID;
 
     int torus[4];
     int procsPerNode;   // number of cores per node
@@ -104,7 +105,7 @@ class XTTorusManager {
     XTTorusManager() {
       int nid = 0, oldnid = -1, lx, ly, lz;
       int i, j, k, l;
-			int xDIM, yDIM, zDIM, maxNID,numCores;
+			int numCores;
       int minX, minY, minZ, minT=0, maxX=0, maxY=0, maxZ=0;
 
       int numPes = CmiNumPes();
@@ -177,8 +178,8 @@ class XTTorusManager {
 
       // we get a torus only if the size of the dimension is the biggest
       torus[0] = 0;		
-      torus[1] = (dimNY == YDIM) ? 1 : 0;
-      torus[2] = (dimNZ == ZDIM) ? 1 : 0;
+      torus[1] = (dimNY == yDIM) ? 1 : 0;
+      torus[2] = (dimNZ == zDIM) ? 1 : 0;
       torus[3] = 0;
     }
 

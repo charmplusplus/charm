@@ -52,7 +52,8 @@ class XT3TorusManager {
     int dimNY;	// dimension of the allocation in Y (nodes)
     int dimNZ;	// dimension of the allocation in Z (nodes)
     int dimNT;  // number of processors per node (2 for XT3)
-
+    int xDIM, yDIM, ZDIM, maxNID;
+  
     int torus[4];
     int procsPerNode;   // number of cores per node
     char mapping[10];
@@ -64,7 +65,7 @@ class XT3TorusManager {
   public:
     XT3TorusManager() {
       int nid = 0, oldnid = -1, lx, ly, lz;
-			int xDIM, yDIM, zDIM, maxNID,numCores;
+			int numCores;
       int minX, minY, minZ, minT=0, maxX=0, maxY=0, maxZ=0;
 
       int numPes = CmiNumPes();
@@ -142,9 +143,9 @@ class XT3TorusManager {
       dimZ = dimNZ;
 
       // we get a torus only if the size of the dimension is the biggest
-      torus[0] = (dimNX == XDIM) ? 1 : 0;
-      torus[1] = (dimNY == YDIM) ? 1 : 0;
-      torus[2] = (dimNZ == ZDIM) ? 1 : 0;
+      torus[0] = (dimNX == xDIM) ? 1 : 0;
+      torus[1] = (dimNY == yDIM) ? 1 : 0;
+      torus[2] = (dimNZ == zDIM) ? 1 : 0;
       torus[3] = 0;
 
       if(dimNT == 2) {
@@ -157,7 +158,19 @@ class XT3TorusManager {
       }
     }
 
-    ~XT3TorusManager() { }
+    ~XT3TorusManager() { 
+			int i,j,k;
+			free(pid2coords); 
+			for(i=0; i<xDIM; i++) {
+				for(j=0; j<yDIM; j++) {
+					for(k=0; k<zDIM; k++) {
+						free(coords2pid[i][j][k]);
+					}
+					free(coords2pid[i][j]);
+				}
+				free(coords2pid[i]);
+			}
+    }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
