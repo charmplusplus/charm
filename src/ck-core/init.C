@@ -938,7 +938,7 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	if(CmiMyNode() == 0) {
+	if(CmiMyNode() == 0 && CmiMyRank() == 0) {
     if(CmiGetArgFlag(argv, "+printTopo")) {
 			TopoManager tmgr;
 			tmgr.printAllocation();
