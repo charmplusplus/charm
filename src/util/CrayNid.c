@@ -92,6 +92,8 @@ int maxY = -1;
 int maxZ = -1;
 int maxNID = -1;
 
+void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
+
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
  *  0: success,   -1: failure
