@@ -419,6 +419,7 @@ void TopoManager::printAllocation()
 	int i,x,y,z,t;
 	printf("Printing topology Info-\n");
 	printf("NumPes -  %d\n",numPes);
+	printf("Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
 	printf("Rank - x y z t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,x,y,z,t);
