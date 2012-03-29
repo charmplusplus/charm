@@ -184,6 +184,7 @@ public:
     CkObjID recver;
     MCount SN;
     MCount TN;
+	int incarnation;
     MlogEntry *localMlogEntry;
     bool freeMsg;
 #endif
@@ -263,6 +264,7 @@ private:
       env->recver.type = TypeInvalid;
       env->SN = 0;
       env->TN = 0;
+	  env->incarnation = -1;
       env->localMlogEntry = NULL;
 #endif
 

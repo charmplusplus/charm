@@ -13,6 +13,7 @@ module CkArray {
 	//Broadcast
 	entry void sendBroadcast(CkMessage *);
 	entry void recvBroadcast(CkMessage *);
+	entry void recvBroadcastViaTree(CkMessage *);
 	entry [expedited] void sendExpeditedBroadcast(CkMessage *);
 	entry [expedited] void recvExpeditedBroadcast(CkMessage *);
   };

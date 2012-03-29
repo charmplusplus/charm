@@ -15,6 +15,11 @@ bgtest:
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
+fttest:
+	for d in charm++ ampi; do \
+		(cd $$d && $(MAKE) fttest OPTS='$(OPTS)' || exit 1) || exit 1; \
+	done
+
 test-converse:
 	cd converse; $(MAKE) test OPTS='$(OPTS)'
 
