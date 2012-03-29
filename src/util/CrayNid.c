@@ -77,12 +77,12 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define MAXNID 4608
   #define TDIM 32
     /* JYC */
-  #define MAXNID 83
+  #define MAXNID 97
   #define TDIM 32
 #endif
   #endif
 
-int *pid2nid;                   /* rank to node ID */
+int *pid2nid = NULL;            /* rank to node ID */
 int nid2pid[MAXNID][TDIM];      /* node ID to rank */
 
 /** \function getMeshCoord
@@ -109,6 +109,7 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
  *  correspondingly also creates an array for nids to pids
  */
 void pidtonid(int numpes) {
+  if (pid2nid != NULL) return;          /* did once already */
 #if XT3_TOPOLOGY
   cnos_nidpid_map_t *nidpid; 
   int ierr, i, j, nid;
@@ -156,12 +157,12 @@ void pidtonid(int numpes) {
       nid2pid[i][l] = -1;
 
   for (i=0; i<numpes; i++) {
-    PMI_Get_nid(i, &nid);
+    PMI_Get_nid(CmiNodeOf(i), &nid);
     pid2nid[i] = nid;
+    CmiAssert(nid < MAXNID);
 
     l = 0;
-    while(nid2pid[nid][l] != -1)
-      l++;
+    while(nid2pid[nid][l] != -1) l++;
     nid2pid[nid][l] = i;
   }
 #endif

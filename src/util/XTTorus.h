@@ -56,7 +56,7 @@
 #define ZDIM 24
 #define TDIM 32
 /* JYC */
-#define MAXNID 83
+#define MAXNID 97
 #define XDIM 1
 #define YDIM 6
 #define ZDIM 8
@@ -173,7 +173,7 @@ class XTTorusManager {
       torus[3] = 0;
     }
 
-    ~XTTorusManager() { }
+    ~XTTorusManager() { free(pid2coords); }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }
