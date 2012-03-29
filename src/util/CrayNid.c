@@ -14,8 +14,6 @@
 
 #if XT3_TOPOLOGY
 #include <catamount/cnos_mpi_os.h>
-#define MAXNID 2784
-#define TDIM 2
 
 #else	/* if it is a XT4/5 or XE */
 #include <pmi.h>
@@ -36,7 +34,7 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
   ierr = cnos_get_nidpid_map(&nidpid);
   nid = nidpid[mpirank].nid;
-  /* free(nidpid); */
+  free(nidpid); 
 
 #elif CMK_HAS_PMI_GET_NID	/* if it is a XT4/5 or XE */
   PMI_Get_nid(mpirank, &nid);
@@ -57,7 +55,12 @@ int getXTNodeID(int mpirank, int nummpiranks) {
 
 #include <rca_lib.h>
 
-  #if XT4_TOPOLOGY
+/*
+	#if XT3_TOPOLOGY
+	#define MAXNID 2784
+	#define TDIM 2
+
+  #elif XT4_TOPOLOGY
   #define MAXNID 14000
   #define TDIM 4
 
@@ -66,24 +69,30 @@ int getXTNodeID(int mpirank, int nummpiranks) {
   #define TDIM 12
 
   #elif XE6_TOPOLOGY
-    /* hopper */
+    // hopper 
   #define MAXNID 6384
   #define TDIM 24
 #if 0
-    /* titan */
+    // titan
   #define MAXNID 9600
 #define TDIM 16
-    /* ESS */
+    // ESS 
   #define MAXNID 4608
   #define TDIM 32
-    /* JYC */
+    // JYC
   #define MAXNID 97
   #define TDIM 32
 #endif
   #endif
+*/
 
 int *pid2nid = NULL;            /* rank to node ID */
-int nid2pid[MAXNID][TDIM];      /* node ID to rank */
+int maxX = -1;
+int maxY = -1;
+int maxZ = -1;
+int maxNID = -1;
+
+void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
 
 /** \function getMeshCoord
  *  wrapper function for rca_get_meshcoord
@@ -110,16 +119,23 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
  */
 void pidtonid(int numpes) {
   if (pid2nid != NULL) return;          /* did once already */
+
+	getDimension(&maxNID,&maxX,&maxY,&maxZ);
+	int numCores = CmiNumCores();
+  
+	pid2nid = (int *)malloc(sizeof(int) * numpes);
+
 #if XT3_TOPOLOGY
   cnos_nidpid_map_t *nidpid; 
-  int ierr, i, j, nid;
-  
+  int ierr, i, nid;
+	int *nid2pid;
+	
+	nid2pid = (int*)malloc(maxNID*2*sizeof(int));
   nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
-  pid2nid = (int *)malloc(sizeof(int) * numpes);
 
-  for(i=0; i<MAXNID; i++) {
-    nid2pid[i][0] = -1;
-    nid2pid[i][1] = -1;
+  for(i=0; i<maxNID; i++) {
+    nid2pid[2*i+0] = -1;
+    nid2pid[2*i+1] = -1;
   }
       
   ierr = cnos_get_nidpid_map(&nidpid);
@@ -129,41 +145,32 @@ void pidtonid(int numpes) {
     
     /* if the first position on the node is not filled */
     /* put it there (0) else at (1) */
-    if (nid2pid[nid][0] == -1)
-      nid2pid[nid][0] = i;
+    if (nid2pid[2*nid+0] == -1)
+      nid2pid[2*nid+0] = i;
     else
-      nid2pid[nid][1] = i;
+      nid2pid[2*nid+1] = i;
   }
-  /* free(nidpid); */
 
   /* CORRECTION FOR MPICH_RANK_REORDER_METHOD */
 
   int k = -1;
-  for(i=0; i<MAXNID; i++) {
-    if(nid2pid[i][0] != -1) {
-      nid2pid[i][0] = k++;
+  for(i=0; i<maxNID; i++) {
+    if(nid2pid[2*i+0] != -1) {
+      nid2pid[2*i+0] = k++;
       pid2nid[k] = i;
-      nid2pid[i][1] = k++;
+      nid2pid[2*i+1] = k++;
       pid2nid[k] = i;
     }
   }
-  
+	free(nidpid);
+	free(nid2pid);
+
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
-  int i, l, nid;
-  pid2nid = (int *)malloc(sizeof(int) * numpes);
-
-  for(i=0; i<MAXNID; i++)
-    for(l=0; l<TDIM; l++)
-      nid2pid[i][l] = -1;
-
+  int i, nid;
   for (i=0; i<numpes; i++) {
     PMI_Get_nid(CmiNodeOf(i), &nid);
     pid2nid[i] = nid;
-    CmiAssert(nid < MAXNID);
-
-    l = 0;
-    while(nid2pid[nid][l] != -1) l++;
-    nid2pid[nid][l] = i;
+    CmiAssert(nid < maxNID);
   }
 #endif
 }
@@ -172,6 +179,14 @@ void pidtonid(int numpes) {
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, ret;
+
+	if(maxNID != -1) {
+		*xdim = maxX;
+		*ydim = maxY;
+		*zdim = maxZ;
+		*maxnid = maxNID;
+		return;
+	}
 
   *xdim = *ydim = *zdim = 0;
     /* loop until fails to find the max */ 
@@ -183,10 +198,10 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
       if (z>*zdim) *zdim = z;
       i++;
   } while (ret == 0);
-  *maxnid = i;
-  *xdim = *xdim+1;
-  *ydim = *ydim+1;
-  *zdim = *zdim+1;
+  maxNID = *maxnid = i;
+  maxX = *xdim = *xdim+1;
+  maxY = *ydim = *ydim+1;
+  maxZ = *zdim = *zdim+1;
 }
 
-#endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY */
+#endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY */

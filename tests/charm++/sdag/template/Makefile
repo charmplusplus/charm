@@ -23,6 +23,6 @@ pgm: pgm.o
 	$(CHARMC) $(OPTS) -o $@ $^
 
 test: $(BIN)
-	$(RUN) +p$(PROCS) $<   $(TESTOPTS)
+	$(RUN) +p$(PROCS) ./$<   $(TESTOPTS)
 
 .PHONY: all clean test
