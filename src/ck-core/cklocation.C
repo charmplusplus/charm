@@ -2024,7 +2024,8 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 	if (home!=CkMyPe() && home!=nowOnPe) {
 		//Let this element's home Pe know it lives here now
 		DEBC((AA"  Telling %s's home %d that it lives on %d.\n"AB,idx2str(idx),home,nowOnPe));
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_)
         informLocationHome(thisgroup,idx,home,CkMyPe());
 #else
 		thisProxy[home].updateLocation(idx,nowOnPe);
@@ -2193,7 +2194,8 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 	}else{
 		DEBS((AA"deliver %s rec is null\n"AB,idx2str(idx)));
 	}
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+//#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
+#if !defined(_FAULT_MLOG_)
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
@@ -2612,7 +2614,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 
 	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+//#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_)
     sendMlogLocation(toPe,UsrToEnv(msg));
 #else
 	//Send off message and delete old copy
@@ -2626,7 +2629,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	duringMigration=CmiFalse;
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx,toPe);
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
+//#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
+#if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
 #endif
 	CK_MAGICNUMBER_CHECK
@@ -2653,7 +2657,8 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 	}
 
 	//Create a record for this element
-#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
+//#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
+#if !defined(_FAULT_MLOG_)     
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,msg->ignoreArrival,CmiFalse /* home told on departure */ );
 #else
     CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );

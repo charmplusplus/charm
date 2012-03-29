@@ -192,7 +192,8 @@ static char* _restartDir;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int teamSize=1;
 int chkptPeriod=1000;
-bool parallelRestart=false;
+bool fastRecovery = false;
+int parallelRecovery = 1;
 extern int BUFFER_TIME; //time spent waiting for buffered messages
 #endif
 
@@ -293,9 +294,12 @@ static inline void _parseCommandLineOpts(char **argv)
     if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
         chkptPeriod = 100;
     }
-    if(CmiGetArgFlagDesc(argv,"+Parallelrestart", "Parallel Restart with message logging protocol")){
-        parallelRestart = true;
+	if(CmiGetArgIntDesc(argv,"+fastRecovery", &parallelRecovery, "Parallel recovery with message logging protocol")){
+        fastRecovery = true;
     }
+#endif
+
+#if defined(_FAULT_MLOG_)
     if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
         _maxBufferedMessages = 2;
     }
@@ -305,7 +309,6 @@ static inline void _parseCommandLineOpts(char **argv)
     if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
         BUFFER_TIME = 2;
     }
-
 #endif	
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;
