@@ -938,6 +938,13 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
+	if(CmiMyNode() == 0) {
+    if(CmiGetArgFlag(argv, "+printTopo")) {
+			TopoManager tmgr;
+			tmgr.printAllocation();
+		}
+	}
+
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
 	CkpvInitialize(size_t *, _offsets);

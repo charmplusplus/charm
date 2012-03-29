@@ -23,16 +23,18 @@
 
 #if XT3_TOPOLOGY
 
+#define CPU_FACTOR 1
+/*
 #define XDIM 11
 #define YDIM 12
 #define ZDIM 16
 #define TDIM 2
 #define MAXNID 2784
-
+*/
 extern "C" int *pid2nid;
-extern "C" int nid2pid[MAXNID][TDIM];
 extern "C" int pidtonid(int numpes);
 extern "C" int getMeshCoord(int nid, int *x, int *y, int *z);
+extern "C" void getDimension(int *,int *, int *, int *);
 
 struct loc {
   int x;
@@ -55,28 +57,43 @@ class XT3TorusManager {
     int procsPerNode;   // number of cores per node
     char mapping[10];
     
-    int coords2pid[XDIM][YDIM][ZDIM][TDIM];     // coordinates to rank
+    int ****coords2pid;     // coordinates to rank
     struct loc *pid2coords;                     // rank to coordinates
     struct loc origin;
 
   public:
     XT3TorusManager() {
       int nid = 0, oldnid = -1, lx, ly, lz;
-      int minX=XDIM, minY=YDIM, minZ=ZDIM, minT=0, maxX=0, maxY=0, maxZ=0;
+			int xDIM, yDIM, zDIM, maxNID,numCores;
+      int minX, minY, minZ, minT=0, maxX=0, maxY=0, maxZ=0;
 
       int numPes = CmiNumPes();
       pid2coords = (struct loc*)malloc(sizeof(struct loc) * numPes);
 
       // first fill the nid2pid and pid2nid data structures
       pidtonid(numPes);
- 
-      for(int i=0; i<XDIM; i++)
-	for(int j=0; j<YDIM; j++)
-	  for(int k=0; k<ZDIM; k++)
-	    for(int l=0; l<TDIM; l++)
-	      coords2pid[i][j][k][l] = -1;
+			getDimension(&maxNID,&xDIM,&yDIM,&zDIM);
+      minX=xDIM, minY=yDIM, minZ=zDIM;
+			numCores = CmiNumCores()*CPU_FACTOR;
+			
+			coords2pid = (int ****)malloc(xDIM*sizeof(int***));
+			for(i=0; i<xDIM; i++) {
+				coords2pid[i] = (int ***)malloc(yDIM*sizeof(int**));
+				for(j=0; j<yDIM; j++) {
+					coords2pid[i][j] = (int **)malloc(zDIM*sizeof(int*));
+					for(k=0; k<zDIM; k++) {
+						coords2pid[i][j][k] = (int *)malloc(numCores*sizeof(int*));
+					}
+				}
+			}
 
-      dimNT = 1;			// assume SN mode first
+      for(i=0; i<xDIM; i++)
+        for(j=0; j<yDIM; j++)
+          for(k=0; k<zDIM; k++)
+            for(l=0; l<numCores; l++)
+              coords2pid[i][j][k][l] = -1;
+ 
+      dimNT = 1;	
       // now fill the coords2pid and pid2coords data structures
       for(int i=0; i<numPes; i++)
       {

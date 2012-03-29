@@ -132,7 +132,7 @@ TopoManager::TopoManager() {
   torusT = false;
 #endif
 
-  numPes = dimNX * dimNY * dimNZ * dimNT;
+  numPes = CmiNumPes();
 }
 
 TopoManager::TopoManager(int NX, int NY, int NZ, int NT) : dimNX(NX), dimNY(NY), dimNZ(NZ), dimNT(NT) {
@@ -414,3 +414,14 @@ int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
   }
 }
 
+void TopoManager::printAllocation() 
+{
+	int i,x,y,z,t;
+	printf("Printing topology Info-\n");
+	printf("NumPes -  %d\n",numPes);
+	printf("Rank - x y z t\n");
+	for(i=0; i<numPes; i++) {
+		rankToCoordinates(i,x,y,z,t);
+		printf("%d - %d %d %d %d\n",i,x,y,z,t);
+	}
+}
