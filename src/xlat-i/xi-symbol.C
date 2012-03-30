@@ -1442,6 +1442,17 @@ Array::genSubDecls(XStr& str)
     str <<
          "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
          "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
+    // Emit constructors that take the base class array index too.  This proves
+    // useful for runtime code that needs to access an element via a CkArrayIndex and
+    // an array proxy. This might compromise type safety a wee bit and is hence not
+    // propagated throughout.  For eg, CProxy_Foo::operator[] still accepts only the
+    // appropriate CkArrayIndexND.
+    str <<
+         "    "<<ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx,CK_DELCTOR_PARAM)\n"
+         "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
+    str <<
+         "    "<<ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx)\n"
+         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
