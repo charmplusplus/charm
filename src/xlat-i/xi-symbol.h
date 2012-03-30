@@ -630,6 +630,8 @@ class Member : public Construct {
   protected:
     Chare *container;
   public:
+    TVarList *tspec;
+    Member() : container(0), tspec(0) { }
     inline Chare *getContainer() const { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }

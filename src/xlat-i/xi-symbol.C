@@ -1851,6 +1851,8 @@ Chare::genDefs(XStr& str)
     if(!external) str << "=0";
     str << ";\n";
   }
+  templateGuardEnd(str);
+
   if(list)
   {//Add definitions for all entry points
     list->genDefs(str);
@@ -1865,6 +1867,8 @@ Chare::genDefs(XStr& str)
       forElement=forIndividual;
     }
   }
+
+  templateGuardBegin(isTemplated(), str);
   // define the python routines
   if (isPython()) {
     str << "/* ---------------- python wrapper -------------- */\n";
@@ -2212,14 +2216,23 @@ Template::genVars(XStr& str)
   str << " > ";
 }
 
+XStr generateTemplateSpec(TVarList* tspec)
+{
+  XStr str;
+
+  if(tspec) {
+    str << "template < ";
+    tspec->genLong(str);
+    str << " > ";
+  }
+
+  return str;
+}
+
 void
 Template::genSpec(XStr& str)
 {
-  str << "template ";
-  str << "< ";
-  if(tspec)
-    tspec->genLong(str);
-  str << " >\n";
+  str << generateTemplateSpec(tspec);
 }
 
 void
@@ -3033,9 +3046,19 @@ XStr Entry::epStr(void)
 XStr Entry::epIdx(int fromProxy)
 {
   XStr str;
-  if (fromProxy)
+  if (fromProxy) {
     str << indexName()<<"::";
-  str << "idx_"<<epStr()<<"()";
+    // If the chare is also templated, then we must avoid a parsing ambiguity
+    if (tspec)
+      str << "template ";
+  }
+  str << "idx_" << epStr();
+  if (tspec) {
+    str << "< ";
+    tspec->genShort(str);
+    str << " >";
+  }
+  str << "()";
   return str;
 }
 
@@ -3044,7 +3067,13 @@ XStr Entry::epRegFn(int fromProxy)
   XStr str;
   if (fromProxy)
     str << indexName() << "::";
-  str << "reg_"<<epStr()<<"()";
+  str << "reg_" << epStr();
+  if (tspec) {
+    str << "< ";
+    tspec->genShort(str);
+    str << " >";
+  }
+  str << "()";
   return str;
 }
 
@@ -3061,12 +3090,13 @@ XStr Entry::chareIdx(int fromProxy)
 // this Member's container with the given return type, e.g.
 // template<int N,class foo> void CProxy_bar<N,foo>
 // Works with non-templated Chares as well.
-XStr Member::makeDecl(const XStr &returnType,int forProxy)
+XStr Member::makeDecl(const XStr &returnType, int forProxy)
 {
   XStr str;
 
   if (container->isTemplated())
-    str << container->tspec() << " ";
+    str << container->tspec() << "\n";
+  str << generateTemplateSpec(tspec) << "\n";
   str << returnType<<" ";
   if (forProxy)
   	str<<container->proxyName();
@@ -3092,7 +3122,8 @@ void Entry::genChareDecl(XStr& str)
     genChareStaticConstructorDecl(str);
   } else {
     // entry method declaration
-    str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
+    str << "    " << generateTemplateSpec(tspec) << "\n"
+        << "    " << retType << " " << name << "(" << paramType(1,1) << ");\n";
   }
 }
 
@@ -3169,9 +3200,11 @@ void Entry::genChareStaticConstructorDefs(XStr& str)
 void Entry::genArrayDecl(XStr& str)
 {
   if(isConstructor()) {
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     genArrayStaticConstructorDecl(str);
   } else {
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     if(isIget())
       str << "    "<<"CkFutureID"<<" "<<name<<"("<<paramType(1,1)<<") ;\n"; //no const
     else if(isLocal())
@@ -3353,16 +3386,20 @@ void Entry::genGroupDecl(XStr& str)
   }
 
   if(isConstructor()) {
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     genGroupStaticConstructorDecl(str);
   } else {
     if ((isSync() || isLocal()) && !container->isForElement()) return; //No sync broadcast
+    str << "    " << generateTemplateSpec(tspec) << "\n";
     if (isLocal())
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1,0)<<");\n";
     else
       str << "    "<<retType<<" "<<name<<"("<<paramType(1,1)<<");\n";
     // entry method on multiple PEs declaration
     if(!container->isForElement() && !container->isForSection() && !isSync() && !isLocal() && !container->isNodeGroup()) {
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"int npes, int *pes"<<eo(1)<<");\n";
+      str << "    " << generateTemplateSpec(tspec) << "\n";
       str << "    "<<retType<<" "<<name<<"("<<paramComma(1,0)<<"CmiGroup &grp"<<eo(1)<<");\n";
     }
   }
@@ -4205,13 +4242,18 @@ void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
 /******************* Shared Entry Point Code **************************/
 void Entry::genIndexDecls(XStr& str)
 {
-  str << "/* DECLS: "; print(str); str << " */";
+  str << "    /* DECLS: "; print(str); str << "     */";
+
+  XStr templateSpecLine;
+  templateSpecLine << "\n    " << generateTemplateSpec(tspec);
 
   // Entry point index storage
   str << "\n    // Entry point registration at startup"
-      << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
+      << templateSpecLine
+      << "\n    static int reg_" << epStr() << "();" ///< @note: Should this be generated as private?
       << "\n    // Entry point index lookup"
-      << "\n    inline static int "<<epIdx(0)<<"{"
+      << templateSpecLine
+      << "\n    inline static int idx_" << epStr() << "() {"
       << "\n      static int epidx = " << epRegFn(0) << ";"
       << "\n      return epidx;"
       << "\n    }\n";
@@ -4224,10 +4266,11 @@ void Entry::genIndexDecls(XStr& str)
   #endif
 
   // Index function, so user can find the entry point number
-  str << "    static int ";
+  str << templateSpecLine
+      << "\n    static int ";
   if (isConstructor()) str <<"ckNew";
   else str <<name;
-  str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }\n";
+  str << "("<<paramType(1,0)<<") { return "<<epIdx(0)<<"; }";
 
   // DMK - Accel Support
   if (isAccel()) {
@@ -4252,17 +4295,20 @@ void Entry::genIndexDecls(XStr& str)
   }
 
   // call function declaration
-  str << "    static void _call_"<<epStr()<<"(void* impl_msg,"<<
-    container->baseName()<<"* impl_obj);\n";
+  str << templateSpecLine
+      << "\n    static void _call_" << epStr() << "(void* impl_msg, void* impl_obj);";
   if(isThreaded()) {
-    str << "    static void _callthr_"<<epStr()<<"(CkThrCallArg *);\n";
+    str  << templateSpecLine
+         << "\n    static void _callthr_"<<epStr()<<"(CkThrCallArg *);";
   }
   if (hasCallMarshall) {
-    str << "    static int _callmarshall_"<<epStr()<<"(char* impl_buf,"<<
-      container->baseName()<<"* impl_obj);\n";
+    str << templateSpecLine
+        << "\n    static int _callmarshall_" << epStr() << "(char* impl_buf,"
+        << container->baseName() << "* impl_obj);";
   }
   if (param->isMarshalled()) {
-    str << "    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);\n";
+    str << templateSpecLine
+        << "\n    static void _marshallmessagepup_"<<epStr()<<"(PUP::er &p,void *msg);";
   }
 }
 
@@ -4514,7 +4560,12 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
     if(isConstructor()) {//Constructor: call "new (obj) foo(parameters)"
   	str << "  new (impl_obj) "<<container->baseName();
     } else {//Regular entry method: call "obj->bar(parameters)"
-  	str << "  impl_obj->"<<name;
+      str << "  impl_obj->" << (tspec ? "template " : "") << name;
+      if (tspec) {
+        str << "< ";
+        tspec->genShort(str);
+        str << " >";
+      }
     }
 
     if (isArgcArgv) { //Extract parameters from CkArgMsg (should be parameter marshalled)
@@ -4534,6 +4585,7 @@ void Entry::genDefs(XStr& str)
   XStr containerType=container->baseName();
   XStr preMarshall,preCall,postCall;
 
+  templateGuardBegin(tspec || container->isTemplated(), str);
   str << "/* DEFS: "; print(str); str << " */\n";
 
   if (attribs&SMIGRATE)
@@ -4560,11 +4612,14 @@ void Entry::genDefs(XStr& str)
 
 
   //Prevents repeated call and __idx definitions:
-  if (container->getForWhom()!=forAll) return;
+  if (container->getForWhom()!=forAll) {
+    templateGuardEnd(str);
+    return;
+  }
 
   // Define the entry point registration functions
   str << "\n// Entry point registration function"
-      << "\n" << makeDecl("int") << "::" << epRegFn(0) << " {"
+      << "\n" << makeDecl("int") << "::reg_" << epStr() << "() {"
       << "\n  return " << genRegEp() << ";"
       << "\n}\n\n";
 
@@ -4665,8 +4720,10 @@ void Entry::genDefs(XStr& str)
   }
 
   //Generate the call-method body
-  str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg,"<<containerType<<" * impl_obj)\n";
-  str << "{\n";
+  str << makeDecl("void")<<"::_call_"<<epStr()<<"(void* impl_msg, void* impl_obj_void)\n";
+  str << "{\n"
+      << "  " << container->baseName() << "* impl_obj = static_cast<"
+      << container->baseName() << " *>(impl_obj_void);\n";
   if (!isLocal()) {
     if(isThreaded()) str << callThread(epStr());
     str << preMarshall;
@@ -4719,13 +4776,20 @@ void Entry::genDefs(XStr& str)
      }
      str << "}\n";
   }
+  templateGuardEnd(str);
 }
 
 XStr Entry::genRegEp()
 {
   XStr str;
   str << "CkRegisterEp(\"" << name << "("<<paramType(0)<<")\",\n"
-      << "      (CkCallFnPtr)_call_" << epStr() << ", ";
+      << "      _call_" << epStr();
+  if (tspec) {
+    str << "< ";
+    tspec->genShort(str);
+    str << " >";
+  }
+  str << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
@@ -4754,6 +4818,9 @@ XStr Entry::genRegEp()
 
 void Entry::genReg(XStr& str)
 {
+  if (tspec)
+    return;
+
   str << "  // REG: "<<*this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget())

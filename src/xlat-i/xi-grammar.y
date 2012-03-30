@@ -672,6 +672,11 @@ IncludeFile    : LITERAL
 
 Member		: Entry ';'
 		{ $$ = $1; }
+                | TemplateSpec Entry ';'
+                {
+                  $2->tspec = $1;
+                  $$ = $2;
+                }
 		| NonEntryMember
 		{ $$ = $1; }
 		;
