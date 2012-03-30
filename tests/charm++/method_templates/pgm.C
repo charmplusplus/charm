@@ -4,17 +4,21 @@
 #include "mylib.def.h"
 #undef CK_TEMPLATES_ONLY
 #include <iostream>
+#include <functional>
 
 // Utility functors
-class add {
+template <typename cmp>
+class count {
     private:
-        int sum;
+        int threshold, num;
+        cmp c;
     public:
-        add(): sum(0) {}
-        inline void operator() (int i) { sum += i; }
-        void pup(PUP::er &p) { p | sum; }
-        friend std::ostream& operator<< (std::ostream& out, const add& obj) {
-            out << "sum = " << obj.sum;
+        count(const int _t=0): threshold(_t), num(0) {}
+        inline void operator() (int i) { if (c(i, threshold)) num++; }
+        void pup(PUP::er &p) { p | threshold; p | num; }
+        friend std::ostream& operator<< (std::ostream& out, const count& obj) {
+            out << "threshold = "<< obj.threshold << "; "
+                << "num = " << obj.num;
             return out;
         }
 };
@@ -29,7 +33,8 @@ class avg {
         void pup(PUP::er &p) { p | sum; p | num; }
         friend std::ostream& operator<< (std::ostream& out, const avg& obj) {
             out << "num = " << obj.num << "; "
-                << "avg = " << ( obj.num ? obj.sum/obj.num : obj.sum );
+                << "sum = " << obj.sum << "; "
+                << "avg = " << ( obj.num ? (double)obj.sum/obj.num : obj.sum );
             return out;
         }
 };
@@ -38,9 +43,9 @@ class avg {
 // Temporary initproc to register the instantiated EPs
 void register_instantiations()
 {
-    add adder;
+    count< std::less<int> >  comparator;
     avg avger;
-    CkIndex_libArray::doSomething<add>(adder);
+    CkIndex_libArray::doSomething< count<std::less<int> > >(comparator);
     CkIndex_libArray::doSomething<avg>(avger);
 };
 
@@ -58,7 +63,8 @@ class pgm : public CBase_pgm
         }
         
         void startTest() {
-            arrProxy.doSomething(add());
+            //count< std::less<int> > cnt(5);
+            arrProxy.doSomething( count< std::less<int> >(5) );
             arrProxy.doSomething(avg());
         }
 
