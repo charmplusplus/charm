@@ -55,7 +55,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   lb_data[4] = 0.0;
   lb_data[5] = 0.0;
   for (int i = 0; i < nMsg; i++) {
-    CkAssert(msgs[i]->getSize() == 4*sizeof(double));
+    CkAssert(msgs[i]->getSize() == 6*sizeof(double));
     double* m = (double *)msgs[i]->getData();
     // Total count
     lb_data[1] += m[1];
