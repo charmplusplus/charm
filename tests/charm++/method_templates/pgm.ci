@@ -1,0 +1,13 @@
+mainmodule client  {
+  extern module mylib;
+  initproc register_instantiations();
+
+  mainchare pgm {
+    entry pgm (CkArgMsg *m);
+
+    entry void startTest();
+    entry[reductiontarget] void endTest();
+  };
+
+}
+

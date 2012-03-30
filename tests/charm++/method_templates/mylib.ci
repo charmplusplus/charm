@@ -1,0 +1,8 @@
+module mylib {
+    array [1D] libArray {
+        entry libArray();
+        template <typename T>
+        entry void doSomething(T t);
+    };
+};
+
