@@ -4,6 +4,8 @@
 #include "mylib.decl.h"
 #include <sstream>
 
+extern int moduleRo;
+
 class libArray: public CBase_libArray
 {
     public:

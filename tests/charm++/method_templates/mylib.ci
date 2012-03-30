@@ -1,4 +1,5 @@
 module mylib {
+  readonly int moduleRo;
     array [1D] libArray {
         entry libArray();
         template <typename T>
