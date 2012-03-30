@@ -18,14 +18,13 @@ class CParsedFile {
     void propagateState(void);
     void generateConnectEntryList(void);
     void generateEntryList(void);       // collect and setup CEntry list for When and If
-    void generateCode(XStr& output);
-    void generateEntries(XStr& output);
+    void generateCode(XStr& decls, XStr& defs);
+    void generateEntries(XStr& decls, XStr& defs);
     void generateConnectEntries(XStr& output);
-    void generateInitFunction(XStr& output);
+    void generateInitFunction(XStr& decls, XStr& defs);
     void generatePupFunction(XStr& output);
-    void generateRegisterEp(XStr& output);
-    void generateTraceEpDecl(XStr& output);
-    void generateTraceEpDef(XStr& output);
+    void generateTraceEp(XStr& decls, XStr& defs);
+    void generateRegisterEp(XStr& decls, XStr& defs);
     void generateDependencyMergePoints(XStr& output);
     void generateTrace();
   public:
@@ -37,34 +36,30 @@ class CParsedFile {
     CParsedFile(Chare *c): container(c) {}
     ~CParsedFile(void){}
     void print(int indent);
-    void doProcess(XStr& classname, XStr& output) {
+    void doProcess(XStr& classname, XStr& decls, XStr& defs) {
       className = &classname;
-      output << "#define " << classname << "_SDAG_CODE \n";
-      
+      decls << "#define " << classname << "_SDAG_CODE \n";
 
       numberNodes();
       labelNodes();
       propagateState();
       generateConnectEntryList();
-      generateTrace();				// for tracing Gengbin
+      generateTrace();
       generateEntryList();
       mapCEntry();
-      generateCode(output);
-      generateEntries(output);
-      generateInitFunction(output);
-      generatePupFunction(output);
-      generateRegisterEp(output);		// for tracing Gengbin
-      generateTraceEpDecl(output);		// for tracing Gengbin
+      generateCode(decls, defs);
+      generateEntries(decls, defs);
+      generateInitFunction(decls, defs);
+      generatePupFunction(decls);
+      generateRegisterEp(decls, defs);
+      generateTraceEp(decls, defs);
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-      generateDependencyMergePoints(output); // for Isaac's Critical Path Detection
+      generateDependencyMergePoints(decls); // for Isaac's Critical Path Detection
 #endif
 
-      output.line_append_padding('\\');
-      output << "\n";
-      output << "#define " << classname << "_SDAG_CODE_DEF \\\n";
-      generateTraceEpDef(output);
-      output << "\n";
+      decls.line_append_padding('\\');
+      decls << "\n";
     }
 
 };

@@ -888,7 +888,7 @@ Chare::genRegisterMethodDef(XStr& str)
   if(list)
     list->genReg(str);
   if (hasSdagEntry) {
-      str << "  " << baseName(0) << "::__sdag_register(); \n";
+      str << "  " << baseName() << "::__sdag_register(); \n";
   }
   str << "}\n";
   templateGuardEnd(str);
@@ -981,11 +981,11 @@ Chare::genDecls(XStr& str)
     list->collectSdagCode(&myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
-      XStr sdag_output;
+      XStr sdagDecls;
       classname << baseName(0);
       resetNumbers();
-      myParsedFile.doProcess(classname, sdag_output);
-      str << sdag_output;
+      myParsedFile.doProcess(classname, sdagDecls, sdagDefs);
+      str << sdagDecls;
     }
   }
 
@@ -1846,7 +1846,7 @@ Chare::genDefs(XStr& str)
     genRegisterMethodDef(str);
   if (hasSdagEntry) {
     str << "\n";
-    str << baseName(0) << "_SDAG_CODE_DEF\n\n";
+    str << sdagDefs;
   }
 }
 
@@ -2187,7 +2187,7 @@ Template::genSpec(XStr& str)
   str << "< ";
   if(tspec)
     tspec->genLong(str);
-  str << " > ";
+  str << " >\n";
 }
 
 void
@@ -2735,37 +2735,39 @@ void CParsedFile::generateConnectEntryList(void)
   }
 }
 
-void CParsedFile::generateCode(XStr& op)
+void CParsedFile::generateCode(XStr& decls, XStr& defs)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op, cn);
+    cn->sdagCon->generateCode(decls, defs, cn);
   }
 }
 
-void CParsedFile::generateEntries(XStr& op)
+void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
   CEntry *en;
   SdagConstruct *sc;
-  op << "public:\n";
+  decls << "public:\n";
   for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
-     sc->generateConnectEntries(op);
+     sc->generateConnectEntries(decls);
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(op);
+    en->generateCode(decls, defs);
   }
 }
 
-void CParsedFile::generateInitFunction(XStr& op)
+void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
-  op << "private:\n";
-  op << "  CDep *__cDep;\n";
-  op << "  void __sdag_init(void) {\n";
-  op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
+  decls << "private:\n";
+  decls << "  CDep *__cDep;\n";
+
+  XStr name = "__sdag_init";
+  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
+  defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
   CEntry *en;
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(op);
+    en->generateDeps(defs);
   }
-  op << "  }\n";
+  endMethod(defs);
 }
 
 
@@ -2775,32 +2777,29 @@ void CParsedFile::generateInitFunction(XStr& op)
 
     Used by Isaac's critical path detection
 */
-void CParsedFile::generateDependencyMergePoints(XStr& op) 
+void CParsedFile::generateDependencyMergePoints(XStr& decls) 
 {
-
-  op << " \n";
+  decls << " \n";
 
   // Each when statement will have a set of message dependencies, and
   // also the dependencies from completion of previous task
   for(int i=0;i<numWhens;i++){
-    op << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+    decls << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
   
   // The end of each overlap block will have multiple paths that merge
   // before the subsequent task is executed
   for(int i=0;i<numOlists;i++){
-    op << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+    decls << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
-
 }
 
-
-void CParsedFile::generatePupFunction(XStr& op)
+void CParsedFile::generatePupFunction(XStr& decls)
 {
-  op << "public:\n";
-  op << "  void __sdag_pup(PUP::er& p) {\n";
-  op << "    if (__cDep) { __cDep->pup(p); }\n";
-  op << "  }\n";
+  decls << "public:\n";
+  decls << "  void __sdag_pup(PUP::er& p) {\n";
+  decls << "    if (__cDep) { __cDep->pup(p); }\n";
+  decls << "  }\n";
 }
 
 void CParsedFile::generateTrace()
@@ -2812,36 +2811,27 @@ void CParsedFile::generateTrace()
   }
 }
 
-void CParsedFile::generateRegisterEp(XStr& op)
+void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
 {
-  op << "  static void __sdag_register() {\n\n";
+  XStr name = "__sdag_register";
+  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
 
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) {
-      cn->sdagCon->generateRegisterEp(op);
+      cn->sdagCon->generateRegisterEp(defs);
     }
   }
-  op << "  }\n";
+  endMethod(defs);
 }
 
-void CParsedFile::generateTraceEpDecl(XStr& op)
+void CParsedFile::generateTraceEp(XStr& decls, XStr& defs)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEpDecl(op);
+      cn->sdagCon->generateTraceEp(decls, defs, container);
     }
   }
 }
-
-void CParsedFile::generateTraceEpDef(XStr& op)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEpDef(op);
-    }
-  }
-}
-
 
 ////////////////////////// SDAGCONSTRUCT ///////////////////////
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
@@ -3014,6 +3004,15 @@ XStr Entry::epIdx(int fromProxy)
   if (fromProxy)
     str << indexName()<<"::";
   str << "idx_"<<epStr()<<"()";
+  return str;
+}
+
+XStr Entry::epRegFn(int fromProxy)
+{
+  XStr str;
+  if (fromProxy)
+    str << indexName() << "::";
+  str << "reg_"<<epStr()<<"()";
   return str;
 }
 
@@ -4177,9 +4176,12 @@ void Entry::genIndexDecls(XStr& str)
   str << "/* DECLS: "; print(str); str << " */";
 
   // Entry point index storage
-  str << "\n    inline static int "<<epIdx(0)<<"{"
-      << "\n      static int __epidx = " << genRegEp()
-      << "\n      return __epidx;"
+  str << "\n    // Entry point registration at startup"
+      << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
+      << "\n    // Entry point index lookup"
+      << "\n    inline static int "<<epIdx(0)<<"{"
+      << "\n      static int epidx = " << epRegFn(0) << ";"
+      << "\n      return epidx;"
       << "\n    }\n";
 
   // DMK - Accel Support - Also declare the function index for the Offload API call
@@ -4204,16 +4206,16 @@ void Entry::genIndexDecls(XStr& str)
   }
 
   if (isReductionTarget()) {
-      str << "    inline static int idx_" << name << "_redn_wrapper() {"
-          << "\n        static int __epidx = CkRegisterEp(\""
-          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
-          << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
-          << " CMessage_CkReductionMsg::__idx, __idx, 0);"
-          << "\n        return __epidx;"
-          << "\n    }\n"
-          << "    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }\n"
-          << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
+      str << "\n    // Entry point registration at startup"
+          << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
+          << "\n    // Entry point index lookup"
+          << "\n    inline static int idx_" << name << "_redn_wrapper() {"
+          << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
+          << "\n      return epidx;"
+          << "\n    }"
+          << "\n    static int " << name << "_redn_wrapper"
+          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
+          << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
 
@@ -4528,6 +4530,22 @@ void Entry::genDefs(XStr& str)
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
 
+  // Define the entry point registration functions
+  str << "\n// Entry point registration function"
+      << "\n" << makeDecl("int") << "::" << epRegFn(0) << " {"
+      << "\n  return " << genRegEp() << ";"
+      << "\n}\n\n";
+
+  if (isReductionTarget())
+  {
+    str << "\n// Redn wrapper registration function"
+        << "\n" << makeDecl("int") << "::reg_"<< name <<"_redn_wrapper() {"
+        << "\n  return CkRegisterEp(\""  << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
+        << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
+        << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n}\n\n";
+  }
+
   // DMK - Accel Support
   #if CMK_CELL != 0
     if (isAccel()) {
@@ -4698,7 +4716,7 @@ XStr Entry::genRegEp()
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
   
   if (internalMode) str << "+CK_EP_INTRINSIC";
-  str << ");";
+  str << ")";
   return str;
 }
 

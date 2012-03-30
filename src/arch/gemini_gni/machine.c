@@ -64,9 +64,9 @@
 #define CMI_EXERT_SEND_CAP	0
 #define	CMI_EXERT_RECV_CAP	0
 #define CMI_EXERT_RDMA_CAP      0
-
 #if CMI_EXERT_SEND_CAP
-#define SEND_CAP  32
+int SEND_large_cap = 100;
+int SEND_large_pending = 0;
 #endif
 
 #if CMI_EXERT_RECV_CAP
@@ -181,7 +181,7 @@ static int _detected_hang = 0;
 #define             SMSG_ATTR_SIZE      sizeof(gni_smsg_attr_t)
 
 // dynamic SMSG
-static int useDynamicSMSG  =0;               /* dynamic smsgs setup */
+static int useDynamicSMSG = 0;               /* dynamic smsgs setup */
 
 static int avg_smsg_connection = 32;
 static int                 *smsg_connected_flag= 0;
@@ -847,6 +847,9 @@ typedef struct comm_thread_stats
     int      count_in_PumpLocalTransactions_rdma;
     double   time_in_PumpLocalTransactions_rdma;
     double   max_time_in_PumpLocalTransactions_rdma;
+    int      count_in_PumpDatagramConnection;
+    double   time_in_PumpDatagramConnection;
+    double   max_time_in_PumpDatagramConnection;
 } Comm_Thread_Stats;
 
 static Comm_Thread_Stats   comm_stats;
@@ -955,6 +958,16 @@ static void init_comm_stats()
               comm_stats.max_time_in_SendRdmaMsg = t;    \
         }
 
+#define STATS_PUMPDATAGRAMCONNECTION_TIME(x)   \
+        { double t = CmiWallTimer(); \
+          x;        \
+          t = CmiWallTimer() - t;          \
+          comm_stats.count_in_PumpDatagramConnection ++;        \
+          comm_stats.time_in_PumpDatagramConnection += t;   \
+          if (t>comm_stats.max_time_in_PumpDatagramConnection)      \
+              comm_stats.max_time_in_PumpDatagramConnection = t;    \
+        }
+
 static void print_comm_stats()
 {
     fprintf(counterLog, "Node[%d] SMSG time in buffer\t[total:%f\tmax:%f\tAverage:%f](milisecond)\n", myrank, 1000.0*comm_stats.all_time_in_send_buffered_smsg, 1000.0*comm_stats.max_time_in_send_buffered_smsg, 1000.0*comm_stats.all_time_in_send_buffered_smsg/comm_stats.smsg_count);
@@ -977,6 +990,8 @@ static void print_comm_stats()
     fprintf(counterLog, "PumpLocalTransactions(RDMA):  %d\t%.6f\t%.6f\t%.6f\n", comm_stats.count_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma, comm_stats.max_time_in_PumpLocalTransactions_rdma, comm_stats.time_in_PumpLocalTransactions_rdma*1e6/comm_stats.count_in_PumpLocalTransactions_rdma);
     fprintf(counterLog, "SendBufferMsg (SMSG):         %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg, comm_stats.max_time_in_SendBufferMsg_smsg, comm_stats.time_in_SendBufferMsg_smsg*1e6/comm_stats.count_in_SendBufferMsg_smsg);
     fprintf(counterLog, "SendRdmaMsg:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg, comm_stats.max_time_in_SendRdmaMsg, comm_stats.time_in_SendRdmaMsg*1e6/comm_stats.count_in_SendRdmaMsg);
+    if (useDynamicSMSG)
+    fprintf(counterLog, "PumpDatagramConnection:                  %d\t%.6f\t%.6f\t%.6f\n",  comm_stats.count_in_PumpDatagramConnection, comm_stats.time_in_PumpDatagramConnection, comm_stats.max_time_in_PumpDatagramConnection, comm_stats.time_in_PumpDatagramConnection*1e6/comm_stats.count_in_PumpDatagramConnection);
 
     fclose(counterLog);
 }
@@ -987,6 +1002,7 @@ static void print_comm_stats()
 #define STATS_PUMPREMOTETRANSACTIONS_TIME(x)       x
 #define STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(x)   x
 #define STATS_SENDRDMAMSG_TIME(x)                  x
+#define STATS_PUMPDATAGRAMCONNECTION_TIME(x)       x
 #endif
 
 static void
@@ -1460,10 +1476,16 @@ static int connect_to(int destNode)
       free(smsg_attr_vector_remote[destNode]);
       smsg_attr_vector_remote[destNode] = NULL;
       mailbox_list->offset -= smsg_memlen;
+#if PRINT_SYH
+    printf("[%d] send connect_to request to %d failed\n", myrank, destNode);
+#endif
       return 0;
     }
     GNI_RC_CHECK("GNI_Post", status);
     smsg_connected_flag[destNode] = 1;
+#if PRINT_SYH
+    printf("[%d] send connect_to request to %d done\n", myrank, destNode);
+#endif
     return 1;
 }
 
@@ -1665,11 +1687,21 @@ inline static gni_return_t send_large_messages(SMSG_QUEUE *queue, int destNode, 
         register_size = 0;  
     }
 
+#if CMI_EXERT_SEND_CAP
+    if(SEND_large_pending >= SEND_large_cap)
+    {
+        status = GNI_RC_ERROR_NOMEM;
+    }
+#endif
+ 
     if(status == GNI_RC_SUCCESS)
     {
-        status = send_smsg_message( queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, inbuff, smsg_ptr); 
+       status = send_smsg_message( queue, destNode, control_msg_tmp, CONTROL_MSG_SIZE, LMSG_INIT_TAG, inbuff, smsg_ptr); 
         if(status == GNI_RC_SUCCESS)
         {
+#if CMI_EXERT_SEND_CAP
+            SEND_large_pending++;
+#endif
             buffered_send_msg += register_size;
             if(control_msg_tmp->seq_id == 0)
             {
@@ -2217,6 +2249,9 @@ static void PumpNetworkSmsg()
                     buffered_send_msg -= GetMempoolsize(msg);
                 MACHSTATE5(8, "GO send done to %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
                 CmiFree(msg);
+#if CMI_EXERT_SEND_CAP
+                SEND_large_pending--;
+#endif
                 break;
             }
 #endif
@@ -2230,6 +2265,9 @@ static void PumpNetworkSmsg()
                 header_tmp = (CONTROL_MSG *) header;
 #endif
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
+#if CMI_EXERT_SEND_CAP
+                    SEND_large_pending--;
+#endif
                 void *msg = (void*)(header_tmp->source_addr);
                 int cur_seq = CmiGetMsgSeq(msg);
                 int offset = ONE_SEG*(cur_seq+1);
@@ -2656,6 +2694,9 @@ static void PumpRemoteTransactions()
                 buffered_send_msg -= GetMempoolsize(msg);
             CmiFree(msg);
             IndexPool_freeslot(&ackPool, index);
+#if CMI_EXERT_SEND_CAP
+            SEND_large_pending--;
+#endif
             break;
 #if CMK_PERSISTENT_COMM
         case 1:  {    // PERSISTENT
@@ -3015,9 +3056,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
     uint64_t            register_size;
     void                *register_addr;
     int                 index_previous = -1;
-#if CMI_EXERT_SEND_CAP
-    int			sent_cnt = 0;
-#endif
 
 #if CMK_SMP
     int          index = 0;
@@ -3077,6 +3115,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             status = GNI_RC_ERROR_RESOURCE;
             if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   
                 /* connection not exists yet */
+#if CMK_SMP
+                  /* non-smp case, connect is issued in send_smsg_message */
+                if (smsg_connected_flag[index] == 0)
+                    connect_to(ptr->destNode); 
+#endif
             }
             else
             switch(ptr->tag)
@@ -3147,9 +3190,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #else
                 FreeMsgList(ptr);
 #endif
-#if CMI_EXERT_SEND_CAP
-                if(++sent_cnt == SEND_CAP) break;
-#endif
             }else {
 #if CMK_SMP
 #if ONE_SEND_QUEUE
@@ -3198,12 +3238,6 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #endif
 #endif
 
-#if CMI_EXERT_SEND_CAP
-	if(sent_cnt == SEND_CAP) {
-            done = 0;
-	    break;
-        }
-#endif
     }   // end pooling for all cores
     return done;
 }
@@ -3221,7 +3255,7 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
         startT = CmiWallTimer();
 #endif
-        PumpDatagramConnection();
+        STATS_PUMPDATAGRAMCONNECTION_TIME(PumpDatagramConnection());
 #if CMK_SMP_TRACE_COMMTHREAD
         endT = CmiWallTimer();
         if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SetupConnect, startT, endT);
@@ -3640,6 +3674,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     Cmi_smp_mode_setting = COMM_WORK_THREADS_SEND_RECV;
 #endif
 
+#if CMI_EXERT_SEND_CAP
+    CmiGetArgInt(*argv,"+useSendLargeCap", &SEND_large_cap);
+#endif
+
+    CmiGetArgInt(*argv,"+useRecvQueue", &REMOTE_QUEUE_ENTRIES);
+    
     env = getenv("CHARM_UGNI_REMOTE_QUEUE_SIZE");
     if (env) REMOTE_QUEUE_ENTRIES = atoi(env);
     CmiGetArgInt(*argv,"+useRecvQueue", &REMOTE_QUEUE_ENTRIES);

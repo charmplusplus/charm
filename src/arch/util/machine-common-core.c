@@ -849,7 +849,7 @@ extern void ConverseCommonExit();
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP
-    AdvanceCommunication(0);
+    AdvanceCommunication(1);
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");

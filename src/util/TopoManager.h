@@ -59,6 +59,7 @@ class TopoManager {
     void sortRanksByHops(int pe, int *pes, int *idx, int n);
     int pickClosestRank(int mype, int *pes, int n);
     int areNeighbors(int pe1, int pe2, int pe3, int distance);
+		void printAllocation();
 
     /** The next 5 functions are only there for backward compatibility
     and should not be used */
@@ -168,7 +169,7 @@ class TopoManager {
     BGQTorusManager bgqtm;
 #elif XT3_TOPOLOGY
     XT3TorusManager xt3tm;
-#elif XT4_TOPOLOGY || XT5_TOPOLOGY
+#elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
     XTTorusManager xttm;
 #endif
 

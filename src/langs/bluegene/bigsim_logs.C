@@ -117,11 +117,11 @@ void bgEvents::write(FILE *fp)
   case BG_EVENT_PROJ:
 	fprintf(fp, "EVT: Projection %d\n", index);  break;
   case BG_EVENT_PRINT: {
-	fprintf(fp, "EVT: time:%f string:%s\n", rTime, data);
-	break;
+        fprintf(fp, "EVT: time:%f string:%s\n", rTime, (const char*)data);
+        break;
        }
   case BG_EVENT_MARK: {
-	fprintf(fp, "EVT: time:%f marker:%s\n", rTime, data);
+	fprintf(fp, "EVT: time:%f marker:%s\n", rTime, (const char*)data);
 	break;
        }
   default: CmiAbort("bgEvents::pup(): unknown BG event type!");

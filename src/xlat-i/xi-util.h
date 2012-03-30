@@ -84,6 +84,9 @@ class Printable {
     friend XStr & operator << (XStr &str,Printable *p) {p->print(str);return str;}
 };
 
+void templateGuardBegin(bool templateOnly, XStr &str);
+void templateGuardEnd(XStr &str);
+
 }
 
 #endif

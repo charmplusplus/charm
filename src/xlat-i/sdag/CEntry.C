@@ -93,7 +93,7 @@ static void generateWhenCode(XStr& op, SdagConstruct *cn)
   op << "        return;\n";
 }
 
-void CEntry::generateCode(XStr& op)
+void CEntry::generateCode(XStr& decls, XStr& defs)
 {
   CStateVar *sv;
   int i;
@@ -101,43 +101,53 @@ void CEntry::generateCode(XStr& op)
   int lastWasVoid;
   sv = (CStateVar *)myParameters->begin();
   i = 0;
-  op << "  void " << *entry <<"(";
+  decls << "  void ";
+
+  templateGuardBegin(false, defs);
+  defs << "void " << decl_entry->getContainer()->baseName() << "::";
+
+  XStr signature;
+  signature <<  *entry << "(";
   for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
     isVoid = sv->isVoid;
     if ((sv->isMsg != 1) && (sv->isVoid != 1)) {
        if (i >0)
-         op <<", ";
-       op << sv->type->charstar() << " ";
+         signature <<", ";
+       signature << sv->type->charstar() << " ";
        if (sv->arrayLength != 0)
-         op << "*";
+         signature << "*";
        else if (sv->byRef != 0) {
-         op <<"&";
+         signature <<"&";
        }
        if (sv->numPtrs != 0) {
          for(int k = 0; k< sv->numPtrs; k++)
-	    op<<"*";
+	    signature << "*";
        }
        if (sv->name != 0)
-         op << sv->name->charstar();
+         signature << sv->name->charstar();
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         op << sv->type->charstar() <<" "<<sv->name->charstar() <<"_msg";
+         signature << sv->type->charstar() <<" "<<sv->name->charstar() <<"_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }
     else
-      op <<"void";
+      signature <<"void";
   }
-  op <<  ") {\n";
-  op << "    CWhenTrigger *tr;\n";
-  op<<  "    void* _bgParentLog = NULL;\n";
+  signature << ")";
+
+  decls << signature << ";\n";
+
+  defs << signature << "{\n";
+  defs << "    CWhenTrigger *tr;\n";
+  defs << "    void* _bgParentLog = NULL;\n";
 #if CMK_BIGSIM_CHARM
-  op<<  "    CkElapse(0.01e-6);\n";
-  SdagConstruct::generateTlineEndCall(op);
+  defs <<  "    CkElapse(0.01e-6);\n";
+  SdagConstruct::generateTlineEndCall(defs);
 #endif
 
-  op << "    CMsgBuffer* cmsgbuf;\n";
+  defs << "    CMsgBuffer* cmsgbuf;\n";
 
   int hasArrays = 0;
   int paramMarshalling = 0;
@@ -145,87 +155,87 @@ void CEntry::generateCode(XStr& op)
   sv = (CStateVar *)myParameters->begin();
   i = 0;
   if (isVoid == 1) {
-     op << "   __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
-     op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
+     defs << "    __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
+     defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
   else {
      for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
         if ((i==0) && (sv->isMsg !=1)) {
-           op <<"    int impl_off=0; int impl_arrstart=0;\n";
+           defs <<"    int impl_off=0; int impl_arrstart=0;\n";
   	   paramMarshalling = 1;
         }
         if(sv->arrayLength != 0) {
            hasArrays++ ;
 	   if (sv->numPtrs > 0)
               printf("ERROR: can't pass pointers across processors \n -- Indicate the array length with []'s, or pass a reference\n");
-           op <<"    int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-           op <<"    impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-           op <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+           defs <<"    int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
+           defs <<"    impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
+           defs <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
         }
         if (paramMarshalling ==0) {
-	   op << "    CmiReference(UsrToEnv(" << sv->name->charstar() << "_msg));\n";
+	   defs << "    CmiReference(UsrToEnv(" << sv->name->charstar() << "_msg));\n";
            if(refNumNeeded) {
-              op << "    int refnum = CkGetRefNum(" <<sv->name->charstar() <<"_msg);\n";
-              op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg , (void *) _bgParentLog, refnum);\n";
-              op << "    tr = __cDep->getTrigger("<<entryNum<<", refnum);\n";
+              defs << "    int refnum = CkGetRefNum(" <<sv->name->charstar() <<"_msg);\n";
+              defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg , (void *) _bgParentLog, refnum);\n";
+              defs << "    tr = __cDep->getTrigger("<<entryNum<<", refnum);\n";
            } else {
-              op << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) "<<sv->name->charstar() <<"_msg,  (void *) _bgParentLog, 0);\n";
-              op << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
+              defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) "<<sv->name->charstar() <<"_msg,  (void *) _bgParentLog, 0);\n";
+              defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
            } 
         }
         count++;
      }
    }
    if (paramMarshalling == 1) {
-     op <<"    {\n";
-     op <<"      PUP::sizer implP1;\n";
+     defs <<"    {\n";
+     defs <<"      PUP::sizer implP1;\n";
      sv = (CStateVar *)myParameters->begin();
      i = 0;
  
      for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
         if(sv->arrayLength != 0)
-           op <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
+           defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
-	   op <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+	   defs <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
 	else   
-	   op <<"      implP1|"<<sv->name->charstar()<<";\n";
+	   defs <<"      implP1|"<<sv->name->charstar()<<";\n";
      }
  
      if (hasArrays > 0)
      { //round up pup'd data length--that's the first array
-        op <<"      impl_arrstart=CK_ALIGN(implP1.size(),16);\n";
-        op <<"      impl_off+=impl_arrstart;\n";
+        defs <<"      impl_arrstart=CK_ALIGN(implP1.size(),16);\n";
+        defs <<"      impl_off+=impl_arrstart;\n";
      }
      else  //No arrays--no padding
-        op <<"      impl_off+=implP1.size();\n";
+        defs <<"      impl_off+=implP1.size();\n";
   
-     op <<"    }\n";
+     defs <<"    }\n";
 
      //Now that we know the size, allocate the packing buffer
-     op <<"    CkMarshallMsg *impl_msg1=CkAllocateMarshallMsg(impl_off,NULL);\n";
+     defs <<"    CkMarshallMsg *impl_msg1=CkAllocateMarshallMsg(impl_off,NULL);\n";
      //Second pass: write the data
-     op <<"    {\n";
-     op <<"      PUP::toMem implP1((void *)impl_msg1->msgBuf);\n";
+     defs <<"    {\n";
+     defs <<"      PUP::toMem implP1((void *)impl_msg1->msgBuf);\n";
      sv = (CStateVar *)myParameters->begin();
      i = 0;
  
      for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
         if(sv->arrayLength != 0)
-           op <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
+           defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
-           op <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+           defs <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
         else   
-	   op <<"      implP1|"<<sv->name->charstar()<<";\n";
+	   defs <<"      implP1|"<<sv->name->charstar()<<";\n";
      }
-     op <<"    }\n";
+     defs <<"    }\n";
      if (hasArrays > 0)
      { //Marshall each array
-       op <<"    char *impl_buf1=impl_msg1->msgBuf+impl_arrstart;\n";
+       defs <<"    char *impl_buf1=impl_msg1->msgBuf+impl_arrstart;\n";
        sv = (CStateVar *)myParameters->begin();
        i = 0;
        for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
          if(sv->arrayLength != 0) {
-           op <<"    memcpy(impl_buf1+impl_off_"<<sv->name->charstar()<<","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+           defs <<"    memcpy(impl_buf1+impl_off_"<<sv->name->charstar()<<","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
 	 }
        }
      }
@@ -236,41 +246,42 @@ void CEntry::generateCode(XStr& op)
      // entry method is an integer that specifies the reference number
      const char* refNumArg = refNumNeeded ? myParameters->begin()->name->charstar() : "0";
 
-     op << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
+     defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
         << ", (void *) impl_msg1, (void*) _bgParentLog, "
         << refNumArg <<  ");\n";
-     op << "    tr = __cDep->getTrigger(" << entryNum << ", "
+     defs << "    tr = __cDep->getTrigger(" << entryNum << ", "
         << refNumArg << ");\n";
    }
 
-  op << "    if (tr == 0)\n";
-  op << "      return;\n"; 
+  defs << "    if (tr == 0)\n";
+  defs << "      return;\n";
 
-  SdagConstruct::generateTraceEndCall(op);
+  SdagConstruct::generateTraceEndCall(defs);
 #if CMK_BIGSIM_CHARM
-  SdagConstruct::generateEndExec(op);
+  SdagConstruct::generateEndExec(defs);
 #endif
 
   if(whenList.length() == 1) {
-    op << "    {\n";
-    generateWhenCode(op, whenList.begin());
-    op << "    }\n";
+    defs << "    {\n";
+    generateWhenCode(defs, whenList.begin());
+    defs << "    }\n";
   }
   else {   
-    op << "    switch(tr->whenID) {\n";
+    defs << "    switch(tr->whenID) {\n";
     for(SdagConstruct *cn=whenList.begin(); !whenList.end(); cn=whenList.next())
     {
-      op << "      case " << cn->nodeNum << ":\n";
-      op << "      {\n";
+      defs << "      case " << cn->nodeNum << ":\n";
+      defs << "      {\n";
       // This emits a `return;', so no `break' is needed
-      generateWhenCode(op, cn);
-      op << "      }\n";
+      generateWhenCode(defs, cn);
+      defs << "      }\n";
     }
-  op << "    }\n";
+    defs << "    }\n";
   } 
 
   // actual code ends
-  op << "  }\n\n";
+  defs << "}\n\n";
+  templateGuardEnd(defs);
 }
 
 }

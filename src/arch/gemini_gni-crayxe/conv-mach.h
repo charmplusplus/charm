@@ -52,6 +52,8 @@
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
 
+#define CMK_USE_SPINLOCK                                   0
+
 /* Specifies what kind of timer to use, and the correspondent headers will be
    included in convcore.c. If none is selected, then the machine.c file needs to
    implement the timer primitives. */
