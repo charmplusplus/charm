@@ -978,7 +978,7 @@ void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg) {
   }
 }
 
-void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio) {
+void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio) {
   lb_type = adaptive_struct.last_lb_type;
   lb_max_avg_ratio = 1;
   if (lb_type == 0) {
