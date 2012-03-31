@@ -806,25 +806,23 @@ char *Chare::proxyPrefix(void)
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
     (void)super;
-    str<<"    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL) {\n";
-    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr);\n","");
-    str<<"    }\n";
-    str<<"    void ckUndelegate(void) {\n";
-    genProxyNames(str,"      ",NULL,"::ckUndelegate();\n","");
-    str<<"    }\n";
-    str<<"    void pup(PUP::er &p) {\n";
-    genProxyNames(str,"      ",NULL,"::pup(p);\n","");
-    str<<"    }\n";
+    str << "\n    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr); ","");
+    str << "}"
+        << "\n    void ckUndelegate(void)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::ckUndelegate(); ","");
+    str << "}"
+        << "\n    void pup(PUP::er &p)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::pup(p); ","");
+    str << "}";
     if (isPython()) {
-      str<<"    void registerPython(const char *str) {\n";
-      str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";//<<Prefix::Proxy<<type<<"(";
-      //if (isArray()) str<<"ckGetArrayID()";
-      //else if (isGroup()) str <<"ckGetGroupID()";
-      //else str<<"ckGetChareID()";
-      str << "*this";
-      str<<"));\n";
-      str<<"    }\n";
+      str << "\n    void registerPython(const char *str)"
+          << "\n    { CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), *this)); }";
     }
+    str << "\n";
 }
 
 
@@ -1029,14 +1027,15 @@ Chare::preprocess()
 static void
 disambig_proxy(XStr &str, const XStr &super)
 {
-  str << "int ckIsDelegated(void) const "
-      << "{return " << super << "::ckIsDelegated();}\n"
-      << "inline CkDelegateMgr *ckDelegatedTo(void) const "
-      << "{return " << super << "::ckDelegatedTo();}\n"
-      << "inline CkDelegateData *ckDelegatedPtr(void) const "
-      << "{return " << super << "::ckDelegatedPtr();}\n"
-      << "CkGroupID ckDelegatedIdx(void) const "
-      << "{return " << super << "::ckDelegatedIdx();}\n";
+  str << "\n    int ckIsDelegated(void) const"
+      << "\n    { return " << super << "::ckIsDelegated(); }"
+      << "\n    inline CkDelegateMgr *ckDelegatedTo(void) const"
+      << "\n    { return " << super << "::ckDelegatedTo(); }"
+      << "\n    inline CkDelegateData *ckDelegatedPtr(void) const"
+      << "\n    { return " << super << "::ckDelegatedPtr(); }"
+      << "\n    CkGroupID ckDelegatedIdx(void) const"
+      << "\n    { return " << super << "::ckDelegatedIdx(); }"
+      << "\n";
 }
 
 void
@@ -1072,18 +1071,22 @@ Chare::genSubDecls(XStr& str)
     XStr super;
     bases->getFirst()->genProxyName(super,forElement);
     disambig_proxy(str, super);
-    str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n"
-	<< "const CkChareID &ckGetChareID(void) const\n"
-	<< "{ return " << super << "::ckGetChareID(); }\n"
-	<< "operator const CkChareID &(void) const {return ckGetChareID();}\n";
+    str << "\n    inline void ckCheck(void) const"
+        << "\n    { "<< super << "::ckCheck(); }"
+        << "\n    const CkChareID &ckGetChareID(void) const"
+        << "\n    { return " << super << "::ckGetChareID(); }"
+        << "\n    operator const CkChareID &(void) const"
+        << "\n    { return ckGetChareID(); }"
+        << "\n";
 
     sharedDisambiguation(str,super);
-    str<<"    void ckSetChareID(const CkChareID &c) {\n";
-    genProxyNames(str,"      ",NULL,"::ckSetChareID(c);\n","");
-    str<<"    }\n";
-
-  str<<"    "<<type<<tvars()<<" *ckLocal(void) const\n";
-  str<<"     { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }\n";
+    str << "\n    void ckSetChareID(const CkChareID &c)"
+        << "\n    {";
+    genProxyNames(str,"      ",NULL,"::ckSetChareID(c); ","");
+    str << "}"
+        << "\n    "<<type<<tvars()<<" *ckLocal(void) const"
+        << "\n    { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }"
+        << "\n";
 
   if(list)
     list->genDecls(str);
@@ -1187,12 +1190,13 @@ void Group::genSubRegisterMethodDef(XStr& str) {
 static void
 disambig_reduction_client(XStr &str, const XStr &super)
 {
-  str << "inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
-      << "{ " << super << "::setReductionClient(fn,param); }\n"
-      << "inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
-      << "{ " << super << "::ckSetReductionClient(fn,param); }\n"
-      << "inline void ckSetReductionClient(CkCallback *cb) const\n"
-      << "{ " << super << "::ckSetReductionClient(cb); }\n";
+  str << "\n    inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const"
+      << "\n    { " << super << "::setReductionClient(fn,param); }"
+      << "\n    inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const"
+      << "\n    { " << super << "::ckSetReductionClient(fn,param); }"
+      << "\n    inline void ckSetReductionClient(CkCallback *cb) const"
+      << "\n    { " << super << "::ckSetReductionClient(cb); }"
+      << "\n";
 }
 
 static void
@@ -1371,23 +1375,28 @@ static void
 disambig_array(XStr &str, const XStr &super)
 {
   disambig_proxy(str, super);
-  str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n" <<
-    "inline operator CkArrayID () const {return ckGetArrayID();}\n" <<
-    "inline static CkArrayID ckCreateEmptyArray(void)" <<
-    "{ return " << super << "::ckCreateEmptyArray(); }\n" <<
-    "inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)" <<
-    "{ return " << super << "::ckCreateArray(m,ctor,opts); }\n" <<
-    "inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)" <<
-    "{ " << super << "::ckInsertIdx(m,ctor,onPe,idx); }\n" <<
-    "inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const" <<
-    "{ " << super << "::ckBroadcast(m,ep,opts); }\n" <<
-    "inline CkArrayID ckGetArrayID(void) const" <<
-    "{ return " << super << "::ckGetArrayID();}\n" <<
-    "inline CkArray *ckLocalBranch(void) const" <<
-    "{ return " << super << "::ckLocalBranch(); }\n" <<
-    "inline CkLocMgr *ckLocMgr(void) const" <<
-    "{ return " << super << "::ckLocMgr(); }\n" <<
-    "inline void doneInserting(void) { " << super << "::doneInserting(); }\n";
+  str << "\n    inline void ckCheck(void) const"
+      << "\n    { " << super << "::ckCheck(); }"
+      << "\n    inline operator CkArrayID () const"
+      << "\n    { return ckGetArrayID(); }"
+      << "\n    inline CkArrayID ckGetArrayID(void) const"
+      << "\n    { return " << super << "::ckGetArrayID(); }"
+      << "\n    inline CkArray *ckLocalBranch(void) const"
+      << "\n    { return " << super << "::ckLocalBranch(); }"
+      << "\n    inline CkLocMgr *ckLocMgr(void) const"
+      << "\n    { return " << super << "::ckLocMgr(); }"
+      << "\n"
+      << "\n    inline static CkArrayID ckCreateEmptyArray(void)"
+      << "\n    { return " << super << "::ckCreateEmptyArray(); }"
+      << "\n    inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)"
+      << "\n    { return " << super << "::ckCreateArray(m,ctor,opts); }"
+      << "\n    inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)"
+      << "\n    { " << super << "::ckInsertIdx(m,ctor,onPe,idx); }"
+      << "\n    inline void doneInserting(void)"
+      << "\n    { " << super << "::doneInserting(); }"
+      << "\n"
+      << "\n    inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const"
+      << "\n    { " << super << "::ckBroadcast(m,ep,opts); }";
   disambig_reduction_client(str, super);
 }
 
@@ -1424,41 +1433,64 @@ Array::genSubDecls(XStr& str)
   if (forElement==forIndividual)
   {/*For an individual element (no indexing)*/
     disambig_array(str, super);
-    str << "inline void ckInsert(CkArrayMessage *m,int ctor,int onPe)\n"
-	<< "  { " << super << "::ckInsert(m,ctor,onPe); }\n"
-	<< "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const\n"
-	<< "  { " << super << "::ckSend(m,ep,opts); }\n"
-	<< "inline void *ckSendSync(CkArrayMessage *m, int ep) const\n"
-	<< "  { return " << super << "::ckSendSync(m,ep); }\n"
-	<< "inline const CkArrayIndex &ckGetIndex() const\n"
-	<< "  { return " << super << "::ckGetIndex(); }\n";
+    str << "\n    inline void ckInsert(CkArrayMessage *m,int ctor,int onPe)"
+        << "\n    { " << super << "::ckInsert(m,ctor,onPe); }"
+        << "\n    inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const"
+        << "\n    { " << super << "::ckSend(m,ep,opts); }"
+        << "\n    inline void *ckSendSync(CkArrayMessage *m, int ep) const"
+        << "\n    { return " << super << "::ckSendSync(m,ep); }"
+        << "\n    inline const CkArrayIndex &ckGetIndex() const"
+        << "\n    { return " << super << "::ckGetIndex(); }"
+        << "\n"
+        << "\n    " << type << tvars() << " *ckLocal(void) const"
+        << "\n    { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }"
+        << "\n";
 
-    str << "    "<<type<<tvars()<<" *ckLocal(void) const\n";
-    str << "      { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }\n";
     //This constructor is used for array indexing
-    str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
+    str << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)"
+        << "\n        :";
+    genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
+    str << "\n    {}"
+        << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)"
+        << "\n        :";
+    genProxyNames(str, "",NULL, "(aid,idx)", ", ");
+    str << "\n    {}"
+        << "\n";
+
+    if ((indexType != (const char*)"CkArrayIndex") && (indexType != (const char*)"CkArrayIndexMax"))
+    {
+      // Emit constructors that take the base class array index too.  This proves
+      // useful for runtime code that needs to access an element via a CkArrayIndex and
+      // an array proxy. This might compromise type safety a wee bit and is hence not
+      // propagated throughout.  For eg, CProxy_Foo::operator[] still accepts only the
+      // appropriate CkArrayIndexND.
+      str << "\n    " <<ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx,CK_DELCTOR_PARAM)"
+          << "\n        :";
+      genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
+      str << "\n    {}"
+          << "\n    " << ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx)"
+          << "\n        :";
+      genProxyNames(str, "",NULL, "(aid,idx)", ", ");
+      str << "\n    {}"
+          << "\n";
+    }
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
     disambig_array(str, super);
 
-    str<< //Build a simple, empty array
-    "    static CkArrayID ckNew(void) {return ckCreateEmptyArray();}\n";
+    //Build a simple, empty array
+    str << "\n    static CkArrayID ckNew(void) { return ckCreateEmptyArray(); }";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
-      str <<
-    "//Generalized array indexing:\n"
-    "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
-    "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n";
+      str << "\n    // Generalized array indexing:"
+          << "\n    "<<etype<<" operator [] (const "<<indexType<<" &idx) const"
+          << "\n    { return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL); }"
+          << "\n    "<<etype<<" operator() (const "<<indexType<<" &idx) const"
+          << "\n    { return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL); }"
+          << "\n";
     }
 
   //Add specialized indexing for these common types
@@ -1507,32 +1539,32 @@ Array::genSubDecls(XStr& str)
   else if (forElement==forSection)
   { /* for Section, indexible version*/
     disambig_array(str, super);
-    str << "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0)\n"
-	<< " { " << super << "::ckSend(m,ep,opts); }\n"
-	<< "inline CkSectionInfo &ckGetSectionInfo()\n"
-	<< "  { return " << super << "::ckGetSectionInfo(); }\n"
-	<< "inline CkSectionID *ckGetSectionIDs()\n"
-	<< "  { return " << super << "::ckGetSectionIDs(); }\n"
-	<< "inline CkSectionID &ckGetSectionID()\n"
-	<< "  { return " << super << "::ckGetSectionID(); }\n"
-	<< "inline CkSectionID &ckGetSectionID(int i)\n"
-	<< "  { return " << super << "::ckGetSectionID(i); }\n"
-	<< "inline CkArrayID ckGetArrayIDn(int i) const\n"
-	<< "{return " << super << "::ckGetArrayIDn(i); } \n"
-	<< "inline CkArrayIndex *ckGetArrayElements() const\n"
-	<< "  { return " << super << "::ckGetArrayElements(); }\n"
-	<< "inline CkArrayIndex *ckGetArrayElements(int i) const\n"
-	<< "{return " << super << "::ckGetArrayElements(i); }\n"
-	<< "inline int ckGetNumElements() const\n"
-	<< "  { return " << super << "::ckGetNumElements(); } \n"
-	<< "inline int ckGetNumElements(int i) const\n"
-	<< "{return " << super << "::ckGetNumElements(i); } \n";
+    str << "\n    inline void ckSend(CkArrayMessage *m, int ep, int opts = 0)"
+        << "\n    { " << super << "::ckSend(m,ep,opts); }"
+        << "\n    inline CkSectionInfo &ckGetSectionInfo()"
+        << "\n    { return " << super << "::ckGetSectionInfo(); }"
+        << "\n    inline CkSectionID *ckGetSectionIDs()"
+        << "\n    { return " << super << "::ckGetSectionIDs(); }"
+        << "\n    inline CkSectionID &ckGetSectionID()"
+        << "\n    { return " << super << "::ckGetSectionID(); }"
+        << "\n    inline CkSectionID &ckGetSectionID(int i)"
+        << "\n    { return " << super << "::ckGetSectionID(i); }"
+        << "\n    inline CkArrayID ckGetArrayIDn(int i) const"
+        << "\n    { return " << super << "::ckGetArrayIDn(i); } "
+        << "\n    inline CkArrayIndex *ckGetArrayElements() const"
+        << "\n    { return " << super << "::ckGetArrayElements(); }"
+        << "\n    inline CkArrayIndex *ckGetArrayElements(int i) const"
+        << "\n    { return " << super << "::ckGetArrayElements(i); }"
+        << "\n    inline int ckGetNumElements() const"
+        << "\n    { return " << super << "::ckGetNumElements(); } "
+        << "\n    inline int ckGetNumElements(int i) const"
+        << "\n    { return " << super << "::ckGetNumElements(i); }";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
       str <<
-    "//Generalized array indexing:\n"
+    "    // Generalized array indexing:\n"
     "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
     "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
