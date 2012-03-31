@@ -55,7 +55,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   lb_data[4] = 0.0;
   lb_data[5] = 0.0;
   for (int i = 0; i < nMsg; i++) {
-    CkAssert(msgs[i]->getSize() == 4*sizeof(double));
+    CkAssert(msgs[i]->getSize() == 6*sizeof(double));
     double* m = (double *)msgs[i]->getData();
     // Total count
     lb_data[1] += m[1];
@@ -603,9 +603,10 @@ bool LBDatabase::AddLoad(int iteration, double load) {
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double idle_time;
     IdleTime(&idle_time);
-    CkPrintf("Idle time %lf for iteration %d\n", idle_time, iteration);
+    CkPrintf("[%d] Idle time %lf for iteration %d\n", CkMyPe(), idle_time, iteration);
+    // Skips the 0th iteration collection of stats hence...
     idle_time = idle_time * getLBDB()->ObjDataCount() /
-       adaptive_struct.total_syncs_called;
+       (adaptive_struct.total_syncs_called + getLBDB()->ObjDataCount());
 
     double lb_data[6];
     lb_data[0] = iteration;
