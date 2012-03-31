@@ -96,7 +96,8 @@ CMK_CELL=0
 SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
-BUILDONLYINIT=""
+MPI_INTEROPERATE=""
+
 ####################################################################
 #
 #  Utility routines used below
@@ -731,10 +732,6 @@ do
 	"-pg"|"-g"|-W*|-O*)
 		OPTS="$OPTS $arg"
 		;;
-		
-	"-onlymoduleinit")
-		BUILDONLYINIT="YES"
-		;;
 
 	"-fmoddir")
 		F90_MODDIR="$F90_MODDIR $1"
@@ -767,6 +764,9 @@ do
 		;;
 	-nof90main)
 		F90_MAIN=
+		;;
+	-mpi)
+		MPI_INTEROPERATE="yes"
 		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -1159,102 +1159,6 @@ Success() {
 	End 0
 }
 
-buildmoduleinit() {
-modInitName="$1"
-#modInitName="moduleinit$$"
-modInitSrc="$modInitName.C"
-modInitObj="$modInitName.o"
-DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
-
-for module in $MODULES; do
-    echo "extern void _register$module(void);" >> $modInitSrc
-done
-for trace in $TRACEMODE; do
-    if test $trace = "summary" 
-    then
-      echo "  extern void _registerTraceSummary();" >> $modInitSrc
-    elif test $trace = "projections"
-    then
-      echo "  extern void _registerTraceProjections();" >> $modInitSrc
-    elif test $trace = "simple"
-    then
-      echo "  extern void _registerTraceSimple();" >> $modInitSrc
-    elif test $trace = "Tau"
-    then
-      echo "  extern void _registerTraceTau();" >> $modInitSrc
-    elif test $trace = "utilization" 
-    then 
-      echo "  extern void _registerTraceUtilization();" >> $modInitSrc 
-    elif test $trace = "controlPoints"
-    then
-      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "all"
-    then
-      echo "  extern void _registerTraceProjections();" >> $modInitSrc
-      echo "  extern void _registerTraceSummary();" >> $modInitSrc
-    fi
-done
-if test -n "$BALANCER"
-then
-    echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
-fi
-echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
-for module in $MODULES; do
-    [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
-    echo "  _register$module();" >> $modInitSrc
-done
-for trace in $TRACEMODE; do
-    if test $trace = "summary"
-    then
-      echo "  _registerTraceSummary();" >> $modInitSrc
-    elif test $trace = "projections"
-    then
-      echo "  _registerTraceProjections();" >> $modInitSrc
-    elif test $trace = "Tau"
-    then
-      TRACE_WITH_TAU=1
-      echo "  _registerTraceTau();" >> $modInitSrc
-    elif test $trace = "simple"
-    then
-      echo "  _registerTraceSimple();" >> $modInitSrc
-    elif test $trace = "utilization" 
-    then 
-      echo "  _registerTraceUtilization();" >>  $modInitSrc 
-    elif test $trace = "controlPoints"
-    then
-      echo "  _registerTraceControlPoints();" >> $modInitSrc
-    elif test $trace = "all"
-    then
-      echo "  _registerTraceProjections();" >> $modInitSrc
-      echo "  _registerTraceSummary();" >> $modInitSrc
-    fi
-done
-if test -n "$BALANCER"
-then
-    [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
-    for deflb in $BALANCER
-    do
-      echo "  LBDefaultCreate(\"$deflb\");" >> $modInitSrc
-    done
-fi
-echo "}" >> $modInitSrc
-
-# creating projections
-echo "void _createTraces(char **argv) {" >> $modInitSrc
-for trace in $TRACEMODE; do
-    [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
-    echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc
-    echo "_createTrace$trace(argv);" >> $modInitSrc
-done
-echo "}" >> $modInitSrc
-}
-
-if [ "$BUILDONLYINIT" = "YES" ]
-then
-	buildmoduleinit moduleinit
-	Do $CMK_CXX $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
-	exit
-fi
 
 ##############################################################################
 #
@@ -1611,6 +1515,11 @@ then
         fi
 fi
 
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
+fi
+
 # check if we're linking a sequential object
 case "$LANGUAGE" in
 "c"|"C"|"f90"|"f77")
@@ -1731,7 +1640,93 @@ then
 fi
 
 ################# Build the module initialization function ##################
-buildmoduleinit "moduleinit$$"
+modInitName="moduleinit$$"
+modInitSrc="$modInitName.C"
+modInitObj="$modInitName.o"
+DoNoErrCheck $RM $modInitSrc $modInitObj > /dev/null 2>&1
+
+for module in $MODULES; do
+    echo "extern void _register$module(void);" >> $modInitSrc
+done
+for trace in $TRACEMODE; do
+    if test $trace = "summary" 
+    then
+      echo "  extern void _registerTraceSummary();" >> $modInitSrc
+    elif test $trace = "projections"
+    then
+      echo "  extern void _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "simple"
+    then
+      echo "  extern void _registerTraceSimple();" >> $modInitSrc
+    elif test $trace = "Tau"
+    then
+      echo "  extern void _registerTraceTau();" >> $modInitSrc
+    elif test $trace = "utilization" 
+    then 
+      echo "  extern void _registerTraceUtilization();" >> $modInitSrc 
+    elif test $trace = "controlPoints"
+    then
+      echo "  extern void _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "all"
+    then
+      echo "  extern void _registerTraceProjections();" >> $modInitSrc
+      echo "  extern void _registerTraceSummary();" >> $modInitSrc
+    fi
+done
+if test -n "$BALANCER"
+then
+    echo "extern void LBDefaultCreate(const char *);" >> $modInitSrc
+fi
+echo "void _registerExternalModules(char **argv) {" >> $modInitSrc
+for module in $MODULES; do
+    [ -n "$VERBOSE" ] && echo "Adding registration for module $module"
+    echo "  _register$module();" >> $modInitSrc
+done
+for trace in $TRACEMODE; do
+    if test $trace = "summary"
+    then
+      echo "  _registerTraceSummary();" >> $modInitSrc
+    elif test $trace = "projections"
+    then
+      echo "  _registerTraceProjections();" >> $modInitSrc
+    elif test $trace = "Tau"
+    then
+      TRACE_WITH_TAU=1
+      echo "  _registerTraceTau();" >> $modInitSrc
+    elif test $trace = "simple"
+    then
+      echo "  _registerTraceSimple();" >> $modInitSrc
+    elif test $trace = "utilization" 
+    then 
+      echo "  _registerTraceUtilization();" >>  $modInitSrc 
+    elif test $trace = "controlPoints"
+    then
+      echo "  _registerTraceControlPoints();" >> $modInitSrc
+    elif test $trace = "all"
+    then
+      echo "  _registerTraceProjections();" >> $modInitSrc
+      echo "  _registerTraceSummary();" >> $modInitSrc
+    fi
+done
+if test -n "$BALANCER"
+then
+    [ -n "$VERBOSE" ] && echo "Adding load balancer for $BALANCER"
+    for deflb in $BALANCER
+    do
+      echo "  LBDefaultCreate(\"$deflb\");" >> $modInitSrc
+    done
+fi
+echo "}" >> $modInitSrc
+
+# creating projections
+echo "void _createTraces(char **argv) {" >> $modInitSrc
+for trace in $TRACEMODE; do
+    [ -n "$VERBOSE" ] && echo "Adding registration for trace $trace"
+    echo "extern void _createTrace$trace(char **argv);" >> $modInitSrc
+    echo "_createTrace$trace(argv);" >> $modInitSrc
+done
+echo "}" >> $modInitSrc
+
 Do $CMK_CXX $OPTS_CPP_INTERNAL $OPTS_CPP $OPTS_CXX -c $modInitSrc -o $modInitObj
 
 ###############################################################################

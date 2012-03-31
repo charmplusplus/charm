@@ -70,19 +70,6 @@ void CharmLibInit(int peid, int numpes, int argc, char **argv){
 	ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
 }
 
-#include "empty.decl.h"
-/*mainchare of mainmodule for interoperability*/
-class empty : public CBase_empty
-{
-public:
-  empty(CkArgMsg* m) 
-  { 
-    delete m;
-    LibCkExit();
-  };
-};
-#include "empty.def.h"
-
 #undef CkExit
 #define CkExit CkExit
 void CharmLibExit() {
