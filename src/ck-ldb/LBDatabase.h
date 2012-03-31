@@ -369,17 +369,9 @@ public:
   int getPredictedLBPeriod();
 
   bool isStrategyComm();
-  void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg) {
-    is_prev_lb_refine = is_lb_refine;
-    after_lb_avg = lb_avg;
-    after_lb_max = lb_max;
-  }
 
-  void GetPrevLBData(int& is_lb_refine, double& lb_max, double& lb_avg) {
-    is_lb_refine = is_prev_lb_refine;
-    lb_max = after_lb_max;
-    lb_avg = after_lb_avg;
-  }
+  void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg);
+  void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio);
 
   void SetMigrationCost(double lb_migration_cost);
   void SetStrategyCost(double lb_strategy_cost);

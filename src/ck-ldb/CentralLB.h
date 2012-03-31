@@ -244,9 +244,8 @@ protected:
     theLbdb->UpdateAfterLBData(is_prev_lb_refine, lb_max, lb_avg);
   }
 
-  virtual void GetPrevLBData(int& is_prev_lb_refine, double& lb_max,
-      double& lb_avg) {
-    theLbdb->GetPrevLBData(is_prev_lb_refine, lb_max, lb_avg);
+  virtual void GetPrevLBData(int& is_prev_lb_refine, double& lb_max_avg_ratio) {
+    theLbdb->GetPrevLBData(is_prev_lb_refine, lb_max_avg_ratio);
   }
 
 

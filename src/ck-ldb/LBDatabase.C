@@ -18,6 +18,7 @@
 #include "NullLB.h"
 
 #define VEC_SIZE 500
+#define IMB_TOLERANCE 1.1
 
 struct AdaptiveData {
   int iteration;
@@ -31,6 +32,10 @@ struct AdaptiveLBDatabase {
   std::vector<AdaptiveData> history_data;
 } adaptive_lbdb;
 
+struct AdaptiveLBInfo {
+  double max_avg_ratio;
+};
+
 struct AdaptiveLBStructure {
   int lb_ideal_period;
   int lb_calculated_period;
@@ -41,10 +46,14 @@ struct AdaptiveLBStructure {
   double lb_strategy_cost;
   double lb_migration_cost;
   bool lb_period_informed;
-  bool isCommLB;
+  bool doCommStrategy;
   int lb_msg_send_no;
   int lb_msg_recv_no;
   int total_syncs_called;
+  int last_lb_type;
+  AdaptiveLBInfo greedy_info;
+  AdaptiveLBInfo refine_info;
+  AdaptiveLBInfo metis_info;
 } adaptive_struct;
 
 
@@ -430,6 +439,7 @@ void LBDatabase::init(void)
   adaptive_struct.lb_msg_send_no = 0;
   adaptive_struct.lb_msg_recv_no = 0;
   adaptive_struct.total_syncs_called = 0;
+  adaptive_struct.last_lb_type = -1;
 
   is_prev_lb_refine = -1;
 }
@@ -663,7 +673,12 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
-  if ((max_idle_load_ratio >= 0.1 || max/avg >= 1.5) && adaptive_lbdb.history_data.size() > 4) {
+  int tmp1;
+  double tmp2;
+  GetPrevLBData(tmp1, tmp2);
+  double tolerate_imb = IMB_TOLERANCE * tmp2;
+
+  if ((max_idle_load_ratio >= 0.1 || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
@@ -674,13 +689,14 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 //    }
 
 
+
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
-      if (max/avg < 1.5) {
-        adaptive_struct.isCommLB = true;
+      if (max/avg < tolerate_imb) {
+        adaptive_struct.doCommStrategy = true;
         CkPrintf("No load imbalance but idle time\n");
       } else {
-        adaptive_struct.isCommLB = false;
+        adaptive_struct.doCommStrategy = false;
         CkPrintf("load imbalance \n");
       }
       adaptive_struct.lb_calculated_period = iteration_n + 1;
@@ -700,7 +716,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
     // If the new lb period is less than current set lb period
     if (adaptive_struct.lb_calculated_period > period) {
-      adaptive_struct.isCommLB = false;
+      adaptive_struct.doCommStrategy = false;
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
       adaptive_struct.lb_period_informed = true;
@@ -742,9 +758,13 @@ bool LBDatabase::generatePlan(int& period) {
   // If we can attain perfect balance, then the new load is close to the
   // average. Hence we pass 1, else pass in some other value which would be the
   // new max_load after load balancing.
+  int tmp1;
+  double tmp2;
+  GetPrevLBData(tmp1, tmp2);
+  
+  double tolerate_imb = IMB_TOLERANCE * tmp2;
 
-
-  return getPeriodForStrategy(1, 1, period);
+  return getPeriodForStrategy(tolerate_imb, 1, period);
 
 //  int refine_period, scratch_period;
 //  bool obtained_refine, obtained_scratch;
@@ -866,6 +886,10 @@ bool LBDatabase::getLineEq(double new_load_percent, double& aslope, double& ac, 
   mslope = 2 * (m2 - m1) / iterations;
   ac = adaptive_lbdb.history_data[0].avg_load * new_load_percent;
   mc = adaptive_lbdb.history_data[0].max_load;
+
+  //ac = (adaptive_lbdb.history_data[1].avg_load * new_load_percent - aslope);
+  //mc = (adaptive_lbdb.history_data[1].max_load - mslope);
+
   return true;
 }
 
@@ -934,7 +958,7 @@ int LBDatabase::getPredictedLBPeriod() {
 }
 
 bool LBDatabase::isStrategyComm() {
-  return adaptive_struct.isCommLB;
+  return adaptive_struct.doCommStrategy;
 }
 
 void LBDatabase::SetMigrationCost(double lb_migration_cost) {
@@ -943,6 +967,25 @@ void LBDatabase::SetMigrationCost(double lb_migration_cost) {
 
 void LBDatabase::SetStrategyCost(double lb_strategy_cost) {
   adaptive_struct.lb_strategy_cost = lb_strategy_cost;
+}
+
+void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg) {
+  adaptive_struct.last_lb_type = lb;
+  if (lb == 0) {
+    adaptive_struct.greedy_info.max_avg_ratio = lb_max/lb_avg;
+  } else if (lb == 1) {
+    adaptive_struct.refine_info.max_avg_ratio = lb_max/lb_avg;
+  }
+}
+
+void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio) {
+  lb_type = adaptive_struct.last_lb_type;
+  lb_max_avg_ratio = 1;
+  if (lb_type == 0) {
+    lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
+  } else if (lb_type == 1) {
+    lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
+  }
 }
 
 /*
