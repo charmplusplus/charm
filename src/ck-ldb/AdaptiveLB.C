@@ -84,40 +84,43 @@ void AdaptiveLB::work(LDStats* stats)
   CkPrintf("AdaptiveLB> Total Bytes %ld\n", totalBytes);
   CkPrintf("AdaptiveLB> Total Comm Overhead %E Total Load %E\n", commOverhead, totalLoad);
 
-  double after_lb_max;
-  double after_lb_avg;
-  int is_prev_lb_refine;
-  GetPrevLBData(is_prev_lb_refine, after_lb_max, after_lb_avg);
+  double lb_max_avg_ratio;
+  int lb_type;
+  GetPrevLBData(lb_type, lb_max_avg_ratio);
 
-  CkPrintf("AdaptiveLB> Previous LB %d\n", is_prev_lb_refine);
+  CkPrintf("AdaptiveLB> Previous LB %d\n", lb_type);
 
-  refineLB->work(stats);
+  metisLB->work(stats);
   return;
   // Choose the right LB
   //
   // If communication overhead is 10% computation, then choose Scotch LB
   if (isComm || (commOverhead > (totalLoad * percent_overhead / 100))) {
     metisLB->work(stats);
+    lb_type = 2;
     CkPrintf("---METIS LB\n");
   } else {
-    if (is_prev_lb_refine == 1) {
-      if (after_lb_max/after_lb_avg < 1.01) {
+    if (lb_type == 1) {
+      if (lb_max_avg_ratio < 1.01) {
+        lb_type = 1;
         refineLB->work(stats);
         CkPrintf("---REFINE LB\n");
       } else {
+        lb_type = 0;
         greedyLB->work(stats);
         CkPrintf("---GREEDY LB\n");
       }
-    } else if (is_prev_lb_refine == -1) {
+    } else if (lb_type == -1) {
+      lb_type = 0;
       greedyLB->work(stats);
       CkPrintf("---GREEDY LB\n");
     } else {
+      lb_type = 1;
       refineLB->work(stats);
       CkPrintf("---REFINE LB\n");
     }
   }
-  UpdateLBDBWithData(stats->is_prev_lb_refine, stats->after_lb_max,
-      stats->after_lb_avg);
+  UpdateLBDBWithData(lb_type, stats->after_lb_max, stats->after_lb_avg);
 
   delete parr;
   delete ogr;
