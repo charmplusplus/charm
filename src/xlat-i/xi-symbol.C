@@ -3090,13 +3090,15 @@ XStr Entry::chareIdx(int fromProxy)
 // this Member's container with the given return type, e.g.
 // template<int N,class foo> void CProxy_bar<N,foo>
 // Works with non-templated Chares as well.
-XStr Member::makeDecl(const XStr &returnType, int forProxy)
+XStr Member::makeDecl(const XStr &returnType, int forProxy, bool isStatic)
 {
   XStr str;
 
   if (container->isTemplated())
     str << container->tspec() << "\n";
   str << generateTemplateSpec(tspec) << "\n";
+  if (isStatic)
+    str << "static ";
   str << returnType<<" ";
   if (forProxy)
   	str<<container->proxyName();
@@ -4282,14 +4284,18 @@ void Entry::genIndexDecls(XStr& str)
 
   if (isReductionTarget()) {
       str << "\n    // Entry point registration at startup"
+          << templateSpecLine
           << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
           << "\n    // Entry point index lookup"
+          << templateSpecLine
           << "\n    inline static int idx_" << name << "_redn_wrapper() {"
           << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
           << "\n      return epidx;"
           << "\n    }"
+          << templateSpecLine
           << "\n    static int " << name << "_redn_wrapper"
           << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
+          << templateSpecLine
           << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
@@ -4600,7 +4606,8 @@ void Entry::genDefs(XStr& str)
   if (container->isMainChare() || container->isChare() || container->isForElement()) {
       if (isReductionTarget()) {
           XStr retStr; retStr<<retType;
-          str << retType << " " << indexName(); //makeDecl(retStr, 1)
+          str << makeDecl(retStr);
+          //str << retType << " " << indexName(); //makeDecl(retStr, 1)
           str << "::_" << name << "_redn_wrapper(void* impl_msg, "
               << container->baseName() << "* impl_obj)\n{\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";

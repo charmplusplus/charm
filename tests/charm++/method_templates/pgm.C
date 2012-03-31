@@ -45,8 +45,8 @@ void register_instantiations()
 {
     count< std::less<int> >  comparator;
     avg avger;
-    CkIndex_libArray::doSomething< count<std::less<int> > >(comparator);
-    CkIndex_libArray::doSomething<avg>(avger);
+    CkIndex_libArray::doSomething(comparator);
+    CkIndex_libArray::doSomething(avger);
 };
 
 

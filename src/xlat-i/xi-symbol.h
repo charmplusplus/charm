@@ -636,7 +636,7 @@ class Member : public Construct {
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
     virtual void collectSdagCode(CParsedFile *, int&) { return; }
-    XStr makeDecl(const XStr &returnType,int forProxy=0);
+    XStr makeDecl(const XStr &returnType,int forProxy=0, bool isStatic = false);
     virtual void genPythonDecls(XStr& ) {}
     virtual void genIndexDecls(XStr& ) {}
     virtual void genPythonDefs(XStr& ) {}
