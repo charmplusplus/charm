@@ -2604,19 +2604,19 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
     mptr = CtvAccessOther(tid,threadpool);
-    current = &(CtvAccessOther(tid,threadpool)->block_head);
+    current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
       numBlocks++;
-      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+      current = MEMPOOL_GetBlockNext(current)?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
 #if ISOMALLOC_DEBUG
     printf("Number of blocks packed %d\n",numBlocks);
 #endif
     pup_int(p,&numBlocks);
-    current = &(CtvAccessOther(tid,threadpool)->block_head);
+    current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
-      pup_bytes(p,&current->size,sizeof(current->size));
-      pup_bytes(p,&current->mem_hndl,sizeof(CmiInt8));
+      pup_bytes(p,&(MEMPOOL_GetBlockSize(current)),sizeof(MEMPOOL_GetBlockSize(current)));
+      pup_bytes(p,&(MEMPOOL_GetBlockMemHndl(current)),sizeof(CmiInt8));
       numSlots = 0;
       if(flag) {
         pup_bytes(p,current,sizeof(mempool_type));
@@ -2627,7 +2627,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       while(currSlot != NULL) {
         numSlots++;
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
+        currSlot = (MEMPOOL_GetSlotGNext(currSlot))?(slot_header*)((char*)mptr+MEMPOOL_GetSlotGNext(currSlot)):NULL;
       }
       pup_int(p,&numSlots);
       if(flag) {
@@ -2638,16 +2638,16 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       while(currSlot != NULL) {
         pup_int(p,&cutOffPoints[currSlot->size]);
-        if(currSlot->status) {
+        if(MEMPOOL_GetSlotStatus(currSlot)) {
           pup_int(p,&flags[0]);
           pup_bytes(p,(void*)currSlot,sizeof(slot_header));
         } else {
           pup_int(p,&flags[1]);
-          pup_bytes(p,(void*)currSlot,cutOffPoints[currSlot->size]);
+          pup_bytes(p,(void*)currSlot,MEMPOOL_GetSlotSize(currSlot));
         }
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
+        currSlot = (MEMPOOL_GetSlotGNext(currSlot))?(slot_header*)((char*)mptr+MEMPOOL_GetSlotGNext(currSlot)):NULL;
       }
-      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+      current = (MEMPOOL_GetBlockNext(current))?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
   }
 

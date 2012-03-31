@@ -3274,6 +3274,30 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+### test pthread_spin_lock ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int main()
+{
+  pthread_spinlock_t  lock;
+
+  pthread_spin_init(&lock, 0);
+
+  pthread_spin_lock(&lock);
+
+  return 0;
+}
+EOT
+test_linkc "whether pthread_spin_lock exists" "yes" "no" "-lpthread"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_SPINLOCK $pass
+_ACEOF
+
 
 ### check libnuma on Linux ####
 if test "$WITH_NUMA" = "yes"

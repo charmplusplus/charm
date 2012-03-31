@@ -206,7 +206,7 @@ CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
-	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
+	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h BGQTorus.h \
 	TopoManager.h XT3Torus.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -215,7 +215,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarrayreductionmgr.h cksection.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
-          ckmessagelogging.h ckobjid.h\
+          ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h charisma.h \
           comlib.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
@@ -507,7 +507,7 @@ pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
 
-TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
+TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h BGQTorus.h XT3Torus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o TopoManager.o TopoManager.C
 
 CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
@@ -706,7 +706,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o\
+	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
            ckgraph.o LButil.o Refiner.o RefinerApprox.o  \
@@ -1062,7 +1062,7 @@ cidepends: charmxi
               $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(CIDEPENDFILE) ; \
         done
 
-depends: cidepends
+depends: cidepends commitid.c
 	$(MAKE) basics
 	echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \

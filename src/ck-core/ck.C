@@ -1378,6 +1378,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
     CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue),
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
+#if CMK_PERSISTENT_COMM
+    CmiPersistentOneSend();
+#endif
   } else {
     if (pe < 0 || CmiNodeOf(pe) != CmiMyNode())
       CkPackMessage(&env);
@@ -1661,8 +1664,10 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_) 
   sendTicketGroupRequest(env,pe,_infoIdx);
+#elif defined(_FAULT_CAUSAL_)
+	sendGroupMsg(env,pe,_infoIdx);
 #else
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
@@ -1809,8 +1814,10 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
 {
   int numPes;
   register envelope *env = _prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_)
         sendTicketNodeGroupRequest(env,node,_infoIdx);
+#elif defined(_FAULT_CAUSAL_)
+	sendNodeGroupMsg(env,node,_infoIdx);
 #else
   numPes = (node==CLD_BROADCAST_ALL?CkNumNodes():1);
   _TRACE_CREATION_N(env, numPes);
@@ -1988,8 +1995,10 @@ extern "C"
 void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   register envelope *env = UsrToEnv(msg);
   _prepareOutgoingArrayMsg(env,ForArrayEltMsg);
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_)
    sendTicketArrayRequest(env,pe,_infoIdx);
+#elif defined(_FAULT_CAUSAL_)
+	sendArrayMsg(env,pe,_infoIdx);
 #else
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);

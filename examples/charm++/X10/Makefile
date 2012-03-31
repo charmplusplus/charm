@@ -16,4 +16,4 @@ X10_lib.o : X10_lib.C X10_lib.decl.h
 
 
 clean : 
-	rm -f a.out *~  X10_test2 charmrun X10_lib.o X10_lib.decl.h X10_lib.def.h
+	rm -f a.out *~  X10_test2 charmrun X10_lib.o *.decl.h *.def.h

@@ -17,33 +17,30 @@
   * persist_machine_init  // machine specific initialization call
 */
 
-#if USE_LRTS_MEMPOOL
-#define LRTS_GNI_RDMA_PUT_THRESHOLD  2048
-#else
-#define LRTS_GNI_RDMA_PUT_THRESHOLD  16384
-#endif
-
 void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 {
     gni_post_descriptor_t *pd;
     gni_return_t status;
     RDMA_REQUEST        *rdma_request_msg;
     
-    CmiAssert(h!=NULL);
     PersistentSendsTable *slot = (PersistentSendsTable *)h;
-    CmiAssert(slot->used == 1);
+    if (h==NULL) {
+        printf("[%d] LrtsSendPersistentMsg: handle from node %d to node %d is NULL. \n", CmiMyPe(), myrank, destNode);
+        CmiAbort("LrtsSendPersistentMsg: not a valid PersistentHandle");
+    }
     CmiAssert(CmiNodeOf(slot->destPE) == destNode);
     if (size > slot->sizeMax) {
-        CmiPrintf("size: %d sizeMax: %d\n", size, slot->sizeMax);
+        CmiPrintf("size: %d sizeMax: %d mype=%d destPe=%d\n", size, slot->sizeMax, CmiMyPe(), destNode);
         CmiAbort("Abort: Invalid size\n");
     }
 
-    // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
-
     if (slot->destBuf[0].destAddress) {
+        // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
+
         // uGNI part
+        START_EVENT();
         MallocPostDesc(pd);
-        if(size <= LRTS_GNI_RDMA_PUT_THRESHOLD) {
+        if(size <= LRTS_GNI_RDMA_THRESHOLD) {
             pd->type            = GNI_POST_FMA_PUT;
         }
         else
@@ -62,27 +59,57 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         pd->cqwrite_value   = PERSIST_SEQ;
         pd->amo_cmd         = 0;
 
+#if CMK_WITH_STATS 
+        pd->sync_flag_addr = 1000000 * CmiWallTimer(); //microsecond
+#endif
         SetMemHndlZero(pd->local_mem_hndl);
-#if CMK_SMP
-        bufferRdmaMsg(destNode, pd, -1);
+
+        TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
+         /* always buffer */
+#if CMK_SMP || 1
+#if REMOTE_EVENT
+        bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
 #else
+        bufferRdmaMsg(destNode, pd, -1);
+#endif
+
+#else                      /* non smp */
+
+#if REMOTE_EVENT
+        pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
+        int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, PERSIST_EVENT((int)(size_t)(slot->destHandle)));
+        GNI_RC_CHECK("GNI_EpSetEventData", sts);
+#endif
         status = registerMessage((void*)(pd->local_addr), pd->length, pd->cqwrite_value, &pd->local_mem_hndl);
         if (status == GNI_RC_SUCCESS) 
         {
-        if(pd->type == GNI_POST_RDMA_PUT) 
-            status = GNI_PostRdma(ep_hndl_array[destNode], pd);
-        else
-            status = GNI_PostFma(ep_hndl_array[destNode],  pd);
+#if CMK_WITH_STATS
+            RDMA_TRY_SEND(pd->type)
+#endif
+            if(pd->type == GNI_POST_RDMA_PUT) 
+                status = GNI_PostRdma(ep_hndl_array[destNode], pd);
+            else
+                status = GNI_PostFma(ep_hndl_array[destNode],  pd);
         }
         else
             status = GNI_RC_ERROR_RESOURCE;
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
+#if REMOTE_EVENT
+            bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
+#else
             bufferRdmaMsg(destNode, pd, -1);
-        }else
-            GNI_RC_CHECK("AFter posting", status);
 #endif
-    }
+        }
+        else {
+            GNI_RC_CHECK("AFter posting", status);
+#if  CMK_WITH_STATS
+            pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+            RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
+#endif
+        }
+#endif
+  }
   else {
 #if 1
     if (slot->messageBuf != NULL) {
@@ -184,31 +211,71 @@ int PumpPersistent()
 
 #endif
 
+#if ! LARGEPAGE
+#error "Persistent communication must be compiled with LARGEPAGE on"
+#endif
+
 void *PerAlloc(int size)
 {
 //  return CmiAlloc(size);
   gni_return_t status;
   void *res = NULL;
-  size = ALIGN64(size) + sizeof(CmiChunkHeader);
-  if (0 != posix_memalign(&res, 64, size))
-      CmiAbort("PerAlloc: failed to allocate memory.");
-  //printf("[%d] PerAlloc %p. \n", myrank, res);
-  MEMORY_REGISTER(onesided_hnd, nic_hndl,  res, size , &MEMHFIELD((char*)res+sizeof(CmiChunkHeader)), &omdh, NULL, status);
-  GNI_RC_CHECK("Mem Register before post", status);
-  return (char*)res+sizeof(CmiChunkHeader);
+  char *ptr;
+  size = ALIGN64(size + sizeof(CmiChunkHeader));
+  //printf("[%d] PerAlloc %p %p %d. \n", myrank, res, ptr, size);
+  res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
+  if (res) ptr = (char*)res - sizeof(mempool_header) + ALIGNBUF;
+  SIZEFIELD(ptr)=size;
+  REFFIELD(ptr)=1;
+  MEMHFIELD(ptr) = GetMemHndl(ptr);
+  return ptr;
 }
                                                                                 
 void PerFree(char *msg)
 {
-//  CmiFree(msg);
-  char *ptr = msg-sizeof(CmiChunkHeader);
-  MEMORY_DEREGISTER(onesided_hnd, nic_hndl, &MEMHFIELD(msg) , &omdh, SIZEFIELD(msg));
-  free(ptr);
+#if CMK_SMP
+  mempool_free_thread((char*)msg - ALIGNBUF + sizeof(mempool_header));
+#else
+  mempool_free(CpvAccess(mempool), (char*)msg - ALIGNBUF + sizeof(mempool_header));
+#endif
 }
 
 /* machine dependent init call */
 void persist_machine_init(void)
 {
+}
+
+void initSendSlot(PersistentSendsTable *slot)
+{
+  int i;
+  slot->destPE = -1;
+  slot->sizeMax = 0;
+  slot->destHandle = 0; 
+#if 0
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    slot->destAddress[i] = NULL;
+    slot->destSizeAddress[i] = NULL;
+  }
+#endif
+  memset(&slot->destBuf, 0, sizeof(PersistentBuf)*PERSIST_BUFFERS_NUM);
+  slot->messageBuf = 0;
+  slot->messageSize = 0;
+  slot->prev = slot->next = NULL;
+}
+
+void initRecvSlot(PersistentReceivesTable *slot)
+{
+  int i;
+#if 0
+  for (i=0; i<PERSIST_BUFFERS_NUM; i++) {
+    slot->messagePtr[i] = NULL;
+    slot->recvSizePtr[i] = NULL;
+  }
+#endif
+  memset(&slot->destBuf, 0, sizeof(PersistentBuf)*PERSIST_BUFFERS_NUM);
+  slot->sizeMax = 0;
+  slot->index = -1;
+  slot->prev = slot->next = NULL;
 }
 
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
@@ -229,6 +296,31 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     // FIXME:  assume always succeed
   }
   slot->sizeMax = maxBytes;
+#if REMOTE_EVENT
+  CmiLock(persistPool.lock);
+  slot->index = IndexPool_getslot(&persistPool, slot, 2);
+  CmiUnlock(persistPool.lock);
+#endif
 }
 
+void clearRecvSlot(PersistentReceivesTable *slot)
+{
+#if REMOTE_EVENT
+  CmiLock(persistPool.lock);
+  IndexPool_freeslot(&persistPool, slot->index);
+  CmiUnlock(persistPool.lock);
+#endif
+}
 
+PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
+{
+#if REMOTE_EVENT
+  if (toindex)
+    return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
+  else {
+    return (PersistentHandle)GetIndexAddress(persistPool, (int)(size_t)h);
+  }
+#else
+  return h;
+#endif
+}

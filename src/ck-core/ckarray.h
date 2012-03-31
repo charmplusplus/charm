@@ -35,6 +35,10 @@ Orion Sky Lawlor, olawlor@acm.org
 extern void _registerCkArray(void);
 CpvExtern (int ,serializer);
 
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#define _MLOG_BCAST_TREE_ 1
+#define _MLOG_BCAST_BFACTOR_ 8
+#endif
 
 /** This flag is true when in the system there is anytime migration, false when
  *  the user code guarantees that no migration happens except during load balancing
@@ -642,6 +646,10 @@ class CkArray : public CkReductionMgr, public CkArrMgr {
   CProxy_CkArray thisProxy;
   typedef CkMigratableListT<ArrayElement> ArrayElementList;
   ArrayElementList *elements;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    int *children;
+    int numChildren;
+#endif
 private:
   bool stableLocations;
 
@@ -694,6 +702,7 @@ public:
   void recvBroadcast(CkMessage *msg);
   void sendExpeditedBroadcast(CkMessage *msg);
   void recvExpeditedBroadcast(CkMessage *msg) { recvBroadcast(msg); }
+  void recvBroadcastViaTree(CkMessage *msg);
 
   void pup(PUP::er &p);
   void ckJustMigrated(void){ doneInserting(); }

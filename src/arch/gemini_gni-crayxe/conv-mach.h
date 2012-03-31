@@ -27,7 +27,7 @@
    one of them must be 1, all the others 0. The different implementations are in
    convserve.h Typically used are UNAVAILABLE for non SMP versions and
    POSIX_THREADS_SMP for SMP versions. The others are used only in special
-   cases: UNIPROCESSOR in sim and uth, PTHREADS in origin, EXEMPLAR in exemplar,
+   cases: UNIPROCESSOR in sim and uth, PTHREADS in origin,
    and NT_THREADS in windows. */
 #define CMK_SHARED_VARS_UNAVAILABLE                        1 /* non SMP versions */
 #define CMK_SHARED_VARS_POSIX_THREADS_SMP                  0 /* SMP versions */
@@ -51,6 +51,8 @@
 #define CMK_THREADS_USE_CONTEXT                            0
 #define CMK_THREADS_USE_JCONTEXT                           0
 #define CMK_THREADS_USE_PTHREADS                           0
+
+#define CMK_USE_SPINLOCK                                   0
 
 /* Specifies what kind of timer to use, and the correspondent headers will be
    included in convcore.c. If none is selected, then the machine.c file needs to

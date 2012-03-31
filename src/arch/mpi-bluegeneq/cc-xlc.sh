@@ -1,4 +1,5 @@
-XLC_TYPICAL_PRE=/opt/ibmcmp/vacpp/bg/11.1/
+XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-feb2012/vacpp/bg/12.1
+XLF_TYPICAL_PRE=/soft/compilers/ibmcmp-feb2012/xlf/bg/14.1
 XLC_PRE=$XLC_TYPICAL_PRE
 
 XLC_TYPICAL_POST=bin/bg
@@ -10,14 +11,14 @@ then
   XLC_PRE=$BGQ_XLC_PRE
 fi
 
-XLC_F=$XLC_PRE/xlf/bg/11.1/
+XLC_F=$XLF_TYPICAL_PRE
 CMK_CC="$XLC_PRE/${XLC_POST}xlc -qcpluscmt -qhalt=e $BGQ_INC"
 CMK_CXX="$XLC_PRE/${XLC_POST}xlC -qhalt=e $BGQ_INC"
 CMK_LD="$CMK_CC"
 CMK_LDXX="$CMK_CXX"
 CMK_CF77="$XLC_F/${XLC_POST}xlf "
 CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90" 
-CMK_CF90_FIXED="$XLC_PRE/xlf/8.1/${XLC_POST}xlf90 " 
+CMK_CF90_FIXED="$XLC_F/${XLC_POST}xlf90 " 
 CMK_C_OPTIMIZE='-O3 -Q'
 CMK_CXX_OPTIMIZE='-O3 -Q'
 CMK_AR='ar cq'

@@ -1,5 +1,6 @@
 /// Global Virtual Time estimation for POSE
 module gvt {
+  extern module poseMsgs;
   /// Global handles ThePVT and TheGVT are declared in gvt.C, used everywhere
   readonly CkGroupID ThePVT;
   readonly CkGroupID TheGVT;

@@ -806,25 +806,23 @@ char *Chare::proxyPrefix(void)
 void Chare::sharedDisambiguation(XStr &str,const XStr &super)
 {
     (void)super;
-    str<<"    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL) {\n";
-    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr);\n","");
-    str<<"    }\n";
-    str<<"    void ckUndelegate(void) {\n";
-    genProxyNames(str,"      ",NULL,"::ckUndelegate();\n","");
-    str<<"    }\n";
-    str<<"    void pup(PUP::er &p) {\n";
-    genProxyNames(str,"      ",NULL,"::pup(p);\n","");
-    str<<"    }\n";
+    str << "\n    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr); ","");
+    str << "}"
+        << "\n    void ckUndelegate(void)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::ckUndelegate(); ","");
+    str << "}"
+        << "\n    void pup(PUP::er &p)"
+        << "\n    { ";
+    genProxyNames(str,"      ",NULL,"::pup(p); ","");
+    str << "}";
     if (isPython()) {
-      str<<"    void registerPython(const char *str) {\n";
-      str<<"      CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), ";//<<Prefix::Proxy<<type<<"(";
-      //if (isArray()) str<<"ckGetArrayID()";
-      //else if (isGroup()) str <<"ckGetGroupID()";
-      //else str<<"ckGetChareID()";
-      str << "*this";
-      str<<"));\n";
-      str<<"    }\n";
+      str << "\n    void registerPython(const char *str)"
+          << "\n    { CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), *this)); }";
     }
+    str << "\n";
 }
 
 
@@ -888,7 +886,7 @@ Chare::genRegisterMethodDef(XStr& str)
   if(list)
     list->genReg(str);
   if (hasSdagEntry) {
-      str << "  " << baseName(0) << "::__sdag_register(); \n";
+      str << "  " << baseName() << "::__sdag_register(); \n";
   }
   str << "}\n";
   templateGuardEnd(str);
@@ -981,11 +979,11 @@ Chare::genDecls(XStr& str)
     list->collectSdagCode(&myParsedFile, sdagPresent);
     if(sdagPresent) {
       XStr classname;
-      XStr sdag_output;
+      XStr sdagDecls;
       classname << baseName(0);
       resetNumbers();
-      myParsedFile.doProcess(classname, sdag_output);
-      str << sdag_output;
+      myParsedFile.doProcess(classname, sdagDecls, sdagDefs);
+      str << sdagDecls;
     }
   }
 
@@ -1029,14 +1027,15 @@ Chare::preprocess()
 static void
 disambig_proxy(XStr &str, const XStr &super)
 {
-  str << "int ckIsDelegated(void) const "
-      << "{return " << super << "::ckIsDelegated();}\n"
-      << "inline CkDelegateMgr *ckDelegatedTo(void) const "
-      << "{return " << super << "::ckDelegatedTo();}\n"
-      << "inline CkDelegateData *ckDelegatedPtr(void) const "
-      << "{return " << super << "::ckDelegatedPtr();}\n"
-      << "CkGroupID ckDelegatedIdx(void) const "
-      << "{return " << super << "::ckDelegatedIdx();}\n";
+  str << "\n    int ckIsDelegated(void) const"
+      << "\n    { return " << super << "::ckIsDelegated(); }"
+      << "\n    inline CkDelegateMgr *ckDelegatedTo(void) const"
+      << "\n    { return " << super << "::ckDelegatedTo(); }"
+      << "\n    inline CkDelegateData *ckDelegatedPtr(void) const"
+      << "\n    { return " << super << "::ckDelegatedPtr(); }"
+      << "\n    CkGroupID ckDelegatedIdx(void) const"
+      << "\n    { return " << super << "::ckDelegatedIdx(); }"
+      << "\n";
 }
 
 void
@@ -1072,18 +1071,22 @@ Chare::genSubDecls(XStr& str)
     XStr super;
     bases->getFirst()->genProxyName(super,forElement);
     disambig_proxy(str, super);
-    str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n"
-	<< "const CkChareID &ckGetChareID(void) const\n"
-	<< "{ return " << super << "::ckGetChareID(); }\n"
-	<< "operator const CkChareID &(void) const {return ckGetChareID();}\n";
+    str << "\n    inline void ckCheck(void) const"
+        << "\n    { "<< super << "::ckCheck(); }"
+        << "\n    const CkChareID &ckGetChareID(void) const"
+        << "\n    { return " << super << "::ckGetChareID(); }"
+        << "\n    operator const CkChareID &(void) const"
+        << "\n    { return ckGetChareID(); }"
+        << "\n";
 
     sharedDisambiguation(str,super);
-    str<<"    void ckSetChareID(const CkChareID &c) {\n";
-    genProxyNames(str,"      ",NULL,"::ckSetChareID(c);\n","");
-    str<<"    }\n";
-
-  str<<"    "<<type<<tvars()<<" *ckLocal(void) const\n";
-  str<<"     { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }\n";
+    str << "\n    void ckSetChareID(const CkChareID &c)"
+        << "\n    {";
+    genProxyNames(str,"      ",NULL,"::ckSetChareID(c); ","");
+    str << "}"
+        << "\n    "<<type<<tvars()<<" *ckLocal(void) const"
+        << "\n    { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }"
+        << "\n";
 
   if(list)
     list->genDecls(str);
@@ -1187,12 +1190,13 @@ void Group::genSubRegisterMethodDef(XStr& str) {
 static void
 disambig_reduction_client(XStr &str, const XStr &super)
 {
-  str << "inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
-      << "{ " << super << "::setReductionClient(fn,param); }\n"
-      << "inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const\n"
-      << "{ " << super << "::ckSetReductionClient(fn,param); }\n"
-      << "inline void ckSetReductionClient(CkCallback *cb) const\n"
-      << "{ " << super << "::ckSetReductionClient(cb); }\n";
+  str << "\n    inline void setReductionClient(CkReductionClientFn fn,void *param=NULL) const"
+      << "\n    { " << super << "::setReductionClient(fn,param); }"
+      << "\n    inline void ckSetReductionClient(CkReductionClientFn fn,void *param=NULL) const"
+      << "\n    { " << super << "::ckSetReductionClient(fn,param); }"
+      << "\n    inline void ckSetReductionClient(CkCallback *cb) const"
+      << "\n    { " << super << "::ckSetReductionClient(cb); }"
+      << "\n";
 }
 
 static void
@@ -1371,23 +1375,28 @@ static void
 disambig_array(XStr &str, const XStr &super)
 {
   disambig_proxy(str, super);
-  str << "inline void ckCheck(void) const {" << super << "::ckCheck();}\n" <<
-    "inline operator CkArrayID () const {return ckGetArrayID();}\n" <<
-    "inline static CkArrayID ckCreateEmptyArray(void)" <<
-    "{ return " << super << "::ckCreateEmptyArray(); }\n" <<
-    "inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)" <<
-    "{ return " << super << "::ckCreateArray(m,ctor,opts); }\n" <<
-    "inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)" <<
-    "{ " << super << "::ckInsertIdx(m,ctor,onPe,idx); }\n" <<
-    "inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const" <<
-    "{ " << super << "::ckBroadcast(m,ep,opts); }\n" <<
-    "inline CkArrayID ckGetArrayID(void) const" <<
-    "{ return " << super << "::ckGetArrayID();}\n" <<
-    "inline CkArray *ckLocalBranch(void) const" <<
-    "{ return " << super << "::ckLocalBranch(); }\n" <<
-    "inline CkLocMgr *ckLocMgr(void) const" <<
-    "{ return " << super << "::ckLocMgr(); }\n" <<
-    "inline void doneInserting(void) { " << super << "::doneInserting(); }\n";
+  str << "\n    inline void ckCheck(void) const"
+      << "\n    { " << super << "::ckCheck(); }"
+      << "\n    inline operator CkArrayID () const"
+      << "\n    { return ckGetArrayID(); }"
+      << "\n    inline CkArrayID ckGetArrayID(void) const"
+      << "\n    { return " << super << "::ckGetArrayID(); }"
+      << "\n    inline CkArray *ckLocalBranch(void) const"
+      << "\n    { return " << super << "::ckLocalBranch(); }"
+      << "\n    inline CkLocMgr *ckLocMgr(void) const"
+      << "\n    { return " << super << "::ckLocMgr(); }"
+      << "\n"
+      << "\n    inline static CkArrayID ckCreateEmptyArray(void)"
+      << "\n    { return " << super << "::ckCreateEmptyArray(); }"
+      << "\n    inline static CkArrayID ckCreateArray(CkArrayMessage *m,int ctor,const CkArrayOptions &opts)"
+      << "\n    { return " << super << "::ckCreateArray(m,ctor,opts); }"
+      << "\n    inline void ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,const CkArrayIndex &idx)"
+      << "\n    { " << super << "::ckInsertIdx(m,ctor,onPe,idx); }"
+      << "\n    inline void doneInserting(void)"
+      << "\n    { " << super << "::doneInserting(); }"
+      << "\n"
+      << "\n    inline void ckBroadcast(CkArrayMessage *m, int ep, int opts=0) const"
+      << "\n    { " << super << "::ckBroadcast(m,ep,opts); }";
   disambig_reduction_client(str, super);
 }
 
@@ -1424,41 +1433,64 @@ Array::genSubDecls(XStr& str)
   if (forElement==forIndividual)
   {/*For an individual element (no indexing)*/
     disambig_array(str, super);
-    str << "inline void ckInsert(CkArrayMessage *m,int ctor,int onPe)\n"
-	<< "  { " << super << "::ckInsert(m,ctor,onPe); }\n"
-	<< "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const\n"
-	<< "  { " << super << "::ckSend(m,ep,opts); }\n"
-	<< "inline void *ckSendSync(CkArrayMessage *m, int ep) const\n"
-	<< "  { return " << super << "::ckSendSync(m,ep); }\n"
-	<< "inline const CkArrayIndex &ckGetIndex() const\n"
-	<< "  { return " << super << "::ckGetIndex(); }\n";
+    str << "\n    inline void ckInsert(CkArrayMessage *m,int ctor,int onPe)"
+        << "\n    { " << super << "::ckInsert(m,ctor,onPe); }"
+        << "\n    inline void ckSend(CkArrayMessage *m, int ep, int opts = 0) const"
+        << "\n    { " << super << "::ckSend(m,ep,opts); }"
+        << "\n    inline void *ckSendSync(CkArrayMessage *m, int ep) const"
+        << "\n    { return " << super << "::ckSendSync(m,ep); }"
+        << "\n    inline const CkArrayIndex &ckGetIndex() const"
+        << "\n    { return " << super << "::ckGetIndex(); }"
+        << "\n"
+        << "\n    " << type << tvars() << " *ckLocal(void) const"
+        << "\n    { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }"
+        << "\n";
 
-    str << "    "<<type<<tvars()<<" *ckLocal(void) const\n";
-    str << "      { return ("<<type<<tvars()<<" *)"<<super<<"::ckLocal(); }\n";
     //This constructor is used for array indexing
-    str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");str<<" {}\n";
-    str <<
-         "    "<<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)\n"
-         "        :";genProxyNames(str, "",NULL, "(aid,idx)", ", ");str<<" {}\n";
+    str << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx,CK_DELCTOR_PARAM)"
+        << "\n        :";
+    genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
+    str << "\n    {}"
+        << "\n    " <<ptype<<"(const CkArrayID &aid,const "<<indexType<<" &idx)"
+        << "\n        :";
+    genProxyNames(str, "",NULL, "(aid,idx)", ", ");
+    str << "\n    {}"
+        << "\n";
+
+    if ((indexType != (const char*)"CkArrayIndex") && (indexType != (const char*)"CkArrayIndexMax"))
+    {
+      // Emit constructors that take the base class array index too.  This proves
+      // useful for runtime code that needs to access an element via a CkArrayIndex and
+      // an array proxy. This might compromise type safety a wee bit and is hence not
+      // propagated throughout.  For eg, CProxy_Foo::operator[] still accepts only the
+      // appropriate CkArrayIndexND.
+      str << "\n    " <<ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx,CK_DELCTOR_PARAM)"
+          << "\n        :";
+      genProxyNames(str, "",NULL, "(aid,idx,CK_DELCTOR_ARGS)", ", ");
+      str << "\n    {}"
+          << "\n    " << ptype<<"(const CkArrayID &aid,const CkArrayIndex &idx)"
+          << "\n        :";
+      genProxyNames(str, "",NULL, "(aid,idx)", ", ");
+      str << "\n    {}"
+          << "\n";
+    }
   }
   else if (forElement==forAll)
   {/*Collective, indexible version*/
     disambig_array(str, super);
 
-    str<< //Build a simple, empty array
-    "    static CkArrayID ckNew(void) {return ckCreateEmptyArray();}\n";
+    //Build a simple, empty array
+    str << "\n    static CkArrayID ckNew(void) { return ckCreateEmptyArray(); }";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
-      str <<
-    "//Generalized array indexing:\n"
-    "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
-    "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
-    "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n";
+      str << "\n    // Generalized array indexing:"
+          << "\n    "<<etype<<" operator [] (const "<<indexType<<" &idx) const"
+          << "\n    { return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL); }"
+          << "\n    "<<etype<<" operator() (const "<<indexType<<" &idx) const"
+          << "\n    { return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL); }"
+          << "\n";
     }
 
   //Add specialized indexing for these common types
@@ -1507,32 +1539,32 @@ Array::genSubDecls(XStr& str)
   else if (forElement==forSection)
   { /* for Section, indexible version*/
     disambig_array(str, super);
-    str << "inline void ckSend(CkArrayMessage *m, int ep, int opts = 0)\n"
-	<< " { " << super << "::ckSend(m,ep,opts); }\n"
-	<< "inline CkSectionInfo &ckGetSectionInfo()\n"
-	<< "  { return " << super << "::ckGetSectionInfo(); }\n"
-	<< "inline CkSectionID *ckGetSectionIDs()\n"
-	<< "  { return " << super << "::ckGetSectionIDs(); }\n"
-	<< "inline CkSectionID &ckGetSectionID()\n"
-	<< "  { return " << super << "::ckGetSectionID(); }\n"
-	<< "inline CkSectionID &ckGetSectionID(int i)\n"
-	<< "  { return " << super << "::ckGetSectionID(i); }\n"
-	<< "inline CkArrayID ckGetArrayIDn(int i) const\n"
-	<< "{return " << super << "::ckGetArrayIDn(i); } \n"
-	<< "inline CkArrayIndex *ckGetArrayElements() const\n"
-	<< "  { return " << super << "::ckGetArrayElements(); }\n"
-	<< "inline CkArrayIndex *ckGetArrayElements(int i) const\n"
-	<< "{return " << super << "::ckGetArrayElements(i); }\n"
-	<< "inline int ckGetNumElements() const\n"
-	<< "  { return " << super << "::ckGetNumElements(); } \n"
-	<< "inline int ckGetNumElements(int i) const\n"
-	<< "{return " << super << "::ckGetNumElements(i); } \n";
+    str << "\n    inline void ckSend(CkArrayMessage *m, int ep, int opts = 0)"
+        << "\n    { " << super << "::ckSend(m,ep,opts); }"
+        << "\n    inline CkSectionInfo &ckGetSectionInfo()"
+        << "\n    { return " << super << "::ckGetSectionInfo(); }"
+        << "\n    inline CkSectionID *ckGetSectionIDs()"
+        << "\n    { return " << super << "::ckGetSectionIDs(); }"
+        << "\n    inline CkSectionID &ckGetSectionID()"
+        << "\n    { return " << super << "::ckGetSectionID(); }"
+        << "\n    inline CkSectionID &ckGetSectionID(int i)"
+        << "\n    { return " << super << "::ckGetSectionID(i); }"
+        << "\n    inline CkArrayID ckGetArrayIDn(int i) const"
+        << "\n    { return " << super << "::ckGetArrayIDn(i); } "
+        << "\n    inline CkArrayIndex *ckGetArrayElements() const"
+        << "\n    { return " << super << "::ckGetArrayElements(); }"
+        << "\n    inline CkArrayIndex *ckGetArrayElements(int i) const"
+        << "\n    { return " << super << "::ckGetArrayElements(i); }"
+        << "\n    inline int ckGetNumElements() const"
+        << "\n    { return " << super << "::ckGetNumElements(); } "
+        << "\n    inline int ckGetNumElements(int i) const"
+        << "\n    { return " << super << "::ckGetNumElements(i); }";
 
     XStr etype; etype<<Prefix::ProxyElement<<type<<tvars();
     if (indexSuffix!=(const char*)"none")
     {
       str <<
-    "//Generalized array indexing:\n"
+    "    // Generalized array indexing:\n"
     "    "<<etype<<" operator [] (const "<<indexType<<" &idx) const\n"
     "        {return "<<etype<<"(ckGetArrayID(), idx, CK_DELCTOR_CALL);}\n"
     "    "<<etype<<" operator() (const "<<indexType<<" &idx) const\n"
@@ -1846,7 +1878,7 @@ Chare::genDefs(XStr& str)
     genRegisterMethodDef(str);
   if (hasSdagEntry) {
     str << "\n";
-    str << baseName(0) << "_SDAG_CODE_DEF\n\n";
+    str << sdagDefs;
   }
 }
 
@@ -2187,7 +2219,7 @@ Template::genSpec(XStr& str)
   str << "< ";
   if(tspec)
     tspec->genLong(str);
-  str << " > ";
+  str << " >\n";
 }
 
 void
@@ -2735,37 +2767,39 @@ void CParsedFile::generateConnectEntryList(void)
   }
 }
 
-void CParsedFile::generateCode(XStr& op)
+void CParsedFile::generateCode(XStr& decls, XStr& defs)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(op, cn);
+    cn->sdagCon->generateCode(decls, defs, cn);
   }
 }
 
-void CParsedFile::generateEntries(XStr& op)
+void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
   CEntry *en;
   SdagConstruct *sc;
-  op << "public:\n";
+  decls << "public:\n";
   for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
-     sc->generateConnectEntries(op);
+     sc->generateConnectEntries(decls);
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(op);
+    en->generateCode(decls, defs);
   }
 }
 
-void CParsedFile::generateInitFunction(XStr& op)
+void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
-  op << "private:\n";
-  op << "  CDep *__cDep;\n";
-  op << "  void __sdag_init(void) {\n";
-  op << "    __cDep = new CDep("<<numEntries<<","<<numWhens<<");\n";
+  decls << "private:\n";
+  decls << "  CDep *__cDep;\n";
+
+  XStr name = "__sdag_init";
+  generateSignature(decls, defs, container, false, "void", &name, false, NULL);
+  defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
   CEntry *en;
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(op);
+    en->generateDeps(defs);
   }
-  op << "  }\n";
+  endMethod(defs);
 }
 
 
@@ -2775,32 +2809,29 @@ void CParsedFile::generateInitFunction(XStr& op)
 
     Used by Isaac's critical path detection
 */
-void CParsedFile::generateDependencyMergePoints(XStr& op) 
+void CParsedFile::generateDependencyMergePoints(XStr& decls) 
 {
-
-  op << " \n";
+  decls << " \n";
 
   // Each when statement will have a set of message dependencies, and
   // also the dependencies from completion of previous task
   for(int i=0;i<numWhens;i++){
-    op << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+    decls << "  MergeablePathHistory _when_" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
   
   // The end of each overlap block will have multiple paths that merge
   // before the subsequent task is executed
   for(int i=0;i<numOlists;i++){
-    op << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
+    decls << "  MergeablePathHistory olist__co" << i << "_PathMergePoint; /* For Critical Path Detection */ \n";
   }
-
 }
 
-
-void CParsedFile::generatePupFunction(XStr& op)
+void CParsedFile::generatePupFunction(XStr& decls)
 {
-  op << "public:\n";
-  op << "  void __sdag_pup(PUP::er& p) {\n";
-  op << "    if (__cDep) { __cDep->pup(p); }\n";
-  op << "  }\n";
+  decls << "public:\n";
+  decls << "  void __sdag_pup(PUP::er& p) {\n";
+  decls << "    if (__cDep) { __cDep->pup(p); }\n";
+  decls << "  }\n";
 }
 
 void CParsedFile::generateTrace()
@@ -2812,36 +2843,27 @@ void CParsedFile::generateTrace()
   }
 }
 
-void CParsedFile::generateRegisterEp(XStr& op)
+void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
 {
-  op << "  static void __sdag_register() {\n\n";
+  XStr name = "__sdag_register";
+  generateSignature(decls, defs, container, true, "void", &name, false, NULL);
 
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) {
-      cn->sdagCon->generateRegisterEp(op);
+      cn->sdagCon->generateRegisterEp(defs);
     }
   }
-  op << "  }\n";
+  endMethod(defs);
 }
 
-void CParsedFile::generateTraceEpDecl(XStr& op)
+void CParsedFile::generateTraceEp(XStr& decls, XStr& defs)
 {
   for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
     if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEpDecl(op);
+      cn->sdagCon->generateTraceEp(decls, defs, container);
     }
   }
 }
-
-void CParsedFile::generateTraceEpDef(XStr& op)
-{
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEpDef(op);
-    }
-  }
-}
-
 
 ////////////////////////// SDAGCONSTRUCT ///////////////////////
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
@@ -3013,7 +3035,16 @@ XStr Entry::epIdx(int fromProxy)
   XStr str;
   if (fromProxy)
     str << indexName()<<"::";
-  str << "__idx_"<<epStr();
+  str << "idx_"<<epStr()<<"()";
+  return str;
+}
+
+XStr Entry::epRegFn(int fromProxy)
+{
+  XStr str;
+  if (fromProxy)
+    str << indexName() << "::";
+  str << "reg_"<<epStr()<<"()";
   return str;
 }
 
@@ -4174,10 +4205,16 @@ void Entry::genAccels_ppe_c_regFuncs(XStr& str) {
 /******************* Shared Entry Point Code **************************/
 void Entry::genIndexDecls(XStr& str)
 {
-  str << "/* DECLS: "; print(str); str << " */\n";
+  str << "/* DECLS: "; print(str); str << " */";
 
   // Entry point index storage
-  str << "    static int "<<epIdx(0)<<";\n";
+  str << "\n    // Entry point registration at startup"
+      << "\n    static int "<<epRegFn(0)<<";" ///< @note: Should this be generated as private?
+      << "\n    // Entry point index lookup"
+      << "\n    inline static int "<<epIdx(0)<<"{"
+      << "\n      static int epidx = " << epRegFn(0) << ";"
+      << "\n      return epidx;"
+      << "\n    }\n";
 
   // DMK - Accel Support - Also declare the function index for the Offload API call
   #if CMK_CELL != 0
@@ -4201,10 +4238,16 @@ void Entry::genIndexDecls(XStr& str)
   }
 
   if (isReductionTarget()) {
-      str << "    static int __idx_" << name << "_redn_wrapper;\n"
-          << "    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return __idx_" << name << "_redn_wrapper; }\n"
-          << "    static void _" << name << "_redn_wrapper(void* impl_msg, "
+      str << "\n    // Entry point registration at startup"
+          << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
+          << "\n    // Entry point index lookup"
+          << "\n    inline static int idx_" << name << "_redn_wrapper() {"
+          << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
+          << "\n      return epidx;"
+          << "\n    }"
+          << "\n    static int " << name << "_redn_wrapper"
+          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
+          << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
 
@@ -4519,10 +4562,20 @@ void Entry::genDefs(XStr& str)
   //Prevents repeated call and __idx definitions:
   if (container->getForWhom()!=forAll) return;
 
-  //Define storage for entry point number
-  str << container->tspec()<<" int "<<indexName()<<"::"<<epIdx(0)<<"=0;\n";
-  if (isReductionTarget()) {
-      str << " int " << indexName() << "::__idx_" << name <<"_redn_wrapper=0;\n";
+  // Define the entry point registration functions
+  str << "\n// Entry point registration function"
+      << "\n" << makeDecl("int") << "::" << epRegFn(0) << " {"
+      << "\n  return " << genRegEp() << ";"
+      << "\n}\n\n";
+
+  if (isReductionTarget())
+  {
+    str << "\n// Redn wrapper registration function"
+        << "\n" << makeDecl("int") << "::reg_"<< name <<"_redn_wrapper() {"
+        << "\n  return CkRegisterEp(\""  << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
+        << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
+        << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n}\n\n";
   }
 
   // DMK - Accel Support
@@ -4668,11 +4721,11 @@ void Entry::genDefs(XStr& str)
   }
 }
 
-void Entry::genReg(XStr& str)
+XStr Entry::genRegEp()
 {
-  str << "// REG: "<<*this;
-  str << "  "<<epIdx(0)<<" = CkRegisterEp(\""<<name<<"("<<paramType(0)<<")\",\n"
-  	"     (CkCallFnPtr)_call_"<<epStr()<<", ";
+  XStr str;
+  str << "CkRegisterEp(\"" << name << "("<<paramType(0)<<")\",\n"
+      << "      (CkCallFnPtr)_call_" << epStr() << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
     if (param->hasConditional())  str<<"MarshallMsg_"<<epStr()<<"::__idx";
@@ -4695,7 +4748,16 @@ void Entry::genReg(XStr& str)
   if (attribs & SMEM) str << "+CK_EP_MEMCRITICAL";
   
   if (internalMode) str << "+CK_EP_INTRINSIC";
-  str << ");\n";
+  str << ")";
+  return str;
+}
+
+void Entry::genReg(XStr& str)
+{
+  str << "  // REG: "<<*this;
+  str << "  " << epIdx(0) << ";\n";
+  if (isReductionTarget())
+    str << "  idx_" << name << "_redn_wrapper();\n";
   if (isConstructor()) {
     if(container->isMainChare()&&!(attribs&SMIGRATE))
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";
@@ -4715,12 +4777,6 @@ void Entry::genReg(XStr& str)
   else if (param->isMessage() && !attribs&SMIGRATE) {
       str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
       str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
-  }
-  if (isReductionTarget()) {
-      str << "  " << "__idx_" << name << "_redn_wrapper = CkRegisterEp(\""
-          << name << "_redn_wrapper(CkReductionMsg* impl_msg)\",\n"
-          << "     (CkCallFnPtr)_" << name << "_redn_wrapper, "
-          << "CMessage_CkReductionMsg::__idx, __idx, 0);";
   }
 }
 

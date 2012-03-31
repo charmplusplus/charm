@@ -16,6 +16,8 @@ public mainchare Main {
         c@obj1(a);
         c@obj2(a, a);
         c@mix2(x, a);
+        SimpleChare c2;
+        c2.local(x, a);
     }
 }
 
@@ -32,5 +34,7 @@ public chare SimpleChare {
     entry void obj2(Foo a, Foo b) {
     }
     entry void mix2(int x, Foo a) {
+    }
+    public void local(int x, Foo a) {
     }
 }

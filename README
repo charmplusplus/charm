@@ -60,9 +60,9 @@ the build script will compile Charm++ under this directory.
 
 For example, on an ordinary Linux PC:
 
-   ./build charm++ net-linux
+   ./build charm++ net-linux-x86_64
 
-will build charm++ in the directory: net-linux/.  The communication
+will build charm++ in the directory: net-linux-x86_64/. The communication
 defaults to UDP packets and the compiler to gcc.
 
 For a more complex example, on a Scyld workstation with the Intel C++ 
@@ -103,10 +103,6 @@ mpi-linux            PC Linux       MPI           GNU compiler
 mpi-ppc-darwin       MacOS X        MPI           GNU C++ compiler
 mpi-linux-ia64       IA64 Linux     MPI           GNU compiler
 mpi-linux-x86_64     Opteron Linux  MPI           GNU compiler
-mpi-axp              Alpha          MPI           GNU compiler
-mpi-linux-axp        Alpha Linux    MPI           GNU compiler
-origin2000           Origin2000  shared-mem       SGI C++ compiler
-t3e                  Cray T3E    shared-mem       Cray C++ compiler
 
 
 To choose <version>, your choice is determined by three options:
@@ -121,7 +117,7 @@ development and testing.
 	"mpi-" Charm++ communicates using MPI calls.  Use this for
 machines with a good MPI implementation (such as the Origin 2000).
 
-	"gemini_gni-", "bluegene[lpq]-", Charm++
+	"gemini_gni-", "bluegene[lp]-", "pami-bluegeneq-" Charm++
 communicates using direct calls to the machine's communication primitives.
 
 	"multicore-" Charm++ communicates using shared memory within a
@@ -194,7 +190,7 @@ need to choose <options> from the following list:
         performance. Try your application to decide if enabling smp mode 
         improves performance.
 
-* bluegene - compile Charm++ as running on Blue Gene emulator.
+* bigsim - compile Charm++ as running on the BigSim emulator.
 * help - show supported options for a version. For example, for net-linux, 
          running:
          > ./build charm++ net-linux help
@@ -229,12 +225,12 @@ Common compile time options such as -g, -O, -Ipath, -Lpath, -llib are
 accepted.
 
 For example, on a Linux machine, you would run
-     > ./build charm++ net-linux -O
+     > ./build charm++ net-linux-x86_64 -O
 
-This will construct a net-linux directory, link over all
-the Charm++ source code into net-linux/tmp, build the entire
-Charm++ runtime system in net-linux/tmp, and link sample programs 
-into net-linux/pgms.
+This will construct a net-linux-x86_64 directory, link over all
+the Charm++ source code into net-linux-x86_64/tmp, build the entire
+Charm++ runtime system in net-linux-x86_64/tmp, and link example programs
+into net-linux-x86_64/examples.
 
 Several #define's control the compilation of Charm++.  Some of these
 #define's can be found in src/<version>/conv-mach.h.  #define's can
@@ -242,15 +238,17 @@ also be specified on the command line, using the -D option.  For
 example,
     > ./build charm++ net-linux -O -DCMK_OPTIMIZE=1
 
-CMK_OPTIMIZE: Turn on optimizations in Charm++/Converse. This disables most of
-the run-time checking performed by Converse and Charm++ runtime. This option
-should be used only after the program has been debugged. Also, this option
-disables Converse/Charm++ tracing mechanisms such as projections and summary.
+Production optimizations: Pass the configure option --with-production
+to ./build to turn on optimizations in Charm++/Converse. This disables
+most of the run-time checking performed by Converse and Charm++
+runtime. This option should be used only after the program has been
+debugged. Also, this option disables Converse/Charm++ tracing
+mechanisms such as projections and summary.
 
 When Charm++ is built successfully, the diretory structure under the
 target directory will look like:
 
-net-linux/
+net-linux-x86_64/
    |
    ---  bin/			# all executables
    |

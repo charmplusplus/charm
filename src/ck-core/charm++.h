@@ -1006,9 +1006,13 @@ if(CpvAccess(networkProgressCount) >=  p)  \
 #endif
 
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if defined(_FAULT_MLOG_) 
 #include "ckmessagelogging.h"
 #endif
+#if defined(_FAULT_CAUSAL_)
+#include "ckcausalmlog.h"
+#endif
+
 #include "ckmemcheckpoint.h"
 #include "readonly.h"
 #include "ckarray.h"

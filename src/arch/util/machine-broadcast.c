@@ -1,3 +1,9 @@
+/**
+ *        functions for broadcast
+**/
+
+CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode);
+
 static void handleOneBcastMsg(int size, char *msg) {
     CmiAssert(CMI_BROADCAST_ROOT(msg)!=0);
 #if CMK_OFFLOAD_BCAST_PROCESS
@@ -106,10 +112,10 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
-        LrtsSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -154,10 +160,10 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        LrtsSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
 #else
         char *newmsg = CopyMsg(msg, size);
-        LrtsSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -354,3 +360,22 @@ void CmiFreeNodeBroadcastAllFn(int size, char *msg) {
 }
 #endif
 /* ##### End of Functions Related with Message Sending OPs ##### */
+
+#if ! CMK_MULTICAST_LIST_USE_COMMON_CODE
+
+void CmiSyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+    LrtsSyncListSendFn(npes, pes, len, msg);
+}
+
+CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int len, char *msg)
+{
+    return LrtsAsyncListSendFn(npes, pes, len, msg);
+}
+
+void CmiFreeListSendFn(int npes, int *pes, int len, char *msg)
+{
+    LrtsFreeListSendFn(npes, pes, len, msg);
+}
+
+#endif

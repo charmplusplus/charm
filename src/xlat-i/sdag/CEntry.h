@@ -40,7 +40,7 @@ class CEntry{
 //      printf("entry %s (%s *)", entry->charstar(), msgType->charstar());
     } 
 
-    void generateCode(XStr& op);
+    void generateCode(XStr& decls, XStr& defs);
     void generateDeps(XStr& op);
 };
 
