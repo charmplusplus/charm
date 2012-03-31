@@ -251,6 +251,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
+		mpi-interoperate.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -713,7 +714,8 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
-           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
+           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
+					 trace-controlPoints.o mpi-interoperate.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
 

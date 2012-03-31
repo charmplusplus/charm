@@ -67,7 +67,6 @@ never be excluded...
 #include "trace.h"
 
 void CkRestartMain(const char* dirname);
-int storeInterOperateStatus = 0;
 
 #define  DEBUGF(x)     //CmiPrintf x;
 
@@ -161,6 +160,9 @@ CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
+//for interoperability
+extern void _libExitHandler(envelope *env);
+extern int _libExitHandlerIdx;
 
 /*
 	FAULT_EVAC
@@ -471,12 +473,10 @@ static void _exitHandler(envelope *env)
   switch(env->getMsgtype()) {
     case StartExitMsg:
       CkAssert(CkMyPe()==0);
-      if(!CharmLibInterOperate) {
-        if (!_CkExitFnVec.isEmpty()) {
-          CkExitFn fn = _CkExitFnVec.deq();
-          fn();
-          break;
-        }
+      if (!_CkExitFnVec.isEmpty()) {
+        CkExitFn fn = _CkExitFnVec.deq();
+        fn();
+        break;
       }
       // else goto next
     case ExitMsg:
@@ -486,10 +486,8 @@ static void _exitHandler(envelope *env)
         return;
       }
       _exitStarted = 1;
-      if(!CharmLibInterOperate) {
-        CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
-        CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-      }
+      CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
+      CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
       env->setMsgtype(ReqStatMsg);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
@@ -507,9 +505,8 @@ static void _exitHandler(envelope *env)
       }	
       break;
     case ReqStatMsg:
-    if(!CharmLibInterOperate) {
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        _messageLoggingExit();
+      _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
@@ -517,7 +514,6 @@ static void _exitHandler(envelope *env)
       /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
-      }
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
@@ -539,21 +535,14 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
       //everyone exits here - there may be issues with leftover messages in the queue
-      if(CharmLibInterOperate) {
+      if(CkMyPe()){
         DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-        _exitStarted = 0;
-        CpvAccess(charmLibExitFlag) = 1;
-      } else {
-        if(CkMyPe()){
-          DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-          CharmLibInterOperate = storeInterOperateStatus;
-          CpvAccess(charmLibExitFlag) = 1;
-          ConverseExit();
-        }
+        ConverseExit();
+				if(CharmLibInterOperate)
+					CpvAccess(charmLibExitFlag) = 1;
       }
       break;
     case StatMsg:
-// shouldn't reach here in interoperate mode
       CkAssert(CkMyPe()==0);
 #if CMK_WITH_STATS
       _allStats[env->getSrcPe()] = (Stats*) EnvToUsr(env);
@@ -564,9 +553,9 @@ static void _exitHandler(envelope *env)
       if(_numStatsRecd==CkNumValidPes()) {
         _printStats();
         DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
-        CharmLibInterOperate = storeInterOperateStatus;
-        CpvAccess(charmLibExitFlag) = 1;
         ConverseExit();
+				if(CharmLibInterOperate)
+					CpvAccess(charmLibExitFlag) = 1;
       }
       break;
     default:
@@ -850,14 +839,12 @@ void CkExit(void)
   CmiSetHandler(env, _exitHandlerIdx);
   CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
 
-  if(!CharmLibInterOperate) {
 #if ! CMK_BIGSIM_THREAD
-    _TRACE_END_EXECUTE();
-    //Wait for stats, which will call ConverseExit when finished:
-    if(!storeInterOperateStatus)
-      CsdScheduler(-1);
+  _TRACE_END_EXECUTE();
+  //Wait for stats, which will call ConverseExit when finished:
+	if(!CharmLibInterOperate)
+  CsdScheduler(-1);
 #endif
-  }
 }
 
 /* This is a routine called in case the application is closing due to a signal.
@@ -1057,6 +1044,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkNumberHandlerEx(_initHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
+	//added for interoperabilitY
+	_libExitHandlerIdx = CkRegisterHandler((CmiHandler)_libExitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 
@@ -1423,21 +1412,4 @@ void registerExitFn(CkExitFn fn)
   _CkExitFnVec.enq(fn);
 }
 
-void CharmLibInit(int peid, int numpes, int argc, char **argv){
-    //note CmiNumNodes and CmiMyNode should just be macros
-    _Cmi_numnodes = numpes;
-    _Cmi_mynode = peid;
-
-  CharmLibInterOperate = 1;
-  ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-}
-
-void CharmLibExit() {
-  storeInterOperateStatus = 1;
-  CharmLibInterOperate = 0;
-  if(CkMyPe() == 0) {
-    CkExit();
-  }
-  CsdScheduler(-1);
-}
 /*@}*/

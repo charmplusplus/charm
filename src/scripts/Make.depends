@@ -421,6 +421,24 @@ init.o: init.C ck.h charm++.h charm.h converse.h conv-config.h \
  trace.h trace-bluegene.h envelope.h qd.h register.h stats.h
 	$(CHARMC) -c -I. init.C
 
+mpi-interoperate.o: mpi-interoperate.C mpi-interoperate.h empty.decl.h \
+ empty.def.h ck.h charm++.h charm.h converse.h conv-config.h \
+ conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
+ queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \
+ conv-trace.h persistent.h debug-conv.h pup.h middle.h middle-conv.h \
+ cklists.h ckbitvector.h ckstream.h init.h ckhashtable.h debug-charm.h \
+ debug-conv++.h simd.h CkMarshall.decl.h ckarrayindex.h cksection.h \
+ ckcallback.h conv-ccs.h sockRoutines.h ccs-server.h ckobjQ.h \
+ ckreduction.h CkReduction.decl.h CkArrayReductionMgr.decl.h \
+ ckmemcheckpoint.h CkMemCheckpoint.decl.h readonly.h ckarray.h \
+ cklocation.h LBDatabase.h lbdb.h LBDBManager.h LBObj.h LBOM.h LBComm.h \
+ LBMachineUtil.h lbdb++.h LBDatabase.decl.h NullLB.decl.h BaseLB.decl.h \
+ CkLocation.decl.h CkArray.decl.h ckfutures.h CkFutures.decl.h charisma.h \
+ charisma.decl.h tempo.h tempo.decl.h waitqd.h waitqd.decl.h sdag.h \
+ ckcheckpoint.h CkCheckpoint.decl.h ckevacuation.h ckarrayreductionmgr.h \
+ trace.h trace-bluegene.h envelope.h qd.h register.h stats.h
+	$(CHARMC) -c -I. mpi-interoperate.C
+
 register.o: register.C ck.h charm++.h charm.h converse.h conv-config.h \
  conv-autoconfig.h conv-common.h conv-mach.h conv-mach-opt.h pup_c.h \
  queueing.h conv-cpm.h conv-cpath.h conv-qd.h conv-random.h conv-lists.h \

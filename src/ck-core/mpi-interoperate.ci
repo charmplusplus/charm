@@ -1,0 +1,6 @@
+mainmodule empty {
+  mainchare empty{
+    entry empty(CkArgMsg *m);
+  };
+}
+
