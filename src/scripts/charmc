@@ -96,6 +96,8 @@ CMK_CELL=0
 SPU_USE_CPP=0
 SPU_EXTRA_LIBS=""
 
+MPI_INTEROPERATE=""
+
 ####################################################################
 #
 #  Utility routines used below
@@ -762,6 +764,9 @@ do
 		;;
 	-nof90main)
 		F90_MAIN=
+		;;
+	-mpi)
+		MPI_INTEROPERATE="yes"
 		;;
 	-*|+*)
 #		Warning "passing unrecognized option $arg to all compilers and linkers"
@@ -1508,6 +1513,11 @@ then
             OBJECTFILES="$OBJECTFILES $CHARMLIB/$f90obj"
           done
         fi
+fi
+
+if [ "$MPI_INTEROPERATE" != "" ]
+then
+	OBJECTFILES="$CHARMLIB/mpi-mainmodule.o $OBJECTFILES"
 fi
 
 # check if we're linking a sequential object
