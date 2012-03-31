@@ -808,13 +808,16 @@ void Chare::sharedDisambiguation(XStr &str,const XStr &super)
     (void)super;
     str << "\n    void ckDelegate(CkDelegateMgr *dTo,CkDelegateData *dPtr=NULL)"
         << "\n    { ";
-    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr); }","");
-    str << "\n    void ckUndelegate(void)"
+    genProxyNames(str,"      ",NULL,"::ckDelegate(dTo,dPtr); ","");
+    str << "}"
+        << "\n    void ckUndelegate(void)"
         << "\n    { ";
-    genProxyNames(str,"      ",NULL,"::ckUndelegate(); }","");
-    str << "\n    void pup(PUP::er &p)"
+    genProxyNames(str,"      ",NULL,"::ckUndelegate(); ","");
+    str << "}"
+        << "\n    void pup(PUP::er &p)"
         << "\n    { ";
-    genProxyNames(str,"      ",NULL,"::pup(p); }","");
+    genProxyNames(str,"      ",NULL,"::pup(p); ","");
+    str << "}";
     if (isPython()) {
       str << "\n    void registerPython(const char *str)"
           << "\n    { CcsRegisterHandler(str, CkCallback("<<Prefix::Index<<type<<"::pyRequest(0), *this)); }";
@@ -1079,8 +1082,9 @@ Chare::genSubDecls(XStr& str)
     sharedDisambiguation(str,super);
     str << "\n    void ckSetChareID(const CkChareID &c)"
         << "\n    {";
-    genProxyNames(str,"      ",NULL,"::ckSetChareID(c); }","");
-    str << "\n    "<<type<<tvars()<<" *ckLocal(void) const"
+    genProxyNames(str,"      ",NULL,"::ckSetChareID(c); ","");
+    str << "}"
+        << "\n    "<<type<<tvars()<<" *ckLocal(void) const"
         << "\n    { return ("<<type<<tvars()<<" *)CkLocalChare(&ckGetChareID()); }"
         << "\n";
 
