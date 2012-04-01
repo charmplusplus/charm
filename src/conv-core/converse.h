@@ -1846,6 +1846,12 @@ void CmiTurnOffStats();
 #define CmiTurnOffStats()
 #endif
 
+/* CharmLibInterOperate should be a global variable as it will be
+ * set only once by MPI ranks respectively.
+ */
+extern int CharmLibInterOperate;
+CpvExtern(int,charmLibExitFlag);
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -1920,11 +1926,5 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 
 CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
-
-/* CharmLibInterOperate should be a global variable as it will be
- * set only once by MPI ranks respectively.
- */
-extern int CharmLibInterOperate;
-CpvExtern(int,charmLibExitFlag);
 
 #endif /* CONVERSE_H */
