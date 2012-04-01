@@ -2975,14 +2975,18 @@ static void  SendRdmaMsg()
             RDMA_TRY_SEND(pd->type)
 #endif
 #if CMK_SMP_TRACE_COMMTHREAD
-            int oldpe = -1;
-            int oldeventid = -1;
-            START_EVENT();
-            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
-            { 
-                TRACE_COMM_GET_MSGID((void*)pd->local_addr, &oldpe, &oldeventid);
-                TRACE_COMM_SET_COMM_MSGID((void*)pd->local_addr);
-            }
+//            int oldpe = -1;
+//            int oldeventid = -1;
+//            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
+//            { 
+//                TRACE_COMM_GET_MSGID((void*)pd->local_addr, &oldpe, &oldeventid);
+//                TRACE_COMM_SET_COMM_MSGID((void*)pd->local_addr);
+//            }
+              if(IS_PUT(pd->type) )
+              { 
+                  START_EVENT();
+                  TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
+              }
 #endif
 
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
@@ -2996,10 +3000,10 @@ static void  SendRdmaMsg()
             CMI_GNI_UNLOCK(lock);
             
 #if CMK_SMP_TRACE_COMMTHREAD
-            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
-            { 
-                if (oldpe != -1)  TRACE_COMM_SET_MSGID((void*)pd->local_addr, oldpe, oldeventid);
-            }
+//            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
+//            { 
+//                if (oldpe != -1)  TRACE_COMM_SET_MSGID((void*)pd->local_addr, oldpe, oldeventid);
+//            }
 #endif
             if(status == GNI_RC_SUCCESS)    //post good
             {
@@ -3021,10 +3025,6 @@ static void  SendRdmaMsg()
                 {
 #if CMK_SMP_TRACE_COMMTHREAD 
                     pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
-                    if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
-                    { 
-                        TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
-                    }
 #endif
                     IncreaseMsgInRecv(((void*)(pd->local_addr)));
                 }
