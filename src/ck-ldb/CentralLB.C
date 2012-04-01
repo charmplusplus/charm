@@ -277,7 +277,8 @@ void CentralLB::ProcessAtSync()
  double bg_walltime;
  theLbdb->GetTime(&total_load,&total_load, &idle_time, &bg_walltime, &bg_walltime);
  theLbdb->IdleTime(&idle_time);
- CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(), total_load, idle_time, bg_walltime, (total_load - idle_time));
+ CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(),
+    total_load, idle_time, bg_walltime, (total_load - idle_time - bg_walltime));
 
 
 

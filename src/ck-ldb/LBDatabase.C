@@ -19,6 +19,7 @@
 
 #define VEC_SIZE 500
 #define IMB_TOLERANCE 1.1
+#define IDLE_LOAD_TOLERANCE 0.3
 
 struct AdaptiveData {
   int iteration;
@@ -59,12 +60,16 @@ struct AdaptiveLBStructure {
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   double lb_data[6];
+  lb_data[1] = 0.0;
   lb_data[2] = 0.0;
   lb_data[3] = 0.0;
   lb_data[4] = 0.0;
   lb_data[5] = 0.0;
   for (int i = 0; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == 6*sizeof(double));
+    if (msgs[i]->getSize() != 6*sizeof(double)) {
+      CkPrintf("Error!!! Reduction not correct. Msg size is %d\n", msgs[i]->getSize());
+    }
     double* m = (double *)msgs[i]->getData();
     // Total count
     lb_data[1] += m[1];
@@ -613,7 +618,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double idle_time;
     IdleTime(&idle_time);
-    CkPrintf("[%d] Idle time %lf for iteration %d\n", CkMyPe(), idle_time, iteration);
+    //CkPrintf("[%d] Idle time %lf for iteration %d\n", CkMyPe(), idle_time, iteration);
     // Skips the 0th iteration collection of stats hence...
     idle_time = idle_time * getLBDB()->ObjDataCount() /
        (adaptive_struct.total_syncs_called + getLBDB()->ObjDataCount());
@@ -632,9 +637,9 @@ bool LBDatabase::AddLoad(int iteration, double load) {
       lb_data[5] = idle_time/total_load_vec[iteration];
     }
 
-    CkPrintf("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
-        total_load_vec[iteration], idle_time,
-        idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
+   // CkPrintf("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
+   //     total_load_vec[iteration], idle_time,
+   //     idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -679,7 +684,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   GetPrevLBData(tmp1, tmp2);
   double tolerate_imb = IMB_TOLERANCE * tmp2;
 
-  if ((max_idle_load_ratio >= 0.1 || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
+  if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
@@ -763,7 +768,10 @@ bool LBDatabase::generatePlan(int& period) {
   double tmp2;
   GetPrevLBData(tmp1, tmp2);
   
-  double tolerate_imb = IMB_TOLERANCE * tmp2;
+  double tolerate_imb = tmp2;
+  if (max/avg < tolerate_imb) {
+    tolerate_imb = 1.0;
+  }
 
   return getPeriodForStrategy(tolerate_imb, 1, period);
 
@@ -799,6 +807,7 @@ bool LBDatabase::generatePlan(int& period) {
 bool LBDatabase::getPeriodForStrategy(double new_load_percent, double overhead_percent, int& period) {
   double mslope, aslope, mc, ac;
   getLineEq(new_load_percent, aslope, ac, mslope, mc);
+  CkPrintf("new load percent %lf\n", new_load_percent);
   CkPrintf("\n max: %fx + %f; avg: %fx + %f\n", mslope, mc, aslope, ac);
   double a = (mslope - aslope)/2;
   double b = (mc - ac);
