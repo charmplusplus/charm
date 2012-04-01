@@ -378,7 +378,7 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
-    PCQueuePush(cs->recv,msg);
+    PCQueuePush(cs->recv,(char*)msg);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_noprocforcommthread)
@@ -800,16 +800,23 @@ static void ConverseRunPE(int everReturn) {
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
-    /* communication thread */
-    if (CmiMyRank() == CmiMyNodeSize()) {
+    if(CharmLibInterOperate) {
+	/* !!! Not considering SMP mode now */
+	/* TODO: make interoperability working in SMP!!! */
+	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+	CsdScheduler(-1);
+    } else {
+      /* communication thread */
+      if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         while (1) CommunicationServerThread(5);
-    } else { /* worker thread */
+      } else { /* worker thread */
         if (!everReturn) {
-            Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-            if (Cmi_usrsched==0) CsdScheduler(-1);
-            ConverseExit();
+          Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+          if (Cmi_usrsched==0) CsdScheduler(-1);
+          ConverseExit();
         }
+      }
     }
 }
 /* ##### End of Functions Related with Machine Startup ##### */
