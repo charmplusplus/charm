@@ -296,18 +296,26 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   }
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT
-  CmiLock(persistPool.lock);
+#if !MULTI_THREAD_SEND
+  CmiLock(persistPool.lock);    /* locked in function */
+#endif
   slot->index = IndexPool_getslot(&persistPool, slot, 2);
+#if !MULTI_THREAD_SEND
   CmiUnlock(persistPool.lock);
+#endif
 #endif
 }
 
 void clearRecvSlot(PersistentReceivesTable *slot)
 {
 #if REMOTE_EVENT
+#if !MULTI_THREAD_SEND
   CmiLock(persistPool.lock);
+#endif
   IndexPool_freeslot(&persistPool, slot->index);
+#if !MULTI_THREAD_SEND
   CmiUnlock(persistPool.lock);
+#endif
 #endif
 }
 
