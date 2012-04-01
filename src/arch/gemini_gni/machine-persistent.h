@@ -10,7 +10,7 @@
 
 #include "gni_pub.h"
 
-#define PERSIST_MIN_SIZE                1024
+#define PERSIST_MIN_SIZE                SMSG_MAX_MSG
 
 #define PERSIST_BUFFERS_NUM             1
 

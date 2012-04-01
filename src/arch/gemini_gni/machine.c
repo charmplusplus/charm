@@ -1275,7 +1275,7 @@ static gni_return_t registerFromMempool(mempool_type *mptr, void *blockaddr, siz
         }
         else if (status == GNI_RC_INVALID_PARAM || status == GNI_RC_PERMISSION_ERROR)
         {
-            CmiAbort("Memory registor for mempool fails\n");
+            GNI_RC_CHECK("registerFromMempool", status);
         }
         else
         {
@@ -1854,10 +1854,6 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
 #endif
   
 #if CMK_BROADCAST_USE_CMIREFERENCE
-  if (npes == 1) {
-    CmiSyncSendAndFree(pes[0], len, msg);
-    return;
-  }
   CmiSyncListSendFn(npes, pes, len, msg);
   CmiFree(msg);
 #else
@@ -2087,7 +2083,7 @@ static void    PumpDatagramConnection()
                status = GNI_SmsgInit(ep_hndl_array[pe], smsg_attr_vector_local[pe], smsg_attr_vector_remote[pe]);
                GNI_RC_CHECK("Dynamic SMSG Init", status);
 #if PRINT_SYH
-               printf("++ Dynamic SMSG setup [%d===>%d] done\n", myrank, pe);
+               printf("[%d] ++ Dynamic SMSG setup [%d===>%d] done\n", myrank, myrank, pe);
 #endif
 	       CmiAssert(smsg_connected_flag[pe] == 1);
                smsg_connected_flag[pe] = 2;
@@ -2102,7 +2098,7 @@ static void    PumpDatagramConnection()
                status = GNI_SmsgInit(ep_hndl_array[remote_id], &send_smsg_attr, &recv_smsg_attr);
                GNI_RC_CHECK("Dynamic SMSG Init", status);
 #if PRINT_SYH
-               printf("++ Dynamic SMSG setup2 [%d===>%d] done\n", myrank, remote_id);
+               printf("[%d] ++ Dynamic SMSG setup2 [%d===>%d] done\n", myrank, myrank, remote_id);
 #endif
                smsg_connected_flag[remote_id] = 2;
 
@@ -2955,18 +2951,19 @@ static void  SendRdmaMsg()
 
         if(status == GNI_RC_SUCCESS)        //mem register good
         {
+            int destNode = ptr->destNode;
             CmiNodeLock lock = (pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) ? rdma_tx_cq_lock:default_tx_cq_lock;
             CMI_GNI_LOCK(lock);
 #if REMOTE_EVENT
             if( pd->cqwrite_value == 0) {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-                int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, ACK_EVENT(ptr->ack_index));
+                int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, ACK_EVENT(ptr->ack_index));
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
 #if CMK_PERSISTENT_COMM
             else if (pd->cqwrite_value == PERSIST_SEQ) {
                 pd->cq_mode |= GNI_CQMODE_REMOTE_EVENT;
-                int sts = GNI_EpSetEventData(ep_hndl_array[ptr->destNode], ptr->destNode, PERSIST_EVENT(ptr->ack_index));
+                int sts = GNI_EpSetEventData(ep_hndl_array[destNode], destNode, PERSIST_EVENT(ptr->ack_index));
                 GNI_RC_CHECK("GNI_EpSetEventData", sts);
             }
 #endif
@@ -2987,11 +2984,11 @@ static void  SendRdmaMsg()
 
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
             {
-                status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
+                status = GNI_PostRdma(ep_hndl_array[destNode], pd);
             }
             else
             {
-                status = GNI_PostFma(ep_hndl_array[ptr->destNode],  pd);
+                status = GNI_PostFma(ep_hndl_array[destNode],  pd);
             }
             CMI_GNI_UNLOCK(lock);
             
@@ -3037,7 +3034,7 @@ static void  SendRdmaMsg()
                 MACHSTATE(8, "GO request from buffered\n"); 
 #endif
 #if PRINT_SYH
-                printf("[%d] SendRdmaMsg: post succeed. seqno: %d\n", myrank, pd->cqwrite_value);
+                printf("[%d] SendRdmaMsg: post succeed. seqno: %x\n", myrank, pd->cqwrite_value);
 #endif
             }else           // cannot post
             {
@@ -3048,7 +3045,7 @@ static void  SendRdmaMsg()
                 ptr = ptr->next;
 #endif
 #if PRINT_SYH
-                printf("[%d] SendRdmaMsg: post failed. seqno: %d\n", myrank, pd->cqwrite_value);
+                printf("[%d] SendRdmaMsg: post failed. seqno: %x dest: %d local mhdl: %lld %lld remote mhdl: %lld %lld connect: %d\n", myrank, pd->cqwrite_value, destNode, pd->local_mem_hndl.qword1, pd->local_mem_hndl.qword2, pd->remote_mem_hndl.qword1, pd->remote_mem_hndl.qword2, smsg_connected_flag[destNode]);
 #endif
                 break;
             }
@@ -3354,6 +3351,28 @@ void LrtsAdvanceCommunication(int whileidle)
 #endif
 }
 
+static void set_smsg_max()
+{
+    char *env;
+
+    if(mysize <=512)
+    {
+        SMSG_MAX_MSG = 1024;
+    }else if (mysize <= 4096)
+    {
+        SMSG_MAX_MSG = 1024;
+    }else if (mysize <= 16384)
+    {
+        SMSG_MAX_MSG = 512;
+    }else {
+        SMSG_MAX_MSG = 256;
+    }
+
+    env = getenv("CHARM_UGNI_SMSG_MAX_SIZE");
+    if (env) SMSG_MAX_MSG = atoi(env);
+    CmiAssert(SMSG_MAX_MSG > 0);
+}    
+
 /* useDynamicSMSG */
 static void _init_dynamic_smsg()
 {
@@ -3369,18 +3388,8 @@ static void _init_dynamic_smsg()
         smsg_attr_vector_local[i] = NULL;
         smsg_attr_vector_remote[i] = NULL;
     }
-    if(mysize <=512)
-    {
-        SMSG_MAX_MSG = 4096;
-    }else if (mysize <= 4096)
-    {
-        SMSG_MAX_MSG = 4096/mysize * 1024;
-    }else if (mysize <= 16384)
-    {
-        SMSG_MAX_MSG = 512;
-    }else {
-        SMSG_MAX_MSG = 256;
-    }
+
+    set_smsg_max();
 
     send_smsg_attr.msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
     send_smsg_attr.mbox_maxcredit = SMSG_MAX_CREDIT;
@@ -3412,6 +3421,9 @@ static void _init_dynamic_smsg()
 
       /* always pre-connect to proc 0 */
     //if (myrank != 0) connect_to(0);
+
+    status = GNI_SmsgSetMaxRetrans(nic_hndl, 4096);
+    GNI_RC_CHECK("SmsgSetMaxRetrans Init", status);
 }
 
 static void _init_static_smsg()
@@ -3425,25 +3437,9 @@ static void _init_static_smsg()
     uint32_t              vmdh_index = -1;
     mdh_addr_t            base_infor;
     mdh_addr_t            *base_addr_vec;
-    char *env;
 
-    if(mysize <=512)
-    {
-        SMSG_MAX_MSG = 1024;
-    }else if (mysize <= 4096)
-    {
-        SMSG_MAX_MSG = 1024;
-    }else if (mysize <= 16384)
-    {
-        SMSG_MAX_MSG = 512;
-    }else {
-        SMSG_MAX_MSG = 256;
-    }
+    set_smsg_max();
     
-    env = getenv("CHARM_UGNI_SMSG_MAX_SIZE");
-    if (env) SMSG_MAX_MSG = atoi(env);
-    CmiAssert(SMSG_MAX_MSG > 0);
-
     smsg_attr = malloc(mysize * sizeof(gni_smsg_attr_t));
     
     smsg_attr[0].msg_type = GNI_SMSG_TYPE_MBOX_AUTO_RETRANSMIT;
