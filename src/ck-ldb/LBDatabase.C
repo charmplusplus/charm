@@ -998,6 +998,14 @@ void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio) {
   }
 }
 
+void LBDatabase::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio) {
+  if (lb_type == 0) {
+    lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
+  } else if (lb_type == 1) {
+    lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
+  }
+}
+
 /*
   callable from user's code
 */
