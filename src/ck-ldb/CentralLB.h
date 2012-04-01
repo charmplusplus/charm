@@ -248,6 +248,10 @@ protected:
     theLbdb->GetPrevLBData(is_prev_lb_refine, lb_max_avg_ratio);
   }
 
+  virtual void GetLBDataForLB(int prev_lb, double& lb_max_avg_ratio) {
+    theLbdb->GetLBDataForLB(prev_lb, lb_max_avg_ratio);
+  }
+
 
 private:  
   CProxy_CentralLB thisProxy;

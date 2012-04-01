@@ -372,6 +372,7 @@ public:
 
   void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg);
   void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio);
+  void GetLBDataForLB(int lb_type, double& lb_max_avg_ratio);
 
   void SetMigrationCost(double lb_migration_cost);
   void SetStrategyCost(double lb_strategy_cost);
