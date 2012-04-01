@@ -38,7 +38,6 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         // CmiPrintf("[%d] LrtsSendPersistentMsg h=%p hdl=%d destNode=%d destAddress=%p size=%d\n", CmiMyPe(), h, CmiGetHandler(m), destNode, slot->destBuf[0].destAddress, size);
 
         // uGNI part
-        START_EVENT();
         MallocPostDesc(pd);
         if(size <= LRTS_GNI_RDMA_THRESHOLD) {
             pd->type            = GNI_POST_FMA_PUT;
@@ -64,7 +63,7 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
 #endif
         SetMemHndlZero(pd->local_mem_hndl);
 
-        TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
+        //TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
          /* always buffer */
 #if CMK_SMP || 1
 #if REMOTE_EVENT

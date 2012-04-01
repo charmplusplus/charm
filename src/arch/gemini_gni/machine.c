@@ -792,6 +792,7 @@ static int stats_off = 0;
 void CmiTurnOnStats()
 {
     stats_off = 0;
+    //CmiPrintf("[%d][%d:%d]+++++++++++ turning on stats \n", CmiMyNode(), CmiMyPe(), CmiMyRank());
 }
 
 void CmiTurnOffStats()
@@ -2973,6 +2974,17 @@ static void  SendRdmaMsg()
 #if CMK_WITH_STATS
             RDMA_TRY_SEND(pd->type)
 #endif
+#if CMK_SMP_TRACE_COMMTHREAD
+            int oldpe = -1;
+            int oldeventid = -1;
+            START_EVENT();
+            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
+            { 
+                TRACE_COMM_GET_MSGID((void*)pd->local_addr, &oldpe, &oldeventid);
+                TRACE_COMM_SET_COMM_MSGID((void*)pd->local_addr);
+            }
+#endif
+
             if(pd->type == GNI_POST_RDMA_GET || pd->type == GNI_POST_RDMA_PUT) 
             {
                 status = GNI_PostRdma(ep_hndl_array[ptr->destNode], pd);
@@ -2983,6 +2995,12 @@ static void  SendRdmaMsg()
             }
             CMI_GNI_UNLOCK(lock);
             
+#if CMK_SMP_TRACE_COMMTHREAD
+            if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
+            { 
+                if (oldpe != -1)  TRACE_COMM_SET_MSGID((void*)pd->local_addr, oldpe, oldeventid);
+            }
+#endif
             if(status == GNI_RC_SUCCESS)    //post good
             {
 #if CMI_EXERT_RDMA_CAP
@@ -3003,6 +3021,10 @@ static void  SendRdmaMsg()
                 {
 #if CMK_SMP_TRACE_COMMTHREAD 
                     pd->sync_flag_value = 1000000 * CmiWallTimer(); //microsecond
+                    if(pd->type == GNI_POST_RDMA_PUT || pd->type == GNI_POST_FMA_PUT)
+                    { 
+                        TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);
+                    }
 #endif
                     IncreaseMsgInRecv(((void*)(pd->local_addr)));
                 }
