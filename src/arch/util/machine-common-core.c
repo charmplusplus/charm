@@ -573,7 +573,7 @@ if (  MSG_STATISTIC)
         msg_histogram[ret_log]++;
 }
 #endif
-        return LrtsSendFunc(destPE, size, msg, P2P_ASYNC);
+        return CmiSendNetworkFunc(destPE, size, msg, P2P_ASYNC);
     }
 }
 #endif
@@ -613,8 +613,11 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
+        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
     }
+#if CMK_PERSISTENT_COMM
+    if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
 }
 #endif
 
@@ -632,7 +635,7 @@ if (  MSG_STATISTIC)
         msg_histogram[ret_log]++;
 }
 #endif
-        return LrtsSendFunc(destNode, size, msg, P2P_ASYNC);
+        return CmiSendNetworkFunc(destNode, size, msg, P2P_ASYNC);
     }
 }
 #endif

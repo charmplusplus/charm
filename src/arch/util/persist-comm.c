@@ -183,7 +183,7 @@ PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes)
     /* randomly pick one rank on the destination node is fine for setup.
        actual message will be handled by comm thread anyway */
   int pe = CmiNodeFirst(destNode) + rand()/RAND_MAX * CmiMyNodeSize();
-  return CmiCreatePersistent(CmiNodeFirst(destNode), maxBytes);
+  return CmiCreatePersistent(pe, maxBytes);
 }
 
 static void persistentRequestHandler(void *env)
