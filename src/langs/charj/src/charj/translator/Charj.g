@@ -121,6 +121,7 @@ tokens {
     TILDE                   = '~'               ;
     AT                      = '@'               ;
     INSTANCEOF              = 'instanceof'      ;
+    SIZEOF                  = 'sizeof'          ;
 
     // Charj keywords for things that are automatically generated
     // and we don't want the user to use them as identifiers
@@ -150,7 +151,6 @@ tokens {
     REGISTER                = 'register'        ;
     REINTERPRET_CAST        = 'reinterpret_cast';
     SIGNED                  = 'signed'          ;
-    SIZEOF                  = 'sizeof'          ;
     STATIC_CAST             = 'static_cast'     ;
     STRUCT                  = 'struct'          ;
     TEMPLATE                = 'template'        ;
@@ -916,8 +916,6 @@ postfixedExpression
             )
         |   (AT templateInstantiation? IDENT arguments)
             ->  ^(ENTRY_METHOD_CALL ^(AT $postfixedExpression IDENT) templateInstantiation? arguments)
-        |   '[' expression ']'
-            ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression expression)
         |   domainExpression
             ->  ^(ARRAY_ELEMENT_ACCESS $postfixedExpression domainExpression)
         )*
@@ -971,6 +969,11 @@ primaryExpression
         -> GETNUMNODES
 	|	THISINDEX
 	|	THISPROXY
+    |   SIZEOF '(' expression ')'
+        -> ^(SIZEOF expression)
+    |   SIZEOF '(' type ')'
+        -> ^(SIZEOF type)
+
     ;
     
 qualifiedIdentExpression

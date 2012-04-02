@@ -1189,20 +1189,14 @@ extern int restarted;
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	ProcessReceiveMigration((CkReductionMsg*)NULL);
+#else
   CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
                   thisProxy);
   contribute(0, NULL, CkReduction::max_int, cb);
 
-  // Reset all adaptive lb related fields since load balancing is being done.
- // adaptive_struct.lb_no_iterations = -1;
- // adaptive_lbdb.history_data.clear();
- // adaptive_struct.prev_load = 0.0;
- // local_state = OFF;
- // adaptive_struct.lb_period_informed = false;
- // adaptive_struct.lb_ideal_period = INT_MAX;
- // adaptive_struct.lb_calculated_period = INT_MAX;
- // adaptive_struct.lb_msg_send_no = 0;
- // adaptive_struct.lb_msg_recv_no = 0;
+#endif
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)

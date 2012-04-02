@@ -56,12 +56,14 @@ typedef struct {
 
 void CmiPersistentInit();
 PersistentHandle CmiCreatePersistent(int destPE, int maxBytes);
+PersistentHandle CmiCreateNodePersistent(int destNode, int maxBytes);
 PersistentReq CmiCreateReceiverPersistent(int maxBytes);
 PersistentHandle CmiRegisterReceivePersistent(PersistentReq req);
 void CmiUsePersistentHandle(PersistentHandle *p, int n);
 void CmiDestoryPersistent(PersistentHandle h);
 void CmiDestoryAllPersistent();
 
+void CmiPersistentOneSend();
 #else
 
 typedef int PersistentRecvHandle;

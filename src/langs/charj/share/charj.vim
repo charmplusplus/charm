@@ -46,6 +46,7 @@ syn keyword javaStatement	return
 syn keyword javaStorageClass	static synchronized transient volatile final strictfp serializable readonly
 syn keyword javaExceptions	throw try catch finally
 syn keyword javaAssert		assert
+syn keyword javaAssert		sizeof
 syn keyword javaMethodDecl	synchronized throws traced chare chare_array group nodegroup mainchare
 syn keyword javaClassDecl	extends implements interface
 " to differentiate the keyword class from MyClass.class we use a match here
@@ -117,7 +118,7 @@ syn keyword javaLabel		default
 
 if !exists("java_allow_cpp_keywords")
   syn keyword javaError auto friend inline redeclared
-  syn keyword javaError register signed sizeof struct template typedef union
+  syn keyword javaError register signed struct template typedef union
   syn keyword javaError unsigned operator
 endif
 

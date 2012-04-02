@@ -10,7 +10,7 @@ test: pgm
 	./charmrun +p4 ./pgm 1000000 100 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun +p4 ./pgm 1000000 100 +x2 +y2 +z2
+	./charmrun +p4 ./pgm 1000000 100 +x2 +y2 +z2 $(TESTOPTS)
 
 
 # compile program with trace projections - performance trace library

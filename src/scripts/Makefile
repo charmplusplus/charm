@@ -65,7 +65,7 @@ ARMCI: charm++ LIBS
 
 f90charm: charm++ $(L)/libf90charm.a
 
-default_libs: completion multicast pythonCCS
+default_libs: completion multicast pythonCCS mpi-main
 
 ChaNGa: charm++ cache liveViz
 
@@ -83,6 +83,9 @@ pythonCCS: charmxi
 
 completion: charmxi
 	cd libs/ck-libs/completion && $(MAKE)
+
+mpi-main: mpi-mainmodule.o
+	cp mpi-mainmodule.o ../lib
 
 translators: charmxi conv-cpm
 
@@ -206,7 +209,7 @@ CONVCOMHEADERS= 3dgridrouter.h hypercuberouter.h hypercubetopology.h	\
 UTILHEADERS=pup.h pupf.h pup_c.h pup_stl.h pup_mpi.h pup_toNetwork.h pup_toNetwork4.h pup_paged.h pup_cmialloc.h\
 	ckimage.h ckdll.h ckhashtable.h ckbitvector.h cklists.h ckliststring.h \
 	cksequence.h ckstatistics.h ckvector3d.h conv-lists.h RTH.h ckcomplex.h \
-	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h \
+	sockRoutines.h sockRoutines.c ckpool.h BGLTorus.h BGPTorus.h BGQTorus.h \
 	TopoManager.h XT3Torus.h XTTorus.h cmimemcpy.h simd.h SSE-Double.h SSE-Float.h crc32.h
 
 CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
@@ -215,7 +218,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  ckarrayreductionmgr.h cksection.h \
 	  ckarrayindex.h ckarray.h cklocation.h ckreduction.h \
 	  ckcheckpoint.h ckmemcheckpoint.h ckevacuation.h\
-          ckmessagelogging.h ckobjid.h\
+          ckmessagelogging.h ckcausalmlog.h ckobjid.h\
 	  ckobjQ.h readonly.h charisma.h \
           comlib.h ComlibArrayListener.h ComlibStrategy.h \
 	  ComlibLearner.h $(UTILHEADERS) \
@@ -251,6 +254,7 @@ CKHEADERS=ck.h ckstream.h envelope.h init.h qd.h charm.h charm++.h \
 	  pathHistory.h envelope-path.h \
           controlPoints.h controlPointsf.h arrayRedistributor.h cp_effects.h register.h stats.h   \
 	  cksequence_internal.h cksequence_factory.h random_sequence.h strided_sequence.h \
+		mpi-interoperate.h \
 	  $(CVHEADERS) $(CONVCOMHEADERS)
 
 ALLHEADERS=$(CKHEADERS) \
@@ -419,7 +423,7 @@ LIBCONV_UTILF=pup_f.o
 converse: fmain-ok charmrun-target swapglobal-target conv-cpm
 
 charmrun-target: sockRoutines.c sockRoutines.h ccs-server.c ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
-	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS)' -j1 ) ; fi
+	if [ -d charmrun ] ; then ( cd charmrun ; $(MAKE) OPTS='$(OPTS) -Wno-error' -j1 ) ; fi
 	if [ -f charmrun ] ; then ( cp -f charmrun ../bin ) ; fi
 
 fmain-ok: fmain.f90
@@ -430,7 +434,7 @@ fmain-ok: fmain.f90
 QUICK_THREADS: $(CVHEADERS)
 	-( cd QuickThreads && $(MAKE) clean )
 	( cd QuickThreads;./configure )
-	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS)' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
+	( cd QuickThreads ; $(MAKE) qt  OPTS='$(OPTS) -Wno-error' ) || ( echo "Did you try to build net-linux on a 64-bit system? Try net-linux-x86_64" && false )
 	cp -f QuickThreads/libqt.a ../lib/libckqt.a
 	-(CHARMINC=.; . ./conv-config.sh; \
 	  test -d ../lib_so && \
@@ -507,7 +511,7 @@ pup_cmialloc.o: pup_cmialloc.C $(CVHEADERS) $(UTILHEADERS)
 ckhashtable.o: ckhashtable.C ckhashtable.h $(CVHEADERS)
 	$(CHARMC) -o ckhashtable.o ckhashtable.C
 
-TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h XT3Torus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
+TopoManager.o: TopoManager.C TopoManager.h BGLTorus.h BGPTorus.h BGQTorus.h XT3Torus.h XTTorus.h CrayNid.c $(CVHEADERS) $(UTILHEADERS)
 	$(CHARMC) -o TopoManager.o TopoManager.C
 
 CrayNid.o: CrayNid.c $(CVHEADERS) $(UTILHEADERS)
@@ -706,21 +710,22 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o main.o \
 	   msgalloc.o ckfutures.o ckIgetControl.o debug-message.o debug-charm.o ckcallback.o \
 	   cklocation.o ckarray.o ckreduction.o ckarrayreductionmgr.o \
            tempo.o waitqd.o LBDatabase.o lbdb.o lbdbf.o charisma.o ckobjQ.o  \
-	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o\
+	   LBAgent.o LBProfit.o ckcheckpoint.o ckmemcheckpoint.o ckevacuation.o ckmessagelogging.o ckcausalmlog.o\
            LBDBManager.o LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o HybridBaseLB.o NborBaseLB.o \
            ckgraph.o LButil.o Refiner.o RefinerApprox.o  \
            RefinerComm.o bitvecset.o ckset.o ckheap.o CommLBHeap.o \
 	   NullLB.o LBSimulation.o $(COMLIB_CORE_OBJS) modifyScheduler.o \
 	   charmProjections.o cktiming.o ckbitvector.o \
-           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o trace-controlPoints.o
+           pathHistory.o controlPoints.o arrayRedistributor.o cp_effects.o \
+					 trace-controlPoints.o mpi-interoperate.o
 
 charm-target: converse $(L)/libck.a $(L)/libckf.a loadbalancers default_libs comlib_objs 
 
-CHARMLIBS: charm++ CONVLIBS
+CHARMLIBS: charm++ CONVLIBS 
 	cd libs; $(MAKE) charmlibs OPTS='$(OPTS)'
 
-$(L)/libck.a: $(LIBCK_CORE)
+$(L)/libck.a: $(LIBCK_CORE) 
 	$(CHARMC) -o $@ $(LIBCK_CORE)
 
 ## Charm fortran AMPI
@@ -820,7 +825,6 @@ TRACE_OBJS =  trace-projections.o  trace-summary.o  trace-simple.o \
 	      trace-counter.o trace-utilization.o	\
 	      trace-bluegene.o trace-projector.o trace-converse.o trace-all.o \
           trace-memory.o
-
 
 ###############################################################################
 #
@@ -999,6 +1003,13 @@ $(L)/libf90charm.a: charmxi f90main.ci f90main.h f90main.C futil.f90
 	-$(CHARMC) -c futil.f90
 	-$(CHARMC) -o $@ f90main.o futil.o
 
+##############################################################################
+# adding this entry for files which do not belong to any of other locations
+
+OTHER_OBJS= mpi-mainmodule.o
+
+##############################################################################
+
 ###############################################################################
 #
 # Make clean
@@ -1062,7 +1073,7 @@ cidepends: charmxi
               $(CHARMXI) -M $$cifile | sed '/\.stamp:/a \\t $$(CHARMC) -intrinsic $$< && touch $$@' >> $(CIDEPENDFILE) ; \
         done
 
-depends: cidepends
+depends: cidepends commitid.c
 	$(MAKE) basics
 	echo "Creating " $(DEPENDFILE) " ...";
 	if [ -f $(DEPENDFILE) ]; then \
@@ -1071,7 +1082,7 @@ depends: cidepends
 	echo '#generated by make depends' > $(DEPENDFILE); \
         touch metis.h scotch.h;   \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) ; do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS) ; do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\
@@ -1098,7 +1109,7 @@ dependsCaseSensitive: cidepends
 	echo '#generated by make depends' > $(DEPENDFILE); \
         touch metis.h scotch.h;   \
 	processFiles=''; 	\
-        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS); do \
+        for i in $(LIBCONV_CORE) $(TRACE_OBJS) $(LIBCK_CORE) $(ALL_LB_OBJS) $(LIBBLUE_OBJS) $(COMLIB_OBJS) $(OTHER_OBJS); do \
 	      processed='false';	\
 	      for f in $$processFiles; do 	\
 		if test $$i = $$f ; then	\

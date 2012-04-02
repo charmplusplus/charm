@@ -9,7 +9,7 @@ test: pgm
 	./charmrun +p4 ./pgm 100000 100 $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun +p4 ./pgm 100000 100 +x2 +y2 +z1
+	./charmrun +p4 ./pgm 100000 100 +x2 +y2 +z1 $(TESTOPTS)
 
 pgm.o : pgm.C pgm.h pgm.decl.h
 	$(CHARMC) -c pgm.C

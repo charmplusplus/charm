@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "NDMeshStreamer.decl.h"
 #include "DataItemTypes.h"
+#include "completion.h"
 
 // allocate more total buffer space than the maximum buffering limit but flush 
 //   upon reaching totalBufferCapacity_
@@ -43,21 +44,50 @@ public:
 };
 
 template <class dtype>
-class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype> {
+class MeshStreamerClient {
+ protected:
+  CompletionDetector *detectorLocalObj_;
  public:
-     virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-     virtual void process(dtype &data)=0; 
+  // would like to make it pure virtual but charm will try to
+  // instantiate the abstract class, leading to errors
+  virtual void process(dtype &data) {};     
+  void setDetector(CompletionDetector *detectorLocalObj) {
+    detectorLocalObj_ = detectorLocalObj;
+  }
 };
 
 template <class dtype>
-class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype> {
+class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>,
+  public MeshStreamerClient<dtype> {
  public:
-     // virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-  // would like to make it pure virtual but charm will try to
-  // instantiate the abstract class, leading to errors
-  virtual void process(dtype &data) {} //=0; 
+
+  virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg) {
+    for (int i = 0; i < msg->numDataItems; i++) {
+      dtype &data = msg->getDataItem(i);
+      process(data);
+    }
+    MeshStreamerClient<dtype>::detectorLocalObj_->consume(msg->numDataItems);
+    delete msg;
+  }
+};
+
+template <class dtype>
+class MeshStreamerArrayClient :  public CBase_MeshStreamerArrayClient<dtype>, 
+  public MeshStreamerClient<dtype>
+   {
+ public:
+
+  // virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
   MeshStreamerArrayClient() {}
   MeshStreamerArrayClient(CkMigrateMessage *msg) {}
+  void receiveRedeliveredItem(dtype data) {
+    MeshStreamerClient<dtype>::detectorLocalObj_->consume();
+    process(data);
+  }
+  void pup(PUP::er &p) {
+    CBase_MeshStreamerArrayClient<dtype>::pup(p);
+  }
+
 };
 
 template <class dtype>
@@ -77,14 +107,15 @@ private:
     int *myLocationIndex_;
 
     CkCallback   userCallback_;
-    int yieldFlag_;
+    bool yieldFlag_;
 
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
-    double timeOfLastSend_; 
-
+    bool hasSentRecently_;
 
     MeshStreamerMessage<dtype> ***dataBuffers_;
+
+    CProxy_CompletionDetector detector_;
 
 #ifdef CACHE_LOCATIONS
     MeshLocation *cachedLocations_;
@@ -103,10 +134,15 @@ private:
 
     virtual void localDeliver(dtype &dataItem) = 0; 
 
+    virtual int numElementsInClient() = 0;
+
+    virtual void initLocalClients() = 0;
+
     void flushLargestBuffer();
 
 protected:
 
+    CompletionDetector *detectorLocalObj_;
     virtual int copyDataItemIntoMessage(
 		MeshStreamerMessage<dtype> *destinationBuffer, 
 		void *dataItemHandle, bool copyIndirectly = false);
@@ -115,28 +151,23 @@ public:
 
     MeshStreamer(int totalBufferCapacity, int numDimensions, 
 		 int *dimensionSizes,
-                 int yieldFlag = 0, double progressPeriodInMs = -1.0);
+                 bool yieldFlag = 0, double progressPeriodInMs = -1.0);
     ~MeshStreamer();
 
       // entry
     void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     void flushDirect();
-    void finish(CkReductionMsg *msg);
+    void finish();
 
-      // non entry
+    // non entry
     bool isPeriodicFlushEnabled() {
       return isPeriodicFlushEnabled_;
     }
     virtual void insertData(dtype &dataItem, int destinationPe); 
     void insertData(void *dataItemHandle, int destinationPe);
-    void doneInserting();
-    void associateCallback(CkCallback &cb, bool automaticFinish = true) { 
-      userCallback_ = cb;
-      if (automaticFinish) {
-        CkStartQD(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), 
-			     this->thisProxy));
-      }
-    }
+    void associateCallback(int numContributors, 
+			   CkCallback startCb, CkCallback endCb, 
+			   CProxy_CompletionDetector detector);
     void flushAllBuffers();
     void registerPeriodicProgressFunction();
 
@@ -146,23 +177,18 @@ public:
       isPeriodicFlushEnabled_ = true; 
       registerPeriodicProgressFunction();
     }
-};
 
-template <class dtype>
-void MeshStreamerGroupClient<dtype>::receiveCombinedData(
-                                MeshStreamerMessage<dtype> *msg) {
-  for (int i = 0; i < msg->numDataItems; i++) {
-    dtype &data = msg->getDataItem(i);
-    process(data);
-  }
-  delete msg;
-}
+    void done(int numContributorsFinished = 1) {
+      detectorLocalObj_->done(numContributorsFinished);
+    }
+
+};
 
 template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(
 		     int totalBufferCapacity, int numDimensions, 
 		     int *dimensionSizes, 
-		     int yieldFlag, 
+		     bool yieldFlag, 
                      double progressPeriodInMs)
  :numDimensions_(numDimensions), 
   totalBufferCapacity_(totalBufferCapacity), 
@@ -217,6 +243,7 @@ MeshStreamer<dtype>::MeshStreamer(
   }
 
   isPeriodicFlushEnabled_ = false; 
+  detectorLocalObj_ = NULL;
 
 #ifdef CACHE_LOCATIONS
   cachedLocations_ = new MeshLocation[numMembers_];
@@ -346,19 +373,13 @@ void MeshStreamer<dtype>::storeMessage(
 
     messageBuffers[bufferIndex] = NULL;
     numDataItemsBuffered_ -= numBuffered; 
-
-    if (isPeriodicFlushEnabled_) {
-      timeOfLastSend_ = CkWallTimer();
-    }
+    hasSentRecently_ = true; 
 
   }
-
   // send if total buffering capacity has been reached
-  if (numDataItemsBuffered_ == totalBufferCapacity_) {
+  else if (numDataItemsBuffered_ == totalBufferCapacity_) {
     flushLargestBuffer();
-    if (isPeriodicFlushEnabled_) {
-      timeOfLastSend_ = CkWallTimer();
-    }
+    hasSentRecently_ = true; 
   }
 
 }
@@ -372,7 +393,6 @@ void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
   MeshLocation destinationLocation = determineLocation(destinationPe);
   storeMessage(destinationPe, destinationLocation, dataItemHandle, 
 	       copyIndirectly); 
-
   // release control to scheduler if requested by the user, 
   //   assume caller is threaded entry
   if (yieldFlag_ && ++count == 1024) {
@@ -386,6 +406,7 @@ template <class dtype>
 inline
 void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 
+  detectorLocalObj_->produce();
   if (destinationPe == CkMyPe()) {
     // copying here is necessary - user code should not be 
     // passed back a reference to the original item
@@ -398,24 +419,40 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::doneInserting() {
-  this->contribute(CkCallback(CkIndex_MeshStreamer<dtype>::finish(NULL), 
-			      this->thisProxy));
+void MeshStreamer<dtype>::associateCallback(
+			  int numContributors,
+			  CkCallback startCb, CkCallback endCb, 
+			  CProxy_CompletionDetector detector) {
+  userCallback_ = endCb; 
+  static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
+			   this->thisProxy);
+  detector_ = detector;      
+  detectorLocalObj_ = detector_.ckLocalBranch();
+  initLocalClients();
+
+  detectorLocalObj_->start_detection(numContributors, startCb, finish , 0);
+  
+  if (progressPeriodInMs_ <= 0) {
+    CkPrintf("Using completion detection in NDMeshStreamer requires"
+	     " setting a valid periodic flush period. Defaulting"
+	     " to 10 ms\n");
+    progressPeriodInMs_ = 10;
+  }
+  
+  hasSentRecently_ = false; 
+  enablePeriodicFlushing();
+      
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::finish(CkReductionMsg *msg) {
-
+void MeshStreamer<dtype>::finish() {
   isPeriodicFlushEnabled_ = false; 
-  flushDirect();
 
   if (!userCallback_.isInvalid()) {
-    CkStartQD(userCallback_);
+    this->contribute(userCallback_);
     userCallback_ = CkCallback();      // nullify the current callback
   }
 
-  // TODO: TEST IF THIS DELETE STILL CAUSES UNEXPLAINED CRASHES
-  //  delete msg; 
 }
 
 template <class dtype>
@@ -538,19 +575,21 @@ void MeshStreamer<dtype>::flushAllBuffers() {
 template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
 
-    if (!isPeriodicFlushEnabled_ || 
-	1000 * (CkWallTimer() - timeOfLastSend_) >= progressPeriodInMs_) {
+  // flush if (1) this is not a periodic call or 
+  //          (2) this is a periodic call and no sending took place
+  //              since the last time the function was invoked
+  if (!isPeriodicFlushEnabled_ || !hasSentRecently_) {
+
+    if (numDataItemsBuffered_ != 0) {
       flushAllBuffers();
-    }
-
-    if (isPeriodicFlushEnabled_) {
-      timeOfLastSend_ = CkWallTimer();
-    }
-
+    }    
 #ifdef DEBUG_STREAMER
-    //CkPrintf("[%d] numDataItemsBuffered_: %d\n", CkMyPe(), numDataItemsBuffered_);
     CkAssert(numDataItemsBuffered_ == 0); 
 #endif
+    
+  }
+
+  hasSentRecently_ = false; 
 
 }
 
@@ -587,6 +626,16 @@ private:
 
   void localDeliver(dtype &dataItem) {
     clientObj_->process(dataItem);
+    MeshStreamer<dtype>::detectorLocalObj_->consume();
+  }
+
+  int numElementsInClient() {
+    // client is a group - there is one element per PE
+    return CkNumPes();
+  }
+
+  void initLocalClients() {
+    clientObj_->setDetector(MeshStreamer<dtype>::detectorLocalObj_);
   }
 
 public:
@@ -594,7 +643,7 @@ public:
   GroupMeshStreamer(int totalBufferCapacity, int numDimensions,
 		    int *dimensionSizes, 
 		    const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
-		    int yieldFlag = 0, double progressPeriodInMs = -1.0)
+		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
    :MeshStreamer<dtype>(totalBufferCapacity, numDimensions, dimensionSizes, 
                          yieldFlag, progressPeriodInMs) 
   {
@@ -602,7 +651,6 @@ public:
     clientObj_ = 
       ((MeshStreamerGroupClient<dtype> *)CkLocalBranch(clientProxy_));
   }
-
 
 };
 
@@ -631,10 +679,31 @@ private:
 
     if (clientObjs_[arrayId] != NULL) {
       clientObjs_[arrayId]->process(packedDataItem.dataItem);
+      MeshStreamer<ArrayDataItem<dtype> >::detectorLocalObj_->consume();
     }
     else { 
       // array element is no longer present locally - redeliver using proxy
-      clientProxy_[arrayId].process(packedDataItem.dataItem);
+      clientProxy_[arrayId].receiveRedeliveredItem(packedDataItem.dataItem);
+    }
+  }
+
+  int numElementsInClient() {
+    return numArrayElements_;
+  }
+
+  void initLocalClients() {
+
+#ifdef CACHE_ARRAY_METADATA
+    std::fill(isCachedArrayMetadata_, 
+	      isCachedArrayMetadata_ + numArrayElements_, false);
+#endif
+
+    for (int i = 0; i < numArrayElements_; i++) {
+      clientObjs_[i] = clientProxy_[i].ckLocal();
+      if (clientObjs_[i] != NULL) {
+	clientObjs_[i]->setDetector(
+                        MeshStreamer<ArrayDataItem<dtype> >::detectorLocalObj_);
+      }
     }
   }
 
@@ -648,7 +717,7 @@ public:
   ArrayMeshStreamer(int totalBufferCapacity, int numDimensions,
 		    int *dimensionSizes, 
 		    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
-		    int yieldFlag = 0, double progressPeriodInMs = -1.0)
+		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
     :MeshStreamer<ArrayDataItem<dtype> >(totalBufferCapacity, numDimensions, 
 					dimensionSizes, yieldFlag, 
 					progressPeriodInMs) 
@@ -659,14 +728,11 @@ public:
     numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
 
     clientObjs_ = new MeshStreamerArrayClient<dtype>*[numArrayElements_];
-    for (int i = 0; i < numArrayElements_; i++) {
-      clientObjs_[i] = clientProxy_[i].ckLocal();
-    }
-
 #ifdef CACHE_ARRAY_METADATA
     destinationPes_ = new int[numArrayElements_];
     isCachedArrayMetadata_ = new bool[numArrayElements_];
-    std::fill(isCachedArrayMetadata_, isCachedArrayMetadata_ + numArrayElements_, false);
+    std::fill(isCachedArrayMetadata_, 
+	      isCachedArrayMetadata_ + numArrayElements_, false);
 #endif
   }
 
@@ -688,6 +754,7 @@ public:
 
   void insertData(dtype &dataItem, int arrayIndex) {
 
+    MeshStreamer<ArrayDataItem<dtype> >::detectorLocalObj_->produce();
     int destinationPe; 
 #ifdef CACHE_ARRAY_METADATA
   if (isCachedArrayMetadata_[arrayIndex]) {    

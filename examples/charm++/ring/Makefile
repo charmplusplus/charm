@@ -12,7 +12,7 @@ test: pgm
 	./charmrun +p4 ./pgm $(TESTOPTS)
 
 bgtest: pgm
-	./charmrun +p4 ./pgm +x2 +y2 +z2
+	./charmrun +p4 ./pgm +x2 +y2 +z2 $(TESTOPTS)
 
 clean:
 	rm -f conv-host pgm *.def.h *.decl.h *.o *~ charmrun charmrun.exe pgm.exe pgm.pdb pgm.ilk

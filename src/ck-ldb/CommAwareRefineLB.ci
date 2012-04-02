@@ -1,0 +1,9 @@
+module CommAwareRefineLB {
+
+extern module CentralLB;
+initnode void lbinit(void);
+group [migratable] CommAwareRefineLB : CentralLB {
+  entry void CommAwareRefineLB(const CkLBOptions &);  
+};
+
+};

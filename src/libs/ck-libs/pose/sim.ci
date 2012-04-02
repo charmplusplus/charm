@@ -1,6 +1,13 @@
+module poseMsgs {
+  message eventMsg;
+  message cancelMsg;
+  message prioMsg;
+};
+
 /// Sim is the base class for all poser entities
 module sim {
   extern module ldbal;
+  extern module poseMsgs;
   extern module gvt;
   extern module mempool;
   extern module memory_temporal;
@@ -8,9 +15,6 @@ module sim {
   readonly CProxy_sim POSE_Objects;
   readonly CProxy_sim POSE_Objects_RO;
   readonly CkChareID POSE_Coordinator_ID;
-  message eventMsg;
-  message cancelMsg;
-  message prioMsg;
   message destMsg;
 
   array [1D] sim {

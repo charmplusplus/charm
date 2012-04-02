@@ -16,6 +16,8 @@ ALL_LDBS=\
    $(L)/libmoduleRefineCommLB.a \
    $(L)/libmoduleRotateLB.a \
    $(L)/libmoduleTreeMatchLB.a \
+   $(L)/libmoduleRefineSwapLB.a \
+   $(L)/libmoduleCommAwareRefineLB.a \
    $(L)/libmoduleComboCentLB.a \
    $(L)/libmoduleGraphPartLB.a \
    $(L)/libmoduleGraphBFTLB.a \
@@ -127,6 +129,18 @@ $(L)/libmoduleTreeMatchLB.a: TreeMatchLB.o tm_tree.o tm_bucket.o tm_timings.o tm
 	$(CHARMC) -o $(L)/libmoduleTreeMatchLB.a TreeMatchLB.o tm_tree.o tm_bucket.o tm_timings.o tm_mapping.o
 	
 LBHEADERS += TreeMatchLB.h TreeMatchLB.decl.h
+
+
+$(L)/libmoduleRefineSwapLB.a: RefineSwapLB.o 
+	$(CHARMC) -o $(L)/libmoduleRefineSwapLB.a RefineSwapLB.o 
+	
+LBHEADERS += RefineSwapLB.h RefineSwapLB.decl.h
+
+
+$(L)/libmoduleCommAwareRefineLB.a: CommAwareRefineLB.o 
+	$(CHARMC) -o $(L)/libmoduleCommAwareRefineLB.a CommAwareRefineLB.o 
+	
+LBHEADERS += CommAwareRefineLB.h CommAwareRefineLB.decl.h
 
 
 $(L)/libmoduleComboCentLB.a: ComboCentLB.o 
@@ -261,6 +275,8 @@ ALL_LB_OBJS=EveryLB.o \
     RefineCommLB.o \
     RotateLB.o \
     TreeMatchLB.o \
+    RefineSwapLB.o \
+    CommAwareRefineLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -303,6 +319,8 @@ EVERYLB_DEPS=EveryLB.o \
     RefineCommLB.o \
     RotateLB.o \
     TreeMatchLB.o \
+    RefineSwapLB.o \
+    CommAwareRefineLB.o \
     ComboCentLB.o \
     GraphPartLB.o \
     GraphBFTLB.o \
@@ -340,6 +358,8 @@ COMMONLBS_DEPS=CommonLBs.o \
     RefineCommLB.o \
     RotateLB.o \
     TreeMatchLB.o \
+    RefineSwapLB.o \
+    CommAwareRefineLB.o \
     manager.o \
     tm_tree.o  \
     tm_timings.o  \

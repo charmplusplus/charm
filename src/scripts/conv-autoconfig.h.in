@@ -186,6 +186,9 @@
 /* whether has socklen_t */
 #undef CMK_HAS_SOCKLEN
 
+/* whether the pthread_spin_lock exists */
+#undef CMK_HAS_SPINLOCK
+
 /* whether has sqrtf */
 #undef CMK_HAS_SQRTF
 
@@ -206,6 +209,9 @@
 
 /* whether has system */
 #undef CMK_HAS_SYSTEM
+
+/* Allows __thread. */
+#undef CMK_HAS_TLS_VARIABLES
 
 /* whether typeinfo/typeid works */
 #undef CMK_HAS_TYPEINFO
@@ -278,9 +284,6 @@
 
 /* Allows switching TLS 64-bit. */
 #undef CMK_TLS_SWITCHING64
-
-/* Allows __thread. */
-#undef CMK_HAS_TLS_VARIABLES
 
 /* enable tracing */
 #undef CMK_TRACE_ENABLED

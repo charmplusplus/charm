@@ -511,10 +511,6 @@ primaryExpression returns [Type type]
 			$type = $ENTRY_METHOD_CALL.symbolType;
 		}
     |   explicitConstructorCall
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
-		{
-			$type = $ARRAY_ELEMENT_ACCESS.symbolType;
-		}
     |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression domainExpression)
 		{
 			$type = $ARRAY_ELEMENT_ACCESS.symbolType; // TODO this is not correct, as it's always null
@@ -553,6 +549,7 @@ primaryExpression returns [Type type]
 			$type = $THISPROXY.symbolType;
 		}
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
     
 explicitConstructorCall
@@ -582,6 +579,8 @@ entryArguments
 
 entryArgExpr
     :   ^(EXPR entryExpr)
+        -> {$EXPR.symbolType instanceof PointerType}? ^(EXPR ^(POINTER_DEREFERENCE entryExpr))
+        -> ^(EXPR entryExpr)
     ;
 
 entryExpr
@@ -671,6 +670,7 @@ entryPrimaryExpression
     |   GETMYNODE
     |   GETMYRANK
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
 
 literal 

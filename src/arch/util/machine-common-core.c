@@ -151,7 +151,11 @@ CpvDeclare(void*, CmiLocalQueue);
 
 enum MACHINE_SMP_MODE {
     INVALID_MODE,
+#if CMK_BLUEGENEQ
+    COMM_THREAD_SEND_RECV = 1,
+#else 
     COMM_THREAD_SEND_RECV = 0,
+#endif
     COMM_THREAD_ONLY_RECV, /* work threads will do the send */
     COMM_WORK_THREADS_SEND_RECV, /* work and comm threads do the both send/recv */
     COMM_THREAD_NOT_EXIST /* work threads will do both send and recv */
@@ -374,7 +378,7 @@ void CmiPushPE(int rank,void *msg) {
     }
 #endif
 
-    PCQueuePush(cs->recv,msg);
+    PCQueuePush(cs->recv,(char*)msg);
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP
   if (_Cmi_noprocforcommthread)
@@ -473,7 +477,7 @@ void CmiSyncSendFn(int destPE, int size, char *msg) {
 #include "machine-xpmem.c"
 #endif
 
-int refcount = 0;
+static int refcount = 0;
 
 #if CMK_USE_OOB
 CpvExtern(int, _urgentSend);
@@ -483,7 +487,7 @@ CpvExtern(int, _urgentSend);
 #if CMK_C_INLINE
 inline 
 #endif
-CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode)
 {
         int rank;
 #if CMK_USE_PXSHM
@@ -498,6 +502,15 @@ CmiCommHandle LrtsSendNetworkFunc(int destNode, int size, char *msg, int mode)
           CmiSendMessageXpmem(msg, size, destNode, &refcount);
           //for (int i=0; i<refcount; i++) CmiReference(msg);
           return 0;
+        }
+#endif
+#if CMK_PERSISTENT_COMM
+        if (CpvAccess(phs)) {
+          if (size > PERSIST_MIN_SIZE) {
+            CmiAssert(CpvAccess(curphs) < CpvAccess(phsSize));
+            LrtsSendPersistentMsg(CpvAccess(phs)[CpvAccess(curphs)], destNode, size, msg);
+            return 0;
+          }
         }
 #endif
 
@@ -521,29 +534,26 @@ void CmiFreeSendFn(int destPE, int size, char *msg) {
     if (CmiMyPe()==destPE) {
         CmiSendSelf(msg);
 #if CMK_PERSISTENT_COMM
-        if (phs) curphs++;
+        if (CpvAccess(phs)) CpvAccess(curphs)++;
 #endif
-    } else {
-#if CMK_PERSISTENT_COMM
-        if (phs) {
-          if (size > 8192) {
-            CmiAssert(curphs < phsSize);
-            LrtsSendPersistentMsg(phs[curphs++], destPE, size, msg);
-            return;
-          }
-          else
-            curphs++;
-        }
-#endif
+    } 
+    else {
         int destNode = CmiNodeOf(destPE);
+        int destRank = CmiRankOf(destPE);
 #if CMK_SMP
         if (CmiMyNode()==destNode) {
-            CmiPushPE(CmiRankOf(destPE), msg);
+            CmiPushPE(destRank, msg);
+#if CMK_PERSISTENT_COMM
+            if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
             return;
         }
 #endif
-        CMI_DEST_RANK(msg) = CmiRankOf(destPE);
-        LrtsSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+        CMI_DEST_RANK(msg) = destRank;
+        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
+#if CMK_PERSISTENT_COMM
+        if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
     }
 }
 #endif
@@ -563,7 +573,7 @@ if (  MSG_STATISTIC)
         msg_histogram[ret_log]++;
 }
 #endif
-        return LrtsSendFunc(destPE, size, msg, P2P_ASYNC);
+        return CmiSendNetworkFunc(destPE, size, msg, P2P_ASYNC);
     }
 }
 #endif
@@ -603,8 +613,11 @@ if (  MSG_STATISTIC)
     msg_histogram[ret_log]++;
 }
 #endif
-        LrtsSendFunc(destNode, size, msg, P2P_SYNC);
+        CmiSendNetworkFunc(destNode, size, msg, P2P_SYNC);
     }
+#if CMK_PERSISTENT_COMM
+    if (CpvAccess(phs)) CpvAccess(curphs)++;
+#endif
 }
 #endif
 
@@ -622,7 +635,7 @@ if (  MSG_STATISTIC)
         msg_histogram[ret_log]++;
 }
 #endif
-        return LrtsSendFunc(destNode, size, msg, P2P_ASYNC);
+        return CmiSendNetworkFunc(destNode, size, msg, P2P_ASYNC);
     }
 }
 #endif
@@ -790,16 +803,23 @@ static void ConverseRunPE(int everReturn) {
        node barrier previously should take care of the node synchronization */
     _immediateReady = 1;
 
-    /* communication thread */
-    if (CmiMyRank() == CmiMyNodeSize()) {
+    if(CharmLibInterOperate) {
+	/* !!! Not considering SMP mode now */
+	/* TODO: make interoperability working in SMP!!! */
+	Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+	CsdScheduler(-1);
+    } else {
+      /* communication thread */
+      if (CmiMyRank() == CmiMyNodeSize()) {
         Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
         while (1) CommunicationServerThread(5);
-    } else { /* worker thread */
+      } else { /* worker thread */
         if (!everReturn) {
-            Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
-            if (Cmi_usrsched==0) CsdScheduler(-1);
-            ConverseExit();
+          Cmi_startfn(CmiGetArgc(CmiMyArgv), CmiMyArgv);
+          if (Cmi_usrsched==0) CsdScheduler(-1);
+          ConverseExit();
         }
+      }
     }
 }
 /* ##### End of Functions Related with Machine Startup ##### */
@@ -839,7 +859,7 @@ extern void ConverseCommonExit();
 
 static void CommunicationServer(int sleepTime) {
 #if CMK_SMP
-    AdvanceCommunication(0);
+    AdvanceCommunication(1);
 
     if (commThdExit == CmiMyNodeSize()) {
         MACHSTATE(2, "CommunicationServer exiting {");

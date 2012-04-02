@@ -59,6 +59,15 @@ public class SymbolTable {
         objectRoot = new ClassSymbol(this, "Object", null, lang);
         lang.define("Object", objectRoot);
 
+        ClassSymbol array = new ClassSymbol(this, "Array",  null, lang);
+        TypeName typeName = new TypeName("int");
+        Type tInt = (Type)(new ClassSymbol(this, "int",    null, lang));
+        Type tVoid = (Type)(new ClassSymbol(this, "void",    null, lang));
+        array.define("size", new MethodSymbol(this, "size", array, tInt));
+        // Not to be used with other Charj code
+        array.define("raw", new MethodSymbol(this, "raw", array, tVoid));
+
+        primitiveTypes.put("Array",  array);
         primitiveTypes.put("void",   new ClassSymbol(this, "void",   null, lang));
         primitiveTypes.put("int",    new ClassSymbol(this, "int",    null, lang));
         primitiveTypes.put("long",   new ClassSymbol(this, "long",   null, lang));
@@ -81,6 +90,13 @@ public class SymbolTable {
         defaultPkg.define("CkMyPe", new MethodSymbol(this, "CkMyPe"));
         defaultPkg.define("CkExit", new MethodSymbol(this, "CkExit"));
         defaultPkg.define("CkWallTimer", new MethodSymbol(this, "CkWallTimer"));
+    }
+
+    public ClassSymbol lookupPrimitive(List<TypeName> type) {
+      if (type.size() == 1)
+        return primitiveTypes.get(type.get(0).name);
+      else
+        return null;
     }
 
     public ClassSymbol resolveBuiltinType(String type) {

@@ -10,7 +10,13 @@
 
 #include "gni_pub.h"
 
+#define PERSIST_MIN_SIZE                SMSG_MAX_MSG
+
 #define PERSIST_BUFFERS_NUM             1
+
+#define PERSIST_SEQ                     0xFFFFFFF
+
+#define IS_PERSISTENT_MEMORY(ptr)          (REFFIELD(msg) > PERSIST_SEQ/2)
 
 typedef struct  _PersistentBuf {
   void *destAddress;
@@ -25,7 +31,7 @@ typedef struct _PersistentSendsTable {
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   void *messageBuf;
   int messageSize;
-  char used;
+  struct _PersistentSendsTable *prev, *next;
 } PersistentSendsTable;
 
 typedef struct _PersistentReceivesTable {
@@ -35,21 +41,25 @@ typedef struct _PersistentReceivesTable {
 #endif
   PersistentBuf     destBuf[PERSIST_BUFFERS_NUM];
   int sizeMax;
+  size_t               index;
   struct _PersistentReceivesTable *prev, *next;
 } PersistentReceivesTable;
 
-extern PersistentReceivesTable *persistentReceivesTableHead;
-extern PersistentReceivesTable *persistentReceivesTableTail;
+CpvExtern(PersistentReceivesTable *, persistentReceivesTableHead);
+CpvExtern(PersistentReceivesTable *, persistentReceivesTableTail);
 
-extern PersistentHandle  *phs;
-extern int phsSize;
-extern int curphs;
+CpvExtern(PersistentHandle *, phs);
+CpvExtern(int, phsSize);
+CpvExtern(int, curphs);
 
+PersistentHandle getPersistentHandle(PersistentHandle h, int toindex);
 void *PerAlloc(int size);
 void PerFree(char *msg);
 int PumpPersistent();
 void swapSendSlotBuffers(PersistentSendsTable *slot);
 void swapRecvSlotBuffers(PersistentReceivesTable *slot);
 void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes);
+void clearRecvSlot(PersistentReceivesTable *slot);
 
 /*@}*/
+

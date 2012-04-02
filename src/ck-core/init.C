@@ -160,6 +160,9 @@ CkpvStaticDeclare(int,  _numInitsRecd);
 CkpvStaticDeclare(PtrQ*, _buffQ);
 CkpvStaticDeclare(PtrVec*, _bocInitVec);
 
+//for interoperability
+extern void _libExitHandler(envelope *env);
+extern int _libExitHandlerIdx;
 
 /*
 	FAULT_EVAC
@@ -192,7 +195,8 @@ static char* _restartDir;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int teamSize=1;
 int chkptPeriod=1000;
-bool parallelRestart=false;
+bool fastRecovery = false;
+int parallelRecovery = 1;
 extern int BUFFER_TIME; //time spent waiting for buffered messages
 #endif
 
@@ -293,9 +297,12 @@ static inline void _parseCommandLineOpts(char **argv)
     if(!CmiGetArgIntDesc(argv,"+chkptPeriod",&chkptPeriod,"Set the checkpoint period for the message logging fault tolerance algorithm in seconds")){
         chkptPeriod = 100;
     }
-    if(CmiGetArgFlagDesc(argv,"+Parallelrestart", "Parallel Restart with message logging protocol")){
-        parallelRestart = true;
+	if(CmiGetArgIntDesc(argv,"+fastRecovery", &parallelRecovery, "Parallel recovery with message logging protocol")){
+        fastRecovery = true;
     }
+#endif
+
+#if defined(_FAULT_MLOG_)
     if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
         _maxBufferedMessages = 2;
     }
@@ -305,7 +312,6 @@ static inline void _parseCommandLineOpts(char **argv)
     if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
         BUFFER_TIME = 2;
     }
-
 #endif	
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;
@@ -318,6 +324,10 @@ static inline void _parseCommandLineOpts(char **argv)
 	  _isNotifyChildInRed = false;
 	}
 
+	_isStaticInsertion = false;
+	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
+	  _isStaticInsertion = true;
+	}
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it
@@ -496,15 +506,14 @@ static void _exitHandler(envelope *env)
       break;
     case ReqStatMsg:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        _messageLoggingExit();
+      _messageLoggingExit();
 #endif
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,(CmiHandler)_discardHandler);
       CkNumberHandler(_bocHandlerIdx, (CmiHandler)_discardHandler);
-	/*FAULT_EVAC*/
+      /*FAULT_EVAC*/
       if(CmiNodeAlive(CkMyPe())){
          _sendStats();
-      }	
       _mainDone = 1; // This is needed because the destructors for
                      // readonly variables will be called when the program
 		     // exits. If the destructor is called while _mainDone
@@ -514,6 +523,7 @@ static void _exitHandler(envelope *env)
 #if CMK_TRACE_ENABLED
       if (_ringexit) traceClose();
 #endif
+    }
       if (_ringexit) {
         int stride = CkNumPes()/_ringtoken;
         int pe = CkMyPe()+1;
@@ -524,10 +534,13 @@ static void _exitHandler(envelope *env)
       }
       else
         CmiFree(env);
+      //everyone exits here - there may be issues with leftover messages in the queue
       if(CkMyPe()){
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
-      }	
+				if(CharmLibInterOperate)
+					CpvAccess(charmLibExitFlag) = 1;
+      }
       break;
     case StatMsg:
       CkAssert(CkMyPe()==0);
@@ -539,8 +552,10 @@ static void _exitHandler(envelope *env)
 			/*FAULT_EVAC*/
       if(_numStatsRecd==CkNumValidPes()) {
         _printStats();
-	DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
+        DEBUGF(("[%d] Calling converse exit \n",CkMyPe()));
         ConverseExit();
+				if(CharmLibInterOperate)
+					CpvAccess(charmLibExitFlag) = 1;
       }
       break;
     default:
@@ -827,6 +842,7 @@ void CkExit(void)
 #if ! CMK_BIGSIM_THREAD
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
+	if(!CharmLibInterOperate)
   CsdScheduler(-1);
 #endif
 }
@@ -934,6 +950,13 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
+	if(CmiMyNode() == 0 && CmiMyRank() == 0) {
+    if(CmiGetArgFlag(argv, "+printTopo")) {
+			TopoManager tmgr;
+			tmgr.printAllocation();
+		}
+	}
+
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
 	CkpvInitialize(size_t *, _offsets);
@@ -1021,6 +1044,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkNumberHandlerEx(_initHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 	_roRestartHandlerIdx = CkRegisterHandler((CmiHandler)_roRestartHandler);
 	_exitHandlerIdx = CkRegisterHandler((CmiHandler)_exitHandler);
+	//added for interoperabilitY
+	_libExitHandlerIdx = CkRegisterHandler((CmiHandler)_libExitHandler);
 	_bocHandlerIdx = CkRegisterHandler((CmiHandler)_initHandler);
 	CkNumberHandlerEx(_bocHandlerIdx, (CmiHandlerEx)_initHandler, CkpvAccess(_coreState));
 
@@ -1162,7 +1187,7 @@ void _initCharm(int unused_argc, char **argv)
 
 	CmiNodeAllBarrier();
 
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
 	CmiBarrier();
 	CmiBarrier();
 	CmiBarrier();

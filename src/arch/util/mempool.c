@@ -33,9 +33,7 @@ Heavily modified by Nikhil Jain 11/28/2011
 int cutOffPoints[] = {64,128,256,512,1024,2048,4096, 8192,16384,32768,
                       65536,131072,262144,524288,1048576,2097152,4194304,
                       8388608,16777216,33554432,67108864,134217728,268435456,
-                      536870912};
-
-
+                      536870912,1073741824};
 
 INLINE_KEYWORD int which_pow2(size_t size)
 {
@@ -72,6 +70,12 @@ INLINE_KEYWORD void fillblock(mempool_type *mptr,block_header *block_head,int po
   if(left < cutOffPoints[power]) {
     power--;
   }
+    
+  if(power == cutOffNum) {
+    CmiAbort("Mempool-requested slot is more than what mempool can provide as\
+    one chunk, increase cutOffNum and cutoffPoints in mempool\n");
+  }
+
 #if MEMPOOL_DEBUG
   CmiPrintf("Left is %d, Max power obtained is %d\n",left,power);
 #endif
@@ -307,7 +311,7 @@ void*  mempool_malloc(mempool_type *mptr, int size, int expand)
         CmiPrintf("Mempool-Did not get memory while expanding\n");
         return NULL;
       }
-
+    
       mptr->size += expand_size;
       current = (block_header*)pool; 
       tail->block_next = ((char*)current-(char*)mptr);

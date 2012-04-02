@@ -66,6 +66,9 @@ extern int cutOffPoints[cutOffNum];
 #endif 
 
 static int _sync_iso = 0;
+#if __FAULT__
+static int _restart = 0;
+#endif
 static int _mmap_probe = 0;
 
 static int read_randomflag(void)
@@ -2078,6 +2081,34 @@ static void init_ranges(char **argv)
      */
   if (_sync_iso == 1)
   {
+#ifdef __FAULT__
+        if(_restart == 1){
+            CmiUInt8 s = (CmiUInt8)freeRegion.start;
+            CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+            CmiUInt8 ss, ee;
+            int try_count, fd;
+            char fname[128];
+            sprintf(fname,".isomalloc");
+            try_count = 0;
+            while ((fd = open(fname, O_RDONLY)) == -1 && try_count<10000){
+                try_count++;
+            }
+            if (fd == -1) {
+                CmiAbort("isomalloc_sync failed during restart, make sure you have a shared file system.");
+            }
+            read(fd, &ss, sizeof(CmiUInt8));
+            read(fd, &ee, sizeof(CmiUInt8));
+            close(fd);
+            if (ss < s || ee > e)
+                CmiAbort("isomalloc_sync failed during restart, virtual memory regions do not overlap.");
+            else {
+                freeRegion.start = (void *)ss;
+                freeRegion.len = (char *)ee -(char *)ss;
+            }
+            CmiPrintf("[%d] consolidated Isomalloc memory region at restart: %p - %p (%d megs)\n",CmiMyPe(),freeRegion.start,freeRegion.start+freeRegion.len,freeRegion.len/meg);
+            goto AFTER_SYNC;
+        }
+#endif
     if (CmiMyRank() == 0 && freeRegion.len > 0u) {
       if (CmiBarrier() == -1 && CmiMyPe()==0) 
         CmiAbort("Charm++ Error> +isomalloc_sync requires CmiBarrier() implemented.\n");
@@ -2163,6 +2194,19 @@ static void init_ranges(char **argv)
           CmiPrintf("[%d] consolidated Isomalloc memory region: %p - %p (%d megs)\n",CmiMyPe(),
               freeRegion.start,freeRegion.start+freeRegion.len,
               freeRegion.len/meg);
+#if __FAULT__
+                if(CmiMyPe() == 0){
+                    int fd;
+                    char fname[128];
+                    CmiUInt8 s = (CmiUInt8)freeRegion.start;
+                    CmiUInt8 e = (CmiUInt8)(freeRegion.start+freeRegion.len);
+                    sprintf(fname,".isomalloc");
+                    while ((fd = open(fname, O_WRONLY|O_TRUNC|O_CREAT, 0644)) == -1);
+                    write(fd, &s, sizeof(CmiUInt8));
+                    write(fd, &e, sizeof(CmiUInt8));
+                    close(fd);
+                }
+#endif
       }   /* end of barrier test */
     } /* end of rank 0 */
     else {
@@ -2172,6 +2216,10 @@ static void init_ranges(char **argv)
       CmiBarrier();
     }
   }
+
+#ifdef __FAULT__
+    AFTER_SYNC:
+#endif
 
   if (CmiMyRank() == 0 && freeRegion.len > 0u)
   {
@@ -2487,6 +2535,11 @@ void CmiIsomallocInit(char **argv)
     _mmap_probe = 0;
   if (CmiGetArgFlagDesc(argv,"+isomalloc_sync","synchronize isomalloc region globaly"))
     _sync_iso = 1;
+#if __FAULT__
+  int resPhase;
+  if (CmiGetArgFlagDesc(argv,"+restartisomalloc","restarting isomalloc on this processor after a crash"))
+    _restart = 1;
+#endif
   init_comm(argv);
   if (!init_map(argv)) {
     disable_isomalloc("mmap() does not work");
@@ -2551,19 +2604,19 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
   flags[0] = 0; flags[1] = 1;
   if(!pup_isUnpacking(p)) {
     mptr = CtvAccessOther(tid,threadpool);
-    current = &(CtvAccessOther(tid,threadpool)->block_head);
+    current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
       numBlocks++;
-      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+      current = MEMPOOL_GetBlockNext(current)?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
 #if ISOMALLOC_DEBUG
     printf("Number of blocks packed %d\n",numBlocks);
 #endif
     pup_int(p,&numBlocks);
-    current = &(CtvAccessOther(tid,threadpool)->block_head);
+    current = MEMPOOL_GetBlockHead(mptr);
     while(current != NULL) {
-      pup_bytes(p,&current->size,sizeof(current->size));
-      pup_bytes(p,&current->mem_hndl,sizeof(CmiInt8));
+      pup_bytes(p,&(MEMPOOL_GetBlockSize(current)),sizeof(MEMPOOL_GetBlockSize(current)));
+      pup_bytes(p,&(MEMPOOL_GetBlockMemHndl(current)),sizeof(CmiInt8));
       numSlots = 0;
       if(flag) {
         pup_bytes(p,current,sizeof(mempool_type));
@@ -2574,7 +2627,7 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       while(currSlot != NULL) {
         numSlots++;
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
+        currSlot = (MEMPOOL_GetSlotGNext(currSlot))?(slot_header*)((char*)mptr+MEMPOOL_GetSlotGNext(currSlot)):NULL;
       }
       pup_int(p,&numSlots);
       if(flag) {
@@ -2585,16 +2638,16 @@ void CmiIsomallocBlockListPup(pup_er p,CmiIsomallocBlockList **lp, CthThread tid
       }
       while(currSlot != NULL) {
         pup_int(p,&cutOffPoints[currSlot->size]);
-        if(currSlot->status) {
+        if(MEMPOOL_GetSlotStatus(currSlot)) {
           pup_int(p,&flags[0]);
           pup_bytes(p,(void*)currSlot,sizeof(slot_header));
         } else {
           pup_int(p,&flags[1]);
-          pup_bytes(p,(void*)currSlot,cutOffPoints[currSlot->size]);
+          pup_bytes(p,(void*)currSlot,MEMPOOL_GetSlotSize(currSlot));
         }
-        currSlot = currSlot->gnext?(slot_header*)((char*)mptr+currSlot->gnext):NULL;
+        currSlot = (MEMPOOL_GetSlotGNext(currSlot))?(slot_header*)((char*)mptr+MEMPOOL_GetSlotGNext(currSlot)):NULL;
       }
-      current = current->block_next?(block_header *)((char*)mptr+current->block_next):NULL;
+      current = (MEMPOOL_GetBlockNext(current))?(block_header *)((char*)mptr+MEMPOOL_GetBlockNext(current)):NULL;
     }
   }
 

@@ -73,11 +73,22 @@ int  traceAvailable();
                       traceSendMsgComm(msg);   \
                       traceEndCommOp(msg);    \
                     }
+
+#define  TRACE_COMM_CONTROL_CREATION(time0, time1, time2, msg)   \
+                    if (traceBeginCommOp(msg)) {   \
+                      traceChangeLastTimestamp(time0);    \
+                      traceSendMsgComm(msg);   \
+                      traceChangeLastTimestamp(time1);    \
+                      traceEndCommOp(msg);    \
+                      traceChangeLastTimestamp(time2);    \
+                    }
+
 #define TRACE_COMM_SET_MSGID(msg, pe, event)  traceSetMsgID(msg, pe, event)
 #define TRACE_COMM_GET_MSGID(msg, pe, event)  traceGetMsgID(msg, pe, event)
 #define TRACE_COMM_SET_COMM_MSGID(msg)  traceCommSetMsgID(msg)
 #else
 #define TRACE_COMM_CREATION(time, msg)
+#define TRACE_COMM_CONTROL_CREATION(time0, time1, time2, msg)
 #define TRACE_COMM_SET_MSGID(msg, pe, event) 
 #define TRACE_COMM_GET_MSGID(msg, pe, event) 
 #define TRACE_COMM_SET_COMM_MSGID(msg)

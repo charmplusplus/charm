@@ -297,6 +297,21 @@ CmiState CmiGetState() {
 #endif
 
 
+#if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
+CmiNodeLock CmiCreateLock()
+{
+  CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_spinlock_t));
+  _MEMCHECK(lk);
+  pthread_spin_init(lk, 0);
+  return lk;
+}
+
+void CmiDestroyLock(CmiNodeLock lk)
+{
+  pthread_spin_destroy(lk);
+  free((void*)lk);
+}
+#else
 CmiNodeLock CmiCreateLock()
 {
   CmiNodeLock lk = (CmiNodeLock)malloc(sizeof(pthread_mutex_t));
@@ -310,6 +325,7 @@ void CmiDestroyLock(CmiNodeLock lk)
   pthread_mutex_destroy(lk);
   free(lk);
 }
+#endif
 
 void CmiYield(void) { sched_yield(); }
 
@@ -476,8 +492,8 @@ static void CmiStartThreads(char **argv)
 
 static void CmiDestoryLocks()
 {
-  pthread_mutex_destroy(comm_mutex);
-  pthread_mutex_destroy(CmiMemLock_lock);
+  CmiDestroyLock(comm_mutex);
+  CmiDestroyLock(CmiMemLock_lock);
   CmiMemLock_lock = 0;
   pthread_mutex_destroy(&barrier_mutex);
 #ifdef CMK_NO_ASM_AVAILABLE

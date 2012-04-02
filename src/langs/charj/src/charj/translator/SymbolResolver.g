@@ -44,7 +44,16 @@ enterMethod
     :   ^((FUNCTION_METHOD_DECL | ENTRY_FUNCTION_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
-            type IDENT .*) { currentMethod = (MethodSymbol)$IDENT.def; }
+            type funcid=IDENT { currentMethod = (MethodSymbol)$funcid.def; }
+            ^(FORMAL_PARAM_LIST (^(FORMAL_PARAM_STD_DECL type ^(argid=IDENT .*)
+            {
+                if (currentMethod.isEntry) {
+                    Type argType = (Type)$argid.def.type;
+                    currentMethod.addEntryArg(argType.getTypeName(), $argid.text);
+                }
+            }
+            ))*)
+            .*)
     |   ^((CONSTRUCTOR_DECL | ENTRY_CONSTRUCTOR_DECL)
             (^(MODIFIER_LIST .*))?
             (^(GENERIC_TYPE_PARAM_LIST .*))? 
@@ -241,6 +250,7 @@ primaryExpression returns [Type type]
             |   SUPER { memberNode = $SUPER; memberText = "super"; }
             ))
         {
+            String parentText = $e.text;
             Type et = $e.type;
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
             if (et instanceof PointerType) et = ((PointerType)et).baseType;
@@ -262,7 +272,8 @@ primaryExpression returns [Type type]
                 memberNode.symbolType = $type;
                 parentNode.def = s;
                 parentNode.symbolType = $type;
-            } else if (!(et instanceof ExternalSymbol)) {
+            } else if (!(et instanceof ExternalSymbol) &&
+                       !parentText.equals("thisIndex")) {
                 System.out.println("Couldn't resolve access " + memberText);
             }
         }
@@ -390,9 +401,10 @@ type returns [Type sym]
             typeText.add(new TypeName($t.getText()));
         } .*)
     |   ^(OBJECT_TYPE { scope = $OBJECT_TYPE.scope; }
-            ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
-                (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
-                {typeText.add(new TypeName($IDENT.text, tparams)); }))+) .*)
+            ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text, tparams)); }
+            (^(TEMPLATE_INST
+              (t1=type {tparams.add($t1.sym);} | lit1=literalVal {tparams.add($lit1.type);} )*))?
+            ))+) .*)
     |   ^(REFERENCE_TYPE { scope = $REFERENCE_TYPE.scope; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }

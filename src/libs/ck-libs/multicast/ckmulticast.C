@@ -622,7 +622,7 @@ void CkMulticastMgr::childrenReady(mCastEntry *entry)
     while (!entry->msgBuf.isEmpty()) 
     {
         multicastGrpMsg *newmsg = entry->msgBuf.deq();
-        DEBUGF(("[%d] release buffer %p %d\n", CkMyPe(), newmsg, newmsg->ep));
+        DEBUGF(("[%d] release buffer %p ep:%d\n", CkMyPe(), newmsg, newmsg->ep));
         newmsg->_cookie.get_val() = entry;
         mCastGrp[CkMyPe()].recvMsg(newmsg);
     }
@@ -891,12 +891,13 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
   CkSectionInfo &sectionInfo = msg->_cookie;
   mCastEntry *entry = (mCastEntry *)msg->_cookie.get_val();
   CmiAssert(entry->getAid() == sectionInfo.get_aid());
+  CkGroupID aid = sectionInfo.get_aid();
 
   // send to local
   int nLocal = entry->localElem.length();
-  DEBUGF(("send to local %d\n", nLocal));
+  DEBUGF(("[%d] send to local %d elems\n", CkMyPe(), nLocal));
   for (i=0; i<nLocal-1; i++) {
-    CProxyElement_ArrayBase ap(sectionInfo.get_aid(), entry->localElem[i]);
+    CProxyElement_ArrayBase ap(aid, entry->localElem[i]);
     if (_entryTable[msg->ep]->noKeep) {
       CkSendMsgArrayInline(msg->ep, msg, sectionInfo.get_aid(), entry->localElem[i], CK_MSG_KEEP);
     }
@@ -913,7 +914,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
     //CmiNetworkProgressAfter(3);
   }
   if (nLocal) {
-    CProxyElement_ArrayBase ap(sectionInfo.get_aid(), entry->localElem[nLocal-1]);
+    CProxyElement_ArrayBase ap(aid, entry->localElem[nLocal-1]);
     ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
 //    CkSendMsgArrayInline(msg->ep, msg, msg->aid, entry->localElem[nLocal-1]);
   }
@@ -1236,7 +1237,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     /// If this cookie is obsolete
     if (entry->isObsolete()) {
         // Send up to root
-        DEBUGF(("[%d] ckmulticast: section cookie obsolete. Will send to root %d\n", CkMyPe(), entry->rootSid.pe));
+        DEBUGF(("[%d] ckmulticast: section cookie obsolete. Will send to root %d\n", CkMyPe(), entry->rootSid.get_pe()));
 
         /// If I am the root, traverse the linked list of cookies to get the latest
         if (!entry->hasParent()) {

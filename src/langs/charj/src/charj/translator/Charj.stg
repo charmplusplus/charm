@@ -383,7 +383,7 @@ class <ident>: public CBase_<ident> {
 <endif>
 >>
 
-chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds, entries) ::=
 <<
 <if(sym.isMainChare)>main<endif>module <ident> {
 <if(ext)>
@@ -394,20 +394,21 @@ chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds) ::=
 extern module <basename>_readonly;
 <endif>
     }>
-    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds, entries = entries)>
 }
 >>
 
 
-chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds) ::=
+chareDeclaration_ci_cont(pds, sym, chareType, arrayDim, ident, ext, csds, entries) ::=
 <<
 <if(first(pds))>namespace <first(pds)>
 {
-    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds)>
+    <chareDeclaration_ci_cont(pds = rest(pds), sym = sym, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds, entries = entries)>
 } // namespace <first(pds)>
 <else>
 <chareType><if(arrayDim)> [<arrayDim>]<endif> <ident><if(ext)> : <ext><endif> {
     <csds; separator="\n">
+    <entries; separator="\n">
 };
 <endif>
 >>
@@ -423,7 +424,19 @@ funcMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
 <modl><ty><gtpl> <id><fpl><adl>;
 >>
 
+
+entryMethodDecl_h(modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl>;
+>>
+
+
 funcMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<modl><ty><gtpl> <id><fpl><adl>;
+>>
+
+entryMethodDecl_ci(modl, gtpl, ty, id, fpl, adl, block) ::=
 <<
 <modl><ty><gtpl> <id><fpl><adl>;
 >>
@@ -466,6 +479,24 @@ funcMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
 >>
 
 
+entryMethodDecl_cc(classSym, methodSym, modl, gtpl, ty, id, fpl, adl, block) ::=
+<<
+<if(block)>
+<modl><ty><gtpl> <classSym.Name>::<id><fpl><adl>
+{
+    <methodSym.entryArgInitializers; separator="\n">
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    <block>
+    #if _CHARJ_TRACE_ALL_METHODS<if(methodSym.isTraced)> || _CHARJ_TRACE_TRACED_METHODS<endif>
+    traceUserBracketEvent(<methodSym.traceID>, _charj_method_trace_timer, CkWallTimer());
+    #endif
+}
+<endif>
+>>
+
+
 ctorDecl_ci(modl, gtpl, id, fpl, block) ::=
 <<
 <modl><gtpl><id><fpl>;
@@ -479,6 +510,25 @@ ctorDecl_h(modl, gtpl, id, fpl, block) ::=
 
 
 ctorDecl_cc(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><id>::<id><fpl>
+<block>
+>>
+
+
+entryCtorDecl_ci(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><gtpl><id><fpl>;
+>>
+
+
+entryCtorDecl_h(modl, gtpl, id, fpl, block) ::=
+<<
+<modl><id><fpl>;
+>>
+
+
+entryCtorDecl_cc(modl, gtpl, id, fpl, block) ::=
 <<
 <modl><id>::<id><fpl>
 <block>
@@ -643,11 +693,22 @@ formal_param_list(sdecl, vdecl) ::=
 >>
 
 
+entry_formal_param_list(sdecl) ::=
+<<
+(<sdecl; separator=", ">)
+>>
+
+
 formal_param_decl(modList, type, declID) ::=
 <<
 <if(modList)><modList> <endif><type> <declID>
 >>
 
+
+entry_formal_param_decl(modList, type, declID) ::=
+<<
+<if(modList)><modList> <endif><type> __<declID>
+>>
 
 assert(cond, msg) ::=
 <<

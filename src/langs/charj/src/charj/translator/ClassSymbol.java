@@ -1,6 +1,11 @@
 
 package charj.translator;
 
+import org.antlr.runtime.*;
+import org.antlr.runtime.tree.*;
+import org.antlr.stringtemplate.*;
+import org.antlr.stringtemplate.StringTemplate;
+import org.antlr.stringtemplate.language.AngleBracketTemplateLexer;
 import java.util.*;
 
 public class ClassSymbol extends SymbolWithScope implements Scope, Type {
@@ -24,6 +29,7 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
     public Map<String, Symbol> members = new LinkedHashMap<String, Symbol>();
     public Map<String, VariableSymbol> fields = new LinkedHashMap<String, VariableSymbol>();
     public Map<String, MethodSymbol> methods = new LinkedHashMap<String, MethodSymbol>();
+    public Map<String, MethodSymbol> sdagMethods = new LinkedHashMap<String, MethodSymbol>();
 
     public Map<String, String> sdag_local_names = new LinkedHashMap<String, String>();
     public Map<String, String> sdag_local_typenames = new LinkedHashMap<String, String>();
@@ -381,4 +387,47 @@ public class ClassSymbol extends SymbolWithScope implements Scope, Type {
         }
         return defs;
     }
+
+    public List<String> generateSDAGEntries() {
+        List<String> entries = new ArrayList<String>();
+        for (Map.Entry<String, MethodSymbol> entry : sdagMethods.entrySet()) {
+          String ident = entry.getKey();
+          MethodSymbol method = entry.getValue();
+          entries.add(emitSDAGEntry(ident, method.sdagFPL));
+        }
+        return entries;
+    }
+
+    public static TreeAdaptor m_adaptor = new CommonTreeAdaptor() {
+        public Object create(Token token) {
+            return new CharjAST(token);
+        }
+        public Object dupNode(Object t) {
+            if (t == null) {
+                return null;
+            }
+            return create(((CharjAST)t).token);
+        }
+    };
+
+    public String emitSDAGEntry(String ident, CharjAST fpl) {
+      try {
+        CommonTree m_ast = (CommonTree)fpl;
+        CommonTreeNodeStream m_nodes = new CommonTreeNodeStream(m_ast);
+        m_nodes.setTreeAdaptor(m_adaptor);
+        CharjEmitter emitter = new CharjEmitter(m_nodes);
+        emitter.setTemplateLib(Translator.getTemplates(Translator.templateFile));
+        StringTemplate fplst = (StringTemplate)emitter.formalParameterList().getTemplate();
+        StringTemplate st = new StringTemplate("entry void <id><fpl>;",
+                                               AngleBracketTemplateLexer.class);
+        st.setAttribute("id", ident);
+        st.setAttribute("fpl", fplst.toString());
+        return st.toString();
+      } catch (RecognitionException ex) {
+        System.err.println(ex.getMessage());
+        ex.printStackTrace(System.err);
+        return "";
+      }
+    }
+
 }

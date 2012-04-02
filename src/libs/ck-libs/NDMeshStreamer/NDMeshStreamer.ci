@@ -1,4 +1,5 @@
 module NDMeshStreamer {
+  extern module completion;
 
   include "DataItemTypes.h";
 
@@ -14,14 +15,17 @@ module NDMeshStreamer {
 
   template<class dtype> array [1D] MeshStreamerArrayClient {
     // entry void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-    entry void process(dtype &data);
+    entry void receiveRedeliveredItem(dtype data);
   };
 
   template<class dtype> 
   group MeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
     entry void flushDirect();
-    entry void finish(CkReductionMsg *msg);
+    entry void finish();
+    entry void associateCallback(int numContributors, 
+				 CkCallback startCb, CkCallback endCb, 
+				 CProxy_CompletionDetector detector);
   };
 
   template<class dtype>
@@ -30,7 +34,7 @@ module NDMeshStreamer {
 	  int totalBufferCapacity, int numDimensions, 
 	  int dimensionSizes[numDimensions], 
 	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
-	  int yieldFlag = 0, double progressPeriodInMs = -1.0);
+	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
   };
 
 
@@ -40,7 +44,7 @@ module NDMeshStreamer {
 	  int totalBufferCapacity, int numDimensions, 
 	  int dimensionSizes[numDimensions],
 	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
-	  int yieldFlag = 0, double progressPeriodInMs = -1.0);
+	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
     entry void receiveArrayData(
 	       MeshStreamerMessage<ArrayDataItem<dtype> > *msg); 

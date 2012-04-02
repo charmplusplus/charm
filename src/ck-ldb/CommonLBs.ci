@@ -17,6 +17,8 @@ module CommonLBs {
   extern module RefineCommLB;
   extern module RotateLB;
   extern module TreeMatchLB;
+  extern module RefineSwapLB;
+  extern module CommAwareRefineLB;
 
   initnode void initCommonLBs(void);
 };

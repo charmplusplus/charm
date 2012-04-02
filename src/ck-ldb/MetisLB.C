@@ -180,6 +180,8 @@ void MetisLB::work(LDStats* stats)
 
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete parr;
+  delete ogr;
 }
 
 #include "MetisLB.def.h"

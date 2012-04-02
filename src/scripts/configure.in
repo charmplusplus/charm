@@ -1236,6 +1236,26 @@ EOT
 test_linkc "whether pthread_setaffinity_np call exists" "yes" "no" "-lpthread"
 AC_DEFINE_UNQUOTED(CMK_HAS_PTHREAD_SETAFFINITY, $pass, [whether the pthread_setaffinity_np() exists])
 
+### test pthread_spin_lock ####
+cat > $tc <<EOT
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
+
+int main()
+{
+  pthread_spinlock_t  lock;
+
+  pthread_spin_init(&lock, 0);
+
+  pthread_spin_lock(&lock);
+
+  return 0;
+}
+EOT
+test_linkc "whether pthread_spin_lock exists" "yes" "no" "-lpthread"
+AC_DEFINE_UNQUOTED(CMK_HAS_SPINLOCK, $pass, [whether the pthread_spin_lock exists])
 
 ### check libnuma on Linux ####
 if test "$WITH_NUMA" = "yes"

@@ -32,6 +32,7 @@ The calls needed to use the reduction manager are:
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #define MAX_INT 5000000
+#define _MLOG_REDUCE_P2P_ 0
 #endif
 
 //This message is sent between group objects on a single PE
@@ -268,7 +269,7 @@ private:
   		>0 indicates this is a reduced contribution.
   	*/
   	int nSources(void) {return sourceFlag<0?-sourceFlag:sourceFlag;}
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
+#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_ )
     int sourceProcessorCount;
     int fromPE;
 #endif
@@ -621,7 +622,7 @@ protected:
 
 //Checkpointing utilities
 public:
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+#if (defined(_FAULT_MLOG_) && _MLOG_REDUCE_P2P_)
     int *perProcessorCounts;
     int processorCount;
     int totalCount;

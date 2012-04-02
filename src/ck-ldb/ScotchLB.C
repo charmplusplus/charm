@@ -150,6 +150,7 @@ void ScotchLB::work(LDStats *stats) {
   free(pemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete parr;
   delete ogr;
 }
 

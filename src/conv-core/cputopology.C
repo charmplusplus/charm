@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#if CMK_BLUEGENEL || CMK_BLUEGENEP
+#if CMK_BLUEGENEL || CMK_BLUEGENEP || CMK_BLUEGENEQ
 #include "TopoManager.h"
 #endif
 
@@ -385,7 +385,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
      topoLock = CmiCreateLock();
   }
 
-#if __FAULT__|| CMK_BLUEGENEQ
+#if __FAULT__
   obtain_flag = 0;
 #endif
   if(CmiGetArgFlagDesc(argv,"+obtain_cpu_topology",
@@ -467,6 +467,24 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
   }
   CmiNodeAllBarrier();
+#elif CMK_BLUEGENEQ
+  if (CmiMyRank() == 0) {
+   TopoManager tmgr;
+
+    int numPes = cpuTopo.numPes = CmiNumPes();
+    cpuTopo.nodeIDs = new int[numPes];
+    CpuTopology::supported = 1;
+
+    int a, b, c, d, e, t, nid;
+    for(int i=0; i<numPes; i++) {
+      tmgr.rankToCoordinates(i, a, b, c, d, e, t);
+      nid = tmgr.coordinatesToRank(a, b, c, d, e, 0);
+      cpuTopo.nodeIDs[i] = nid;
+    }
+    cpuTopo.sort();
+    if (CmiMyPe()==0)  CmiPrintf("Charm++> Running on %d unique compute nodes (%d-way SMP).\n", cpuTopo.numNodes, CmiNumCores());
+  }
+  CmiNodeAllBarrier();
 #elif CMK_CRAYXT || CMK_CRAYXE
   if(CmiMyRank() == 0) {
     int numPes = cpuTopo.numPes = CmiNumPes();
@@ -512,7 +530,7 @@ extern "C" void LrtsInitCpuTopo(char **argv)
     /* get my ip address */
   if (CmiMyRank() == 0)
   {
-  #if CMK_HAS_GETHOSTNAME
+  #if CMK_HAS_GETHOSTNAME && !CMK_BLUEGENEQ
     myip = skt_my_ip();        /* not thread safe, so only calls on rank 0 */
     // fprintf(stderr, "[%d] IP is %d.%d.%d.%d\n", CmiMyPe(), myip.data[0],myip.data[1],myip.data[2],myip.data[3]);
   #elif CMK_BPROC

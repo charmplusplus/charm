@@ -61,6 +61,7 @@ Orion Sky Lawlor, olawlor@acm.org
 CpvDeclare(int ,serializer);
 
 bool _isAnytimeMigration;
+bool _isStaticInsertion;
 bool _isNotifyChildInRed;
 
 #define ARRAY_DEBUG_OUTPUT 0
@@ -547,7 +548,7 @@ void CkArrayOptions::init()
 {
     locMgr.setZero();
     anytimeMigration = _isAnytimeMigration;
-    staticInsertion = false;
+    staticInsertion = _isStaticInsertion;
     reductionClient.type = CkCallback::invalid;
     disableNotifyChildInRed = !_isNotifyChildInRed;
     broadcastViaScheduler = false;
@@ -751,6 +752,40 @@ CkArray::CkArray(CkArrayOptions &opts,
   nodeProxy = nodetemp;
   //nodeProxy = new CProxy_CkArrayReductionMgr (nodereductionID);
 #endif
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	// creating the spanning tree to be used for broadcast
+	children = (int *) CmiAlloc(sizeof(int) * _MLOG_BCAST_BFACTOR_);
+	numChildren = 0;
+	
+	// computing the level of the tree this pe is in
+	// we should use the geometric series formula, but now a quick and dirty code should suffice
+	// PE 0 is at level 0, PEs 1.._MLOG_BCAST_BFACTOR_ are at level 1 and so on
+	int level = 0;
+	int aux = CmiMyPe();
+	int max = CmiNumPes();
+	int factor = _MLOG_BCAST_BFACTOR_;
+	int startLevel = 0;
+	int startNextLevel = 1;
+	while(aux >= 0){
+		level++;
+		startLevel = startNextLevel;
+		startNextLevel += factor;
+		aux -= factor;
+		factor *= _MLOG_BCAST_BFACTOR_;
+	}
+
+	// adding children to the tree
+	int first = startNextLevel + (CmiMyPe() - startLevel) * _MLOG_BCAST_BFACTOR_;
+	for(int i=0; i<_MLOG_BCAST_BFACTOR_; i++){
+		if(first + i >= CmiNumPes())
+			break;
+		children[i] = first + i;
+		numChildren++;
+	}
+ 
+#endif
+
 
   if (opts.reductionClient.type != CkCallback::invalid && CkMyPe() == 0)
       ckSetReductionClient(&opts.reductionClient);
@@ -1241,8 +1276,19 @@ void CkArray::sendBroadcast(CkMessage *msg)
 {
 	CK_MAGICNUMBER_CHECK
 	if(CkMyPe() == CpvAccess(serializer)){
+#if _MLOG_BCAST_TREE_
+		// Using the spanning tree to broadcast the message
+		for(int i=0; i<numChildren; i++){
+			CkMessage *copyMsg = (CkMessage *) CkCopyMsg((void **)&msg);
+			thisProxy[children[i]].recvBroadcastViaTree(copyMsg);
+		}
+	
+		// delivering message locally
+		recvBroadcast(msg);	
+#else
 		//Broadcast the message to all processors
 		thisProxy.recvBroadcast(msg);
+#endif
 	}else{
 		thisProxy[CpvAccess(serializer)].sendBroadcast(msg);
 	}
@@ -1256,6 +1302,21 @@ void CkArray::sendExpeditedBroadcast(CkMessage *msg)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 int _tempBroadcastCount=0;
+
+// Delivers a message using the spanning tree
+void CkArray::recvBroadcastViaTree(CkMessage *msg)
+{
+	CK_MAGICNUMBER_CHECK
+
+	// Using the spanning tree to broadcast the message
+	for(int i=0; i<numChildren; i++){
+		CkMessage *copyMsg = (CkMessage *) CkCopyMsg((void **)&msg);
+		thisProxy[children[i]].recvBroadcastViaTree(copyMsg);
+	}
+
+	// delivering message locally
+	recvBroadcast(msg);	
+}
 
 void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index){
     if(homePe(*index)==CmiMyPe()){
@@ -1284,6 +1345,9 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
 void CkArray::staticBroadcastHomeElements(CkArray *arr,void *data,CkLocRec *rec,CkArrayIndex *index){
     arr->broadcastHomeElements(data,rec,index);
 }
+#else
+void CkArray::recvBroadcastViaTree(CkMessage *msg){
+}
 #endif
 
 
@@ -1299,7 +1363,7 @@ void CkArray::recvBroadcast(CkMessage *m)
         locMgr->callForAllRecords(CkArray::staticBroadcastHomeElements,this,(void *)msg);
 #else
 	//Run through the list of local elements
-	int idx=0, len=0;
+	int idx=0, len=0, count=0;
         if (stableLocations) {            /* remove all NULLs in the array */
           len = 0;
           while (elements->next(idx)!=NULL) len++;
@@ -1323,7 +1387,7 @@ void CkArray::recvBroadcast(CkMessage *m)
   		startVTimer();
 #endif
 		CmiBool doFree = CmiFalse;
-		if (stableLocations && idx == len) doFree = CmiTrue;
+		if (stableLocations && ++count == len) doFree = CmiTrue;
 		broadcaster->deliver(msg, el, doFree);
 	}
 #endif
@@ -1337,8 +1401,13 @@ void CkArray::recvBroadcast(CkMessage *m)
 
 	// CkArrayBroadcaster doesn't have msg buffered, and there was
 	// no last delivery to transfer ownership
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	if (stableLocations)
+	  delete msg;
+#else
 	if (stableLocations && len == 0)
 	  delete msg;
+#endif
 }
 
 #include "CkArray.def.h"

@@ -130,6 +130,8 @@ extern int CmiMyRank_();
 extern int _Cmi_mype;
 extern int _Cmi_numpes;
 extern int _Cmi_myrank; /* Normally zero; only 1 during SIGIO handling */
+extern int _Cmi_mynode;
+extern int _Cmi_numnodes;
 
 #define CmiMyPe()           _Cmi_mype
 #define CmiMyRank()         0
@@ -202,11 +204,18 @@ extern void CmiNodeBarrier(void);
 extern void CmiNodeAllBarrier(void);
 #define CmiSvAlloc CmiAlloc
 
+#if CMK_HAS_SPINLOCK && CMK_USE_SPINLOCK
+typedef pthread_spinlock_t *CmiNodeLock;
+#define CmiLock(lock) (pthread_spin_lock(lock))
+#define CmiUnlock(lock) (pthread_spin_unlock(lock))
+#define CmiTryLock(lock) (pthread_spin_trylock(lock))
+#else
 typedef pthread_mutex_t *CmiNodeLock;
-extern CmiNodeLock CmiCreateLock();
 #define CmiLock(lock) (pthread_mutex_lock(lock))
 #define CmiUnlock(lock) (pthread_mutex_unlock(lock))
 #define CmiTryLock(lock) (pthread_mutex_trylock(lock))
+#endif
+extern CmiNodeLock CmiCreateLock();
 extern void CmiDestroyLock(CmiNodeLock lock);
 
 extern CmiNodeLock CmiMemLock_lock;
@@ -608,6 +617,10 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 	}
 #else
 #define MESSAGE_PHASE_CHECK(msg)
+#endif
+
+#if CMK_CONVERSE_GEMINI_UGNI && !CMK_SEQUENTIAL
+#include "gni_pub.h"
 #endif
 
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
@@ -1821,6 +1834,20 @@ extern int *memCriticalEntries;
 
 double CmiReadSize(const char *str);
 
+#if  CMK_CONVERSE_GEMINI_UGNI
+void CmiTurnOnStats();
+void CmiTurnOffStats();
+#else
+#define CmiTurnOnStats()
+#define CmiTurnOffStats()
+#endif
+
+/* CharmLibInterOperate should be a global variable as it will be
+ * set only once by MPI ranks respectively.
+ */
+extern int CharmLibInterOperate;
+CpvExtern(int,charmLibExitFlag);
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
@@ -1895,6 +1922,5 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 
 CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
-
 
 #endif /* CONVERSE_H */

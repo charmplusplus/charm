@@ -15,7 +15,7 @@ test: all
 	./charmrun +p3 ./hello 10 $(TESTOPTS)
 
 bgtest: all
-	./charmrun +p3 ./hello 10 +x1 +y1 +z3
+	./charmrun +p3 ./hello 10 +x1 +y1 +z3 $(TESTOPTS)
 
 clean:
 	rm -f conv-host *.o charmrun charmrun.exe

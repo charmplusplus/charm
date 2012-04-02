@@ -149,6 +149,7 @@ public:
       struct s_chare {  // NewChareMsg, NewVChareMsg, ForChareMsg, ForVidMsg, FillVidMsg
         void *ptr;      ///< object pointer
         UInt forAnyPe;  ///< Used only by newChare
+        int  bype;      ///< created by this pe
       } chare;
       struct s_group {         // NodeBocInitMsg, BocInitMsg, ForNodeBocMsg, ForBocMsg
         CkGroupID g;           ///< GroupID
@@ -183,6 +184,7 @@ public:
     CkObjID recver;
     MCount SN;
     MCount TN;
+	int incarnation;
     MlogEntry *localMlogEntry;
     bool freeMsg;
 #endif
@@ -262,6 +264,7 @@ private:
       env->recver.type = TypeInvalid;
       env->SN = 0;
       env->TN = 0;
+	  env->incarnation = -1;
       env->localMlogEntry = NULL;
 #endif
 
@@ -317,6 +320,14 @@ private:
     }
     void   setObjPtr(void *p) { 
       CkAssert(getMsgtype()==ForChareMsg); type.chare.ptr = p; 
+    }
+    UInt getByPe(void) { 
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      return type.chare.bype; 
+    }
+    void setByPe(UInt pe) { 
+      CkAssert(getMsgtype()==NewChareMsg || getMsgtype()==NewVChareMsg); 
+      type.chare.bype = pe; 
     }
 
 // Group-specific fields

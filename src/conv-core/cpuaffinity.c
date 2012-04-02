@@ -547,7 +547,7 @@ void CmiInitCPUAffinity(char **argv)
      affLock = CmiCreateLock();
   }
 
-#if CMK_BLUEGENEP
+#if CMK_BLUEGENEP | CMK_BLUEGENEQ
   if(affinity_flag){
       affinity_flag = 0;
       if(CmiMyPe()==0) CmiPrintf("Charm++> cpu affinity setting is not needed on BG/P, thus ignored.\n");
@@ -589,7 +589,7 @@ void CmiInitCPUAffinity(char **argv)
     }
     else {
     /* if (CmiSetCPUAffinity(CmiNumCores()-1) == -1) CmiAbort("set_cpu_affinity abort!"); */
-#if !CMK_CRAYXT && !CMK_CRAYXE
+#if !CMK_CRAYXT && !CMK_CRAYXE && !CMK_BLUEGENEQ
       if (pemap == NULL) {
 #if CMK_MACHINE_PROGRESS_DEFINED
         while (affinity_doneflag < CmiMyNodeSize())  CmiNetworkProgress();

@@ -454,7 +454,6 @@ primaryExpression
     |   ^(ENTRY_METHOD_CALL ^(AT primaryExpression IDENT) templateInstantiation? arguments)
         ->  ^(ENTRY_METHOD_CALL ^(DOT primaryExpression IDENT) templateInstantiation? arguments)
     |   explicitConstructorCall
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
     |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
@@ -469,6 +468,7 @@ primaryExpression
 	|	THISINDEX
 	|	THISPROXY
     |   domainExpression
+    |   ^(SIZEOF (expression | type))
     ;
     
 explicitConstructorCall

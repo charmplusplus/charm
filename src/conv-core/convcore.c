@@ -135,6 +135,9 @@ extern void CldModuleInit(char **);
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
 
+int CharmLibInterOperate = 0;
+CpvDeclare(int,charmLibExitFlag);
+
 CpvStaticDeclare(int, CmiMainHandlerIDP); /* Main handler for _CmiMultipleSend that is run on every node */
 
 #if CMK_MEM_CHECKPOINT
@@ -922,7 +925,7 @@ void CmiTimerInit(char **argv)
 
   _absoluteTime = CmiGetArgFlagDesc(argv,"+useAbsoluteTime", "Use system's absolute time as wallclock time.");
 
-#if ! CMK_MEM_CHECKPOINT
+#if !CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
   /* try to synchronize calling barrier */
   CmiBarrier();
   CmiBarrier();
@@ -940,7 +943,7 @@ void CmiTimerInit(char **argv)
     (ru.ru_stime.tv_sec * 1.0)+(ru.ru_stime.tv_usec * 0.000001);
 #endif
 
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && !_FAULT_MLOG_ && !_FAULT_CAUSAL_
   CmiBarrier();
 /*  CmiBarrierZero(); */
 #endif
@@ -1811,6 +1814,13 @@ void CsdScheduleForever(void)
   int isIdle=0;
   SCHEDULE_TOP
   while (1) {
+    /* The interoperation will cost this little overhead in scheduling */
+    if(CharmLibInterOperate) {
+      if(CpvAccess(charmLibExitFlag)) {
+        CpvAccess(charmLibExitFlag) = 0;
+        break;
+      }
+    }
     msg = CsdNextMessage(&state);
     if (msg!=NULL) { /*A message is available-- process it*/
       if (isIdle) {isIdle=0;CsdEndIdle();}
@@ -3498,6 +3508,9 @@ void ConverseCommonInit(char **argv)
   CpvInitialize(int, cmiArgDebugFlag);
   CpvAccess(cmiArgDebugFlag) = 0;
 #endif
+  CpvInitialize(int,charmLibExitFlag);
+  CpvAccess(charmLibExitFlag) = 0;
+
   CpvInitialize(int,_curRestartPhase);
   CpvAccess(_curRestartPhase)=1;
   CmiArgInit(argv);

@@ -20,4 +20,4 @@ test: all
 	./charmrun ./hello +p4 10 $(TESTOPTS)
 
 bgtest: all
-	./charmrun ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1 +bglog
+	./charmrun ./hello +p4 10 +x2 +y2 +z2 +cth1 +wth1 +bglog $(TESTOPTS)
