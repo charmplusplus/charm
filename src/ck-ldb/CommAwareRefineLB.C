@@ -344,6 +344,25 @@ void CommAwareRefineLB::work(LDStats* stats)
       }
     }
 
+  int local_comm = 0;
+  int remote_comm = 0;
+  for (int i=0; i< ogr->vertices.size(); i++) {
+    for(int j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      vert = ogr->vertices[i].sendToList[j].getNeighborId();
+      if(ogr->vertices[i].getNewPe() == ogr->vertices[vert].getNewPe()) {
+        local_comm++;
+      } else {
+        remote_comm++;
+      }
+    }
+  }
+  CkPrintf("Local communication: %d Remote communication: %d\n", local_comm, remote_comm);
+  stats->local_comm = local_comm;
+  stats->remote_comm = remote_comm;
+
+  stats->is_prev_lb_refine = 3;
+  stats->after_lb_max = 0;
+  stats->after_lb_avg = 0;
 
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);         // Send decisions back to LDStats

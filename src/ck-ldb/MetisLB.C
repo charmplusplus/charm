@@ -172,7 +172,24 @@ void MetisLB::work(LDStats* stats)
     if(pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
-  stats->is_prev_lb_refine = 3;
+
+  int local_comm = 0;
+  int remote_comm = 0;
+  for (int i=0; i< numVertices; i++) {
+    for(int j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      vert = ogr->vertices[i].sendToList[j].getNeighborId();
+      if(pemap[i] == pemap[vert]) {
+        local_comm++;
+      } else {
+        remote_comm++;
+      }
+    }
+  }
+  CkPrintf("Local communication: %d Remote communication: %d\n", local_comm, remote_comm);
+  stats->local_comm = local_comm;
+  stats->remote_comm = remote_comm;
+
+  stats->is_prev_lb_refine = 2;
   stats->after_lb_max = 0;
   stats->after_lb_avg = 0;
 
