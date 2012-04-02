@@ -30,6 +30,7 @@ private:
   CentralLB *greedyLB;
   CentralLB *refineLB;
   CentralLB *metisLB;
+  CentralLB *commRefineLB;
 };
 
 #endif /* CENTRAL_ADAPTIVE_LB_H */

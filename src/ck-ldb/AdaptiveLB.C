@@ -25,6 +25,7 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CentralLB(opt)
   char *greedyLBString = "GreedyLB";
   char *refineLBString = "RefineLB";
   char *metisLBString = "MetisLB";
+  char *commRefineLBString = "CommAwareRefineLB";
 
   LBAllocFn fn = getLBAllocFn(greedyLBString);
   if (fn == NULL) {
@@ -49,6 +50,14 @@ AdaptiveLB::AdaptiveLB(const CkLBOptions &opt): CentralLB(opt)
   }
   BaseLB *slb = fn();
   metisLB = (CentralLB*)slb;
+
+  fn = getLBAllocFn(commRefineLBString);
+  if (fn == NULL) {
+    CkPrintf("LB> Invalid load balancer: %s.\n", commRefineLBString);
+    CmiAbort("");
+  }
+  BaseLB *crlb = fn();
+  commRefineLB = (CentralLB*)crlb;
 }
 
 void AdaptiveLB::work(LDStats* stats)
@@ -108,7 +117,7 @@ void AdaptiveLB::work(LDStats* stats)
       CkPrintf("---METIS LB\n");
     } else if (comm_refine_ratio <= 1.01) {
       lb_type = 3;
-      //commRefineLB->work(stats);
+      commRefineLB->work(stats);
       CkPrintf("---CommAwareRefineLB\n");
     } else if (comm_ratio <= 1.01) {
       lb_type = 2;
@@ -116,7 +125,7 @@ void AdaptiveLB::work(LDStats* stats)
       CkPrintf("---METIS LB\n");
     } else {
       lb_type = 3;
-      //commRefineLB->work(stats);
+      commRefineLB->work(stats);
       CkPrintf("---CommAwareRefineLB\n");
     }
 
