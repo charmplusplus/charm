@@ -35,6 +35,7 @@ struct AdaptiveLBDatabase {
 
 struct AdaptiveLBInfo {
   double max_avg_ratio;
+  double local_remote_ratio;
 };
 
 struct AdaptiveLBStructure {
@@ -54,7 +55,8 @@ struct AdaptiveLBStructure {
   int last_lb_type;
   AdaptiveLBInfo greedy_info;
   AdaptiveLBInfo refine_info;
-  AdaptiveLBInfo metis_info;
+  AdaptiveLBInfo comm_info;
+  AdaptiveLBInfo comm_refine_info;
 } adaptive_struct;
 
 
@@ -680,8 +682,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
   int tmp1;
-  double tmp2;
-  GetPrevLBData(tmp1, tmp2);
+  double tmp2, tmp3;
+  GetPrevLBData(tmp1, tmp2, tmp3);
   double tolerate_imb = IMB_TOLERANCE * tmp2;
 
   if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
@@ -765,8 +767,8 @@ bool LBDatabase::generatePlan(int& period) {
   // average. Hence we pass 1, else pass in some other value which would be the
   // new max_load after load balancing.
   int tmp1;
-  double tmp2;
-  GetPrevLBData(tmp1, tmp2);
+  double tmp2, tmp3;
+  GetPrevLBData(tmp1, tmp2, tmp3);
   
   double tolerate_imb = tmp2;
   if (max/avg < tolerate_imb) {
@@ -979,30 +981,40 @@ void LBDatabase::SetStrategyCost(double lb_strategy_cost) {
   adaptive_struct.lb_strategy_cost = lb_strategy_cost;
 }
 
-void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg) {
+void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg, double
+    local_comm, double remote_comm) {
   adaptive_struct.last_lb_type = lb;
   if (lb == 0) {
     adaptive_struct.greedy_info.max_avg_ratio = lb_max/lb_avg;
   } else if (lb == 1) {
     adaptive_struct.refine_info.max_avg_ratio = lb_max/lb_avg;
+  } else if (lb == 2) {
+    adaptive_struct.comm_info.local_remote_ratio = local_comm/remote_comm;
+  } else if (lb == 3) {
+    adaptive_struct.comm_refine_info.local_remote_ratio =
+    local_comm/remote_comm;
   }
 }
 
-void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio) {
+void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
+    local_remote_comm_ratio) {
   lb_type = adaptive_struct.last_lb_type;
   lb_max_avg_ratio = 1;
-  if (lb_type == 0) {
-    lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
-  } else if (lb_type == 1) {
-    lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
-  }
+  local_remote_comm_ratio = 1;
+  GetLBDataForLB(lb_type, lb_max_avg_ratio, local_remote_comm_ratio);
 }
 
-void LBDatabase::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio) {
+void LBDatabase::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&
+    local_remote_comm_ratio) {
   if (lb_type == 0) {
     lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
   } else if (lb_type == 1) {
     lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
+  } else if (lb_type == 2) {
+    local_remote_comm_ratio = adaptive_struct.comm_info.local_remote_ratio;
+  } else if (lb_type == 3) {
+    local_remote_comm_ratio =
+       adaptive_struct.comm_refine_info.local_remote_ratio;
   }
 }
 

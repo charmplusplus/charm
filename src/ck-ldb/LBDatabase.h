@@ -370,9 +370,12 @@ public:
 
   bool isStrategyComm();
 
-  void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg);
-  void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio);
-  void GetLBDataForLB(int lb_type, double& lb_max_avg_ratio);
+  void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg, double
+      local_comm, double remote_comm);
+  void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
+      local_remote_comm_ratio);
+  void GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&
+      local_remote_comm_ratio);
 
   void SetMigrationCost(double lb_migration_cost);
   void SetStrategyCost(double lb_strategy_cost);

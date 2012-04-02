@@ -105,6 +105,8 @@ public:
     int is_prev_lb_refine;
     double after_lb_max;
     double after_lb_avg;
+    double local_comm;
+    double remote_comm;
 
     LDStats(int c=0, int complete_flag=1);
     /// the functions below should be used to obtain the number of processors

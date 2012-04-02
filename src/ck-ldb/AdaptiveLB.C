@@ -84,24 +84,42 @@ void AdaptiveLB::work(LDStats* stats)
   CkPrintf("AdaptiveLB> Total Bytes %ld\n", totalBytes);
   CkPrintf("AdaptiveLB> Total Comm Overhead %E Total Load %E\n", commOverhead, totalLoad);
 
+  double tmp;
   double refine_max_avg_ratio, lb_max_avg_ratio;
-  int lb_type;
-  GetPrevLBData(lb_type, lb_max_avg_ratio);
-  GetLBDataForLB(1, refine_max_avg_ratio);
   double greedy_max_avg_ratio;
-  GetLBDataForLB(0, greedy_max_avg_ratio);
+  int lb_type;
+  double comm_ratio, comm_refine_ratio;
+
+  GetPrevLBData(lb_type, lb_max_avg_ratio, tmp);
+  GetLBDataForLB(1, refine_max_avg_ratio, tmp);
+  GetLBDataForLB(0, greedy_max_avg_ratio, tmp);
+  GetLBDataForLB(2, tmp, comm_ratio);
+  GetLBDataForLB(3, tmp, comm_refine_ratio);
 
   CkPrintf("AdaptiveLB> Previous LB %d\n", lb_type);
 
-  metisLB->work(stats);
-  return;
   // Choose the right LB
   //
   // If communication overhead is 10% computation, then choose Scotch LB
   if (isComm || (commOverhead > (totalLoad * percent_overhead / 100))) {
-    metisLB->work(stats);
-    lb_type = 2;
-    CkPrintf("---METIS LB\n");
+    if(lb_type == -1) {
+      lb_type = 2;
+      metisLB->work(stats);
+      CkPrintf("---METIS LB\n");
+    } else if (comm_refine_ratio <= 1.01) {
+      lb_type = 3;
+      //commRefineLB->work(stats);
+      CkPrintf("---CommAwareRefineLB\n");
+    } else if (comm_ratio <= 1.01) {
+      lb_type = 2;
+      metisLB->work(stats);
+      CkPrintf("---METIS LB\n");
+    } else {
+      lb_type = 3;
+      //commRefineLB->work(stats);
+      CkPrintf("---CommAwareRefineLB\n");
+    }
+
   } else {
     if (lb_type == -1) {
       lb_type = 0;
@@ -121,7 +139,8 @@ void AdaptiveLB::work(LDStats* stats)
       CkPrintf("---REFINE LB\n");
     }
   }
-  UpdateLBDBWithData(lb_type, stats->after_lb_max, stats->after_lb_avg);
+  UpdateLBDBWithData(lb_type, stats->after_lb_max, stats->after_lb_avg,
+      stats->local_comm, stats->remote_comm);
 
   delete parr;
   delete ogr;
