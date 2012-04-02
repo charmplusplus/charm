@@ -225,8 +225,7 @@ void *PerAlloc(int size)
   res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
   if (res) ptr = (char*)res - sizeof(mempool_header) + ALIGNBUF;
   SIZEFIELD(ptr)=size;
-  REFFIELD(ptr)=1;
-  MEMHFIELD(ptr) = GetMemHndl(ptr);
+  REFFIELD(ptr)= PERSIST_SEQ;
   return ptr;
 }
                                                                                 
@@ -284,15 +283,11 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
     char *buf = PerAlloc(maxBytes+sizeof(int)*2);
     _MEMCHECK(buf);
     memset(buf, 0, maxBytes+sizeof(int)*2);
-    slot->destBuf[i].mem_hndl = MEMHFIELD(buf);
+      /* used large page and from mempool, memory always registered */
+    slot->destBuf[i].mem_hndl = GetMemHndl(buf);
     slot->destBuf[i].destAddress = buf;
-    /* note: assume first integer in elan converse header is the msg size */
+      /* note: assume first integer in elan converse header is the msg size */
     slot->destBuf[i].destSizeAddress = (unsigned int*)buf;
-#if USE_LRTS_MEMPOOL
-    // assume already registered from mempool
-    // slot->destBuf[i].mem_hndl = GetMemHndl(buf);
-#endif
-    // FIXME:  assume always succeed
   }
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT

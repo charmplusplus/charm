@@ -2389,8 +2389,8 @@ static gni_return_t  registerMessage(void *msg, int size, int seqno, gni_mem_han
 #if CMK_PERSISTENT_COMM
       // persistent message is always registered
       // BIG_MSG small pieces do not have malloc chunk header
-    if ((seqno <= 1 || seqno == PERSIST_SEQ) && !IsMemHndlZero(MEMHFIELD(msg))) {
-        *memh = MEMHFIELD(msg);
+    if (IS_PERSISTENT_MEMORY(msg)) {
+        *memh = GetMemHndl(msg);
         return GNI_RC_SUCCESS;
     }
 #endif
@@ -3972,9 +3972,6 @@ void* LrtsAlloc(int n_bytes, int header)
         ptr = res + ALIGNBUF - header;
 #endif
     }
-#if CMK_PERSISTENT_COMM
-    if (ptr) SetMemHndlZero(MEMHFIELD((char*)ptr+header));
-#endif
     return ptr;
 }
 
@@ -3982,7 +3979,7 @@ void  LrtsFree(void *msg)
 {
     CmiUInt4 size = SIZEFIELD((char*)msg+sizeof(CmiChunkHeader));
 #if CMK_PERSISTENT_COMM
-    if (!IsMemHndlZero(MEMHFIELD((char*)msg+sizeof(CmiChunkHeader)))) return;
+    if (IS_PERSISTENT_MEMORY(msg)) return;
 #endif
     if (size <= SMSG_MAX_MSG)
         free(msg);

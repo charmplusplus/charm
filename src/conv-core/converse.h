@@ -629,9 +629,6 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 typedef struct {
   int size;
   int ref;
-#if  CMK_CONVERSE_GEMINI_UGNI && !CMK_SEQUENTIAL
-  gni_mem_handle_t memh;             /* register memory handle */
-#endif
 } CmiChunkHeader;
 
 #if CMK_USE_IBVERBS | CMK_USE_IBUD
@@ -648,7 +645,6 @@ struct infiCmiChunkMetaDataStruct *registerMultiSendMesg(char *msg,int msgSize);
 /* Given a user chunk m, extract the enclosing chunk header fields: */
 #define SIZEFIELD(m) (((CmiChunkHeader *)(m))[-1].size)
 #define REFFIELD(m) (((CmiChunkHeader *)(m))[-1].ref)
-#define MEMHFIELD(m) (((CmiChunkHeader *)(m))[-1].memh)
 #define BLKSTART(m) (((CmiChunkHeader *)(m))-1)
 
 extern void* malloc_nomigrate(size_t size);

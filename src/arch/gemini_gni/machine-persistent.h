@@ -16,6 +16,8 @@
 
 #define PERSIST_SEQ                     0xFFFFFFF
 
+#define IS_PERSISTENT_MEMORY(ptr)          (REFFIELD(msg) > PERSIST_SEQ/2)
+
 typedef struct  _PersistentBuf {
   void *destAddress;
   void *destSizeAddress;
