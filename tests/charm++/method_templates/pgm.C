@@ -19,6 +19,14 @@ void register_instantiations()
 };
 
 
+// Register reducer functions
+void register_reducers()
+{
+    CkReduction::reducerType countReducer = CkReduction::addReducer(count< std::less<int> >::reduce_count);
+    CkReduction::reducerType avgReducer   = CkReduction::addReducer(avg::reduce_avg);
+}
+
+
 // Test driver
 class pgm : public CBase_pgm
 {

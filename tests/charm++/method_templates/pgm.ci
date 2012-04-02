@@ -1,6 +1,7 @@
 mainmodule client  {
   extern module mylib;
   initproc register_instantiations();
+  initproc register_reducers();
 
   mainchare pgm {
     entry pgm (CkArgMsg *m);
