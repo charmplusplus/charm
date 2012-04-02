@@ -676,22 +676,21 @@ public:
 
 };
 
-template <class dtype, class ctype>
+template <class dtype>
 class MeshStreamerClientIterator : public CkLocIterator {
 
 public:
   
   CompletionDetector *detectorLocalObj_;
-  ctype clientProxy_;
+  CkArray *clientArrMgr_;
   MeshStreamerClientIterator(CompletionDetector *detectorObj, 
-			     ctype clientProxy) 
-   : detectorLocalObj_(detectorObj), clientProxy_(clientProxy) {}
+			     CkArray *clientArrMgr) 
+    : detectorLocalObj_(detectorObj), clientArrMgr_(clientArrMgr) {}
 
   // CkLocMgr::iterate will call addLocation on all elements local to this PE
   void addLocation(CkLocation &loc) {
 
-    ((MeshStreamerClient<dtype> *) 
-     (clientProxy_.ckLocalBranch()->lookup(loc.getIndex())))
+    ((MeshStreamerClient<dtype> *) (clientArrMgr_->lookup(loc.getIndex())))
       ->setDetector(detectorLocalObj_); 
 
   }
@@ -722,7 +721,7 @@ private:
   void localDeliver(ArrayDataItem<dtype, itype> &packedDataItem) {
     itype arrayId = packedDataItem.arrayIndex; 
 
-    MeshStreamerArrayClient<dtype> *clientObj;
+    MeshStreamerClient<dtype> *clientObj;
 #ifdef CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
 #else
@@ -759,9 +758,9 @@ private:
 #else
     // set completion detector in local elements of the client
     CkLocMgr *clientLocMgr = clientProxy_.ckLocMgr(); 
-    MeshStreamerClientIterator<dtype, ctype> clientIterator(
+    MeshStreamerClientIterator<dtype> clientIterator(
      MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_, 
-     clientProxy_);
+     clientProxy_.ckLocalBranch());
     clientLocMgr->iterate(clientIterator);
 #endif    
 
