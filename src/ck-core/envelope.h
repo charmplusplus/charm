@@ -184,7 +184,7 @@ public:
     CkObjID recver;
     MCount SN;
     MCount TN;
-	int incarnation;
+    int incarnation;
     MlogEntry *localMlogEntry;
     bool freeMsg;
 #endif

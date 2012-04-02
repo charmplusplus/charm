@@ -1257,13 +1257,10 @@ void TraceProjections::creation(char *msg)
 {
 #if CMK_SMP_TRACE_COMMTHREAD
         // msg must be a charm message
-	envelope *e = (envelope *)msg;
-	int ep = e->getEpIdx();
-    if(ep==0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
-	if(_entryTable[ep]->traceEnabled) {
-		creation(e, ep, 1);
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(_entryTable[ep]->traceEnabled) {
+        creation(e, ep, 1);
         e->setSrcPe(CkMyPe());              // pretend I am the sender
     }
 #endif
@@ -1272,13 +1269,10 @@ void TraceProjections::creation(char *msg)
 void TraceProjections::traceCommSetMsgID(char *msg)
 {
 #if CMK_SMP_TRACE_COMMTHREAD
-        // msg must be a charm message
-	envelope *e = (envelope *)msg;
-	int ep = e->getEpIdx();
-    if(ep==0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
-	if(_entryTable[ep]->traceEnabled) {
+    // msg must be a charm message
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if(_entryTable[ep]->traceEnabled) {
         e->setSrcPe(CkMyPe());              // pretend I am the sender
         e->setEvent(curevent);
     }
@@ -1291,9 +1285,6 @@ void TraceProjections::traceGetMsgID(char *msg, int *pe, int *event)
     *pe = *event = -1;
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
-    if(ep==0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
     if(_entryTable[ep]->traceEnabled) {
         *pe = e->getSrcPe();
         *event = e->getEvent();
@@ -1305,9 +1296,9 @@ void TraceProjections::traceSetMsgID(char *msg, int pe, int event)
        // msg must be a charm message
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
-    if(ep==0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
+    if(ep<=0 || ep>=_entryTable.size()) return;
+    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()+CkNumNodes()) return;
+    if (e->getMsgtype()<=0 || e->getMsgtype()>=LAST_CK_ENVELOPE_TYPE) return;
     if(_entryTable[ep]->traceEnabled) {
         e->setSrcPe(pe);
         e->setEvent(event);
@@ -1399,9 +1390,6 @@ void TraceProjections::beginExecute(char *msg){
 	//This function is called from comm thread in SMP mode
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
-    if (ep == 0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
     if(_entryTable[ep]->traceEnabled)
 		beginExecute(e);
 #endif
@@ -1462,9 +1450,6 @@ void TraceProjections::endExecute(char *msg)
 	//This function is called from comm thread in SMP mode
     envelope *e = (envelope *)msg;
     int ep = e->getEpIdx();
-    if (ep == 0) return;
-    int num = _entryTable.size();
-    CmiAssert(ep < num);
     if(_entryTable[ep]->traceEnabled)
 		endExecute();
 #endif	
