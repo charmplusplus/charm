@@ -35,7 +35,7 @@ struct AdaptiveLBDatabase {
 
 struct AdaptiveLBInfo {
   double max_avg_ratio;
-  double local_remote_ratio;
+  double remote_local_ratio;
 };
 
 struct AdaptiveLBStructure {
@@ -686,6 +686,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   GetPrevLBData(tmp1, tmp2, tmp3);
   double tolerate_imb = IMB_TOLERANCE * tmp2;
 
+  CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
+
   if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
@@ -989,32 +991,32 @@ void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg, double
   } else if (lb == 1) {
     adaptive_struct.refine_info.max_avg_ratio = lb_max/lb_avg;
   } else if (lb == 2) {
-    adaptive_struct.comm_info.local_remote_ratio = local_comm/remote_comm;
+    adaptive_struct.comm_info.remote_local_ratio = remote_comm/local_comm;
   } else if (lb == 3) {
-    adaptive_struct.comm_refine_info.local_remote_ratio =
-    local_comm/remote_comm;
+    adaptive_struct.comm_refine_info.remote_local_ratio =
+    remote_comm/local_comm;
   }
 }
 
 void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
-    local_remote_comm_ratio) {
+    remote_local_comm_ratio) {
   lb_type = adaptive_struct.last_lb_type;
   lb_max_avg_ratio = 1;
-  local_remote_comm_ratio = 1;
-  GetLBDataForLB(lb_type, lb_max_avg_ratio, local_remote_comm_ratio);
+  remote_local_comm_ratio = 1;
+  GetLBDataForLB(lb_type, lb_max_avg_ratio, remote_local_comm_ratio);
 }
 
 void LBDatabase::GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&
-    local_remote_comm_ratio) {
+    remote_local_comm_ratio) {
   if (lb_type == 0) {
     lb_max_avg_ratio = adaptive_struct.greedy_info.max_avg_ratio;
   } else if (lb_type == 1) {
     lb_max_avg_ratio = adaptive_struct.refine_info.max_avg_ratio;
   } else if (lb_type == 2) {
-    local_remote_comm_ratio = adaptive_struct.comm_info.local_remote_ratio;
+    remote_local_comm_ratio = adaptive_struct.comm_info.remote_local_ratio;
   } else if (lb_type == 3) {
-    local_remote_comm_ratio =
-       adaptive_struct.comm_refine_info.local_remote_ratio;
+    remote_local_comm_ratio =
+       adaptive_struct.comm_refine_info.remote_local_ratio;
   }
 }
 
