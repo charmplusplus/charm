@@ -14,7 +14,7 @@
 // #define DEBUG_STREAMER
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
-#define CACHE_ARRAY_METADATA // only works for 1D array clients
+// #define CACHE_ARRAY_METADATA // only works for 1D array clients
 
 struct MeshLocation {
   int dimension; 
