@@ -3033,6 +3033,7 @@ XStr Entry::marshallMsg(void)
 XStr Entry::epStr(bool isForRedn)
 {
   XStr str;
+  if (isForRedn) str<<"redn_wrapper_";
   str << name << "_";
   if (param->isMessage()) {
     str<<param->getBaseName();
@@ -3040,7 +3041,6 @@ XStr Entry::epStr(bool isForRedn)
   }
   else if (param->isVoid()) str<<"void";
   else str<<"marshall"<<entryCount;
-  if (isForRedn) str<<"_redn_wrapper";
   return str;
 }
 
@@ -4294,7 +4294,7 @@ void Entry::genIndexDecls(XStr& str)
           << "\n      return epidx;"
           << "\n    }"
           << templateSpecLine
-          << "\n    static int " << name << "_redn_wrapper"
+          << "\n    static int " << "redn_wrapper_" << name
           << "(CkReductionMsg* impl_msg) { return " << epIdx(0, true) << "; }"
           << templateSpecLine
           << "\n    static void _" << epStr(true) << "(void* impl_msg, "
