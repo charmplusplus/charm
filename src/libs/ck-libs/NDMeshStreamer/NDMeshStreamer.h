@@ -138,6 +138,7 @@ private:
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
     CProxy_CompletionDetector detector_;
+    int prio_;
 
 #ifdef CACHE_LOCATIONS
     MeshLocation *cachedLocations_;
@@ -189,7 +190,8 @@ public:
     void insertData(void *dataItemHandle, int destinationPe);
     void associateCallback(int numContributors, 
 			   CkCallback startCb, CkCallback endCb, 
-			   CProxy_CompletionDetector detector);
+			   CProxy_CompletionDetector detector,
+			   int prio);
     void flushAllBuffers();
     void registerPeriodicProgressFunction();
 
@@ -358,12 +360,14 @@ void MeshStreamer<dtype>::storeMessage(
     if (dimension == 0) {
       // personalized messages do not require destination indices
       messageBuffers[bufferIndex] = 
-        new (0, bufferSize_) MeshStreamerMessage<dtype>();
+        new (0, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>();
     }
     else {
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, bufferSize_) MeshStreamerMessage<dtype>();
+        new (bufferSize_, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>();
     }
+    *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
+    CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
 #ifdef DEBUG_STREAMER
     CkAssert(messageBuffers[bufferIndex] != NULL);
 #endif
@@ -444,7 +448,9 @@ template <class dtype>
 void MeshStreamer<dtype>::associateCallback(
 			  int numContributors,
 			  CkCallback startCb, CkCallback endCb, 
-			  CProxy_CompletionDetector detector) {
+			  CProxy_CompletionDetector detector, 
+			  int prio) {
+  prio_ = prio;
   userCallback_ = endCb; 
   static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
 			   this->thisProxy);
@@ -534,6 +540,7 @@ void MeshStreamer<dtype>::flushLargestBuffer() {
 	envelope *env = UsrToEnv(destinationBuffer);
 	env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
 			  (bufferSize_ - destinationBuffer->numDataItems));
+	*((int *) env->getPrioPtr()) = prio_;
       }
       numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
@@ -578,7 +585,10 @@ void MeshStreamer<dtype>::flushAllBuffers() {
 	for (int k = 0; k < messageBuffers[j]->numDataItems; k++) {
 
 	  MeshStreamerMessage<dtype> *directMsg = 
-	    new (0, 1) MeshStreamerMessage<dtype>();
+	    new (0, 1, sizeof(int)) MeshStreamerMessage<dtype>();
+	  *(int *) CkPriorityPtr(directMsg) = prio_;
+	  CkSetQueueing(directMsg, CK_QUEUEING_IFIFO);
+
 #ifdef DEBUG_STREAMER
 	  CkAssert(directMsg != NULL);
 #endif

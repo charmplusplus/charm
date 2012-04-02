@@ -29,7 +29,8 @@ module NDMeshStreamer {
     entry void finish();
     entry void associateCallback(int numContributors, 
 				 CkCallback startCb, CkCallback endCb, 
-				 CProxy_CompletionDetector detector);
+				 CProxy_CompletionDetector detector,
+				 int prio);
   };
 
   template<class dtype>
