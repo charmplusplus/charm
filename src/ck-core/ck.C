@@ -2580,6 +2580,21 @@ int getCharmEnvelopeSize() {
   return sizeof(envelope);
 }
 
+extern "C"
+int isCharmEnvelope(void *msg) {
+      // best efford guessing if this is a charm envelope
+    envelope *e = (envelope *)msg;
+    int ep = e->getEpIdx();
+    if (ep<=0 || ep>=_entryTable.size()) return 0;
+#if CMK_SMP
+    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()+CkNumNodes()) return 0;
+#else
+    if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()) return 0;
+#endif
+    if (e->getMsgtype()<=0 || e->getMsgtype()>=LAST_CK_ENVELOPE_TYPE) return 0;
+    return 1;
+}
+
 
 #include "CkMarshall.def.h"
 
