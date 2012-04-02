@@ -1,6 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "charm++.h"
+#include <iostream>
+
 // A pup-friendly functor identical to return value of std::bind2nd(cmp(), threshold)
 template <typename cmp>
 class count {

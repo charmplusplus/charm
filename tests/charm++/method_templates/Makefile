@@ -6,7 +6,7 @@ CHARMBIN := $(CHARMHOME)/bin
 CHARMINC := $(CHARMHOME)/include
 
 # The relevant source files for this project
-HDR       = mylib.h
+HDR       = mylib.h utils.h
 SRC       = mylib.C pgm.C
 OBJ       = $(SRC:.C=.o)
 INTF      = mylib.ci pgm.ci   
@@ -19,7 +19,7 @@ ARGS      =
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
 CXXFLAGS += -language charm++ $(OPTS)
-CPPFLAGS +=
+CPPFLAGS += $(OPTS)
 LDFLAGS  +=
 EXEC      = ./charmrun
 EXECFLAGS = +p$(NP)

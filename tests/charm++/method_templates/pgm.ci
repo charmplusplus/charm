@@ -1,5 +1,7 @@
 mainmodule client  {
   extern module mylib;
+  include "utils.h";
+
   initproc register_instantiations();
   initproc register_reducers();
 
@@ -8,6 +10,7 @@ mainmodule client  {
 
     entry void startTest();
     entry[reductiontarget] void endTest();
+    entry[reductiontarget] void avgDone(avg avger);
   };
 
 }
