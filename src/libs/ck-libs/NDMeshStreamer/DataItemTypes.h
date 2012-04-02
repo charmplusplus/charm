@@ -1,10 +1,10 @@
 #ifndef DATA_ITEM_TYPES_H
 #define DATA_ITEM_TYPES_H
 
-template<class dtype>
+template<class dtype, class itype>
 class ArrayDataItem{
  public:
-  int arrayIndex;
+  itype arrayIndex;
   dtype dataItem;
 };
 

@@ -164,6 +164,7 @@ void ScotchRefineLB::work(LDStats *stats) {
   free(oldpemap);
   /** ============================== CLEANUP ================================ */
   ogr->convertDecisions(stats);
+  delete parr;
   delete ogr;
 }
 

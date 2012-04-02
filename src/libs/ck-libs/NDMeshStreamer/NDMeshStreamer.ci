@@ -18,6 +18,10 @@ module NDMeshStreamer {
     entry void receiveRedeliveredItem(dtype data);
   };
 
+  template<class dtype> array [3D] MeshStreamerArray3DClient {
+    entry void receiveRedeliveredItem(dtype data);
+  };
+
   template<class dtype> 
   group MeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
@@ -37,17 +41,16 @@ module NDMeshStreamer {
 	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
   };
 
-
-  template<class dtype>
-    group ArrayMeshStreamer : MeshStreamer<ArrayDataItem<dtype> > {
+  template<class dtype, class ctype, class itype>
+    group ArrayMeshStreamer : MeshStreamer<ArrayDataItem<dtype, itype> > {
     entry ArrayMeshStreamer(
 	  int totalBufferCapacity, int numDimensions, 
 	  int dimensionSizes[numDimensions],
-	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
+	  const ctype &clientProxy,
 	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
 
     entry void receiveArrayData(
-	       MeshStreamerMessage<ArrayDataItem<dtype> > *msg); 
+	       MeshStreamerMessage<ArrayDataItem<dtype, itype> > *msg); 
   };
 
 };

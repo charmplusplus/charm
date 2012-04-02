@@ -1,7 +1,6 @@
 /** \file RefineSwapLB.C
  *
- *  Written by Gengbin Zheng
- *  Updated by Abhinav Bhatele, 2010-12-09 to use ckgraph
+ *  Written by Harshitha Menon 
  *
  *  Status:
  *    -- Does not support pe_speed's currently
@@ -21,7 +20,8 @@
 using std::cout;
 using std::endl;
 
-CreateLBFunc_Def(RefineSwapLB, "always assign the heaviest obj onto lightest loaded processor.")
+CreateLBFunc_Def(RefineSwapLB,
+    "always assign the heaviest obj onto lightest loaded processor.")
 
 RefineSwapLB::RefineSwapLB(const CkLBOptions &opt): CentralLB(opt)
 {
@@ -73,16 +73,15 @@ inline void addObjToProc(ProcArray* parr, ObjGraph* ogr, std::vector<int>*
   pe_obj[pe_index].push_back(obj_index);
 
   // Update load
-  parr->procs[pe_index].setTotalLoad(parr->procs[pe_index].getTotalLoad() +
-      ogr->vertices[obj_index].getVertexLoad());
+  parr->procs[pe_index].totalLoad() += ogr->vertices[obj_index].getVertexLoad();
 }
 
 inline void removeObjFromProc(ProcArray* parr, ObjGraph* ogr, std::vector<int>*
     pe_obj, int pe_index, int arr_index) {
 
   // Update load
-  parr->procs[pe_index].setTotalLoad(parr->procs[pe_index].getTotalLoad() -
-      ogr->vertices[pe_obj[pe_index][arr_index]].getVertexLoad());
+  parr->procs[pe_index].totalLoad() -=
+      ogr->vertices[pe_obj[pe_index][arr_index]].getVertexLoad();
 
   // Remove from pe_obj
   pe_obj[pe_index].erase(pe_obj[pe_index].begin() + arr_index);
@@ -101,7 +100,6 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     std::vector<int>& min_pe_heap, std::vector<int>* pe_obj, int max_pe,
     double avg_load, double threshold) {
 
-  //cout << "Picked max pe " << max_pe << " (" << parr->procs[max_pe].getTotalLoad() << ")" << endl;
   int best_p, best_p_iter, arr_index;
   bool allocated = false;
   int pe_considered;
@@ -117,7 +115,8 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
       obj_considered = pe_obj[max_pe][i];
       pe_considered = min_pe_heap[j];
    
-      if (parr->procs[pe_considered].getTotalLoad() + ogr->vertices[obj_considered].getVertexLoad() < (avg_load + threshold)) {
+      if (parr->procs[pe_considered].getTotalLoad() +
+          ogr->vertices[obj_considered].getVertexLoad() < (avg_load + threshold)) {
     //    if (ogr->vertices[obj_considered].getVertexLoad() > best_size) {
           best_size = ogr->vertices[obj_considered].getVertexLoad();
           best_p = pe_considered;
@@ -135,11 +134,6 @@ bool refine(ProcArray* parr, ObjGraph* ogr, std::vector<int>& max_pe_heap,
     int best_obj = pe_obj[max_pe][arr_index];
     addObjToProc(parr, ogr, pe_obj, best_p, best_obj);
     removeObjFromProc(parr, ogr, pe_obj, max_pe, arr_index);
-
-   // std::cout << " Moving obj " << best_obj << " (" <<
-   //   ogr->vertices[best_obj].getVertexLoad() << ") from " << max_pe << " to " <<
-   //   best_p << " New load " << max_pe << ":" << parr->procs[max_pe].getTotalLoad()
-   //   << " " << best_p << ":" << parr->procs[best_p].getTotalLoad()<< std::endl; 
 
     // Update the max heap and min list
     if (parr->procs[max_pe].getTotalLoad() > (avg_load + threshold)) {
@@ -252,7 +246,6 @@ void RefineSwapLB::work(LDStats* stats)
 
 
   /** ============================= STRATEGY ================================ */
-  //parr->resetTotalLoad();
 
   if (_lb_args.debug()>1) 
     CkPrintf("[%d] In RefineSwapLB strategy\n",CkMyPe());
@@ -271,7 +264,6 @@ void RefineSwapLB::work(LDStats* stats)
 
 
   // Create a datastructure to store the objects in a processor
-//  CkPrintf("Object load\n");
   for (int i = 0; i < ogr->vertices.size(); i++) {
     pe_obj[ogr->vertices[i].getCurrentPe()].push_back(i);
 //    CkPrintf("%d pe %d: %lf\n", i, ogr->vertices[i].getCurrentPe(), ogr->vertices[i].getVertexLoad());
@@ -308,22 +300,6 @@ void RefineSwapLB::work(LDStats* stats)
         break;
       }
     }
-  }
-
-  //std::cout << "Overloaded Processor load " << avg_load << endl;
-  for (int p_index = 0; p_index < max_pe_heap.size(); p_index++) {
-    //std::cout << max_pe_heap[p_index] << ": " << parr->procs[max_pe_heap[p_index]].getTotalLoad() << std::endl;
-  }
-
-  //std::cout << "Underloaded Processor load"<< endl;
-  for (int p_index = 0; p_index < min_pe_heap.size(); p_index++) {
-    //std::cout << min_pe_heap[p_index] << ": " << parr->procs[min_pe_heap[p_index]].getTotalLoad() << std::endl;
-  }
-
-
-  //std::cout << "Processor load"<< endl;
-  for (int i = 0; i < parr->procs.size(); i++) {
-    //CkPrintf("%d : %lf\n", i, parr->procs[i].getTotalLoad());
   }
 
   /** ============================== CLEANUP ================================ */

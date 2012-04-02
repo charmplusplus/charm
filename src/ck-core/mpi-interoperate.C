@@ -62,12 +62,16 @@ void _libExitHandler(envelope *env)
 }
 
 void CharmLibInit(int peid, int numpes, int argc, char **argv){
+#if CMK_CONVERSE_MPI
 	//note CmiNumNodes and CmiMyNode should just be macros
 	_Cmi_numnodes = numpes;
 	_Cmi_mynode = peid;
 
 	CharmLibInterOperate = 1;
 	ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
+#else
+        CmiAbort("mpi-interoperate only supports MPI machine layer");
+#endif
 }
 
 #undef CkExit
