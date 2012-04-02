@@ -18,6 +18,7 @@ void register_instantiations()
     CkCallback bar;
     CkIndex_libArray::doSomething(comparator, foo, bar);
     CkIndex_libArray::doSomething(avger, foo, bar);
+    CkReductionTarget(pgm, acceptResults<avg>);
 };
 
 
@@ -51,14 +52,15 @@ class pgm : public CBase_pgm
             //arrProxy.doSomething( count< std::less<int> >(5) );
 
             // Setup a redn cb and start the parallel sum computation
-            CkCallback avgCB(CkReductionTarget(pgm, avgDone), thisProxy);
+            CkCallback avgCB(CkReductionTarget(pgm, acceptResults<avg>), thisProxy);
             arrProxy.doSomething(avg(), avgReducer, avgCB);
         }
 
-        void avgDone(avg avger) {
+        template <typename T>
+        void acceptResults(T op) {
             std::ostringstream out;
-            out << "[main] Summed all data in the library chare array:\n"
-                << avger
+            out << "[main] Applied operation to all data in library chare array in parallel:\n"
+                << op
                 << "\n";
             CkPrintf("%s", out.str().c_str());
             endTest();
@@ -74,5 +76,8 @@ class pgm : public CBase_pgm
         int nElements, nDone, nDatumsPerChare;
 };
 
+#define CK_TEMPLATES_ONLY
+#include "client.def.h"
+#undef CK_TEMPLATES_ONLY
 #include "client.def.h"
 

@@ -10,7 +10,8 @@ mainmodule client  {
 
     entry void startTest();
     entry[reductiontarget] void endTest();
-    entry[reductiontarget] void avgDone(avg avger);
+    template <typename T>
+    entry[reductiontarget] void acceptResults(T t);
   };
 
 }
