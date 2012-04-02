@@ -4297,7 +4297,7 @@ void Entry::genIndexDecls(XStr& str)
           << "\n    static int " << "redn_wrapper_" << name
           << "(CkReductionMsg* impl_msg) { return " << epIdx(0, true) << "; }"
           << templateSpecLine
-          << "\n    static void _" << epStr(true) << "(void* impl_msg, "
+          << "\n    static void _call_" << epStr(true) << "(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
 
@@ -4609,7 +4609,7 @@ void Entry::genDefs(XStr& str)
           XStr retStr; retStr<<retType;
           str << makeDecl(retStr);
           //str << retType << " " << indexName(); //makeDecl(retStr, 1)
-          str << "::_" << epStr(true) << "(void* impl_msg, "
+          str << "::_call_" << epStr(true) << "(void* impl_msg, "
               << container->baseName() << "* impl_obj)\n{\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
@@ -4636,7 +4636,7 @@ void Entry::genDefs(XStr& str)
     str << "\n// Redn wrapper registration function"
         << "\n" << makeDecl("int") << "::reg_"<< epStr(true) <<"() {"
         << "\n  return CkRegisterEp(\""  << epStr(true) << "(CkReductionMsg* impl_msg)\","
-        << "\n        (CkCallFnPtr)_" << epStr(true) << ", CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n        (CkCallFnPtr)_call_" << epStr(true) << ", CMessage_CkReductionMsg::__idx, __idx, 0);"
         << "\n}\n\n";
   }
 
