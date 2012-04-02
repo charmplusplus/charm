@@ -4,6 +4,7 @@
 #define CMK_AMD64                                          1
 #define CMK_64BIT                                          1
 
+#undef CMK_CCS_AVAILABLE
 #define CMK_CCS_AVAILABLE                                  0
 
 #define CMK_CMIDELIVERS_USE_COMMON_CODE                    1
