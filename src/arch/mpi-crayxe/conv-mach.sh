@@ -5,6 +5,7 @@ CMK_BUILD_CRAY=1
 
 PGCC=`CC -V 2>&1 | grep pgCC`
 ICPC=`CC -V 2>&1 | grep Intel`
+GNU=`CC -V 2>&1 | grep 'g++'`
 
 CMK_CPP_CHARM="/lib/cpp -P"
 CMK_CPP_C="cc -E $CMK_DEFS "
@@ -53,6 +54,11 @@ CMK_QT="generic64"
 # for F90 compiler
 CMK_CF77="ftn "
 CMK_CF90="ftn "
+if test -n "$GNU"
+then
+    CMK_CF77="$CMK_CF77 -ffree-line-length-none"
+    CMK_CF90="$CMK_CF90 -ffree-line-length-none"
+fi
 CMK_F90LIBS=""
 CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
