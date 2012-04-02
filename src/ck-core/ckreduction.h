@@ -201,7 +201,7 @@ private:
 	//Don't instantiate a CkReduction object-- it's just a namespace.
 	CkReduction();
 };
-
+PUPbytes(CkReduction::reducerType)
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
