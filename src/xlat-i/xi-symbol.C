@@ -3030,7 +3030,7 @@ XStr Entry::marshallMsg(void)
   return ret;
 }
 
-XStr Entry::epStr(void)
+XStr Entry::epStr(bool isForRedn)
 {
   XStr str;
   str << name << "_";
@@ -3040,10 +3040,11 @@ XStr Entry::epStr(void)
   }
   else if (param->isVoid()) str<<"void";
   else str<<"marshall"<<entryCount;
+  if (isForRedn) str<<"_redn_wrapper";
   return str;
 }
 
-XStr Entry::epIdx(int fromProxy)
+XStr Entry::epIdx(int fromProxy, bool isForRedn)
 {
   XStr str;
   if (fromProxy) {
@@ -3052,7 +3053,7 @@ XStr Entry::epIdx(int fromProxy)
     if (tspec)
       str << "template ";
   }
-  str << "idx_" << epStr();
+  str << "idx_" << epStr(isForRedn);
   if (tspec) {
     str << "< ";
     tspec->genShort(str);
@@ -3062,12 +3063,12 @@ XStr Entry::epIdx(int fromProxy)
   return str;
 }
 
-XStr Entry::epRegFn(int fromProxy)
+XStr Entry::epRegFn(int fromProxy, bool isForRedn)
 {
   XStr str;
   if (fromProxy)
     str << indexName() << "::";
-  str << "reg_" << epStr();
+  str << "reg_" << epStr(isForRedn);
   if (tspec) {
     str << "< ";
     tspec->genShort(str);
@@ -4285,18 +4286,18 @@ void Entry::genIndexDecls(XStr& str)
   if (isReductionTarget()) {
       str << "\n    // Entry point registration at startup"
           << templateSpecLine
-          << "\n    static int reg_"<<name<<"_redn_wrapper();" ///< @note: Should this be generated as private?
+          << "\n    static int reg_"<< epStr(true) <<"();" ///< @note: Should this be generated as private?
           << "\n    // Entry point index lookup"
           << templateSpecLine
-          << "\n    inline static int idx_" << name << "_redn_wrapper() {"
-          << "\n      static int epidx = reg_"<<name<<"_redn_wrapper();"
+          << "\n    inline static int idx_" << epStr(true) << "() {"
+          << "\n      static int epidx = "<< epRegFn(0, true) <<";"
           << "\n      return epidx;"
           << "\n    }"
           << templateSpecLine
           << "\n    static int " << name << "_redn_wrapper"
-          << "(CkReductionMsg* impl_msg) { return idx_" << name << "_redn_wrapper(); }"
+          << "(CkReductionMsg* impl_msg) { return " << epIdx(0, true) << "; }"
           << templateSpecLine
-          << "\n    static void _" << name << "_redn_wrapper(void* impl_msg, "
+          << "\n    static void _" << epStr(true) << "(void* impl_msg, "
           << container->baseName() <<"* impl_obj);\n";
   }
 
@@ -4608,7 +4609,7 @@ void Entry::genDefs(XStr& str)
           XStr retStr; retStr<<retType;
           str << makeDecl(retStr);
           //str << retType << " " << indexName(); //makeDecl(retStr, 1)
-          str << "::_" << name << "_redn_wrapper(void* impl_msg, "
+          str << "::_" << epStr(true) << "(void* impl_msg, "
               << container->baseName() << "* impl_obj)\n{\n"
               << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
           XStr precall;
@@ -4633,10 +4634,9 @@ void Entry::genDefs(XStr& str)
   if (isReductionTarget())
   {
     str << "\n// Redn wrapper registration function"
-        << "\n" << makeDecl("int") << "::reg_"<< name <<"_redn_wrapper() {"
-        << "\n  return CkRegisterEp(\""  << name << "_redn_wrapper(CkReductionMsg* impl_msg)\","
-        << "\n        (CkCallFnPtr)_" << name << "_redn_wrapper,"
-        << " CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n" << makeDecl("int") << "::reg_"<< epStr(true) <<"() {"
+        << "\n  return CkRegisterEp(\""  << epStr(true) << "(CkReductionMsg* impl_msg)\","
+        << "\n        (CkCallFnPtr)_" << epStr(true) << ", CMessage_CkReductionMsg::__idx, __idx, 0);"
         << "\n}\n\n";
   }
 
@@ -4831,7 +4831,7 @@ void Entry::genReg(XStr& str)
   str << "  // REG: "<<*this;
   str << "  " << epIdx(0) << ";\n";
   if (isReductionTarget())
-    str << "  idx_" << name << "_redn_wrapper();\n";
+    str << "  " << epIdx(0, true) << ";\n";
   if (isConstructor()) {
     if(container->isMainChare()&&!(attribs&SMIGRATE))
       str << "  CkRegisterMainChare(__idx, "<<epIdx(0)<<");\n";

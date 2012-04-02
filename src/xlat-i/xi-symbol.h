@@ -924,9 +924,9 @@ class Entry : public Member {
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
 
-    XStr epStr(void);
-    XStr epIdx(int fromProxy=1);
-    XStr epRegFn(int fromProxy=1);
+    XStr epStr(bool isForRedn = false);
+    XStr epIdx(int fromProxy=1, bool isForRedn = false);
+    XStr epRegFn(int fromProxy=1, bool isForRedn = false);
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
