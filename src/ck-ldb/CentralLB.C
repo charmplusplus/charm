@@ -764,9 +764,13 @@ extern int restarted;
 void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+	ProcessReceiveMigration((CkReductionMsg*)NULL);
+#else
   CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
                   thisProxy);
   contribute(0, NULL, CkReduction::max_int, cb);
+#endif
 }
 
 void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
