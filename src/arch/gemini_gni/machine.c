@@ -478,7 +478,7 @@ typedef struct  rmda_msg
 
 
 #if CMK_SMP
-#define SMP_LOCKS                       0
+#define SMP_LOCKS               1
 #define ONE_SEND_QUEUE                  0
 PCQueue sendRdmaBuf;
 typedef struct  msg_list_index
@@ -1413,7 +1413,11 @@ static void setup_smsg_connection(int destNode)
     pd->local_addr      = (uint64_t) smsg_attr;
     pd->remote_addr     = (uint64_t)&((((gni_smsg_attr_t*)(smsg_connection_vec[destNode].addr))[myrank]));
     pd->remote_mem_hndl = smsg_connection_vec[destNode].mdh;
+#if MULTI_THREAD_SEND
     pd->src_cq_hndl     = rdma_tx_cqh;
+#else
+    pd->src_cq_hndl     = 0;
+#endif
     pd->rdma_mode       = 0;
     status = GNI_PostFma(ep_hndl_array[destNode],  pd);
     print_smsg_attr(smsg_attr);
@@ -1884,7 +1888,7 @@ static      int         event_SetupConnect = 111;
 static      int         event_PumpSmsg = 222 ;
 static      int         event_PumpTransaction = 333;
 static      int         event_PumpRdmaTransaction = 444;
-static      int         event_SendBufferSmsg = 444;
+static      int         event_SendBufferSmsg = 484;
 static      int         event_SendFmaRdmaMsg = 555;
 static      int         event_AdvanceCommunication = 666;
 
@@ -1892,8 +1896,8 @@ static void registerUserTraceEvents() {
 #if CMI_MPI_TRACE_USEREVENTS && CMK_TRACE_ENABLED && !CMK_TRACE_IN_CHARM
     event_SetupConnect = traceRegisterUserEvent("setting up connections", -1 );
     event_PumpSmsg = traceRegisterUserEvent("Pump network small msgs", -1);
-    event_PumpTransaction = traceRegisterUserEvent("Pump FMA local transaction" , -1);
-    event_PumpRdmaTransaction = traceRegisterUserEvent("Pump RDMA local transaction" , -1);
+    event_PumpTransaction = traceRegisterUserEvent("Pump FMA/RDMA local transaction" , -1);
+    event_PumpRdmaTransaction = traceRegisterUserEvent("Pump RDMA remote event" , -1);
     event_SendBufferSmsg = traceRegisterUserEvent("Sending buffered small msgs", -1);
     event_SendFmaRdmaMsg = traceRegisterUserEvent("Sending buffered fma/rdma transactions", -1);
     event_AdvanceCommunication = traceRegisterUserEvent("Worker thread in sending/receiving", -1);
@@ -2037,7 +2041,9 @@ void LrtsPostNonLocal(){
 #if CMK_WORKER_SINGLE_TASK
     if (CmiMyRank() % 6 == 2)
 #endif
+#if MULTI_THREAD_SEND
     PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
+#endif
 
 #if REMOTE_EVENT
 #if CMK_WORKER_SINGLE_TASK
@@ -2484,7 +2490,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->local_addr      = (uint64_t) msg_data;
     pd->remote_addr     = request_msg->source_addr + offset;
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
+#if MULTI_THREAD_SEND
     pd->src_cq_hndl     = rdma_tx_cqh;
+#else
+    pd->src_cq_hndl     = 0; 
+#endif
     pd->rdma_mode       = 0;
     pd->amo_cmd         = 0;
 #if CMI_EXERT_RECV_RDMA_CAP
@@ -2584,7 +2594,11 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id )
     pd->local_addr      = (uint64_t) msg_data;
     pd->remote_addr     = request_msg->source_addr;
     pd->remote_mem_hndl = request_msg->source_mem_hndl;
+#if MULTI_THREAD_SEND
     pd->src_cq_hndl     = rdma_tx_cqh;
+#else
+    pd->src_cq_hndl     = 0;
+#endif
     pd->rdma_mode       = 0;
     pd->amo_cmd         = 0;
 
@@ -3326,6 +3340,9 @@ void LrtsAdvanceCommunication(int whileidle)
     startT = CmiWallTimer();
 #endif
     PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
+#if MULTI_THREAD_SEND
+    STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(PumpLocalTransactions(rdma_tx_cqh,  rdma_tx_cq_lock));
+#endif
     //MACHSTATE(8, "after PumpLocalTransactions\n") ; 
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
@@ -3335,7 +3352,6 @@ void LrtsAdvanceCommunication(int whileidle)
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
 #endif
-    STATS_PUMPLOCALTRANSACTIONS_RDMA_TIME(PumpLocalTransactions(rdma_tx_cqh,  rdma_tx_cq_lock));
 
 #if CQWRITE
     PumpCqWriteTransactions();
@@ -3788,9 +3804,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     /* the third parameter : The number of events the NIC allows before generating an interrupt. Setting this parameter to zero results in interrupt delivery with every event. When using this parameter, the mode parameter must be set to GNI_CQ_BLOCKING*/
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &default_tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate (tx)", status);
-    
+#if MULTI_THREAD_SEND
     status = GNI_CqCreate(nic_hndl, LOCAL_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &rdma_tx_cqh);
     GNI_RC_CHECK("GNI_CqCreate RDMA (tx)", status);
+#endif
     /* create the destination completion queue for receiving micro-messages, make this queue considerably larger than the number of transfers */
 
     status = GNI_CqCreate(nic_hndl, REMOTE_QUEUE_ENTRIES, 0, GNI_CQ_NOBLOCK, NULL, NULL, &smsg_rx_cqh);
@@ -4072,7 +4089,9 @@ void LrtsDrainResources()
             PumpDatagramConnection();
         PumpNetworkSmsg();
         PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
+#if MULTI_THREAD_SEND
         PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
+#endif
 #if REMOTE_EVENT
         PumpRemoteTransactions();
 #endif
