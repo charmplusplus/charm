@@ -150,7 +150,7 @@ void CommAwareRefineLB::work(LDStats* stats)
   /** ========================== INITIALIZATION ============================= */
   ProcArray *parr = new ProcArray(stats);       // Processor Array
   ObjGraph *ogr = new ObjGraph(stats);          // Object Graph
-  int vertexid_pe[ogr->vertices.size()]; // Stores the cur pe of obj
+  std::vector<int> vertexid_pe(ogr->vertices.size()); // Stores the cur pe of obj
   double avgload = parr->getAverageLoad();      // Average load of processors
 
   // Sets to false if it is overloaded, else to true
