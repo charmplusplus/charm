@@ -4,20 +4,23 @@
 #include "charm++.h"
 #include <iostream>
 
+typedef double libdtype;
+
 // A pup-friendly functor identical to return value of std::bind2nd(cmp(), threshold)
 template <typename cmp>
 class count {
     private:
-        int threshold, num;
+        libdtype threshold;
+        int num;
         cmp c;
     public:
         //
-        count(const int _t=0): threshold(_t), num(0) {}
+        count(const libdtype _t=0): threshold(_t), num(0) {}
 
         // Operate on an input element
-        inline void operator() (int* first, int *last)
+        inline void operator() (libdtype* first, libdtype *last)
         {
-            for (int *ptr = first; ptr != last; ptr++)
+            for (libdtype *ptr = first; ptr != last; ptr++)
                 if (c(*ptr, threshold)) num++;
         }
 
@@ -52,15 +55,16 @@ class count {
 // Functor that computes the sum and avg of a sequence of integers
 class avg {
     private:
-        int sum, num;
+        libdtype sum;
+        int num;
     public:
         avg(): sum(0), num(0) {}
 
         // Operate on an input element
-        inline void operator() (int* first, int *last)
+        inline void operator() (libdtype* first, libdtype *last)
         {
             num += std::distance(first, last);
-            for (int *ptr = first; ptr != last; ptr++)
+            for (libdtype *ptr = first; ptr != last; ptr++)
                 sum += *ptr;
         }
 

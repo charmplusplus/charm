@@ -2,17 +2,21 @@
 #define MYLIB_H
 
 #include "mylib.decl.h"
+#include <cstdlib>
 
 extern int moduleRo;
+
+typedef double dtype;
 
 class libArray: public CBase_libArray
 {
     public:
         libArray(int _arrSize): arrSize(_arrSize), myData(NULL)
         {
-            myData = new int[arrSize];
+            std::srand(thisIndex);
+            myData = new dtype[arrSize];
             for (int i = 0; i < arrSize; i++)
-                myData[i] = thisIndex * arrSize + i;
+                myData[i] = (dtype)std::rand() / RAND_MAX;
         }
 
         libArray(CkMigrateMessage *msg) {}
@@ -32,7 +36,7 @@ class libArray: public CBase_libArray
 
     private:
         int arrSize;
-        int *myData;
+        dtype *myData;
 };
 
 #endif // MYLIB_H
