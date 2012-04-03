@@ -2584,8 +2584,10 @@ extern "C"
 int isCharmEnvelope(void *msg) {
       // best efford guessing if this is a charm envelope
     envelope *e = (envelope *)msg;
-    int ep = e->getEpIdx();
-    if (ep<=0 || ep>=_entryTable.size()) return 0;
+    if (SIZEFIELD(msg) < sizeof(envelope)) return 0;
+    if (SIZEFIELD(msg) < e->getTotalsize()) return 0;
+    if (e->getTotalsize() < sizeof(envelope)) return 0;
+    if (e->getEpIdx()<=0 || e->getEpIdx()>=_entryTable.size()) return 0;
 #if CMK_SMP
     if (e->getSrcPe()<0 || e->getSrcPe()>=CkNumPes()+CkNumNodes()) return 0;
 #else
