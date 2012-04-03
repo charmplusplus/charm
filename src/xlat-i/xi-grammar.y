@@ -213,36 +213,36 @@ ConstructList	: /* Empty */
 		;
 
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
-		{ if($3) $3->setExtern($1); $$ = $3; }
-                | NAMESPACE Name '{' ConstructList '}'
-                { $$ = new Scope($2, $4); }
-                | USING NAMESPACE QualName ';'
-                { $$ = new UsingScope($3, false); }
-                | USING QualName ';'
-                { $$ = new UsingScope($2, true); }
-		| OptExtern Module
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NonEntryMember 
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Message ';'
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Chare
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Group
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NodeGroup
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Array
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Template
-		{ $2->setExtern($1); $$ = $2; }
-		| HashIFComment
-		{ $$ = NULL; }
-		| HashIFDefComment
-		{ $$ = NULL; }
-                | AccelBlock
-                { $$ = $1; }
-		;
+        { if($3) $3->setExtern($1); $$ = $3; }
+        | NAMESPACE Name '{' ConstructList '}'
+        { $$ = new Scope($2, $4); }
+        | USING NAMESPACE QualName ';'
+        { $$ = new UsingScope($3, false); }
+        | USING QualName ';'
+        { $$ = new UsingScope($2, true); }
+        | OptExtern Module
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern NonEntryMember
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Message ';'
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Chare
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Group
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern NodeGroup
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Array
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Template
+        { $2->setExtern($1); $$ = $2; }
+        | HashIFComment
+        { $$ = NULL; }
+        | HashIFDefComment
+        { $$ = NULL; }
+        | AccelBlock
+        { $$ = $1; }
+        ;
 
 TParam		: Type
 		{ $$ = new TParamType($1); }
