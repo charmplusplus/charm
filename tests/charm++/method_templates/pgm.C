@@ -19,6 +19,7 @@ void register_instantiations()
     CkIndex_libArray::doSomething(comparator, foo, bar);
     CkIndex_libArray::doSomething(avger, foo, bar);
     CkReductionTarget(pgm, acceptResults<avg>);
+    CkReductionTarget(pgm, acceptResults< count< std::less<int> > >);
 };
 
 
@@ -49,11 +50,13 @@ class pgm : public CBase_pgm
         
         void startTest() {
             // Run the tests
-            //arrProxy.doSomething( count< std::less<int> >(5) );
-
-            // Setup a redn cb and start the parallel sum computation
+            // Setup a redn cb and start the parallel sum computation of sum and avg
             CkCallback avgCB(CkReductionTarget(pgm, acceptResults<avg>), thisProxy);
             arrProxy.doSomething(avg(), avgReducer, avgCB);
+
+            // Setup a redn cb and start the parallel count of num elements less than given threshold
+            CkCallback cntCB(CkReductionTarget(pgm, acceptResults< count< std::less<int> > >), thisProxy);
+            arrProxy.doSomething( count< std::less<int> >(nElements*nDatumsPerChare/2), countReducer, cntCB );
         }
 
         template <typename T>
@@ -63,11 +66,7 @@ class pgm : public CBase_pgm
                 << op
                 << "\n";
             CkPrintf("%s", out.str().c_str());
-            endTest();
-        }
-
-        void endTest() {
-            if (++nDone == 1)
+            if (++nDone == 2)
                 CkExit();
         }
 

@@ -9,7 +9,6 @@ mainmodule client  {
     entry pgm (CkArgMsg *m);
 
     entry void startTest();
-    entry[reductiontarget] void endTest();
     template <typename T>
     entry[reductiontarget] void acceptResults(T t);
   };
