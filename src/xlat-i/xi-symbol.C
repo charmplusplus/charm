@@ -4265,6 +4265,18 @@ void Entry::genIndexDecls(XStr& str)
       << "\n      return epidx;"
       << "\n    }\n";
 
+  if (!isConstructor()) {
+    str << templateSpecLine
+        << "\n    inline static int idx_" << name << "("
+        << retType
+        << " (" << container->baseName() << "::*)(";
+    if (param)
+      param->print(str);
+    str << ") ) {"
+        << "\n      return " << epIdx(0) << ";"
+        << "\n    }\n\n";
+  }
+
   // DMK - Accel Support - Also declare the function index for the Offload API call
   #if CMK_CELL != 0
     if (isAccel()) {
