@@ -3033,14 +3033,18 @@ XStr Entry::marshallMsg(void)
 XStr Entry::epStr(bool isForRedn)
 {
   XStr str;
-  if (isForRedn) str<<"redn_wrapper_";
+  if (isForRedn)
+    str<<"redn_wrapper_";
   str << name << "_";
+
   if (param->isMessage()) {
     str<<param->getBaseName();
     str.replace(':', '_');
   }
-  else if (param->isVoid()) str<<"void";
-  else str<<"marshall"<<entryCount;
+  else if (param->isVoid())
+    str<<"void";
+  else
+    str<<"marshall"<<entryCount;
   return str;
 }
 
