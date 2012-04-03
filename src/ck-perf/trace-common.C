@@ -164,7 +164,7 @@ static void traceCommonInit(char **argv)
 }
 
 /** Write out the common parts of the .sts file. */
-extern void traceWriteSTS(FILE *stsfp,int nUserEvents) {
+void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   fprintf(stsfp, "MACHINE %s\n",CMK_MACHINE_NAME);
 #if CMK_SMP_TRACE_COMMTHREAD
   //Assuming there's only 1 comm thread now! --Chao Mei

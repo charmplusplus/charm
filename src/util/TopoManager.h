@@ -59,7 +59,7 @@ class TopoManager {
     void sortRanksByHops(int pe, int *pes, int *idx, int n);
     int pickClosestRank(int mype, int *pes, int n);
     int areNeighbors(int pe1, int pe2, int pe3, int distance);
-		void printAllocation();
+    void printAllocation(FILE *fp);
 
     /** The next 5 functions are only there for backward compatibility
     and should not be used */
