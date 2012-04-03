@@ -950,13 +950,6 @@ void _initCharm(int unused_argc, char **argv)
 { 
 	int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
-	if(CmiMyNode() == 0 && CmiMyRank() == 0) {
-    if(CmiGetArgFlag(argv, "+printTopo")) {
-			TopoManager tmgr;
-			tmgr.printAllocation();
-		}
-	}
-
 	DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
 
 	CkpvInitialize(size_t *, _offsets);
@@ -1258,6 +1251,14 @@ void _initCharm(int unused_argc, char **argv)
         }
         CmiInitCPUTopology(argv);
     }
+
+	if(CmiMyPe() == 0) {
+            if(CmiGetArgFlag(argv, "+printTopo")) {
+		TopoManager tmgr;
+		tmgr.printAllocation(stdout);
+	    }
+	}
+
 
 #if CMK_USE_PXSHM && CMK_CRAYXE && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized

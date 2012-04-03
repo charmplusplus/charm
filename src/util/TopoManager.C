@@ -414,15 +414,16 @@ int TopoManager::partition(int pe, int *pes, int *idx, int left, int right) {
   }
 }
 
-void TopoManager::printAllocation() 
+void TopoManager::printAllocation(FILE *fp)
 {
 	int i,x,y,z,t;
-	printf("Printing topology Info-\n");
-	printf("NumPes -  %d\n",numPes);
-	printf("Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
-	printf("Rank - x y z t\n");
+	fprintf(fp, "Topology Info-\n");
+	fprintf(fp, "NumPes -  %d\n", numPes);
+	fprintf(fp, "Dims - %d %d %d\n",dimNX,dimNY,dimNZ);
+	fprintf(fp, "Rank - x y z t\n");
 	for(i=0; i<numPes; i++) {
 		rankToCoordinates(i,x,y,z,t);
-		printf("%d - %d %d %d %d\n",i,x,y,z,t);
+		fprintf(fp, "%d - %d %d %d %d\n",i,x,y,z,t);
 	}
 }
+

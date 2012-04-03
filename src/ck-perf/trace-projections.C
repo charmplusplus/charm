@@ -8,6 +8,7 @@
 #include "charm++.h"
 #include "trace-projections.h"
 #include "trace-projectionsBOC.h"
+#include "TopoManager.h"
 
 #if DEBUG_PROJ
 #define DEBUGF(...) CkPrintf(__VA_ARGS__)
@@ -379,6 +380,23 @@ void LogPool::createSts(const char *fix)
   delete[] fname;
 }  
 
+void LogPool::createTopo(const char *fix)
+{
+  CkAssert(CkMyPe() == 0);
+  // create the topo file
+  char *fname = new char[strlen(CkpvAccess(traceRoot))+strlen(fix)+strlen(".topo")+2];
+  sprintf(fname, "%s%s.topo", CkpvAccess(traceRoot), fix);
+  do
+    {
+      topofp = fopen(fname, "w");
+    } while (!stsfp && (errno == EINTR || errno == EMFILE));
+  if(stsfp==0){
+    CmiPrintf("Cannot open projections topo file for writing due to %s\n", strerror(errno));
+    CmiAbort("Error!!\n");
+  }
+  delete[] fname;
+}  
+
 void LogPool::createRC()
 {
   // create the projections rc file.
@@ -594,6 +612,12 @@ void LogPool::writeRC(void)
   fclose(rcfp);
 }
 
+void LogPool::writeTopo(void)
+{
+  TopoManager tmgr;
+  tmgr.printAllocation(topofp);
+  fclose(topofp);
+}
 
 #if CMK_BIGSIM_CHARM
 static void updateProjLog(void *data, double t, double recvT, void *ptr)
@@ -1021,6 +1045,7 @@ TraceProjections::TraceProjections(char **argv):
   if (CkMyPe() == 0) {
     _logPool->createSts();
     _logPool->createRC();
+    _logPool->createTopo();
   }
   funcCount=1;
 
@@ -1160,6 +1185,7 @@ void TraceProjections::closeTrace() {
     // CkPrintf("Pe 0 will now write sts and projrc files\n");
     _logPool->writeSts(this);
     _logPool->writeRC();
+    _logPool->writeTopo();
     // CkPrintf("Pe 0 has now written sts and projrc files\n");
   }
   delete _logPool;	 // will write logs to file
