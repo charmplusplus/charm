@@ -9,6 +9,7 @@
 #include <functional>
 #include <iterator>
 
+typedef count< std::less<libdtype> > cntType;
 // Temporary initproc to register the instantiated EPs
 void register_instantiations()
 {
@@ -21,7 +22,7 @@ void register_instantiations()
     CkIndex_libArray::doSomething(comparator, foo, bar);
     CkIndex_libArray::doSomething(avger, foo, bar);
     CkReductionTarget(pgm, acceptResults<avg>);
-    CkReductionTarget(pgm, acceptResults< count< std::less<libdtype> > >);
+    CkReductionTarget(pgm, acceptResults< cntType >);
 };
 
 
@@ -32,7 +33,7 @@ CkReduction::reducerType avgReducer;
 // Register reducer functions
 void register_reducers()
 {
-    countReducer = CkReduction::addReducer(count< std::less<libdtype> >::reduce_count);
+    countReducer = CkReduction::addReducer(cntType::reduce_count);
     avgReducer   = CkReduction::addReducer(avg::reduce_avg);
 }
 
@@ -58,8 +59,8 @@ class pgm : public CBase_pgm
             arrProxy.doSomething(avg(), avgReducer, avgCB);
 
             // Setup a redn cb and start the parallel count of num elements less than given threshold
-            CkCallback cntCB(CkReductionTarget(pgm, acceptResults< count< std::less<libdtype> > >), thisProxy);
-            arrProxy.doSomething( count< std::less<libdtype> >(0.5), countReducer, cntCB );
+            CkCallback cntCB(CkReductionTarget(pgm, acceptResults< cntType >), thisProxy);
+            arrProxy.doSomething( cntType(0.5), countReducer, cntCB );
         }
 
         template <typename T>
