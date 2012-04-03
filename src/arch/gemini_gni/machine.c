@@ -69,7 +69,7 @@
 #define CMI_PUMPNETWORKSMSG_CAP    0
 
 #if CMI_SENDBUFFERSMSG_CAP
-int     SendBufferMsg_cap  =10;
+int     SendBufferMsg_cap  = 10;
 #endif
 
 #if CMI_PUMPNETWORKSMSG_CAP
@@ -77,13 +77,13 @@ int     PumpNetworkSmsg_cap = 10;
 #endif
 
 #if CMI_EXERT_SEND_LARGE_CAP
-int SEND_large_cap = 100;
-int SEND_large_pending = 0;
+static int SEND_large_cap = 100;
+static int SEND_large_pending = 0;
 #endif
 
 #if CMI_EXERT_RECV_RDMA_CAP
-int   RDMA_cap =   100;
-int   RDMA_pending = 0;
+static int   RDMA_cap =   100;
+static int   RDMA_pending = 0;
 #endif
 
 #define USE_LRTS_MEMPOOL                  1
@@ -478,7 +478,7 @@ typedef struct  rmda_msg
 
 
 #if CMK_SMP
-#define SMP_LOCKS               1
+#define SMP_LOCKS                       1
 #define ONE_SEND_QUEUE                  0
 PCQueue sendRdmaBuf;
 typedef struct  msg_list_index
@@ -2038,10 +2038,10 @@ void LrtsPostNonLocal(){
 #endif
     PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
 
+#if MULTI_THREAD_SEND
 #if CMK_WORKER_SINGLE_TASK
     if (CmiMyRank() % 6 == 2)
 #endif
-#if MULTI_THREAD_SEND
     PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
 #endif
 
@@ -3100,7 +3100,77 @@ static void  SendRdmaMsg()
 #endif
 }
 
+static inline gni_return_t _sendOneBufferedSmsg(SMSG_QUEUE *queue, MSG_LIST *ptr)
+{
+    CONTROL_MSG         *control_msg_tmp;
+    gni_return_t        status = GNI_RC_ERROR_RESOURCE;
+
+    MACHSTATE5(8, "noempty-smsg  %d (%d,%d,%d) tag=%d \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size, ptr->tag); 
+    if (useDynamicSMSG && smsg_connected_flag[ptr->destNode] != 2) {   
+            /* connection not exists yet */
+#if CMK_SMP
+            /* non-smp case, connect is issued in send_smsg_message */
+        if (smsg_connected_flag[ptr->destNode] == 0)
+            connect_to(ptr->destNode); 
+#endif
+    }
+    else
+    switch(ptr->tag)
+    {
+    case SMALL_DATA_TAG:
+        status = send_smsg_message(queue, ptr->destNode,  ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+        if(status == GNI_RC_SUCCESS)
+        {
+            CmiFree(ptr->msg);
+        }
+        break;
+    case LMSG_INIT_TAG:
+        control_msg_tmp = (CONTROL_MSG*)ptr->msg;
+        status = send_large_messages(queue, ptr->destNode, control_msg_tmp, 1, ptr);
+        break;
+#if !REMOTE_EVENT && !CQWRITE
+    case ACK_TAG:
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+        if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
+        break;
+#endif
+    case BIG_MSG_TAG:
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+        if(status == GNI_RC_SUCCESS)
+        {
+            FreeControlMsg((CONTROL_MSG*)ptr->msg);
+        }
+        break;
+#if CMK_PERSISTENT_COMM && !REMOTE_EVENT && !CQWRITE 
+    case PUT_DONE_TAG:
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
+        if(status == GNI_RC_SUCCESS)
+        {
+            FreeControlMsg((CONTROL_MSG*)ptr->msg);
+        }
+        break;
+#endif
+#if CMK_DIRECT
+    case DIRECT_PUT_DONE_TAG:
+        status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr);  
+        if(status == GNI_RC_SUCCESS)
+        {
+            free((CMK_DIRECT_HEADER*)ptr->msg);
+        }
+        break;
+#endif
+    default:
+        printf("Weird tag\n");
+        CmiAbort("should not happen\n");
+    }       // end switch
+    return status;
+}
+
 // return 1 if all messages are sent
+#if CMK_SMP
+
+#if ONE_SEND_QUEUE
+
 static int SendBufferMsg(SMSG_QUEUE *queue)
 {
     MSG_LIST            *ptr, *tmp_ptr, *pre=0, *current_head;
@@ -3113,9 +3183,7 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #if     CMI_SENDBUFFERSMSG_CAP
     int                 sent_length = 0;
 #endif
-#if CMK_SMP
     int          index = 0;
-#if ONE_SEND_QUEUE
     memset(destpe_avail, 0, mysize * sizeof(char));
     for (index=0; index<1; index++)
     {
@@ -3130,11 +3198,47 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 PCQueuePush(queue->sendMsgBuf, (char*)ptr);
                 continue;
             }
-#else
+            status = _sendOneBufferedSmsg(queue, ptr);
+#if CMI_SENDBUFFERSMSG_CAP
+            sent_length++;
+#endif
+            if(status == GNI_RC_SUCCESS)
+            {
+#if PRINT_SYH
+                buffered_smsg_counter--;
+                printf("[%d==>%d] buffered smsg sending done\n", myrank, ptr->destNode);
+#endif
+                FreeMsgList(ptr);
+            }else {
+                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
+                done = 0;
+                if(status == GNI_RC_ERROR_RESOURCE)
+                {
+                    destpe_avail[ptr->destNode] = 1;
+                }
+            } 
+        } //end while
+    }   // end pooling for all cores
+    return done;
+}
+
+#else   /*  ! ONE_SEND_QUEUE  */
+
+static int SendBufferMsg(SMSG_QUEUE *queue)
+{
+    MSG_LIST            *ptr;
+    gni_return_t        status;
+    int                 done = 1;
+#if     CMI_SENDBUFFERSMSG_CAP
+    int                 sent_length = 0;
+#endif
+    static int          index = -1;
+    int idx;
 #if SMP_LOCKS
     int nonempty = PCQueueLength(nonEmptyQueues);
-    for(index =0; index<nonempty; index++) 
+    for(idx =0; idx<nonempty; idx++) 
     {
+        index++;  if (index >= nonempty) index = 0;
 #if CMI_SENDBUFFERSMSG_CAP
         if ( sent_length >= SendBufferMsg_cap) { done = 0; return done;}
 #endif
@@ -3142,14 +3246,15 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
         MSG_LIST_INDEX *current_list = (MSG_LIST_INDEX *)PCQueuePop(nonEmptyQueues);
         CMI_PCQUEUEPOP_UNLOCK(nonEmptyQueues)
         if(current_list == NULL) break; 
-        PCQueue current_queue= current_list-> sendSmsgBuf;
+        PCQueue current_queue= current_list->sendSmsgBuf;
         CmiLock(current_list->lock);
         int i, len = PCQueueLength(current_queue);
         current_list->pushed = 0;
         CmiUnlock(current_list->lock);
 #else      /* ! SMP_LOCKS */
-    for(index =0; index<mysize; index++) 
+    for(idx =0; idx<mysize; idx++) 
     {
+        index++;  if (index == mysize) index = 0;
 #if CMI_SENDBUFFERSMSG_CAP
         if ( sent_length >= SendBufferMsg_cap) { done = 0; return done;}
 #endif
@@ -3162,76 +3267,8 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             ptr = (MSG_LIST*)PCQueuePop(current_queue);
             CMI_PCQUEUEPOP_UNLOCK(current_queue)
             if (ptr == 0) break;
-#endif
-#else
-    int index = queue->smsg_head_index;
-    while(index != -1)
-    {
-        ptr = queue->smsg_msglist_index[index].sendSmsgBuf;
-        pre = 0;
-        while(ptr != 0)
-        {
-#endif
-            MACHSTATE5(8, "noempty-smsg  %d (%d,%d,%d) tag=%d \n", ptr->destNode, buffered_send_msg, buffered_recv_msg, register_memory_size, ptr->tag); 
-            status = GNI_RC_ERROR_RESOURCE;
-            if (useDynamicSMSG && smsg_connected_flag[index] != 2) {   
-                /* connection not exists yet */
-#if CMK_SMP
-                  /* non-smp case, connect is issued in send_smsg_message */
-                if (smsg_connected_flag[index] == 0)
-                    connect_to(ptr->destNode); 
-#endif
-            }
-            else
-            switch(ptr->tag)
-            {
-            case SMALL_DATA_TAG:
-                status = send_smsg_message(queue, ptr->destNode,  ptr->msg, ptr->size, ptr->tag, 1, ptr);  
-                if(status == GNI_RC_SUCCESS)
-                {
-                    CmiFree(ptr->msg);
-                }
-                break;
-            case LMSG_INIT_TAG:
-                control_msg_tmp = (CONTROL_MSG*)ptr->msg;
-                status = send_large_messages( queue, ptr->destNode, control_msg_tmp, 1, ptr);
-                break;
-#if !REMOTE_EVENT && !CQWRITE
-            case ACK_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
-                if(status == GNI_RC_SUCCESS) FreeAckMsg((ACK_MSG*)ptr->msg);
-                break;
-#endif
-            case BIG_MSG_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
-                if(status == GNI_RC_SUCCESS)
-                {
-                    FreeControlMsg((CONTROL_MSG*)ptr->msg);
-                }
-                break;
-#if CMK_PERSISTENT_COMM && !REMOTE_EVENT && !CQWRITE 
-            case PUT_DONE_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, ptr->size, ptr->tag, 1, ptr);  
-                if(status == GNI_RC_SUCCESS)
-                {
-                    FreeControlMsg((CONTROL_MSG*)ptr->msg);
-                }
-                break;
-#endif
-#if CMK_DIRECT
-            case DIRECT_PUT_DONE_TAG:
-                status = send_smsg_message(queue, ptr->destNode, ptr->msg, sizeof(CMK_DIRECT_HEADER), ptr->tag, 1, ptr);  
-                if(status == GNI_RC_SUCCESS)
-                {
-                    free((CMK_DIRECT_HEADER*)ptr->msg);
-                }
-                break;
 
-#endif
-            default:
-                printf("Weird tag\n");
-                CmiAbort("should not happen\n");
-            }       // end switch
+            status = _sendOneBufferedSmsg(queue, ptr);
 #if CMI_SENDBUFFERSMSG_CAP
             sent_length++;
 #endif
@@ -3241,7 +3278,62 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                 buffered_smsg_counter--;
                 printf("[%d==>%d] buffered smsg sending done\n", myrank, ptr->destNode);
 #endif
-#if !CMK_SMP
+                FreeMsgList(ptr);
+            }else {
+                PCQueuePush(current_queue, (char*)ptr);
+                done = 0;
+                if(status == GNI_RC_ERROR_RESOURCE)
+                {
+                    break;
+                }
+            } 
+        } //end while
+#if SMP_LOCKS
+        CmiLock(current_list->lock);
+        if(!PCQueueEmpty(current_queue) && current_list->pushed == 0)
+        {
+            current_list->pushed = 1;
+            PCQueuePush(nonEmptyQueues, (char*)current_list);
+        }
+        CmiUnlock(current_list->lock); 
+#endif
+    }   // end pooling for all cores
+    return done;
+}
+
+#endif
+
+#else              /* non-smp */
+
+static int SendBufferMsg(SMSG_QUEUE *queue)
+{
+    MSG_LIST            *ptr, *tmp_ptr, *pre=0, *current_head;
+    CONTROL_MSG         *control_msg_tmp;
+    gni_return_t        status;
+    int                 done = 1;
+    uint64_t            register_size;
+    void                *register_addr;
+    int                 index_previous = -1;
+#if     CMI_SENDBUFFERSMSG_CAP
+    int                 sent_length = 0;
+#endif
+    int index = queue->smsg_head_index;
+    while(index != -1)
+    {
+        ptr = queue->smsg_msglist_index[index].sendSmsgBuf;
+        pre = 0;
+        while(ptr != 0)
+        {
+            status = _sendOneBufferedSmsg(queue, ptr);
+#if CMI_SENDBUFFERSMSG_CAP
+            sent_length++;
+#endif
+            if(status == GNI_RC_SUCCESS)
+            {
+#if PRINT_SYH
+                buffered_smsg_counter--;
+                printf("[%d==>%d] buffered smsg sending done\n", myrank, ptr->destNode);
+#endif
                 tmp_ptr = ptr;
                 if(pre)
                 {
@@ -3251,32 +3343,16 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
                     ptr = queue->smsg_msglist_index[index].sendSmsgBuf = queue->smsg_msglist_index[index].sendSmsgBuf->next;
                 }
                 FreeMsgList(tmp_ptr);
-#else
-                FreeMsgList(ptr);
-#endif
             }else {
-#if CMK_SMP
-#if ONE_SEND_QUEUE
-                PCQueuePush(queue->sendMsgBuf, (char*)ptr);
-#else
-                PCQueuePush(current_queue, (char*)ptr);
-#endif
-#else
                 pre = ptr;
                 ptr=ptr->next;
-#endif
                 done = 0;
                 if(status == GNI_RC_ERROR_RESOURCE)
                 {
-#if CMK_SMP && ONE_SEND_QUEUE 
-                    destpe_avail[ptr->destNode] = 1;
-#else
                     break;
-#endif
                 }
             } 
         } //end while
-#if !CMK_SMP
         if(ptr == 0)
             queue->smsg_msglist_index[index].tail = pre;
         if(queue->smsg_msglist_index[index].sendSmsgBuf == 0)
@@ -3290,21 +3366,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
             index_previous = index;
         }
         index = queue->smsg_msglist_index[index].next;
-#else
-#if !ONE_SEND_QUEUE && SMP_LOCKS
-        CmiLock(current_list->lock);
-        if(!PCQueueEmpty(current_queue) && current_list->pushed == 0)
-        {
-            current_list->pushed = 1;
-            PCQueuePush(nonEmptyQueues, (char*)current_list);
-        }
-        CmiUnlock(current_list->lock); 
-#endif
-#endif
 
     }   // end pooling for all cores
     return done;
 }
+#endif
 
 static void ProcessDeadlock();
 void LrtsAdvanceCommunication(int whileidle)
