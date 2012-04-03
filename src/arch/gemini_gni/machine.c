@@ -61,12 +61,12 @@
 #define REMOTE_EVENT               1
 #define CQWRITE                    0
 
-#define CMI_EXERT_SEND_LARGE_CAP	0
-#define CMI_EXERT_RECV_RDMA_CAP      0
+#define CMI_EXERT_SEND_LARGE_CAP   0
+#define CMI_EXERT_RECV_RDMA_CAP    0
 
 
-#define CMI_SENDBUFFERSMSG_CAP 0
-#define CMI_PUMPNETWORKSMSG_CAP 0
+#define CMI_SENDBUFFERSMSG_CAP     0
+#define CMI_PUMPNETWORKSMSG_CAP    0
 
 #if CMI_SENDBUFFERSMSG_CAP
 int     SendBufferMsg_cap  =10;
@@ -114,9 +114,11 @@ int   RDMA_pending = 0;
 CpvStaticDeclare(double, projTraceStart);
 #define  START_EVENT()  CpvAccess(projTraceStart) = CmiWallTimer();
 #define  END_EVENT(x)   traceUserBracketEvent(x, CpvAccess(projTraceStart), CmiWallTimer());
+#define  EVENT_TIME()   CpvAccess(projTraceStart)
 #else
 #define  START_EVENT()
 #define  END_EVENT(x)
+#define  EVENT_TIME()   (0.0)
 #endif
 
 #if USE_LRTS_MEMPOOL
@@ -476,7 +478,7 @@ typedef struct  rmda_msg
 
 
 #if CMK_SMP
-#define SMP_LOCKS               0
+#define SMP_LOCKS                       0
 #define ONE_SEND_QUEUE                  0
 PCQueue sendRdmaBuf;
 typedef struct  msg_list_index
@@ -2222,7 +2224,7 @@ static void PumpNetworkSmsg()
                 memcpy(msg_data, (char*)header, msg_nbytes);
                 GNI_SmsgRelease(ep_hndl_array[inst_id]);
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
-                TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg_data);
+                TRACE_COMM_CREATION(EVENT_TIME(), msg_data);
                 CMI_CHECK_CHECKSUM(msg_data, msg_nbytes);
                 handleOneRecvedMsg(msg_nbytes, msg_data);
                 break;
@@ -2720,7 +2722,7 @@ static void PumpRemoteTransactions()
             size = CmiGetMsgSize(msg);
             CmiReference(msg);
             CMI_CHECK_CHECKSUM(msg, size);
-            TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+            TRACE_COMM_CREATION(EVENT_TIME(), msg);
             handleOneRecvedMsg(size, msg); 
             break;
             }
@@ -2893,7 +2895,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         buffered_recv_msg -= GetMempoolsize((void*)(tmp_pd->local_addr));
                     MACHSTATE5(8, "GO Recv done ack send from %d (%d,%d, %d) tag=%d\n", inst_id, buffered_send_msg, buffered_recv_msg, register_memory_size, msg_tag); 
 #endif
-                    TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)tmp_pd->local_addr);
+                    TRACE_COMM_CREATION(EVENT_TIME(), (void*)tmp_pd->local_addr);
                     CMI_CHECK_CHECKSUM((void*)tmp_pd->local_addr, tmp_pd->length);
                     handleOneRecvedMsg(tmp_pd->length, (void*)tmp_pd->local_addr); 
                 }else if(msg_tag == BIG_MSG_TAG){
@@ -2908,7 +2910,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
                         if( tmp_pd->cqwrite_value == 1)
                             TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
-                        TRACE_COMM_CREATION(CpvAccess(projTraceStart), msg);
+                        TRACE_COMM_CREATION(EVENT_TIME(), msg);
                         CMI_CHECK_CHECKSUM(msg, tmp_pd->first_operand);
                         handleOneRecvedMsg(tmp_pd->first_operand, msg); 
                     }
@@ -2997,7 +2999,7 @@ static void  SendRdmaMsg()
             if(IS_PUT(pd->type))
             {
                  START_EVENT();
-                 TRACE_COMM_CREATION(CpvAccess(projTraceStart), (void*)pd->local_addr);//based on assumption, post always succeeds on first try
+                 TRACE_COMM_CREATION(EVENT_TIME(), (void*)pd->local_addr);//based on assumption, post always succeeds on first try
             }
 #endif
 
@@ -3117,11 +3119,10 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
 #else
 #if SMP_LOCKS
     int nonempty = PCQueueLength(nonEmptyQueues);
+    for(index =0; index<nonempty; index++) 
+    {
 #if CMI_SENDBUFFERSMSG_CAP
-    for(index =0; index<nonempty ; index++) {
-        if ( sent_length < SendBufferMsg_cap) { done = 0; return done;}
-#else
-    for(index =0; index<nonempty; index++) {
+        if ( sent_length >= SendBufferMsg_cap) { done = 0; return done;}
 #endif
         CMI_PCQUEUEPOP_LOCK(nonEmptyQueues)
         MSG_LIST_INDEX *current_list = (MSG_LIST_INDEX *)PCQueuePop(nonEmptyQueues);
@@ -3132,11 +3133,11 @@ static int SendBufferMsg(SMSG_QUEUE *queue)
         int i, len = PCQueueLength(current_queue);
         current_list->pushed = 0;
         CmiUnlock(current_list->lock);
-#else
+#else      /* ! SMP_LOCKS */
+    for(index =0; index<mysize; index++) 
+    {
 #if CMI_SENDBUFFERSMSG_CAP
-    for(index =0; index<mysize && sent_length < SendBufferMsg_cap; index++) {
-#else
-    for(index =0; index<mysize; index++) {
+        if ( sent_length >= SendBufferMsg_cap) { done = 0; return done;}
 #endif
         //if (index == myrank) continue;
         PCQueue current_queue = queue->smsg_msglist_index[index].sendSmsgBuf;
