@@ -4636,8 +4636,7 @@ void Entry::genDefs(XStr& str)
   {
     str << "\n// Redn wrapper registration function"
         << "\n" << makeDecl("int") << "::reg_"<< epStr(true) <<"() {"
-        << "\n  return CkRegisterEp(\""  << epStr(true) << "(CkReductionMsg* impl_msg)\","
-        << "\n        _call_" << epStr(true) << ", CMessage_CkReductionMsg::__idx, __idx, 0);"
+        << "\n  return " << genRegEp(true) << ";"
         << "\n}\n\n";
   }
 
@@ -4787,11 +4786,15 @@ void Entry::genDefs(XStr& str)
   templateGuardEnd(str);
 }
 
-XStr Entry::genRegEp()
+XStr Entry::genRegEp(bool isForRedn)
 {
   XStr str;
-  str << "CkRegisterEp(\"" << name << "("<<paramType(0)<<")\",\n"
-      << "      _call_" << epStr();
+  str << "CkRegisterEp(\"";
+  if (isForRedn)
+      str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
+  else
+      str << name << "("<<paramType(0)<<")\",\n";
+  str << "      _call_" << epStr(isForRedn);
   if (tspec) {
     str << "< ";
     tspec->genShort(str);
@@ -4805,6 +4808,8 @@ XStr Entry::genRegEp()
   } else if(!param->isVoid() && !(attribs&SMIGRATE)) {
     param->genMsgProxyName(str);
     str <<"::__idx";
+  } else if (isForRedn) {
+    str << "CMessage_CkReductionMsg::__idx";
   } else {
     str << "0";
   }
@@ -4812,7 +4817,11 @@ XStr Entry::genRegEp()
   str << ", __idx";
   /* attributes */
   str << ", 0";
-  if (attribs & SNOKEEP) str << "+CK_EP_NOKEEP";
+  // reductiontarget variants should not be nokeep. The actual ep will be
+  // parameter marshalled (and hence flagged as nokeep), but we'll delete the
+  // CkReductionMsg in generated code, not runtime code. (so that we can cast
+  // it to CkReductionMsg not CkMarshallMsg)
+  if ( !isForRedn && (attribs & SNOKEEP) ) str << "+CK_EP_NOKEEP";
   if (attribs & SNOTRACE) str << "+CK_EP_TRACEDISABLE";
   if (attribs & SIMMEDIATE) str << "+CK_EP_TRACEDISABLE";
 

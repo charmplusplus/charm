@@ -1032,7 +1032,7 @@ class Entry : public Member {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    XStr genRegEp();
+    XStr genRegEp(bool isForRedn = false);
     void preprocess();
     char *getEntryName() { return name; }
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);
