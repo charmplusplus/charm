@@ -600,13 +600,14 @@ void traceAddThreadListeners(CthThread tid, envelope *e) {
 extern int _charmHandlerIdx;
 class CkCoreState;
 extern void _processHandler(void *, CkCoreState*);
+extern "C" int isCharmEnvelope(void *msg);
 int CkIsCharmMessage(char *msg)
 {
 //CmiPrintf("[%d] CkIsCharmMessage: %d %p %d %p\n", CkMyPe(),CmiGetHandler(msg), CmiGetHandlerFunction(msg), _charmHandlerIdx, _processHandler);
   if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
          (CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
     return 1;
-  if (CmiGetXHandler(msg) == _charmHandlerIdx) return 1;
+  if (CmiGetXHandler(msg) == _charmHandlerIdx) return isCharmEnvelope(msg);
   return 0;
 }
 #endif

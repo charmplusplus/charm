@@ -15,6 +15,7 @@ CkMemCheckpoint.decl.h CkMemCheckpoint.def.h: ckmemcheckpoint.ci.stamp
 CkReduction.decl.h CkReduction.def.h: ckreduction.ci.stamp
 ComboCentLB.decl.h ComboCentLB.def.h: ComboCentLB.ci.stamp
 comlib.decl.h comlib.def.h: ComlibManager.ci.stamp
+CommAwareRefineLB.decl.h CommAwareRefineLB.def.h: CommAwareRefineLB.ci.stamp
 CommLB.decl.h CommLB.def.h: CommLB.ci.stamp
 CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
 ControlPoints.decl.h ControlPoints.def.h: controlPoints.ci.stamp
