@@ -40,6 +40,7 @@ struct AdaptiveLBInfo {
 
 struct AdaptiveLBStructure {
   int lb_ideal_period;
+  int final_lb_period;
   int lb_calculated_period;
   int lb_no_iterations;
   int global_max_iter_no;
@@ -436,6 +437,7 @@ void LBDatabase::init(void)
 
   // If metabalancer enabled, initialize the variables
   adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
@@ -582,6 +584,7 @@ void LBDatabase::ResumeClients() {
   adaptive_lbdb.history_data.clear();
 
   adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
@@ -925,6 +928,7 @@ void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
   }
 //  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period);
   adaptive_struct.lb_ideal_period = period;
+  adaptive_struct.final_lb_period = period;
   LDOMAdaptResumeSync(myLDHandle, period);
 
 //  if (local_state == ON) {
@@ -957,10 +961,15 @@ void LBDatabase::ReceiveIterationNo(int req_no, int local_iter_no) {
   if (local_iter_no > adaptive_struct.global_max_iter_no) {
     adaptive_struct.global_max_iter_no = local_iter_no;
   }
+  int period;
   if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
-    adaptive_struct.lb_ideal_period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
-    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
-    CkPrintf("Final lb_period %d\n", adaptive_struct.lb_ideal_period);
+    period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
+    // If the period is less than the previously announced,
+    if (adaptive_struct.global_max_iter_no < adaptive_struct.final_lb_period) {
+      adaptive_struct.lb_ideal_period = period;
+      thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
+      CkPrintf("Final lb_period %d\n", adaptive_struct.lb_ideal_period);
+    }
     adaptive_struct.in_progress = false;
     adaptive_struct.global_max_iter_no = 0;
     adaptive_struct.global_recv_iter_counter = 0;
