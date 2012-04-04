@@ -378,11 +378,10 @@ gni_msgq_ep_attr_t      msgq_ep_attrs_size;
 /* =====Beginning of Declarations of Machine Specific Variables===== */
 static int cookie;
 static int modes = 0;
-static gni_cq_handle_t       smsg_rx_cqh = NULL;
-static gni_cq_handle_t       default_tx_cqh = NULL;
-static gni_cq_handle_t       rdma_tx_cqh = NULL;
-static gni_cq_handle_t       rdma_rx_cqh = NULL;
-static gni_cq_handle_t       post_tx_cqh = NULL;
+static gni_cq_handle_t       smsg_rx_cqh = NULL;      // smsg send
+static gni_cq_handle_t       default_tx_cqh = NULL;   // bind to endpoint
+static gni_cq_handle_t       rdma_tx_cqh = NULL;      // rdma - local event
+static gni_cq_handle_t       rdma_rx_cqh = NULL;      // mempool - remote event
 static gni_ep_handle_t       *ep_hndl_array;
 
 static CmiNodeLock           *ep_lock_array;
@@ -2019,12 +2018,11 @@ void LrtsPostNonLocal(){
     double startT, endT;
 #endif
 #if MULTI_THREAD_SEND
+
     if(mysize == 1) return;
-#if CMK_SMP_TRACE_COMMTHREAD
-    traceEndIdle();
-#endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
+    traceEndIdle();
     startT = CmiWallTimer();
 #endif
 
@@ -2038,18 +2036,16 @@ void LrtsPostNonLocal(){
 #endif
     PumpLocalTransactions(default_tx_cqh, default_tx_cq_lock);
 
-#if MULTI_THREAD_SEND
 #if CMK_WORKER_SINGLE_TASK
     if (CmiMyRank() % 6 == 2)
 #endif
     PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
-#endif
 
 #if REMOTE_EVENT
 #if CMK_WORKER_SINGLE_TASK
     if (CmiMyRank() % 6 == 3)
 #endif
-    PumpRemoteTransactions();
+    PumpRemoteTransactions();         // rdma_rx_cqh
 #endif
 
 #if CMK_WORKER_SINGLE_TASK
@@ -2070,10 +2066,9 @@ void LrtsPostNonLocal(){
 #if CMK_SMP_TRACE_COMMTHREAD
     endT = CmiWallTimer();
     traceUserBracketEvent(event_AdvanceCommunication, startT, endT);
-#endif
-#if CMK_SMP_TRACE_COMMTHREAD
     traceBeginIdle();
 #endif
+
 #endif
 }
 
@@ -2164,9 +2159,8 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id);
 static void PumpNetworkSmsg()
 {
     uint64_t            inst_id;
-    int                 ret;
     gni_cq_entry_t      event_data;
-    gni_return_t        status, status2;
+    gni_return_t        status;
     void                *header;
     uint8_t             msg_tag;
     int                 msg_nbytes;
@@ -2190,8 +2184,8 @@ static void PumpNetworkSmsg()
         CMI_GNI_LOCK(smsg_rx_cq_lock)
         status =GNI_CqGetEvent(smsg_rx_cqh, &event_data);
         CMI_GNI_UNLOCK(smsg_rx_cq_lock)
-        if(status != GNI_RC_SUCCESS)
-            break;
+        if(status != GNI_RC_SUCCESS) break;
+
         inst_id = GNI_CQ_GET_INST_ID(event_data);
 #if REMOTE_EVENT
         inst_id = GET_RANK(inst_id);      /* important */
@@ -2284,7 +2278,7 @@ static void PumpNetworkSmsg()
 #endif
                 CMI_GNI_UNLOCK(smsg_mailbox_lock)
 #if CMI_EXERT_SEND_LARGE_CAP
-                    SEND_large_pending--;
+                SEND_large_pending--;
 #endif
                 void *msg = (void*)(header_tmp->source_addr);
                 int cur_seq = CmiGetMsgSeq(msg);
@@ -2691,11 +2685,11 @@ static void PumpRemoteTransactions()
     int                     inst_id, index, type, size;
 
     while(1) {
-        CMI_GNI_LOCK(rdma_tx_cq_lock)
-//        CMI_GNI_LOCK(global_gni_lock)
+        CMI_GNI_LOCK(global_gni_lock)
+//        CMI_GNI_LOCK(rdma_tx_cq_lock)
         status = GNI_CqGetEvent(rdma_rx_cqh, &ev);
-//        CMI_GNI_UNLOCK(global_gni_lock)
-        CMI_GNI_UNLOCK(rdma_tx_cq_lock)
+//        CMI_GNI_UNLOCK(rdma_tx_cq_lock)
+        CMI_GNI_UNLOCK(global_gni_lock)
 
         if(status != GNI_RC_SUCCESS) break;
 
@@ -2920,7 +2914,7 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
 #if PRINT_SYH
                         printf("Pipeline msg done [%d]\n", myrank);
 #endif
-#if                 CMK_SMP_TRACE_COMMTHREAD
+#if     CMK_SMP_TRACE_COMMTHREAD
                         if( tmp_pd->cqwrite_value == 1)
                             TRACE_COMM_CONTROL_CREATION((double)(tmp_pd->sync_flag_addr/1000000.0), (double)((tmp_pd->sync_flag_addr+1)/1000000.0), (double)((tmp_pd->sync_flag_addr+2)/1000000.0), (void*)tmp_pd->local_addr); 
 #endif
