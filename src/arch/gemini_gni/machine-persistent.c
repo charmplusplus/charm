@@ -53,7 +53,11 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
        
         pd->remote_addr     = (uint64_t)slot->destBuf[0].destAddress;
         pd->remote_mem_hndl = slot->destBuf[0].mem_hndl;
-        pd->src_cq_hndl     = 0;//post_tx_cqh;     /* smsg_tx_cqh;  */
+#if MULTI_THREAD_SEND
+        pd->src_cq_hndl     = rdma_tx_cqh;
+#else
+        pd->src_cq_hndl     = 0;
+#endif
         pd->rdma_mode       = 0;
         pd->cqwrite_value   = PERSIST_SEQ;
         pd->amo_cmd         = 0;
@@ -292,7 +296,7 @@ void setupRecvSlot(PersistentReceivesTable *slot, int maxBytes)
   slot->sizeMax = maxBytes;
 #if REMOTE_EVENT
 #if !MULTI_THREAD_SEND
-  CmiLock(persistPool.lock);    /* locked in function */
+  CmiLock(persistPool.lock);    /* lock in function */
 #endif
   slot->index = IndexPool_getslot(&persistPool, slot, 2);
 #if !MULTI_THREAD_SEND
@@ -320,7 +324,10 @@ PersistentHandle getPersistentHandle(PersistentHandle h, int toindex)
   if (toindex)
     return (PersistentHandle)(((PersistentReceivesTable*)h)->index);
   else {
-    return (PersistentHandle)GetIndexAddress(persistPool, (int)(size_t)h);
+    CmiLock(persistPool.lock);
+    PersistentHandle ret = (PersistentHandle)GetIndexAddress(persistPool, (int)(size_t)h);
+    CmiUnlock(persistPool.lock);
+    return ret;
   }
 #else
   return h;
