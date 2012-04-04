@@ -386,6 +386,11 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
 // Each contributor must contribute exactly once to the each reduction.
 void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 {
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    Chare *oldObj =CpvAccess(_currentObj);
+    CpvAccess(_currentObj) = this;
+#endif
+
 #if CMK_BIGSIM_CHARM
   _TRACE_BG_TLINE_END(&(m->log));
 #endif
@@ -408,6 +413,10 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
     thisProxy[0].contributeViaMessage(m);
 #else
   addContribution(m);
+#endif
+
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CpvAccess(_currentObj) = oldObj;
 #endif
 }
 
