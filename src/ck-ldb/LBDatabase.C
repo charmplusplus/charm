@@ -21,6 +21,8 @@
 #define IMB_TOLERANCE 1.1
 #define IDLE_LOAD_TOLERANCE 0.3
 
+#   define DEBAD(x) /*CkPrintf x*/
+
 struct AdaptiveData {
   int iteration;
   double max_load;
@@ -39,11 +41,12 @@ struct AdaptiveLBInfo {
 };
 
 struct AdaptiveLBStructure {
-  int lb_ideal_period;
+  int tentative_period;
   int final_lb_period;
   int lb_calculated_period;
   int lb_no_iterations;
   int global_max_iter_no;
+  int tentative_max_iter_no;
   int global_recv_iter_counter;
   bool in_progress;
   double lb_strategy_cost;
@@ -436,11 +439,12 @@ void LBDatabase::init(void)
   max_iteration = -1;
 
   // If metabalancer enabled, initialize the variables
-  adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.tentative_period =  INT_MAX;
   adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = 0;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
@@ -583,11 +587,12 @@ void LBDatabase::ResumeClients() {
   // If metabalancer enabled, initialize the variables
   adaptive_lbdb.history_data.clear();
 
-  adaptive_struct.lb_ideal_period =  INT_MAX;
+  adaptive_struct.tentative_period =  INT_MAX;
   adaptive_struct.final_lb_period =  INT_MAX;
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = 0;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
@@ -610,8 +615,8 @@ void LBDatabase::ResumeClients() {
 bool LBDatabase::AddLoad(int iteration, double load) {
   total_contrib_vec[iteration]++;
   adaptive_struct.total_syncs_called++;
-  //CkPrintf("At PE %d Total contribution for iteration %d is %lf total objs %d\n", CkMyPe(), iteration,
-  //total_contrib_vec[iteration], getLBDB()->ObjDataCount());
+  DEBAD(("At PE %d Total contribution for iteration %d is %lf total objs %d\n", CkMyPe(), iteration,
+    total_contrib_vec[iteration], getLBDB()->ObjDataCount()));
 
   if (iteration > adaptive_struct.lb_no_iterations) {
     adaptive_struct.lb_no_iterations = iteration;
@@ -642,7 +647,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
       lb_data[5] = idle_time/total_load_vec[iteration];
     }
 
-   // CkPrintf("[%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
+   // CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
    //     total_load_vec[iteration], idle_time,
    //     idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
 
@@ -659,7 +664,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double avg_idle = load[4]/load[1];
   double max_idle_load_ratio = load[5];
   int iteration_n = load[0];
-  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]);
+  DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]));
   delete msg;
  
   // Store the data for this iteration
@@ -702,9 +707,10 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 //    }
 
 
-
-    // If the new lb period is less than current set lb period
-    if (adaptive_struct.lb_calculated_period > iteration_n + 1) {
+    // If the previously calculated_period (not the final decision) is greater
+    // than the iter +1, we can inform this and expect to get a change.
+    if ((iteration_n + 1 > adaptive_struct.tentative_max_iter_no) &&
+        (iteration_n+1 < adaptive_struct.lb_calculated_period)) {
       if (max/avg < tolerate_imb) {
         adaptive_struct.doCommStrategy = true;
         CkPrintf("No load imbalance but idle time\n");
@@ -728,7 +734,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     //CkPrintf("Carry out load balancing step at iter\n");
 
     // If the new lb period is less than current set lb period
-    if (adaptive_struct.lb_calculated_period > period) {
+    //if (adaptive_struct.lb_calculated_period > period) {
+    if (period > adaptive_struct.tentative_max_iter_no) {
       adaptive_struct.doCommStrategy = false;
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
@@ -737,6 +744,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
           adaptive_struct.lb_calculated_period);
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
     }
+    //}
   }
 }
 
@@ -755,15 +763,15 @@ bool LBDatabase::generatePlan(int& period) {
     data = adaptive_lbdb.history_data[i];
     max += data.max_load;
     avg += data.avg_load;
-    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+    DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
   }
 //  max /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
 //  avg /= (adaptive_struct.lb_no_iterations - adaptive_lbdb.history_data[0].iteration);
 //
-//  adaptive_struct.lb_ideal_period = (adaptive_struct.lb_strategy_cost +
+//  adaptive_struct.tentative_period = (adaptive_struct.lb_strategy_cost +
 //  adaptive_struct.lb_migration_cost) / (max - avg);
 //  CkPrintf("max : %lf, avg: %lf, strat cost: %lf, migration_cost: %lf, idealperiod : %d \n",
-//      max, avg, adaptive_struct.lb_strategy_cost, adaptive_struct.lb_migration_cost, adaptive_struct.lb_ideal_period);
+//      max, avg, adaptive_struct.lb_strategy_cost, adaptive_struct.lb_migration_cost, adaptive_struct.tentative_period);
 //
 
   // If linearly varying load, then find lb_period
@@ -916,7 +924,7 @@ void LBDatabase::LoadBalanceDecision(int req_no, int period) {
     return;
   }
   //CkPrintf("[%d] Load balance decision made cur iteration: %d period:%d state: %d\n",CkMyPe(), adaptive_struct.lb_no_iterations, period, local_state);
-  adaptive_struct.lb_ideal_period = period;
+  adaptive_struct.tentative_period = period;
   //local_state = ON;
   adaptive_struct.lb_msg_recv_no = req_no;
   thisProxy[0].ReceiveIterationNo(req_no, adaptive_struct.lb_no_iterations);
@@ -926,8 +934,8 @@ void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
   if (req_no < adaptive_struct.lb_msg_recv_no) {
     return;
   }
-//  CkPrintf("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period);
-  adaptive_struct.lb_ideal_period = period;
+  DEBAD(("[%d] Final Load balance decision made cur iteration: %d period:%d \n",CkMyPe(), adaptive_struct.lb_no_iterations, period));
+  adaptive_struct.tentative_period = period;
   adaptive_struct.final_lb_period = period;
   LDOMAdaptResumeSync(myLDHandle, period);
 
@@ -940,7 +948,7 @@ void LBDatabase::LoadBalanceDecisionFinal(int req_no, int period) {
   // processor. If the decision is that the ideal period is in the future,
   // resume. If the ideal period is now, then carry out load balancing.
 //  if (local_state == PAUSE) {
-//    if (adaptive_struct.lb_no_iterations < adaptive_struct.lb_ideal_period) {
+//    if (adaptive_struct.lb_no_iterations < adaptive_struct.tentative_period) {
 //      local_state = DECIDED;
 //      //SendMinStats();
 //      //FIX ME!!! ResumeClients(0);
@@ -961,23 +969,38 @@ void LBDatabase::ReceiveIterationNo(int req_no, int local_iter_no) {
   if (local_iter_no > adaptive_struct.global_max_iter_no) {
     adaptive_struct.global_max_iter_no = local_iter_no;
   }
+
   int period;
   if (CkNumPes() == adaptive_struct.global_recv_iter_counter) {
-    period = (adaptive_struct.lb_ideal_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.lb_ideal_period : adaptive_struct.global_max_iter_no + 1;
-    // If the period is less than the previously announced,
-    if (adaptive_struct.global_max_iter_no < adaptive_struct.final_lb_period) {
-      adaptive_struct.lb_ideal_period = period;
-      thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.lb_ideal_period);
-      CkPrintf("Final lb_period %d\n", adaptive_struct.lb_ideal_period);
+
+    if (adaptive_struct.global_max_iter_no > adaptive_struct.tentative_max_iter_no) {
+      adaptive_struct.tentative_max_iter_no = adaptive_struct.global_max_iter_no;
     }
+    period = (adaptive_struct.tentative_period > adaptive_struct.global_max_iter_no) ? adaptive_struct.tentative_period : adaptive_struct.global_max_iter_no + 1;
+    // If no one has gone into load balancing stage, then we can safely change
+    // the period otherwise keep the old period.
+    if (adaptive_struct.global_max_iter_no < adaptive_struct.final_lb_period) {
+      adaptive_struct.tentative_period = period;
+      CkPrintf("Final lb_period CHANGED!%d\n", adaptive_struct.tentative_period);
+    } else {
+      adaptive_struct.tentative_period = adaptive_struct.final_lb_period;
+      CkPrintf("Final lb_period NOT CHANGED!%d\n", adaptive_struct.tentative_period);
+    }
+    thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.tentative_period);
     adaptive_struct.in_progress = false;
     adaptive_struct.global_max_iter_no = 0;
     adaptive_struct.global_recv_iter_counter = 0;
   }
 }
 
-int LBDatabase::getPredictedLBPeriod() {
-  return adaptive_struct.lb_ideal_period;
+int LBDatabase::getPredictedLBPeriod(bool& is_tentative) {
+  if (adaptive_struct.tentative_period < adaptive_struct.final_lb_period) {
+    is_tentative = true;
+    return adaptive_struct.tentative_period;
+   } else {
+     is_tentative = false;
+     return adaptive_struct.final_lb_period;
+   }
 }
 
 bool LBDatabase::isStrategyComm() {

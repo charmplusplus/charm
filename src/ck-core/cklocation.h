@@ -322,6 +322,7 @@ public:
   virtual void ckJustMigrated(void); /*default is empty*/
 
   void recvLBPeriod(void *data);
+  void clearAdaptiveData(void);
 
   //used for out-of-core emulation
   virtual void ckJustRestored(void); /*default is empty*/

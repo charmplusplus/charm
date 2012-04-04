@@ -366,7 +366,7 @@ public:
   bool getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc);
   bool getPeriodForLinear(double a, double b, double c, int& period);
   bool getPeriodForStrategy(double new_load, double overhead_percent, int& period);
-  int getPredictedLBPeriod();
+  int getPredictedLBPeriod(bool& is_tentative);
 
   bool isStrategyComm();
 

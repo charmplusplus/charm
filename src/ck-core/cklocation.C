@@ -42,6 +42,7 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
 #   define DEBUG(x) CkPrintf x
+#   define DEBAD(x) CkPrintf x
 #else
 #   define DEB(X) /*CkPrintf x*/
 #   define DEBI(X) /*CkPrintf x*/
@@ -53,6 +54,7 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBB(x) /*CkPrintf x*/
 #   define str(x) /**/
 #   define DEBUG(x)   /**/
+#   define DEBAD(x) /*CkPrintf x*/
 #endif
 
 #if CMK_LBDB_ON
@@ -1074,10 +1076,22 @@ double CkMigratable::getObjTime() {
 	return myRec->getObjTime();
 }
 
+void CkMigratable::clearAdaptiveData() {
+  local_state = OFF;
+  atsync_iteration = -1;
+  prev_load = 0.0;
+}
+
 void CkMigratable::recvLBPeriod(void *data) {
   int lb_period = *((int *) data);
-  //CkPrintf("--[pe %s] Received the LB Period %d current iter %d state %d\n",
-   //   idx2str(thisIndexMax), lb_period, atsync_iteration, local_state);
+ DEBAD(("\t[obj %s] Received the LB Period %d current iter %d state %d on PE %d\n",
+     idx2str(thisIndexMax), lb_period, atsync_iteration, local_state, CkMyPe()));
+
+  if (local_state == LOAD_BALANCE) {
+    CkAssert(lb_period == myRec->getLBDB()->getPredictedLBPeriod());
+    return;
+  }
+
   if (local_state == PAUSE) {
     if (atsync_iteration < lb_period) {
     //  CkPrintf("---[pe %s] pause and decided\n", idx2str(thisIndexMax));
@@ -1088,9 +1102,9 @@ void CkMigratable::recvLBPeriod(void *data) {
    // CkPrintf("---[pe %s] load balance\n", idx2str(thisIndexMax));
     local_state = LOAD_BALANCE;
 
-    local_state = OFF;
-    atsync_iteration = -1;
-    prev_load = 0.0;
+   // local_state = OFF;
+   // atsync_iteration = -1;
+   // prev_load = 0.0;
 
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;
@@ -1150,17 +1164,20 @@ void CkMigratable::AtSync(int waitForMigration)
 //    return;
 //  }
 
-  if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod()) {
+  bool is_tentative;
+  if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod(is_tentative)) {
     ResumeFromSync();
+  } else if (is_tentative) {
+    local_state = PAUSE;
   } else if (local_state == DECIDED) {
-//    CkPrintf("[pe %s] Went to load balance\n", idx2str(thisIndexMax));
+    DEBAD(("[pe %s] Went to load balance iter %d\n", idx2str(thisIndexMax), atsync_iteration));
     local_state = LOAD_BALANCE;
-    local_state = OFF;
-    atsync_iteration = -1;
-    prev_load = 0.0;
+   // local_state = OFF;
+   // atsync_iteration = -1;
+   // prev_load = 0.0;
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   } else {
-//    CkPrintf("[pe %s] Went to pause state\n", idx2str(thisIndexMax));
+    DEBAD(("[pe %s] Went to pause state iter %d\n", idx2str(thisIndexMax), atsync_iteration));
     local_state = PAUSE;
   }
 }
@@ -1186,6 +1203,7 @@ void CkMigratable::staticResumeFromSync(void* data)
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     CpvAccess(_currentObj) = el;
 #endif
+  el->clearAdaptiveData();
 	el->ResumeFromSync();
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
     el->mlogData->resumeCount++;
