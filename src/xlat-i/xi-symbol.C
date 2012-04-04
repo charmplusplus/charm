@@ -4341,20 +4341,20 @@ void Entry::genDecls(XStr& str)
 
   str << "/* DECLS: "; print(str); str << " */\n";
   if(retType==0 && !isConstructor())
-      die("Entry methods must specify a return type-- \n"
-      	"use void if necessary",line);
+    die("Entry methods must specify a return type-- \n"
+        "use void if necessary",line);
 
   if (attribs&SMIGRATE)
     {} //User cannot call the migration constructor
   else if(container->isGroup()) {
-      genGroupDecl(str);
+    genGroupDecl(str);
   } else if(container->isArray()) {
-      if(!isIget())
-        genArrayDecl(str);
-      else if(container->isForElement())
-	genArrayDecl(str);
+    if(!isIget())
+      genArrayDecl(str);
+    else if(container->isForElement())
+      genArrayDecl(str);
   } else { // chare or mainchare
-      genChareDecl(str);
+    genChareDecl(str);
   }
 }
 
