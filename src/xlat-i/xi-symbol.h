@@ -969,13 +969,15 @@ class Entry : public Member {
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
+    XStr *label;
+    char *name;
+
+    // SDAG support
     SdagConstruct *sdagCon;
     TList<CStateVar *> *stateVars;
     TList<CStateVar *> *stateVarsChildren;
     TList<CStateVar *> estateVars;
     CEntry *entryPtr;
-    XStr *label;
-    char *name;
     const char *intExpr;
     ParamList *param;
     ParamList *connectParam;
