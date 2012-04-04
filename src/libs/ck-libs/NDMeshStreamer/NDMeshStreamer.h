@@ -94,6 +94,25 @@ public:
 };
 
 template <class dtype>
+class MeshStreamerArray2DClient : 
+  public CBase_MeshStreamerArray2DClient<dtype>, 
+  public MeshStreamerClient<dtype> 
+{
+
+public:
+  MeshStreamerArray2DClient() {}
+  MeshStreamerArray2DClient(CkMigrateMessage *msg) {}
+  void receiveRedeliveredItem(dtype data) {
+    MeshStreamerClient<dtype>::detectorLocalObj_->consume();
+    process(data);
+  }
+  void pup(PUP::er &p) {
+    CBase_MeshStreamerArray2DClient<dtype>::pup(p);
+  }
+
+};
+
+template <class dtype>
 class MeshStreamerArray3DClient : 
   public CBase_MeshStreamerArray3DClient<dtype>, 
   public MeshStreamerClient<dtype> 

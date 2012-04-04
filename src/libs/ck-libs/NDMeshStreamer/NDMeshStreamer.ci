@@ -18,6 +18,11 @@ module NDMeshStreamer {
     entry void receiveRedeliveredItem(dtype data);
   };
 
+  template<class dtype> array [2D] MeshStreamerArray2DClient {
+    // entry void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
+    entry void receiveRedeliveredItem(dtype data);
+  };
+
   template<class dtype> array [3D] MeshStreamerArray3DClient {
     entry void receiveRedeliveredItem(dtype data);
   };
