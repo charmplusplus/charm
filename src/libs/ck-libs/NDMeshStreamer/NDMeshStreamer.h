@@ -107,7 +107,7 @@ public:
     process(data);
   }
   void pup(PUP::er &p) {
-    CBase_MeshStreamerArray3DClient<dtype>::pup(p);
+    CBase_MeshStreamerArray2DClient<dtype>::pup(p);
   }
 
 };
