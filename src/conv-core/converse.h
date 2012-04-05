@@ -1921,6 +1921,12 @@ EXTERN void CmiNotifyCommThd(CmiNotifyCommThdMsg *msg);
 #endif
 
 CpvCExtern(int, _urgentSend);
+#if CMK_USE_OOB
 #define CmiEnableUrgentSend(yn)   CpvAccess(_urgentSend)=(yn)
+#else
+#define CmiEnableUrgentSend(yn)   
+#endif
 
 #endif /* CONVERSE_H */
+
+
