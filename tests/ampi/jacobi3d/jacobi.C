@@ -227,8 +227,11 @@ int main(int ac, char** av)
     starttime = MPI_Wtime();
 #ifdef AMPI
     if(iter%CKPT_FREQ == 50) {
-      AMPI_MemCheckpoint();
-      //MPI_Migrate();
+#ifdef CMK_MEM_CHECKPOINT
+		AMPI_MemCheckpoint();
+#elif CMK_MESSAGE_LOGGING
+		MPI_Migrate();
+#endif
     }
 #endif
   }
