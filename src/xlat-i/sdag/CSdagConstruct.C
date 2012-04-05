@@ -1174,6 +1174,12 @@ void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 }
 
+void generateSignature(XStr& str,
+                       const XStr* name, const char* suffix,
+                       TList<CStateVar*>* params)
+{
+
+}
 void generateSignature(XStr& decls, XStr& defs,
                        const Entry* entry, bool declareStatic, const char* returnType,
                        const XStr* name, bool isEnd,
