@@ -2407,7 +2407,7 @@ void
 Module::genReg(XStr& str)
 {
   if(external) {
-    str << "      _register"<<name<<"();"<<endx;
+    str << "  _register"<<name<<"();"<<endx;
   } else {
     if (clist) clist->genDefs(str);
   }
@@ -5235,7 +5235,7 @@ void ParamList::beginRednWrapperUnmarshall(XStr &str)
                 callEach(&Parameter::beginUnmarshall,str);
             }
         } else {
-            str << "/* non two-param case */\n";
+            str << "  /* non two-param case */\n";
             callEach(&Parameter::beginUnmarshall,str);
             str<<"  impl_buf+=CK_ALIGN(implP.size(),16);\n";
             str<<"  /*Unmarshall arrays:*/\n";
@@ -5346,7 +5346,7 @@ void InitCall::print(XStr& str)
 }
 void InitCall::genReg(XStr& str)
 {
-	str<<"      _registerInitCall(";
+	str<<"  _registerInitCall(";
 	if (container)
 		str<<container->baseName()<<"::";
 	str<<name;
