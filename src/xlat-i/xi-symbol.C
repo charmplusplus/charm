@@ -2940,7 +2940,7 @@ void ParamList::checkParamList(){
 }
 
 Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, SdagConstruct *sc, const char *e, int connect, ParamList *connectPList) :
-      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
+      attribs(a), retType(r), stacksize(sz), sdagCon(sc), name((char *)n), targs(0), intExpr(e), param(p), connectParam(connectPList), isConnect(connect)
 {
   line=l; container=NULL;
   entryCount=-1;
@@ -4333,6 +4333,9 @@ void Entry::genIndexDecls(XStr& str)
 
 void Entry::genDecls(XStr& str)
 {
+  if (external)
+    return;
+
   if(isConstructor() && retType && !retType->isVoid())
     die("Constructors cannot return a value",line);
 
@@ -4601,6 +4604,8 @@ void Entry::genCall(XStr& str, const XStr &preCall, bool redn_wrapper)
 
 void Entry::genDefs(XStr& str)
 {
+  if (external)
+    return;
   XStr containerType=container->baseName();
   XStr preMarshall,preCall,postCall;
 
@@ -4850,6 +4855,15 @@ void Entry::genReg(XStr& str)
 {
   if (tspec)
     return;
+
+  if (external) {
+    str << "  CkIndex_" << label << "::idx_" << name;
+    if (targs)
+        str << "< " << targs << " >";
+    str << "( static_cast< "
+        << retType << " (" << label << "::*)(" << paramType(0,0) << ") >(NULL) );\n";
+    return;
+  }
 
   str << "  // REG: "<<*this;
   str << "  " << epIdx(0) << ";\n";

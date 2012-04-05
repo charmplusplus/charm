@@ -13,14 +13,6 @@ typedef count< std::less<libdtype> > cntType;
 // Temporary initproc to register the instantiated EPs
 void register_instantiations()
 {
-    // Useless temporary variables just to feed the CkIndex functions
-    avg avger;
-    CkReduction::reducerType foo;
-    CkCallback bar;
-
-    CkIndex_libArray::idx_doSomething< cntType > (
-        static_cast<void (libArray::*) (const cntType&, const CkReduction::reducerType&, const CkCallback&)>(NULL));
-    CkIndex_libArray::doSomething(avger, foo, bar);
     CkReductionTarget(pgm, acceptResults<avg>);
     CkReductionTarget(pgm, acceptResults< cntType >);
 };

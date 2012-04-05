@@ -971,6 +971,7 @@ class Entry : public Member {
   public:
     XStr *label;
     char *name;
+    TParamList *targs;
 
     // SDAG support
     SdagConstruct *sdagCon;

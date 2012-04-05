@@ -236,6 +236,16 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Template
         { $2->setExtern($1); $$ = $2; }
+        | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters ';'
+        {
+          Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+          int isExtern = 1;
+          e->setExtern(isExtern);
+          e->targs = $6;
+          e->label = new XStr;
+          $4->print(*e->label);
+          $$ = e;
+        }
         | HashIFComment
         { $$ = NULL; }
         | HashIFDefComment
