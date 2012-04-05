@@ -2970,6 +2970,7 @@ void Entry::setChare(Chare *c) {
           //Main chare always magically takes CkArgMsg
           Type *t = new PtrType(new NamedType("CkArgMsg"));
           param=new ParamList(new Parameter(line,t));
+          std::cerr << "Charmxi> " << line << ": Deprecation warning: mainchare constructors should explicitly take CkArgMsg* if that's how they're implemented.\n";
         }
 
 	entryCount=c->nextEntry();

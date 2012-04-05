@@ -1,7 +1,7 @@
 module nodering {
   message nodering_message;
   mainchare nodering_main {
-    entry nodering_main();
+    entry nodering_main(CkArgMsg *m);
   };
   nodegroup nodering_group {
     entry nodering_group(void);
