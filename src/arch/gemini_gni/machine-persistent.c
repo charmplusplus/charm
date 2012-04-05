@@ -71,9 +71,9 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
          /* always buffer */
 #if CMK_SMP || 1
 #if REMOTE_EVENT
-        bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
+        bufferRdmaMsg(sendPersistentBuf, destNode, pd, (int)(size_t)(slot->destHandle));
 #else
-        bufferRdmaMsg(destNode, pd, -1);
+        bufferRdmaMsg(sendPersistentBuf, destNode, pd, -1);
 #endif
 
 #else                      /* non smp */
@@ -99,9 +99,9 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
         if(status == GNI_RC_ERROR_RESOURCE|| status == GNI_RC_ERROR_NOMEM )
         {
 #if REMOTE_EVENT
-            bufferRdmaMsg(destNode, pd, (int)(size_t)(slot->destHandle));
+            bufferRdmaMsg(sendRdmaBuf, destNode, pd, (int)(size_t)(slot->destHandle));
 #else
-            bufferRdmaMsg(destNode, pd, -1);
+            bufferRdmaMsg(sendRdmaBuf, destNode, pd, -1);
 #endif
         }
         else {
@@ -226,7 +226,7 @@ void *PerAlloc(int size)
   char *ptr;
   size = ALIGN64(size + sizeof(CmiChunkHeader));
   //printf("[%d] PerAlloc %p %p %d. \n", myrank, res, ptr, size);
-  res = mempool_malloc(CpvAccess(mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
+  res = mempool_malloc(CpvAccess(persistent_mempool), ALIGNBUF+size-sizeof(mempool_header), 1);
   if (res) ptr = (char*)res - sizeof(mempool_header) + ALIGNBUF;
   SIZEFIELD(ptr)=size;
   REFFIELD(ptr)= PERSIST_SEQ;
@@ -238,7 +238,7 @@ void PerFree(char *msg)
 #if CMK_SMP
   mempool_free_thread((char*)msg - ALIGNBUF + sizeof(mempool_header));
 #else
-  mempool_free(CpvAccess(mempool), (char*)msg - ALIGNBUF + sizeof(mempool_header));
+  mempool_free(CpvAccess(persistent_mempool), (char*)msg - ALIGNBUF + sizeof(mempool_header));
 #endif
 }
 
