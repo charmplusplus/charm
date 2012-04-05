@@ -267,8 +267,10 @@ void ArrayElement::initBasics(void)
 			  l->ckElementCreating(this));
   }
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-        mlogData->objID.type = TypeArray;
-        mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
+	if(mlogData == NULL)
+		mlogData = new ChareMlogData();
+	mlogData->objID.type = TypeArray;
+	mlogData->objID.data.array.id = (CkGroupID)thisArrayID;
 #endif
 #ifdef _PIPELINED_ALLREDUCE_
 	allredMgr = NULL;
