@@ -685,10 +685,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
-  		    if ($5 != 0)
-                      $7->param = new ParamList($5);
- 		    else 
- 	 	      $7->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $7->param = new ParamList($5);
                   }
 		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		}
@@ -696,10 +693,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
-		    if ($4 != 0)
-                      $5->param = new ParamList($4);
-		    else
-                      $5->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $5->param = new ParamList($4);
                   }
 		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
 		  if (e->param && e->param->isCkMigMsgPtr()) {
@@ -939,7 +933,7 @@ AccelParamList	: AccelParameter
 EParameters	: '(' ParamList ')'
 		{ $$ = $2; }
 		| '(' ')'
-		{ $$ = 0; }
+		{ $$ = new ParamList(new Parameter(0, new BuiltinType("void"))); }
 		;
 
 AccelEParameters  : '[' AccelParamList ']'
@@ -1065,19 +1059,9 @@ StartIntExpr	: '('
 		;
 
 SEntry		: IDENT EParameters
-		{ 
-		  if ($2 != 0)
-		     $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); 
-		  else
-		     $$ = new Entry(lineno, 0, 0, $1, 
-				new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, 0, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); }
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
-		{ if ($5 != 0)
-		    $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); 
-		  else
-		    $$ = new Entry(lineno, 0, 0, $1, new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, $3, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); }
 		;
 
 SEntryList	: SEntry 

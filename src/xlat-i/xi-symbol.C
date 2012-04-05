@@ -2966,16 +2966,12 @@ void Entry::setChare(Chare *c) {
 	Removed old treatment for CkArgMsg to allow argc, argv or void
 	constructors for mainchares.
 	* **************************************************************/
-	if (param==NULL)
-	{//Fake a parameter list of the appropriate type
-		Type *t;
-		if (isConstructor()&&container->isMainChare())
-			//Main chare always magically takes CkArgMsg
-			t=new PtrType(new NamedType("CkArgMsg"));
-		else
-			t=new BuiltinType("void");
-		param=new ParamList(new Parameter(line,t));
-	}
+        if (isConstructor() && container->isMainChare() && param->isVoid()) {
+          //Main chare always magically takes CkArgMsg
+          Type *t = new PtrType(new NamedType("CkArgMsg"));
+          param=new ParamList(new Parameter(line,t));
+        }
+
 	entryCount=c->nextEntry();
 
 	//Make a special "callmarshall" method, for communication optimizations to use:
