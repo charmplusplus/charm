@@ -1,0 +1,9 @@
+module mylib {
+  readonly int moduleRo;
+    array [1D] libArray {
+        entry libArray(int _dataSize);
+        template <typename T>
+        entry void doSomething(T t, CkReduction::reducerType, CkCallback redCB);
+    };
+};
+

@@ -201,7 +201,7 @@ private:
 	//Don't instantiate a CkReduction object-- it's just a namespace.
 	CkReduction();
 };
-
+PUPbytes(CkReduction::reducerType)
 
 //A CkReductionMsg is sent up the reduction tree-- it
 // carries a contribution, or several reduced contributions.
@@ -649,7 +649,7 @@ public:
   void contribute(CkReductionMsg *msg);\*/
 
 #define CkReductionTarget(me, method) \
-    CkIndex_##me::method##_redn_wrapper(NULL)
+    CkIndex_##me::redn_wrapper_##method(NULL)
 
 #define CK_REDUCTION_CONTRIBUTE_METHODS_DEF(me,myRednMgr,myRednInfo,migratable) \
 void me::contribute(int dataSize,const void *data,CkReduction::reducerType type,\

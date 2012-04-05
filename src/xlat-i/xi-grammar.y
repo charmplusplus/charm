@@ -213,36 +213,46 @@ ConstructList	: /* Empty */
 		;
 
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
-		{ if($3) $3->setExtern($1); $$ = $3; }
-                | NAMESPACE Name '{' ConstructList '}'
-                { $$ = new Scope($2, $4); }
-                | USING NAMESPACE QualName ';'
-                { $$ = new UsingScope($3, false); }
-                | USING QualName ';'
-                { $$ = new UsingScope($2, true); }
-		| OptExtern Module
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NonEntryMember 
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Message ';'
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Chare
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Group
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern NodeGroup
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Array
-		{ $2->setExtern($1); $$ = $2; }
-		| OptExtern Template
-		{ $2->setExtern($1); $$ = $2; }
-		| HashIFComment
-		{ $$ = NULL; }
-		| HashIFDefComment
-		{ $$ = NULL; }
-                | AccelBlock
-                { $$ = $1; }
-		;
+        { if($3) $3->setExtern($1); $$ = $3; }
+        | NAMESPACE Name '{' ConstructList '}'
+        { $$ = new Scope($2, $4); }
+        | USING NAMESPACE QualName ';'
+        { $$ = new UsingScope($3, false); }
+        | USING QualName ';'
+        { $$ = new UsingScope($2, true); }
+        | OptExtern Module
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern NonEntryMember
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Message ';'
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Chare
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Group
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern NodeGroup
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Array
+        { $2->setExtern($1); $$ = $2; }
+        | OptExtern Template
+        { $2->setExtern($1); $$ = $2; }
+        | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters ';'
+        {
+          Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+          int isExtern = 1;
+          e->setExtern(isExtern);
+          e->targs = $6;
+          e->label = new XStr;
+          $4->print(*e->label);
+          $$ = e;
+        }
+        | HashIFComment
+        { $$ = NULL; }
+        | HashIFDefComment
+        { $$ = NULL; }
+        | AccelBlock
+        { $$ = $1; }
+        ;
 
 TParam		: Type
 		{ $$ = new TParamType($1); }
@@ -672,6 +682,11 @@ IncludeFile    : LITERAL
 
 Member		: Entry ';'
 		{ $$ = $1; }
+                | TemplateSpec Entry ';'
+                {
+                  $2->tspec = $1;
+                  $$ = $2;
+                }
 		| NonEntryMember
 		{ $$ = $1; }
 		;
@@ -680,10 +695,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($7 != 0) { 
 		    $7->con1 = new SdagConstruct(SIDENT, $4);
-  		    if ($5 != 0)
-                      $7->param = new ParamList($5);
- 		    else 
- 	 	      $7->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $7->param = new ParamList($5);
                   }
 		  $$ = new Entry(lineno, $2, $3, $4, $5, $6, $7, 0, 0); 
 		}
@@ -691,10 +703,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
 		  if ($5 != 0) {
 		    $5->con1 = new SdagConstruct(SIDENT, $3);
-		    if ($4 != 0)
-                      $5->param = new ParamList($4);
-		    else
-                      $5->param = new ParamList(new Parameter(0, new BuiltinType("void")));
+                    $5->param = new ParamList($4);
                   }
 		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
 		  if (e->param && e->param->isCkMigMsgPtr()) {
@@ -934,7 +943,7 @@ AccelParamList	: AccelParameter
 EParameters	: '(' ParamList ')'
 		{ $$ = $2; }
 		| '(' ')'
-		{ $$ = 0; }
+		{ $$ = new ParamList(new Parameter(0, new BuiltinType("void"))); }
 		;
 
 AccelEParameters  : '[' AccelParamList ']'
@@ -1060,19 +1069,9 @@ StartIntExpr	: '('
 		;
 
 SEntry		: IDENT EParameters
-		{ 
-		  if ($2 != 0)
-		     $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); 
-		  else
-		     $$ = new Entry(lineno, 0, 0, $1, 
-				new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, 0, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $2, 0, 0, 0, 0); }
 		| IDENT SParamBracketStart CCode SParamBracketEnd EParameters 
-		{ if ($5 != 0)
-		    $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); 
-		  else
-		    $$ = new Entry(lineno, 0, 0, $1, new ParamList(new Parameter(0, new BuiltinType("void"))), 0, 0, $3, 0); 
-		}
+		{ $$ = new Entry(lineno, 0, 0, $1, $5, 0, 0, $3, 0); }
 		;
 
 SEntryList	: SEntry 

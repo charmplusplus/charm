@@ -630,11 +630,13 @@ class Member : public Construct {
   protected:
     Chare *container;
   public:
+    TVarList *tspec;
+    Member() : container(0), tspec(0) { }
     inline Chare *getContainer() const { return container; }
     virtual void setChare(Chare *c) { container = c; }
     virtual int isSdag(void) { return 0; }
     virtual void collectSdagCode(CParsedFile *, int&) { return; }
-    XStr makeDecl(const XStr &returnType,int forProxy=0);
+    XStr makeDecl(const XStr &returnType,int forProxy=0, bool isStatic = false);
     virtual void genPythonDecls(XStr& ) {}
     virtual void genIndexDecls(XStr& ) {}
     virtual void genPythonDefs(XStr& ) {}
@@ -922,9 +924,9 @@ class Entry : public Member {
     int hasCallMarshall;
     void genCall(XStr &dest,const XStr &preCall, bool redn_wrapper=false);
 
-    XStr epStr(void);
-    XStr epIdx(int fromProxy=1);
-    XStr epRegFn(int fromProxy=1);
+    XStr epStr(bool isForRedn = false);
+    XStr epIdx(int fromProxy=1, bool isForRedn = false);
+    XStr epRegFn(int fromProxy=1, bool isForRedn = false);
     XStr chareIdx(int fromProxy=1);
     void genEpIdxDecl(XStr& str);
     void genEpIdxDef(XStr& str);
@@ -967,13 +969,16 @@ class Entry : public Member {
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
   public:
+    XStr *label;
+    char *name;
+    TParamList *targs;
+
+    // SDAG support
     SdagConstruct *sdagCon;
     TList<CStateVar *> *stateVars;
     TList<CStateVar *> *stateVarsChildren;
     TList<CStateVar *> estateVars;
     CEntry *entryPtr;
-    XStr *label;
-    char *name;
     const char *intExpr;
     ParamList *param;
     ParamList *connectParam;
@@ -1030,7 +1035,7 @@ class Entry : public Member {
     void genDecls(XStr& str);
     void genDefs(XStr& str);
     void genReg(XStr& str);
-    XStr genRegEp();
+    XStr genRegEp(bool isForRedn = false);
     void preprocess();
     char *getEntryName() { return name; }
     void generateEntryList(TList<CEntry*>&, SdagConstruct *);

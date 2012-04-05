@@ -1,7 +1,7 @@
 mainmodule megatest {
   readonly CkChareID  mainhandle;
   mainchare main {
-    entry main();
+    entry main(CkArgMsg *m);
     entry void start();
     entry void finish(void);
   };
