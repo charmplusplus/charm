@@ -702,7 +702,7 @@ static int PumpMsgs(void) {
             else {
                 START_EVENT();
                 IRecvList one = irecvListEntryAllocate();
-                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req));
+                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)));
                     CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
                 one->msg = msg;
                 one->size = nbytes;
