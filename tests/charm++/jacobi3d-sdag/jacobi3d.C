@@ -190,8 +190,12 @@ class Main : public CBase_Main {
 	void report() {
 		iterations += CKP_FREQ;
 		if (iterations < MAX_ITER) {
+#ifdef CMK_MEM_CHECKPOINT
 			CkCallback cb (CkIndex_Jacobi::doStep(), array);
 			CkStartMemCheckpoint(cb);
+#else
+			array.doStep();
+#endif
 		} else {
 			CkPrintf("Completed %d iterations\n", MAX_ITER-1);
 			endTime = CmiWallTimer();
@@ -401,7 +405,16 @@ class Jacobi: public CBase_Jacobi {
 		constrainBC();
 
 		if (iterations % CKP_FREQ == 0 || iterations > MAX_ITER){
+#ifdef CMK_MEM_CHECKPOINT
 			contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+#elif CMK_MESSAGE_LOGGING
+			if(iterations > MAX_ITER)
+				contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+			else
+				AtSync();
+#else
+			doStep();
+#endif
 		} else {
 			doStep();
 		}

@@ -177,12 +177,16 @@ class Main : public CBase_Main {
     	iterations = value[0];
 		if (iterations < MAX_ITER) {
 			times.push_back(std::make_pair(CmiWallTimer() - startTime,iterations));
+#ifdef CMK_MEM_CHECKPOINT
 			if(iterations != 0 && iterations % CKP_FREQ == 0){
 				CkCallback cb (CkIndex_Jacobi::doStep(), array);
 				CkStartMemCheckpoint(cb);		
 			}else{
 				array.doStep();
 			}
+#else
+			array.doStep();
+#endif
       	} else {
 			CkPrintf("Completed %d iterations\n", MAX_ITER-1);
 			endTime = CmiWallTimer();
@@ -230,6 +234,8 @@ class Jacobi: public CBase_Jacobi {
 		iterations = 0;
       	imsg = 0;
       	constrainBC();
+
+		usesAtSync = CmiTrue;
     }
 
     Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) {}
@@ -405,6 +411,18 @@ class Jacobi: public CBase_Jacobi {
       	new_temperature = tmp;
 
 		constrainBC();
+#ifdef CMK_MESSAGE_LOGGING
+		if(iterations % CKP_FREQ == 0){
+			AtSync();
+		} else {
+			contribute(sizeof(int), &iterations, CkReduction::max_int);
+		}
+#else
+		contribute(sizeof(int), &iterations, CkReduction::max_int);
+#endif
+	}
+
+	void ResumeFromSync(){
 		contribute(sizeof(int), &iterations, CkReduction::max_int);
 	}
 
