@@ -3027,7 +3027,7 @@ XStr Entry::marshallMsg(void)
   return ret;
 }
 
-XStr Entry::epStr(bool isForRedn)
+XStr Entry::epStr(bool isForRedn, bool templateCall)
 {
   XStr str;
   if (isForRedn)
@@ -3042,6 +3042,13 @@ XStr Entry::epStr(bool isForRedn)
     str<<"void";
   else
     str<<"marshall"<<entryCount;
+
+  if (tspec && templateCall) {
+    str << "< ";
+    tspec->genShort(str);
+    str << " >";
+  }
+
   return str;
 }
 
@@ -3054,13 +3061,7 @@ XStr Entry::epIdx(int fromProxy, bool isForRedn)
     if (tspec)
       str << "template ";
   }
-  str << "idx_" << epStr(isForRedn);
-  if (tspec) {
-    str << "< ";
-    tspec->genShort(str);
-    str << " >";
-  }
-  str << "()";
+  str << "idx_" << epStr(isForRedn, true) << "()";
   return str;
 }
 
@@ -3069,13 +3070,7 @@ XStr Entry::epRegFn(int fromProxy, bool isForRedn)
   XStr str;
   if (fromProxy)
     str << indexName() << "::";
-  str << "reg_" << epStr(isForRedn);
-  if (tspec) {
-    str << "< ";
-    tspec->genShort(str);
-    str << " >";
-  }
-  str << "()";
+  str << "reg_" << epStr(isForRedn, true) << "()";
   return str;
 }
 
@@ -4812,12 +4807,7 @@ XStr Entry::genRegEp(bool isForRedn)
       str << "redn_wrapper_" << name << "(CkReductionMsg *impl_msg)\",\n";
   else
       str << name << "("<<paramType(0)<<")\",\n";
-  str << "      _call_" << epStr(isForRedn);
-  if (tspec) {
-    str << "< ";
-    tspec->genShort(str);
-    str << " >";
-  }
+  str << "      _call_" << epStr(isForRedn, true);
   str << ", ";
   /* messageIdx: */
   if (param->isMarshalled()) {
