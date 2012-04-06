@@ -702,12 +702,14 @@ static int PumpMsgs(void) {
             else {
                 START_EVENT();
                 IRecvList one = irecvListEntryAllocate();
-                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)));
+                if(MPI_SUCCESS != MPI_Irecv(msg, nbytes, MPI_BYTE, sts.MPI_SOURCE, sts.MPI_TAG, charmComm, &(one->req)))
                     CmiAbort("PumpMsgs: MPI_Irecv failed!\n");
+		/*printf("[%d]: irecv msg=%p, nbytes=%d, src=%d, tag=%d\n", CmiMyPe(), msg, nbytes, sts.MPI_SOURCE, sts.MPI_TAG);*/
                 one->msg = msg;
                 one->size = nbytes;
                 one->next = NULL;
                 waitIrecvListTail->next = one;
+		waitIrecvListTail = one;
                 CONDITIONAL_TRACE_USER_EVENT(50); /* MPI_Irecv related user events */
             }
 #endif
