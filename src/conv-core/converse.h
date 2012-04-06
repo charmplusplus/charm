@@ -619,10 +619,6 @@ CpvExtern(int, _curRestartPhase);      /* number of restarts */
 #define MESSAGE_PHASE_CHECK(msg)
 #endif
 
-#if CMK_CONVERSE_GEMINI_UGNI && !CMK_SEQUENTIAL
-#include "gni_pub.h"
-#endif
-
 /** This header goes before each chunk of memory allocated with CmiAlloc. 
     See the comment in convcore.c for details on the fields.
 */
