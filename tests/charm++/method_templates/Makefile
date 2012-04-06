@@ -22,7 +22,7 @@ CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS += $(OPTS)
 LDFLAGS  +=
 EXEC      = ./charmrun
-EXECFLAGS = +p$(NP)
+EXECFLAGS = +p$(NP) $(TESTOPTS)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
 endif
