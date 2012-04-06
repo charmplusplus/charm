@@ -13,6 +13,7 @@ extern void BgPrintf(char *);
 #define DIMY 128
 #define DIMZ 128
 #define CKPT_FREQ 100
+#define NO_PUP
 
 int NX, NY, NZ;
 
