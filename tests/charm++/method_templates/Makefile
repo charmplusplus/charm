@@ -45,7 +45,7 @@ again:
 
 test: all
 	@echo "########################################################################################"
-	$(EXEC) $(EXECFLAGS) $(TARGET) $(ARGS)
+	$(EXEC) $(EXECFLAGS) ./$(TARGET) $(ARGS)
 
 
 ####### Pattern rules
