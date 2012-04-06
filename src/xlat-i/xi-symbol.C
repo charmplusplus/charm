@@ -4317,8 +4317,8 @@ void Entry::genIndexDecls(XStr& str)
   }
   if (hasCallMarshall) {
     str << templateSpecLine
-        << "\n    static int _callmarshall_" << epStr() << "(char* impl_buf,"
-        << container->baseName() << "* impl_obj);";
+        << "\n    static int _callmarshall_" << epStr()
+        << "(char* impl_buf, void* impl_obj_void);";
   }
   if (param->isMarshalled()) {
     str << templateSpecLine
@@ -4642,7 +4642,19 @@ void Entry::genDefs(XStr& str)
   // Define the entry point registration functions
   str << "\n// Entry point registration function"
       << "\n" << makeDecl("int") << "::reg_" << epStr() << "() {"
-      << "\n  return " << genRegEp() << ";"
+      << "\n  int epidx = " << genRegEp() << ";";
+  if (hasCallMarshall)
+    str << "\n  CkRegisterMarshallUnpackFn(epidx, "
+        << "_callmarshall_" << epStr(false, true) << ");";
+  if (param->isMarshalled()) {
+    str << "\n  CkRegisterMessagePupFn(epidx, "
+        << "_marshallmessagepup_" << epStr(false, true) << ");\n";
+  }
+  else if (param->isMessage() && !attribs&SMIGRATE) {
+    str << "\n  CkRegisterMessagePupFn(epidx, (CkMessagePupFn)"
+        << param->param->getType()->getBaseName() << "::ckDebugPup);";
+  }
+  str << "\n  return epidx;"
       << "\n}\n\n";
 
   if (isReductionTarget())
@@ -4762,7 +4774,9 @@ void Entry::genDefs(XStr& str)
   str << "}\n";
 
   if (hasCallMarshall) {
-    str << makeDecl("int")<<"::_callmarshall_"<<epStr()<<"(char* impl_buf,"<<containerType<<" * impl_obj) {\n";
+    str << makeDecl("int") << "::_callmarshall_" << epStr()
+        <<"(char* impl_buf, void* impl_obj_void) {\n";
+    str << "  " << containerType << "* impl_obj = static_cast< " << containerType << " *>(impl_obj_void);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
         genCall(str,preCall);
@@ -4866,18 +4880,6 @@ void Entry::genReg(XStr& str)
       str << "  CkRegisterDefaultCtor(__idx, "<<epIdx(0)<<");\n";
     if(attribs&SMIGRATE)
       str << "  CkRegisterMigCtor(__idx, "<<epIdx(0)<<");\n";
-  }
-  if (hasCallMarshall)
-      str << "  CkRegisterMarshallUnpackFn("<<epIdx(0)<<
-            ",(CkMarshallUnpackFn)_callmarshall_"<<epStr()<<");\n";
-
-  if (param->isMarshalled()) {
-      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<
-  	    ",(CkMessagePupFn)_marshallmessagepup_"<<epStr()<<");\n";
-  }
-  else if (param->isMessage() && !attribs&SMIGRATE) {
-      str << "  CkRegisterMessagePupFn("<<epIdx(0)<<", (CkMessagePupFn)";
-      str << param->param->getType()->getBaseName() <<"::ckDebugPup);\n";
   }
 }
 
