@@ -14,7 +14,7 @@ INTF      = mylib.ci pgm.ci
 # Specify the exe name and the arguments to run it with
 NP        = 4
 TARGET    = testTemplateEP
-ARGS      = 
+ARGS      = $(TESTOPTS)
 
 # Specify the compilers, run script, flags etc.
 CXX       = $(CHARMBIN)/charmc
@@ -22,7 +22,7 @@ CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS += $(OPTS)
 LDFLAGS  +=
 EXEC      = ./charmrun
-EXECFLAGS = +p$(NP) $(TESTOPTS)
+EXECFLAGS = +p$(NP)
 ifdef $(NODELIST)
   EXECFLAGS += ++nodelist $(NODELIST)
 endif
