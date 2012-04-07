@@ -2033,7 +2033,19 @@ void LrtsPostCommonInit(int everReturn)
 
 /* this is called by worker thread */
 void LrtsPostNonLocal(){
-#if 1
+
+#if CMK_WORKER_SINGLE_TASK
+    if (CmiMyRank() % 5 == 1)
+#endif
+    {
+        traceEndIdle();
+#if REMOTE_EVENT
+        RECV_PERSISTENT
+#endif
+         SEND_PERSISTENT
+         traceBeginIdle();
+    }
+#if 0
 #if CMK_SMP_TRACE_COMMTHREAD
     double startT, endT;
 #endif
@@ -3514,11 +3526,12 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpSmsg, startT, endT);
 #endif
 
+#if !MULTI_THREAD_SEND
 #if REMOTE_EVENT
     RECV_PERSISTENT
 #endif
     SEND_PERSISTENT
-
+#endif
     //sending small messages
     /* Send buffered Message */
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -3553,11 +3566,15 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpTransaction, startT, endT);
 #endif
 
+#if CMK_USE_OOB
+    SendBufferMsg(&smsg_oob_queue, NULL);
+#endif
+#if !MULTI_THREAD_SEND
 #if REMOTE_EVENT
     RECV_PERSISTENT
 #endif
     SEND_PERSISTENT
-
+#endif
     //Pump Remote event
 
 #if CMK_SMP_TRACE_COMMTHREAD
@@ -3577,11 +3594,16 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpRdmaTransaction, startT, endT);
 #endif
  
+#if CMK_USE_OOB
+    SendBufferMsg(&smsg_oob_queue, NULL);
+#endif
     //Send pending RDMA transactions
+#if !MULTI_THREAD_SEND
 #if REMOTE_EVENT
     RECV_PERSISTENT
 #endif
     SEND_PERSISTENT
+#endif
 
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
@@ -3597,6 +3619,9 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_SendFmaRdmaMsg, startT, endT);
 #endif
 
+#if CMK_USE_OOB
+    SendBufferMsg(&smsg_oob_queue, NULL);
+#endif
 #if REMOTE_EVENT
     RECV_PERSISTENT
 #endif
