@@ -32,7 +32,15 @@ extern void NodeHelper_Parallelize(
                         int paramNum, void * param, /* the input parameters for the above func */
                         int numChunks, /* number of chunks to be partitioned */
                         int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */                        
-			int sync=1, /* whether the flow will continue unless all chunks have finished */ 
+                        int sync=1, /* whether the flow will continue unless all chunks have finished */ 
+                        void *redResult=NULL, REDUCTION_TYPE type=NODEHELPER_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
+                        );
+extern void NodeHelper_Parallelize(
+						HelperFn func, /* the function that finishes a partial work on another thread */
+                        int paramNum, void * param, /* the input parameters for the above func */
+                        int numChunks, /* number of chunks to be partitioned */
+                        int lowerRange, int upperRange, /* the loop-like parallelization happens in [lowerRange, upperRange] */                        
+                        int sync=1, /* whether the flow will continue unless all chunks have finished */ 
                         void *redResult=NULL, REDUCTION_TYPE type=NODEHELPER_NONE /* the reduction result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */
                         );
 #endif

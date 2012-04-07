@@ -115,13 +115,18 @@ void FuncNodeHelper::exit(){
 #define NDH_TOTAL_WORK_EVENTID  139
 #define NDH_FINISH_SIGNAL_EVENTID 143
 
+static FuncNodeHelper *globalNodeHelper = NULL;
+
 FuncNodeHelper::FuncNodeHelper(int mode_, int numThreads_)
 {  
     traceRegisterUserEvent("nodehelper total work",NDH_TOTAL_WORK_EVENTID);
     traceRegisterUserEvent("nodehlelper finish signal",NDH_FINISH_SIGNAL_EVENTID);
 
     mode = mode_;
-
+    
+    CmiAssert(globalNodeHelper==NULL);
+    globalNodeHelper = this;
+    
     if(mode == NODEHELPER_USECHARM){
         //CkPrintf("FuncNodeHelper created on node %d\n", CkMyNode());                     
         numHelpers = CkMyNodeSize();
@@ -132,7 +137,7 @@ FuncNodeHelper::FuncNodeHelper(int mode_, int numThreads_)
             
         for (int i=0; i<numHelpers; i++) {
             CkChareID helper;
-            CProxy_FuncSingleHelper::ckNew((size_t)this, &helper, pestart+i);
+            CProxy_FuncSingleHelper::ckNew(numHelpers, &helper, pestart+i);
         }
     }else if(mode == NODEHELPER_PTHREAD){
 		helperPtr = NULL;
@@ -158,7 +163,7 @@ int FuncNodeHelper::MAX_CHUNKS = 64;
 #define ALLOW_MULTIPLE_UNSYNC 1
 void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param, 
                                     int numChunks, int lowerRange, 
-				    int upperRange, int sync,
+				                    int upperRange, int sync,
                                     void *redResult, REDUCTION_TYPE type) {
                                         
     double _start; //may be used for tracing
@@ -179,14 +184,15 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 	TRACE_START(NDH_TOTAL_WORK_EVENTID);
 	if(mode == NODEHELPER_USECHARM){	
 		FuncSingleHelper *thisHelper = helperPtr[CkMyRank()];
+#if USE_CONVERSE_NOTIFICATION        
 	#if ALLOW_MULTIPLE_UNSYNC
 		ConverseNotifyMsg *notifyMsg = thisHelper->getNotifyMsg();
 	#else
 		ConverseNotifyMsg *notifyMsg = thisHelper->notifyMsg;
 	#endif
 		curLoop = (CurLoopInfo *)(notifyMsg->ptr);
-		curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);	
-		if(useTreeBcast){		
+		curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
+		if(useTreeBcast){
 			int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
 			//just implicit binary tree
 			int pe = CmiMyRank()+1;        
@@ -202,6 +208,44 @@ void FuncNodeHelper::parallelizeFunc(HelperFn func, int paramNum, void * param,
 				CmiPushPE(i, (void *)(notifyMsg));
 			}
 		}
+#else
+    #if ALLOW_MULTIPLE_UNSYNC
+        curLoop = thisHelper->getNewTask();
+    #else
+        curLoop = thisHelper->taskBuffer[0];
+    #endif
+        curLoop->set(numChunks, func, lowerRange, upperRange, paramNum, param);
+        if(useTreeBcast){
+			int loopTimes = TREE_BCAST_BRANCH>(CmiMyNodeSize()-1)?CmiMyNodeSize()-1:TREE_BCAST_BRANCH;
+			//just implicit binary tree
+			int pe = CmiMyRank()+1;
+			for(int i=0; i<loopTimes; i++, pe++){
+				if(pe >= CmiMyNodeSize()) pe -= CmiMyNodeSize();
+                CharmNotifyMsg *one = thisHelper->getNotifyMsg();
+                one->ptr = (void *)curLoop;
+                envelope *env = UsrToEnv(one);
+                env->setObjPtr(thisHelper->ckGetChareID().objPtr);
+				CmiPushPE(pe, (void *)(env));    
+			}
+		}else{
+			for (int i=CmiMyRank()+1; i<numHelpers; i++) {
+                CharmNotifyMsg *one = thisHelper->getNotifyMsg();
+                one->ptr = (void *)curLoop;
+                envelope *env = UsrToEnv(one);
+                env->setObjPtr(thisHelper->ckGetChareID().objPtr);
+                //printf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
+				CmiPushPE(i, (void *)(env));
+			}
+			for (int i=0; i<CmiMyRank(); i++) {
+                CharmNotifyMsg *one = thisHelper->getNotifyMsg();
+                one->ptr = (void *)curLoop;
+                envelope *env = UsrToEnv(one);
+                env->setObjPtr(thisHelper->ckGetChareID().objPtr);
+                //printf("[%d] sending a msg %p (env=%p) to [%d]\n", CmiMyRank(), one, env, i);
+				CmiPushPE(i, (void *)(env));
+			}
+		}
+#endif        
 	}else if(mode == NODEHELPER_PTHREAD){
 		int numThreads = numHelpers-1;
 		curLoop = pthdLoop;
@@ -272,13 +316,22 @@ static void RegisterNodeHelperHdlrs(){
     CpvAccess(NdhStealWorkHandler) = CmiRegisterHandler((CmiHandler)SingleHelperStealWork);
 }
 
-FuncSingleHelper::FuncSingleHelper(size_t ndhPtr) {
-    thisNodeHelper = (FuncNodeHelper *)ndhPtr;
-    CmiAssert(thisNodeHelper!=NULL);
-        
+extern int _charmHandlerIdx;
+FuncSingleHelper::FuncSingleHelper(int numHelpers) {
+    totalHelpers = numHelpers;
+#if USE_CONVERSE_NOTIFICATION    
+    notifyMsgBufSize = TASK_BUFFER_SIZE;
+#else
+    notifyMsgBufSize = TASK_BUFFER_SIZE*totalHelpers;
+#endif
+
+    CmiAssert(globalNodeHelper!=NULL);
+    thisNodeHelper = globalNodeHelper;
+            
 	nextFreeNotifyMsg = 0;
-    notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*MSG_BUFFER_SIZE);
-    for(int i=0; i<MSG_BUFFER_SIZE; i++){
+#if USE_CONVERSE_NOTIFICATION    
+    notifyMsg = (ConverseNotifyMsg *)malloc(sizeof(ConverseNotifyMsg)*notifyMsgBufSize);
+    for(int i=0; i<notifyMsgBufSize; i++){
         ConverseNotifyMsg *tmp = notifyMsg+i;
         if(thisNodeHelper->useTreeBcast){
             tmp->srcRank = CmiMyRank();
@@ -288,12 +341,60 @@ FuncSingleHelper::FuncSingleHelper(size_t ndhPtr) {
         tmp->ptr = (void *)(new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS));
         CmiSetHandler(tmp, CpvAccess(NdhStealWorkHandler));
     }
-    thisNodeHelper->helperPtr[CkMyRank()] = this;
+#else
+    nextFreeTaskBuffer = 0;
+    notifyMsg = (CharmNotifyMsg **)malloc(sizeof(CharmNotifyMsg *)*notifyMsgBufSize);
+    for(int i=0; i<notifyMsgBufSize; i++){
+        CharmNotifyMsg *tmp = new(sizeof(int)*8)CharmNotifyMsg; //allow msg priority bits
+        notifyMsg[i] = tmp;
+        if(thisNodeHelper->useTreeBcast){
+            tmp->srcRank = CmiMyRank();
+        }else{
+            tmp->srcRank = -1;
+        }
+        tmp->ptr = NULL;
+        envelope *env = UsrToEnv(tmp);
+        env->setMsgtype(ForChareMsg);
+        env->setEpIdx(CkIndex_FuncSingleHelper::stealWork(NULL));
+        env->setSrcPe(CkMyPe());
+        CmiSetHandler(env, _charmHandlerIdx);
+        //env->setObjPtr has to be called when a notification msg is sent
+    }
+    taskBuffer = (CurLoopInfo **)malloc(sizeof(CurLoopInfo *)*TASK_BUFFER_SIZE);
+    for(int i=0; i<TASK_BUFFER_SIZE; i++){
+        taskBuffer[i] = new CurLoopInfo(FuncNodeHelper::MAX_CHUNKS);
+    }
+#endif    
+    globalNodeHelper->helperPtr[CkMyRank()] = this;
 }
 
+void FuncSingleHelper::stealWork(CharmNotifyMsg *msg){
+#if !USE_CONVERSE_NOTIFICATION    
+    int srcRank = msg->srcRank;
+    CurLoopInfo *loop = (CurLoopInfo *)msg->ptr;
+    if(srcRank >= 0){
+        //means using tree-broadcast to send the notification msg
+        int relPE = CmiMyRank()-msg->srcRank;
+		if(relPE<0) relPE += CmiMyNodeSize();
+		
+		//CmiPrintf("Rank[%d]: got msg from src %d with relPE %d\n", CmiMyRank(), msg->srcRank, relPE);
+		relPE=relPE*TREE_BCAST_BRANCH+1;
+		for(int i=0; i<TREE_BCAST_BRANCH; i++, relPE++){
+			if(relPE >= CmiMyNodeSize()) break;
+			int pe = (relPE + msg->srcRank)%CmiMyNodeSize();
+			//CmiPrintf("Rank[%d]: send msg to dst %d (relPE: %d) from src %d\n", CmiMyRank(), pe, relPE, msg->srcRank);
+            CharmNotifyMsg *newone = getNotifyMsg();
+            newone->ptr = (void *)loop;
+            envelope *env = UsrToEnv(newone);
+            env->setObjPtr(thisNodeHelper->helperPtr[pe]->ckGetChareID().objPtr);
+			CmiPushPE(pe, (void *)env);
+		}
+    }
+    loop->stealWork();
+#endif    
+}
 
 void SingleHelperStealWork(ConverseNotifyMsg *msg){
-	
 	int srcRank = msg->srcRank;
 	
 	if(srcRank >= 0){
@@ -365,10 +466,18 @@ void NodeHelper_Exit(CProxy_FuncNodeHelper nodeHelper){
 void NodeHelper_Parallelize(CProxy_FuncNodeHelper nodeHelper, HelperFn func, 
                         int paramNum, void * param, 
                         int numChunks, int lowerRange, int upperRange,
-			int sync,
+			            int sync,
                         void *redResult, REDUCTION_TYPE type)
 {
     nodeHelper[CkMyNode()].ckLocalBranch()->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
 }
 
+void NodeHelper_Parallelize(HelperFn func, 
+                        int paramNum, void * param, 
+                        int numChunks, int lowerRange, int upperRange,
+			            int sync,
+                        void *redResult, REDUCTION_TYPE type)
+{
+    globalNodeHelper->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
+}
 #include "NodeHelper.def.h"
