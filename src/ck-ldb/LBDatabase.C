@@ -444,7 +444,7 @@ void LBDatabase::init(void)
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
-  adaptive_struct.tentative_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = -1;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
@@ -592,7 +592,7 @@ void LBDatabase::ResumeClients() {
   adaptive_struct.lb_calculated_period = INT_MAX;
   adaptive_struct.lb_no_iterations = -1;
   adaptive_struct.global_max_iter_no = 0;
-  adaptive_struct.tentative_max_iter_no = 0;
+  adaptive_struct.tentative_max_iter_no = -1;
   adaptive_struct.global_recv_iter_counter = 0;
   adaptive_struct.in_progress = false;
   adaptive_struct.lb_strategy_cost = 0.0;
@@ -678,7 +678,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   adaptive_lbdb.history_data.push_back(data);
 
   // If lb period inform is in progress, dont inform again
-  if (adaptive_struct.in_progress) {
+  if (adaptive_struct.in_progress || (adaptive_struct.final_lb_period == iteration_n)) {
     return;
   }
 
@@ -700,10 +700,24 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
-//      adaptive_struct.lb_calculated_period = 40;
-//      adaptive_struct.lb_period_informed = true;
-//      thisProxy.LoadBalanceDecision(adaptive_struct.lb_calculated_period);
-//      return;
+     // if (iteration_n <= 5) {
+     //   adaptive_struct.lb_calculated_period = 9;
+     // } else if (iteration_n <= 10) {
+     //   adaptive_struct.lb_calculated_period = 7;
+     // }// else if (iteration_n <= 10) {
+     // //adaptive_struct.lb_calculated_period = 9;
+     // //} else if (iteration_n > adaptive_struct.tentative_max_iter_no) {
+     // //  adaptive_struct.lb_calculated_period = iteration_n + 1;
+     // //}
+
+     // adaptive_struct.doCommStrategy = false;
+     // adaptive_struct.lb_period_informed = true;
+
+     // CkPrintf("Informing everyone the lb period is %d\n",
+     //     adaptive_struct.lb_calculated_period);
+     // thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
+     // return;
+
 //    }
 
 
@@ -732,6 +746,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   int period;
   if (generatePlan(period)) {
     //CkPrintf("Carry out load balancing step at iter\n");
+    DEBAD(("Generated period and calculated %d and period %d max iter %d\n",
+    adaptive_struct.lb_calculated_period, period,
+    adaptive_struct.tentative_max_iter_no));
 
     // If the new lb period is less than current set lb period
     //if (adaptive_struct.lb_calculated_period > period) {
@@ -988,7 +1005,7 @@ void LBDatabase::ReceiveIterationNo(int req_no, int local_iter_no) {
     }
     thisProxy.LoadBalanceDecisionFinal(req_no, adaptive_struct.tentative_period);
     adaptive_struct.in_progress = false;
-    adaptive_struct.global_max_iter_no = 0;
+    //adaptive_struct.global_max_iter_no = -1;
     adaptive_struct.global_recv_iter_counter = 0;
   }
 }
