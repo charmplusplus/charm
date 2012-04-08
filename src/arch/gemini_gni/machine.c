@@ -2446,7 +2446,7 @@ static void getLargeMsgRequest(void* header, uint64_t inst_id, uint8_t tag, PCQu
             RDMA_TRANS_INIT(pd->type, pd->sync_flag_addr/1000000.0)
 #endif
         }
-    }else
+    }else if (status != GNI_RC_SUCCESS)
     {
         SetMemHndlZero((pd->local_mem_hndl));
     }
