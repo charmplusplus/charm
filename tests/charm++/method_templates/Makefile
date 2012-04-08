@@ -48,14 +48,8 @@ test: all
 	$(EXEC) $(EXECFLAGS) ./$(TARGET) $(ARGS)
 
 
-####### Pattern rules
-# Rule to generate dependency information for C++ source files
-%.d: %.C
-	$(info Generating dependencies for $<)
-	@g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) -I$(CHARMINC) $< | perl $(CHARMBIN)/dep.pl $(CHARMINC) > $@
-#	@$(SHELL) -ec 'g++ -MM -MG $(CPPFLAGS) $(INCDIRS:%=-I%) $< \
-#	| sed '\''s/\($*\)\.o[ :]*/\1.o $@ : /g'\'' > $@; \
-#	[ -s $@ ] || rm -f $@'
+mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
+pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
 
 # Rule to generate dependency info for charm++ interface (ci) definition files
 %.di: %.ci
@@ -66,6 +60,5 @@ test: all
 	$(CXX) $< && touch $@
 
 # Include the generated files containing dependency info
--include $(SRC:.C=.d)
 -include $(INTF:.ci=.di)
 
