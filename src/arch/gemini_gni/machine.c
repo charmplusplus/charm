@@ -1104,12 +1104,6 @@ void my_free_huge_pages(void *ptr, int size)
 #include "machine-lrts.h"
 #include "machine-common-core.c"
 
-/* Network progress function is used to poll the network when for
-   messages. This flushes receive buffers on some  implementations*/
-#if CMK_MACHINE_PROGRESS_DEFINED
-void CmiMachineProgressImpl() {
-}
-#endif
 
 static int SendBufferMsg(SMSG_QUEUE *queue, SMSG_QUEUE *urgent_queue);
 static void SendRdmaMsg(PCQueue );
@@ -1898,20 +1892,10 @@ void LrtsPostCommonInit(int everReturn)
 }
 
 /* this is called by worker thread */
-void LrtsPostNonLocal(){
-
-#if MULTI_THREAD_SEND
-#if CMK_WORKER_SINGLE_TASK
-    if (CmiMyRank() % 5 == 1)
-#endif
-    {
-        traceEndIdle();
-        PUMP_REMOTE_HIGHPRIORITY
-        POST_HIGHPRIORITY_RDMA
-        traceBeginIdle();
-    }
-#endif
+void LrtsPostNonLocal()
+{
 #if 0
+
 #if CMK_SMP_TRACE_COMMTHREAD
     double startT, endT;
 #endif
@@ -1924,6 +1908,30 @@ void LrtsPostNonLocal(){
     startT = CmiWallTimer();
 #endif
 
+    CmiMachineProgressImpl();
+
+#if CMK_SMP_TRACE_COMMTHREAD
+    endT = CmiWallTimer();
+    traceUserBracketEvent(event_AdvanceCommunication, startT, endT);
+    traceBeginIdle();
+#endif
+
+#endif
+#endif
+}
+
+/* Network progress function is used to poll the network when for
+   messages. This flushes receive buffers on some  implementations*/
+#if CMK_MACHINE_PROGRESS_DEFINED
+void CmiMachineProgressImpl() {
+#if ! CMK_SMP || MULTI_THREAD_SEND
+
+    SEND_OOB_SMSG(smsg_oob_queue)
+    PUMP_REMOTE_HIGHPRIORITY
+    PUMP_LOCAL_HIGHPRIORITY
+    POST_HIGHPRIORITY_RDMA
+
+#if 0
 #if CMK_WORKER_SINGLE_TASK
     if (CmiMyRank() % 6 == 0)
 #endif
@@ -1967,15 +1975,11 @@ void LrtsPostNonLocal(){
     STATS_SENDRDMAMSG_TIME(SendRdmaMsg());
 #endif
 
-#if CMK_SMP_TRACE_COMMTHREAD
-    endT = CmiWallTimer();
-    traceUserBracketEvent(event_AdvanceCommunication, startT, endT);
-    traceBeginIdle();
-#endif
-
 #endif
 #endif
 }
+#endif
+
 
 /* useDynamicSMSG */
 static void    PumpDatagramConnection()
