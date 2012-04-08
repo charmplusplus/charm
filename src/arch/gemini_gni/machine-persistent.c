@@ -71,9 +71,9 @@ void LrtsSendPersistentMsg(PersistentHandle h, int destNode, int size, void *m)
          /* always buffer */
 #if CMK_SMP || 1
 #if REMOTE_EVENT
-        bufferRdmaMsg(sendPersistentBuf, destNode, pd, (int)(size_t)(slot->destHandle));
+        bufferRdmaMsg(sendHighPriorBuf, destNode, pd, (int)(size_t)(slot->destHandle));
 #else
-        bufferRdmaMsg(sendPersistentBuf, destNode, pd, -1);
+        bufferRdmaMsg(sendHighPriorBuf, destNode, pd, -1);
 #endif
 
 #else                      /* non smp */
