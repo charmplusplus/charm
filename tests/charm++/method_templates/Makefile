@@ -28,10 +28,6 @@ ifdef $(NODELIST)
 endif
 
 
-mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
-pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
-
-
 ########### This stuff should be able take care of itself ############
 
 .PHONY: all clean again test bgtest translateInterface
@@ -51,6 +47,9 @@ test: all
 	@echo "########################################################################################"
 	$(EXEC) $(EXECFLAGS) ./$(TARGET) $(ARGS)
 
+
+mylib.o: mylib.C mylib.h mylib.decl.h mylib.def.h
+pgm.o: pgm.C client.decl.h mylib.h mylib.decl.h mylib.def.h utils.h client.def.h
 
 # Rule to generate dependency info for charm++ interface (ci) definition files
 %.di: %.ci
