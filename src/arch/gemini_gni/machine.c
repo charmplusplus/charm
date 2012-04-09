@@ -67,17 +67,27 @@
 
 #define CMI_SENDBUFFERSMSG_CAP     0
 #define CMI_PUMPNETWORKSMSG_CAP    0
+#define CMI_PUMPREMOTETRANSACTIONS_CAP    0
+#define CMI_PUMPLOCALTRANSACTIONS_CAP    0
 
 #if CMI_SENDBUFFERSMSG_CAP
-int     SendBufferMsg_cap  = 10;
+int     SendBufferMsg_cap  = 20;
 #endif
 
 #if CMI_PUMPNETWORKSMSG_CAP
-int     PumpNetworkSmsg_cap = 10;
+int     PumpNetworkSmsg_cap = 20;
+#endif
+
+#if CMI_PUMPREMOTETRANSACTIONS_CAP
+int     PumpRemoteTransactions_cap = 20;
+#endif
+
+#if CMI_PUMPREMOTETRANSACTIONS_CAP
+int     PumpLocalTransactions_cap = 20;
 #endif
 
 #if CMI_EXERT_SEND_LARGE_CAP
-static int SEND_large_cap = 10;
+static int SEND_large_cap = 20;
 static int SEND_large_pending = 0;
 #endif
 
@@ -1894,7 +1904,7 @@ void LrtsPostCommonInit(int everReturn)
 /* this is called by worker thread */
 void LrtsPostNonLocal()
 {
-#if 0
+#if 1
 
 #if CMK_SMP_TRACE_COMMTHREAD
     double startT, endT;
@@ -1902,6 +1912,8 @@ void LrtsPostNonLocal()
 
 #if MULTI_THREAD_SEND
     if(mysize == 1) return;
+
+    if (CmiMyRank() % 6 != 3) return;
 
 #if CMK_SMP_TRACE_COMMTHREAD
     traceEndIdle();
@@ -1926,6 +1938,7 @@ void LrtsPostNonLocal()
 void CmiMachineProgressImpl() {
 #if ! CMK_SMP || MULTI_THREAD_SEND
 
+    STATS_PUMPNETWORK_TIME(PumpNetworkSmsg());
     SEND_OOB_SMSG(smsg_oob_queue)
     PUMP_REMOTE_HIGHPRIORITY
     PUMP_LOCAL_HIGHPRIORITY
@@ -2597,7 +2610,13 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
     void                    *msg;   
     int                     inst_id, index, type, size;
 
+#if CMI_PUMPREMOTETRANSACTIONS_CAP
+    int                     pump_count = 0;
+#endif
     while(1) {
+#if CMI_PUMPREMOTETRANSACTIONS_CAP
+        if (pump_count > PumpRemoteTransactions_cap) break;
+#endif
         CMI_GNI_LOCK(global_gni_lock)
 //        CMI_GNI_LOCK(rdma_tx_cq_lock)
         status = GNI_CqGetEvent(rx_cqh, &ev);
@@ -2605,6 +2624,10 @@ static void PumpRemoteTransactions(gni_cq_handle_t rx_cqh)
         CMI_GNI_UNLOCK(global_gni_lock)
 
         if(status != GNI_RC_SUCCESS) break;
+
+#if CMI_PUMPREMOTETRANSACTIONS_CAP
+        pump_count ++;
+#endif
 
         inst_id = GNI_CQ_GET_INST_ID(ev);
         index = GET_INDEX(inst_id);
@@ -2674,8 +2697,13 @@ static void PumpLocalTransactions(gni_cq_handle_t my_tx_cqh, CmiNodeLock my_cq_l
     CMK_DIRECT_HEADER       *cmk_direct_done_msg;
 #endif
     SMSG_QUEUE         *queue = &smsg_queue;
-
+#if CMI_PUMPLOCALTRANSACTIONS_CAP
+    int         pump_count = 0;
+    while(pump_count < PumpLocalTransactions_cap) {
+        pump_count++;
+#else
     while(1) {
+#endif
         CMI_GNI_LOCK(my_cq_lock) 
         status = GNI_CqGetEvent(my_tx_cqh, &ev);
         CMI_GNI_UNLOCK(my_cq_lock)
@@ -3201,6 +3229,11 @@ void LrtsAdvanceCommunication(int whileidle)
     if (endT-startT>=TRACE_THRESHOLD) traceUserBracketEvent(event_PumpSmsg, startT, endT);
 #endif
 
+    SEND_OOB_SMSG(smsg_oob_queue)
+    PUMP_REMOTE_HIGHPRIORITY
+    PUMP_LOCAL_HIGHPRIORITY
+    POST_HIGHPRIORITY_RDMA
+    
     ///* Send buffered Message */
 #if CMK_SMP_TRACE_COMMTHREAD
     startT = CmiWallTimer();
