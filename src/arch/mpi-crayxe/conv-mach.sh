@@ -25,10 +25,10 @@ CMK_LD_LIBRARY_PATH="-Wl,-rpath,$CHARMLIBSO/"
 if test -n "$PGCC"
 then
 CMK_CC="$CMK_CC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
-CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc -fPIC "
-CMK_SEQ_CXX="pgCC -fPIC "
+CMK_SEQ_CXX="pgCC -fPIC --no_using_std "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="icc -fPIC "

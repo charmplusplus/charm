@@ -21,10 +21,10 @@ CMK_QT="generic64"
 if test -n "$PGCC"
 then
 CMK_CC="$CMK_CC -DCMK_FIND_FIRST_OF_PREDICATE=1 "
-CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 "
+CMK_CXX="$CMK_CXX -DCMK_FIND_FIRST_OF_PREDICATE=1 --no_using_std "
 # gcc is needed for building QT
 CMK_SEQ_CC="gcc "
-CMK_SEQ_CXX="pgCC "
+CMK_SEQ_CXX="pgCC  --no_using_std "
 elif test -n "$ICPC"
 then
 CMK_SEQ_CC="icc -fPIC "
