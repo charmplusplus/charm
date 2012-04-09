@@ -1,0 +1,47 @@
+This is a step-by-step quick tutorial for simple usage of BigSim and visualizing its Projections output logs.
+For more information, please refer to BigSim and Projections manuals.
+
+1- download latest version of Charm from website or git repository:
+	cd ~
+	git clone git://charm.cs.uiuc.edu/charm.git
+
+2- build charm (and AMPI) with bigemulator and bigsim (replace "linux" with "darwin" for mac):
+	cd charm
+	./build charm++ net-linux-x86_64 bigemulator bigsim
+	./build AMPI net-linux-x86_64 bigemulator bigsim
+
+3- compile your code using charm or AMPI compilers located in "net-linux-x86_64-bigemulator-bigsim/bin" with Projections module, for example:
+	cd tests/ampi/jacobi3d; make OPTS="-tracemode projections"
+
+4- run your application emulating the target machine and rename the symbol file, for example:
+	./charmrun +p1 jacobi 4 4 2 5 +vp32 +x32 +y1 +z1 +cth1 +wth1 +bglog
+	mv jacobi.sts tproj.sts  #rename the symbol file
+
+5- download BigSim's simulator
+	cd ~
+	git clone git://charm.cs.uiuc.edu/BigFastSim
+
+6- build BigFastSim:
+	cd BigFastSim/Release
+	vim makefile  #change CHARMPATH=$(HOME)/charm/net-linux-x86_64-bigemulator-bigsim/
+	make
+
+7- copy simulator to trace files' directory:
+	cd ~/charm/tests/ampi/jacobi3d
+	cp ~/BigFastSim/Release/seqSimulator .
+
+8- run the simulator with projections output: (to see other options such as changing latency and bandwidth run "./seqSimulator -help")
+	./seqSimulator -tproj
+
+9- download and make Projections:
+	git clone git://charm.cs.uiuc.edu/projections.git
+	cd projections
+	ant
+
+10- run Projections:
+	./bin/projections64 #open tproj.sts file
+
+After opeing the symbol file (file/open <tproj.sts>), you can use different features of Projections such as tools/Timelines.
+
+-by Ehsan (totoni2@illinois.edu) April 9, 2012
+
