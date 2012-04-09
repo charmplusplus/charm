@@ -2,11 +2,11 @@ mainmodule client  {
   extern module mylib;
   include "utils.h";
 
-  initproc register_instantiations();
+  initnode register_instantiations();
   extern entry void libArray doSomething(cntType&, CkReduction::reducerType&, CkCallback&);
   extern entry void libArray doSomething(avg&, CkReduction::reducerType&, CkCallback&);
 
-  initproc register_reducers();
+  initnode register_reducers();
 
   mainchare pgm {
     entry pgm (CkArgMsg *m);
