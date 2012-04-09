@@ -348,7 +348,10 @@ public:
     LDRemoveLocalBarrierReceiver(myLDHandle,h);
   };
 
-  inline void AtLocalBarrier(LDBarrierClient h) { LDAtLocalBarrier(myLDHandle,h); }
+  inline void AtLocalBarrier(LDBarrierClient h) {
+    lb_in_progress = true;
+    LDAtLocalBarrier(myLDHandle,h);
+  }
   inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
   inline void LocalBarrierOff(void) { LDLocalBarrierOn(myLDHandle); };
   void ResumeClients();
@@ -361,6 +364,9 @@ public:
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void ReceiveIterationNo(int, int); // Receives the current iter no
+  void HandleAdaptiveNoObj();
+  void RegisterNoObjCallback(int index);
+  void TriggerAdaptiveReduction();
 
   bool generatePlan(int& period);
   bool getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc);
@@ -393,7 +399,9 @@ private:
   std::vector<double> total_contrib_vec;
   std::vector<int> total_msg_vec;
   std::vector<int> total_bytes_vec;
+  std::vector<int> lbdb_no_obj_callback;
   int max_iteration;
+  bool lb_in_progress;
 
   double after_lb_max;
   double after_lb_avg;

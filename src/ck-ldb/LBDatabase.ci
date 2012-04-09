@@ -17,6 +17,8 @@ module LBDatabase {
     entry [immediate] void LoadBalanceDecision(int req_no, int period);
     entry [immediate] void LoadBalanceDecisionFinal(int req_no, int period);
     entry [immediate] void ReceiveIterationNo(int, int);
+    entry [immediate] void RegisterNoObjCallback(int);
+    entry [immediate] void TriggerAdaptiveReduction();
   }
 
 };

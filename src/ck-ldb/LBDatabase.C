@@ -24,7 +24,7 @@
 #   define DEBAD(x) /*CkPrintf x*/
 
 struct AdaptiveData {
-  int iteration;
+  double iteration;
   double max_load;
   double avg_load;
   double max_idle_load_ratio;
@@ -417,6 +417,8 @@ void LBDatabase::initnodeFn()
 
   _expectedLoad = new LBRealType[num_proc];
   for (proc=0; proc<num_proc; proc++) _expectedLoad[proc]=0.0;
+
+  //CkPrintf("Total objs in %d is %d\n", CkMyPe(), getLBDB()->ObjDataCount());
 }
 
 // called my constructor
@@ -453,6 +455,8 @@ void LBDatabase::init(void)
   adaptive_struct.lb_msg_recv_no = 0;
   adaptive_struct.total_syncs_called = 0;
   adaptive_struct.last_lb_type = -1;
+
+  lb_in_progress = false;
 
   is_prev_lb_refine = -1;
 }
@@ -604,11 +608,18 @@ void LBDatabase::ResumeClients() {
   max_load_vec.clear();
   total_load_vec.clear();
   total_contrib_vec.clear();
+  if (lb_in_progress) {
+    lbdb_no_obj_callback.clear();
+    lb_in_progress = false;
+  }
 
   max_load_vec.resize(VEC_SIZE, 0.0);
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_contrib_vec.resize(VEC_SIZE, 0.0);
 
+  if (getLBDB()->ObjDataCount() == 0) {
+    HandleAdaptiveNoObj();
+  }
   LDResumeClients(myLDHandle);
 }
 
@@ -647,9 +658,9 @@ bool LBDatabase::AddLoad(int iteration, double load) {
       lb_data[5] = idle_time/total_load_vec[iteration];
     }
 
-   // CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
-   //     total_load_vec[iteration], idle_time,
-   //     idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
+    //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
+    //    total_load_vec[iteration], idle_time,
+    //    idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
     contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
@@ -666,6 +677,12 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   int iteration_n = load[0];
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]));
   delete msg;
+  
+  if (adaptive_struct.final_lb_period != iteration_n) {
+    for (int i = 0; i < lbdb_no_obj_callback.size(); i++) {
+      thisProxy[lbdb_no_obj_callback[i]].TriggerAdaptiveReduction();
+    }
+  }
  
   // Store the data for this iteration
   adaptive_struct.lb_no_iterations = iteration_n;
@@ -1019,6 +1036,49 @@ int LBDatabase::getPredictedLBPeriod(bool& is_tentative) {
      return adaptive_struct.final_lb_period;
    }
 }
+
+
+void LBDatabase::HandleAdaptiveNoObj() {
+  adaptive_struct.lb_no_iterations++;
+  thisProxy[0].RegisterNoObjCallback(CkMyPe());
+  TriggerAdaptiveReduction();
+}
+
+void LBDatabase::RegisterNoObjCallback(int index) {
+  if (lb_in_progress) {
+    lbdb_no_obj_callback.clear();
+    lb_in_progress = false;
+  }
+  lbdb_no_obj_callback.push_back(index);
+  CkPrintf("Registered %d to have no objs.\n", index);
+
+  // If collection has already happened and this is second iteration, then
+  // trigger reduction.
+  if (adaptive_struct.lb_no_iterations != -1) {
+    thisProxy[index].TriggerAdaptiveReduction();
+  }
+}
+
+void LBDatabase::TriggerAdaptiveReduction() {
+  adaptive_struct.lb_no_iterations++;
+  double lb_data[6];
+  lb_data[0] = adaptive_struct.lb_no_iterations;
+  lb_data[1] = 1;
+  lb_data[2] = 0.0;
+  //lb_data[2] = max_load_vec[iteration];
+  lb_data[3] = 0.0;
+  //lb_data[3] = getLBDB()->ObjDataCount();
+  lb_data[4] = 0.0;
+  lb_data[5] = 0.0;
+
+  // CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
+  //     total_load_vec[iteration], idle_time,
+  //     idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
+
+  CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
+  contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
+}
+
 
 bool LBDatabase::isStrategyComm() {
   return adaptive_struct.doCommStrategy;
