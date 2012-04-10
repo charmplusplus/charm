@@ -60,6 +60,7 @@ void MetisLB::work(LDStats* stats)
   int numEdges = 0;				// number of edges
 
   double maxLoad = 0.0;
+  long maxBytes = 1;
   int i, j, k, vert;
 
   /** remove duplicate edges from recvFrom */
@@ -80,6 +81,19 @@ void MetisLB::work(LDStats* stats)
     if(ogr->vertices[i].getVertexLoad() > maxLoad)
       maxLoad = ogr->vertices[i].getVertexLoad();
     numEdges = numEdges + ogr->vertices[i].sendToList.size() + ogr->vertices[i].recvFromList.size();
+
+    /** the num of Bytes is normalized to an integer between 0 and 1024 */
+    for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
+      if (ogr->vertices[i].sendToList[j].getNumBytes() > maxBytes) {
+        maxBytes = ogr->vertices[i].sendToList[j].getNumBytes();
+      }
+    }
+
+    for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
+      if (ogr->vertices[i].recvFromList[j].getNumBytes() > maxBytes) {
+        maxBytes = ogr->vertices[i].recvFromList[j].getNumBytes();
+      }
+    }
   }
 
   /* adjacency list */
@@ -93,18 +107,21 @@ void MetisLB::work(LDStats* stats)
 
   int edgeNum = 0;
   double ratio = 256.0/maxLoad;
+  double byte_ratio = 1024.0/maxBytes;
 
   for(i = 0; i < numVertices; i++) {
     xadj[i] = edgeNum;
     vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
     for(j = 0; j < ogr->vertices[i].sendToList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].sendToList[j].getNeighborId();
-      adjwgt[edgeNum] = ogr->vertices[i].sendToList[j].getNumBytes();
+      adjwgt[edgeNum] = (int)ceil(ogr->vertices[i].sendToList[j].getNumBytes() *
+          byte_ratio);
       edgeNum++;
     }
     for(j = 0; j < ogr->vertices[i].recvFromList.size(); j++) {
       adjncy[edgeNum] = ogr->vertices[i].recvFromList[j].getNeighborId();
-      adjwgt[edgeNum] = ogr->vertices[i].recvFromList[j].getNumBytes();
+      adjwgt[edgeNum] = (int)ceil(ogr->vertices[i].recvFromList[j].getNumBytes()
+          * byte_ratio);
       edgeNum++;
     }
   }
