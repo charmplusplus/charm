@@ -405,6 +405,7 @@ private:
 
   double after_lb_max;
   double after_lb_avg;
+  double prev_idle;
   int is_prev_lb_refine;
 
 public:

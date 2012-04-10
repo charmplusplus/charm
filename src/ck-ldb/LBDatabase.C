@@ -20,6 +20,7 @@
 #define VEC_SIZE 500
 #define IMB_TOLERANCE 1.1
 #define IDLE_LOAD_TOLERANCE 0.3
+#define NEGLECT_IDLE 2 // Should never be == 1
 
 #   define DEBAD(x) /*CkPrintf x*/
 
@@ -439,6 +440,7 @@ void LBDatabase::init(void)
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_contrib_vec.resize(VEC_SIZE, 0.0);
   max_iteration = -1;
+  prev_idle = 0.0;
 
   // If metabalancer enabled, initialize the variables
   adaptive_struct.tentative_period =  INT_MAX;
@@ -608,6 +610,7 @@ void LBDatabase::ResumeClients() {
   max_load_vec.clear();
   total_load_vec.clear();
   total_contrib_vec.clear();
+  prev_idle = 0.0;
   if (lb_in_progress) {
     lbdb_no_obj_callback.clear();
     lb_in_progress = false;
@@ -639,10 +642,20 @@ bool LBDatabase::AddLoad(int iteration, double load) {
   if (total_contrib_vec[iteration] == getLBDB()->ObjDataCount()) {
     double idle_time;
     IdleTime(&idle_time);
-    //CkPrintf("[%d] Idle time %lf for iteration %d\n", CkMyPe(), idle_time, iteration);
+
+    if (iteration < NEGLECT_IDLE) {
+      prev_idle = idle_time;
+    }
+    idle_time -= prev_idle;
+
     // Skips the 0th iteration collection of stats hence...
-    idle_time = idle_time * getLBDB()->ObjDataCount() /
-       (adaptive_struct.total_syncs_called + getLBDB()->ObjDataCount());
+   // idle_time = idle_time * getLBDB()->ObjDataCount() /
+   //   (adaptive_struct.total_syncs_called + getLBDB()->ObjDataCount());
+   int total_countable_syncs = adaptive_struct.total_syncs_called + (1 - NEGLECT_IDLE) * getLBDB()->ObjDataCount();
+    if (total_countable_syncs != 0) {
+      idle_time = idle_time * getLBDB()->ObjDataCount() / total_countable_syncs;
+    }
+    //CkPrintf("[%d] Idle time %lf and countable %d for iteration %d\n", CkMyPe(), idle_time, total_countable_syncs, iteration);
 
     double lb_data[6];
     lb_data[0] = iteration;
@@ -676,6 +689,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double max_idle_load_ratio = load[5];
   int iteration_n = load[0];
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]));
+  //CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs %lf/%lf\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1], load[4],load[1]);
   delete msg;
   
   if (adaptive_struct.final_lb_period != iteration_n) {
