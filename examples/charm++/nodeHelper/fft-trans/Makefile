@@ -1,5 +1,5 @@
 USEROPTS	= -O3
-CHARMDIR = $(HOME)/curcvs/charm/net-linux-x86_64-smp-opt/
+CHARMDIR = ../../..
 
 CHARMINC = $(CHARMDIR)/include
 CHARMLIB = $(CHARMDIR)/lib
