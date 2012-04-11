@@ -51,7 +51,10 @@ class MeshStreamerClient {
  public:
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
-  virtual void process(dtype &data) {};     
+  virtual void process(dtype &data) {
+    CkAbort("Error. MeshStreamerClient::process() is being called. "
+            "This virtual function should have been defined by the user.\n");
+  };     
   void setDetector(CompletionDetector *detectorLocalObj) {
     detectorLocalObj_ = detectorLocalObj;
   }
