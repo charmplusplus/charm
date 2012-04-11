@@ -1,0 +1,14 @@
+module NodeHelper{
+    initproc void RegisterNodeHelperHdlrs(void);
+
+    message CharmNotifyMsg;
+
+	nodegroup FuncNodeHelper{
+		entry FuncNodeHelper(int mode, int numThreads);
+		entry void exit();
+	};
+	chare FuncSingleHelper{
+		entry FuncSingleHelper(int numHelpers);
+		entry void stealWork(CharmNotifyMsg *msg);
+	};
+};
