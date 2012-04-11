@@ -11,8 +11,8 @@ jacobi.o: jacobi.C
 	$(CHARMC) -language ampic -swapglobals jacobi.C 
 
 fttest: jacobi
-	./charmrun ./jacobi 2 2 2 200 +vp8 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_01.txt
-	./charmrun ./jacobi 4 2 2 200 +vp16 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_02.txt
+	./charmrun ./jacobi 2 2 2 200 +vp8 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_01.txt $(TESTOPTS)
+	./charmrun ./jacobi 4 2 2 200 +vp16 +p8 +balancer DummyLB +isomalloc_sync +killFile kill_02.txt $(TESTOPTS)
 
 clean:
 	rm -f *.o jacobi jacobi.o *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls
