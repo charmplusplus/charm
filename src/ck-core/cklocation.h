@@ -286,6 +286,7 @@ private:
     LOAD_BALANCE
   } local_state;
   double  prev_load;
+  double lb_done;
 
 public:
   CkArrayIndex thisIndexMax;
@@ -298,6 +299,7 @@ public:
 
   virtual int ckGetChareType(void) const;// {return thisChareType;}
   const CkArrayIndex &ckGetArrayIndex(void) const {return myRec->getIndex();}
+  bool didLB() {return lb_done;}
 
 #if CMK_LBDB_ON  //For load balancing:
   //Suspend load balancer measurements (e.g., before CthSuspend)
