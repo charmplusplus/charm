@@ -59,11 +59,11 @@ static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
 static MPI_Comm charmComm;
 
 #if CMI_EXERT_SEND_CAP
-#define SEND_CAP 3
+static int SEND_CAP=3;
 #endif
 
 #if CMI_EXERT_RECV_CAP
-#define RECV_CAP 2
+static int RECV_CAP=2;
 #endif
 /* ###End of flow control related macros ### */
 
@@ -1468,7 +1468,19 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
     }
 #endif
 
-#if CMI_DYNAMIC_EXERT_CAP
+#if CMI_EXERT_SEND_CAP
+    CmiGetArgInt(largv, "+dynCapSend", &SEND_CAP);
+    if (myNID==0) {
+        printf("Charm++: using static send cap %d\n", SEND_CAP);
+    }
+#endif
+#if CMI_EXERT_RECV_CAP
+    CmiGetArgInt(largv, "+dynCapRecv", &RECV_CAP);
+    if (myNID==0) {
+        printf("Charm++: using static recv cap %d\n", RECV_CAP);
+    }
+#endif
+#if CMI_DYNAMIC_EXERT_CAP 
     CmiGetArgInt(largv, "+dynCapThreshold", &CMI_DYNAMIC_OUTGOING_THRESHOLD);
     CmiGetArgInt(largv, "+dynCapSend", &CMI_DYNAMIC_SEND_CAPSIZE);
     CmiGetArgInt(largv, "+dynCapRecv", &CMI_DYNAMIC_RECV_CAPSIZE);
