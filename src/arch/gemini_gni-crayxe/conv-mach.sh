@@ -1,3 +1,4 @@
+GEMINI_CRAYXE=1
 PMI_CFLAGS=`pkg-config --cflags cray-pmi`
 PMI_LIBS=`pkg-config --libs cray-pmi`
 UGNI_CFLAGS=`pkg-config --cflags cray-ugni`
@@ -54,4 +55,3 @@ CMK_F90_USE_MODDIR=1
 CMK_F90_MODINC="-I"
 CMK_MOD_EXT="mod"
 
-. $CHARMINC/conv-mach-pxshm.sh

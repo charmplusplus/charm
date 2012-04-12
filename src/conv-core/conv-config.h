@@ -44,6 +44,7 @@
 #include "conv-mach-opt.h"
 
 
+
 /* Fix various invariants (these symbols should probably 
   be eliminated entirely) */
 #define CMK_LBDB_OFF (!CMK_LBDB_ON)
@@ -121,6 +122,10 @@
 #if CMK_SMP && CMK_BROADCAST_USE_CMIREFERENCE
 #undef CMK_BROADCAST_USE_CMIREFERENCE
 #define CMK_BROADCAST_USE_CMIREFERENCE                      0
+#endif
+
+#if CMK_CRAYXE && CMK_CONVERSE_GEMINI_UGNI && ! CMK_SMP
+#include "conv-mach-pxshm.h"
 #endif
 
 #endif

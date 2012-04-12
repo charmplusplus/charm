@@ -65,10 +65,10 @@
 #define CMI_EXERT_RECV_RDMA_CAP    0
 
 
-#define CMI_SENDBUFFERSMSG_CAP     0
-#define CMI_PUMPNETWORKSMSG_CAP    0
+#define CMI_SENDBUFFERSMSG_CAP            0
+#define CMI_PUMPNETWORKSMSG_CAP           0
 #define CMI_PUMPREMOTETRANSACTIONS_CAP    0
-#define CMI_PUMPLOCALTRANSACTIONS_CAP    0
+#define CMI_PUMPLOCALTRANSACTIONS_CAP     0
 
 #if CMI_SENDBUFFERSMSG_CAP
 int     SendBufferMsg_cap  = 20;
@@ -1741,7 +1741,11 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
       return;
   }
 #if CMK_PERSISTENT_COMM
-  if (CpvAccess(phs) && len > PERSIST_MIN_SIZE) {
+  if (CpvAccess(phs) && len > PERSIST_MIN_SIZE 
+#if CMK_SMP
+            && IS_PERSISTENT_MEMORY(msg)
+#endif
+     ){
       int i;
       for(i=0;i<npes;i++) {
         if (pes[i] == CmiMyPe())
@@ -3647,7 +3651,7 @@ void LrtsPreCommonInit(int everReturn){
     CpvAccess(mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, _mempool_size_limit);
 #if CMK_PERSISTENT_COMM
     CpvInitialize(mempool_type*, persistent_mempool);
-    CpvAccess(persistent_mempool) = mempool_init(_mempool_size, alloc_mempool_block, free_mempool_block, _mempool_size_limit);
+    CpvAccess(persistent_mempool) = mempool_init(_mempool_size, alloc_persistent_mempool_block, free_mempool_block, _mempool_size_limit);
 #endif
     MACHSTATE2(8, "mempool_init %d %p\n", CmiMyRank(), CpvAccess(mempool)) ; 
 #endif
