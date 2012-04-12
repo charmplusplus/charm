@@ -1088,8 +1088,9 @@ void CkMigratable::recvLBPeriod(void *data) {
  DEBAD(("\t[obj %s] Received the LB Period %d current iter %d state %d on PE %d\n",
      idx2str(thisIndexMax), lb_period, atsync_iteration, local_state, CkMyPe()));
 
+  bool is_tentative;
   if (local_state == LOAD_BALANCE) {
-    CkAssert(lb_period == myRec->getLBDB()->getPredictedLBPeriod());
+    CkAssert(lb_period == myRec->getLBDB()->getPredictedLBPeriod(is_tentative));
     return;
   }
 

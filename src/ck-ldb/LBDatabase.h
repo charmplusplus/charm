@@ -368,16 +368,18 @@ public:
   void RegisterNoObjCallback(int index);
   void TriggerAdaptiveReduction();
 
-  bool generatePlan(int& period);
+  bool generatePlan(int& period, double& ratio_at_t);
   bool getLineEq(double new_load_percent, double& aslope, double& ac, double& mslope, double& mc);
   bool getPeriodForLinear(double a, double b, double c, int& period);
-  bool getPeriodForStrategy(double new_load, double overhead_percent, int& period);
+  bool getPeriodForStrategy(double new_load, double overhead_percent, int& period, double& ratio_at_t);
   int getPredictedLBPeriod(bool& is_tentative);
 
   bool isStrategyComm();
 
   void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg, double
       local_comm, double remote_comm);
+
+  void UpdateAfterLBData(double max_cpu, double max_load, double avg_load);
   void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
       local_remote_comm_ratio);
   void GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&

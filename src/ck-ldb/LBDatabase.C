@@ -689,6 +689,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double max_idle_load_ratio = load[5];
   int iteration_n = load[0];
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]));
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]);
   //CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs %lf/%lf\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1], load[4],load[1]);
   delete msg;
   
@@ -720,12 +721,42 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // If the max/avg ratio is greater than the threshold and also this is not the
   // step immediately after load balancing, carry out load balancing
   //if (max/avg >= 1.1 && adaptive_lbdb.history_data.size() > 4) {
+  // Generate the plan for the adaptive strategy
+  int period;
+  double ratio_at_t = 1.0;
+  if (generatePlan(period, ratio_at_t)) {
+    //CkPrintf("Carry out load balancing step at iter\n");
+    DEBAD(("Generated period and calculated %d and period %d max iter %d\n",
+    adaptive_struct.lb_calculated_period, period,
+    adaptive_struct.tentative_max_iter_no));
+
+    // If the new lb period is less than current set lb period
+    //if (adaptive_struct.lb_calculated_period > period) {
+    if (period > adaptive_struct.tentative_max_iter_no) {
+      adaptive_struct.doCommStrategy = false;
+      adaptive_struct.lb_calculated_period = period;
+      adaptive_struct.in_progress = true;
+      adaptive_struct.lb_period_informed = true;
+      CkPrintf("Informing everyone the lb period is %d\n",
+          adaptive_struct.lb_calculated_period);
+      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
+      return;
+    }
+    //}
+  }
   int tmp1;
   double tmp2, tmp3;
   GetPrevLBData(tmp1, tmp2, tmp3);
-  double tolerate_imb = IMB_TOLERANCE * tmp2;
+  double tolerate_imb;
+
+  if (ratio_at_t == 1.0) {
+    tolerate_imb = IMB_TOLERANCE * tmp2;
+  } else {
+    tolerate_imb = ratio_at_t;
+  }
 
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
+
 
   if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
@@ -773,30 +804,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     return;
   }
 
-  // Generate the plan for the adaptive strategy
-  int period;
-  if (generatePlan(period)) {
-    //CkPrintf("Carry out load balancing step at iter\n");
-    DEBAD(("Generated period and calculated %d and period %d max iter %d\n",
-    adaptive_struct.lb_calculated_period, period,
-    adaptive_struct.tentative_max_iter_no));
-
-    // If the new lb period is less than current set lb period
-    //if (adaptive_struct.lb_calculated_period > period) {
-    if (period > adaptive_struct.tentative_max_iter_no) {
-      adaptive_struct.doCommStrategy = false;
-      adaptive_struct.lb_calculated_period = period;
-      adaptive_struct.in_progress = true;
-      adaptive_struct.lb_period_informed = true;
-      CkPrintf("Informing everyone the lb period is %d\n",
-          adaptive_struct.lb_calculated_period);
-      thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
-    }
-    //}
-  }
 }
 
-bool LBDatabase::generatePlan(int& period) {
+bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
   if (adaptive_lbdb.history_data.size() <= 8) {
     return false;
   }
@@ -836,7 +846,7 @@ bool LBDatabase::generatePlan(int& period) {
     tolerate_imb = 1.0;
   }
 
-  return getPeriodForStrategy(tolerate_imb, 1, period);
+  return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);
 
 //  int refine_period, scratch_period;
 //  bool obtained_refine, obtained_scratch;
@@ -867,7 +877,8 @@ bool LBDatabase::generatePlan(int& period) {
 //  return false;
 }
 
-bool LBDatabase::getPeriodForStrategy(double new_load_percent, double overhead_percent, int& period) {
+bool LBDatabase::getPeriodForStrategy(double new_load_percent,
+    double overhead_percent, int& period, double& ratio_at_t) {
   double mslope, aslope, mc, ac;
   getLineEq(new_load_percent, aslope, ac, mslope, mc);
   CkPrintf("new load percent %lf\n", new_load_percent);
@@ -901,6 +912,7 @@ bool LBDatabase::getPeriodForStrategy(double new_load_percent, double overhead_p
     CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
   }
+  ratio_at_t = ((mslope*period + mc)/(aslope*period + ac));
   return true;
 }
 
@@ -1120,6 +1132,24 @@ void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg, double
     remote_comm/local_comm;
   }
 }
+
+void LBDatabase::UpdateAfterLBData(double max_cpu, double max_load, double
+avg_load) {
+  if (adaptive_struct.last_lb_type == -1) {
+    adaptive_struct.last_lb_type = 0;
+  }
+  int lb = adaptive_struct.last_lb_type;
+  if (lb == 0) {
+    adaptive_struct.greedy_info.max_avg_ratio = max_load/avg_load;
+  } else if (lb == 1) {
+    adaptive_struct.refine_info.max_avg_ratio = max_load/avg_load;
+  } else if (lb == 2) {
+    adaptive_struct.comm_info.max_avg_ratio = max_load/avg_load;
+  } else if (lb == 3) {
+    adaptive_struct.comm_refine_info.max_avg_ratio = max_load/avg_load;
+  }
+}
+
 
 void LBDatabase::GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
     remote_local_comm_ratio) {
