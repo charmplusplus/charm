@@ -716,6 +716,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   }
 
   double idle_load_tolerance = IDLE_LOAD_TOLERANCE;
+  CkPrintf("alpha_beta_to_load %lf\n", alpha_beta_cost_to_load);
   if (alpha_beta_cost_to_load < 0.1) {
     // Ignore the effect hence increase tolerance
     CkPrintf("Changing the idle load tolerance coz this isn't communication intensive benchmark\n");
@@ -1201,8 +1202,9 @@ avg_load) {
   }
 }
 
-void LBDatabase::UpdateAfterLBComm(double alpha_beta_cost_to_load) {
-  alpha_beta_cost_to_load = alpha_beta_cost_to_load;
+void LBDatabase::UpdateAfterLBComm(double alpha_beta_to_load) {
+  CkPrintf("Setting alpha beta %lf\n", alpha_beta_to_load);
+  alpha_beta_cost_to_load = alpha_beta_to_load;
 }
 
 
