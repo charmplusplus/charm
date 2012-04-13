@@ -379,7 +379,7 @@ public:
   void UpdateAfterLBData(int is_lb_refine, double lb_max, double lb_avg, double
       local_comm, double remote_comm);
 
-  void UpdateAfterLBData(double max_cpu, double max_load, double avg_load);
+  void UpdateAfterLBData(double max_load, double max_cpu, double avg_load);
   void GetPrevLBData(int& lb_type, double& lb_max_avg_ratio, double&
       local_remote_comm_ratio);
   void GetLBDataForLB(int lb_type, double& lb_max_avg_ratio, double&

@@ -281,6 +281,8 @@ void CentralLB::ProcessAtSync()
  DEBAD(("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(),
     total_load, idle_time, bg_walltime, (total_load - idle_time - bg_walltime)));
 
+// CkPrintf("Total walltime [%d] %lf: %lf: %lf final laod: %lf\n", CkMyPe(),
+//    total_load, idle_time, bg_walltime, (total_load - idle_time - bg_walltime));
 
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
@@ -1497,13 +1499,13 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   LBRealType mLoad, mCpuLoad, totalLoad;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
+  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
   getPredictedLoadWithMsg(stats, clients, msg, info,1);
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   int nmsgs, nbytes;
   stats->computeNonlocalComm(nmsgs, nbytes);
   CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
-  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
 
 
   if (_lb_args.debug()) {

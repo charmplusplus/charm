@@ -670,7 +670,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     } else {
       lb_data[5] = idle_time/total_load_vec[iteration];
     }
-
+  
     //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
     //    total_load_vec[iteration], idle_time,
     //    idle_time/total_load_vec[iteration], adaptive_struct.lb_no_iterations);
@@ -729,8 +729,47 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     DEBAD(("Generated period and calculated %d and period %d max iter %d\n",
     adaptive_struct.lb_calculated_period, period,
     adaptive_struct.tentative_max_iter_no));
+    int tmp1;
+    double tmp2, tmp3;
+    GetPrevLBData(tmp1, tmp2, tmp3);
+    double tolerate_imb;
 
-    // If the new lb period is less than current set lb period
+    if (ratio_at_t == 1.0) {
+      tolerate_imb = IMB_TOLERANCE * tmp2;
+    } else {
+      CkPrintf("Changed tolerance to %lf after line eq whereas max/avg is %lf\n", ratio_at_t, max/avg);
+      tolerate_imb = ratio_at_t;
+    }
+
+    CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
+
+
+
+    if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
+      CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
+
+      // If the previously calculated_period (not the final decision) is greater
+      // than the iter +1, we can inform this and expect to get a change.
+      if ((iteration_n + 1 > adaptive_struct.tentative_max_iter_no) &&
+          (iteration_n+1 < adaptive_struct.lb_calculated_period)) {
+        if (max/avg < tolerate_imb) {
+          adaptive_struct.doCommStrategy = true;
+          CkPrintf("No load imbalance but idle time\n");
+        } else {
+          adaptive_struct.doCommStrategy = false;
+          CkPrintf("load imbalance \n");
+        }
+        adaptive_struct.lb_calculated_period = iteration_n + 1;
+        adaptive_struct.lb_period_informed = true;
+        adaptive_struct.in_progress = true;
+        CkPrintf("Informing everyone the lb period is %d\n",
+            adaptive_struct.lb_calculated_period);
+        thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
+      }
+      return;
+    }
+
+    // If the new lb period from linear extrapolation is less than current set lb period
     //if (adaptive_struct.lb_calculated_period > period) {
     if (period > adaptive_struct.tentative_max_iter_no) {
       adaptive_struct.doCommStrategy = false;
@@ -742,8 +781,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
       thisProxy.LoadBalanceDecision(adaptive_struct.lb_msg_send_no++, adaptive_struct.lb_calculated_period);
       return;
     }
-    //}
   }
+
   int tmp1;
   double tmp2, tmp3;
   GetPrevLBData(tmp1, tmp2, tmp3);
@@ -807,7 +846,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 }
 
 bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
-  if (adaptive_lbdb.history_data.size() <= 8) {
+  if (adaptive_lbdb.history_data.size() <= 4) {
     return false;
   }
 
@@ -843,6 +882,7 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
   
   double tolerate_imb = tmp2;
   if (max/avg < tolerate_imb) {
+    CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);
     tolerate_imb = 1.0;
   }
 
@@ -1133,12 +1173,13 @@ void LBDatabase::UpdateAfterLBData(int lb, double lb_max, double lb_avg, double
   }
 }
 
-void LBDatabase::UpdateAfterLBData(double max_cpu, double max_load, double
+void LBDatabase::UpdateAfterLBData(double max_load, double max_cpu, double
 avg_load) {
   if (adaptive_struct.last_lb_type == -1) {
     adaptive_struct.last_lb_type = 0;
   }
   int lb = adaptive_struct.last_lb_type;
+  //CkPrintf("Storing data after lb ratio %lf for lb %d\n", max_load/avg_load, lb);
   if (lb == 0) {
     adaptive_struct.greedy_info.max_avg_ratio = max_load/avg_load;
   } else if (lb == 1) {
