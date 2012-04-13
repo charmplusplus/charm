@@ -245,7 +245,7 @@ int         lrts_send_rdma_success = 0;
 #define  POST_HIGHPRIORITY_RDMA   
 #endif
 
-#if REMOTE_EVENT && CMK_USE_OOB  
+#if REMOTE_EVENT && (CMK_USE_OOB || CMK_PERSISTENT_COMM) 
 #define  PUMP_REMOTE_HIGHPRIORITY    STATS_PUMPREMOTETRANSACTIONS_TIME(PumpRemoteTransactions(highpriority_rx_cqh) );
 #else
 #define  PUMP_REMOTE_HIGHPRIORITY
@@ -4058,7 +4058,7 @@ void LrtsDrainResources()
         PumpLocalTransactions(rdma_tx_cqh, rdma_tx_cq_lock);
 #endif
 
-#if CMK_USE_OOB
+#if CMK_USE_OOB 
         PumpLocalTransactions(highprior_rdma_tx_cqh, rdma_tx_cq_lock);
 #endif
 
