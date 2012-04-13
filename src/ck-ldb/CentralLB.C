@@ -14,6 +14,11 @@
 //#include "limits.h"
 #include <vector>
 
+#define alpha 4.0e-6
+#define beta 2.67e-9
+#define percent_overhead 10
+
+
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
 #define  DEBAD(x)        // CmiPrintf x
@@ -1496,17 +1501,26 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   int clients = CkNumPes();
   LBInfo info(clients);
   getPredictedLoadWithMsg(stats, clients, msg, info, 0);
-  LBRealType mLoad, mCpuLoad, totalLoad;
+  LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
+
   getPredictedLoadWithMsg(stats, clients, msg, info,1);
-  info.getSummary(mLoad, mCpuLoad, totalLoad);
+  info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
   CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   int nmsgs, nbytes;
   stats->computeNonlocalComm(nmsgs, nbytes);
   CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
 
+
+  long msg_n;
+  long long bytes_n;
+  stats->computeComm(msg_n, bytes_n);
+  CkPrintf("CharmLB> Total communication %ld msg and %lld bytes\n", nmsgs, nbytes);
+
+  double alpha_beta_cost = (msg_n * alpha) + (bytes_n * beta);
+  theLbdb->UpdateAfterLBComm(alpha_beta_cost/totalLoad);
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();

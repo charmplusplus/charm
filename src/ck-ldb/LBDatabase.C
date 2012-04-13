@@ -441,6 +441,7 @@ void LBDatabase::init(void)
   total_contrib_vec.resize(VEC_SIZE, 0.0);
   max_iteration = -1;
   prev_idle = 0.0;
+  alpha_beta_cost_to_load = 1.0; // Some random value. Fix me!
 
   // If metabalancer enabled, initialize the variables
   adaptive_struct.tentative_period =  INT_MAX;
@@ -714,6 +715,15 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     return;
   }
 
+  double idle_load_tolerance = IDLE_LOAD_TOLERANCE;
+  if (alpha_beta_cost_to_load < 0.1) {
+    // Ignore the effect hence increase tolerance
+    CkPrintf("Changing the idle load tolerance coz this isn't communication intensive benchmark\n");
+    idle_load_tolerance = 1024.0;
+  }
+
+
+
 //  if (adaptive_struct.lb_period_informed) {
 //    return;
 //  }
@@ -745,7 +755,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
 
 
-    if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
+    if ((max_idle_load_ratio >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
       CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 
       // If the previously calculated_period (not the final decision) is greater
@@ -797,7 +807,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
 
 
-  if ((max_idle_load_ratio >= IDLE_LOAD_TOLERANCE || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
+  if ((max_idle_load_ratio >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
@@ -1189,6 +1199,10 @@ avg_load) {
   } else if (lb == 3) {
     adaptive_struct.comm_refine_info.max_avg_ratio = max_load/avg_load;
   }
+}
+
+void LBDatabase::UpdateAfterLBComm(double alpha_beta_cost_to_load) {
+  alpha_beta_cost_to_load = alpha_beta_cost_to_load;
 }
 
 
