@@ -3526,109 +3526,71 @@ static CmiUInt8 total_mempool_calls = 0;
 
 #if USE_LRTS_MEMPOOL
 
+inline
+static void *_alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag, gni_cq_handle_t cqh)
+{
+    void *pool;
+    int ret;
+    gni_return_t status = GNI_RC_SUCCESS;
+
+    size_t default_size =  expand_flag? _expand_mem : _mempool_size;
+    if (*size < default_size) *size = default_size;
+#if LARGEPAGE
+    // round up to be multiple of _tlbpagesize
+    //*size = (*size + _tlbpagesize - 1)/_tlbpagesize*_tlbpagesize;
+    *size = ALIGNHUGEPAGE(*size);
+#endif
+    total_mempool_size += *size;
+    total_mempool_calls += 1;
+#if   !LARGEPAGE
+    if ((*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) && expand_flag) 
+    {
+        printf("Error: A mempool block with size %lld is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX. (current=%lld, %lld)\n", *size, MAX_REG_MEM, MAX_BUFF_SEND);
+        CmiAbort("alloc_mempool_block");
+    }
+#endif
+#if LARGEPAGE
+    pool = my_get_huge_pages(*size);
+    ret = pool==NULL;
+#else
+    ret = posix_memalign(&pool, ALIGNBUF, *size);
+#endif
+    if (ret != 0) {
+      printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
+      if (ret == ENOMEM)
+        CmiAbort("alloc_mempool_block: out of memory.");
+      else
+        CmiAbort("alloc_mempool_block: posix_memalign failed");
+    }
+#if LARGEPAGE
+    CmiMemLock();
+    register_count++;
+    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, cqh, status);
+    CmiMemUnlock();
+    if(status != GNI_RC_SUCCESS) {
+        printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
+sweep_mempool(CpvAccess(mempool));
+    }
+    GNI_RC_CHECK("MEMORY_REGISTER", status);
+#else
+    SetMemHndlZero((*mem_hndl));
+#endif
+    return pool;
+}
+
+inline
+static void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
+{
+    return _alloc_mempool_block(size, mem_hndl, expand_flag, rdma_rx_cqh);
+}
+
 #if CMK_PERSISTENT_COMM
-void *alloc_persistent_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
+inline
+static void *alloc_persistent_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
 {
-    void *pool;
-    int ret;
-    gni_return_t status = GNI_RC_SUCCESS;
-
-    size_t default_size =  expand_flag? _expand_mem : _mempool_size;
-    if (*size < default_size) *size = default_size;
-#if LARGEPAGE
-    // round up to be multiple of _tlbpagesize
-    //*size = (*size + _tlbpagesize - 1)/_tlbpagesize*_tlbpagesize;
-    *size = ALIGNHUGEPAGE(*size);
-#endif
-    total_mempool_size += *size;
-    total_mempool_calls += 1;
-#if   !LARGEPAGE
-    if ((*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) && expand_flag) 
-    {
-        printf("Error: A mempool block with size %lld is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX. (current=%lld, %lld)\n", *size, MAX_REG_MEM, MAX_BUFF_SEND);
-        CmiAbort("alloc_mempool_block");
-    }
-#endif
-#if LARGEPAGE
-    pool = my_get_huge_pages(*size);
-    ret = pool==NULL;
-#else
-    ret = posix_memalign(&pool, ALIGNBUF, *size);
-#endif
-    if (ret != 0) {
-      printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
-      if (ret == ENOMEM)
-        CmiAbort("alloc_mempool_block: out of memory.");
-      else
-        CmiAbort("alloc_mempool_block: posix_memalign failed");
-    }
-#if LARGEPAGE
-    CmiMemLock();
-    register_count++;
-    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, highpriority_rx_cqh, status);
-    CmiMemUnlock();
-    if(status != GNI_RC_SUCCESS) {
-        printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
-sweep_mempool(CpvAccess(mempool));
-    }
-    GNI_RC_CHECK("MEMORY_REGISTER", status);
-#else
-    SetMemHndlZero((*mem_hndl));
-#endif
-    return pool;
+    return _alloc_mempool_block(size, mem_hndl, expand_flag, highpriority_rx_cqh);
 }
 #endif
-
-void *alloc_mempool_block(size_t *size, gni_mem_handle_t *mem_hndl, int expand_flag)
-{
-    void *pool;
-    int ret;
-    gni_return_t status = GNI_RC_SUCCESS;
-
-    size_t default_size =  expand_flag? _expand_mem : _mempool_size;
-    if (*size < default_size) *size = default_size;
-#if LARGEPAGE
-    // round up to be multiple of _tlbpagesize
-    //*size = (*size + _tlbpagesize - 1)/_tlbpagesize*_tlbpagesize;
-    *size = ALIGNHUGEPAGE(*size);
-#endif
-    total_mempool_size += *size;
-    total_mempool_calls += 1;
-#if   !LARGEPAGE
-    if ((*size > MAX_REG_MEM || *size > MAX_BUFF_SEND) && expand_flag) 
-    {
-        printf("Error: A mempool block with size %lld is allocated, which is greater than the maximum mempool allowed.\n Please increase the max pool size by using +gni-mempool-max or set enviorment variable CHARM_UGNI_MEMPOOL_MAX. (current=%lld, %lld)\n", *size, MAX_REG_MEM, MAX_BUFF_SEND);
-        CmiAbort("alloc_mempool_block");
-    }
-#endif
-#if LARGEPAGE
-    pool = my_get_huge_pages(*size);
-    ret = pool==NULL;
-#else
-    ret = posix_memalign(&pool, ALIGNBUF, *size);
-#endif
-    if (ret != 0) {
-      printf("Charm++> can not allocate memory pool of size %.2fMB. \n", 1.0*(*size)/1024/1024);
-      if (ret == ENOMEM)
-        CmiAbort("alloc_mempool_block: out of memory.");
-      else
-        CmiAbort("alloc_mempool_block: posix_memalign failed");
-    }
-#if LARGEPAGE
-    CmiMemLock();
-    register_count++;
-    MEMORY_REGISTER(onesided_hnd, nic_hndl, pool, *size, mem_hndl, &omdh, rdma_rx_cqh, status);
-    CmiMemUnlock();
-    if(status != GNI_RC_SUCCESS) {
-        printf("[%d, %d] memory reigstration %f G (%lld) ask for %lld\n", myrank, CmiMyRank(), register_memory_size/(1024*1024.0*1024),register_count, *size);
-sweep_mempool(CpvAccess(mempool));
-    }
-    GNI_RC_CHECK("MEMORY_REGISTER", status);
-#else
-    SetMemHndlZero((*mem_hndl));
-#endif
-    return pool;
-}
 
 // ptr is a block head pointer
 void free_mempool_block(void *ptr, gni_mem_handle_t mem_hndl)
