@@ -338,21 +338,21 @@ CkReductionMsg *sumTwoShorts(int nMsg,CkReductionMsg **msgs)
 
 The reduction function must be registered with \charmpp{} 
 using \kw{CkReduction::addReducer} from
-an \kw{initcall} routine (see section~\ref{initcall} for details
-on the \kw{initcall} mechanism).   \kw{CkReduction::addReducer}
+an \kw{initnode} routine (see section~\ref{initcall} for details
+on the \kw{initnode} mechanism).   \kw{CkReduction::addReducer}
 returns a \kw{CkReduction::reducerType} which you can later 
-pass to \kw{contribute}.  Since \kw{initcall} routines are executed
+pass to \kw{contribute}.  Since \kw{initnode} routines are executed
 once on every node, you can safely store the \kw{CkReduction::reducerType}
 in a global or class-static variable.  For the example above, the reduction
 function is registered and used in the following manner:
 
 \begin{alltt}
 //In the .ci file:
-  initcall void registerSumTwoShorts(void);
+  initnode void registerSumTwoShorts(void);
 
 //In some .C file:
 /*global*/ CkReduction::reducerType sumTwoShortsType;
-/*initcall*/ void registerSumTwoShorts(void)
+/*initnode*/ void registerSumTwoShorts(void)
 \{
   sumTwoShortsType=CkReduction::addReducer(sumTwoShorts);
 \}
@@ -363,6 +363,6 @@ function is registered and used in the following manner:
 \end{alltt}
 
 Note that you cannot call \kw{CkReduction::addReducer}
-from anywhere but an \kw{initcall} routine.
+from anywhere but an \kw{initnode} routine.
 
 
