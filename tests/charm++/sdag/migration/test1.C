@@ -39,9 +39,7 @@ class Cell : public CBase_Cell {
 public:
   int val;
 
-  Cell() : val(thisIndex.x * 10 + thisIndex.y) {
-    __sdag_init();
-  }
+  Cell() : val(thisIndex.x * 10 + thisIndex.y) { }
 
   void pup(PUP::er &p) {
     CkPrintf("called PUP for cell %s\n", p.isPacking() ? "packing" : "unpacking or sizing");
@@ -52,7 +50,7 @@ public:
     p | val;
   }
 
-  Cell(CkMigrateMessage *m) {__sdag_init();}
+  Cell(CkMigrateMessage *m) { }
 };
 
 #include "test1.def.h"

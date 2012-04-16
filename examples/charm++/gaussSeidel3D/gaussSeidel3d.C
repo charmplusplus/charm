@@ -173,7 +173,6 @@ class GaussSeidel: public CBase_GaussSeidel {
 
   // Constructor, initialize values
   GaussSeidel() {
-    __sdag_init();
 
     int i, j, k;
     // allocate a three dimensional array

@@ -148,7 +148,6 @@ class Stencil: public CBase_Stencil {
 
     // Constructor, initialize values
     Stencil() {
-      __sdag_init();
       usesAtSync = CmiTrue;
 
       int i, j, k;
@@ -182,7 +181,7 @@ class Stencil: public CBase_Stencil {
       p(new_temperature, size);
     }
 
-    Stencil(CkMigrateMessage* m) { __sdag_init(); }
+    Stencil(CkMigrateMessage* m) { }
 
     ~Stencil() { 
       delete [] temperature; 

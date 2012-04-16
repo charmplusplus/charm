@@ -13,7 +13,6 @@ struct Fib : public CBase_Fib {
 
   Fib(int n, bool isRoot_, CProxy_Fib parent_)
     : parent(parent_), isRoot(isRoot_) {
-    __sdag_init();
     calc(n);
   }
 

@@ -78,7 +78,6 @@ struct allToAll : public CBase_allToAll {
     int recvCnt;
 
 	allToAll() {
-		 __sdag_init();
         iter = 0;
         recvCnt = 0;
 		msgs = new allToAllMsg*[numChares*msgCount];

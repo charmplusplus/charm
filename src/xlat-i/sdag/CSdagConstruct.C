@@ -632,7 +632,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum;
      if (e->intExpr)
        defs << ", " << e->intExpr;
-     defs << "); // SEGFAULT? __cDep = 0x0? Did you call __sdag_init() in your constructor?\n";
+     defs << ");\n";
 
     el = el->next;
   }

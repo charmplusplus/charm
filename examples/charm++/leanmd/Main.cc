@@ -17,7 +17,6 @@
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* m) {
-   __sdag_init();
   CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS START UP ...\n");
 
   //set variable values to a default set
@@ -65,7 +64,6 @@ Main::Main(CkArgMsg* m) {
 
 //constructor for chare object migration
 Main::Main(CkMigrateMessage* msg): CBase_Main(msg) { 
-  __sdag_init();
 }
 
 //pup routine incase the main chare moves, pack important information

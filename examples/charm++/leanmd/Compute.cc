@@ -16,13 +16,11 @@ extern /* readonly */ int finalStepCount;
 
 //compute - Default constructor
 Compute::Compute() {
-  __sdag_init();
   stepCount = 1;
   usesAtSync = CmiTrue;
 }
 
 Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg)  { 
-  __sdag_init();
   usesAtSync = CmiTrue;
   delete msg;
 }

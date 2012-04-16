@@ -15,7 +15,6 @@ extern /* readonly */ int finalStepCount;
 
 //default constructor
 Cell::Cell() {
-  __sdag_init();
   int i;
   inbrs = NUM_NEIGHBORS;
   //load balancing to be called when AtSync is called
@@ -51,7 +50,6 @@ Cell::Cell() {
 
 //constructor for chare object migration
 Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg) {
-  __sdag_init();
   usesAtSync = CmiTrue;
   delete msg;
 }  

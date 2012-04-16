@@ -116,16 +116,21 @@ void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 
 void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
 {
-  decls << "private:\n";
+  decls << "public:\n";
   decls << "  CDep *__cDep;\n";
 
-  XStr name = "__sdag_init";
+  XStr name = "_sdag_init";
   generateSignature(decls, defs, container, false, "void", &name, false, NULL);
   defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
   CEntry *en;
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
     en->generateDeps(defs);
   }
+  endMethod(defs);
+
+  // Backwards compatibility
+  XStr oldname = "__sdag_init";
+  generateSignature(decls, defs, container, false, "void", &oldname, false, NULL);
   endMethod(defs);
 }
 

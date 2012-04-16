@@ -234,6 +234,8 @@ class Jacobi: public CBase_Jacobi {
 
     // Constructor, initialize values
     Jacobi() {
+      // This call is an anachronism - the need to call __sdag_init() has been
+      // removed. We still call it here to test backward compatibility.
       __sdag_init();
 
       int i, j, k;
@@ -257,9 +259,7 @@ class Jacobi: public CBase_Jacobi {
 
     }
 
-    Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) {
-		__sdag_init();
-	}
+    Jacobi(CkMigrateMessage* m): CBase_Jacobi(m) { }
 
     ~Jacobi() { 
       delete [] temperature; 

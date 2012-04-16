@@ -71,7 +71,6 @@ struct manyToMany : public CBase_manyToMany {
     int recvCnt;
 
 	manyToMany() {
-		 __sdag_init();
         iter = 0;
         recvCnt = 0;
 		msgs = new manyToManyMsg*[numChares];

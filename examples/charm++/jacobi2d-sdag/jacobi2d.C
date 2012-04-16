@@ -52,7 +52,6 @@ public:
   double maxdifference;
   Main_SDAG_CODE;
   Main(CkArgMsg* m) {
-    __sdag_init();
     if ( (m->argc < 3) || (m->argc > 6)) {
       CkPrintf("%s [array_size] [block_size]\n", m->argv[0]);
       CkPrintf("OR %s [array_size] [block_size] maxiterations\n", m->argv[0]);
@@ -136,7 +135,6 @@ class Jacobi: public CBase_Jacobi {
   bool leftBound, rightBound, topBound, bottomBound;
   // Constructor, initialize values
   Jacobi() {
-    __sdag_init();
     usesAtSync=CmiTrue;
 
     int i, j;
@@ -213,7 +211,7 @@ class Jacobi: public CBase_Jacobi {
     p(new_temperature, size);
   }
 
-  Jacobi(CkMigrateMessage* m) {__sdag_init();}
+  Jacobi(CkMigrateMessage* m) { }
 
   ~Jacobi() { 
     delete [] temperature; 

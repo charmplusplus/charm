@@ -126,8 +126,6 @@ struct fft : public CBase_fft {
   bool validating;
   int nPerThread;
   fft() {
-    __sdag_init();
-
     validating = false;
 
     n = N*N/numChunks;

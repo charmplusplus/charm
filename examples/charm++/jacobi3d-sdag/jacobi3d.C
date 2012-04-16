@@ -118,8 +118,6 @@ public:
 
   // Constructor, initialize values
   Jacobi() {
-    __sdag_init();
-
     usesAtSync = CmiTrue;
     converged = false;
 
@@ -152,7 +150,7 @@ public:
     p(new_temperature, size);
   }
 
-  Jacobi(CkMigrateMessage* m) {__sdag_init();}
+  Jacobi(CkMigrateMessage* m) { }
 
   ~Jacobi() { 
     delete [] temperature; 

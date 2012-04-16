@@ -45,7 +45,6 @@ class Block : public CBase_Block {
   Block(unsigned int blockSize_, unsigned int numBlocks_)
     : blockSize(blockSize_), numBlocks(numBlocks_)
   {
-    __sdag_init();
     unsigned int elems = blockSize * blockSize;
     data = new double[elems];
     for (int i = 0; i < elems; ++i)

@@ -110,7 +110,6 @@ class ComputeObject : public CBase\_ComputeObject \{
 
 public:
   ComputeObject() \{
-    __sdag_init();
     startStep();
   \}
   void startStep() \{
@@ -128,10 +127,9 @@ public:
 \};
 \end{alltt}
 \end{center}
-Note that chare classes containing SDAG code must make a few additional calls
-in addition to inheriting from their {\tt CBase\_Foo} class: incorporate the
-{\tt Foo\_SDAG\_CODE} generated-code macro in the class, and call {\tt
-  \_\_sdag\_init()} in the class's constructor(s).
+Note that chare classes containing SDAG code must include a few additional declarations
+in addition to inheriting from their {\tt CBase\_Foo} class, by incorporating the
+{\tt Foo\_SDAG\_CODE} generated-code macro in the class.
 
 Atomic blocks can also specify a textual `label' that will appear in traces, as
 follows:
@@ -185,7 +183,6 @@ class ComputeObject : public CBase_ComputeObject \{
 
 public:
   ComputeObject() \{
-    __sdag_init();
     startStep();
   \}
 
@@ -278,7 +275,6 @@ class ComputeObject : public CBase_ComputeObject \{
 
 public:
   ComputeObject() \{
-    __sdag_init();
     runForever();
   \}
 
@@ -318,7 +314,6 @@ class ComputeObject : public CBase_ComputeObject \{
 
 public:
   ComputeObject() \{
-    __sdag_init();
     n = 10;
     runForever();
   \}
@@ -383,7 +378,6 @@ class ComputeObject : public CBase_ComputeObject \{
 
 public:
   ComputeObject() \{
-    __sdag_init();
     startStep();
   \}
 
@@ -421,9 +415,6 @@ If you've added \sdag\ code to your class, you must link in the code by:
      in the .h file.  This macro defines the entry points and support
      code used by \sdag{}.  Forgetting this results in a compile error
      (undefined sdag entry methods referenced from the .def.h file).
-  \item Adding a call to the routine ``\_\_sdag\_init();'' from every constructor,
-     including the migration constructor.  Forgetting this results in
-     using uninitalized data, and a horrible runtime crash.
   \item Adding a call to the pup routine ``\_\_sdag\_pup(p);'' from your pup routine.
      Forgetting this results in failure after migration.
 \end{itemize}
@@ -434,12 +425,9 @@ class Foo : public CBase_Foo \{
 public:
     Foo_SDAG_CODE
     Foo(...) \{
-       __sdag_init();
        ...
     \}
-    Foo(CkMigrateMessage *m) \{
-       __sdag_init();
-    \}
+    Foo(CkMigrateMessage *m) \{ \}
     
     void pup(PUP::er &p) \{
        CBase_Foo::pup(p);
