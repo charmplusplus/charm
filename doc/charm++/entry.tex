@@ -54,6 +54,11 @@ sync entry methods are blocking - they do not return control to the caller
 until the method is finished executing completely.  Sync methods may have
 return values; however, they may only return messages. Callers must run in a
 thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
+Calls expecting a return value will receive it as the return from the proxy invocation:
+\begin{alltt}
+ReturnMsg* m;
+m = A[i].foo(a, b, c);
+\end{alltt}
 
 \index{exclusive}\item[exclusive] entry methods, which exist only on node groups, are
 \index{entry method}entry methods that do not execute while other exclusive
