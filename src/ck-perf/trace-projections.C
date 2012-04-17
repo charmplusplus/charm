@@ -1016,7 +1016,9 @@ TraceProjections::TraceProjections(char **argv):
 
 
 #if CMK_PROJECTIONS_USE_ZLIB
-  int compressed = CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
+  int compressed = true || CmiGetArgFlagDesc(argv,"+gz-trace","Write log files pre-compressed with gzip");
+  int disableCompressed = CmiGetArgFlagDesc(argv,"+no-gz-trace","Disable writing log files pre-compressed with gzip");
+  compressed = compressed && !disableCompressed;
 #else
   // consume the flag so there's no confusing
   CmiGetArgFlagDesc(argv,"+gz-trace",
