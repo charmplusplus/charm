@@ -1942,7 +1942,7 @@ static CthThread CthCreateInner(CthVoidFn fn, void *arg, int size,int Migratable
   }
 
 #if CMK_THREADS_BUILD_TLS
-  allocNewTLSSeg(&B(result)->tlsseg);
+  allocNewTLSSeg(&B(result)->tlsseg, result);
 #endif
 
   return result;
