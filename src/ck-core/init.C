@@ -1255,7 +1255,10 @@ void _initCharm(int unused_argc, char **argv)
 	if(CmiMyPe() == 0) {
             if(CmiGetArgFlag(argv, "+printTopo")) {
 		TopoManager tmgr;
-		tmgr.printAllocation(stdout);
+    FILE *fp;
+    fp = fopen("topologyInfo.txt", "w");
+    if (fp == NULL) fp = stderr;
+		tmgr.printAllocation(fp);
 	    }
 	}
 
