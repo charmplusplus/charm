@@ -16,12 +16,12 @@ module completion {
       	producers_total = num_producers;
       	cb = finish;
       	if (!start.isInvalid())
-         contribute(start);
+          contribute(start);
       }
 
       while (producers_done_global < producers_total) {
       	atomic {
-	    contribute(sizeof(int), &producers_done_local, CkReduction::sum_int,
+          contribute(sizeof(int), &producers_done_local, CkReduction::sum_int,
       		     CkCallback(CkReductionTarget(CompletionDetector, producers_done),
 				thisgroup));
       	}
@@ -35,12 +35,12 @@ module completion {
       	  int counts[2];
       	  counts[0] = produced; // Move up to first reduction loop
       	  counts[1] = consumed;
-         contribute(2*sizeof(int), counts, CkReduction::sum_int,
+          contribute(2*sizeof(int), counts, CkReduction::sum_int,
       		     CkCallback(CkReductionTarget(CompletionDetector, count_consumed),
 				thisgroup));
       	}
       	when count_consumed(int produced_global, int consumed_global) atomic {
-         unconsumed = produced_global - consumed_global;
+          unconsumed = produced_global - consumed_global;
       	}
       }
 
