@@ -14,7 +14,6 @@ module completion {
         running = true;
         prio = prio_;
         producers_total = num_producers;
-        cb = finish;
         if (!start.isInvalid())
           contribute(start);
       }
@@ -46,9 +45,8 @@ module completion {
 
       atomic "completion finished" {
         init();
-        CkAssert(!cb.isInvalid());
-        contribute(cb);
-        cb = CkCallback();
+        CkAssert(!finish.isInvalid());
+        contribute(finish);
       }
     };
 

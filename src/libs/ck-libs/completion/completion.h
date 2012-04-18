@@ -18,7 +18,6 @@ private:
     int produced, consumed, unconsumed;
     int producers_total, producers_done_local, producers_done_global;
     int prio;
-    CkCallback cb;
     bool running;
 
     void init();
