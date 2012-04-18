@@ -8,47 +8,47 @@ module completion {
     // How many producer objects must signal completion, and who
     // should we tell when consumption matches production?
     entry void start_detection(int num_producers, CkCallback start, CkCallback finish,
-			       int prio_) {
+                               int prio_) {
       atomic {
-      	CkAssert(!running);
-      	running = true;
-      	prio = prio_;
-      	producers_total = num_producers;
-      	cb = finish;
-      	if (!start.isInvalid())
+        CkAssert(!running);
+        running = true;
+        prio = prio_;
+        producers_total = num_producers;
+        cb = finish;
+        if (!start.isInvalid())
           contribute(start);
       }
 
       while (producers_done_global < producers_total) {
-      	atomic {
+        atomic {
           contribute(sizeof(int), &producers_done_local, CkReduction::sum_int,
-      		     CkCallback(CkReductionTarget(CompletionDetector, producers_done),
-				thisgroup));
-      	}
-      	when producers_done(int producers_done_global_) atomic {
-      	  producers_done_global = producers_done_global_;
-      	}
+                     CkCallback(CkReductionTarget(CompletionDetector, producers_done),
+                                thisgroup));
+        }
+        when producers_done(int producers_done_global_) atomic {
+          producers_done_global = producers_done_global_;
+        }
       }
 
       while (unconsumed > 0) {
-      	atomic {
-      	  int counts[2];
-      	  counts[0] = produced; // Move up to first reduction loop
-      	  counts[1] = consumed;
+        atomic {
+          int counts[2];
+          counts[0] = produced; // Move up to first reduction loop
+          counts[1] = consumed;
           contribute(2*sizeof(int), counts, CkReduction::sum_int,
-      		     CkCallback(CkReductionTarget(CompletionDetector, count_consumed),
-				thisgroup));
-      	}
-      	when count_consumed(int produced_global, int consumed_global) atomic {
+                     CkCallback(CkReductionTarget(CompletionDetector, count_consumed),
+                                thisgroup));
+        }
+        when count_consumed(int produced_global, int consumed_global) atomic {
           unconsumed = produced_global - consumed_global;
-      	}
+        }
       }
 
       atomic "completion finished" {
-	init();
-	CkAssert(!cb.isInvalid());
-      	contribute(cb);
-      	cb = CkCallback();
+        init();
+        CkAssert(!cb.isInvalid());
+        contribute(cb);
+        cb = CkCallback();
       }
     };
 
