@@ -706,8 +706,9 @@ private:
   void deliverToDestination(
        int destinationPe, 
        MeshStreamerMessage<ArrayDataItem<dtype, itype> > *destinationBuffer) {
-    ( (CProxy_ArrayMeshStreamer<dtype, itype>) 
-      this->thisProxy )[destinationPe].receiveArrayData(destinationBuffer);
+
+    CProxy_ArrayMeshStreamer<dtype, itype> myProxy(this->thisProxy); 
+    myProxy[destinationPe].receiveArrayData(destinationBuffer);
   }
 
   void localDeliver(ArrayDataItem<dtype, itype> &packedDataItem) {
