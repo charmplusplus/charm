@@ -119,6 +119,7 @@ private:
 
     CProxy_CompletionDetector detector_;
     int prio_;
+    int yieldCount_;
 
 #ifdef CACHE_LOCATIONS
     MeshLocation *cachedLocations_;
@@ -393,7 +394,6 @@ void MeshStreamer<dtype>::storeMessage(
 template <class dtype>
 inline
 void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
-  static int count = 0;
   const static bool copyIndirectly = true;
 
   MeshLocation destinationLocation = determineLocation(destinationPe);
@@ -401,8 +401,8 @@ void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
 	       copyIndirectly); 
   // release control to scheduler if requested by the user, 
   //   assume caller is threaded entry
-  if (yieldFlag_ && ++count == 1024) {
-    count = 0; 
+  if (yieldFlag_ && ++yieldCount_ == 1024) {
+    yieldCount_ = 0; 
     CthYield();
   }
 
@@ -430,11 +430,13 @@ void MeshStreamer<dtype>::associateCallback(
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
+  yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
-  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushDirect(), this->thisProxy);
-  static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
-			   this->thisProxy);
+  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushDirect(), 
+                     this->thisProxy);
+  CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
+		    this->thisProxy);
   detector_ = detector;      
   detectorLocalObj_ = detector_.ckLocalBranch();
   initLocalClients();
@@ -825,7 +827,7 @@ public:
     clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
 #endif
 
-  static ArrayDataItem<dtype, itype> packedDataItem;
+  ArrayDataItem<dtype, itype> packedDataItem;
     if (destinationPe == CkMyPe()) {
       // copying here is necessary - user code should not be 
       // passed back a reference to the original item
@@ -837,7 +839,7 @@ public:
 
     // this implementation avoids copying an item before transfer into message
 
-    static DataItemHandle tempHandle; 
+    DataItemHandle tempHandle; 
     tempHandle.arrayIndex = arrayIndex; 
     tempHandle.dataItem = &dataItem;
 
