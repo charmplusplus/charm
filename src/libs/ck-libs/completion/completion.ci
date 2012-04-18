@@ -7,7 +7,8 @@ module completion {
 
     // How many producer objects must signal completion, and who
     // should we tell when consumption matches production?
-    entry void start_detection(int num_producers, CkCallback start, CkCallback finish,
+    entry void start_detection(int num_producers,
+                               CkCallback start, CkCallback allProduced, CkCallback finish,
                                int prio_) {
       atomic {
         CkAssert(!running);
@@ -27,6 +28,11 @@ module completion {
         when producers_done(int producers_done_global_) atomic {
           producers_done_global = producers_done_global_;
         }
+      }
+
+      atomic {
+        if (CkMyPe() == 0 && !allProduced.isInvalid())
+          allProduced.send();
       }
 
       while (unconsumed > 0) {

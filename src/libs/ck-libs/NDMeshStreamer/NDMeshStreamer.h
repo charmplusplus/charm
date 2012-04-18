@@ -432,13 +432,14 @@ void MeshStreamer<dtype>::associateCallback(
 			  int prio) {
   prio_ = prio;
   userCallback_ = endCb; 
+  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushDirect(), this->thisProxy);
   static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
 			   this->thisProxy);
   detector_ = detector;      
   detectorLocalObj_ = detector_.ckLocalBranch();
   initLocalClients();
 
-  detectorLocalObj_->start_detection(numContributors, startCb, finish , 0);
+  detectorLocalObj_->start_detection(numContributors, startCb, flushCb, finish , 0);
   
   if (progressPeriodInMs_ <= 0) {
     CkPrintf("Using completion detection in NDMeshStreamer requires"
