@@ -1257,8 +1257,12 @@ void _initCharm(int unused_argc, char **argv)
 		TopoManager tmgr;
     FILE *fp;
     fp = fopen("topologyInfo.txt", "w");
-    if (fp == NULL) fp = stderr;
+    if (fp == NULL) {
+      CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
+      fp = stdout;
+    }
 		tmgr.printAllocation(fp);
+    fclose(fp);
 	    }
 	}
 
