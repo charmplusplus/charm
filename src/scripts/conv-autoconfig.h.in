@@ -36,6 +36,9 @@
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
+/* whether synchronization primitives works in C */
+#undef CMK_C_SYNC_PRIMITIVES
+
 /* whether C++ allows declaration of variable sized array */
 #undef CMK_DECLARE_VARSIZE_ARRAY
 

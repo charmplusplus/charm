@@ -45,93 +45,51 @@ public:
 };
 
 template <class dtype>
-class MeshStreamerClient {
- protected:
+class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
+ private:
   CompletionDetector *detectorLocalObj_;
  public:
+  MeshStreamerArrayClient(){}
+  MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
   virtual void process(dtype &data) {
-    CkAbort("Error. MeshStreamerClient::process() is being called. "
+    CkAbort("Error. MeshStreamerArrayClient::process() is being called. "
             "This virtual function should have been defined by the user.\n");
   };     
   void setDetector(CompletionDetector *detectorLocalObj) {
     detectorLocalObj_ = detectorLocalObj;
   }
-};
-
-template <class dtype>
-class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>,
-  public MeshStreamerClient<dtype> {
- public:
-
-  virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg) {
-    for (int i = 0; i < msg->numDataItems; i++) {
-      dtype &data = msg->getDataItem(i);
-      process(data);
-    }
-    MeshStreamerClient<dtype>::detectorLocalObj_->consume(msg->numDataItems);
-    delete msg;
-  }
-};
-
-template <class dtype>
-class MeshStreamerArrayClient :  public CBase_MeshStreamerArrayClient<dtype>, 
-  public MeshStreamerClient<dtype>
-{
-
-public:
-
-  // virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg);
-  MeshStreamerArrayClient() {}
-  MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   void receiveRedeliveredItem(dtype data) {
-    MeshStreamerClient<dtype>::detectorLocalObj_->consume();
+    detectorLocalObj_->consume();
     process(data);
   }
 
   void pup(PUP::er &p) {
     CBase_MeshStreamerArrayClient<dtype>::pup(p);
-  }
+   }  
 
 };
 
 template <class dtype>
-class MeshStreamerArray2DClient : 
-  public CBase_MeshStreamerArray2DClient<dtype>, 
-  public MeshStreamerClient<dtype> 
-{
+class MeshStreamerGroupClient : public CBase_MeshStreamerGroupClient<dtype>{
 
-public:
-  MeshStreamerArray2DClient() {}
-  MeshStreamerArray2DClient(CkMigrateMessage *msg) {}
-  void receiveRedeliveredItem(dtype data) {
-    MeshStreamerClient<dtype>::detectorLocalObj_->consume();
-    process(data);
+ private:
+  CompletionDetector *detectorLocalObj_;
+
+ public:
+  virtual void process(dtype &data) = 0;
+  void setDetector(CompletionDetector *detectorLocalObj) {
+    detectorLocalObj_ = detectorLocalObj;
   }
-  void pup(PUP::er &p) {
-    CBase_MeshStreamerArray2DClient<dtype>::pup(p);
+  virtual void receiveCombinedData(MeshStreamerMessage<dtype> *msg) {
+    for (int i = 0; i < msg->numDataItems; i++) {
+      dtype &data = msg->getDataItem(i);
+      process(data);
+    }
+    detectorLocalObj_->consume(msg->numDataItems);
+    delete msg;
   }
-
-};
-
-template <class dtype>
-class MeshStreamerArray3DClient : 
-  public CBase_MeshStreamerArray3DClient<dtype>, 
-  public MeshStreamerClient<dtype> 
-{
-
-public:
-  MeshStreamerArray3DClient() {}
-  MeshStreamerArray3DClient(CkMigrateMessage *msg) {}
-  void receiveRedeliveredItem(dtype data) {
-    MeshStreamerClient<dtype>::detectorLocalObj_->consume();
-    process(data);
-  }
-  void pup(PUP::er &p) {
-    CBase_MeshStreamerArray3DClient<dtype>::pup(p);
-  }
-
 };
 
 template <class dtype>
@@ -161,6 +119,7 @@ private:
 
     CProxy_CompletionDetector detector_;
     int prio_;
+    int yieldCount_;
 
 #ifdef CACHE_LOCATIONS
     MeshLocation *cachedLocations_;
@@ -435,7 +394,6 @@ void MeshStreamer<dtype>::storeMessage(
 template <class dtype>
 inline
 void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
-  static int count = 0;
   const static bool copyIndirectly = true;
 
   MeshLocation destinationLocation = determineLocation(destinationPe);
@@ -443,8 +401,8 @@ void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
 	       copyIndirectly); 
   // release control to scheduler if requested by the user, 
   //   assume caller is threaded entry
-  if (yieldFlag_ && ++count == 1024) {
-    count = 0; 
+  if (yieldFlag_ && ++yieldCount_ == 1024) {
+    yieldCount_ = 0; 
     CthYield();
   }
 
@@ -472,15 +430,18 @@ void MeshStreamer<dtype>::associateCallback(
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
+  yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
-  static CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
-			   this->thisProxy);
+  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushDirect(), 
+                     this->thisProxy);
+  CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
+		    this->thisProxy);
   detector_ = detector;      
   detectorLocalObj_ = detector_.ckLocalBranch();
   initLocalClients();
 
-  detectorLocalObj_->start_detection(numContributors, startCb, finish , 0);
+  detectorLocalObj_->start_detection(numContributors, startCb, flushCb, finish , 0);
   
   if (progressPeriodInMs_ <= 0) {
     CkPrintf("Using completion detection in NDMeshStreamer requires"
@@ -722,19 +683,21 @@ public:
   // CkLocMgr::iterate will call addLocation on all elements local to this PE
   void addLocation(CkLocation &loc) {
 
-    ((MeshStreamerClient<dtype> *) (clientArrMgr_->lookup(loc.getIndex())))
-      ->setDetector(detectorLocalObj_); 
+    MeshStreamerArrayClient<dtype> *clientObj = 
+      (MeshStreamerArrayClient<dtype> *) clientArrMgr_->lookup(loc.getIndex());
 
+    CkAssert(clientObj != NULL); 
+    clientObj->setDetector(detectorLocalObj_); 
   }
 
 };
 
-template <class dtype, class ctype, class itype>
+template <class dtype, class itype>
 class ArrayMeshStreamer : public MeshStreamer<ArrayDataItem<dtype, itype> > {
   
 private:
   
-  ctype clientProxy_;
+  CProxy_MeshStreamerArrayClient<dtype> clientProxy_;
   CkArray *clientArrayMgr_;
   int numArrayElements_;
 #ifdef CACHE_ARRAY_METADATA
@@ -746,14 +709,15 @@ private:
   void deliverToDestination(
        int destinationPe, 
        MeshStreamerMessage<ArrayDataItem<dtype, itype> > *destinationBuffer) {
-    ( (CProxy_ArrayMeshStreamer<dtype, ctype, itype>) 
-      this->thisProxy )[destinationPe].receiveArrayData(destinationBuffer);
+
+    CProxy_ArrayMeshStreamer<dtype, itype> myProxy(this->thisProxy); 
+    myProxy[destinationPe].receiveArrayData(destinationBuffer);
   }
 
   void localDeliver(ArrayDataItem<dtype, itype> &packedDataItem) {
     itype arrayId = packedDataItem.arrayIndex; 
 
-    MeshStreamerClient<dtype> *clientObj;
+    MeshStreamerArrayClient<dtype> *clientObj;
 #ifdef CACHE_ARRAY_METADATA
     clientObj = clientObjs_[arrayId];
 #else
@@ -806,7 +770,8 @@ public:
   };
 
   ArrayMeshStreamer(int totalBufferCapacity, int numDimensions,
-		    int *dimensionSizes, const ctype &clientProxy,
+		    int *dimensionSizes, 
+                    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
     :MeshStreamer<ArrayDataItem<dtype, itype> >(
       totalBufferCapacity, numDimensions, dimensionSizes, yieldFlag, 
@@ -862,7 +827,7 @@ public:
     clientArrayMgr_->lastKnown(clientProxy_[arrayIndex].ckGetIndex());
 #endif
 
-  static ArrayDataItem<dtype, itype> packedDataItem;
+  ArrayDataItem<dtype, itype> packedDataItem;
     if (destinationPe == CkMyPe()) {
       // copying here is necessary - user code should not be 
       // passed back a reference to the original item
@@ -874,7 +839,7 @@ public:
 
     // this implementation avoids copying an item before transfer into message
 
-    static DataItemHandle tempHandle; 
+    DataItemHandle tempHandle; 
     tempHandle.arrayIndex = arrayIndex; 
     tempHandle.dataItem = &dataItem;
 

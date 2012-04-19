@@ -67,9 +67,9 @@ class CkArrayIndex: public CkArrayIndexBase
     public:
         /// Default
         CkArrayIndex() { nInts=0; dimension=0; for (int i=0; i<CK_ARRAYINDEX_MAXLEN; i++) index[i] = 0; }
-#ifdef _PIPELINED_ALLREDUCE_
+
 	CkArrayIndex(int idx) {init(1,1,idx);};
-#endif
+
         /// Return a pointer to the actual index data
         int *data(void)             {return index; }
         /// Return a const pointer to the actual index data

@@ -883,6 +883,19 @@ EOT
 test_cxx "whether __thread (Thread Local Storage) is supported" "yes" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_TLS_VARIABLES, $strictpass, [Allows __thread.])
 
+#### check __sync_add_and_fetch ####
+cat > $tc <<EOT
+#include <stdio.h>
+int main()
+{
+  int t=1;
+  __sync_add_and_fetch(&t, 1);
+  return 1;
+}
+EOT
+test_linkc "whether synchronization primitives (__sync_add_and_fetch) works in C" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_C_SYNC_PRIMITIVES, $pass, [whether synchronization primitives works in C])
+
 ### test if switching TLS register ###
 if test $in64bit = 1
 then

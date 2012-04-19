@@ -2825,6 +2825,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check __sync_add_and_fetch ####
+cat > $tc <<EOT
+#include <stdio.h>
+int main()
+{
+  int t=1;
+  __sync_add_and_fetch(&t, 1);
+  return 1;
+}
+EOT
+test_linkc "whether synchronization primitives (__sync_add_and_fetch) works in C" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_C_SYNC_PRIMITIVES $pass
+_ACEOF
+
+
 ### test if switching TLS register ###
 if test $in64bit = 1
 then
