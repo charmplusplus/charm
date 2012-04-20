@@ -1844,6 +1844,11 @@ void CmiTurnOffStats();
 extern int CharmLibInterOperate;
 CpvExtern(int,charmLibExitFlag);
 
+/*
+ *         Topology C wrapper
+ */
+extern int CmiGetHopsBetweenRanks(int pe1, int pe2);
+
 #if defined(__cplusplus)
 }                                         /* end of extern "C"  */
 #endif
