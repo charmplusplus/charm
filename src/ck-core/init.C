@@ -1253,10 +1253,11 @@ void _initCharm(int unused_argc, char **argv)
     }
 
 	if(CmiMyPe() == 0) {
-            if(CmiGetArgFlag(argv, "+printTopo")) {
+        char *topoFilename;
+            if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) {
 		TopoManager tmgr;
     FILE *fp;
-    fp = fopen("topologyInfo.txt", "w");
+    fp = fopen(topoFilename, "w");
     if (fp == NULL) {
       CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
       fp = stdout;
