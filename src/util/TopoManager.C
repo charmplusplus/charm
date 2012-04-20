@@ -427,3 +427,11 @@ void TopoManager::printAllocation(FILE *fp)
 	}
 }
 
+
+extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)
+{
+    TopoManager topomgr;
+    topomgr.getHopsBetweenRanks(pe1, pe2);
+}
+
+
