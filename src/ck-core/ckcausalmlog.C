@@ -538,6 +538,27 @@ void sendArrayMsg(envelope *env,int destPE,int _infoIdx){
 };
 
 /**
+ * Sends a message to a singleton chare.
+ */
+void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid){
+	CkObjID recver;
+	recver.type = TypeChare;
+	recver.data.chare.id = *pCid;
+
+	if(CpvAccess(_currentObj)!=NULL &&  CpvAccess(_currentObj)->mlogData->objID.type != TypeArray){
+		char recverString[100],senderString[100];
+		
+		DEBUG(printf("[%d] %s being sent message from non-array %s \n",CkMyPe(),recver.toString(recverString),CpvAccess(_currentObj)->mlogData->objID.toString(senderString)));
+	}
+
+	// initializing values of envelope
+	env->SN = 0;
+	env->TN = 0;
+
+	sendCommonMsg(recver,env,destPE,_infoIdx);
+};
+
+/**
  * A method to generate the actual ticket requests for groups, nodegroups or arrays.
  */
 void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){

@@ -1583,6 +1583,9 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
   // VidBlock was not yet filled). The problem is that the creation was never
   // traced later when the VidBlock was filled. One solution is to trace the
   // creation here, the other to trace it in VidBlock->msgDeliver().
+#if defined(_FAULT_CAUSAL_)
+	sendChareMsg(env,destPE,_infoIdx,pCid);
+#else
   _TRACE_CREATION_1(env);
   if (destPE!=-1) {
     CpvAccess(_qd)->create();
@@ -1592,6 +1595,7 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
       _CldEnqueue(destPE, env, _infoIdx);
   }
   _TRACE_CREATION_DONE(1);
+#endif
 }
 
 extern "C"
