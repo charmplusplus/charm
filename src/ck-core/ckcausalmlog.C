@@ -37,7 +37,7 @@
 #define DEBUG_PERF(x) // x
 #define DEBUG_CHECKPOINT 1
 #define DEBUG_NOW(x) x
-#define DEBUG_PE(x,y) if(CkMyPe() == x) y
+#define DEBUG_PE(x,y) // if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
 extern const char *idx2str(const CkArrayIndex &ind);
@@ -669,8 +669,8 @@ inline bool isTeamLocal(int destPE){
  * Method that does the actual send by creating a ticket request filling it up and sending it.
  */
 void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend){
-	DEBUG(char recverString[100]);
-	DEBUG(char senderString[100]);
+	DEBUG_NOW(char recverString[100]);
+	DEBUG_NOW(char senderString[100]);
 
 	int totalSize;
 	StoreDeterminantsHeader header;
@@ -678,7 +678,7 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	char *ptrs[2];
 
 	envelope *env = entry->env;
-	DEBUG(printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
+	DEBUG_PE(3,printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
 
 	// setting all the information
 	Chare *obj = (Chare *)entry->env->sender.getObject();
@@ -983,7 +983,7 @@ inline bool _getTicket(envelope *env, int *flag){
 bool fault_aware(CkObjID &recver){
 	switch(recver.type){
 		case TypeChare:
-			return false;
+			return true;
 		case TypeMainChare:
 			return false;
 		case TypeGroup:
@@ -1005,8 +1005,10 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// getting the receiver object
 	CkObjID recver = env->recver;
-	if(!fault_aware(recver))
+	if(!fault_aware(recver)){
 		return 1;
+		CkPrintf("[%d] Receiver NOT fault aware\n",CkMyPe());
+	}
 
 	Chare *obj = (Chare *)recver.getObject();
 	*objPointer = obj;
@@ -1016,13 +1018,13 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 			int totalSize = env->getTotalsize();
 			CmiSyncSend(possiblePE,totalSize,(char *)env);
 			
-			DEBUG(printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
+			DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
 		}else{
 			// this is the case where a message is received and the object has not been initialized
 			// we delayed the delivery of the message
 			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
 			
-			DEBUG(printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
+			DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
 		}
 		return 0;
 	}
@@ -1035,7 +1037,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 	}
 
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG(printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
+	DEBUG_PE(0,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
 
 	// getting a ticket for this message
 	ticketSuccess = _getTicket(env,&flag);

@@ -1167,7 +1167,7 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
         MCount SN;
         MlogEntry *entry=NULL;
         if(env->getMsgtype() == ForBocMsg || env->getMsgtype() == ForNodeBocMsg ||
-        env->getMsgtype() == ForArrayEltMsg){
+        env->getMsgtype() == ForArrayEltMsg || env->getMsgtype() == ForChareMsg){
                 sender = env->sender;
                 SN = env->SN;
                 int result = preProcessReceivedMessage(env,&obj,&entry);
