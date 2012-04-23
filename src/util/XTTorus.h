@@ -225,8 +225,8 @@ class XTTorusManager {
     }
 
     inline int coordinatesToRank(int x, int y, int z, int t) {
-      if(coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t] == -1 && ((t+origin.t)>=CmiNumCores())) {
-				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t-CmiNumCores()]; 
+      if(coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t] == -1 && ((t+origin.t)>=(dimNT/2))) {
+				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t-dimNT/2]; 
 			} else {
 				return coords2pid[x+origin.x][y+origin.y][z+origin.z][t+origin.t];
 			}
