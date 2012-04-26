@@ -886,6 +886,8 @@ extern "C" void CmiInitCPUAffinity(char **argv);
 extern "C" void CmiInitMemAffinity(char **argv);
 extern "C" void CmiInitPxshm(char **argv);
 
+extern void TopoManager_init();
+
 //extern "C" void CldCallback();
 
 void _registerInitCall(CkInitCallFn fn, int isNodeCall)
@@ -1240,6 +1242,9 @@ void _initCharm(int unused_argc, char **argv)
 			CcdCallFnAfter((CcdVoidFn)CkDecideEvacPe, 0, 10000);
 		}*/
 	}	
+
+    TopoManager_init();
+    CmiNodeAllBarrier();
 
     if (!_replaySystem) {
         if (faultFunc == NULL) {         // this is not restart

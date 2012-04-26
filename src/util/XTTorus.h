@@ -18,6 +18,10 @@
 #define CPU_FACTOR 1
 #endif
 
+#if CMK_HAS_RCALIB
+#include <rca_lib.h>
+#endif
+
 #if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
 
 // XDIM, YDIM, ZDIM and MAXNID depend on a specific Cray installation.
@@ -75,6 +79,9 @@ extern "C" int *pid2nid;
 extern "C" int pidtonid(int numpes);
 extern "C" int getMeshCoord(int nid, int *x, int *y, int *z);
 extern "C" void getDimension(int *,int *, int *, int *);
+#if CMK_HAS_RCALIB
+extern "C" rca_mesh_coord_t  *coords;
+#endif
 
 struct loc {
   int x;
@@ -105,28 +112,35 @@ class XTTorusManager {
     XTTorusManager() {
       int nid = 0, oldnid = -1, lx, ly, lz;
       int i, j, k, l;
-			int numCores;
+      int numCores;
       int minX, minY, minZ, minT=0, maxX=0, maxY=0, maxZ=0;
 
       int numPes = CmiNumPes();
       pid2coords = (struct loc*)malloc(sizeof(struct loc) * numPes);
+      _MEMCHECK(pid2coords);
 
       // fill the nid2pid and pid2nid data structures
+/*
       pidtonid(numPes);
-			getDimension(&maxNID,&xDIM,&yDIM,&zDIM);
+*/
+      getDimension(&maxNID,&xDIM,&yDIM,&zDIM);
       minX=xDIM, minY=yDIM, minZ=zDIM;
-			numCores = CmiNumCores()*CPU_FACTOR;
+      numCores = CmiNumCores()*CPU_FACTOR;
 
-			coords2pid = (int ****)malloc(xDIM*sizeof(int***));
-			for(i=0; i<xDIM; i++) {
-				coords2pid[i] = (int ***)malloc(yDIM*sizeof(int**));
-				for(j=0; j<yDIM; j++) {
-					coords2pid[i][j] = (int **)malloc(zDIM*sizeof(int*));
-					for(k=0; k<zDIM; k++) {
-						coords2pid[i][j][k] = (int *)malloc(numCores*sizeof(int*));
-					}
-				}
+      coords2pid = (int ****)malloc(xDIM*sizeof(int***));
+      _MEMCHECK(coords2pid);
+      for(i=0; i<xDIM; i++) {
+		coords2pid[i] = (int ***)malloc(yDIM*sizeof(int**));
+                _MEMCHECK(coords2pid[i]);
+		for(j=0; j<yDIM; j++) {
+			coords2pid[i][j] = (int **)malloc(zDIM*sizeof(int*));
+                        _MEMCHECK(coords2pid[i][j]);
+			for(k=0; k<zDIM; k++) {
+				coords2pid[i][j][k] = (int *)malloc(numCores*sizeof(int*));
+                                _MEMCHECK(coords2pid[i][j][k]);
 			}
+		}
+      }
 
       for(i=0; i<xDIM; i++)
         for(j=0; j<yDIM; j++)
@@ -139,8 +153,10 @@ class XTTorusManager {
       for(i=0; i<numPes; i++)
       {
         nid = pid2nid[i];
-        if (nid != oldnid)
-          getMeshCoord(nid, &lx, &ly, &lz);
+        if (nid != oldnid) {
+          int ret = getMeshCoord(nid, &lx, &ly, &lz);
+          CmiAssert(ret != -1);
+        }
         oldnid = nid;
 
         pid2coords[i].x = lx;      
@@ -150,10 +166,11 @@ class XTTorusManager {
         l = 0;
         while(coords2pid[lx][ly][lz][l] != -1)
           l++;
+        CmiAssert(l<numCores);
         coords2pid[lx][ly][lz][l] = i;
         pid2coords[i].t = l;
-				if((l+1) > dimNT)
-					dimNT = l+1;
+	if((l+1) > dimNT)
+		dimNT = l+1;
 
         if (lx<minX) minX = lx; if (lx>maxX) maxX = lx;
         if (ly<minY) minY = ly; if (ly>maxY) maxY = ly;
@@ -184,18 +201,19 @@ class XTTorusManager {
     }
 
     ~XTTorusManager() { 
-			int i,j,k;
-			free(pid2coords); 
-			for(i=0; i<xDIM; i++) {
-				for(j=0; j<yDIM; j++) {
-					for(k=0; k<zDIM; k++) {
-						free(coords2pid[i][j][k]);
-					}
-					free(coords2pid[i][j]);
-				}
-				free(coords2pid[i]);
+	int i,j,k;
+	free(pid2coords); 
+	for(i=0; i<xDIM; i++) {
+		for(j=0; j<yDIM; j++) {
+			for(k=0; k<zDIM; k++) {
+				free(coords2pid[i][j][k]);
 			}
+			free(coords2pid[i][j]);
 		}
+		free(coords2pid[i]);
+	}
+        free(coords2pid);
+    }
 
     inline int getDimX() { return dimX; }
     inline int getDimY() { return dimY; }

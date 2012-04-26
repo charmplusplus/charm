@@ -19,6 +19,9 @@
 #include <pmi.h>
 #endif
 
+CmiNodeLock  cray_lock =  PTHREAD_LOCK_INITIALIZER;
+CmiNodeLock  cray_lock2 =  PTHREAD_LOCK_INITIALIZER;
+
 /** \function getXTNodeID
  *  returns nodeID corresponding to the MPI rank (possibly obtained
  *  from CmiMyNode()/CmiNodeOf(pe)) passed to it
@@ -91,6 +94,9 @@ int maxX = -1;
 int maxY = -1;
 int maxZ = -1;
 int maxNID = -1;
+#if CMK_HAS_RCALIB
+rca_mesh_coord_t  *coords = NULL;
+#endif
 
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
 
@@ -100,13 +106,22 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim);
  */
 int getMeshCoord(int nid, int *x, int *y, int *z) {
 #if CMK_HAS_RCALIB
+  if (coords == NULL) {
   rca_mesh_coord_t xyz;
-  int ret;
+  int ret = -1;
   ret = rca_get_meshcoord(nid, &xyz);
+  if (ret == -1) return -1;
   *x = xyz.mesh_x;
   *y = xyz.mesh_y;
   *z = xyz.mesh_z;
   return ret;
+  }
+  else {
+  *x = coords[nid].mesh_x;
+  *y = coords[nid].mesh_y;
+  *z = coords[nid].mesh_z;
+  return *x==-1?-1:0;
+  }
 #else
   CmiAbort("rca_get_meshcoord not exist");
   return -1;
@@ -118,19 +133,23 @@ int getMeshCoord(int nid, int *x, int *y, int *z) {
  *  correspondingly also creates an array for nids to pids
  */
 void pidtonid(int numpes) {
-  if (pid2nid != NULL) return;          /* did once already */
+  CmiLock(cray_lock);
+  if (pid2nid != NULL) {
+      CmiUnlock(cray_lock);
+      return;          /* did once already */
+  }
 
-	getDimension(&maxNID,&maxX,&maxY,&maxZ);
-	int numCores = CmiNumCores();
+  getDimension(&maxNID,&maxX,&maxY,&maxZ);
+  int numCores = CmiNumCores();
   
-	pid2nid = (int *)malloc(sizeof(int) * numpes);
+  pid2nid = (int *)malloc(sizeof(int) * numpes);
 
 #if XT3_TOPOLOGY
   cnos_nidpid_map_t *nidpid; 
   int ierr, i, nid;
 	int *nid2pid;
 	
-	nid2pid = (int*)malloc(maxNID*2*sizeof(int));
+  nid2pid = (int*)malloc(maxNID*2*sizeof(int));
   nidpid = (cnos_nidpid_map_t *)malloc(sizeof(cnos_nidpid_map_t) * numpes);
 
   for(i=0; i<maxNID; i++) {
@@ -166,27 +185,37 @@ void pidtonid(int numpes) {
 	free(nid2pid);
 
 #elif XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
-  int i, nid;
+  int i, nid, ret;
+  CmiAssert(coords == NULL);
+  coords = (rca_mesh_coord_t *)malloc(sizeof(rca_mesh_coord_t)*(maxNID+1));
+  for (i=0; i<maxNID; i++) {
+    coords[i].mesh_x = coords[i].mesh_y = coords[i].mesh_z = -1;
+  }
   for (i=0; i<numpes; i++) {
     PMI_Get_nid(CmiNodeOf(i), &nid);
     pid2nid[i] = nid;
     CmiAssert(nid < maxNID);
+    ret = rca_get_meshcoord(nid, &coords[nid]);
+    CmiAssert(ret != -1);
   }
 #endif
+  CmiUnlock(cray_lock);
 }
 
 /* get size and dimension for XE machine */
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, ret;
+  CmiLock(cray_lock2);
 
-	if(maxNID != -1) {
-		*xdim = maxX;
-		*ydim = maxY;
-		*zdim = maxZ;
-		*maxnid = maxNID;
-		return;
-	}
+  if(maxNID != -1) {
+	*xdim = maxX;
+	*ydim = maxY;
+	*zdim = maxZ;
+	*maxnid = maxNID;
+        CmiUnlock(cray_lock2);
+	return;
+  }
 
   *xdim = *ydim = *zdim = 0;
     /* loop until fails to find the max */ 
@@ -202,6 +231,17 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxX = *xdim = *xdim+1;
   maxY = *ydim = *ydim+1;
   maxZ = *zdim = *zdim+1;
+  CmiUnlock(cray_lock2);
+}
+
+void craynid_init()
+{
+  if (CmiMyRank()==0) {
+    cray_lock = CmiCreateLock();
+    cray_lock2 = CmiCreateLock();
+
+    pidtonid(CmiNumPes());
+  }
 }
 
 #endif /* XT3_TOPOLOGY || XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY */

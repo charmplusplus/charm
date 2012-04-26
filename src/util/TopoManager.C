@@ -427,6 +427,16 @@ void TopoManager::printAllocation(FILE *fp)
 	}
 }
 
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+extern "C" void craynid_init();
+#endif
+
+void TopoManager_init()
+{
+#if XT4_TOPOLOGY || XT5_TOPOLOGY || XE6_TOPOLOGY
+    craynid_init();
+#endif
+}
 
 extern "C" int CmiGetHopsBetweenRanks(int pe1, int pe2)
 {
