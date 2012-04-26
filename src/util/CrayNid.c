@@ -19,8 +19,7 @@
 #include <pmi.h>
 #endif
 
-CmiNodeLock  cray_lock =  PTHREAD_LOCK_INITIALIZER;
-CmiNodeLock  cray_lock2 =  PTHREAD_LOCK_INITIALIZER;
+CmiNodeLock  cray_lock, cray_lock2;
 
 /** \function getXTNodeID
  *  returns nodeID corresponding to the MPI rank (possibly obtained
