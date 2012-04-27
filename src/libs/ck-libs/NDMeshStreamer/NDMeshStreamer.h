@@ -475,11 +475,11 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
     dtype &dataItem = msg->getDataItem(i);
-    destinationLocation = determineLocation(destinationPe);
     if (destinationPe == CkMyPe()) {
       localDeliver(dataItem);
     }
     else {
+      destinationLocation = determineLocation(destinationPe);
       storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
   }
