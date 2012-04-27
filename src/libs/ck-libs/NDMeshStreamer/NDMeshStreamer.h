@@ -61,6 +61,7 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
     detectorLocalObj_ = detectorLocalObj;
   }
   void receiveRedeliveredItem(dtype data) {
+    //    CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
     detectorLocalObj_->consume();
     process(data);
   }
@@ -143,6 +144,7 @@ private:
     virtual void initLocalClients() = 0;
 
     void flushLargestBuffer();
+    void flushToIntermediateDestinations();
 
 protected:
 
@@ -591,6 +593,52 @@ void MeshStreamer<dtype>::flushAllBuffers() {
     }
   }
 }
+
+template <class dtype>
+void MeshStreamer<dtype>::flushToIntermediateDestinations() {
+
+  MeshStreamerMessage<dtype> **messageBuffers; 
+  MeshStreamerMessage<dtype> *destinationBuffer; 
+  int destinationIndex, numBuffers; 
+
+  for (int i = 0; i < numDimensions_; i++) {
+
+    messageBuffers = dataBuffers_[i]; 
+    numBuffers = individualDimensionSizes_[i]; 
+
+    for (int j = 0; j < numBuffers; j++) {
+
+      if(messageBuffers[j] == NULL) {
+	continue;
+      }
+
+      messageBuffers = dataBuffers_[i]; 
+      destinationBuffer = messageBuffers[j];
+      destinationIndex = myIndex_ + 
+	(j - myLocationIndex_[i]) * 
+	combinedDimensionSizes_[i] ;
+
+      if (destinationBuffer->numDataItems < bufferSize_) {
+	// not sending the full buffer, shrink the message size
+	envelope *env = UsrToEnv(destinationBuffer);
+	env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
+			  (bufferSize_ - destinationBuffer->numDataItems));
+	*((int *) env->getPrioPtr()) = prio_;
+      }
+      numDataItemsBuffered_ -= destinationBuffer->numDataItems;
+
+      if (i == 0) {
+        deliverToDestination(destinationIndex, destinationBuffer);
+      }
+      else {
+	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+      }
+      messageBuffers[j] = NULL;
+    }
+  }
+}
+
+
 
 template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
