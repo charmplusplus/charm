@@ -469,9 +469,10 @@ void MeshStreamer<dtype>::finish() {
 template <class dtype>
 void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 
-  int destinationPe; 
+  int destinationPe, lastDestinationPe; 
   MeshLocation destinationLocation;
 
+  lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
     dtype &dataItem = msg->getDataItem(i);
@@ -479,9 +480,13 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
       localDeliver(dataItem);
     }
     else {
-      destinationLocation = determineLocation(destinationPe);
+      if (destinationPe != lastDestinationPe) {
+        // do this once per sequence of items with the same destination
+        destinationLocation = determineLocation(destinationPe);
+      }
       storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
+    lastDestinationPe = destinationPe; 
   }
 
   delete msg;
