@@ -61,7 +61,7 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
     detectorLocalObj_ = detectorLocalObj;
   }
   void receiveRedeliveredItem(dtype data) {
-    //    CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
+    CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
     detectorLocalObj_->consume();
     process(data);
   }

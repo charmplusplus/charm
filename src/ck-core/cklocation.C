@@ -2633,6 +2633,12 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 #if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
 #endif
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+        DEBM((AA"Global location update! idx %s to %d \n"AB,idx2str(idx),toPe));
+        thisProxy.updateLocation(idx, toPe);                        
+#endif
+
 	CK_MAGICNUMBER_CHECK
 }
 
