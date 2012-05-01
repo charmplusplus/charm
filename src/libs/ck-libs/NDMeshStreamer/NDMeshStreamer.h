@@ -15,6 +15,7 @@
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
+// #define STREAMER_EXPERIMENTAL
 
 struct MeshLocation {
   int dimension; 
@@ -115,9 +116,10 @@ private:
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
     bool hasSentRecently_;
+#ifdef STREAMER_EXPERIMENTAL
     bool hasSentPreviously_;
     bool immediateMode_; 
-
+#endif
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
     CProxy_CompletionDetector detector_;
@@ -253,7 +255,9 @@ MeshStreamer<dtype>::MeshStreamer(
 
   isPeriodicFlushEnabled_ = false; 
   detectorLocalObj_ = NULL;
+#ifdef STREAMER_EXPERIMENTAL
   immediateMode_ = false; 
+#endif
 
 #ifdef CACHE_LOCATIONS
   cachedLocations_ = new MeshLocation[numMembers_];
@@ -435,7 +439,10 @@ void MeshStreamer<dtype>::associateCallback(
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
+#ifdef STREAMER_EXPERIMENTAL
   immediateMode_ = false;
+  hasSentPreviously_ = false; 
+#endif
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
@@ -457,7 +464,6 @@ void MeshStreamer<dtype>::associateCallback(
   }
   
   hasSentRecently_ = false; 
-  hasSentPreviously_ = false; 
   enablePeriodicFlushing();
       
 }
@@ -496,9 +502,11 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
     lastDestinationPe = destinationPe; 
   }
 
+#ifdef STRAMER_EXPERIMENTAL
   if (immediateMode_) {
     flushToIntermediateDestinations();
   }
+#endif
 
   delete msg;
 
@@ -665,6 +673,7 @@ void MeshStreamer<dtype>::flushDirect(){
     
   }
 
+#ifdef STREAMER_EXPERIMENTAL
   // switch into immediate sending mode when 
   // number of items buffered is small; avoid doing the switch 
   // at the beginning before any sending has taken place
@@ -676,6 +685,7 @@ void MeshStreamer<dtype>::flushDirect(){
   if (!hasSentPreviously_) {
     hasSentPreviously_ = hasSentRecently_; 
   }
+#endif
 
   hasSentRecently_ = false; 
 
