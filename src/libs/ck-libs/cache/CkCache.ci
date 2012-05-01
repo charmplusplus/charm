@@ -16,7 +16,7 @@ module CkCache {
     entry void writebackChunk(int num);
     entry void finishedChunk(int num, CmiUInt8 weight);
     entry void collectStatistics(CkCallback &cb);
-    entry [local] std::map<CkCacheKey,CkCacheEntry*> *getCache();
-    entry [local] CkCacheEntry *requestCacheEntryNoFetch(CkCacheKey key, int chunk);
+    //entry [local] std::map<CkCacheKey,CkCacheEntry*> *getCache();
+    //entry [local] CkCacheEntry *requestCacheEntryNoFetch(CkCacheKey key, int chunk);
   };
 };
