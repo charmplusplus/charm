@@ -4,4 +4,3 @@
 // to decide if the library exists before adding the line to conv-mach-opt.h
 //
 // If this is not the intended idiom, then please enlighten me.
-
