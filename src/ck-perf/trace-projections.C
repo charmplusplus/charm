@@ -100,7 +100,11 @@ On T3E, we need to have file number control by open/close files only when needed
 #endif //CMK_TRACE_LOGFILE_NUM_CONTROL
 
 #if CMK_HAS_COUNTER_PAPI
+#ifdef USE_SPP_PAPI
+int papiEvents[NUMPAPIEVENTS];
+#else
 int papiEvents[NUMPAPIEVENTS] = { PAPI_L2_DCM, PAPI_FP_OPS };
+#endif
 #endif // CMK_HAS_COUNTER_PAPI
 
 /**
@@ -1069,21 +1073,80 @@ TraceProjections::TraceProjections(char **argv):
 
 #if CMK_SMP
   //PAPI_thread_init has to finish before calling PAPI_create_eventset
-  CmiNodeAllBarrier();
+  #if CMK_SMP_TRACE_COMMTHREAD
+      CmiNodeAllBarrier();
+  #else
+      CmiNodeBarrier();
+  #endif
 #endif
   // PAPI 3 mandates the initialization of the set to PAPI_NULL
   papiEventSet = PAPI_NULL; 
   if (PAPI_create_eventset(&papiEventSet) != PAPI_OK) {
     CmiAbort("PAPI failed to create event set!\n");
   }
+#ifdef USE_SPP_PAPI
+  //  CmiPrintf("Using SPP counters for PAPI\n");
+  if(PAPI_query_event(PAPI_FP_OPS)==PAPI_OK) {
+    papiEvents[0] = PAPI_FP_OPS;
+  }else{
+    if(CmiMyPe()==0){
+      CmiAbort("WARNING: PAPI_FP_OPS doesn't exist on this platform!");
+    }
+  }
+  if(PAPI_query_event(PAPI_TOT_INS)==PAPI_OK) {
+    papiEvents[1] = PAPI_TOT_INS;
+  }else{
+    CmiAbort("WARNING: PAPI_TOT_INS doesn't exist on this platform!");
+  }
+  int EventCode;
+  int ret;
+  ret=PAPI_event_name_to_code("perf::PERF_COUNT_HW_CACHE_LL:MISS",&EventCode);
+  if(PAPI_query_event(EventCode)==PAPI_OK) {
+    papiEvents[2] = EventCode;
+  }else{
+    CmiAbort("WARNING: perf::PERF_COUNT_HW_CACHE_LL:MISS doesn't exist on this platform!");
+  }
+  ret=PAPI_event_name_to_code("DATA_PREFETCHER:ALL",&EventCode);
+  if(PAPI_query_event(EventCode)==PAPI_OK) {
+    papiEvents[3] = EventCode;
+  }else{
+    CmiAbort("WARNING: DATA_PREFETCHER:ALL doesn't exist on this platform!");
+  }
+  if(PAPI_query_event(PAPI_L1_DCA)==PAPI_OK) {
+    papiEvents[4] = PAPI_L1_DCA;
+  }else{
+    CmiAbort("WARNING: PAPI_L1_DCA doesn't exist on this platform!");
+  }
+  if(PAPI_query_event(PAPI_TOT_CYC)==PAPI_OK) {
+    papiEvents[5] = PAPI_TOT_CYC;
+  }else{
+    CmiAbort("WARNING: PAPI_TOT_CYC doesn't exist on this platform!");
+  }
+#else
+  // just uses { PAPI_L2_DCM, PAPI_FP_OPS } the 2 initialized PAPI_EVENTS
+#endif
   papiRetValue = PAPI_add_events(papiEventSet, papiEvents, NUMPAPIEVENTS);
-  if (papiRetValue != PAPI_OK) {
+  if (papiRetValue < 0) {
     if (papiRetValue == PAPI_ECNFLCT) {
       CmiAbort("PAPI events conflict! Please re-assign event types!\n");
     } else {
+      char error_str[PAPI_MAX_STR_LEN];
+      PAPI_perror(papiRetValue,error_str,PAPI_MAX_STR_LEN);
+      CmiPrintf("PAPI failed with error %s val %d\n",error_str,papiRetValue);
       CmiAbort("PAPI failed to add designated events!\n");
     }
   }
+  if(CkMyPe()==0)
+    {
+      CmiPrintf("Registered %d PAPI counters:",NUMPAPIEVENTS);
+      char nameBuf[PAPI_MAX_STR_LEN];
+      for(int i=0;i<NUMPAPIEVENTS;i++)
+	{
+	  PAPI_event_code_to_name(papiEvents[i], nameBuf);
+	  CmiPrintf("%s ",nameBuf);
+	}
+      CmiPrintf("\n");
+    }
   memset(papiValues, 0, NUMPAPIEVENTS*sizeof(LONG_LONG_PAPI));
 #endif
 }

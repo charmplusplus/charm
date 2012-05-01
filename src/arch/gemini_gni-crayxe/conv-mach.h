@@ -3,6 +3,9 @@
 
 #define CMK_CRAYXE                                         1
 
+// for cray xe we use the known conflict free counter set from the SPP project
+#define USE_SPP_PAPI                                       1
+
 #define XE6_TOPOLOGY					   1
 
 /* 1 if the machine has a function called "getpagesize()", 0 otherwise .
