@@ -115,6 +115,7 @@ private:
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
     bool hasSentRecently_;
+    bool hasSentPreviously_;
     bool immediateMode_; 
 
     MeshStreamerMessage<dtype> ***dataBuffers_;
@@ -456,6 +457,7 @@ void MeshStreamer<dtype>::associateCallback(
   }
   
   hasSentRecently_ = false; 
+  hasSentPreviously_ = false; 
   enablePeriodicFlushing();
       
 }
@@ -666,10 +668,14 @@ void MeshStreamer<dtype>::flushDirect(){
   // switch into immediate sending mode when 
   // number of items buffered is small; avoid doing the switch 
   // at the beginning before any sending has taken place
-  if (hasSentRecently_ && 
+  if (hasSentPreviously_ && 
       (numDataItemsBuffered_ < .1 * totalBufferCapacity_)) {
     immediateMode_ = true; 
   } 
+
+  if (!hasSentPreviously_) {
+    hasSentPreviously_ = hasSentRecently_; 
+  }
 
   hasSentRecently_ = false; 
 
