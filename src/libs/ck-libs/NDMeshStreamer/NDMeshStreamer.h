@@ -115,6 +115,7 @@ private:
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
     bool hasSentRecently_;
+    bool immediateMode_; 
 
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
@@ -251,6 +252,7 @@ MeshStreamer<dtype>::MeshStreamer(
 
   isPeriodicFlushEnabled_ = false; 
   detectorLocalObj_ = NULL;
+  immediateMode_ = false; 
 
 #ifdef CACHE_LOCATIONS
   cachedLocations_ = new MeshLocation[numMembers_];
@@ -432,6 +434,7 @@ void MeshStreamer<dtype>::associateCallback(
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
+  immediateMode_ = false;
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
@@ -489,6 +492,10 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
       storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
     lastDestinationPe = destinationPe; 
+  }
+
+  if (immediateMode_) {
+    flushToIntermediateDestinations();
   }
 
   delete msg;
@@ -642,7 +649,6 @@ void MeshStreamer<dtype>::flushToIntermediateDestinations() {
 
 template <class dtype>
 void MeshStreamer<dtype>::flushDirect(){
-
   // flush if (1) this is not a periodic call or 
   //          (2) this is a periodic call and no sending took place
   //              since the last time the function was invoked
@@ -656,6 +662,14 @@ void MeshStreamer<dtype>::flushDirect(){
 #endif
     
   }
+
+  // switch into immediate sending mode when 
+  // number of items buffered is small; avoid doing the switch 
+  // at the beginning before any sending has taken place
+  if (hasSentRecently_ && 
+      (numDataItemsBuffered_ < .1 * totalBufferCapacity_)) {
+    immediateMode_ = true; 
+  } 
 
   hasSentRecently_ = false; 
 
