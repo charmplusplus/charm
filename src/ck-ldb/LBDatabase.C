@@ -909,16 +909,17 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
       tolerate_imb = 1.0;                                                                                            
     }                                                                                                                
     CkPrintf("Will generate plan for refine %lf imb and %lf overhead\n", tolerate_imb, 0.2);                         
-    getPeriodForStrategy(tolerate_imb, 0.2, period, ratio_at_t);                                                     
-  } else {                                                                                                           
-    GetLBDataForLB(0, tmp2, tmp3);                                                                                   
-    if (max/avg < tolerate_imb) {                                                                                    
-      CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);                      
-      tolerate_imb = 1.0;                                                                                            
-    }                                                                                                                
-    CkPrintf("Will generate plan for greedy %lf imb and %lf overhead\n", tolerate_imb, 0.2);                         
-    getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);                                                       
-  } 
+    return getPeriodForStrategy(tolerate_imb, 0.2, period, ratio_at_t);                                                     
+  }
+  
+  GetLBDataForLB(0, tmp2, tmp3);                                                                                   
+  if (max/avg < tolerate_imb) {                                                                                    
+    CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);                      
+    tolerate_imb = 1.0;                                                                                            
+  }                                                                                                                
+  CkPrintf("Will generate plan for greedy %lf imb and %lf overhead\n", tolerate_imb, 0.2);                         
+  return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);                                                       
+
 //  int refine_period, scratch_period;
 //  bool obtained_refine, obtained_scratch;
 //  obtained_refine = getPeriodForStrategy(1, 1, refine_period);
