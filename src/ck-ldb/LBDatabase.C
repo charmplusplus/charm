@@ -716,11 +716,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   }
 
   double idle_load_tolerance = IDLE_LOAD_TOLERANCE;
-<<<<<<< HEAD
-  CkPrintf("%lf Alpha beta cost \n", alpha_beta_cost_to_load);
-=======
   CkPrintf("alpha_beta_to_load %lf\n", alpha_beta_cost_to_load);
->>>>>>> 61a4e2efa017ec4edc0eeeb377012830a9151348
   if (alpha_beta_cost_to_load < 0.1) {
     // Ignore the effect hence increase tolerance
     CkPrintf("Changing the idle load tolerance coz this isn't communication intensive benchmark\n");
@@ -891,7 +887,7 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
   // If we can attain perfect balance, then the new load is close to the
   // average. Hence we pass 1, else pass in some other value which would be the
   // new max_load after load balancing.
-  int tmp1;
+  /*int tmp1;
   double tmp2, tmp3;
   GetPrevLBData(tmp1, tmp2, tmp3);
   
@@ -901,8 +897,28 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     tolerate_imb = 1.0;
   }
 
-  return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);
-
+  return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);*/
+  int tmp1;                                                                                                          
+  double tmp2, tmp3;                                                                                                 
+  GetLBDataForLB(1, tmp2, tmp3);                                                                                     
+  double tolerate_imb = tmp2;                                                                                        
+                                                                                                                     
+  if (tmp2 <= 1.01) {                                                                                                
+    if (max/avg < tolerate_imb) {                                                                                    
+      CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);                      
+      tolerate_imb = 1.0;                                                                                            
+    }                                                                                                                
+    CkPrintf("Will generate plan for refine %lf imb and %lf overhead\n", tolerate_imb, 0.2);                         
+    getPeriodForStrategy(tolerate_imb, 0.2, period, ratio_at_t);                                                     
+  } else {                                                                                                           
+    GetLBDataForLB(0, tmp2, tmp3);                                                                                   
+    if (max/avg < tolerate_imb) {                                                                                    
+      CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);                      
+      tolerate_imb = 1.0;                                                                                            
+    }                                                                                                                
+    CkPrintf("Will generate plan for greedy %lf imb and %lf overhead\n", tolerate_imb, 0.2);                         
+    getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);                                                       
+  } 
 //  int refine_period, scratch_period;
 //  bool obtained_refine, obtained_scratch;
 //  obtained_refine = getPeriodForStrategy(1, 1, refine_period);
