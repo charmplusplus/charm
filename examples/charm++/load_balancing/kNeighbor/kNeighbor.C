@@ -122,8 +122,7 @@ class Main: public CBase_Main {
       }
 
       gStarttime = CmiWallTimer();
-      for (int i=0; i<num_chares; i++)
-	array[i].commWithNeighbors();
+	array.commWithNeighbors();
     }
 
     void resumeIter() {
@@ -131,8 +130,7 @@ class Main: public CBase_Main {
       CkPrintf("Resume iteration at step %d\n", currentStep);
 #endif
       gStarttime = CmiWallTimer();
-      for (int i=0; i<num_chares; i++)
-	array[i].commWithNeighbors();
+	array.commWithNeighbors();
     }
 
     void terminate(CkReductionMsg *msg) {
