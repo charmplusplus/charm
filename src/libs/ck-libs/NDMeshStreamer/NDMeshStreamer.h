@@ -15,6 +15,7 @@
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
+// #define STREAMER_EXPERIMENTAL
 
 struct MeshLocation {
   int dimension; 
@@ -61,6 +62,7 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
     detectorLocalObj_ = detectorLocalObj;
   }
   void receiveRedeliveredItem(dtype data) {
+    CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
     detectorLocalObj_->consume();
     process(data);
   }
@@ -114,7 +116,10 @@ private:
     double progressPeriodInMs_; 
     bool isPeriodicFlushEnabled_; 
     bool hasSentRecently_;
-
+#ifdef STREAMER_EXPERIMENTAL
+    bool hasSentPreviously_;
+    bool immediateMode_; 
+#endif
     MeshStreamerMessage<dtype> ***dataBuffers_;
 
     CProxy_CompletionDetector detector_;
@@ -143,6 +148,7 @@ private:
     virtual void initLocalClients() = 0;
 
     void flushLargestBuffer();
+    void flushToIntermediateDestinations();
 
 protected:
 
@@ -249,6 +255,9 @@ MeshStreamer<dtype>::MeshStreamer(
 
   isPeriodicFlushEnabled_ = false; 
   detectorLocalObj_ = NULL;
+#ifdef STREAMER_EXPERIMENTAL
+  immediateMode_ = false; 
+#endif
 
 #ifdef CACHE_LOCATIONS
   cachedLocations_ = new MeshLocation[numMembers_];
@@ -430,6 +439,10 @@ void MeshStreamer<dtype>::associateCallback(
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
+#ifdef STREAMER_EXPERIMENTAL
+  immediateMode_ = false;
+  hasSentPreviously_ = false; 
+#endif
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
@@ -469,20 +482,31 @@ void MeshStreamer<dtype>::finish() {
 template <class dtype>
 void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 
-  int destinationPe; 
+  int destinationPe, lastDestinationPe; 
   MeshLocation destinationLocation;
 
+  lastDestinationPe = -1;
   for (int i = 0; i < msg->numDataItems; i++) {
     destinationPe = msg->destinationPes[i];
     dtype &dataItem = msg->getDataItem(i);
-    destinationLocation = determineLocation(destinationPe);
     if (destinationPe == CkMyPe()) {
       localDeliver(dataItem);
     }
     else {
+      if (destinationPe != lastDestinationPe) {
+        // do this once per sequence of items with the same destination
+        destinationLocation = determineLocation(destinationPe);
+      }
       storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
+    lastDestinationPe = destinationPe; 
   }
+
+#ifdef STRAMER_EXPERIMENTAL
+  if (immediateMode_) {
+    flushToIntermediateDestinations();
+  }
+#endif
 
   delete msg;
 
@@ -588,8 +612,53 @@ void MeshStreamer<dtype>::flushAllBuffers() {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::flushDirect(){
+void MeshStreamer<dtype>::flushToIntermediateDestinations() {
 
+  MeshStreamerMessage<dtype> **messageBuffers; 
+  MeshStreamerMessage<dtype> *destinationBuffer; 
+  int destinationIndex, numBuffers; 
+
+  for (int i = 0; i < numDimensions_; i++) {
+
+    messageBuffers = dataBuffers_[i]; 
+    numBuffers = individualDimensionSizes_[i]; 
+
+    for (int j = 0; j < numBuffers; j++) {
+
+      if(messageBuffers[j] == NULL) {
+	continue;
+      }
+
+      messageBuffers = dataBuffers_[i]; 
+      destinationBuffer = messageBuffers[j];
+      destinationIndex = myIndex_ + 
+	(j - myLocationIndex_[i]) * 
+	combinedDimensionSizes_[i] ;
+
+      if (destinationBuffer->numDataItems < bufferSize_) {
+	// not sending the full buffer, shrink the message size
+	envelope *env = UsrToEnv(destinationBuffer);
+	env->setTotalsize(env->getTotalsize() - sizeof(dtype) *
+			  (bufferSize_ - destinationBuffer->numDataItems));
+	*((int *) env->getPrioPtr()) = prio_;
+      }
+      numDataItemsBuffered_ -= destinationBuffer->numDataItems;
+
+      if (i == 0) {
+        deliverToDestination(destinationIndex, destinationBuffer);
+      }
+      else {
+	this->thisProxy[destinationIndex].receiveAlongRoute(destinationBuffer);
+      }
+      messageBuffers[j] = NULL;
+    }
+  }
+}
+
+
+
+template <class dtype>
+void MeshStreamer<dtype>::flushDirect(){
   // flush if (1) this is not a periodic call or 
   //          (2) this is a periodic call and no sending took place
   //              since the last time the function was invoked
@@ -603,6 +672,20 @@ void MeshStreamer<dtype>::flushDirect(){
 #endif
     
   }
+
+#ifdef STREAMER_EXPERIMENTAL
+  // switch into immediate sending mode when 
+  // number of items buffered is small; avoid doing the switch 
+  // at the beginning before any sending has taken place
+  if (hasSentPreviously_ && 
+      (numDataItemsBuffered_ < .1 * totalBufferCapacity_)) {
+    immediateMode_ = true; 
+  } 
+
+  if (!hasSentPreviously_) {
+    hasSentPreviously_ = hasSentRecently_; 
+  }
+#endif
 
   hasSentRecently_ = false; 
 

@@ -16,7 +16,11 @@
 
 #if CMK_HAS_COUNTER_PAPI
 #include <papi.h>
+#ifdef USE_SPP_PAPI
+#define NUMPAPIEVENTS 6
+#else
 #define NUMPAPIEVENTS 2
+#endif
 #endif
 
 #if CMK_PROJECTIONS_USE_ZLIB
