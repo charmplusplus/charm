@@ -349,7 +349,6 @@ public:
   };
 
   inline void AtLocalBarrier(LDBarrierClient h) {
-    lb_in_progress = true;
     LDAtLocalBarrier(myLDHandle,h);
   }
   inline void LocalBarrierOn(void) { LDLocalBarrierOn(myLDHandle); };
@@ -359,6 +358,7 @@ public:
   inline void SetLBPeriod(double s) { LDSetLBPeriod(myLDHandle, s);}
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 
+  void ResetAdaptive();
   bool AddLoad(int iteration, double load);
   void ReceiveMinStats(CkReductionMsg *);
   void LoadBalanceDecision(int, int);
@@ -404,7 +404,6 @@ private:
   std::vector<int> total_bytes_vec;
   std::vector<int> lbdb_no_obj_callback;
   int max_iteration;
-  bool lb_in_progress;
 
   double after_lb_max;
   double after_lb_avg;
@@ -413,6 +412,7 @@ private:
   int is_prev_lb_refine;
 
 public:
+  bool lb_in_progress;
   BaseLB** getLoadBalancers() {return loadbalancers.getVec();}
   int getNLoadBalancers() {return nloadbalancers;}
 

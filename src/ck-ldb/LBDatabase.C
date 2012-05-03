@@ -716,6 +716,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   }
 
   double idle_load_tolerance = IDLE_LOAD_TOLERANCE;
+  CkPrintf("%lf Alpha beta cost \n", alpha_beta_cost_to_load);
   if (alpha_beta_cost_to_load < 0.1) {
     // Ignore the effect hence increase tolerance
     CkPrintf("Changing the idle load tolerance coz this isn't communication intensive benchmark\n");
@@ -1113,9 +1114,14 @@ int LBDatabase::getPredictedLBPeriod(bool& is_tentative) {
    }
 }
 
+void LBDatabase::ResetAdaptive() {
+  adaptive_struct.lb_no_iterations = -1;
+  lb_in_progress = true;
+}
 
 void LBDatabase::HandleAdaptiveNoObj() {
   adaptive_struct.lb_no_iterations++;
+  //CkPrintf("HandleAdaptiveNoObj %d\n", adaptive_struct.lb_no_iterations);
   thisProxy[0].RegisterNoObjCallback(CkMyPe());
   TriggerAdaptiveReduction();
 }
@@ -1123,6 +1129,7 @@ void LBDatabase::HandleAdaptiveNoObj() {
 void LBDatabase::RegisterNoObjCallback(int index) {
   if (lb_in_progress) {
     lbdb_no_obj_callback.clear();
+    //CkPrintf("Clearing and registering\n");
     lb_in_progress = false;
   }
   lbdb_no_obj_callback.push_back(index);
@@ -1131,19 +1138,19 @@ void LBDatabase::RegisterNoObjCallback(int index) {
   // If collection has already happened and this is second iteration, then
   // trigger reduction.
   if (adaptive_struct.lb_no_iterations != -1) {
+    //CkPrintf("Collection already started now %d so kick in\n", adaptive_struct.lb_no_iterations);
     thisProxy[index].TriggerAdaptiveReduction();
   }
 }
 
 void LBDatabase::TriggerAdaptiveReduction() {
   adaptive_struct.lb_no_iterations++;
+  //CkPrintf("Trigger adaptive for %d\n", adaptive_struct.lb_no_iterations);
   double lb_data[6];
   lb_data[0] = adaptive_struct.lb_no_iterations;
   lb_data[1] = 1;
   lb_data[2] = 0.0;
-  //lb_data[2] = max_load_vec[iteration];
   lb_data[3] = 0.0;
-  //lb_data[3] = getLBDB()->ObjDataCount();
   lb_data[4] = 0.0;
   lb_data[5] = 0.0;
 
@@ -1201,8 +1208,9 @@ avg_load) {
   }
 }
 
-void LBDatabase::UpdateAfterLBComm(double alpha_beta_cost_to_load) {
-  alpha_beta_cost_to_load = alpha_beta_cost_to_load;
+void LBDatabase::UpdateAfterLBComm(double alpha_beta_to_load) {
+  CkPrintf("Setting LB alpa beta %lf \n", alpha_beta_to_load);
+  alpha_beta_cost_to_load = alpha_beta_to_load;
 }
 
 

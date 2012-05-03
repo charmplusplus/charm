@@ -984,6 +984,7 @@ void CentralLB::LoadBalance()
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
 
+  theLbdb->ResetAdaptive();
   if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
 
   if (_lb_args.debug()) 
