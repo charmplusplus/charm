@@ -1255,23 +1255,33 @@ void _initCharm(int unused_argc, char **argv)
 #endif
         }
         CmiInitCPUTopology(argv);
+#if CMK_SHARED_VARS_POSIX_THREADS_SMP
+        if (CmiCpuTopologyEnabled()) {
+            int *pelist;
+            int num;
+            CmiGetPesOnPhysicalNode(0, &pelist, &num);
+            if (CkMyPe()==0 && !_Cmi_noprocforcommthread && num+num/CmiMyNodeSize() > CmiNumCores()) {
+                CkPrintf("\nCharm++> Warning: the number of SMP threads is greater than the number of physical cores, use +CmiNoProcForComThread runtime option.\n\n");
+            }
+        }
+#endif
     }
 
-	if(CmiMyPe() == 0) {
+    if(CmiMyPe() == 0) {
         char *topoFilename;
-            if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) {
-		TopoManager tmgr;
-    FILE *fp;
-    fp = fopen(topoFilename, "w");
-    if (fp == NULL) {
-      CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
-      fp = stdout;
+        if(CmiGetArgStringDesc(argv,"+printTopo",&topoFilename,"topo file name")) 
+        {
+	    TopoManager tmgr;
+            FILE *fp;
+            fp = fopen(topoFilename, "w");
+            if (fp == NULL) {
+              CkPrintf("Error opening topology.Info.txt file, writing to stdout\n");
+              fp = stdout;
+            }
+	    tmgr.printAllocation(fp);
+            fclose(fp);
+        }
     }
-		tmgr.printAllocation(fp);
-    fclose(fp);
-	    }
-	}
-
 
 #if CMK_USE_PXSHM && CMK_CRAYXE && CMK_SMP
       // for SMP on Cray XE6 (hopper) it seems pxshm has to be initialized
