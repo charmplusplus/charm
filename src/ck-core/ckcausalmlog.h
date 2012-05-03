@@ -61,7 +61,6 @@ typedef struct {
 	int index;
 } RemoveDeterminantsHeader;
 
-
 /**
  * @brief Struct for the header of the storeDeterminants handler
  */
@@ -208,6 +207,7 @@ public:
 
 	int toResumeOrNot;
 	int resumeCount;
+	int immigrantRecFlag;
 
 private:
 
@@ -237,6 +237,7 @@ public:
 		resendReplyRecvd=0;
 		toResumeOrNot=0;
 		resumeCount=0;
+		immigrantRecFlag = 0;
 	};
 	inline MCount nextSN(const CkObjID &recver);
 	inline Ticket next_ticket(CkObjID &sender,MCount SN);
@@ -282,12 +283,13 @@ public:
 };
 
 /**
- * @brief 
+ * @brief Class that represents the location of an array element.
  */
 class LocationID{
 public:
 	CkArrayIndexMax idx;
 	CkGroupID gid;
+	int PE;
 };
 
 /**
