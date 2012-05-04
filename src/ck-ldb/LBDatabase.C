@@ -833,7 +833,8 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     data = adaptive_lbdb.history_data[i];
     max += data.max_load;
     avg += data.avg_load;
-    DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
+    //DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
+    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
   }
 //  max /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
 //  avg /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
@@ -869,7 +870,7 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);
     tolerate_imb = 1.0;
   }
-  CkPrintf("Will generate plan for greedy %lf imb and %lf overhead\n", tolerate_imb, 0.2);
+
   return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);
 }
 
