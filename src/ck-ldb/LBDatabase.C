@@ -19,7 +19,7 @@
 
 #define VEC_SIZE 500
 #define IMB_TOLERANCE 1.1
-#define IDLE_LOAD_TOLERANCE 0.3
+#define UTILIZATION_THRESHOLD 0.3
 #define NEGLECT_IDLE 2 // Should never be == 1
 
 #   define DEBAD(x) /*CkPrintf x*/
@@ -71,7 +71,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
   lb_data[2] = 0.0;
   lb_data[3] = 0.0;
   lb_data[4] = 0.0;
-  lb_data[5] = 0.0;
+  lb_data[5] = 1.0;
   for (int i = 0; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == 6*sizeof(double));
     if (msgs[i]->getSize() != 6*sizeof(double)) {
@@ -87,7 +87,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     // Avg idle
     lb_data[4] += m[4];
     // Max idle
-    lb_data[5] = ((m[5] > lb_data[5]) ? m[5] : lb_data[5]);
+    lb_data[5] = ((m[5] < lb_data[5]) ? m[5] : lb_data[5]);
     if (i == 0) {
       // Iteration no
       lb_data[0] = m[0];
@@ -667,9 +667,9 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     //lb_data[3] = getLBDB()->ObjDataCount();
     lb_data[4] = idle_time;
     if (total_load_vec[iteration] == 0.0) {
-      lb_data[5] = idle_time;
+      lb_data[5] = 0.0;
     } else {
-      lb_data[5] = idle_time/(idle_time + total_load_vec[iteration]);
+      lb_data[5] = total_load_vec[iteration]/(idle_time + total_load_vec[iteration]);
     }
   
     //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
@@ -715,12 +715,12 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     return;
   }
 
-  double idle_load_tolerance = IDLE_LOAD_TOLERANCE;
+  double utilization_threshold = UTILIZATION_THRESHOLD;
   CkPrintf("alpha_beta_to_load %lf\n", alpha_beta_cost_to_load);
   if (alpha_beta_cost_to_load < 0.1) {
     // Ignore the effect hence increase tolerance
     CkPrintf("Changing the idle load tolerance coz this isn't communication intensive benchmark\n");
-    idle_load_tolerance = 1024.0;
+    utilization_threshold = 0.0;
   }
 
 
@@ -756,7 +756,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
 
 
-    if ((utilization >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
+    if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
       CkPrintf("Carry out load balancing step at iter max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
 
       // If the previously calculated_period (not the final decision) is greater
@@ -808,7 +808,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
 
 
-  if ((utilization >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
+  if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
     CkPrintf("Carry out load balancing step at iter max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
