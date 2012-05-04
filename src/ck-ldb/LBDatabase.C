@@ -28,7 +28,7 @@ struct AdaptiveData {
   double iteration;
   double max_load;
   double avg_load;
-  double max_idle_load_ratio;
+  double utilization;
   double idle_time;
 };
 
@@ -669,7 +669,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     if (total_load_vec[iteration] == 0.0) {
       lb_data[5] = idle_time;
     } else {
-      lb_data[5] = idle_time/total_load_vec[iteration];
+      lb_data[5] = idle_time/(idle_time + total_load_vec[iteration]);
     }
   
     //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
@@ -687,11 +687,11 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double avg = load[2]/load[1];
   double max = load[3];
   double avg_idle = load[4]/load[1];
-  double max_idle_load_ratio = load[5];
+  double utilization = load[5];
   int iteration_n = load[0];
-  DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]));
-  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1]);
-  //CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs %lf/%lf\n",iteration_n, avg, max, avg_idle, max_idle_load_ratio, load[1], load[4],load[1]);
+  DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, utilization, load[1]));
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, utilization, load[1]);
+  //CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs %lf/%lf\n",iteration_n, avg, max, avg_idle, utilization, load[1], load[4],load[1]);
   delete msg;
   
   if (adaptive_struct.final_lb_period != iteration_n) {
@@ -706,7 +706,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   data.iteration = adaptive_struct.lb_no_iterations;
   data.max_load = max;
   data.avg_load = avg;
-  data.max_idle_load_ratio = max_idle_load_ratio;
+  data.utilization = utilization;
   data.idle_time = avg_idle;
   adaptive_lbdb.history_data.push_back(data);
 
@@ -756,8 +756,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
 
 
-    if ((max_idle_load_ratio >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
-      CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
+    if ((utilization >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
+      CkPrintf("Carry out load balancing step at iter max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
 
       // If the previously calculated_period (not the final decision) is greater
       // than the iter +1, we can inform this and expect to get a change.
@@ -808,8 +808,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp1, tmp2, tmp3);
 
 
-  if ((max_idle_load_ratio >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
-    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and max_idle_load_ratio ratio (%lf)\n", max/avg, max_idle_load_ratio);
+  if ((utilization >= idle_load_tolerance || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 4) {
+    CkPrintf("Carry out load balancing step at iter max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
 //    if (!adaptive_struct.lb_period_informed) {
 //      // Just for testing
      // if (iteration_n <= 5) {
