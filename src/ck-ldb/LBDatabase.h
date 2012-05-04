@@ -361,6 +361,7 @@ public:
   void ResetAdaptive();
   bool AddLoad(int iteration, double load);
   void ReceiveMinStats(CkReductionMsg *);
+  void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
   void LoadBalanceDecision(int, int);
   void LoadBalanceDecisionFinal(int, int);
   void ReceiveIterationNo(int, int); // Receives the current iter no
@@ -397,11 +398,10 @@ private:
   int new_ld_balancer;		// for Node 0
   CkVec<BaseLB *>   loadbalancers;
   int nloadbalancers;
-  std::vector<double> max_load_vec;
+  // Keeps track of per iteration load.
   std::vector<double> total_load_vec;
-  std::vector<double> total_contrib_vec;
-  std::vector<int> total_msg_vec;
-  std::vector<int> total_bytes_vec;
+  // Keeps track of how many local chares contributed
+  std::vector<int> total_count_vec;
   std::vector<int> lbdb_no_obj_callback;
   int max_iteration;
 
