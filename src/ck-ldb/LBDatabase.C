@@ -19,6 +19,7 @@
 
 #define VEC_SIZE 500
 #define IMB_TOLERANCE 1.1
+#define OUTOFWAY_TOLERANCE 2
 #define UTILIZATION_THRESHOLD 0.7
 #define NEGLECT_IDLE 2 // Should never be == 1
 
@@ -744,6 +745,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   // First generate the lb period based on the cost of lb. Find out what is the
   // expected imbalance at the calculated lb period.
   int period;
+  // This is based on the new max load after load balancing. So technically, it
+  // is calculated based on the shifter up avg curve.
   double ratio_at_t = 1.0;
   int tmp_lb_type;
   double tmp_max_avg_ratio, tmp_comm_ratio;
@@ -757,7 +760,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     // set the imbalance tolerance to be ratio_at_calculated_lb_period
     if (ratio_at_t != 1.0) {
       CkPrintf("Changed tolerance to %lf after line eq whereas max/avg is %lf\n", ratio_at_t, max/avg);
-      tolerate_imb = ratio_at_t;
+      // Since ratio_at_t is shifter up, max/(tmp_max_avg_ratio * avg) should be
+      // compared with the tolerance
+      tolerate_imb = ratio_at_t * tmp_max_avg_ratio * OUTOFWAY_TOLERANCE;
     }
 
     CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
@@ -781,6 +786,7 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
         adaptive_struct.lb_calculated_period);
       return;
     }
+    // TODO: Shouldn't we return from here??
   }
 
   CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
@@ -908,6 +914,7 @@ bool LBDatabase::getPeriodForStrategy(double new_load_percent,
     CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
   }
+  CkPrintf("Ratio at t (%lf*%d + %lf) / (%lf*%d+ac)\n", mslope, period, mc, aslope, period, ac);
   ratio_at_t = ((mslope*period + mc)/(aslope*period + ac));
   return true;
 }
