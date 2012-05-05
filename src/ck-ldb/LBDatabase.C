@@ -919,7 +919,7 @@ bool LBDatabase::getPeriodForStrategy(double new_load_percent,
     return false;
   }
   ratio_at_t = ((mslope*period + mc)/(aslope*period + ac));
-  CkPrintf("Ratio at t (%lf*%d + %lf) / (%lf*%d+%d) = %lf\n", mslope, period, mc, aslope, period, ac, ratio_at_t);
+  CkPrintf("Ratio at t (%lf*%d + %lf) / (%lf*%d+%lf) = %lf\n", mslope, period, mc, aslope, period, ac, ratio_at_t);
   return true;
 }
 
