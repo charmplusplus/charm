@@ -39,6 +39,10 @@ struct AdaptiveLBDatabase {
 } adaptive_lbdb;
 
 struct AdaptiveLBInfo {
+  AdaptiveLBInfo() {
+    max_avg_ratio = 1;
+    remote_local_ratio = 1;
+  }
   double max_avg_ratio;
   double remote_local_ratio;
 };
