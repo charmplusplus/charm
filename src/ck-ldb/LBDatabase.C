@@ -918,8 +918,8 @@ bool LBDatabase::getPeriodForStrategy(double new_load_percent,
     CkPrintf("Avg | Max Period set when curves intersect\n");
     return false;
   }
-  CkPrintf("Ratio at t (%lf*%d + %lf) / (%lf*%d+ac)\n", mslope, period, mc, aslope, period, ac);
   ratio_at_t = ((mslope*period + mc)/(aslope*period + ac));
+  CkPrintf("Ratio at t (%lf*%d + %lf) / (%lf*%d+%d) = %lf\n", mslope, period, mc, aslope, period, ac, ratio_at_t);
   return true;
 }
 
@@ -962,6 +962,7 @@ bool LBDatabase::getLineEq(double new_load_percent, double& aslope, double& ac, 
     data = adaptive_lbdb.history_data[i];
     m1 += data.max_load;
     a1 += data.avg_load;
+    CkPrintf("max (%d, %lf) avg (%d, %lf) adjusted_avg (%d, %lf)\n", i, data.max_load, i, data.avg_load, i, new_load_percent*data.avg_load);
   }
   m1 /= i;
   a1 = (a1 * new_load_percent) / i;
