@@ -844,7 +844,7 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     max += data.max_load;
     avg += data.avg_load;
     //DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
-    CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+    //CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
   }
 //  max /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
 //  avg /= (adaptive_struct.lb_iteration_no - adaptive_lbdb.history_data[0].iteration);
@@ -971,6 +971,7 @@ bool LBDatabase::getLineEq(double new_load_percent, double& aslope, double& ac, 
     data = adaptive_lbdb.history_data[i];
     m2 += data.max_load;
     a2 += data.avg_load;
+    CkPrintf("max (%d, %lf) avg (%d, %lf) adjusted_avg (%d, %lf)\n", i, data.max_load, i, data.avg_load, i, new_load_percent*data.avg_load);
   }
   m2 /= (i - total/2);
   a2 = (a2 * new_load_percent) / (i - total/2);

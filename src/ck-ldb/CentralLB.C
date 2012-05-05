@@ -1504,12 +1504,14 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   getPredictedLoadWithMsg(stats, clients, msg, info, 0);
   LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
-  CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
+  //CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
+  info.print();
   theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
 
   getPredictedLoadWithMsg(stats, clients, msg, info,1);
   info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
-  CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
+  info.print();
+  //CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   int nmsgs, nbytes;
   stats->computeNonlocalComm(nmsgs, nbytes);
   CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
