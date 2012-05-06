@@ -881,7 +881,25 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     tolerate_imb = 1.0;
   }
 
-  return getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t);
+  if (getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t)) {
+    return true;
+  }
+
+  max = 0.0;
+  avg = 0.0;
+  for (int i = 0; i < adaptive_lbdb.history_data.size(); i++) {
+    data = adaptive_lbdb.history_data[i];
+    max += data.max_load;
+    avg += data.avg_load*tolerate_imb;
+    //DEBAD(("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load));
+    //CkPrintf("max (%d, %lf) avg (%d, %lf)\n", i, data.max_load, i, data.avg_load);
+  }
+  max /= adaptive_lbdb.history_data.size();
+  avg /= adaptive_lbdb.history_data.size();
+  double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
+  period = cost/(max - avg); 
+  ratio_at_t = max / avg;
+  return true;
 }
 
 bool LBDatabase::getPeriodForStrategy(double new_load_percent,
@@ -980,6 +998,9 @@ bool LBDatabase::getLineEq(double new_load_percent, double& aslope, double& ac, 
   mslope = 2 * (m2 - m1) / iterations;
   ac = adaptive_lbdb.history_data[0].avg_load * new_load_percent;
   mc = adaptive_lbdb.history_data[0].max_load;
+
+  ac = a1 - ((aslope * total)/4);
+  mc = m1 - ((mslope * total)/4);
 
   //ac = (adaptive_lbdb.history_data[1].avg_load * new_load_percent - aslope);
   //mc = (adaptive_lbdb.history_data[1].max_load - mslope);
