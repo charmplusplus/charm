@@ -947,6 +947,10 @@ bool LBDatabase::getPeriodForLinear(double a, double b, double c, int& period) {
   CkPrintf("Quadratic Equation %lf X^2 + %lf X + %lf\n", a, b, c);
   if (a == 0.0) {
     period = (-c / b);
+    if (period < 0) {
+      CkPrintf("-ve period for -c/b (%d)\n", period);
+      return false;
+    }
     CkPrintf("Ideal period for linear load %d\n", period);
     return true;
   }
