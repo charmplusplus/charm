@@ -872,9 +872,11 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
     CkPrintf("Will generate plan for refine %lf imb and %lf overhead\n", tolerate_imb, 0.2);
     return getPeriodForStrategy(tolerate_imb, 0.2, period, ratio_at_t);
   }
-#endif
 
   GetLBDataForLB(0, tmp_max_avg_ratio, tmp_comm_ratio);
+#endif
+
+  GetPrevLBData(tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
   tolerate_imb = tmp_max_avg_ratio;
   if (max/avg < tolerate_imb) {
     CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);
