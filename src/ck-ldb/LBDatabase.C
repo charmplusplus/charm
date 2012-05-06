@@ -1043,11 +1043,14 @@ int LBDatabase::getPredictedLBPeriod(bool& is_tentative) {
   // If tentative and final_lb_period are the same, then the decision has been
   // made but if not, they are in the middle of consensus, hence return the
   // lease of the two
-  if (adaptive_struct.tentative_period < adaptive_struct.final_lb_period) {
+  if (adaptive_struct.tentative_period != adaptive_struct.final_lb_period) {
     is_tentative = true;
+  } else {
+    is_tentative = false;
+  }
+  if (adaptive_struct.tentative_period < adaptive_struct.final_lb_period) {
     return adaptive_struct.tentative_period;
    } else {
-     is_tentative = false;
      return adaptive_struct.final_lb_period;
    }
 }
