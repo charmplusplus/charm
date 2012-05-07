@@ -436,10 +436,10 @@ void CurLoopInfo::stealWork() {
     int execTimes = 0;
     while (nextChunkId < numChunks) {
         if (nextChunkId < remainder) {
-            first = (unit+1)*nextChunkId;
+            first = lowerIndex+(unit+1)*nextChunkId;
             last = first+unit;
         } else {
-            first = (nextChunkId - remainder)*unit + markIdx;
+            first = lowerIndex+(nextChunkId - remainder)*unit + markIdx;
             last = first+unit-1;
         }
 
