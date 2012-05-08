@@ -81,15 +81,17 @@ struct AdaptiveLBStructure {
 
 
 CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
-  double lb_data[6];
+  double lb_data[8];
   lb_data[1] = 0.0; // total number of processors contributing
   lb_data[2] = 0.0; // total load
   lb_data[3] = 0.0; // max load
   lb_data[4] = 0.0; // idle time
   lb_data[5] = 1.0; // utilization
+  lb_data[6] = 0.0; // total load with bg
+  lb_data[7] = 0.0; // max load with bg
   for (int i = 0; i < nMsg; i++) {
-    CkAssert(msgs[i]->getSize() == 6*sizeof(double));
-    if (msgs[i]->getSize() != 6*sizeof(double)) {
+    CkAssert(msgs[i]->getSize() == 8*sizeof(double));
+    if (msgs[i]->getSize() != 8*sizeof(double)) {
       CkPrintf("Error!!! Reduction not correct. Msg size is %d\n", msgs[i]->getSize());
     }
     double* m = (double *)msgs[i]->getData();
@@ -103,6 +105,10 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     lb_data[4] += m[4];
     // Get least utilization
     lb_data[5] = ((m[5] < lb_data[5]) ? m[5] : lb_data[5]);
+    // Get Avg load with bg
+    lb_data[6] += m[6];
+    // Get Max load with bg
+    lb_data[7] = ((m[7] > lb_data[7])? m[7] : lb_data[7]);
     if (i == 0) {
       // Iteration no
       lb_data[0] = m[0];
@@ -112,7 +118,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
       %lf\n", lb_data[0], m[0]);
     }
   }
-  return CkReductionMsg::buildNew(6*sizeof(double), lb_data);
+  return CkReductionMsg::buildNew(8*sizeof(double), lb_data);
 }
 
 /*global*/ CkReduction::reducerType lbDataCollectionType;
@@ -657,8 +663,13 @@ bool LBDatabase::AddLoad(int iteration, double load) {
   }
   total_load_vec[iteration] += load;
   if (total_count_vec[iteration] == getLBDB()->ObjDataCount()) {
-    double idle_time;
+    double idle_time, bg_walltime, cpu_bgtime;
     IdleTime(&idle_time);
+    BackgroundLoad(&bg_walltime, &cpu_bgtime);
+
+    int sync_for_bg = adaptive_struct.total_syncs_called +
+        getLBDB()->ObjDataCount();
+    bg_walltime = bg_walltime * getLBDB()->ObjDataCount() / sync_for_bg;
 
     if (iteration < NEGLECT_IDLE) {
       prev_idle = idle_time;
@@ -674,7 +685,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     }
     //CkPrintf("[%d] Idle time %lf and countable %d for iteration %d\n", CkMyPe(), idle_time, total_countable_syncs, iteration);
 
-    double lb_data[6];
+    double lb_data[8];
     lb_data[0] = iteration;
     lb_data[1] = 1;
     lb_data[2] = total_load_vec[iteration]; // For average load
@@ -686,13 +697,15 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     } else {
       lb_data[5] = total_load_vec[iteration]/(idle_time + total_load_vec[iteration]);
     }
+    lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
+    lb_data[7] = lb_data[6]; // For Max load with bg
 
     //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
     //    total_load_vec[iteration], idle_time,
     //    idle_time/total_load_vec[iteration], adaptive_struct.lb_iteration_no);
 
     CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-    contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
+    contribute(8*sizeof(double), lb_data, lbDataCollectionType, cb);
   }
   return true;
 }
@@ -704,8 +717,10 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
   double avg_idle = load[4]/load[1];
   double utilization = load[5];
   int iteration_n = load[0];
+  double avg_load_bg = load[6]/load[1];
+  double max_load_bg = load[7];
   DEBAD(("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, utilization, load[1]));
-  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_idle, utilization, load[1]);
+  CkPrintf("** [%d] Iteration Avg load: %lf Max load: %lf With bg Avg load: %lf Max load: %lf Avg Idle : %lf Max Idle : %lf for %lf procs\n",iteration_n, avg, max, avg_load_bg, max_load_bg, avg_idle, utilization, load[1]);
   delete msg;
 
 #if EXTRA_FEATURE
