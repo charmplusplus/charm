@@ -1928,6 +1928,12 @@ CpvCExtern(int, _urgentSend);
 #define CmiEnableUrgentSend(yn)   
 #endif
 
+#if defined(__cplusplus)
+extern "C" int CmiIsMyNodeIdle();
+#else
+extern int CmiIsMyNodeIdle();
+#endif
+
 #endif /* CONVERSE_H */
 
 

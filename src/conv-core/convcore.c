@@ -223,6 +223,9 @@ void* LrtsAlloc(int, int);
 void  LrtsFree(void*);
 #endif
 
+CpvStaticDeclare(int, cmiMyPeIdle);
+int CmiIsMyNodeIdle();
+
 /*****************************************************************************
  *
  * Command-Line Argument (CLA) parsing routines.
@@ -1556,6 +1559,9 @@ void CsdBeginIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_IDLE(); 	/* projector */
 #endif
+
+  CpvAccess(cmiMyPeIdle) = 1;
+
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_IDLE) ;
 }
 
@@ -1569,6 +1575,9 @@ void CsdEndIdle(void)
 #if CMK_TRACE_ENABLED && CMK_PROJECTOR
   _LOG_E_PROC_BUSY(); 	/* projector */
 #endif
+
+  CpvAccess(cmiMyPeIdle) = 0;
+
   CcdRaiseCondition(CcdPROCESSOR_BEGIN_BUSY) ;
 }
 
@@ -3520,6 +3529,10 @@ void ConverseCommonInit(char **argv)
 #endif
   if (CmiMyPe() == 0)
       CmiPrintf("Converse/Charm++ Commit ID: %s\n", CmiCommitID);
+
+  CpvInitialize(int, cmiMyPeIdle);
+  CpvAccess(cmiMyPeIdle) = 0;
+
 /* #if CONVERSE_POOL */
   CmiPoolAllocInit(30);  
 /* #endif */
@@ -3800,6 +3813,14 @@ double CmiReadSize(const char *str)
         val = atof(str);
     }
     return val;
+}
+
+int CmiIsMyNodeIdle(){
+    int i;
+    for(i=0; i<CmiMyNodeSize(); i++){
+        if(CpvAccessOther(cmiMyPeIdle, i)) return 1;
+    }
+    return 0;
 }
 
 /*@}*/
