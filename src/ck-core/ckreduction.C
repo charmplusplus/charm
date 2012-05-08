@@ -1874,6 +1874,9 @@ void CkNodeReductionMgr::startReduction(int number,int srcNode)
 	//If none of these cases, we need to start the reduction--
 	DEBR((AA"Starting Node reduction #%d on %p srcNode %d\n"AB,redNo,this,srcNode));
 	inProgress=CmiTrue;
+
+	if(!_isNotifyChildInRed) return;
+
 	//Sent start requests to our kids (in case they don't already know)
 	
 	for (int k=0;k<treeKids();k++)
