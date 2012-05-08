@@ -1034,6 +1034,11 @@ static inline IrrGroup *_lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope
 	return obj;
 }
 
+IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID)
+{
+  return _lookupGroupAndBufferIfNotThere(ck, env, groupID);
+}
+
 static inline void _deliverForBocMsg(CkCoreState *ck,int epIdx,envelope *env,IrrGroup *obj)
 {
 #if CMK_LBDB_ON

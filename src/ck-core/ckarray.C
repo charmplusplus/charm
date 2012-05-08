@@ -646,12 +646,45 @@ CkArrayID CProxy_ArrayBase::ckCreateEmptyArray(void)
   return ckCreateArray((CkArrayMessage *)CkAllocSysMsg(),0,CkArrayOptions());
 }
 
+extern IrrGroup *lookupGroupAndBufferIfNotThere(CkCoreState *ck,envelope *env,const CkGroupID &groupID);
+
+struct CkInsertIdxMsg {
+  char core[CmiReservedHeaderSize];
+  CkArrayIndex idx;
+  CkArrayMessage *m;
+  int ctor;
+  int onPe;
+  CkArrayID _aid;
+};
+
+static int ckinsertIdxHdl;
+
+void ckinsertIdxFunc(void *m)
+{
+  CkInsertIdxMsg *msg = (CkInsertIdxMsg *)m;
+  CProxy_ArrayBase   ca(msg->_aid);
+  ca.ckInsertIdx(msg->m, msg->ctor, msg->onPe, msg->idx);
+  CmiFree(msg);
+}
+
 void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage *m,int ctor,int onPe,
 	const CkArrayIndex &idx)
 {
   if (m==NULL) m=(CkArrayMessage *)CkAllocSysMsg();
   m->array_ep()=ctor;
-  ckLocalBranch()->prepareCtorMsg(m,onPe,idx);
+  CkArray *ca = ckLocalBranch();
+  if (ca == NULL) {
+      CkInsertIdxMsg *msg = (CkInsertIdxMsg *)CmiAlloc(sizeof(CkInsertIdxMsg));
+      msg->idx = idx;
+      msg->m = m;
+      msg->ctor = ctor;
+      msg->onPe = onPe;
+      msg->_aid = _aid;
+      CmiSetHandler(msg, ckinsertIdxHdl);
+      ca = (CkArray *)lookupGroupAndBufferIfNotThere(CkpvAccess(_coreState), (envelope*)msg,_aid);
+      if (ca == NULL) return;
+  }
+  ca->prepareCtorMsg(m,onPe,idx);
   if (ckIsDelegated()) {
   	ckDelegatedTo()->ArrayCreate(ckDelegatedPtr(),ctor,m,idx,onPe,_aid);
   	return;
@@ -706,6 +739,7 @@ void _ckArrayInit(void)
     // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
+  ckinsertIdxHdl = CkRegisterHandler(ckinsertIdxFunc);
 }
 
 CkArray::CkArray(CkArrayOptions &opts,
