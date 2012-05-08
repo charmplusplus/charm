@@ -1,0 +1,51 @@
+mainmodule matmul {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  array [2D] Block {
+    entry Block(unsigned int blockSize, unsigned int numBlocks);
+    entry void pdgemmSendInput(CProxy_Block output, bool aOrB) {
+      atomic {
+        if (aOrB)
+          output[thisIndex].inputA(thisIndex.x, data, blockSize, true);
+        else
+          output[thisIndex].inputB(thisIndex.y, data, blockSize, true);
+      }
+    };
+
+    entry void pdgemmRun(double alpha, double beta, CkCallback done) {
+      forall [block] (0:numBlocks-1,1) {
+        when
+          inputA[block](int blockIdA, double blockA[blockSizeA*blockSizeA],
+                        unsigned int blockSizeA, bool fromSourceA),
+          inputB[block](int blockIdB, double blockB[blockSizeB*blockSizeB],
+                        unsigned int blockSizeB, bool fromSourceB) atomic {
+          CkAssert(blockSizeA == blockSizeB);
+          cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                      blockSize, blockSize, blockSize,
+                      alpha,
+                      blockA, blockSize, blockB, blockSize,
+                      beta, data, blockSize);
+          if (fromSourceA || ((blockIdA + numBlocks - 1) % numBlocks != thisIndex.x)) {
+            int destX = (thisIndex.x + 1) % numBlocks;
+            int destY = thisIndex.y;
+            thisProxy(destX, destY).inputA(blockIdA, blockA, blockSizeA);
+          }
+          if (fromSourceB || ((blockIdB + numBlocks - 1) % numBlocks != thisIndex.y)) {
+            int destX = thisIndex.x;
+            int destY = (thisIndex.y + 1) % numBlocks;
+            thisProxy(destX, destY).inputB(blockIdB, blockB, blockSizeB);
+          }
+        }
+      }
+      atomic {
+        contribute(done);
+      }
+    };
+    entry void inputA(int blockIdA, double blockA[blockSizeA*blockSizeA], unsigned int blockSizeA, bool fromSource = false);
+    entry void inputB(int blockIdB, double blockB[blockSizeB*blockSizeB], unsigned int blockSizeB, bool fromSource = false);
+  };
+};
