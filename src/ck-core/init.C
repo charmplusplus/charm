@@ -222,6 +222,8 @@ static int _raiseEvac=0;
 static char *_raiseEvacFile;
 void processRaiseEvacFile(char *raiseEvacFile);
 
+extern bool useNodeBlkMapping;
+
 static inline void _parseCommandLineOpts(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
@@ -328,6 +330,11 @@ static inline void _parseCommandLineOpts(char **argv)
 	if (CmiGetArgFlagDesc(argv,"+staticInsertion","Array elements are only inserted at construction")) {
 	  _isStaticInsertion = true;
 	}
+
+        useNodeBlkMapping = false;
+        if (CmiGetArgFlagDesc(argv,"+useNodeBlkMapping","Array elements are block-mapped in SMP-node level")) {
+          useNodeBlkMapping = true;
+        }
 
 #if ! CMK_WITH_CONTROLPOINT
 	// Display a warning if charm++ wasn't compiled with control point support but user is expecting it

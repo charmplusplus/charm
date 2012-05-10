@@ -55,7 +55,8 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBUG(x)   /**/
 #endif
 
-
+//whether to use block mapping in the SMP node level
+bool useNodeBlkMapping;
 
 #if CMK_LBDB_ON
 /*LBDB object handles are fixed-sized, and not necc.
@@ -232,6 +233,12 @@ public:
   int _numFirstSet;		/* _remChares X (_binSize + 1) -- number of
 				   chares in the first set */
 
+  int _nBinSizeFloor;           /* floor of numChares/numNodes */
+  int _nRemChares;              /* numChares % numNodes -- equals the number of
+                                   nodes in the first set */
+  int _nNumFirstSet;            /* _remChares X (_binSize + 1) -- number of
+                                   chares in the first set of nodes */
+
   /** All processors are divided into two sets. Processors in the first set
    *  have one chare more than the processors in the second set. */
 
@@ -246,6 +253,8 @@ public:
   void compute_binsize()
   {
     int numPes = CkNumPes();
+    //Now assuming homogenous nodes where each node has the same number of PEs
+    int numNodes = CkNumNodes();
 
     if (_nelems.nInts == 1) {
       _numChares = _nelems.data()[0];
@@ -259,6 +268,10 @@ public:
     _binSizeFloor = (int)floor((double)_numChares/(double)numPes);
     _binSizeCeil = (int)ceil((double)_numChares/(double)numPes);
     _numFirstSet = _remChares * (_binSizeFloor + 1);
+
+    _nRemChares = _numChares % numNodes;
+    _nBinSizeFloor = _numChares/numNodes;
+    _nNumFirstSet = _nRemChares * (_nBinSizeFloor +1);
   }
 
   void pup(PUP::er& p){
@@ -268,8 +281,11 @@ public:
     p|_numChares;
     p|_remChares;
     p|_numFirstSet;
+    p|_nRemChares;
+    p|_nBinSizeFloor;
+    p|_nNumFirstSet;
   }
-};
+}c;
 
 
 /**
@@ -317,6 +333,31 @@ public:
     }
 #endif
 
+    if(useNodeBlkMapping){
+      if(flati < amaps[arrayHdl]->_numChares){
+        int numCharesOnNode = amaps[arrayHdl]->_nBinSizeFloor;
+        int startNodeID, offsetInNode;
+        if(flati < amaps[arrayHdl]->_nNumFirstSet){
+          numCharesOnNode++;
+          startNodeID = flati/numCharesOnNode;
+          offsetInNode = flati%numCharesOnNode;
+        }else{
+          startNodeID = amaps[arrayHdl]->_nRemChares+(flati-amaps[arrayHdl]->_nNumFirstSet)/numCharesOnNode;
+          offsetInNode = (flati-amaps[arrayHdl]->_nNumFirstSet)%numCharesOnNode;
+        }
+        int nodeSize = CkMyNodeSize(); //assuming every node has same number of PEs
+        int elemsPerPE = numCharesOnNode/nodeSize;
+        int remElems = numCharesOnNode%nodeSize;
+        int firstSetPEs = remElems*(elemsPerPE+1);
+        if(offsetInNode<firstSetPEs){
+          return CkNodeFirst(startNodeID)+offsetInNode/(elemsPerPE+1);
+        }else{
+          return CkNodeFirst(startNodeID)+remElems+(offsetInNode-firstSetPEs)/elemsPerPE;
+        }
+      } else
+          return (flati % CkNumPes());
+    }
+    //regular PE-based block mapping
     if(flati < amaps[arrayHdl]->_numFirstSet)
       return (flati / (amaps[arrayHdl]->_binSizeFloor + 1));
     else if (flati < amaps[arrayHdl]->_numChares)
