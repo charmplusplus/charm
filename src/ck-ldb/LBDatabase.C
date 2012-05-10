@@ -459,6 +459,7 @@ void LBDatabase::init(void)
 
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_count_vec.resize(VEC_SIZE, 0);
+  purge_index = 0;
   max_iteration = -1;
   prev_idle = 0.0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
@@ -635,6 +636,7 @@ void LBDatabase::ResumeClients() {
 
   total_load_vec.clear();
   total_count_vec.clear();
+  purge_index = 0;
   prev_idle = 0.0;
   if (lb_in_progress) {
     lbdb_no_obj_callback.clear();
@@ -652,17 +654,24 @@ void LBDatabase::ResumeClients() {
   LDResumeClients(myLDHandle);
 }
 
-bool LBDatabase::AddLoad(int iteration, double load) {
-  total_count_vec[iteration]++;
-  adaptive_struct.total_syncs_called++;
-  DEBAD(("At PE %d Total contribution for iteration %d is %d total objs %d\n", CkMyPe(), iteration,
-    total_count_vec[iteration], getLBDB()->ObjDataCount()));
-
-  if (iteration > adaptive_struct.lb_iteration_no) {
-    adaptive_struct.lb_iteration_no = iteration;
+bool LBDatabase::AddLoad(int it_n, double load) {
+  if (it_n > VEC_SIZE && purge_index < VEC_SIZE) {
+    total_count_vec.assign(VEC_SIZE, 0);
+    total_load_vec.assign(VEC_SIZE, 0.0);
+    purge_index += VEC_SIZE;
   }
-  total_load_vec[iteration] += load;
-  if (total_count_vec[iteration] == getLBDB()->ObjDataCount()) {
+  int index = it_n - purge_index;
+  total_count_vec[index]++;
+  adaptive_struct.total_syncs_called++;
+  DEBAD(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
+  CkMyPe(), it_n,
+    total_count_vec[index], getLBDB()->ObjDataCount()));
+
+  if (it_n > adaptive_struct.lb_iteration_no) {
+    adaptive_struct.lb_iteration_no = it_n;
+  }
+  total_load_vec[index] += load;
+  if (total_count_vec[index] == getLBDB()->ObjDataCount()) {
     double idle_time, bg_walltime, cpu_bgtime;
     IdleTime(&idle_time);
     BackgroundLoad(&bg_walltime, &cpu_bgtime);
@@ -671,7 +680,7 @@ bool LBDatabase::AddLoad(int iteration, double load) {
         getLBDB()->ObjDataCount();
     bg_walltime = bg_walltime * getLBDB()->ObjDataCount() / sync_for_bg;
 
-    if (iteration < NEGLECT_IDLE) {
+    if (it_n < NEGLECT_IDLE) {
       prev_idle = idle_time;
     }
     idle_time -= prev_idle;
@@ -686,16 +695,16 @@ bool LBDatabase::AddLoad(int iteration, double load) {
     //CkPrintf("[%d] Idle time %lf and countable %d for iteration %d\n", CkMyPe(), idle_time, total_countable_syncs, iteration);
 
     double lb_data[8];
-    lb_data[0] = iteration;
+    lb_data[0] = it_n;
     lb_data[1] = 1;
-    lb_data[2] = total_load_vec[iteration]; // For average load
-    lb_data[3] = total_load_vec[iteration]; // For max load
+    lb_data[2] = total_load_vec[index]; // For average load
+    lb_data[3] = total_load_vec[index]; // For max load
     lb_data[4] = idle_time;
     // Set utilization
-    if (total_load_vec[iteration] == 0.0) {
+    if (total_load_vec[index] == 0.0) {
       lb_data[5] = 0.0;
     } else {
-      lb_data[5] = total_load_vec[iteration]/(idle_time + total_load_vec[iteration]);
+      lb_data[5] = total_load_vec[index]/(idle_time + total_load_vec[index]);
     }
     lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
     lb_data[7] = lb_data[6]; // For Max load with bg

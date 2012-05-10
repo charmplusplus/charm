@@ -404,6 +404,7 @@ private:
   std::vector<int> total_count_vec;
   std::vector<int> lbdb_no_obj_callback;
   int max_iteration;
+  int purge_index;
 
   double after_lb_max;
   double after_lb_avg;
