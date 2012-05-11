@@ -7,7 +7,7 @@
 #include "completion.h"
 #include "ckarray.h"
 
-// limit total number of data items in system to
+// limit total number of buffered data items to
 // maxNumDataItemsBuffered_ (flush when limit is reached) but allow
 // allocation of up to a factor of OVERALLOCATION_FACTOR more space to
 // take advantage of nonuniform filling of buffers
@@ -320,6 +320,10 @@ MeshStreamer<dtype>::MeshStreamer(
   cntMsgExpected_ = new int[numDimensions_];
   cntFinished_ = new int[numDimensions_]; 
 
+  for (int i = 0; i < numDimensions_; i++) {
+    cntMsgSent_[i] = new int[individualDimensionSizes_[i]]; 
+  }
+
 #endif
 
 }
@@ -508,7 +512,6 @@ void MeshStreamer<dtype>::init(CkCallback startCb, CkCallback endCb,
                                int prio) {
 
   for (int i = 0; i < numDimensions_; i++) {
-    cntMsgSent_[i] = new int[individualDimensionSizes_[i]]; 
     std::fill(cntMsgSent_[i], 
               cntMsgSent_[i] + individualDimensionSizes_[i], 0);
     cntMsgReceived_[i] = 0;
