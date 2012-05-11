@@ -47,7 +47,7 @@
 #include "cmidirect.h"
 #endif
 
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -2974,6 +2974,7 @@ static void  SendRdmaMsg( BufferList sendqueue)
 #if PRINT_SYH
                 printf("[%d] SendRdmaMsg: post succeed. seqno: %x\n", myrank, pd->cqwrite_value);
 #endif
+                FreeRdmaRequest(ptr);
             }else           // cannot post
             {
                 PCQueuePush(sendRdmaBuf, (char*)ptr);
