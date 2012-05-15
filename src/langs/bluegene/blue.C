@@ -2082,7 +2082,7 @@ void correctMsgTime(char *msg)
    }
 }
 
-
+extern void traceWriteSTS(FILE *stsfp,int nUserEvents);
 //TODO: write disk bgTraceFiles
 static void writeToDisk()
 {
@@ -2117,6 +2117,12 @@ static void writeToDisk()
     CmiPrintf("[0] Number is numX:%d numY:%d numZ:%d numCth:%d numWth:%d numEmulatingPes:%d totalWorkerProcs:%d bglog_ver:%d\n",cva(bgMach).x,cva(bgMach).y,cva(bgMach).z,cva(bgMach).numCth,cva(bgMach).numWth,numEmulatingPes,totalWorkerProcs,bglog_version);
     
     fclose(f2);
+
+    FILE* stsfp = fopen("tproj.sts", "w");
+    if (stsfp == 0) {
+         CmiAbort("Cannot open summary sts file for writing.\n");
+    }
+    traceWriteSTS(stsfp,0);
   }
   
   sprintf(d, "%sbgTrace%d", cva(bgMach).traceroot?cva(bgMach).traceroot:"", CmiMyPe()); 
