@@ -299,7 +299,7 @@ int TopoManager::coordinatesToRank(int x, int y, int z, int t) {
 
 #if CMK_BLUEGENEQ
 int TopoManager::coordinatesToRank(int a, int b, int c, int d, int e, int t) {
-  CmiAssert( a>=0 && x<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
+  CmiAssert( a>=0 && a<dimNA && b>=0 && b<dimNB && c>=0 && c<dimNC && d>=0 && d<dimND && e>=0 && e<dimNE && t>=0 && t<dimNT );
   return bgqtm.coordinatesToRank(a, b, c, d, e, t);
 }
 #endif
