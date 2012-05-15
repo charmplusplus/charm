@@ -56,6 +56,12 @@ TopoManager::TopoManager() {
   dimNY = bgqtm.getDimNY();
   dimNZ = bgqtm.getDimNZ();
   dimNT = bgqtm.getDimNT();
+  
+  dimNA = bgqtm.getDimNA();
+  dimNB = bgqtm.getDimNB();
+  dimNC = bgqtm.getDimNC();
+  dimND = bgqtm.getDimND();
+  dimNE = bgqtm.getDimNE();
 
   procsPerNode = bgqtm.getProcsPerNode();
   int *torus;
