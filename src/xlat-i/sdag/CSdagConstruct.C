@@ -1353,7 +1353,7 @@ void SdagConstruct::generateTrace()
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
 {
   if(traceName)
-    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, " << "_sdag_idx_" << traceName->charstar() << "(), CkMyPe(), 0, NULL); \n";
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName->charstar() << "()), CkMyPe(), 0, NULL); \n";
 }
 
 void SdagConstruct::generateDummyBeginExecute(XStr& op)

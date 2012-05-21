@@ -3251,8 +3251,8 @@ void Entry::genArrayDefs(XStr& str)
       str << "  if (obj==NULL) CkAbort(\"Trying to call a LOCAL entry method on a non-local element\");\n";
       str << "#endif\n";
       if (!isNoTrace())
-	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg," << epIdx()
-	      << ",CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
+	  str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForArrayEltMsg,(" << epIdx()
+	      << "),CkMyPe(), 0, ((CkArrayIndex&)ckGetIndex()).getProjectionID(((CkGroupID)ckGetArrayID()).idx));\n";
       str << "#if CMK_LBDB_ON\n  objHandle = obj->timingBeforeCall(&objstopped);\n#endif\n";
       str << "#if CMK_CHARMDEBUG\n"
       "  CpdBeforeEp("<<epIdx()<<", obj, NULL);\n"
@@ -3438,7 +3438,7 @@ void Entry::genGroupDefs(XStr& str)
       XStr unmarshallStr; param->unmarshall(unmarshallStr);
       str << "  "<<container->baseName()<<" *obj = ckLocalBranch();\n";
       str << "  CkAssert(obj);\n";
-      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,"<<epIdx()<<",CkMyPe(),0,NULL);\n";
+      if (!isNoTrace()) str << "  _TRACE_BEGIN_EXECUTE_DETAILED(0,ForBocMsg,("<<epIdx()<<"),CkMyPe(),0,NULL);\n";
       str << "#if CMK_LBDB_ON\n"
 "  // if there is a running obj being measured, stop it temporarily\n"
 "  LDObjHandle objHandle;\n"
