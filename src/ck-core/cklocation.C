@@ -973,6 +973,7 @@ void CkMigratable::commonInit(void) {
 	usesAtSync=CmiFalse;
 	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
+	atsync_iteration = -1;
   clearAdaptiveData();
 	/*
 	FAULT_EVAC
