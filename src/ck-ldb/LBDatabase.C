@@ -36,6 +36,7 @@ struct AdaptiveData {
 
 struct AdaptiveLBDatabase {
   std::vector<AdaptiveData> history_data;
+  int lb_iter_no;
 } adaptive_lbdb;
 
 struct AdaptiveLBInfo {
@@ -480,6 +481,8 @@ void LBDatabase::init(void)
   adaptive_struct.total_syncs_called = 0;
   adaptive_struct.last_lb_type = -1;
 
+  adaptive_lbdb.lb_iter_no = -1;
+
   // This is indicating if the load balancing strategy and migration started.
   // This is mainly used to register callbacks for noobj pes. They would
   // register as soon as resumefromsync is called. On receiving the handles at
@@ -655,12 +658,7 @@ void LBDatabase::ResumeClients() {
 }
 
 bool LBDatabase::AddLoad(int it_n, double load) {
-  if (it_n > VEC_SIZE && purge_index < VEC_SIZE) {
-    total_count_vec.assign(VEC_SIZE, 0);
-    total_load_vec.assign(VEC_SIZE, 0.0);
-    purge_index += VEC_SIZE;
-  }
-  int index = it_n - purge_index;
+  int index = it_n % VEC_SIZE;
   total_count_vec[index]++;
   adaptive_struct.total_syncs_called++;
   DEBAD(("At PE %d Total contribution for iteration %d is %d total objs %d\n",
@@ -708,6 +706,8 @@ bool LBDatabase::AddLoad(int it_n, double load) {
     }
     lb_data[6] = lb_data[2] + bg_walltime; // For Avg load with bg
     lb_data[7] = lb_data[6]; // For Max load with bg
+    total_load_vec[index] = 0.0;
+    total_count_vec[index] = 0;
 
     //CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
     //    total_load_vec[iteration], idle_time,
@@ -741,9 +741,9 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 #endif
 
   // Store the data for this iteration
-  adaptive_struct.lb_iteration_no = iteration_n;
+  adaptive_lbdb.lb_iter_no = iteration_n;
   AdaptiveData data;
-  data.iteration = adaptive_struct.lb_iteration_no;
+  data.iteration = adaptive_lbdb.lb_iter_no;
   data.max_load = max;
   data.avg_load = avg;
   data.utilization = utilization;
@@ -1109,7 +1109,7 @@ int LBDatabase::getPredictedLBPeriod(bool& is_tentative) {
 // Called by CentralLB to indicate that the LB strategy and migration is in
 // progress.
 void LBDatabase::ResetAdaptive() {
-  adaptive_struct.lb_iteration_no = -1;
+  adaptive_lbdb.lb_iter_no = -1;
   lb_in_progress = true;
 }
 
@@ -1134,7 +1134,7 @@ void LBDatabase::RegisterNoObjCallback(int index) {
 
   // If collection has already happened and this is second iteration, then
   // trigger reduction.
-  if (adaptive_struct.lb_iteration_no != -1) {
+  if (adaptive_lbdb.lb_iter_no != -1) {
     //CkPrintf("Collection already started now %d so kick in\n", adaptive_struct.lb_iteration_no);
     thisProxy[index].TriggerAdaptiveReduction();
   }
