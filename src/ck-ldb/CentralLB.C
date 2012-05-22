@@ -1506,7 +1506,7 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   //CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
   //info.print();
-  //theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
+  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
 
   //getPredictedLoadWithMsg(stats, clients, msg, info,1);
   //info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
