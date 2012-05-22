@@ -1505,25 +1505,25 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
   LBRealType mLoad, mCpuLoad, totalLoad, totalLoadWComm;
   info.getSummary(mLoad, mCpuLoad, totalLoad);
   //CkPrintf("CharmLB> Max load w/o comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
-  info.print();
-  theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
+  //info.print();
+  //theLbdb->UpdateAfterLBData(mLoad, mCpuLoad, totalLoad/clients);
 
-  getPredictedLoadWithMsg(stats, clients, msg, info,1);
-  info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
-  info.print();
+  //getPredictedLoadWithMsg(stats, clients, msg, info,1);
+  //info.getSummary(mLoad, mCpuLoad, totalLoadWComm);
+  //info.print();
   //CkPrintf("CharmLB> Max load with comm %lf Max cpu load %lf Avg load %lf\n", mLoad, mCpuLoad, totalLoad/clients);
-  int nmsgs, nbytes;
-  stats->computeNonlocalComm(nmsgs, nbytes);
-  CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
+  //int nmsgs, nbytes;
+  //stats->computeNonlocalComm(nmsgs, nbytes);
+  //CkPrintf("CharmLB> Non local communication %d msg and %d bytes\n", nmsgs, nbytes);
 
 
-  long msg_n;
-  long long bytes_n;
-  stats->computeComm(msg_n, bytes_n);
-  CkPrintf("CharmLB> Total communication %ld msg and %lld bytes\n", nmsgs, nbytes);
+  //long msg_n;
+  //long long bytes_n;
+  //stats->computeComm(msg_n, bytes_n);
+  //CkPrintf("CharmLB> Total communication %ld msg and %lld bytes\n", nmsgs, nbytes);
 
-  double alpha_beta_cost = (msg_n * alpha) + (bytes_n * beta);
-  theLbdb->UpdateAfterLBComm(alpha_beta_cost/totalLoad);
+  //double alpha_beta_cost = (msg_n * alpha) + (bytes_n * beta);
+  //theLbdb->UpdateAfterLBComm(alpha_beta_cost/totalLoad);
 
   if (_lb_args.debug()) {
     double strat_end_time = CkWallTimer();
@@ -1535,7 +1535,6 @@ LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
     CkPrintf("CharmLB> %s: PE [%d] #Objects migrating: %d, LBMigrateMsg size: %.2f MB\n", lbname, cur_ld_balancer, msg->n_moves, env->getTotalsize()/1024.0/1024.0);
     CkPrintf("CharmLB> %s: PE [%d] strategy finished at %f duration %f s\n",
 	      lbname, cur_ld_balancer, strat_end_time, strat_end_time-strat_start_time);
-    // FIX ME!!! adaptive_struct.lb_strategy_cost = (strat_end_time - strat_start_time);
     //CkPrintf("Strategy cost %f %f %f\n", strat_end_time, strat_start_time, adaptive_struct.lb_strategy_cost);
     theLbdb->SetStrategyCost(strat_end_time - strat_start_time);
   }

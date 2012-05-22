@@ -17,11 +17,12 @@
 
 #include "NullLB.h"
 
-#define VEC_SIZE 500
+#define VEC_SIZE 50
 #define IMB_TOLERANCE 1.1
 #define OUTOFWAY_TOLERANCE 2
 #define UTILIZATION_THRESHOLD 0.7
 #define NEGLECT_IDLE 2 // Should never be == 1
+#define MIN_STATS 6
 
 #   define DEBAD(x) /*CkPrintf x*/
 #   define EXTRA_FEATURE 0
@@ -117,6 +118,7 @@ CkReductionMsg* lbDataCollection(int nMsg, CkReductionMsg** msgs) {
     if (m[0] != lb_data[0]) {
       CkPrintf("Error!!! Reduction is intermingled between iteration %lf and\
       %lf\n", lb_data[0], m[0]);
+      CkAbort("Intermingling iterations\n");
     }
   }
   return CkReductionMsg::buildNew(8*sizeof(double), lb_data);
@@ -460,10 +462,10 @@ void LBDatabase::init(void)
 
   total_load_vec.resize(VEC_SIZE, 0.0);
   total_count_vec.resize(VEC_SIZE, 0);
-  purge_index = 0;
   max_iteration = -1;
   prev_idle = 0.0;
   alpha_beta_cost_to_load = 1.0; // Some random value. TODO: Find the actual
+  adaptive_lbdb.lb_iter_no = -1;
 
   // If metabalancer enabled, initialize the variables
   adaptive_struct.tentative_period =  INT_MAX;
@@ -637,21 +639,16 @@ void LBDatabase::ResumeClients() {
   adaptive_struct.lb_msg_recv_no = 0;
   adaptive_struct.total_syncs_called = 0;
 
-  total_load_vec.clear();
-  total_count_vec.clear();
-  purge_index = 0;
   prev_idle = 0.0;
   if (lb_in_progress) {
     lbdb_no_obj_callback.clear();
     lb_in_progress = false;
   }
 
-  total_load_vec.resize(VEC_SIZE, 0.0);
-  total_count_vec.resize(VEC_SIZE, 0);
-
   // While resuming client, if we find that there are no objects, then handle
   // the case accordingly.
   if (getLBDB()->ObjDataCount() == 0) {
+    CkPrintf("%d processor has 0 objs\n", CkMyPe());
     HandleAdaptiveNoObj();
   }
   LDResumeClients(myLDHandle);
@@ -669,6 +666,12 @@ bool LBDatabase::AddLoad(int it_n, double load) {
     adaptive_struct.lb_iteration_no = it_n;
   }
   total_load_vec[index] += load;
+  if (total_count_vec[index] > getLBDB()->ObjDataCount()) {
+    CkPrintf("iteration %d received %d contributions and expected %d\n", it_n,
+        total_count_vec[index], getLBDB()->ObjDataCount());
+    CkAbort("Abort!!! Received more contribution");
+  }
+
   if (total_count_vec[index] == getLBDB()->ObjDataCount()) {
     double idle_time, bg_walltime, cpu_bgtime;
     IdleTime(&idle_time);
@@ -795,7 +798,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
 
     CkPrintf("Prev LB Data Type %d, max/avg %lf, local/remote %lf\n", tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
 
-    if ((utilization < utilization_threshold || max/avg >= tolerate_imb) && adaptive_lbdb.history_data.size() > 6) {
+    if ((utilization < utilization_threshold || max/avg >= tolerate_imb) &&
+          adaptive_lbdb.history_data.size() > MIN_STATS) {
       CkPrintf("Trigger soon even though we calculated lbperiod max/avg(%lf) and utilization ratio (%lf)\n", max/avg, utilization);
       TriggerSoon(iteration_n, max/avg, tolerate_imb);
       return;
@@ -804,7 +808,8 @@ void LBDatabase::ReceiveMinStats(CkReductionMsg *msg) {
     // If the new lb period from linear extrapolation is greater than maximum
     // iteration known from previously collected data, then inform all the
     // processors about the new calculated period.
-    if (period > adaptive_struct.tentative_max_iter_no) {
+    if (period > adaptive_struct.tentative_max_iter_no && period !=
+          adaptive_struct.final_lb_period) {
       adaptive_struct.doCommStrategy = false;
       adaptive_struct.lb_calculated_period = period;
       adaptive_struct.in_progress = true;
@@ -835,7 +840,8 @@ void LBDatabase::TriggerSoon(int iteration_n, double imbalance_ratio,
   // than the iter +1 and if it is greater than the maximum iteration we have
   // seen so far, then we can inform this
   if ((iteration_n + 1 > adaptive_struct.tentative_max_iter_no) &&
-      (iteration_n+1 < adaptive_struct.lb_calculated_period)) {
+      (iteration_n+1 < adaptive_struct.lb_calculated_period) &&
+      (iteration_n + 1 != adaptive_struct.final_lb_period)) {
     if (imbalance_ratio < tolerate_imb) {
       adaptive_struct.doCommStrategy = true;
       CkPrintf("No load imbalance but idle time\n");
@@ -902,13 +908,14 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
 
   GetPrevLBData(tmp_lb_type, tmp_max_avg_ratio, tmp_comm_ratio);
   tolerate_imb = tmp_max_avg_ratio;
-  if (max/avg < tolerate_imb) {
-    CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);
-    tolerate_imb = 1.0;
-  }
-
-  if (getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t)) {
-    return true;
+//  if (max/avg < tolerate_imb) {
+//    CkPrintf("Resorting to imb = 1.0 coz max/avg (%lf) < imb(%lf)\n", max/avg, tolerate_imb);
+//    tolerate_imb = 1.0;
+//  }
+  if (max/avg > tolerate_imb) {
+    if (getPeriodForStrategy(tolerate_imb, 1, period, ratio_at_t)) {
+      return true;
+    }
   }
 
   max = 0.0;
@@ -924,6 +931,11 @@ bool LBDatabase::generatePlan(int& period, double& ratio_at_t) {
   avg /= adaptive_lbdb.history_data.size();
   double cost = adaptive_struct.lb_strategy_cost + adaptive_struct.lb_migration_cost;
   period = cost/(max - avg); 
+  CkPrintf("Obtained period %d from constant prediction\n", period);
+  if (period < 0) { 
+    period = adaptive_struct.final_lb_period;
+    CkPrintf("Obtained -ve period from constant prediction so changing to prev %d\n", period);
+  } 
   ratio_at_t = max / avg;
   return true;
 }
@@ -1145,20 +1157,22 @@ void LBDatabase::TriggerAdaptiveReduction() {
 #if EXTRA_FEATURE
   adaptive_struct.lb_iteration_no++;
   //CkPrintf("Trigger adaptive for %d\n", adaptive_struct.lb_iteration_no);
-  double lb_data[6];
+  double lb_data[8];
   lb_data[0] = adaptive_struct.lb_iteration_no;
   lb_data[1] = 1;
   lb_data[2] = 0.0;
   lb_data[3] = 0.0;
   lb_data[4] = 0.0;
   lb_data[5] = 0.0;
+  lb_data[6] = 0.0;
+  lb_data[7] = 0.0;
 
   // CkPrintf("   [%d] sends total load %lf idle time %lf ratio of idle/load %lf at iter %d\n", CkMyPe(),
   //     total_load_vec[iteration], idle_time,
   //     idle_time/total_load_vec[iteration], adaptive_struct.lb_iteration_no);
 
   CkCallback cb(CkIndex_LBDatabase::ReceiveMinStats((CkReductionMsg*)NULL), thisProxy[0]);
-  contribute(6*sizeof(double), lb_data, lbDataCollectionType, cb);
+  contribute(8*sizeof(double), lb_data, lbDataCollectionType, cb);
 #endif
 }
 
