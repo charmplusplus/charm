@@ -404,10 +404,8 @@ MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) {
     remainder -= combinedDimensionSizes_[i] * dimensionIndex;
   }
 
-  // all indices agree - message to oneself
-  destinationLocation.dimension = 0; 
-  destinationLocation.bufferIndex = myLocationIndex_[0];
-  return destinationLocation; 
+  CkAbort("Error. MeshStreamer::determineLocation called with destinationPe "
+          "equal to sender's PE. This is unexpected and may cause errors.\n"); 
 }
 
 template <class dtype>
