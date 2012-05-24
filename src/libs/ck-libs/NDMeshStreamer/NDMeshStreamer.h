@@ -34,11 +34,12 @@ public:
 #ifdef STAGED_COMPLETION
   int finalMsgCount; 
 #endif
+  int dimension; 
   int numDataItems;
   int *destinationPes;
   dtype *dataItems;
 
-  MeshStreamerMessage(): numDataItems(0) {
+  MeshStreamerMessage(int dim): numDataItems(0), dimension(dim) {
 #ifdef STAGED_COMPLETION
     finalMsgCount = -1; 
 #endif
@@ -110,6 +111,8 @@ private:
   int *individualDimensionSizes_;
   int *combinedDimensionSizes_;
 
+  int *startingIndexAtDimension_; 
+
   int myIndex_;
   int *myLocationIndex_;
 
@@ -164,7 +167,8 @@ protected:
   virtual int copyDataItemIntoMessage(
               MeshStreamerMessage<dtype> *destinationBuffer, 
               void *dataItemHandle, bool copyIndirectly = false);
-  MeshLocation determineLocation(int destinationPe);
+  MeshLocation determineLocation(int destinationPe, 
+                                 int dimensionReceivedAlong);
 public:
 
   MeshStreamer(int maxNumDataItemsBuffered, int numDimensions, 
@@ -278,6 +282,7 @@ MeshStreamer<dtype>::MeshStreamer(
   individualDimensionSizes_ = new int[numDimensions_];
   combinedDimensionSizes_ = new int[numDimensions_ + 1];
   myLocationIndex_ = new int[numDimensions_];
+  startingIndexAtDimension_ = new int[numDimensions_ + 1]; 
   memcpy(individualDimensionSizes_, dimensionSizes, 
 	 numDimensions * sizeof(int)); 
   combinedDimensionSizes_[0] = 1; 
@@ -311,9 +316,12 @@ MeshStreamer<dtype>::MeshStreamer(
 
   myIndex_ = CkMyPe();
   int remainder = myIndex_;
+  startingIndexAtDimension_[numDimensions_] = 0;
   for (int i = numDimensions_ - 1; i >= 0; i--) {    
     myLocationIndex_[i] = remainder / combinedDimensionSizes_[i];
-    remainder -= combinedDimensionSizes_[i] * myLocationIndex_[i];
+    int dimensionOffset = combinedDimensionSizes_[i] * myLocationIndex_[i];
+    remainder -= dimensionOffset; 
+    startingIndexAtDimension_[i] = startingIndexAtDimension_[i+1] + dimensionOffset; 
   }
 
   isPeriodicFlushEnabled_ = false; 
@@ -356,6 +364,7 @@ MeshStreamer<dtype>::~MeshStreamer() {
   delete[] individualDimensionSizes_;
   delete[] combinedDimensionSizes_; 
   delete[] myLocationIndex_;
+  delete[] startingIndexAtDimension_;
 
 #ifdef CACHE_LOCATIONS
   delete[] cachedLocations_;
@@ -374,10 +383,11 @@ MeshStreamer<dtype>::~MeshStreamer() {
 
 }
 
-
 template <class dtype>
 inline
-MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) { 
+MeshLocation MeshStreamer<dtype>::determineLocation(
+                                  int destinationPe, 
+                                  int dimensionReceivedAlong) {
 
 #ifdef CACHE_LOCATIONS
   if (isCached_[destinationPe]) {    
@@ -386,9 +396,9 @@ MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) {
 #endif
 
   MeshLocation destinationLocation;
-  int remainder = destinationPe;
+  int remainder = destinationPe - startingIndexAtDimension_[dimensionReceivedAlong];
   int dimensionIndex; 
-  for (int i = numDimensions_ - 1; i >= 0; i--) {        
+  for (int i = dimensionReceivedAlong - 1; i >= 0; i--) {        
     dimensionIndex = remainder / combinedDimensionSizes_[i];
     
     if (dimensionIndex != myLocationIndex_[i]) {
@@ -406,6 +416,8 @@ MeshLocation MeshStreamer<dtype>::determineLocation(int destinationPe) {
 
   CkAbort("Error. MeshStreamer::determineLocation called with destinationPe "
           "equal to sender's PE. This is unexpected and may cause errors.\n"); 
+  // to prevent warnings
+  return destinationLocation; 
 }
 
 template <class dtype>
@@ -432,11 +444,12 @@ void MeshStreamer<dtype>::storeMessage(
     if (dimension == 0) {
       // personalized messages do not require destination indices
       messageBuffers[bufferIndex] = 
-        new (0, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>();
+        new (0, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
     }
     else {
       messageBuffers[bufferIndex] = 
-        new (bufferSize_, bufferSize_, sizeof(int)) MeshStreamerMessage<dtype>();
+        new (bufferSize_, bufferSize_, sizeof(int)) 
+        MeshStreamerMessage<dtype>(dimension);
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
     CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
@@ -497,7 +510,10 @@ inline
 void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
   const static bool copyIndirectly = true;
 
-  MeshLocation destinationLocation = determineLocation(destinationPe);
+  // treat newly inserted items as if they were received along
+  // a higher dimension (e.g. for a 3D mesh, received along 4th dimension)
+  MeshLocation destinationLocation = determineLocation(destinationPe, 
+                                                       numDimensions_);
   storeMessage(destinationPe, destinationLocation, dataItemHandle, 
 	       copyIndirectly); 
   // release control to scheduler if requested by the user, 
@@ -611,7 +627,7 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
     else {
       if (destinationPe != lastDestinationPe) {
         // do this once per sequence of items with the same destination
-        destinationLocation = determineLocation(destinationPe);
+        destinationLocation = determineLocation(destinationPe, msg->dimension);
       }
       storeMessage(destinationPe, destinationLocation, &dataItem);   
     }
@@ -625,9 +641,7 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
 #endif
 
 #ifdef STAGED_COMPLETION
-  envelope *env = UsrToEnv(msg);
-  MeshLocation sourceLocation = this->determineLocation(env->getSrcPe());
-  markMessageReceived(sourceLocation.dimension, msg->finalMsgCount); 
+  markMessageReceived(msg->dimension, msg->finalMsgCount); 
 #endif
 
   delete msg;
@@ -726,7 +740,7 @@ void MeshStreamer<dtype>::flushAllBuffers() {
 	for (int k = 0; k < messageBuffers[j]->numDataItems; k++) {
 
 	  MeshStreamerMessage<dtype> *directMsg = 
-	    new (0, 1, sizeof(int)) MeshStreamerMessage<dtype>();
+	    new (0, 1, sizeof(int)) MeshStreamerMessage<dtype>(i);
 	  *(int *) CkPriorityPtr(directMsg) = prio_;
 	  CkSetQueueing(directMsg, CK_QUEUEING_IFIFO);
 
@@ -770,7 +784,7 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     if(messageBuffers[j] == NULL) {      
       if (sendMsgCounts && j != myLocationIndex_[dimension]) {
         messageBuffers[j] = 
-          new (0, 0, sizeof(int)) MeshStreamerMessage<dtype>();
+          new (0, 0, sizeof(int)) MeshStreamerMessage<dtype>(dimension);
         *(int *) CkPriorityPtr(messageBuffers[j]) = prio_;
         CkSetQueueing(messageBuffers[j], CK_QUEUEING_IFIFO);
       }
@@ -886,16 +900,13 @@ private:
       dtype &data = msg->getDataItem(i);
       clientObj_->process(data);
     }
+
 #ifdef STAGED_COMPLETION
-    envelope *env = UsrToEnv(msg);
-    MeshLocation sourceLocation = this->determineLocation(env->getSrcPe());
-#ifdef DEBUG_STREAMER
-    CkAssert(env->getSrcPe() >= 0 && env->getSrcPe() < CkNumPes()); 
-#endif
 #ifdef STREAMER_VERBOSE_OUTPUT
+    envelope *env = UsrToEnv(msg);
     CkPrintf("[%d] received at dest from %d %d items finalMsgCount: %d\n", CkMyPe(), env->getSrcPe(), msg->numDataItems, msg->finalMsgCount);  
 #endif
-    markMessageReceived(sourceLocation.dimension, msg->finalMsgCount); 
+    markMessageReceived(msg->dimension, msg->finalMsgCount); 
 #else 
     this->detectorLocalObj_->consume(msg->numDataItems);    
 #endif
@@ -1080,9 +1091,7 @@ public:
       localDeliver(packedData);
     }
 #ifdef STAGED_COMPLETION
-    envelope *env = UsrToEnv(msg);
-    MeshLocation sourceLocation = this->determineLocation(env->getSrcPe());
-    markMessageReceived(sourceLocation.dimension, msg->finalMsgCount);
+    markMessageReceived(msg->dimension, msg->finalMsgCount);
 #endif
 
     delete msg;
