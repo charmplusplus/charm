@@ -19,7 +19,7 @@
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
 // #define STREAMER_EXPERIMENTAL
 // #define STREAMER_VERBOSE_OUTPUT
-// #define STAGED_COMPLETION
+#define STAGED_COMPLETION
 
 struct MeshLocation {
   int dimension; 
@@ -145,7 +145,7 @@ private:
   int *cntFinished_; 
   int dimensionToFlush_;
   int numLocalDone_; 
-
+  int numLocalContributors_;
 
   void storeMessage(int destinationPe, 
                     const MeshLocation &destinationCoordinates, 
@@ -205,7 +205,7 @@ public:
   void done(int numContributorsFinished = 1) {
 #ifdef STAGED_COMPLETION
     numLocalDone_ += numContributorsFinished; 
-    if (numLocalDone_ == numLocalElementsInClient()) {
+    if (numLocalDone_ == numLocalContributors_) {
       startStagedCompletion();
     }
 #else
@@ -213,7 +213,7 @@ public:
 #endif
   }
 
-  void init(CkCallback startCb, CkCallback endCb, int prio);
+  void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, int prio);
   
   void startStagedCompletion() {          
     if (individualDimensionSizes_[dimensionToFlush_] != 1) {
@@ -543,8 +543,8 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::init(CkCallback startCb, CkCallback endCb, 
-                               int prio) {
+void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb, 
+                               CkCallback endCb, int prio) {
 
   for (int i = 0; i < numDimensions_; i++) {
     std::fill(cntMsgSent_[i], 
@@ -560,6 +560,7 @@ void MeshStreamer<dtype>::init(CkCallback startCb, CkCallback endCb,
   prio_ = prio;
 
   numLocalDone_ = 0; 
+  numLocalContributors_ = numLocalContributors; 
   initLocalClients();
   this->contribute(startCb);
 }
