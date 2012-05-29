@@ -15,11 +15,24 @@
 #include "pami.h"
 #include "pami_sys.h"
 
+#if CMK_SMP
+#define CMK_USE_L2ATOMICS   1
+#endif
+
+#if CMK_SMP && CMK_USE_L2ATOMICS
+#include "L2AtomicQueue.h"
+#endif
+
 char *ALIGN_32(char *p) {
   return((char *)((((unsigned long)p)+0x1f) & (~0x1FUL)));
 }
 
+#if CMK_SMP && CMK_USE_L2ATOMICS
+CpvDeclare(L2AtomicQueue*, broadcast_q);          
+#else
 CpvDeclare(PCQueue, broadcast_q);                 //queue to send broadcast messages
+#endif
+
 #if CMK_NODE_QUEUE_AVAILABLE
 CsvDeclare(PCQueue, node_bcastq);
 CsvDeclare(CmiNodeLock, node_bcastLock);
@@ -39,7 +52,7 @@ CsvDeclare(CmiNodeLock, node_bcastLock);
 #define CMK_BROADCAST_SPANNING_TREE    1
 #endif /* CMK_SMP */
 
-#define BROADCAST_SPANNING_FACTOR     2
+#define BROADCAST_SPANNING_FACTOR     4
 
 //The root of the message infers the type of the message
 // 1. root is 0, then it is a normal point-to-point message
@@ -95,7 +108,7 @@ CpvDeclare(void*, CmiLocalQueue);
 
 #if CMK_NODE_QUEUE_AVAILABLE
 #define SMP_NODEMESSAGE   (0xFB) // rank of the node message when node queue
-// is available
+                                 // is available
 #define NODE_BROADCAST_OTHERS (-1)
 #define NODE_BROADCAST_ALL    (-2)
 #endif
@@ -103,6 +116,9 @@ CpvDeclare(void*, CmiLocalQueue);
 
 typedef struct ProcState {
     /* PCQueue      sendMsgBuf; */      /* per processor message sending queue */
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicQueue   atomic_queue;
+#endif
     CmiNodeLock  recvLock;              /* for cs->recv */
     CmiNodeLock bcastLock;
 } ProcState;
@@ -168,16 +184,14 @@ void CmiPushPE(int pe,void *msg) {
         return;
     }
 #endif
-#if CMK_SMP
-    //CmiLock(procState[pe].recvLock);
-#endif
 
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicEnqueue(&procState[pe].atomic_queue, msg);
+#else
     PCQueuePush(cs->recv,(char *)msg);
+#endif
     //printf("%d: PCQueue length = %d, msg = %x\n", CmiMyPe(), PCQueueLength(cs->recv), msg);
 
-#if CMK_SMP
-    //CmiUnlock(procState[pe].recvLock);
-#endif
     CmiIdleLock_addMessage(&cs->idle);
     MACHSTATE1(3,"} Pushing message into rank %d's queue done",pe);
 }
@@ -204,10 +218,10 @@ static void CmiPushNode(void *msg) {
 }
 #endif /* CMK_NODE_QUEUE_AVAILABLE */
 
-#define MAX_NUM_CONTEXTS  16
+#define MAX_NUM_CONTEXTS  64
 
 #if CMK_SMP 
-#define CMK_PAMI_MULTI_CONTEXT  0
+#define CMK_PAMI_MULTI_CONTEXT  1
 #else
 #define CMK_PAMI_MULTI_CONTEXT  0
 #endif
@@ -215,15 +229,17 @@ static void CmiPushNode(void *msg) {
 #if CMK_PAMI_MULTI_CONTEXT
 volatile int msgQueueLen [MAX_NUM_CONTEXTS];
 volatile int outstanding_recvs [MAX_NUM_CONTEXTS];
-#define  MY_CONTEXT_ID() (CmiMyRank() >> 2)
-#define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> 2])
+#define THREADS_PER_CONTEXT 4
+#define LTPS                2 //Log Threads Per Context (TPS)
+#define  MY_CONTEXT_ID() (CmiMyRank() >> LTPS)
+#define  MY_CONTEXT()    (cmi_pami_contexts[CmiMyRank() >> LTPS])
 
-#define  INCR_MSGQLEN()  (msgQueueLen[CmiMyRank() >> 2] ++)
-#define  DECR_MSGQLEN()  (msgQueueLen[CmiMyRank() >> 2] --)
-#define  MSGQLEN()       (msgQueueLen[CmiMyRank() >> 2])
-#define  INCR_ORECVS()   (outstanding_recvs[CmiMyRank() >> 2] ++)
-#define  DECR_ORECVS()   (outstanding_recvs[CmiMyRank() >> 2] --)
-#define  ORECVS()        (outstanding_recvs[CmiMyRank() >> 2])
+#define  INCR_MSGQLEN()  //(msgQueueLen[CmiMyRank() >> LTPS] ++)
+#define  DECR_MSGQLEN()  //(msgQueueLen[CmiMyRank() >> LTPS] --)
+#define  MSGQLEN()       0 //(msgQueueLen[CmiMyRank() >> LTPS])
+#define  INCR_ORECVS()   //(outstanding_recvs[CmiMyRank() >> LTPS] ++)
+#define  DECR_ORECVS()   //(outstanding_recvs[CmiMyRank() >> LTPS] --)
+#define  ORECVS()        0 //(outstanding_recvs[CmiMyRank() >> LTPS])
 #else
 volatile int msgQueueLen;
 volatile int outstanding_recvs;
@@ -237,6 +253,18 @@ volatile int outstanding_recvs;
 #define  DECR_ORECVS()   (outstanding_recvs --)
 #define  ORECVS()        (outstanding_recvs)
 #endif
+
+#if CMK_SMP 
+#define PAMIX_CONTEXT_LOCK_INIT(x)
+#define PAMIX_CONTEXT_LOCK(x)        if(LTPS) PAMI_Context_lock(x)
+#define PAMIX_CONTEXT_UNLOCK(x)      if(LTPS) {ppc_msync(); PAMI_Context_unlock(x);}
+#define PAMIX_CONTEXT_TRYLOCK(x)     ((LTPS)?(PAMI_Context_trylock(x) == PAMI_SUCCESS):(1))
+#else
+#define PAMIX_CONTEXT_LOCK_INIT(x)
+#define PAMIX_CONTEXT_LOCK(x)
+#define PAMIX_CONTEXT_UNLOCK(x)
+#endif
+
 
 static char     **Cmi_argv;
 static char     **Cmi_argvcopy;
@@ -295,16 +323,16 @@ static void recv_done(pami_context_t ctxt, void *clientdata, pami_result_t resul
 
 #if CMK_BROADCAST_SPANNING_TREE 
     if (CMI_IS_BCAST_ON_CORES(msg) ) {
-      int pe = CmiMyRank(); //CMI_DEST_RANK(msg);
-        //printf ("%d: Receiving bcast message from %d with %d bytes for %d\n", CmiMyPe(), CMI_BROADCAST_ROOT(msg), sndlen, pe);
-        char *copymsg;
+        int pe = CmiMyRank(); //CMI_DEST_RANK(msg);
+	char *copymsg;
         copymsg = (char *)CmiAlloc(sndlen);
         CmiMemcpy(copymsg,msg,sndlen);
 
-        //received_broadcast = 1;
-#if CMK_SMP
+#if   CMK_SMP && CMK_USE_L2ATOMICS
+	L2AtomicEnqueue(CpvAccessOther(broadcast_q, pe), copymsg);	
+#elif CMK_SMP
         CmiLock(procState[pe].bcastLock);
-        PCQueuePush(CpvAccessOther(broadcast_q, pe), copymsg);
+        PCQueuePush(CpvAccessOther(broadcast_q, pe), copymsg);	
         CmiUnlock(procState[pe].bcastLock);
 #else
         PCQueuePush(CpvAccess(broadcast_q), copymsg);
@@ -364,8 +392,8 @@ static void pkt_dispatch (pami_context_t       context,      /**< IN: PAMI conte
 
 
 #if CMK_NODE_QUEUE_AVAILABLE
+void sendBroadcastMessagesNode() __attribute__((__noinline__));
 void sendBroadcastMessagesNode() {
-    if (PCQueueLength(CsvAccess(node_bcastq))==0) return;
     //node broadcast message could be always handled by any cores (including
     //comm thd) on this node
     //CmiLock(CsvAccess(NodeState).CmiNodeRecvLock);
@@ -386,36 +414,48 @@ void sendBroadcastMessagesNode() {
 }
 #endif
 
+void sendBroadcastMessages() __attribute__((__noinline__));
 void sendBroadcastMessages() {
-  PCQueue toPullQ;
-  toPullQ = CpvAccess(broadcast_q);
-
-  if (PCQueueLength(toPullQ)==0) return;
-#if CMK_SMP
-  CmiLock(procState[CmiMyRank()].bcastLock);
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    L2AtomicQueue *toPullQ;
+#else
+    PCQueue toPullQ;
 #endif
 
+    toPullQ = CpvAccess(broadcast_q);
+    
+#if CMK_SMP && !CMK_USE_L2ATOMICS
+    CmiLock(procState[CmiMyRank()].bcastLock);
+#endif
+    
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    char *msg = (char *) L2AtomicDequeue(toPullQ);
+#else
     char *msg = (char *) PCQueuePop(toPullQ);
-
-#if CMK_SMP
+#endif
+    
+#if CMK_SMP && !CMK_USE_L2ATOMICS
     CmiUnlock(procState[CmiMyRank()].bcastLock);
 #endif
-
-    while (msg) {
-
+    
+    while (msg) {      
 #if CMK_BROADCAST_SPANNING_TREE
         SendSpanningChildren(((CmiMsgHeaderBasic *) msg)->size, msg);
 #endif
 
         CmiFree (msg);
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_USE_L2ATOMICS
         CmiLock(procState[CmiMyRank()].bcastLock);
 #endif
 
+#if CMK_SMP && CMK_USE_L2ATOMICS
+	msg = (char *) L2AtomicDequeue(toPullQ);
+#else
         msg = (char *) PCQueuePop(toPullQ);
+#endif
 
-#if CMK_SMP
+#if CMK_SMP && !CMK_USE_L2ATOMICS
         CmiUnlock(procState[CmiMyRank()].bcastLock);
 #endif
     }
@@ -437,8 +477,8 @@ void mysleep (unsigned long cycles) {
 }
 
 static void * test_buf;
-
 volatile int pami_barrier_flag = 0;
+typedef pami_result_t (*pamix_proc_memalign_fn) (void**, size_t, size_t, const char*);
 
 void pami_barrier_done (void *ctxt, void * clientdata, pami_result_t err)
 {
@@ -457,6 +497,8 @@ char clientname[] = "Converse";
 
 #include "malloc.h"
 
+void *l2atomicbuf;
+
 void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret) {
     int n, i, count;
 
@@ -471,14 +513,18 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
     PAMI_Client_create (clientname, &cmi_pami_client, NULL, 0);
     size_t _n = 1;
 #if CMK_PAMI_MULTI_CONTEXT
-    if ((_Cmi_mynodesize % 4) == 0)
-      _n = _Cmi_mynodesize / 4;  //have a context for each four threads
+    if ((_Cmi_mynodesize % THREADS_PER_CONTEXT) == 0)
+      _n = _Cmi_mynodesize / THREADS_PER_CONTEXT;  //have a context for each four threads
     else
-      _n = 1 + (_Cmi_mynodesize / 4);  //have a context for each four threads
+      _n = 1 + (_Cmi_mynodesize / THREADS_PER_CONTEXT);  //have a context for each four threads
 #endif
 
     cmi_pami_contexts = (pami_context_t *) malloc (sizeof(pami_context_t) * _n);
-    PAMI_Context_createv (cmi_pami_client, NULL, 0, cmi_pami_contexts, _n);
+    pami_result_t rc = PAMI_Context_createv (cmi_pami_client, NULL, 0, cmi_pami_contexts, _n);
+    if (rc != PAMI_SUCCESS) {
+      fprintf(stderr, "PAMI_Context_createv failed for %d contexts\n", _n);
+      assert(0);
+    }
     cmi_pami_numcontexts = _n;
 
     pami_configuration_t configuration;
@@ -590,8 +636,17 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
 #endif
 
     int actualNodeSize = _Cmi_mynodesize;
-#if !CMK_MULTICORE
-    actualNodeSize++; //considering the extra comm thread
+
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    //pami_result_t rc;
+    pami_extension_t l2;
+    pamix_proc_memalign_fn PAMIX_L2_proc_memalign;
+    size_t size = 2 * actualNodeSize * sizeof(L2AtomicState);
+    rc = PAMI_Extension_open(NULL, "EXT_bgq_l2atomic", &l2);
+    CmiAssert (rc == 0);
+    PAMIX_L2_proc_memalign = (pamix_proc_memalign_fn)PAMI_Extension_symbol(l2, "proc_memalign");
+    rc = PAMIX_L2_proc_memalign(&l2atomicbuf, 64, size, NULL);
+    CmiAssert (rc == 0);    
 #endif
 
     procState = (ProcState *)CmiAlloc((actualNodeSize) * sizeof(ProcState));
@@ -599,11 +654,12 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched, int initret)
         /*    procState[i].sendMsgBuf = PCQueueCreate();   */
         procState[i].recvLock = CmiCreateLock();
         procState[i].bcastLock = CmiCreateLock();
-    }
-
-#if CMK_SMP && !CMK_MULTICORE
-    //commThdExitLock = CmiCreateLock();
+#if CMK_SMP && CMK_USE_L2ATOMICS
+	L2AtomicQueueInit ((char *) l2atomicbuf + sizeof(L2AtomicState)*i,
+			   sizeof(L2AtomicState),
+			   &procState[i].atomic_queue);
 #endif
+    }
 
     //printf ("Starting Threads\n");
     CmiStartThreads(argv);
@@ -637,8 +693,17 @@ void ConverseRunPE(int everReturn) {
 
     CthInit(CmiMyArgv);
 
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    CpvInitialize(L2AtomicQueue*, broadcast_q);
+    //Initialize broadcastq
+    L2AtomicQueue *l2q = malloc(sizeof(L2AtomicQueue));
+    CpvAccess(broadcast_q) = l2q;
+    L2AtomicQueueInit (l2atomicbuf + sizeof(L2AtomicState)*(_Cmi_mynodesize + CmiMyRank()),
+		       sizeof(L2AtomicState), l2q);
+#else
     CpvInitialize(PCQueue, broadcast_q);
     CpvAccess(broadcast_q) = PCQueueCreate();
+#endif
 
     //printf ("Before Converse Common Init\n");
     ConverseCommonInit(CmiMyArgv);
@@ -657,22 +722,6 @@ void ConverseRunPE(int everReturn) {
       ConverseExit();
     }
 }
-
-#if CMK_SMP
-static int inexit = 0;
-
-/* test if all processors recv queues are empty */
-static int RecvQueueEmpty() {
-    int i;
-    for (i=0; i<_Cmi_mynodesize; i++) {
-        CmiState cs=CmiGetStateN(i);
-        if (!PCQueueEmpty(cs->recv)) return 0;
-    }
-    return 1;
-}
-
-#endif
-
 
 void ConverseExit(void) {
 
@@ -748,28 +797,21 @@ char *CmiGetNonLocalNodeQ(void) {
 
 void *CmiGetNonLocal() {
 
-    CmiState cs = CmiGetState();
-
     void *msg = NULL;
+    CmiState cs = CmiGetState();
     CmiIdleLock_checkMessage(&cs->idle);
-    /* although it seems that lock is not needed, I found it crashes very often
-       on mpi-smp without lock */
 
-    /*if(CmiMyRank()==0) printf("Got stuck here on proc[%d] node[%d]\n", CmiMyPe(), CmiMyNode());*/
-
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    msg = L2AtomicDequeue(&procState[CmiMyRank()].atomic_queue);
+    if (msg == NULL) {
+      AdvanceCommunications();     
+      msg = L2AtomicDequeue(&procState[CmiMyRank()].atomic_queue);
+    }
+#else
     if (PCQueueLength(cs->recv)==0)
       AdvanceCommunications();
-
     if (PCQueueLength(cs->recv)==0) return NULL;
-
-#if CMK_SMP
-    //CmiLock(procState[cs->rank].recvLock);
-#endif
-
     msg =  PCQueuePop(cs->recv);
-
-#if CMK_SMP
-    //CmiUnlock(procState[cs->rank].recvLock);
 #endif
 
     return msg;
@@ -799,9 +841,13 @@ static void CmiSendPeer (int rank, int size, char *msg) {
         copymsg = (char *)CmiAlloc(size);
         CmiMemcpy(copymsg,msg,size);
 
+#if CMK_USE_L2ATOMICS
+	L2AtomicEnqueue(CpvAccessOther(broadcast_q, rank), copymsg);
+#else
         CmiLock(procState[rank].bcastLock);
         PCQueuePush(CpvAccessOther(broadcast_q, rank), copymsg);
         CmiUnlock(procState[rank].bcastLock);
+#endif
     }
 #endif
     
@@ -810,7 +856,7 @@ static void CmiSendPeer (int rank, int size, char *msg) {
 #endif
 
 
-void CmiGeneralFreeSendN (int node, int rank, int size, char * msg);
+void CmiGeneralFreeSendN (int node, int rank, int size, char * msg, int to_lock);
 
 
 /* The general free send function
@@ -830,10 +876,10 @@ void  CmiGeneralFreeSend(int destPE, int size, char* msg) {
         return;
     }
 
-    CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg);
+    CmiGeneralFreeSendN (CmiNodeOf (destPE), CmiRankOf (destPE), size, msg, 1);
 }
 
-void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
+void CmiGeneralFreeSendN (int node, int rank, int size, char * msg, int to_lock) {
 
     //printf ("%d, %d: Sending Message to node %d rank %d \n", CmiMyPe(),
     //  CmiMyNode(), node, rank);
@@ -850,11 +896,14 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
 
     pami_endpoint_t target;
 #if CMK_PAMI_MULTI_CONTEXT
-    size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>2) : 0;
+    size_t dst_context = (rank != SMP_NODEMESSAGE) ? (rank>>LTPS) : 0;
 #else
     size_t dst_context = 0;
 #endif
     PAMI_Endpoint_create (cmi_pami_client, (pami_task_t)node, dst_context, &target);
+
+    //CmiAssert ((MY_CONTEXT_ID()) >= 0 &&
+    //	       (MY_CONTEXT_ID()) < cmi_pami_numcontexts);
 
     //fprintf (stderr, "Calling PAMI Send to %d magic %d size %d\n", node, CMI_MAGIC(msg), size);
     if (size < 128) {
@@ -867,15 +916,15 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
       parameters.dest = target;
       
       pami_context_t my_context = MY_CONTEXT();
-      CmiAssert (my_context != NULL);
+      //CmiAssert (my_context != NULL);
+      
+      if(to_lock)
+	PAMIX_CONTEXT_LOCK(my_context);
 
-#if CMK_SMP
-      PAMI_Context_lock(my_context);
-#endif
       PAMI_Send_immediate (my_context, &parameters);
-#if CMK_SMP
-      PAMI_Context_unlock(my_context);
-#endif
+
+      if(to_lock)
+	PAMIX_CONTEXT_UNLOCK(my_context);
       CmiFree(msg);
     }
     else {
@@ -890,24 +939,23 @@ void CmiGeneralFreeSendN (int node, int rank, int size, char * msg) {
       parameters.events.remote_fn     = NULL;
       memset(&parameters.send.hints, 0, sizeof(parameters.send.hints));
       parameters.send.dest = target;
-
-      pami_context_t my_context = MY_CONTEXT();
-      CmiAssert (my_context != NULL);
       
-#if CMK_SMP
-      PAMI_Context_lock(my_context);
-#endif
+      pami_context_t my_context = MY_CONTEXT();
+      //CmiAssert (my_context != NULL);
+      
+      if (to_lock)
+	PAMIX_CONTEXT_LOCK(my_context);
       INCR_MSGQLEN();
       PAMI_Send (my_context, &parameters);
-#if CMK_SMP
-      PAMI_Context_unlock(my_context);
-#endif
+      if (to_lock)
+	PAMIX_CONTEXT_UNLOCK(my_context);
     }
 }
 
 void CmiSyncSendFn(int destPE, int size, char *msg) {
     char *copymsg;
     copymsg = (char *)CmiAlloc(size);
+    CmiAssert(copymsg != NULL);
     CmiMemcpy(copymsg,msg,size);
     //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiSyncSendFn on comm thd on node %d\n", CmiMyNode());
     CmiFreeSendFn(destPE,size,copymsg);
@@ -965,7 +1013,7 @@ void SendSpanningChildren(int size, char *msg) {
 	((CmiMsgHeaderBasic *)copymsg)->size = size;
 	CMI_SET_CHECKSUM(copymsg, size);
 	
-	CmiGeneralFreeSendN(p,0,size,copymsg);	
+	CmiGeneralFreeSendN(p,0,size,copymsg,1);	
     }    
 
 #if CMK_SMP    
@@ -1060,14 +1108,25 @@ void AdvanceCommunications() {
    
 #if CMK_SMP
     CmiAssert (my_context != NULL);
-    PAMI_Context_trylock_advancev(&my_context, 1, 1);
+    //PAMI_Context_trylock_advancev(&my_context, 1, 1);
+    if (PAMIX_CONTEXT_TRYLOCK(my_context))
+    {
+      PAMI_Context_advance(my_context, 1);
+      PAMIX_CONTEXT_UNLOCK(my_context);
+    }
 #else
     PAMI_Context_advance(my_context, 1);
 #endif
-    
-    sendBroadcastMessages();
+
+#if CMK_SMP && CMK_USE_L2ATOMICS
+    if (!L2AtomicQueueEmpty(CpvAccess(broadcast_q)))
+#else        
+    if (PCQueueLength(CpvAccess(broadcast_q)) > 0)
+#endif
+      sendBroadcastMessages();
 #if CMK_NODE_QUEUE_AVAILABLE
-    sendBroadcastMessagesNode();
+    if (PCQueueLength(CsvAccess(node_bcastq)) > 0)
+      sendBroadcastMessagesNode();
 #endif
     
     
@@ -1159,8 +1218,7 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
     ((CmiMsgHeaderBasic *)msg)->size = size;
     CMI_SET_CHECKSUM(msg, size);
 
-    //if(CmiMyRank()==CmiMyNodeSize()) printf("CmiFreeListSendFn on comm thd on node %d\n", CmiMyNode());
-
+    //printf("CmiFreeListSendFn on node %d rank %d\n", CmiMyNode(), CmiMyRank());
     //printf("%d: In Free List Send Fn\n", CmiMyPe());
     int new_npes = 0;
 
@@ -1170,22 +1228,32 @@ void CmiFreeListSendFn(int npes, int *pes, int size, char *msg) {
             CmiSyncSend(pes[i], size, msg);
     }
 
+    pami_context_t my_context = MY_CONTEXT();
+    PAMIX_CONTEXT_LOCK(my_context);
+
+    char *copymsg;
     for (i=0;i<npes;i++) {
-        if (CmiNodeOf(pes[i]) == CmiMyNode());
+      if (CmiNodeOf(pes[i]) == CmiMyNode());
         else if (i < npes - 1) {
-#if !CMK_SMP 
-            CmiReference(msg);
-            CmiGeneralFreeSend(pes[i], size, msg);
+#if !CMK_SMP
+	    CmiReference(msg);
+	    copymsg = msg;
 #else
-            CmiSyncSend(pes[i], size, msg);
+	    copymsg = (char *)CmiAlloc(size);
+	    CmiAssert(copymsg != NULL);
+	    CmiMemcpy(copymsg,msg,size);
 #endif
+            CmiGeneralFreeSendN(CmiNodeOf(pes[i]), CmiRankOf(pes[i]), size, copymsg, 0);
         }
     }
 
     if (npes  && CmiNodeOf(pes[npes-1]) != CmiMyNode())
-      CmiSyncSendAndFree(pes[npes-1], size, msg); //Sameto CmiFreeSendFn
+      //CmiSyncSendAndFree(pes[npes-1], size, msg); //Sameto CmiFreeSendFn
+      CmiGeneralFreeSendN(CmiNodeOf(pes[npes-1]), CmiRankOf(pes[npes-1]), size, msg, 0);
     else
       CmiFree(msg);    
+
+    PAMIX_CONTEXT_UNLOCK(my_context);
 }
 
 CmiCommHandle CmiAsyncListSendFn(int npes, int *pes, int size, char *msg) {
@@ -1294,14 +1362,9 @@ static void CmiNetworkBarrier() {
     pami_result_t result;
     pami_barrier_flag = 1;
     pami_context_t my_context = cmi_pami_contexts[0];
-#if CMK_SMP
-    PAMI_Context_lock(my_context);
-#endif
-    result = PAMI_Collective(my_context, &pami_barrier);
-    
-#if CMK_SMP
-    PAMI_Context_unlock(my_context);
-#endif    
+    PAMIX_CONTEXT_LOCK(my_context);
+    result = PAMI_Collective(my_context, &pami_barrier);   
+    PAMIX_CONTEXT_UNLOCK(my_context);
     
     if (result != PAMI_SUCCESS)
     {
@@ -1309,14 +1372,10 @@ static void CmiNetworkBarrier() {
       return;
     }
     
-#if CMK_SMP
-    PAMI_Context_lock(my_context);
-#endif
+    PAMIX_CONTEXT_LOCK(my_context);
     while (pami_barrier_flag)
       result = PAMI_Context_advance (my_context, 100);
-#if CMK_SMP
-    PAMI_Context_unlock(my_context);
-#endif
+    PAMIX_CONTEXT_UNLOCK(my_context);
 }
 
 #if CMK_NODE_QUEUE_AVAILABLE
@@ -1353,7 +1412,7 @@ void CmiFreeNodeSendFn(int node, int size, char *msg) {
     if (node == _Cmi_mynode) {
         CmiSendNodeSelf(msg);
     } else {
-        CmiGeneralFreeSendN(node, SMP_NODEMESSAGE, size, msg);
+      CmiGeneralFreeSendN(node, SMP_NODEMESSAGE, size, msg, 1);
     }
 }
 
@@ -1386,7 +1445,7 @@ void SendSpanningChildrenNode(int size, char *msg) {
         char *dupmsg = (char *)CmiAlloc(size);
         CmiMemcpy(dupmsg,msg,size);
         //printf("In SendSpanningChildrenNode, sending bcast msg (root %d) from node %d to node %d\n", startnode, CmiMyNode(), nid);
-        CmiGeneralFreeSendN(nid, SMP_NODEMESSAGE, size, dupmsg);
+        CmiGeneralFreeSendN(nid, SMP_NODEMESSAGE, size, dupmsg,1);
     }
 }
 
