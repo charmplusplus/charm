@@ -1410,6 +1410,7 @@ void killLocal(void *_dummy,double curWallTime){
 void readKillFile(){
         FILE *fp=fopen(killFile,"r");
         if(!fp){
+                printf("[%d] Cannot open file %s (MEMCKPT) \n",CkMyPe(),killFile);
                 return;
         }
         int proc;
