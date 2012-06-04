@@ -10,6 +10,7 @@
 #endif
 
 CpvExtern(Chare *,_currentObj);
+CpvExtern(int, _numImmigrantRecObjs);
 
 //states of a ticket sent as a reply to a request
 #define NEW_TICKET 1
@@ -208,6 +209,7 @@ public:
 	int toResumeOrNot;
 	int resumeCount;
 	int immigrantRecFlag;
+	int immigrantSourcePE;
 
 private:
 
@@ -283,16 +285,6 @@ public:
 };
 
 /**
- * @brief Class that represents the location of an array element.
- */
-class LocationID{
-public:
-	CkArrayIndexMax idx;
-	CkGroupID gid;
-	int PE;
-};
-
-/**
  * @brief
  */
 class StoredCheckpoint{
@@ -364,6 +356,12 @@ typedef struct{
 	int PE;
 	int dataSize;
 } CheckPointDataMsg;
+
+typedef struct{
+    char header[CmiMsgHeaderSizeBytes];
+    int PE;
+} DistributeObjectMsg;
+
 
 /*typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
