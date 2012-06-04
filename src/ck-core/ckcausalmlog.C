@@ -641,7 +641,6 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		DEBUG_RESTART(printf("[%d] Generate Ticket Request to %s from %s PE %d SN %d \n",CkMyPe(),env->recver.toString(recverName),env->sender.toString(senderString),destPE,env->SN));
 	}*/
 		
-	MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 //	CkPackMessage(&(mEntry->env));
 //	traceUserBracketEvent(32,_startTime,CkWallTimer());
 	
@@ -649,7 +648,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 
 	// uses the proper ticketing mechanism for local, team and general messages
 	if(isLocal(destPE)){
-		sendLocalMsg(mEntry);
+		sendLocalMsg(env, _infoIdx);
 	}else{
 		if((teamSize > 1) && isTeamLocal(destPE)){
 
@@ -666,6 +665,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		}
 		
 		// sending the message
+		MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 		sendMsg(sender,recver,destPE,mEntry,env->SN,ticketNumber,resend);
 		
 	}
@@ -777,18 +777,18 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
  * then enqueues the message. If we are recovering, then the message 
  * is enqueued in a delay queue.
  */
-void sendLocalMsg(MlogEntry *entry){
+void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG_PERF(double _startTime=CkWallTimer());
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG(Chare *senderObj = (Chare *)entry->env->sender.getObject();)
+	DEBUG(Chare *senderObj = (Chare *)env->sender.getObject();)
 	DEBUG(char senderString[100]);
 	DEBUG(char recverString[100]);
 	Ticket ticket;
 
-	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),entry->env->SN,entry->env->sender.toString(senderString),entry->env->recver.toString(recverString)));
+	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),env->SN,env->sender.toString(senderString),env->recver.toString(recverString)));
 
 	// getting the receiver local object
-	Chare *recverObj = (Chare *)entry->env->recver.getObject();
+	Chare *recverObj = (Chare *)env->recver.getObject();
 
 	// if receiver object is not NULL, we will ask it for a ticket
 	if(recverObj){
@@ -828,7 +828,7 @@ void sendLocalMsg(MlogEntry *entry){
 		addBufferedDeterminant(entry->env->sender, entry->env->recver, entry->env->SN, entry->env->TN);
 */
 		// sends the local message
-		_skipCldEnqueue(CmiMyPe(),entry->env,entry->_infoIdx);	
+		_skipCldEnqueue(CmiMyPe(),env,_infoIdx);	
 
 		DEBUG_MEM(CmiMemoryCheck());
 	}else{

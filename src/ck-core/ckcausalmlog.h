@@ -515,7 +515,7 @@ void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid);
 void sendNodeGroupMsg(envelope *env,int destNode,int _infoIdx);
 void sendCommonMsg(CkObjID &recver,envelope *env,int destPE,int _infoIdx);
 void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend);
-void sendLocalMsg(MlogEntry *entry);
+void sendLocalMsg(envelope *env, int _infoIdx);
 
 //handler functions
 void _ticketRequestHandler(TicketRequest *);
