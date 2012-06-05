@@ -1236,7 +1236,7 @@ void CmiTimerInit(char **argv)
   uint32_t clockMhz = pers.Kernel_Config.FreqMHz;
   CpvAccess(clocktick) = 1.0 / (clockMhz * 1e6); 
 
-  fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);
+  /*fprintf(stderr, "Blue Gene/Q running at clock speed of %d Mhz\n", clockMhz);*/
 
   /* try to synchronize calling barrier */
   CmiBarrier();
