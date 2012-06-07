@@ -617,8 +617,8 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	if(env->sender.type == TypeInvalid){
 	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
 	}else{
-		envelope *copyEnv = copyEnvelope(env);
-		env = copyEnv;
+//		envelope *copyEnv = copyEnvelope(env);
+//		env = copyEnv;
 		env->sender = CpvAccess(_currentObj)->mlogData->objID;
 		env->SN = 0;
 	}
