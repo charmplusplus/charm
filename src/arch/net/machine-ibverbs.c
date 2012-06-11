@@ -467,8 +467,6 @@ static void CmiMachineInit(char **argv){
 	dev = *devList;
 	CmiAssert(dev != NULL);
 
-	ibPort=1;
-
 	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
 
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
@@ -480,10 +478,18 @@ static void CmiMachineInit(char **argv){
 	
 	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
 	
-	context->ibPort = ibPort;
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
 	CmiAssert(context->context != NULL);
+
+        // test ibPort
+        int MAXPORT = 8;
+        for (ibPort = 1; ibPort < MAXPORT; i++) {
+          struct ibv_port_attr attr;
+          if (ibv_query_port(context->context, ibPort, &attr) == 0) break;
+        }
+        if (ibPort == MAXPORT) CmiAbort("No valid IB port found!");
+	context->ibPort = ibPort;
 	
 	MACHSTATE1(3,"device opened %p",context->context);
 
