@@ -486,7 +486,9 @@ static void CmiMachineInit(char **argv){
         int MAXPORT = 8;
         for (ibPort = 1; ibPort < MAXPORT; i++) {
           struct ibv_port_attr attr;
-          if (ibv_query_port(context->context, ibPort, &attr) == 0) break;
+          if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
+          if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  break;
+          
         }
         if (ibPort == MAXPORT) CmiAbort("No valid IB port found!");
 	context->ibPort = ibPort;
