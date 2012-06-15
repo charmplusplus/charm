@@ -972,7 +972,7 @@ expr
     ;
 
 primaryExpression
-@init { int dims = 1; }
+@init { int dims = 1; boolean isValueType = true; }
     :   ^(DOT prim=primaryExpression
             ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
@@ -1011,9 +1011,20 @@ primaryExpression
                     }
                 }
             }
+            if ($pe.start.symbolType instanceof PointerType) {
+              PointerType pt = (PointerType)($pe.start.symbolType);
+              ClassSymbol cs = (ClassSymbol)(pt.baseType);
+              if (cs != null && cs.templateArgs != null && cs.templateArgs.size() > 0) {
+                List<TypeName> list = new ArrayList<TypeName>();
+                list.add(new TypeName(cs.templateArgs.get(0).getTypeName()));
+                isValueType = symtab.lookupPrimitive(list) != null;
+              }
+            }
         }
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+        -> {isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
                template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        -> {!isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*((*(<pe>))[<ex>]))"
         -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
                template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
         -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
