@@ -973,7 +973,38 @@ expr
 
 primaryExpression
 @init { int dims = 1; boolean isValueType = true; }
-    :   ^(DOT prim=primaryExpression
+    :   ^(DOT ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) IDENT)
+         -> template(pe={$pe.st}, ex={$ex.st}, id={$IDENT.text}) "(*((*(<pe>))[<ex>])).<id>"
+    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
+            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
+                PointerType p = (PointerType)($pe.start.symbolType);
+                if (p.baseType instanceof ClassSymbol) {
+                    ClassSymbol cs = (ClassSymbol)(p.baseType);
+                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
+                        cs.templateArgs.get(1) instanceof LiteralType) {
+                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
+                        dims = Integer.valueOf(l.literal);
+                    }
+                }
+            }
+            if ($pe.start.symbolType instanceof PointerType) {
+              PointerType pt = (PointerType)($pe.start.symbolType);
+              ClassSymbol cs = (ClassSymbol)(pt.baseType);
+              if (cs != null && cs.templateArgs != null && cs.templateArgs.size() > 0) {
+                List<TypeName> list = new ArrayList<TypeName>();
+                list.add(new TypeName(cs.templateArgs.get(0).getTypeName()));
+                isValueType = symtab.lookupPrimitive(list) != null;
+              }
+            }
+        }
+        -> {/*isValueType && */$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
+        //-> {!isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
+               //template(pe={$pe.st}, ex={$ex.st}) "(*((*(<pe>))[<ex>]))"
+        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
+               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
+        -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
+    |   ^(DOT prim=primaryExpression
             ( IDENT   -> template(id={$IDENT.text}, prim={$prim.st}) "<prim>.<id>"
             | THIS    -> template(prim={$prim.st}) "<prim>.this"
             | SUPER   -> template(prim={$prim.st}) "<prim>.super"
@@ -999,35 +1030,6 @@ primaryExpression
         -> method_call(primary={$pe.st}, generic_types={$gtal.st}, args={$args.st})
     |   explicitConstructorCall
         -> {$explicitConstructorCall.st}
-    |   ^(ARRAY_ELEMENT_ACCESS pe=primaryExpression ex=expressionArrayAccess) {
-            if ($pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType) {
-                PointerType p = (PointerType)($pe.start.symbolType);
-                if (p.baseType instanceof ClassSymbol) {
-                    ClassSymbol cs = (ClassSymbol)(p.baseType);
-                    if (cs.templateArgs != null && cs.templateArgs.size() > 1 &&
-                        cs.templateArgs.get(1) instanceof LiteralType) {
-                        LiteralType l = (LiteralType)(cs.templateArgs.get(1));
-                        dims = Integer.valueOf(l.literal);
-                    }
-                }
-            }
-            if ($pe.start.symbolType instanceof PointerType) {
-              PointerType pt = (PointerType)($pe.start.symbolType);
-              ClassSymbol cs = (ClassSymbol)(pt.baseType);
-              if (cs != null && cs.templateArgs != null && cs.templateArgs.size() > 0) {
-                List<TypeName> list = new ArrayList<TypeName>();
-                list.add(new TypeName(cs.templateArgs.get(0).getTypeName()));
-                isValueType = symtab.lookupPrimitive(list) != null;
-              }
-            }
-        }
-        -> {isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
-               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>))[<ex>]"
-        -> {!isValueType && $pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 1}?
-               template(pe={$pe.st}, ex={$ex.st}) "(*((*(<pe>))[<ex>]))"
-        -> {$pe.start.symbolType != null && $pe.start.symbolType instanceof PointerType && dims == 2}?
-               template(pe={$pe.st}, ex={$ex.st}) "(*(<pe>)).access(<ex>)"
-        -> template(pe={$pe.st}, ex={$ex.st}) "(<pe>)[<ex>]"
     |   literal
         -> {$literal.st}
     |   newExpression[null]
