@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstdio>
+#include <vector>
 
 using std::cerr;
 using std::endl;
@@ -174,6 +175,46 @@ bool test_general_ififo()
   return result;
 }
 
+double timePerOp_general_ififo(int qBaseSize = 256)
+{
+  Queue q = CqsCreate();
+  int qBatchSize = 1<<4;
+  int numIters   = 1<<16;
+
+  std::vector<char> msgs(qBaseSize + qBatchSize);
+  std::vector<unsigned int> prios(qBaseSize + qBatchSize);
+
+  for (int i = 0; i < qBaseSize + qBatchSize; i++)
+      prios[i] = std::rand();
+
+  for (int i = 0; i < qBaseSize; i++)
+      CqsEnqueueGeneral(q, (void*)&msgs[i], CQS_QUEUEING_IFIFO, 8*sizeof(int), &prios[i]);
+
+  double startTime = CmiWallTimer();
+  for (int i = 0; i < numIters; i++)
+  {
+      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+        CqsEnqueueGeneral(q, (void*)&msgs[j], CQS_QUEUEING_IFIFO, 8*sizeof(int), &prios[j]);
+      void *m;
+      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+        CqsDequeue(q, &m);
+  }
+
+  CqsDelete(q);
+  return 1000000 * (CmiWallTimer() - startTime) / (numIters * qBatchSize * 2);
+}
+
+
+bool perftest_general_ififo()
+{
+  CkPrintf("Reporting time per enqueue / dequeue operation for charm's underlying mixed priority queue\n");
+  CkPrintf("\n  Q length     time/op(us)\n");
+  for (int i = 16; i <= 1024; i *= 2)
+    CkPrintf("%10d %15f\n", i, timePerOp_general_ififo(i));
+
+  return true;
+}
+
 #if 0
 // Template for new harness-driven tests
 bool test_foo()
@@ -202,6 +243,7 @@ struct main : public CBase_main
     RUN_TEST(test_enumerate);
     RUN_TEST(test_general_fifo);
     RUN_TEST(test_general_ififo);
+    RUN_TEST(perftest_general_ififo);
 
     if (fail) {
       sprintf(message, "%d/%d tests failed\n", fail, tests);
