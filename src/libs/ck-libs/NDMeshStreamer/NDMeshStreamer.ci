@@ -37,6 +37,12 @@ module NDMeshStreamer {
 	  int dimensionSizes[numDimensions], 
 	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
 	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+
+    entry GroupMeshStreamer(
+          int numDimensions, int dimensionSizes[numDimensions], 
+	  const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+	  int bufferSize, bool yieldFlag = 0, 
+	  double progressPeriodInMs = -1.0);
   };
 
   template<class dtype, class itype>
@@ -46,6 +52,11 @@ module NDMeshStreamer {
 	  int dimensionSizes[numDimensions],
 	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 	  bool yieldFlag = 0, double progressPeriodInMs = -1.0);
+    entry ArrayMeshStreamer(
+	  int numDimensions, int dimensionSizes[numDimensions],
+	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
+	  int bufferSize, bool yieldFlag = 0, 
+	  double progressPeriodInMs = -1.0);
   };
 
 };
