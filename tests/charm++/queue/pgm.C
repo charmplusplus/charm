@@ -8,6 +8,7 @@ using std::endl;
 using std::sprintf;
 
 #include "queueing.h"
+#include "msgq.h"
 #include "main.decl.h"
 
 #define CmiFree free
@@ -205,15 +206,50 @@ double timePerOp_general_ififo(int qBaseSize = 256)
 }
 
 
+double timePerOp_stlQ(int qBaseSize = 256)
+{
+  msgQ<int> q;
+  int qBatchSize = 1<<4;
+  int numIters   = 1<<16;
+
+  std::vector<char> msgs(qBaseSize + qBatchSize);
+  std::vector<unsigned int> prios(qBaseSize + qBatchSize);
+
+  for (int i = 0; i < qBaseSize + qBatchSize; i++)
+      prios[i] = std::rand();
+
+  for (int i = 0; i < qBaseSize; i++)
+      q.enq((msg_t*)&msgs[i], prios[i]);
+
+  double startTime = CmiWallTimer();
+  for (int i = 0; i < numIters; i++)
+  {
+      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+          q.enq((msg_t*)&msgs[j], prios[j]);
+      void *m;
+      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+        q.deq();
+  }
+
+  return 1000000 * (CmiWallTimer() - startTime) / (numIters * qBatchSize * 2);
+}
+
+
 bool perftest_general_ififo()
 {
   CkPrintf("Reporting time per enqueue / dequeue operation for charm's underlying mixed priority queue\n");
   CkPrintf("\n  Q length     time/op(us)\n");
-  for (int i = 16; i <= 1024; i *= 2)
+  for (int i = 16; i <= 2048; i *= 2)
     CkPrintf("%10d %15f\n", i, timePerOp_general_ififo(i));
+
+  printf("Reporting time per enqueue / dequeue operation for an STL version of the same Q functionality\n");
+  printf("\n  Q length     time/op(us)\n");
+  for (int i = 16; i <= 2048; i *= 2)
+    printf("%10d %15f\n", i, timePerOp_stlQ(i));
 
   return true;
 }
+
 
 #if 0
 // Template for new harness-driven tests
