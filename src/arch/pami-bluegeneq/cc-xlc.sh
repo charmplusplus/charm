@@ -1,4 +1,4 @@
-XLC_TYPICAL_PRE=/opt/ibmcmp/vacpp/bg/12.1/
+XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-apr2012/vacpp/bg/12.1
 XLC_PRE=$XLC_TYPICAL_PRE
 
 XLC_TYPICAL_POST=bin/bg
