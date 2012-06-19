@@ -204,6 +204,9 @@
 /* whether std::inserter works */
 #undef CMK_HAS_STD_INSERTER
 
+/* whether std::unordered_map works */
+#undef CMK_HAS_STD_UNORDERED_MAP
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 

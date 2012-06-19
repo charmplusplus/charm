@@ -2692,6 +2692,25 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### check if std::unordered_map is defined #####
+cat > $t <<EOT
+#include <unordered_map>
+
+int foo()
+{
+  std::unordered_map<int,int> myhashtbl;
+  myhashtbl[0] = 42;
+  myhashtbl[1234] = 0;
+  return myhashtbl[1234];
+}
+EOT
+test_cxx "whether std::unordered_map is defined" "ok" "no" "-std=c++0x"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_HAS_STD_UNORDERED_MAP $pass
+_ACEOF
+
+
 
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
