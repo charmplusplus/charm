@@ -110,10 +110,6 @@ namespace CharjArray {
       block = *block_;
     }
 
-    Array(type *block_) {
-      block = block_;
-    }
-
     Array(type& block_) {
       block = &block_;
     }
@@ -131,6 +127,8 @@ namespace CharjArray {
       domain = domain_;
       //if (atype == ROW_MAJOR)
       block = new type[domain.size()];
+      printf("Array: allocating memory, size=%d, base pointer=%p\n",
+             domain.size(), block);
     }
 
     type* raw() { return block; }
@@ -151,17 +149,26 @@ namespace CharjArray {
       return block[atype::access(i, domain)];
     }
 
+    type& access(const int i) {
+      return this->operator[](i);
+    }
+
     type& access(const int i, const int j) {
+      //printf("Array: accessing, index (%d,%d), offset=%d, base pointer=%p\n",
+      //i, j, atype::access(i, j, domain), block);
       return block[atype::access(i, j, domain)];
     }
 
-    type& access(const int i, const Range range) {
-      Domain<2> d(range);
+    type& access(const int i, const Range r) {
+      Domain<1> d(r);
+      //printf("Array: accessing subrange, size = %d, range (%d,%d), base pointer=%p\n",
+      //d.size(), r.start, r.stop, block);
       type* buf = new type[d.size()];
       for (int j = 0; j < d.size(); j++) {
+        //printf("Array: copying element (%d,%d), base pointer=%p\n", i, j, block);
         buf[j] = block[atype::access(i, j, domain)];
       }
-      return buf;
+      return *buf;
     }
 
     const type& access(const int i, const int j) const {
