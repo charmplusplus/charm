@@ -449,6 +449,7 @@ rangeListAccess
 
 rangeExpressionAccess
     :   ^(RANGE_EXPRESSION (ri+=rangeItem)*)
+        -> {$ri.size() > 1}? template(t={$ri}) "Range(<t; separator=\",\">)"
         -> template(t={$ri}) "<t; separator=\",\">"
     ;
 
