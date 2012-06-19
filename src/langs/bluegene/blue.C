@@ -1,6 +1,36 @@
 /** \file: blue.C -- Converse BlueGene Emulator Code
+ *  \addtogroup  Emulator
  *  Emulator written by Gengbin Zheng, gzheng@uiuc.edu on 2/20/2001
+ *
+
+Emulator emulates a taget machine with much large number of nodes/processors.
+In the programmer's view, each node consists of a number of hardware-supported
+threads. Within a node, threads are divided into worker threads and
+communication threads. Communication thread's only job is to check incoming
+messages from the network and put the messages in either a worker's queue or a
+node global queue.  Worker threads repeatedly retrieve messages from the queues
+and execute the handler functions associated with the messages. Emulators
+provides APIs to allow a thread to send a message to another thread. Similar to
+Converse message, the header of each emulator message encodes a handler
+function to be invoked at the destination. Each worker thread continuously
+polls message from its queue for incoming messages. For each message, the
+designated handler function associated with the message is invoked.
+
+A low level API is described in BigSim manual. It is a set of functions
+typically starts with prefix "Bg". It implements functions for setting up the
+emulated machine configurations and message passing. 
+
+In order for Charm++ to port on the emulator:
+1. Cpv => Ckpv,  because emulator processor private variables
+2. Some Cmi functions change to Ck version of the same functions, if there is a Ck version
+2. Some Converse functions need to be manually converted to calling Bg functions (BigSim low level API)
+3. Converse threads need to be specially handled (the scheduling strategy)
+ 
+Out-of-core execution and record-replay are two relatively new features added
+to the emulator.
+
  */
+
  
 #include <stdio.h>
 #include <string.h>
@@ -41,7 +71,7 @@ CpvDeclare(int, numNodes);        /* number of bg nodes on this PE */
 /* emulator node level variables */
 CpvDeclare(SimState, simState);
 
-CpvDeclare(int      , CthResumeBigSimThreadIdx);
+CpvDeclare(int, CthResumeBigSimThreadIdx);
 
 static int arg_argc;
 static char **arg_argv;

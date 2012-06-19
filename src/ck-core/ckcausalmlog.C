@@ -121,10 +121,20 @@ int _maxBufferedDets;
 // stores the incarnation number from every other processor
 CpvDeclare(char *, _incarnation);
 
+// storage for remove determinants header
+CpvDeclare(RemoveDeterminantsHeader *, _removeDetsHeader);
+// storage for store determinants header
+CpvDeclare(StoreDeterminantsHeader *, _storeDetsHeader);
+// storage for the sizes in vector-send to store determinants
+CpvDeclare(int *, _storeDetsSizes);
+// storage for the pointers in vector-send to store determinants
+CpvDeclare(char **, _storeDetsPtrs);
+
 /***** *****/
 
 /***** VARIABLES FOR PARALLEL RECOVERY *****/
-CpvDeclare(CkVec<LocationID *> *, _emigrantRecObjs);
+CpvDeclare(int, _numEmigrantRecObjs);
+CpvDeclare(int, _numImmigrantRecObjs);
 CpvDeclare(CkVec<CkLocRec_local *> *, _immigrantRecObjs);
 /***** *****/
 
@@ -231,6 +241,7 @@ double lastRestart=0;
 //update location globals
 int _receiveLocationHandlerIdx;
 
+
 /** 
  * @brief Initialize message logging data structures and register handlers
  */
@@ -307,18 +318,29 @@ void _messageLoggingInit(){
 	CpvInitialize(char *, _localDets);
 	CpvInitialize((CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *> *),_remoteDets);
 	CpvInitialize(char *, _incarnation);
+	CpvInitialize(RemoveDeterminantsHeader *, _removeDetsHeader);
+	CpvInitialize(StoreDeterminantsHeader *, _storeDetsHeader);
+	CpvInitialize(int *, _storeDetsSizes);
+	CpvInitialize(char **, _storeDetsPtrs);
 	CpvAccess(_localDets) = (char *) CmiAlloc(_maxBufferedDets * sizeof(Determinant));
 	CpvAccess(_remoteDets) = new CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *>(100, 0.4);
 	CpvAccess(_incarnation) = (char *) CmiAlloc(CmiNumPes() * sizeof(int));
 	for(int i=0; i<CmiNumPes(); i++){
 		CpvAccess(_incarnation)[i] = 0;
 	}
+	CpvAccess(_removeDetsHeader) = (RemoveDeterminantsHeader *) CmiAlloc(sizeof(RemoveDeterminantsHeader));
+	CpvAccess(_storeDetsHeader) = (StoreDeterminantsHeader *) CmiAlloc(sizeof(StoreDeterminantsHeader));
+	CpvAccess(_storeDetsSizes) = (int *) CmiAlloc(sizeof(int) * 2);
+	CpvAccess(_storeDetsPtrs) = (char **) CmiAlloc(sizeof(char *) * 2);
 
 	// Cpv variables for parallel recovery
-	CpvInitialize(CkVec<LocationID *> *, _emigrantRecObjs);
-	CpvAccess(_emigrantRecObjs) = new CkVec<LocationID *>;
-	CpvInitialize(CkVec<CkLocRec_local *> *, _immigrantRecObjs);
-	CpvAccess(_immigrantRecObjs) = new CkVec<CkLocRec_local *>;
+	CpvInitialize(int, _numEmigrantRecObjs);
+    CpvAccess(_numEmigrantRecObjs) = 0;
+    CpvInitialize(int, _numImmigrantRecObjs);
+    CpvAccess(_numImmigrantRecObjs) = 0;
+
+    CpvInitialize(CkVec<CkLocRec_local *> *, _immigrantRecObjs);
+    CpvAccess(_immigrantRecObjs) = new CkVec<CkLocRec_local *>;
 
 	//Cpv variables for checkpoint
 	CpvInitialize(StoredCheckpoint *,_storedCheckpointData);
@@ -595,8 +617,8 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	if(env->sender.type == TypeInvalid){
 	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
 	}else{
-		envelope *copyEnv = copyEnvelope(env);
-		env = copyEnv;
+//		envelope *copyEnv = copyEnvelope(env);
+//		env = copyEnv;
 		env->sender = CpvAccess(_currentObj)->mlogData->objID;
 		env->SN = 0;
 	}
@@ -623,7 +645,6 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		DEBUG_RESTART(printf("[%d] Generate Ticket Request to %s from %s PE %d SN %d \n",CkMyPe(),env->recver.toString(recverName),env->sender.toString(senderString),destPE,env->SN));
 	}*/
 		
-	MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 //	CkPackMessage(&(mEntry->env));
 //	traceUserBracketEvent(32,_startTime,CkWallTimer());
 	
@@ -631,7 +652,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 
 	// uses the proper ticketing mechanism for local, team and general messages
 	if(isLocal(destPE)){
-		sendLocalMsg(mEntry);
+		sendLocalMsg(env, _infoIdx);
 	}else{
 		if((teamSize > 1) && isTeamLocal(destPE)){
 
@@ -648,6 +669,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		}
 		
 		// sending the message
+		MlogEntry *mEntry = new MlogEntry(env,destPE,_infoIdx);
 		sendMsg(sender,recver,destPE,mEntry,env->SN,ticketNumber,resend);
 		
 	}
@@ -686,9 +708,6 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	DEBUG_NOW(char senderString[100]);
 
 	int totalSize;
-	StoreDeterminantsHeader header;
-	int sizes[2];
-	char *ptrs[2];
 
 	envelope *env = entry->env;
 	DEBUG_PE(3,printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
@@ -716,19 +735,19 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	if(_numBufferedDets > 0){
 
 		// modifying the actual number of determinants sent in message
-		header.number = _numBufferedDets;
-		header.index = _indexBufferedDets;
-		header.phase = _phaseBufferedDets;
-		header.PE = CmiMyPe();
+		CpvAccess(_storeDetsHeader)->number = _numBufferedDets;
+		CpvAccess(_storeDetsHeader)->index = _indexBufferedDets;
+		CpvAccess(_storeDetsHeader)->phase = _phaseBufferedDets;
+		CpvAccess(_storeDetsHeader)->PE = CmiMyPe();
 	
 		// sending the message
-		sizes[0] = sizeof(StoreDeterminantsHeader);
-		sizes[1] = _numBufferedDets * sizeof(Determinant);
-		ptrs[0] = (char *) &header;
-		ptrs[1] = CpvAccess(_localDets) + (_indexBufferedDets - _numBufferedDets) * sizeof(Determinant);
+		CpvAccess(_storeDetsSizes)[0] = sizeof(StoreDeterminantsHeader);
+		CpvAccess(_storeDetsSizes)[1] = _numBufferedDets * sizeof(Determinant);
+		CpvAccess(_storeDetsPtrs)[0] = (char *) CpvAccess(_storeDetsHeader);
+		CpvAccess(_storeDetsPtrs)[1] = CpvAccess(_localDets) + (_indexBufferedDets - _numBufferedDets) * sizeof(Determinant);
 		DEBUG(CkPrintf("[%d] Sending %d determinants\n",CkMyPe(),_numBufferedDets));
-		CmiSetHandler(&header, _storeDeterminantsHandlerIdx);
-		CmiSyncVectorSend(destPE, 2, &sizes[0], &ptrs[0]);
+		CmiSetHandler(CpvAccess(_storeDetsHeader), _storeDeterminantsHandlerIdx);
+		CmiSyncVectorSend(destPE, 2, CpvAccess(_storeDetsSizes), CpvAccess(_storeDetsPtrs));
 	}
 
 	// updating its message log entry
@@ -762,18 +781,18 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
  * then enqueues the message. If we are recovering, then the message 
  * is enqueued in a delay queue.
  */
-void sendLocalMsg(MlogEntry *entry){
+void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG_PERF(double _startTime=CkWallTimer());
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG(Chare *senderObj = (Chare *)entry->env->sender.getObject();)
+	DEBUG(Chare *senderObj = (Chare *)env->sender.getObject();)
 	DEBUG(char senderString[100]);
 	DEBUG(char recverString[100]);
 	Ticket ticket;
 
-	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),entry->env->SN,entry->env->sender.toString(senderString),entry->env->recver.toString(recverString)));
+	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),env->SN,env->sender.toString(senderString),env->recver.toString(recverString)));
 
 	// getting the receiver local object
-	Chare *recverObj = (Chare *)entry->env->recver.getObject();
+	Chare *recverObj = (Chare *)env->recver.getObject();
 
 	// if receiver object is not NULL, we will ask it for a ticket
 	if(recverObj){
@@ -813,7 +832,7 @@ void sendLocalMsg(MlogEntry *entry){
 		addBufferedDeterminant(entry->env->sender, entry->env->recver, entry->env->SN, entry->env->TN);
 */
 		// sends the local message
-		_skipCldEnqueue(CmiMyPe(),entry->env,entry->_infoIdx);	
+		_skipCldEnqueue(CmiMyPe(),env,_infoIdx);	
 
 		DEBUG_MEM(CmiMemoryCheck());
 	}else{
@@ -860,11 +879,9 @@ void _removeDeterminantsHandler(char *buffer){
  */
 void _storeDeterminantsHandler(char *buffer){
 	StoreDeterminantsHeader *header;
-	RemoveDeterminantsHeader removeHeader;
-	Determinant *detPtr, *det;
+	Determinant *detPtr, det;
 	int i, n, index, phase, destPE;
 	CkVec<Determinant> *vec;
-
 
 	// getting the header from the message and pointing to the first determinant
 	header = (StoreDeterminantsHeader *)buffer;
@@ -879,22 +896,21 @@ void _storeDeterminantsHandler(char *buffer){
 
 	// going through all determinants and storing them into _remoteDets
 	for(i = 0; i < n; i++){
-		det = new Determinant();
-		det->sender = detPtr->sender;
-		det->receiver = detPtr->receiver;
-		det->SN = detPtr->SN;
-		det->TN = detPtr->TN;
+		det.sender = detPtr->sender;
+		det.receiver = detPtr->receiver;
+		det.SN = detPtr->SN;
+		det.TN = detPtr->TN;
 
 		// getting the determinant array
-		vec = CpvAccess(_remoteDets)->get(det->receiver);
+		vec = CpvAccess(_remoteDets)->get(det.receiver);
 		if(vec == NULL){
 			vec = new CkVec<Determinant>();
-			CpvAccess(_remoteDets)->put(det->receiver) = vec;
+			CpvAccess(_remoteDets)->put(det.receiver) = vec;
 		}
 #if COLLECT_STATS_DETS
 #if COLLECT_STATS_DETS_DUP
 		for(int j=0; j<vec->size(); j++){
-			if(isSameDet(&(*vec)[j],det)){
+			if(isSameDet(&(*vec)[j],&det)){
 				numDupDets++;
 				break;
 			}
@@ -904,7 +920,7 @@ void _storeDeterminantsHandler(char *buffer){
 #if COLLECT_STATS_MEMORY
 		storedDetsSize++;
 #endif
-		vec->push_back(*det);
+		vec->push_back(det);
 		detPtr = detPtr++;
 	}
 
@@ -914,10 +930,10 @@ void _storeDeterminantsHandler(char *buffer){
 	CmiFree(buffer);
 
 	// sending the ACK back to the sender
-	removeHeader.index = index;
-	removeHeader.phase = phase;
-	CmiSetHandler(&removeHeader,_removeDeterminantsHandlerIdx);
-	CmiSyncSend(destPE, sizeof(RemoveDeterminantsHeader), (char *)&removeHeader);
+	CpvAccess(_removeDetsHeader)->index = index;
+	CpvAccess(_removeDetsHeader)->phase = phase;
+	CmiSetHandler(CpvAccess(_removeDetsHeader),_removeDeterminantsHandlerIdx);
+	CmiSyncSend(destPE, sizeof(RemoveDeterminantsHeader), (char *)CpvAccess(_removeDetsHeader));
 	
 }
 
@@ -2891,20 +2907,17 @@ public:
 		CkPrintf("[%d] Distributing objects to Processor %d: ",CkMyPe(),*targetPE);
 		idx.print();
 
-		// inserting the emigrant object to the list of emigrant recovery objects
-		// every broadcast message will be sent to these objects
-		LocationID *location = new LocationID();
-		location->idx = idx;
-		location->gid = loc.getManager()->getGroupID();
-		location->PE = *targetPE;
-		CpvAccess(_emigrantRecObjs)->push_back(location);	
+		// incrementing number of emigrant objects
+		CpvAccess(_numEmigrantRecObjs)++;
 			
 		//pack up this location and send it across
 		PUP::sizer psizer;
 		pupLocation(loc,psizer);
-		int totalSize = psizer.size()+CmiMsgHeaderSizeBytes;
+		int totalSize = psizer.size() + sizeof(DistributeObjectMsg);
 		char *msg = (char *)CmiAlloc(totalSize);
-		char *buf = &msg[CmiMsgHeaderSizeBytes];
+		DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)msg;
+		distributeMsg->PE = CkMyPe();
+		char *buf = &msg[sizeof(DistributeObjectMsg)];
 		PUP::toMem pmem(buf);
 		pmem.becomeDeleting();
 		pupLocation(loc,pmem);
@@ -2943,7 +2956,9 @@ void distributeRestartedObjects(){
  */
 void _distributedLocationHandler(char *receivedMsg){
 	printf("Array element received at processor %d after distribution at restart\n",CkMyPe());
-	char *buf = &receivedMsg[CmiMsgHeaderSizeBytes];
+	DistributeObjectMsg *distributeMsg = (DistributeObjectMsg *)receivedMsg;
+	int sourcePE = distributeMsg->PE;
+	char *buf = &receivedMsg[sizeof(DistributeObjectMsg)];
 	PUP::fromMem pmem(buf);
 	CkGroupID gID;
 	CkArrayIndexMax idx;
@@ -2962,6 +2977,7 @@ void _distributedLocationHandler(char *receivedMsg){
 
 	// adding object to the list of immigrant recovery objects
 	CpvAccess(_immigrantRecObjs)->push_back((CkLocRec_local *)rec);
+	CpvAccess(_numImmigrantRecObjs)++;
 	
 	CkVec<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec_local *)rec,eltList);
@@ -2969,6 +2985,7 @@ void _distributedLocationHandler(char *receivedMsg){
 		if(eltList[i]->mlogData->toResumeOrNot == 1 && eltList[i]->mlogData->resumeCount < globalResumeCount){
 			CpvAccess(_currentObj) = eltList[i];
 			eltList[i]->mlogData->immigrantRecFlag = 1;
+			eltList[i]->mlogData->immigrantSourcePE = sourcePE;
 			eltList[i]->ResumeFromSync();
 		}
 	}

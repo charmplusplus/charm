@@ -93,9 +93,18 @@ public class SymbolTable {
     }
 
     public ClassSymbol lookupPrimitive(List<TypeName> type) {
-      if (type.size() == 1)
-        return primitiveTypes.get(type.get(0).name);
-      else
+      if (type.size() == 1) {
+        ClassSymbol cs = primitiveTypes.get(type.get(0).name);
+        if (cs != null && type.get(0).parameters != null && type.get(0).parameters.size() > 0) {
+          if (cs.templateArgs == null)
+            cs.templateArgs = new ArrayList<Type>();
+          for (Type param : type.get(0).parameters) {
+            /*System.out.println("template type param: " + param);*/
+            cs.templateArgs.add(param);
+          }
+        }
+        return cs;
+      } else
         return null;
     }
 

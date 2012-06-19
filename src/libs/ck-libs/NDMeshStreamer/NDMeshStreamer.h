@@ -17,7 +17,6 @@
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
-// #define STREAMER_EXPERIMENTAL
 // #define STREAMER_VERBOSE_OUTPUT
 #define STAGED_COMPLETION
 
@@ -122,10 +121,6 @@ private:
   double progressPeriodInMs_; 
   bool isPeriodicFlushEnabled_; 
   bool hasSentRecently_;
-#ifdef STREAMER_EXPERIMENTAL
-  bool hasSentPreviously_;
-  bool immediateMode_; 
-#endif
   MeshStreamerMessage<dtype> ***dataBuffers_;
 
   CProxy_CompletionDetector detector_;
@@ -172,7 +167,7 @@ protected:
 public:
 
   MeshStreamer(int maxNumDataItemsBuffered, int numDimensions, 
-               int *dimensionSizes,
+               int *dimensionSizes, int bufferSize,
                bool yieldFlag = 0, double progressPeriodInMs = -1.0);
   ~MeshStreamer();
 
@@ -270,12 +265,14 @@ template <class dtype>
 MeshStreamer<dtype>::MeshStreamer(
 		     int maxNumDataItemsBuffered, int numDimensions, 
 		     int *dimensionSizes, 
+                     int bufferSize,
 		     bool yieldFlag, 
                      double progressPeriodInMs)
  :numDimensions_(numDimensions), 
   maxNumDataItemsBuffered_(maxNumDataItemsBuffered), 
   yieldFlag_(yieldFlag), 
-  progressPeriodInMs_(progressPeriodInMs)
+  progressPeriodInMs_(progressPeriodInMs), 
+  bufferSize_(bufferSize)
 {
 
   int sumAlongAllDimensions = 0;   
@@ -292,10 +289,19 @@ MeshStreamer<dtype>::MeshStreamer(
       combinedDimensionSizes_[i] * individualDimensionSizes_[i];
   }
 
-  // except for personalized messages, the buffers for dimensions with the 
-  //   same index as the sender's are not used
-  bufferSize_ = OVERALLOCATION_FACTOR * maxNumDataItemsBuffered_ 
-    / (sumAlongAllDimensions - numDimensions_ + 1); 
+  // a bufferSize input of 0 indicates it should be calculated by the library
+  if (bufferSize_ == 0) {
+    CkAssert(maxNumDataItemsBuffered_ > 0);
+    // except for personalized messages, the buffers for dimensions with the 
+    //   same index as the sender's are not used
+    bufferSize_ = OVERALLOCATION_FACTOR * maxNumDataItemsBuffered_ 
+      / (sumAlongAllDimensions - numDimensions_ + 1); 
+  }
+  else {
+    maxNumDataItemsBuffered_ = 
+      bufferSize_ * (sumAlongAllDimensions - numDimensions_ + 1);
+  }
+
   if (bufferSize_ <= 0) {
     bufferSize_ = 1; 
     CkPrintf("Argument maxNumDataItemsBuffered to MeshStreamer constructor "
@@ -326,9 +332,6 @@ MeshStreamer<dtype>::MeshStreamer(
 
   isPeriodicFlushEnabled_ = false; 
   detectorLocalObj_ = NULL;
-#ifdef STREAMER_EXPERIMENTAL
-  immediateMode_ = false; 
-#endif
 
 #ifdef CACHE_LOCATIONS
   cachedLocations_ = new MeshLocation[numMembers_];
@@ -572,10 +575,6 @@ void MeshStreamer<dtype>::associateCallback(
 			  CProxy_CompletionDetector detector, 
 			  int prio) {
 
-#ifdef STREAMER_EXPERIMENTAL
-  immediateMode_ = false;
-  hasSentPreviously_ = false; 
-#endif
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
@@ -634,12 +633,6 @@ void MeshStreamer<dtype>::receiveAlongRoute(MeshStreamerMessage<dtype> *msg) {
     }
     lastDestinationPe = destinationPe; 
   }
-
-#ifdef STREAMER_EXPERIMENTAL
-  if (immediateMode_) {
-    flushToIntermediateDestinations();
-  }
-#endif
 
 #ifdef STAGED_COMPLETION
   markMessageReceived(msg->dimension, msg->finalMsgCount); 
@@ -852,20 +845,6 @@ void MeshStreamer<dtype>::flushDirect(){
     
   }
 
-#ifdef STREAMER_EXPERIMENTAL
-  // switch into immediate sending mode when 
-  // number of items buffered is small; avoid doing the switch 
-  // at the beginning before any sending has taken place
-  if (hasSentPreviously_ && 
-      (numDataItemsBuffered_ < .1 * maxNumDataItemsBuffered_)) {
-    immediateMode_ = true; 
-  } 
-
-  if (!hasSentPreviously_) {
-    hasSentPreviously_ = hasSentRecently_; 
-  }
-#endif
-
   hasSentRecently_ = false; 
 
 }
@@ -940,8 +919,20 @@ public:
 		    int *dimensionSizes, 
 		    const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
 		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
-   :MeshStreamer<dtype>(maxNumDataItemsBuffered, numDimensions, dimensionSizes, 
-                         yieldFlag, progressPeriodInMs) 
+   :MeshStreamer<dtype>(maxNumDataItemsBuffered, numDimensions, dimensionSizes,
+                        0, yieldFlag, progressPeriodInMs) 
+  {
+    clientProxy_ = clientProxy; 
+    clientObj_ = 
+      ((MeshStreamerGroupClient<dtype> *)CkLocalBranch(clientProxy_));
+  }
+
+  GroupMeshStreamer(int numDimensions, int *dimensionSizes, 
+		    const CProxy_MeshStreamerGroupClient<dtype> &clientProxy,
+		    int bufferSize, bool yieldFlag = 0, 
+                    double progressPeriodInMs = -1.0)
+   :MeshStreamer<dtype>(0, numDimensions, dimensionSizes, bufferSize, 
+                        yieldFlag, progressPeriodInMs) 
   {
     clientProxy_ = clientProxy; 
     clientObj_ = 
@@ -1048,6 +1039,17 @@ private:
 #endif
   }
 
+  void commonInit() {
+#ifdef CACHE_ARRAY_METADATA
+    numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
+    clientObjs_ = new MeshStreamerArrayClient<dtype>*[numArrayElements_];
+    destinationPes_ = new int[numArrayElements_];
+    isCachedArrayMetadata_ = new bool[numArrayElements_];
+    std::fill(isCachedArrayMetadata_, 
+	      isCachedArrayMetadata_ + numArrayElements_, false);
+#endif    
+  }
+
 public:
 
   struct DataItemHandle {
@@ -1060,20 +1062,26 @@ public:
                     const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 		    bool yieldFlag = 0, double progressPeriodInMs = -1.0)
     :MeshStreamer<ArrayDataItem<dtype, itype> >(
-      maxNumDataItemsBuffered, numDimensions, dimensionSizes, yieldFlag, 
-      progressPeriodInMs) 
+                  maxNumDataItemsBuffered, numDimensions, dimensionSizes, 
+                  0, yieldFlag, progressPeriodInMs) 
   {
     clientProxy_ = clientProxy; 
     clientArrayMgr_ = clientProxy_.ckLocalBranch();
+    commonInit();
+  }
 
-#ifdef CACHE_ARRAY_METADATA
-    numArrayElements_ = (clientArrayMgr_->getNumInitial()).data()[0];
-    clientObjs_ = new MeshStreamerArrayClient<dtype>*[numArrayElements_];
-    destinationPes_ = new int[numArrayElements_];
-    isCachedArrayMetadata_ = new bool[numArrayElements_];
-    std::fill(isCachedArrayMetadata_, 
-	      isCachedArrayMetadata_ + numArrayElements_, false);
-#endif
+  ArrayMeshStreamer(int numDimensions, int *dimensionSizes, 
+		    const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
+		    int bufferSize, bool yieldFlag = 0, 
+                    double progressPeriodInMs = -1.0)
+    :MeshStreamer<ArrayDataItem<dtype,itype> >(
+                  0, numDimensions, dimensionSizes, 
+                  bufferSize, yieldFlag, progressPeriodInMs) 
+  {
+    clientProxy_ = clientProxy; 
+    clientArrayMgr_ = clientProxy_.ckLocalBranch();
+    commonInit();
+
   }
 
   ~ArrayMeshStreamer() {

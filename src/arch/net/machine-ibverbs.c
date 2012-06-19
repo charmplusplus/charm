@@ -279,7 +279,7 @@ struct infiContext {
 	int insideProcessBufferedBcasts;
 };
 
-static struct infiContext *context;
+static struct infiContext *context = NULL;
 
 
 
@@ -454,6 +454,7 @@ static void CmiMachineInit(char **argv){
 	int calcMaxSize;
 	infiPacket *pktPtrs;
 	struct infiRdmaPacket **rdmaPktPtrs;
+        int num_devices, idev;
 
 	MACHSTATE(3,"CmiMachineInit {");
 	MACHSTATE2(3,"_Cmi_numnodes %d CmiNumNodes() %d",_Cmi_numnodes,CmiNumNodes());
@@ -461,29 +462,46 @@ static void CmiMachineInit(char **argv){
 	
 	//TODO: make the device and ibport configureable by commandline parameter
 	//Check example for how to do that
-	devList =  ibv_get_device_list(NULL);
+	devList =  ibv_get_device_list(&num_devices);
+        CmiAssert(num_devices > 0);
 	CmiAssert(devList != NULL);
 
-	dev = *devList;
-	CmiAssert(dev != NULL);
-
-	ibPort=1;
-
-	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
-
 	context = (struct infiContext *)malloc(sizeof(struct infiContext));
-	
 	MACHSTATE1(3,"context allocated %p",context);
 	
 	//localAddr will store the local addresses of all the qps
 	context->localAddr = (struct infiAddr *)malloc(sizeof(struct infiAddr)*_Cmi_numnodes);
-	
 	MACHSTATE1(3,"context->localAddr allocated %p",context->localAddr);
-	
-	context->ibPort = ibPort;
+
+        idev = 0;
+
+        // try all devices, can't assume device 0 is IB, it may be ethernet
+loop:
+	dev = devList[idev];
+	CmiAssert(dev != NULL);
+
+	MACHSTATE1(3,"device name %s",ibv_get_device_name(dev));
+
 	//the context for this infiniband device 
 	context->context = ibv_open_device(dev);
 	CmiAssert(context->context != NULL);
+
+        // test ibPort
+        int MAXPORT = 8;
+        for (ibPort = 1; ibPort < MAXPORT; ibPort++) {
+          struct ibv_port_attr attr;
+          if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
+          if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  break;
+          
+        }
+        if (ibPort == MAXPORT) {
+          if (++idev == num_devices)
+            CmiAbort("No valid IB port found!");
+          else
+            goto loop;
+        }
+	context->ibPort = ibPort;
+	MACHSTATE1(3,"use port %d", ibPort);
 	
 	MACHSTATE1(3,"device opened %p",context->context);
 

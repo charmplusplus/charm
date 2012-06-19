@@ -676,7 +676,7 @@ entryPrimaryExpression
     |   ^(METHOD_CALL primaryExpression genericTypeArgumentList? arguments)
     |   ^(ENTRY_METHOD_CALL primaryExpression genericTypeArgumentList? entryArguments)
     |   explicitConstructorCall
-    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression expression)
+    |   ^(ARRAY_ELEMENT_ACCESS primaryExpression domainExpression)
     |   literal
     |   newExpression
         ->  ^(POINTER_DEREFERENCE newExpression)

@@ -10,6 +10,7 @@
 #endif
 
 CpvExtern(Chare *,_currentObj);
+CpvExtern(int, _numImmigrantRecObjs);
 
 //states of a ticket sent as a reply to a request
 #define NEW_TICKET 1
@@ -208,6 +209,7 @@ public:
 	int toResumeOrNot;
 	int resumeCount;
 	int immigrantRecFlag;
+	int immigrantSourcePE;
 
 private:
 
@@ -283,16 +285,6 @@ public:
 };
 
 /**
- * @brief Class that represents the location of an array element.
- */
-class LocationID{
-public:
-	CkArrayIndexMax idx;
-	CkGroupID gid;
-	int PE;
-};
-
-/**
  * @brief
  */
 class StoredCheckpoint{
@@ -364,6 +356,12 @@ typedef struct{
 	int PE;
 	int dataSize;
 } CheckPointDataMsg;
+
+typedef struct{
+    char header[CmiMsgHeaderSizeBytes];
+    int PE;
+} DistributeObjectMsg;
+
 
 /*typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
@@ -515,7 +513,7 @@ void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid);
 void sendNodeGroupMsg(envelope *env,int destNode,int _infoIdx);
 void sendCommonMsg(CkObjID &recver,envelope *env,int destPE,int _infoIdx);
 void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend);
-void sendLocalMsg(MlogEntry *entry);
+void sendLocalMsg(envelope *env, int _infoIdx);
 
 //handler functions
 void _ticketRequestHandler(TicketRequest *);

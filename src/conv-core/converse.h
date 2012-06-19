@@ -1699,8 +1699,8 @@ extern int _immRunning;
   __asm__ __volatile__("fetchadd4.rel %0=[%1],-1": "=r" (someInt_private): "r"(&someInt) :"memory"); }
 #define CmiMemoryAtomicFetchAndInc(input,output) __asm__ __volatile__("fetchadd4.rel %0=[%1],1": "=r" (output): "r"(&input) :"memory")
 #elif CMK_PPC_ASM
-#define CmiMemoryReadFence()               __asm__ __volatile__("eieio":::"memory")
-#define CmiMemoryWriteFence()              __asm__ __volatile__("eieio":::"memory")
+#define CmiMemoryReadFence()               __asm__ __volatile__("sync":::"memory")
+#define CmiMemoryWriteFence()              __asm__ __volatile__("sync":::"memory")
 #define CmiMemoryAtomicIncrement(someInt)   { int someInt_private; \
      __asm__ __volatile__ (      \
         "loop%=:\n\t"       /* repeat until this succeeds */    \

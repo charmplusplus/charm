@@ -15,8 +15,7 @@ fi
 BGQ_BIN=$BGQ_FLOOR/gnu-linux/bin
 BGQ_INC="-I$BGQ_INSTALL/comm/sys/include -I$BGQ_INSTALL/spi/include -I$BGQ_INSTALL -I$BGQ_INSTALL/spi/include/kernel/cnk/"
 
-BGQ_LIB="-L$BGQ_INSTALL/comm/sys/lib -lpami -L$BGQ_INSTALL/spi/lib -lSPI -lSPI_cnk -lpthread -lrt" 
-#"-pg -L/bghome/boger/sandbox/src-110606/bgq/work/gnu-linux/powerpc64-bgq-linux/lib -lc"
+BGQ_LIB="-L$BGQ_INSTALL/comm/sys-fast/lib -lpami -L$BGQ_INSTALL/spi/lib -lSPI -lSPI_cnk -lpthread -lrt" 
 
 # test if compiler binary present
 if test ! -x $BGQ_BIN/powerpc64-bgq-linux-g++

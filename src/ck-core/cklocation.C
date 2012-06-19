@@ -1851,15 +1851,18 @@ void CkLocMgr::flushAllRecs(void)
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 void CkLocMgr::callForAllRecords(CkLocFn fnPointer,CkArray *arr,void *data){
-    void *objp;
-    void *keyp;
+	void *objp;
+	void *keyp;
 
-    CkHashtableIterator *it = hash.iterator();
-  while (NULL!=(objp=it->next(&keyp))) {
-    CkLocRec *rec=*(CkLocRec **)objp;
-    CkArrayIndex &idx=*(CkArrayIndex *)keyp;
-        fnPointer(arr,data,rec,&idx);
-    }
+	CkHashtableIterator *it = hash.iterator();
+	while (NULL!=(objp=it->next(&keyp))) {
+		CkLocRec *rec=*(CkLocRec **)objp;
+		CkArrayIndex &idx=*(CkArrayIndex *)keyp;
+		fnPointer(arr,data,rec,&idx);
+	}
+
+	// releasing iterator memory
+	delete it;
 }
 #endif
 
@@ -1969,6 +1972,9 @@ void CkLocMgr::pup(PUP::er &p){
         p | count;
         DEBUG(CmiPrintf("[%d] Packing Locmgr %d has %d home elements\n",CmiMyPe(),thisgroup.idx,count));
 
+		// releasing iterator memory
+		delete it;
+
         it = hash.iterator();
       while (NULL!=(objp=it->next(&keyp))) {
       CkLocRec *rec=*(CkLocRec **)objp;
@@ -1985,6 +1991,9 @@ void CkLocMgr::pup(PUP::er &p){
             }
         }
         CmiAssert(count == count1);
+
+		// releasing iterator memory
+		delete it;
 
 #endif
 

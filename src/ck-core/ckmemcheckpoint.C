@@ -1117,9 +1117,10 @@ static void askProcDataHandler(char *msg)
 #if CMK_MEM_CHECKPOINT
     int diePe = *(int *)(msg+CmiMsgHeaderSizeBytes);
     CkPrintf("[%d] restartBcastHandler called with '%d' cur_restart_phase:%d at time %f.\n",CmiMyPe(),diePe, CpvAccess(_curRestartPhase), CkWallTimer());
-    if (CpvAccess(procChkptBuf) == NULL) 
+    if (CpvAccess(procChkptBuf) == NULL)  {
       CkPrintf("[%d] no checkpoint found for processor %d. This could be due to a crash before the first checkpointing.\n", CkMyPe(), diePe);
-    CmiAssert(CpvAccess(procChkptBuf)!=NULL);
+      CkAbort("no checkpoint found");
+    }
     envelope *env = (envelope *)(UsrToEnv(CpvAccess(procChkptBuf)));
     CmiAssert(CpvAccess(procChkptBuf)->pe == diePe);
 
@@ -1410,6 +1411,7 @@ void killLocal(void *_dummy,double curWallTime){
 void readKillFile(){
         FILE *fp=fopen(killFile,"r");
         if(!fp){
+                printf("[%d] Cannot open file %s (MEMCKPT) \n",CkMyPe(),killFile);
                 return;
         }
         int proc;
