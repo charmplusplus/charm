@@ -110,6 +110,14 @@ namespace CharjArray {
       block = *block_;
     }
 
+    Array(type *block_) {
+      block = block_;
+    }
+
+    Array(type& block_) {
+      block = &block_;
+    }
+
     Array() : ref_parent(0) {
 
     }
@@ -145,6 +153,15 @@ namespace CharjArray {
 
     type& access(const int i, const int j) {
       return block[atype::access(i, j, domain)];
+    }
+
+    type& access(const int i, const Range range) {
+      Domain<2> d(range);
+      type* buf = new type[d.size()];
+      for (int j = 0; j < d.size(); j++) {
+        buf[j] = block[atype::access(i, j, domain)];
+      }
+      return buf;
     }
 
     const type& access(const int i, const int j) const {
