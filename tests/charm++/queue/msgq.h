@@ -3,8 +3,13 @@
 
 #include <deque>
 #include <queue>
-#include <map>
 #include <ostream>
+
+#if CMK_HAS_STD_UNORDERED_MAP
+#include <unordered_map>
+#else
+#include <map>
+#endif
 
 typedef void msg_t;
 
@@ -46,7 +51,11 @@ class msgQ
 
     private:
         size_t qSize;
+        #if CMK_HAS_STD_UNORDERED_MAP
+        std::unordered_map<prio_t, std::deque<const msg_t*> > msgmap;
+        #else
         std::map<prio_t, std::deque<const msg_t*> > msgmap;
+        #endif
         std::priority_queue<prio_t, std::vector<prio_t>, std::greater<prio_t> > prios;
 };
 
@@ -70,7 +79,6 @@ void msgQ<P>::enq(const msg_t *msg
         q.push_front(msg);
     // Increment the total number of msgs in this container
     qSize++;
-
 }
 
 

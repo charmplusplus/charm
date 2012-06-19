@@ -237,6 +237,12 @@ double timePerOp_stlQ(int qBaseSize = 256)
 
 bool perftest_general_ififo()
 {
+  #if CMK_HAS_STD_UNORDERED_MAP
+  CkPrintf("The STL variant of the msg q is using a std::unordered_map\n");
+  #else
+  CkPrintf("The STL variant of the msg q is using a std::map\n");
+  #endif
+
   CkPrintf("Reporting time per enqueue / dequeue operation for charm's underlying mixed priority queue\n");
   CkPrintf("\n  Q length     time/op(us)\n");
   for (int i = 16; i <= 2048; i *= 2)
