@@ -92,6 +92,8 @@ typeDeclaration returns [ClassSymbol sym]
                 classScopeDeclaration*)
     |   ^('interface' IDENT (^(EXTENDS type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    |   ^(MESSAGE IDENT messageScopeDeclaration*)
+    |   ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
     ;
 
 classType
@@ -110,7 +112,12 @@ chareType
 enumConstant
     :   ^(IDENT arguments?)
     ;
-    
+
+messageScopeDeclaration
+    :   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+    ;
+
 classScopeDeclaration
     :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
             type IDENT formalParameterList domainExpression? b=block)
@@ -212,7 +219,13 @@ accessModifierList
     ;
 
 charjModifierList
-    :   ^(CHARJ_MODIFIER_LIST charjModifier*)
+@init { boolean ctor = false; }
+    :   ^(CHARJ_MODIFIER_LIST charjModifier* {
+            // Non contructor entry methods are potential reduction targets
+            ctor = $CHARJ_MODIFIER_LIST.hasParentOfType(ENTRY_CONSTRUCTOR_DECL);
+        })
+        -> {ctor}? ^(CHARJ_MODIFIER_LIST charjModifier* )
+        -> ^(CHARJ_MODIFIER_LIST charjModifier* REDUCTIONTARGET)
     ;
 
 otherModifierList
@@ -235,6 +248,8 @@ charjModifier
     :   ENTRY
     |   SDAGENTRY
     |   TRACED
+    |   ACCELERATED
+    |   THREADED
     ;
 
 otherModifier
@@ -264,6 +279,7 @@ nonArraySectionObjectType returns [Type type]
 	|   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	^(MESSAGE_TYPE qualifiedTypeIdent)
 	|	VOID
 	;	
 
@@ -276,6 +292,7 @@ objectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	^(MESSAGE_TYPE qualifiedTypeIdent)
 	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
@@ -284,6 +301,7 @@ entryArgObjectType returns [ClassSymbol type]
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+    |   ^(MESSAGE_TYPE qualifiedTypeIdent)
     ;
 
 qualifiedTypeIdent returns [ClassSymbol type]
@@ -419,6 +437,7 @@ nonBlockStatement returns [boolean sdag]
     |   ^(PRINTLN expression*)
     |   ^(EXIT expression?)
     |   EXITALL
+    |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
 switchCaseLabel
@@ -495,6 +514,7 @@ primaryExpression returns [Type type]
                 )
         )
 		-> { $pe.type instanceof PointerType }? ^(ARROW primaryExpression IDENT? THIS? SUPER?)
+		-> { $pe.type instanceof MessageType }? ^(ARROW primaryExpression IDENT? THIS? SUPER?)
 		->										^(DOT primaryExpression IDENT? THIS? SUPER?)
     |   parenthesizedExpression
     |   IDENT

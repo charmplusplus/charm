@@ -49,7 +49,9 @@ enterMethod
             {
                 if (currentMethod.isEntry) {
                     Type argType = (Type)$argid.def.type;
-                    currentMethod.addEntryArg(argType.getTypeName(), $argid.text);
+                    if (argType instanceof PointerType) {
+                        currentMethod.addEntryArg(argType.getTypeName(), $argid.text);
+                    }
                 }
             }
             ))*)
@@ -255,6 +257,7 @@ primaryExpression returns [Type type]
             if (et instanceof ProxyType) et = ((ProxyType)et).baseType;
             if (et instanceof PointerType) et = ((PointerType)et).baseType;
 			if (et instanceof ProxySectionType) et = ((ProxySectionType)et).baseType;
+			if (et instanceof MessageType) et = ((MessageType)et).baseType;
             ClassSymbol cxt = (ClassSymbol)et;
             Symbol s;
             if (cxt == null) {
@@ -409,6 +412,8 @@ type returns [Type sym]
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(PROXY_TYPE { scope = $PROXY_TYPE.scope; proxy = true; }
             ^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
+	|	^(MESSAGE_TYPE { scope = $MESSAGE_TYPE.scope; pointer = true; }
+			^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
 	|	^(ARRAY_SECTION_TYPE { scope = $ARRAY_SECTION_TYPE.scope; proxySection = true; }
 			^(QUALIFIED_TYPE_IDENT (^(IDENT {typeText.add(new TypeName($IDENT.text));} .*))+) .*)
     |   ^(POINTER_TYPE { scope = $POINTER_TYPE.scope; pointer = true; }

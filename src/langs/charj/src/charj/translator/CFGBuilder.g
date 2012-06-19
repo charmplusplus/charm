@@ -198,6 +198,8 @@ type
             ^(QUALIFIED_TYPE_IDENT (^(IDENT .*))+) .*)
 	|	^(ARRAY_SECTION_TYPE 
 			^(QUALIFIED_TYPE_IDENT (^(IDENT .*))+) .*)
+	|	^(MESSAGE_TYPE 
+			^(QUALIFIED_TYPE_IDENT (^(IDENT .*))+) .*)
     |   ^(POINTER_TYPE 
             ^(QUALIFIED_TYPE_IDENT (^(IDENT (^(TEMPLATE_INST
                         (t1=type | lit1=literalVal)*))?))+) .*)

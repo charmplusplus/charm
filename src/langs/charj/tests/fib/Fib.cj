@@ -1,10 +1,12 @@
 
 readonly Main@ main;
 
+extern atoi;
+
 public mainchare Main {
     int n;
 
-    public entry Main(CkArgMsg m) {
+    public entry Main(CkArgMsg[~]@ m) {
         if (m.argc < 2) n = 16;
         else n = atoi(m.argv[1]);
         main = thisProxy;

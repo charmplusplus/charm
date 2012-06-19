@@ -2,12 +2,12 @@ group Charj;
 
 charjSource_ci(basename, pd, imports, types, ros, debug) ::=
 <<
+mainmodule <basename> {
 
 // interface for <basename>
 <imports; separator="\n">
 <types; separator="\n\n">
 
-module <basename>_readonly {
 <if(ros)>
     <charjReadonly_ci(pds = pd, ros = ros)>
 <endif>
@@ -18,10 +18,10 @@ module <basename>_readonly {
 
 charjReadonly_ci(pds, ros) ::=
 <<
-<if(first(pds))>namespace <first(pds)>
-{
-    <charjReadonly_ci(pds = rest(pds), ros = ros)>
-} // namespace <first(pds)>
+//<if(first(pds))>namespace <first(pds)>
+//{
+<charjReadonly_ci(pds = rest(pds), ros = ros)>
+//} // namespace <first(pds)>
 <else>
 <ros; separator="\n">
 <endif>
@@ -39,12 +39,13 @@ charjSource_h(basename, pd, imports, types, ros, debug) ::=
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
+#include "<basename>.decl.h"
 <imports; separator="\n">
 <types; separator="\n\n">
 <if(ros)>
 /* Readonly variables */
 <readonlys_h(pds = pd, ros = ros)>
-#include "<basename>_readonly.decl.h"
+//#include "<basename>_readonly.decl.h"
 <endif>
 
 
@@ -66,6 +67,7 @@ charjSource_cc(basename, pd, imports, types, ros, debug) ::=
 <endif>
 
 
+#include "<basename>.def.h"
 >>
 
 readonlys_h(pds, ros) ::=
@@ -95,7 +97,7 @@ readonlys_cc_inner(pds, ros, basename) ::=
 readonlys_cc(pds, ros, basename) ::=
 <<
 <readonlys_cc_inner(pds = pds, ros = ros, basename = basename)>
-#include "<basename>_readonly.def.h"
+//#include "<basename>_readonly.def.h"
 
 >>
 
@@ -139,6 +141,41 @@ type_epilogue_h(sym) ::=
 chare_epilogue_h(sym) ::=
 <<
 <type_epilogue_h(sym)>
+>>
+
+message_h(basename, ident, msds) ::=
+<<
+//#include "<basename>.decl.h"
+class <ident> : public CMessage_<ident>
+{
+    <msds>
+};
+>>
+
+message_ci(ident, msds) ::=
+<<
+message <ident>
+{
+    <msds>
+};
+>>
+
+multicastMessage_h(basename, ident, msds) ::=
+<<
+#include "ckmulticast.h"
+//#include "<basename>.decl.h"
+class <ident> : public CkMcastBaseMsg, public CMessage_<ident>
+{
+    <msds>
+};
+>>
+
+multicastMessage_ci(ident, msds) ::=
+<<
+message <ident>
+{
+    <msds>
+};
 >>
 
 classDeclaration_h(sym, ident, ext, csds, tident, needsPupInit) ::=
@@ -258,9 +295,9 @@ CProxySection_<initSym.classType> <classSym.name>::<initSym.methodName>(CProxy_<
 
 chareDeclaration_cc(sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
 <<
-#include "<ident>.decl.h"
+//#include "<ident>.decl.h"
 <chareDeclaration_cc_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, pupers = pupers, pupInits = pupInits, needsMigration = needsMigration, inits = inits)>
-#include "<ident>.def.h"
+//#include "<ident>.def.h"
 >>
 
 chareDeclaration_cc_cont(pds, sym, ident, ext, csds, pupers, pupInits, needsMigration, inits) ::=
@@ -343,7 +380,7 @@ void <sym.name>::_initTrace() {
 chareDeclaration_h(sym, ident, ext, csds, needsPupInit, needsMigration) ::=
 <<
 <chare_preamble_h(sym)>
-#include "<ident>.decl.h"
+//#include "<ident>.decl.h"
 <chareDeclaration_h_cont(pds = sym.packageNames, sym = sym, ident = ident, ext = ext, csds = csds, needsPupInit = needsPupInit, needsMigration = needsMigration)>
 <chare_epilogue_h(sym)>
 >>
@@ -385,17 +422,17 @@ class <ident>: public CBase_<ident> {
 
 chareDeclaration_ci(basename, sym, chareType, arrayDim, ident, ext, csds, entries) ::=
 <<
-<if(sym.isMainChare)>main<endif>module <ident> {
+//<if(sym.isMainChare)>main<endif>module <ident> {
 <if(ext)>
-    extern module <ext>;
+    //extern module <ext>;
 <endif>
-    <sym.Externs:{ext| extern module <ext>;
+    //<sym.Externs:{ext| extern module <ext>;
 <if(sym.isMainChare)>
-extern module <basename>_readonly;
+//extern module <basename>_readonly;
 <endif>
-    }>
+//    }>
     <chareDeclaration_ci_cont(pds = sym.packageNames, chareType = chareType, arrayDim = arrayDim, ident = ident, ext = ext, csds = csds, entries = entries)>
-}
+//}
 >>
 
 
@@ -620,7 +657,7 @@ mod_list_h(accmods, localmods, charjmods, othermods) ::=
 
 mod_list_ci(accmods, localmods, charjmods, othermods) ::=
 <<
-<if(charjmods)><charjmods; separator=" "> <endif>
+entry <if(charjmods)>[<charjmods; separator=", ">] <endif>
 >>
 
 local_var_decl(modList, type, declList, domainExps) ::=
@@ -809,6 +846,11 @@ exit(expr) ::=
 exitall() ::=
 <<
 CkExit();
+>>
+
+contribute(data, type, target) ::=
+<<
+    contribute(<data>, CkCallback(CkReductionTarget(<type>)), <target>);
 >>
 
 range_constructor(range, others, len) ::=

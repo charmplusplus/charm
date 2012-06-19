@@ -82,6 +82,8 @@ typeDeclaration
         )
     |   ^(INTERFACE IDENT (^('extends' type+))?  interfaceScopeDeclaration*)
     |   ^(ENUM IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
+    |   ^(MESSAGE IDENT messageScopeDeclaration*)
+    |   ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
     ;
 
 chareArrayType
@@ -98,6 +100,22 @@ chareType
 enumConstant
     :   ^(IDENT arguments?)
     ;
+
+messageScopeDeclaration
+    :   ^(PRIMITIVE_VAR_DECLARATION m = modifierList? simpleType variableDeclaratorList)
+        -> {$modifierList.tree != null}? ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
+        -> ^(PRIMITIVE_VAR_DECLARATION 
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            simpleType variableDeclaratorList)
+    |   ^(OBJECT_VAR_DECLARATION m = modifierList? objectType variableDeclaratorList)
+        -> {$modifierList.tree != null}? ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
+        -> ^(OBJECT_VAR_DECLARATION  
+            ^(MODIFIER_LIST ^(ACCESS_MODIFIER_LIST 'private') ^(LOCAL_MODIFIER_LIST) 
+                ^(CHARJ_MODIFIER_LIST) ^(OTHER_MODIFIER_LIST))
+            objectType variableDeclaratorList)
+    ;
+
     
 classScopeDeclaration
     :   ^(d=FUNCTION_METHOD_DECL m=modifierList? g=genericTypeParameterList? 
@@ -218,6 +236,8 @@ charjModifier returns [boolean isEntry]
     :   ENTRY { $isEntry = true; }
     |   SDAGENTRY { $isEntry = true; }
     |   TRACED
+    |   ACCELERATED
+    |   THREADED
     ;
 
 otherModifier
@@ -255,6 +275,7 @@ objectType
     |   ^(PROXY_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(REFERENCE_TYPE qualifiedTypeIdent domainExpression?)
     |   ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
+	|	^(MESSAGE_TYPE qualifiedTypeIdent)
 	|	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression?)
     ;
 
@@ -373,6 +394,7 @@ nonBlockStatement
     |   ^(PRINTLN expression*)
     |   ^(EXIT expression?)
     |   EXITALL
+    |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
 switchCaseLabel

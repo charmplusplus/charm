@@ -4,7 +4,7 @@
 #define VDW_B            (1.031093844 * pow(10.0, -77))
 
 #define ENERGY_VAR        (1.0 * pow(10.0,-5))
-#powdefine PARTICLES_PER_CELL   300
+#define PARTICLES_PER_CELL   300
 
 #define DEFAULT_DELTA         1// interact femtoseconds
 
@@ -15,48 +15,51 @@
 #define KAWAY_X               1
 #define KAWAY_Y               1
 #define KAWAY_Z               1
-#define NBRS_X              (2*KAWAY_X+1)
-#define NBRS_Y            (2*KAWAY_YWAY_Y+1)
-#define NBRS_Z            (2*KAWAY_Z+1)
+#define NBRS_X                (2*KAWAY_X+1)
+#define NBRS_Y                  (2*KAWAY_Y+1)
+#define NBRS_Z                  (2*KAWAY_Z+1)
 #define NUM_NEIGHBORS        (NBRS_X * NBRS_Y * NBRS_Z)
 
-#define CELLARRAY_DIM_X      3
-#definedefine CELLARRAY_DIM_Y      3
-#define CELLARRAY_DIM_Z      3
-#define         PTP_CUT_OFF        12 // cut off for atom to atom interactions
-#definedefinee CELL_MARGIN        4  // constant diff between cutoff and cell size#define CELL_SIZE_X        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_X
-#definedefineene CELL_SIZE_Y        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Y
-#define CELL_SIZE_YL_SIZE_Z        (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Z
-#define CELL_ORIGIN_YIN_X      0
-#define CELL_ORIGIN_Y      0
-#define CELL_ORIGIN_Z                              0
+#define CELLARRAY_DIM_X       3
+#define CELLARRAY_DIM_Y       3
+#define CELLARRAY_DIM_Z       3
+#define PTP_CUT_OFF             12
+#define CELL_MARGIN             4  
+#define CELL_SIZE_Y             ((PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Y)
+#define CELL_SIZE_Z             ((PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Z)
+#define CELL_ORIGIN_X             0
+#define CELL_ORIGIN_Y             0
+#define CELL_ORIGIN_Z             0
 
 #define MIGRATE_STEPCOUNT    20
-#define DEFAULT_FINALSTEPCOUNT1001
+#define DEFAULT_FINALSTEPCOUNT 1001
 #define MAX_VELOCITY      30.0
 
-#define WRAP_X(a)(((a)+cellArrayyDimX)%cellArrayDimX)
+#define WRAP_X(a)(((a)+cellArrayDimX)%cellArrayDimX)
 #define WRAP_Y(a)(((a)+cellArrayDimY)%cellArrayDimXDimY)
 #define WRAP_Z(a)(((a)+cellArrayDimZ)%cellArrayDimZ)
 #define BLOCK_SIZE 512
 
+extern srand48;
 extern drand48;
 extern pow;
 extern fabs;
 extern abs;
+extern atoi;
+extern CkSectionInfo;
+extern ParticleDataMsg;
 
 readonly Main@ mainProxy;       //central controller
-readonly Cell@ cellArray;       //array that houses atoms
-readonly Compute@ computeArray; //computational kernels
-readonly CkGroupID mCastGrpID;  //multicast group handle
+//readonly Cell@ cellArray;       //array that houses atoms
+//readonly Compute@ computeArray; //computational kernels
+//readonly CkGroupID mCastGrpID;  //multicast group handle
 
 readonly int cellArrayDimX;         // X dimension of the Cell array
 readonly int cellArrayDimY;         // Y dimension of the Cell array
-readonly int cellArrayDimYArrayDimZ;// Z dimension of the Cell array
+readonly int cellArrayDimZ;         // Z dimension of the Cell array
 readonly int finalStepCount;        // number of steps in the simulaion
 readonly int firstLdbStep;          // begin load balancing after this many steps
 readonly int ldbPeriod;             // load balancing period
-
 
 class vec3 {
     double x, y, z;
@@ -77,17 +80,19 @@ class vec3 {
     }
 }
 
-class Particle {
-    double mass;
-    vec3 pos, acc, vel;
-}
-
 multicast_message ParticleDataMsg {
     Array<vec3> part;
 }
-        
-mainchare Main {
-    entry Main(CkArgMsg m) {
+
+class Particle {
+    double mass;
+    vec3 pos;
+    vec3 acc;
+    vec3 vel;
+}
+
+public mainchare Main {
+    public entry Main(CkArgMsg[~]@ m) {
         CkPrintf("\nLENNARD JONES MOLECULAR DYNAMICS START UP ...\n");
 
         //set variable values to a default set
@@ -97,13 +102,14 @@ mainchare Main {
         finalStepCount = DEFAULT_FINALSTEPCOUNT;
         firstLdbStep = DEFAULT_FIRST_LDB;
         ldbPeriod = DEFAULT_LDB_PERIOD;
+/*
 
         mainProxy = thisProxy;
 
         //branch factor for spanning tree of multicast
         int bFactor = 4;
         //creating the multicast spanning tree
-        mCastGrpID = CProxy_CkMulticastMgr.ckNew(bFactor);
+        mCastGrpID = CkMulticastMgr@.ckNew(bFactor);
 
         int numPes = CkNumPes();
         int currPe = -1;
@@ -114,7 +120,8 @@ mainchare Main {
         //read user parameters
         //number of celles/cells in each dimension
         if (m.argc > cur_arg) {
-            cellArrayDimX=atoi(m.argv[cur_arg++]);
+            cellArrayDimX = atoi(m.argv[cur_arg++]);
+        }
             cellArrayDimY=atoi(m.argv[cur_arg++]);
             cellArrayDimZ=atoi(m.argv[cur_arg++]);
             CkPrintf("Cell Array Dimension X:%d Y:%d Z:%d of size %d %d %d\n",cellArrayDimX,cellArrayDimY,cellArrayDimZ,CELL_SIZE_X,CELL_SIZE_Y,CELL_SIZE_Z);
@@ -159,9 +166,11 @@ mainchare Main {
 
         thisProxy@run();
         delete m;
+        */
     }
 
     entry void run() {
+        /*
         when computesCreated() {
             computeArray@doneInserting();
             CkPrintf("Computes: %d .... created\n", (NUM_NEIGHBORS/2+1)*cellArrayDimX*cellArrayDimY*cellArrayDimZ);
@@ -182,6 +191,7 @@ mainchare Main {
             }
             CkExit();
         }
+        */
     }
 }
 
@@ -193,13 +203,12 @@ chare_array [3d] Cell {
     int stepTime;
     int updateCount;
     Array<double> energy;
-    Compute[%]@ mCastSecProxy;
+//    Compute[%]@ mCastSecProxy;
 
     entry Cell() {
+    /*
         int i;
         inbrs = NUM_NEIGHBORS;
-        //load balancing to be called when AtSync is called
-        usesAtSync = CmiTrue;
 
         myNumParts = PARTICLES_PER_CELL;
         // starting random generator
@@ -210,6 +219,9 @@ chare_array [3d] Cell {
         for (i=0; i < myNumParts; i++) {
             particles[i] = new Particle();
             particles[i].mass = HYDROGEN_MASS;
+
+            //FIXME: for some reason these array accesses are not type-checked to
+            // be PointerType. Figure out why and fix.
 
             //give random values for position and velocity
             particles[i].pos.x = drand48() * CELL_SIZE_X + thisIndex.x * CELL_SIZE_X;
@@ -225,8 +237,10 @@ chare_array [3d] Cell {
         stepTime = 0; 
         energy = new Array<double>([2]);
         energy[0] = energy[1] = 0;
+    */
     }
 
+/*
     entry void createComputes() {
         int num;  
 
@@ -274,7 +288,7 @@ chare_array [3d] Cell {
                 computesList[num][3] = px1; computesList[num][4] = py1; computesList[num][5] = pz1;
             }
         } // end of for loop
-        contribute(0,CkReduction.nop,CkCallback(Main.computesCreated),mainProxy);
+        contribute(0,CkReduction.nop,CkCallback(Main.computesCreated,mainProxy));
     }
 
     entry void createSection() {
@@ -453,21 +467,27 @@ chare_array [3d] Cell {
                 CkReduction.sum_double,
                 CkCallback(Main.energySumK, mainProxy));
     } 
+*/
 }
 
 chare_array [6d] Compute {
     Array<double> energy;
     int stepCount, cellCount;
-    CkSectionInfo mcast1, mcast2;
+    // FIXME: CkSectionInfo mcast1, mcast2;
+    //CkSectionInfo mcast1;
+    //CkSectionInfo mcast2;
     ParticleDataMsg bufferedMsg;
 
     entry Compute() {
         cellCount = 0;
         stepCount = 0;
         energy = new Array<double>([2]);
-        energy[0] = energy[1] = 0;
+        // FIXME: energy[0] = energy[1] = 0;
+        energy[0] = 0;
+        energy[1] = 0;
     }
 
+/*
     void interact(ParticleDataMsg msg) {
         double energyP = 0;
 
@@ -666,5 +686,5 @@ chare_array [6d] Compute {
         delete separation;
         return energy;
     }
+*/
 }
-

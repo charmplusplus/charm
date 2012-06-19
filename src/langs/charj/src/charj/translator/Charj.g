@@ -57,6 +57,9 @@ tokens {
     NODEGROUP               = 'nodegroup'       ;
     ENUM                    = 'enum'            ;
     READONLY                = 'readonly'        ;
+    ACCELERATED             = 'accelerated'     ;
+    THREADED                = 'threaded'        ;
+    REDUCTIONTARGET         = 'reductiontarget' ;
 
     OVERLAP                 = 'overlap'         ;
     WHEN                    = 'when'            ;
@@ -70,9 +73,13 @@ tokens {
     GETMYNODE               = 'getMyNode'       ;
     GETNUMPES               = 'getNumPes'       ;
     GETNUMNODES             = 'getNumNodes'     ;
+    CONTRIBUTE              = 'contribute'      ;
 
     THISINDEX		    = 'thisIndex'	;
     THISPROXY		    = 'thisProxy'	;
+
+    MESSAGE                 = 'message'          ;
+    MULTICAST_MESSAGE       = 'multicast_message';
 
     FOR                     = 'for'             ;
     WHILE                   = 'while'           ;
@@ -226,6 +233,7 @@ tokens {
 	ARRAY_SECTION_TYPE;
 	ARRAY_SECTION;
 	ARRAY_SECTION_INIT;
+    MESSAGE_TYPE;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
     VAR_DECLARATOR;
@@ -296,6 +304,7 @@ typeDeclaration
     |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
+    |   messageDefinition
     ;
 
 templateList
@@ -342,6 +351,13 @@ enumDefinition
         -> ^(ENUM IDENT ^('implements' typeList)? enumConstants classScopeDeclaration*)
     ;
 
+messageDefinition
+    :   MESSAGE IDENT '{' messageScopeDeclaration* '}' ';'?
+        -> ^(MESSAGE IDENT messageScopeDeclaration*)
+    |   MULTICAST_MESSAGE IDENT '{' messageScopeDeclaration* '}' ';'?
+        -> ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
+    ;
+
 enumConstants
     :   enumConstant (','! enumConstant)*
     ;
@@ -352,6 +368,11 @@ enumConstant
 
 typeList
     :   type (','! type)*
+    ;
+
+messageScopeDeclaration
+    :	primitiveVariableDeclaration
+	|	objectVariableDeclaration
     ;
 
 classScopeDeclaration
@@ -486,6 +507,8 @@ modifier
     |   ENTRY
     |   SDAGENTRY
     |   TRACED
+    |   ACCELERATED
+    |   THREADED
     |   PRIVATE
     |   ABSTRACT
     |   NATIVE
@@ -516,6 +539,8 @@ constructorType
         ->  ^(OBJECT_TYPE qualifiedTypeIdent domainExpression?)
 	|	MOD qualifiedTypeIdent AT domainExpression
 		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent domainExpression)
+    |   qualifiedTypeIdent TILDE 
+        ->  ^(MESSAGE_TYPE qualifiedTypeIdent)
     ;
 
 simpleType
@@ -530,6 +555,8 @@ objectType
         ->  ^(POINTER_TYPE qualifiedTypeIdent domainExpression?)
 	|	qualifiedTypeIdent '[' MOD ']' AT
 		->	^(ARRAY_SECTION_TYPE qualifiedTypeIdent)
+	|	qualifiedTypeIdent '[' TILDE ']' AT
+		->	^(MESSAGE_TYPE qualifiedTypeIdent)
     ;
 
 qualifiedTypeIdent
@@ -718,6 +745,8 @@ nonBlockStatement
         ->  ^(EXIT expression?)
     |   EXITALL '(' ')' ';'
         ->  EXITALL
+    |   CONTRIBUTE '(' expression ',' qualifiedIdentifier ',' expression ')' ';'
+        -> ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;           
         
 
