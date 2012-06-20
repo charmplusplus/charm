@@ -176,17 +176,20 @@ bool test_general_ififo()
   return result;
 }
 
+
+const int qSizeMin   = 1<<4;
+const int qSizeMax   = 1<<12;
+const int qBatchSize = 1<<4;
+const int numIters   = 1<<16;
+const int numMsgs    = 1<<7;
+
+std::vector<char> msgs(qSizeMax + numMsgs);
+std::vector<unsigned int> prios(qSizeMax + numMsgs);
+
+
 double timePerOp_general_ififo(int qBaseSize = 256)
 {
   Queue q = CqsCreate();
-  int qBatchSize = 1<<4;
-  int numIters   = 1<<16;
-
-  std::vector<char> msgs(qBaseSize + qBatchSize);
-  std::vector<unsigned int> prios(qBaseSize + qBatchSize);
-
-  for (int i = 0; i < qBaseSize + qBatchSize; i++)
-      prios[i] = std::rand();
 
   for (int i = 0; i < qBaseSize; i++)
       CqsEnqueueGeneral(q, (void*)&msgs[i], CQS_QUEUEING_IFIFO, 8*sizeof(int), &prios[i]);
@@ -194,29 +197,24 @@ double timePerOp_general_ififo(int qBaseSize = 256)
   double startTime = CmiWallTimer();
   for (int i = 0; i < numIters; i++)
   {
-      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+    for (int strt = qBaseSize; strt < qBaseSize + numMsgs; strt += qBatchSize)
+    {
+      for (int j = strt; j < strt + qBatchSize; j++)
         CqsEnqueueGeneral(q, (void*)&msgs[j], CQS_QUEUEING_IFIFO, 8*sizeof(int), &prios[j]);
       void *m;
-      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+      for (int j = 0; j < qBatchSize; j++)
         CqsDequeue(q, &m);
+    }
   }
 
   CqsDelete(q);
-  return 1000000 * (CmiWallTimer() - startTime) / (numIters * qBatchSize * 2);
+  return 1000000 * (CmiWallTimer() - startTime) / (numIters * numMsgs * 2);
 }
 
 
 double timePerOp_stlQ(int qBaseSize = 256)
 {
   msgQ<int> q;
-  int qBatchSize = 1<<4;
-  int numIters   = 1<<16;
-
-  std::vector<char> msgs(qBaseSize + qBatchSize);
-  std::vector<unsigned int> prios(qBaseSize + qBatchSize);
-
-  for (int i = 0; i < qBaseSize + qBatchSize; i++)
-      prios[i] = std::rand();
 
   for (int i = 0; i < qBaseSize; i++)
       q.enq((msg_t*)&msgs[i], prios[i]);
@@ -224,14 +222,17 @@ double timePerOp_stlQ(int qBaseSize = 256)
   double startTime = CmiWallTimer();
   for (int i = 0; i < numIters; i++)
   {
-      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
-          q.enq((msg_t*)&msgs[j], prios[j]);
+    for (int strt = qBaseSize; strt < qBaseSize + numMsgs; strt += qBatchSize)
+    {
+      for (int j = strt; j < strt + qBatchSize; j++)
+        q.enq((msg_t*)&msgs[j], prios[j]);
       void *m;
-      for (int j = qBaseSize; j < qBaseSize+qBatchSize; j++)
+      for (int j = 0; j < qBatchSize; j++)
         q.deq();
+    }
   }
 
-  return 1000000 * (CmiWallTimer() - startTime) / (numIters * qBatchSize * 2);
+  return 1000000 * (CmiWallTimer() - startTime) / (numIters * numMsgs * 2);
 }
 
 
@@ -243,16 +244,31 @@ bool perftest_general_ififo()
   CkPrintf("The STL variant of the msg q is using a std::map\n");
   #endif
 
-  CkPrintf("Reporting time per enqueue / dequeue operation for charm's underlying mixed priority queue\n");
-  CkPrintf("\n  Q length     time/op(us)\n");
-  for (int i = 16; i <= 2048; i *= 2)
-    CkPrintf("%10d %15f\n", i, timePerOp_general_ififo(i));
+  CkPrintf("Reporting time per enqueue / dequeue operation (us) for charm's underlying mixed priority queue\n"
+           "Nprios (row) is the number of different priority values that are used.\n"
+           "Qlen (col) is the base length of the queue on which the enq/deq operations are times\n"
+          );
 
-  printf("Reporting time per enqueue / dequeue operation for an STL version of the same Q functionality\n");
-  printf("\n  Q length     time/op(us)\n");
-  for (int i = 16; i <= 2048; i *= 2)
-    printf("%10d %15f\n", i, timePerOp_stlQ(i));
+  CkPrintf("\nversion  Nprios");
+  for (int i = qSizeMin; i <= qSizeMax; i*=2)
+    CkPrintf("%10d", i);
 
+  // Charm applications typically have a small/moderate number of different message priorities
+  for (int hl = 16; hl < 128; hl *=2)
+  {
+    std::srand(42);
+    for (int i = 0; i < qSizeMax + numMsgs; i++)
+      prios[i] = std::rand() % hl;
+
+    CkPrintf("\n  charm %7d", hl);
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
+      CkPrintf("%10.4f", i, timePerOp_general_ififo(i));
+    CkPrintf("\n    stl %7d", hl);
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
+      CkPrintf("%10.4f", i, timePerOp_stlQ(i));
+  }
+
+  CkPrintf("\n");
   return true;
 }
 
