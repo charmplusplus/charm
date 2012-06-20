@@ -208,7 +208,8 @@ public:
 #endif
   }
 
-  void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, int prio);
+  void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
+            int prio);
   
   void startStagedCompletion() {          
     if (individualDimensionSizes_[dimensionToFlush_] != 1) {
@@ -565,6 +566,11 @@ void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb,
   numLocalDone_ = 0; 
   numLocalContributors_ = numLocalContributors; 
   initLocalClients();
+
+  if (numLocalContributors_ == 0) {
+    startStagedCompletion();
+  }
+
   this->contribute(startCb);
 }
 
@@ -1090,6 +1096,14 @@ public:
     delete [] destinationPes_;
     delete [] isCachedArrayMetadata_; 
 #endif
+  }
+
+  void init(CkArrayID senderArrayID, CkCallback startCb, 
+            CkCallback endCb, int prio) {
+    CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
+    int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
+    MeshStreamer<ArrayDataItem<dtype, itype> >::init(
+                 numLocalElements, startCb, endCb, prio); 
   }
 
   void receiveAtDestination(
