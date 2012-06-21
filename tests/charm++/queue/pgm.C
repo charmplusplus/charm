@@ -176,6 +176,24 @@ bool test_general_ififo()
   return result;
 }
 
+bool test_stl_ififo()
+{
+  msgQ<int> q;
+  void *i = (char *)1, *j = (char *)2, *k = (char *)3, *l = (char*)4;
+  unsigned int a = -1, b = 0, c = 1, d = -1;
+  q.enq(i, d, true);
+  q.enq(j, c);
+  q.enq(k, b);
+  q.enq(l, a);
+  void *r, *s, *t, *u;
+  r = (void*)q.deq();
+  s = (void*)q.deq();
+  t = (void*)q.deq();
+  u = (void*)q.deq();
+  bool result = (r == i) && (s == l) && (t == k) && (u == j);
+  return result;
+}
+
 
 const int qSizeMin   = 1<<4;
 const int qSizeMax   = 1<<12;
@@ -246,7 +264,7 @@ bool perftest_general_ififo()
 
   CkPrintf("Reporting time per enqueue / dequeue operation (us) for charm's underlying mixed priority queue\n"
            "Nprios (row) is the number of different priority values that are used.\n"
-           "Qlen (col) is the base length of the queue on which the enq/deq operations are times\n"
+           "Qlen (col) is the base length of the queue on which the enq/deq operations are timed\n"
           );
 
   CkPrintf("\nversion  Nprios");
@@ -301,6 +319,7 @@ struct main : public CBase_main
     RUN_TEST(test_enumerate);
     RUN_TEST(test_general_fifo);
     RUN_TEST(test_general_ififo);
+    RUN_TEST(test_stl_ififo);
     RUN_TEST(perftest_general_ififo);
 
     if (fail) {
