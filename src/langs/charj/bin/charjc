@@ -51,6 +51,9 @@ processArgs() {
         "--translate-only")
             ARGS="$ARGS $arg"
             ;;
+        "--count-tokens")
+            ARGS="$ARGS $arg"
+            ;;
         "--charmc")
             CHARMC="$1"
             shift

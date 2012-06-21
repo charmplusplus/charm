@@ -82,6 +82,17 @@ public class Translator {
         }
     };
 
+    public int tokenCount(String filename) throws Exception {
+        m_basename = filename.substring(0, filename.lastIndexOf("."));
+        m_basename = m_basename.substring(m_basename.lastIndexOf("/") + 1);
+
+        ANTLRFileStream input = new ANTLRFileStream(filename);
+            
+        CharjLexer lexer = new CharjLexer(input);
+        m_tokens = new CommonTokenStream(lexer);
+        return m_tokens.getTokens().size();
+    }
+
     public String translate(String filename) throws Exception {
         m_basename = filename.substring(0, filename.lastIndexOf("."));
         m_basename = m_basename.substring(m_basename.lastIndexOf("/") + 1);
