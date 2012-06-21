@@ -57,6 +57,9 @@ module NDMeshStreamer {
 	  const CProxy_MeshStreamerArrayClient<dtype> &clientProxy,
 	  int bufferSize, bool yieldFlag = 0, 
 	  double progressPeriodInMs = -1.0);
+
+    entry void init(CkArrayID senderArrayID, CkCallback startCb, 
+		    CkCallback endCb, int prio); 
   };
 
 };
