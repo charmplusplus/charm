@@ -174,7 +174,7 @@ public:
   // entry
   void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
-  void flushDirect();
+  void flushIfIdle();
   void finish();
 
   // non entry
@@ -187,7 +187,6 @@ public:
                          CkCallback startCb, CkCallback endCb, 
                          CProxy_CompletionDetector detector,
                          int prio);
-  void flushAllBuffers();
   void registerPeriodicProgressFunction();
 
   // flushing begins only after enablePeriodicFlushing has been invoked
@@ -584,7 +583,7 @@ void MeshStreamer<dtype>::associateCallback(
   yieldCount_ = 0; 
   prio_ = prio;
   userCallback_ = endCb; 
-  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushDirect(), 
+  CkCallback flushCb(CkIndex_MeshStreamer<dtype>::flushIfIdle(), 
                      this->thisProxy);
   CkCallback finish(CkIndex_MeshStreamer<dtype>::finish(), 
 		    this->thisProxy);
@@ -713,53 +712,6 @@ void MeshStreamer<dtype>::sendLargestBuffer() {
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::flushAllBuffers() {
-
-  MeshStreamerMessage<dtype> **messageBuffers; 
-  int numBuffers; 
-
-  for (int i = 0; i < numDimensions_; i++) {
-
-    messageBuffers = dataBuffers_[i]; 
-    numBuffers = individualDimensionSizes_[i]; 
-
-    for (int j = 0; j < numBuffers; j++) {
-
-      if(messageBuffers[j] == NULL) {
-	continue;
-      }
-
-      numDataItemsBuffered_ -= messageBuffers[j]->numDataItems;
-
-      if (i == 0) {
-	int destinationPe = myIndex_ + j - myLocationIndex_[i];
-        this->thisProxy[destinationPe].receiveAtDestination(messageBuffers[j]);
-      }	 
-      else {
-
-	for (int k = 0; k < messageBuffers[j]->numDataItems; k++) {
-
-	  MeshStreamerMessage<dtype> *directMsg = 
-	    new (0, 1, sizeof(int)) MeshStreamerMessage<dtype>(i);
-	  *(int *) CkPriorityPtr(directMsg) = prio_;
-	  CkSetQueueing(directMsg, CK_QUEUEING_IFIFO);
-
-#ifdef DEBUG_STREAMER
-	  CkAssert(directMsg != NULL);
-#endif
-	  int destinationPe = messageBuffers[j]->destinationPes[k]; 
-	  dtype &dataItem = messageBuffers[j]->getDataItem(k);   
-	  directMsg->addDataItem(dataItem);
-          this->thisProxy[destinationPe].receiveAtDestination(directMsg);
-	}
-	delete messageBuffers[j];
-      }
-      messageBuffers[j] = NULL;
-    }
-  }
-}
-
-template <class dtype>
 void MeshStreamer<dtype>::flushToIntermediateDestinations() {
   
   for (int i = 0; i < numDimensions_; i++) {
@@ -814,7 +766,10 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
     numDataItemsBuffered_ -= destinationBuffer->numDataItems;
 
 #ifdef STAGED_COMPLETION
-    destinationBuffer->finalMsgCount = ++cntMsgSent_[dimension][j];
+    cntMsgSent_[dimension][j]++;
+    if (sendMsgCounts) {
+      destinationBuffer->finalMsgCount = cntMsgSent_[dimension][j];
+    }
 #endif
 
     if (dimension == 0) {
@@ -836,14 +791,14 @@ void MeshStreamer<dtype>::flushDimension(int dimension, bool sendMsgCounts) {
 
 
 template <class dtype>
-void MeshStreamer<dtype>::flushDirect(){
+void MeshStreamer<dtype>::flushIfIdle(){
   // flush if (1) this is not a periodic call or 
   //          (2) this is a periodic call and no sending took place
   //              since the last time the function was invoked
   if (!isPeriodicFlushEnabled_ || !hasSentRecently_) {
 
     if (numDataItemsBuffered_ != 0) {
-      flushAllBuffers();
+      flushToIntermediateDestinations();
     }    
 #ifdef DEBUG_STREAMER
     CkAssert(numDataItemsBuffered_ == 0); 
@@ -862,7 +817,7 @@ void periodicProgressFunction(void *MeshStreamerObj, double time) {
     static_cast<MeshStreamer<dtype>*>(MeshStreamerObj); 
 
   if (properObj->isPeriodicFlushEnabled()) {
-    properObj->flushDirect();
+    properObj->flushIfIdle();
     properObj->registerPeriodicProgressFunction();
   }
 }

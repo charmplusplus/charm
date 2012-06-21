@@ -18,7 +18,7 @@ module NDMeshStreamer {
   template<class dtype> 
   group MeshStreamer {
     entry void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
-    entry void flushDirect();
+    entry void flushIfIdle();
     entry void finish();
     entry void init(int numLocalContributors, CkCallback startCb, 
 		    CkCallback endCb, int prio);
