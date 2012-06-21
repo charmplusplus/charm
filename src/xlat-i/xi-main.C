@@ -11,6 +11,7 @@ extern FILE *yyin;
 extern void yyrestart ( FILE *input_file );
 extern int yyparse (void);
 extern int yyerror(char *);
+extern int yylex(void);
 
 extern xi::ModuleList *modlist;
 
@@ -119,6 +120,13 @@ ModuleList *Parse(FILE *fp)
   return modlist;
 }
 
+int count_tokens(FILE* fp)
+{
+    yyin = fp;
+    int count = 0;
+    while (yylex()) count++;
+    return count;
+}
 
 void abortxi(char *name)
 {
@@ -136,6 +144,7 @@ int main(int argc, char *argv[])
   fortranMode = 0;
   internalMode = 0;
   bool dependsMode = false;
+  bool countTokens = false;
 
   for (int i=1; i<argc; i++) {
     if (*argv[i]=='-') {
@@ -144,12 +153,18 @@ int main(int argc, char *argv[])
       else if (strcmp(argv[i],"-intrinsic")==0)  internalMode = 1;
       else if (strncmp(argv[i],"-D", 2)==0)  macros.append(new MacroDefinition(argv[i]+2));
       else if (strncmp(argv[i], "-M", 2)==0) dependsMode = true;
+      else if (strcmp(argv[i], "-count-tokens")==0) countTokens = true;
       else abortxi(argv[0]);
     }
     else
       fname = argv[i];
   }
   //if (fname==NULL) abortxi(argv[0]);
+
+  if (countTokens) {
+      cout << count_tokens(openFile(fname)) << endl;
+      return 0;
+  }
 
   ModuleList *m = Parse(openFile(fname)) ;
   if (!m) return 0;

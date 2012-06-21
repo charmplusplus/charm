@@ -79,6 +79,7 @@ USE_RELIABLE_CC=""
 USE_FASTEST_CC=""
 PROG_EXT=""
 GENDEPENDS="no"
+COUNTTOKENS="no"
 
 COPY_CHARMRUN=true
 USE_BUILD_OPTIONS=0
@@ -632,10 +633,15 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	"-M")
+        PREPROCESS="no"
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
 		;;
+    "-count-tokens")
+		OPTS="$OPTS $arg"
+        COUNTTOKENS="yes"
+        ;;
 	"-default-to-aout")
 		if [ "$EXPLICIT_OBJECT $EXPLICIT_COMPILATION" = "no no" ]
 		then
@@ -1046,6 +1052,11 @@ fi
 if [ "$GENDEPENDS" = "yes" ]
 then
     CMK_XIOPTS="$CMK_XIOPTS -M"
+fi
+
+if [ "$COUNTTOKENS" = "yes" ]
+then
+    CMK_XIOPTS="$CMK_XIOPTS -count-tokens"
 fi
 
 if test "$CMK_WITH_TAU" = "true"
