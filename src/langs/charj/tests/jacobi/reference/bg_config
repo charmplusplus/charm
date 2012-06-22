@@ -1,0 +1,16 @@
+x 2
+y 2
+z 2
+cth 1
+wth 2
+#stacksize  4000
+#timing  walltime
+timing  elapse
+#timing  counter
+cpufactor   1.0
+fpfactor    5e-7
+traceroot     .
+log      no
+correct  no
+network   lemieux
+#projections 2,4-8
