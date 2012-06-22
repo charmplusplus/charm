@@ -1,5 +1,9 @@
 #include <stdlib.h>
 #include "parallelJacobi.decl.h"
+
+#define ITER    100
+#define WORK     1
+
      
 class Main: public Chare {
   

@@ -1,4 +1,5 @@
-OPTS=-g
+OPTS=-O3
+#OPTS=-O3 -DRAW_STENCIL
 CHARMC=charmc $(OPTS)
 
 all: jacobi

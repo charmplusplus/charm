@@ -91,9 +91,10 @@ void Chunk::sendStrips()
 
 void Chunk::doStencil()
 {
-    #if _CHARJ_TRACE_ALL_METHODS
-    int _charj_method_trace_timer = CkWallTimer();
-    #endif
+#ifdef RAW_STENCIL
+    doStencil_raw();
+    return;
+#endif
     {
         double maxChange = 0.0;
         resetBoundary();
