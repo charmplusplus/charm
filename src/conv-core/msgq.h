@@ -11,6 +11,8 @@
 #include <map>
 #endif
 
+namespace conv {
+
 typedef void msg_t;
 
 template <typename P>
@@ -143,6 +145,8 @@ void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
         mapitr++;
     }
 }
+
+} // end namespace conv
 
 #endif // MSG_Q_H
 
