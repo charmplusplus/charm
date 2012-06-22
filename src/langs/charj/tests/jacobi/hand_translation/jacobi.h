@@ -8,6 +8,9 @@
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
+#define ITER 100
+#define WORK  10
+
 #include <charm++.h>
 #include <string>
 #include <vector>
@@ -47,6 +50,7 @@ class Chunk: public CBase_Chunk {
     public: Chunk(int t, int x, int y);
     private: void sendStrips();
     private: void doStencil();
+    private: void doStencil_raw();
     private: void resetBoundary();
     public: void processStripFromLeft(Array<double> __s);
     public: void processStripFromRight(Array<double> __s);

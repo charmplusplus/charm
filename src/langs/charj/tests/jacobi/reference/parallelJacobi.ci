@@ -39,9 +39,9 @@ mainmodule parallelJacobi {
 				atomic "fromRight" {processStripfromright(aMessage);}
 			}
 		}
-		atomic "doWork" {
-			doWork();
-			if(iterations == 3)
+        atomic "doWork" {
+            doWork();
+            if(iterations == ITER)
 				{ /*BgPrint0("Real Iter: %e\n"); */}
 			else
 				thisProxy[thisIndex].singleStep(new VoidMsg);

@@ -20,7 +20,7 @@ mainmodule jacobi {
     array [1D] Chunk {
         entry Chunk(int t, int x, int y);
         entry [reductiontarget] void jacobi(){
-            for (_sdag_jacobi_i = 0; _sdag_jacobi_i < 3; ++_sdag_jacobi_i) {
+            for (_sdag_jacobi_i = 0; _sdag_jacobi_i < ITER; ++_sdag_jacobi_i) {
                 atomic {
                     sendStrips();
                 }
@@ -40,7 +40,8 @@ mainmodule jacobi {
                     }
                 }
                 atomic {
-                    doStencil();
+                    for (int j=0; j<WORK; ++j) doStencil();
+                    //for (int j=0; j<WORK; ++j) doStencil_raw();
                 }
 
             }

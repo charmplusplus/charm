@@ -46,6 +46,7 @@ Chunk_SDAG_CODE
 private:
  int  myxdim, myydim,total,counter,iterations;
   double *A, *B;
+  double* temp;
   double myMax;
   void resetBoundary();
   void print();

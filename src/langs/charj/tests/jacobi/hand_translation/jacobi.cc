@@ -148,6 +148,74 @@ void Chunk::doStencil()
     #endif
 }
 
+#define indexof(i,j,ydim) ( ((i)*(ydim)) + (j))
+void Chunk::doStencil_raw()
+{
+    #if _CHARJ_TRACE_ALL_METHODS
+    int _charj_method_trace_timer = CkWallTimer();
+    #endif
+    double* rA = A->raw();
+    double* rB = B->raw();
+    {
+        double maxChange = 0.0;
+        resetBoundary();
+
+        if((thisIndex !=0)&&(thisIndex != total-1))
+            for (int i=1; i<myxdim+1; i++)
+                for (int j=1; j<myydim-1; j++) {
+                    rB[indexof(i,j,myydim)] = 
+                        (0.2)*(rA[indexof(i,  j,  myydim)] +
+                                rA[indexof(i,  j+1,myydim)] +
+                                rA[indexof(i,  j-1,myydim)] +
+                                rA[indexof(i+1,j,  myydim)] +
+                                rA[indexof(i-1,j,  myydim)]);
+
+                    double change =  rB[indexof(i,j,myydim)] - rA[indexof(i,j,myydim)];
+                    if (change < 0) change = - change;
+                    if (change > maxChange) maxChange = change;
+                }
+
+        if(thisIndex == 0)
+            for (int i=1; i<myxdim; i++)
+                for (int j=1; j<myydim-1; j++) {
+                    rB[indexof(i,j,myydim)] = 
+                        (0.2)*(rA[indexof(i,  j,  myydim)] +
+                                rA[indexof(i,  j+1,myydim)] +
+                                rA[indexof(i,  j-1,myydim)] +
+                                rA[indexof(i+1,j,  myydim)] +
+                                rA[indexof(i-1,j,  myydim)]);
+
+                    double change =  rB[indexof(i,j,myydim)] - rA[indexof(i,j,myydim)];
+                    if (change < 0) change = - change;
+                    if (change > maxChange) maxChange = change;
+                }
+
+        if(thisIndex == total-1) {
+            for (int i=1; i<myxdim; i++)
+                for (int j=1; j<myydim-1; j++) {
+                    rB[indexof(i,j,myydim)] = 
+                        (0.2)*(rA[indexof(i,  j,  myydim)] +
+                                rA[indexof(i,  j+1,myydim)] +
+                                rA[indexof(i,  j-1,myydim)] +
+                                rA[indexof(i+1,j,  myydim)] +
+                                rA[indexof(i-1,j,  myydim)]);
+
+                    double change =  rB[indexof(i,j,myydim)] - rA[indexof(i,j,myydim)];
+                    if (change < 0) change = - change;
+                    if (change > maxChange) maxChange = change;
+                }
+        }
+      
+        Array<double, 2>* tmp = A;
+        A = B;
+        B = tmp;
+    }
+    #if _CHARJ_TRACE_ALL_METHODS
+    traceUserBracketEvent(192321988, _charj_method_trace_timer, CkWallTimer());
+    #endif
+}
+
+
 void Chunk::resetBoundary()
 {
     #if _CHARJ_TRACE_ALL_METHODS
