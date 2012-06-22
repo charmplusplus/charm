@@ -633,7 +633,7 @@ do
 		OPTS="$OPTS $arg"
 		;;
 	"-M")
-        PREPROCESS="no"
+		PREPROCESS=""
 		SKIPLINK="yes"
 		OPTS="$OPTS $arg"
 		GENDEPENDS="yes"
