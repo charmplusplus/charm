@@ -1,0 +1,18 @@
+mainmodule ping {
+  readonly CProxy_main mainProxy;
+  readonly int iterations;
+  readonly int payload;
+  readonly int PEsPerNode;
+  readonly int CharesPerPE;
+  mainchare main {
+    entry main(CkArgMsg *);
+    entry void maindone(void);
+  };
+  message PingMsg{char x[];};
+
+  array [1D] Ping1 {
+    entry Ping1();
+    entry void start(void);
+    entry void recv(PingMsg *);
+  };        	
+};
