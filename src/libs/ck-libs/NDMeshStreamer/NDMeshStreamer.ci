@@ -21,12 +21,13 @@ module NDMeshStreamer {
     entry void flushIfIdle();
     entry void finish();
     entry void init(int numLocalContributors, CkCallback startCb, 
-		    CkCallback endCb, int prio);
+		    CkCallback endCb, int prio, 
+		    bool usePeriodicFlushing);
 
     entry void associateCallback(int numContributors, 
 				 CkCallback startCb, CkCallback endCb, 
 				 CProxy_CompletionDetector detector,
-				 int prio);
+				 int prio, bool usePeriodicFlushing);
     entry void receiveAtDestination(MeshStreamerMessage<dtype> *msg);
   };
 
@@ -59,7 +60,8 @@ module NDMeshStreamer {
 	  double progressPeriodInMs = -1.0);
 
     entry void init(CkArrayID senderArrayID, CkCallback startCb, 
-		    CkCallback endCb, int prio); 
+		    CkCallback endCb, int prio, 
+		    bool usePeriodicFlushing); 
   };
 
 };

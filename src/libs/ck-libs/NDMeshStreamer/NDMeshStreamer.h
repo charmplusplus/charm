@@ -186,7 +186,7 @@ public:
   void associateCallback(int numContributors, 
                          CkCallback startCb, CkCallback endCb, 
                          CProxy_CompletionDetector detector,
-                         int prio);
+                         int prio, bool usePeriodicFlushing);
   void registerPeriodicProgressFunction();
 
   // flushing begins only after enablePeriodicFlushing has been invoked
@@ -208,7 +208,7 @@ public:
   }
 
   void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
-            int prio);
+            int prio, bool usePeriodicFlushing);
   
   void startStagedCompletion() {          
     if (individualDimensionSizes_[dimensionToFlush_] != 1) {
@@ -547,7 +547,8 @@ void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
 
 template <class dtype>
 void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb, 
-                               CkCallback endCb, int prio) {
+                               CkCallback endCb, int prio, 
+                               bool usePeriodicFlushing) {
 
   for (int i = 0; i < numDimensions_; i++) {
     std::fill(cntMsgSent_[i], 
@@ -570,6 +571,11 @@ void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb,
     startStagedCompletion();
   }
 
+  hasSentRecently_ = false;
+  if (usePeriodicFlushing) {
+    enablePeriodicFlushing();
+  }
+
   this->contribute(startCb);
 }
 
@@ -578,7 +584,7 @@ void MeshStreamer<dtype>::associateCallback(
 			  int numContributors,
 			  CkCallback startCb, CkCallback endCb, 
 			  CProxy_CompletionDetector detector, 
-			  int prio) {
+			  int prio, bool usePeriodicFlushing) {
 
   yieldCount_ = 0; 
   prio_ = prio;
@@ -601,8 +607,9 @@ void MeshStreamer<dtype>::associateCallback(
   }
   
   hasSentRecently_ = false; 
-  enablePeriodicFlushing();
-      
+  if (usePeriodicFlushing) {
+    enablePeriodicFlushing();
+  }
 }
 
 template <class dtype>
@@ -1054,11 +1061,12 @@ public:
   }
 
   void init(CkArrayID senderArrayID, CkCallback startCb, 
-            CkCallback endCb, int prio) {
+            CkCallback endCb, int prio, bool usePeriodicFlushing) {
     CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
     int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
     MeshStreamer<ArrayDataItem<dtype, itype> >::init(
-                 numLocalElements, startCb, endCb, prio); 
+                 numLocalElements, startCb, endCb, prio,
+                 usePeriodicFlushing); 
   }
 
   void receiveAtDestination(
