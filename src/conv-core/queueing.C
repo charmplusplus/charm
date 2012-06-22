@@ -593,15 +593,15 @@ void CqsEnqueueGeneral(Queue q, void *data, int strategy,
   case CQS_QUEUEING_IFIFO:
     iprio=prioptr[0]+(1U<<(CINTBITS-1));
     if ((int)iprio<0)
-      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, &iprio);
-    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, &iprio);
+      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, (unsigned int*)&iprio);
+    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, (unsigned int*)&iprio);
     CqsDeqEnqueueFifo(d, data);
     break;
   case CQS_QUEUEING_ILIFO:
     iprio=prioptr[0]+(1U<<(CINTBITS-1));
     if ((int)iprio<0)
-      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, &iprio);
-    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, &iprio);
+      d=CqsPrioqGetDeq(&(q->posprioq), CINTBITS, (unsigned int*)&iprio);
+    else d=CqsPrioqGetDeq(&(q->negprioq), CINTBITS, (unsigned int*)&iprio);
     CqsDeqEnqueueLifo(d, data);
     break;
   case CQS_QUEUEING_BFIFO:
