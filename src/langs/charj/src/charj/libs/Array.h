@@ -22,6 +22,11 @@ namespace CharjArray {
     size(stop_ - start_), start(start_), stop(stop_) {
       assert(stop >= start);
     }
+    void pup(PUP::er& p) { 
+        p | size;
+        p | start;
+        p | stop;
+    }
   };
 
   template<int dims>
@@ -56,6 +61,10 @@ namespace CharjArray {
 	  total *= ranges[i].size;
 
       return total;
+    }
+
+    void pup(PUP::er& p) { 
+        for (int i=0; i<dims; ++i) p | ranges[i];
     }
   };
 
@@ -99,26 +108,28 @@ namespace CharjArray {
     Domain<dims> domain;
     type *block;
     int ref_cout;
+    bool did_init;
     Array* ref_parent;
 
   public:
-    Array(Domain<dims> domain_) : ref_parent(0) {
+    Array(Domain<dims> domain_) : ref_parent(0), did_init(false) {
       init(domain_);
     }
 
-    Array(type **block_) {
+    Array(type **block_) : did_init(false) {
       block = *block_;
     }
 
-    Array(type& block_) {
+    Array(type& block_) : did_init(false) {
       block = &block_;
     }
 
-    Array() : ref_parent(0) {
+    Array() : ref_parent(0), did_init(false) {
 
     }
 
-    Array(Array* parent, Domain<dims> domain_) : ref_parent(parent) {
+    Array(Array* parent, Domain<dims> domain_)
+        : ref_parent(parent), did_init(false) {
       domain = domain_;
       block = parent->block;
     }
@@ -127,14 +138,15 @@ namespace CharjArray {
       domain = domain_;
       //if (atype == ROW_MAJOR)
       block = new type[domain.size()];
-      printf("Array: allocating memory, size=%d, base pointer=%p\n",
-             domain.size(), block);
+      //printf("Array: allocating memory, size=%d, base pointer=%p\n",
+      //       domain.size(), block);
+      did_init = true;
     }
 
     type* raw() { return block; }
 
     ~Array() {
-      delete[] block;
+      if (did_init) delete[] block;
     }
 
     /*type* operator[] (const Domain<dims> &domain) {
@@ -187,7 +199,13 @@ namespace CharjArray {
       return domain.ranges[dim].size;
     }
 
-    void pup(PUP::er& p) { }
+    void pup(PUP::er& p) { 
+        p | domain;
+        if (p.isUnpacking()) {
+            block = new type[domain.size()];
+        }
+        PUParray(p, block, domain.size());
+    }
 
     void fill(const type &t) {
       for (int i = 0; i < domain.size(); ++i)
