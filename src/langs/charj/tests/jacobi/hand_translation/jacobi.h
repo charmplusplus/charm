@@ -8,8 +8,9 @@
  * It is not meant to be edited by hand and may be overwritten by charjc. *
  **************************************************************************/
 
+//#define RAW_STENCIL
 #define ITER 100
-#define WORK  10
+#define WORK  1
 
 #include <charm++.h>
 #include <string>

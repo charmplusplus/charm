@@ -1,8 +1,5 @@
 #include "parallelJacobi.h"
 
-#define ITER    100
-#define WORK     10
-
 #define DEBUG   0
 
 #define indexof(i,j,ydim) ( ((i)*(ydim)) + (j))

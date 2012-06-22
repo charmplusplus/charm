@@ -1,7 +1,7 @@
 CHARMC = charmc
 BINARY = jacobi
 
-CHARMCFLAGS = $(OPTS) -g -I/Users/abecker/src/charm/src/langs/charj/src/charj/libs
+CHARMCFLAGS = $(OPTS) -O3 -I/Users/abecker/src/charm/src/langs/charj/src/charj/libs
 CHARMCLINKFLAGS = -language charm++
 TESTFLAGS = $(TESTOPTS)
 

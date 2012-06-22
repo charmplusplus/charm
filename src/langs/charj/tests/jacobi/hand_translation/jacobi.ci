@@ -41,7 +41,6 @@ mainmodule jacobi {
                 }
                 atomic {
                     for (int j=0; j<WORK; ++j) doStencil();
-                    //for (int j=0; j<WORK; ++j) doStencil_raw();
                 }
 
             }
