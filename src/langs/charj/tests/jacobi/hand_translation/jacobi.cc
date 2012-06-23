@@ -3,7 +3,6 @@
 /* Readonly variable support */
 CProxy_Main main_proxy;
 CProxy_Chunk chunks;
-int num_finished;
 double start_time;
 
 Main::Main(CkArgMsg* m)
@@ -16,8 +15,18 @@ Main::Main(CkArgMsg* m)
     if (k < CkNumPes() || k % CkNumPes()) CkAbort("k must be a multiple of numPes.");
     chunks = CProxy_Chunk::ckNew(k, x, y, k);
     chunks.jacobi();
-    num_finished = 0;
+    num_finished = k;
+    main_proxy = thisProxy;
     start_time = CmiWallTimer();
+}
+
+void Main::finished()
+{
+    if (--num_finished == 0) {
+        double elapsed = CmiWallTimer() - start_time;
+        CkPrintf("Finished in %fs %fs/step, %d iterations\n", elapsed, elapsed/ITER, ITER);
+        CkExit();
+    }
 }
 //#include "Main.def.h"
 

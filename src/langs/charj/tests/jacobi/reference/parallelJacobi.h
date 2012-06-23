@@ -5,11 +5,12 @@
 #define WORK     1
 
      
-class Main: public Chare {
+class Main: public CBase_Main{
   
  public: 
   int numElements, numFinished;
   Main(CkArgMsg *m);
+  void finished();
 };
 
 class Msg: public CMessage_Msg{

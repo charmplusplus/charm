@@ -2,13 +2,13 @@
 extern atoi;
 extern CkAbort;
 
-readonly Main@ main;
+readonly Main@ main_proxy;
 readonly Chunk@ chunks;
-readonly int num_finished;
 readonly double start_time;
 
 mainchare Main {
-    public entry Main(CkArgMsg[~]@ m) {
+    int num_finished = 0;
+    entry Main(CkArgMsg[~]@ m) {
         if (m.argc != 4) CkAbort("Wrong parameters\n");
 
         int x = atoi(m.argv[1]);
@@ -22,6 +22,16 @@ mainchare Main {
         chunks@jacobi();
         num_finished = 0;
         start_time = CmiWallTimer();
+        main_proxy = thisProxy;
+    }
+
+    entry void finished() {
+        if (++num_finished == CkNumPes()) {
+            double elapsed = CmiWallTimer() - start_time;
+            CkPrintf("Finished in %fs %fs/step, %d iterations\n", elapsed, elapsed/_sdag_jacobi_i, _sdag_jacobi_i);
+            CkPrintf("Numfin=%d, total=%d, Pes = %d\n", _sdag_jacobi_i, total, CkNumPes());
+            CkExit();
+        }
     }
 }
 

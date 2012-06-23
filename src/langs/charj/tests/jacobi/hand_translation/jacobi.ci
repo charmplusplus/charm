@@ -5,12 +5,12 @@ mainmodule jacobi {
     //
     mainchare Main {
         entry Main(CkArgMsg* m);
+        entry void finished();
     };
 //}
 
     readonly CProxy_Main main_proxy;
     readonly CProxy_Chunk chunks;
-    readonly int num_finished;
     readonly double start_time;
 
 
@@ -45,12 +45,7 @@ mainmodule jacobi {
 
             }
             atomic {
-                if (CkMyPe() == 0) {
-                    double elapsed = CmiWallTimer() - start_time;
-                    CkPrintf("Finished in %fs %fs/step, %d iterations\n", elapsed, elapsed/_sdag_jacobi_i, _sdag_jacobi_i);
-                    CkPrintf("Numfin=%d, total=%d, Pes = %d\n", _sdag_jacobi_i, total, CkNumPes());
-                }
-                CkExit();
+                main_proxy.finished();
             }
         };
         entry void getStripFromLeft(Array<double> s);

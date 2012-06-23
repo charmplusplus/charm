@@ -9,7 +9,7 @@ mainmodule parallelJacobi {
 
     mainchare Main {
         entry Main(CkArgMsg *m);
-	//entry void isFinished(int clientNo);
+	    entry void finished();
     };
 
     readonly CProxy_Main globalMainProxy;

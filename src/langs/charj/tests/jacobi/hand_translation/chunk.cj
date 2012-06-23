@@ -127,10 +127,7 @@ chare_array [1D] Chunk {
                 }
             }
             doStencil();
-            if (CkMyPe() == 0) {
-                CkPrintf("Numfin=%d, total=%d, Pes = %d\n",i,total,CkNumPes());
-            }
         }
-        CkExit();
+        if (i == 3) main_proxy@finished();
     }
 }

@@ -104,19 +104,7 @@ void Chunk::print() {
 void Chunk::testEnd(){
 
     if(iterations == ITER)  {
-
-        if(CkMyPe() != 0)
-            return;
-
-        if((CkMyPe()==0)&&(numFinished != total/CkNumPes()))
-            return;
-
-        double elapt = CmiWallTimer()-startTime;
-        CkPrintf("Finished in %fs %fs/step and iters is %d\n", elapt, elapt/iterations,iterations);
-        CkPrintf("Numfin=%d, total=%d, Pes = %d\n",numFinished,total,CkNumPes());
-        // BgPrint("ENDED at: %f\n");
-        CkExit();
-        return;
+        globalMainProxy.finished();
     }
 
 }
@@ -278,10 +266,18 @@ Main::Main(CkArgMsg *m)
 
     chunk_arr.singleStep(new VoidMsg());
     startTime = CmiWallTimer();
-    numFinished = 0;
+    numFinished = k;
+    globalMainProxy = thisProxy;
 }
 
-
+void Main::finished()
+{
+    if (--numFinished == 0) {
+        double elapt = CmiWallTimer()-startTime;
+        CkPrintf("Finished in %fs %fs/step and iters is %d\n", elapt, elapt/ITER,ITER);
+        CkExit();
+    }
+}
 
 
 #include "parallelJacobi.def.h"

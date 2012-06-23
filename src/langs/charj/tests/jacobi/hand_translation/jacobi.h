@@ -33,12 +33,13 @@ using CharjArray::Vector;
 //#include "Main.decl.h"
 class Main: public CBase_Main {
     public: Main(CkArgMsg* m);
+            void finished();
+    public: int num_finished;
 };
 
 /* Readonly variables */
 extern CProxy_Main main;
 extern CProxy_Chunk chunks;
-extern int num_finished;
 extern double start_time;
 //#include "jacobi_readonly.decl.h"
 
