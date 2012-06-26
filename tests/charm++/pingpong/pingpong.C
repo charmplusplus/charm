@@ -109,7 +109,7 @@ public:
     arrF[CkArrayIndexFancy("second")].insert(P2);
     arrF.doneInserting();
     phase=0;
-    mainProxy.maindone();
+    CkStartQD(CkCallback(CkIndex_main::maindone(), mainProxy));
     delete m;
   };
 
