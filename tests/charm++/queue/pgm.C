@@ -178,7 +178,7 @@ bool test_general_ififo()
 const int qSizeMin   = 1<<4;
 const int qSizeMax   = 1<<12;
 const int qBatchSize = 1<<4;
-const int numIters   = 1<<16;
+const int numIters   = 1<<12;
 const int numMsgs    = 1<<7;
 
 std::vector<char> msgs(qSizeMax + numMsgs);
@@ -222,7 +222,7 @@ bool perftest_general_ififo()
     CkPrintf("%10d", i);
 
   // Charm applications typically have a small/moderate number of different message priorities
-  for (int hl = 16; hl < 128; hl *=2)
+  for (int hl = 16; hl <= 128; hl *=2)
   {
     std::srand(42);
     for (int i = 0; i < qSizeMax + numMsgs; i++)
