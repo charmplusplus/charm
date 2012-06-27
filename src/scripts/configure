@@ -2286,6 +2286,62 @@ then
   fi
 fi
 
+# Figure out if the user has asked to enable the latest language standards
+USER_ASKED_FOR_NEW_STD=`echo "$BUILDOPTS" | grep "-use-new-std" | wc -l`
+
+# If the user has asked for the newer standards, check if the compilers know about them
+if test $USER_ASKED_FOR_NEW_STD -ge 1
+then
+
+#### check if c compiler supports c11 compilation flags ####
+cat > $tc <<EOT
+#include <stdio.h>
+
+int foo()
+{
+  return 0;
+}
+EOT
+test_cc "whether c compiler knows of the c11 standard" "ok" "no" "$CMK_ENABLE_C11"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_COMPILER_KNOWS_C11 $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        # Record results for charmc's future use
+        add_flag 'CMK_COMPILER_KNOWS_C11="1"' "c11"
+        # For the rest of configure, append this to compilation flags
+        OPTS_CC="$CMK_ENABLE_C11 $OPTS"
+fi
+
+#### check if C++ compiler supports cpp11 compilation flags ####
+cat > $t <<EOT
+#include <iostream>
+
+int foo()
+{
+  return 0;
+}
+EOT
+test_cxx "whether c++ compiler knows of the cpp11 standard" "ok" "no" "$CMK_ENABLE_CPP11"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_COMPILER_KNOWS_CPP11 $pass
+_ACEOF
+
+if test $pass -eq 1
+then
+        # Record results for charmc's future use
+        add_flag 'CMK_COMPILER_KNOWS_CPP11="1"' "cpp11"
+        # For the rest of configure, append this to compilation flags
+        OPTS_CXX="$CMK_ENABLE_CPP11 $OPTS"
+fi
+
+fi # endif USER_ASKED_FOR_NEW_STD
+
+
 # Perform the tests
 
 
@@ -2692,6 +2748,9 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+
+####### Check support for features added by the new C11 and CPP11 standards ########
+
 #### check if std::unordered_map is defined #####
 cat > $t <<EOT
 #include <unordered_map>
@@ -2704,7 +2763,7 @@ int foo()
   return myhashtbl[1234];
 }
 EOT
-test_cxx "whether std::unordered_map is defined" "ok" "no" "-std=c++0x"
+test_cxx "whether std::unordered_map is defined" "ok" "no" ""
 
 cat >>confdefs.h <<_ACEOF
 #define CMK_HAS_STD_UNORDERED_MAP $pass
