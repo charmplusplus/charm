@@ -20,6 +20,9 @@ CMK_CF90="$XLC_F/${XLC_POST}xlf90  -qsuffix=f=f90"
 CMK_CF90_FIXED="$XLC_PRE/xlf/8.1/${XLC_POST}xlf90 " 
 CMK_C_OPTIMIZE='-O3 -Q'
 CMK_CXX_OPTIMIZE='-O3 -Q'
+CMK_ENABLE_C11='-qlanglvl=extc1x'
+CMK_ENABLE_CPP11='-qlanglvl=extended0x'
+
 CMK_AR='ar cq'
 CMK_NM='nm '
 CMK_QT="aix"
