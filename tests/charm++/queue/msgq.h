@@ -42,6 +42,8 @@ class msgQ
         inline prio_t top_priority() const { return prios.top(); }
 
         ///
+        void enumerate(msg_t **first, msg_t **last) const;
+        ///
         friend std::ostream& operator<< (std::ostream &out, const msgQ &q)
         {
             out <<"\nmsgQ[" << q.qSize << "]:";
@@ -50,12 +52,19 @@ class msgQ
         }
 
     private:
+        ///
         size_t qSize;
+        ///
         #if CMK_HAS_STD_UNORDERED_MAP
         std::unordered_map<prio_t, std::deque<const msg_t*> > msgmap;
+        typedef typename std::unordered_map<prio_t, std::deque<const msg_t*> >::iterator msgmapitr_t;
+        typedef typename std::unordered_map<prio_t, std::deque<const msg_t*> >::const_iterator msgmapconstitr_t;
         #else
         std::map<prio_t, std::deque<const msg_t*> > msgmap;
+        typedef typename std::map<prio_t, std::deque<const msg_t*> >::iterator msgmapitr_t;
+        typedef typename std::map<prio_t, std::deque<const msg_t*> >::const_iterator msgmapconstitr_t;
         #endif
+        ///
         std::priority_queue<prio_t, std::vector<prio_t>, std::greater<prio_t> > prios;
 };
 
@@ -114,6 +123,25 @@ const msg_t* msgQ<P>::front() const
         return NULL;
     prio_t &prio = prios.top();
     return msgmap[prio].front();
+}
+
+
+
+template <typename P>
+void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
+{
+    if (first >= last)
+        return;
+
+    msg_t **ptr = first;
+    msgmapconstitr_t mapitr = msgmap.begin();
+    while (ptr != last && mapitr != msgmap.end())
+    {
+        std::deque<const msg_t*>::const_iterator itr = mapitr->second.begin();
+        while (ptr != last && itr != mapitr->second.end())
+            *ptr++ = (msg_t*) *itr++;
+        mapitr++;
+    }
 }
 
 #endif // MSG_Q_H
