@@ -262,6 +262,14 @@ struct main : public CBase_main
 {
   main(CkArgMsg *)
   {
+    #if CMK_USE_STL_MSGQ
+    CkPrintf("Charm has CMK_USE_STL_MSGQ enabled\n");
+    #if CMK_HAS_STD_UNORDERED_MAP
+    CkPrintf("... and its using a msg q implemented with a std::unordered_map\n");
+    #else
+    CkPrintf("... and its using a msg q implemented with a std::map\n");
+    #endif
+    #endif
     int tests = 0, success = 0, fail = 0;
     char message[100];
 

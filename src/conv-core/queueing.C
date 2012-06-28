@@ -2,6 +2,10 @@
 #include <converse.h>
 #include <string.h>
 
+#if CMK_USE_STL_MSGQ
+#include "msgq.h"
+#endif
+
 /** @defgroup CharmScheduler 
     @brief The portion of Charm++ responsible for scheduling the execution 
     of Charm++ entry methods
@@ -553,6 +557,9 @@ Queue CqsCreate(void)
   CqsDeqInit(&(q->zeroprio));
   CqsPrioqInit(&(q->negprioq));
   CqsPrioqInit(&(q->posprioq));
+#if CMK_USE_STL_MSGQ
+  q->stlQ = (void*) new conv::msgQ<int>;
+#endif
   return q;
 }
 
@@ -560,17 +567,54 @@ void CqsDelete(Queue q)
 {
   CmiFree(q->negprioq.heap);
   CmiFree(q->posprioq.heap);
+#if CMK_USE_STL_MSGQ
+  if (q->stlQ != NULL) delete (conv::msgQ<int>*)(q->stlQ);
+#endif
   CmiFree(q);
-}
-
-unsigned int CqsLength(Queue q)
-{
-  return q->length;
 }
 
 unsigned int CqsMaxLength(Queue q)
 {
   return q->maxlen;
+}
+
+#if CMK_USE_STL_MSGQ
+
+unsigned int CqsLength(Queue q)
+{ return ( (conv::msgQ<int>*)(q->stlQ) )->size(); }
+
+int CqsEmpty(Queue q)
+{ return ( (conv::msgQ<int>*)(q->stlQ) )->empty(); }
+
+void CqsEnqueueGeneral(Queue q, void *data, int strategy, int priobits,unsigned int *prioptr)
+{
+    bool isFifo = (strategy == CQS_QUEUEING_FIFO  ||
+                   strategy == CQS_QUEUEING_IFIFO ||
+                   strategy == CQS_QUEUEING_BFIFO ||
+                   strategy == CQS_QUEUEING_LFIFO);
+    if (priobits >= sizeof(int)*8 && strategy != CQS_QUEUEING_FIFO && strategy != CQS_QUEUEING_LIFO)
+        ( (conv::msgQ<int>*)(q->stlQ) )->enq( data, prioptr[0], isFifo);
+    else
+        ( (conv::msgQ<int>*)(q->stlQ) )->enq( data, 0, isFifo);
+}
+
+void CqsEnqueueFifo(Queue q, void *data)
+{ ( (conv::msgQ<int>*)(q->stlQ) )->enq(data); }
+
+void CqsEnqueueLifo(Queue q, void *data)
+{ ( (conv::msgQ<int>*)(q->stlQ) )->enq(data, 0, false); }
+
+void CqsEnqueue(Queue q, void *data)
+{ ( (conv::msgQ<int>*)(q->stlQ) )->enq(data); }
+
+void CqsDequeue(Queue q, void **resp)
+{ *resp = (void*) ( (conv::msgQ<int>*)(q->stlQ) )->deq(); }
+
+#else
+
+unsigned int CqsLength(Queue q)
+{
+  return q->length;
 }
 
 int CqsEmpty(Queue q)
@@ -697,6 +741,7 @@ void CqsDequeue(Queue q, void **resp)
   *resp = 0; return;
 }
 
+#endif // CMK_USE_STL_MSGQ
 static struct prio_struct kprio_zero = { 0, 0, {0} };
 static struct prio_struct kprio_max  = { 32, 1, {((unsigned int)(-1))} };
 
@@ -796,6 +841,14 @@ void** CqsEnumeratePrioq(_prioq q, int *num){
   return result;
 }
 
+#if CMK_USE_STL_MSGQ
+void CqsEnumerateQueue(Queue q, void ***resp){
+  conv::msgQ<int> *stlQ = (conv::msgQ<int>*) q->stlQ;
+  *resp = (void **)CmiAlloc(stlQ->size() * sizeof(conv::msg_t*));
+  stlQ->enumerate(*resp, *resp + stlQ->size());
+}
+
+#else
 void CqsEnumerateQueue(Queue q, void ***resp){
   void **result;
   int num;
@@ -825,6 +878,7 @@ void CqsEnumerateQueue(Queue q, void ***resp){
   }
   CmiFree(result);
 }
+#endif
 
 /**
    Remove first occurence of a specified entry from the deq  by
