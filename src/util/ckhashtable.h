@@ -435,7 +435,7 @@ public:
 				OBJ o; KEY k;
 				p|k;
 				p|o;
-				put(k)=o;
+				this->put(k)=o;
 				p|hasNext;
 			}
 		}
