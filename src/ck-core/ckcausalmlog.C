@@ -1066,7 +1066,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 	}
 
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG_PE(0,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s stored for future time %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
+	DEBUG_PE(0,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s at %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
 
 	// getting a ticket for this message
 	ticketSuccess = _getTicket(env,&flag);
