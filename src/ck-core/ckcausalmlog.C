@@ -38,6 +38,7 @@
 #define DEBUG_CHECKPOINT 1
 #define DEBUG_NOW(x) x
 #define DEBUG_PE(x,y) // if(CkMyPe() == x) y
+#define DEBUG_PE_NOW(x,y)  if(CkMyPe() == x) y
 #define DEBUG_RECOVERY(x) //x
 
 extern const char *idx2str(const CkArrayIndex &ind);
@@ -601,6 +602,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	MCount ticketNumber = 0;
 	int resend=0; //is it a resend
 	char recverName[100];
+	char senderString[100];
 	double _startTime=CkWallTimer();
 	
 	DEBUG_MEM(CmiMemoryCheck());
@@ -608,6 +610,15 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	if(CpvAccess(_currentObj) == NULL){
 //		CkAssert(0);
 		DEBUG(printf("[%d] !!!!WARNING: _currentObj is NULL while message is being sent\n",CkMyPe());)
+		generalCldEnqueue(destPE,env,_infoIdx);
+		return;
+	}
+
+	// checking if this message should bypass determinants in message-logging
+	if(env->flags & CK_BYPASS_DET_MLOG){
+	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
+		env->recver = recver;
+		CkPrintf("[%d] Bypassing determinants from %s to %s PE %d\n",CkMyPe(),CpvAccess(_currentObj)->mlogData->objID.toString(senderString),recver.toString(recverName),destPE);
 		generalCldEnqueue(destPE,env,_infoIdx);
 		return;
 	}
@@ -637,7 +648,6 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 		resend = 1;
 	}
 	
-	char senderString[100];
 //	if(env->SN != 1){
 		DEBUG(printf("[%d] Generate Ticket Request to %s from %s PE %d SN %d \n",CkMyPe(),env->recver.toString(recverName),env->sender.toString(senderString),destPE,env->SN));
 	//	CmiPrintStackTrace(0);
@@ -727,7 +737,7 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 #endif
 		}else{
 			// the message has to be deleted after it has been sent
-			entry->env->freeMsg = true;
+			entry->env->flags = entry->env->flags | CK_FREE_MSG_MLOG;
 		}
 	}
 
@@ -1034,9 +1044,17 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// getting the receiver object
 	CkObjID recver = env->recver;
+
+	// checking for determinants bypass in message logging
+	if(env->flags & CK_BYPASS_DET_MLOG){
+		DEBUG_NOW(printf("[%d] Bypassing message sender %s recver %s \n",CkMyPe(),env->sender.toString(senderString), recver.toString(recverString)));
+		return 1;	
+	}
+
+	// checking if receiver is fault aware
 	if(!fault_aware(recver)){
-		return 1;
 		CkPrintf("[%d] Receiver NOT fault aware\n",CkMyPe());
+		return 1;
 	}
 
 	Chare *obj = (Chare *)recver.getObject();
@@ -1066,7 +1084,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 	}
 
 	DEBUG_MEM(CmiMemoryCheck());
-	DEBUG_PE(0,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s at %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
+	DEBUG_PE(2,printf("[%d] Message received, sender = %s SN %d TN %d tProcessed %d for recver %s at %.6lf \n",CkMyPe(),env->sender.toString(senderString),env->SN,env->TN,obj->mlogData->tProcessed, recver.toString(recverString),CkWallTimer()));
 
 	// getting a ticket for this message
 	ticketSuccess = _getTicket(env,&flag);
@@ -1095,7 +1113,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 //env->sender.updatePosition(env->getSrcPe());
 	if(env->TN == obj->mlogData->tProcessed+1){
 		//the message that needs to be processed now
-		DEBUG_PE(3,printf("[%d] Message SN %d TN %d sender %s recver %s being processed recvPointer %p\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString),obj));
+		DEBUG_PE(2,printf("[%d] Message SN %d TN %d sender %s recver %s being processed recvPointer %p\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString),obj));
 		// once we find a message that we can process we put back all the messages in the out of order queue
 		// back into the main scheduler queue. 
 	DEBUG_MEM(CmiMemoryCheck());

@@ -399,6 +399,10 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 	// if object is an immigrant recovery object, we send the contribution to the source PE
 	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
+		
+		// turning on the message-logging bypass flag
+		envelope *env = UsrToEnv(m);
+		env->flags = env->flags | CK_BYPASS_DET_MLOG;
     	thisProxy[CpvAccess(_currentObj)->mlogData->immigrantSourcePE].contributeViaMessage(m);
 		return;
 	}
@@ -417,6 +421,11 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 #if defined(_FAULT_CAUSAL_)
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
+	//if(CkMyPe() == 2) CkPrintf("[%d] ---> Contributing Via Message\n",CkMyPe());
+	
+	// turning off bypassing flag
+	envelope *env = UsrToEnv(m);
+	env->flags = env->flags & ~CK_BYPASS_DET_MLOG;
 
 	// adding contribution
     addContribution(m);
