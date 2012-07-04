@@ -204,6 +204,9 @@ CkReductionMgr::CkReductionMgr()//Constructor
     totalCount = 0;
     processorCount = 0;
 #endif
+#if defined(_FAULT_CAUSAL_)
+	numImmigrantRecObjs = 0;
+#endif
   disableNotifyChildrenStart = CmiFalse;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
@@ -219,6 +222,10 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
+#if defined(_FAULT_CAUSAL_)
+	numImmigrantRecObjs = 0;
+#endif
+
 }
 
 void CkReductionMgr::flushStates(int isgroup)
@@ -660,7 +667,7 @@ void CkReductionMgr::finishReduction(void)
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_CAUSAL_))
-	if (nContrib<(lcount+adj(redNo).lcount)-CpvAccess(_numImmigrantRecObjs)){
+	if (nContrib<(lcount+adj(redNo).lcount)-numImmigrantRecObjs){
         DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 		return;//Need more local messages
 	}
@@ -686,7 +693,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
 #if (defined(_FAULT_CAUSAL_))
-    result->gcount+=gcount+adj(redNo).gcount-CpvAccess(_numImmigrantRecObjs);
+    result->gcount+=gcount+adj(redNo).gcount-numImmigrantRecObjs;
 #else
     result->gcount+=gcount+adj(redNo).gcount;
 #endif
