@@ -618,7 +618,7 @@ void sendCommonMsg(CkObjID &recver,envelope *_env,int destPE,int _infoIdx){
 	if(env->flags & CK_BYPASS_DET_MLOG){
 	 	env->sender = CpvAccess(_currentObj)->mlogData->objID;
 		env->recver = recver;
-		CkPrintf("[%d] Bypassing determinants from %s to %s PE %d\n",CkMyPe(),CpvAccess(_currentObj)->mlogData->objID.toString(senderString),recver.toString(recverName),destPE);
+		DEBUG(CkPrintf("[%d] Bypassing determinants from %s to %s PE %d\n",CkMyPe(),CpvAccess(_currentObj)->mlogData->objID.toString(senderString),recver.toString(recverName),destPE));
 		generalCldEnqueue(destPE,env,_infoIdx);
 		return;
 	}
@@ -1047,7 +1047,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// checking for determinants bypass in message logging
 	if(env->flags & CK_BYPASS_DET_MLOG){
-		DEBUG_NOW(printf("[%d] Bypassing message sender %s recver %s \n",CkMyPe(),env->sender.toString(senderString), recver.toString(recverString)));
+		DEBUG(printf("[%d] Bypassing message sender %s recver %s \n",CkMyPe(),env->sender.toString(senderString), recver.toString(recverString)));
 		return 1;	
 	}
 
