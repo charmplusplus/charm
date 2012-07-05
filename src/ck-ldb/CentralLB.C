@@ -959,6 +959,10 @@ void resumeCentralLbAfterChkpt(void *_lb){
     CpvAccess(_currentObj)=lb;
     lb->endMigrationDone(lb->savedBalancing);
 }
+void resumeAfterRestoreParallelRecovery(void *_lb){
+    CentralLB *lb= (CentralLB *)_lb;
+	lb->ProcessReceiveMigration((CkReductionMsg*)NULL);
+}
 #endif
 
 

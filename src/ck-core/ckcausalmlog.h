@@ -616,6 +616,7 @@ void startLoadBalancingMlog(void (*fnPtr)(void *),void *_centralLb);
 void finishedCheckpointLoadBalancing();
 void sendMlogLocation(int targetPE,envelope *env);
 void resumeFromSyncRestart(void *data,ChareMlogData *mlogData);
+void restoreParallelRecovery(void (*fnPtr)(void *),void *_centralLb);
 
 //handlers for Load Balancing
 void _receiveMlogLocationHandler(void *buf);

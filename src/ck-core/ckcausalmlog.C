@@ -3142,6 +3142,14 @@ void initMlogLBStep(CkGroupID gid){
 #endif
 }
 
+/**
+ * Restores objects after parallel recovery, either by sending back the immigrant objects or 
+ * by waiting for all emigrant objects to be back.
+ */
+void restoreParallelRecovery(void (*fnPtr)(void *),void *_centralLb){
+	// CODING
+}
+
 void startLoadBalancingMlog(void (*_fnPtr)(void *),void *_centralLb){
 	DEBUGLB(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
 	DEBUG_TEAM(printf("[%d] start Load balancing section of message logging \n",CmiMyPe()));
