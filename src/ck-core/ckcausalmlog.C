@@ -2983,8 +2983,6 @@ void _distributedLocationHandler(char *receivedMsg){
 	pmem |gID;
 	pmem |idx;
 	CkLocMgr *mgr = (CkLocMgr*)CkpvAccess(_groupTable)->find(gID).getObj();
-	// CODING
-//	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(idx).getObj();
 	donotCountMigration=1;
 	mgr->resume(idx,pmem,CmiTrue);
 	donotCountMigration=0;
@@ -2998,7 +2996,6 @@ void _distributedLocationHandler(char *receivedMsg){
 	// adding object to the list of immigrant recovery objects
 	CpvAccess(_immigrantRecObjs)->push_back((CkLocRec_local *)rec);
 	CpvAccess(_numImmigrantRecObjs)++;
-	reductionMgr->incImmigrantRecObjs();
 	
 	CkVec<CkMigratable *> eltList;
 	mgr->migratableList((CkLocRec_local *)rec,eltList);
@@ -3007,6 +3004,11 @@ void _distributedLocationHandler(char *receivedMsg){
 			CpvAccess(_currentObj) = eltList[i];
 			eltList[i]->mlogData->immigrantRecFlag = 1;
 			eltList[i]->mlogData->immigrantSourcePE = sourcePE;
+
+			// incrementing immigrant counter at reduction manager
+			CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[i]->mlogData->objID.data.array.id).getObj();
+			reductionMgr->incNumImmigrantRecObjs();
+
 			eltList[i]->ResumeFromSync();
 		}
 	}
