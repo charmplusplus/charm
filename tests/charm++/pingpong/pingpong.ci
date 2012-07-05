@@ -39,7 +39,7 @@ mainmodule pingpong {
   };
   group PingG {
     entry PingG(void);
-    entry void start(bool isPipelined, bool copy, int fragSize);
+    entry void start(bool isPipelined, bool copy, bool allocate, int fragSize);
     entry void recv(PingMsg *);
     entry void pipelinedRecv(FragMsg *); 
   }
