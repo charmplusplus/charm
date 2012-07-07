@@ -551,12 +551,20 @@ public:
 	void decNumImmigrantRecObjs(){
 		numImmigrantRecObjs--;
 	}
+	void incNumEmigrantRecObjs(){
+		numEmigrantRecObjs++;
+	}
+	void decNumEmigrantRecObjs(){
+		numEmigrantRecObjs--;
+	}
+
 #endif
 
 private:
 
 #if defined(_FAULT_CAUSAL_)
 	int numImmigrantRecObjs;
+	int numEmigrantRecObjs;
 #endif
 
 //Data members

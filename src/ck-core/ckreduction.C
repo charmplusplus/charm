@@ -667,7 +667,7 @@ void CkReductionMgr::finishReduction(void)
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_CAUSAL_))
-	if (nContrib<(lcount+adj(redNo).lcount)-numImmigrantRecObjs){
+	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
         DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 		return;//Need more local messages
 	}

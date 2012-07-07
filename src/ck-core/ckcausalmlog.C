@@ -2923,13 +2923,21 @@ public:
 			
 		CkArrayIndexMax idx = loc.getIndex();
 		CkLocRec_local *rec = loc.getLocalRecord();
+		CkLocMgr *locMgr = loc.getManager();
+		CkVec<CkMigratable *> eltList;
 			
 		CkPrintf("[%d] Distributing objects to Processor %d: ",CkMyPe(),*targetPE);
 		idx.print();
 
 		// incrementing number of emigrant objects
 		CpvAccess(_numEmigrantRecObjs)++;
-			
+    	locMgr->migratableList((CkLocRec_local *)rec,eltList);
+		CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
+		
+		// let everybody else know the object is leaving
+		locMgr->callMethod(rec,&CkMigratable::ckAboutToMigrate);
+		reductionMgr->incNumEmigrantRecObjs();
+	
 		//pack up this location and send it across
 		PUP::sizer psizer;
 		pupLocation(loc,psizer);
@@ -2991,6 +2999,13 @@ void _sendBackLocationHandler(char *receivedMsg){
 	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
 	printf("Array element inserted at processor %d after distribution at restart ",CkMyPe());
 	idx.print();
+
+	// decrementing number of emigrant objects at reduction manager
+	CkVec<CkMigratable *> eltList;
+	CkLocRec *rec = mgr->elementRec(idx);
+	mgr->migratableList((CkLocRec_local *)rec,eltList);
+	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
+	reductionMgr->decNumEmigrantRecObjs();
 
 	// checking if it has received all emigrant recovering objects
 	CpvAccess(_numEmigrantRecObjs)--;
@@ -3214,6 +3229,9 @@ void sendBackImmigrantRecObjs(){
 
 		CkPrintf("[%d] Sending back object to %d: ",CkMyPe(),targetPE);
 		idx.print();
+
+		// let everybody else know the object is leaving
+		locMgr->callMethod(rec,&CkMigratable::ckAboutToMigrate);
 			
 		//pack up this location and send it across
 		pupLocation(loc,locMgr,psizer);

@@ -645,6 +645,7 @@ public:
 	//Look up array element in hash table.  Return NULL if not there.
 	CkLocRec *elementNrec(const CkArrayIndex &idx);
 
+
 private:
 //Internal interface:
 	//Add given element array record at idx, replacing the existing record
@@ -669,7 +670,6 @@ private:
 
 	/// Call this member function on each element of this location:
 	typedef void (CkMigratable::* CkMigratable_voidfn_t)(void);
-	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
 
 	CmiBool deliverUnknown(CkArrayMessage *msg,CkDeliver_t type,int opts);
 
@@ -683,6 +683,9 @@ CkLocRec_local *createLocal(const CkArrayIndex &idx,
 		CmiBool forMigration, CmiBool ignoreArrival,
 		CmiBool notifyHome);
 #endif
+
+public:
+	void callMethod(CkLocRec_local *rec,CkMigratable_voidfn_t fn);
 
 //Data Members:
 	//Map array ID to manager and elements
