@@ -954,9 +954,20 @@ void CProxy_ArrayBase::doneInserting(void)
   CProxy_CkArray(_aid).remoteDoneInserting();
 }
 
+void CProxy_ArrayBase::beginInserting(void)
+{
+  DEBC((AA"Broadcasting a beginInserting request\n"AB));
+  CProxy_CkArray(_aid).remoteBeginInserting();
+}
+
 void CkArray::doneInserting(void)
 {
   thisProxy[CkMyPe()].remoteDoneInserting();
+}
+
+void CkArray::beginInserting(void)
+{
+  thisProxy[CkMyPe()].remoteBeginInserting();
 }
 
 /// This is called on every processor after the last array insertion.
@@ -968,6 +979,18 @@ void CkArray::remoteDoneInserting(void)
     DEBC((AA"Done inserting objects\n"AB));
     for (int l=0;l<listeners.size();l++) listeners[l]->ckEndInserting();
     locMgr->doneInserting();
+  }
+}
+
+void CkArray::remoteBeginInserting(void)
+{
+  CK_MAGICNUMBER_CHECK;
+
+  if (!isInserting) {
+    isInserting = CmiTrue;
+    DEBC((AA"Begin inserting objects\n"AB));
+    for (int l=0;l<listeners.size();l++) listeners[l]->ckBeginInserting();
+    locMgr->startInserting();
   }
 }
 
