@@ -679,7 +679,8 @@ void CkReductionMgr::finishReduction(void)
 #endif
 
 #if GROUP_LEVEL_REDUCTION
-  if (nRemote<treeKids()) return;//Need more remote messages
+  if (nRemote<treeKids())  return;//Need more remote messages
+	
 #endif
  
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
@@ -693,7 +694,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
 #if (defined(_FAULT_CAUSAL_))
-    result->gcount+=gcount+adj(redNo).gcount-numImmigrantRecObjs;
+    result->gcount+=gcount+adj(redNo).gcount;
 #else
     result->gcount+=gcount+adj(redNo).gcount;
 #endif

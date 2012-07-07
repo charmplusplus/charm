@@ -2997,7 +2997,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	mgr->resume(idx,pmem,CmiTrue);
 	donotCountMigration=0;
 	informLocationHome(gID,idx,mgr->homePe(idx),CkMyPe());
-	printf("Array element inserted at processor %d after distribution at restart ",CkMyPe());
+	printf("Array element inserted at processor %d after parallel recovery\n",CkMyPe());
 	idx.print();
 
 	// decrementing number of emigrant objects at reduction manager
@@ -3006,6 +3006,7 @@ void _sendBackLocationHandler(char *receivedMsg){
 	mgr->migratableList((CkLocRec_local *)rec,eltList);
 	CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[0]->mlogData->objID.data.array.id).getObj();
 	reductionMgr->decNumEmigrantRecObjs();
+	reductionMgr->decGCount();
 
 	// checking if it has received all emigrant recovering objects
 	CpvAccess(_numEmigrantRecObjs)--;
@@ -3054,6 +3055,7 @@ void _distributedLocationHandler(char *receivedMsg){
 			// incrementing immigrant counter at reduction manager
 			CkReductionMgr *reductionMgr = (CkReductionMgr*)CkpvAccess(_groupTable)->find(eltList[i]->mlogData->objID.data.array.id).getObj();
 			reductionMgr->incNumImmigrantRecObjs();
+			reductionMgr->decGCount();
 
 			eltList[i]->ResumeFromSync();
 		}
