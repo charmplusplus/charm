@@ -583,6 +583,7 @@ void _sendDetsReplyHandler(char *msg);
 void _receivedTNDataHandler(ReceivedTNData *msg);
 void _receivedDetDataHandler(ReceivedDetData *msg);
 void _distributedLocationHandler(char *receivedMsg);
+void _sendBackLocationHandler(char *receivedMsg);
 void _updateHomeRequestHandler(RestartRequest *updateRequest);
 void _updateHomeAckHandler(RestartRequest *updateHomeAck);
 void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest);
