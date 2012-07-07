@@ -2581,6 +2581,26 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### Check ucontext and FPU pointer ####
+cat > $t <<EOT
+#include <infiniband/verbs.h>
+void test()
+{
+    struct ibv_context    *context;
+    int ibPort;
+    struct ibv_port_attr attr;
+    if (ibv_query_port(context, ibPort, &attr) != 0) return;
+    if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  return;
+}
+EOT
+test_cxx "whether ibverbs ibv_port_attr has link_layer field" "yes" "no" ""
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_IBV_PORT_ATTR_HAS_LINK_LAYER $pass
+_ACEOF
+
+
+
 ###################### C++ Compiler Features #####################
 
 #### check C inline ####
