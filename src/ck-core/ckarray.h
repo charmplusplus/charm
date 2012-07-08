@@ -350,6 +350,7 @@ public:
 	unsigned int numLocalElements() const { return ckLocMgr()->numLocalElements(); }
 
 	void doneInserting(void);
+	void beginInserting(void);
 
 	CK_REDUCTION_CLIENT_DECL
 
@@ -688,7 +689,9 @@ public:
   /// Create initial array elements:
   virtual void insertInitial(const CkArrayIndex &idx,void *ctorMsg,int local=1);
   virtual void doneInserting(void);
+  virtual void beginInserting(void);
   void remoteDoneInserting(void);
+  void remoteBeginInserting(void);
 
   /// Create manually:
   virtual CmiBool insertElement(CkMessage *);

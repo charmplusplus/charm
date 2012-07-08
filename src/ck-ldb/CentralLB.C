@@ -765,7 +765,7 @@ void CentralLB::ReceiveMigration(LBMigrateMsg *m)
 {
   storedMigrateMsg = m;
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-	ProcessReceiveMigration((CkReductionMsg*)NULL);
+	restoreParallelRecovery(&resumeAfterRestoreParallelRecovery,(void *)this);
 #else
   CkCallback cb(CkIndex_CentralLB::ProcessReceiveMigration((CkReductionMsg*)NULL),
                   thisProxy);
@@ -958,6 +958,10 @@ void resumeCentralLbAfterChkpt(void *_lb){
     CentralLB *lb= (CentralLB *)_lb;
     CpvAccess(_currentObj)=lb;
     lb->endMigrationDone(lb->savedBalancing);
+}
+void resumeAfterRestoreParallelRecovery(void *_lb){
+    CentralLB *lb= (CentralLB *)_lb;
+	lb->ProcessReceiveMigration((CkReductionMsg*)NULL);
 }
 #endif
 

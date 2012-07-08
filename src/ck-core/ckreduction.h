@@ -544,8 +544,29 @@ public:
 	*/
 	int getGCount(){return gcount;};
         static void sanitycheck();
+#if defined(_FAULT_CAUSAL_)
+	void decGCount(){gcount--;}
+	void incNumImmigrantRecObjs(){
+		numImmigrantRecObjs++;
+	}
+	void decNumImmigrantRecObjs(){
+		numImmigrantRecObjs--;
+	}
+	void incNumEmigrantRecObjs(){
+		numEmigrantRecObjs++;
+	}
+	void decNumEmigrantRecObjs(){
+		numEmigrantRecObjs--;
+	}
+
+#endif
+
 private:
 
+#if defined(_FAULT_CAUSAL_)
+	int numImmigrantRecObjs;
+	int numEmigrantRecObjs;
+#endif
 
 //Data members
 	//Stored callback function (may be NULL if none has been set)

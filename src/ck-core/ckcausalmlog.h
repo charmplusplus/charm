@@ -583,6 +583,7 @@ void _sendDetsReplyHandler(char *msg);
 void _receivedTNDataHandler(ReceivedTNData *msg);
 void _receivedDetDataHandler(ReceivedDetData *msg);
 void _distributedLocationHandler(char *receivedMsg);
+void _sendBackLocationHandler(char *receivedMsg);
 void _updateHomeRequestHandler(RestartRequest *updateRequest);
 void _updateHomeAckHandler(RestartRequest *updateHomeAck);
 void _verifyAckRequestHandler(VerifyAckMsg *verifyRequest);
@@ -616,6 +617,7 @@ void startLoadBalancingMlog(void (*fnPtr)(void *),void *_centralLb);
 void finishedCheckpointLoadBalancing();
 void sendMlogLocation(int targetPE,envelope *env);
 void resumeFromSyncRestart(void *data,ChareMlogData *mlogData);
+void restoreParallelRecovery(void (*fnPtr)(void *),void *_centralLb);
 
 //handlers for Load Balancing
 void _receiveMlogLocationHandler(void *buf);

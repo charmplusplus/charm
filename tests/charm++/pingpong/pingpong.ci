@@ -7,6 +7,9 @@ mainmodule pingpong {
     entry void maindone(void);
   };
   message PingMsg{char x[];};
+  message FragMsg{
+    char x[];
+  };
   message IdMsg;
 
   array [1D] Ping1 {
@@ -36,8 +39,9 @@ mainmodule pingpong {
   };
   group PingG {
     entry PingG(void);
-    entry void start(void);
+    entry void start(bool isPipelined, bool copy, bool allocate, int fragSize);
     entry void recv(PingMsg *);
+    entry void pipelinedRecv(FragMsg *); 
   }
   nodegroup PingN {
     entry PingN(void);

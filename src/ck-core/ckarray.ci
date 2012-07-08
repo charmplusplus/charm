@@ -9,6 +9,7 @@ module CkArray {
 	entry CkArray(CkArrayOptions opts, CkMarshalledMessage ctorMsg, CkNodeGroupID nodereductionProxy);
 	//Insertion
 	entry void insertElement(CkMessage *);
+	entry void remoteBeginInserting(void);
 	entry void remoteDoneInserting(void);
 	//Broadcast
 	entry void sendBroadcast(CkMessage *);

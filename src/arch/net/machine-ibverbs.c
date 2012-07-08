@@ -491,7 +491,11 @@ loop:
         for (ibPort = 1; ibPort < MAXPORT; ibPort++) {
           struct ibv_port_attr attr;
           if (ibv_query_port(context->context, ibPort, &attr) != 0) continue;
+#if CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
           if (attr.link_layer == IBV_LINK_LAYER_INFINIBAND)  break;
+#else
+          break;
+#endif
           
         }
         if (ibPort == MAXPORT) {

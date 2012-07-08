@@ -1,14 +1,18 @@
 CHARMC := ../../../bin/charmc
 CXX := $(CHARMC) $(OPTS)
 
-all: pgm
-test: pgm
+TARGETS = pgm msgqtest
+all: $(TARGETS)
+test: $(TARGETS)
 	./charmrun ./pgm $(TESTOPTS)
+	./charmrun ./msgqtest $(TESTOPTS)
 
 pgm.C: main.decl.h
+
+msgqtest.C: main.decl.h
 
 main.decl.h: test.ci
 	$(CHARMC) $<
 
 clean:
-	rm -f pgm *.o *.decl.h *.def.h charmrun pgm.exe pgm.pdb pgm.ilk
+	rm -f $(TARGETS) *.o *.decl.h *.def.h charmrun pgm.exe pgm.pdb pgm.ilk

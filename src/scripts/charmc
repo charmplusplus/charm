@@ -699,6 +699,14 @@ do
                 WERROR="0"
                 ;;
 
+	"-use-new-std")
+        USE_NEW_STD="1"
+		;;
+
+	"-no-use-new-std")
+		USE_NEW_STD="0"
+		;;
+
 	-LANG*)
 		Warning "passing unrecognized option $arg to all compilers and linkers"
 		OPTS="$OPTS $arg"
@@ -838,6 +846,21 @@ PROCESSED_MODULES=""
 if [ "$WERROR" = "1" ]
 then
     OPTS="$OPTS $CMK_WARNINGS_ARE_ERRORS"
+fi
+
+# If the user has asked for the latest language standards (C11 or CPP11)
+if [ "$USE_NEW_STD" = "1" ]
+then
+    # and if configure confirmed that the underlying compiler knows abt C11, enable it
+    if [ "$CMK_COMPILER_KNOWS_C11" = "1" ]
+    then
+        OPTS_CC="$OPTS $CMK_ENABLE_C11"
+    fi
+    # and if configure confirmed that the underlying compiler knows abt CPP11, enable it
+    if [ "$CMK_COMPILER_KNOWS_CPP11" = "1" ]
+    then
+        OPTS_CXX="$OPTS $CMK_ENABLE_CPP11"
+    fi
 fi
 
 # Look up and add the dependencies for module $1

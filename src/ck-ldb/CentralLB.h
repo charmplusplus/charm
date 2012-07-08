@@ -264,6 +264,7 @@ public:
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_)) 
     void resumeCentralLbAfterChkpt(void *lb);
+	void resumeAfterRestoreParallelRecovery(void *_lb);
 #endif
 
 // CLBStatsMsg is not directly sent in the entry function

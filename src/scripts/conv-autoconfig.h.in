@@ -18,6 +18,12 @@
 /* enable charmdebug */
 #undef CMK_CHARMDEBUG
 
+/* whether c compiler knows of the c11 standard */
+#undef CMK_COMPILER_KNOWS_C11
+
+/* whether c++ compiler knows of the cpp11 standard */
+#undef CMK_COMPILER_KNOWS_CPP11
+
 /* whether ucontext has pointer */
 #undef CMK_CONTEXT_FPU_POINTER
 
@@ -204,6 +210,9 @@
 /* whether std::inserter works */
 #undef CMK_HAS_STD_INSERTER
 
+/* whether std::unordered_map works */
+#undef CMK_HAS_STD_UNORDERED_MAP
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 
@@ -227,6 +236,9 @@
 
 /* whether has values.h */
 #undef CMK_HAS_VALUES_H
+
+/* whether ibv_port_attr has link_layer field */
+#undef CMK_IBV_PORT_ATTR_HAS_LINK_LAYER
 
 /* Setting load balancing timer type */
 #undef CMK_LBTIME_TYPE

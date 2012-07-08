@@ -26,7 +26,10 @@
 // silly ancient name: for backward compatability only.
 #define PW(x) CkPriobitsToInts(x) 
 
-
+#if defined(_FAULT_CAUSAL_)
+#define CK_FREE_MSG_MLOG 	0x1
+#define CK_BYPASS_DET_MLOG 	0x2
+#endif
 
 //#define USE_CRITICAL_PATH_HEADER_ARRAY
 
@@ -185,8 +188,7 @@ public:
     MCount SN;
     MCount TN;
     int incarnation;
-    MlogEntry *localMlogEntry;
-    bool freeMsg;
+	int flags;
 #endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
@@ -265,7 +267,6 @@ private:
       env->SN = 0;
       env->TN = 0;
 	  env->incarnation = -1;
-      env->localMlogEntry = NULL;
 #endif
 
       return env;

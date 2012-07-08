@@ -204,6 +204,9 @@ CkReductionMgr::CkReductionMgr()//Constructor
     totalCount = 0;
     processorCount = 0;
 #endif
+#if defined(_FAULT_CAUSAL_)
+	numImmigrantRecObjs = 0;
+#endif
   disableNotifyChildrenStart = CmiFalse;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
 }
@@ -219,6 +222,10 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   nContrib=nRemote=0;
   maxStartRequest=0;
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
+#if defined(_FAULT_CAUSAL_)
+	numImmigrantRecObjs = 0;
+#endif
+
 }
 
 void CkReductionMgr::flushStates(int isgroup)
@@ -399,6 +406,10 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 	// if object is an immigrant recovery object, we send the contribution to the source PE
 	if(CpvAccess(_currentObj)->mlogData->immigrantRecFlag){
+		
+		// turning on the message-logging bypass flag
+		envelope *env = UsrToEnv(m);
+		env->flags = env->flags | CK_BYPASS_DET_MLOG;
     	thisProxy[CpvAccess(_currentObj)->mlogData->immigrantSourcePE].contributeViaMessage(m);
 		return;
 	}
@@ -417,6 +428,11 @@ void CkReductionMgr::contribute(contributorInfo *ci,CkReductionMsg *m)
 
 #if defined(_FAULT_CAUSAL_)
 void CkReductionMgr::contributeViaMessage(CkReductionMsg *m){
+	//if(CkMyPe() == 2) CkPrintf("[%d] ---> Contributing Via Message\n",CkMyPe());
+	
+	// turning off bypassing flag
+	envelope *env = UsrToEnv(m);
+	env->flags = env->flags & ~CK_BYPASS_DET_MLOG;
 
 	// adding contribution
     addContribution(m);
@@ -651,7 +667,7 @@ void CkReductionMgr::finishReduction(void)
   }
   //CkPrintf("[%d]finishReduction called for redNo %d with nContrib %d at %.6f\n",CkMyPe(),redNo, nContrib,CmiWallTimer());
 #if (defined(_FAULT_CAUSAL_))
-	if (nContrib<(lcount+adj(redNo).lcount)-CpvAccess(_numImmigrantRecObjs)){
+	if (nContrib<(lcount+adj(redNo).lcount) - numImmigrantRecObjs + numEmigrantRecObjs){
         DEBR((AA"Need more local messages %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
 		return;//Need more local messages
 	}
@@ -663,7 +679,8 @@ void CkReductionMgr::finishReduction(void)
 #endif
 
 #if GROUP_LEVEL_REDUCTION
-  if (nRemote<treeKids()) return;//Need more remote messages
+  if (nRemote<treeKids())  return;//Need more remote messages
+	
 #endif
  
   DEBR((AA"Reducing data... %d %d\n"AB,nContrib,(lcount+adj(redNo).lcount)));
@@ -677,7 +694,7 @@ void CkReductionMgr::finishReduction(void)
     DEBR((AA"Passing reduced data up to parent node %d.\n"AB,treeParent()));
     DEBR((AA"Message gcount is %d+%d+%d.\n"AB,result->gcount,gcount,adj(redNo).gcount));
 #if (defined(_FAULT_CAUSAL_))
-    result->gcount+=gcount+adj(redNo).gcount-CpvAccess(_numImmigrantRecObjs);
+    result->gcount+=gcount+adj(redNo).gcount;
 #else
     result->gcount+=gcount+adj(redNo).gcount;
 #endif
