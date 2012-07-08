@@ -2631,6 +2631,7 @@ void infi_CmiFree(void *ptr){
 
 	MACHSTATE(3,"Freeing");
 
+        if (Cmi_charmrun_fd == -1) return free(ptr);
         ptr += sizeof(CmiChunkHeader);
         size = SIZEFIELD (ptr);
 /*      if(size > firstBinSize){*/
