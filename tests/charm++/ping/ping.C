@@ -37,8 +37,6 @@ public:
           payload=atoi(m->argv[1]);
       if(m->argc>2)
           PEsPerNode = atoi(m->argv[2]);
-      if(PEsPerNode > CkMyNodeSize())
-          PEsPerNode = CkMyNodeSize();
       if(m->argc>3)
           CharesPerPE = atoi(m->argv[3]);
       if(m->argc>4)
@@ -58,8 +56,9 @@ public:
       if(niter == iterations)
       {
           double pingTimer = CkWallTimer() - start_time;
-          CkPrintf("Ping time for %d messages(%d Chares * %d PEs per node) of %d Bytes cost %f ms\n", 
-              PEsPerNode * CharesPerPE, CharesPerPE, PEsPerNode, payload, 1000*pingTimer/iterations);
+          CkPrintf("Chares       Workers        NoOfMsgs        Bytes           Total           Time\n");
+          CkPrintf("PingTime %d  \t\t%d  \t\t%d  \t\t%d \t\t%.3f\nn",
+              CharesPerPE, PEsPerNode, PEsPerNode * CharesPerPE, payload, 1000*pingTimer/iterations);
           CkExit();
       }else
       {
@@ -89,6 +88,7 @@ public:
   }
   void recv(PingMsg *msg)
   {
+      delete msg;
       recvCnt++;
       if(recvCnt == PEsPerNode * CharesPerPE)
       {
