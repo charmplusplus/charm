@@ -10,7 +10,7 @@ over the members of an array or group.
 The data to be reduced comes from a call to the member \kw{contribute} 
 method:
 \begin{alltt}
-void contribute(int nBytes,const void *data,CkReduction::reducerType type);
+void contribute(int nBytes, const void *data, CkReduction::reducerType type);
 \end{alltt}
 
 This call contributes \kw{nBytes} bytes starting at \kw{data} to the
@@ -155,6 +155,13 @@ which it must not deallocate.
     cout<<``Second force sum is ``<<forceSum[1]<<endl;
   \}
 \end{alltt}
+
+If the target of a reduction is an entry method defined by a
+\emph{whem} clause in \ref[SDAG]{sdag}, one may wish to set a
+reference number or tag that SDAG can use to match the resulting
+reduction message. To set the tag on a reduction message, the
+contributors can pass an additional integer argument at the end of the
+{\tt contribute()} call.
 
 \subsubsection{Typed Reductions}
 
