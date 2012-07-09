@@ -14,24 +14,24 @@ mainmodule pingpong {
 
   array [1D] Ping1 {
     entry Ping1();
-    entry void start(void);
+    entry void start(bool reportTime);
     entry void recv(PingMsg *);
     entry [threaded] void trecv(PingMsg *);
   };        	
   array [2D] Ping2 {
     entry Ping2();
-    entry void start(void);
+    entry void start(bool reportTime);
     entry void recv(PingMsg *);
   };        	
   array [3D] Ping3 {
     entry Ping3();
-    entry void start(void);
+    entry void start(bool reportTime);
     entry void recv(PingMsg *);
   };        	
   chare PingC {
     entry PingC(void);
     entry PingC(IdMsg *);
-    entry void start(void);
+    entry void start(bool reportTime);
     entry void exchange(IdMsg *);
     entry void recvReuse(PingMsg *);
     entry void recv(PingMsg *);
@@ -39,21 +39,21 @@ mainmodule pingpong {
   };
   group PingG {
     entry PingG(void);
-    entry void start(bool isPipelined, bool copy, bool allocate, int fragSize);
+    entry void start(bool reportTime, bool isPipelined, bool copy, bool allocate, int fragSize);
     entry void recv(PingMsg *);
     entry void pipelinedRecv(FragMsg *); 
   }
   nodegroup PingN {
     entry PingN(void);
-    entry void start(void);
-    entry void startRDMA(void);
+    entry void start(bool reportTime);
+    entry void startRDMA(bool reportTime);
     entry [exclusive] void recv(PingMsg *);
     entry [exclusive] void recvRDMA();
     entry [exclusive] void recvHandle(char ptr[size], int size);
   }
   array [Fancy] PingF {
     entry PingF();
-    entry void start(void);
+    entry void start(bool reportTime);
     entry void recv(PingMsg *msg);
   };        	
 };
