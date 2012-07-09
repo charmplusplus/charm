@@ -206,6 +206,7 @@ CkReductionMgr::CkReductionMgr()//Constructor
 #endif
 #if defined(_FAULT_CAUSAL_)
 	numImmigrantRecObjs = 0;
+	numEmigrantRecObjs = 0;
 #endif
   disableNotifyChildrenStart = CmiFalse;
   DEBR((AA"In reductionMgr constructor at %d \n"AB,this));
@@ -224,6 +225,7 @@ CkReductionMgr::CkReductionMgr(CkMigrateMessage *m) :CkGroupInitCallback(m)
   DEBR((AA"In reductionMgr migratable constructor at %d \n"AB,this));
 #if defined(_FAULT_CAUSAL_)
 	numImmigrantRecObjs = 0;
+	numEmigrantRecObjs = 0;
 #endif
 
 }
