@@ -2,11 +2,18 @@ CHARMC=../../../bin/charmc $(OPTS) $(MOPTS)
 
 OBJS = jacobi3d.o
 
+OBJS_OMP = jacobi3d_omp.o
+
+OMP_FLAG = -DJACOBI_OPENMP
+
 all: jacobi3d
 
 jacobi3d: $(OBJS)
 	$(CHARMC) -language charm++ -module DummyLB -o jacobi3d $(OBJS)
 #	$(CHARMC) -language charm++ -module EveryLB -memory paranoid -o jacobi3d $(OBJS)
+
+jacobi3d_omp: $(OBJS_OMP)
+	$(CHARMC) -language charm++ -module DummyLB -fopenmp -o jacobi3d $(OBJS)
 
 projections: $(OBJS)
 	$(CHARMC) -language charm++ -tracemode projections -lz -o jacobi3d.prj $(OBJS)
@@ -29,3 +36,7 @@ clean:
 
 jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
+
+jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
+	$(CHARMC) $(OMP_FLAG) -c jacobi3d.C
+

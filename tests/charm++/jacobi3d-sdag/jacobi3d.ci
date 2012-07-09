@@ -20,6 +20,7 @@ mainmodule jacobi3d {
 
   mainchare Main {
     entry Main(CkArgMsg *m);
+    entry void start();
     entry void report();
   };
 
@@ -47,6 +48,10 @@ mainmodule jacobi3d {
 
   group JacobiMap : CkArrayMap {
     entry JacobiMap(int x, int y, int z);
+  };
+
+  nodegroup OmpInitializer {
+    entry OmpInitializer(int numThreads); 
   };
 
 };

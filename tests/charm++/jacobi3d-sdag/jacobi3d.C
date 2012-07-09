@@ -32,6 +32,9 @@
 
 #include "jacobi3d.decl.h"
 #include "TopoManager.h"
+#ifdef JACOBI_OPENMP
+#include <omp.h>
+#endif
 
 // See README for documentation
 
@@ -179,12 +182,27 @@ class Main : public CBase_Main {
 	    hops += tmgr.getHopsBetweenRanks(p, jmap[i][j][wrap_z(k-1)]);
 	  }
       CkPrintf("Total Hops: %d\n", hops);
-
-		startTime = CmiWallTimer();
 	
-		//Start the computation
-		array.doStep();
-	}
+#ifdef JACOBI_OPENMP 
+      int numOmpThreads = 
+        CkNumPes() / (num_chare_x * num_chare_y * num_chare_z);
+      if (numOmpThreads <= 1) {
+        numOmpThreads = 1; 
+      }
+      CkPrintf("Computation loop will be parallelized"
+               " with %d OpenMP threads\n", numOmpThreads);
+      CProxy_OmpInitializer ompInit = 
+        CProxy_OmpInitializer::ckNew(numOmpThreads);
+#else    
+      //Start the computation
+      start();
+#endif
+    }
+
+  void start() {
+    startTime = CmiWallTimer();                
+    array.doStep();
+  }
 
     // Each worker reports back to here when it completes an iteration
 	void report() {
@@ -429,6 +447,9 @@ class Jacobi: public CBase_Jacobi {
     // If all neighbor values have been received, we update our values and proceed
     void compute_kernel() {
 #pragma unroll    
+#ifdef JACOBI_OPENMP
+  #pragma omp parallel for
+#endif
       for(int i=1; i<blockDimX+1; ++i) {
 	for(int j=1; j<blockDimY+1; ++j) {
 	  for(int k=1; k<blockDimZ+1; ++k) {
@@ -554,5 +575,19 @@ class JacobiMap : public CkArrayMap {
       return mapping[index[0]*Y*Z + index[1]*Z + index[2]]; 
     }
 };
+
+class OmpInitializer : public CBase_OmpInitializer{
+public:
+	OmpInitializer(int numThreads) {
+#ifdef JACOBI_OPENMP
+          if (numThreads < 1) {
+            numThreads = 1; 
+          }
+          omp_set_num_threads(numThreads);
+#endif
+          mainProxy.start();
+	}
+};
+
 
 #include "jacobi3d.def.h"
