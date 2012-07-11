@@ -868,7 +868,8 @@ findModuleDep() {
 	M=$1
 	notInList $M $PROCESSED_MODULES || return
 	PROCESSED_MODULES="$PROCESSED_MODULES $M"
-	PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
+	#PRE_LIBRARIES=`AddList $PRE_LIBRARIES -lmodule$M`
+	PRE_LIBRARIES=`AddList -lmodule$M $PRE_LIBRARIES`
 # HACK: add modules to both ends of library list, to avoid
 #  undefined symbol CkRegisterMainModule when it's in a module file.
 	POST_LIBRARIES=`AddList $POST_LIBRARIES -lmodule$M`
