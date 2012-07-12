@@ -48,7 +48,6 @@ tokens {
     CHARE                   = 'chare'           ;
     CHARE_ARRAY             = 'chare_array'     ;
     MAINCHARE               = 'mainchare'       ;
-    INTERFACE               = 'interface'       ;
     PACKAGE                 = 'package'         ;
     IMPORT                  = 'import'          ;
     CLASS                   = 'class'           ;
@@ -195,12 +194,10 @@ tokens {
     FOR_UPDATE;
     FORMAL_PARAM_LIST;
     FORMAL_PARAM_STD_DECL;
-    FORMAL_PARAM_VARARG_DECL;
     FUNCTION_METHOD_DECL;
     DIVCON_METHOD_DECL;
     GENERIC_TYPE_ARG_LIST;
     GENERIC_TYPE_PARAM_LIST;
-    INTERFACE_TOP_LEVEL_SCOPE;
     IMPLEMENTS_CLAUSE;
     LABELED_STATEMENT;
     LET_ASSIGNMENT;
@@ -301,7 +298,6 @@ externDeclaration
 typeDeclaration
     :   classDefinition
     |   templateDeclaration
-    |   interfaceDefinition
     |   enumDefinition
     |   chareDefinition
     |   messageDefinition
@@ -337,13 +333,6 @@ chareDefinition
         -> ^(TYPE chareType IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
-interfaceDefinition
-    :   'interface' IDENT (EXTENDS typeList)?  '{'
-            interfaceScopeDeclaration*
-        '}' ';'?
-        -> ^('interface' IDENT ^(EXTENDS typeList)? interfaceScopeDeclaration*)
-    ;
-
 enumDefinition
     :   ENUM IDENT ('implements' typeList)? '{'
             enumConstants ','? ';' classScopeDeclaration*
@@ -377,10 +366,10 @@ messageScopeDeclaration
 
 classScopeDeclaration
     :   functionMethodDeclaration
-	|	constructorDeclaration
-	|	divconMethodDeclaration
-	|	primitiveVariableDeclaration
-	|	objectVariableDeclaration
+    |	constructorDeclaration
+    |	divconMethodDeclaration
+    |	primitiveVariableDeclaration
+    |	objectVariableDeclaration
     ;
 
 functionMethodDeclaration
@@ -399,28 +388,16 @@ divconMethodDeclaration
 	;
 
 primitiveVariableDeclaration
-	:	modifierList? simpleType classFieldDeclaratorList ';'
-		->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
-	;
+  : modifierList? simpleType classFieldDeclaratorList ';'
+    ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType classFieldDeclaratorList)
+  ;
 
 objectVariableDeclaration
-	:	modifierList? objectType classFieldDeclaratorList ';'
-		->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
-	;
+  : modifierList? objectType classFieldDeclaratorList ';'
+    ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
+  ;
 
-interfaceScopeDeclaration
-    :   modifierList?
-        (   genericTypeParameterList?
-            (   type IDENT formalParameterList ';'
-                ->  ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList?
-                        type IDENT formalParameterList)
-            )
-        |   simpleType interfaceFieldDeclaratorList ';'
-            ->  ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType interfaceFieldDeclaratorList)
-        |   objectType interfaceFieldDeclaratorList ';'
-            ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType interfaceFieldDeclaratorList)        
-        )
-    ;
+
 
 classFieldDeclaratorList
     :   classFieldDeclarator (',' classFieldDeclarator)*
@@ -430,16 +407,6 @@ classFieldDeclaratorList
 classFieldDeclarator
     :   variableDeclaratorId (ASSIGNMENT variableInitializer)?
         ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer?)
-    ;
-
-interfaceFieldDeclaratorList
-    :   interfaceFieldDeclarator (',' interfaceFieldDeclarator)*
-        ->  ^(VAR_DECLARATOR_LIST interfaceFieldDeclarator+)
-    ;
-
-interfaceFieldDeclarator
-    :   variableDeclaratorId ASSIGNMENT variableInitializer
-        ->  ^(VAR_DECLARATOR variableDeclaratorId variableInitializer)
     ;
 
 variableDeclaratorId
@@ -596,11 +563,8 @@ qualifiedIdentList
 formalParameterList
     :   lp='('
         (   // Contains at least one standard argument declaration and optionally a variable argument declaration.
-            formalParameterStandardDecl (',' formalParameterStandardDecl)* (',' formalParameterVarArgDecl)? 
-            ->  ^(FORMAL_PARAM_LIST[$lp, "FORMAL_PARAM_LIST"] formalParameterStandardDecl+ formalParameterVarArgDecl?) 
-            // Contains a variable argument declaration only.
-        |   formalParameterVarArgDecl
-            ->  ^(FORMAL_PARAM_LIST[$lp, "FORMAL_PARAM_LIST"] formalParameterVarArgDecl) 
+            formalParameterStandardDecl (',' formalParameterStandardDecl)*
+            ->  ^(FORMAL_PARAM_LIST[$lp, "FORMAL_PARAM_LIST"] formalParameterStandardDecl+)
             // Contains nothing.
         |   ->  ^(FORMAL_PARAM_LIST[$lp, "FORMAL_PARAM_LIST"]) 
         )
@@ -610,11 +574,6 @@ formalParameterList
 formalParameterStandardDecl
     :   localModifierList? type variableDeclaratorId
         ->  ^(FORMAL_PARAM_STD_DECL localModifierList? type variableDeclaratorId)
-    ;
-
-formalParameterVarArgDecl
-    :   localModifierList? type '...' variableDeclaratorId
-        ->  ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
     ;
 
 qualifiedIdentifier

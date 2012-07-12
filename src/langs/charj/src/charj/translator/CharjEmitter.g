@@ -182,8 +182,6 @@ typeDeclaration
         -> {emitH()}? multicastMessage_h(basename={basename()}, ident={$IDENT.text}, msds={$msds})
         -> {emitCI()}? multicastMessage_ci(ident={$IDENT.text}, msds={$msds})
         ->
-    |   ^(INTERFACE IDENT (^('extends' type+))? interfaceScopeDeclaration*)
-        -> template(t={$text}) "/*INTERFACE-not implemented*/ <t>"
     |   ^(ENUM IDENT (^('implements' type+))? classScopeDeclaration*)
         -> template(t={$text}) "/*ENUM-not implemented*/ <t>"
     |   ^(TYPE chareType IDENT (^('extends' type))? (^('implements' type+))?
@@ -398,15 +396,6 @@ classScopeDeclaration
         ->
     ;
     
-interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? type IDENT formalParameterList)
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList[$simpleType.st])
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList[$objectType.st])
-        -> template(t={$text}) "/*interfaceScopeDeclarations-not implemented */ <t>"
-    ;
-
 variableDeclaratorList[StringTemplate obtype]
     :   ^(VAR_DECLARATOR_LIST (var_decls+=variableDeclarator[obtype])+ )
         -> {emitCI() && currentClass != null && currentMethod != null && currentMethod.hasSDAG}?
@@ -708,19 +697,14 @@ entryFormalParameter
 
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)* fpvd=formalParameterVarargDecl?)
-        -> formal_param_list(sdecl={$fpsd}, vdecl={$fpvd.st})
+    :   ^(FORMAL_PARAM_LIST (fpsd+=formalParameterStandardDecl)*)
+        -> formal_param_list(sdecl={$fpsd})
     ;
 
     
 formalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL lms=localModifierList? t=type vdid=variableDeclaratorId)
         -> formal_param_decl(modList={$lms.st}, type={$t.st}, declID={$vdid.st})
-    ;
-    
-formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
-        -> template(t={$text}) "/*formal parameter varargs not implemented*/ <t>"
     ;
     
 qualifiedIdentifier

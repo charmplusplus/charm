@@ -720,13 +720,9 @@ generic_arg_list(types) ::=
 >>
 
 
-formal_param_list(sdecl, vdecl) ::=
+formal_param_list(sdecl) ::=
 <<
-<if(vdecl)>
-(<sdecl; separator=", ">, <vdecl>)
-<else>
 (<sdecl; separator=", ">)
-<endif>
 >>
 
 

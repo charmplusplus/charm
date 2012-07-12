@@ -90,7 +90,6 @@ typeDeclaration returns [ClassSymbol sym]
     :   ^(TYPE classType IDENT { currentClass = (ClassSymbol) $IDENT.def.type; }
             (^(EXTENDS parent=type))? (^('implements' type+))?
                 classScopeDeclaration*)
-    |   ^('interface' IDENT (^(EXTENDS type+))?  interfaceScopeDeclaration*)
     |   ^('enum' IDENT (^('implements' type+))? enumConstant+ classScopeDeclaration*)
     |   ^(MESSAGE IDENT messageScopeDeclaration*)
     |   ^(MULTICAST_MESSAGE IDENT messageScopeDeclaration*)
@@ -142,16 +141,6 @@ field [ClassSymbol type]
     :   ^(VAR_DECLARATOR ^(IDENT domainExpression?) variableInitializer?)
     ;
     
-interfaceScopeDeclaration
-    :   ^(FUNCTION_METHOD_DECL modifierList? genericTypeParameterList? 
-            type IDENT formalParameterList domainExpression?)
-        // Interface constant declarations have been switched to variable
-        // declarations by Charj.g; the parser has already checked that
-        // there's an obligatory initializer.
-    |   ^(PRIMITIVE_VAR_DECLARATION modifierList? simpleType variableDeclaratorList)
-    |   ^(OBJECT_VAR_DECLARATION modifierList? objectType variableDeclaratorList)
-    ;
-
 variableDeclaratorList
     :   ^(VAR_DECLARATOR_LIST variableDeclarator+)
     ;
@@ -333,7 +322,7 @@ genericTypeArgument
     ;
 
 formalParameterList
-    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl* formalParameterVarargDecl?) 
+    :   ^(FORMAL_PARAM_LIST formalParameterStandardDecl*) 
     ;
 
 formalParameterStandardDecl
@@ -341,15 +330,11 @@ formalParameterStandardDecl
     ;
 
 entryFormalParameterList
-    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl* formalParameterVarargDecl?) 
+    :   ^(FORMAL_PARAM_LIST entryFormalParameterStandardDecl*) 
     ;
 
 entryFormalParameterStandardDecl
     :   ^(FORMAL_PARAM_STD_DECL localModifierList? entryArgType variableDeclaratorId)
-    ;
-    
-formalParameterVarargDecl
-    :   ^(FORMAL_PARAM_VARARG_DECL localModifierList? type variableDeclaratorId)
     ;
     
 // FIXME: is this rule right? Verify that this is ok, I expected something like:
