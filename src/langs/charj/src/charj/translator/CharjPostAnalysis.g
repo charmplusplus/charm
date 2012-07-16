@@ -418,10 +418,6 @@ nonBlockStatement returns [boolean sdag]
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
-    |   ^(PRINT expression*)
-    |   ^(PRINTLN expression*)
-    |   ^(EXIT expression?)
-    |   EXITALL
     |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
@@ -543,11 +539,6 @@ primaryExpression returns [Type type]
 		{
 			$type = $SUPER.symbolType;
 		}
-    |   GETNUMPES
-    |   GETNUMNODES
-    |   GETMYPE
-    |   GETMYNODE
-    |   GETMYRANK
 	|	THISINDEX
 	|	THISPROXY
 		{

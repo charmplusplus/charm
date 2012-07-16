@@ -9,10 +9,10 @@
 grammar Charj;
 
 options {
-    backtrack = true; 
-    memoize = true;
-    output = AST;
-    ASTLabelType = CharjAST;
+  backtrack = true; 
+  memoize = true;
+  output = AST;
+  ASTLabelType = CharjAST;
 }
 
 tokens {
@@ -62,20 +62,10 @@ tokens {
 
     OVERLAP                 = 'overlap'         ;
     WHEN                    = 'when'            ;
-
-    PRINT                   = 'print'           ;
-    PRINTLN                 = 'println'         ;
-    EXIT                    = 'exit'            ;
-    EXITALL                 = 'exitAll'         ;
-    GETMYPE                 = 'getMyPe'         ;
-    GETMYRANK               = 'getMyRank'       ;
-    GETMYNODE               = 'getMyNode'       ;
-    GETNUMPES               = 'getNumPes'       ;
-    GETNUMNODES             = 'getNumNodes'     ;
     CONTRIBUTE              = 'contribute'      ;
 
-    THISINDEX		    = 'thisIndex'	;
-    THISPROXY		    = 'thisProxy'	;
+    THISINDEX		        = 'thisIndex'	;
+    THISPROXY		        = 'thisProxy'	;
 
     MESSAGE                 = 'message'          ;
     MULTICAST_MESSAGE       = 'multicast_message';
@@ -168,7 +158,7 @@ tokens {
     USING                   = 'using'           ;
     VIRTUAL                 = 'virtual'         ;
     WCHAR_T                 = 'wchar_t'         ;
-    
+
     // tokens for imaginary nodes
     ARGUMENT_LIST;
     ARRAY_DECLARATOR;
@@ -227,9 +217,9 @@ tokens {
     REFERENCE_TYPE;
     POINTER_TYPE;
     PROXY_TYPE;
-	ARRAY_SECTION_TYPE;
-	ARRAY_SECTION;
-	ARRAY_SECTION_INIT;
+    ARRAY_SECTION_TYPE;
+    ARRAY_SECTION;
+    ARRAY_SECTION_INIT;
     MESSAGE_TYPE;
     PRIMITIVE_VAR_DECLARATION;
     OBJECT_VAR_DECLARATION;
@@ -247,14 +237,14 @@ tokens {
 }
 
 @header {
-package charj.translator;
+    package charj.translator;
 }
 
 @members {
 }
 
 @lexer::header {
-package charj.translator; 
+    package charj.translator; 
 }
 
 @lexer::members {
@@ -314,7 +304,7 @@ templateDeclaration
 
 classDefinition
     :   PUBLIC? CLASS IDENT (EXTENDS type)? ('implements' typeList)? '{'
-      classScopeDeclaration* '}' ';'?
+            classScopeDeclaration* '}' ';'?
         -> ^(TYPE CLASS IDENT ^(EXTENDS type)? ^('implements' typeList)? classScopeDeclaration*)
     ;
 
@@ -396,8 +386,6 @@ objectVariableDeclaration
   : modifierList? objectType classFieldDeclaratorList ';'
     ->  ^(OBJECT_VAR_DECLARATION modifierList? objectType classFieldDeclaratorList)
   ;
-
-
 
 classFieldDeclaratorList
     :   classFieldDeclarator (',' classFieldDeclarator)*
@@ -546,11 +534,6 @@ primitiveType
     |   DOUBLE
     ;
 
-/*genericTypeArgumentList
-    :   lt='<' genericTypeArgument (',' genericTypeArgument)* genericTypeListClosing
-        ->  ^(GENERIC_TYPE_ARG_LIST[$lt, "GENERIC_TYPE_ARG_LIST"] genericTypeArgument+)
-    ;*/
-
 genericTypeArgument
     :   type
     |   '?'
@@ -599,18 +582,18 @@ blockStatement
 
 localVariableDeclaration
     :	primitiveVarDeclaration
-	|   objectVarDeclaration
-	;
+    |   objectVarDeclaration
+    ;
 
 primitiveVarDeclaration
-	:	localModifierList? simpleType classFieldDeclaratorList
+    :	localModifierList? simpleType classFieldDeclaratorList
         ->  ^(PRIMITIVE_VAR_DECLARATION localModifierList? simpleType classFieldDeclaratorList)
-	;
+    ;
 
 objectVarDeclaration
-	:	localModifierList? objectType classFieldDeclaratorList
+    :	localModifierList? objectType classFieldDeclaratorList
         ->  ^(OBJECT_VAR_DECLARATION localModifierList? objectType classFieldDeclaratorList)
-	;
+    ;
 
 statement
     :   nonBlockStatement
@@ -696,14 +679,6 @@ nonBlockStatement
         ->  ^('embed' STRING_LITERAL EMBED_BLOCK)
     |   expression ';'!
     |   ';' // Preserve empty statements.
-    |   PRINT '(' (expression (',' expression)*)* ')' ';'
-        ->  ^(PRINT expression*)
-    |   PRINTLN '(' (expression (',' expression)*)* ')' ';'
-        ->  ^(PRINTLN expression*)
-    |   EXIT '(' expression? ')' ';'
-        ->  ^(EXIT expression?)
-    |   EXITALL '(' ')' ';'
-        ->  EXITALL
     |   CONTRIBUTE '(' expression ',' qualifiedIdentifier ',' expression ')' ';'
         -> ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;           
@@ -772,8 +747,8 @@ assignmentExpression
             |   '<<='^
             |   '>>='^
             |   '>>>='^
-        ) 
-        assignmentExpression)?
+            ) 
+            assignmentExpression)?
     ;
     
 conditionalExpression
@@ -945,16 +920,6 @@ primaryExpression
             ->  ^(METHOD_CALL ^(DOT SUPER IDENT) arguments)
         |   ->  ^(DOT SUPER IDENT)
         )
-    |   GETMYPE '(' ')'
-        ->  GETMYPE
-    |   GETNUMPES '(' ')'
-        ->  GETNUMPES
-    |   GETMYRANK '(' ')'
-        ->  GETMYRANK
-    |   GETMYNODE '(' ')'
-        -> GETMYNODE
-    |   GETNUMNODES '(' ')'
-        -> GETNUMNODES
 	|	THISINDEX
 	|	THISPROXY
     |   SIZEOF '(' expression ')'

@@ -377,10 +377,6 @@ nonBlockStatement
     |   ^('delete' expression)
     |   ^(EMBED STRING_LITERAL EMBED_BLOCK)
     |   ';' // Empty statement.
-    |   ^(PRINT expression*)
-    |   ^(PRINTLN expression*)
-    |   ^(EXIT expression?)
-    |   EXITALL
     |   ^(CONTRIBUTE expression qualifiedIdentifier expression)
     ;
         
@@ -469,11 +465,6 @@ primaryExpression
     |   THIS
     |   arrayTypeDeclarator
     |   SUPER
-    |   GETNUMPES
-    |   GETNUMNODES
-    |   GETMYPE
-    |   GETMYNODE
-    |   GETMYRANK
 	|	THISINDEX
 	|	THISPROXY
     |   domainExpression

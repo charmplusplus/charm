@@ -847,14 +847,6 @@ nonBlockStatement
         ->  embed_cc(str={$STRING_LITERAL.text}, blk={$EMBED_BLOCK.text})
     |   ';' // Empty statement.
         -> {%{$start.getText()}}
-    |   ^(PRINT (exprs += expression)*)
-        ->  print(exprs = {$exprs})
-    |   ^(PRINTLN (exprs += expression)*)
-        ->  println(exprs = {$exprs})
-    |   ^(EXIT expression?)
-        ->  exit(expr = {$expression.st})
-    |   EXITALL
-        ->  exitall()
     |   ^(CONTRIBUTE e1=expression q=qualifiedIdentifier e2=expression)
         -> contribute(data={$e1.st}, type={$q.st}, target={$e2.st})
     ;
@@ -1054,16 +1046,6 @@ primaryExpression
         -> {$arrayTypeDeclarator.st}
     |   SUPER
         -> {%{$start.getText()}}
-    |   GETNUMPES
-        ->  template() "CkNumPes()"
-    |   GETNUMNODES
-        ->  template() "CkNumNodes()"
-    |   GETMYPE
-        ->  template() "CkMyPe()"
-    |   GETMYNODE
-        ->  template() "CkMyNode()"
-    |   GETMYRANK
-        ->  template() "CkMyRank()"
 	|	THISINDEX
 		->	template() "thisIndex"
 	|	THISPROXY
