@@ -213,6 +213,9 @@
 /* whether std::unordered_map works */
 #undef CMK_HAS_STD_UNORDERED_MAP
 
+/* whether anon structs are permitted */
+#undef CMK_HAS_ANON_STRUCTS
+
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
 

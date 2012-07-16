@@ -861,6 +861,38 @@ test_cxx "whether std::unordered_map is defined" "ok" "no" ""
 AC_DEFINE_UNQUOTED(CMK_HAS_STD_UNORDERED_MAP, $pass, [whether std::unordered_map works])
 
 
+#### check if anon structs are permitted #####
+cat > $t <<EOT
+#include <iostream>
+using std::cout;
+
+struct idx
+{
+    const static int dims = 3;
+    union
+    {
+        int data[[dims]];
+        struct { int x, y, z; };
+    };
+
+    idx(const int i=0, const int j=0, const int k=0): x(i), y(j), z(k) {}
+};
+
+int main()
+{
+    cout<<"Hello World!\n";
+    idx myidx(1, 2, 3);
+    cout<< "idx = ("
+        << myidx.data[[0]] << ","
+        << myidx.data[[1]] << ","
+        << myidx.z << ")\n";
+    return (myidx.data[[0]] = 1 && myidx.y == 2 && myidx.data[[2]] == 3);
+}
+EOT
+test_cxx "whether anon structs are permitted" "yes" "no" ""
+AC_DEFINE_UNQUOTED(CMK_HAS_ANON_STRUCTS, $pass, [whether anon structs are permitted])
+
+
 #### test if we can have multiple delete like this ####
 cat > $t <<EOT
 class foo {
