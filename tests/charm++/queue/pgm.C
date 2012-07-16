@@ -230,7 +230,7 @@ bool perftest_general_ififo()
 
     CkPrintf("\n  charm %7d", hl);
     for (int i = qSizeMin; i <= qSizeMax; i *= 2)
-      CkPrintf("%10.4f", i, timePerOp_general_ififo(i));
+      CkPrintf("%10.4f", timePerOp_general_ififo(i));
   }
 
   CkPrintf("\n");
