@@ -177,14 +177,6 @@ public class Translator {
         m_nodes.setTreeAdaptor(m_adaptor);
     }
 
-    private ClassSymbol semanticPass() throws
-        RecognitionException, IOException, InterruptedException
-    {
-        m_nodes.reset();
-        CharjSemantics sem = new CharjSemantics(m_nodes);
-        return sem.charjSource(m_symtab);
-    }
-
     private void resolveTypes() throws
         RecognitionException, IOException, InterruptedException
     {
@@ -271,47 +263,6 @@ public class Translator {
         }
 
         return null;
-    }
-
-    /** Load a class from disk looking in lib/package
-     *  Side-effect: add class to symtab. This is used by ClassSymbol to
-     *  load unknown types from disk. packageName comes from the output
-     *  of PackageScope.getFullyQualifiedName
-     */
-    public ClassSymbol loadType(String packageName, String typeName) {
-        if (debug()) System.out.println(
-                " [charj] loadType(" + typeName + ") from " + packageName);
-        
-        ClassSymbol cs = null;
-        try {
-            String packageDir = ".";
-            if ( packageName!=null ) {
-                packageDir = packageName.replace(".", "/");
-            }
-            String fullName = packageDir + "/" + typeName + ".cj";
-		
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            boolean fileExists = (cl.getResource(fullName) != null);
-            if (!fileExists) {
-                if (debug()) System.out.println(
-                        " \tloadType(" + typeName + "): not found");
-                return null;
-            }
-
-            if (debug()) System.out.println(
-                    " \tloadType(" + typeName + "): parsing " + 
-                    packageName + "." + typeName);
-            
-            ANTLRInputStream fs = new ANTLRInputStream(
-                    cl.getResourceAsStream(fullName));
-            fs.name = packageDir + "/" + typeName + ".cj";
-            CharjLexer lexer = new CharjLexer(fs);
-            
-            cs = semanticPass();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return cs;
     }
 
     /**
