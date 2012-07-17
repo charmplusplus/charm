@@ -1,31 +1,5 @@
 \section{Introduction}
 
-This manual describes \charmpp, an object oriented portable parallel
-programming language based on \CC. Its program structure, execution
-model, interface language constructs and runtime system calls are
-described here\footnote{For a description of the underlying design
-philosophy please refer to the following papers :\\
-    L. V. Kale and Sanjeev Krishnan,
-    {\em ``\charmpp : Parallel Programming with Message-Driven Objects''},
-    in ``Parallel Programming Using \CC'',
-    MIT Press, 1995. \\
-    L. V. Kale and Sanjeev Krishnan,
-    {\em ``\charmpp : A Portable Concurrent Object Oriented System
-    Based On \CC''},
-    Proceedings of the Conference on Object Oriented Programming,
-    Systems, Languages and Applications (OOPSLA), September 1993.
-}.
-
-\charmpp\ has continuously evolved since the OOPSLA 1993 paper.  The earlier
-versions modified the \CC\ syntax to support \charmpp\ primitives, and
-contained a full-fledged \charmpp\ translator that parsed the \charmpp\
-syntactic extensions as well as the \CC\ syntax to produce a \CC\ program,
-which was later compiled using a \CC\ compiler.  The current version does not
-augment the \CC{} syntax, and does not use a \charmpp\ translator as in previous
-versions. Instead, the older constructs are converted to calls into the runtime
-library, several new constructs are added, and minimal language constructs are
-used to describe the interfaces.
-
 \charmpp\ is an explicitly parallel language based on \CC\ with a runtime
 library for supporting parallel computation called the Charm kernel.  It
 provides a clear separation between sequential and parallel objects.  The
@@ -33,7 +7,7 @@ execution model of \charmpp\ is message driven, thus helping one write programs
 that are latency-tolerant.  \charmpp\ supports dynamic load balancing while
 creating new work as well as periodically, based on object migration.  Several
 dynamic load balancing strategies are provided.  \charmpp\ supports both
-irregular as well as regular, data-parallel applications.  It is based on the
+irregular as well as regular, data-parallel applications.  It is built on top of the
 {\sc Converse} interoperable runtime system for parallel programming.
 
 Currently the parallel platforms supported by \charmpp\ are the BlueGene/L,BlueGene/P, PSC
@@ -98,9 +72,19 @@ some phase of the program), and dynamic load balancing (during remote object
 creation). In addition, several libraries are built on top of \charmpp\ that
 can simplify otherwise arduous parallel programming tasks.
 
-The following sections provide detailed information about various features of
-\charmpp\ programming system.
-
+The following sections provide detailed information about various features of the
+\charmpp\ programming system.\footnote{For a description of the underlying design
+philosophy please refer to the following papers :\\
+    L. V. Kale and Sanjeev Krishnan,
+    {\em ``\charmpp : Parallel Programming with Message-Driven Objects''},
+    in ``Parallel Programming Using \CC'',
+    MIT Press, 1995. \\
+    L. V. Kale and Sanjeev Krishnan,
+    {\em ``\charmpp : A Portable Concurrent Object Oriented System
+    Based On \CC''},
+    Proceedings of the Conference on Object Oriented Programming,
+    Systems, Languages and Applications (OOPSLA), September 1993.
+}.
 \subsection{History}
 
 The {\sc Charm} software was developed as a group effort of the Parallel
