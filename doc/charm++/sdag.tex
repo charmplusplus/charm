@@ -172,6 +172,36 @@ the EBNF form below.
 
 \subsection{Usage}
 
+You can use SDAG to implement entry methods for any chare, chare array, group,
+or nodegroup. Any entry method implemented using SDAG must be implemented in the
+interface (.ci) file for its class. An SDAG entry method consists of a series of
+SDAG constructs of the following kinds:
+
+\begin{itemize}
+    \item {\tt atomic} blocks: Atomic blocks simply contain sequential \CC code.
+        They're called atomic because the code within them executes without
+        interruption from incoming messages. Typically atomic blocks hold the
+        code that actually deals with incoming messages in a {\tt when}
+        statement, or to do local operations before a message is sent or after
+        it's received.
+    \item {\tt overlap} blocks: Overlap blocks contain a series of SDAG
+        statements within them which can occur in any order. Commonly these
+        blocks are used to hold a series of {\tt when} triggers which can be
+        received and processed in any order. Flow of control doesn't leave the
+        overlap block until all the statements within it have been processed.
+    \item {\tt when} statements: These statement, also called triggers, indicate
+        that we expect an incoming message of a particular type, and provide
+        code to handle that message when it arrives. They commonly occur inside
+        of {\tt overlap} blocks, loops, and other control flow statements.
+    \item {\tt forall} loops: These loops are used when each iteration of a loop
+        can be performed in parallel. This is in contrast to a regular {\tt for}
+        loop, in which each iteration is executed sequentially.
+    \item {\tt if}, {\tt for}, and {\tt while} statements: these statements have
+        the same meaning as the normal {\tt if}, {\tt for}, and {\tt while}
+        loops in sequential \CC programs. This allows the programmer to use
+        common control flow constructs outside the context of atomic blocks.
+\end{itemize}
+
 \sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.
 
 If you've added \sdag\ code to your class, you must link in the code by:
