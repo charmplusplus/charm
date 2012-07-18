@@ -193,3 +193,10 @@ The differences in Poll Mode may be apparent. There is no callback function whic
 The server should call Deposit with the same global size and combiner type on all of the array elements which correspond to the ``this'' parameter.
 
 The latest version of liveVizPoll is not backwards compatable with older versions. The old version had some fundamental problems which would occur if a server generated an image before a client requested it. Thus the new version buffers server generated images until requested by a client. Furthermore the client requests are also buffered if they arrive before the server generates the images. Problems could also occur during migration with the old version.
+
+\section{Caveats}
+There is a known bug caused by how ``liveVizDeposit'' internally uses a reduction to build the image.
+
+Currently its contribute call is handled as if it were the chare calling ``liveVizDeposit'' that actually contributed to the liveViz reduction.
+If there is any other reduction going on elsewhere in this chare, some liveViz contribute calls might be issued before the corresponding non-liveViz contribute is reached.
+This would imply that image data would be treated as if were part of the non-liveViz reduction, leading to unexpected behavior potentially anywhere in the non-liveViz code.
