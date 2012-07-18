@@ -48,6 +48,10 @@ After unpacking, the pointer is guaranteed
 to have the same value that it did before packing.
 }
 
+Note- Use of this function to pup individual blocks is not supported any longer.
+All the blocks allocated via CmiIsomalloc are pupped by the RTS as one single
+unit.
+
 \function{int CmiIsomallocLength(void *block);}
 \index{CmiIsomallocLength}
 \desc{
