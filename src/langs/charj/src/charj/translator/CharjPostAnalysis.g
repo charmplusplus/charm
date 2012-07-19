@@ -682,8 +682,7 @@ literal
     ;
 
 rangeItem returns [Object item]
-    :   DECIMAL_LITERAL { $item = $DECIMAL_LITERAL; }
-    |   IDENT			{ $item = $IDENT; }
+    :   ^(EXPR expr){ $item = $EXPR; }
     ;
 
 rangeExpression returns [ArrayList<Object> range]
@@ -691,9 +690,11 @@ rangeExpression returns [ArrayList<Object> range]
 {
 	$range = new ArrayList<Object>();
 }
-    :   ^(RANGE_EXPRESSION rangeItem)								{ $range.add($rangeItem.item); }	
-    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem)				{ $range.add($i1.item); $range.add($i2.item); }
-    |   ^(RANGE_EXPRESSION i1=rangeItem i2=rangeItem i3=rangeItem)	{ $range.add($i1.item); $range.add($i2.item); $range.add($i3.item); }
+    :   ^(RANGE_EXPRESSION i1=rangeItem (i2=rangeItem)? (i3=rangeItem)?) {
+            $range.add($i1.item);
+            if (i2 != null) $range.add($i2.item);
+            if (i3 != null) $range.add($i3.item);
+        }
     ;
 
 rangeList returns [ArrayList<ArrayList<Object>> ranges]

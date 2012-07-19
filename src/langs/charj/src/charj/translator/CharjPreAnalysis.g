@@ -501,15 +501,8 @@ literal
     |   NULL
     ;
 
-rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
-    ;
-
 rangeExpression
-    :   ^(RANGE_EXPRESSION rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem)
-    |   ^(RANGE_EXPRESSION rangeItem rangeItem rangeItem)
+    :   ^(RANGE_EXPRESSION expression expression? expression?)
     ;
 
 rangeList

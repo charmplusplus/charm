@@ -702,8 +702,7 @@ parenthesizedExpression
     ;
     
 rangeItem
-    :   DECIMAL_LITERAL
-    |   IDENT
+    :   expression
     ;
 
 rangeExpression

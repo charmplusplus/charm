@@ -428,10 +428,8 @@ variableInitializer[StringTemplate obtype]
     ;
 
 rangeItem
-    :   dl=DECIMAL_LITERAL
-        -> template(t={$dl.text}) "<t>"
-    |   IDENT
-        -> template(t={$IDENT.text}) "<t>"
+    :   e=expression
+        -> template(e={$e.st}) "<e>"
     ;
 
 rangeExpression

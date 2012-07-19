@@ -6,11 +6,18 @@ public mainchare ArrayTest {
     thisProxy@entry1();
   }
 
+  public int id(int i) { return i; }
+
   public entry void entry1() {
     Array<int> foo = new Array<int>([10]);
 
     for (int i = 0; i < foo.size(); i++) {
       foo[i] = i;
+    }
+
+    for (int i = 0; i < foo.size()-1; i++) {
+      foo[i+1] = i;
+      foo[i/2 + (id(i) - i/2)] = i;
     }
 
     for (int i = 0; i < foo.size(); i++) {
