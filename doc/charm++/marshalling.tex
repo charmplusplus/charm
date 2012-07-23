@@ -93,67 +93,8 @@ pup routine, a ``PUPbytes'' declaration, or a working operator|.
 See the PUP description in Section~\ref{sec:pup} for more details 
 on these routines.
 
-\begin{alltt}
-//Declarations:
-class point3d \{
-public:
-    double x,y,z;    
-    void pup(PUP::er &p) \{
-      p|x; p|y; p|z;
-    \}
-\};
-
-typedef struct \{
-    int refCount;
-    char data[17];
-\} refChars;
-PUPbytes(date);
-
-class date \{
-public:
-    char month,day;
-    int year;
-    //...non-virtual manipulation routines...
-\};
-inline void operator|(PUP::er &p,date &d) \{
-    p|d.month; p|d.day;
-    p|d.year;
-\}
-
-//In the .ci file:
-    entry void pointRefOnDate(point3d &p,refChars r[d.year],date &d);
-\end{alltt}
-
 Any user-defined types in the argument list must be declared 
 before including the ``.decl.h'' file.
 As usual in \CC, it is often dramatically more efficient to pass
-a large structure by reference (as shown) than by value.
+a large structure by reference than by value.
 
-For efficiency, arrays (like \uw{refChars} above) are always copied
-as blocks of bytes and passed via pointers.  This means classes
-that need their pup routines to be called, such as those with dynamically
-allocated data or virtual methods cannot be passed as arrays--use CkVec
-or STL vectors to pass lists of complicated user-defined classes. 
-For historical reasons, pointer-accessible structures 
-cannot appear alone in the parameter list (because they are confused 
-with messages).
-
-The order of marshalling operations on the send side is:
-\begin{itemize}
-\item Call ``p\verb.|.a'' on each marshalled parameter with a sizing PUP::er.
-\item Compute the lengths of each array.
-\item Call ``p\verb.|.a'' on each marshalled parameter with a packing PUP::er.
-\item \kw{memcpy} each arrays' data.
-\end{itemize}
-
-The order of marshalling operations on the receive side is:
-\begin{itemize}
-\item Create an instance of each marshalled parameter using its default constructor.
-\item Call ``p\verb.|.a'' on each marshalled parameter using an unpacking PUP::er.
-\item Compute pointers into the message for each array.
-\end{itemize}
-
-Finally, very large structures are most efficiently passed via messages,
-because messages are an efficient, low-level construct that minimizes copying
-and overhead; but very complicated structures are easiest to pass via 
-marshalling, because marshalling uses the high-level pup framework.

@@ -303,6 +303,39 @@ void A2::pup(PUP::er \&p)
 \}
 \end{alltt}
 
+\subsubsection{Marshalling User Defined Data Types via PUP}
 
+Parameter marshalling requires serialization and is therefore
+implemented using the PUP framework.  User defined data types passed
+as parameters must abide by the standard PUP contract (see section
+\ref{sec:pupcontract}).
+
+For efficiency, arrays are always copied as blocks of bytes and passed
+via pointers.  This means classes that need their pup routines to be
+called, such as those with dynamically allocated data or virtual
+methods cannot be passed as arrays--use CkVec or STL vectors to pass
+lists of complicated user-defined classes.  For historical reasons,
+pointer-accessible structures cannot appear alone in the parameter
+list (because they are confused with messages).
+
+The order of marshalling operations on the send side is:
+\begin{itemize}
+\item Call ``p\verb.|.a'' on each marshalled parameter with a sizing PUP::er.
+\item Compute the lengths of each array.
+\item Call ``p\verb.|.a'' on each marshalled parameter with a packing PUP::er.
+\item \kw{memcpy} each arrays' data.
+\end{itemize}
+
+The order of marshalling operations on the receive side is:
+\begin{itemize}
+\item Create an instance of each marshalled parameter using its default constructor.
+\item Call ``p\verb.|.a'' on each marshalled parameter using an unpacking PUP::er.
+\item Compute pointers into the message for each array.
+\end{itemize}
+
+Finally, very large structures are most efficiently passed via messages,
+because messages are an efficient, low-level construct that minimizes copying
+and overhead; but very complicated structures are often most easily passed via 
+marshalling, because marshalling uses the high-level pup framework.
 
 
