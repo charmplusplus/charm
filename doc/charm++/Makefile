@@ -2,9 +2,9 @@
 FILE=manual
 TEX=$(FILE).tex arrays.tex callbacks.tex chares.tex commlib.tex delegation.tex \
 	entry.tex further.tex groups.tex inhertmplt.tex index.tex intro.tex \
-	io.tex loadb.tex advancedlb.tex futures.tex \
+	utilities.tex loadb.tex advancedlb.tex futures.tex \
 	marshalling.tex messages.tex modules.tex nodegroups.tex othercalls.tex \
-	overview.tex pup.tex quiesce.tex readonly.tex reductions.tex sdag.tex \
+	overview.tex pup.tex advancedpup.tex quiesce.tex readonly.tex reductions.tex sdag.tex \
 	python.tex alltoall.tex
 DEST=charm++
 LATEX2HTML=$(L2H) -split 5
