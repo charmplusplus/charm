@@ -547,20 +547,20 @@ application is presented below.
 
 \begin{alltt}
 /*** lbexample.ci ***/
-mainmodule lbexample {
+mainmodule lbexample \{
   readonly CProxy_Main mainProxy;
   readonly int nElements;
 
-  mainchare Main {
+  mainchare Main \{
     entry Main(CkArgMsg *m);
     entry void done(void);
-  };
+  \};
 
-  array [1D] LBExample {
+  array [1D] LBExample \{
     entry LBExample(void);
     entry void doWork();
-  };
-};
+  \};
+\};
 \end{alltt}
 
 --------------------------------------------------------------------------------
