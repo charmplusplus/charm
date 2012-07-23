@@ -1,6 +1,5 @@
-\subsection{Modules}
 
-\subsubsection{Structure of a \charmpp\ Program}
+\subsection{Structure of a \charmpp\ Program}
 
 A \charmpp\ program is structurally similar to a \CC{} program.  Most of a
 \charmpp\ program {\em is} \CC{} code.\footnote{\bf Constraint: The \CC{} code
@@ -120,12 +119,12 @@ pgm: pgm.ci pgm.h pgm.C
 
 \end{alltt}
 
-\uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm Kernel starts
+\uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm RTS starts
 execution of this program by creating an instance of \uw{HelloMain} on
 processor 0. The HelloMain constructor creates a chare group
 \uw{HelloGroup}, and stores a handle to itself and returns. The call to
-create the group returns immediately after directing Charm Kernel to perform
-the actual creation and invocation.  Shortly after, the Charm Kernel will
+create the group returns immediately after directing Charm RTS to perform
+the actual creation and invocation.  Shortly after, the Charm RTS will
 create an object of type \uw{HelloGroup} on each processor, and call its
 constructor. The constructor will then print ``Hello World...'' and then
 call the \uw{PrintDone} method of \uw{HelloMain}. The \uw{PrintDone} method

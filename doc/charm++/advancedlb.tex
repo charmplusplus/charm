@@ -3,6 +3,133 @@
 
 \label{advancedlb}
 
+\subsubsection{Load Balancing Simulation}
+
+The simulation feature of load balancing framework allows the users to collect information
+about the compute wall/cpu time and communication of the chares during a particular run of
+the program and use this information to later test different load balancing strategies to
+see which one is suitable for the programs behaviour. Currently, this feature is supported only for
+the centralized load balancing strategies. For this, the load balancing framework
+accepts the following command line options:
+\begin{enumerate}
+\item {\em +LBDump StepStart}\\
+        This will dump the instrument/communication data collected by the load balancing framework
+	starting from the load balancing step {\em StepStart} into a file on the disk. The name of the file
+	is given by the {\em +LBDumpFile} option. The first step in the program is number 0. Negative
+	numbers will be converted to 0.
+\item {\em +LBDumpSteps StepsNo}\\
+        This option specifies the number of steps for which data will be dumped to disk. If omitted, default value is 1.
+	The program will exit after StepsNo files are dumped.
+\item {\em +LBDumpFile FileName}\\
+	This option specifies the base name of the file into which the load balancing data is dumped. If this
+	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
+	a number is appended to the filename in the form {\tt Filename.\#}; this applies to both dump and
+	simulation.
+\item {\em +LBSim StepStart}\\
+	This option instructs the framework to do the simulation during the first load balancing step.
+	When this option is specified, the load balancing data from the file specified in the {\em +LBDumpFile}
+	option, with the addition of the step number, will be read and this data
+	will be used for the load balancing. The program will print the results
+	of the balancing for a number of steps given by the {\em +LBSimSteps} option, and then will exit.
+\item {\em +LBSimSteps StepsNo}\\
+        This option has the same meaning of {\em +LBDumpSteps}, except that apply for the simulation mode.
+	Default value is 1.
+\item {\em +LBSimProcs}\\
+        This option may change the number of processors target of the load balancer strategy. It may be used to test
+	the load balancer in conditions where some processor crashes or someone becomes available. If this number is not
+	changed since the original run, starting from the second step file the program will print other additional
+	information about how the simulated load differs from the real load during the run (considering all
+	strategies that were applied while running). This may be used to test the validity of a load balancer
+	prediction over the reality. If the strategies used during run and simulation differ, the additional data
+	printed may not be useful.
+\end{enumerate}
+As an example, we can collect the data for a 1000 processor run of a program using:
+\begin{alltt}
+./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
+\end{alltt}
+This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
+\begin{alltt}
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat [+LBSimProcs 900]
+\end{alltt}
+
+\subsubsection{Future load predictor}
+
+When objects do not follow the assumption that the future workload will be the
+same as the past, the load balancer might not have the correct information to do
+a correct rebalancing job. To prevent this the user can provide a transition
+function to the load balancer to predict what will be the future workload, given
+the past, instrumented one. As said, the user might provide a specific class
+which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
+Here is the abstract class:
+\begin{alltt}
+class LBPredictorFunction {
+public:
+  int num_params;
+ 
+  virtual void initialize_params(double *x);
+
+  virtual double predict(double x, double *params) =0;
+  virtual void print(double *params) {PredictorPrintf("LB: unknown model");};
+  virtual void function(double x, double *param, double &y, double *dyda) =0;
+};
+\end{alltt}
+\begin{itemize}
+\item {\tt initialize\_params} by default initializes the parameters randomly. If the user
+knows how they should be, this function can be reimplemented.
+\item {\tt predict} is the function the model implements. For example, if the function is
+$y=ax+b$, the method in the implemented class should be like:
+\begin{verbatim}
+double predict(double x, double *param) {return (param[0]*x + param[1]);}
+\end{verbatim}
+\item {\tt print} is a debugging function and it can be reimplemented to have a meaningful
+print of the learnt model
+\item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
+{\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
+all its derivatives with respect to the parameters, respectively).
+For the function in the example should look like:
+\begin{verbatim}
+void function(double x, double *param, double &y, double *dyda) {
+  y = predict(x, param);
+  dyda[0] = x;
+  dyda[1] = 1;
+}
+\end{verbatim}
+\end{itemize}
+Other than these function, the user should provide a constructor which must initialize
+{\tt num\_params} to the number of parameters the model has to learn. This number is
+the dimension of {\tt param} and {\tt dyda} in the previous functions. For the given
+example, the constructor is {\tt \{num\_params = 2;\}}.
+
+If the model behind the computation is not known, the user can leave the system to
+use a predefined default function.
+
+As seen, the function can have several parameters which will be learned during
+the execution of the program. For this, two parameters can be setup at command
+line to specify the learning behaviour:
+\begin{enumerate}
+\item {\em +LBPredictorWindow size}\\
+This parameter will specify how many statistics the load balancer will keep. 
+The greater this number is, the better the
+approximation of the workload will be, but more memory is required to store
+the intermediate information. The default is 20.
+\item {\em +LBPredictorDelay steps}\\
+This will tell how many load balancer steps to wait before considering the
+function parameters learnt and start using the mode. The load balancer will
+collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
+the model as soon as {\em +LBPredictorDelay} information are collected. The
+default is 10.
+\end{enumerate}
+Moreover another flag can be set to enable the predictor from command line: {\em
++LBPredictor}.\\
+Other than the command line options, there are some methods
+callable from user program to modify the predictor. These methods are:
+\begin{itemize}
+\item {\tt void PredictorOn(LBPredictorFunction *model);}
+\item {\tt void PredictorOn(LBPredictorFunction *model,int wind);}
+\item {\tt void PredictorOff();}
+\item {\tt void ChangePredictor(LBPredictorFunction *model);}
+\end{itemize}
+
 \subsubsection{Control CPU Load Statistics}
 
 Charm++ programmers can control CPU load data in the load balancing database

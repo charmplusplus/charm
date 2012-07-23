@@ -1,0 +1,101 @@
+\section{History}
+
+The {\sc Charm} software was developed as a group effort of the Parallel
+Programming Laboratory at the University of Illinois at Urbana-Champaign.
+Researchers at the Parallel Programming Laboratory keep \charmpp\ updated for
+the new machines, new programming paradigms, and for supporting and simplifying
+development of emerging applications for parallel processing.  The earliest
+prototype, Chare Kernel(1.0), was developed in the late eighties. It consisted
+only of basic remote method invocation constructs available as a library.  The
+second prototype, Chare Kernel(2.0), a complete re-write with major design
+changes.  This included C language extensions to denote Chares, messages and
+asynchronous remote method invocation.  {\sc Charm}(3.0) improved on this
+syntax, and contained important features such as information sharing
+abstractions, and chare groups (called Branch Office Chares).  {\sc Charm}(4.0)
+included \charmpp\ and was released in fall 1993.  \charmpp\ in its initial
+version consisted of syntactic changes to \CC\ and employed a special
+translator that parsed the entire \CC\ code while translating the syntactic
+extensions.  {\sc Charm}(4.5)  had a major change that resulted from a
+significant shift in the research agenda of the Parallel Programming
+Laboratory. The message-driven runtime system code of the \charmpp\ was
+separated from the actual language implementation, resulting in an
+interoperable parallel runtime system called {\sc
+Converse}. The \charmpp\ runtime system was
+retargetted on top of {\sc Converse}, and popular programming paradigms such as
+MPI and PVM were also implemented on {\sc Converse}. This allowed
+interoperability between these paradigms and \charmpp. This release also
+eliminated the full-fledged \charmpp\ translator by replacing syntactic
+extensions to \CC\ with \CC\ macros, and instead contained a small language and
+a translator for describing the interfaces of \charmpp\ entities to the runtime
+system.  This version of \charmpp, which, in earlier releases was known as {\em
+Interface Translator \charmpp}, is the default version of \charmpp\ now, and
+hence referred simply as {\bf \charmpp}.  In early 1999, the runtime system of
+\charmpp\ 
+%was formally named the Charm Kernel, and 
+was rewritten in \CC.
+Several new features were added. The interface language underwent significant
+changes, and the macros that replaced the syntactic extensions in original
+\charmpp, were replaced by natural \CC\ constructs. Late 1999, and early
+2000 reflected several additions to \charmpp{}, when a load balancing
+framework and migratable objects were added to \charmpp{}.
+
+\section {Acknowledgements}
+
+The Charm software was developed as a
+group effort.  The earliest prototype, Chare Kernel(1.0), was
+developed by Wennie Shu and Kevin Nomura working with Laxmikant
+Kale.  The second prototype, Chare Kernel(2.0), a complete
+re-write with major design changes, was developed by a team
+consisting of Wayne Fenton, Balkrishna Ramkumar, Vikram Saletore,
+Amitabh B. Sinha and Laxmikant Kale. The translator for Chare
+Kernel(2.0) was written by Manish Gupta.  Charm(3.0), with
+significant design changes, was developed by a team consisting of
+Attila Gursoy, Balkrishna Ramkumar, Amitabh B.  Sinha and
+Laxmikant Kale, with a new translator written by Nimish Shah.  The
+\charmpp\ implementation was done by Sanjeev Krishnan.  Charm(4.0)
+included \charmpp\ and was released in fall 1993.  Charm(4.5) was
+developed by Attila Gursoy, Sanjeev Krishnan, Milind Bhandarkar,
+Joshua Yelon, Narain Jagathesan and Laxmikant Kale.  Charm(4.8),
+developed by the same team included Converse, a parallel runtime
+system that allows interoperability among modules written using
+different paradigms within a single application. \charmpp\ runtime
+system was re-targetted at Converse. Syntactic extensions in
+\charmpp\ were dropped, and a simple interface translator was
+developed (by Sanjeev Krishnan and Jay DeSouza) that, along with
+the \charmpp\ runtime, became the \charmpp\ language.  Charm
+(5.4R1) included the following: a complete rewrite of the
+\charmpp\ runtime system (using \CC) and the interface translator
+(done by Milind Bhandarkar), several new features such as Chare
+Arrays (developed by Robert Brunner and Orion Lawlor), various
+libraries (written by Terry Wilmarth, Gengbin Zheng, Laxmikant
+Kale, Zehra Sura, Milind Bhandarkar, Robert Brunner, and Krishnan
+Varadarajan.) A coordination language ``Structured Dagger'' was
+been implemented on top of \charmpp\ (Milind Bhandarkar), dynamic
+seed-based load balancing (Terry Wilmarth and Joshua Yelon), a
+client-server interface for Converse programs, and debugging
+support by Parthasarathy Ramachandran, Jeff Wright, and Milind
+Bhandarkar, Projections, the performance visualization and
+analysis tool, was redesigned and rewritten using Java by Michael
+Denardo. The test suite for \charmpp\ was developed by Michael
+Lang, Jackie Wang, and Fang Hu. Converse was been ported to ASCI
+Red (Joshua Yelon), Cray T3E (Robert Brunner), and SGI Origin2000
+(Milind Bhandarkar). For the current version Charm 6.0 (R1),
+Converse has been ported to new platforms including BlueGene/[LP]
+(Kumar, Huang, Bhatele), Cray XT3/4 (Zheng), Apple G5, Myrinet
+(Zheng), and Infiniband (Chakravorty).  Charm 6.0 introduces a
+dedicated no network SMP multicore Converse layer for stand-alone
+workstation experimenters (Zheng, Chakravorty, Kale, Jetley).
+Charm 6.0 also includes cross platform network topology aware
+chare placement for 3D tori and mesh networks (Kumar, Huang,
+Bhatele, Bohm). The test suite was extended for automated testing
+on all supported platforms by Gengbin Zheng.  The Projection tool
+was substantially improved by Chee Wai Lee and Isaac Dooley. The
+Control Point performance tuning framework was created by Isaac
+Dooley. Debugging support was enhanced with memory inspection
+features by Filippo Gioachin. The Charisma orchestration language
+was implemented on top of Charm++ by Chao Huang and Sanjay Kale.
+Sanjay Kale, Orion Lawlor, Gengbin Zheng, Terry Wilmarth, Filippo
+Gioachin, Sayantan Chakravorty, Chao Huang, David Kunzman, Isaac
+Dooley, Eric Bohm, Sameer Kumar, Chao Mei, Pritish Jetley, and
+Abhinav Bhatele, have been responsible for the changes to the
+system since the last release. 

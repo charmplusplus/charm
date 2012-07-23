@@ -1,31 +1,4 @@
-\subsection{Entry Methods}
-
-\label{entry}
-
-In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
-nodegroups communicate using remote method invocation.  These ``remote entry'' methods may either take marshalled parameters, described in the next section; or special objects called messages.  Messages are lower level, more efficient, more flexible, and more difficult to use than parameter marshalling.
-
-An entry method is always a part of a chare--
-there are no global entry methods in \charmpp{}.
-Entry methods are declared in the the interface file as:
-
-\begin{alltt}
-entry void \uw{Entry1}(\uw{parameters});
-\end{alltt}
-
-\uw{Parameters} is either a list of marshalled parameters,
-(e.g., ``int i, double x''), or a message description (e.g.,
-``MyMessage *msg'').  See section~\ref{marshalling} and
-section~\ref{messages} for details on these types of
-parameters.
-
-Entry methods typically do not return data-- in \CC, they have
-return type ``void''.  An entry method with the same name
-as its enclosing class is a constructor.  Constructors in \CC
-have no return type.  Finally, sync methods, described below,
-may return a message.
-
-\subsubsection{Entry Method Attributes}
+\subsection{Entry Method Attributes}
 
 \label{attributes}
 
