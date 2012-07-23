@@ -348,7 +348,7 @@ Below are the descriptions about the compiler and runtime options:
 load balancers will remain inactive at execution time unless overridden by other
 runtime options.
 \item {\em -module CommonLBs} \\
-  links a special module CommonLBs which includes some commonly used charmpp{}
+  links a special module CommonLBs which includes some commonly used \charmpp{}
 built-in load balancers.
 \item {\em -balancer GreedyCommLB} \\
   links the load balancer GreedyCommLB and invokes it at runtime.
@@ -361,7 +361,7 @@ load balancers. In the above example, GreedyLB and RefineLB strategies are
 applied one after the other in each load balancing step.
 \end{itemize}
 
-The list of existing load balancers are in section \ref{lbStrategy}. Note: you
+The list of existing load balancers is in section \ref{lbStrategy}. Note: you
 can have multiple -module *LB options. LB modules are linked into a program,
 but they are not activated automatically at runtime.  Using -balancer A at
 compile time will activate load balancer A automatically at runtime.
@@ -370,7 +370,7 @@ again, although it does not hurt.  Using CommonLBs is a convenient way to link
 against the commonly used existing load balancers.  One of the load balancers
 called MetisLB requires the METIS library which is located at:
 charm/src/libs/ck-libs/parmetis/METISLib/.  You need to compile METIS library
-by "make METIS" under charm/tmp after you compile Charm++.
+by ``make METIS'' under charm/tmp after you compile Charm++.
 
 \item {\bf runtime options:}
 
@@ -392,7 +392,7 @@ subsequent load balancing steps.
 Note: +balancer option works only if you have already linked the corresponding 
 load balancers module at compile time. 
 Giving +balancer with a wrong LB name will result in a runtime error.
-When you have used -balancer A as compile time option, you don't need to use 
+When you have used -balancer A as compile time option, you do not need to use 
 +balancer A again to activate it at runtime. However, you can 
 use +balancer B to override the compile time option and choose to
 activate B instead of A.
