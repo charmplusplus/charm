@@ -1,18 +1,19 @@
-\subsection{Structued Control Flow: Structured Dagger}
+\subsection{Structured Control Flow: Structured Dagger}
 \label{sec:sdag}
 
-\charmpp\ is based on the message-driven parallel programming paradigm.  The
-message-driven programming style avoids the use of blocking receives and
-allows overlap of computation and communication by scheduling computations
-depending on availability of data.  This programing style enables \charmpp\
-programs to tolerate communication latencies adaptively. Threads suffer from
-loss of performance due to context-switching overheads and limited scalability
-due to large and unpredictable stack memory requirements, when used in a
-data-driven manner to coordinate a sequence of remotely triggered actions.
+\charmpp\ is based on the message-driven parallel programming paradigm. In
+contrast to many other approaches, \charmpp\ programmers encode entry points to
+their parallel objects, but do not explicitly wait (i.e. block) on the runtime
+to indicate completion of posted `receive' requests. Thus, a \charmpp\ object's
+overall flow of control can end up fragmented across a number of separate
+methods, obscuring the sequence in which code is expected to
+execute. Furthermore, there are often constraints on when different pieces of
+code should execute relative to one another, related to data and
+synchronization dependencies.
 
-The need to sequence remotely triggered actions
-arises in many situations. Let us consider an example:
-
+Consider one way of expressing these constraints using flags, buffers, and
+counters, as in the following example:
+%
 %\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
@@ -62,42 +63,15 @@ public:
 %\caption{Compute Object in a Molecular Dynamics Application}
 %\label{figchareexample}
 %\end{figure}
+In each step, this object expects pairs of messages, and waits to process the
+incoming data until it has both of them. This sequencing is encoded across 4
+different functions, which in real code could be much larger and more numerous,
+resulting in a spaghetti-code mess.
 
-
-Consider an algorithm for computing cutoff-based pairwise interactions
-between atoms in a molecular dynamics application, where interaction
-between atoms is considered only when they are within some cutoff
-distance of each other.  This algorithm is based on a combination of
-task and spatial decompositions of the molecular system. The bounding
-box for the molecule is divided into a number of cubes ({\em Patches})
-each containing some number of atoms.  Since each patch contains a
-different number of atoms and these atoms migrate between patches as
-simulation progresses, a dynamic load balancing scheme is used. In
-this scheme, the task of computing the pairwise interactions between
-atoms of all pairs of patches is divided among a number of {\em
-Compute Objects}. These compute objects are assigned at runtime to
-different processors. The initialization message for each compute
-object contains the indices of the patches. The patches themselves are
-distributed across processors. Mapping information of patches to
-processors is maintained by a replicated object called {\em
-PatchManager}.  Figure~\ref{figchareexample} illustrates the \charmpp\
-implementation of the compute object. Each compute object requests
-information about both patches assigned to it from the
-PatchManager. PatchManager then contacts the appropriate processors
-and delivers the patch information to the requesting compute
-object. The compute object, after receiving information about each
-patch, determines which atoms in a patch do not interact with atoms in
-another patch since they are separated by more than the cut-off
-distance. This is done in method {\tt filter}.  Filtering could be
-done after both patches arrive. However, in order to increase
-processor utilization, we do it immediately after any patch
-arrives. Since the patches can arrive at the requesting compute object
-in any order, the compute object has to buffer the received patches,
-and maintain state information using counters or flags.  This example
-has been chosen for simplicity in order to demonstrate the necessity
-of counters and buffers.  In general, a parallel algorithm may have
-more interactions leading to the use of many counters, flags, and
-message buffers, which complicates program development significantly.
+Instead, it would be preferable to express this flow of control using
+structured constructs, such as loops. \charmpp\ provides such constructs for
+structured control flow across an object's entry methods in a notation called
+Structured Dagger.
 
 Threads are typically used to perform the abovementioned sequencing.
 Lets us code our previous example using threads.
