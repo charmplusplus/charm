@@ -182,6 +182,7 @@ migrations, insertions, and deletions.
 
 
 \subsubsection{Reductions on Chare Arrays}
+\label{reductions}
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
@@ -196,25 +197,6 @@ ArrayElement::contribute(int nBytes,const void *data,CkReduction::reducerType ty
 \end{alltt}
 
 Reductions are described in more detail in Section~\ref{reductions}.
-
-
-\subsubsection{Destroying Arrays}
-
-To destroy an array element-- detach it from the array,
-call its destructor, and release its memory--invoke its 
-\kw{Array destroy} method, as:
-
-\begin{alltt}
-a1[i].ckDestroy();
-\end{alltt}
-
-You must ensure that no messages are sent to a deleted element. 
-After destroying an element, you may insert a new element at
-its index.
-
-\subsubsection{Array Reductions}
-
-\label{reductions}
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
@@ -320,3 +302,17 @@ This will also work for arrays of data elements, and for any user-defined type w
 number of elements, say 3 {\tt int}s, you can also specify a reduction target which
 takes 3 {\tt int}s and it will be invoked correctly. 
 
+
+\subsubsection{Destroying Arrays}
+
+To destroy an array element-- detach it from the array,
+call its destructor, and release its memory--invoke its 
+\kw{Array destroy} method, as:
+
+\begin{alltt}
+a1[i].ckDestroy();
+\end{alltt}
+
+You must ensure that no messages are sent to a deleted element. 
+After destroying an element, you may insert a new element at
+its index.
