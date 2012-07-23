@@ -1,6 +1,11 @@
 \subsection{Messages}
 
 \label{messages}
+Although \charmpp supports automated parameter marshalling for entry methods,
+you can also manually handle the process of packing and unpacking parameters by
+using messages. By using messages, you can potentially improve performance by
+avoiding unnecessary copying
+
 A message encapsulates all the parameters sent to an
 entry method.  Since the parameters are already encapsulated,
 sending messages is often more efficient than parameter marshalling.
