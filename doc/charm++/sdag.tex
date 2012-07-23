@@ -16,27 +16,27 @@ arises in many situations. Let us consider an example:
 %\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
-      class compute_object : public Chare \{
-      private:
-      int         count;
-      Patch       *first, *second;
-      public:
-      compute_object(MSG *msg) \{
-      count = 2; MyChareID(\&chareid);
-      PatchManager->Get(msg->first_index, recv_first, \&thishandle,NOWAIT);
-      PatchManager->Get(msg->second_index, recv_second, \&thishandle,NOWAIT);
-      \}
-      void recv_first(PATCH_MSG *msg) \{
-       first = msg->patch;
-       filter(first);
-       if (--count == 0 ) computeInteractions(first,second);
-      \} 
-      void recv_second(PATCH_MSG *msg)\{
-       second = msg->patch;
-       filter(second);
-       if (--count == 0) computeInteractions(first,second);
-      \}
-     \}
+class compute_object : public Chare \{  
+    private:
+    int         count;
+    Patch       *first, *second;
+    public:
+    compute_object(MSG *msg) \{
+        count = 2; MyChareID(\&chareid);
+        PatchManager->Get(msg->first_index, recv_first, \&thishandle,NOWAIT);
+        PatchManager->Get(msg->second_index, recv_second, \&thishandle,NOWAIT);
+    \}
+    void recv_first(PATCH_MSG *msg) \{
+        first = msg->patch;
+        filter(first);
+        if (--count == 0 ) computeInteractions(first,second);
+    \} 
+    void recv_second(PATCH_MSG *msg)\{
+        second = msg->patch;
+        filter(second);
+        if (--count == 0) computeInteractions(first,second);
+    \}
+\}
 \end{alltt}
 \end{center}
 %\caption{Compute Object in a Molecular Dynamics Application}
@@ -85,25 +85,22 @@ Lets us code our previous example using threads.
 %\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
-void compute_thread(int first_index, int second_index)
-\{
+void compute_thread(int first_index, int second_index)\{
     getPatch(first_index);
     getPatch(second_index);
     threadId[0] = createThread(recvFirst);
     threadId[1] = createThread(recvSecond);
     threadJoin(2, threadId);
     computeInteractions(first, second);
-  \}
-  void recvFirst(void)
-  \{
+\}
+void recvFirst(void)\{
     recv(first, sizeof(Patch), ANY_PE, FIRST_TAG);
     filter(first);
-  \}
-  void recvSecond(void)
-  \{
+\}
+void recvSecond(void)\{
     recv(second, sizeof(Patch), ANY_PE, SECOND_TAG);
     filter(second);
-  \}
+\}
 \end{alltt}
 \end{center}
 %\caption{Compute Thread in a Molecular Dynamics Application}
@@ -129,21 +126,21 @@ adding any significant overhead.
 %\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
-  array[1D] compute_object \{
+array[1D] compute_object \{
     entry void recv_first(Patch *first);
     entry void recv_second(Patch *first);
     entry void compute_object(MSG *msg)\{
-      atomic \{
-         PatchManager->Get(msg->first_index,\dots);
-         PatchManager->Get(msg->second_index,\dots);
-      \}
-      overlap \{
-        when recv_first(Patch *first) atomic \{ filter(first); \}
-        when recv_second(Patch *second) atomic \{ filter(second); \}
-      \}
-      atomic \{ computeInteractions(first, second); \}
+        atomic \{
+            PatchManager->Get(msg->first_index,\dots);
+            PatchManager->Get(msg->second_index,\dots);
+        \}
+        overlap \{
+            when recv_first(Patch *first) atomic \{ filter(first); \}
+            when recv_second(Patch *second) atomic \{ filter(second); \}
+        \}
+        atomic \{ computeInteractions(first, second); \}
     \}
-  \}
+\}
 \end{alltt}
 \end{center}
 %\caption{\sdag\ Implementation of the Compute Object}
@@ -221,19 +218,19 @@ For example, an array named ``Foo'' that uses sdag code might contain:
 
 \begin{alltt}
 class Foo : public CBase_Foo \{
-public:
+    public:
     Foo_SDAG_CODE
     Foo(...) \{
-       __sdag_init();
-       ...
+        __sdag_init();
+        ...
     \}
     Foo(CkMigrateMessage *m) \{
-       __sdag_init();
+        __sdag_init();
     \}
     
     void pup(PUP::er &p) \{
-       CBase_Foo::pup(p);
-       __sdag_pup(p);
+        CBase_Foo::pup(p);
+        __sdag_pup(p);
     \}
 \};
 \end{alltt}
