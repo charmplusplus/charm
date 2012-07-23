@@ -15,6 +15,7 @@ TList<Entry *> *connectEntries = new TList<Entry *>();
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);
+int count_newlines(char *s);
 
 /* We return Tokens only when not in a comment. */
 #define Return if (!in_comment) return
@@ -56,7 +57,7 @@ nonIntExpr [^();,:]*
 
 %%
 {nonBracket}	{ if (in_bracket) {Yval;return Token(CPROGRAM);} else REJECT;}
-{nonBraces}	{ if (in_braces) {Yval;return Token(CPROGRAM);} else REJECT;}
+{nonBraces}	{ if (in_braces) {Yval; lineno += count_newlines(yytext); return Token(CPROGRAM);} else REJECT;}
 {nonIntExpr}	{ if (in_int_expr) {Yval;return Token(CPROGRAM);} else REJECT;}
 "//".*		{ /* ignore single line comments */ }
 "\r"		{ /* ignore ^M characters for dos-unix compat */ }
@@ -157,6 +158,18 @@ int search(char *s)
   }
   yylval.strval = strcpy(new char[yyleng+1], s);
   return IDENT;
+}
+
+// Oh my $DEITY...
+int count_newlines(char *s) {
+    int count = 0;
+
+    while (*s != '\0') {
+        if (*s == '\n') count++;
+        s++;
+    }
+
+    return count;
 }
 
 int yywrap() { return 1; }
