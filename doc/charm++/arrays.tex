@@ -249,10 +249,6 @@ In all cases, the result of the reduction operation is passed to the {\em reduct
 client}.  Many different kinds of reduction clients can be used, as
 explained in Section~\ref{reductionClients}.
 
-\paragraph{Typed Reductions}
-
-\label{typed_reductions}
-
 Typically the client entry method of a reduction takes a single argument of
 type CkReductionMsg. However, by giving an entry method the
 \kw{reductiontarget} attribute in the {\tt .ci} file, you can instead use entry methods that take
@@ -282,7 +278,9 @@ the code for a typed reduction that yields an {\tt int}, would look like this:
   \}
 \end{alltt}
 
-This will also work for arrays of data elements, and for any user-defined type with a PUP method
+This will also work for arrays of data 
+elements(entry [reductiontarget] void done(int n, int result[n]);), 
+and for any user-defined type with a PUP method
 (see ~\ref{sec:pup}). If you know that the reduction will yield a particular
 number of elements, say 3 {\tt int}s, you can also specify a reduction target which
 takes 3 {\tt int}s and it will be invoked correctly. 
