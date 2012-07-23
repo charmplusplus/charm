@@ -257,6 +257,33 @@ the object may happen at any time. In certain load balancing scheme where
 user explicitly control when the load balancing happens, user may choose
 to pack only a part of the data and may skip those temporary data.
 
+An array element can migrate by calling the \kw{migrateMe}(\uw{destination
+processor}) member function-- this call must be the last action
+in an element entry point.  The system can also migrate array elements
+for load balancing (see the section~\ref{lbarray}).
+
+To migrate your array element to another processor, the \charmpp{}
+runtime will:
+
+\begin{itemize}
+\item Call your \kw{ckAboutToMigrate} method
+\item Call your \uw{pup} method with a sizing \kw{PUP::er} to determine how 
+big a message it needs to hold your element.
+\item Call your \uw{pup} method again with a packing \kw{PUP::er} to pack 
+your element into a message.
+\item Call your element's destructor (killing off the old copy).
+\item Send the message (containing your element) across the network.
+\item Call your element's migration constructor on the new processor.
+\item Call your \uw{pup} method on with an unpacking \kw{PUP::er} to unpack 
+the element.
+\item Call your \kw{ckJustMigrated} method
+\end{itemize}
+
+Migration constructors, then, are normally empty-- all the unpacking
+and allocation of the data items is done in the element's \uw{pup} routine.
+Deallocation is done in the element destructor as usual.
+
+
 \subsubsection{Other utility functions}
 
 There are several utility functions that can be called in applications to

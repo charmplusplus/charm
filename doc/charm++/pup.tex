@@ -259,5 +259,67 @@ repeatedly over the object lifetime.
 Finally, objects are destroyed by calling their destructor
 as usual.
 
+\subsubsection{Migratable Array Elements}
+
+\label{arraymigratable}
+Array objects can \index{migrate}migrate from one PE to another.
+For example, the load balancer (see section~\ref{lbFramework})
+might migrate array elements to better balance the load between
+processors.  For an array element to migrate, it must implement
+a pack/unpack or ``pup'' method:
+
+\begin{alltt}
+//In the .h file:
+class A2 : public CBase\_A2 \{
+private: //My data members:
+    int nt;
+    unsigned char chr;
+    float flt[7];
+    int numDbl;
+    double *dbl;
+public:	
+    //...other declarations
+
+    virtual void pup(PUP::er \&p);
+\};
+
+//In the .C file:
+void A2::pup(PUP::er \&p)
+\{
+    CBase\_A2::pup(p); //<- MUST call superclass's pup routine
+    p|nt;
+    p|chr;
+    p(flt,7);
+    p|numDbl;
+    if (p.isUnpacking()) dbl=new double[numDbl];
+    p(dbl,numDbl);
+\}
+\end{alltt}
+
+Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
+
+\begin{alltt}
+class bar: public CBase\_bar \{
+ private:
+    int a,b;
+ public:
+    bar_SDAG_CODE 
+    ...other methods...
+
+    virtual void pup(PUP::er& p) \{
+      __sdag_pup(p);
+      ...pup other data here...
+    \}
+\};
+\end{alltt}
+
+See the \index{PUP} section ``PUP'' for more details on pup routines
+and the \kw{PUP::er} type.
+
+The system uses one pup routine to do both packing and unpacking by
+passing different types of \kw{PUP::er}s to it.  You can determine
+what type of \kw{PUP::er} has been passed to you with the
+\kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
+
 
 
