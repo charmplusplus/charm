@@ -31,6 +31,7 @@ typedef enum {
   The image parameters are passed in as a "liveVizRequestMsg *" message.
 */
 void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c);
+void liveVizInit(const liveVizConfig &cfg, CkArrayID a, CkCallback c, CkArrayOptions &opts);
 
 class liveVizRequestMsg : public CMessage_liveVizRequestMsg {
 public:
@@ -134,6 +135,17 @@ void liveVizPollDeposit(ArrayElement *from,
 						int bytes_per_pixel=3
 						);
 
+
+class LiveVizBoundElement : public CBase_LiveVizBoundElement {
+public:
+	LiveVizBoundElement(){}
+	LiveVizBoundElement(CkMigrateMessage *msg){}
+	~LiveVizBoundElement(){}
+	
+	void deposit(CkReductionMsg *msg){
+		contribute(msg);
+	}
+};
 
 
 
