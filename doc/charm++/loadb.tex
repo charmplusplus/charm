@@ -472,55 +472,58 @@ load balancer.
  command line option to choose other topology such as ring, mesh3D and 
  dense graph.
 \item {\em spray}\\  
- a strategy which imposes a spanning tree organization on the processors,
+ A strategy which imposes a spanning tree organization on the processors,
  results in communication via global reduction among all processors 
  to compute global average load via periodic reduction. 
  It uses averaging of loads to determine how seeds should be
 distributed.
+\item  {\em workstealing} \\
+ A strategy that the idle processor requests a random processor and steal 
+ chares.
 \end{enumerate}
 
 Other strategies can also be explored follow the simple API of the 
 seed load balancer.
 \linebreak
 
-{\bf Seed load balancers for Chares:}
-
-Seed load balancers can be directly used for load balancing Chares.
-The default seed load balancer which is always linked is the random seed load balancer.
-Users can choose another strategy listed above and link as a plugin
-module into binary as described below.
-
-{\bf Seed load balancers for Array Elements:}
-
-Seed load balancers can also be used for array elements in the same way 
-as they are used for individual chares.
-Chare array is a collection of individual Chares in Charm++.
-Since Chare Array has its internal strategy of static mapping of individual
-array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to processors in Round-Robin fashion unless a different CkArrayMap is used}, 
-a special CkArrayMap called {\em CldMap} must be created and passed into
-array creation calls to interface with seed load balancer.
-
-For creating an empty array and then inserting chares into it, the API is as follows:
-
-\begin{alltt}
-  CkArrayOptions opt;
-  CkGroupID cldmapID = CProxy_CldMap::ckNew();
-  opt.setMap(cldmapID);
-  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
-  for (int i=0; i<numChares; i++) 
-    arr[i].insert(param);
-\end{alltt}
-
-For initially populating the array with chares at time of creation the API is as follows:
-\begin{alltt}
-  CkArrayOptions opt(numChares);
-  CkGroupID cldmapID = CProxy_CldMap::ckNew();
-  opt.setMap(cldmapID);
-  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
-\end{alltt}
-
-The details about array creation are explained in section~\ref{advanced arrays} of the manual.
-
+%{\bf Seed load balancers for Chares:}
+%
+%Seed load balancers can be directly used for load balancing Chares.
+%The default seed load balancer which is always linked is the random seed load balancer.
+%Users can choose another strategy listed above and link as a plugin
+%module into binary as described below.
+%
+%{\bf Seed load balancers for Array Elements:}
+%
+%Seed load balancers can also be used for array elements in the same way 
+%as they are used for individual chares.
+%Chare array is a collection of individual Chares in Charm++.
+%Since Chare Array has its internal strategy of static mapping of individual
+%array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to processors in Round-Robin fashion unless a different CkArrayMap is used}, 
+%a special CkArrayMap called {\em CldMap} must be created and passed into
+%array creation calls to interface with seed load balancer.
+%
+%For creating an empty array and then inserting chares into it, the API is as follows:
+%
+%\begin{alltt}
+%  CkArrayOptions opt;
+%  CkGroupID cldmapID = CProxy_CldMap::ckNew();
+%  opt.setMap(cldmapID);
+%  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
+%  for (int i=0; i<numChares; i++) 
+%    arr[i].insert(param);
+%\end{alltt}
+%
+%For initially populating the array with chares at time of creation the API is as follows:
+%\begin{alltt}
+%  CkArrayOptions opt(numChares);
+%  CkGroupID cldmapID = CProxy_CldMap::ckNew();
+%  opt.setMap(cldmapID);
+%  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
+%\end{alltt}
+%
+%The details about array creation are explained in section~\ref{advanced arrays} of the manual.
+%
 {\bf Compile and run time options for seed load balancers}
 
 To choose a seed load balancer other than the default {\em rand} strategy,
@@ -575,53 +578,53 @@ mainmodule lbexample {
 
 /*mainchare*/
 class Main : public CBase_Main
-{
+\{
 private:
   int count;
 public:
   Main(CkArgMsg* m)
-  {
+  \{
     /*....Initialization....*/
     mainProxy = thisProxy;
     CProxy_LBExample arr = CProxy_LBExample::ckNew(nElements);
     arr.doWork();
-  };
+  \};
 
   void done(void)
-  {
+  \{
     count++;
     if(count==nElements){
       CkPrintf("All done");
       CkExit();
-    }
-  };
-};
+    \}
+  \};
+\};
 
 /*array [1D]*/
 class LBExample : public CBase_LBExample
-{
+\{
 private:
   int workcnt;
 public:
   LBExample()
-  {
+  \{
     workcnt=0;
     /* May initialize some variables to be used in doWork */
     //Must be set to CmiTrue to make AtSync work
     usesAtSync=CmiTrue;
-  }
+  \}
 
-  LBExample(CkMigrateMessage *m) { /* Migration constructor -- invoked when chare migrates */ }
+  LBExample(CkMigrateMessage *m) \{ /* Migration constructor -- invoked when chare migrates */ }
   
   /* Must be written for migration to succeed */
-  void pup(PUP::er &p){
+  void pup(PUP::er &p)\{
     CBase_LBExample::pup(p);
     p|workcnt;
     /* There may be some more variables used in doWork */
   }
 	
   void doWork()
-  {
+  \{
     /* Do work proportional to the chare index to see the effects of LB */
     
     workcnt++;
@@ -632,12 +635,12 @@ public:
       AtSync();
     else
       doWork();
-  }
+  \}
   
-  void ResumeFromSync(){
+  void ResumeFromSync()\{
     doWork();
-  }
-};
+  \}
+\};
 
 #include "lbexample.def.h"
 \end{alltt}
