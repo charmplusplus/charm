@@ -186,20 +186,6 @@ migrations, insertions, and deletions.
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
 max, min, ...) to data items scattered across many processors and
-collects the result in one place.  \charmpp{} supports reductions on the
-elements of a Chare array.
-
-The data to be reduced comes from each array element, 
-which must call the \kw{contribute} method:
-
-\begin{alltt}
-ArrayElement::contribute(int nBytes,const void *data,CkReduction::reducerType type);
-\end{alltt}
-
-Reductions are described in more detail in Section~\ref{reductions}.
-
-A \index{array reduction}reduction applies a single operation (e.g. add,
-max, min, ...) to data items scattered across many processors and
 collects the result in one place.  \charmpp{} supports reductions
 over the members of an array or group.
 
