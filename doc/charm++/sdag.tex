@@ -16,27 +16,47 @@ arises in many situations. Let us consider an example:
 %\begin{figure}[ht]
 \begin{center}
 \begin{alltt}
-      class compute_object : public Chare \{
-      private:
-      int         count;
-      Patch       *first, *second;
-      public:
-      compute_object(MSG *msg) \{
-      count = 2; MyChareID(\&chareid);
-      PatchManager->Get(msg->first_index, recv_first, \&thishandle,NOWAIT);
-      PatchManager->Get(msg->second_index, recv_second, \&thishandle,NOWAIT);
-      \}
-      void recv_first(PATCH_MSG *msg) \{
-       first = msg->patch;
-       filter(first);
-       if (--count == 0 ) computeInteractions(first,second);
-      \} 
-      void recv_second(PATCH_MSG *msg)\{
-       second = msg->patch;
-       filter(second);
-       if (--count == 0) computeInteractions(first,second);
-      \}
-     \}
+// in .ci file
+chare ComputeObject {
+  entry void ComputeObject();
+  entry void startStep();
+  entry void firstInput(Input i);
+  entry void secondInput(Input j);
+};
+
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  int   expectedMessageCount;
+  Input first, second;
+
+public:
+  ComputeObject() \{
+    startStep();
+  \}
+  void startStep() \{
+    expectedMessageCount = 2;
+  \}
+
+  void firstInput(Input i) \{
+    first = i;
+    if (--expectedMessageCount == 0)
+      computeInteractions(first, second);
+    \}
+  void recv_second(Input j) \{
+    second = j;
+    if (--expectedMessageCount == 0)
+      computeInteractions(first, second);
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+    // reset for next step
+    startStep();
+  \}
+\};
 \end{alltt}
 \end{center}
 %\caption{Compute Object in a Molecular Dynamics Application}
