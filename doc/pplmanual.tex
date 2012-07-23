@@ -4,6 +4,7 @@
 \usepackage{makeidx}
 \usepackage{alltt}
 %\usepackage{html}
+\usepackage{hyphenat}
 \usepackage{listings}
 \usepackage{hyperref}
 \hypersetup{
@@ -41,7 +42,7 @@
 \newcommand{\args}[1]{\hspace*{2em}{\texttt{#1}}\\}
 \newcommand{\prototype}[1]{\vspace{0.2in}\index{#1}}
 \newcommand{\param}[1]{{\texttt{#1}}}
-\newcommand{\kw}[1]{{\textsf{#1}\index{#1}}}
+\newcommand{\kw}[1]{{\nohyphens{\textsf{#1}}\index{#1}}}
 \newcommand{\uw}[1]{{\textsl{#1}}}
 \newcommand{\desc}[1]{\indent{#1}}
 \newcommand{\note}[1]{(\textbf{Note:} #1)}
