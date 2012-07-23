@@ -318,26 +318,26 @@ LBSetPeriod(5.0);
       Alternatively, one can specify +LBPeriod \{seconds\} at command line.
 \end{itemize}
 
-\subsubsection{Compiler and run-time options to use load balancing module}
+\subsubsection{Compiler and runtime options to use load balancing module}
 
 \label{lbOption}
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
 allows programmers to easily experiment with different existing strategies 
 by simply linking a pool of strategy modules and choosing
-one to use at run-time via a command line option.
+one to use at runtime via a command line option.
 
 Please note that linking a load balancing module is different from activating it:
 \begin{itemize}
-\item link a LB module: is to link a Load Balancer module(library) at 
-   compile time; You can link against multiple LB libraries as candidates.
-\item activate a LB: is to actually ask at run-time to create a LB strategy and 
+\item link an LB module: is to link an Load Balancer module(library) at 
+   compile time. You can link against multiple LB libraries as candidates.
+\item activate an LB: is to actually ask the runtime to create an LB strategy and 
    start it. You can only activate load balancers that have been linked at
    compile time.
 \end{itemize}
 
 
-Below are the descriptions about the compiler and run-time options:
+Below are the descriptions about the compiler and runtime options:
 
 \begin{enumerate}
 \item {\bf compile time options:}
@@ -345,27 +345,26 @@ Below are the descriptions about the compiler and run-time options:
 \begin{itemize}
 \item {\em -module NeighborLB -module GreedyCommLB ...}  \\
   links the modules NeighborLB, GreedyCommLB etc into an application, but these
-load balancers will remain inactive at execution time unless overriden by other
+load balancers will remain inactive at execution time unless overridden by other
 runtime options.
 \item {\em -module CommonLBs} \\
   links a special module CommonLBs which includes some commonly used charmpp{}
 built-in load balancers.
 \item {\em -balancer GreedyCommLB} \\
-  links the load balancer GreedyCommLB and invokes this load balancer at
-runtime.
+  links the load balancer GreedyCommLB and invokes it at runtime.
 \item {\em -balancer GreedyCommLB -balancer RefineLB} \\
   invokes GreedyCommLB at the first load balancing step and RefineLB in all
 subsequent load balancing steps.
 \item {\em -balancer ComboCentLB:GreedyLB,RefineLB}  \\
-  One can choose to create a new combination load balancer made of multiple
+  You can create a new combination load balancer made of multiple
 load balancers. In the above example, GreedyLB and RefineLB strategies are
 applied one after the other in each load balancing step.
 \end{itemize}
 
 The list of existing load balancers are in section \ref{lbStrategy}. Note: you
 can have multiple -module *LB options. LB modules are linked into a program,
-but they are not activated automatically at runtime.  Using -balancer at
-compile time in order to activate load balancers automatically at run time.
+but they are not activated automatically at runtime.  Using -balancer A at
+compile time will activate load balancer A automatically at runtime.
 Having -balancer A implies -module A, so you don't have to write -module A
 again, although it does not hurt.  Using CommonLBs is a convenient way to link
 against the commonly used existing load balancers.  One of the load balancers
@@ -373,16 +372,16 @@ called MetisLB requires the METIS library which is located at:
 charm/src/libs/ck-libs/parmetis/METISLib/.  You need to compile METIS library
 by "make METIS" under charm/tmp after you compile Charm++.
 
-\item {\bf run-time options:}
+\item {\bf runtime options:}
 
-Run-time options are similar to the compile time options as described above,
+Runtime options are similar to the compile time options as described above,
 but they can override compile time options.
 
 \begin{itemize}
 \item {\em +balancer help} \\
   displays all available balancers that have been linked in.
 \item {\em +balancer GreedyCommLB} \\
-  invoked GreedyCommLB
+  invokes GreedyCommLB
 \item {\em +balancer GreedyCommLB +balancer RefineLB} \\
   invokes GreedyCommLB at the first load balancing step and RefineLB in all
 subsequent load balancing steps.
@@ -390,58 +389,59 @@ subsequent load balancing steps.
   same as the example in the -balancer compile time option.
 \end{itemize}
 
-Note: +balancer option works only if you have already linked the load balancers module at compile time. 
+Note: +balancer option works only if you have already linked the corresponding 
+load balancers module at compile time. 
 Giving +balancer with a wrong LB name will result in a runtime error.
 When you have used -balancer A as compile time option, you don't need to use 
 +balancer A again to activate it at runtime. However, you can 
 use +balancer B to override the compile time option and choose to
 activate B instead of A.
 
-\item {\bf When there is no load balancer activated}
+\item {\bf Handling the case that no load balancer is activated by users}
 
-When you don't activate any of the load balancers at compile time or run time, 
-and your program counts on a load balancer because you use {\em AtSync()}
+Wen no balancer is linked by users, 
+but the program counts on a load balancer because you use {\em AtSync()}
 and expect {\em ResumeFromSync()} to be called to continue,
-be assured that your program can still run. 
-A special load balancer called {\em NullLB} is 
-automatically created in this case which just
-calls {\em ResumeFromSync()} after {\em AtSync()}. 
-This default load balancer keeps a program from hanging after calling {\em AtSync()}.
+a special load balancer called {\em NullLB} will be 
+automatically created in this case in order to run the program.
+This default load balancer calls {\em ResumeFromSync()} after {\em AtSync()}. 
+It keeps a program from hanging after calling {\em AtSync()}.
 The {\em NullLB} is smart enough to keep silent if another 
 load balancer is created.
 
-\item {\bf Other useful run-time options}
+\item {\bf Other useful runtime options}
 
-There are a few other run-time options for load balancing that may be useful:
+There are a few other runtime options for load balancing that may be useful:
 
 \begin{itemize}
 \item {\em +LBDebug \{verbose level\}} \\
-     \{verbose level\} can be any positive integer number. 0 to turn off. 
-     This option asks load balancer to output more information to stdout 
-about load balancing. The bigger the verbose level, the more verbose the output is.
+     \{verbose level\} can be any positive integer number. 0 is to turn off the verbose. 
+     This option asks load balancer to output load balancing information to stdout.
+     The bigger the verbose level is, the more verbose the output is.
 \item {\em +LBPeriod \{seconds\}} \\
-     \{seconds\} can be any float number. This sets the minimum period time in 
+     \{Seconds\} can be any float number. This option sets the minimum period time in 
 seconds between two consecutive load balancing steps. The default value is 
-1 second. That is to say a second load balancing step won't happen until
-after 1 second since the last load balancing step.
+1 second. That is to say that a load balancing step will not happen until
+1 second after the last load balancing step.
 \item {\em +LBSameCpus} \\
-     this option simply tells load balancer that all processors are of same speed. The load balancer will then skip the measurement of CPU speed at run-time.
+     This option simply tells load balancer that all processors are of same speed.
+     The load balancer will then skip the measurement of CPU speed at runtime.
 \item {\em +LBObjOnly} \\
-     this tells load balancer to ignore processor background load when making migration decisions.
+     This tells load balancer to ignore processor background load when making migration decisions.
 \item {\em +LBSyncResume} \\
-     after load balancing step, normally a processor can resume computation 
+     After load balancing step, normally a processor can resume computation 
 once all objects are received on that processor, even when other processors
 are still working on migrations.  If this turns out to be a problem, 
 that is when some processors start working on computation while the other 
-processors are still busy migrating objects, then use this option to force 
-a global barrier on all processors to make sure processors can only resume 
-computation after migrations finish on all processors.
+processors are still busy migrating objects, then this option can be used to force 
+a global barrier on all processors to make sure that processors can only resume 
+computation after migrations are completed on all processors.
 \item {\em +LBOff} \\
-     Turns off load balancing instrumentation at startup time. This call turns
-off the instrument of both CPU and communication usage.
+     This option turns off load balancing instrumentation 
+     of both CPU and communication usageat startup time. 
 \item {\em +LBCommOff} \\
-     Turns off load balancing instrumentation of communication at startup time. 
-The instrument of CPU usage is left on.
+     This option turns off load balancing instrumentation of communication at startup time. 
+     The instrument of CPU usage is left on.
 \end{itemize}
 
 \end{enumerate}
@@ -451,23 +451,23 @@ The instrument of CPU usage is left on.
 \label{seedlb}
 
 Seed load balancing involves the movement of object creation messages, or
-"seeds", to create a balance of work across a set of processors. This load
-balancing scheme is used for load balancing chares only at creation time. When
-the chare is created on a processor, there is no movement of the chare due to
-the seed load balancer. The measurement based load balancer described in
-previous subsection perform the task of moving chares during work to achieve
-load balance.
-
-Several variations of strategies have been designed and analyzed. 
+"seeds", to create a balance of work across a set of processors. 
+This seed load balancing scheme is used to balance chares  at creation time.
+After the chare constructor is executed on a processor, the seed balancer does not
+migrate it.
+%the seed load balancer. The measurement based load balancer described in
+%previous subsection perform the task of moving chares during work to achieve
+%load balance.
+Depending on the movement strategy, several seed load balancers are available now. 
 \begin{enumerate}
 \item {\em random}\\  
  A strategy that places seeds randomly when they are created and does
 no movement of seeds thereafter. This is used as the default seed 
 load balancer.
 \item {\em neighbor}\\  
- a strategy which imposes a virtual topology on the processors,
- load exchange happens to neighbors only. The overloaded processors
- initiate the load balancing, where a processor sends work to its neighbors
+ A strategy which imposes a virtual topology on the processors,
+ load exchange happens among neighbors only. The overloaded processors
+ initiate the load balancing and send work to its neighbors
  when it becomes overloaded. The default topology is mesh2D, one can use
  command line option to choose other topology such as ring, mesh3D and 
  dense graph.
