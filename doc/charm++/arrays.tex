@@ -1,25 +1,25 @@
-\subsection{Basic Arrays}
-
+\subsection{Chare Arrays}
 \label{basic arrays}
 
-Arrays \index{arrays} are arbitrarily-sized collections of chares.  The
-entire array has a globally unique identifier of type \kw{CkArrayID}, and
-each element has a unique index of type \kw{CkArrayIndex}.  A \kw{CkArrayIndex}
-can be a single integer (i.e. 1D array), several integers (i.e. a
-multidimensional array), or an arbitrary string of bytes (e.g. a binary tree
-index).
+Chare arrays\index{chare array}\index{chare arrays}\index{arrays} are
+arbitrarily-sized, possibly-sparse collections of chares that are distributed
+across the processors. The entire array has a globally unique identifier of
+type \kw{CkArrayID}, and each element has a unique index of type
+\kw{CkArrayIndex}. A \kw{CkArrayIndex} can be a single integer (i.e. 1D array),
+several integers (i.e. a multidimensional array), or an arbitrary string of
+bytes (e.g. a binary tree index).
 
 Array elements can be dynamically created and destroyed on any processor,
-and messages for the elements will still arrive properly.
-Array elements can be migrated at any time, allowing arrays to be efficiently
-load balanced.  Array elements can also receive array broadcasts and
-contribute to array reductions.
+migrated between processors, and messages for the elements will still arrive
+properly. Array elements can be migrated at any time, allowing arrays to be
+efficiently load balanced. A chare array (or a subset of array elements) can
+receive a broadcast/multicast or contribute to a reduction.
 
 \subsubsection{Declaring a 1D Array}
 
 You can declare a one-dimensional \index{array}\index{chare array}chare array
 as:
-
+%
 \begin{alltt}
 //In the .ci file:
 array [1D] A \{
@@ -27,16 +27,23 @@ array [1D] A \{
   entry void someEntry(\uw{parameters2});
 \};
 \end{alltt}
-
-Just as every Chare inherits from the system class \kw{CBase}\_\uw{ClassName}, every 
-array element inherits from the system class \kw{CBase}\_\uw{ClassName}.
-Just as a Chare inherits ``thishandle'', each
-array element inherits ``thisArrayID'', the \kw{CkArrayID} of its array,
-and ``thisIndex'', the element's array index.
-As well as chares are allowed to inherit directly from class \kw{Chare},
-array elements are allowed to inherit from \kw{ArrayElement1D} if 1D array,
-\kw{ArrayElement2D} if 2D array, and so on up to 6D.
-
+%
+Array elements extend the system class \kw{CBase}\_\uw{ClassName}, inheriting
+several fields:
+%
+\begin{itemize}
+\item \kw{thisProxy}: the proxy to the entire chare array that can be indexed
+  to obtain a proxy to a specific array element (e.g. for a 1D chare array
+  \kw{thisProxy[10]}; for a 2D chare array \kw{thisProxy(10, 20)})
+\item \kw{thisArrayID}: the array's globally unique identifier
+\item \kw{thisIndex}: the element's array index (an array element can obtain a
+  proxy to itself like this \kw{thisProxy[thisIndex]})
+\end{itemize}
+%
+\zap{As well as chares are allowed to inherit directly from class \kw{Chare},
+  array elements are allowed to inherit from \kw{ArrayElement1D} if 1D array,
+  \kw{ArrayElement2D} if 2D array, and so on up to 6D.}
+%
 \begin{alltt}
 class A : public CBase\_A \{
   public:
@@ -46,140 +53,166 @@ class A : public CBase\_A \{
     void someEntry(\uw{parameters2});
 \};
 \end{alltt}
-
-Note \uw{A}'s odd migration constructor, which is normally empty:
-
+%
+Note that \uw{A}'s must have a \emph{migration constructor}, which is typically
+empty:
+%
 \begin{alltt}
 //In the .C file:
 A::A(void)
 \{
-  //...your constructor code...
+  //... constructor code ...
 \}
-A::A(CkMigrateMessage *m) \{ \}
-\end{alltt}
 
-Read the section ``Migratable Array Elements'' for more
-information on the \kw{CkMigrateMessage} constructor. 
+A::A(CkMigrateMessage *m) \{ /* the migration constructor */ \}
+
+A::someEntry(\uw{parameters2})
+\{
+  // ... code for someEntry ...
+\}
+\end{alltt}
+%
+See the section~\ref{arraymigratable} on migratable array elements for more
+information on the \kw{CkMigrateMessage} constructor.
 
 \subsubsection{Declaring Multidimensional Arrays}
 
-\charmpp{} contains direct support for multidimensional and
-even user-defined index arrays.  These arrays can be declared as:
-
+\charmpp{} supports multidimensional or user-defined indexes. These array types
+can be declared as:
+%
 \begin{alltt}
 //In the .ci file:
-message MyMsg;
-array [1D] A1 \{ entry A1(); entry void e(\uw{parameters});\}
-array [2D] A2 \{ entry A2(); entry void e(\uw{parameters});\}
-array [3D] A3 \{ entry A3(); entry void e(\uw{parameters});\}
-array [4D] A4 \{ entry A4(); entry void e(\uw{parameters});\}
-array [5D] A5 \{ entry A5(); entry void e(\uw{parameters});\}
-array [6D] A6 \{ entry A6(); entry void e(\uw{parameters});\}
-array [Foo] AF \{ entry AF(); entry void e(\uw{parameters});\}
+array [1D]  ArrayA \{ entry ArrayA(); entry void e(\uw{parameters});\}
+array [2D]  ArrayB \{ entry ArrayB(); entry void e(\uw{parameters});\}
+array [3D]  ArrayC \{ entry ArrayC(); entry void e(\uw{parameters});\}
+array [4D]  ArrayD \{ entry ArrayD(); entry void e(\uw{parameters});\}
+array [5D]  ArrayE \{ entry ArrayE(); entry void e(\uw{parameters});\}
+array [6D]  ArrayF \{ entry ArrayF(); entry void e(\uw{parameters});\}
+array [Foo] ArrayG \{ entry ArrayG(); entry void e(\uw{parameters});\}
 \end{alltt}
-
+%
 The last declaration expects an array index of type \kw{CkArrayIndex}\uw{Foo},
-which must be defined before including the \texttt{.decl.h} file 
-(see ``User-defined array index type'' below).  
-
+which must be defined before including the \texttt{.decl.h} file (see
+section~\ref{user-defined array index type} on user-defined array indices for
+more information).
+%
 \begin{alltt}
 //In the .h file:
-class A1 : public CBase\_A1 \{ public: A1()\{\} ...\};
-class A2 : public CBase\_A2 \{ public: A2()\{\} ...\};
-class A3 : public CBase\_A3 \{ public: A3()\{\} ...\};
-class A4 : public CBase\_A4 \{ public: A4()\{\} ...\};
-class A5 : public CBase\_A5 \{ public: A5()\{\} ...\};
-class A6 : public CBase\_A6 \{ public: A6()\{\} ...\};
-class AF : public CBase\_AF \{ public: AF()\{\} ...\};
+class ArrayA : public CBase\_ArrayA \{ public: ArrayA()\{\} ...\};
+class ArrayB : public CBase\_ArrayB \{ public: ArrayB()\{\} ...\};
+class ArrayC : public CBase\_ArrayC \{ public: ArrayC()\{\} ...\};
+class ArrayD : public CBase\_ArrayD \{ public: ArrayD()\{\} ...\};
+class ArrayE : public CBase\_ArrayE \{ public: ArrayE()\{\} ...\};
+class ArrayF : public CBase\_ArrayF \{ public: ArrayF()\{\} ...\};
+class ArrayG : public CBase\_ArrayG \{ public: ArrayG()\{\} ...\};
 \end{alltt}
+%
+The fields in \kw{thisIndex} are different depending on the dimensionality of
+the chare array:
+%
+\begin{itemize}
+\item 1D array: \kw{thisIndex}
+\item 2D array ($x$,$y$): \kw{thisIndex.x}, \kw{thisIndex.y}
+\item 3D array ($x$,$y$,$z$): \kw{thisIndex.x}, \kw{thisIndex.y},
+  \kw{thisIndex.z}
+\item 4D array ($w$,$x$,$y$,$z$): \kw{thisIndex.w}, \kw{thisIndex.x},
+  \kw{thisIndex.y}, \kw{thisIndex.z}
+\item 5D array ($v$,$w$,$x$,$y$,$z$): \kw{thisIndex.v}, \kw{thisIndex.w},
+  \kw{thisIndex.x}, \kw{thisIndex.y}, \kw{thisIndex.z}
+\item 6D array ($x_1$,$y_1$,$z_1$,$x_2$,$y_2$,$z_2$): \kw{thisIndex.x1},
+  \kw{thisIndex.y1}, \kw{thisIndex.z1}, \kw{thisIndex.x2}, \kw{thisIndex.y2},
+  \kw{thisIndex.z2}
+\item Foo array: \kw{thisIndex}
+\end{itemize}
 
-A 1D array element can access its index via its inherited ``thisIndex''
-field; a 2D via ``thisIndex.x'' and ``thisIndex.y'', and a 3D via
-``thisIndex.x'', ``thisIndex.y'', and ``thisIndex.z''. The subfields
-of 4D, 5D, and 6D are respectively \{w,x,y,z\}, \{v,w,x,y,z\}, and 
-\{x1,y1,z1,x2,y2,z2\}.
-A user-defined index array can access its index as ``thisIndex''.
-
-
-Likewise, you can create a dense multidimensional array by passing the 
-extents at creation time to \kw{ckNew}.
-
-\begin{alltt}
-CProxy_A1 a1 = CProxy_A1::ckNew(parameters, num_elements);
-CProxy_A2 a2 = CProxy_A2::ckNew(parameters, num_rows, num_colums);
-CProxy_A3 a3 = CProxy_A3::ckNew(parameters, num_rows, num_columns, num_depth);
-\end{alltt}
-
-For 4D, 5D, 6D and user-defined arrays, this functionality cannot be used. 
-You need to insert the array elements individually (Section~\ref{dynamic_insertion}).
-
-
-\subsubsection{Creating a Simple Array}
-
+\subsubsection{Creating an Array}
 \label{basic array creation}
 
-You always create an array using the \kw{CProxy\_Array::ckNew}
-routine.  This returns a proxy object, which can
-be kept, copied, or sent in messages.
-To create a 1D \index{array}array containing elements indexed 
-(0, 1, ..., \uw{num\_elements}-1), use:
-
+An array is created using the \kw{CProxy\_Array::ckNew} routine. This returns a
+proxy object, which can be kept, copied, or sent in messages. The following
+creates a 1D \index{array}array containing elements indexed (0, 1, \ldots,
+\uw{dimX}-1):
+%
 \begin{alltt}
-CProxy_A1 a1 = CProxy_A1::ckNew(\uw{parameters},num_elements);
+CProxy_ArrayA a1 = CProxy_ArrayA::ckNew(\uw{parameters}, dimX);
 \end{alltt}
+%
+Likewise, a dense multidimensional array can be created by passing the extents
+at creation time to \kw{ckNew}.
+%
+\begin{alltt}
+CProxy_ArrayB a2 = CProxy_ArrayB::ckNew(\uw{parameters}, dimX, dimY);
+CProxy_ArrayC a3 = CProxy_ArrayC::ckNew(\uw{parameters}, dimX, dimY, dimZ);
+\end{alltt}
+%
+For 4D, 5D, 6D and user-defined arrays, this functionality cannot be used.  The
+array elements must be inserted individually as described in
+section~\ref{dynamic_insertion}.
 
-The constructor is invoked on each array element.
-For creating higher-dimensional arrays, or for more options
-when creating the array, see section~\ref{advanced array create}.
-
+During creation, the constructor is invoked on each array element. For more
+options when creating the array, see section~\ref{advanced array create}.
 
 \subsubsection{Entry Method Invocation}
 
-An array proxy responds to the appropriate index call--
-for 1D arrays, use [i] or (i); for 2D use (x,y); for 3D
-use (x,y,z); and for user-defined types use [f] or (f).
-
-To send a \index{Array message} message to an array element, index the proxy 
+To obtain a proxy to a specific element in chare array, the chare array proxy
+(e.g. \kw{thisProxy}) must be indexed by the appropriate index call depending
+on the dimentionality of the array:
+%
+\begin{itemize}
+\item 1D array, to obtain a proxy to element $i$: \kw{thisIndex[$i$]} or
+  \kw{thisIndex($i$)}
+\item 2D array, to obtain a proxy to element $(i,j)$: \kw{thisIndex($i$,$j$)}
+\item 3D array, to obtain a proxy to element $(i,j,k)$: \kw{thisIndex($i$,$j$,$k$)}
+\item 4D array, to obtain a proxy to element $(i,j,k,l)$:
+  \kw{thisIndex($i$,$j$,$k$,$l$)}
+\item 5D array, to obtain a proxy to element $(i,j,k,l,m)$:
+  \kw{thisIndex($i$,$j$,$k$,$l$,$m$)}
+\item 6D array, to obtain a proxy to element $(i,j,k,l,m,n)$:
+  \kw{thisIndex($i$,$j$,$k$,$l$,$m$,$n$)}
+\item User-defined array, to obtain a proxy to element $i$: \kw{thisIndex[$i$]}
+  or \kw{thisIndex($i$)}
+\end{itemize}
+%
+To send a \index{Array message} message to an array element, index the proxy
 and call the method name:
-
+%
 \begin{alltt}
 a1[i].doSomething(\uw{parameters});
 a3(x,y,z).doAnother(\uw{parameters});
 aF[CkArrayIndexFoo(...)].doAgain(\uw{parameters});
 \end{alltt}
 
-You may invoke methods on array elements that have not yet
-been created-- by default, the system will buffer the message until the
-element is created\footnote{However, the element must eventually be 
-created-- i.e., within a 3-minute buffering period.}.
+You may invoke methods on array elements that have not yet been created. The
+system will buffer the message until the element is created.\footnote{However,
+  the element must eventually be created (i.e. within a 3-minute buffering
+  period).}
 
-Messages are not guarenteed to be delivered in order.
-For example, if I invoke a method A, then method B;
-it is possible for B to be executed before A.
-
+Messages are not guarenteed to be delivered in order. For instance, if a method
+is invoked on method \kw{A} and then method \kw{B}; it is possible that \kw{B} is
+executed before \kw{A}.
+%
 \begin{alltt}
 a1[i].A();
 a1[i].B();
 \end{alltt}
 
-Messages sent to migrating elements will be delivered after
-the migrating element arrives.  It is an error to send 
-a message to a deleted array element.
-
+Messages sent to migrating elements will be delivered after the migrating
+element arrives on the destination processor. It is an error to send a message
+to a deleted array element.
 
 \subsubsection{Broadcasts}
 
-To \index{Array broadcast} broadcast a message to all the current elements of an array, 
-simply omit the index, as:
-
+To \index{array broadcast} broadcast a message to all the current elements of
+an array, simply omit the index (invoke an entry method on the chare array
+proxy):
+%
 \begin{alltt}
 a1.doIt(\uw{parameters}); //<- invokes doIt on each array element
 \end{alltt}
-
-The broadcast message will be delivered to every existing array 
-element exactly once.  Broadcasts work properly even with ongoing
-migrations, insertions, and deletions.
-
+%
+The broadcast message will be delivered to every existing array element exactly
+once. Broadcasts work properly even with ongoing migrations, insertions, and
+deletions.
 
 \subsubsection{Reductions on Chare Arrays}
 \label{reductions}
