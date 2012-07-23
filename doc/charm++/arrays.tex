@@ -196,15 +196,14 @@ void contribute(int nBytes, const void *data, CkReduction::reducerType type);
 \end{alltt}
 
 This call contributes \kw{nBytes} bytes starting at \kw{data} to the
-reduction \kw{type} (see reduction types, below).  Unlike sending a
+reduction \kw{type} (see Section~\ref{builtin_reduction}).  Unlike sending a
 message, you may use \kw{data} after the call to \kw{contribute}.  All
-members of the chare array or group must call \kw{contribute}, and all of them must use the same
-reduction type.  
+members of the chare array or group must call \kw{contribute}, 
+and all of them must use the same reduction type.  
 
 When you create a new chare array element, it is expected
 to contribute to the next reduction not already in progress on that
-processor.  The
-reduction will complete properly even if elements are migrated
+processor.  The reduction will complete properly even if elements are migrated
 or deleted during the reduction. 
 
 For example, if we want to sum each array/group member's single integer myInt, 
@@ -248,7 +247,7 @@ of contribute may be used:
 
 In all cases, the result of the reduction operation is passed to the {\em reduction
 client}.  Many different kinds of reduction clients can be used, as
-explained below (Section~\ref{reductionClients}).
+explained in Section~\ref{reductionClients}.
 
 \paragraph{Typed Reductions}
 
@@ -288,6 +287,103 @@ This will also work for arrays of data elements, and for any user-defined type w
 number of elements, say 3 {\tt int}s, you can also specify a reduction target which
 takes 3 {\tt int}s and it will be invoked correctly. 
 
+\subsubsection{Built-in Reduction Types}
+\label{builtin_reduction}
+
+\charmpp{} includes several built-in reduction types, used to combine 
+individual contributions.  Any of them may be passed as an argument of type
+\kw{CkReduction::reducerType} to \kw{contribute}.
+
+The first four operations ({\tt sum}, {\tt product}, {\tt max}, and {\tt min}) work on {\tt int},
+{\tt float}, or {\tt double} data as indicated by the suffix.  The logical
+reductions ({\tt and}, {\tt or}) only work on integer data.  All the built-in
+reductions work on either single numbers (pass a pointer) or arrays-- just
+pass the correct number of bytes to \kw{contribute}.
+
+\begin{enumerate}
+
+\item \kw{CkReduction::nop}-- no operation performed.
+
+\item \kw{CkReduction::sum\_int}, \kw{sum\_float}, \kw{sum\_double}-- the
+result will be the sum of the given numbers.
+
+\item \kw{CkReduction::product\_int}, \kw{product\_float},
+\kw{product\_double}-- the result will be the product of the given numbers.
+
+\item \kw{CkReduction::max\_int}, \kw{max\_float}, \kw{max\_double}-- the
+result will be the largest of the given numbers.
+
+\item \kw{CkReduction::min\_int}, \kw{min\_float}, \kw{min\_double}-- the
+result will be the smallest of the given numbers.
+
+\item \kw{CkReduction::logical\_and}-- the result will be the logical AND of the given
+integers.  0 is false, nonzero is true.
+
+\item \kw{CkReduction::logical\_or}-- the result will be the logical OR of the given
+integers.
+
+\item \kw{CkReduction::bitvec\_and}-- the result will be the bitvector AND of the given numbers (represented as integers).
+
+\item \kw{CkReduction::bitvec\_or}-- the result will be the bitvector OR of the given numbers (represented as integers).
+
+\item \kw{CkReduction::set}-- the result will be a verbatim concatenation of
+all the contributed data, separated into \kw{CkReduction::setElement} records.
+The data contributed can be of any length, and can vary across array elements
+or reductions.  To extract the data from each element, see the description
+below.
+
+\item \kw{CkReduction::concat}-- the result will be a byte-by-byte
+concatentation of all the contributed data.  The contributed elements
+are not delimiter-separated. 
+
+\end{enumerate}
+
+
+\kw{CkReduction::set} returns a collection of \kw{CkReduction::setElement}
+objects, one per contribution.  This class has the definition:
+
+\begin{alltt}
+class CkReduction::setElement 
+\{
+public:
+  int dataSize;//The length of the data array below
+  char data[];//The (dataSize-long) array of data
+  CkReduction::setElement *next(void);
+\};
+\end{alltt}
+
+To extract the contribution of each array element from a reduction set, use the
+\uw{next} routine repeatedly:
+
+\begin{alltt}
+  //Inside a reduction handler-- 
+  //  data is our reduced data from CkReduction_set
+  CkReduction::setElement *cur=(CkReduction::setElement *)data;
+  while (cur!=NULL)
+  \{
+    ... //Use cur->dataSize and cur->data
+    //Now advance to the next element's contribution
+    cur=cur->next();
+  \}
+\end{alltt}
+
+The reduction set order is undefined.  You should add a source field to the
+contributed elements if you need to know which array element gave a particular
+contribution.  Additionally, if the contributed elements are of a complex 
+data type, you will likely have to supply code for 
+%serialize/unserialize operation on your element structure if your
+%reduction element data is complex.  
+serializing/deserializing them.
+Consider using the \kw{PUP}
+interface see ~\ref{sec:pup} to simplify your object serialization
+needs.
+
+If the outcome of your reduction is dependent on the order in which 
+data elements are processed, or if your data is just too
+heterogenous to be handled elegantly by the predefined types and you
+don't want to undertake multiple reductions, it may be best to define
+your own reduction type.  See the next section
+(Section~\ref{new_type_reduction}) for details.
 
 \subsubsection{Destroying Arrays}
 
