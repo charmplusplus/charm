@@ -614,7 +614,7 @@ public:
     usesAtSync=CmiTrue;
   \}
 
-  LBExample(CkMigrateMessage *m) \{ /* Migration constructor -- invoked when chare migrates */ }
+  LBExample(CkMigrateMessage *m) \{ /* Migration constructor -- invoked when chare migrates */ \}
   
   /* Must be written for migration to succeed */
   void pup(PUP::er &p)\{
