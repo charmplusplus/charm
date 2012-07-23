@@ -12,7 +12,7 @@ The basic idea behind this is straightforward: Checkpointing an
 application is like migrating its parallel objects from the processors
 onto disks, and restarting is the reverse. Thanks to the migration 
 utilities like PUP'ing(Section~\ref{sec:pup}), users can decide what 
-data to save in checkpoints and how to save them.
+data to save in checkpoints and how to save them. However, unlike migration (where certain objects do not need a PUP method), checkpoint requires all the objects to implement the PUP method.
 
 Two schemes of fault tolerance protocols are implemented.
 
