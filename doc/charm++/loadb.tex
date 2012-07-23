@@ -12,8 +12,8 @@ existing processors, and that they can be migrated at runtime.
 Many parallel applications, especially physical simulations, are
 iterative in nature. They may contain a series of time-steps, and/or
 iterative solvers that run to convergence. For such computations,
-typically, the heuristic principle that we call "principle of
-persistence" holds: the computational loads and communication patterns
+typically, the heuristic principle that we call ``principle of
+persistence'' holds: the computational loads and communication patterns
 between objects (chares) tend to persist over time, even in dynamic
 applications. In such cases, recent past is a good predictor of near
 future. Measurement-based chare migration strategies are useful in
@@ -22,19 +22,19 @@ may be extended to chares in the future.
 
 For applications without such iterative structure, or with iterative structure
 but without the predictability (i.e. where the principle of persistence does
-not apply), Charm++ supports "seed balancers" that move seeds for new chares
+not apply), Charm++ supports ``seed balancers'' that move seeds for new chares
 among processors (possibly repeatedly) to achieve load balance. These
 strategies are currently available for both chares and chare-arrays.  Seed
 balancers were the original load balancers provided in Charm since the late
-'80s. They are extremely useful for state-space search applications, and are
+80's. They are extremely useful for state-space search applications, and are
 also useful in other computations, as well as in conjunction with migration
 strategies.
 
 For iterative computations when there is a correlation between iterations/steps
 but either it is not strong or the machine environment is not predictable
-(noise due to OS interrupts on small time steps, or time-shared desk-top
+(noise due to OS interrupts on small time steps, or time-shared desktop
 machines), one can use a combination of the two kinds of strategies. The
-base-line load balancing is provided by migration strategies; But in each
+baseline load balancing is provided by migration strategies, but in each
 iteration one also spawns off work in the form of chares that can run on any
 processor. The seed balancer will handle such work as it arises.
 
@@ -44,7 +44,7 @@ processor. The seed balancer will handle such work as it arises.
 \label{migrationlb}
 
 In \charmpp{}, objects (except groups, nodegroups) can migrate from 
-processor to processor at run-time. Object migration can potentially 
+processor to processor at runtime. Object migration can potentially 
 improve the performance of the parallel program by migrating objects from 
 overloaded processors to underloaded ones. 
 
@@ -60,7 +60,7 @@ load and communication structure during execution and stores them into a
 \kw{load balancing database}. \charmpp{} then provides a collection of \kw{load
 balancing strategies} whose job is to decide on a new mapping of objects to
 processors based on the information from the database.  Such measurement based
-strategies are efficient when we can reasonably assume that objects in
+strategies are efficient when we can reasonably assume that objects in a 
 \charmpp{} application tend to exhibit temporal correlation in their
 computation and communication patterns, i.e. future can be to some extent
 predicted using the historical measurement data, allowing effective
@@ -71,7 +71,7 @@ Here are the two terms often used in \charmpp{} load balancing framework:
 %
 \item \kw{Load balancing database} provides the interface of almost all load
 balancing calls. On each processor, it stores the load balancing instrumented
-data and coordinates the load balancing manager and balancer. it is implemented
+data and coordinates the load balancing manager and balancer. It is implemented
 as a Chare Group called \kw{LBDatabase}.
 %
 \item \kw{Load balancer or strategy} takes the load balancing database and
@@ -105,7 +105,7 @@ the process is iterated until the load balance can be achieved.
 In hierarchical approaches, processors are divided into independent autonomous
 sets of processor groups and these groups are organized in hierarchies,
 therefore decentralizing the load balancing task. Different strategies can be
-used to load balancing load on processors inside each processor group, and
+used to balance the load on processors inside each processor group, and
 processors across groups in a hierarchical fashion.
 
 Listed below are some of the available non-trivial centralized load balancers
@@ -113,20 +113,20 @@ and their brief descriptions:
 \begin{itemize}
 \item {\bf RandCentLB}:   Randomly assigns objects to processors;
 %\item {\bf RecBisectBfLB}:        Recursively partition with Breadth first enumeration;
-\item {\bf MetisLB}:      Use Metis(tm) to partitioning object communication graph;
-\item {\bf GreedyLB}:   Use greedy algorithm, always pick the heaviest object to the least loaded processor.
-\item {\bf GreedyCommLB}:       Greedy algorithm which also takes communication graph into account;
-\item {\bf TopoCentLB}:       Greedy algorithm which also takes processor topology into account;
-\item {\bf RefineLB}:     Move objects away from the most overloaded processors to reach average, limits the number of objects migrated;
-\item {\bf RefineCommLB}:     Same idea as in RefineLB, but take communication into account;
-\item {\bf RefineTopoLB}:       Same idea as in RefineLB, but take processor topology into account;
-\item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of above centralized load balancers;
+\item {\bf MetisLB}:      Uses METIS\texttrademark\hspace{0mm} to partitioning object communication graph.
+\item {\bf GreedyLB}:   Uses a greedy algorithm that always assigns the heaviest object to the least loaded processor.
+\item {\bf GreedyCommLB}:  Extends the greedy algorithm to take the communication graph into account.
+\item {\bf TopoCentLB}:    Extends the greedy algorithm to take processor topology into account.
+\item {\bf RefineLB}:     Moves objects away from the most overloaded processors to reach average, limits the number of objects migrated.
+\item {\bf RefineCommLB}:     Same idea as in RefineLB, but takes communication into account.
+\item {\bf RefineTopoLB}:       Same idea as in RefineLB, but takes processor topology into account.
+\item {\bf ComboCentLB}:  A special load balancer that can be used to combine any number of above centralized load balancers.
 \end{itemize}
 
 Listed below are the distributed load balancers:
 \begin{itemize}
 \item {\bf NeighborLB}:   A neighborhood load balancer in which each processor tries to average out its load only among its neighbors.
-\item {\bf WSLB}:   A load balancer for workstation clusters, which can detect load changes on desktops (and other timeshared processors) and adjust load without interferes with other's use of the desktop.
+\item {\bf WSLB}:   A load balancer for workstation clusters, which can detect load changes on desktops (and other timeshared processors) and adjust load without interfering with other's use of the desktop.
 \end{itemize}
 
 An example of a hierarchical strategy can be found in:
@@ -135,8 +135,8 @@ An example of a hierarchical strategy can be found in:
 the root.
 \end{itemize}
 
-Users can choose any load balancing strategy they think is good for their
-application. The compiler and run-time options are described in
+Users can choose any load balancing strategy they think is appropriate for their
+application. The compiler and runtime options are described in
 section~\ref{lbOption}.
 
 %In some cases, one may need to create and invoke multiple load balancing
@@ -151,7 +151,7 @@ section~\ref{lbOption}.
 The load balancing framework is well integrated with chare array implementation
 -- when a chare array is created, it automatically registers its elements with
 the load balancing framework. The instrumentation of compute time (wall/cpu
-time) and communication pattern are done automatically and APIs are provided
+time) and communication pattern is done automatically and APIs are provided
 for users to trigger the load balancing.  To use the load balancer, you must
 make your array elements migratable (see migration section above) and choose a
 \kw{load balancing strategy} (see the section \ref{lbStrategy} for a
@@ -186,7 +186,7 @@ The detailed APIs of these three methods are described as follows:
 \item {\bf Periodical load balancing mode}: In the default setting, load
 balancing happens whenever the array elements are ready, with an interval of 1
 second. It is desirable for the application to set a larger interval using
-+LBPeriod runtime option. For example "+LBPeriod 5.0" can be used to start load
++LBPeriod runtime option. For example ``+LBPeriod 5.0'' can be used to start load
 balancing roughly every 5 seconds. By default, array elements may be asked to
 migrate at any time provided that they are not in the middle of executing an
 entry method. The array element's variable \kw{usesAtSync} being CmiFalse
@@ -253,8 +253,8 @@ for how to write a ``pup'' for an array element.
 
 In general one needs to pack the whole snapshot of the member data in an 
 array element in the pup subroutine. This is because the migration of
-the object may happen at any time. In certain load balancing scheme where
-user explicitly control when the load balancing happens, user may choose
+the object may happen at any time. In certain load balancing schemes where
+ the user explicitly controls when the load balancing happens, the user may choose
 to pack only a part of the data and may skip those temporary data.
 
 An array element can migrate by calling the \kw{migrateMe}(\uw{destination
@@ -297,7 +297,7 @@ configure the load balancer, etc. These functions are:
       Fortran interface: {\bf FLBTURNINSTRUMENTON()} and {\bf FLBTURNINSTRUMENTOFF()}.
 \item {\bf setMigratable(CmiBool migratable)}: is a member function of array
       element. This function can be called 
-      in an array element constructor to tell load balancer whether this object
+      in an array element constructor to tell the load balancer whether this object
       is migratable or not\footnote{Currently not all load balancers 
       recognize this setting though.}.
 \item {\bf LBSetPeriod(double s)}: this function can be called
