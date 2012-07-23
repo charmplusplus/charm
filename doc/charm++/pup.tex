@@ -42,12 +42,14 @@ checkpoint and restart calculations involving \uw{foo}s.
 
 \subsubsection{PUP contract}
 
-Your object's \uw{pup} method must save and restore all your object's data.
-As shown, you save and restore a class's contents by writing a method
-called ``pup'' which passes all the parts of the class to an object of type
-\index{PUP::er} \kw{PUP::er}, which does the saving or restoring.  
-We often use ``pup'' as a verb, meaning ``to save/restore the value of''
-or equivalently, ``to call the pup method of''.
+\label{sec:pupcontract}
+Your object's \uw{pup} method must save and restore all your object's
+data.  As shown, you save and restore a class's contents by writing a
+method called ``pup'' which passes all the parts of the class to an
+object of type \index{PUP::er} \kw{PUP::er}, which does the saving or
+restoring.  This manual will often use ``pup'' as a verb, meaning ``to
+save/restore the value of'' or equivalently, ``to call the pup method
+of''.
 
 Pup methods for complicated objects normally call the pup methods
 for their simpler parts.  Since all objects depend on their immediate
@@ -58,14 +60,13 @@ no pup method, you must pup the values in the superclass yourself.
 
 
 \paragraph{PUP operator}
-
-\label{sec:pupstl}
+\label{sec:pupoperator}
 
 The recommended way to pup any object \verb.a. is to use \verb.p|a;..
 This syntax is an operator \verb.|. applied to the \kw{PUP::er} \verb.p.
 and the user variable \verb.a..
 
-The \verb.p|a;. syntax works wherever a is:
+The \verb.p|a;. syntax works wherever \verb.a. is:
 
 \begin{itemize}
  \item A simple type, including char, short, int, long, float, or double.
@@ -83,6 +84,8 @@ The \verb.p|a;. syntax works wherever a is:
     In this case, \verb.p|a;. calls the custom \verb.operator |..
 \end{itemize}
 
+
+
 For container types, you must simply pup each element of the container.
 For arrays, you can use the utility method \kw{PUParray}, which takes
 the \kw{PUP::er}, the array base pointer, and the array length.
@@ -94,10 +97,13 @@ This utility method is defined for user-defined types T as:
     \}
   \end{alltt}
 
+\paragraph{PUP STL Container Objects}
+\label{sec:pupstl}
 If the variable is from the C++ Standard Template Library, you can include 
 operator\verb.|.'s for STL vector, map, list, pair, and string, templated
 on anything, by including the header ``pup\_stl.h''.
 
+\paragraph{PUP Dynamic Data}
 As usual in \CC{}, pointers and allocatable objects usually require special handling. 
 Typically this only requires a \kw{p.isUnpacking()} conditional block, 
 where you perform the appropriate allocation.  See 
@@ -141,17 +147,15 @@ the case for simple structs and classes without pointers.
 \end{itemize}
 
 Note that pupping as bytes is just like using `memcpy': 
-it does nothing to the data but copy it whole.
+it does nothing to the data other than copy it whole.
 For example, if the class contains any pointers, you
 must make sure to do any allocation needed, and
 pup the referenced data yourself.
 
-Pupping as bytes will prevent your pup method from 
-ever being able to work across different machine 
-architectures.  We don't do this very often yet, but 
-eventually may, so pupping as bytes is currently discouraged.
-
-
+Pupping as bytes may prevent your pup method from ever being able to
+work across different machine architectures.  This is currently
+an uncommon scenario, but heterogenous architectures may become more
+common, so pupping as bytes is discouraged.
 
 \paragraph{PUP overhead}
 
@@ -170,7 +174,7 @@ transfer, with one virtual function call per array.
 
 \label{sec:pupsdag}
 
-Please note that if your object contains Structured Dagger code (see section~\ref{sec:sdag}) you must call the generated method \kw{\_\_sdag\_pup} to correctly pup the Structured Dagger state:
+Please note that if your object contains Structured Dagger code (see section~\ref{sec:sdag}) you must call the generated method \kw{\_\_sdag\_pup}, after any superclass pup methods, to correctly pup the Structured Dagger state:
 
 \begin{alltt}
 class bar : public barParent \{
@@ -217,7 +221,7 @@ sizing and packing must see exactly the same data.
 The \kw{p.isDeleting()} flag indicates the object will be deleted
 after calling the pup method.  This is normally only needed for
 pup methods called via the C or f90 interface, as provided by 
-AMPI or the FEM framework.  Other \charmpp{} array elements, 
+AMPI or the other frameworks.  Other \charmpp{} array elements, 
 marshalled parameters, and other C++ interface objects 
 have their destructor called when they are deleted, so the 
 \kw{p.isDeleting()} call is not normally required---instead,
@@ -259,14 +263,17 @@ repeatedly over the object lifetime.
 Finally, objects are destroyed by calling their destructor
 as usual.
 
+More specialized modes and PUP::ers are described in section~\ref{sec:PUP:CommonPUPers}. 
+
 \subsubsection{Migratable Array Elements}
 
 \label{arraymigratable}
-Array objects can \index{migrate}migrate from one PE to another.
-For example, the load balancer (see section~\ref{lbFramework})
-might migrate array elements to better balance the load between
-processors.  For an array element to migrate, it must implement
-a pack/unpack or ``pup'' method:
+Array objects can \index{migrate}migrate from one PE to another.  For
+example, the load balancer (see section~\ref{lbFramework}) might
+migrate array elements to better balance the load between processors.
+For an array element to be migratable, it must implement a \uw{pup}
+method.  The standard PUP contract (see section \ref{sec:pupcontract})
+and constraints wrt to serializing data, and use of Structured Dagger apply.  A simple example for an array follows:
 
 \begin{alltt}
 //In the .h file:
@@ -296,30 +303,6 @@ void A2::pup(PUP::er \&p)
 \}
 \end{alltt}
 
-Please note that if your object contains Structured Dagger code (see section ``Structured Dagger'') you must use the following syntax to correctly pup the object:
-
-\begin{alltt}
-class bar: public CBase\_bar \{
- private:
-    int a,b;
- public:
-    bar_SDAG_CODE 
-    ...other methods...
-
-    virtual void pup(PUP::er& p) \{
-      __sdag_pup(p);
-      ...pup other data here...
-    \}
-\};
-\end{alltt}
-
-See the \index{PUP} section ``PUP'' for more details on pup methods
-and the \kw{PUP::er} type.
-
-The system uses one pup method to do both packing and unpacking by
-passing different types of \kw{PUP::er}s to it.  You can determine
-what type of \kw{PUP::er} has been passed to you with the
-\kw{isPacking()}, \kw{isUnpacking()}, and \kw{isSizing()} calls.
 
 
 
