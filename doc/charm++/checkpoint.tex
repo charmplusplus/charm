@@ -4,11 +4,10 @@
 \label{sec:checkpoint}
 
 \charmpp{} offers a range of fault tolerance capabilities through its 
-checkpoint/restart mechanism. Usual Chare array-based \charmpp{} application 
-including AMPI application can be checkpointed to disk files and later 
-on restarting from the files.
+checkpoint/restart mechanism. Usual chare-array-based \charmpp{} applications, 
+including AMPI applications, can be checkpointed to disk files and be restarted later from the files.
 
-The basic idea behind this is straightforward: Checkpointing an 
+The basic idea behind this is straightforward: checkpointing an 
 application is like migrating its parallel objects from the processors
 onto disks, and restarting is the reverse. Thanks to the migration 
 utilities like PUP'ing(Section~\ref{sec:pup}), users can decide what 
@@ -44,15 +43,14 @@ Therefore, it is up to the programmer what to save and restore for
 the application. One illustration of this flexbility is a complicated
 scientific computation application with 9 matrices, 8 of which holding 
 the intermediate results and 1 holding the final results of each timestep.
-To save resource, the PUP routine can well omit the 8 intermediate matrices
+To save resources, the PUP routine can well omit the 8 intermediate matrices
 and checkpoint the matrix with final results of each timestep. 
 
 Group and nodegroup objects(Section~\ref{sec:group}) are normally not 
 meant to be migrated. In order to checkpoint them, however, the user 
-wants to write PUP routines for the groups and declare them as 
+has to write PUP routines for the groups and declare them as 
 {\tt [migratable]} in the .ci file. Some programs use {\it mainchares}
-to hold key control data like global object counts, and thus needs
-mainchares be checkpointed too. To do this, the programmer should write
+to hold key control data like global object counts, and thus mainchares need to be checkpointed too. To do this, the programmer should write
 a PUP routine for the mainchare and declare them as {\tt [migratable]} 
 in the .ci file, just as in the case of Group and NodeGroup. In addition,
 the programmer also needs to put the proxy to the mainchare (usually 
@@ -66,44 +64,43 @@ name is created and a collection of checkpoint files are written into it.
 
 The user can choose to run the \charmpp{} application in restart mode, i.e.,
 restarting execution from last checkpoint. The command line option {\tt
--restart DIRNAME} is required to invoke this mode. For example:
++restart DIRNAME} is required to invoke this mode. For example:
 
 \begin{alltt}
   > ./charmrun hello +p4 +restart log
 \end{alltt}
 
 Restarting is the reverse process of checkpointing. \charmpp{} allows 
-restarting the old checkpoint on different number of physical processor.
+restarting the old checkpoint on a different number of physical processors.
 This provides the flexibility to expand or shrink your application when
-the availability of computing resource changes. 
+the availability of computing resources changes. 
 
 Note that on restart, if the old reduction client was set to a static 
 function, the function pointer might be lost and the user needs to register
 it again. A better alternative is to always use entry method of a chare
 object. Since all the entry methods are registered inside \charmpp{} system,
-in restart phase, the reduction client will be automatically restored.
+in the restart phase, the reduction client will be automatically restored.
 
-After a failure, the system may consist less number of processors. After
-a problem fixed, some processors may become available again. Therefore,
-the user may need to flexibility to restart on different number of processors
-than in the checkpointing phase. This is allowable by giving different 
+After a failure, the system may contain less number of processors. Once the failed components have been repaired, some processors may become available again. Therefore,
+the user may need the flexibility to restart on a different number of processors
+than in the checkpointing phase. This is allowable by giving a different 
 {\tt +pN} option at runtime. One thing to note is that the new load 
 distribution might differ from the previous one at checkpoint time,
-so running a load balancing (See Section~\ref{loadbalancing}) is suggested. 
+so running a load balancer (see Section~\ref{loadbalancing}) after restart is suggested. 
 
 If restart is not done on the same number of processors, the processor-specific
 data in a group/nodegroup branch cannot (and usually should not) be 
-restored individually. A copy from processor 0 will be propagate to all 
+restored individually. A copy from processor 0 will be propagated to all 
 the processors.
 
 \subsubsection{Choosing What to Save}
 
 In your programs, you may use chare groups for different types of purposes. 
 For example, groups holding read-only data can avoid excessive data copying,
-while groups maintaining processor-specific information is used as a local
+while groups maintaining processor-specific information are used as a local
 manager of the processor. In the latter situation, the data is sometimes
 too complicated to save and restore but easy to re-compute. For the read-only
-data, you want to save and restore it in the PUP'er routing and leave empty
+data, you want to save and restore it in the PUP'er routine and leave empty
 the migration constructor, via which the new object is created during restart.
 For the easy-to-recompute type of data, we just omit the PUP'er routine and
 do the data reconstruction in the group's migration constructor.
@@ -111,7 +108,7 @@ do the data reconstruction in the group's migration constructor.
 A similar example is the program mentioned above, where there aree two 
 types of chare arrays, one maintaining intermediate results while the 
 other type holding the final result for each timestep. The programmer 
-can take advantage of the flexibility by omitting PUP'er routine empty
+can take advantage of the flexibility by leaving PUP'er routine empty
 for intermediate objects, and do save/restore only for the important 
 objects. 
 
@@ -134,7 +131,7 @@ This double checkpointing ensures the availability of one checkpoint in case
 the other is lost. 
 The double in-memory checkpoint/restart scheme is useful and efficient
 for applications with small memory footprint at the checkpoint state. 
-The double in-disk variation stores checkpoints into local disk, thus 
+The double in-disk variant stores checkpoints into local disk, thus 
 can be useful for applications with large memory footprint. 
 %Its advantage is to reduce the recovery
 %overhead to seconds when a failure occurs.
@@ -143,8 +140,7 @@ can be useful for applications with large memory footprint.
 
 \subsubsection{Checkpointing}
 
-The function that user can call to initiate a checkpointing in a Chare 
-array-based application is: 
+The function that user can call to initiate a checkpointing in a chare-array-based application is: 
 
 \begin{alltt}
       void CkStartMemCheckpoint(CkCallback &cb)
@@ -155,7 +151,7 @@ Just like the above disk checkpoint described, it is up to programmer what to sa
 The programmer is responsible for choosing when to activate checkpointing so that
 the size of a global checkpoint state can be minimal.
 
-In AMPI applications, user just needs to call the following function to 
+In AMPI applications, the user just needs to call the following function to 
 start checkpointing:
 
 \begin{alltt}
@@ -165,28 +161,28 @@ start checkpointing:
 \subsubsection{Restarting}
 
 When a processor crashes, the restart protocol will be automatically
-invoked to recover all objects using the last checkpoints. And then the program
-will continue to run on the survived processors. This is based on the assumption
+invoked to recover all objects using the last checkpoints. The program
+will continue to run on the surviving processors. This is based on the assumption
 that there are no extra processors to replace the crashed ones. 
 
 However, if there are a pool of extra processors to replace the crashed ones, 
-the fault-toerlance protocol can also take advantage of this to grab one
+the fault-tolerance protocol can also take advantage of this to grab one
 free processor and let the program run on the same number of processors 
-as before crash. 
+as before the crash. 
 In order to achieve this, \charmpp{} needs to be compiled with the macro option
  {\it CK\_NO\_PROC\_POOL} turned on.
 
 
 \subsubsection{Double in-disk checkpoint/restart}
 
-A variation of double memory checkpoint/restart,
+A variant of double memory checkpoint/restart,
 {\it double in-disk checkpoint/restart},
-can be applied to applcaitions with large memory footprint.
+can be applied to applications with large memory footprint.
 In this scheme, instead of storing checkpoints in the memory, it stores 
 them in the local disk.
-The checkpoint files are named "ckpt[CkMyPe]-[idx]-XXXXXX" and are stored under /tmp.
+The checkpoint files are named "ckpt[CkMyPe]-[idx]-XXXXXX" and are stored under the /tmp directory.
 
-A programmer can use runtime option {\it +ftc\_disk} to switch to this mode.
+A programmer should use the runtime option {\it +ftc\_disk} to switch to this mode.
 For example:
 
 \begin{alltt}
