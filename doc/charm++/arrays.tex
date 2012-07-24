@@ -215,7 +215,7 @@ The broadcast message will be delivered to every existing array element exactly
 once. Broadcasts work properly even with ongoing migrations, insertions, and
 deletions.
 
-\subsubsection{Reductions on Chare Arrays}
+\subsection{Reductions on Chare Arrays}
 \label{reductions}
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
@@ -324,7 +324,7 @@ or {\em deleted} during the reduction. Additionally, when you create a new chare
 it is expected to contribute to the next reduction not already in progress on that
 processor. 
 
-\subsubsection{Built-in Reduction Types}
+\subsection{Built-in Reduction Types}
 \label{builtin_reduction}
 
 \charmpp{} includes several built-in reduction types, used to combine 
@@ -422,7 +422,7 @@ don't want to undertake multiple reductions, it may be best to define
 your own reduction type.  See the next section
 (Section~\ref{new_type_reduction}) for details.
 
-\subsubsection{Destroying Arrays}
+\subsection{Destroying Arrays}
 
 To destroy an array element-- detach it from the array,
 call its destructor, and release its memory--invoke its 
