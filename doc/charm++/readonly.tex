@@ -2,16 +2,16 @@
 
 \label{readonly}
 
-Since \charmpp\ does not allow global variables for keeping programs portable
-across a wide range of machines, it provides a special mechanism for sharing
+Since \charmpp\ does not allow global variables,
+it provides a special mechanism for sharing
 data amongst all objects. {\it Read-only} variables of simple data types or
 compound data types including messages and arrays are used to share information
 that is obtained only after the program begins execution and does not change
 after they are initialized in the dynamic scope of the {\tt main} function of
-the \kw{mainchare}. They are broadcasted to every PE by the \charmpp\ runtime,
-and can be accessed in the same way as \CC ``global'' variables on any PEs.
+the \kw{mainchare}. They are broadcast to every PE by the \charmpp\ runtime,
+and can be accessed in the same way as \CC ``global'' variables on any PE.
 Compound data structures containing pointers can be made available as read-only
-variables using read-only messages or read-only arrays.  Note that memory space
+variables using read-only messages or read-only arrays.  Note that memory
 has to be allocated for read-only messages by using \kw{new} to create the
 message in the {\tt main} function of the \kw{mainchare}. 
 
@@ -41,7 +41,7 @@ every PE.
 
 The variable \uw{ReadonlyArrayName} is declared to be a read-only array of type
 \uw{Type} with \uw{arraysize} elements. \uw{Type} must be a single token and
-not a type expression. The value of \uw{arraysize} must be known in compile
+not a type expression. The value of \uw{arraysize} must be known at compile
 time.
 
 Read-only variables must be declared either as global or as public class static
@@ -59,5 +59,5 @@ Similar declarations preceded by \kw{extern} would appear in the {\tt
 
 {\it Note:}  The current \charmpp\ translator cannot prevent
 assignments to read-only variables.  The user must make sure that no
-assignments occur in the program.
+assignments occur in the program outside of the mainchare constructor.
 
