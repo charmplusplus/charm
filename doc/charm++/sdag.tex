@@ -71,7 +71,148 @@ resulting in a spaghetti-code mess.
 Instead, it would be preferable to express this flow of control using
 structured constructs, such as loops. \charmpp\ provides such constructs for
 structured control flow across an object's entry methods in a notation called
-Structured Dagger.
+Structured Dagger. The basic constructs of Structured Dagger (SDAG) provide for
+\emph{program-order execution} of the entry methods and code blocks that they
+define. These definitions appear in the {\tt .ci} file definition of the
+enclosing chare class as a `body' of an entry method following its signature.
+
+The most basic construct in SDAG is the {\tt atomic} block. Atomic blocks
+contain sequential \CC code.  They're called atomic because the code within
+them executes without returning control to the \charmpp\ runtime scheduler, and
+thus avoiding interruption from incoming messages. The earlier example can be
+adapted to use atmoic blocks as follows:
+\begin{center}
+\begin{alltt}
+// in .ci file
+chare ComputeObject {
+  entry void ComputeObject();
+  entry void startStep();
+  entry void firstInput(Input i) {
+    atomic {
+      first = i;
+      if (--expectedMessageCount == 0)
+        computeInteractions(first, second);
+    }
+  };
+  entry void secondInput(Input j){
+    atomic {
+      second = j;
+      if (--expectedMessageCount == 0)
+        computeInteractions(first, second);
+    }
+  };
+};
+
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  ComputeObject_SDAG_Code
+  int   expectedMessageCount;
+  Input first, second;
+
+public:
+  ComputeObject() \{
+    __sdag_init();
+    startStep();
+  \}
+  void startStep() \{
+    expectedMessageCount = 2;
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+    // reset for next step
+    startStep();
+  \}
+\};
+\end{alltt}
+\end{center}
+Note that chare classes containing SDAG code must make a few additional calls
+in addition to inheriting from their {\tt CBase_Foo} class: incorporate the
+{\tt Foo_SDAG_CODE} generated-code macro in the class, and call {\tt
+  __sdag_init()} in the class's constructor(s).
+
+Atomic blocks can also specify a textual `label' that will appear in traces, as
+follows:
+\begin{center}
+\begin{alltt}
+  entry void firstInput(Input i) {
+    atomic ``process first'' {
+      first = i;
+      if (--expectedMessageCount == 0)
+        computeInteractions(first, second);
+    }
+  };
+\end{alltt}
+\end{center}
+
+In order to control the sequence in which entry methods are processed, SDAG
+provides the {\tt when} construct. Entry methods defined by a {\tt when} are
+not executed immediately when a message tergeting them is delivered, but
+instead are held until control flow in the chare reaches a corresponding {\tt
+  when} clause. Conversely, when control flow reaches a {\tt when} clause, the
+generated code checks whether a corresponding message has arrived: if one has
+arrived, it is processed; otherwise, control is returned to the
+\charmpp\ scheduler. 
+
+The use of {\tt when} substantially simplifies the example from above:
+\begin{center}
+\begin{alltt}
+// in .ci file
+chare ComputeObject {
+  entry void ComputeObject();
+  entry void startStep() {
+    when firstInput(Input first)
+      when secondInput(Input second)
+        atomic {
+          computeInteractions(first, second);
+        }
+  };
+  entry void firstInput(Input i);
+  entry void secondInput(Input j);
+};
+
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  ComputeObject_SDAG_Code
+
+public:
+  ComputeObject() \{
+    __sdag_init();
+    startStep();
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+    // reset for next step
+    startStep();
+  \}
+\};
+\end{alltt}
+\end{center}
+Like an {\tt if} or {\tt while} in C code, each {\tt when} clause has a body
+made up of the statement or block following it. The variables declared as
+arguments to the entry method triggering the when are available in the scope of
+the body. By using the sequenced execution of SDAG code and the availability of
+parameters to when-defined entry methods in their bodies, the counter {\tt
+  expectedMessageCount} and the intermediate copies of the received input are
+eliminated. Note that the entry methods {\tt firstInput} and {\tt secondInput}
+are still declared in the {\tt .ci} file, but their definition is in the SDAG
+code. The interface translator generates appropriate code to handle buffering
+and triggering them appropriately.
+
+
+
+
+ Typically atomic blocks hold
+the code that actually deals with incoming messages in a {\tt when} statement,
+or to do local operations before a message is sent or after it's received.
+
 
 Threads are typically used to perform the abovementioned sequencing.
 Lets us code our previous example using threads.
