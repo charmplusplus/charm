@@ -1,4 +1,4 @@
-\documentclass[10pt]{article}
+\documentclass[10pt]{report}
 
 \usepackage{../pplmanual} \input{../pplmanual} \usepackage{html}
 \usepackage{listings}
@@ -21,43 +21,43 @@
 
 \part{Introduction}
 
-\section{Programming and Execution Model}
+\chapter{Programming and Execution Model}
 \input{intro}
 \input{overview}
 
 
 \part{Basic Usage}
 
-\section{Program Structure, Compilation and Utilities}
+\chapter{Program Structure, Compilation and Utilities}
   \input{modules}	
   \input{utilities}
   \input{helloworld}
 
-\section{Basic Syntax}
+\chapter{Basic Syntax}
   \input{marshalling}	
   \input{chares}
   \input{readonly}
 
-\section{Chare Arrays}
+\chapter{Chare Arrays}
   \input{arrays}
 
-\section{Expressing Parallel Control Flow}
+\chapter{Expressing Parallel Control Flow}
   \input{sdag}
 
-\section{Serialization Using the PUP Framework}
+\chapter{Serialization Using the PUP Framework}
   \input{pup}
 
-\section{Load Balancing}
+\chapter{Load Balancing}
   \input{loadb}
 
-\section{Processor-Aware Constructs}
+\chapter{Processor-Aware Constructs}
   \input{groups}
   \input{nodegroups}
 
 
 \part{Advanced Usage}
 
-\section{Advanced Concepts}
+\chapter{Advanced Concepts}
 
   \input{entry}
   \input{messages}
