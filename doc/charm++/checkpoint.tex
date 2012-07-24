@@ -180,7 +180,7 @@ A variant of double memory checkpoint/restart,
 can be applied to applications with large memory footprint.
 In this scheme, instead of storing checkpoints in the memory, it stores 
 them in the local disk.
-The checkpoint files are named "ckpt[CkMyPe]-[idx]-XXXXXX" and are stored under the /tmp directory.
+The checkpoint files are named ``ckpt[CkMyPe]-[idx]-XXXXX'' and are stored under the /tmp directory.
 
 A programmer should use the runtime option {\it +ftc\_disk} to switch to this mode.
 For example:
