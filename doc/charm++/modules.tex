@@ -1,5 +1,3 @@
-\subsection{Program and File Structure}
-
 A \charm program is essentially a \CC program where some components describe
 its parallel structure. Sequential code can be written using any programming
 technologies that cooperate with the \CC toolchain. This includes C and
@@ -8,7 +6,7 @@ entities interact with the \charm framework via inherited classes and function
 calls.
 
 
-\subsubsection{.ci Files}
+\subsection{.ci Files}
 \index{ci}
 All user program components that comprise its parallel interface (such as
 messages, chares, entry methods, etc.) are granted this elevated status by
@@ -23,7 +21,7 @@ interaction of the user program's entities with the framework.  A program may
 have several interface description files.
 
 
-\subsubsection{Modules}
+\subsection{Modules}
 \index{module}
 The top-level construct in a \ci file is a named container for interface
 declarations called a \kw{module}. Modules allow related declarations to be
@@ -39,7 +37,7 @@ module myFirstModule \{
 \end{alltt}
 
 
-\subsubsection{Generated Files}
+\subsection{Generated Files}
 \index{decl}\index{def}
 
 Each module present in a \ci file is parsed to generate two files. The basename
@@ -66,7 +64,7 @@ build systems slightly more complicated. We adopt some conventions to ease this 
 This is described in~\ref{AppendixSectionDescribingPhilRamsWorkOnCi.stampAndCharmc-M}.
 
 
-\subsubsection{Module Dependencies}
+\subsection{Module Dependencies}
 \index{extern}
 
 A module may depend on the parallel entities declared in another module. It can
@@ -91,7 +89,7 @@ compilation of the source code for the current module. This is usually required
 anyway because of the dependencies between user program entities across the two
 modules.
 
-\subsubsection{The Main Module and Reachable Modules}
+\subsection{The Main Module and Reachable Modules}
 \index{mainmodule}
 
 \charm software can contain several module definitions from several
@@ -141,7 +139,7 @@ mainmodule M \{
 \end{alltt}
 
 
-\subsubsection{Including other headers}
+\subsection{Including other headers}
 \index{include}
 
 There can be occasions where code generated from the module definitions
@@ -174,7 +172,7 @@ module C \{
 \end{alltt}
 
 
-\subsubsection{main()}
+\subsection{main()}
 
 The \charmpp framework implements its own main\(\) function and retains control
 until the parallel execution environment is initialized and ready for executing
@@ -188,4 +186,6 @@ modules, permitting good control over the grouping and export of parallel API.
 This aids the encapsulation of parallel software.
 
 
+\subsection{Toolchain}
+\index{charmc}
 
