@@ -186,6 +186,12 @@ modules, permitting good control over the grouping and export of parallel API.
 This aids the encapsulation of parallel software.
 
 
-\subsection{Toolchain}
+\subsection{Compiling \charm Programs}
 \index{charmc}
+
+\charm provides a compiler-wrapper called \kw{charmc} that handles all \ci, C,
+\CC and fortran source files that are part of a user program. Users can invoke
+charmc to parse their interface descriptions, compile source code and link
+objects into binaries. It also links against the appropriate set of charm
+framework objects and libraries while producing a binary.
 
