@@ -1,4 +1,4 @@
-\subsection{Chare Arrays}
+%\subsection{Chare Arrays}
 \label{basic arrays}
 
 Chare arrays\index{chare array}\index{chare arrays}\index{arrays} are
@@ -15,7 +15,7 @@ properly. Array elements can be migrated at any time, allowing arrays to be
 efficiently load balanced. A chare array (or a subset of array elements) can
 receive a broadcast/multicast or contribute to a reduction.
 
-\subsubsection{Declaring a One-dimensional Array}
+\subsection{Declaring a One-dimensional Array}
 
 You can declare a one-dimensional (1D) \index{array}\index{chare array}chare
 array as:
@@ -76,7 +76,7 @@ See the section~\ref{arraymigratable} on migratable array elements for more
 information on the migration constructor that takes \kw{CkMigrateMessage *} as
 the argument.
 
-\subsubsection{Declaring Multi-dimensional Arrays}
+\subsection{Declaring Multi-dimensional Arrays}
 
 \charmpp{} supports multi-dimensional or user-defined indices. These array types
 can be declared as:
@@ -126,7 +126,7 @@ the chare array:
 \item Foo array: \kw{thisIndex}
 \end{itemize}
 
-\subsubsection{Creating an Array}
+\subsection{Creating an Array}
 \label{basic array creation}
 
 An array is created using the \kw{CProxy\_Array::ckNew} routine. This returns a
@@ -153,7 +153,7 @@ section~\ref{dynamic_insertion}.
 During creation, the constructor is invoked on each array element. For more
 options when creating the array, see section~\ref{advanced array create}.
 
-\subsubsection{Entry Method Invocation}
+\subsection{Entry Method Invocation}
 
 To obtain a proxy to a specific element in chare array, the chare array proxy
 (e.g. \kw{thisProxy}) must be indexed by the appropriate index call depending
@@ -189,8 +189,8 @@ system will buffer the message until the element is created.\footnote{However,
   period).}
 
 Messages are not guarenteed to be delivered in order. For instance, if a method
-is invoked on method \kw{A} and then method \kw{B}; it is possible that \kw{B} is
-executed before \kw{A}.
+is invoked on method \kw{A} and then method \kw{B}; it is possible that \kw{B}
+is executed before \kw{A}.
 %
 \begin{alltt}
 a1[i].A();
@@ -201,7 +201,7 @@ Messages sent to migrating elements will be delivered after the migrating
 element arrives on the destination processor. It is an error to send a message
 to a deleted array element.
 
-\subsubsection{Broadcasts}
+\subsection{Broadcasts on Chare Arrays}
 
 To \index{array broadcast} broadcast a message to all the current elements of
 an array, simply omit the index (invoke an entry method on the chare array
