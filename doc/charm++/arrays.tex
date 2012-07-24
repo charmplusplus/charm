@@ -5,20 +5,20 @@ Chare arrays\index{chare array}\index{chare arrays}\index{arrays} are
 arbitrarily-sized, possibly-sparse collections of chares that are distributed
 across the processors. The entire array has a globally unique identifier of
 type \kw{CkArrayID}, and each element has a unique index of type
-\kw{CkArrayIndex}. A \kw{CkArrayIndex} can be a single integer (i.e. 1D array),
-several integers (i.e. a multidimensional array), or an arbitrary string of
+\kw{CkArrayIndex}. A \kw{CkArrayIndex} can be a single integer (i.e. a one-dimensional array),
+several integers (i.e. a multi-dimensional array), or an arbitrary string of
 bytes (e.g. a binary tree index).
 
-Array elements can be dynamically created and destroyed on any processor,
-migrated between processors, and messages for the elements will still arrive
+Array elements can be dynamically created and destroyed on any PE,
+migrated between PEs, and messages for the elements will still arrive
 properly. Array elements can be migrated at any time, allowing arrays to be
 efficiently load balanced. A chare array (or a subset of array elements) can
 receive a broadcast/multicast or contribute to a reduction.
 
-\subsubsection{Declaring a 1D Array}
+\subsubsection{Declaring a One-dimensional Array}
 
-You can declare a one-dimensional \index{array}\index{chare array}chare array
-as:
+You can declare a one-dimensional (1D) \index{array}\index{chare array}chare
+array as:
 %
 \begin{alltt}
 //In the .ci file:
@@ -54,7 +54,7 @@ class A : public CBase\_A \{
 \};
 \end{alltt}
 %
-Note that \uw{A}'s must have a \emph{migration constructor}, which is typically
+Note that \uw{A} must have a \emph{migration constructor}, which is typically
 empty:
 %
 \begin{alltt}
@@ -73,11 +73,12 @@ A::someEntry(\uw{parameters2})
 \end{alltt}
 %
 See the section~\ref{arraymigratable} on migratable array elements for more
-information on the \kw{CkMigrateMessage} constructor.
+information on the migration constructor that takes \kw{CkMigrateMessage *} as
+the argument.
 
-\subsubsection{Declaring Multidimensional Arrays}
+\subsubsection{Declaring Multi-dimensional Arrays}
 
-\charmpp{} supports multidimensional or user-defined indexes. These array types
+\charmpp{} supports multi-dimensional or user-defined indices. These array types
 can be declared as:
 %
 \begin{alltt}
