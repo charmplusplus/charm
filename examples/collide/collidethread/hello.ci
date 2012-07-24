@@ -1,0 +1,14 @@
+mainmodule hello {
+  readonly CProxy_main mid;
+  readonly CProxy_Hello arr;
+
+  mainchare main {
+    entry main();
+    entry void maindone(void);
+  };
+
+  array [1D] Hello {
+    entry Hello(COLLIDE_Handle collide);
+    entry void DoIt(void);
+  };
+};
