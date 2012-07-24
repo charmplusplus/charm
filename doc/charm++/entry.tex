@@ -18,27 +18,28 @@ an entry method:
 
 \begin{description}
 \index{threaded}\item[threaded] \index{entry method}entry methods are
-entry methods which are run in their own nonpreemptible threads. These
+entry methods which run in their own non-preemptible threads. These
 entry methods may perform blocking operations, such as calls to a
-\kw{sync} entry method, or explicitly suspend themselves.
+\kw{sync} entry method, or explicitly suspending themselves.
 
-\index{sync}\item[sync] \index{entry method}entry methods are special in that calls to
-sync entry methods are blocking - they do not return control to the caller
-until the method is finished executing completely.  Sync methods may have
-return values; however, they may only return messages. Callers must run in a
-thread separate from the runtime scheduler, e.g. a \kw{threaded} entry methods.
-Calls expecting a return value will receive it as the return from the proxy invocation:
+\index{sync}\item[sync] \index{entry method}entry methods are special in that
+calls to sync entry methods are blocking - they do not return control to the
+caller until the method finishes execution completely. Sync methods may
+have return values; however, they may only return messages. Callers must run in
+a thread separate from the runtime scheduler, e.g. a \kw{threaded} entry
+methods.  Calls expecting a return value will receive it as the return from the
+proxy invocation:
 \begin{alltt}
 ReturnMsg* m;
 m = A[i].foo(a, b, c);
 \end{alltt}
 
-\index{exclusive}\item[exclusive] entry methods, which exist only on node groups, are
-\index{entry method}entry methods that do not execute while other exclusive
-\index{entry method}entry methods of its node group are executing in the same
-node.  If one exclusive method of a node group is executing on node 0, and
-another one is scheduled to run on that same node, the second exclusive method
-will wait for the first to finish before it executes.
+\index{exclusive}\item[exclusive] entry methods exist only on NodeGroup
+objects, and they do not execute while other exclusive \index{entry
+method}entry methods belonging to the same NodeGroup objects are executing on
+the same node.  For example, if one exclusive method of a NodeGroup object is
+executing on node N, and another one is scheduled to run on the same node, the
+second exclusive method will wait to execute until the first one finishes.
 
 \index{nokeep}\item[nokeep] entry methods tells Charm++ that messages passed to
 these user entry methods will not be kept by the calls. Charm++ runtime
