@@ -6,7 +6,7 @@ entities interact with the \charm framework via inherited classes and function
 calls.
 
 
-\subsection{.ci Files}
+\section{.ci Files}
 \index{ci}
 All user program components that comprise its parallel interface (such as
 messages, chares, entry methods, etc.) are granted this elevated status by
@@ -21,7 +21,7 @@ interaction of the user program's entities with the framework.  A program may
 have several interface description files.
 
 
-\subsection{Modules}
+\section{Modules}
 \index{module}
 The top-level construct in a \ci file is a named container for interface
 declarations called a \kw{module}. Modules allow related declarations to be
@@ -37,7 +37,7 @@ module myFirstModule \{
 \end{alltt}
 
 
-\subsection{Generated Files}
+\section{Generated Files}
 \index{decl}\index{def}
 
 Each module present in a \ci file is parsed to generate two files. The basename
@@ -64,7 +64,7 @@ build systems slightly more complicated. We adopt some conventions to ease this 
 This is described in~\ref{AppendixSectionDescribingPhilRamsWorkOnCi.stampAndCharmc-M}.
 
 
-\subsection{Module Dependencies}
+\section{Module Dependencies}
 \index{extern}
 
 A module may depend on the parallel entities declared in another module. It can
@@ -89,7 +89,7 @@ compilation of the source code for the current module. This is usually required
 anyway because of the dependencies between user program entities across the two
 modules.
 
-\subsection{The Main Module and Reachable Modules}
+\section{The Main Module and Reachable Modules}
 \index{mainmodule}
 
 \charm software can contain several module definitions from several
@@ -139,7 +139,7 @@ mainmodule M \{
 \end{alltt}
 
 
-\subsection{Including other headers}
+\section{Including other headers}
 \index{include}
 
 There can be occasions where code generated from the module definitions
@@ -172,7 +172,7 @@ module C \{
 \end{alltt}
 
 
-\subsection{The main() function}
+\section{The main() function}
 
 The \charmpp framework implements its own main\(\) function and retains control
 until the parallel execution environment is initialized and ready for executing
@@ -186,7 +186,7 @@ modules, permitting good control over the grouping and export of parallel API.
 This aids the encapsulation of parallel software.
 
 
-\subsection{Compiling \charm Programs}
+\section{Compiling \charm Programs}
 \index{charmc}
 
 \charm provides a compiler-wrapper called \kw{charmc} that handles all \ci, C,
