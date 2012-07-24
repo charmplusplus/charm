@@ -458,7 +458,7 @@ PackedMessage::unpack(void* inbuf)
   int num_nodes;
   memcpy(&num_nodes, buf, sizeof(int));
   buf = buf + sizeof(int);
-  // allocate the message through charm kernel
+  // allocate the message through Charm RTS
   PackedMessage* pmsg = 
     (PackedMessage*)CkAllocBuffer(inbuf, sizeof(PackedMessage));
   // call "inplace" constructor of PackedMessage that calls constructor

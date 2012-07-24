@@ -194,11 +194,11 @@ Chare Groups\footnote{ These were called Branch Office Chares (BOC) in earlier
 versions of Charm.} are a special type of concurrent objects.  Each chare group
 is a collection of chares, with one representative (group member) on each
 processor. All the members of a chare group share a globally unique name
-(handle, defined by Charm kernel to be of type \kw{CkGroupID}). An entire chare
+(handle, defined by Charm RTS to be of type \kw{CkGroupID}). An entire chare
 group could be addressed using this global handle, and an individual member of
 a chare group can be addressed using the global handle, and a processor number.
 Chare groups are instances of \CC\ classes subclassed from a system-provided
-class called \kw{Group}. The Charm kernel has to be notified that these chares
+class called \kw{Group}. The Charm RTS has to be notified that these chares
 are semantically different, and therefore chare groups have a different
 declaration in the interface specification file.
 
