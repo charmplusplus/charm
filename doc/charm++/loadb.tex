@@ -378,9 +378,12 @@ implies -module A, so you don't have to write -module A again,
 although that is not invalid.  Using CommonLBs is a convenient way to
 link against the commonly used existing load balancers.  One such load
 balancer, called MetisLB, requires the METIS library which is located
-at: charm/src/libs/ck-libs/parmetis/METISLib/.  A pre-requisite for
-use of this library is to compile the METIS library by ``make METIS''
-under charm/tmp after compiling \charmpp{}.
+at: 
+
+\tt{charm/src/libs/ck-libs/parmetis/METISLib/.}
+
+A pre-requisite for use of this library is to compile the METIS
+library by ``make METIS'' under charm/tmp after compiling \charmpp{}.
 
 \item {\bf runtime options:}
 
