@@ -1,9 +1,10 @@
-\section{Basic Constructs and Program Structure}
+\section{Basic Constructs}
 
-\charmpp\ is an object oriented parallel language. What sets \charmpp\ apart
-from traditional programming models such as message passing and shared variable
-programming is that the execution model of \charmpp\ is message-driven.
-Therefore, computations in \charmpp\ are triggered based on arrival of
+\charmpp\ is an object-based parallel programming paradigm.
+%What sets \charmpp\ apart
+%from traditional programming models such as message passing and shared variable
+%programming is that the execution model of \charmpp\ is message-driven.
+Computations in \charmpp\ are triggered based on arrival of
 associated messages. These computations in turn can fire off more messages to
 other (possibly remote) processors that trigger more computations on those
 processors.
@@ -223,4 +224,15 @@ associated with shared address space programming. However, \charmpp\ eases such
 problems by allowing the programmer to specify an entry method of a nodegroup
 to be {\em exclusive}, thus guaranteeing that no other {\em exclusive} method
 of that nodegroup member can execute simultaneously within the node.
+
+\subsubsection{Entry Methods}
+In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
+nodegroups communicate using remote method invocation.  These ``remote entry'' methods may either take marshalled parameters, described in the next section; or special objects called messages.
+
+\charm programs are open to the full gamut of program design techniques that are possible in
+\CC. One may view the role of the programming model as providing a platform for
+addressing and interacting with remote objects.
+However, \charmpp does not provide a full global address space. Each process in
+the parallel execution has its own address space and \charmpp does not
+implicitly share or synchronize global or static variables.
 
