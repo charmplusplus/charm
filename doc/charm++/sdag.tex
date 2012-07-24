@@ -130,9 +130,9 @@ public:
 \end{alltt}
 \end{center}
 Note that chare classes containing SDAG code must make a few additional calls
-in addition to inheriting from their {\tt CBase_Foo} class: incorporate the
-{\tt Foo_SDAG_CODE} generated-code macro in the class, and call {\tt
-  __sdag_init()} in the class's constructor(s).
+in addition to inheriting from their {\tt CBase\_Foo} class: incorporate the
+{\tt Foo\_SDAG\_CODE} generated-code macro in the class, and call {\tt
+  \_\_sdag\_init()} in the class's constructor(s).
 
 Atomic blocks can also specify a textual `label' that will appear in traces, as
 follows:
