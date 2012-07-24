@@ -10,16 +10,20 @@ dynamic load balancing strategies are provided.  \charmpp\ supports both
 irregular as well as regular, data-parallel applications.  It is built on top of the
 {\sc Converse} interoperable runtime system for parallel programming.
 
-Currently the parallel platforms supported by \charmpp\ are the BlueGene/L,BlueGene/P, PSC
-Lemieux, IBM SP, SGI Origin2000, Cray XT3/4, Cray X1, Cray T3E, a single workstation or a
-network of workstations from Sun Microsystems (Solaris), IBM RS-6000 (AIX) SGI
-(IRIX 5.3 or 6.4), HP (HP-UX), Intel x86 (Linux, Windows 98/2000/XP), Intel
-IA64, Intel x86\_64, multicore x86 and x86\_64, and Apple Mac. The communication protocols and infrastructures supported
-by \charmpp\ are UDP, TCP, Myrinet, Infiniband, Quadrics Elan, Shmem, MPI and
-NCSA VMI.  \charmpp\ programs can run without changing the source on all these
-platforms.  Please see the \charmpp{}/\converse{} Installation and
-Usage \htmladdnormallink{Manual}{http://charm.cs.uiuc.edu/manuals/html/install/manual.html}
-for details about installing, compiling and running \charmpp\ programs.
+Currently the parallel platforms supported by \charmpp\ are the
+BlueGene/L,BlueGene/P, BlueGene/Q, Cray XT, XE and XK series
+(including XK6 and XE6), 
+% XT3/4, Cray X1, Cray T3E,
+a single workstation or a network of
+workstations (including x86 (running Linux, Windows, MacOS)), etc.
+The communication protocols and infrastructures supported by
+\charmpp\ are UDP, TCP, Myrinet, Infiniband, uGNI, and PAMI. 
+\charmpp\ programs can run without changing the source
+on all these platforms.  Please see the \charmpp{}/\converse{}
+Installation and Usage
+\htmladdnormallink{Manual}{http://charm.cs.uiuc.edu/manuals/html/install/manual.html}
+for details about installing, compiling and running
+\charmpp\ programs.
 
 \subsection{\charmpp\ Execution Model}
 
