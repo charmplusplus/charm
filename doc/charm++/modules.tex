@@ -8,7 +8,7 @@ entities interact with the \charm framework via inherited classes and function
 calls.
 
 
-\subsubsection{.ci files}
+\subsubsection{.ci Files}
 \index{ci}
 All user program components that comprise its parallel interface (such as
 messages, chares, entry methods, etc.) are granted this elevated status by
@@ -182,15 +182,6 @@ user code. Hence, the user program must not define a \emph{main()} function.
 Control enters the user code via the \kw{mainchare} of the \kw{mainmodule}.
 This will be discussed in further detail in~\ref{mainchare}.
 
-\zap{
-It is open to the full gamut of program design techniques that are possible in
-\CC. One may view the role of the programming model as providing a platform for
-addressing and interacting with remote objects.
-However, \charmpp does not provide a full global address space. Each process in
-the parallel execution has its own address space and \charmpp does not
-implicitly share or synchronize global or static variables.
-}
-
 Using the facilities described thus far, the parallel interface declarations
 for a \charm program can be spread across multiple ci files and multiple
 modules, permitting good control over the grouping and export of parallel API.
@@ -301,5 +292,5 @@ The proxy class also provides static registration functions used by the
 (\uw{\_\_registerHello} in the above program) which calls all the registration
 functions corresponding to the readonly variables and entry methods declared in
 the module.
-}
+} % end zap
 
