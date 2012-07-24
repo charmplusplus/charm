@@ -4,13 +4,13 @@
 
 %(This introduction added on 11/12/2003)
 
-Load balancing in Charm++ is enabled by its ability to place, or
+Load balancing in \charmpp{} is enabled by its ability to place, or
 migrate, chares or chare-array-elements.  Typical application usage to
 exploit this feature will construct many more chares than processors, and
 enable their runtime migration.
 
 Iterative applications, which are commonplace in physical simulations,
-are the most suitable target for Charm++'s measurement based load
+are the most suitable target for \charmpp{}'s measurement based load
 balancing techniques.  Such applications may contain a series of
 time-steps, and/or iterative solvers that run to convergence. For such
 computations, typically, the heuristic principle that we call
