@@ -184,9 +184,11 @@ aF[CkArrayIndexFoo(...)].doAgain(\uw{parameters});
 \end{alltt}
 
 You may invoke methods on array elements that have not yet been created. The
-system will buffer the message until the element is created.\footnote{However,
-  the element must eventually be created (i.e. within a 3-minute buffering
-  period).}
+\charmpp{} runtime system will buffer the message until the element is
+created. 
+%\footnote{However, the element must eventually be created (i.e. within
+%a 3-minute buffering period).}
+\footnote{However, the element must eventually be created.}
 
 Messages are not guarenteed to be delivered in order. For instance, if a method
 is invoked on method \kw{A} and then method \kw{B}; it is possible that \kw{B}
@@ -198,7 +200,7 @@ a1[i].B();
 \end{alltt}
 
 Messages sent to migrating elements will be delivered after the migrating
-element arrives on the destination processor. It is an error to send a message
+element arrives on the destination PE. It is an error to send a message
 to a deleted array element.
 
 \subsection{Broadcasts on Chare Arrays}

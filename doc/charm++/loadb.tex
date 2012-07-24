@@ -1,45 +1,48 @@
-
 \subsection{Load Balancing}
 
 \label{loadbalancing}
 
 %(This introduction added on 11/12/2003)
 
-Charm++ supports load balancing, enabled by the fact there are a large
-number of chares or chare-array-elements typically available to map to
-existing processors, and that they can be migrated at runtime.
+Load balancing in \charmpp{} is enabled by its ability to place, or
+migrate, chares or chare-array-elements.  Typical application usage to
+exploit this feature will construct many more chares than processors, and
+enable their runtime migration.
 
-Many parallel applications, especially physical simulations, are
-iterative in nature. They may contain a series of time-steps, and/or
-iterative solvers that run to convergence. For such computations,
-typically, the heuristic principle that we call ``principle of
-persistence'' holds: the computational loads and communication patterns
-between objects (chares) tend to persist over time, even in dynamic
-applications. In such cases, recent past is a good predictor of near
-future. Measurement-based chare migration strategies are useful in
-this context. Currently these apply to chare-array elements, but they
-may be extended to chares in the future.
+Iterative applications, which are commonplace in physical simulations,
+are the most suitable target for \charmpp{}'s measurement based load
+balancing techniques.  Such applications may contain a series of
+time-steps, and/or iterative solvers that run to convergence. For such
+computations, typically, the heuristic principle that we call
+``principle of persistence'' holds: the computational loads and
+communication patterns between objects (chares) tend to persist over
+multiple iterations, even in dynamic applications. In such cases,
+the recent past is a good predictor of the near future. Measurement-based
+chare migration strategies are useful in this context. Currently these
+apply to chare-array elements, but they may be extended to chares in
+the future.
 
-For applications without such iterative structure, or with iterative structure
-but without the predictability (i.e. where the principle of persistence does
-not apply), Charm++ supports ``seed balancers'' that move seeds for new chares
-among processors (possibly repeatedly) to achieve load balance. These
-strategies are currently available for both chares and chare-arrays.  Seed
-balancers were the original load balancers provided in Charm since the late
-80's. They are extremely useful for state-space search applications, and are
-also useful in other computations, as well as in conjunction with migration
+For applications without such iterative structure, or with iterative
+structure, but without predictability (i.e. where the principle of
+persistence does not apply), Charm++ supports ``seed balancers'' that
+move ``seeds'' for new chares among processors (possibly repeatedly)
+to achieve load balance. These strategies are currently available for
+both chares and chare-arrays.  Seed balancers were the original load
+balancers provided in Charm since the late 80's. They are extremely
+useful for state-space search applications, and are also useful in
+other computations, as well as in conjunction with migration
 strategies.
 
-For iterative computations when there is a correlation between iterations/steps
-but either it is not strong or the machine environment is not predictable
-(noise due to OS interrupts on small time steps, or time-shared desktop
+For iterative computations when there is a correlation between iterations/steps,
+but either it is not strong,k or the machine environment is not predictable
+(due to noise from OS interrupts on small time steps, or time-shared desktop
 machines), one can use a combination of the two kinds of strategies. The
 baseline load balancing is provided by migration strategies, but in each
 iteration one also spawns off work in the form of chares that can run on any
 processor. The seed balancer will handle such work as it arises.
 
-Examples are in the directories of {\tt examples/charm++/load\_balancing} and 
-{\tt tests/charm++/load\_balancing}
+Examples are in {\tt examples/charm++/load\_balancing} and {\tt
+  tests/charm++/load\_balancing}
 \subsubsection{Measurement-based Object Migration Strategies}
 
 \label{lbFramework}
