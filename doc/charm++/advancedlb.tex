@@ -6,9 +6,9 @@
 \subsubsection{Load Balancing Simulation}
 
 The simulation feature of load balancing framework allows the users to collect information
-about the compute wall/cpu time and communication of the chares during a particular run of
-the program and use this information to later test different load balancing strategies to
-see which one is suitable for the programs behaviour. Currently, this feature is supported only for
+about the compute WALL/CPU time and communication of the chares during a particular run of
+the program and use this information later to test different load balancing strategies to
+see which one is suitable for the program behaviour. Currently, this feature is supported only for
 the centralized load balancing strategies. For this, the load balancing framework
 accepts the following command line options:
 \begin{enumerate}
@@ -26,7 +26,7 @@ accepts the following command line options:
 	a number is appended to the filename in the form {\tt Filename.\#}; this applies to both dump and
 	simulation.
 \item {\em +LBSim StepStart}\\
-	This option instructs the framework to do the simulation during the first load balancing step.
+	This option instructs the framework to do the simulation from {\em StepStart} step.
 	When this option is specified, the load balancing data from the file specified in the {\em +LBDumpFile}
 	option, with the addition of the step number, will be read and this data
 	will be used for the load balancing. The program will print the results
@@ -45,12 +45,14 @@ accepts the following command line options:
 \end{enumerate}
 As an example, we can collect the data for a 1000 processor run of a program using:
 \begin{alltt}
-./charmrun pgm +p 1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
+./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
 \end{alltt}
 This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
 \begin{alltt}
 ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat [+LBSimProcs 900]
 \end{alltt}
+Please note that this does not invoke any real application run. Actually
+ ''pgm'' can be replaced with any generic application which calls centralized load balancer.
 
 \subsubsection{Future load predictor}
 
@@ -62,7 +64,7 @@ the past, instrumented one. As said, the user might provide a specific class
 which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
 Here is the abstract class:
 \begin{alltt}
-class LBPredictorFunction {
+class LBPredictorFunction \{
 public:
   int num_params;
  
@@ -71,12 +73,13 @@ public:
   virtual double predict(double x, double *params) =0;
   virtual void print(double *params) {PredictorPrintf("LB: unknown model");};
   virtual void function(double x, double *param, double &y, double *dyda) =0;
-};
+\};
 \end{alltt}
 \begin{itemize}
 \item {\tt initialize\_params} by default initializes the parameters randomly. If the user
 knows how they should be, this function can be reimplemented.
-\item {\tt predict} is the function the model implements. For example, if the function is
+\item {\tt predict} is the function that predicts the load according to the factors in parameters.
+For example, if the function is
 $y=ax+b$, the method in the implemented class should be like:
 \begin{verbatim}
 double predict(double x, double *param) {return (param[0]*x + param[1]);}
@@ -108,13 +111,13 @@ the execution of the program. For this, two parameters can be setup at command
 line to specify the learning behaviour:
 \begin{enumerate}
 \item {\em +LBPredictorWindow size}\\
-This parameter will specify how many statistics the load balancer will keep. 
+This parameter will specify how many statistics steps the load balancer will keep. 
 The greater this number is, the better the
 approximation of the workload will be, but more memory is required to store
 the intermediate information. The default is 20.
 \item {\em +LBPredictorDelay steps}\\
 This will tell how many load balancer steps to wait before considering the
-function parameters learnt and start using the mode. The load balancer will
+function parameters learnt and starting to use the mode. The load balancer will
 collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
 the model as soon as {\em +LBPredictorDelay} information are collected. The
 default is 10.
@@ -160,10 +163,10 @@ existing one.
 
 \subsubsection{Model-based Load Balancing}
 
-Charm++ programmers can also choose to feed load balancer with their own CPU
+You can also choose to feed load balancer with their own CPU
 timing of each Chare based on certain computational model of the applications.
 
-To do so, first turn off automatic CPU load measurement completely
+To do so, first you need to turn off automatic CPU load measurement completely
 by setting:
 
 \begin{alltt}
