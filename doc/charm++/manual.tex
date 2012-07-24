@@ -19,8 +19,6 @@
 \maketitle
 
 
-\part{Introduction}
-
 \chapter{Programming and Execution Model}
 \input{intro}
 \input{overview}
@@ -57,8 +55,6 @@
 
 \part{Advanced Usage}
 
-\chapter{Advanced Concepts}
-
   \input{entry}
   \input{messages}
   \input{order.tex}
@@ -73,17 +69,27 @@
   \input{delegation}    
 %  \input{commlib}
   \input{alltoall}
-  \input{python}
-\input{inhertmplt}
 
+\chapter{Python scripting language}
+\label{python}
+  \input{python}
+
+\chapter{Inheritance and Templates in Charm++}
+\label{inheritance and templates}
+  \input{inhertmplt}
 
 % TO BE MOVED TO ITS OWN MANUAL
 %\input{msa.tex}
 
-\input{checkpoint}
+\chapter{Checkpoint/Restart}
+\index{Checkpoint/Restart}
+\label{sec:checkpoint}
+  \input{checkpoint}
 
-\input{controlpoints}
-
+\chapter{Control Point Automatic Tuning Framework}
+\index{Control Point Automatic Tuning Framework}
+\label{sec:controlpoint}
+  \input{controlpoints}
 
 \appendix
 
