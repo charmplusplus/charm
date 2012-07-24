@@ -1,0 +1,108 @@
+\zap{
+A simple \charmpp\ program is given below:
+
+\begin{alltt}
+///////////////////////////////////////
+// File: pgm.ci
+
+mainmodule Hello \{
+  readonly CProxy_HelloMain mainProxy;
+  mainchare HelloMain \{
+    entry HelloMain(); // implicit CkArgMsg * as argument
+    entry void PrintDone(void);
+  \};
+  group HelloGroup \{
+    entry HelloGroup(void);
+  \};
+\};
+
+////////////////////////////////////////
+// File: pgm.h
+#include "Hello.decl.h" // Note: not pgm.decl.h
+
+class HelloMain : public CBase_HelloMain \{
+  public:
+    HelloMain(CkArgMsg *);
+    void PrintDone(void);
+  private:
+    int count;
+\};
+
+class HelloGroup: public Group \{
+  public:
+    HelloGroup(void);
+\};
+
+/////////////////////////////////////////
+// File: pgm.C
+#include "pgm.h"
+
+CProxy_HelloMain mainProxy;
+
+HelloMain::HelloMain(CkArgMsg *msg) \{
+  delete msg;
+  count = 0;
+  mainProxy = thisProxy;
+  CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
+\}
+
+void HelloMain::PrintDone(void) \{
+  count++;
+  if (count == CkNumPes()) \{ // Wait for all group members to finish the printf
+    CkExit();
+  \}
+\}
+
+HelloGroup::HelloGroup(void) \{
+  ckout << "Hello World from processor " << CkMyPe() << endl;
+  mainProxy.PrintDone();
+\}
+
+#include "Hello.def.h" // Include the Charm++ object implementations
+
+/////////////////////////////////////////
+// File: Makefile
+
+pgm: pgm.ci pgm.h pgm.C
+      charmc -c pgm.ci
+      charmc -c pgm.C
+      charmc -o pgm pgm.o -language charm++
+
+\end{alltt}
+
+\uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm RTS starts
+execution of this program by creating an instance of \uw{HelloMain} on
+processor 0. The HelloMain constructor creates a chare group
+\uw{HelloGroup}, and stores a handle to itself and returns. The call to
+create the group returns immediately after directing Charm RTS to perform
+the actual creation and invocation.  Shortly after, the Charm RTS will
+create an object of type \uw{HelloGroup} on each processor, and call its
+constructor. The constructor will then print ``Hello World...'' and then
+call the \uw{PrintDone} method of \uw{HelloMain}. The \uw{PrintDone} method
+calls \kw{CkExit} after all group members have called it (i.e., they have
+finished printing ``Hello World...''), and the \charmpp program exits.
+
+\subsection{Functions in the ``decl.h'' and ``def.h'' files}
+
+The \texttt{decl.h} file provides declarations for the proxy classes of the
+concurrent objects declared in the ``.ci'' file (from which the \texttt{decl.h}
+file is generated). So the \uw{Hello.decl.h} file will have the declaration of
+the class CProxy\_HelloMain. Similarly it will also have the declaration for
+the HelloGroup class. 
+
+This class will have functions to create new instances of the chares and
+groups, like the function \kw{ckNew}. For \uw{HelloGroup} this function creates
+an instance of the class \uw{HelloGroup} on all the processors. 
+
+The proxy class also has functions corresponding to the entry methods defined
+in the ``.ci'' file. In the above program the method wait is declared in
+\uw{CProxy\_HelloMain} (proxy class for \uw{HelloMain}).
+
+The proxy class also provides static registration functions used by the
+\charmpp{} runtime.  The \texttt{def.h} file has a registration function
+(\uw{\_\_registerHello} in the above program) which calls all the registration
+functions corresponding to the readonly variables and entry methods declared in
+the module.
+} % end zap
+
+
