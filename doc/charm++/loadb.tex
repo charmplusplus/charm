@@ -150,7 +150,7 @@ section~\ref{lbOption}.
 
 The load balancing framework is well integrated with chare array implementation
 -- when a chare array is created, it automatically registers its elements with
-the load balancing framework. The instrumentation of compute time (wall/cpu
+the load balancing framework. The instrumentation of compute time (WALL/CPU
 time) and communication pattern is done automatically and APIs are provided
 for users to trigger the load balancing.  To use the load balancer, you must
 make your array elements migratable (see migration section above) and choose a
@@ -192,8 +192,8 @@ migrate at any time provided that they are not in the middle of executing an
 entry method. The array element's variable \kw{usesAtSync} being CmiFalse
 attributes to this default behavior.
 %
-\item {\bf At sync mode}: Using this method, elements can only be migrated at
-certain points in the execution when user calls \kw{AtSync()}. For using the at
+\item {\bf At sync mode}: Using this method, elements can be migrated only at
+certain points in the execution when user calls \kw{AtSync()}. In order to use the at
 sync mode, one should set \kw{usesAtSync} to CmiTrue in the array element
 constructor.  When an element is ready to migrate, call
 \kw{AtSync()}~\footnote{AtSync() is a member function of class ArrayElement}.
@@ -213,7 +213,8 @@ balancing that it is time for load balancing. During the time between {\em
 AtSync} and {\em ResumeFromSync}, the object may be migrated. One can choose
 to let objects continue working with incoming messages, however keep in mind
 the object may suddenly show up in another processor and make sure no
-operations that could possibly prevent migration be performed. This is the automatic way of doing load balancing where the application does not need to define ResumeFromSync().
+operations that could possibly prevent migration be performed. This is 
+the automatic way of doing load balancing where the application does not need to define ResumeFromSync().
 
 The more commonly used approach is to force the object to be idle until load
 balancing finishes. The user places an AtSync call at the end of some iteration
