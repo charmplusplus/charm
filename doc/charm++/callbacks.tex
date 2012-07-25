@@ -1,5 +1,3 @@
-\section{Callbacks}
-
 \label{callbacks}
 
 Callbacks provide a generic way to store the information required to
@@ -12,7 +10,7 @@ method.  To do this, you would create an object of type
 \kw{CkCallback} with the chare's \kw{CkChareID} and entry method
 index, and pass this callback object to the reduction library.
 
-\subsection{Creating a CkCallback Object}
+\section{Creating a CkCallback Object}
 
 \index{CkCallback}
 
@@ -110,7 +108,7 @@ One final type of callback, \kw{CkCallbackResumeThread()},
 can only be used from within threaded entry methods. 
 This callback type is further discussed in the following section.
 
-\subsection{CkCallback Invocation}
+\section{CkCallback Invocation}
 
 \label{libraryInterface}
 
@@ -149,7 +147,7 @@ As an alternative to ``send'', the callback can be used in a {\em
 ``send'' method on the callback when the contribute operation has
 finished.
 
-\subsection{Synchronous Execution with CkCallbackResumeThread}
+\section{Synchronous Execution with CkCallbackResumeThread}
 
 Threaded entry methods can be suspended and resumed through the {\em
   CkCallbackResumeThread} class. {\em CkCallbackResumeThread} is
