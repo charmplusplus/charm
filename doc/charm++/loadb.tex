@@ -236,7 +236,7 @@ manually. To switch to the manual mode, the application calls {\em TurnManualLBO
 on every processor to prevent the load balancer from starting automatically. {\em
 TurnManualLBOn()} should be called as early as possible in the program. It
 could be called at the initialization part of the program, for example from a
-global variable constructor, or in an initcall~\ref{initcall}.  It can also be
+global variable constructor, or in an initcall(Section~\ref{initcall}).  It can also be
 called in the constructor of a static array and definitely before the {\em
 doneInserting} call for a dynamic array.  It can be called multiple times on
 one processor, but only the last one takes effect.
@@ -244,7 +244,7 @@ one processor, but only the last one takes effect.
 The function call {\em StartLB()} starts load balancing immediately. This call
 should be made at only one place on only one processor. This function is also
 not blocking, the object will continue to process messages and the load
-balancing when triggered happens at the background.
+balancing when triggered happens in the background.
 
 {\em TurnManualLBOff()} turns off manual load balancing and switches back to
 the automatic Load balancing mode.
@@ -256,7 +256,7 @@ the automatic Load balancing mode.
 \label{lbmigobj}
 
 Load balancers migrate objects automatically.
-For an array element to migrate, user can refer to section~\ref{arraymigratable}
+For an array element to migrate, user can refer to Section~\ref{arraymigratable}
 for how to write a ``pup'' for an array element.
 
 In general one needs to pack the whole snapshot of the member data in an 
@@ -369,7 +369,7 @@ load balancers. In the above example, GreedyLB and RefineLB strategies are
 applied one after the other in each load balancing step.
 \end{itemize}
 
-The list of existing load balancers is in section
+The list of existing load balancers is given in Section
 \ref{lbStrategy}. Note: you can have multiple -module *LB options. LB
 modules are linked into a program, but they are not activated
 automatically at runtime.  Using -balancer A at compile time will
@@ -451,7 +451,7 @@ a global barrier on all processors to make sure that processors can only resume
 computation after migrations are completed on all processors.
 \item {\em +LBOff} \\
      This option turns off load balancing instrumentation 
-     of both CPU and communication usageat startup time. 
+     of both CPU and communication usage at startup time. 
 \item {\em +LBCommOff} \\
      This option turns off load balancing instrumentation of communication at startup time. 
      The instrument of CPU usage is left on.
@@ -496,7 +496,7 @@ distributed.
  chares.
 \end{enumerate}
 
-Other strategies can also be explored follow the simple API of the 
+Other strategies can also be explored by following the simple API of the 
 seed load balancer.
 \linebreak
 
