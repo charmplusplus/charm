@@ -203,10 +203,127 @@ parameters to when-defined entry methods in their bodies, the counter {\tt
   expectedMessageCount} and the intermediate copies of the received input are
 eliminated. Note that the entry methods {\tt firstInput} and {\tt secondInput}
 are still declared in the {\tt .ci} file, but their definition is in the SDAG
-code. The interface translator generates appropriate code to handle buffering
-and triggering them appropriately.
+code. The interface translator generates code to handle buffering and
+triggering them appropriately.
 
+For simplicity, {\tt when} constructs can also specify multiple expected entry
+methods that all feed into a single body, by separating their prototypes with
+commas:
+\begin{center}
+\begin{alltt}
+entry void startStep() \{
+  when firstInput(Input first),
+       secondInput(Input second)
+    atomic \{
+      computeInteractions(first, second);
+    \}
+\};
+\end{alltt}
+\end{center}
 
+SDAG supports the {\tt for} and {\tt while} loop constructs mostly as if they
+appeared in plain C or C++ code. In the running example, {\tt
+  computeInteractions()} calls {\tt startStep()} when it is finished to start
+the next step. Instead of this arrangement, the loop structure can be made
+explicit:
+\begin{center}
+\begin{alltt}
+// in .ci file
+chare ComputeObject \{
+  entry void ComputeObject();
+  entry void runForever() \{
+    while(true) \{
+      when firstInput(Input first),
+           secondInput(Input second) atomic \{
+          computeInteractions(first, second);
+      \}
+    \}
+  \};
+  entry void firstInput(Input i);
+  entry void secondInput(Input j);
+\};
+
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  ComputeObject_SDAG_Code
+
+public:
+  ComputeObject() \{
+    __sdag_init();
+    runForever();
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+  \}
+\};
+\end{alltt}
+\end{center}
+If this code should instead run for a fixed number of iterations, we can
+instead use a for loop:
+\begin{center}
+\begin{alltt}
+// in .ci file
+chare ComputeObject \{
+  entry void ComputeObject();
+  entry void runForever() \{
+    for(iter = 0; iter < n; ++iter) \{
+      when firstInput(Input first),
+           secondInput(Input second) atomic \{
+        computeInteractions(first, second);
+      \}
+    \}
+  \};
+  entry void firstInput(Input i);
+  entry void secondInput(Input j);
+\};
+
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  ComputeObject_SDAG_Code
+  int n, iter;
+
+public:
+  ComputeObject() \{
+    __sdag_init();
+    n = 10;
+    runForever();
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+  \}
+\};
+\end{alltt}
+\end{center}
+Note that {\tt int iter;} is declared in the chare's class definition and not
+in the {\tt .ci} file. This is necessary because the \charmpp\ interface
+translator does not fully parse the declarations in the {\tt for} loop header,
+because of the inherent complexities of C++.
+
+SDAG also supports conditional execution of statements and blocks with {\tt if}
+statements. The syntax of SDAG {\tt if} statements matches that of C and
+C++. However, if one encounters a parsing error on correct-looking code in a
+loop or conditional statement, try assigning the condition expression to a
+boolean variable in an atomic preceding the statement and then testing that
+boolean's value. This can be necessary because of the complexity of parsing C++
+code.
+
+In cases where multiple tasks must be processed before execution continues, but
+with no dependencies or interactions among them, SDAG provides the {\tt
+  overlap} construct. Overlap blocks contain a series of SDAG statements within
+them which can occur in any order. Commonly these blocks are used to hold a
+series of {\tt when} triggers which can be received and processed in any
+order. Flow of control doesn't leave the overlap block until all the statements
+within it have been processed.
+
+In the running example, suppose each input needed to be preprocessed 
 
 
  Typically atomic blocks hold
@@ -319,11 +436,7 @@ SDAG constructs of the following kinds:
         code that actually deals with incoming messages in a {\tt when}
         statement, or to do local operations before a message is sent or after
         it's received.
-    \item {\tt overlap} blocks: Overlap blocks contain a series of SDAG
-        statements within them which can occur in any order. Commonly these
-        blocks are used to hold a series of {\tt when} triggers which can be
-        received and processed in any order. Flow of control doesn't leave the
-        overlap block until all the statements within it have been processed.
+    \item {\tt overlap} blocks: 
     \item {\tt when} statements: These statement, also called triggers, indicate
         that we expect an incoming message of a particular type, and provide
         code to handle that message when it arrives. They commonly occur inside
