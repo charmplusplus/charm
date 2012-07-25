@@ -18,12 +18,12 @@ counters, as in the following example:
 \begin{center}
 \begin{alltt}
 // in .ci file
-chare ComputeObject {
+chare ComputeObject \{
   entry void ComputeObject();
   entry void startStep();
   entry void firstInput(Input i);
   entry void secondInput(Input j);
-};
+\};
 
 // in C++ file
 class ComputeObject : public CBase_ComputeObject \{
@@ -80,32 +80,32 @@ The most basic construct in SDAG is the {\tt atomic} block. Atomic blocks
 contain sequential \CC code.  They're called atomic because the code within
 them executes without returning control to the \charmpp\ runtime scheduler, and
 thus avoiding interruption from incoming messages. The earlier example can be
-adapted to use atmoic blocks as follows:
+adapted to use atomic blocks as follows:
 \begin{center}
 \begin{alltt}
 // in .ci file
-chare ComputeObject {
+chare ComputeObject \{
   entry void ComputeObject();
   entry void startStep();
-  entry void firstInput(Input i) {
-    atomic {
+  entry void firstInput(Input i) \{
+    atomic \{
       first = i;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
-    }
-  };
-  entry void secondInput(Input j){
-    atomic {
+    \}
+  \};
+  entry void secondInput(Input j) \{
+    atomic \{
       second = j;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
-    }
-  };
-};
+    \}
+  \};
+\};
 
 // in C++ file
-class ComputeObject : public CBase_ComputeObject \{
-  ComputeObject_SDAG_Code
+class ComputeObject : public CBase\_ComputeObject \{
+  ComputeObject\_SDAG\_Code
   int   expectedMessageCount;
   Input first, second;
 
@@ -138,13 +138,13 @@ Atomic blocks can also specify a textual `label' that will appear in traces, as
 follows:
 \begin{center}
 \begin{alltt}
-  entry void firstInput(Input i) {
-    atomic ``process first'' {
+  entry void firstInput(Input i) \{
+    atomic "process first" \{
       first = i;
       if (--expectedMessageCount == 0)
         computeInteractions(first, second);
-    }
-  };
+    \}
+  \};
 \end{alltt}
 \end{center}
 
@@ -161,18 +161,18 @@ The use of {\tt when} substantially simplifies the example from above:
 \begin{center}
 \begin{alltt}
 // in .ci file
-chare ComputeObject {
+chare ComputeObject \{
   entry void ComputeObject();
-  entry void startStep() {
+  entry void startStep() \{
     when firstInput(Input first)
       when secondInput(Input second)
-        atomic {
+        atomic \{
           computeInteractions(first, second);
-        }
-  };
+        \}
+  \};
   entry void firstInput(Input i);
   entry void secondInput(Input j);
-};
+\};
 
 // in C++ file
 class ComputeObject : public CBase_ComputeObject \{
