@@ -1,0 +1,31 @@
+mainmodule pgm {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Histogram histogramProxy;
+  readonly CProxy_HistogramMerger histogramMergerProxy;
+
+  // Main chare sends a number of bins to Histogram chare array elements
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void charesRegistered();
+    entry [reductiontarget] void receiveHistogram(int binCounts[nBins], int nBins);
+  };
+
+  // Each Histogram object has a set of values. When it receives a set of 
+  // bins, it counts the number of its values that lie within each bin. 
+  // Instead of directly contribute()ing counts to a reduction, these counts
+  // are submitted to the local branch of the HistogramMerger group.
+  array [1D] Histogram {
+    entry Histogram(int nElementsPerChare, int maxElementValue);
+    entry void registerWithMerger(const CkCallback &replyToCb);
+    entry [nokeep] void count(int binValues[nBins], int nBins);
+  };
+
+  // The local branch of this group on a PE receives count contributions from
+  // all the chare array elements on that PE. When it has received all the 
+  // contributions it is waiting for, it initiates a reduction to communicate
+  // the count results to the main chare.
+  group HistogramMerger {
+    entry HistogramMerger(int nKeys);
+  };
+
+};
