@@ -1,13 +1,21 @@
-\charmpp\ is an explicitly parallel language based on \CC\ with a runtime
-library for supporting parallel computation called the Charm Runtime System.  It
-provides a clear separation between sequential and parallel objects.  The
-execution model of \charmpp\ is message driven, thus helping one write programs
-that are latency-tolerant.  \charmpp\ supports dynamic load balancing while
-creating new work as well as periodically, based on object migration.  Several
-dynamic load balancing strategies are provided.  \charmpp\ supports both
-irregular as well as regular, data-parallel applications.  It is built on top of the
-{\sc Converse} interoperable runtime system for parallel programming.
 
+\charmpp\ is a C++-based parallel programming system, founded on the
+migratable-objects programming model, and supported by a novel and
+powerful adaptive runtime system. It supports both irregular as well
+as regular applications, and can be used to specify task-parallelism
+as well as data parallelism in a single application. It automates
+dynamic load balancing for task-parallel as well as data-parallel
+applications, via separate suites of load-balancing strategies. Why
+are its message-driven execution model, it supports automatic latency
+tolerance, among other features. Charm++ also supports automatic
+checkpoint/restart checkpoints, as well as fault tolerance based on
+distributed checkpoints.
+% {\sc Converse} interoperable runtime system for parallel
+% programming.
+
+Charm++ is a production-quality parallel programming system used by
+multiple applications in science and engineering on supercomputers as
+well as departmental clusters around the world.
 Currently the parallel platforms supported by \charmpp\ are the
 BlueGene/L,BlueGene/P, BlueGene/Q, Cray XT, XE and XK series
 (including XK6 and XE6), 
