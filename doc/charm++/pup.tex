@@ -38,7 +38,7 @@ checkpoint and restart calculations involving \uw{foo}s.
 
 
 
-\subsection{PUP contract}
+\section{PUP contract}
 
 \label{sec:pupcontract}
 Your object's \uw{pup} method must save and restore all your object's
@@ -57,7 +57,7 @@ pup method is when you don't have a superclass.  If your superclass has
 no pup method, you must pup the values in the superclass yourself.
 
 
-\subsubsection{PUP operator}
+\subsection{PUP operator}
 \label{sec:pupoperator}
 
 The recommended way to pup any object \verb.a. is to use \verb.p|a;..
@@ -95,13 +95,13 @@ This utility method is defined for user-defined types T as:
     \}
   \end{alltt}
 
-\subsubsection{PUP STL Container Objects}
+\subsection{PUP STL Container Objects}
 \label{sec:pupstl}
 If the variable is from the C++ Standard Template Library, you can include 
 operator\verb.|.'s for STL vector, map, list, pair, and string, templated
 on anything, by including the header ``pup\_stl.h''.
 
-\subsubsection{PUP Dynamic Data}
+\subsection{PUP Dynamic Data}
 As usual in \CC{}, pointers and allocatable objects usually require special handling. 
 Typically this only requires a \kw{p.isUnpacking()} conditional block, 
 where you perform the appropriate allocation.  See 
@@ -120,7 +120,7 @@ operator\verb.|. might look like:
 \end{alltt}
 
 
-\subsubsection{PUP as bytes}
+\subsection{PUP as bytes}
 
 \label{sec:pupbytes}
 
@@ -155,7 +155,7 @@ work across different machine architectures.  This is currently
 an uncommon scenario, but heterogenous architectures may become more
 common, so pupping as bytes is discouraged.
 
-\subsubsection{PUP overhead}
+\subsection{PUP overhead}
 
 \label{sec:pupoverhead}
 
@@ -168,7 +168,7 @@ with the ``PUPbytes'' declaration, \kw{PUParray} uses an even faster block
 transfer, with one virtual function call per array.
 
 
-\subsubsection{PUP structured dagger}
+\subsection{PUP structured dagger}
 
 \label{sec:pupsdag}
 
@@ -190,7 +190,7 @@ class bar : public barParent \{
 
 
 
-\subsubsection{PUP modes}
+\subsection{PUP modes}
 
 \label{sec:pupmodes}
 
@@ -228,7 +228,7 @@ memory should be deallocated in the destructor as usual.
 More specialized modes and PUP::ers are described in section~\ref{sec:PUP:CommonPUPers}. 
 
 
-\subsection{PUP Life Cycle}
+\section{PUP Usage Sequence}
 
 \label{sec:lifecycle}
 
@@ -236,11 +236,11 @@ More specialized modes and PUP::ers are described in section~\ref{sec:PUP:Common
 \begin{center}
 \includegraphics[width=6.0in]{fig/pup}
 \end{center}
-\caption{Life cycle of an object with a pup method.}
+\caption{Method sequence of an object with a pup method.}
 \label{fig:pup}
 \end{figure}
 
-The life cycle of an object with a pup method is shown in 
+Typical method invocation sequence of an object with a pup method is shown in 
 Figure~\ref{fig:pup}.  As usual in \CC{}, objects are 
 constructed, do some processing, and are then destroyed.
 
@@ -264,7 +264,7 @@ Finally, objects are destroyed by calling their destructor
 as usual.
 
 
-\subsection{Migratable Array Elements using PUP}
+\section{Migratable Array Elements using PUP}
 
 \label{arraymigratable}
 Array objects can \index{migrate}migrate from one PE to another.  For
@@ -302,7 +302,7 @@ void A2::pup(PUP::er \&p)
 \}
 \end{alltt}
 
-\subsection{Marshalling User Defined Data Types via PUP}
+\section{Marshalling User Defined Data Types via PUP}
 
 Parameter marshalling requires serialization and is therefore
 implemented using the PUP framework.  User defined data types passed
