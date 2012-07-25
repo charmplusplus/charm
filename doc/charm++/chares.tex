@@ -1,4 +1,4 @@
-\subsection{Chare Objects}
+\section{Chare Objects}
 
 \index{chare}Chares are concurrent objects with methods that can be invoked
 remotely. These methods are known as \index{entry method}entry methods. All
@@ -81,7 +81,7 @@ this form is not suggested.
 mechanism allows chares to send their handles to other chares.
 }
 
-\subsubsection{Chare Creation}
+\subsection{Chare Creation}
 
 \label{chare creation}
 
@@ -132,7 +132,7 @@ For an example of chare creation in a full application, see
 {\tt examples/charm++/fib} in the \charmpp software distribution, which
 calculates fibonacci numbers in parallel.
 
-\subsubsection{Method Invocation on Chares}
+\subsection{Method Invocation on Chares}
 
 A message \index{message} may be sent to a \index{chare}chare through a proxy
 object using the notation:
@@ -147,7 +147,7 @@ is asynchronous and non-blocking; it returns immediately after sending the
 message. 
 
 
-\subsubsection{Local Access}
+\subsection{Local Access}
 
 You can get direct access to a local chare using the
 proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
