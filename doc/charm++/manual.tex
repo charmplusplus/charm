@@ -54,15 +54,15 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
   \input{groups}
   \input{nodegroups}
 
-\chapter{Startup Order}
-
+\chapter{Initializations at Program Startup}
+  \input{startuporder}
 
 \part{Advanced Usage}
 
 \chapter{Optimizing Entry Method Invocation}
-  \input{entry}
   \input{messages}
-  \input{order.tex}
+  \input{entry}
+  \input{order}
 
 \chapter{Callbacks}
   \input{callbacks}
@@ -70,6 +70,7 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \chapter{Waiting on Completion}
   \section{Asynchronous Barriers}
   \section{Threaded Entry Methods}
+  \section{Sync Entry Methods}
   \input{futures}
   \input{quiesce}
 
@@ -102,14 +103,14 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 
 \part{Optional / Expert Usage}
 
-\chapter{Python scripting language}
-\label{python}
-  \input{python}
-
-\chapter{Control Point Automatic Tuning Framework}
-\index{Control Point Automatic Tuning Framework}
+\chapter{Control Point Automatic Tuning}
+\index{Control Point Automatic Tuning}
 \label{sec:controlpoint}
   \input{controlpoints}
+
+\chapter{Dynamic Code Injection}
+\label{python}
+  \input{python}
 
 \chapter{Writing Libraries for Custom Messaging}
   \input{delegation}
