@@ -1,4 +1,4 @@
-\subsection{NodeGroup Objects}
+\section{NodeGroup Objects}
 
 The {\em node group} construct \index{node groups} \index{nodegroup} \index{Nodegroup} is 
 similar to the group construct discussed above. 
@@ -12,7 +12,7 @@ Therefore, each logical node hosts a single branch of the
 node group.  When an entry method of a
 node group is executed on one of its branches, it executes on {\em some} PE within the node.
 
-\subsubsection{NodeGroup Declaration} 
+\subsection{NodeGroup Declaration} 
 
 Node groups are defined in a similar way to groups.  \footnote{As with groups,
 older syntax allows node groups to inherit from \kw{NodeGroup} instead of a
@@ -47,7 +47,7 @@ branches.
 %executing.
 
 
-\subsubsection{Method Invocation on NodeGroups}
+\subsection{Method Invocation on NodeGroups}
 
 As with chares, chare arrays and groups, entry methods are invoked on
 NodeGroup branches via proxy objects. 
@@ -81,7 +81,7 @@ program, please consult \S~\ref{sec:nodegroups/exclusive} (below).
 %executed by only one processor at a time, the method should be flagged
 %\index{exclusive}\kw{exclusive} in the interface file. 
 
-\subsubsection{NodeGroups and \kw{exclusive} Entry Methods}
+\subsection{NodeGroups and \kw{exclusive} Entry Methods}
 \ref{sec:nodegroups/exclusive}
 
 Node groups may have \index{exclusive}\kw{exclusive} entry methods.  The execution of an \kw{exclusive}
@@ -104,7 +104,7 @@ An entry method can be marked exclusive by tagging it with the \kw{exclusive} at
 as explained in \S~\ref{attributes}.
 
 
-\subsubsection{Accessing the Local Branch of a NodeGroup}
+\subsection{Accessing the Local Branch of a NodeGroup}
 
 The local \index{branch}branch of a \kw{NodeGroup} \uw{NG}, and hence its
 member fields and methods, can be accessed through the method \kw{NG*

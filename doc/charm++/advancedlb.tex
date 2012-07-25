@@ -1,9 +1,4 @@
-
-\subsection{Advanced Load Balancing}
-
-\label{advancedlb}
-
-\subsubsection{Load Balancing Simulation}
+\section{Load Balancing Simulation}
 
 The simulation feature of load balancing framework allows the users to collect information
 about the compute WALL/CPU time and communication of the chares during a particular run of
@@ -55,7 +50,8 @@ This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data t
 Please note that this does not invoke any real application run. Actually
  ''pgm'' can be replaced with any generic application which calls centralized load balancer.
 Example can be found {\tt test/charm++/load\_balancing/lb\_test/}
-\subsubsection{Future load predictor}
+
+\section{Future load predictor}
 
 When objects do not follow the assumption that the future workload will be the
 same as the past, the load balancer might not have the correct information to do
@@ -134,7 +130,7 @@ callable from user program to modify the predictor. These methods are:
 \item {\tt void ChangePredictor(LBPredictorFunction *model);}
 \end{itemize}
 
-\subsubsection{Control CPU Load Statistics}
+\section{Control CPU Load Statistics}
 
 \charmpp{} programmers can control CPU load data in the load balancing database
 before a load balancing phase is started (which is the time when load balancing
@@ -162,7 +158,7 @@ has measured for the current array element.
 This is useful when the users want to derive a new CPU load based on the 
 existing one.
 
-\subsubsection{Model-based Load Balancing}
+\section{Model-based Load Balancing}
 
 You can also choose to feed load balancer with their own CPU
 timing of each Chare based on certain computational model of the applications.
@@ -189,7 +185,7 @@ This function serves as a callback that is called on each chare object when
 load balancer framework. {\em setObjTime()} described above can be used for
 this.
 
-\subsubsection{Writing a new load balancing strategy}
+\section{Writing a new load balancing strategy}
 
 \charmpp{} programmers can choose an existing load balancing strategy from
 \charmpp{}'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
@@ -235,7 +231,7 @@ balancing strategy}
 Incorporating this strategy into the \charmpp{} build framework is explained in
 the next section.
 
-\subsubsection{Adding a load balancer to \charmpp{}}
+\section{Adding a load balancer to \charmpp{}}
 
 Let us assume that we are writing a new centralized load balancer called FooLB.
 The next few steps explain the steps of adding the load balancer to the \charmpp{}
@@ -268,8 +264,7 @@ strategy files.
 \end{enumerate}
 
 
-\subsubsection{Understand Load Balancing Database Data Structure}
-
+\section{Understand Load Balancing Database Data Structure}
 \label{lbdatabase}
 
 To write a load balancing strategy, you need to know 

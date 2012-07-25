@@ -1,9 +1,3 @@
-%\subsection{Load Balancing}
-
-\label{loadbalancing}
-
-%(This introduction added on 11/12/2003)
-
 Load balancing in \charmpp{} is enabled by its ability to place, or
 migrate, chares or chare array elements.  Typical application usage to
 exploit this feature will construct many more chares than processors, and
@@ -43,8 +37,8 @@ processor. The seed balancer will handle such work as it arises.
 
 Examples are in {\tt examples/charm++/load\_balancing} and {\tt
   tests/charm++/load\_balancing}
-\subsubsection{Measurement-based Object Migration Strategies}
 
+\section{Measurement-based Object Migration Strategies}
 \label{lbFramework}
 \label{migrationlb}
 
@@ -87,8 +81,7 @@ hierarchical load balancers.
 %
 \end{itemize}
 
-\subsubsection{Available Load Balancing Strategies}
-
+\section{Available Load Balancing Strategies}
 \label{lbStrategy}
 
 Load balancing can be performed in either a centralized, a fully distributed,
@@ -150,7 +143,7 @@ section~\ref{lbOption}.
 %an aggressive load balancer such as GreedyRefLB in the first load balancing
 %step, and use RefineLB for the later load balancing steps.
 
-\subsubsection{Load Balancing Chare Arrays}
+\section{Load Balancing Chare Arrays}
 \label{lbarray}
 
 The load balancing framework is well integrated with chare array implementation
@@ -251,8 +244,7 @@ the automatic Load balancing mode.
 %
 \end{enumerate}
 
-\subsubsection{Migrating objects}
-
+\section{Migrating objects}
 \label{lbmigobj}
 
 Load balancers migrate objects automatically.
@@ -292,7 +284,7 @@ and allocation of the data items is done in the element's \uw{pup} routine.
 Deallocation is done in the element destructor as usual.
 
 
-\subsubsection{Other utility functions}
+\section{Other utility functions}
 
 There are several utility functions that can be called in applications to
 configure the load balancer, etc. These functions are:
@@ -326,8 +318,7 @@ LBSetPeriod(5.0);
       Alternatively, one can specify +LBPeriod \{seconds\} at command line.
 \end{itemize}
 
-\subsubsection{Compiler and runtime options to use load balancing module}
-
+\section{Compiler and runtime options to use load balancing module}
 \label{lbOption}
 
 Load balancing strategies are implemented as libraries in \charmpp{}. This
@@ -462,8 +453,7 @@ computation after migrations are completed on all processors.
 
 \end{enumerate}
 
-\subsubsection{Seed load balancers - load balancing Chares at creation time}
-
+\section{Seed load balancers - load balancing Chares at creation time}
 \label{seedlb}
 
 Seed load balancing involves the movement of object creation messages, or
@@ -556,7 +546,7 @@ under charm/lib, named as {\em libcldb-foo.a}, where {\em foo} is the strategy
 name used above. Now one can use {\bf -balance foo} as compile time option
 to {\bf charmc} to link with the {\em foo} seed load balancer.
 
-\subsubsection{Simple Load Balancer Usage Example - Automatic with Sync LB}
+\section{Simple Load Balancer Usage Example - Automatic with Sync LB}
 \label{lbexample}
 
 A simple example of how to use a load balancer in sync mode in one's

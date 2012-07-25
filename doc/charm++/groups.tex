@@ -1,5 +1,4 @@
-\subsection{Group Objects}
-
+\section{Group Objects}
 \label{sec:group}
 
 So far, we have discussed chares separately from the underlying hardware resources 
@@ -18,7 +17,7 @@ where \uw{ClassName} is the name of group's \CC{} class
 \footnote{Older, deprecated syntax allows groups to inherit directly from the
 system-defined class \kw{Group}}.
 
-\subsubsection{Group Definition}
+\subsection{Group Definition}
 
 In the interface ({\tt .ci}) file, we declare
 
@@ -47,7 +46,7 @@ class Foo : public CBase\_Foo \{
 \};
 \end{alltt}
 
-\subsubsection{Group Creation}
+\subsection{Group Creation}
 
 Groups are created in a manner similar to chares and chare arrays, i.e. 
 through \kw{ckNew}. Given the declarations and definitions of group {\tt Foo}
@@ -111,7 +110,7 @@ Note that there can be several instances of each group type.
 In such a case, each instance has a unique group identifier, and its own set
 of branches.
 
-\subsubsection{Method Invocation on Groups}
+\subsection{Method Invocation on Groups}
 
 An asynchronous entry method can be invoked on a particular branch of a
 group through a proxy of that group. If we have a group with a proxy
