@@ -54,7 +54,7 @@ This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data t
 \end{alltt}
 Please note that this does not invoke any real application run. Actually
  ''pgm'' can be replaced with any generic application which calls centralized load balancer.
-
+Example can be found {\tt test/charm++/load\_balancing/lb\_test/}
 \subsubsection{Future load predictor}
 
 When objects do not follow the assumption that the future workload will be the
@@ -223,7 +223,7 @@ void FooLB::work(LDStats *stats) \{
 Figure~\ref{fig:ckgraph} explains the two data structures available to the
 strategy: ProcArray and ObjGraph. Using them, the strategy should assign objects 
 to new processors  where it wants to be migrated through the setNewPe() method.
-
+{\tt src/ck-ldb/GreedyLB.C} can be referred.
 \begin{figure}[h]
 \centering
 \includegraphics[width=6.0in]{fig/ckgraph.png}
