@@ -31,7 +31,22 @@ Installation and Usage
 for details about installing, compiling and running
 \charmpp\ programs.
 
-\subsection{\charmpp\ Execution Model}
+
+
+\subsubsection{Migratable Objects Programming Model} 
+The key feature of the migratabl-objects model is {\em
+over-decomposition}: The programmer decomposes the program into a
+large number of work units and data units, and specifies the
+computation in terms of creation of and interactions between these
+units, without any direct reference to the processor on which any unit
+resides. This empowers the runtime system to assign units to
+processors, and to change the assignment at runtime as
+necessary. Charm++ is the main (and early) exemplar of this
+programming model. AMPI is another example within the Charm++ family
+of the same model.
+
+\subsubsection{\charmpp\ Execution Model}
+
 
 A \charmpp\ program consists of a number of \charmpp\ objects distributed
 across the available number of processors. Thus, the basic unit of parallel
