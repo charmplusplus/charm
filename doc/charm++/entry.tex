@@ -17,36 +17,40 @@ an entry method:
 \kw{threaded}, \kw{sync}, \kw{exclusive}, \kw{nokeep}, \kw{notrace}, \kw{immediate}, \kw{expedited}, \kw{inline}, \kw{local}, \kw{python}.
 
 \begin{description}
-\index{threaded}\item[threaded] \index{entry method}entry methods are
-entry methods which run in their own non-preemptible threads. These
+\index{threaded}\item[threaded] \index{entry method}entry methods 
+run in their own non-preemptible threads. These
 entry methods may perform blocking operations, such as calls to a
 \kw{sync} entry method, or explicitly suspending themselves.
 
 \index{sync}\item[sync] \index{entry method}entry methods are special in that
-calls to sync entry methods are blocking - they do not return control to the
-caller until the method finishes execution completely. Sync methods may
-have return values; however, they may only return messages. Callers must run in
-a thread separate from the runtime scheduler, e.g. a \kw{threaded} entry
-methods.  Calls expecting a return value will receive it as the return from the
-proxy invocation:
+calls to them are blocking--they do not return control to the caller until the
+method finishes execution completely. Sync methods may have return values;
+however, they may only return messages. Callers must run in a thread separate
+from the runtime scheduler, e.g. a \kw{threaded} entry methods.  Calls
+expecting a return value will receive it as the return from the proxy
+invocation:
 \begin{alltt}
 ReturnMsg* m;
 m = A[i].foo(a, b, c);
 \end{alltt}
 
-\index{exclusive}\item[exclusive] entry methods exist only on NodeGroup
-objects, and they do not execute while other exclusive \index{entry
-method}entry methods belonging to the same NodeGroup objects are executing on
-the same node.  For example, if one exclusive method of a NodeGroup object is
-executing on node N, and another one is scheduled to run on the same node, the
-second exclusive method will wait to execute until the first one finishes.
+\index{exclusive}\item[exclusive] \index{entry method} entry methods should
+only exist on NodeGroup objects. One such entry method will not execute while
+some other exclusive entry methods belonging to the same NodeGroup object are
+executing on the same node. In other words, if one exclusive method of a
+NodeGroup object is executing on node N, and another one is scheduled to run on
+the same node, the second exclusive method will wait to execute until the first
+one finishes.
 
-\index{nokeep}\item[nokeep] entry methods tells Charm++ that messages passed to
-these user entry methods will not be kept by the calls. Charm++ runtime
-may be able to adopt optimization for reusing the message memory.
+\index{nokeep}\item[nokeep] entry methods only take a message as the argument,
+and the memory buffer for this message will be managed by the \charmpp{}
+runtime rather than the user calls. Such entry methods entail runtime 
+optimizations such as reusing the message memory.
+%these user entry methods will not be kept by the calls. Charm++ runtime
+%may be able to adopt optimization for reusing the message memory.
 
-\index{notrace}\item[notrace] entry methods simply tells Charm++ that calls to 
-these entry methods should be not traced in trace projections or summary mode.
+\index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
+performance analysis.
 
 \index{immediate}\item[immediate] entry methods are entry functions in which 
 short messages can be executed in an ``immediate'' fashion when they are
