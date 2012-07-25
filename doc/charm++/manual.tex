@@ -56,6 +56,7 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 
 \chapter{Startup Order}
 
+
 \part{Advanced Usage}
 
 \chapter{Optimizing Entry Method Invocation}
@@ -63,12 +64,14 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
   \input{messages}
   \input{order.tex}
 
-\chapter{Threads, Futures, sync, barriers, quiesce, completion etc ...}
-  \input{futures}
-  \input{quiesce}
-
 \chapter{Callbacks}
   \input{callbacks}
+
+\chapter{Waiting on Completion}
+  \section{Asynchronous Barriers}
+  \section{Threaded Entry Methods}
+  \input{futures}
+  \input{quiesce}
 
 \chapter{More Chare Array Features}
 \label{advanced arrays}
@@ -81,6 +84,8 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \chapter{Reductions}
   \input{reductions}
   \input{alltoall}
+
+\chapter{Serialization}
   \input{advancedpup}
 
 \chapter{More Load Balancing}
@@ -92,7 +97,6 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
   \input{checkpoint}
 
   \input{othercalls}    
-  \input{delegation}    
 %  \input{commlib}
 
 
@@ -107,20 +111,28 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \label{sec:controlpoint}
   \input{controlpoints}
 
+\chapter{Writing Libraries for Custom Messaging}
+  \input{delegation}
+
 % TO BE MOVED TO ITS OWN MANUAL
 %\input{msa.tex}
+
 
 \part{Appendix}
 \appendix
 
-
 % TO BE MOVED TO ITS OWN MANUAL
 %\input{quickbigsim}
 
-\input{further}
+\chapter{Further Information}
+  \input{further}
+
+\chapter{History}
+  \input{history}
+
+\chapter {Acknowledgements}
+  \input{credits}
 
 \input{index}
-
-\input{credits}
 
 \end{document}

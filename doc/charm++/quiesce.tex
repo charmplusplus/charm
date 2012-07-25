@@ -1,68 +1,4 @@
-\subsection{Quiescence Detection}
-
-\label{sec:qd}
-
-In \charmpp, \index{quiescence}quiescence is defined as the state in which no
-processor is executing an entry point, and no messages are awaiting processing.
-
-\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQD} and
-\kw{CkWaitQD}.
-
-\kw{CkStartQD} registers with the system a callback that should be made the
-next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} has two
-variants which expect the following arguments: 
-\begin{enumerate}
-\item An index corresponding to the entry function that is to be called,
-and a handle to the chare on which that entry function should be called.  The
-syntax of this call looks like this:
-
-\begin{alltt}
- CkStartQD(int Index,const CkChareID* chareID);
-\end{alltt}
-
-To retrieve the corresponding index of a particular \index{entry method}entry
-method, you must use a static method contained within the \uw{CkIndex} object
-corresponding to the \index{chare}chare containing that entry method.  The
-syntax of this call is as follows:
-
-\begin{alltt}
-\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{EntryMethod}(\uw{parameters});
-\end{alltt}
-
-where \uw{ChareClass} is the C++ class of the chare containing
-the desired entry method, \uw{EntryMethod} is the name of that entry method,
-and \uw{parameters} are the parameters taken by the method.
-These parameters are only used to resolve the proper \uw{EntryMethod};
-they are otherwise ignored.
-
-\item 
-A \uw{CkCallback} object. The syntax of this call looks like:
-\begin{alltt}
-  CkStartQD(const CkCallback& cb);
-\end{alltt}
-
-Upon quiescence detection, specified callback is called with no parameters.
-
-\end{enumerate}
-
-
-\kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
-\kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
-detected.  It takes no parameters and returns no value.  A call to
-\kw{CkWaitQD} simply looks like this: 
-
-\begin{alltt}
-  CkWaitQD();
-\end{alltt}
-
-Keep in mind that \kw{CkWaitQD} should only be called from threaded
-\index{entry method}entry methods because a call to \kw{CkWaitQD} suspends the
-current thread of execution, and if it were called outside of a threaded entry
-method it would suspend the main thread of execution of the processor from
-which \kw{CkWaitQD} was called and the entire program would come to a grinding
-halt on that processor.
-
-\subsubsection{Completion Detection}
+\section{Completion Detection}
 
 Completion detection is a method for automatically detecting
 completion of a distributed process within an application. It is a
@@ -153,3 +89,67 @@ At some point, when everyone is consuming elements, completion will be
 reached. The system will detect that state and will trigger the \verb|finish|
 callback. At that point, \verb|start_detection| can be called again to restart
 the process.
+
+\section{Quiescence Detection}
+\label{sec:qd}
+
+In \charmpp, \index{quiescence}quiescence is defined as the state in which no
+processor is executing an entry point, and no messages are awaiting processing.
+
+\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQD} and
+\kw{CkWaitQD}.
+
+\kw{CkStartQD} registers with the system a callback that should be made the
+next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} has two
+variants which expect the following arguments: 
+\begin{enumerate}
+\item An index corresponding to the entry function that is to be called,
+and a handle to the chare on which that entry function should be called.  The
+syntax of this call looks like this:
+
+\begin{alltt}
+ CkStartQD(int Index,const CkChareID* chareID);
+\end{alltt}
+
+To retrieve the corresponding index of a particular \index{entry method}entry
+method, you must use a static method contained within the \uw{CkIndex} object
+corresponding to the \index{chare}chare containing that entry method.  The
+syntax of this call is as follows:
+
+\begin{alltt}
+\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{EntryMethod}(\uw{parameters});
+\end{alltt}
+
+where \uw{ChareClass} is the C++ class of the chare containing
+the desired entry method, \uw{EntryMethod} is the name of that entry method,
+and \uw{parameters} are the parameters taken by the method.
+These parameters are only used to resolve the proper \uw{EntryMethod};
+they are otherwise ignored.
+
+\item 
+A \uw{CkCallback} object. The syntax of this call looks like:
+\begin{alltt}
+  CkStartQD(const CkCallback& cb);
+\end{alltt}
+
+Upon quiescence detection, specified callback is called with no parameters.
+
+\end{enumerate}
+
+
+\kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
+\kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
+detected.  It takes no parameters and returns no value.  A call to
+\kw{CkWaitQD} simply looks like this: 
+
+\begin{alltt}
+  CkWaitQD();
+\end{alltt}
+
+Keep in mind that \kw{CkWaitQD} should only be called from threaded
+\index{entry method}entry methods because a call to \kw{CkWaitQD} suspends the
+current thread of execution, and if it were called outside of a threaded entry
+method it would suspend the main thread of execution of the processor from
+which \kw{CkWaitQD} was called and the entire program would come to a grinding
+halt on that processor.
+
