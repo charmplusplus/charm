@@ -3,7 +3,7 @@ broadcasts, and reductions) are needed in almost every
 \charmpp{} program.  The more advanced techniques that follow
 are not universally needed; but are still often useful.
 
-\subsubsection{Local Access}
+\section{Local Access}
 
 \index{ckLocal for arrays}
 \label{ckLocal for arrays}
@@ -24,9 +24,9 @@ then, to either avoid \kw{ckLocal} or else call \kw{ckLocal}
 each time the element may have migrated; e.g., at the start 
 of each entry method.
 
-\subsubsection{Advanced Array Creation}
-
+\section{Advanced Array Creation}
 \label{advanced array create}
+
 There are several ways to control the array creation process.
 You can adjust the map and bindings before creation, change
 the way the initial array elements are created, create elements
@@ -38,8 +38,7 @@ or create different elements using different methods.
 An array element has the same syntax and semantics no matter
 how it was created.  
 
-\subsubsection{Advanced Array Creation: CkArrayOptions}
-
+\section{CkArrayOptions}
 \index{CkArrayOptions}
 \label{CkArrayOptions}
 
@@ -85,8 +84,7 @@ array elements will be inserted by bulk creation or by {\tt
   opts.setStaticInsertion(true)} \footnote{This can enable a slightly
   faster default mapping scheme.}.
 
-\subsubsection{Advanced Array Creation: Map Object}
-
+\section{Map Object}
 \index{array map}
 \label{array map}
 
@@ -154,8 +152,7 @@ For example, if you've declared a map object named ``BlockMap'':
 
 
 
-\subsubsection{Advanced Array Creation: Initial Elements}
-
+\section{Initial Elements}
 \index{array initial}
 \label{array initial}
 
@@ -202,10 +199,10 @@ Thus calling \kw{ckNew(10)} on a 3-processor machine would result in
 30 elements being created.
 
 
-\subsubsection{Advanced Array Creation: Bound Arrays}
-
+\section{Bound Arrays}
 \index{bound arrays} \index{bindTo}
 \label{bound arrays}
+
 You can ``bind'' a new array to an existing array
 using the \kw{bindTo} method of \kw{CkArrayOptions}.  Bound arrays
 act like separate arrays in all ways except for migration--
@@ -286,8 +283,7 @@ private:
 \end{alltt}
 
 
-\subsubsection{Advanced Array Creation: Dynamic Insertion}
-
+\section{Dynamic Insertion}
 \label{dynamic_insertion}
 
 In addition to creating initial array elements using ckNew,
@@ -349,7 +345,7 @@ create an array element on based on the current map object.
 
 
 
-\subsubsection{Advanced Array Creation: Demand Creation}
+\section{Demand Creation}
 
 Normally, invoking an entry method on a nonexistant array
 element is an error.  But if you add the attribute
@@ -372,10 +368,10 @@ created elements.
 
 
 
-\subsubsection{User-defined Array Index Type}
+\section{User-defined Array Indices}
 \label{user-defined array index type}
-
 \index{Array index type, user-defined}
+
 \charmpp{} array indices are arbitrary collections of integers.
 To define a new array index, you create an ordinary C++ class 
 which inherits from \kw{CkArrayIndex} and sets the ``nInts'' member
@@ -453,12 +449,10 @@ AF::AF()
 \}
 \end{alltt}
 
-%\subsubsection{Load Balancing Chare Arrays}
-
+%\section{Load Balancing Chare Arrays}
 %see section~\ref{lbFramework}
 
-\subsubsection{Array Section}
-
+\section{Array Sections}
 \label{array section}
 
 \charmpp{} supports the array section operation, the section operation identifies a subset of array 
@@ -540,9 +534,7 @@ creates some limitation on the construction delegation and use of
 array section proxies.  For safety, array sections should be
 created in a post constructor entry method.
 
-
 \label {array_section_multicast}
-
 
 To use the library, you need to compile and install CkMulticast library and 
 link your applications against the library using -module:
@@ -606,7 +598,7 @@ Due to this restriction, you must define message explicitly for multicast
 entry functions and no parameter marshalling can be used for multicast with 
 CkMulticast library.
 
-\paragraph{Array Section Reduction} 
+\subsection{Array Section Reduction} 
 
 Since an array element can be a member of multiple array sections, 
 it is necessary to disambiguate between which array
@@ -665,7 +657,7 @@ As in an array reduction, users can use built-in reduction
 types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
 
-\paragraph{Array section multicast/reduction when migration happens}
+\subsection{Array section multicast/reduction when migration happens}
 
 Using multicast/reduction, you don't need to worry about array migrations.
 When migration happens, array element in the array section can still use 
@@ -700,11 +692,9 @@ void Foo::pup(PUP::er & p) {
 }
 \end{alltt}
 
-\paragraph{Cross Array Sections}
-
-
-\experimental{}
+\subsection{Cross Array Sections}
 \label{cross array section}
+\experimental{}
 
 Cross array sections contain elements from multiple arrays.
 Construction and use of cross array sections is similar to normal
