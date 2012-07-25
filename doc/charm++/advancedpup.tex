@@ -1,14 +1,11 @@
-\subsection{Advanced PUP}
-
-\subsubsection{Dynamic Allocation}
-
+\section{Dynamic Allocation}
 \label{sec:pupdynalloc}
 
 If your class has fields that are dynamically allocated, when unpacking
 these need to be allocated (in the usual way) before you pup them.
 Deallocation should be left to the class destructor as usual.
 
-\paragraph{No allocation}
+\subsection{No allocation}
 
 The simplest case is when there is no dynamic allocation.
 \begin{alltt}
@@ -25,7 +22,7 @@ public:
 \};
 \end{alltt}
 
-\paragraph{Allocation outside pup}
+\subsection{Allocation outside pup}
 
 The next simplest case is when we contain a class 
 that is always allocated during our constructor,
@@ -47,7 +44,7 @@ public:
 \};
 \end{alltt}
 
-\paragraph{Allocation during pup}
+\subsection{Allocation during pup}
 
 If we need values obtained during the pup routine
 before we can allocate the class, we must 
@@ -71,7 +68,7 @@ public:
 \};
 \end{alltt}
 
-\paragraph{Allocatable array}
+\subsection{Allocatable array}
 
 For example, if we keep an array of doubles,
 we need to know how many doubles there are 
@@ -102,7 +99,7 @@ public:
 \};
 \end{alltt}
 
-\paragraph{NULL object pointer}
+\subsection{NULL object pointer}
 
 If our allocated object may be NULL, our allocation
 becomes much more complicated.  We must first check
@@ -133,7 +130,7 @@ public:
 This sort of code is normally much longer and more
 error-prone if split into the various packing/unpacking cases.
 
-\paragraph{Array of classes}
+\subsection{Array of classes}
 
 An array of actual classes can be treated exactly the same way
 as an array of basic types.  PUParray will pup each 
@@ -162,7 +159,7 @@ public:
 \end{alltt}
 
 
-\paragraph{Array of pointers to classes}
+\subsection{Array of pointers to classes}
 
 An array of pointers to classes must handle each element
 separately, since the PUParray routine does not work with 
@@ -205,7 +202,7 @@ with virtual methods.  The PUP::able framework described
 in the next section can be helpful in this case.
 
 
-\subsubsection{Subclass allocation via PUP::able}
+\section{Subclass allocation via PUP::able}
 
 \label{sec:pup::able}
 If the class \uw{foo} above might have been a subclass, instead of
@@ -397,7 +394,7 @@ In the example above, we could do:
 \end{alltt}
 
 
-\subsubsection{C and Fortran bindings}
+\section{C and Fortran bindings}
 
 C and Fortran programmers can use a limited subset of the
 \kw{PUP::er} capability.  The routines all take a 
@@ -431,7 +428,7 @@ interface is recommended.
 
 
 
-\subsubsection{Common PUP::ers}
+\section{Common PUP::ers}
 \label{sec:PUP:CommonPUPers}
 The most common \kw{PUP::er}s used are \kw{PUP::sizer},
 \kw{PUP::toMem}, and \kw{PUP::fromMem}.  These are sizing,
@@ -455,7 +452,7 @@ native binary format, based on a \kw{machineInfo} structure
 that describes the format used by the source machine.
 
 
-\subsubsection{PUP::seekBlock}
+\section{PUP::seekBlock}
 
 It may rarely occur that you require items to be unpacked
 in a different order than they are packed.  That is, you
@@ -500,7 +497,7 @@ order.  There is currently a small fixed limit of 3 on the
 maximum number of seek sections.
 
 
-\subsubsection{Writing a PUP::er}
+\section{Writing a PUP::er}
 
 System-level programmers may occasionally find it useful to define
 their own \kw{PUP::er} objects.  The system \kw{PUP::er} class is 
@@ -519,7 +516,4 @@ while an isUnpacking PUP::er may not read the original values of
 the user data.  If your PUP::er is not clearly packing (saving values
 to some format) or unpacking (restoring values), declare it as 
 sizing \kw{PUP::er}.
-
-
-
 
