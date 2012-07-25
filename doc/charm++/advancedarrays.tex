@@ -43,7 +43,9 @@ or create different elements using different methods.
 An array element has the same syntax and semantics no matter
 how it was created.  
 
-\section{CkArrayOptions}
+
+
+\subsection{Configuring Array Characteristics Using CkArrayOptions}
 \index{CkArrayOptions}
 \label{CkArrayOptions}
 
@@ -97,15 +99,15 @@ array elements will be inserted by bulk creation or by {\tt
   opts.setStaticInsertion(true)} \footnote{This can enable a slightly
   faster default mapping scheme.}.
 
-\section{Map Object}
+\subsection{Initial Placement Using Map Objects}
 \index{array map}
 \label{array map}
 
-You can use \kw{CkArrayOptions} to specify a ``map object''
-for an array.  The map object is used by the array manager
-to determine the ``home'' processor of each element.  The
-home processor is the processor responsible for maintaining
-the location of the element.
+You can use \kw{CkArrayOptions} to specify a ``map object'' for an
+array.  The map object is used by the array manager to determine the
+``home'' PE of each element.  The home PE is the PE upon which it is
+initially placed, which will retain responsibility for maintaining the
+location of the element.
 
 There is a default map object, which maps 1D array indices
 in a block fashion to processors, and maps other array
@@ -173,7 +175,7 @@ Other 3D Torus network oriented map examples are in:
 examples/charm++/topology
 \end{alltt}
 
-\section{Initial Elements}
+\subsection{Initial Elements}
 \index{array initial}
 \label{array initial}
 
@@ -369,9 +371,12 @@ see the reduction manager and load balancer sections for details.
 If you do not specify one, the system will choose a processor to 
 create an array element on based on the current map object.
 
+A demonstration of dynamic insertion is available:
+\begin{alltt}
+examples/charm++/hello/fancyarray
+\end{alltt}
 
-
-\section{Demand Creation}
+\subsection{Demand Creation}
 
 Normally, invoking an entry method on a nonexistant array
 element is an error.  But if you add the attribute
@@ -478,8 +483,14 @@ AF::AF()
 \}
 \end{alltt}
 
+A demonstration of user defined indices available:
+\begin{alltt}
+examples/charm++/hello/fancyarray
+\end{alltt}
+
 %\section{Load Balancing Chare Arrays}
 %see section~\ref{lbFramework}
+
 
 \section{Array Sections}
 \label{array section}
@@ -627,6 +638,11 @@ Due to this restriction, you must define message explicitly for multicast
 entry functions and no parameter marshalling can be used for multicast with 
 CkMulticast library.
 
+Example usage of delegated array sections multicasts:
+\begin{alltt}
+tests/charm++/array4d
+\end{alltt}
+
 \subsection{Array Section Reduction} 
 
 Since an array element can be a member of multiple array sections, 
@@ -685,6 +701,12 @@ must delete the message when done.
 As in an array reduction, users can use built-in reduction 
 types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
+
+An example program for section reduction is available:
+\begin{alltt}
+tests/charm++/delegation/pipelined-section-reduction
+\end{alltt}
+
 
 \subsection{Array section multicast/reduction when migration happens}
 
