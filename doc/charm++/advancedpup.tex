@@ -119,12 +119,12 @@ public:
       mySuperclass::pup(p);
       int has_f=(f!=NULL);
       p|has_f;
-      if (has_f) {
+      if (has_f) \{
         if (p.isUnpacking()) f=new foo;
         p|*f;
-      } else {
+      \} else \{
         f=NULL;
-      }
+      \}
     \}
     ~keepsNullFoo() \{delete f;\}
 \};
