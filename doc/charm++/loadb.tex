@@ -267,7 +267,7 @@ to pack only a part of the data and may skip temporary data.
 
 An array element can migrate by calling the \kw{migrateMe}(\uw{destination
 processor}) member function-- this call must be the last action
-in an element entry point.  The system can also migrate array elements
+in an element entry method.  The system can also migrate array elements
 for load balancing (see the section~\ref{lbarray}).
 
 To migrate your array element to another processor, the \charmpp{}
@@ -357,7 +357,10 @@ load balancers will remain inactive at execution time unless overridden by other
 runtime options.
 \item {\em -module CommonLBs} \\
   links a special module CommonLBs which includes some commonly used \charmpp{}
-built-in load balancers.
+built-in load balancers. The commonly used load balancers include {\tt
+BlockLB, CommLB, DummyLB, GreedyAgentLB, GreedyCommLB, GreedyLB,
+NeighborCommLB, NeighborLB, OrbLB, PhasebyArrayLB, RandCentLB,
+RecBipartLB, RefineLB, RefineCommLB, RotateLB, TreeMatchLB, RefineSwapLB, CommAwareRefineLB}.
 \item {\em -balancer GreedyCommLB} \\
   links the load balancer GreedyCommLB and invokes it at runtime.
 \item {\em -balancer GreedyCommLB -balancer RefineLB} \\
