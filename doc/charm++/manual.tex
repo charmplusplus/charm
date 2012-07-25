@@ -23,6 +23,8 @@
 \input{intro}
 \input{overview}
 
+\chapter{Machine Model}
+node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 
 \part{Basic Usage}
 
@@ -55,42 +57,57 @@
 
 \part{Advanced Usage}
 
+\chapter{Optimizing Entry Method Invocation}
   \input{entry}
   \input{messages}
   \input{order.tex}
-  \input{callbacks}
+
+\chapter{More Chare Array Features}
+\label{advanced arrays}
   \input{advancedarrays}
-  \input{advancedlb}
-  \input{futures}
-  \input{quiesce}
-  \input{reductions}
-  \input{advancedpup}
-  \input{othercalls}    
-  \input{delegation}    
-%  \input{commlib}
-  \input{alltoall}
 
-\chapter{Python scripting language}
-\label{python}
-  \input{python}
-
-\chapter{Inheritance and Templates in Charm++}
+\chapter{Chare Inheritance and Templates}
 \label{inheritance and templates}
   \input{inhertmplt}
 
-% TO BE MOVED TO ITS OWN MANUAL
-%\input{msa.tex}
+\chapter{}
+  \input{callbacks}
+  \input{reductions}
+  \input{alltoall}
+  \input{advancedpup}
+
+\chapter{More Load Balancing}
+  \input{advancedlb}
 
 \chapter{Checkpoint/Restart}
 \index{Checkpoint/Restart}
 \label{sec:checkpoint}
   \input{checkpoint}
 
+\chapter{Threads, Futures, sync, barriers, quiesce, completion etc ...}
+  \input{futures}
+  \input{quiesce}
+
+  \input{othercalls}    
+  \input{delegation}    
+%  \input{commlib}
+
+
+\part{Optional / Expert Usage}
+
+\chapter{Python scripting language}
+\label{python}
+  \input{python}
+
 \chapter{Control Point Automatic Tuning Framework}
 \index{Control Point Automatic Tuning Framework}
 \label{sec:controlpoint}
   \input{controlpoints}
 
+% TO BE MOVED TO ITS OWN MANUAL
+%\input{msa.tex}
+
+\part{Appendix}
 \appendix
 
 
