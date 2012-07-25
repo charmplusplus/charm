@@ -7,27 +7,28 @@ useful when running a Charm++ program. Other utilities are listed in
 Section~\ref{other Charm++ calls}.
 
 \function{int CkNumPes()} \index{CkNumPes} \desc{returns the total
-  number of processors, across all nodes.}
+  number of processing elements (PEs), across all nodes.}
 
-\function{int CkMyPe()} \index{CkMyPe} \desc{returns the processor
-  number on which the call was made.}
+\function{int CkMyPe()} \index{CkMyPe} \desc{returns the index of the
+  PE on which the call was made.}
 
 \function{void CkAssert(int expression)} \desc{Aborts the program 
-if expression is 0}
+if expression is 0.}
 
 \function{void CkAbort(const char *message)} \index{CkAbort}
-\desc{Cause the program to abort, printing the given error message.
-  This routine never returns.}
+\desc{Causes the program to abort, printing the given error message.
+  This function never returns.}
 
 \function{void CkExit()} \index{CkExit} \desc{This call informs the
-  Charm RTS that computation on all processors should terminate.
-  After the currently executing entry method completes, no more
-  messages or entry methods will be called on any other processor.
-  This routine never returns.}
+  Charm RTS that computation on all processors should terminate.  This
+  routine never returns, so any code after the call to CkExit() inside
+  the function that calls it will not execute. Other processors will
+  continue executing until they receive notification to stop, so it is
+  a good idea to ensure through synchronization that all useful work
+  has finished before calling CkExit().  }
 
 \function{double CkWallTimer()} \index{CkWallTimer} \index{timers}
-\desc{Returns the elapsed time in seconds since the program has
-  started from the wall clock timer.}
+\desc{Returns the elapsed time in seconds since the start of the program.}
 
 \subsection{Terminal I/O}
 
@@ -39,27 +40,26 @@ In place of C-style printf and scanf, \charmpp\ provides
 interfaces that are identical to their C counterparts, but there are some
 differences in their behavior that should be mentioned.
 
-A recent change to \charmpp\ is to also support all forms of printf,
+\charmpp\ also supports all forms of printf,
 cout, etc. in addition to the special forms shown below.  The special
 forms below are still useful, however, since they obey well-defined
 (but still lax) ordering requirements.
 
-\function{int CkPrintf(format [, arg]*)} \index{CkPrintf} \index{input/output}
-\desc{This call is used for atomic terminal output. Its usage is similar to
-\texttt{printf} in C.  However, \kw{CkPrintf} has some special properties
-that make it more suited for parallel programming on networks of
-workstations.  \kw{CkPrintf} routes all terminal output to the \kw{charmrun},
-which is running on the host computer.  So, if a
-\index{chare}chare on processor 3 makes a call to \kw{CkPrintf}, that call
-puts the output in a TCP message and sends it to host
-computer where it will be displayed.  This message passing is an asynchronous
-send, meaning that the call to \kw{CkPrintf} returns immediately after the
-message has been sent, and most likely before the message has actually
-been received, processed, and displayed. \footnote{Because of
-communication latencies, the following scenario is actually possible:
-Chare 1 does a \kw{CkPrintf} from processor 1, then creates chare 2 on
-processor 2.  After chare 2's creation, it calls \kw{CkPrintf}, and the
-message from chare 2 is displayed before the one from chare 1.}
+\function{int CkPrintf(format [, arg]*)} \index{CkPrintf}
+\index{input/output} \desc{This call is used for atomic terminal
+  output. Its usage is similar to \texttt{printf} in C.  However,
+  \kw{CkPrintf} has some special properties that make it more suited
+  for parallel programming.  \kw{CkPrintf} routes all terminal output
+  to a single end point which prints the output. This guarantees that
+  the output for a single call to CkPrintf will be printed completely
+  without being interleaved with other calls to CkPrintf. Note that
+  CkPrintf is implemented using an asynchronous send, meaning that the
+  call to \kw{CkPrintf} returns immediately after the message has been
+  sent, and most likely before the message has actually been received,
+  processed, and displayed. As such, there is no guarantee of order in
+  which the output for concurrent calls to CkPrintf is
+  printed. Imposing such an order requires proper synchronization
+  between the calls to CkPrintf in the parallel application.
 }
 
 \function{void CkError(format [, arg]*))} \index{CkError} \index{input/output} 
@@ -73,7 +73,7 @@ only after all input has been retrieved.
 }
 
 For \CC\ style stream-based I/O, \charmpp\ offers 
-\kw{ckout} and \kw{ckerr} in the place of cout, and cerr.  The
+\kw{ckout} and \kw{ckerr} in place of cout and cerr.  The
 \CC\ streams and their \charmpp\ equivalents are related in the same
 manner as printf and scanf are to \kw{CkPrintf} and \kw{CkScanf}.  The
 \charmpp\ streams are all used through the same interface as the \CC\ 
