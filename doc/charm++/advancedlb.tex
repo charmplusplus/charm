@@ -8,7 +8,7 @@
 The simulation feature of load balancing framework allows the users to collect information
 about the compute WALL/CPU time and communication of the chares during a particular run of
 the program and use this information later to test different load balancing strategies to
-see which one is suitable for the program behaviour. Currently, this feature is supported only for
+see which one is suitable for the program behavior. Currently, this feature is supported only for
 the centralized load balancing strategies. For this, the load balancing framework
 accepts the following command line options:
 \begin{enumerate}
@@ -49,7 +49,8 @@ As an example, we can collect the data for a 1000 processor run of a program usi
 \end{alltt}
 This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
 \begin{alltt}
-./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat [+LBSimProcs 900]
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat
+[+LBSimProcs 900]
 \end{alltt}
 Please note that this does not invoke any real application run. Actually
  ''pgm'' can be replaced with any generic application which calls centralized load balancer.
@@ -77,14 +78,14 @@ public:
 \end{alltt}
 \begin{itemize}
 \item {\tt initialize\_params} by default initializes the parameters randomly. If the user
-knows how they should be, this function can be reimplemented.
+knows how they should be, this function can be re-implemented.
 \item {\tt predict} is the function that predicts the load according to the factors in parameters.
 For example, if the function is
 $y=ax+b$, the method in the implemented class should be like:
 \begin{verbatim}
 double predict(double x, double *param) {return (param[0]*x + param[1]);}
 \end{verbatim}
-\item {\tt print} is a debugging function and it can be reimplemented to have a meaningful
+\item {\tt print} is a debugging function and it can be re-implemented to have a meaningful
 print of the learnt model
 \item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
 {\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
@@ -108,7 +109,7 @@ use a predefined default function.
 
 As seen, the function can have several parameters which will be learned during
 the execution of the program. For this, two parameters can be setup at command
-line to specify the learning behaviour:
+line to specify the learning behavior:
 \begin{enumerate}
 \item {\em +LBPredictorWindow size}\\
 This parameter will specify how many statistics steps the load balancer will keep. 
@@ -135,7 +136,7 @@ callable from user program to modify the predictor. These methods are:
 
 \subsubsection{Control CPU Load Statistics}
 
-Charm++ programmers can control CPU load data in the load balancing database
+\charmpp{} programmers can control CPU load data in the load balancing database
 before a load balancing phase is started (which is the time when load balancing
 database is collected and used by load balancing strategies).
 
@@ -175,30 +176,30 @@ by setting:
 
 in array element's constructor.
 
-Then the users need to implement the following function to the chare array
+Then the you need to implement the following function to the chare array
 classes:
 
 \begin{alltt}
    virtual void CkMigratable::UserSetLBLoad();      // defined in base class
 \end{alltt}
 
-This function served as a callback that is called on each chare object when
+This function serves as a callback that is called on each chare object when
 {\em AtSync()} is called and ready to do load balancing. The implementation of
 {\em UserSetLBLoad()} is simply to set the current chare object's CPU load to
 load balancer framework. {\em setObjTime()} described above can be used for
 this.
 
-\subsubsection{Writing a communication-aware load balancing strategy}
+\subsubsection{Writing a new load balancing strategy}
 
-Charm++ programmers can choose an existing load balancing strategy from
-Charm++'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
+\charmpp{} programmers can choose an existing load balancing strategy from
+\charmpp{}'s built-in strategies(see ~\ref{lbStrategy}) for the best performance
 based on the characteristics of their applications. However, they can also
 choose to write their own load balancing strategies.
 
-The Charm++ load balancing framework provides a simple scheme to incorporate
+The \charmpp{} load balancing framework provides a simple scheme to incorporate
 new load balancing strategies. The programmer needs to write their strategy for
-load balancing based on a instrumented ProcArray and ObjGraph provided by the
-load balancing framework. This strategy is to be incorporated within this
+load balancing based on the instrumented ProcArray and ObjGraph provided by the
+load balancing framework. This strategy is implemented within this
 function:
 
 \begin{alltt}
@@ -220,8 +221,8 @@ void FooLB::work(LDStats *stats) \{
 \end{alltt}
 
 Figure~\ref{fig:ckgraph} explains the two data structures available to the
-strategy: ProcArray and ObjGraph. Using these, the strategy should assign new
-processors for objects it wants to be migrated through the setNewPe() method.
+strategy: ProcArray and ObjGraph. Using them, the strategy should assign objects 
+to new processors  where it wants to be migrated through the setNewPe() method.
 
 \begin{figure}[h]
 \centering
@@ -231,18 +232,18 @@ balancing strategy}
 \label{fig:ckgraph}
 \end{figure}
 
-Incorporating this strategy into the Charm++ build framework is explained in
+Incorporating this strategy into the \charmpp{} build framework is explained in
 the next section.
 
-\subsubsection{Adding a load balancer to Charm++}
+\subsubsection{Adding a load balancer to \charmpp{}}
 
 Let us assume that we are writing a new centralized load balancer called FooLB.
-The next few steps explain the addition of the load balancer to the Charm++
+The next few steps explain the steps of adding the load balancer to the \charmpp{}
 build system:
 
 \begin{enumerate}
-\item Create files named {\em FooLB.ci, FooLB.h and FooLB.C}. One can choose to
-copy and rename the files GraphPartLB.* and rename the class name in those
+\item Create files named {\em FooLB.ci, FooLB.h and FooLB.C} in directory of {\tt src/ck-ldb}.
+One can choose to copy and rename the files GraphPartLB.* and rename the class name in those
 files.
 
 \item Implement the strategy in the {\em FooLB} class method --- {\bf
@@ -261,8 +262,8 @@ link time, you also need to create the dependency file called
 libmoduleFooLB.dep. Run the script in charm/tmp, which creates the new Makefile
 named ``Make.lb''.
 
-\item Run ``make depends'' to update dependence rule of Charm++ files.  And run
-``make charm++'' to compile Charm++ which includes the new load balancing
+\item Run ``make depends'' to update dependence rule of \charmpp{} files.  And run
+``make charm++'' to compile \charmpp{} which includes the new load balancing
 strategy files.
 \end{enumerate}
 
@@ -271,12 +272,12 @@ strategy files.
 
 \label{lbdatabase}
 
-To write a load balancing strategy, one may want to know 
+To write a load balancing strategy, you need to know 
 what information is measured during the runtime and how it is represented in
-the load balancing database data structure?
+the load balancing database data structure.
 
 There are mainly 3 categories of information: a) processor information including processor speed, background load; b) object information including per object
-cpu/wallclock compute time and c) communication information .
+CPU/WallClock compute time and c) communication information .
 
 The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 
@@ -311,7 +312,7 @@ The database data structure named {\kw LDStats} is defined in {\em CentralLB.h}:
 \end{verbatim}
 
 \begin{enumerate}
-\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float if wanted at Charm++ compile time. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
+\item {\em LBRealType} is the data type for load balancer measured time. It is "double" by default. User can specify the type to float at \charmpp{} compile time if want. For example, ./build charm++ net-linux-x86\_64 {-}{-}with-lbtime-type=float;
 \item {\em procs} array defines processor attributes and usage data for each
 processor;
 \item {\em objData} array records per object information, {\em LDObjData} is defined in {\em lbdb.h};
