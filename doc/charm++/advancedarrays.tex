@@ -1,13 +1,13 @@
-The basic array features described before (creation, messaging,
+The basic array features described previously (creation, messaging,
 broadcasts, and reductions) are needed in almost every
 \charmpp{} program.  The more advanced techniques that follow
-are not universally needed; but are still often useful.
+are not universally needed, but represent many useful optimisations.
 
 \section{Local Access}
 
 \index{ckLocal for arrays}
 \label{ckLocal for arrays}
-You can get direct access to a local array element using the
+Provides direct access to a local array element using the
 proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
 to the element if it exists on the local processor; and NULL if
 the element does not exist or is on another processor.
@@ -23,6 +23,11 @@ obtained with \kw{ckLocal} are no longer valid.  It is best,
 then, to either avoid \kw{ckLocal} or else call \kw{ckLocal} 
 each time the element may have migrated; e.g., at the start 
 of each entry method.
+
+An example of this usage is available in matmul3d:
+\begin{alltt}
+examples/charm++/topology/matmul3d
+\end{alltt}
 
 \section{Advanced Array Creation}
 \label{advanced array create}
@@ -63,6 +68,7 @@ the following code segments all do exactly the same thing:
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
+
 Note that the ``numElements'' in an array element is simply the
 numElements passed in when the array was created.  The true number of
 array elements may grow or shrink during the course of the
@@ -70,8 +76,15 @@ computation, so numElements can become out of date.  This ``bulk''
 constructor approach should be preferred where possible, especially
 for large arrays.  Bulk construction is handled via a broadcast which
 will be significantly more efficient in the number of messages
-required than inserting each element individually which will require
+required than inserting each element individually, which will require
 one message send per element.
+
+Examples of bulk construction are commonplace, see:
+\begin{alltt}
+examples/charm++/jacobi3d-sdag
+\end{alltt}
+for a demonstration of the slightly more complicated case of
+multidimensional chare array bulk construction.
 
 \kw{CkArrayOptions} contains a few flags that the runtime can use to
 optimize handling of a given array. If the array elements will only
@@ -150,7 +163,15 @@ For example, if you've declared a map object named ``BlockMap'':
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
+An example which contructs one element per physical node may be found here: 
+\begin{alltt}
+examples/charm++/pupDisk
+\end{alltt}
 
+Other 3D Torus network oriented map examples are in:
+\begin{alltt}
+examples/charm++/topology
+\end{alltt}
 
 \section{Initial Elements}
 \index{array initial}
@@ -282,6 +303,11 @@ private:
 \};
 \end{alltt}
 
+A demonstration of bound arrays can be found in startupTest
+\begin{alltt}
+test/charm++/startupTest
+\end{alltt}
+
 
 \section{Dynamic Insertion}
 \label{dynamic_insertion}
@@ -366,7 +392,10 @@ A single array can have a mix of demand-creation and
 classic entry methods; and demand-created and normally 
 created elements.
 
-
+A simple example of demand creation
+\begin{alltt}
+tests/charm++/demand\_creation
+\end{alltt}
 
 \section{User-defined Array Indices}
 \label{user-defined array index type}
