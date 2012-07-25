@@ -15,7 +15,7 @@ properly. Array elements can be migrated at any time, allowing arrays to be
 efficiently load balanced. A chare array (or a subset of array elements) can
 receive a broadcast/multicast or contribute to a reduction.
 
-\subsection{Declaring a One-dimensional Array}
+\section{Declaring a One-dimensional Array}
 
 You can declare a one-dimensional (1D) \index{array}\index{chare array}chare
 array as:
@@ -76,7 +76,7 @@ See the section~\ref{arraymigratable} on migratable array elements for more
 information on the migration constructor that takes \kw{CkMigrateMessage *} as
 the argument.
 
-\subsection{Declaring Multi-dimensional Arrays}
+\section{Declaring Multi-dimensional Arrays}
 
 \charmpp{} supports multi-dimensional or user-defined indices. These array types
 can be declared as:
@@ -126,7 +126,7 @@ the chare array:
 \item Foo array: \kw{thisIndex}
 \end{itemize}
 
-\subsection{Creating an Array}
+\section{Creating an Array}
 \label{basic array creation}
 
 An array is created using the \kw{CProxy\_Array::ckNew} routine. This returns a
@@ -153,7 +153,7 @@ section~\ref{dynamic_insertion}.
 During creation, the constructor is invoked on each array element. For more
 options when creating the array, see section~\ref{advanced array create}.
 
-\subsection{Entry Method Invocation}
+\section{Entry Method Invocation}
 
 To obtain a proxy to a specific element in chare array, the chare array proxy
 (e.g. \kw{thisProxy}) must be indexed by the appropriate index call depending
@@ -203,7 +203,7 @@ Messages sent to migrating elements will be delivered after the migrating
 element arrives on the destination PE. It is an error to send a message
 to a deleted array element.
 
-\subsection{Broadcasts on Chare Arrays}
+\section{Broadcasts on Chare Arrays}
 
 To \index{array broadcast} broadcast a message to all the current elements of
 an array, simply omit the index (invoke an entry method on the chare array
@@ -217,7 +217,7 @@ The broadcast message will be delivered to every existing array element exactly
 once. Broadcasts work properly even with ongoing migrations, insertions, and
 deletions.
 
-\subsection{Reductions on Chare Arrays}
+\section{Reductions on Chare Arrays}
 \label{reductions}
 
 A \index{array reduction}reduction applies a single operation (e.g. add,
@@ -329,7 +329,7 @@ or {\em deleted} during the reduction. Additionally, when you create a new chare
 it is expected to contribute to the next reduction not already in progress on that
 processor. 
 
-\subsection{Built-in Reduction Types}
+\section{Built-in Reduction Types}
 \label{builtin_reduction}
 
 \charmpp{} includes several built-in reduction types, used to combine 
@@ -427,7 +427,7 @@ don't want to undertake multiple reductions, it may be best to define
 your own reduction type.  See the next section
 (Section~\ref{new_type_reduction}) for details.
 
-\subsection{Destroying Arrays}
+\section{Destroying Arrays}
 
 To destroy an array element-- detach it from the array,
 call its destructor, and release its memory--invoke its 
