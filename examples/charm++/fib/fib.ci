@@ -1,0 +1,10 @@
+mainmodule fib {
+    mainchare main {
+        entry main(CkArgMsg* m);
+    };
+
+    chare fib {
+        entry fib(int amIroot, int n, CProxy_fib parent);
+        entry void response(int value);
+    };
+};
