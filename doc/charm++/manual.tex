@@ -50,10 +50,11 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \chapter{Load Balancing}
   \input{loadb}
 
-\chapter{Processor-Aware Constructs}
+\chapter{Processor-Aware Chare Collections}
   \input{groups}
   \input{nodegroups}
 
+\chapter{Startup Order}
 
 \part{Advanced Usage}
 
@@ -61,6 +62,13 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
   \input{entry}
   \input{messages}
   \input{order.tex}
+
+\chapter{Threads, Futures, sync, barriers, quiesce, completion etc ...}
+  \input{futures}
+  \input{quiesce}
+
+\chapter{Callbacks}
+  \input{callbacks}
 
 \chapter{More Chare Array Features}
 \label{advanced arrays}
@@ -70,8 +78,6 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \label{inheritance and templates}
   \input{inhertmplt}
 
-\chapter{Callbacks}
-  \input{callbacks}
 \chapter{Reductions}
   \input{reductions}
   \input{alltoall}
@@ -84,10 +90,6 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \index{Checkpoint/Restart}
 \label{sec:checkpoint}
   \input{checkpoint}
-
-\chapter{Threads, Futures, sync, barriers, quiesce, completion etc ...}
-  \input{futures}
-  \input{quiesce}
 
   \input{othercalls}    
   \input{delegation}    
