@@ -38,5 +38,5 @@ jacobi3d.o: jacobi3d.C jacobi3d.decl.h
 	$(CHARMC) -c jacobi3d.C
 
 jacobi3d_omp.o: jacobi3d.C jacobi3d.decl.h
-	$(CHARMC) $(OMP_FLAG) -c jacobi3d.C
+	$(CHARMC) $(OMP_FLAG) -fopenmp -c jacobi3d.C
 
