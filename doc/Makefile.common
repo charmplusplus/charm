@@ -21,7 +21,7 @@ L2H=latex2html -white -antialias -local_icons \
 	-show_section_numbers \
 	-top_navigation \
 	-address '<p align="right">'"`/bin/date +"%B %d, %Y"`"'<br> \
-            '$(PROJECT_LINK)'<a href="http://charm.cs.uiuc.edu/">Charm Homepage</a>'
+            '$(PROJECT_LINK)'<a href="http://charm.cs.illinois.edu/">PPL Homepage</a>'
 
 DEPTEX=$(TEX) $(FILE).aux index.tex
 
@@ -56,7 +56,8 @@ $(FILE): $(TEX) $(FILE).aux
 	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
-	-@ln -s ../../manual.css $(FILE)
+	-@/bin/cp ../manual.css $(FILE)
+	-@/bin/cp ../navbarbkgd.png $(FILE)
 	-/bin/cp title.html $(FILE)
 	$(L2H) -split 0 $(FILE).tex
 	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html

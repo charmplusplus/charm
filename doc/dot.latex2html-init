@@ -2,7 +2,7 @@
 #
 ### Command Line Argument Defaults #######################################
 
-# $MAX_SPLIT_DEPTH = 5;	# Stop making separate files at this depth
+$MAX_SPLIT_DEPTH = 3;	# Stop making separate files at this depth
 
 $MAX_LINK_DEPTH = 4;    # Stop showing child nodes at this depth   
 
@@ -152,10 +152,11 @@ $TITLES_LANGUAGE = "english";
 # Feel free to mix and match buttons, titles, your own text, your logos,
 # and arbitrary HTML (the "." is the Perl concatenation operator).
 sub top_navigation_panel {
-    "<!--#include virtual=\"/includes/top.shtml\"-->" .
-    "<style type=\"text/css\"><!--@import url(\"manual.css\");--></style>" .
+    # "<!--#include virtual=\"/includes/top.shtml\"-->" .
+    #"<style type=\"text/css\"><!--@import url(\"manual.css\");--></style>" .
+		"<link href='http://fonts.googleapis.com/css?family=Puritan' rel='stylesheet' type='text/css'>" .
 
-    "<DIV class=\"ManualTitle\"><!--#include virtual=\"title.html\"--></DIV>\n" .
+    "<DIV class=\"ManualTitle\">Charm++ Parallel Programming System: Manual</DIV>\n" .
 
     # Now add a few buttons with a space between them
     #"$NEXT $UP $PREVIOUS $CONTENTS $INDEX $CUSTOM_BUTTONS" .
