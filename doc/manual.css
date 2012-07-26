@@ -55,7 +55,16 @@ DIV.ManualTitle	{ padding: 3pt; text-align: center; font-size: x-large; font-wei
 DIV.center		{   }
 SPAN.tt		{   }
 SPAN.sc		{   }
-DIV.alltt		{ background: lightgray; padding: 3pt; padding-left: 15pt; padding-right: 15pt; margin: 10pt; display: table }
+DIV.alltt		{
+		background: #000;
+		color: #090;
+		padding: 8px;
+		margin: 10px auto;
+		display: block;
+		width: 650px;
+		border-radius: 3px;
+		font-size: 120%;
+}
 
 div.navigation {
 		text-align: center;
