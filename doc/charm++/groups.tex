@@ -169,3 +169,9 @@ When all the chares on a PE have finished their work, the local branch
 can send single a message to the main chare.  This reduces the number of messages
 sent to the mainchare from the number of chares created, to the number of processors. 
 
+For a more concrete example on how to use groups, please refer to the {\tt
+histogram\_group} example in the {\tt examples/charm++} directory in your
+\charmpp{} distribution. It presents a parallel histogramming operation in
+which chare array elements funnel their bin counts through a group, instead of
+contributing directly to a reduction across all chares. 
+
