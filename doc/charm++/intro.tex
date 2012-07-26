@@ -45,25 +45,63 @@ necessary. Charm++ is the main (and early) exemplar of this
 programming model. AMPI is another example within the Charm++ family
 of the same model.
 
+
 \subsubsection{\charmpp\ Execution Model}
 
+% A \charmpp\ program consists of a number of \charmpp\ objects
+% distributed across the available number of processors. Thus, 
+A basic
+unit of parallel computation in \charmpp\ programs is a {\em
+chare}\index{chare}. 
+% a \charmpp\ object that can be created on any
+% available processor and can be accessed from remote processors.
+A \index{chare}chare is similar to a process, an actor, an ADA task,
+etc. At its most basic level, it is just a C++ object.
+%  with some of its methods
+% that can be invoked from remote objects. 
+A \charmpp computation consists of a large number of chares
+distributed on available processors of the system, and interacting
+with each other via asynchronous method invocations.
+Asynchronously invoking a method on a remote object can also be
+thought of as
+sending a ``message'' to it. So, these method invocations are
+sometimes referred to as messages. (besides, in the implementation,
+the method invocations are packaged as messages anyway).
+\index{chare}Chares can be
+created dynamically.
+% , and many chares may be active simultaneously.
+% Chares send \index{message}{\em messages} to one another to invoke
+% methods asynchronously.  
 
-A \charmpp\ program consists of a number of \charmpp\ objects distributed
-across the available number of processors. Thus, the basic unit of parallel
-computation in \charmpp\ programs is the {\em chare}\index{chare}, a \charmpp\
-object that can be created on any available processor and can be accessed from
-remote processors.  A \index{chare}chare is similar to a process, an actor, an
-ADA task, etc.  \index{chare}Chares are created dynamically, and many chares
-may be active simultaneously.  Chares send \index{message}{\em messages} to one
-another to invoke methods asynchronously.  Conceptually, the system maintains a
+Conceptually, the system maintains a
 ``work-pool'' consisting of seeds for new \index{chare}chares, and
 \index{message}messages for existing chares. The Charm++ runtime system ({\em
-Charm RTS}) may pick multiple items, non-deterministically, from this pool
-and execute them.  
+Charm RTS}) may pick multiple items, non-deterministically, from this
+pool and execute them, with the proviso that two different methods
+cannot be simultaneously executing on the same chare object (say, on
+different processors). Although one can define a reasonable
+theoretical operational semantics of Charm++ in this fashion, a more
+practical description of operation is useful to understand Charm++: On
+each PE (``PE'' stands for a ``Processing Element''. PEs are akin to
+cores, see later section for a precise description), there is a
+scheduler operating with its own private pool of messages. Each
+instantiated chare has one PE which is where it currently resides. The
+pool on each PE includes messages meant for Chares residing on that
+PE, and seeds for new Chares that are tentatively meant to be
+instantiated on that PE. The scheduler picks a message, creates a new
+chare if the message is a seed (i.e. a constructor invocation) for a
+new Chare, and invokes the method specified by the message. When the
+method returns control back to the scheduler, it repeats the
+cycle. I.e. there is no pre-emptive scheduling of other invocations.
+
+When a chare method executes, it may create  method invocatins for other
+chares. The Charm Runtime System (RTS, sometimes referred to as the
+Chare Kernl in the manual) locates the PE where the targeted chare
+resides, and delivers the invocation to the scheduler on that PE. 
 
 Methods of a \index{chare}chare that can be remotely invoked are called
 \index{entry method}{\em entry} methods.  Entry methods may take marshalled
-parameters, or a pointer to a message object.  Since \index{chare}chares can
+parameters, or a pointer to a message object.  Since \index{chare} chares can
 be created on remote processors, obviously some constructor of a chare needs
 to be an entry method.  Ordinary entry methods\footnote{``Threaded'' or
 ``synchronous'' methods are different.} are completely non-preemptive--
@@ -71,33 +109,52 @@ to be an entry method.  Ordinary entry methods\footnote{``Threaded'' or
 and all calls made are asynchronous.
 
 \charmpp\ provides dynamic seed-based load balancing. Thus location (processor
-number) need not be specified while creating a remote \index{chare}chare. The
-Charm RTS will then place the remote chare on a least loaded processor. Thus
-one can imagine chare creation as generating only a seed for the new chare,
-which may {\em take root} on the most {\em fertile} processor. Charm RTS
-identifies a \index{chare}chare by a {\em ChareID}.  Since user code does not
-need to name a chares' processor, chares can potentially migrate from one
-processor to another.  (This behavior is used by the dynamic load-balancing
-framework for chare containers, such as arrays.)
+number) need not be specified while creating a
+remote \index{chare}chare. The Charm RTS will then place the remote
+chare on a least loaded processor. Thus one can imagine chare creation
+as generating only a seed for the new chare, which may {\em take root}
+on some specific processor at a later time. Charm RTS identifies
+a \index{chare}chare by a {\em ChareID}.  
 
-Other \charmpp\ objects are collections of chares. They are: {\em
-chare-arrays}, \index{group}{\em chare-groups}, and \index{nodegroup}{\em
-chare-nodegroups}, referred to as {\em arrays}, {\em groups}, and {\em
-nodegroups} throughout this manual. An array is a collection of arbitrary
-number of migratable chares, indexed by some index type, and mapped to
-processors according to a user-defined map group. A group (nodegroup) is a
-collection of chares, one per processor (SMP node), that is addressed using
-a unique system-wide name.
+% Since user code does not
+% need to name a chares' processor, chares can potentially migrate from
+% one processor to another.  (This behavior is used by the dynamic
+% load-balancing framework for chare containers, such as arrays.)
+
+Chares can be grouped into collections. The types of collections of
+chares supported in Charm++ are: {\em chare-arrays}, \index{group}{\em
+chare-groups}, and \index{nodegroup}{\em chare-nodegroups}, referred
+to as {\em arrays}, {\em groups}, and {\em nodegroups} throughout this
+manual for brevity. A Chare-array is a collection of arbitrary number
+of migratable chares, indexed by some index type, and mapped to
+processors according to a user-defined map group. A group (nodegroup)
+is a collection of chares, with exactly one member element on each PE
+(SMP node).
+
+Charm++ does not allow global variables except readonly variables
+(see \ref{readonly}). A chare can only access its own data directly.
+However, each chare is accessible by a globally valid name. So, one
+can think of Charm++ as supporting a {\em global object space}.
+
+
 
 Every \charmpp\ program must have at least one \kw{mainchare}.  Each
 \kw{mainchare} is created by the system on processor 0 when the \charmpp\
-program starts up.  Execution of a \charmpp\ program begins with the Charm
-Kernel constructing all the designated \kw{mainchare}s.  For a \kw{mainchare} named X, execution starts at constructor X() or X(CkArgMsg *) which are equivalent.
-Typically, the
+program starts up.  Execution of a \charmpp\ program begins with the
+Charm Kernel constructing all the designated \kw{mainchare}s.  For
+a \kw{mainchare} named X, execution starts at constructor X() or
+X(CkArgMsg *) which are equivalent.  Typically, the
 \kw{mainchare} constructor starts the computation by creating arrays, other
 chares, and groups.  It can also be used to initialize shared \kw{readonly}
 objects.
 
+\charmpp\ program execution is terminated by the \kw{CkExit} call.  Like the
+\kw{exit} system call, \kw{CkExit} never returns. The Charm RTS ensures
+that no more messages are processed and no entry methods are called after a
+\kw{CkExit}. \kw{CkExit} need not be called on all processors; it is enough
+to call it from just one processor at the end of the computation.
+
+\zap{
 The only method of communication between processors in \charmpp\ is
 asynchronous \index{entry method} entry method invocation on remote chares.
 For this purpose, Charm RTS needs to know the types of
@@ -112,20 +169,67 @@ Fortunately, it is done automatically by the \charmpp\ interface translator.
 The \charmpp\ interface translator generates definitions for {\em proxy}
 objects. A proxy object acts as a {\em handle} to a remote chare. One
 invokes methods on a proxy object, which in turn carries out remote method
-invocation on the chare.
+invocation on the chare.}
 
-In addition, the \charmpp\ interface translator provides ways to enhance the
-basic functionality of Charm RTS using user-level threads and futures. These
-allow entry methods to be executed in separate user-level threads.  These
-\index{threaded} {\em threaded} entry methods may block waiting for data by
-making {\em synchronous} calls to remote object methods that return results in
-messages.
+As described so far, the execution of individual Chares is
+``reactive'': When method A is invoked the chare executes this code,
+and so on. But very often, chares have specific life-cycles, and the
+sequence of entry methods they execute can be specified in a
+structured manner, while even allowing for some localized
+non-determinism (e.g. a pair of methods may execute in any order, but
+when they both execute, the execution continues in a pre-dtermined
+manner). To simplify expression of such control structures, Charm++
+provides two methods: the structured dagger notation
+(Sec \ref{sec:sdag}), which is the main notation we recommend you use.
+Alternatively, you may use threaded entry methods, in combination with
+futures and sync methods (See \ref{sec:threads}). The threaded methods
+run in light-weight user-level threads, and can block waiting for data
+in a variety of ways. Again, only the particular thread of a
+particular chare is blocked, while the PE continues executing other
+chares. 
 
-\charmpp\ program execution is terminated by the \kw{CkExit} call.  Like the
-\kw{exit} system call, \kw{CkExit} never returns. The Charm RTS ensures
-that no more messages are processed and no entry methods are called after a
-\kw{CkExit}. \kw{CkExit} need not be called on all processors; it is enough
-to call it from just one processor at the end of the computation.
+The normal entry methods, being asynchronus, are not allowed to return
+any value, and are declared with a void return type. However, the {\em
+sync} methods are an exception to this. They must be called from a
+threaded method, and so are allowed to return (certain types of)
+values.  
+
+\section{Proxies and Handles}
+\label{proxies}
+
+Those familiar with various component models (such as CORBA) in the
+distributed computing world will recognize ``proxy'' to be a dummy, standin
+entity that refers to an actual entity.  For each chare type, a ``proxy''
+class exists.\footnote{The proxy class is generated by the ``interface
+translator'' based on a description of the entry methods}  The methods of
+this ``proxy'' class correspond to the remote methods of the actual class, and
+act as ``forwarders''. That is, when one invokes a method on a proxy to a
+remote object, the proxy forwards this method invocation to the actual
+remote object. All entities that are created and manipulated remotely in
+\charmpp\ have such proxies. Proxies for each type of entity in \charmpp\
+have some differences among the features they support, but the basic syntax
+and semantics remain the same -- that of invoking methods on the remote
+object by invoking methods on proxies.
+
+You can have several proxies that all refer to the same object.
+
+\zap{
+Historically, handles (which are basically globally unique
+identifiers) were used to uniquely identify \charmpp\ objects.  Unlike
+pointers, they are valid on all processors and so could be sent as
+parameters in messages.  They are still available, but now proxies
+also have the same feature.
+}
+
+(NOTE: I assume handles are not to be mentioned. Right?)
+Handles (like CkChareID, CkArrayID, etc.) and 
+
+Proxies (like
+CProxy\_foo) are just bytes and can be sent in messages, pup'd, and
+parameter marshalled.  This is now true of almost all objects in
+Charm++: the only exceptions being entire Chares (Array Elements,
+etc.) and, paradoxically, messages themselves.
+
 
 The following sections provide detailed information about various features of the
 \charmpp\ programming system.\footnote{For a description of the underlying design
