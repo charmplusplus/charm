@@ -38,7 +38,17 @@ TD.eqno			{ }	/* equation-number cells */
 
 
 /* document-specific styles come next */
-BODY  { background: white; color: black }
+html { background: #ffffff; }
+
+body {
+		background: #efefef; color: black;
+		margin:20px auto;
+		padding:30px;
+		width: 900px;
+		-moz-border-radius: 20px; -webkit-border-radius: 20px; border-radius: 20px;
+		border: 2px solid #333333;
+}
+
 DIV.ManualTitle	{ background: navy; padding: 3pt; text-align: center; color: lightyellow; font-size: x-large; font-weight: bold  }
 DIV.center		{   }
 SPAN.tt		{   }
