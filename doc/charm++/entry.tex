@@ -52,52 +52,63 @@ optimizations such as reusing the message memory.
 \index{notrace}\item[notrace] entry methods will not be traced during execution. As a result, they will not be considered and displayed in Projections for
 performance analysis.
 
-\index{immediate}\item[immediate] entry methods are entry functions in which 
-short messages can be executed in an ``immediate'' fashion when they are
-received either by an interrupt (Network version) or by a communication thread
-(in SMP version). Such messages can be useful for implementing
-multicasts/reductions as well as data lookup, in which case processing of
-critical messages won't be delayed (in the scheduler queue) by entry functions
-that could take long time to finish. Immediate messages are only available for
-nodegroup entry methods. Immediate messages are implicitly ``exclusive'' on each
-node, that is one execution of immediate message will not be interrupted by
-another. Function \kw{CmiProbeImmediateMsg()} can be called in users code to
-probe and process immediate messages periodically.
+\index{immediate}\item[immediate] entry methods are executed in an
+``immediate'' fashion as they skip the message scheduling while other normal
+entry methods donot. Immediate entry methods should be only associcated with
+NodeGroup objects although it is not checked during compilation. If the
+destination of such entry method is on the local node, then the method will be
+executed in the context of the regular PE regardless the execution mode of
+\charmpp{} runtime. However, in the SMP mode, if the destination of the method
+is on the remote node, then the method will be executed in the context of the
+communication thread.  
+%are entry functions in which 
+%short messages can be executed in an ``immediate'' fashion when they are
+%received either by an interrupt (Network version) or by a communication thread
+%(in SMP version). 
+Such entry methods can be useful for implementing multicasts/reductions as well
+as data lookup when such operations are on the performance critical path. On a
+certain \charmpp{} PE, skipping the normal message scheduling prevents the
+execution of immediate entry methods from being delayed by entry functions that
+could take a long time to finish. Immediate entry methods are implicitly
+``exclusive'' on each node, meaning that one execution of immediate message
+will not be interrupted by another. Function \kw{CmiProbeImmediateMsg()} can be
+called in user codes to probe and process immediate messages periodically.
 
-\index{expedited}\item[expedited] entry methods are entry functions 
-that skip Charm++'s priority-based message queue. It is useful for messages that
-require prompt processing however in the situation when immediate message does
-not apply. Compared with immediate message, it provides a more general solution
-that works for all Charm++ objects, i.e. Chare, Group, NodeGroup and Chare
-Array. However, expedited message still needs to be scheduled in low level
-Converse message queue and be processed in the order of arrival. It may still
-suffer from long running entry methods.
+\index{expedited}\item[expedited] entry methods skip the priority-based message
+queue in \charmpp{} runtime. It is useful for messages that require prompt
+processing when adding the immediate attribute to the message does not apply.
+Compared with the immediate attribute, the expedited attribute provides a more
+general solution that works for all types of \charmpp{} objects, i.e. Chare,
+Group, NodeGroup and Chare Array. However, expedited entry methods will still
+be scheduled in the lower-level Converse message queue, and be processed in the
+order of message arrival. Therefore, they may still suffer from delays caused
+by long running entry methods.
 
-\index{inline}\item[inline] entry methods are entry functions in which the
-message is delivered immediately to the recipient if it happens to reside on the
-same processor. Therefore, these entry methods need to be reentrant, as they
-could be called multiple times recursively. If the recipient reside on another
-processor, a regular message is sent, and \kw{inline} has no effect.
+\index{inline}\item[inline] entry methods will be immediately invoked if the
+message recipient happens to be on the same PE. These entry methods need to be
+re-entrant as they could be called multiple times recursively. If the recipient
+resides on a non-local PE, a regular message is sent, and \kw{inline} has no
+effect.
 
-\index{local}\item[local] entry methods are equivalent to function calls: the
-entry method is always called immediately. This feature is available only for
-Groups and Chare Arrays. The user has to guarantee that the recipient chare
-element reside on the same processor, a failure will result in the application
-to abort. In contrast will all other entry methods where input parameters are
-marshalled into a message, \kw{local} entry methods pass them direcly to the
-callee. This implies that the callee can modify the caller data if this is
-passed by pointer or reference. Furthermore, the input parameters do not require
-to be PUPable. Being these entry methods always called immediately, they are
-allowed to have a non-void return type. Nevertheless, the returned type must be
-a pointer.
+\index{local}\item[local] entry methods are equivalent to normal function
+calls: the entry method is always executed immediately. This feature is
+available only for Group objects and Chare Array objects. The user has to
+guarantee that the recipient chare element reside on the same PE. Otherwise,
+the application will abort on a failure. If the \kw{local} entry method uses
+parameter marshalling, instead of marshalling input parameters into a message,
+it will pass them direcly to the callee. This implies that the callee can
+modify the caller data if method parameters are passed by pointer or reference.
+Furthermore, input parameters do not require to be PUPable. Considering that
+these entry methods always execute immediately, they are allowed to have a
+non-void return value. Nevertheless, the return type of the method must be a
+pointer.
 
-\index{python}\item[python] entry methods are methods which are enabled to be
-called from python scripts running as explained in section~\ref{python}. In
-order to work, the object owning the method must also be declared with the
+\index{python}\item[python] entry methods are enabled to be
+called from python scripts as explained in chapter~\ref{python}. Note that the object owning the method must also be declared with the
 keyword \kw{python}.
 
 \index{reductiontarget}\item[reductiontarget] entry methods may be used as the
 target of reductions, despite not taking CkReductionMsg as an argument.
-See~\ref{reductions}.
+See section~\ref{reductions} for more references.
 
 \end{description}
