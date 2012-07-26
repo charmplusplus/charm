@@ -222,7 +222,7 @@ Thus calling \kw{ckNew(10)} on a 3-processor machine would result in
 30 elements being created.
 
 
-\section{Bound Arrays}
+\subsection{Bound Arrays}
 \index{bound arrays} \index{bindTo}
 \label{bound arrays}
 
@@ -311,7 +311,7 @@ test/charm++/startupTest
 \end{alltt}
 
 
-\section{Dynamic Insertion}
+\subsection{Dynamic Insertion}
 \label{dynamic_insertion}
 
 In addition to creating initial array elements using ckNew,
@@ -376,14 +376,14 @@ A demonstration of dynamic insertion is available:
 examples/charm++/hello/fancyarray
 \end{alltt}
 
-\section{Demand Creation}
+\subsection{Demand Creation}
 
-Normally, invoking an entry method on a nonexistant array
+Demand Creation is a specialized form of dynamic insertion. Normally, invoking an entry method on a nonexistant array
 element is an error.  But if you add the attribute
 \index{createhere} \index{createhome}
 \kw{[createhere]} or \kw{[createhome]} to an entry method,
  the array manager will 
-``demand create'' a new element to handle the message.  
+``demand create'' a new element to handle the message. 
 
 With \kw{[createhome]}, the new element
 will be created on the home processor, which is most efficient when messages for
@@ -395,7 +395,7 @@ The new element is created by calling its default (taking no
 parameters) constructor, which must exist and be listed in the .ci file.
 A single array can have a mix of demand-creation and
 classic entry methods; and demand-created and normally 
-created elements.
+created elements. 
 
 A simple example of demand creation
 \begin{alltt}
