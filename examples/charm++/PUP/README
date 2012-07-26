@@ -1,0 +1,18 @@
+Example of typical uses cases of PUP
+
+1. Use of PUP to support passing user defined types as arguments for
+   remote method invocation.
+
+   a. simple PUP for an object containing only plain old data
+
+      i. same thing implemented using PUPbytes
+
+   b. mode aware PUP for heap allocated data (array slice)
+
+   c. PUP for a recursive (singly linked list for simplicity) data structure
+
+   d. PUP of STL container based data
+
+2. Use of PUP to enable dynamic load balancing of chare array elements
+
+3. Use of advanced PUP::ers for parallel I/O
