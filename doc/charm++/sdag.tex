@@ -325,8 +325,51 @@ series of {\tt when} triggers which can be received and processed in any
 order. Flow of control doesn't leave the overlap block until all the statements
 within it have been processed.
 
-In the running example, suppose each input needed to be preprocessed 
+In the running example, suppose each input needs to be preprocessed independently
+before the call to {\tt computerInteractions}. Since we don't care which order
+they get processed in, and want it to happen as soon as possible, we can apply
+{\tt overlap}:
+\begin{center}
+\begin{alltt}
+// in .ci file
+chare ComputeObject \{
+  entry void ComputeObject();
+  entry void startStep() \{
+    overlap \{
+      when firstInput(Input i)
+        atomic \{ first = preprocess(i); \}
+      when secondInput(Input j)
+        atomic \{ second = preprocess(j); \}
+     \}
+     atomic \{
+       computeInteractions(first, second);
+     \}
+  \};
+  entry void firstInput(Input i);
+  entry void secondInput(Input j);
+\};
 
+// in C++ file
+class ComputeObject : public CBase_ComputeObject \{
+  ComputeObject_SDAG_Code
+
+public:
+  ComputeObject() \{
+    __sdag_init();
+    startStep();
+  \}
+
+  void computeInteractions(Input a, Input b) \{
+    // do computations using a and b
+    . . .
+    // send off results
+    . . .
+    // reset for next step
+    startStep();
+  \}
+\};
+\end{alltt}
+\end{center}
 
 
 
