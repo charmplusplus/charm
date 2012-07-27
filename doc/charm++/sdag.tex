@@ -150,7 +150,10 @@ follows:
 In order to control the sequence in which entry methods are processed, SDAG
 provides the {\tt when} construct. These statements, also called triggers,
 indicate that we expect an incoming message of a particular type, and provide
-code to handle that message when it arrives.
+code to handle that message when it arrives. From the perspective of a chare
+object reaching a {\tt when} statement, it is effectively a `blocking
+receive.'
+
 Entry methods defined by a {\tt when} are
 not executed immediately when a message tergeting them is delivered, but
 instead are held until control flow in the chare reaches a corresponding {\tt
