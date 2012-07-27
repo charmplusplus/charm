@@ -246,7 +246,9 @@ number in square brackets between the entry method name and its parameter list.
 That expression will be compared for equality with the entry method's first
 argument, or with the reference number field of an explicit message
 (\S~\ref{messages}). Matching is used in the loop example below, and in
-{\tt examples/charm++/jacobi2d-sdag/jacobi2d.ci}.
+{\tt examples/charm++/jacobi2d-sdag/jacobi2d.ci}. Multiple {\tt when} triggers for
+an entry method with different matching reference numbers will not conflict - each
+will receive only corresponding messages.
 
 SDAG supports the {\tt for} and {\tt while} loop constructs mostly as if they
 appeared in plain C or C++ code. In the running example, {\tt
@@ -397,7 +399,60 @@ public:
 \end{alltt}
 \end{center}
 
+The final construct offered by SDAG is the {\tt forall} loop. These loops are
+used when the iterations of a loop can be performed independently and in any
+order. This is in contrast to a regular {\tt for} loop, in which each iteration
+is executed sequentially. The {\tt forall} loop can be seen as an overlap with
+an indexed set of otherwise identical statements in the body. Its syntax is 
+\begin{center}
+\begin{alltt}
+forall [IDENT] (MIN:MAX,STRIDE) BODY
+\end{alltt}
+\end{center}
+The range from MIN to MAX is inclusive. Its use is demonstrated through
+distributed parallel matrix-matrix multiply shown in
+{\tt examples/charm++/matmul/matmul.ci}.
 
+
+\section{Usage Notes}
+
+If you've added \sdag\ code to your class, you must link in the code by:
+\begin{itemize}
+  \item Adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
+     in the .h file.  This macro defines the entry points and support
+     code used by \sdag{}.  Forgetting this results in a compile error
+     (undefined sdag entry methods referenced from the .def.h file).
+  \item Adding a call to the routine ``\_\_sdag\_init();'' from every constructor,
+     including the migration constructor.  Forgetting this results in
+     using uninitalized data, and a horrible runtime crash.
+  \item Adding a call to the pup routine ``\_\_sdag\_pup(p);'' from your pup routine.
+     Forgetting this results in failure after migration.
+\end{itemize}
+For example, an array named ``Foo'' that uses sdag code might contain:
+\begin{center}
+\begin{alltt}
+class Foo : public CBase_Foo \{
+public:
+    Foo_SDAG_CODE
+    Foo(...) \{
+       __sdag_init();
+       ...
+    \}
+    Foo(CkMigrateMessage *m) \{
+       __sdag_init();
+    \}
+    
+    void pup(PUP::er &p) \{
+       CBase_Foo::pup(p);
+       __sdag_pup(p);
+    \}
+    . . .
+\};
+\end{alltt}
+\end{center}
+
+\zap{
+\section{Relationship to Threads}
 
 Threads are typically used to perform the abovementioned sequencing.
 Lets us code our previous example using threads.
@@ -469,85 +524,11 @@ adding any significant overhead.
 %\caption{\sdag\ Implementation of the Compute Object}
 %\label{figsdagexample}
 %\end{figure}
-
-\sdag\ is a coordination language built on top of \charmpp\ that supports the
-sequencing mentioned above, while overcoming limitations of thread-based
-languages, and facilitating a clear expression of flow of control within the
-object without losing the performance benefits of adaptive message-driven
-execution.  In other words, \sdag\ is a structured notation for specifying
-intra-process control dependences in message-driven programs. It combines the
-efficiency of message-driven execution with the explicitness of control
-specification. \sdag\ allows easy expression of dependences among messages and
-computations and also among computations within the same object using
-when-blocks and various structured constructs.  \sdag\ is adequate for
-expressing control-dependencies that form a series-parallel control-flow graph.
-\sdag\ has been developed on top of \charmpp\. \sdag\ allows \charmpp\ entry
-methods (in chares, groups or arrays) to specify code (a when-block body) to be
-executed upon occurrence of certain events.  These events (or guards of a
-when-block) are entry methods of the object that can be invoked remotely. While
-writing a \sdag\ program, one has to declare these entries in \charmpp\
-interface file. The implementation of the entry methods that contain the
-when-block is written using the \sdag\ language. Grammar of \sdag\ is given in
-the EBNF form below.
-
-\subsubsection{Usage}
-
-You can use SDAG to implement entry methods for any chare, chare array, group,
-or nodegroup. Any entry method implemented using SDAG must be implemented in the
-interface (.ci) file for its class. An SDAG entry method consists of a series of
-SDAG constructs of the following kinds:
-
-\begin{itemize}
-    \item {\tt forall} loops: These loops are used when each iteration of a loop
-        can be performed in parallel. This is in contrast to a regular {\tt for}
-        loop, in which each iteration is executed sequentially.
-    \item {\tt if}, {\tt for}, and {\tt while} statements: these statements have
-        the same meaning as the normal {\tt if}, {\tt for}, and {\tt while}
-        loops in sequential \CC programs. This allows the programmer to use
-        common control flow constructs outside the context of atomic blocks.
-\end{itemize}
-
-\sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.
-
-If you've added \sdag\ code to your class, you must link in the code by:
-\begin{itemize}
-  \item Adding ``{\it className}\_SDAG\_CODE'' inside the class declaration
-     in the .h file.  This macro defines the entry points and support
-     code used by \sdag{}.  Forgetting this results in a compile error
-     (undefined sdag entry methods referenced from the .def file).
-  \item Adding a call to the routine ``\_\_sdag\_init();'' from every constructor,
-     including the migration constructor.  Forgetting this results in
-     using uninitalized data, and a horrible runtime crash.
-  \item Adding a call to the pup routine ``\_\_sdag\_pup(p);'' from your pup routine.
-     Forgetting this results in failure after migration.
-\end{itemize}
-
-For example, an array named ``Foo'' that uses sdag code might contain:
-
-\begin{alltt}
-class Foo : public CBase_Foo \{
-public:
-    Foo_SDAG_CODE
-    Foo(...) \{
-       __sdag_init();
-       ...
-    \}
-    Foo(CkMigrateMessage *m) \{
-       __sdag_init();
-    \}
-    
-    void pup(PUP::er &p) \{
-       CBase_Foo::pup(p);
-       __sdag_pup(p);
-    \}
-\};
-\end{alltt}
-
-For more details regarding \sdag{}, look at the example located in the 
-{\tt examples/charm++/hello/sdag} directory in the \charmpp\ distribution.
+}
 
 
-\subsubsection{Grammar}
+\zap{
+\section{Grammar}
 
 \paragraph{Tokens}
 
@@ -601,4 +582,47 @@ For more details regarding \sdag{}, look at the example located in the
 <entry> := <ident> [ "[" <int-expr> "]" ] "(" <ident> "*" <ident> ")" 
   
 \end{alltt}
+}
+
+\zap{
+\sdag\ is a coordination language built on top of \charmpp\ that supports the
+sequencing mentioned above, while overcoming limitations of thread-based
+languages, and facilitating a clear expression of flow of control within the
+object without losing the performance benefits of adaptive message-driven
+execution.  In other words, \sdag\ is a structured notation for specifying
+intra-process control dependences in message-driven programs. It combines the
+efficiency of message-driven execution with the explicitness of control
+specification. \sdag\ allows easy expression of dependences among messages and
+computations and also among computations within the same object using
+when-blocks and various structured constructs.  \sdag\ is adequate for
+expressing control-dependencies that form a series-parallel control-flow graph.
+\sdag\ has been developed on top of \charmpp\. \sdag\ allows \charmpp\ entry
+methods (in chares, groups or arrays) to specify code (a when-block body) to be
+executed upon occurrence of certain events.  These events (or guards of a
+when-block) are entry methods of the object that can be invoked remotely. While
+writing a \sdag\ program, one has to declare these entries in \charmpp\
+interface file. The implementation of the entry methods that contain the
+when-block is written using the \sdag\ language. Grammar of \sdag\ is given in
+the EBNF form below.
+
+\subsubsection{Usage}
+
+You can use SDAG to implement entry methods for any chare, chare array, group,
+or nodegroup. Any entry method implemented using SDAG must be implemented in the
+interface (.ci) file for its class. An SDAG entry method consists of a series of
+SDAG constructs of the following kinds:
+
+\begin{itemize}
+    \item {\tt forall} loops: 
+    \item {\tt if}, {\tt for}, and {\tt while} statements: these statements have
+        the same meaning as the normal {\tt if}, {\tt for}, and {\tt while}
+        loops in sequential \CC programs. This allows the programmer to use
+        common control flow constructs outside the context of atomic blocks.
+\end{itemize}
+
+\sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.
+
+For more details regarding \sdag{}, look at the example located in the 
+{\tt examples/charm++/hello/sdag} directory in the \charmpp\ distribution.
+}
 
