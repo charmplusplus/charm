@@ -170,6 +170,7 @@ class Type : public Printable {
     int operator==(const Type &tp) const {
       return  (strcmp(getBaseName(), tp.getBaseName())==0);
     }
+    virtual ~Type() { }
 };
 
 class BuiltinType : public Type {
