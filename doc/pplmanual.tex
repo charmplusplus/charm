@@ -50,4 +50,11 @@
 \newcommand{\note}[1]{(\textbf{Note:} #1)}
 \newcommand{\term}[1]{{\bf #1}\index{#1}}
 
+% Explicitly state that part numbering uses uppercase roman numerals
+% This is just to keep latex2html from barfing and causing a filename
+% collision between part II and chapter 2 etc. This will work as long
+% as we don't have an appendix section 9 (which would be alphabetized
+% to I (and again conflict with part 1).
+\renewcommand{\thepart}{\Roman{part}}
+
 \makeindex
