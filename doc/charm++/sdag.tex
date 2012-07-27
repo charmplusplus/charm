@@ -151,7 +151,10 @@ follows:
 \end{center}
 
 In order to control the sequence in which entry methods are processed, SDAG
-provides the {\tt when} construct. Entry methods defined by a {\tt when} are
+provides the {\tt when} construct. These statements, also called triggers,
+indicate that we expect an incoming message of a particular type, and provide
+code to handle that message when it arrives.
+Entry methods defined by a {\tt when} are
 not executed immediately when a message tergeting them is delivered, but
 instead are held until control flow in the chare reaches a corresponding {\tt
   when} clause. Conversely, when control flow reaches a {\tt when} clause, the
@@ -472,10 +475,6 @@ interface (.ci) file for its class. An SDAG entry method consists of a series of
 SDAG constructs of the following kinds:
 
 \begin{itemize}
-    \item {\tt when} statements: These statement, also called triggers, indicate
-        that we expect an incoming message of a particular type, and provide
-        code to handle that message when it arrives. They commonly occur inside
-        of {\tt overlap} blocks, loops, and other control flow statements.
     \item {\tt forall} loops: These loops are used when each iteration of a loop
         can be performed in parallel. This is in contrast to a regular {\tt for}
         loop, in which each iteration is executed sequentially.
