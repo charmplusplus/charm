@@ -236,6 +236,18 @@ specified, and should not be relied upon. For an example of multiple {\tt when}
 statements handling the same entry method without reaching the unspecified case,
 see the CharmLU benchmark.
 
+To more finely control the correspondence between incoming messages and {\tt when}
+clauses associated with the target entry method, SDAG supports \emph{matching} on
+reference numbers. Matching is typically used to denote an iteration of a program
+that executes asynchronously (without any sort of barrier or other synchronization
+between steps) or a particular piece of the problem being solved.
+Matching is requested by placing an expression denoting the desired reference
+number in square brackets between the entry method name and its parameter list.
+That expression will be compared for equality with the entry method's first
+argument, or with the reference number field of an explicit message
+(\S~\ref{messages}). Matching is used in the loop example below, and in
+{\tt examples/charm++/jacobi2d-sdag/jacobi2d.ci}.
+
 SDAG supports the {\tt for} and {\tt while} loop constructs mostly as if they
 appeared in plain C or C++ code. In the running example, {\tt
   computeInteractions()} calls {\tt startStep()} when it is finished to start
@@ -286,14 +298,15 @@ chare ComputeObject \{
   entry void ComputeObject();
   entry void runForever() \{
     for(iter = 0; iter < n; ++iter) \{
-      when firstInput(Input first),
-           secondInput(Input second) atomic \{
+      // Match to only accept inputs for the current iteration
+      when firstInput[iter](int a, Input first),
+           secondInput[iter](int b, Input second) atomic \{
         computeInteractions(first, second);
       \}
     \}
   \};
-  entry void firstInput(Input i);
-  entry void secondInput(Input j);
+  entry void firstInput(int a, Input i);
+  entry void secondInput(int b, Input j);
 \};
 
 // in C++ file
@@ -324,7 +337,7 @@ because of the inherent complexities of C++.
 
 SDAG also supports conditional execution of statements and blocks with {\tt if}
 statements. The syntax of SDAG {\tt if} statements matches that of C and
-C++. However, if one encounters a parsing error on correct-looking code in a
+C++. However, if one encounters a syntax error on correct-looking code in a
 loop or conditional statement, try assigning the condition expression to a
 boolean variable in an atomic preceding the statement and then testing that
 boolean's value. This can be necessary because of the complexity of parsing C++
