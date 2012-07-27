@@ -44,7 +44,10 @@ one finishes.
 
 \index{nokeep}\item[nokeep] entry methods only take a message as the argument,
 and the memory buffer for this message will be managed by the \charmpp{}
-runtime rather than the user calls. Such entry methods entail runtime 
+runtime rather than the user calls. This means that user has to guarantee that
+the message should not be buffered for a later usage or be freed in the user 
+codes. Otherwise, a runtime error will be caused. 
+Such entry methods entail runtime 
 optimizations such as reusing the message memory.
 %these user entry methods will not be kept by the calls. Charm++ runtime
 %may be able to adopt optimization for reusing the message memory.
