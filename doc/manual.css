@@ -38,6 +38,10 @@ TD.eqno			{ }	/* equation-number cells */
 
 
 /* document-specific styles come next */
+body { font-family: Droid Sans, Arial, sans-serif; }
+h1, h2, h3 { font-family: Puritan, Verdana, Helvetica sans-serif; }
+.alltt { font-family: monospace; }
+
 html { background: #ffffff; }
 
 body {
@@ -48,7 +52,6 @@ body {
 		-moz-border-radius: 20px; -webkit-border-radius: 20px; border-radius: 20px;
 		box-shadow: 0px 2px #aaa;
 		border: 1px solid #ccc;
-		font-family: Puritan, Verdana, Helvetica sans-serif;
 }
 
 DIV.ManualTitle	{ padding: 3pt; text-align: center; font-size: x-large; font-weight: bold  }

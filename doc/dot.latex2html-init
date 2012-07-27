@@ -154,8 +154,6 @@ $TITLES_LANGUAGE = "english";
 sub top_navigation_panel {
     # "<!--#include virtual=\"/includes/top.shtml\"-->" .
     #"<style type=\"text/css\"><!--@import url(\"manual.css\");--></style>" .
-		"<link href='http://fonts.googleapis.com/css?family=Puritan' rel='stylesheet' type='text/css'>" .
-
     "<DIV class=\"ManualTitle\">Charm++ Parallel Programming System: Manual</DIV>\n" .
 
     # Now add a few buttons with a space between them
@@ -203,6 +201,19 @@ sub bot_navigation_panel {
     
     "</tr></table></center>"
   
+}
+
+# Add more tags etc to the head section of each page
+sub replace_morelinks {
+    $_ =~ s/$more_links_mark/$more_links."\n".&head_tags()/e;
+}
+
+sub head_tags {
+    "<!-- Inserted from l2h_init.pl -->\n" .
+    "<link href='http://fonts.googleapis.com/css?family=Puritan' rel='stylesheet' type='text/css'>\n" .
+    "<link href='http://fonts.googleapis.com/css?family=Droid Sans' rel='stylesheet' type='text/css'>\n" .
+    "<script src='https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js' type='text/javascript'></script>\n" .
+    "<!-- end of inserted tags -->\n"
 }
 
 1;	# This must be the last line
