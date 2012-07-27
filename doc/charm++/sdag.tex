@@ -79,8 +79,10 @@ enclosing chare class as a `body' of an entry method following its signature.
 The most basic construct in SDAG is the {\tt atomic} block. Atomic blocks
 contain sequential \CC code.  They're called atomic because the code within
 them executes without returning control to the \charmpp\ runtime scheduler, and
-thus avoiding interruption from incoming messages. The earlier example can be
-adapted to use atomic blocks as follows:
+thus avoiding interruption from incoming messages. Typically atomic blocks hold
+the code that actually deals with incoming messages in a {\tt when} statement,
+or to do local operations before a message is sent or after it's received. The
+earlier example can be adapted to use atomic blocks as follows:
 \begin{center}
 \begin{alltt}
 // in .ci file
@@ -326,9 +328,6 @@ within it have been processed.
 In the running example, suppose each input needed to be preprocessed 
 
 
- Typically atomic blocks hold
-the code that actually deals with incoming messages in a {\tt when} statement,
-or to do local operations before a message is sent or after it's received.
 
 
 Threads are typically used to perform the abovementioned sequencing.
@@ -430,13 +429,6 @@ interface (.ci) file for its class. An SDAG entry method consists of a series of
 SDAG constructs of the following kinds:
 
 \begin{itemize}
-    \item {\tt atomic} blocks: Atomic blocks simply contain sequential \CC code.
-        They're called atomic because the code within them executes without
-        interruption from incoming messages. Typically atomic blocks hold the
-        code that actually deals with incoming messages in a {\tt when}
-        statement, or to do local operations before a message is sent or after
-        it's received.
-    \item {\tt overlap} blocks: 
     \item {\tt when} statements: These statement, also called triggers, indicate
         that we expect an incoming message of a particular type, and provide
         code to handle that message when it arrives. They commonly occur inside
