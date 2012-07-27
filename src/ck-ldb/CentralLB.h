@@ -174,8 +174,9 @@ public:
     predictorOn(pred, _lb_predict_window);
   }
   void predictorOn(LBPredictorFunction *pred, int window_size) {
-    if (predicted_model) PredictorPrintf("Predictor already allocated");
-    else {
+    if (predicted_model) {
+      PredictorPrintf("Predictor already allocated");
+    } else {
       _lb_predict_window = window_size;
       if (pred) predicted_model = new FutureModel(window_size, pred);
       else predicted_model = new FutureModel(window_size);
