@@ -4,6 +4,7 @@ mainmodule allToAll {
     readonly int max_iter;
     readonly int numChares;
     readonly int msgSize;
+    readonly int msgCount;
 
 	message allToAllMsg {
 		char data[];
@@ -26,7 +27,7 @@ mainmodule allToAll {
                 sendAllToAll();
             }
 
-            for(count = 0; count < numChares; ++count){
+            for(count = 0; count < msgCount*numChares; ++count){
                 when getAllToAll[iter](allToAllMsg *m) atomic {
                     processAllToAll(m);
                 }

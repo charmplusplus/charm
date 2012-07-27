@@ -4,6 +4,7 @@
 /*readonly*/ int numChares;
 /*readonly*/ int msgSize;
 /*readonly*/ int max_iter;
+/*readonly*/ int msgCount;
 
 struct allToAllMsg : public CMessage_allToAllMsg {
   char *data;
@@ -16,17 +17,22 @@ struct Main : public CBase_Main {
 
 	Main(CkArgMsg* m) {
 
-        max_iter = 1000;
+        max_iter = 300;
         numChares = CkNumPes();
         msgSize = 1024;
-		// 3D allToAll on a NxNxN array
+        msgCount = 1;
+        // 3D allToAll on a NxNxN array
         if(m->argc >= 2)
         {
             msgSize = atoi(m->argv[1]);
         }
         if(m->argc >= 3)
         {
-            numChares = atoi(m->argv[2]);
+            msgCount = atoi(m->argv[2]);
+        }
+        if(m->argc >= 4)
+        {
+            max_iter = atoi(m->argv[3]);
         }
         
         delete m;
@@ -47,14 +53,16 @@ struct Main : public CBase_Main {
 	void nextallToAll() {
 		
         iter++;
+        if(iter %50 == 0)
+            CkPrintf("iter = %d\n", iter);
         if(iter < max_iter)
         {
             allToAllProxy.doAllToAll();
         }else
         {
             double time = CkWallTimer() - start;
-            CkPrintf("allToAll on %d cores for msg size: %d per iteration:%f ms\n",
-                CkNumPes(), msgSize,  time/max_iter*1000);
+            CkPrintf("allToAll on %d cores for msg size: %d\n iteration(ms):%d\t%f\n",
+                CkNumPes(), msgSize,  msgSize, time/max_iter*1000);
             CkExit();
         }
     }
@@ -73,8 +81,8 @@ struct allToAll : public CBase_allToAll {
 		 __sdag_init();
         iter = 0;
         recvCnt = 0;
-		msgs = new allToAllMsg*[numChares];
-		for(int i = 0; i < numChares; i++) {
+		msgs = new allToAllMsg*[numChares*msgCount];
+		for(int i = 0; i < msgCount*numChares; i++) {
 			msgs[i] = new (msgSize) allToAllMsg;
 		}
 
@@ -84,12 +92,14 @@ struct allToAll : public CBase_allToAll {
 
 	// Sends transpose messages to every other chare
 	void sendAllToAll() {
-		
+	
+        for(int j=0;j<msgCount; j++) {
         for(int i = thisIndex; i < thisIndex+numChares; i++) {
 			int t = i % numChares;
-			CkSetRefNum(msgs[t],iter);
-			thisProxy[t].getAllToAll(msgs[t]);
+			CkSetRefNum(msgs[j*numChares+t],iter);
+			thisProxy[t].getAllToAll(msgs[j*numChares+t]);
 		}
+        }
 	}
 
 	// Sends transpose messages to every other chare
