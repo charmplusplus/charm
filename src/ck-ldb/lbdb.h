@@ -244,7 +244,6 @@ void LDDoneRegisteringObjects(LDOMHandle _h);
 LDObjHandle LDRegisterObj(LDOMHandle h, LDObjid id, void *userptr,
 			  int migratable);
 void LDUnregisterObj(LDObjHandle h);
-const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 void * LDObjUserData(LDObjHandle &_h);
 void LDObjTime(LDObjHandle &h, LBRealType walltime, LBRealType cputime);
@@ -350,6 +349,8 @@ int LDMemusage(LDHandle _db);
 #ifdef __cplusplus
 }
 #endif /* _cplusplus */
+
+const LDObjHandle &LDGetObjHandle(LDHandle h, int idx);
 
 #if CMK_LBDB_ON
 PUPbytes(LDHandle)
