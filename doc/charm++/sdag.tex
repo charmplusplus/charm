@@ -226,6 +226,14 @@ entry void startStep() \{
 \end{alltt}
 \end{center}
 
+A single entry method is allowed to appear in more than one {\tt when} statement.
+If only one of those {\tt when} statements has been triggered when the runtime
+delivers a message to that entry method, that {\tt when} statement is guaranteed
+to process it. If there is no trigger waiting for that entry method, then the
+next corresponding {\tt when} to be reached will receive that message. If there is
+more than one {\tt when} waiting on that method, which one will receive it is not
+specified, and should not be relied upon.
+
 SDAG supports the {\tt for} and {\tt while} loop constructs mostly as if they
 appeared in plain C or C++ code. In the running example, {\tt
   computeInteractions()} calls {\tt startStep()} when it is finished to start
