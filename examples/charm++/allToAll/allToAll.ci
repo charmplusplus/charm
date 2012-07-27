@@ -1,0 +1,40 @@
+mainmodule allToAll {
+
+	readonly CProxy_Main mainProxy;
+    readonly int max_iter;
+    readonly int numChares;
+    readonly int msgSize;
+
+	message allToAllMsg {
+		char data[];
+	};
+
+	mainchare Main {
+		entry Main(CkArgMsg *m);
+		entry [reductiontarget] void allToAllReady();
+		entry [reductiontarget] void nextallToAll();
+	};
+
+	array [1D] allToAll {
+		entry allToAll();
+        entry void sendAllToAll();
+		entry void getAllToAll(allToAllMsg *m);
+	
+        entry void doAllToAll() {
+           
+            atomic {
+                sendAllToAll();
+            }
+
+            for(count = 0; count < numChares; ++count){
+                when getAllToAll[iter](allToAllMsg *m) atomic {
+                    processAllToAll(m);
+                }
+            }
+            atomic {
+			    iter++;
+				finish();
+            }
+		};
+	};
+};
