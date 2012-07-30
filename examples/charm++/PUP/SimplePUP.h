@@ -38,8 +38,11 @@ class SimpleArray : public CBase_SimpleArray {
   ~SimpleArray(){}
 
   void acceptData(SimpleObject &inData){
+
+    //do something to the object
     localCopy=inData;
     localCopy.doWork();
+
     if(thisIndex==0) //no one lower to pass to
       {
 	done();
