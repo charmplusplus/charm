@@ -62,7 +62,7 @@ $(FILE): $(TEX) $(FILE).aux
 	$(L2H) -split 0 $(FILE).tex
 	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
 	$(LATEX2HTML) $(FILE).tex
-	../latex2html_fixpaths.sh
+	../l2h_sanitize_markup.sh
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)
