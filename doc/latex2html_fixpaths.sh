@@ -21,6 +21,21 @@ do
 	cwd=`echo $cwd | sed -e 's@/home/net@/expand/home@'`
 	sed -e 's!'`pwd`'/!!g' $f > tmp || die "error running sed on $f"
 	mv $f $f.bak || die "error backing up $f"
-	sed -e 's!'$cwd'/!!g' tmp > $f || die "error running sed on $f"
+    # Munge through the markup and... 
+	# Relativize all paths
+    # Replace placeholder with script tag
+    # Replace div.alltt with pre tag
+	# Delete tt tag that is no longer supported in html5
+	# Remove matching closing tags
+    # and also remove the closing div matching the div.alltt
+	# and finally delete the line if it just has whitespace
+	sed -e 's!'$cwd'/!!g' \
+	    -e 's|replace_with_script|script|g' \
+		-e 's|<DIV CLASS="alltt"[^>]*>|<pre>|g' \
+		-e 's|<TT>||g' \
+		-e '/<\/TT>/{N;s|<\/TT>||g;/\n<\/DIV>/{s|<\/DIV>|</pre>|g}}' \
+		-e '/^\w*$/d' \
+	tmp > $f || die "error running sed on $f"
+	rm $f.bak
 	#mv tmp $f || die "error replacing $f"
 done
