@@ -40,7 +40,7 @@ TD.eqno			{ }	/* equation-number cells */
 /* document-specific styles come next */
 body { font-family: Droid Sans, Arial, sans-serif; }
 h1, h2, h3 { font-family: Puritan, Verdana, Helvetica sans-serif; }
-.alltt { font-family: monospace; }
+code, pre { font-family: "Courier New" Courier monospace; }
 
 html { background: #ffffff; }
 
@@ -58,15 +58,16 @@ DIV.ManualTitle	{ padding: 3pt; text-align: center; font-size: x-large; font-wei
 DIV.center		{   }
 SPAN.tt		{   }
 SPAN.sc		{   }
-DIV.alltt		{
+pre {
 		background: #000;
 		color: #090;
 		padding: 8px;
 		margin: 10px auto;
 		display: block;
 		width: 650px;
+		overflow-x: auto;
 		border-radius: 3px;
-		font-size: 120%;
+		font-size: 110%;
 }
 
 div.navigation {
