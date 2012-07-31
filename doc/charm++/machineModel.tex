@@ -1,4 +1,4 @@
-
+\section{Machine Model}
 At its basic level, Charm++ machine model is very simple: Think of
 each chare as a separate processor by itself. The methods of each
 chare can access its own instance variables (which are all private, at
@@ -9,7 +9,6 @@ remote method invocations towards other chare objects. (Of course, the
 instance variables can include as many other regular C++ objects that
 it ``has''; but no chare objects. It can only have references to other
 chare objects).
-
 
 In accordance with this vision, the first part of the manual (up to
 and including the chapter on load balancing) has almost no mention of
@@ -56,7 +55,4 @@ node. zit is usually not a good idea to launch Charm with more PEs
 than there are hardware threads on each node. More information about
 these launch time options are provided in [manual for how to run charm
 apps] and [Chao's section on SMP related primitives in this manual].
-
- 
-
 
