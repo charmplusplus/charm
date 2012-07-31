@@ -1,18 +1,20 @@
-\charmpp{} offers a range of fault tolerance capabilities through its 
-checkpoint/restart mechanism. Usual chare-array-based \charmpp{} applications, 
-including AMPI applications, can be checkpointed to disk files and be restarted later from the files.
+\charmpp{} offers a couple of checkpoint/restart mechanisms. Each of these targets a specific need in parallel programming. However, both of them are based on the same infrastructure. 
 
-The basic idea behind this is straightforward: checkpointing an 
-application is like migrating its parallel objects from the processors
-onto disks, and restarting is the reverse. Thanks to the migration 
-utilities like PUP'ing(Section~\ref{sec:pup}), users can decide what 
-data to save in checkpoints and how to save them. However, unlike migration (where certain objects do not need a PUP method), checkpoint requires all the objects to implement the PUP method.
+Traditional chare-array-based \charmpp{} applications, including AMPI applications, can be checkpointed to storage buffers (either files or memory regions) and be restarted later from those buffers. The basic idea behind this is straightforward: checkpointing an application is like migrating its parallel objects from the processors onto buffers, and restarting is the reverse. Thanks to the migration utilities like PUP methods (Section~\ref{sec:pup}), users can decide what data to save in checkpoints and how to save them. However, unlike migration (where certain objects do not need a PUP method), checkpoint requires all the objects to implement the PUP method.
 
-Two schemes of fault tolerance protocols are implemented.
+The two checkpoint/restart schemes implemented are:
+\begin{itemize}
+\item Disk-based Checkpoint/Restart: provides support for \emph{split execution}, where the execution of an application can not be carried out uninterruptedly. There may be several reasons for this, for instance, the total execution time may exceed the maximum allocation time in a supercomputer.
+\item Double Local-storage Checkpoint/Restart: offers a \emph{fault tolerance} mechanism for applications running on unreliable machines.
+\end{itemize}
 
-\subsection{Disk-based Checkpoint/Restart}
 
-\subsubsection{Checkpointing}
+\section{Split Execution}
+There are several reasons for having to split the execution of an application. A common case is where the total execution time of the application exceeds the maximum allocation time for a job in a supercomputer. For that case, an application may checkpoint before the allocation time expires and then restart from the checkpoint in a future allocation. 
+
+Another reason for having a split execution is when an application consists in \emph{phases} and each phase may be run a different number of times with varying parameters. Consider, for instance, an application with two phases where the first phase only has a possible configuration (it is run only once). The second phase may have several configuration (for testing various algorithms). In that case, once the first phase is complete, the application checkpoints the result. Further executions of the second phase may just resume from that checkpoint.
+
+\subsection{Checkpointing}
 
 \label{sec:diskcheckpoint}
 	The API to checkpoint the application is:
@@ -55,7 +57,7 @@ processor 0, which holds the mainchare, initiates the checkpoint.
 After {\tt CkStartCheckpoint} is executed, a directory of the designated
 name is created and a collection of checkpoint files are written into it. 
 
-\subsubsection{Restarting}
+\subsection{Restarting}
 
 The user can choose to run the \charmpp{} application in restart mode, i.e.,
 restarting execution from last checkpoint. The command line option {\tt
@@ -88,7 +90,7 @@ data in a group/nodegroup branch cannot (and usually should not) be
 restored individually. A copy from processor 0 will be propagated to all 
 the processors.
 
-\subsubsection{Choosing What to Save}
+\subsection{Choosing What to Save}
 
 In your programs, you may use chare groups for different types of purposes. 
 For example, groups holding read-only data can avoid excessive data copying,
@@ -107,14 +109,13 @@ can take advantage of the flexibility by leaving PUP'er routine empty
 for intermediate objects, and do save/restore only for the important 
 objects. 
 
-\subsection{Double Memory/Disk Checkpoint/Restart}
-
+\section{Fault Tolerance}
 \label{sec:MemCheckpointing}
+As supercomputers grow in size, their reliability decreases correspondingly. This is due to the fact that the ability to assemble components in a machine surpasses the increase in reliability per component. What we an expect in the future is applications to run on unreliable hardware.
 
-The previous disk-based fault-tolerance scheme is a very basic scheme in 
-that when a failure occurs, the whole program gets killed and the user has to
+The previous disk-based checkpoint/restart can be used as a fault tolerance scheme. However, it would be a very basic scheme in that when a failure occurs, the whole program gets killed and the user has to
 manually restart the application from the checkpoint files.
-The double checkpoint/restart protocol described in this subsection
+The double local-storage checkpoint/restart protocol described in this subsection
 provides an automatic fault tolerance solution. When a failure occurs,
 the program can automatically detect the failure and restart from the 
 checkpoint.
@@ -133,7 +134,7 @@ can be useful for applications with large memory footprint.
 %Currently, this scheme only supports Chare array-based Charm++ applications.
 
 
-\subsubsection{Checkpointing}
+\subsection{Checkpointing}
 
 The function that user can call to initiate a checkpointing in a chare-array-based application is: 
 
@@ -153,7 +154,7 @@ start checkpointing:
       void AMPI_MemCheckpoint()
 \end{alltt}
 
-\subsubsection{Restarting}
+\subsection{Restarting}
 
 When a processor crashes, the restart protocol will be automatically
 invoked to recover all objects using the last checkpoints. The program
@@ -167,8 +168,7 @@ as before the crash.
 In order to achieve this, \charmpp{} needs to be compiled with the macro option
  {\it CK\_NO\_PROC\_POOL} turned on.
 
-
-\subsubsection{Double in-disk checkpoint/restart}
+\subsection{Double in-disk checkpoint/restart}
 
 A variant of double memory checkpoint/restart,
 {\it double in-disk checkpoint/restart},
@@ -184,4 +184,18 @@ For example:
    ./charmrun hello +p8 +ftc_disk
 \end{alltt} 
 
+\subsection{Building Instructions}
+In order to have the double local-storage checkpoint/restart functionality available, the parameter \emph{syncft} must be provided at building time:
+
+\begin{alltt}
+   ./build charm++ net-linux-x86_64 syncft
+\end{alltt} 
+The only resilient machine layer is net-linux. The double local-storage should not be used with any other machine layer.
+
+\subsection{Failure Injection}
+To test your application is able to recover from failures, we provide a failure injection mechanism that lets you specify what PEs will fail at what point in time. You must create a text file with two columns. The first colum will store the PEs that will fail. The second column will store the time at which the corresponding PE will fail. Make sure all the failures occur after the first checkpoint. The runtime parameter \emph{kill\_file} has to be added to the command line along with the file name:
+
+\begin{alltt}
+   ./charmrun hello +p8 +kill_file <file>
+\end{alltt} 
 
