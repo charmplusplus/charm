@@ -57,6 +57,7 @@ $(FILE): $(TEX) $(FILE).aux
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
 	-@/bin/cp ../manual.css $(FILE)
+	-@/bin/cp ../*.js $(FILE)
 	-@/bin/cp ../navbarbkgd.png $(FILE)
 	-/bin/cp title.html $(FILE)
 	$(L2H) -split 0 $(FILE).tex
