@@ -10,7 +10,7 @@ However, a node group has one chare per {\em process}, or {\em logical node}, ra
 %rather than one chare per processor.  
 Therefore, each logical node hosts a single branch of the
 node group.  When an entry method of a
-node group is executed on one of its branches, it executes on {\em some} PE within the node.
+node group is executed on one of its branches, it executes on {\em some} PE within the logical node.
 
 \subsection{NodeGroup Declaration} 
 
@@ -74,7 +74,7 @@ invoked on a particular \index{branch}branch of a \index{nodegroup}nodegroup,
 it may be executed by {\em any} PE in that logical node. Thus two invocations of
 a single entry method on a particular \index{branch}branch of a
 \index{nodegroup}NodeGroup may be executed {\em concurrently} by two
-different PEs in the logical node. If this may cause data races in your
+different PEs in the logical node. If this could cause data races in your
 program, please consult \S~\ref{sec:nodegroups/exclusive} (below).
 
 %If that method contains code that should be
@@ -82,26 +82,24 @@ program, please consult \S~\ref{sec:nodegroups/exclusive} (below).
 %\index{exclusive}\kw{exclusive} in the interface file. 
 
 \subsection{NodeGroups and \kw{exclusive} Entry Methods}
-\ref{sec:nodegroups/exclusive}
+\label{sec:nodegroups/exclusive}
 
-Node groups may have \index{exclusive}\kw{exclusive} entry methods.  The execution of an \kw{exclusive}
-entry method invocation is mutually exclusive with those of all other \kw{exclusive} entry methods invocations.
-That is, an \kw{exclusive}
-entry method invocation is not executed on a logical node as long as another \kw{exclusive} entry 
-method is executing on it.
-More explicitly, if a method \uw{M} of a
-nodegroup \uw{NG} is marked exclusive, it means that while an instance of that method is being
-executed by a PE within a logical node, no other PE within that
-logical node will execute any other {\em exclusive} methods.
-%of that
-%\index{nodegroup}nodegroup \index{branch}branch.  
-However, PEs in the logical node may still 
-execute {\em non-exclusive} entry method invocations.
-%on that l
-%\index{branch}branch, however.
-%of that node group are running on the same node.  
-An entry method can be marked exclusive by tagging it with the \kw{exclusive} attribute,
-as explained in \S~\ref{attributes}.
+Node groups may have \index{exclusive}\kw{exclusive} entry methods.  The
+execution of an \kw{exclusive} entry method invocation is {\em mutually
+exclusive} with those of all other \kw{exclusive} entry methods invocations.
+That is, an \kw{exclusive} entry method invocation is not executed on a logical
+node as long as another \kw{exclusive} entry method is executing on it.  More
+explicitly, if a method \uw{M} of a nodegroup \uw{NG} is marked exclusive, it
+means that while an instance of \uw{M} is being executed by a PE within a
+logical node, no other PE within that logical node will execute any other {\em
+exclusive} methods.
+%of that \index{nodegroup}nodegroup \index{branch}branch.  
+However, PEs in the logical node may still execute {\em non-exclusive} entry
+method invocations.
+%on that l \index{branch}branch, however.  of that node group are running on
+%the same node.  
+An entry method can be marked exclusive by tagging it with the \kw{exclusive}
+attribute, as explained in \S~\ref{attributes}.
 
 
 \subsection{Accessing the Local Branch of a NodeGroup}
