@@ -11,16 +11,16 @@ it ``has''; but no chare objects. It can only have references to other
 chare objects).
 
 
-In accordance with this vision, the first part of the manual has
-almost no mention of entities with physical meanings (cores, nodes,
-etc.). The runtime system is responsible for the mgic of keeping
-closely communicating objects on nearby physical locations, and
-optimizing communications within chares on the same node or core by
-exploiting the physically available shared memory. The programmer does
-not have to deal with this at all. The only exception to this pure
-model in the basic part are the functions used for finding out which
-``processor'' an object is running on, and for finding how many total
-processors are there.
+In accordance with this vision, the first part of the manual (up to
+and including the chapter on load balancing) has almost no mention of
+entities with physical meanings (cores, nodes, etc.). The runtime
+system is responsible for the mgic of keeping closely communicating
+objects on nearby physical locations, and optimizing communications
+within chares on the same node or core by exploiting the physically
+available shared memory. The programmer does not have to deal with
+this at all. The only exception to this pure model in the basic part
+are the functions used for finding out which ``processor'' an object
+is running on, and for finding how many total processors are there.
 
 However, for implementing lower level libraries, and certin optimizations,
 programmers need to be aware of processors. In any case, it is useful
