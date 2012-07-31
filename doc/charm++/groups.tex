@@ -64,20 +64,21 @@ can be obtained in the group's methods from the variable \kw{thisgroup}, which i
 member of the \kw{Group} superclass.
 
 A group can also be identified through its proxy, which can be obtained in one of three ways:
-(a) as the inherited {\tt thisProxy} data member of the class; (b) from a call to \kw{ckNew} 
+(a) as the inherited {\tt thisProxy} data member of the class; (b) when creating a group,
+you can obtain a proxy to it from a call to \kw{ckNew} 
 as shown below:
 
 \begin{alltt}
-CkGroupID fooGroupID = CProxy_Foo::ckNew(\uw{parameters1});
+CProxy fooProxy = CProxy_Foo::ckNew(\uw{parameters1});
 \end{alltt}
 
 or (c) by using a group identifier to create a proxy, as shown below:
 
 \begin{alltt}
-  // We have `fooGroupID' from the above `ckNew' invocation
+// Assume that we have obtained `fooGroupID' as the CkGroupID for the group
 
-  // Obtain a proxy to the group from its group ID
-  CProxy_Foo anotherFooProxy = CProxy_Foo(fooGroupID);
+// Obtain a proxy to the group from its group ID
+CProxy_Foo anotherFooProxy = CProxy_Foo(fooGroupID);
 \end{alltt}
 
 It is possible to specify the dependence of group creations using
@@ -119,7 +120,7 @@ that branch of the group which resides on PE {\tt somePE}, we would accomplish
 this with the following syntax:
 
 \begin{alltt}
- fooProxy[somePE].someEntryMethod(\uw{parameters});
+fooProxy[somePE].someEntryMethod(\uw{parameters});
 \end{alltt}
 
 %This sends the given parameters to the \index{branch}branch of
@@ -131,11 +132,11 @@ A message may be broadcast \index{broadcast} to all branches of a group
 (i.e., to all PEs) using the notation :
 
 \begin{alltt}
- fooProxy.anotherEntryMethod(\uw{parameters});
+fooProxy.anotherEntryMethod(\uw{parameters});
 \end{alltt}
 
 This invokes entry method \uw{anotherEntryMethod} with the given \uw{parameters} on 
-all branches of the group. This call is asynchronous and non-blocking; it returns immediately
+all branches of the group. This call is also asynchronous and non-blocking, and it, too, returns immediately
 after sending the message.
 
 Recall that each PE hosts a branch of every instantiated group. 
@@ -143,7 +144,7 @@ Sequential objects, chares and other groups can gain access to this {\em PE-loca
 branch using \kw{ckLocalBranch()}:
 
 \begin{alltt}
-GroupType *g=fooProxy.ckLocalBranch();
+GroupType *g=groupProxy.ckLocalBranch();
 \end{alltt}
 
 This call returns a regular \CC\ pointer to the actual object (not a proxy)
@@ -151,7 +152,6 @@ referred to by the proxy \uw{groupProxy}.  Once a proxy to the
 local branch of a group is obtained, that branch can be accessed as a regular
 \CC\ object.  Its public methods can return values, and its public data is 
 readily accessible.
-
 Thus a dynamically created \index{chare}chare can invoke a public method of a
 group without knowining the PE on which it actually resides. 
 %the method
