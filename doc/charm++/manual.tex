@@ -88,12 +88,18 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \label{inheritance and templates}
   \input{inhertmplt}
 
-\chapter{Reductions}
+\chapter{Collectives}
   \input{reductions}
   \input{alltoall}
 
 \chapter{Serializing Complex Types}
   \input{advancedpup}
+
+\chapter{Querying Network / Node Topology}
+\index{topomanager}
+\index{cputopology}
+\label{topo}
+  \input{topology}
 
 \chapter{Checkpoint/Restart}
 \index{Checkpoint/Restart}
@@ -105,17 +111,13 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 \label{sec:hetero}
   \input{hetero}
 
-\chapter{Miscellaneous Features}
-  \input{othercalls}    
-%  \input{commlib}
+\chapter{Performance Tracing for Analysis}
+\index{projections}
+\label{sec:trace-projections}
+  \input{tracing}
 
 
-\part{Optional / Expert Usage}
-
-\chapter{Control Point Automatic Tuning}
-\index{Control Point Automatic Tuning}
-\label{sec:controlpoint}
-  \input{controlpoints}
+\part{Expert Usage}
 
 \chapter{Tuning and Developing Load Balancers}
 \label{advancedlb}
@@ -133,6 +135,18 @@ node, PE, ranks?, smp-mode and non-smp mode terminology. etc.
 % TO BE MOVED TO ITS OWN MANUAL
 %\input{msa.tex}
 
+
+\part{Experimental Features}
+
+\chapter{Control Point Automatic Tuning}
+\index{Control Point Automatic Tuning}
+\label{sec:controlpoint}
+  \input{controlpoints}
+
+\chapter{Loop-level Parallelism}
+\index{ckloop}
+\label{sec:ckloop}
+  \input{ckloop}
 
 \part{Appendix}
 \appendix
