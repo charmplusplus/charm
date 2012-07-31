@@ -1,9 +1,8 @@
-\charmpp{} supports the array section operation, the section operation identifies a subset of array 
-elements from a chare array for access via a single section proxy. \charmpp{} also supports array sections
-which are a subset of array elements in multiple chare arrays of the
-same type \ref{cross array section}.
-A special proxy for an array section can be created given a list of array
-indexes of elements.
+\charmpp{} supports defining and addressing subsets of the elements of a chare
+array.  This entity is called a chare array section (section). These section
+elements are addressed via a section proxy.
+\charmpp{} also supports array sections which are a subset of array elements in
+multiple chare arrays of the same type \ref{cross array section}.
 Multicast operations, a broadcast to all members of a section, are directly supported in array section proxy with
 an unoptimized direct-sending implementation.
 Section reduction is not directly supported by the section proxy. 
@@ -11,6 +10,8 @@ However, an optimized section multicast/reduction
 library called ''CkMulticast'' is provided as a separate library module,
 which can be plugged in as a delegation of a section proxy for performing
 section-based multicasts and reductions using optimized spanning trees. 
+
+\section{Section Creation}
 
 For each chare array "A" declared in a ci file, a section proxy 
 of type "CProxySection\_A" is automatically generated in the decl and def 
@@ -49,6 +50,10 @@ one needs to use the generic array index type: CkArrayIndex.
   CProxySection_Hello proxy = CProxySection_Hello::ckNew(helloArrayID, elems, numElems);
 \end{alltt}
 
+
+\section{Section Multicasts: via CkMulticast}
+\label {array_section_multicast}
+
 Once you have the array section proxy, you can broadcast to all the 
 section members, or send messages to one member using its offset index within the section, like these:
 
@@ -76,8 +81,6 @@ construction to race ahead of several other startup procedures, this
 creates some limitation on the construction delegation and use of
 array section proxies.  For safety, array sections should be
 created in a post constructor entry method.
-
-\label {array_section_multicast}
 
 To use the library, you need to compile and install CkMulticast library and 
 link your applications against the library using -module:
@@ -141,7 +144,7 @@ Due to this restriction, you must define message explicitly for multicast
 entry functions and no parameter marshalling can be used for multicast with 
 CkMulticast library.
 
-\subsection{Array Section Reduction} 
+\section{Section Reductions} 
 
 Since an array element can be a member of multiple array sections, 
 it is necessary to disambiguate between which array
@@ -200,7 +203,7 @@ As in an array reduction, users can use built-in reduction
 types(Section~\ref{builtin_reduction}) or define his/her own reducer functions
 (Section~\ref{new_type_reduction}).
 
-\subsection{Array section multicast/reduction when migration happens}
+\section{Section Collectives when Migration Happens}
 
 Using multicast/reduction, you don't need to worry about array migrations.
 When migration happens, array element in the array section can still use 
@@ -235,7 +238,7 @@ void Foo::pup(PUP::er & p) {
 }
 \end{alltt}
 
-\subsection{Cross Array Sections}
+\section{Cross Array Sections}
 \label{cross array section}
 \experimental{}
 
@@ -292,8 +295,6 @@ arrays as follows:
 	    \}
 	  CProxySection\_multisectiontest\_array1d arrayLowProxy(3,aidArr,aelems,naelems);
 \end{alltt}
-
-
 
 The resulting cross section proxy, as in the example \uw{arrayLowProxy},
 can then be used for multicasts in the same way as a normal array
