@@ -1,4 +1,33 @@
-describe the order in which entities are constructed on PE 0 and other PEs
-what assumptions can user program make about entity availability:
-ie groups are available in any chare array constructor, but not vice versa etc.
+%describe the order in which entities are constructed on PE 0 and other PEs
+%what assumptions can user program make about entity availability:
+%ie groups are available in any chare array constructor, but not vice versa etc.
 
+The \charmpp{} program starts with the following sequence:
+\begin{enumerate}
+\item Modules Registration: the modules are registered in the same order with
+their specified order at the linking stage of the program compilation.
+For example, if "-module A -module B" is specified for \charmpp{} program
+linking, then module A is registered before module B at runtime.
+
+\item \kw{initnode},\kw{initproc} Calls: all those calls are invoked before the
+creation of other \charmpp{} data structures and the invocation of every
+mainchares from different modules.
+
+\item \kw{readonly} Variables: those variables are initialized in the mainchare following the program order as written on PE 0. After the initialization, they
+are broadcasted to every other PEs making them available in the constructors
+of \charmpp{} objects such as Group objects etc..
+
+\item \kw{Group} and \kw{NodeGroup} Creation: on PE 0, constructors of these
+objects are invoked in the program order. However, on every other PEs, their
+creation are triggered by messages. Since the message order is not guaranteed
+in \charmpp{} program, constructors should \textbf{not} depend on other Group
+or NodeGroup objects on a PE. In addition, since those objects are initialized
+after the initialization of readonly variabales, readonly variables can be used
+in their constructors.
+
+\item \charmpp{} Array Creation: the order of calling Array constructors follows
+the same mechanism with that of Group and NodeGroup as described above.
+Therefore, the creation of one array should \textbf{not} depend on other arrays.
+As Array objects are initialized last, their constructors can use 
+readonly variables and local branches to Group or NodeGroup objects.
+\end{enumerate}
