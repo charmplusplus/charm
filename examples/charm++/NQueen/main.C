@@ -89,7 +89,7 @@ Main::Main(CkArgMsg* msg)
             bitfield &= ~lsb;
         }
     }
-    starttimer = CmiWallTimer();//CkTimer();
+    starttimer = CkWallTimer();//CkTimer();
     counterGroup = counterInit();
     CkStartQD(CkIndex_Main::Quiescence1((DUMMYMSG *)0), &mainhandle);
 }
@@ -99,9 +99,9 @@ Main::Main(CkMigrateMessage* msg) {}
 void Main::Quiescence1(DUMMYMSG *msg)
 {
     int numSolutions = CProxy_counter(counterGroup).ckLocalBranch()->getTotalCount();
-    double endtimer = CmiWallTimer();
+    double endtimer = CkWallTimer();
     CkPrintf("There are %d Solutions to %d queens. Time=%f End time=%f\n",
-        2*numSolutions, numQueens, endtimer-starttimer, CmiWallTimer());
+        2*numSolutions, numQueens, endtimer-starttimer, CkWallTimer());
     CkExit();
 }
 

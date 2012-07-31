@@ -94,7 +94,7 @@ public:
       pme_z = CProxy_PMEPencil_Z::ckNew(2, opts_z);
 
       done_pme=0;
-      nextPhraseTimer = CmiWallTimer();
+      nextPhraseTimer = CkWallTimer();
       pme_x.nextPhrase();
       
     };
@@ -106,7 +106,7 @@ public:
         {
             done_pme = 0;
 
-            CkPrintf("\nPME(%d, %d, %d) on %d PEs (%d pes/node)(%d nodes)\n %d iteration, average time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), pes_per_node, CkNumPes()/pes_per_node, max_iter, (CmiWallTimer()-nextPhraseTimer)/max_iter*1000);
+            CkPrintf("\nPME(%d, %d, %d) on %d PEs (%d pes/node)(%d nodes)\n %d iteration, average time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), pes_per_node, CkNumPes()/pes_per_node, max_iter, (CkWallTimer()-nextPhraseTimer)/max_iter*1000);
             CkExit();
         }
     }

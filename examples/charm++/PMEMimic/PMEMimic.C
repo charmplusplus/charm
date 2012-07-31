@@ -86,7 +86,7 @@ public:
       pme_z = CProxy_PMEPencil_Z::ckNew(2, opts_z);
 
       done_pme=0;
-      startTimer = CmiWallTimer();
+      startTimer = CkWallTimer();
       pme_x.start();
       
     };
@@ -98,7 +98,7 @@ public:
         {
             done_pme = 0;
 
-            CkPrintf("PME(%d, %d, %d) on %d PEs, %d iteration, avg time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), max_iter, (CmiWallTimer()-startTimer)/max_iter*1000);
+            CkPrintf("PME(%d, %d, %d) on %d PEs, %d iteration, avg time:%f(ms)\n", grid_x, grid_y, grid_z, CkNumPes(), max_iter, (CkWallTimer()-startTimer)/max_iter*1000);
             CkExit();
         }
     }

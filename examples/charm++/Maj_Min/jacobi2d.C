@@ -74,7 +74,7 @@ public:
     num_chares = majElements + minElements;
 
     //Start the computation
-    startTime = CmiWallTimer ();
+    startTime = CkWallTimer ();
     start = startTime;
     recieve_count = 0;
 #ifdef PRIOR
@@ -104,7 +104,7 @@ public:
   void report (CkReductionMsg *msg)
   {
     recieve_count++;
-    double totaltime = CmiWallTimer () - startTime;
+    double totaltime = CkWallTimer () - startTime;
 //    printf("coming in report--------------------------------------------- rec=%d\n",recieve_count);
     if (2 == recieve_count)
 //      if(minElements+1 == recieve_count)
@@ -113,7 +113,7 @@ public:
 	  {
 	    CkPrintf
 	      ("Completed %d iterations; last iteration time: %.6lf total time=%f\n",
-	       iterations, totaltime, CmiWallTimer () - start);
+	       iterations, totaltime, CkWallTimer () - start);
 //	    CkExit ();
 		mainProxy.exiting();
 	  }
@@ -149,7 +149,7 @@ if(iterations==1) useThisCriticalPathForPriorities();
 	    recieve_count = 0;
 	    iterations++;
 	    // Call begin_iteration on all worker chares in array
-	    startTime = CmiWallTimer ();
+	    startTime = CkWallTimer ();
 #ifdef PRIOR
 	    opts = new CkEntryOptions ();
 	    opts1 = new CkEntryOptions ();
@@ -283,7 +283,7 @@ else
 	  opts->setPriority (-100);
 	  opts1->setPriority (100);
 
-//printf("-------- Jacobi[%d] sending message to next one at time=%f\n",thisIndex,CmiWallTimer());
+//printf("-------- Jacobi[%d] sending message to next one at time=%f\n",thisIndex,CkWallTimer());
 	  thisProxy[thisIndex + 1].begin_iteration (1, opts);
         for(int i=(thisIndex+1)*7;i<(thisIndex+1)*7+7;i++)
                 minorProxy[i].begin_iteration(1,opts1);
@@ -295,7 +295,7 @@ else
 	}
       else
 	{
-//                      printf("CAlling report Jacobi[%d] time=%f!!!!!!!!!!1\n",thisIndex,CmiWallTimer());
+//                      printf("CAlling report Jacobi[%d] time=%f!!!!!!!!!!1\n",thisIndex,CkWallTimer());
 
 //	  else
 //	    mainProxy.report ();
@@ -388,7 +388,7 @@ public:
   // The first step is to send the local state to the neighbors
   void begin_iteration (int i)
   {
-//printf("XXXXXXXXX Minor[%d] coming in begin_itertaion at time=%f\n",thisIndex,CmiWallTimer());
+//printf("XXXXXXXXX Minor[%d] coming in begin_itertaion at time=%f\n",thisIndex,CkWallTimer());
     useLB = 1;
     iterations++;
 

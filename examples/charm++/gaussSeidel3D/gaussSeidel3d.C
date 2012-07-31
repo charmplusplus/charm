@@ -135,7 +135,7 @@ public:
     // Create new array of worker chares
     array = CProxy_GaussSeidel::ckNew(num_chare_x, num_chare_y, num_chare_z); 
 
-    startTime = CmiWallTimer();
+    startTime = CkWallTimer();
 
     //Start the computation
     array.doStep();
@@ -144,7 +144,7 @@ public:
   // Each worker reports back to here when it completes an iteration
   void report() {
     iterations++;
-    endTime = CmiWallTimer();
+    endTime = CkWallTimer();
     CkPrintf("Average time for each of the first %d iteration: %f\n", iterations ,(endTime - startTime)/(iterations));
     if(iterations >= MAX_ITER){
       CkExit();

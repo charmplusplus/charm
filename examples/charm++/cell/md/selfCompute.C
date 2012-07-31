@@ -83,7 +83,7 @@ void SelfCompute::doCalc_callback() {
 
   // DMK - DEBUG
   #if ENABLE_USER_EVENTS != 0
-    double __start_time__ = CmiWallTimer();
+    double __start_time__ = CkWallTimer();
   #endif
 
   // DMK - DEBUG
@@ -105,7 +105,7 @@ void SelfCompute::doCalc_callback() {
 
   // DMK - DEBUG
   #if ENABLE_USER_EVENTS != 0
-    double __end_time__ = CmiWallTimer();
+    double __end_time__ = CkWallTimer();
     traceUserBracketEvent(PROJ_USER_EVENT_SELFCOMPUTE_DOCALC_CALLBACK, __start_time__, __end_time__);
   #endif
 }

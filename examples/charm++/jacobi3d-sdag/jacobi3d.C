@@ -128,12 +128,12 @@ class Main : public CBase_Main {
       iterations++;
       if (iterations <= WARM_ITER) {
 	if (iterations == WARM_ITER)
-	  startTime = CmiWallTimer();
+	  startTime = CkWallTimer();
 	array.doStep();
       }
       else {
 	CkPrintf("Completed %d iterations\n", MAX_ITER-1);
-	endTime = CmiWallTimer();
+	endTime = CkWallTimer();
 	CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(MAX_ITER-1-WARM_ITER));
         CkExit();
       }

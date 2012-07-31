@@ -24,7 +24,7 @@ mainmodule jacobi2d {
 	}
       }
       atomic "start_timed_portion" {
-	startTime = CmiWallTimer();
+	startTime = CkWallTimer();
 	array.doStep(CkCallback(CkIndex_Main::report(NULL), thisProxy),
 		     maxiterations);
       }

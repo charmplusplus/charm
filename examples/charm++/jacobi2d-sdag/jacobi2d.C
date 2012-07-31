@@ -112,7 +112,7 @@ public:
 	CkPrintf("Difference %.10g Satisfied Threshhold %.10g in %d Iterations\n", maxdifference,THRESHHOLD,iterations);
       else
 	CkPrintf("Completed %d Iterations , Difference %lf fails threshhold\n", iterations,maxdifference);
-      endTime = CmiWallTimer();
+      endTime = CkWallTimer();
       CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(maxiterations-1-WARM_ITER));
       CkExit();
   }

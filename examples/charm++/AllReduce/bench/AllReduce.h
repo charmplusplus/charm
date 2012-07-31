@@ -23,8 +23,8 @@ public:
 	  checkIn++;
 	  if (checkIn==units) {
 		  checkIn = 0;
-		  // CkPrintf("All done in %lf seconds\n",(CmiWallTimer()-startTime));
-		  double newTime= CmiWallTimer();
+		  // CkPrintf("All done in %lf seconds\n",(CkWallTimer()-startTime));
+		  double newTime= CkWallTimer();
 		  iterNo++;
 		  timeForEach[sizeInd] += newTime-startTime;
 		  if(iterNo==numItr)
@@ -39,7 +39,7 @@ public:
 			  currentSize *= 2;
 
 		  }
-			startTime = CmiWallTimer();
+			startTime = CkWallTimer();
 			arr.dowork(currentSize);
 	  }
   }

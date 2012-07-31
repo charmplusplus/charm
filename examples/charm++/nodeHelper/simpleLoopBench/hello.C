@@ -50,11 +50,11 @@ int openMPWork(int start, int end) {
 }
 
 extern "C" void doCalc(int first, int last, void *result, int paramNum, void * param) {    
-    //double tstart = CmiWallTimer();
+    //double tstart = CkWallTimer();
     
 	work(first, last, result);
     
-	//tstart = CmiWallTimer() - tstart;
+	//tstart = CkWallTimer() - tstart;
     //printf("start=%d, end=%d, time: %f,result: %d on proc %d\n",first, last, tstart,result,CkMyPe());
 }
 
@@ -103,15 +103,15 @@ Main::Main(CkArgMsg* m) {
 	int result;
 	double starttime, endtime;
 	for(int i=0; i<3; i++){
-		starttime = CmiWallTimer();
+		starttime = CkWallTimer();
 		work(0, loopTimes, &result);		
-		endtime = CmiWallTimer();
+		endtime = CkWallTimer();
 		CkPrintf("Calibration %d: the loop takes %.3f us with result %d\n", i+1,  (endtime-starttime)*1e6, result);
 	}
 	int results[5];
-	starttime = CmiWallTimer();
+	starttime = CkWallTimer();
 	for(int i=0; i<5; i++) work(0, loopTimes, results+i);
-	endtime = CmiWallTimer();
+	endtime = CkWallTimer();
 	double avgtime = (endtime-starttime)*1e6/5; //in the unit of us
 	CkPrintf("Calibration: avg time %.3f us of 5 consecutive runs, so a 100us-loop will iterate %d times\n", avgtime, (int)(loopTimes*100.0/avgtime));
 		
@@ -124,7 +124,7 @@ void Main::done(void) {
     if (numElemFinished < totalElems) {
         return;
     } else {
-		mainTimes[mainStep] = (CmiWallTimer() - timestamp)*1e6;
+		mainTimes[mainStep] = (CkWallTimer() - timestamp)*1e6;
         mainStep++;
         numElemFinished=0;
         if (mainStep < TEST_REPEAT_TIMES) {
@@ -177,7 +177,7 @@ void Main::doTests(CkQdMsg *msg) {
         }
     }
     
-	timestamp = CmiWallTimer(); //record the start time of the whole test
+	timestamp = CkWallTimer(); //record the start time of the whole test
     for (int i=0; i<totalElems; i++) {
         allTestsProxy[i].doTest(mainStep, curTestMode);
         //allTestsProxy[8].doTest(mainStep, curTestMode);
@@ -224,7 +224,7 @@ void TestInstance::doTest(int curstep, int curTestMode) {
 	hasTest = 1;
 	int result;
 	
-    double timerec = CmiWallTimer();
+    double timerec = CkWallTimer();
     
     if(curTestMode == 0){
 	    NodeHelper_Parallelize(doCalc, 0, NULL, numChunks, 0, loopTimes-1, 1, &result, NODEHELPER_INT_SUM);
@@ -232,7 +232,7 @@ void TestInstance::doTest(int curstep, int curTestMode) {
         result = openMPWork(0, loopTimes-1);
     }
     
-    allTimes[curstep]=(CmiWallTimer()-timerec)*1e6;
+    allTimes[curstep]=(CkWallTimer()-timerec)*1e6;
 	allResults[curstep] = result;
 	
     mainProxy.done();
