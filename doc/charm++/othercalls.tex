@@ -36,19 +36,3 @@ to begin the computation.  Initcall routines are typically
 used to do special registrations and global variable setup
 before the computation actually begins.
 
-
-\subsection{Other Calls}
-
-\label{other Charm++ calls}
-
-The following calls provide commonly needed functions.
-
-\function{double CkCpuTimer()} \index{CkCpuTimer} \index{timers}
-\desc{Returns the current value of the system timer in seconds. The system
-timer is started when the program begins execution. This timer measures process
-time (user and system).}
-
-\function{double CkTimer()} \index{CkTimer} \index{timers}
-\desc{This is an alias for either \kw{CkWallTimer} on dedicated machines (such as ASCI Red) or 
-\kw{CkCpuTimer} for machines with multiple user processes per CPU (such as workstation cluster.)}
-
