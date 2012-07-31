@@ -200,7 +200,6 @@ sub bot_navigation_panel {
     ($NEXT_TITLE ? "<td><B> Next:</B> $NEXT_TITLE</td>\n" : undef) . 
     
     "</tr></table></center>"
-  
 }
 
 # Add more tags etc to the head section of each page
@@ -212,7 +211,25 @@ sub head_tags {
     "<!-- Inserted from l2h_init.pl -->\n" .
     "<link href='http://fonts.googleapis.com/css?family=Puritan' rel='stylesheet' type='text/css'>\n" .
     "<link href='http://fonts.googleapis.com/css?family=Droid Sans' rel='stylesheet' type='text/css'>\n" .
-    "<script src='https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js' type='text/javascript'></script>\n" .
+    "\n" .
+    "<replace_with_script src='https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js' type='text/javascript'></script>\n" .
+    "\n" .
+    "<replace_with_script src='http://charm.cs.illinois.edu/codemirror/lib/codemirror.js' type='text/javascript'></script>\n" .
+    "<replace_with_script src='http://charm.cs.illinois.edu/codemirror/mode/clike/clike.js' type='text/javascript'></script>\n" .
+    "<replace_with_script src='http://charm.cs.illinois.edu/codemirror/lib/util/runmode.js' type='text/javascript'></script>\n" .
+    "<link href='http://charm.cs.illinois.edu/codemirror/lib/codemirror.css' rel='stylesheet' type='text/css'>\n" .
+    "<link href='http://charm.cs.illinois.edu/codemirror/theme/lesser-dark.css' rel='stylesheet' type='text/css'>\n" .
+    "<replace_with_script type='text/javascript'>\n" .
+'//<![CDATA[
+// Grab all code snippets and paint it to highlight syntax
+$(document).ready( function() {
+    $("code").each( function(idx) {
+        CodeMirror.runMode($(this).text(), "text/x-c++src", $(this).get(0));
+    })
+    .addClass("cm-s-lesser-dark");
+} )
+//]]>' .
+    "</script>\n" .
     "<!-- end of inserted tags -->\n"
 }
 
