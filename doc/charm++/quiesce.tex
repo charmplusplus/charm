@@ -153,3 +153,10 @@ method it would suspend the main thread of execution of the processor from
 which \kw{CkWaitQD} was called and the entire program would come to a grinding
 halt on that processor.
 
+\function{void CkExitAfterQuiescence()} \index{CkExitAfterQuiescence}
+\desc{This call informs the Charm RTS that computation on all processors
+should terminate as soon as the machine becomes completely idle--that is,
+after all messages and entry methods are finished.  This is the state of 
+quiescence, as described further in Section~\ref{sec:qd}.
+This routine returns immediately.}
+

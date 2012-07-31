@@ -41,47 +41,7 @@ before the computation actually begins.
 
 \label{other Charm++ calls}
 
-The following calls provide information about the machines upon which the
-parallel program is executing.  Processing Element refers to a single CPU.
-Node refers to a single machine-- a set of processing elements which share
-memory (i.e. an address space).  Processing Elements and Nodes are numbered,
-starting from zero.
-
-Thus if a parallel program is executing on one 4-processor workstation and one
-2-processor workstation, there would be 6 processing elements (0, 1 ,2, 3, 4,
-and 5) but only 2 nodes (0 and 1).  A given node's processing elements are
-numbered sequentially.
-
-\function{int CkMyRank()} \index{CkMyRank}
-\desc{returns the rank number of the processor on which the call was made.
-Processing elements within a node are ranked starting from zero.}
-
-\function{int CkMyNode()} \index{CkMyNode}
-\desc{returns the address space number (node number) on which the call was made.}
-
-\function{int CkNumNodes()} \index{CkMyNodes}
-\desc{returns the total number of address spaces.}
-
-\function{int CkNodeFirst(int node)} \index{CkNodeFirst}
-\desc{returns the processor number of the first processor in this address space.}
-
-\function{int CkNodeSize(int node)} \index{CkNodeSize}
-\desc{returns the number of processors in the address space on which the call was made.}
-
-\function{int CkNodeOf(int pe)} \index{CkNodeOf}
-\desc{returns the node number on which the call was made.}
-
-\function{int CkRankOf(int pe)} \index{CkRankOf}
-\desc{returns the rank of the given processor within its node.}
-
 The following calls provide commonly needed functions.
-
-\function{void CkExitAfterQuiescence()} \index{CkExitAfterQuiescence}
-\desc{This call informs the Charm RTS that computation on all processors
-should terminate as soon as the machine becomes completely idle--that is,
-after all messages and entry methods are finished.  This is the state of 
-quiescence, as described further in Section~\ref{sec:qd}.
-This routine returns immediately.}
 
 \function{double CkCpuTimer()} \index{CkCpuTimer} \index{timers}
 \desc{Returns the current value of the system timer in seconds. The system
