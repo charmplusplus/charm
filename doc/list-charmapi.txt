@@ -37,3 +37,8 @@ CkArrayIndex
 __sdag_init
 __sdag_pup
 
+PUP
+PUP::toDisk
+PUP::seekBlock
+PUP::able
+
