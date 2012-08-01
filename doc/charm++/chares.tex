@@ -7,11 +7,11 @@ number of other entry methods. All chare classes and their entry methods are
 declared in the interface (\texttt{.ci}) file:
 
 \begin{alltt}
-chare ChareType
-\{
-    entry ChareType(\uw{parameters1});
-    entry void EntryMethodName(\uw{parameters2});
-\};
+    chare ChareType
+    \{
+        entry ChareType(\uw{parameters1});
+        entry void EntryMethodName(\uw{parameters2});
+    \};
 \end{alltt}
 
 Although it is {\em declared} in an interface file, a chare is a \CC{} object and must
@@ -26,9 +26,8 @@ the following definition in a \texttt{.h} file:
 \begin{alltt}
    class ChareType : public CBase\_ChareType \{
        // Data and member functions as in C++
-       // One or more entry methods definitions of the form:
        public:
-           ChareType(\uw{parameters2});
+           ChareType(\uw{parameters1});
            void EntryMethodName2(\uw{parameters2});
    \};
 \end{alltt}
@@ -137,9 +136,9 @@ calculates fibonacci numbers in parallel.
 A message \index{message} may be sent to a \index{chare}chare through a proxy
 object using the notation:
 
-\begin{tabbing}
-chareProxy.EntryMethod(\uw{parameters})
-\end{tabbing}
+\begin{alltt}
+    chareProxy.EntryMethod(\uw{parameters})
+\end{alltt}
 
 This invokes the entry method \uw{EntryMethod} on the chare referred
 to by the proxy \uw{chareProxy}. This call
@@ -154,8 +153,11 @@ proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
 to the chare if it exists on the local processor, and NULL otherwise.
 
 \begin{alltt}
-C *c=chareProxy.ckLocal();
-if (c==NULL) //...is remote-- send message
-else //...is local-- directly use members and methods of c
+    C *c=chareProxy.ckLocal();
+    if (c==NULL) {
+        // object is remote; send message
+    } else {
+        // object is local; directly use members and methods of c
+    }
 \end{alltt}
 
