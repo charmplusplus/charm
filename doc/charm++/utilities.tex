@@ -4,13 +4,7 @@
 
 The following calls provide basic rank information and utilities
 useful when running a Charm++ program. Other utilities are listed in
-Section~\ref{other Charm++ calls}.
-
-\function{int CkNumPes()} \index{CkNumPes} \desc{returns the total
-  number of processing elements (PEs), across all nodes.}
-
-\function{int CkMyPe()} \index{CkMyPe} \desc{returns the index of the
-  PE on which the call was made.}
+Section~\ref{other Charm++ calls}. 
 
 \function{void CkAssert(int expression)} \desc{Aborts the program 
 if expression is 0.}
@@ -29,6 +23,41 @@ if expression is 0.}
 
 \function{double CkWallTimer()} \index{CkWallTimer} \index{timers}
 \desc{Returns the elapsed time in seconds since the start of the program.}
+
+\subsection{Information about Logical Machine Entities}
+As described in section~\ref{machineModel}, \charmpp{} recoginizes two
+logical machine entities: ``node'' and PE (processing element). 
+The following functions provide basic information about such logical machine 
+that a \charmpp{} program runs on. PE and ``node'' are numbered starting
+from zero.
+
+\function{int CkNumPes()} \index{CkNumPes} \desc{returns the total
+  number of PEs across all nodes.}
+
+\function{int CkMyPe()} \index{CkMyPe} \desc{returns the index of the
+  PE on which the call was made.}
+
+\function{int CkNumNodes()} \index{CkMyNodes}
+\desc{returns the total number of logical \charmpp{} nodes.}
+
+\function{int CkMyNode()} \index{CkMyNode}
+\desc{returns the index of the ``node'' on which the call was made.}
+
+\function{int CkMyRank()} \index{CkMyRank}
+\desc{returns the rank number of the PE on a ``node'' on which the call 
+was made. PEs within a ``node'' are also ranked starting from zero.}
+
+\function{int CkNodeFirst(int nd)} \index{CkNodeFirst}
+\desc{returns the index of the first PE on the logical node $nd$.}
+
+\function{int CkNodeSize(int nd)} \index{CkNodeSize}
+\desc{returns the number of PEs on the logical node $nd$ on which the call was made.}
+
+\function{int CkNodeOf(int pe)} \index{CkNodeOf}
+\desc{returns the ``node'' number that PE $pe$ belongs to.}
+
+\function{int CkRankOf(int pe)} \index{CkRankOf}
+\desc{returns the rank of the given PE within its node.}
 
 \subsection{Terminal I/O}
 

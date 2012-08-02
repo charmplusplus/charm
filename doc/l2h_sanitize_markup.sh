@@ -34,7 +34,7 @@ do
 	    -e 's|replace_with_script|script|g' \
 		-e 's|<DIV CLASS="alltt"[^>]*>|<pre><code>|g' \
 		-e 's|<TT>||g' \
-		-e '/<\/TT>/{N;s|<\/TT>||g;/\n<\/DIV>/{s|<\/DIV>|</code></pre>|g}}' \
+		-e '/<\/TT>/{N;s|<TT>||g;s|<\/TT>||g;/\n<\/DIV>/{s|<\/DIV>|</code></pre>|g}}' \
 		-e '/<pre>/,/<\/pre>/s|<BR>||g' \
 		-e '/^\w*$/d' \
 	tmp > $f || die "error running sed on $f"
