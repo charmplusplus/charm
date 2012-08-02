@@ -37,7 +37,7 @@ static const char *idx2str(const CkArrayMessage *m) {
 #   define DEBS(x) CkPrintf x  //Send/recv/broadcast debug messages
 #   define DEBM(x) CkPrintf x  //Migration debug messages
 #   define DEBL(x) CkPrintf x  //Load balancing debug messages
-#   define DEBK(x) //CkPrintf x  //Spring Cleaning debug messages
+#   define DEBK(x) CkPrintf x  //Spring Cleaning debug messages
 #   define DEBB(x) CkPrintf x  //Broadcast debug messages
 #   define AA "LocMgr on %d: "
 #   define AB ,CkMyPe()
@@ -2123,6 +2123,12 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 	if (oldRec==NULL||oldRec->type()!=CkLocRec::local) 
 	{ //This is the first we've heard of that element-- add new local record
 		rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue);
+#if CMK_GLOBAL_LOCATION_UPDATE
+                DEBC((AA"Global location broadcast for new element idx %s "
+                      "assigned to %d \n"AB, idx2str(idx), CkMyPe()));
+                thisProxy.updateLocation(idx, CkMyPe());                        
+#endif
+                
 	} else 
 	{ //rec is *already* local-- must not be the first insertion	
 		rec=((CkLocRec_local *)oldRec);
@@ -2685,7 +2691,8 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 #endif
 
 #if CMK_GLOBAL_LOCATION_UPDATE
-        DEBM((AA"Global location update! idx %s to %d \n"AB,idx2str(idx),toPe));
+        DEBM((AA"Global location update. idx %s " 
+              "assigned to %d \n"AB,idx2str(idx),toPe));
         thisProxy.updateLocation(idx, toPe);                        
 #endif
 
