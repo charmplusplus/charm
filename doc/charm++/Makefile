@@ -5,7 +5,8 @@ TEX=$(FILE).tex arrays.tex callbacks.tex chares.tex commlib.tex delegation.tex \
 	helloworld.tex utilities.tex loadb.tex advancedlb.tex futures.tex \
 	marshalling.tex messages.tex modules.tex nodegroups.tex othercalls.tex \
 	overview.tex pup.tex advancedpup.tex quiesce.tex readonly.tex reductions.tex sdag.tex \
-	python.tex alltoall.tex history.tex
+	python.tex alltoall.tex history.tex \
+	../projections/tracing.tex
 DEST=charm++
 LATEX2HTML=$(L2H) -split 5
 
