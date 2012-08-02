@@ -1,6 +1,6 @@
 // Grab all code snippets and paint it to highlight syntax
 $(document).ready( function() {
-    $("code").each( function(idx) {
+    $("pre code").each( function(idx) {
         CodeMirror.runMode($(this).text(), "text/x-charm++", $(this).get(0));
     })
     .addClass("cm-s-lesser-dark")
