@@ -16,9 +16,9 @@ bgtest:
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
 	done
 
-fttest:
+syncfttest causalfttest:
 	for d in jacobi3d; do \
-        (cd $$d && $(MAKE) fttest OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
+        (cd $$d && $(MAKE) $@ OPTS='$(OPTS)' TESTOPTS='$(TESTOPTS)' || exit 1) || exit 1; \
     done
 
 clean:
