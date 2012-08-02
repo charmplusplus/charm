@@ -9,6 +9,7 @@
 *.ci.stamp
 
 # Ignore build artifacts created in the top-level directory
+config_opts.sh
 smart-build.log
 VERSION
 bin
