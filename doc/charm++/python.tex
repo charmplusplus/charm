@@ -535,14 +535,16 @@ Python script is suspended for long periods of time while waiting for the
 are automatically released and re-acquired by the \texttt{CkCallbackPython}
 class when it suspends.
 
-% This can be done using the two functions:
+\zap{
+This can be done using the two functions:
 
-%\begin{alltt}
-%void pythonAwake(int handle);   // to acquire the lock
-%void pythonSleep(int handle);   // to release the lock
-%\end{alltt}
+\begin{alltt}
+void pythonAwake(int handle);   // to acquire the lock
+void pythonSleep(int handle);   // to release the lock
+\end{alltt}
 
-%Important to remember is that before any Python value is accessed, the Python
-%interpreter must be awake. This include the functions \texttt{Py\_BuildValue} and
-%\texttt{PyArg\_ParseTuple}. \textbf{Note:} it is an error to call these functions
-%more than once before the other one is called.
+Important to remember is that before any Python value is accessed, the Python
+interpreter must be awake. This include the functions \texttt{Py\_BuildValue} and
+\texttt{PyArg\_ParseTuple}. \textbf{Note:} it is an error to call these functions
+more than once before the other one is called.
+} % end zap

@@ -493,45 +493,50 @@ Other strategies can also be explored by following the simple API of the
 seed load balancer.
 \linebreak
 
-%{\bf Seed load balancers for Chares:}
-%
-%Seed load balancers can be directly used for load balancing Chares.
-%The default seed load balancer which is always linked is the random seed load balancer.
-%Users can choose another strategy listed above and link as a plugin
-%module into binary as described below.
-%
-%{\bf Seed load balancers for Array Elements:}
-%
-%Seed load balancers can also be used for array elements in the same way 
-%as they are used for individual chares.
-%Chare array is a collection of individual Chares in Charm++.
-%Since Chare Array has its internal strategy of static mapping of individual
-%array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to processors in Round-Robin fashion unless a different CkArrayMap is used}, 
-%a special CkArrayMap called {\em CldMap} must be created and passed into
-%array creation calls to interface with seed load balancer.
-%
-%For creating an empty array and then inserting chares into it, the API is as follows:
-%
-%\begin{alltt}
-%  CkArrayOptions opt;
-%  CkGroupID cldmapID = CProxy_CldMap::ckNew();
-%  opt.setMap(cldmapID);
-%  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
-%  for (int i=0; i<numChares; i++) 
-%    arr[i].insert(param);
-%\end{alltt}
-%
-%For initially populating the array with chares at time of creation the API is as follows:
-%\begin{alltt}
-%  CkArrayOptions opt(numChares);
-%  CkGroupID cldmapID = CProxy_CldMap::ckNew();
-%  opt.setMap(cldmapID);
-%  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
-%\end{alltt}
-%
-%The details about array creation are explained in section~\ref{advanced arrays} of the manual.
-%
+\zap{
+{\bf Seed load balancers for Chares:}
+
+Seed load balancers can be directly used for load balancing Chares.
+The default seed load balancer which is always linked is the random seed load balancer.
+Users can choose another strategy listed above and link as a plugin
+module into binary as described below.
+
+{\bf Seed load balancers for Array Elements:}
+
+Seed load balancers can also be used for array elements in the same way 
+as they are used for individual chares.
+Chare array is a collection of individual Chares in Charm++.
+Since Chare Array has its internal strategy of static mapping of individual
+array elements to processors using {\em CkArrayMap}~\ref{array map}~\footnote{by default it always distributed array elements to processors in Round-Robin fashion unless a different CkArrayMap is used}, 
+a special CkArrayMap called {\em CldMap} must be created and passed into
+array creation calls to interface with seed load balancer.
+
+For creating an empty array and then inserting chares into it, the API is as follows:
+
+\begin{alltt}
+  CkArrayOptions opt;
+  CkGroupID cldmapID = CProxy_CldMap::ckNew();
+  opt.setMap(cldmapID);
+  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
+  for (int i=0; i<numChares; i++) 
+    arr[i].insert(param);
+\end{alltt}
+
+For initially populating the array with chares at time of creation the API is as follows:
+\begin{alltt}
+  CkArrayOptions opt(numChares);
+  CkGroupID cldmapID = CProxy_CldMap::ckNew();
+  opt.setMap(cldmapID);
+  CProxy_WorkUnit arr = CProxy_WorkUnit::ckNew(param, opt); 
+\end{alltt}
+
+The details about array creation are explained in section~\ref{advanced arrays} of the manual.
+
+} % end zap
+
+
 {\bf Compile and run time options for seed load balancers}
+
 
 To choose a seed load balancer other than the default {\em rand} strategy,
 use link time command line option {\bf -balance foo}. 
