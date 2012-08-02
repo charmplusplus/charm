@@ -1,0 +1,12 @@
+mainmodule threaded_ring {
+    readonly int nElems;
+    mainchare Main {
+        entry Main(CkArgMsg*);
+    }
+
+    array [1D] Ring {
+        entry Ring();
+        entry [threaded] void run();
+        entry void getData();
+    }
+}
