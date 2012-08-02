@@ -14,16 +14,12 @@ steps:
 \begin{enumerate}
 \item 
 Prepare your application code by linking with the appropriate trace
-generation modules and executing it to generate trace data. (see
-section \ref{sec::preparation})
+generation modules and executing it to generate trace data.
 \item
 Using the Java-based tool to visually study various aspects of the
 performance information to locate application execution performance
-problems. (see section \ref{sec::visualization})
+problems.
 \end{enumerate}
-
-\section{Preparing the Application}
-\label{sec::preparation}
 
 The \charmpp{} runtime automatically records pertinent performance
 data at performance-related events encountered by the runtime. These
@@ -52,7 +48,7 @@ To enable performance tracing of your application, users simply need
 to link the appropriate trace data generation module(s) (also referred
 to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
 
-\subsection{Enabling Performance Tracing at Link/Run Time}
+\section{Enabling Performance Tracing at Link/Run Time}
 \label{sec::trace modules}
 
 \projections{} tracing modules dictate the type of performance data,
@@ -61,7 +57,7 @@ refered to as ``tracemodes''. There are currently 2 tracemodes
 available. Zero or more tracemodes may be specified at link-time. When
 no tracemodes are specified, no trace data is generated.
 
-\subsubsection{Tracemode {\tt projections}}
+\subsection{Tracemode {\tt projections}}
 
 Link time option: {\tt -tracemode projections}
 
@@ -99,7 +95,7 @@ while recorded and issue a warning immediately.
     PROGNAME.projdir.K}
 \end{itemize}
 
-\subsubsection{Tracemode {\tt summary}}
+\subsection{Tracemode {\tt summary}}
 
 Compile option: {\tt -tracemode summary}
 
@@ -151,7 +147,7 @@ executable. This runtime option currently overrides the {\tt
 +sumDetail} option.
 \end{itemize}
 
-\subsubsection{General Runtime Options}
+\subsection{General Runtime Options}
 \label{sec::general options}
 
 The following is a list of runtime options available with the same
@@ -172,7 +168,7 @@ the terminal I/O system of the machine and result in unacceptable
 perturbation of the application.
 \end{itemize}
 
-\subsubsection{End-of-run Analysis for Data Reduction}
+\subsection{End-of-run Analysis for Data Reduction}
 \label{sec::data reduction}
 
 As applications are scaled to thousands or hundreds of thousands of
@@ -209,10 +205,10 @@ research. It would be appreciated if users of this feature could
 contact the developers if you have input or suggestions.
 
 
-\subsection{Tracing API for \charmpp{} Applications}
+\section{Tracing API for \charmpp{} Applications}
 \label{sec::api}
 
-\subsubsection{Selective Tracing}
+\subsection{Selective Tracing}
 \label{sec::selective tracing}
 
 \charmpp{} allows user to start/stop tracing the execution at certain
@@ -243,7 +239,7 @@ Prevents the runtime from tracing events (including all user events) on the loca
 
 \end{itemize}
 
-\subsubsection{User Events}
+\subsection{User Events}
 \label{sec::user events}
 
 \projections{} has the ability to visualize traceable user

@@ -1,5 +1,5 @@
 %\documentclass[10pt,dvips]{article}
-\documentclass[10pt]{article}
+\documentclass[10pt]{report}
 \usepackage{../pplmanual}
 \usepackage[pdftex]{graphicx}
 \usepackage{subfigure}
@@ -26,11 +26,11 @@ Chee Wai Lee, Isaac Dooley, and Sindhura Bandhakavi
 \begin{document}
 \maketitle
 
-\section{Introduction}
+\chapter{Generating Performance Traces}
 \input{tracing}
 
 
-\subsubsection{Function-level Tracing for Adaptive MPI Applications}
+\subsection{Function-level Tracing for Adaptive MPI Applications}
 \label{sec::AMPI functions}
 
 Adaptive MPI (AMPI) is an implementation of the MPI interface on top
@@ -108,7 +108,7 @@ AMPI function events captured by the use of this API are recognized by
 the visualization system and used for special AMPI-specific views in
 addition to standard \charmpp{} entry methods.
 
-%\subsubsection{Tracing POSE Parallel Discrete Event Simulation Abstractions}
+%\subsection{Tracing POSE Parallel Discrete Event Simulation Abstractions}
 %\label{sec::POSE}
 %
 %Parallel Object-oriented Simulation Environment (POSE) is a parallel
@@ -126,7 +126,7 @@ addition to standard \charmpp{} entry methods.
 
 \newpage
 
-\section{The \projections{} Performance Visualization Tool}
+\chapter{The \projections{} Performance Visualization Tool}
 \label{sec::visualization}
 
 The \projections{} Java-based visualization tool (henceforth refered
@@ -135,7 +135,7 @@ source release. It can be located at \\ {\tt
 CHARM\_LOCATION/tools/projections} which will henceforth be refered to
 as {\tt PROJECTIONS\_LOCATION}.
 
-\subsection{Building \projections{}}
+\section{Building \projections{}}
 
 To rebuild \projections{} (optional) from the source:
 
@@ -157,9 +157,9 @@ To rebuild \projections{} (optional) from the source:
       {\tt projections.jar}       : archive of all the java and image files
 \end{enumerate}
 
-\subsection{Visualization and Analysis using \projections{}}
+\section{Visualization and Analysis using \projections{}}
 
-\subsubsection{Starting Up}
+\subsection{Starting Up}
 \label{sec:startingUp}
 From any location, type: \\
 {\tt > PROJECTIONS\_LOCATION/bin/projections [NAME.sts]} \\
@@ -260,7 +260,7 @@ its available features.
 There should not be any serious performance issues involved in the
 loading of summary data on the main window.
 
-\subsubsection{Available Tools}
+\subsection{Available Tools}
 \label{sec::available tools}
 
 The following tools and views become available to you after a dataset
@@ -311,9 +311,9 @@ interval. While the {\bf Graphs} view can show the same data, it is
 unable to stack the entry points, which proves useful in some cases.
 \end{itemize}
 
-\subsection{Performance Views}
+\section{Performance Views}
 
-\subsubsection{Graphs}
+\subsection{Graphs}
 \label{sec::graph view}
 
 %{\bf Introduction}
@@ -474,7 +474,7 @@ The Graph Window has 3 components in its display:
    \end{itemize}
 \end{enumerate}
 
-\subsubsection{Timelines}
+\subsection{Timelines}
 \label{sec::timeline view}
 
 %{\bf Introduction}
@@ -648,7 +648,7 @@ over the desired time-period before proceeding to use this view. If
 choose a smaller time range or fewer processors. We expect to add features to alleviate
 this problem in future releases.
 
-\subsubsection{Usage Profile}
+\subsection{Usage Profile}
 \label{sec::usage profile}
 The Usage Profile window (see figure \ref{usage profile}) lets you see
 percentage-wise what each processor spends its time on during a
@@ -730,7 +730,7 @@ through Java's garbage collection system.
 
 \end{itemize}
 
-\subsubsection{Communication}
+\subsection{Communication}
 \label{sec::communication}
 
 The communication tool (see figure \ref{communication}) visualizes
@@ -770,7 +770,7 @@ by an entry methods. This is available when the runtime option {\tt -bgsize}
 
 This view uses memory proportional to the number of processors selected.
 
-\subsubsection{Communication vs Time}
+\subsection{Communication vs Time}
 
 The communication over time tool (see figure \ref{communication-time})
 visualizes communication properties over all processors and displayed
@@ -809,7 +809,7 @@ Bluegene machine).
 
 This view has no known problems loading any range or volume of data.
 
-\subsubsection{View Log Files}
+\subsection{View Log Files}
 
 This window (see figure \ref{viewlog}) lets you see a translation of a
 log file from a bunch of numbers to a verbose version.  A dialog box
@@ -849,7 +849,7 @@ The tool has 2 buttons. ``Open File'' reloads the dialog box (described
 above) and allows the user to select a new processor's data to be loaded.
 ``Close Window'' closes the current window.
 
-\subsubsection{Histograms}
+\subsection{Histograms}
 
 This module (see figure \ref{histogram}) allows you to examine the
 performance property distribution of all your entry points (EP). It
@@ -947,7 +947,7 @@ The performance of this view is affected by the number of bins the
 user wishes to analyze. We recommend the user limits the analysis to
 1,000 bins or less.
 
-\subsubsection{Overview}
+\subsection{Overview}
 
 Overview (see figure \ref{overview}) gives users an overview of the
 utilization of all processors during the execution over a
@@ -1025,7 +1025,7 @@ skipping processors (e.g. {\tt 0-8191:2} instead of {\tt
 0-8191}). This should show the general application structure almost as
 well as using the full processor range.
 
-\subsubsection{Animations}
+\subsection{Animations}
 
 This window (see figure \ref{animation}) animates the processor usage
 over a specified range of time and a specified interval size.
@@ -1067,7 +1067,7 @@ view via the dialog box.
 
 This view has no known performance issues.
 
-\subsubsection{Time Profile Graph}
+\subsection{Time Profile Graph}
 
 The Time Profile view (see figure \ref{time profile}) is a
 visualization of the amount of time contributed by each entry method
@@ -1114,7 +1114,7 @@ This tool's performance is tied to the number of intervals desired by
 the user. We recommend that the user stick to visualizing 1,000
 intervals or less.
 
-\subsubsection{User Events Profile}
+\subsection{User Events Profile}
 
 The User Events view is essentially a usage profile (See section
 \ref{sec::usage profile}) of bracketed user events (if any) that were
@@ -1136,9 +1136,9 @@ proportional to the number of processors to be displayed.
 
 \input{View_Outlier}
 
-\subsubsection{Multirun Analysis}
+\subsection{Multirun Analysis}
 
-\subsubsection{Function Tool}
+\subsection{Function Tool}
 \label{sec::function tool}
 The Function Tool view presents a graph that is a usage profile (See
 section \ref{sec::usage profile}) of AMPI function information. This
@@ -1155,9 +1155,9 @@ time} (i.e. time within functions are computed by subtracting the
 measured time spent minus the time spent by any calls to nested
 functions).
 
-%\subsubsection{POSE Analysis}
+%\subsection{POSE Analysis}
 
-\subsubsection{AMPI Usage Profile}
+\subsection{AMPI Usage Profile}
 
 The AMPI Usage Profile view presents a graph similar to Function
 Tool's (See section \ref{sec::function tool}) with several
@@ -1178,10 +1178,10 @@ showing the percentage utilization for a different AMPI function.
 
 \input{View_NoiseMiner}
 
-\subsection{Miscellaneous features}
+\section{Miscellaneous features}
 \label{sec::misc}
 
-\subsubsection{Standard Graph Display Interface} 
+\subsection{Standard Graph Display Interface} 
 
 A standard graph display (an example of which can be found with the
 Main Summary Graph - figure \ref{mainwindow}) has the following
@@ -1214,7 +1214,7 @@ similarly to the {\bf x-scale} feature where the buttons and fields are
 concerned.
 \end{itemize}
 
-\subsubsection{Standard Dialog Features}
+\subsection{Standard Dialog Features}
 
 \begin{figure}[htb]
 \center
@@ -1268,7 +1268,7 @@ list. Clicking on any one item changes the start and end times on the
 dialog box.
 \end{itemize}
 
-\subsubsection{Data Fields}
+\subsection{Data Fields}
 
 Throughout \projections{} tools and dialog boxes (see sample figure
 \ref{standard dialog}), data entry fields are provided. Unless
