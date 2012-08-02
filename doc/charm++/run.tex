@@ -1,6 +1,3 @@
-\section{Executing \charmpp{} Programs}
-\label{executing charm programs}
-
 When compiling \charmpp{} programs, the charmc linker produces 
 both an executable file and a program called {\tt charmrun},
 which is used to load the executable onto the parallel machine.
@@ -27,7 +24,7 @@ to be set for its execution on compute nodes
 .charmrunrc under home directory. charmrun
 will run that shell script before running the executable.
 
-\subsection[Command Line Options]{Command Line Options}
+\section[Command Line Options]{Command Line Options}
 \label{command line options}
 \index{command line options}
 
@@ -60,7 +57,7 @@ entry point of the main chare.
 
 
 
-\subsubsection{Additional Network Options}
+\subsection{Additional Network Options}
 \label{network command line options}
 
 The following {\tt ++} command line options are available in
@@ -164,7 +161,7 @@ time.
 
 \end{description}
 
-\subsubsection{Multicore Options}
+\subsection{Multicore Options}
 
 On multicore platforms, operating systems (by default) are free to move
 processes and threads among cores to balance load. This however sometimes can
@@ -206,7 +203,21 @@ wanted to use 3 cores from each socket, one could write this as {\tt
 
 \end{description}
 
-\subsection{Nodelist file}
+\subsection{IO buffering options}
+\label{io buffer options}
+There may be circumstances where a \charmpp{} application may want to take
+or relinquish control of stdout buffer flushing. Most systems default to
+giving the \charmpp{} runtime control over stdout but a few default to
+giving the application that control. The user can override these system
+defaults with the following runtime options:
+
+\begin{description}
+\item[{\tt +io\_flush\_user}]     User (application) controls stdout flushing
+\item[{\tt +io\_flush\_system}]   The \charmpp{} runtime controls flushing
+\end{description}
+
+
+\section{Nodelist file}
 
 For network of workstations,
 the list of machines to run the program can be specified in a file.  
@@ -321,15 +332,3 @@ follows:
 	pathname and appended extension if specified) on all nodes.
 \end{enumerate}
 
-\subsubsection{IO buffering options}
-\label{io buffer options}
-There may be circumstances where a \charmpp{} application may want to take
-or relinquish control of stdout buffer flushing. Most systems default to
-giving the \charmpp{} runtime control over stdout but a few default to
-giving the application that control. The user can override these system
-defaults with the following runtime options:
-
-\begin{description}
-\item[{\tt +io\_flush\_user}]     User (application) controls stdout flushing
-\item[{\tt +io\_flush\_system}]   The \charmpp{} runtime controls flushing
-\end{description}
