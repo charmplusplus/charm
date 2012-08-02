@@ -271,97 +271,99 @@ runtime system.  As mentioned at the start of this section, received
 messages may be reused or deleted by the programmer.  Finally, messages are
 deleted using the standard \CC{} \kw{delete} operator.  
 
-%\subsubsection{Messages with Variable Length Arrays}
-%
-%\label{varsize messages}
-%\index{variable size messages}
-%\index{varsize message}
-%
-%Such a message is declared as 
-%
-%\begin{alltt}
-% message mtype \{
-%   type1 var_name1[];
-%   type2 var_name2[];
-%   type3 var_name3[];
-% \};
-%\end{alltt}
-%
-%in \charmpp\ interface file. 
-%\begin{alltt}
-%class mtype : public CMessage_mtype \{
-% private:
-%   type1 *var_name1;
-%   type2 *var_name2;
-%   type3 *var_name3;
-%   friend class CMessage_mtype;
-%\};
-%\end{alltt}
-%
-%\small
-%\hrule
-%
-%\noindent\textbf{An Example}
-%
-%Suppose a \charmpp\ message contains two variable length arrays of types
-%\texttt{int} and \texttt{double}:
-%
-%\begin{alltt} 
-%class VarsizeMessage: public CMessage_VarsizeMessage \{
-%  public:
-%    int lengthFirst;
-%    int lengthSecond;
-%    int* firstArray;
-%    double* secondArray;
-%    // other functions here
-%\};
-%\end{alltt}
-%
-%Then in the \texttt{.ci} file, this has to be declared as: 
-%
-%\begin{alltt}
-%message VarsizeMessage \{
-%  int firstArray[];
-%  double secondArray[];
-%\};
-%\end{alltt}
-%
-%We specify the types and actual names of the fields that
-%contain variable length arrays. The dimensions of these arrays are NOT
-%specified in the interface file, since they will be specified in the
-%constructor of the message when message is created. In the {\tt .h} or {\tt .C}
-%file, this class is declared as:
-%
-%\begin{alltt} 
-%
-%class VarsizeMessage : public CMessage_VarsizeMessage \{ 
-%  public: 
-%    int lengthFirst;
-%    int lengthSecond;
-%    int* firstArray;
-%    double* secondArray;
-%    // other functions here
-%\};
-%\end{alltt}
-%
-%The interface translator generates the \uw{CMessage\_VarsizeMessage} class,
-%which contains code to properly allocate, pack and unpack the
-%\uw{VarsizeMessage}.
-%
-%
-%One can allocate messages of the \uw{VarsizeMessage} class as follows:
-%
-%\begin{alltt}
-%// firstArray will have 4 elements
-%// secondArray will have 5 elements 
-%VarsizeMessage* p = new(4, 5, 0) VarsizeMessage;
-%p->firstArray[2] = 13;     // the arrays have already been allocated 
-%p->secondArray[4] = 6.7; 
-%\end{alltt}
+\zap{
+\subsubsection{Messages with Variable Length Arrays}
 
-%\hrule
-%\normalsize
-%No special handling is needed for deleting varsize messages.
+\label{varsize messages}
+\index{variable size messages}
+\index{varsize message}
+
+Such a message is declared as 
+
+\begin{alltt}
+ message mtype \{
+   type1 var_name1[];
+   type2 var_name2[];
+   type3 var_name3[];
+ \};
+\end{alltt}
+
+in \charmpp\ interface file. 
+\begin{alltt}
+class mtype : public CMessage_mtype \{
+ private:
+   type1 *var_name1;
+   type2 *var_name2;
+   type3 *var_name3;
+   friend class CMessage_mtype;
+\};
+\end{alltt}
+
+\small
+\hrule
+
+\noindent\textbf{An Example}
+
+Suppose a \charmpp\ message contains two variable length arrays of types
+\texttt{int} and \texttt{double}:
+
+\begin{alltt} 
+class VarsizeMessage: public CMessage_VarsizeMessage \{
+  public:
+    int lengthFirst;
+    int lengthSecond;
+    int* firstArray;
+    double* secondArray;
+    // other functions here
+\};
+\end{alltt}
+
+Then in the \texttt{.ci} file, this has to be declared as: 
+
+\begin{alltt}
+message VarsizeMessage \{
+  int firstArray[];
+  double secondArray[];
+\};
+\end{alltt}
+
+We specify the types and actual names of the fields that
+contain variable length arrays. The dimensions of these arrays are NOT
+specified in the interface file, since they will be specified in the
+constructor of the message when message is created. In the {\tt .h} or {\tt .C}
+file, this class is declared as:
+
+\begin{alltt} 
+
+class VarsizeMessage : public CMessage_VarsizeMessage \{ 
+  public: 
+    int lengthFirst;
+    int lengthSecond;
+    int* firstArray;
+    double* secondArray;
+    // other functions here
+\};
+\end{alltt}
+
+The interface translator generates the \uw{CMessage\_VarsizeMessage} class,
+which contains code to properly allocate, pack and unpack the
+\uw{VarsizeMessage}.
+
+
+One can allocate messages of the \uw{VarsizeMessage} class as follows:
+
+\begin{alltt}
+// firstArray will have 4 elements
+// secondArray will have 5 elements 
+VarsizeMessage* p = new(4, 5, 0) VarsizeMessage;
+p->firstArray[2] = 13;     // the arrays have already been allocated 
+p->secondArray[4] = 6.7; 
+\end{alltt}
+
+\hrule
+\normalsize
+No special handling is needed for deleting varsize messages.
+} % end zap
 
 \subsection{Message Packing}
 
