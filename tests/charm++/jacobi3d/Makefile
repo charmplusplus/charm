@@ -16,7 +16,13 @@ summary: $(OBJS)
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)  jacobi3d.ci
 
-fttest: jacobi3d
+syncfttest: jacobi3d
+	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB $(TESTOPTS)
+	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_02.txt $(TESTOPTS)
+	./charmrun ./jacobi3d 256 256 256 64 64 32 +p8 +balancer DummyLB +killFile kill_03.txt $(TESTOPTS)
+
+causalfttest: jacobi3d
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB $(TESTOPTS)
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +fastRecovery 1 +killFile kill_01.txt $(TESTOPTS)
