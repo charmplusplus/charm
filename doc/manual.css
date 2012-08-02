@@ -16,17 +16,17 @@ BIG.HUGE		{ font-size : larger   }
 BIG.XHUGE		{ font-size : xx-large }
 
 /* heading styles */
-H1		{ color: #9b4e4e; margin: 2px auto; text-align:center; }
-H2		{ color: #9b4e4e; padding: 8pt; }
+H1		{ color: #7b2e2e; margin: 2px auto; text-align:center; }
+H2		{ color: #7b2e2e; padding: 8pt; }
 H3		{ padding: 5pt; }
 H4		{ padding: 3pt  }
 H5		{  }
-H1 a	{ color: #9b4e4e;  }
-H2 a	{ color: #9b4e4e;  }
+H1 a	{ color: #7b2e2e;  }
+H2 a	{ color: #7b2e2e;  }
 H3 a	{ color: black;  }
 H4 a	{ color: black;  }
-H1 a:hover	{ color: #9b4e4e  }
-H2 a:hover	{ color: #9b4e4e  }
+H1 a:hover	{ color: #7b2e2e  }
+H2 a:hover	{ color: #7b2e2e  }
 H3 a:hover	{ color: black  }
 H4 a:hover	{ color: black  }
 
@@ -84,7 +84,7 @@ DIV.ManualTitle	{
 		display: inline-block;
 		margin: 5px;
 		text-align: center;
-		font-size: x-large;
+		font-size: large;
 		font-weight: bold;
 }
 
