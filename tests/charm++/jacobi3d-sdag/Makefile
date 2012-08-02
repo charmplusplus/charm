@@ -24,7 +24,7 @@ summary: $(OBJS)
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC)  jacobi3d.ci
 
-syncfttest casualfttest: fttest
+syncfttest causalfttest: fttest
 fttest: jacobi3d
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB $(TESTOPTS)
 	./charmrun ./jacobi3d 256 128 +p8 +balancer DummyLB +killFile kill_01.txt $(TESTOPTS)
