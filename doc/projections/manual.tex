@@ -124,45 +124,6 @@ addition to standard \charmpp{} entry methods.
 %is executed with the {\tt +dop\_pose} runtime option. No additional
 %user intervention is required.
 
-\section{Advanced Tracing Features}
-\label{sec::advanced tracing features}
-
-\subsection{End-of-run Analysis for Data Reduction}
-\label{sec::data reduction}
-
-As applications are scaled to thousands or hundreds of thousands of
-processors, the amount of data generated becomes extremely large and
-potentially unmanagable by the visualization tool. At the time of this
-documentation, \projections{} is capable of handling data from 8000+
-processors but with somewhat severe tool responsiveness issues. We
-have developed an approach to mitigate this data size problem with
-options to trim-off ``uninteresting'' processors' data by not writing
-such data at the end of an application's execution.
-
-This is currently done through heuristics to pick out interesting
-extremal (i.e. poorly behaved) processors and at the same time using a
-k-means clustering to pick out exemplar processors from equivalence
-classes to form a representative subset of processor data. The analyst
-is advised to also link in the summary module via {\tt +tracemode
-summary} and enable the {\tt +sumDetail} option in order to retain
-some profile data for processors whose data were dropped.
-
-\begin{itemize}
-\item
-{\tt +extrema}: enables extremal processor identification analysis at
-the end of the application's execution.
-\item
-{\tt +numClusters}: determines the number of clusters (equivalence
-classes) to be used by the k-means clustering algorithm for
-determining exemplar processors. Analysts should take advantage of
-their knowledge of natural application decomposition to guess at a
-good value for this.
-\end{itemize}
-
-This feature is still being developed and refined as part of our
-research. It would be appreciated if users of this feature could
-contact the developers if you have input or suggestions.
-
 \newpage
 
 \section{The \projections{} Performance Visualization Tool}

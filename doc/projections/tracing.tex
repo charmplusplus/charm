@@ -22,7 +22,7 @@ performance information to locate application execution performance
 problems. (see section \ref{sec::visualization})
 \end{enumerate}
 
-\section{Preparing the \charmpp{} Application}
+\section{Preparing the Application}
 \label{sec::preparation}
 
 The \charmpp{} runtime automatically records pertinent performance
@@ -52,7 +52,7 @@ To enable performance tracing of your application, users simply need
 to link the appropriate trace data generation module(s) (also referred
 to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
 
-\subsection{\projections{} Tracing Modules at Application Link Time}
+\subsection{Enabling Performance Tracing at Link/Run Time}
 \label{sec::trace modules}
 
 \projections{} tracing modules dictate the type of performance data,
@@ -151,7 +151,7 @@ executable. This runtime option currently overrides the {\tt
 +sumDetail} option.
 \end{itemize}
 
-\subsection{General Runtime Options}
+\subsubsection{General Runtime Options}
 \label{sec::general options}
 
 The following is a list of runtime options available with the same
@@ -172,8 +172,44 @@ the terminal I/O system of the machine and result in unacceptable
 perturbation of the application.
 \end{itemize}
 
+\subsubsection{End-of-run Analysis for Data Reduction}
+\label{sec::data reduction}
 
-\subsection{\projections{} API for \charmpp{} Applications}
+As applications are scaled to thousands or hundreds of thousands of
+processors, the amount of data generated becomes extremely large and
+potentially unmanagable by the visualization tool. At the time of this
+documentation, \projections{} is capable of handling data from 8000+
+processors but with somewhat severe tool responsiveness issues. We
+have developed an approach to mitigate this data size problem with
+options to trim-off ``uninteresting'' processors' data by not writing
+such data at the end of an application's execution.
+
+This is currently done through heuristics to pick out interesting
+extremal (i.e. poorly behaved) processors and at the same time using a
+k-means clustering to pick out exemplar processors from equivalence
+classes to form a representative subset of processor data. The analyst
+is advised to also link in the summary module via {\tt +tracemode
+summary} and enable the {\tt +sumDetail} option in order to retain
+some profile data for processors whose data were dropped.
+
+\begin{itemize}
+\item
+{\tt +extrema}: enables extremal processor identification analysis at
+the end of the application's execution.
+\item
+{\tt +numClusters}: determines the number of clusters (equivalence
+classes) to be used by the k-means clustering algorithm for
+determining exemplar processors. Analysts should take advantage of
+their knowledge of natural application decomposition to guess at a
+good value for this.
+\end{itemize}
+
+This feature is still being developed and refined as part of our
+research. It would be appreciated if users of this feature could
+contact the developers if you have input or suggestions.
+
+
+\subsection{Tracing API for \charmpp{} Applications}
 \label{sec::api}
 
 \subsubsection{Selective Tracing}
@@ -280,17 +316,10 @@ Eg.
    traceUserBracketEvent(20, critStart,CmiWallTimer());
 \end{verbatim}
 
-
-
-
-
 \item
 {\tt void traceUserSuppliedNote(char * note) }
 
 This function records a user specified text string at the current time.
-
-
-
 
 \item
 {\tt void traceUserSuppliedBracketedNote(char *note, int EventNum, double StartTime, double EndTime)}
