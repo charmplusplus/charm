@@ -1,31 +1,30 @@
 \projections{} is a performance analysis/visualization framework that
 helps you understand and investigate performance-related problems in
-your parallel (\charmpp{}) application. It is a framework with an
-event tracing component with features that allow you to control the
-amount of information generated and to a lesser degree the amount of
-perturbation the tracing activities introduce into the application. It
+the (\charmpp{}) applications. It is a framework with an
+event tracing component which allows to control the
+amount of information generated. The tracing has low perturbation 
+on the application. It
 also has a Java-based visualization and analysis component with
-various views that will help present the performance information in a
+various views that help present the performance information in a
 visually useful manner.
 
-Performance analysis with \projections{} typically involves 2 simple
+Performance analysis with \projections{} typically involves two simple
 steps:
 
 \begin{enumerate}
 \item 
-Prepare your application code by linking with the appropriate trace
-generation modules and executing it to generate trace data.
+Prepare your application by linking with the appropriate trace
+generation modules and execute it to generate trace data.
 \item
 Using the Java-based tool to visually study various aspects of the
-performance information to locate application execution performance
-problems.
+performance and locate the performance issues for that application execution.
 \end{enumerate}
 
 The \charmpp{} runtime automatically records pertinent performance
-data at performance-related events encountered by the runtime. These
+data for performance-related events during execution. These
 events include the start and end of entry method execution, message
-sends from entry methods and scheduler idle time. This means {\em
-most} users will not need to manually insert code into their
+send from entry methods and scheduler idle time. This means {\em
+most} users do not need to manually insert code into their
 applications in order to generate trace data. In scenarios where
 special performance information not captured by the runtime is
 required, an API (see section \ref{sec::api}) is available for
@@ -53,7 +52,7 @@ to as {\em tracemode(s)}). (see section \ref{sec::trace modules})
 
 \projections{} tracing modules dictate the type of performance data,
 data detail and data format each processor will record. They are also
-refered to as ``tracemodes''. There are currently 2 tracemodes
+refereed to as ``tracemodes''. There are currently 2 tracemodes
 available. Zero or more tracemodes may be specified at link-time. When
 no tracemodes are specified, no trace data is generated.
 
@@ -61,20 +60,20 @@ no tracemodes are specified, no trace data is generated.
 
 Link time option: {\tt -tracemode projections}
 
-This tracemode generates detailed event log files that contain
+This tracemode generates files that contain
 information about all \charmpp{} events like entry method calls and
 message packing during the execution of the program.  The data will be
 used by \projections{} in visualization and analysis.
 
-This tracemode will generate a single symbol table file and $p$ ASCII
+This tracemode creates a single symbol table file and $p$ ASCII
 log files for $p$ processors. The names of the log files will be
 NAME.\#.log where NAME is the name of your executable and \# is the
 processor \#. The name of the symbol table file is NAME.sts where NAME
 is the name of your executable.
 
-This is the main source of data expected by the performance
+This is the main source of data needed by the performance
 visualizer. Certain tools like timeline will not work without the
-detailed data from this tracemode.
+detail data from this tracemode.
 
 The following is a list of runtime options available under this tracemode:
 
@@ -102,11 +101,11 @@ Compile option: {\tt -tracemode summary}
 In this tracemode, execution time across all entry points for each
 processor is partitioned into a fixed number of equally sized
 time-interval bins. These bins are globally resized whenever they are
-all filled in order to accomodate longer execution times while keeping
+all filled in order to accommodate longer execution times while keeping
 the amount of space used constant.
 
 Additional data like the total number of calls made to each entry
-point is summarised within each processor.
+point is summarized within each processor.
 
 This tracemode will generate a single symbol table file and $p$ ASCII
 summary files for $p$ processors. The names of the summary files will
@@ -173,7 +172,7 @@ perturbation of the application.
 
 As applications are scaled to thousands or hundreds of thousands of
 processors, the amount of data generated becomes extremely large and
-potentially unmanagable by the visualization tool. At the time of this
+potentially unmanageable by the visualization tool. At the time of this
 documentation, \projections{} is capable of handling data from 8000+
 processors but with somewhat severe tool responsiveness issues. We
 have developed an approach to mitigate this data size problem with
