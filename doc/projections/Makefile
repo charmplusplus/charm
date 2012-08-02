@@ -1,6 +1,6 @@
 # Stub makefile for LaTeX PPL manual
 FILE=manual
-TEX=$(FILE).tex 
+TEX=$(FILE).tex tracing.tex 
 
 DEST=projections
 LATEX2HTML=$(L2H) -split 5
