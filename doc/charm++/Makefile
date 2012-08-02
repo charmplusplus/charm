@@ -1,7 +1,7 @@
 # Stub makefile for LaTeX PPL manual
 FILE=manual
 TEX=$(FILE).tex arrays.tex callbacks.tex chares.tex commlib.tex delegation.tex \
-	entry.tex further.tex groups.tex inhertmplt.tex index.tex intro.tex \
+	entry.tex groups.tex inhertmplt.tex index.tex intro.tex \
 	helloworld.tex utilities.tex loadb.tex advancedlb.tex futures.tex \
 	marshalling.tex messages.tex modules.tex nodegroups.tex othercalls.tex \
 	overview.tex pup.tex advancedpup.tex quiesce.tex readonly.tex reductions.tex sdag.tex \
