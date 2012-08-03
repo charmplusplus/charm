@@ -82,7 +82,7 @@ The \verb.p|a;. syntax works wherever \verb.a. is:
     In this case, \verb.p|a;. calls the custom \verb.operator |..
 \end{itemize}
 
-See \exampleref{examples/charm++/PUP}
+See \examplerefdir{PUP}
 
 For container types, you must simply pup each element of the container.
 For arrays, you can use the utility method \kw{PUParray}, which takes
@@ -102,7 +102,7 @@ If the variable is from the C++ Standard Template Library, you can include
 operator\verb.|.'s for STL vector, map, list, pair, and string, templated
 on anything, by including the header ``pup\_stl.h''.
 
-See \exampleref{examples/charm++/PUP/STLPUP}
+See \examplerefdir{PUP/STLPUP}
 
 \subsection{PUP Dynamic Data}
 As usual in \CC{}, pointers and allocatable objects usually require special handling. 
@@ -122,7 +122,7 @@ operator\verb.|. might look like:
   \}
 \end{alltt}
 
-See \exampleref{examples/charm++/PUP/HeapPUP}
+See \examplerefdir{PUP/HeapPUP}
 
 \subsection{PUP as bytes}
 
@@ -341,5 +341,5 @@ because messages are an efficient, low-level construct that minimizes copying
 and overhead; but very complicated structures are often most easily passed via 
 marshalling, because marshalling uses the high-level pup framework.
 
-See \exampleref{examples/charm++/PUP/HeapPUP}
+See \examplerefdir{PUP/HeapPUP}
 

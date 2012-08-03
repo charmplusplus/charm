@@ -35,8 +35,8 @@ baseline load balancing is provided by migration strategies, but in each
 iteration one also spawns off work in the form of chares that can run on any
 processor. The seed balancer will handle such work as it arises.
 
-Examples are in \exampleref{examples/charm++/load\_balancing} and
-\exampleref{tests/charm++/load\_balancing}
+Examples are in \examplerefdir{load\_balancing} and
+\testrefdir{load\_balancing}
 
 \section{Measurement-based Object Migration Strategies}
 \label{lbFramework}
@@ -465,7 +465,7 @@ migrate it.
 %previous subsection perform the task of moving chares during work to achieve
 %load balance.
 Depending on the movement strategy, several seed load balancers are available now.
-Examples can be found \exampleref{examples/charm++/NQueen}.
+Examples can be found \examplerefdir{NQueen}.
 \begin{enumerate}
 \item {\em random}\\  
  A strategy that places seeds randomly when they are created and does

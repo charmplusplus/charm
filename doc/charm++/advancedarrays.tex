@@ -25,7 +25,7 @@ each time the element may have migrated; e.g., at the start
 of each entry method.
 
 An example of this usage is available
-in \exampleref{examples/charm++/topology/matmul3d}.
+in \examplerefdir{topology/matmul3d}.
 
 \section{Advanced Array Creation}
 \label{advanced array create}
@@ -80,7 +80,7 @@ required than inserting each element individually, which will require
 one message send per element.
 
 Examples of bulk construction are commonplace, see
-\exampleref{examples/charm++/jacobi3d-sdag}
+\examplerefdir{jacobi3d-sdag}
 for a demonstration of the slightly more complicated case of
 multidimensional chare array bulk construction.
 
@@ -162,10 +162,10 @@ For example, if you've declared a map object named ``BlockMap'':
 \end{alltt}
 
 An example which contructs one element per physical node may be found in
-\exampleref{examples/charm++/PUP/pupDisk}
+\examplerefdir{PUP/pupDisk}
 
 Other 3D Torus network oriented map examples are in
-\exampleref{examples/charm++/topology}
+\examplerefdir{topology}
 
 \subsection{Initial Elements}
 \index{array initial}
@@ -298,7 +298,7 @@ private:
 \end{alltt}
 
 A demonstration of bound arrays can be found in
-\exampleref{tests/charm++/startupTest}
+\testrefdir{startupTest}
 
 
 \subsection{Dynamic Insertion}
@@ -362,7 +362,7 @@ If you do not specify one, the system will choose a processor to
 create an array element on based on the current map object.
 
 A demonstration of dynamic insertion is available:
-\exampleref{examples/charm++/hello/fancyarray}
+\examplerefdir{hello/fancyarray}
 
 \subsection{Demand Creation}
 
@@ -386,7 +386,7 @@ classic entry methods; and demand-created and normally
 created elements. 
 
 A simple example of demand creation
-\exampleref{tests/charm++/demand\_creation}
+\testrefdir{demand\_creation}
 
 \section{User-defined Array Indices}
 \label{user-defined array index type}
@@ -470,7 +470,7 @@ AF::AF()
 \end{alltt}
 
 A demonstration of user defined indices can be seen in
-\exampleref{examples/charm++/hello/fancyarray}
+\examplerefdir{hello/fancyarray}
 
 %\section{Load Balancing Chare Arrays}
 %see section~\ref{lbFramework}

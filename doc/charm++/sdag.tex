@@ -246,7 +246,7 @@ number in square brackets between the entry method name and its parameter list.
 That expression will be compared for equality with the entry method's first
 argument, or with the reference number field of an explicit message
 (\S~\ref{messages}). Matching is used in the loop example below, and in
-\exampleref{examples/charm++/jacobi2d-sdag/jacobi2d.ci}. Multiple {\tt when} triggers for
+\examplereffile{jacobi2d-sdag/jacobi2d.ci}. Multiple {\tt when} triggers for
 an entry method with different matching reference numbers will not conflict - each
 will receive only corresponding messages.
 
@@ -411,8 +411,7 @@ forall [IDENT] (MIN:MAX,STRIDE) BODY
 \end{center}
 The range from MIN to MAX is inclusive. Its use is demonstrated through
 distributed parallel matrix-matrix multiply shown in
-\exampleref{examples/charm++/matmul/matmul.ci}.
-
+\examplereffile{matmul/matmul.ci}
 
 \section{Usage Notes}
 
@@ -622,6 +621,6 @@ SDAG constructs of the following kinds:
 
 \sdag{} code can be inserted into the .ci file for any array, group, or chare's entry methods.
 
-For more details regarding \sdag{}, look at \exampleref{examples/charm++/hello/sdag}
+For more details regarding \sdag{}, look at \examplerefdir{hello/sdag}
 }
 

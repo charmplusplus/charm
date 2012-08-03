@@ -57,6 +57,12 @@
 % to I (and again conflict with part 1).
 \renewcommand{\thepart}{\Roman{part}}
 
-\newcommand{\exampleref}[1]{{\tt #1}}
+\newcommand{\gitweb}[2]{http://charm.cs.illinois.edu/cgi-bin/gitweb2.cgi?p=charm.git;hb=HEAD;a=#1;f=#2}
+
+\newcommand{\gitwebref}[3]{\href{\gitweb{#1}{#2/charm\%2B\%2B/#3}}{\tt #2/charm++/#3}}
+\newcommand{\examplereffile}[1]{\gitwebref{blob}{examples}{#1}}
+\newcommand{\examplerefdir}[1]{\gitwebref{tree}{examples}{#1}}
+\newcommand{\testreffile}[1]{\gitwebref{blob}{tests}{#1}}
+\newcommand{\testrefdir}[1]{\gitwebref{tree}{tests}{#1}}
 
 \makeindex
