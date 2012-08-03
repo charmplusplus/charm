@@ -81,31 +81,32 @@ different processors). Although one can define a reasonable
 theoretical operational semantics of Charm++ in this fashion, a more
 practical description of execution is useful to understand Charm++: On
 each PE (``PE'' stands for a ``Processing Element''. PEs are akin to
-cores; see section \ref{sec:machine} for a precise description), there is a
-scheduler operating with its own private pool of messages. Each
-instantiated chare has one PE which is where it currently resides. The
-pool on each PE includes messages meant for Chares residing on that
-PE, and seeds for new Chares that are tentatively meant to be
-instantiated on that PE. The scheduler picks a message, creates a new
-chare if the message is a seed (i.e. a constructor invocation) for a
-new Chare, and invokes the method specified by the message. When the
-method returns control back to the scheduler, it repeats the
-cycle. I.e. there is no pre-emptive scheduling of other invocations.
+processor cores; see section \ref{sec:machine} for a precise
+description), there is a scheduler operating with its own private pool
+of messages. Each instantiated chare has one PE which is where it
+currently resides. The pool on each PE includes messages meant for
+Chares residing on that PE, and seeds for new Chares that are
+tentatively meant to be instantiated on that PE. The scheduler picks a
+message, creates a new chare if the message is a seed (i.e. a
+constructor invocation) for a new Chare, and invokes the method
+specified by the message. When the method returns control back to the
+scheduler, it repeats the cycle. I.e. there is no pre-emptive
+scheduling of other invocations.
 
-When a chare method executes, it may create  method invocatins for other
+When a chare method executes, it may create  method invocations for other
 chares. The Charm Runtime System (RTS, sometimes referred to as the
-Chare Kernl in the manual) locates the PE where the targeted chare
+Chare Kernel in the manual) locates the PE where the targeted chare
 resides, and delivers the invocation to the scheduler on that PE. 
 
 Methods of a \index{chare}chare that can be remotely invoked are called
-\index{entry method}{\em entry} methods.  Entry methods may take marshalled
+\index{entry method}{\em entry} methods.  Entry methods may take serializable
 parameters, or a pointer to a message object.  Since \index{chare}
 chares can be created on remote processors, obviously some constructor
 of a chare needs to be an entry method.  Ordinary entry
 methods\footnote{``Threaded'' or ``synchronous'' methods are
 different. But even they do not lead to pre-emption; only to
 cooperative multi-threading} are completely non-preemptive--
-\charmpp\ will never interrupt an executing method to start any other work,
+\charmpp\ will not interrupt an executing method to start any other work,
 and all calls made are asynchronous.
 
 \charmpp\ provides dynamic seed-based load balancing. Thus location (processor
@@ -126,14 +127,14 @@ Chares can be grouped into collections. The types of collections of
 chares supported in Charm++ are: {\em chare-arrays}, \index{group}{\em
 chare-groups}, and \index{nodegroup}{\em chare-nodegroups}, referred
 to as {\em arrays}, {\em groups}, and {\em nodegroups} throughout this
-manual for brevity. A Chare-array is a collection of arbitrary number
+manual for brevity. A Chare-array is a collection of an arbitrary number
 of migratable chares, indexed by some index type, and mapped to
 processors according to a user-defined map group. A group (nodegroup)
 is a collection of chares, with exactly one member element on each PE
-(SMP node).
+(``node'').
 
-Charm++ does not allow global variables except readonly variables
-(see \ref{readonly}). A chare can only access its own data directly.
+Charm++ does not allow global variables, except readonly variables
+(see \ref{readonly}). A chare can normally only access its own data directly.
 However, each chare is accessible by a globally valid name. So, one
 can think of Charm++ as supporting a {\em global object space}.
 
@@ -184,7 +185,7 @@ structures, Charm++ provides two methods: the structured dagger
 notation (Sec \ref{sec:sdag}), which is the main notation we recommend
 you use.  Alternatively, you may use threaded entry methods, in
 combination with {\em futures} and {\em sync} methods
-(See \ref{sec:threads}). The threaded methods run in light-weight
+(See \ref{threaded}). The threaded methods run in light-weight
 user-level threads, and can block waiting for data in a variety of
 ways. Again, only the particular thread of a particular chare is
 blocked, while the PE continues executing other chares.
@@ -237,11 +238,8 @@ identifiers) were used to uniquely identify \charmpp\ objects.  Unlike
 pointers, they are valid on all processors and so could be sent as
 parameters in messages.  They are still available, but now proxies
 also have the same feature.
-}
 
-(NOTE: I assume handles are not to be mentioned. Right?)
-Handles (like CkChareID, CkArrayID, etc.) and 
-
+Handles (like CkChareID, CkArrayID, etc.) are still used internally, but should only be considered relevant to expert level usage.}
 \zap{
 Proxies (like
 CProxy\_foo) are just bytes and can be sent in messages, pup'd, and
@@ -252,19 +250,19 @@ etc.) and, paradoxically, messages themselves.
 
 The following sections provide detailed information about various features of the
 \charmpp\ programming system. Part I, ``Basic Usage'', is sufficient
-for wrirting full-fledged applications. Note that only the last two
+for writing full-fledged applications. Note that only the last two
 chapters of this part involve the notion of physical processors
 (cores, nodes, ..), with the exception of simple query-type utilities
-(Sec \ref{sec:basic utility fns}). We strongly suggest that all
+(Sec \ref{basic utility fns}). We strongly suggest that all
 application developers, beginners and experts alike, try to stick to
 the basic language to the extent possible, and use features from the
 advanced sections only when you are convinced they are
-essential. (They are are useful in specific situatins; but a common
-mistake we see when we examine programs written by beginners is to
-jump to using more complex features that are not really needed for
-their purpose. Hence the caution). The
-advanced concepts in the Part II of the manual support optimizations,
-convenience features, and more complex or sophisticated features. 
+essential. (They are are useful in specific situations; but a common
+mistake we see when we examine programs written by beginners is the
+inclusion of complex features that are not necessary for their
+purpose. Hence the caution). The advanced concepts in the Part II of
+the manual support optimizations, convenience features, and more
+complex or sophisticated features.
 
 
 \footnote{For a description of the underlying design

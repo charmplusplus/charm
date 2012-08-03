@@ -1,5 +1,6 @@
 \section{Machine Model}
 \label{machineModel}
+\label{sec:machine}
 At its basic level, \charmpp{} machine model is very simple: Think of
 each chare as a separate processor by itself. The methods of each
 chare can access its own instance variables (which are all private, at
@@ -24,7 +25,7 @@ is running on, and for finding how many total processors are there.
 
 However, for implementing lower level libraries, and certain optimizations,
 programmers need to be aware of processors. In any case, it is useful
-to understand how the \charmpp{} implementaiton works under the hood. So,
+to understand how the \charmpp{} implementation works under the hood. So,
 we describe the machine model, and some associoated terminology here.
 
 In terms of physical resources, we assume the parallel machine
