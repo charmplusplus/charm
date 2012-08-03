@@ -1298,6 +1298,8 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
     }
 
+    *argc = CmiGetArgc(largv);     /* update it in case it is out of sync */
+
     if(!CharmLibInterOperate) {
 #if CMK_MPI_INIT_THREAD
 #if CMK_SMP
