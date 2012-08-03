@@ -165,6 +165,9 @@ not displayed. This option enables warning messages to be printed to
 screen. However, on large numbers of processors, they can overwhelm
 the terminal I/O system of the machine and result in unacceptable
 perturbation of the application.
+
+{\tt +traceprocessors RANGE}: Only output logfiles for PEs present in the range (i.e. \tt{0-31,32-999966:1000,999967-999999} to record every PE on the first 32, only every thousanth for the middle range, and the last 32 for a million processor run).
+
 \end{itemize}
 
 \subsection{End-of-run Analysis for Data Reduction}
@@ -172,7 +175,7 @@ perturbation of the application.
 
 As applications are scaled to thousands or hundreds of thousands of
 processors, the amount of data generated becomes extremely large and
-potentially unmanageable by the visualization tool. At the time of this
+potentially unmanageable by the visualization tool. At the time of this{\tt +traceWarn}
 documentation, \projections{} is capable of handling data from 8000+
 processors but with somewhat severe tool responsiveness issues. We
 have developed an approach to mitigate this data size problem with
