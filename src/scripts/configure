@@ -4017,6 +4017,23 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+#### query Cray machine max NID ####
+
+cmd=`which xtprocadmin 2>/dev/null`
+if test -n "$cmd"
+then
+    maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking Cray machine maxnid" >&5
+$as_echo_n "checking Cray machine maxnid... " >&6; }
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$maxnid\"" >&5
+$as_echo "\"$maxnid\"" >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_CRAY_MAXNID $maxnid
+_ACEOF
+
+fi
+
 fi
 
 #### test if it can build shared library ####

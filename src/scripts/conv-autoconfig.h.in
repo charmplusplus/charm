@@ -39,6 +39,9 @@
 /* C++ *_casts<> work */
 #undef CMK_CPP_CAST_LEGAL
 
+/* Cray MAXNID */
+#undef CMK_CRAY_MAXNID
+
 /* whether C inline works in C */
 #undef CMK_C_INLINE
 
@@ -86,6 +89,9 @@
 
 /* whether has alloca.h */
 #undef CMK_HAS_ALLOCA_H
+
+/* whether anon structs are permitted */
+#undef CMK_HAS_ANON_STRUCTS
 
 /* whether has asctime */
 #undef CMK_HAS_ASCTIME
@@ -212,9 +218,6 @@
 
 /* whether std::unordered_map works */
 #undef CMK_HAS_STD_UNORDERED_MAP
-
-/* whether anon structs are permitted */
-#undef CMK_HAS_ANON_STRUCTS
 
 /* whether has strings.h */
 #undef CMK_HAS_STRINGS_H
