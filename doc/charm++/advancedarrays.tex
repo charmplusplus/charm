@@ -24,10 +24,8 @@ then, to either avoid \kw{ckLocal} or else call \kw{ckLocal}
 each time the element may have migrated; e.g., at the start 
 of each entry method.
 
-An example of this usage is available in matmul3d:
-\begin{alltt}
-examples/charm++/topology/matmul3d
-\end{alltt}
+An example of this usage is available
+in \exampleref{examples/charm++/topology/matmul3d}.
 
 \section{Advanced Array Creation}
 \label{advanced array create}
@@ -81,10 +79,8 @@ will be significantly more efficient in the number of messages
 required than inserting each element individually, which will require
 one message send per element.
 
-Examples of bulk construction are commonplace, see:
-\begin{alltt}
-examples/charm++/jacobi3d-sdag
-\end{alltt}
+Examples of bulk construction are commonplace, see
+\exampleref{examples/charm++/jacobi3d-sdag}
 for a demonstration of the slightly more complicated case of
 multidimensional chare array bulk construction.
 
@@ -165,15 +161,11 @@ For example, if you've declared a map object named ``BlockMap'':
   a1=CProxy_A1::ckNew(\uw{parameters},opts);
 \end{alltt}
 
-An example which contructs one element per physical node may be found here: 
-\begin{alltt}
-examples/charm++/pupDisk
-\end{alltt}
+An example which contructs one element per physical node may be found in
+\exampleref{examples/charm++/pupDisk}
 
-Other 3D Torus network oriented map examples are in:
-\begin{alltt}
-examples/charm++/topology
-\end{alltt}
+Other 3D Torus network oriented map examples are in
+\exampleref{examples/charm++/topology}
 
 \subsection{Initial Elements}
 \index{array initial}
@@ -305,10 +297,8 @@ private:
 \};
 \end{alltt}
 
-A demonstration of bound arrays can be found in startupTest
-\begin{alltt}
-test/charm++/startupTest
-\end{alltt}
+A demonstration of bound arrays can be found in
+\exampleref{tests/charm++/startupTest}
 
 
 \subsection{Dynamic Insertion}
@@ -372,9 +362,7 @@ If you do not specify one, the system will choose a processor to
 create an array element on based on the current map object.
 
 A demonstration of dynamic insertion is available:
-\begin{alltt}
-examples/charm++/hello/fancyarray
-\end{alltt}
+\exampleref{examples/charm++/hello/fancyarray}
 
 \subsection{Demand Creation}
 
@@ -398,9 +386,7 @@ classic entry methods; and demand-created and normally
 created elements. 
 
 A simple example of demand creation
-\begin{alltt}
-tests/charm++/demand\_creation
-\end{alltt}
+\exampleref{tests/charm++/demand\_creation}
 
 \section{User-defined Array Indices}
 \label{user-defined array index type}
@@ -483,10 +469,8 @@ AF::AF()
 \}
 \end{alltt}
 
-A demonstration of user defined indices available:
-\begin{alltt}
-examples/charm++/hello/fancyarray
-\end{alltt}
+A demonstration of user defined indices can be seen in
+\exampleref{examples/charm++/hello/fancyarray}
 
 %\section{Load Balancing Chare Arrays}
 %see section~\ref{lbFramework}
