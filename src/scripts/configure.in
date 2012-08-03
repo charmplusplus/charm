@@ -1845,6 +1845,17 @@ EOT
 test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
 
+#### query Cray machine max NID ####
+
+cmd=`which xtprocadmin 2>/dev/null`
+if test -n "$cmd"
+then
+    maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    AC_MSG_CHECKING(Cray machine maxnid)
+    AC_MSG_RESULT("$maxnid")
+    AC_DEFINE_UNQUOTED(CMK_CRAY_MAXNID, $maxnid, [Cray MAXNID])
+fi
+
 fi
 
 #### test if it can build shared library ####
