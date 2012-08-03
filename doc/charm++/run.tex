@@ -10,6 +10,10 @@ To run a \charmpp{} program named ``pgm'' on four processors, type:
 charmrun pgm +p4
 \end{alltt}
 
+Execution on platforms which use platform specific launchers, (i.e.,
+{\bf aprun}, {\bf ibrun}), can proceed without charmrun, or charmrun can be used
+in coordination with those launchers via the {\tt ++mpiexec} (see
+\ref{mpiexec} parameter.
 
 Programs built using the network version of \charmpp{} can be run
 alone, without charmrun.  This restricts you to using the processors
@@ -74,7 +78,7 @@ the network version:
 
 
 \item[{\tt ++mpiexec}]
-
+\label{mpiexec}
 Use the cluster's {\tt mpiexec} job launcher instead of the built in rsh/ssh
 method.
 
