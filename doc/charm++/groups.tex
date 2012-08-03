@@ -1,21 +1,22 @@
+So far, we have discussed chares separately from the underlying
+hardware resources to which they are mapped. However, for writing
+lower-level libraries or optimizing application performance it is
+sometimes useful to create chare collections where a single chare is
+mapped per specified resource used in the run. The
+\kw{group} \footnote{Originally called {\em Branch Office Chare} or
+  {\em Branched Chare}} and \kw{node group} constructs provide this
+facility by creating a collection of chares with \index{chare}a single
+chare (or {\sl branch}) on each PE (in the case of groups) or process
+(for node groups). 
+
 \section{Group Objects}
 \label{sec:group}
 
-So far, we have discussed chares separately from the underlying hardware resources 
-to which they are mapped. However, while writing lower-level libraries it is sometimes
-useful to be able to refer to the PE on which a chare's entry method is being executed.
-The \kw{group} \footnote{Originally called {\em Branch Office Chare} or 
-{\em Branched Chare}}construct provides this facility by creating a 
-%A \kw{group}
-% \index{group}is a 
-collection of chares, such that 
-there exists \index{chare}a single chare (or {\sl branch} of the group) on each
-PE.   Each branch has its own data members.  Groups have
-a definition syntax similar to normal chares,
-and they have to inherit from the system-defined class \kw{CBase}\_\uw{ClassName}, 
-where \uw{ClassName} is the name of group's \CC{} class
-\footnote{Older, deprecated syntax allows groups to inherit directly from the
-system-defined class \kw{Group}}.
+Groups have a definition syntax similar to normal chares, and they
+have to inherit from the system-defined class
+\kw{CBase}\_\uw{ClassName}, where \uw{ClassName} is the name of the
+group's \CC{} class \footnote{Older, deprecated syntax allows groups
+to inherit directly from the system-defined class \kw{Group}}.
 
 \subsection{Group Definition}
 
@@ -56,12 +57,12 @@ from above, we can create a group in the following manner:
 CkGroupID fooGroupID = CProxy_Foo::ckNew(\uw{parameters1});
 \end{alltt}
 
-
-In the above, \kw{ckNew} returns an object of type \kw{CkGroupID}, which is
-the globally unique identifier of the corresponding instance of the group.
-This identifier is common to all of the group's branches and
-can be obtained in the group's methods from the variable \kw{thisgroup}, which is a public data
-member of the \kw{Group} superclass.
+In the above, \kw{ckNew} returns an object of type \kw{CkGroupID},
+which is the globally unique identifier of the corresponding instance
+of the group.  This identifier is common to all of the group's
+branches and can be obtained in the group's methods by accessing the variable
+\kw{thisgroup}, which is a public data member of the \kw{Group}
+superclass.
 
 A group can also be identified through its proxy, which can be obtained in one of three ways:
 (a) as the inherited {\tt thisProxy} data member of the class; (b) when creating a group,
@@ -152,8 +153,8 @@ referred to by the proxy \uw{groupProxy}.  Once a proxy to the
 local branch of a group is obtained, that branch can be accessed as a regular
 \CC\ object.  Its public methods can return values, and its public data is 
 readily accessible.
-Thus a dynamically created \index{chare}chare can invoke a public method of a
-group without knowining the PE on which it actually resides. 
+%Thus a dynamically created \index{chare}chare can invoke a public method of a
+%group without knowing the PE on which it actually resides. 
 %the method
 %executes in the local \index{branch}branch of the group.
 
@@ -166,8 +167,8 @@ to send to the mainchare.  Instead of creating a separate message for each
 chare's data, we create a group. When a particular chare
 finishes its work, it reports its findings to the local branch of the group.
 When all the chares on a PE have finished their work, the local branch
-can send single a message to the main chare.  This reduces the number of messages
-sent to the mainchare from the number of chares created, to the number of processors. 
+can send a single message to the main chare.  This reduces the number of messages
+sent to the mainchare from the number of chares created to the number of processors. 
 
 For a more concrete example on how to use groups, please refer to
 \exampleref{examples/charm++/histogram\_group}. It presents a parallel

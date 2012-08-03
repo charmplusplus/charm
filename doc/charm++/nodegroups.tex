@@ -1,16 +1,19 @@
 \section{NodeGroup Objects}
 
-The {\em node group} construct \index{node groups} \index{nodegroup} \index{Nodegroup} is 
-similar to the group construct discussed above. 
-That is, a node group is a collection of chares that can be addressed via globally unique
-identifier. 
-%already discussed in that node groups are
-%collections of chares as well.  
-However, a node group has one chare per {\em process}, or {\em logical node}, rather than one chare per PE.
-%rather than one chare per processor.  
-Therefore, each logical node hosts a single branch of the
-node group.  When an entry method of a
-node group is executed on one of its branches, it executes on {\em some} PE within the logical node.
+The {\em node group} construct \index{node groups} \index{nodegroup}
+\index{Nodegroup} is similar to the group construct discussed
+above. Rather than having one chare per PE, a node group is a
+collection of chares with one chare per {\em process}, or {\em logical
+  node}.  Therefore, each logical node hosts a single branch of the
+node group.  As with groups, node groups can be addressed via globally
+unique identifiers. Nonetheless, there are significant differences in 
+the semantics of node groups as compared to groups and chare arrays. 
+When an entry method of a node group is executed
+on one of its branches, it executes on {\em some} PE within the
+logical node. Also, multiple entry method calls can execute
+concurrently on a single node group branch. This makes node groups
+significantly different from groups and requires some care when using
+them.
 
 \subsection{NodeGroup Declaration} 
 
