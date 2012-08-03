@@ -55,9 +55,10 @@ through the choice of constructor used when creating the callback.
 Possible constructors are: 
 
 \begin{enumerate}
-\item \kw{CkCallback(CkCallbackFn fn,void *param)} When invoked, the
-callback will pass \uw{param} and the result message to the given C function,
-which should have a prototype like:
+\item \kw{CkCallback(void (*CkCallbackFn)(void *, void *),void *param)} 
+When invoked, the callback will pass \uw{param} and the result message
+to the given C function, which should have a prototype
+like:
 
 \begin{alltt}
 void \uw{myCallbackFn}(void *param,void *message)
@@ -68,8 +69,9 @@ so \uw{param} is allowed to point to heap-allocated data.  Of course, you
 are required to free any storage referenced by \uw{param}.
 
 \item \kw{CkCallback(CkCallback::ignore)} When invoked, the callback
-will do nothing.  This can be useful if a \charmpp{} library requires a callback,
-but you don't care when it finishes, or will find out some other way.
+will do nothing.  This can be useful if a \charmpp{} library requires
+a callback, but you don't care when it finishes, or will find out some
+other way.
 
 \item \kw{CkCallback(CkCallback::ckExit)} When invoked, the callback
 will call CkExit(), ending the Charm++ program.
@@ -98,15 +100,14 @@ the callback will broadcast its message to the given entry method
 of the given group.
 
 \item \kw{CkCallback(int ep,int onPE,const CkGroupID \&id)}
-When invoked,
-the callback will send its message to the given entry method
-of the given group member. 
+When invoked, the callback will send its message to the given entry
+method of the given group member.
 
 \end{enumerate}
 
-One final type of callback, \kw{CkCallbackResumeThread()}, 
-can only be used from within threaded entry methods. 
-This callback type is further discussed in the following section.
+One final type of callback, \kw{CkCallbackResumeThread()}, can only be
+used from within threaded entry methods.  This callback type is
+discussed in section \ref{sec:ckcallbackresumethread}.
 
 \section{CkCallback Invocation}
 
@@ -147,7 +148,13 @@ As an alternative to ``send'', the callback can be used in a {\em
 ``send'' method on the callback when the contribute operation has
 finished.
 
+For examples of how to use the various callback types, please see {\tt
+callback.C} in the {\tt tests/charm++/megatest} directory in your
+\charmpp{} distribution. 
+
 \section{Synchronous Execution with CkCallbackResumeThread}
+
+\label{sec:ckcallbackresumethread}
 
 Threaded entry methods can be suspended and resumed through the {\em
   CkCallbackResumeThread} class. {\em CkCallbackResumeThread} is
