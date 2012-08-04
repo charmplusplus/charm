@@ -322,7 +322,7 @@ coincides with migration.  More intricate state based PUPing, for
 objects whose memory footprint varies substantially with computation
 phase, can be handled by explicitly maintaining the object's phase in
 a member variable and implementing phase conditional logic in the PUP
-method.
+method (see section~\ref{sec:pupdynalloc}).
 
 \section{Marshalling User Defined Data Types via PUP}
 
