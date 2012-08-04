@@ -65,6 +65,7 @@ div.navigation {
 		margin:0; padding: 2px;
 		border-bottom: 1px #555555 solid;
 		background: #dfdfdf;
+		font-size: 80%;
 }
 
 #nav-quicklinks {
@@ -80,11 +81,10 @@ div.navigation {
 		margin: 0px 1em;
 }
 
-DIV.ManualTitle	{
+DIV.manualtitle	{
 		display: inline-block;
 		margin: 5px;
 		text-align: center;
-		font-size: large;
 		font-weight: bold;
 }
 

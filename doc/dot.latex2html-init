@@ -163,7 +163,7 @@ sub top_navigation_panel {
     ($NEXT_TITLE ? '<li id="nav-next"><strong> Next:</strong>' . $NEXT_TITLE . "</li>\n" : undef) . 
     "</ul>" .
 
-    "<div class=\"ManualTitle\">Charm++ Manual</DIV>\n"
+    "<div class=\"manualtitle\">Charm++ Manual</DIV>\n"
 }
 
 sub bot_navigation_panel {
