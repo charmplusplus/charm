@@ -225,6 +225,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 #if CMK_CRAY_MAXNID
           if (i<=CMK_CRAY_MAXNID) {
               i++;
+              ret = 0;
               continue;
           }
 #endif
@@ -240,7 +241,7 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxY = *ydim = *ydim+1;
   maxZ = *zdim = *zdim+1;
   CmiUnlock(cray_lock2);
-  // printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim);
+  /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 
 void craynid_init()
