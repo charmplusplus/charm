@@ -3,7 +3,7 @@
 \usepackage{fancyvrb}
 \usepackage{makeidx}
 \usepackage{alltt}
-%\usepackage{html}
+\usepackage{html}
 \usepackage{hyphenat}
 \usepackage{listings}
 \usepackage{xspace} %<- creates problems with other hyperlink packages like "html"
@@ -65,4 +65,10 @@
 \newcommand{\testreffile}[1]{\gitwebref{blob}{tests}{#1}}
 \newcommand{\testrefdir}[1]{\gitwebref{tree}{tests}{#1}}
 
+\begin{htmlonly}
+\renewcommand{\examplereffile}[1]{{\tt\emph{examples/charm++/#1}}}
+\renewcommand{\examplerefdir}[1]{{\tt examples/charm++/#1}}
+\renewcommand{\testreffile}[1]{{\tt\emph{tests/charm++/#1}}}
+\renewcommand{\testrefdir}[1]{{\tt tests/charm++/#1}}
+\end{htmlonly}
 \makeindex
