@@ -1,19 +1,104 @@
-\section{Installing \charmpp{}}
-
-You can install \charmpp{} as either source code or a precompiled
-binary package.  Downloading source code is more flexible, since you
-can choose the options you want; but a precompiled binary is slightly
+\charmpp{} can be installed either from the source code or using a precompiled
+binary package. Building from the source code provides more flexibility, since one 
+can choose the options as desired. However, a precompiled binary may be slightly
 easier to get running.
+ 
+\section{Downloading \charmpp{}}
 
-You begin by downloading \charmpp{} from our web site:
-	http://charm.cs.uiuc.edu/download.html
+\charmpp{} can be downloaded using one of the following methods:
 
-Unpack \charmpp{} using a tool capable of extracting gzip'd tar
-files, such as tar (on Unix) or WinZIP (under Windows).  \charmpp{}
-will be extracted to a directory called ``charm''.
-If you choose the source distribution, read the included 
-``charm/README'' file for detailed instructions on building \charmpp{}
-from source.
+\begin{itemize}
+\item From \charmpp{} website -- The current stable version (source code and
+binaries) can be downloaded from our website at {\em http://charm.cs.uiuc.edu/software}.
+\item From source archive -- The latest development version of \charmpp{} can be downloaded
+from our source archive using {\em git clone git://charm.cs.uiuc.edu/charm.git}.
+\end{itemize}
+
+If you download the source code from the website, you will have to unpack it 
+using a tool capable of extracting gzip'd tar files, such as tar (on Unix) 
+or WinZIP (under Windows).  \charmpp{} will be extracted to a directory 
+called ``charm''. 
+
+\section{Installation}
+
+A typical prototype command for building \charmpp{} from the source code is:
+\vspace{5pt}\\
+{\bf ./build $<$TARGET$>$ $<$TARGET ARCHITECTURE$>$ [OPTIONS]} where,
+
+\begin{description}
+\item [TARGET] is the framework one wants to build such as {\em charm++} or {\em
+AMPI}.
+\item [TARGET ARCHITECTURE] is the machine architecture one wants to build for
+such as {\em net-linux-x86\_64}, {\em bluegenep} etc.
+\item [OPTIONS] are additional options to the build process, e.g. {\em smp} is
+used to build a shared memory version, {\em -j8} is given to build in parallel
+etc.
+\end {description}
+
+In Table~\ref{tab:buildlist}, a list of build commands is provided for some of the commonly 
+used systems. Note that, in general, options such as {\em smp}, {\em
+--with-production}, compiler specifiers etc can be used with all targets. It is
+advisable to build with {\em --with-production} to obtain the best performance.
+If one desires to perform trace collection (for Projections), {\em
+--enable-tracing --enable-tracing-commthread} should also be passed to the build command.
+
+Details on all the available alternatives for each of the above mentioned
+parameters can be found by invoking {\em ./build --help}. One can also go through the 
+build process in an interactive manner. Run {\em ./build}, and it will be followed by 
+a few queries to select appropiate choices for the build one wants to perform.
+
+
+\begin{table}[ht]
+\begin{tabular}{|p{6cm}|p{9cm}|}
+\hline
+Net with 32 bit Linux & ./build charm++ net-linux --with-production -j8
+\\\hline
+Multicore 64 bit Linux & ./build charm++ multicore-linux64 --with-production -j8
+\\\hline
+Net with 64 bit Linux & ./build charm++ net-linux-x86\_64 --with-production -j8
+\\\hline
+Net with 64 bit Linux (intel compilers) & ./build charm++ net-linux-x86\_64 icc --with-production -j8
+\\\hline
+Net with 64 bit Linux (shared memory) & ./build charm++ net-linux-x86\_64 smp --with-production -j8
+\\\hline
+Net with 64 bit Linux (checkpoint restart based fault tolerance) & ./build charm++ net-linux-x86\_64 syncft --with-production -j8
+\\\hline
+MPI with 64 bit Linux & ./build charm++ mpi-linux-x86\_64 --with-production -j8
+\\\hline
+MPI with 64 bit Linux (shared memory) & ./build charm++ mpi-linux-x86\_64 smp --with-production -j8
+\\\hline
+MPI with 64 bit Linux (mpicxx wrappers) & ./build charm++ mpi-linux-x86\_64 mpicxx --with-production -j8
+\\\hline
+IBVERBS with 64 bit Linux & ./build charm++ net-linux-x86\_64 ibverbs --with-production -j8
+\\\hline
+Net with 32 bit Windows & ./build charm++ net-win32 --with-production -j8
+\\\hline
+Net with 64 bit Windows & ./build charm++ net-win64 --with-production -j8
+\\\hline
+MPI with 64 bit Windows & ./build charm++ mpi-win64 --with-production -j8
+\\\hline
+Net with 64 bit Mac & ./build charm++ net-darwin-x86\_64 --with-production -j8
+\\\hline
+Blue Gene/L & ./build charm++ bluegenel xlc --with-production -j8
+\\\hline
+Blue Gene/P & ./build charm++ bluegenep xlc --with-production -j8
+\\\hline
+Blue Gene/Q & ./build charm++ pami-bluegeneq xlc --with-production -j8
+\\\hline
+Cray XT3 & ./build charm++ mpi-crayxt3 --with-production -j8
+\\\hline
+Cray XT5 & ./build charm++ mpi-crayxt --with-production -j8
+\\\hline
+Cray XE6 & ./build charm++ gemini\_gni-crayxe --with-production -j8
+\\\hline
+\end{tabular}
+\caption{Build command for some common cases}
+\label{tab:buildlist}
+\end{table}
+
+As mentioned earlier, one can also build \charmpp{} using the precompiled binary
+in a manner similar to what is used for installing any common software.
+
 
 The main directories in a \charmpp{} installation are:
 
@@ -45,10 +130,12 @@ Directory where \charmpp{} is built.
 \item[\kw{charm/tools}]
 Visualization tools for \charmpp{} programs.
 
+\item[\kw{charm/tests}]
+Test \charmpp{} programs used by autobuild.
+
 \end{description}
 
-
-\subsection{Security Issues}
+\section{Security Issues}
 
 On most computers, \charmpp{} programs are simple binaries, and they pose
 no more security issues than any other program would.  The only exception
@@ -75,11 +162,11 @@ at each internet domain, and the frequency with which it is used.
 We recognize that some users may have objections to our notification
 code.  Therefore, we have provided a second copy of the {\tt
 charmrun} program with the notification code removed.  If you look
-within the charm {\tt bin} directory, you will find these programs:
+within the {\tt bin} directory, you will find these programs:
 
 \begin{alltt}
-    % cd charm/bin
-    % ls charmrun*
+    \$ cd charm/bin
+    \$ ls charmrun*
     charmrun
     charmrun-notify
     charmrun-silent
@@ -90,27 +177,19 @@ permanently deactivate notification, you may use the version without the
 notification code:
 
 \begin{alltt}
-    % cd charm/bin
-    % cp charmrun.silent charmrun
+    \$ cd charm/bin
+    \$ cp charmrun.silent charmrun
 \end{alltt}
 
-The {\em only} versions of \charmpp{} that ever notify us are 
+The only versions of \charmpp{} that ever notify us are 
 the network versions.
 
 
-\subsection{Reducing disk usage}
-
-This section describes how you may delete parts of the distribution to
-save disk space.  
+\section{Reducing disk usage}
 
 The charm directory contains a collection of example-programs and
-test-programs.  These may be deleted with no other effects:
-
-\begin{alltt}
-    % rm -r charm/pgms
-\end{alltt}
-
-You may also {\tt strip} all the binaries in {\tt charm/bin}.
+test-programs.  These may be deleted with no other effects. You may 
+also {\tt strip} all the binaries in {\tt charm/bin}.
 
 
 
