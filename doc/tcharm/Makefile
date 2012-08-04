@@ -4,7 +4,7 @@ TEX=$(FILE).tex
 
 DEST=tcharm
 LATEX2HTML=$(L2H) -split 5
-DOCTITLE='Threaded C<SMALL>HARM++</SMALL> Manual'
+DOCTITLE='Threaded Charm++ Manual'
 
 include ../Makefile.common
 

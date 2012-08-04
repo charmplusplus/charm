@@ -4,7 +4,7 @@ TEX=$(FILE).tex tracing.tex
 
 DEST=projections
 LATEX2HTML=$(L2H) -split 5
-DOCTITLE='P<SMALL>ROJECTIONS</SMALL> Manual'
+DOCTITLE='Projections Manual'
 
 include ../Makefile.common
 
