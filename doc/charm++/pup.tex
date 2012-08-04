@@ -276,7 +276,11 @@ example, the load balancer (see section~\ref{lbFramework}) might
 migrate array elements to better balance the load between processors.
 For an array element to be migratable, it must implement a \uw{pup}
 method.  The standard PUP contract (see section \ref{sec:pupcontract})
-and constraints wrt to serializing data, and use of Structured Dagger apply.  A simple example for an array follows:
+and constraints wrt to serializing data, and use of Structured Dagger
+apply. 
+
+
+A simple example for an array follows:
 
 \begin{alltt}
 //In the .h file:
@@ -305,6 +309,20 @@ void A2::pup(PUP::er \&p)
     p(dbl,numDbl);
 \}
 \end{alltt}
+
+The default assumption, as used in the example above, for the object
+state at PUP time is that a chare, and its member objects, could be
+migrated at any time while it is inactive, i.e. not executing an entry
+method.  Actual migration time can be controlled (see
+section~\ref{lbFramework}) to be less frequent.  If migration timing
+is fully user controlled, e.g., at the end of a synchronized load
+balancing step, then PUP implementation can be simplified to only
+transport ``live'' ephemeral data matching the object state which
+coincides with migration.  More intricate state based PUPing, for
+objects whose memory footprint varies substantially with computation
+phase, can be handled by explicitly maintaining the object's phase in
+a member variable and implementing phase conditional logic in the PUP
+method.
 
 \section{Marshalling User Defined Data Types via PUP}
 
