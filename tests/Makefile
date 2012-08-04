@@ -15,9 +15,9 @@ bgtest:
 		(cd $$d && $(MAKE) bgtest OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
-fttest:
+syncfttest causalfttest:
 	for d in charm++ ampi; do \
-		(cd $$d && $(MAKE) fttest OPTS='$(OPTS)' || exit 1) || exit 1; \
+		(cd $$d && $(MAKE) $@ OPTS='$(OPTS)' || exit 1) || exit 1; \
 	done
 
 test-converse:
