@@ -9,6 +9,7 @@ TEX=$(FILE).tex arrays.tex callbacks.tex chares.tex commlib.tex delegation.tex \
 	../projections/tracing.tex
 DEST=charm++
 LATEX2HTML=$(L2H) -split 5
+DOCTITLE = 'Charm++ Manual'
 
 include ../Makefile.common
 

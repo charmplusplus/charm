@@ -3,6 +3,7 @@ FILE=manual
 TEX=$(FILE).tex 
 DEST=debugger
 LATEX2HTML=$(L2H) -split 5
+DOCTITLE='C<SMALL>HARM++</SMALL> Debugger Manual'
 PROJECT_LINK='<a href="http://charm.cs.uiuc.edu/research/debugger">CharmDebug Homepage</a><br>'
 
 FIG_TARGET=build_eps_fig

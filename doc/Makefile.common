@@ -7,6 +7,7 @@
 #   TEX: all TeX files to depend on (often just "manual.tex")
 #   DEST: destination manual name (e.g., "fem")
 #   LATEX2HTML: call to latex2html, which should be "$(L2H) <args>"
+#   DOCTITLE: title of the manual
 # (optional) PROJECT_LINK: HTML to include at bottom of page
 
 # Destination directory for local copy of files (e.g., on user machine)
@@ -62,7 +63,7 @@ $(FILE): $(TEX) $(FILE).aux
 	-/bin/cp title.html $(FILE)
 	$(L2H) -split 0 $(FILE).tex
 	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
-	$(LATEX2HTML) $(FILE).tex
+	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
 	../l2h_sanitize_markup.sh
 
 # LaTeX Index and link support
