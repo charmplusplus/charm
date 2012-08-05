@@ -26,6 +26,8 @@ L2H=latex2html -white -antialias -local_icons \
 
 DEPTEX=$(TEX) $(FILE).aux index.tex
 
+.PHONY: setup html1page
+
 # Default target: build postscript, pdf, and html:
 
 all: pdf ps html
@@ -50,9 +52,17 @@ $(FILE).pdf: $(TEX) $(FILE).aux
 	pdflatex $(FILE).tex
 
 # HTML Target:
-html: $(FILE)
+html: $(FILE) html1page
 
-$(FILE): $(TEX) $(FILE).aux
+$(FILE): setup $(TEX) $(FILE).aux
+	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
+	../l2h_sanitize_markup.sh
+
+html1page: setup $(TEX) $(FILE).aux
+	$(L2H) -split 0 $(FILE).tex
+	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
+
+setup:
 	-@ln -s ../pplmanual.* .
 	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
@@ -60,10 +70,6 @@ $(FILE): $(TEX) $(FILE).aux
 	-@/bin/cp ../manual.css $(FILE)
 	-@/bin/cp ../*.js $(FILE)
 	-@/bin/cp ../navbarbkgd.png $(FILE)
-	$(L2H) -split 0 $(FILE).tex
-	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
-	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
-	../l2h_sanitize_markup.sh
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)
