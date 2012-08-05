@@ -10,7 +10,7 @@ die() {
 	exit 0
 }
 
-[ -x manual ] || die "fixpaths.sh requires a manual/ directory"
+[ -x manual ] || die "this script requires a manual/ directory"
 
 cp -r fig figs manual/
 
@@ -20,8 +20,10 @@ do
 	cwd=`pwd`
 	cwd=`echo $cwd | sed -e 's@/home/net@/expand/home@'`
 	sed -e 's!'`pwd`'/!!g' $f > tmp || die "error running sed on $f"
-	mv $f $f.bak || die "error backing up $f"
-  # Munge through the markup and... 
+    # Uncomment to produce backup files for identifying the results of regex
+	#mv $f $f.bak || die "error backing up $f"
+
+    # Munge through the markup and... 
 	# Relativize all paths
 	# Replace placeholder with script tag
 	# Replace div.alltt with pre tag
@@ -38,6 +40,4 @@ do
 		-e '/<pre>/,/<\/pre>/s|<BR>||g' \
 		-e '/^\w*$/d' \
 	tmp > $f || die "error running sed on $f"
-	rm $f.bak
-	#mv tmp $f || die "error replacing $f"
 done

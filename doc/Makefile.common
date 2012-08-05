@@ -61,7 +61,6 @@ $(FILE): $(TEX) $(FILE).aux
 	-@/bin/cp ../manual.css $(FILE)
 	-@/bin/cp ../*.js $(FILE)
 	-@/bin/cp ../navbarbkgd.png $(FILE)
-	-/bin/cp title.html $(FILE)
 	$(L2H) -split 0 $(FILE).tex
 	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
 	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
