@@ -1,10 +1,8 @@
-\section{Reductions}
-
-\subsection{Reduction Clients}
+\section{Reduction Clients}
 
 \label{reductionClients}
 
-After the data is reduced, it is passed to a you via a callback object,
+After the data is reduced, it is passed to you via a callback object,
 as described in section~\ref{callbacks}.  The message passed to
 the callback is of type \kw{CkReductionMsg}.
 The important members of \kw{CkReductionMsg} are
@@ -87,13 +85,13 @@ which it must not deallocate.
 \end{alltt}
 
 If the target of a reduction is an entry method defined by a
-\emph{whem} clause in \ref[SDAG]{sdag}, one may wish to set a
-reference number or tag that SDAG can use to match the resulting
+\emph{when} clause in SDAG(Section~\ref{sec:sdag}), one may wish to set a
+reference number (or tag) that SDAG can use to match the resulting
 reduction message. To set the tag on a reduction message, the
 contributors can pass an additional integer argument at the end of the
 {\tt contribute()} call.
 
-\subsection{Defining a New Reduction Type}
+\section{Defining a New Reduction Type}
 
 \label{new_type_reduction}
 
