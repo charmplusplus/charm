@@ -21,7 +21,6 @@ L2H=latex2html -white -antialias -local_icons \
 	-long_titles 1 \
 	-show_section_numbers \
 	-top_navigation \
-	-t $(DOCTITLE) \
 	-address '<p align="right">'"`/bin/date +"%B %d, %Y"`"'<br> \
             '$(PROJECT_LINK)'<a href="http://charm.cs.illinois.edu/">PPL Homepage</a>'
 
