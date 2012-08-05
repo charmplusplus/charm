@@ -26,17 +26,17 @@ do
     # Munge through the markup and... 
 	# Relativize all paths
 	# Replace placeholder with script tag
+	# Remove all closing tt tags
+	# and also remove the closing div matching the div.alltt
 	# Replace div.alltt with pre tag
 	# Delete tt tag that is no longer supported in html5
-	# Remove matching closing tags
-	# and also remove the closing div matching the div.alltt
 	# Remove all br tags in between pre tags
 	# and finally delete the line if it just has whitespace
 	sed -e 's!'$cwd'/!!g' \
 	    -e 's|replace_with_script|script|g' \
+		-e '/<\/TT>/{N;s|<\/TT>||g;/\n<\/DIV>/{s|<\/DIV>|</code></pre>|g}}' \
 		-e 's|<DIV CLASS="alltt"[^>]*>|<pre><code>|g' \
 		-e 's|<TT>||g' \
-		-e '/<\/TT>/{N;s|<TT>||g;s|<\/TT>||g;/\n<\/DIV>/{s|<\/DIV>|</code></pre>|g}}' \
 		-e '/<pre>/,/<\/pre>/s|<BR>||g' \
 		-e '/^\w*$/d' \
 	tmp > $f || die "error running sed on $f"
