@@ -31,7 +31,7 @@ method index is the \charmpp{} version of a function pointer.  The
 entry method index can be obtained using the syntax:
 
 \begin{alltt}
-\kw{int myIdx}=CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
+\uw{int myIdx} = CkIndex_\uw{ChareName}::\uw{EntryMethod}(\uw{parameters});
 \end{alltt}
 
 Here, \uw{ChareName} is the name of the chare (group, or array)
@@ -51,55 +51,59 @@ initialized as the argument is only used to resolve the target entry
 method.
 
 The intended behavior upon a callback's invocation is specified
-through the choice of constructor used when creating the callback. 
+through the choice of callback constructor used when creating the callback. 
 Possible constructors are: 
 
 \begin{enumerate}
-\item \kw{CkCallback(void (*CkCallbackFn)(void *, void *),void *param)} 
+\item \kw{CkCallback(void (*CallbackFn)(void *, void *), void *param)} - 
 When invoked, the callback will pass \uw{param} and the result message
 to the given C function, which should have a prototype
 like:
 
 \begin{alltt}
-void \uw{myCallbackFn}(void *param,void *message)
+void \uw{myCallbackFn}(void *param, void *message)
 \end{alltt}
 
 This function will be called on the processor where the callback was created,
-so \uw{param} is allowed to point to heap-allocated data.  Of course, you
+so \uw{param} is allowed to point to heap-allocated data.  Hence, this 
+constructor should be used only when it is known that the callback target (which by definition here
+is just a C-like function) will be on the same processor as from where the constructor was called. 
+Of course, you
 are required to free any storage referenced by \uw{param}.
 
-\item \kw{CkCallback(CkCallback::ignore)} When invoked, the callback
+\item \kw{CkCallback(CkCallback::ignore)} - When invoked, the callback
 will do nothing.  This can be useful if a \charmpp{} library requires
 a callback, but you don't care when it finishes, or will find out some
 other way.
 
-\item \kw{CkCallback(CkCallback::ckExit)} When invoked, the callback
+\item \kw{CkCallback(CkCallback::ckExit)} - When invoked, the callback
 will call CkExit(), ending the Charm++ program.
 
-\item \kw{CkCallback(int ep,const CkChareID \&id)} When invoked, the 
-callback will send its message to the given entry method of the given
-Chare.  Note that a chare proxy will also work in place of a chare id:
+\item \kw{CkCallback(int ep, const CkChareID \&id)} - When invoked, the 
+callback will send its message to the given entry method (specified by the 
+entry point index - \kw{ep}) of the given
+Chare (specified by the chare \kw{id}).  Note that a chare proxy will also work in place of a chare id:
 
 \begin{alltt}
-	CkCallback myCB(CkIndex_myChare::myEntry(NULL),myChareProxy);
+	CkCallback myCB(CkIndex_myChare::myEntry(NULL), myChareProxy);
 \end{alltt}
 
-\item \kw{CkCallback(int ep,const CkArrayID \&id)} 
+\item \kw{CkCallback(int ep, const CkArrayID \&id)} - 
 When invoked,
 the callback will broadcast its message to the given entry method
 of the given array.  An array proxy will work in the place of an array id.
 
-\item \kw{CkCallback(int ep,const CkArrayIndex \&idx,const CkArrayID \&id)}
+\item \kw{CkCallback(int ep, const CkArrayIndex \&idx, const CkArrayID \&id)} - 
 When invoked,
 the callback will send its message to the given entry method
 of the given array element. 
 
-\item \kw{CkCallback(int ep,const CkGroupID \&id)} 
+\item \kw{CkCallback(int ep, const CkGroupID \&id)} - 
 When invoked,
 the callback will broadcast its message to the given entry method
 of the given group.
 
-\item \kw{CkCallback(int ep,int onPE,const CkGroupID \&id)}
+\item \kw{CkCallback(int ep, int onPE, const CkGroupID \&id)} - 
 When invoked, the callback will send its message to the given entry
 method of the given group member.
 
@@ -241,8 +245,8 @@ void mainControlFlow() \{
 \end{alltt}
 
 In all cases a {\em CkCallbackResumeThread} can be used to suspend a thread
-only once.
-
+only once.\\
+(See \examplerefdir{barnes-charm} for a complete example).\\
 {\em Deprecated usage}: in the past, ``thread\_delay'' was used to retrieve the
 incoming message from the callback. While that is still allowed for backward
 compatibility, its usage is deprecated. The old usage is subject to memory
