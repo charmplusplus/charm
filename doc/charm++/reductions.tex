@@ -4,7 +4,9 @@
 
 After the data is reduced, it is passed to you via a callback object,
 as described in section~\ref{callbacks}.  The message passed to
-the callback is of type \kw{CkReductionMsg}.
+the callback is of type \kw{CkReductionMsg}. Unlike typed reductions
+briefed in Section~\ref{reductions}, here we discuss callbacks that take 
+\kw{CkReductionMsg*} argument as custom reduction types can be built using these.
 The important members of \kw{CkReductionMsg} are
 \kw{getSize()}, which returns the number of bytes of reduction data; and
 \kw{getData()}, which returns a ``void *'' to the actual reduced data.
@@ -160,6 +162,6 @@ function is registered and used in the following manner:
 \end{alltt}
 
 Note that you cannot call \kw{CkReduction::addReducer}
-from anywhere but an \kw{initnode} routine.
-
+from anywhere but an \kw{initnode} routine.\\
+(See \examplerefdir{barnes-charm} for a complete example).
 
