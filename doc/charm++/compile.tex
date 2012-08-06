@@ -10,14 +10,14 @@ has to add some command-line options in addition to the simplified
 syntax shown below.  The options are described next.
 
 \begin{alltt}
- * Compile C                        charmc -o pgm.o pgm.c
- * Compile C++                      charmc -o pgm.o pgm.C
- * Link                             charmc -o pgm   obj1.o obj2.o obj3.o...
- * Compile + Link                   charmc -o pgm   src1.c src2.ci src3.C
- * Create Library                   charmc -o lib.a obj1.o obj2.o obj3.o...
- * CPM preprocessing                charmc -gen-cpm file.c
- * Translate Charm++ Interface File charmc file.ci
+ * Compile C                            charmc -o pgm.o pgm.c
+ * Compile C++                          charmc -o pgm.o pgm.C
+ * Link                                 charmc -o pgm   obj1.o obj2.o obj3.o...
+ * Compile + Link                       charmc -o pgm   src1.c src2.ci src3.C
+ * Create Library                       charmc -o lib.a obj1.o obj2.o obj3.o...
+ * Translate Charm++ Interface File     charmc file.ci
 \end{alltt}
+% * CPM preprocessing                charmc -gen-cpm file.c
 
 Charmc automatically figures out where the charm lib and include
 directories are --- at no point do you have to configure this
@@ -116,7 +116,7 @@ example).  Usually, charmc prefers the less buggy of the two, but
 not always.  This option causes charmc to switch to the most reliable
 compiler, regardless of whether it produces slow code or not.
 
-\item[{\tt -language \{converse|charm++|sdag|ampi|fem|f90charm\}}:]
+\item[{\tt -language \{converse|charm++|ampi|fem|f90charm\}}:]
 
 When linking with charmc, one must specify the ``language''.  This
 is just a way to help charmc include the right libraries.  Pick the
@@ -125,7 +125,6 @@ is just a way to help charmc include the right libraries.  Pick the
 \begin{itemize}
 \item{{\bf Charm++} if your program includes \charmpp{}, C++, and C.}
 \item{{\bf Converse} if your program includes C or C++.}
-\item{{\bf sdag} if your program includes structured dagger.}
 \item{{\bf f90charm} if your program includes f90 Charm interface.}
 \end{itemize}
 
