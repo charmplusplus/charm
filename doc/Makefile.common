@@ -52,7 +52,7 @@ $(FILE).pdf: $(TEX) $(FILE).aux
 	pdflatex $(FILE).tex
 
 # HTML Target:
-html: $(FILE) html1page
+html: html1page $(FILE)
 
 $(FILE): setup $(TEX) $(FILE).aux
 	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
