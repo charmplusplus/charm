@@ -1024,9 +1024,10 @@ install:
 	@test ! -d $(DESTDIR)/lib && mkdir -p $(DESTDIR)/lib || true
 	@test ! -d $(DESTDIR)/lib_so && mkdir -p $(DESTDIR)/lib_so || true
 	@test ! -d $(DESTDIR)/bin && mkdir -p $(DESTDIR)/bin || true
-	cp -f ../include/*   $(DESTDIR)/include
+	# cp -f ../include/*   $(DESTDIR)/include
+	for f in ../include/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/include; fi; done
 	cp -f ../lib/*       $(DESTDIR)/lib
-	cp -f ../lib_so/*    $(DESTDIR)/lib_so
+	cp -f ../lib_so/*    $(DESTDIR)/lib_so || true
 #	cp -f ../bin/*       $(DESTDIR)/bin
 	for f in ../bin/*; do if test -f $$f; then cp -f $$f $(DESTDIR)/bin; fi; done
 
