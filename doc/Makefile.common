@@ -57,6 +57,7 @@ html: $(FILE) html1page
 $(FILE): setup $(TEX) $(FILE).aux
 	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
 	../l2h_sanitize_markup.sh
+	for f in $@/*.html; do echo "Sanitizing $$f"; ../markupSanitizer.py $$f > tmpop && cat tmpop > $$f && rm tmpop; done
 
 html1page: setup $(TEX) $(FILE).aux
 	$(L2H) -split 0 $(FILE).tex

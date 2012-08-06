@@ -29,6 +29,5 @@ do
 	sed -e 's!'$cwd'/!!g' \
 	    -e 's|replace_with_script|script|g' \
 	tmp > $f || die "error running sed on $f"
-    ../markupSanitizer.py $f > tmp
     cat tmp > $f
 done
