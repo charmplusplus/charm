@@ -1,58 +1,80 @@
-The Charm software was developed as a
-group effort.  The earliest prototype, Chare Kernel(1.0), was
-developed by Wennie Shu and Kevin Nomura working with Laxmikant
-Kale.  The second prototype, Chare Kernel(2.0), a complete
-re-write with major design changes, was developed by a team
-consisting of Wayne Fenton, Balkrishna Ramkumar, Vikram Saletore,
-Amitabh B. Sinha and Laxmikant Kale. The translator for Chare
-Kernel(2.0) was written by Manish Gupta.  Charm(3.0), with
-significant design changes, was developed by a team consisting of
-Attila Gursoy, Balkrishna Ramkumar, Amitabh B.  Sinha and
-Laxmikant Kale, with a new translator written by Nimish Shah.  The
-\charmpp\ implementation was done by Sanjeev Krishnan.  Charm(4.0)
-included \charmpp\ and was released in fall 1993.  Charm(4.5) was
-developed by Attila Gursoy, Sanjeev Krishnan, Milind Bhandarkar,
-Joshua Yelon, Narain Jagathesan and Laxmikant Kale.  Charm(4.8),
-developed by the same team included Converse, a parallel runtime
-system that allows interoperability among modules written using
-different paradigms within a single application. \charmpp\ runtime
-system was re-targetted at Converse. Syntactic extensions in
-\charmpp\ were dropped, and a simple interface translator was
-developed (by Sanjeev Krishnan and Jay DeSouza) that, along with
-the \charmpp\ runtime, became the \charmpp\ language.  Charm
-(5.4R1) included the following: a complete rewrite of the
-\charmpp\ runtime system (using \CC) and the interface translator
-(done by Milind Bhandarkar), several new features such as Chare
-Arrays (developed by Robert Brunner and Orion Lawlor), various
-libraries (written by Terry Wilmarth, Gengbin Zheng, Laxmikant
-Kale, Zehra Sura, Milind Bhandarkar, Robert Brunner, and Krishnan
-Varadarajan.) A coordination language ``Structured Dagger'' was
-been implemented on top of \charmpp\ (Milind Bhandarkar), dynamic
-seed-based load balancing (Terry Wilmarth and Joshua Yelon), a
-client-server interface for Converse programs, and debugging
-support by Parthasarathy Ramachandran, Jeff Wright, and Milind
-Bhandarkar, Projections, the performance visualization and
-analysis tool, was redesigned and rewritten using Java by Michael
-Denardo. The test suite for \charmpp\ was developed by Michael
-Lang, Jackie Wang, and Fang Hu. Converse was been ported to ASCI
-Red (Joshua Yelon), Cray T3E (Robert Brunner), and SGI Origin2000
-(Milind Bhandarkar). For the current version Charm 6.0 (R1),
-Converse has been ported to new platforms including BlueGene/[LP]
-(Kumar, Huang, Bhatele), Cray XT3/4 (Zheng), Apple G5, Myrinet
-(Zheng), and Infiniband (Chakravorty).  Charm 6.0 introduces a
-dedicated no network SMP multicore Converse layer for stand-alone
-workstation experimenters (Zheng, Chakravorty, Kale, Jetley).
-Charm 6.0 also includes cross platform network topology aware
-chare placement for 3D tori and mesh networks (Kumar, Huang,
-Bhatele, Bohm). The test suite was extended for automated testing
-on all supported platforms by Gengbin Zheng.  The Projection tool
-was substantially improved by Chee Wai Lee and Isaac Dooley. The
-Control Point performance tuning framework was created by Isaac
-Dooley. Debugging support was enhanced with memory inspection
-features by Filippo Gioachin. The Charisma orchestration language
-was implemented on top of Charm++ by Chao Huang and Sanjay Kale.
-Sanjay Kale, Orion Lawlor, Gengbin Zheng, Terry Wilmarth, Filippo
-Gioachin, Sayantan Chakravorty, Chao Huang, David Kunzman, Isaac
-Dooley, Eric Bohm, Sameer Kumar, Chao Mei, Pritish Jetley, and
-Abhinav Bhatele, have been responsible for the changes to the
-system since the last release. 
+\begin{itemize}
+\item Aaron Becker
+\item Abhinav Bhatele
+\item Abhishek Gupta
+\item Akhil Langer
+\item Amit Sharma
+\item Anshu Arya
+\item Artem Shvorin
+\item Arun Singla
+\item Attila Gursoy
+\item Chao Huang
+\item Chao Mei
+\item Chee Wai Lee
+\item David Kunzman
+\item Dmitriy Ofman
+\item Edgar Solomonik
+\item Ehsan Totoni
+\item Emmanuel Jeannot
+\item Eric Bohm
+\item Eric Shook
+\item Esteban Meneses
+\item Esteban Pauli
+\item Filippo Gioachin
+\item Gengbin Zheng
+\item Greg Koenig
+\item Gunavardhan Kakulapati
+\item Hari Govind
+\item Harshitha Menon
+\item Isaac Dooley
+\item Jayant DeSouza
+\item Jeffrey Wright
+\item Jim Phillips
+\item Jonathan Booth
+\item Jonathan Lifflander
+\item Joshua Unger
+\item Josh Yelon
+\item Laxmikant Kale
+\item Lixia Shi
+\item Lukasz Wesolowski
+\item Mani Srinivas Potnuru
+\item Milind Bhandarkar
+\item Minas Charalambides
+\item Narain Jagathesan
+\item Neelam Saboo
+\item Nihit Desai
+\item Nikhil Jain
+\item Nilesh Choudhury
+\item Orion Lawlor
+\item Osman Sarood
+\item Parthasarathy Ramachandran
+\item Phil Miller
+\item Pritish Jetley
+\item Puneet Narula
+\item Rahul Joshi
+\item Ralf Gunter
+\item Ramkumar Vadali
+\item Ramprasad Venkataraman
+\item Rashmi Jyothi
+\item Robert Blake
+\item Robert Brunner
+\item Rui Liu
+\item Ryan Mokos
+\item Sameer Kumar
+\item Sameer Paranjpye
+\item Sanjeev Krishnan
+\item Sayantan Chakravorty
+\item Sindhura Bandhakavi
+\item Tarun Agarwal
+\item Terry L. Wilmarth
+\item Theckla Louchios
+\item Tim Hinrichs
+\item Timothy Knauff
+\item Vikas Mehta
+\item Viraj Paropkari
+\item Xiang Ni
+\item Yanhua Sun
+\item Yan Shi
+\item Yogesh Mehta
+\item Zheng Shao
+\end{itemize}
