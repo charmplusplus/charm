@@ -47,7 +47,7 @@
 #include "cmidirect.h"
 #endif
 
-#define     LARGEPAGE              0
+#define     LARGEPAGE              1
 
 #if CMK_SMP
 #define MULTI_THREAD_SEND          0
@@ -624,6 +624,7 @@ static void IndexPool_init(IndexPool *pool)
         pool->indexes[i].type = 0;
     }
     pool->indexes[i].next = -1;
+    pool->indexes[i].type = 0;
     pool->freehead = 0;
 #if MULTI_THREAD_SEND || CMK_PERSISTENT_COMM
     pool->lock  = CmiCreateLock();
@@ -639,6 +640,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
 #if MULTI_THREAD_SEND  
     CmiLock(pool->lock);
 #endif
+    CmiAssert(type == 1 || type == 2);
     s = pool->freehead;
     if (s == -1) {
         int newsize = pool->size * 2;
@@ -660,7 +662,7 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     }
     pool->freehead = pool->indexes[s].next;
     pool->indexes[s].addr = addr;
-    CmiAssert(pool->indexes[s].type == 0 && (type == 1 || type == 2));
+    CmiAssert(pool->indexes[s].type == 0);
     pool->indexes[s].type = type;
 #if MULTI_THREAD_SEND
     CmiUnlock(pool->lock);
