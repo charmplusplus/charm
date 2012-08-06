@@ -54,10 +54,14 @@ $(FILE).pdf: $(TEX) $(FILE).aux
 # HTML Target:
 html: html1page $(FILE)
 
+tmpFile = tmp-navmenu.html
+
 $(FILE): setup $(TEX) $(FILE).aux
 	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
 	../l2h_sanitize_markup.sh
-	for f in $@/*.html; do echo "Sanitizing $$f"; ../markupSanitizer.py $$f > tmpop && cat tmpop > $$f && rm tmpop; done
+	../navmenuGenerator.py $@/index.html > $(tmpFile)
+	for f in $@/*.html; do echo "Sanitizing $$f"; ../markupSanitizer.py $$f $(tmpFile) > tmpop && cat tmpop > $$f && rm tmpop; done
+	rm -f $(tmpFile)
 
 html1page: setup $(TEX) $(FILE).aux
 	$(L2H) -split 0 $(FILE).tex

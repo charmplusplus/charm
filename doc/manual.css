@@ -66,7 +66,32 @@ div.navigation {
 		border-bottom: 1px #555555 solid;
 		background: #dfdfdf;
 		font-size: 80%;
+		cursor: pointer;
 }
+
+ul.manual-toc {
+		-moz-column-width: 32em;
+		-webkit-column-width: 32em;
+		display: none;
+}
+
+ul.manual-toc > li {
+		font-weight: bold;
+}
+
+ul.manual-toc > li > ul {
+		font-weight: normal;
+}
+
+ul.manual-toc li a {
+		color: #000;
+		text-decoration: none;
+}
+
+ul.manual-toc li a:hover {
+		color: #7b2e2e;
+}
+
 
 #nav-quicklinks {
 		display:inline-block;
