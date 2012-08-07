@@ -56,7 +56,7 @@ static int CMI_DYNAMIC_RECV_CAPSIZE=3;
 /* initial values, -1 indiates there's no cap */
 static int dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
 static int dynamicRecvCap = CMI_DYNAMIC_MAXCAPSIZE;
-static MPI_Comm charmComm;
+MPI_Comm charmComm;
 
 #if CMI_EXERT_SEND_CAP
 static int SEND_CAP=3;
