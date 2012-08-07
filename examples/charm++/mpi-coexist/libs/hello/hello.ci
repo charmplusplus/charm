@@ -1,0 +1,12 @@
+module hello {
+
+  chare MainHello {
+    entry MainHello(int elems);
+    entry void done(void);
+  };
+
+  array [1D] Hello {
+    entry Hello(CProxy_MainHello mp, int nElems);
+    entry void SayHi(int hiNo);
+  };        	
+};
