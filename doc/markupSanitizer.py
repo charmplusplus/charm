@@ -56,6 +56,7 @@ titl = soup.find('title')
 soup.find('head').extract()
 newhead = BeautifulSoup(open("../assets/head.html"), "lxml")
 newhead = newhead.find('head').extract()
+newhead.append(titl)
 soup.html.body.insert_before(newhead)
 
 # Print cleaned up markup to stdout
