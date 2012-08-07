@@ -157,8 +157,6 @@ sub top_navigation_panel {
     '<ul id="nav-quicklinks">' . "\n" .
 	# ... and the ``previous'' title
     ($PREVIOUS_TITLE ? '<li id="nav-prev"><strong>Previous:</strong>' . $PREVIOUS_TITLE . "</li>\n" : undef) .
-    # Similarly with the ``up'' title ...
-    ($UP_TITLE ? '<li id="nav-up"><strong>Up:</strong>' . $UP_TITLE . "</li>\n" : undef) . 
     # If ``next'' section exists, add its title to the navigation panel
     ($NEXT_TITLE ? '<li id="nav-next"><strong> Next:</strong>' . $NEXT_TITLE . "</li>\n" : undef) . 
     "</ul>" .
