@@ -58,9 +58,8 @@ tmpFile = tmp-navmenu.html
 
 $(FILE): setup $(TEX) $(FILE).aux
 	export MANUALTITLE=$(DOCTITLE) && $(LATEX2HTML) $(FILE).tex && unset MANUALTITLE
-	../l2h_sanitize_markup.sh
 	../navmenuGenerator.py $@/index.html > $(tmpFile)
-	for f in $@/*.html; do echo "Sanitizing $$f"; ../markupSanitizer.py $$f $(tmpFile) > tmpop && cat tmpop > $$f && rm tmpop; done
+	for f in $@/*.html; do echo "Sanitizing $$f"; sed -i -e 's!'`pwd`'/!!g' $$f; ../markupSanitizer.py $$f $(tmpFile) > tmpop && cat tmpop > $$f && rm tmpop; done
 	rm -f $(tmpFile)
 
 html1page: setup $(TEX) $(FILE).aux
@@ -72,7 +71,7 @@ setup:
 	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
-	-@/bin/cp -r ../assets $(FILE)
+	-@/bin/cp -r ../assets fig figs $(FILE)
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)
