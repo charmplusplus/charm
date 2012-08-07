@@ -42,12 +42,12 @@ body { font-family: "Droid Sans", Arial, sans-serif; }
 h1, h2, h3 { font-family: Puritan, Verdana, Helvetica sans-serif; }
 code, pre { font-family: "Courier New" Courier monospace; }
 
-html {
+body {
 		background: #ffffff;
 		background: url(hatchbkgd.png) repeat;
 }
 
-body {
+#maincontainer {
 		background: #efefef; color: black;
 		margin:5em auto 20px;
 		padding:30px;
