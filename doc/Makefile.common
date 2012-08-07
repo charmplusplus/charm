@@ -72,9 +72,7 @@ setup:
 	-@ln -s ../dot.latex2html-init .latex2html-init
 	-@rm -fr $(FILE)/*.html $(FILE)/*.aux
 	-@mkdir $(FILE)
-	-@/bin/cp ../manual.css $(FILE)
-	-@/bin/cp ../*.js $(FILE)
-	-@/bin/cp ../navbarbkgd.png $(FILE)
+	-@/bin/cp -r ../assets $(FILE)
 
 # LaTeX Index and link support
 $(FILE).aux: $(TEX) index.tex $(FIG_TARGET)
