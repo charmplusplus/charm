@@ -7,8 +7,9 @@ $(document).ready( function() {
     .children("span.cm-charmkeyword").css("color", "#dd5ef3");
 
     $(".navigation")
-    .click( function() { $("ul.manual-toc").fadeToggle() } )
-    .mouseleave( function() { $("ul.manual-toc").fadeOut('slow') } )
+    .append('<span id="pulldowntab" class="navsymbol">&raquo;</span>')
+    .click( function() { $("ul.manual-toc").fadeToggle(); $("#pulldowntab").toggle(); } )
+    .mouseleave( function() { $("ul.manual-toc").fadeOut('slow'); $("#pulldowntab").fadeIn('slow'); } )
     .css('cursor','pointer');
 
 } )

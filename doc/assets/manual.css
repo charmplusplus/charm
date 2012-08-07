@@ -130,6 +130,16 @@ DIV.manualtitle	{
 		font-weight: bold;
 }
 
+#pulldowntab {
+	position: absolute;
+	left: 50%; top: 0.75em;
+	color: #999;
+	-webkit-transform: rotate(90deg);
+	-moz-transform: rotate(90deg);
+	-o-transform: rotate(90deg);
+	writing-mode: tb-rl;
+}
+
 DIV.center		{   }
 SPAN.tt		{   }
 SPAN.sc		{   }
