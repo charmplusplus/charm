@@ -23,10 +23,6 @@ do
     # Uncomment to produce backup files for identifying the results of regex
 	#mv $f $f.bak || die "error backing up $f"
 
-    # Munge through the markup and... 
 	# Relativize all paths
-	# Replace placeholder with script tag
-	sed -e 's!'$cwd'/!!g' \
-	    -e 's|replace_with_script|script|g' \
-	tmp > $f || die "error running sed on $f"
+	sed -e 's!'$cwd'/!!g' tmp > $f || die "error running sed on $f"
 done

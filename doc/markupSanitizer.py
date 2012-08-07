@@ -33,10 +33,11 @@ navmenu = soup.find('div', 'navigation')
 if navmenu:
     navmenu.extract()
 
-# Wrap the remaining contents with a div
-soup.body['class'] = 'maincontainer'
-soup.body.name = 'div'
-soup.find('div','maincontainer').wrap( soup.new_tag('body') )
+# Wrap the remaining contents within a div
+if not soup.find('div', id='maincontainer'):
+    soup.body['id'] = 'maincontainer'
+    soup.body.name = 'div'
+    soup.find('div', id='maincontainer').wrap( soup.new_tag('body') )
 
 if navmenu:
     # If this navmenu doesn't already have a TOC, insert one
@@ -47,6 +48,15 @@ if navmenu:
         navmenu.append(navmenuTOC)
     # Reinsert the navigation bar at the end
     soup.body.append(navmenu)
+
+# Extract the title
+titl = soup.find('title')
+
+# Replace the head section with the user-supplied head markup
+soup.find('head').extract()
+newhead = BeautifulSoup(open("../assets/head.html"), "lxml")
+newhead = newhead.find('head').extract()
+soup.html.body.insert_before(newhead)
 
 # Print cleaned up markup to stdout
 print( soup.prettify(formatter="html") )
