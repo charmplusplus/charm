@@ -1,0 +1,14 @@
+module CkLoop{
+    initproc void RegisterCkLoopHdlrs(void);
+
+    message CharmNotifyMsg;
+
+	nodegroup FuncCkLoop{
+		entry FuncCkLoop(int mode, int numThreads);
+		entry void exit();
+	};
+	chare FuncSingleHelper{
+		entry FuncSingleHelper(int numHelpers);
+		entry void stealWork(CharmNotifyMsg *msg);
+	};
+};
