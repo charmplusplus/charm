@@ -47,7 +47,7 @@ $NEXT_PAGE_IN_NAVIGATION = 1;
 # Put a link to the previous logical page  in  the  navigation  panel
 $PREVIOUS_PAGE_IN_NAVIGATION = 1;
 
-$INFO = 1;              # 0 = do not make a "About this document..." section 
+$INFO = 0;              # 0 = do not make a "About this document..." section 
 
 # Reuse images generated during previous runs
 $REUSE = 2;
