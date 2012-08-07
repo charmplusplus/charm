@@ -39,10 +39,12 @@ soup.body.name = 'div'
 soup.find('div','maincontainer').wrap( soup.new_tag('body') )
 
 if navmenu:
-    # Add a toc within the navmenu
-    navmenuTOC = BeautifulSoup(open("tmp-navmenu.html"), "lxml")
-    navmenuTOC = navmenuTOC.find('ul','manual-toc').extract()
-    navmenu.append(navmenuTOC)
+    # If this navmenu doesn't already have a TOC, insert one
+    if not navmenu.find('ul','manual-toc'):
+        # Add a toc within the navmenu
+        navmenuTOC = BeautifulSoup(open("tmp-navmenu.html"), "lxml")
+        navmenuTOC = navmenuTOC.find('ul','manual-toc').extract()
+        navmenu.append(navmenuTOC)
     # Reinsert the navigation bar at the end
     soup.body.append(navmenu)
 
