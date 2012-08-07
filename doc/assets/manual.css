@@ -21,6 +21,10 @@ h2		{ color: #7b2e2e; padding: 8pt; }
 h3		{ padding: 5pt; }
 h4		{ padding: 3pt;  }
 
+/* Remove the annoying underlines, but still keep it accessible */
+a { text-decoration: none; }
+a:hover { color:#a00; border-bottom: 1px dotted #a00; }
+
 
 
 /* mathematics styles */
