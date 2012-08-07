@@ -109,6 +109,20 @@ ul.manual-toc li a:hover {
 		margin: 0px 1em;
 }
 
+.navsymbol {
+		font-weight:bold;
+		font-size: 130%;
+		line-height:70%;
+}
+
+#nav-quicklinks a {
+		text-decoration: none;
+}
+
+#nav-quicklinks a:hover {
+	color: #7b2e2e;
+}
+
 DIV.manualtitle	{
 		display: inline-block;
 		margin: 5px;

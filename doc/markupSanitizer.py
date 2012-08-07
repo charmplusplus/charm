@@ -46,6 +46,22 @@ if navmenu:
         navmenuTOC = BeautifulSoup(open("tmp-navmenu.html"), "lxml")
         navmenuTOC = navmenuTOC.find('ul','manual-toc').extract()
         navmenu.append(navmenuTOC)
+
+    # Insert navigation symbols to prev and next links
+    prevsymbol = soup.new_tag('span')
+    prevsymbol['class'] = 'navsymbol'
+    prevsymbol.string = u'\xab'
+    prv = navmenu.find('li',id='nav-prev')
+    if prv:
+        prv.find('a').insert(0, prevsymbol)
+
+    nextsymbol = soup.new_tag('span')
+    nextsymbol['class'] = 'navsymbol'
+    nextsymbol.string = u'\xbb'
+    nxt = navmenu.find('li',id='nav-next')
+    if nxt:
+        nxt.find('a').append(nextsymbol)
+
     # Reinsert the navigation bar at the end
     soup.body.append(navmenu)
 

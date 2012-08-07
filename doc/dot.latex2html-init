@@ -156,9 +156,9 @@ sub top_navigation_panel {
     #"$NEXT $UP $PREVIOUS $CONTENTS $INDEX $CUSTOM_BUTTONS" .
     '<ul id="nav-quicklinks">' . "\n" .
 	# ... and the ``previous'' title
-    ($PREVIOUS_TITLE ? '<li id="nav-prev"><strong>Previous:</strong>' . $PREVIOUS_TITLE . "</li>\n" : undef) .
+    ($PREVIOUS_TITLE ? '<li id="nav-prev">' . $PREVIOUS_TITLE . "</li>\n" : undef) .
     # If ``next'' section exists, add its title to the navigation panel
-    ($NEXT_TITLE ? '<li id="nav-next"><strong> Next:</strong>' . $NEXT_TITLE . "</li>\n" : undef) . 
+    ($NEXT_TITLE ? '<li id="nav-next">' . $NEXT_TITLE . "</li>\n" : undef) .
     "</ul>" .
 
     '<div class="manualtitle">' .
