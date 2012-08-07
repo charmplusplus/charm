@@ -16,19 +16,10 @@ BIG.HUGE		{ font-size : larger   }
 BIG.XHUGE		{ font-size : xx-large }
 
 /* heading styles */
-H1		{ color: #7b2e2e; margin: 2px auto; text-align:center; }
-H2		{ color: #7b2e2e; padding: 8pt; }
-H3		{ padding: 5pt; }
-H4		{ padding: 3pt  }
-H5		{  }
-H1 a	{ color: #7b2e2e;  }
-H2 a	{ color: #7b2e2e;  }
-H3 a	{ color: black;  }
-H4 a	{ color: black;  }
-H1 a:hover	{ color: #7b2e2e  }
-H2 a:hover	{ color: #7b2e2e  }
-H3 a:hover	{ color: black  }
-H4 a:hover	{ color: black  }
+h1		{ color: #7b2e2e; margin: 2px auto; text-align:center; }
+h2		{ color: #7b2e2e; padding: 8pt; }
+h3		{ padding: 5pt; }
+h4		{ padding: 3pt;  }
 
 
 
@@ -74,26 +65,12 @@ ul.manual-toc {
 		display: none;
 }
 
-ul.manual-toc > li {
-		font-weight: bold;
-}
-
-ul.manual-toc > li > ul {
-		font-weight: normal;
-}
-
-ul.manual-toc, ul.manual-toc ul {
-		list-style-type: none;
-}
-
-ul.manual-toc li a {
-		color: #000;
-		text-decoration: none;
-}
-
-ul.manual-toc li a:hover {
-		color: #7b2e2e;
-}
+ul.manual-toc > li { font-weight: bold; }
+ul.manual-toc > li > ul { font-weight: normal; }
+ul.manual-toc,
+ul.manual-toc ul { list-style-type: none; }
+ul.manual-toc li a { color: #000; text-decoration: none; }
+ul.manual-toc li a:hover { color: #7b2e2e; }
 
 
 #nav-quicklinks {
@@ -109,21 +86,16 @@ ul.manual-toc li a:hover {
 		margin: 0px 1em;
 }
 
+#nav-quicklinks a { text-decoration: none; }
+#nav-quicklinks a:hover { color: #7b2e2e; }
+
 .navsymbol {
 		font-weight:bold;
 		font-size: 130%;
 		line-height:70%;
 }
 
-#nav-quicklinks a {
-		text-decoration: none;
-}
-
-#nav-quicklinks a:hover {
-	color: #7b2e2e;
-}
-
-DIV.manualtitle	{
+div.manualtitle	{
 		display: inline-block;
 		margin: 5px;
 		text-align: center;
@@ -140,9 +112,6 @@ DIV.manualtitle	{
 	writing-mode: tb-rl;
 }
 
-DIV.center		{   }
-SPAN.tt		{   }
-SPAN.sc		{   }
 pre {
 		background: #262626;
 		color: #d9bf8c;
@@ -155,12 +124,9 @@ pre {
 		font-size: 110%;
 }
 
-DIV.small		{   }
-SPAN.bf		{   }
-PRE.preform		{   }
-DIV.em		{   }
-SPAN.textit		{ font-style: italic  }
-SPAN.textsl		{ font-style: italic  }
-SPAN.arabic		{   }
-SPAN.textbf		{ font-weight: bold  }
-SPAN.textsf		{ font-style: italic  }
+span.textit		{ font-style: italic  }
+span.textsl		{ font-style: italic  }
+span.arabic		{   }
+span.textbf		{ font-weight: bold  }
+span.textsf		{ font-style: italic  }
+
