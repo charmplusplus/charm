@@ -83,6 +83,10 @@ ul.manual-toc > li > ul {
 		font-weight: normal;
 }
 
+ul.manual-toc, ul.manual-toc ul {
+		list-style-type: none;
+}
+
 ul.manual-toc li a {
 		color: #000;
 		text-decoration: none;

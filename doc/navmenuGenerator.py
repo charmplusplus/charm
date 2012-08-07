@@ -19,10 +19,6 @@ toc = soup.find("ul","ChildLinks").extract()
 for sctn in toc.select("li > ul > li > ul"):
     sctn.extract()
 
-# Discard all spans (numbering)
-for spn in toc("span"):
-    spn.extract()
-
 # Discard all br tags
 for b in toc("br"):
     b.extract()
