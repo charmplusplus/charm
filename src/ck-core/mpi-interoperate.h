@@ -8,9 +8,11 @@
 #if CMK_CONVERSE_MPI
 #include <mpi.h>
 extern MPI_Comm charmComm;
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
+#else
+void CharmLibInit(int userComm, int argc, char **argv);
 #endif
 
-void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
 void CharmLibExit();
 
 extern "C" void LibCkExit(void);

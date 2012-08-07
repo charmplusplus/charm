@@ -61,8 +61,8 @@ void _libExitHandler(envelope *env)
 	}
 }
 
-void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 #if CMK_CONVERSE_MPI
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 	//note CmiNumNodes and CmiMyNode should just be macros
   charmComm = userComm;
   MPI_Comm_size(charmComm, &_Cmi_numnodes);
@@ -70,10 +70,12 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv){
 
 	CharmLibInterOperate = 1;
 	ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
-#else
-        CmiAbort("mpi-interoperate only supports MPI machine layer");
-#endif
 }
+#else
+void CharmLibInit(int userComm, int argc, char **argv){
+    CmiAbort("mpi-interoperate only supports MPI machine layer");
+}
+#endif
 
 #undef CkExit
 #define CkExit CkExit
