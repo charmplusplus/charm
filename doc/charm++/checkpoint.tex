@@ -93,10 +93,13 @@ has to write PUP routines for the groups and declare them as {\tt
 hold key control data like global object counts, and thus mainchares
 need to be checkpointed too. To do this, the programmer should write a
 PUP routine for the mainchare and declare them as {\tt [migratable]}
-in the .ci file, just as in the case of Group and NodeGroup. In
-addition, the programmer also needs to put the proxy to the mainchare
-(usually noted as mainproxy) as a read-only variable in the code, and make
-sure processor 0, which holds the mainchare, initiates the checkpoint.
+in the .ci file, just as in the case of Group and NodeGroup.
+
+The checkpoint must be recorded at a synchronization point in the
+application, to ensure a consistent state upon restart. One easy way
+to achieve this is to synchronize through a reduction to a single
+chare (such as the mainchare used at startup) and have that chare make
+the call to initiate the checkpoint.
 
 After {\tt CkStartCheckpoint} is executed, a directory of the
 designated name is created and a collection of checkpoint files are
