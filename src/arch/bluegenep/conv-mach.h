@@ -3,7 +3,6 @@
 
 #define CMK_BLUEGENEP                                      1
 
-#define CMK_CONVERSE_MPI                                   1
 
 #define CMK_NO_OUTSTANDING_SENDS			   0
 
