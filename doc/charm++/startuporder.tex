@@ -7,12 +7,13 @@
 %what assumptions can user program make about entity availability:
 %ie groups are available in any chare array constructor, but not vice versa etc.
 
-The \charmpp{} program starts with the following sequence:
+%A \charmpp{} program starts with the following sequence:
+At startup, every \charmpp{} program performs the following actions, in sequence:
 \begin{enumerate}
-\item Modules Registration: the modules are registered in the same order with
-their specified order at the linking stage of the program compilation.
-For example, if "-module A -module B" is specified for \charmpp{} program
-linking, then module A is registered before module B at runtime.
+\item Module Registration: all modules given in the \kw{.ci} files are registered in the order
+of their specification in the linking stage of program compilation.
+For example, if you specified "{\tt -module A -module B}" while linking your \charmpp{} program,
+then module {\tt A} is registered before module {\tt B} at runtime.
 
 \item \kw{initnode},\kw{initproc} Calls: all those calls are invoked before the
 creation of other \charmpp{} data structures and the invocation of every

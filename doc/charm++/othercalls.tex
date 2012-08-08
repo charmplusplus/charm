@@ -5,7 +5,7 @@
 Some registration routines need be executed exactly once
 before the computation begins. You may choose to 
 declare a regular  \CC\ subroutine \kw{initnode} in the .ci file
-to ask \charmpp to execute the routine exactly once on {\em every node} 
+to ask \charmpp{} to execute the routine exactly once on {\em every logical node} 
 before the computation begins, or to declare a regular  \CC\ subroutine 
 \kw{initproc} to be executed exactly once on {\em every processor}.
 
@@ -22,17 +22,21 @@ module foo \{
 \end{alltt}
 
 This code will execute the routines \uw{fooNodeInit} and static 
-\uw{bar::barNodeInit} once on every node and \uw{fooProcInit}
+\uw{bar::barNodeInit} once on every logical node and \uw{fooProcInit}
 and \uw{bar::barProcInit} on every processor before the main computation 
 starts.
 Initnode calls are always executed before initproc calls.
-Both init calls (declared as static member function) can be used in chare, 
-group or chare arrays.
+Both init calls (declared as static member functions) can be used in chares, 
+chare arrays and groups.
 
-Note that these routines should only do registration, not computation since
-Charm run-time initialization does not start yet ---
-use a mainchare instead, which gets executed on only processor 0,
-to begin the computation.  Initcall routines are typically
-used to do special registrations and global variable setup
-before the computation actually begins.
+Note that these routines should only implement registration and startup functionality, 
+and not parallel computation, since
+the \charmpp{} run time system will not have started up fully when they are invoked. 
+%does not start yet ---
+In order to begin the parallel computation, you should 
+use a mainchare instead, which gets executed on only PE 0.
+%to begin the computation.  
+%Initcall routines are typically
+%used to do special registrations and global variable setup
+%before the computation actually begins.
 
