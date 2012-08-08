@@ -12,7 +12,7 @@ At startup, every \charmpp{} program performs the following actions, in sequence
 \begin{enumerate}
 \item Module Registration: all modules given in the \kw{.ci} files are registered in the order
 of their specification in the linking stage of program compilation.
-For example, if you specified "{\tt -module A -module B}" while linking your \charmpp{} program,
+For example, if you specified ``{\tt -module A -module B}'' while linking your \charmpp{} program,
 then module {\tt A} is registered before module {\tt B} at runtime.
 
 \item \kw{initnode}, \kw{initproc} Calls: all initnode and initproc functions are invoked before the
