@@ -1850,7 +1850,11 @@ AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available
 cmd=`which xtprocadmin 2>/dev/null`
 if test -n "$cmd"
 then
-    maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    #maxnid=`xtprocadmin  | tail -1  | awk '{print $1}'`
+    # workaround for hopper
+    (export SHELL=/bin/csh; xtprocadmin >& t.$$)
+    maxnid=`cat t.$$  | tail -1  | awk '{print $1}'`
+    /bin/rm -f t.$
     AC_MSG_CHECKING(Cray machine maxnid)
     AC_MSG_RESULT("$maxnid")
     AC_DEFINE_UNQUOTED(CMK_CRAY_MAXNID, $maxnid, [Cray MAXNID])

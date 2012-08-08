@@ -1,0 +1,4 @@
+OPTS = -O3
+CHARMDIR=../../..
+CHARMC=$(CHARMDIR)/bin/charmc $(OPTS)
+CXX=mpicxx $(OPTS)

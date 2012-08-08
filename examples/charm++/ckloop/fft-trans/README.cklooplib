@@ -1,0 +1,21 @@
+Simple test application to try node level parallelization of FFT using
+threads in the CkLoop library compared to a standard charm level
+decomposition.
+
+The main distinction here is node level shared memory awareness.  The
+CkLoop library will exploit that whereas the charm decomposition
+will not.  
+
+We are also interested in getting a sense of at what level of
+granularity it is worth trying to do node level parallelism.  It is
+expected that a lower bound on practically parallelizable grainsize
+will exist as determined by cache locality and function call overhead.
+Below that threshold it won't be worth trying to explicitely exploit
+the available data parallelism.  Hopefully this number is larger than
+a few fft lines with tens to hundreds of points.
+
+For simplicity we do a single FFT for complex to complex using single
+precision as this is typical for NAMD.  A more advanced version would
+do real to complex, but that is more pain than necessary to
+demonstrate utility.
+

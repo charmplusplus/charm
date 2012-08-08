@@ -5,7 +5,14 @@
 #include "ck.h"
 #include "trace.h"
 
-void CharmLibInit(int peid, int numpes, int argc, char **argv);
+#if CMK_CONVERSE_MPI
+#include <mpi.h>
+extern MPI_Comm charmComm;
+void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
+#else
+void CharmLibInit(int userComm, int argc, char **argv);
+#endif
+
 void CharmLibExit();
 
 extern "C" void LibCkExit(void);
