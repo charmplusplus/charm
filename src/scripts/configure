@@ -4031,7 +4031,7 @@ then
 $as_echo_n "checking Cray machine maxnid... " >&6; }
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$maxnid\"" >&5
 $as_echo "\"$maxnid\"" >&6; }
-    if -n "$maxnid"
+    if test -n "$maxnid"
     then
 
 cat >>confdefs.h <<_ACEOF
