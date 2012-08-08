@@ -1,7 +1,7 @@
 \section{\kw{initnode} and \kw{initproc} Routines}
 \input{othercalls}
 
-\section{The Sequence of \charmpp{} Program Startup}
+\section{Event Sequence During \charmpp{} Startup}
 
 %describe the order in which entities are constructed on PE 0 and other PEs
 %what assumptions can user program make about entity availability:
@@ -15,25 +15,30 @@ of their specification in the linking stage of program compilation.
 For example, if you specified "{\tt -module A -module B}" while linking your \charmpp{} program,
 then module {\tt A} is registered before module {\tt B} at runtime.
 
-\item \kw{initnode},\kw{initproc} Calls: all those calls are invoked before the
-creation of other \charmpp{} data structures and the invocation of every
-mainchares from different modules.
+\item \kw{initnode}, \kw{initproc} Calls: all initnode and initproc functions are invoked before the
+creation of \charmpp{} data structures, and before the invocation of any
+mainchares' \kw{main()} methods.
 
-\item \kw{readonly} Variables: those variables are initialized in the mainchare following the program order as written on PE 0. After the initialization, they
-are broadcasted to every other PEs making them available in the constructors
-of \charmpp{} objects such as Group objects etc..
+\item \kw{readonly} Variables: \kw{readonly} variables are initialized on PE 0 in the \kw{mainchare},
+following program order as given in the {\tt main()} method. After initialization, they
+are broadcast to all other PEs making them available in the constructors
+groups, chares, chare arrays, etc. (see below.)
 
 \item \kw{Group} and \kw{NodeGroup} Creation: on PE 0, constructors of these
-objects are invoked in the program order. However, on every other PEs, their
-creation are triggered by messages. Since the message order is not guaranteed
-in \charmpp{} program, constructors should \textbf{not} depend on other Group
-or NodeGroup objects on a PE. In addition, since those objects are initialized
+objects are invoked in program order. However, on all other PEs, their
+creation is triggered by messages. Since message order is not guaranteed
+in \charmpp{} program, constructors of groups and nodegroups should \textbf{not} depend 
+on other Group or NodeGroup objects on a PE. However, if your program structure requires
+it, you can explicitly specify that the creation of certain Groups/NodeGroups depends
+on the creation of others, as described in \S~\ref{sec:groups/creation}.
+In addition, since those objects are initialized
 after the initialization of readonly variabales, readonly variables can be used
-in their constructors.
+in the constructors of Groups and NodeGroups.
 
-\item \charmpp{} Array Creation: the order of calling Array constructors follows
-the same mechanism with that of Group and NodeGroup as described above.
+\item \charmpp{} Array Creation: the order in which array constructors are called on PEs is
+similar to that described for groups and nodegroups, above.
+%the same mechanism with that of Group and NodeGroup as described above.
 Therefore, the creation of one array should \textbf{not} depend on other arrays.
 As Array objects are initialized last, their constructors can use 
-readonly variables and local branches to Group or NodeGroup objects.
+readonly variables and local branches of Group or NodeGroup objects.
 \end{enumerate}
