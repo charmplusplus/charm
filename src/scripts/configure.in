@@ -1854,7 +1854,7 @@ then
     # workaround for hopper
     (export SHELL=/bin/csh; xtprocadmin >& t.$$)
     maxnid=`cat t.$$  | tail -1  | awk '{print $1}'`
-    /bin/rm -f t.$
+    /bin/rm -f t.$$
     AC_MSG_CHECKING(Cray machine maxnid)
     AC_MSG_RESULT("$maxnid")
     if test -n "$maxnid"

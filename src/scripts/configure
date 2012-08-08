@@ -4026,7 +4026,7 @@ then
     # workaround for hopper
     (export SHELL=/bin/csh; xtprocadmin >& t.$$)
     maxnid=`cat t.$$  | tail -1  | awk '{print $1}'`
-    /bin/rm -f t.$
+    /bin/rm -f t.$$
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking Cray machine maxnid" >&5
 $as_echo_n "checking Cray machine maxnid... " >&6; }
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$maxnid\"" >&5
