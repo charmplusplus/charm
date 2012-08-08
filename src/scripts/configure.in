@@ -1857,7 +1857,10 @@ then
     /bin/rm -f t.$
     AC_MSG_CHECKING(Cray machine maxnid)
     AC_MSG_RESULT("$maxnid")
+    if -n "$maxnid"
+    then
     AC_DEFINE_UNQUOTED(CMK_CRAY_MAXNID, $maxnid, [Cray MAXNID])
+    fi
 fi
 
 fi
