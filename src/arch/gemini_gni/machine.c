@@ -3666,6 +3666,10 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID)
     CmiGetArgInt(*argv,"+useSendLargeCap", &SEND_large_cap);
 #endif
 
+#if CMI_EXERT_RECV_RDMA_CAP 
+    CmiGetArgInt(*argv,"+useRecvRdmaCap", &RDMA_cap);
+#endif
+  
 #if CMI_SENDBUFFERSMSG_CAP
     CmiGetArgInt(*argv,"+useSendBufferCap", &SendBufferMsg_cap);
 #endif
