@@ -2,16 +2,17 @@
 \section{Sync Entry Methods}
 \label{sync}
 
-Generally entry methods are invoked asynchronously and return void. Therefore,
-while an entry method may send data back to its invoker, it does so by invoking
-another asynchronous entry method on the invoking chare object.
+Generally, entry methods are invoked asynchronously and return {\tt void}. Therefore,
+while an entry method may send data back to its invoker, it can only do so by invoking
+another asynchronous entry method on the chare object that invoked it.
 
 However, it is possible to use \kw{sync} entry methods, which have blocking
-semantics and can return data back to their invoker that is available when it
-returns from blocking. This returned data must be in the form of a \charmpp
-message. Because the caller of a sync entry method will block, it must execute
-in a thread separate from the scheduler; that is, it must be a \kw{threaded}
-entry method. If a sync entry method returns a value, it is provided as the
+semantics. The data returned by the invocation of such an entry method is
+available at the call site when it returns from blocking. This returned data
+must be in the form of a \charmpp message. Because the caller of a sync entry
+method will block, it must execute in a thread separate from the scheduler;
+that is, it must be a \kw{threaded} entry method ({\em cf.} \S~\ref{threaded},
+above).  If a \kw{sync} entry method returns a value, it is provided as the
 return value from the invocation on the proxy object:
 
 \begin{alltt}
