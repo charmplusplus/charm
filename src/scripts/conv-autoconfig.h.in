@@ -180,6 +180,9 @@
 /* whether Cray rca library is available */
 #undef CMK_HAS_RCALIB
 
+/* whether Cray rca has rca_get_max_dimension */
+#undef CMK_HAS_RCA_MAX_DIMENSION
+
 /* whether has regex.h */
 #undef CMK_HAS_REGEX_H
 
