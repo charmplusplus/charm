@@ -26,6 +26,7 @@ tmp
 /multicore-*
 /uth-*
 /bluegenep*
+/pami*
 /gemini_gni-crayxe*
 
 # Ignore cruft that would result from compiling charm example/test code
