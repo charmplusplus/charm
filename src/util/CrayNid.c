@@ -205,6 +205,8 @@ void pidtonid(int numpes) {
 void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 {
   int i = 0, ret;
+  rca_mesh_coord_t dimsize;
+
   CmiLock(cray_lock2);
 
   if(maxNID != -1) {
@@ -215,6 +217,16 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
         CmiUnlock(cray_lock2);
 	return;
   }
+
+#if CMK_HAS_RCA_MAX_DIMENSION
+  // rca_get_meshtopology(&mnid);
+  rca_get_max_dimension(&dimsize);
+  *xdim = dimsize.mesh_x+1;
+  *ydim = dimsize.mesh_y+1;
+  *zdim = dimsize.mesh_z+1;
+  *maxnid = *xdim * *ydim * *zdim * 2;
+
+#else
 
   *xdim = *ydim = *zdim = 0;
     /* loop until fails to find the max */ 
@@ -240,7 +252,10 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
   maxX = *xdim = *xdim+1;
   maxY = *ydim = *ydim+1;
   maxZ = *zdim = *zdim+1;
+#endif
+
   CmiUnlock(cray_lock2);
+
   /* printf("%d %d %d %d\n", *maxnid, *xdim, *ydim, *zdim); */
 }
 

@@ -1845,6 +1845,20 @@ EOT
 test_linkc "whether Cray rca library is available" "yes" "no" "-lrca"
 AC_DEFINE_UNQUOTED(CMK_HAS_RCALIB, $pass, [whether Cray rca library is available])
 
+#### test if Cray mesh dimension query function will work ####
+cat > $tc <<EOT
+#include <rca_lib.h>
+
+int main() {
+    rca_mesh_coord_t xyz;
+    rca_get_max_dimension(&xyz);
+
+    return 0;
+}
+EOT
+test_linkc "whether Cray rca_has get_max_dimension" "yes" "no" "-lrca"
+AC_DEFINE_UNQUOTED(CMK_HAS_RCA_MAX_DIMENSION, $pass, [whether Cray rca has rca_get_max_dimension])
+
 #### query Cray machine max NID ####
 
 cmd=`which xtprocadmin 2>/dev/null`
