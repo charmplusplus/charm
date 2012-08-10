@@ -7,7 +7,12 @@
 
 #if CMK_CONVERSE_MPI
 #include <mpi.h>
+#ifdef __cplusplus
+extern "C" { MPI_Comm charmComm; }
+#else 
 extern MPI_Comm charmComm;
+#endif
+
 void CharmLibInit(MPI_Comm userComm, int argc, char **argv);
 #else
 void CharmLibInit(int userComm, int argc, char **argv);
