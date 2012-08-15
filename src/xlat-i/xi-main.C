@@ -114,7 +114,7 @@ ModuleList *Parse(FILE *fp)
 {
   modlist = NULL;
   yyin = fp ;
-  if(yyparse())
+  if(::yyparse())
       exit(1);
   fclose(fp) ;
   return modlist;
