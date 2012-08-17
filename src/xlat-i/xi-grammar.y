@@ -18,6 +18,10 @@ extern int macroDefined(const char *str, int istrue);
 extern const char *python_doc;
 void splitScopedName(const char* name, const char** scope, const char** basename);
 }
+
+// Error handling
+bool hasSeenConstructor = false;
+char *lastConstructor;
 %}
 
 %union {
@@ -252,6 +256,8 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { $$ = NULL; }
         | AccelBlock
         { $$ = $1; }
+        | error
+        { printf("Invalid construct\n"); yyclearin; yyerrok; }
         ;
 
 TParam		: Type
@@ -494,17 +500,25 @@ BaseList	: QualNamedType
 		;
 
 Chare		: CHARE CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2|Chare::CCHARE, $3, $4, $5); }
+		{ $$ = new Chare(lineno, $2|Chare::CCHARE, $3, $4, $5);
+          hasSeenConstructor = false;
+        }
 		| MAINCHARE CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, $2, $3, $4, $5); }
+		{ $$ = new MainChare(lineno, $2, $3, $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 Group		: GROUP CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new Group(lineno, $2, $3, $4, $5); }
+		{ $$ = new Group(lineno, $2, $3, $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 NodeGroup	: NODEGROUP CAttribs NamedType OptBaseList MemberEList
-		{ $$ = new NodeGroup(lineno, $2, $3, $4, $5); }
+		{ $$ = new NodeGroup(lineno, $2, $3, $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 ArrayIndexType	: '[' NUMBER Name ']'
@@ -701,40 +715,51 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		}
 		| ENTRY EAttribs Name EParameters OptSdagCode /*Constructor*/
 		{ 
-		  if ($5 != 0) {
-		    $5->con1 = new SdagConstruct(SIDENT, $3);
-                    $5->param = new ParamList($4);
-                  }
-		  Entry *e = new Entry(lineno, $2,     0, $3, $4,  0, $5, 0, 0);
-		  if (e->param && e->param->isCkMigMsgPtr()) {
-		    yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
-		    $$ = NULL;
-		  } else
-		    $$ = e;
+          if (hasSeenConstructor && strcmp(lastConstructor, $3) != 0) {
+            yyerror("Entry method has no return type and we've seen a constructor already\n");
+          } else {
+            // If we see another method without a return type, it should better be an overloaded constructor!
+            if (!lastConstructor) free(lastConstructor);
+            lastConstructor = (char *) malloc(strlen($3) + 1);
+            strcpy(lastConstructor, $3);
+            hasSeenConstructor = true;
+
+            if ($5 != 0) {
+              $5->con1 = new SdagConstruct(SIDENT, $3);
+              $5->param = new ParamList($4);
+            }
+            Entry *e = new Entry(lineno, $2, 0, $3, $4, 0, $5, 0, 0);
+            if (e->param && e->param->isCkMigMsgPtr()) {
+              yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
+              $$ = NULL;
+            } else {
+              $$ = e;
+            }
+          }
 		}
 		| ENTRY '[' ACCEL ']' VOID Name EParameters AccelEParameters ParamBraceStart CCode ParamBraceEnd Name /* DMK : Accelerated Entry Method */
-                {
-                  int attribs = SACCEL;
-                  const char* name = $6;
-                  ParamList* paramList = $7;
-                  ParamList* accelParamList = $8;
-		  XStr* codeBody = new XStr($10);
-                  const char* callbackName = $12;
+        {
+          int attribs = SACCEL;
+          const char* name = $6;
+          ParamList* paramList = $7;
+          ParamList* accelParamList = $8;
+          XStr* codeBody = new XStr($10);
+          const char* callbackName = $12;
 
-                  $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList,
-                                 0, 0, 0, 0, 0
-                                );
-                  $$->setAccelParam(accelParamList);
-                  $$->setAccelCodeBody(codeBody);
-                  $$->setAccelCallbackName(new XStr(callbackName));
-                }
+          $$ = new Entry(lineno, attribs, new BuiltinType("void"), name, paramList,
+                         0, 0, 0, 0, 0
+                        );
+          $$->setAccelParam(accelParamList);
+          $$->setAccelCodeBody(codeBody);
+          $$->setAccelCallbackName(new XStr(callbackName));
+        }
 		;
 
-AccelBlock      : ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
-                { $$ = new AccelBlock(lineno, new XStr($3)); }
-                | ACCELBLOCK ';'
-                { $$ = new AccelBlock(lineno, NULL); }
-                ;
+AccelBlock:  ACCELBLOCK ParamBraceStart CCode ParamBraceEnd ';'
+           { $$ = new AccelBlock(lineno, new XStr($3)); }
+           | ACCELBLOCK ';'
+           { $$ = new AccelBlock(lineno, NULL); }
+           ;
 
 EReturn		: VOID
 		{ $$ = new BuiltinType("void"); }
@@ -746,6 +771,8 @@ EAttribs	: /* Empty */
 		{ $$ = 0; }
 		| '[' EAttribList ']'
 		{ $$ = $2; }
+        | error
+        { printf("Invalid entry method attribute list\n"); yyclearin; }
 		;
 
 EAttribList	: EAttrib
@@ -784,6 +811,8 @@ EAttrib		: THREADED
 		{ $$ = SMEM; }
         | REDUCTIONTARGET
         { $$ = SREDUCE; }
+		| error
+		{ printf("Invalid entry method attribute: %s\n", yylval); }
 		;
 
 DefaultParameter: LITERAL
@@ -1046,6 +1075,9 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		{ $$ = $2; }
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = buildAtomic($2, NULL, NULL); }
+        | error
+        { printf("Unknown SDAG construct\n"); yyclearin; }
+        ;
 
 HasElse		: /* Empty */
 		{ $$ = 0; }
