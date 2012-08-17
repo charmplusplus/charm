@@ -1327,6 +1327,8 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 			MPI_Comm_rank(charmComm, myNodeID);
     }
 
+    MPI_Bcast(&_Cmi_mynodesize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
     myNID = *myNodeID;
 
     MPI_Get_version(&ver, &subver);
