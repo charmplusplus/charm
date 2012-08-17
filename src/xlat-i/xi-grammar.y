@@ -257,7 +257,7 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         | AccelBlock
         { $$ = $1; }
         | error
-        { printf("Invalid construct\n"); yyclearin; yyerrok; }
+        { printf("Invalid construct\n"); YYABORT; }
         ;
 
 TParam		: Type
@@ -772,7 +772,7 @@ EAttribs	: /* Empty */
 		| '[' EAttribList ']'
 		{ $$ = $2; }
         | error
-        { printf("Invalid entry method attribute list\n"); yyclearin; }
+        { printf("Invalid entry method attribute list\n"); YYABORT; }
 		;
 
 EAttribList	: EAttrib
@@ -812,7 +812,7 @@ EAttrib		: THREADED
         | REDUCTIONTARGET
         { $$ = SREDUCE; }
 		| error
-		{ printf("Invalid entry method attribute: %s\n", yylval); }
+		{ printf("Invalid entry method attribute: %s\n", yylval); YYABORT; }
 		;
 
 DefaultParameter: LITERAL
@@ -1076,7 +1076,7 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = buildAtomic($2, NULL, NULL); }
         | error
-        { printf("Unknown SDAG construct\n"); yyclearin; }
+        { printf("Unknown SDAG construct\n"); YYABORT; }
         ;
 
 HasElse		: /* Empty */
