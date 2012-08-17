@@ -926,7 +926,7 @@ AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 cat > $t <<EOT
 double foo(void)
 {
-  unsigned long long int v;
+  unsigned long long int v=0;
   int *lo=0+(int *)&v;
   int *hi=1+(int *)&v;
   __asm__ __volatile__(
