@@ -22,9 +22,11 @@ BlueGene/Q, Cray XT, XE and XK series (including XK6 and XE6),
 a single workstation or a network of workstations (including x86
 (running Linux, Windows, MacOS)), etc.  The communication protocols
 and infrastructures supported by
-\charmpp\ are UDP, TCP, Myrinet, Infiniband, uGNI, and PAMI. 
+\charmpp\ are UDP, TCP, Myrinet, Infiniband, MPI, uGNI, and PAMI. 
 \charmpp\ programs can run without changing the source
-on all these platforms.  Please see the \charmpp{}/\converse{}
+on all these platforms. If built on MPI, \charmpp{} programs can 
+also interoperate with pure MPI programs (\S\ref{sec:interop}).
+  Please see the \charmpp{}/\converse{}
 Installation and Usage
 \htmladdnormallink{Manual}{http://charm.cs.illinois.edu/manuals/html/install/manual.html}
 for details about installing, compiling and running
