@@ -8,56 +8,58 @@ the centralized load balancing strategies. For this, the load balancing framewor
 accepts the following command line options:
 \begin{enumerate}
 \item {\em +LBDump StepStart}\\
-        This will dump the instrument/communication data collected by the load balancing framework
+        This will dump the compute and the communication data collected by the load balancing framework
 	starting from the load balancing step {\em StepStart} into a file on the disk. The name of the file
-	is given by the {\em +LBDumpFile} option. The first step in the program is number 0. Negative
-	numbers will be converted to 0.
+	is given by the {\em +LBDumpFile} option. The load balancing step in the
+  program is numbered starting from 0. Negative value for {\em StepStart} will be converted to 0.
 \item {\em +LBDumpSteps StepsNo}\\
-        This option specifies the number of steps for which data will be dumped to disk. If omitted, default value is 1.
-	The program will exit after StepsNo files are dumped.
+        This option specifies the number of load balancing steps for which data will be dumped to disk.
+        If omitted, default value is 1. The program will exit after {\em StepsNo} files are dumped.
 \item {\em +LBDumpFile FileName}\\
-	This option specifies the base name of the file into which the load balancing data is dumped. If this
+        This option specifies the base name of the file created with the loadd balancing data. If this
 	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
 	a number is appended to the filename in the form {\tt Filename.\#}; this applies to both dump and
 	simulation.
 \item {\em +LBSim StepStart}\\
 	This option instructs the framework to do the simulation from {\em StepStart} step.
-	When this option is specified, the load balancing data from the file specified in the {\em +LBDumpFile}
-	option, with the addition of the step number, will be read and this data
-	will be used for the load balancing. The program will print the results
-	of the balancing for a number of steps given by the {\em +LBSimSteps} option, and then will exit.
+	When this option is specified, the load balancing data along with the step
+  number will be read from the file specified in the {\em +LBDumpFile}
+	option The program will print the results of the balancing for a number of steps given
+  by the {\em +LBSimSteps} option, and then will exit.
 \item {\em +LBSimSteps StepsNo}\\
-        This option has the same meaning of {\em +LBDumpSteps}, except that apply for the simulation mode.
-	Default value is 1.
+        This option applies only to the simulation mode. It specifies the number of
+  load balancing steps for which the data will be dumped. The default value is 1.
 \item {\em +LBSimProcs}\\
-        This option may change the number of processors target of the load balancer strategy. It may be used to test
-	the load balancer in conditions where some processor crashes or someone becomes available. If this number is not
+        With this option, the user can change the number of processors
+  specified to the load balancing strategy. It may be used to test
+	the strategy in the cases where some processor crashes or a new processor becomes available. If this number is not
 	changed since the original run, starting from the second step file the program will print other additional
 	information about how the simulated load differs from the real load during the run (considering all
 	strategies that were applied while running). This may be used to test the validity of a load balancer
 	prediction over the reality. If the strategies used during run and simulation differ, the additional data
 	printed may not be useful.
 \end{enumerate}
-As an example, we can collect the data for a 1000 processor run of a program using:
+Here is an example which collects the data for a 1000 processor run of a program
 \begin{alltt}
 ./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
 \end{alltt}
-This will collect data on files data.dat.{2,3,4,5}. Then, we can use this data to observe various centralized strategies using:
+This will collect data on files data.dat.{2,3,4,5}. We can use this data to
+analyze the performance of various centralized strategies using:
 \begin{alltt}
 ./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat
 [+LBSimProcs 900]
 \end{alltt}
-Please note that this does not invoke any real application run. Actually
+Please note that this does not invoke the real application. In fact,
  ''pgm'' can be replaced with any generic application which calls centralized load balancer.
 An example can be found in \testrefdir{load\_balancing/lb\_test}.
 
 \section{Future load predictor}
 
 When objects do not follow the assumption that the future workload will be the
-same as the past, the load balancer might not have the correct information to do
-a correct rebalancing job. To prevent this the user can provide a transition
+same as the past, the load balancer might not have the right information to do
+a good rebalancing job. To prevent this, the user can provide a transition
 function to the load balancer to predict what will be the future workload, given
-the past, instrumented one. As said, the user might provide a specific class
+the past, instrumented one. For this, the user can provide a specific class
 which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
 Here is the abstract class:
 \begin{alltt}
@@ -75,13 +77,12 @@ public:
 \begin{itemize}
 \item {\tt initialize\_params} by default initializes the parameters randomly. If the user
 knows how they should be, this function can be re-implemented.
-\item {\tt predict} is the function that predicts the load according to the factors in parameters.
-For example, if the function is
-$y=ax+b$, the method in the implemented class should be like:
+\item {\tt predict} is the function that predicts the based on the function parameters.
+An example for the {\em predict} function is given below.
 \begin{verbatim}
 double predict(double x, double *param) {return (param[0]*x + param[1]);}
 \end{verbatim}
-\item {\tt print} is a debugging function and it can be re-implemented to have a meaningful
+\item {\tt print} is useful for debugging and it can be re-implemented to have a meaningful
 print of the learnt model
 \item {\tt function} is a function internally needed to learn the parameters, {\tt x} and
 {\tt param} are input, {\tt y} and {\tt dyda} are output (the computed function and
@@ -95,13 +96,13 @@ void function(double x, double *param, double &y, double *dyda) {
 }
 \end{verbatim}
 \end{itemize}
-Other than these function, the user should provide a constructor which must initialize
+Other than these functions, the user should provide a constructor which must initialize
 {\tt num\_params} to the number of parameters the model has to learn. This number is
 the dimension of {\tt param} and {\tt dyda} in the previous functions. For the given
 example, the constructor is {\tt \{num\_params = 2;\}}.
 
-If the model behind the computation is not known, the user can leave the system to
-use a predefined default function.
+If the model for computation is not known, the user can leave the system to
+use the default function.
 
 As seen, the function can have several parameters which will be learned during
 the execution of the program. For this, two parameters can be setup at command
@@ -122,7 +123,7 @@ default is 10.
 Moreover another flag can be set to enable the predictor from command line: {\em
 +LBPredictor}.\\
 Other than the command line options, there are some methods
-callable from user program to modify the predictor. These methods are:
+which can be called from the user program to modify the predictor. These methods are:
 \begin{itemize}
 \item {\tt void PredictorOn(LBPredictorFunction *model);}
 \item {\tt void PredictorOn(LBPredictorFunction *model,int wind);}
@@ -133,7 +134,7 @@ callable from user program to modify the predictor. These methods are:
 \section{Control CPU Load Statistics}
 
 \charmpp{} programmers can control CPU load data in the load balancing database
-before a load balancing phase is started (which is the time when load balancing
+before a load balancing phase has started (which is the time when load balancing
 database is collected and used by load balancing strategies).
 
 In an array element, the following function can be invoked to overwrite the 
