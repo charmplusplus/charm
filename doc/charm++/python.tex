@@ -13,7 +13,7 @@ The interface provides three different types of requests:
 
 \begin{description}
 \item[Execute] requests to execute a code, it will contain the code to be executed on the server, together with the instructions on how to handle the environment;
-\item[Print] asks the server to send back all the strings which has been printed by the script until now;
+\item[Print] asks the server to send back all the strings which have been printed by the script until now;
 \item[Finished] asks the server if the current script has finished or it is still running.
 \end{description}
 
@@ -31,8 +31,7 @@ function to all the objects reflected by the iterator structure.
 \item \textbf{high level} By implementing \kw{python} entry methods, the Python code uploaded can access them and activate complex, parallel operations that will be performed by the \charmpp{} application. (see section~\ref{pythonHighLevel})
 \end{itemize}
 
-The description will follow the client implementation first, and continuing then
-on the server implementation.
+This documentation will describe the client API first, and then the server API. 
 
 
 \section{The client side}
@@ -69,7 +68,7 @@ original class will be unmodified and can be reused in subsequent calls.
 
 \end{description}
 
-A tipical invocation to send a request from the client to the server has the
+A typical invocation to send a request from the client to the server has the
 following format:
 
 \begin{alltt}
@@ -81,7 +80,7 @@ CcsSendRequest (&server, "pyCode", 0, request.size(), request.pack());
 
 To execute a Python script on a running server, the client has to create an
 instance of \texttt{PythonExecute}, the two constructors have the following
-signature (java has a correspondent functionality):
+signature (java has a corresponding functionality):
 
 \begin{alltt}
 PythonExecute(char *code, bool persistent=false, bool highlevel=false, CmiUInt4 interpreter=0);
@@ -92,8 +91,8 @@ PythonExecute(char *code, char *method, PythonIterator *info, bool persistent=fa
 The second one is used for iterative requests (see~\ref{pythonIterator}). The
 only required argument is the code, a null terminated string, which will not be
 modified by the system. All the other parameters are optional. They refer to the
-possible variants that an execution request can be. In particular, this is a
-list of all the options present:
+possible variants for an execution request. In particular, this is a
+list of all the options:
 
 \begin{description}
 
@@ -102,15 +101,14 @@ If the request is a single code (false) or if it represents a function over
 which to iterate (true) (see~\ref{pythonIterator} for more details).
 
 \item[persistent]
-It is possible to store information on the server which will be retained across
-different client calls (such as simple data or complete libraries). True means
-that the information will be retained on the server, false means that the
-information will be deleted when the script terminates to run. In order to
-properly dispose the memory, when the last call is made (and the data is not
-anymore needed), this flag should be set to false. When information has been
-stored on the server, in order to reuse it, the interpreter field of the request
-should be set to the correct value (which was returned by the previous call, see
-later in this subsection).
+It is possible to store information on the server which will be
+retained across different client calls (from simple data all the way
+up to complete libraries). True means that the information will be
+retained on the server, false means that the information will be
+deleted when the script terminates. In order to properly release the
+memory, when the last call is made (and the data is no longer
+required), this flag should be set to false. To reuse persistent data,
+the interpreter field of the request should be set to handle returned by a previous persistent call (see later in this subsection).
 
 \item[high level]
 In order to have the ability to call high level \charmpp{} functions (available
@@ -119,15 +117,15 @@ the entire module ``charm'' will not be present, but the startup of the script
 will be faster.
 
 \item[print retain]
-When the client decides to print some output back to the client, this data can be
+When the requested action triggers printed output for the client, this data can be
 retrieved with a PythonPrint request. If the output is not desired, this flag
 can be set to false, and the output will be discarded. If it is set to true the
-output will be saved waiting to be retrieved by the client. The data will
+output will be buffered pending retrieval by the client. The data will
 survive also after the termination of the Python script, and if not retrieved
-will waste memory on the server.
+will bloat memory usage on the server.
 
 \item[busy waiting]
-Instead of returning immediately to the client a handle that can be used to
+Instead of returning a handle immediately to the client, that can be used to
 retrieve prints and check if the script has finished, the server will answer to
 the client only when the script has terminated to run (and it will effectively
 work as a PythonFinished request).
@@ -160,7 +158,7 @@ request for prints, check if the script has finished, and for reusing the same
 interpreter (if it was persistent).
 
 A value of 0 means that there was an error and the script didn't run. This is
-typically due to a request to reuse of an existing interpreter which is not
+typically due to a request to reuse an existing interpreter which is not
 available, either because it was not persistent or because another script is
 still running on that interpreter.
 
@@ -185,21 +183,21 @@ using the \texttt{CkPrintf} function call.
 
 \item[printclient]
 It accepts a string as parameter. It will forward the string back to the client when it
-issues a PythonPrint request. It will buffer the strings if the \texttt{KeepPrint}
+issues a PythonPrint request. It will buffer the strings until requested by PythonPrint if the \texttt{KeepPrint}
 option is true, otherwise it will discard them.
 
 \item[mype]
-It requires no parameters, and it will return an integer representing the
+Requires no parameters, and will return an integer representing the
 current processor where the code is executing. It is equivalent to the \charmpp{}
 function \texttt{CkMyPe()}.
 
 \item[numpes]
-It requires no parameters, and it will return an integer representing the
+Requires no parameters, and will return an integer representing the
 total number of processors that the application is using. It is equivalent to
 the \charmpp{} function \texttt{CkNumPes()}.
 
 \item[myindex]
-It requires no parameters, and it will return the index of the current element
+Requires no parameters, and will return the index of the current element
 inside the array, if the object under which Python is running is an array, or
 None if it is running under a Chare, a Group or a Nodegroup. The index will be a
 tuple containing as many numbers as the dimension of the array.
@@ -253,7 +251,7 @@ This is what the ``iterative'' functionality provides. In order for this to
 work, the server has to implement two additional functions
 (see~\ref{pythonServerIterator}), and the client has to pass some more
 information together with the code. This information is the name of the function
-that has to be called (which can be defined in the ``code'' or have already been
+that has to be called (which can be defined in the ``code'' or was previously
 uploaded to a persistent interpreter), and a user defined structure which
 specifies over what data the function should be invoked. These values can be
 specified either while constructing the PythonExecute variable (see the second
@@ -264,15 +262,13 @@ void setMethodName(char *name);
 void setIterator(PythonIterator *iter);
 \end{alltt}
 
-As for the PythonIterator object, it has to be a class defined by the user, and
-the user has to insure that the same definition is present inside both the
+The \texttt{PythonIterator} object must be defined by the user, and
+the user must insure that the same definition is present inside both the
 client and the server. The \charmpp{} system will simply pass this structure as
-a void pointer. This structure needs to inherit from \texttt{PythonIterator}. It
-is recommended that no pointers are used inside this class, and no dynamic
-memory allocation. If this is the case, nothing else needs to be done.
+a void pointer. This structure must inherit from \texttt{PythonIterator}.  In the simple case (highly recommended), wherein no pointers or dynamic allocation are used inside this class,  nothing else needs to be done because it is trivial to serialize such objects.
 
-If instead pointers and dynamic memory allocation is used, the following methods
-have to be reimplemented:
+If instead pointers or dynamic memory allocation are used, the following methods
+have to be reimplemented to support correct serialization:
 
 \begin{alltt}
 int size();
@@ -419,17 +415,19 @@ functions are provided. They are explained in subsection~\ref{pythonUtilityFuncs
 The second is a void pointer containing information of what the iteration should
 run over. This parameter may contain any data structure, and an agreement between the
 client and the user object is necessary. The system treats it as a void pointer
-since it has no information of what user defined data it contains.
+since it has no information about what user defined data it contains.
 
-The second function (\texttt{nextIteratorUpdate}) has three parameters. The
-first contains the object to be filled like in \texttt{buildIterator}, but this
-time the object contains the PyObject which was provided for the last iteration,
-potentially modified by the Python function. Its content can be read with the
-provided routines, used to retrieve the next logical element in the iterator
-(with which to update the parameter itself), and possibly update the content of
-the data inside the \charmpp{} object. The second parameter is the object
-returned by the last call to the Python function, and the third parameter is the
-same data structure passed to \texttt{buildIterator}.
+The second function (\texttt{nextIteratorUpdate}) has three
+parameters. The first parameter contains the object to be filled
+(similar to \texttt{buildIterator}), but the second object contains
+the PyObject which was provided for the last iteration, potentially
+modified by the Python function. Its content can be read with the
+provided routines, used to retrieve the next logical element in the
+iterator (with which to update the parameter itself), and possibly
+update the content of the data inside the \charmpp{} object. The
+second parameter is the object returned by the last call to the Python
+function, and the third parameter is the same data structure passed
+to \texttt{buildIterator}.
 
 Both functions return an integer which will be interpreted by the system as follows:
 \begin{description}
@@ -440,7 +438,7 @@ Both functions return an integer which will be interpreted by the system as foll
 \section{Server utility functions}
 \label{pythonUtilityFuncs}
 
-They are inherited when declaring an object as Python-compliant, and therefore
+These are inherited when declaring an object as Python-compliant, and therefore
 they are available inside the object code. All of them accept a PyObject pointer
 where to read/write the data, a string with the name of a field, and one or two
 values containing the data to be read/written (note that to read the data from
@@ -515,10 +513,9 @@ information on how this can be done using CkCallbackResumeThread callbacks). The
 only difference with other threaded entry methods is that here the callback
 \texttt{CkCallbackPython} must be used instead of CkCallbackResumeThread. The
 more specialized CkCallbackPython callback works exactly like the other one,
-except that it handles correctly Python internal locks.
+except that it correctly handles Python internal locks.
 
-At the end of the computation, if a value needs to be returned to the Python script,
-the following special returning function has to be used:
+At the end of the computation, the following special function will return a value to the Python script:
 
 \function{void pythonReturn(int handle, PyObject* result);}
 
