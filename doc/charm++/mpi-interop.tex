@@ -53,14 +53,14 @@ that can be invoked from pure MPI programs, and transfers the control to the
 start work for the \charmpp{} libraries. Here is an example interface function for the
 {\em hello} library. 
 \begin{alltt}
-  void HelloStart(int elems)
-  \{
-    if(CkMyPe() == 0) \{
-      CkPrintf("HelloStart - Starting lib by calling constructor of MainHello\\n");
-      CProxy\_MainHello mainhello = CProxy\_MainHello::ckNew(elems);
-    \}
-    CsdScheduler(-1);
+void HelloStart(int elems)
+\{
+  if(CkMyPe() == 0) \{
+  CkPrintf("HelloStart - Starting lib by calling constructor of MainHello\\n");
+  CProxy\_MainHello mainhello = CProxy\_MainHello::ckNew(elems);
   \}
+  CsdScheduler(-1);
+\}
 \end{alltt}
 
 This function creates a new chare (mainHello) defined in the {\em hello} library which
