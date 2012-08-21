@@ -1,8 +1,8 @@
 \section{Load Balancing Simulation}
 
-The simulation feature of load balancing framework allows the users to collect information
+The simulation feature of the load balancing framework allows the users to collect information
 about the compute WALL/CPU time and communication of the chares during a particular run of
-the program and use this information later to test different load balancing strategies to
+the program and use this information later to test the different load balancing strategies to
 see which one is suitable for the program behavior. Currently, this feature is supported only for
 the centralized load balancing strategies. For this, the load balancing framework
 accepts the following command line options:
@@ -24,10 +24,10 @@ accepts the following command line options:
 	This option instructs the framework to do the simulation from {\em StepStart} step.
 	When this option is specified, the load balancing data along with the step
   number will be read from the file specified in the {\em +LBDumpFile}
-	option The program will print the results of the balancing for a number of steps given
+	option. The program will print the results of the balancing for a number of steps given
   by the {\em +LBSimSteps} option, and then will exit.
 \item {\em +LBSimSteps StepsNo}\\
-        This option applies only to the simulation mode. It specifies the number of
+        This option is applicable only to the simulation mode. It specifies the number of
   load balancing steps for which the data will be dumped. The default value is 1.
 \item {\em +LBSimProcs}\\
         With this option, the user can change the number of processors
@@ -109,8 +109,8 @@ the execution of the program. For this, two parameters can be setup at command
 line to specify the learning behavior:
 \begin{enumerate}
 \item {\em +LBPredictorWindow size}\\
-This parameter will specify how many statistics steps the load balancer will keep. 
-The greater this number is, the better the
+This parameter specifies the number of statistics steps the load balancer will
+store.  The greater this number is, the better the
 approximation of the workload will be, but more memory is required to store
 the intermediate information. The default is 20.
 \item {\em +LBPredictorDelay steps}\\
@@ -134,11 +134,11 @@ which can be called from the user program to modify the predictor. These methods
 \section{Control CPU Load Statistics}
 
 \charmpp{} programmers can control CPU load data in the load balancing database
-before a load balancing phase has started (which is the time when load balancing
+before a load balancing phase starts (which is the time when load balancing
 database is collected and used by load balancing strategies).
 
 In an array element, the following function can be invoked to overwrite the 
-CPU load that is measured by load balancing framework.
+CPU load that is measured by the load balancing framework.
 
 \begin{alltt}
    double newTiming;
@@ -161,10 +161,10 @@ existing one.
 
 \section{Model-based Load Balancing}
 
-You can also choose to feed load balancer with their own CPU
+The user can choose to feed load balancer with their own CPU
 timing of each Chare based on certain computational model of the applications.
 
-To do so, first you need to turn off automatic CPU load measurement completely
+To do so, the user first needs to turn off automatic CPU load measurement completely
 by setting:
 
 \begin{alltt}
@@ -173,7 +173,7 @@ by setting:
 
 in array element's constructor.
 
-Then the you need to implement the following function to the chare array
+The user must also implement the following function to the chare array
 classes:
 
 \begin{alltt}
@@ -182,8 +182,8 @@ classes:
 
 This function serves as a callback that is called on each chare object when
 {\em AtSync()} is called and ready to do load balancing. The implementation of
-{\em UserSetLBLoad()} is simply to set the current chare object's CPU load to
-load balancer framework. {\em setObjTime()} described above can be used for
+{\em UserSetLBLoad()} is simply to set the current chare object's CPU load in
+load balancing framework. {\em setObjTime()} described above can be used for
 this.
 
 \section{Writing a new load balancing strategy}
