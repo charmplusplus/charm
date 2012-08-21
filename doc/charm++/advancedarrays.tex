@@ -7,9 +7,9 @@ are not universally needed, but represent many useful optimisations.
 
 \index{ckLocal for arrays}
 \label{ckLocal for arrays}
-Provides direct access to a local array element using the
+It is possible to get direct access to a local array element using the
 proxy's \kw{ckLocal} method, which returns an ordinary \CC\ pointer
-to the element if it exists on the local processor; and NULL if
+to the element if it exists on the local processor, and NULL if
 the element does not exist or is on another processor.
 
 \begin{alltt}
@@ -36,7 +36,7 @@ the way the initial array elements are created, create elements
 explicitly during the computation, and create elements implicitly,
 ``on demand''.  
 
-You can create all your elements using any one of these methods,
+You can create all of an arrays elements using any one of these methods,
 or create different elements using different methods.  
 An array element has the same syntax and semantics no matter
 how it was created.  
@@ -147,6 +147,11 @@ class BlockMap : public CkArrayMap
 \};
 
 \end{alltt}
+
+Note that the first argument to the \kw{procNum} method exists for reasons
+internal to the runtime system and is not used in the calculation of processor
+numbers.
+
 Once you've instantiated a custom map object, you can use it to
 control the location of a new array's elements using the
 \kw{setMap} method of the \kw{CkArrayOptions} object described above.
