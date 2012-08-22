@@ -13,6 +13,7 @@ void Driver::get_square(int value)
 {
     int_message* square_message = s.square(value);
     int square = square_message->value;
+    CkPrintf("%d^2 = %d\n", value, square);
     CkFreeMsg(square_message);
     CkExit();
 }
