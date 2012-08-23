@@ -1754,6 +1754,9 @@ void CkNodeReductionMgr::contributeWithCounter(contributorInfo *ci,CkReductionMs
 void CkNodeReductionMgr::ReductionStarting(CkReductionNumberMsg *m)
 {
   CmiLock(lockEverything);
+	/*
+		FAULT_EVAC
+	*/
   if(blocked){
 	delete m;
   	CmiUnlock(lockEverything);
@@ -1919,9 +1922,14 @@ void CkNodeReductionMgr::addContribution(CkReductionMsg *m)
 }
 
 void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
+        CmiLock(lockEverything);   
+	/*
+		FAULT_EVAC
+	*/
 	if(blocked){
 		DEBR(("[%d] This node is blocked, so local message is being buffered as no %d\n",CkMyNode(),bufferedMsgs.length()));
 		bufferedMsgs.enq(m);
+                CmiUnlock(lockEverything);   
 		return;
 	}
 	
@@ -1935,6 +1943,7 @@ void CkNodeReductionMgr::LateMigrantMsg(CkReductionMsg *m){
 		msgs.enq(m);
 		finishReduction();
 	}
+        CmiUnlock(lockEverything);   
 }
 
 
