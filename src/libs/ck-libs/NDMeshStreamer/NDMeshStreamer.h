@@ -13,7 +13,6 @@
 // take advantage of nonuniform filling of buffers
 #define OVERALLOCATION_FACTOR 4
 
-// #define DEBUG_STREAMER
 // #define CACHE_LOCATIONS
 // #define SUPPORT_INCOMPLETE_MESH
 // #define CACHE_ARRAY_METADATA // only works for 1D array clients
@@ -208,6 +207,10 @@ public:
   void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
             int prio, bool usePeriodicFlushing);
   
+  bool stagedCompletionStarted() {    
+    return (useStagedCompletion_ && dimensionToFlush_ != numDimensions_ - 1); 
+  }
+
   void startStagedCompletion() {          
     if (individualDimensionSizes_[dimensionToFlush_] != 1) {
       flushDimension(dimensionToFlush_, true);
@@ -244,9 +247,7 @@ public:
 #ifdef STREAMER_VERBOSE_OUTPUT
         CkPrintf("[%d] contribute\n", CkMyPe()); 
 #endif
-#ifdef DEBUG_STREAMER
         CkAssert(numDataItemsBuffered_ == 0); 
-#endif
         this->contribute(userCallback_);
         return; 
       }
@@ -446,9 +447,7 @@ void MeshStreamer<dtype>::storeMessage(
     }
     *(int *) CkPriorityPtr(messageBuffers[bufferIndex]) = prio_;
     CkSetQueueing(messageBuffers[bufferIndex], CK_QUEUEING_IFIFO);
-#ifdef DEBUG_STREAMER
     CkAssert(messageBuffers[bufferIndex] != NULL);
-#endif
   }
   
   MeshStreamerMessage<dtype> *destinationBuffer = messageBuffers[bufferIndex];
@@ -521,6 +520,10 @@ void MeshStreamer<dtype>::insertData(void *dataItemHandle, int destinationPe) {
 template <class dtype>
 inline
 void MeshStreamer<dtype>::insertData(dtype &dataItem, int destinationPe) {
+
+  // no data items should be submitted after all local contributors call done 
+  // and staged completion has begun
+  CkAssert(stagedCompletionStarted() == false);
 
   if (!useStagedCompletion_) {
     detectorLocalObj_->produce();
@@ -807,9 +810,7 @@ void MeshStreamer<dtype>::flushIfIdle(){
     if (numDataItemsBuffered_ != 0) {
       flushToIntermediateDestinations();
     }    
-#ifdef DEBUG_STREAMER
     CkAssert(numDataItemsBuffered_ == 0); 
-#endif
     
   }
 
@@ -928,9 +929,7 @@ public:
     MeshStreamerArrayClient<dtype> *clientObj = 
       (MeshStreamerArrayClient<dtype> *) clientArrMgr_->lookup(loc.getIndex());
 
-#ifdef DEBUG_STREAMER
     CkAssert(clientObj != NULL); 
-#endif
     clientObj->setDetector(detectorLocalObj_); 
   }
 
@@ -1088,6 +1087,12 @@ public:
   }
 
   void insertData(dtype &dataItem, itype arrayIndex) {
+
+    // no data items should be submitted after all local contributors call done
+    // and staged completion has begun
+    CkAssert((MeshStreamer<ArrayDataItem<dtype, itype> >
+               ::stagedCompletionStarted()) == false);
+
     if (MeshStreamer<ArrayDataItem<dtype, itype> >
          ::useStagedCompletion_ == false) {
       MeshStreamer<ArrayDataItem<dtype, itype> >::detectorLocalObj_->produce();
