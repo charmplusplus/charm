@@ -2816,7 +2816,7 @@ int main()
         << myidx.data[0] << ","
         << myidx.data[1] << ","
         << myidx.z << ")\n";
-    return (myidx.data[0] = 1 && myidx.y == 2 && myidx.data[2] == 3);
+    return (myidx.data[0] == 1 && myidx.y == 2 && myidx.data[2] == 3);
 }
 EOT
 test_cxx "whether anon structs are permitted" "yes" "no" ""
