@@ -14,14 +14,14 @@ accepts the following command line options:
   program is numbered starting from 0. Negative value for {\em StepStart} will be converted to 0.
 \item {\em +LBDumpSteps StepsNo}\\
         This option specifies the number of load balancing steps for which data will be dumped to disk.
-        If omitted, default value is 1. The program will exit after {\em StepsNo} files are dumped.
+        If omitted, its default value is 1. The program will exit after {\em StepsNo} files are created.
 \item {\em +LBDumpFile FileName}\\
-        This option specifies the base name of the file created with the loadd balancing data. If this
+        This option specifies the base name of the file created with the load balancing data. If this
 	option is not specified, the framework uses the default file {\tt lbdata.dat}. Since multiple steps are allowed,
-	a number is appended to the filename in the form {\tt Filename.\#}; this applies to both dump and
-	simulation.
+	a number correspoding to the step number is appended to the filename in the form {\tt Filename.\#};
+  this applies to both dump and simulation.
 \item {\em +LBSim StepStart}\\
-	This option instructs the framework to do the simulation from {\em StepStart} step.
+	This option instructs the framework to do the simulation starting from {\em StepStart} step.
 	When this option is specified, the load balancing data along with the step
   number will be read from the file specified in the {\em +LBDumpFile}
 	option. The program will print the results of the balancing for a number of steps given
@@ -33,7 +33,7 @@ accepts the following command line options:
         With this option, the user can change the number of processors
   specified to the load balancing strategy. It may be used to test
 	the strategy in the cases where some processor crashes or a new processor becomes available. If this number is not
-	changed since the original run, starting from the second step file the program will print other additional
+	changed since the original run, starting from the second step file, the program will print other additional
 	information about how the simulated load differs from the real load during the run (considering all
 	strategies that were applied while running). This may be used to test the validity of a load balancer
 	prediction over the reality. If the strategies used during run and simulation differ, the additional data
@@ -41,12 +41,12 @@ accepts the following command line options:
 \end{enumerate}
 Here is an example which collects the data for a 1000 processor run of a program
 \begin{alltt}
-./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile dump.dat
+./charmrun pgm +p1000 +balancer RandCentLB +LBDump 2 +LBDumpSteps 4 +LBDumpFile lbsim.dat
 \end{alltt}
-This will collect data on files data.dat.{2,3,4,5}. We can use this data to
+This will collect data on files lbsim.dat.{2,3,4,5}. We can use this data to
 analyze the performance of various centralized strategies using:
 \begin{alltt}
-./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile dump.dat
+./charmrun pgm +balancer <Strategy to test> +LBSim 2 +LBSimSteps 4 +LBDumpFile lbsim.dat
 [+LBSimProcs 900]
 \end{alltt}
 Please note that this does not invoke the real application. In fact,
@@ -59,7 +59,7 @@ When objects do not follow the assumption that the future workload will be the
 same as the past, the load balancer might not have the right information to do
 a good rebalancing job. To prevent this, the user can provide a transition
 function to the load balancer to predict what will be the future workload, given
-the past, instrumented one. For this, the user can provide a specific class
+the past instrumented one. For this, the user can provide a specific class
 which inherits from {\tt LBPredictorFunction} and implement the appropriate functions. 
 Here is the abstract class:
 \begin{alltt}
@@ -77,7 +77,7 @@ public:
 \begin{itemize}
 \item {\tt initialize\_params} by default initializes the parameters randomly. If the user
 knows how they should be, this function can be re-implemented.
-\item {\tt predict} is the function that predicts the based on the function parameters.
+\item {\tt predict} is the function that predicts the future load based on the function parameters.
 An example for the {\em predict} function is given below.
 \begin{verbatim}
 double predict(double x, double *param) {return (param[0]*x + param[1]);}
@@ -105,8 +105,8 @@ If the model for computation is not known, the user can leave the system to
 use the default function.
 
 As seen, the function can have several parameters which will be learned during
-the execution of the program. For this, two parameters can be setup at command
-line to specify the learning behavior:
+the execution of the program. For this, user can be add the following command
+line arguments to specify the learning behavior:
 \begin{enumerate}
 \item {\em +LBPredictorWindow size}\\
 This parameter specifies the number of statistics steps the load balancer will
@@ -120,20 +120,21 @@ collect statistics for a {\em +LBPredictorWindow} steps, but it will start using
 the model as soon as {\em +LBPredictorDelay} information are collected. The
 default is 10.
 \end{enumerate}
-Moreover another flag can be set to enable the predictor from command line: {\em
+Moreover, another flag can be set to enable the predictor from command line: {\em
 +LBPredictor}.\\
 Other than the command line options, there are some methods
 which can be called from the user program to modify the predictor. These methods are:
 \begin{itemize}
 \item {\tt void PredictorOn(LBPredictorFunction *model);}
-\item {\tt void PredictorOn(LBPredictorFunction *model,int wind);}
+\item {\tt void PredictorOn(LBPredictorFunction *model,int window);}
 \item {\tt void PredictorOff();}
 \item {\tt void ChangePredictor(LBPredictorFunction *model);}
 \end{itemize}
 
+An example can be found in \testrefdir{load\_balancing/lb\_test/predictor}.
 \section{Control CPU Load Statistics}
 
-\charmpp{} programmers can control CPU load data in the load balancing database
+\charmpp{} programmers can modify the CPU load data in the load balancing database
 before a load balancing phase starts (which is the time when load balancing
 database is collected and used by load balancing strategies).
 
@@ -149,7 +150,7 @@ CPU load that is measured by the load balancing framework.
 the superclass of all array elements.
 
 The users can also retrieve the current timing that the load balancing runtime
-has measured for the current array element. 
+has measured for the current array element using {\em getObjTime()}. 
  
 \begin{alltt} 
    double measuredTiming; 
@@ -162,16 +163,14 @@ existing one.
 \section{Model-based Load Balancing}
 
 The user can choose to feed load balancer with their own CPU
-timing of each Chare based on certain computational model of the applications.
+timing for each Chare based on certain computational model of the applications.
 
-To do so, the user first needs to turn off automatic CPU load measurement completely
-by setting:
+To do so, in the array element's constructor, the user first needs to turn off 
+automatic CPU load measurement completely by setting
 
 \begin{alltt}
    usesAutoMeasure = CmiFalse;
 \end{alltt}
-
-in array element's constructor.
 
 The user must also implement the following function to the chare array
 classes:
