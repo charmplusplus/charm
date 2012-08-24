@@ -9,10 +9,10 @@ parallel as several threads concurrently evaluate the futures created by a
 program.
 
 In some ways, a future resembles lazy evaluation. Each future is assigned to a
-particular thread (or to a chare, in \charmpp) and, eventually, its value will
-be delivered to the calling program. Once a future is created, a {\em
-reference} is returned immediately. If the {\em value} calculated by the future
-is needed, however, the calling program blocks until the value is available.
+particular thread (or to a chare, in \charmpp) and, eventually, its value is
+delivered to the calling program. Once a future is created, a {\em
+reference} is returned immediately. However, if the {\em value} calculated by the future
+is needed, the calling program blocks until the value is available.
 
 \charmpp\ provides all the necessary infrastructure to use futures by means of
 the following functions: 
@@ -75,6 +75,6 @@ Other functions complete the API for futures. {\em CkReleaseFuture} destroys a
 future. {\em CkProbeFuture} tests whether the future has already finished computing
 the value of the expression.
 
-The \converse\ version of future functions can be found in the \converse\
-\htmladdnormallink{manual}{http://charm.cs.illinois.edu/manuals/html/convext/manual.html}.
+The \converse\ version of future functions can be found in the
+\htmladdnormallink{\converse{} manual}{http://charm.cs.illinois.edu/manuals/html/convext/manual.html}.
 
