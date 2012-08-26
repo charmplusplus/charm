@@ -304,17 +304,6 @@ static inline void _parseCommandLineOpts(char **argv)
     }
 #endif
 
-#if defined(_FAULT_MLOG_)
-    if(!CmiGetArgIntDesc(argv,"+mlog_local_buffer",&_maxBufferedMessages,"# of local messages buffered in the message logging protoocl")){
-        _maxBufferedMessages = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_remote_buffer",&_maxBufferedTicketRequests,"# of remote ticket requests buffered in the message logging protoocl")){
-        _maxBufferedTicketRequests = 2;
-    }
-    if(!CmiGetArgIntDesc(argv,"+mlog_buffer_time",&BUFFER_TIME,"# Time spent waiting for messages to be buffered in the message logging protoocl")){
-        BUFFER_TIME = 2;
-    }
-#endif	
 	/* Anytime migration flag */
 	_isAnytimeMigration = true;
 	if (CmiGetArgFlagDesc(argv,"+noAnytimeMigration","The program does not require support for anytime migration")) {

@@ -26,7 +26,7 @@
 // silly ancient name: for backward compatability only.
 #define PW(x) CkPriobitsToInts(x) 
 
-#if defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #define CK_FREE_MSG_MLOG 	0x1
 #define CK_BYPASS_DET_MLOG 	0x2
 #endif
