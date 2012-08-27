@@ -1,3 +1,5 @@
+-include ../tmp/buildopts.mk
+
 DIRS=util charm++ converse ampi fem
 
 all:
