@@ -1132,5 +1132,5 @@ dependsCaseSensitive: cidepends
         done;  \
         rm -f metis.h  scotch.h
 
-
-
+# The build script should have spit out the build options into this makefile
+-include buildopts.mk
