@@ -23,7 +23,12 @@ template <typename P = int>
 class msgQ
 {
     public:
+        /// The datatype for msg priorities
         typedef P prio_t;
+        /// The datatype of the index of the container storing msgs of a given priority
+        typedef short bktidx_t;
+        /// Yet another typedef. Just for terseness
+        typedef typename std::pair<prio_t, bktidx_t> prioidx_t;
 
         ///
         msgQ(): qSize(0) {}
@@ -41,7 +46,7 @@ class msgQ
         ///
         inline bool empty() const { return (0 == qSize); }
         ///
-        inline prio_t top_priority() const { return prios.top(); }
+        inline prio_t top_priority() const { return prios.top().first; }
 
         ///
         void enumerate(msg_t **first, msg_t **last) const;
@@ -56,18 +61,16 @@ class msgQ
     private:
         ///
         size_t qSize;
-        ///
+        /// Vector of msg buckets (each of them a deq)
+        std::vector< std::deque<const msg_t*> > msgbuckets;
+        /// A heap of distinct msg priorities
+        std::priority_queue<prioidx_t, std::vector<prioidx_t>, std::greater<prioidx_t> > prios;
+        /// A mapping between priority values and the bucket indices
         #if CMK_HAS_STD_UNORDERED_MAP
-        std::unordered_map<prio_t, std::deque<const msg_t*> > msgmap;
-        typedef typename std::unordered_map<prio_t, std::deque<const msg_t*> >::iterator msgmapitr_t;
-        typedef typename std::unordered_map<prio_t, std::deque<const msg_t*> >::const_iterator msgmapconstitr_t;
+        std::unordered_map<prio_t, int> prio2bktidx;
         #else
-        std::map<prio_t, std::deque<const msg_t*> > msgmap;
-        typedef typename std::map<prio_t, std::deque<const msg_t*> >::iterator msgmapitr_t;
-        typedef typename std::map<prio_t, std::deque<const msg_t*> >::const_iterator msgmapconstitr_t;
+        std::map<prio_t, int> prio2bktidx;
         #endif
-        ///
-        std::priority_queue<prio_t, std::vector<prio_t>, std::greater<prio_t> > prios;
 };
 
 
@@ -78,11 +81,24 @@ void msgQ<P>::enq(const msg_t *msg
                  ,const bool isFifo
                  )
 {
-    // Create or access deq holding msgs of this priority
-    std::deque<const msg_t*> &q = msgmap[prio];
+    // Find index of / create the bucket holding msgs of this priority
+    typename std::map<prio_t, int>::iterator itr = prio2bktidx.find(prio);
+    bktidx_t bktidx;
+    if (prio2bktidx.end() != itr)
+        bktidx = itr->second;
+    else
+    {
+        msgbuckets.push_back( std::deque<const msg_t*>() );
+        bktidx = msgbuckets.size() - 1;
+        prio2bktidx[prio] = bktidx;
+    }
+
+    // Access deq holding msgs of this priority
+    std::deque<const msg_t*> &q = msgbuckets[bktidx];
     // If this deq is empty, insert corresponding priority into prioQ
     if (q.empty())
-        prios.push(prio);
+        prios.push( std::make_pair(prio, bktidx) );
+
     // Enq msg either at front or back of deq
     if (isFifo)
         q.push_back(msg);
@@ -100,11 +116,11 @@ const msg_t* msgQ<P>::deq()
     if (prios.empty())
         return NULL;
 
-    // Get the top priority in the priority queue
-    const prio_t &prio = prios.top();
+    // Get the index of the bucket holding the highest priority msgs
+    const bktidx_t &bktidx = prios.top().second;
+    std::deque<const msg_t*> &q = msgbuckets[bktidx];
 
-    std::deque<const msg_t*> &q = msgmap[prio];
-    // Assert that there is at least one msg corresponding to this priority, in the msgmap
+    // Assert that there is at least one msg corresponding to this priority
     if (q.empty()) throw;
     const msg_t *msg = q.front();
     q.pop_front();
@@ -123,8 +139,7 @@ const msg_t* msgQ<P>::front() const
 {
     if (prios.empty())
         return NULL;
-    prio_t &prio = prios.top();
-    return msgmap[prio].front();
+    return msgbuckets[prios.top().second].front();
 }
 
 
@@ -136,13 +151,11 @@ void msgQ<P>::enumerate(msg_t **first, msg_t **last) const
         return;
 
     msg_t **ptr = first;
-    msgmapconstitr_t mapitr = msgmap.begin();
-    while (ptr != last && mapitr != msgmap.end())
+    for (int i=0; ptr != last && i <= msgbuckets.size(); i++)
     {
-        std::deque<const msg_t*>::const_iterator itr = mapitr->second.begin();
-        while (ptr != last && itr != mapitr->second.end())
+        std::deque<const msg_t*>::const_iterator itr = msgbuckets[i].begin();
+        while (ptr != last && itr != msgbuckets[i].end())
             *ptr++ = (msg_t*) *itr++;
-        mapitr++;
     }
 }
 
