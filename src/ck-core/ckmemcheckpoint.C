@@ -61,9 +61,9 @@ void noopck(const char*, ...)
 // assume NO extra processors--1
 // assume extra processors--0
 #if CMK_CONVERSE_MPI
-#define CK_NO_PROC_POOL				1
+#define CK_NO_PROC_POOL				0
 #else
-#define CK_NO_PROC_POOL				1
+#define CK_NO_PROC_POOL				0
 #endif
 
 #define STREAMING_INFORMHOME                    1
