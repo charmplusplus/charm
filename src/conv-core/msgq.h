@@ -25,10 +25,6 @@ class msgQ
     public:
         /// The datatype for msg priorities
         typedef P prio_t;
-        /// The datatype of the index of the container storing msgs of a given priority
-        typedef short bktidx_t;
-        /// Yet another typedef. Just for terseness
-        typedef typename std::pair<prio_t, bktidx_t> prioidx_t;
 
         ///
         msgQ(): qSize(0) {}
@@ -59,6 +55,11 @@ class msgQ
         }
 
     private:
+        /// The datatype of the index of the container storing msgs of a given priority
+        typedef short bktidx_t;
+        /// Yet another typedef. Just for terseness
+        typedef typename std::pair<prio_t, bktidx_t> prioidx_t;
+
         ///
         size_t qSize;
         /// Vector of msg buckets (each of them a deq)
