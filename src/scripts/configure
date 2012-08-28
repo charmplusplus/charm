@@ -610,6 +610,7 @@ enable_controlpoint
 with_numa
 with_lbtime_type
 with_refnum_type
+with_prio_type
 with_metis
 '
       ac_precious_vars='build_alias
@@ -1239,6 +1240,7 @@ Optional Packages:
   --with-numa             support memory affinity with NUMA
   --with-lbtime-type=type load balancing timer type
   --with-refnum-type=type size of the envelope refnum field
+  --with-prio-type=type   size of expected message priorities
   --with-metis            support the METIS graph partitioner and associated
                           load balancer
 
@@ -2371,6 +2373,47 @@ _ACEOF
 
 else
   Echo "Invalid size specified for refnum field"
+  test_finish 1
+fi
+
+
+
+# Check whether --with-prio-type was given.
+if test "${with_prio_type+set}" = set; then :
+  withval=$with_prio_type;
+else
+  with_prio_type=bitvec
+fi
+
+
+if test "$with_prio_type" = "char" -o "$with_prio_type" = "short" -o "$with_prio_type" = "int" -o "$with_prio_type" = "long"
+then
+  Echo "Configuring support for message priorities of sizeof type $with_prio_type"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_USE_STL_MSGQ 1
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_MSG_PRIO_TYPE $with_prio_type
+_ACEOF
+
+elif test "$with_prio_type" = "bitvec"
+then
+  Echo "Configuring support for message priorities of arbitrary size (bitvectors)"
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_USE_STL_MSGQ 0
+_ACEOF
+
+
+cat >>confdefs.h <<_ACEOF
+#define CMK_MSG_PRIO_TYPE $with_prio_type
+_ACEOF
+
+else
+  Echo "Invalid size ($with_prio_type) specified for message priorities. Can only accept char, short, int, long and bitvec"
   test_finish 1
 fi
 
