@@ -1,4 +1,6 @@
+# Temporary hack that needs to be removed / replaced
 -include ../tmp/buildopts.mk
+OPTS += $(OPTSATBUILDTIME)
 
 DIRS=util charm++ converse ampi fem
 
