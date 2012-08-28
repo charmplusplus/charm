@@ -42,7 +42,7 @@ class msgQ
         ///
         inline bool empty() const { return (0 == qSize); }
         ///
-        inline prio_t top_priority() const { return prios.top().first; }
+        inline prio_t top_priority() const { return prioQ.top().first; }
 
         ///
         void enumerate(msg_t **first, msg_t **last) const;
@@ -65,7 +65,7 @@ class msgQ
         /// Vector of msg buckets (each of them a deq)
         std::vector< std::deque<const msg_t*> > msgbuckets;
         /// A heap of distinct msg priorities
-        std::priority_queue<prioidx_t, std::vector<prioidx_t>, std::greater<prioidx_t> > prios;
+        std::priority_queue<prioidx_t, std::vector<prioidx_t>, std::greater<prioidx_t> > prioQ;
         /// A mapping between priority values and the bucket indices
         #if CMK_HAS_STD_UNORDERED_MAP
         std::unordered_map<prio_t, int> prio2bktidx;
@@ -98,7 +98,7 @@ void msgQ<P>::enq(const msg_t *msg
     std::deque<const msg_t*> &q = msgbuckets[bktidx];
     // If this deq is empty, insert corresponding priority into prioQ
     if (q.empty())
-        prios.push( std::make_pair(prio, bktidx) );
+        prioQ.push( std::make_pair(prio, bktidx) );
 
     // Enq msg either at front or back of deq
     if (isFifo)
@@ -114,11 +114,11 @@ void msgQ<P>::enq(const msg_t *msg
 template <typename P>
 const msg_t* msgQ<P>::deq()
 {
-    if (prios.empty())
+    if (prioQ.empty())
         return NULL;
 
     // Get the index of the bucket holding the highest priority msgs
-    const bktidx_t &bktidx = prios.top().second;
+    const bktidx_t &bktidx = prioQ.top().second;
     std::deque<const msg_t*> &q = msgbuckets[bktidx];
 
     // Assert that there is at least one msg corresponding to this priority
@@ -127,7 +127,7 @@ const msg_t* msgQ<P>::deq()
     q.pop_front();
     // If all msgs of the highest priority have been consumed, pop that priority from the priority Q
     if (q.empty())
-        prios.pop();
+        prioQ.pop();
     // Decrement the total number of msgs in this container
     qSize--;
     return msg;
@@ -138,9 +138,9 @@ const msg_t* msgQ<P>::deq()
 template <typename P>
 const msg_t* msgQ<P>::front() const
 {
-    if (prios.empty())
+    if (prioQ.empty())
         return NULL;
-    return msgbuckets[prios.top().second].front();
+    return msgbuckets[prioQ.top().second].front();
 }
 
 
