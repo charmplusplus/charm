@@ -128,11 +128,4 @@
 #include "conv-mach-pxshm.h"
 #endif
 
-
-#if CMK_HAS_STD_UNORDERED_MAP
-#define CMK_USE_STL_MSGQ 1
-#else
-#define CMK_USE_STL_MSGQ 0
-#endif
-
 #endif
