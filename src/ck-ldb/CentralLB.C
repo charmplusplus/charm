@@ -785,7 +785,6 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
 	if(step() > m->step){
 		char str[100];
 		envelope *env = UsrToEnv(m);
-		CmiPrintf("[%d] Object %s tProcessed %d m->TN %d\n",CmiMyPe(),mlogData->objID.toString(str),mlogData->tProcessed,env->TN);
 		return;
 	}
 	lbDecisionCount = m->lbDecisionCount;

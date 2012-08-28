@@ -186,7 +186,9 @@ public:
     CkObjID sender;
     CkObjID recver;
     MCount SN;
+#if defined(_FAULT_CAUSAL_)
     MCount TN;
+#endif
     int incarnation;
 	int flags;
 #endif
@@ -265,7 +267,9 @@ private:
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
+#if defined(_FAULT_CAUSAL_)
       env->TN = 0;
+#endif
 	  env->incarnation = -1;
 #endif
 

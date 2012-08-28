@@ -31,146 +31,96 @@ extern char objString[100];
 // constant to define the type of checkpoint used (synchronized or not)
 #define SYNCHRONIZED_CHECKPOINT 1
 
-/**
- * @brief Struct to store the determinant of a particular message.
- * The determinant remembers all the necessary information for a 
- * message to be replayed in the same order as in the execution prior
- * the failure.
- */
-typedef struct {
-	// sender ID
-	CkObjID sender;
-	// receiver ID
-	CkObjID receiver;
-	// SSN: sender sequence number
-	MCount SN;
-	// TN: ticket number (RSN: receiver sequence number)
-	MCount TN;
-} Determinant;
 
-/**
- * @brief Typedef for the hashtable type that maps object IDs to determinants.
- */
-typedef CkHashtableT<CkHashtableAdaptorT<CkObjID>, CkVec<Determinant> *> CkDeterminantHashtableT;
-
-/**
- * @brief Struct for the header of the removeDeterminants handler
- */
-typedef struct {
-	char header[CmiMsgHeaderSizeBytes];
-	int phase;
-	int index;
-} RemoveDeterminantsHeader;
-
-/**
- * @brief Struct for the header of the storeDeterminants handler
- */
-typedef struct {
-	char header[CmiMsgHeaderSizeBytes];
-	int number;
-	int index;
-	int phase;
-	int PE;
-} StoreDeterminantsHeader;
-
-/**
- * @brief Structure for a ticket assigned to a particular message.
- */
-class Ticket {
-public:
-	MCount TN;
-	int state;
-	Ticket(){
-		TN = 0;
-		state = 0;
-	}
-	Ticket(int x){
-		TN = x;
-		state = 0;
-	}
-};
-PUPbytes(Ticket)
 class MlogEntry;
 
 class RestoredLocalMap;
 
-#define INITSIZE_SNTOTICKET 100
+#define RSSN_INITIAL_SIZE 16
 
 /**
- * @brief Class that maps SN (sequence numbers) to TN (ticket numbers)
- * for a particular object.
+ * @brief Class that stores all received-sender-sequence-numbers (rssn) from another object.
  */
-class SNToTicket{
-	private:
-		Ticket initial[INITSIZE_SNTOTICKET];
-		Ticket *ticketVec;
-		MCount startSN;
-		int currentSize;
-		MCount finishSN;
-	public:
-		SNToTicket(){
-			currentSize = INITSIZE_SNTOTICKET;
-			ticketVec = &initial[0];
-			bzero(ticketVec,sizeof(Ticket)*currentSize);
-			startSN = 0;
-			finishSN = 0;
-		}
-		/**
- 		 * Gets the finishSN value.
- 		 */ 
-		inline MCount getFinishSN(){
-			return finishSN;
-		}
-		/**
- 		 * Gets the startSN value.
- 		 */	 
-		inline MCount getStartSN(){
-			return startSN;
-		}
-		//assume indices start from 1.. true for MCounts
-		inline Ticket &put(MCount SN){
-			if(SN > finishSN) finishSN = SN;
-			if(startSN == 0){
-				startSN = SN;				
-			}
-			int index = SN-startSN;
-			if(index >= currentSize){
-				int oldSize = currentSize;
-				Ticket *old = ticketVec;
-				
-				currentSize = index*2;
-				ticketVec = new Ticket[currentSize];
-				memcpy(ticketVec,old,sizeof(Ticket)*oldSize);
-				if(old != &initial[0]){					
-					delete [] old;
-				}
-			}
-			return ticketVec[index];
+class RSSN{
+private:
+	MCount *data;
+	int currentSize, start, end;
+public:
+
+	// Constructor
+	RSSN(){
+		currentSize = RSSN_INITIAL_SIZE;
+		start = 0;
+		end = 0;
+		data = new MCount[RSSN_INITIAL_SIZE];
+		bzero(data,sizeof(MCount)*currentSize);
+	}
+
+	// Checks if a particular SSN is already in the data; if not, stores it		
+	// return value: 0 (sucess, value stored), 1 (value already there)
+	int checkAndStore(MCount ssn){
+		int index, oldCS, num, i;
+		MCount *old;
+
+		// checking if ssn can be inserted, most common case
+		if(start == end && ssn == (data[start] + 1)){
+			data[start] = ssn;
+			return 0;
 		}
 
-		inline Ticket get(MCount SN){
-			int index = SN-startSN;
-			CmiAssert(index >= 0);
-			if(index >= currentSize){
-				Ticket tn;
-				return tn;
-			}else{
-				return ticketVec[index];
+		// checking if ssn was already received
+		if(ssn <= data[start]) return 1;
+
+		// checking if data needs to be extended
+		if(ssn-data[start] >= currentSize){
+			old = data;
+			oldCS = currentSize;
+			currentSize *= 2;
+			data = new MCount[currentSize];
+			bzero(data,sizeof(MCount)*currentSize);
+			for(i=start, num=0; i!=end; i=(i+1)%oldCS,num++){
+				data[num] = old[i];
 			}
+			start = 0;
+			end = num-1;
+			delete[] old;
 		}
 
-		inline void pup(PUP::er &p){
-			p | startSN;
-			p | currentSize;
-			if(p.isUnpacking()){
-				if(currentSize > INITSIZE_SNTOTICKET){
-					ticketVec = new Ticket[currentSize];
-				}
+		// adding ssn into data
+		num = end - start;
+		if(num < 0) num += currentSize;
+		num++;
+		index = (start+ssn-data[start])%currentSize;
+		data[index] = ssn;
+		if((ssn-data[start]) >= num) end = index;
+
+		// compressing ssn
+		index = start + 1;
+		while(data[index]){
+			data[start] = 0;
+			start = index;
+			index = (index + 1)%currentSize;
+			if(index == end) break;
+		}
+		return 0;
+	}
+
+	// PUP method
+	inline void pup(PUP::er &p){
+		p | start;
+		p | end;
+		p | currentSize;
+		if(p.isUnpacking()){
+			if(currentSize > RSSN_INITIAL_SIZE){
+				delete[] data;
+				data = new MCount[currentSize];
 			}
-			for(int i=0;i<currentSize;i++){
-				p | ticketVec[i];
-			}
-		}	
+		}
+		for(int i=0;i<currentSize;i++){
+			p | data[i];
+		}
+	}
+
 };
 
 
@@ -187,68 +137,42 @@ class ChareMlogData{
 public:
 	// Object unique ID.
 	CkObjID objID;
-	// Counts how many tickets have been handed out.
-	MCount tCount; 
-	// Stores the highest ticket that has been processed.
-	MCount tProcessed;
-	
-	//TODO: pup receivedTNs
-	CkVec<MCount> *receivedTNs; //used to store TNs received by senders during a restart
-	MCount *ticketHoles;
-	int numberHoles;
-	int currentHoles;
 	// variable that keeps a count of the processors that have replied to a requests to resend messages. 
 	int resendReplyRecvd;
 	// 0 -> Normal state .. 1-> just after restart. tickets should not be handed out at this time 
 	int restartFlag;
 	// 0 -> normal state .. 1 -> recovery of a team member 
     int teamRecoveryFlag; 	
-	//TML: teamTable, stores the SN to TN mapping for messages intra team
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>, SNToTicket *> teamTable;
-
 	int toResumeOrNot;
 	int resumeCount;
 	int immigrantRecFlag;
 	int immigrantSourcePE;
 
 private:
-
-	// SNTable, stores the number of messages sent (sequence numbers) to other objects.
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>,MCount> snTable;
-	// TNTable, stores the ticket associated with a particular combination <ObjectID,SN>.
-	CkHashtableT<CkHashtableAdaptorT<CkObjID>,SNToTicket *> ticketTable;
+	// ssnTable, stores the number of messages sent (sequence numbers) to other objects.
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>, MCount> ssnTable;
+	// receivedSsnTable, stores the list of ssn received from other objects.
+	CkHashtableT<CkHashtableAdaptorT<CkObjID>, RSSN *> receivedSsnTable;
 	// Log of messages sent.
 	CkQ<MlogEntry *> mlog;
-	
-		
-	inline MCount newTN();
 
 public:
 	/**
  	 * Default constructor.
  	 */ 
-	ChareMlogData():ticketTable(1000,0.3),snTable(100,0.4),teamTable(100,0.4){
-		tCount = 0;
-		tProcessed = 0;
-		numberHoles = 0;
-		ticketHoles = NULL;
-		currentHoles = 0;
+	ChareMlogData():ssnTable(100,0.4),receivedSsnTable(100,0.4){
 		restartFlag=0;
 		teamRecoveryFlag=0;
-		receivedTNs = NULL;
 		resendReplyRecvd=0;
 		toResumeOrNot=0;
 		resumeCount=0;
 		immigrantRecFlag = 0;
 	};
 	inline MCount nextSN(const CkObjID &recver);
-	inline Ticket next_ticket(CkObjID &sender,MCount SN);
-	inline void verifyTicket(CkObjID &sender,MCount SN, MCount TN);
-	inline Ticket getTicket(CkObjID &sender, MCount SN);
+	int checkAndStoreSsn(const CkObjID &sender, MCount ssn);
 	void addLogEntry(MlogEntry *entry);
 	virtual void pup(PUP::er &p);
 	CkQ<MlogEntry *> *getMlog(){ return &mlog;};
-	MCount searchRestoredLocalQ(CkObjID &sender,CkObjID &recver,MCount SN);
 };
 
 /**
@@ -263,8 +187,6 @@ public:
 	envelope *env;
 	int destPE;
 	int _infoIdx;
-	int indexBufDets;
-	int numBufDets;
 	
 	MlogEntry(envelope *_env,int _destPE,int __infoIdx){
 		env = _env;
@@ -299,58 +221,6 @@ public:
 	};
 };
 
-/**
- *  @brief Class for storing metadata of local messages.
- *  It maps sequence numbers to ticket numbers.
- *  It is used after a restart to maintain the same ticket numbers.
- */
-class RestoredLocalMap {
-public:
-	MCount minSN,maxSN,count;
-	MCount *TNArray;
-	RestoredLocalMap(){
-		minSN=maxSN=count=0;
-		TNArray=NULL;
-	};
-	RestoredLocalMap(int i){
-		minSN=maxSN=count=0;
-		TNArray=NULL;
-	};
-
-	virtual void pup(PUP::er &p);
-};
-
-
-typedef struct {
-	char header[CmiMsgHeaderSizeBytes];
-	CkObjID sender;
-	CkObjID recver;
-	MlogEntry *logEntry;
-	MCount SN;
-	MCount TN;
-	int senderPE;
-} TicketRequest;
-CpvExtern(CkQ<TicketRequest *> *,_delayedTicketRequests);
-CpvExtern(CkQ<MlogEntry *> *,_delayedLocalTicketRequests);
-
-typedef struct{
-	TicketRequest request;
-	Ticket ticket;
-	int recverPE;
-} TicketReply;
-
-CpvExtern(char**,_bufferedTicketRequests);
-extern int _maxBufferedTicketRequests; //Number of ticket requests to be buffered
-
-
-
-typedef struct {
-	char header[CmiMsgHeaderSizeBytes];
-	int numberLogs;
-} BufferedLocalLogHeader;
-
-typedef BufferedLocalLogHeader BufferedTicketRequestHeader;
-
 typedef struct{
 	char header[CmiMsgHeaderSizeBytes];
 	int PE;
@@ -370,11 +240,6 @@ typedef struct{
 } CheckPointAck;*/
 
 typedef CheckPointDataMsg CheckPointAck;
-
-typedef struct{
-	CkObjID recver;
-	MCount tProcessed;
-} TProcessedLog;
 
 
 /**
@@ -424,8 +289,7 @@ typedef struct {
 typedef struct{
 	int PE;
 	int numberObjects;
-	TProcessedLog *listObjects;
-	CkVec<MCount> *ticketVecs;
+	CkObjID *listObjects;
 } ResendData;
 
 typedef struct {
@@ -512,26 +376,16 @@ void sendArrayMsg(envelope *env,int destPE,int _infoIdx);
 void sendChareMsg(envelope *env,int destPE,int _infoIdx, const CkChareID *pCid);
 void sendNodeGroupMsg(envelope *env,int destNode,int _infoIdx);
 void sendCommonMsg(CkObjID &recver,envelope *env,int destPE,int _infoIdx);
-void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,MCount TN,int resend);
+void sendRemoteMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,int resend);
 void sendLocalMsg(envelope *env, int _infoIdx);
 
 //handler functions
-void _ticketRequestHandler(TicketRequest *);
-void _ticketHandler(TicketReply *);
 void _pingHandler(CkPingMsg *msg);
-void _bufferedLocalMessageCopyHandler(BufferedLocalLogHeader *recvdHeader,int freeHeader=1);
-void _bufferedLocalMessageAckHandler(BufferedLocalLogHeader *recvdHeader);
-void _bufferedTicketRequestHandler(BufferedTicketRequestHeader *recvdHeader);
-void _bufferedTicketHandler(BufferedTicketRequestHeader *recvdHeader);
-void _storeDeterminantsHandler(char *buffer);
-void _removeDeterminantsHandler(char *buffer);
-
 
 //methods for sending messages
 extern void _skipCldEnqueue(int pe,envelope *env, int infoFn);
 extern void _noCldNodeEnqueue(int node, envelope *env);
 void generalCldEnqueue(int destPE,envelope *env,int _infoIdx);
-void retryTicketRequest(void *_ticketRequest,double curWallTime);
 
 //methods to process received messages with respect to mlog
 int preProcessReceivedMessage(envelope *env,Chare **objPointer,MlogEntry **localLogEntry);
@@ -565,8 +419,6 @@ extern int _removeProcessedLogHandlerIdx;
 //methods for restart
 void CkMlogRestart(const char * dummy, CkArgMsg * dummyMsg);
 void CkMlogRestartDouble(void *,double);
-void processReceivedTN(Chare *obj,int vecsize,MCount *listTNs);
-void processReceivedDet(Chare *obj,int vecsize, Determinant *listDets);
 void initializeRestart(void *data,ChareMlogData *mlogData);
 void distributeRestartedObjects();
 void sendDummyMigration(int restartPE,CkGroupID lbID,CkGroupID locMgrID,CkArrayIndexMax &idx,int locationPE);
@@ -645,7 +497,6 @@ extern CkVec<MigrationRecord> migratedNoticeList;
 extern CkVec<RetainedMigratedObject *> retainedObjectList;
 
 int getCheckPointPE();
-inline int isSameDet(Determinant *first, Determinant *second);
 void forAllCharesDo(MlogFn fnPointer,void *data);
 envelope *copyEnvelope(envelope *env);
 extern void _initDone(void);
