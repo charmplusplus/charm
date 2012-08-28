@@ -61,7 +61,7 @@ void noopck(const char*, ...)
 // assume NO extra processors--1
 // assume extra processors--0
 #if CMK_CONVERSE_MPI
-#define CK_NO_PROC_POOL				0
+#define CK_NO_PROC_POOL				1
 #else
 #define CK_NO_PROC_POOL				1
 #endif
@@ -588,7 +588,7 @@ void CkMemCheckPT::report()
     objsize += entry->getSize();
   }
   CmiAssert(CpvAccess(procChkptBuf));
-  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
+//  CkPrintf("[%d] Checkpoint object size: %d len: %d Processor data: %d \n", CkMyPe(), objsize, len, CpvAccess(procChkptBuf)->len);
 }
 
 /*****************************************************************************
@@ -862,7 +862,7 @@ void CkMemCheckPT::recoverArrayElements()
 {
   double curTime = CmiWallTimer();
   int len = ckTable.length();
-  CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
+  //CkPrintf("[%d] CkMemCheckPT ----- %s len: %d in %f seconds \n",CkMyPe(), stage, len, curTime-startTime);
   stage = (char *)"recoverArrayElements";
   if (CkMyPe() == thisFailedPe)
   CkPrintf("[%d] CkMemCheckPT ----- %s starts at %f \n",CkMyPe(), stage, curTime);
@@ -1368,7 +1368,7 @@ void CkRegisterRestartHandler( )
 
 #if ! CMK_CONVERSE_MPI
   // print pid to kill
-  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
+//  CkPrintf("[%d] PID %d \n", CkMyPe(), getpid());
 //  sleep(4);
 #endif
 #endif
