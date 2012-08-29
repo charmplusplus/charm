@@ -1386,7 +1386,7 @@ void CkArray::broadcastHomeElements(void *data,CkLocRec *rec,CkArrayIndex *index
         envelope *env = UsrToEnv(copy);
         env->sender.data.group.onPE = CkMyPe();
 #if defined(_FAULT_CAUSAL_)
-        env->TN = 0
+        env->TN = 0;
 #endif
 		env->SN = 0;
         env->piggyBcastIdx = epIdx;
