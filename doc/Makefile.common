@@ -61,9 +61,14 @@ $(FILE): setup $(TEX) $(FILE).aux
 	for f in $@/*.html; do echo "Sanitizing $$f"; sed -i -e 's!'`pwd`'/!!g' $$f; ../markupSanitizer.py $$f $(tmpFile) > tmpop && cat tmpop > $$f && rm tmpop; done
 	rm -f $(tmpFile)
 
+l2h1pagecfg = ./l2h-1page-init
+
 html1page: setup $(TEX) $(FILE).aux
-	$(L2H) -split 0 $(FILE).tex
+	cp ../dot.latex2html-init $(l2h1pagecfg)
+	sed -i -e "s|MAX_SPLIT_DEPTH[ ]*=|MAX_SPLIT_DEPTH = 0; #|g" $(l2h1pagecfg)
+	$(L2H) -init_file $(l2h1pagecfg) $(FILE).tex
 	-@mv $(FILE)/$(FILE).html $(FILE)/$(FILE)-1p.html
+	rm -f $(l2h1pagecfg)
 
 setup:
 	-@ln -s ../pplmanual.* .

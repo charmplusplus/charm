@@ -2,6 +2,7 @@
 #
 ### Command Line Argument Defaults #######################################
 
+# Supplied on the command line in the makefile
 $MAX_SPLIT_DEPTH = 3;	# Stop making separate files at this depth
 
 $MAX_LINK_DEPTH = 4;    # Stop showing child nodes at this depth   
