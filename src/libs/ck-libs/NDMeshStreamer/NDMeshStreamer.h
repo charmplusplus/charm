@@ -58,7 +58,9 @@ class MeshStreamerArrayClient : public CBase_MeshStreamerArrayClient<dtype>{
 private:
   CompletionDetector *detectorLocalObj_;
 public:
-  MeshStreamerArrayClient(){}
+  MeshStreamerArrayClient(){
+    detectorLocalObj_ = NULL; 
+  }
   MeshStreamerArrayClient(CkMigrateMessage *msg) {}
   // would like to make it pure virtual but charm will try to
   // instantiate the abstract class, leading to errors
@@ -73,7 +75,9 @@ public:
 #ifdef STREAMER_VERBOSE_OUTPUT
     CkPrintf("[%d] redelivered to index %d\n", CkMyPe(), this->thisIndex.data[0]);
 #endif
-    detectorLocalObj_->consume();
+    if (detectorLocalObj_ != NULL) {
+      detectorLocalObj_->consume();
+    }
     process(data);
   }
 
@@ -248,7 +252,10 @@ public:
         CkPrintf("[%d] contribute\n", CkMyPe()); 
 #endif
         CkAssert(numDataItemsBuffered_ == 0); 
-        this->contribute(userCallback_);
+        if (!userCallback_.isInvalid()) {
+          this->contribute(userCallback_);
+          userCallback_ = CkCallback();
+        }
         return; 
       }
       else if (individualDimensionSizes_[dimensionToFlush_] != 1) {
