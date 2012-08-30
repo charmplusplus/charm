@@ -588,6 +588,27 @@ else
   test_finish 1
 fi
 
+# enable/disable randomized scheduler queue
+AC_ARG_ENABLE([randomized-msgq],
+            [AS_HELP_STRING([--enable-randomized-msgq],
+              [enable a randomized msg queue (for debugging etc)])], ,
+            [enable_randomized_msgq=no])
+
+if test "$enable_randomized_msgq" = "yes" -a "$with_prio_type" != "bitvec"
+then
+  Echo "The charm message queue will be randomized (and will not respect priorities)"
+  AC_DEFINE_UNQUOTED(CMK_RANDOMIZED_MSGQ, 1, [enable the randomized msgq in the scheduler])
+else
+  AC_DEFINE_UNQUOTED(CMK_RANDOMIZED_MSGQ, 0, [disable the randomized msgq in the scheduler])
+  if test "$with_prio_type" = "bitvec"
+  then
+    Echo "Ignoring --enable-randomized-msg."
+    Echo 'A randomized message queue is only available when --with-prio-type != bitvec.'
+    Echo "Specify prio-type to be a data type long enough to hold the msg priorities in your application"
+    Echo "for eg: --with-prio-type=int (or short / long etc)."
+  fi
+fi
+
 #### Check if compiler if 64 bit ####
 cat > $t <<EOT
 #include <stdio.h>
