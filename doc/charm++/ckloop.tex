@@ -1,1 +1,64 @@
-chao to write text to ckloop functionality
+To better utilize the multicore chip, it has become increasingly popular to
+adopt shared-memory multithreading programming methods to exploit parallelism
+on a node. For example, in hybrid MPI programs, OpenMP is the most popular
+choice.  When launching such hybrid programs, users have to make sure there are
+spare physical cores allocated to the shared-memory mulithreading runtime.
+Otherwise, the runtime that handles distributed-memory programming may
+interfere with resource contention because the two independent runtime systems
+are not coordinated.  If spare cores are allocated, just in the same way of
+launching a MPI+OpenMP hybrid program, \charmpp{} will work perfectly with any
+shared-memory parallel programming languages (e.g., OpenMP).
+
+If there are no spare cores allocated, to avoid the resouce contention, a
+\emph{unified runtime} is needed to supoort both the intra-node shared-memory
+multithreading parallelism and the inter-node distributed-memory
+message-passing parallelism. Additionally, considering a parallel application
+may just have a small fraction of its computation but critical that could be
+ported to shared-memory parallelism (the save on the critical computation may
+also reduce the communication cost, thus leading to more performance
+improvement), dedicating physical cores on every node to shared-memory
+multithreading runtime will cause a waste on computation power because those
+dedicated cores are not utilized at all during the most of application's
+execution time period. This case also indicates the necessity of a unified
+runtime so that both types of parallelism are supported.
+
+\emph{CkLoop} library is an add-on to the \charmpp{} runtime to achieve such a
+unified runtime.  The library implements a simple OpenMP-like shared-memory
+multithreading runtime that re-uses \charmpp{} PEs to perform tasks spawned by
+the multithreading runtime. This library targets to be used in the \charmpp{}
+SMP mode.
+
+The \emph{CkLoop} library is built in
+\$CHARM\_DIR/\$MACH\_LAYER/tmp/libs/ck-libs/ckloop by executing ``make''
+comamnd. To use it for user applications, one has to include ``CkLoopAPI.h'' in
+the source codes. The interface functions of this library are explained as
+follows: \begin{itemize} \item CProxy\_FuncCkLoop \textbf{CkLoop\_Init}(int
+numThreads=0) : This function initializes the CkLoop library, and it only needs
+to be called once on a single PE during the initilization phase of the
+application.  The argument ``numThreads'' is only used in the \charmpp{}
+non-SMP mode, specifying the number of threads to be created for the
+single-node shared-memory parallelism. It will be ignored in the SMP mode.
+
+\item void \textbf{CkLoop\_Exit}(CProxy\_FuncCkLoop ckLoop): This function is
+intended to be used in the non-SMP mode of \charmpp{} as it frees the resources
+(e.g., terminating the spawned threads) used by the CkLoop library. It should
+be called on just one PE.
+
+\item void \textbf{CkLoop\_Parallelize}( \\ HelperFn func, /* the function that
+finishes a partial work on another thread */ \\ int paramNum, void * param, /*
+the input parameters for the above func */ \\ int numChunks, /* number of
+chunks to be partitioned */ int lowerRange, int upperRange, /* the loop-like
+parallelization happens in [lowerRange, upperRange] */ \\ int sync=1, /*
+control the on/off of the implicit barrier after each parallelized loop */ \\
+void *redResult=NULL, REDUCTION\_TYPE type=CKLOOP\_NONE /* the reduction
+result, ONLY SUPPORT SINGLE VAR of TYPE int/float/double */ \\): The
+``HelperFn'' is defined as ``typedef void (*HelperFn)(int first,int last, void
+*result, int paramNum, void *param);'' The ``result'' is the buffer for
+reduction result on a single simple-type variable.  \end{itemize}
+
+Examples of using this library can be found in \examplerefdir{ckloop} and the
+widely-used molecule dynamics simulation
+application--NAMD\footnote{http://www.ks.uiuc.edu/Research/namd}
+
+
+
