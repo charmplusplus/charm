@@ -359,7 +359,7 @@ static  void EnqueueMsg(void *m, int size, int node, int mode);
 
 /* The machine-specific send function */
 static CmiCommHandle MachineSpecificSendForMPI(int destPE, int size, char *msg, int mode);
-#define MachineSpecificSendForMPI
+#define LrtsSendFunc MachineSpecificSendForMPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
 static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
