@@ -358,8 +358,8 @@ static  void EnqueueMsg(void *m, int size, int node, int mode);
 #endif
 
 /* The machine-specific send function */
-static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg, int mode);
-#define LrtsSendFunc MachineSpecificSendForMPI
+static CmiCommHandle MachineSpecificSendForMPI(int destPE, int size, char *msg, int mode);
+#define MachineSpecificSendForMPI
 
 /* ### Beginning of Machine-startup Related Functions ### */
 static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
@@ -495,9 +495,10 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     return (CmiCommHandle) &(smsg->req);
 }
 
-static CmiCommHandle MachineSpecificSendForMPI(int destNode, int size, char *msg, int mode) {
+static CmiCommHandle MachineSpecificSendForMPI(int destPE, int size, char *msg, int mode) {
     /* Ignoring the mode for MPI layer */
 
+    int destNode = CmiNodeOf(destPE);
     CmiState cs = CmiGetState();
     SMSG_LIST *msg_tmp;
     int  rank;
