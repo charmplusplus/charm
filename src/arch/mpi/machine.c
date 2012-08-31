@@ -357,37 +357,11 @@ static int SendMsgBuf();
 static  void EnqueueMsg(void *m, int size, int node, int mode);
 #endif
 
-/* The machine-specific send function */
-static CmiCommHandle MachineSpecificSendForMPI(int destPE, int size, char *msg, int mode);
-#define LrtsSendFunc MachineSpecificSendForMPI
-
-/* ### Beginning of Machine-startup Related Functions ### */
-static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID);
-#define LrtsInit MachineInitForMPI
-
-static void MachinePreCommonInitForMPI(int everReturn);
-static void MachinePostCommonInitForMPI(int everReturn);
-#define LrtsPreCommonInit MachinePreCommonInitForMPI
-#define LrtsPostCommonInit MachinePostCommonInitForMPI
-/* ### End of Machine-startup Related Functions ### */
-
-/* ### Beginning of Machine-running Related Functions ### */
-static void AdvanceCommunicationForMPI(int whenidle);
-#define LrtsAdvanceCommunication AdvanceCommunicationForMPI
-
-static void DrainResourcesForMPI(); /* used when exit */
-#define LrtsDrainResources DrainResourcesForMPI
-
-static void MachineExitForMPI();
-#define LrtsExit MachineExitForMPI
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
 void CmiNotifyIdleForMPI(void);
 /* ### End of Idle-state Related Functions ### */
-
-static void MachinePostNonLocalForMPI();
-#define LrtsPostNonLocal MachinePostNonLocalForMPI
 
 /* =====End of Declarations of Machine Specific Functions===== */
 
@@ -495,7 +469,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
     return (CmiCommHandle) &(smsg->req);
 }
 
-static CmiCommHandle MachineSpecificSendForMPI(int destPE, int size, char *msg, int mode) {
+CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode) {
     /* Ignoring the mode for MPI layer */
 
     int destNode = CmiNodeOf(destPE);
@@ -1013,7 +987,7 @@ static double sendtime = 0.0;
 
 #endif //end of CMK_SMP
 
-static void AdvanceCommunicationForMPI(int whenidle) {
+void LrtsAdvanceCommunication(int whenidle) {
 #if REPORT_COMM_METRICS
     double t1, t2, t3, t4;
     t1 = CmiWallTimer();
@@ -1058,11 +1032,11 @@ static void AdvanceCommunicationForMPI(int whenidle) {
 }
 /* ######End of functions related with communication progress ###### */
 
-static void MachinePostNonLocalForMPI() {
+void LrtsPostNonLocal() {
 #if !CMK_SMP
     if (no_outstanding_sends) {
         while (CpvAccess(MsgQueueLen)>0) {
-            AdvanceCommunicationForMPI(0);
+            LrtsAdvanceCommunication(0);
         }
     }
 
@@ -1114,7 +1088,7 @@ void CmiMachineProgressImpl() {
 #endif
 
 /* ######Beginning of functions related with exiting programs###### */
-void DrainResourcesForMPI() {
+void LrtsDrainResources() {
 #if !CMK_SMP
     while (!CmiAllAsyncMsgsSent()) {
         PumpMsgs();
@@ -1139,12 +1113,12 @@ void DrainResourcesForMPI() {
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
     if (MPI_SUCCESS != MPI_Barrier(charmComm))
-        CmiAbort("DrainResourcesForMPI: MPI_Barrier failed!\n");
+        CmiAbort("LrtsDrainResources: MPI_Barrier failed!\n");
     END_EVENT(10);
     MACHSTATE(2, "} Machine exit barrier end");
 }
 
-void MachineExitForMPI() {
+void LrtsExit() {
     int i;
 #if (CMK_DEBUG_MODE || CMK_WEB_MODE || NODE_0_IS_CONVHOST)
     int doPrint = 0;
@@ -1273,7 +1247,7 @@ static char *thread_level_tostring(int thread_level) {
  *  Obtain the number of nodes, my node id, and consuming machine layer
  *  specific arguments
  */
-static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNodeID) {
+void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     int n,i;
     int ver, subver;
     int provided;
@@ -1527,7 +1501,7 @@ static void MachineInitForMPI(int *argc, char ***argv, int *numNodes, int *myNod
 #endif
 }
 
-static void MachinePreCommonInitForMPI(int everReturn) {
+void LrtsPreCommonInit(int everReturn) {
 
 #if MPI_POST_RECV
     int doInit = 1;
@@ -1623,7 +1597,7 @@ static void MachinePreCommonInitForMPI(int everReturn) {
 #endif
 }
 
-static void MachinePostCommonInitForMPI(int everReturn) {
+void LrtsPostCommonInit(int everReturn) {
 
     CmiIdleState *s=CmiNotifyGetState();
 
@@ -2193,7 +2167,7 @@ static void recordMsgHistogramInfo(int size)
 }
 #endif /* end of MPI_DYNAMIC_POST_RECV */
 
-static void reportMsgHistogramInfo()
+void reportMsgHistogramInfo()
 {
 #if MPI_DYNAMIC_POST_RECV
     int i, count;
