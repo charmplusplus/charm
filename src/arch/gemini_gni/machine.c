@@ -1711,6 +1711,8 @@ CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode)
     return 0;
 }
 
+#if 0
+// this is no different from the common code
 void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   int i;
@@ -1777,6 +1779,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiFree(msg);
 #endif
 }
+#endif
 
 static void    PumpDatagramConnection();
 static      int         event_SetupConnect = 111;
