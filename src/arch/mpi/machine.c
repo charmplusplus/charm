@@ -332,7 +332,7 @@ static CmiNodeLock  sendMsgBufLock = NULL;        /* for sendMsgBuf */
 #endif
 /* =====End of Declarations of Machine Specific Variables===== */
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 #define FAIL_TAG   1200
 int num_workpes, total_pes;
 int *petorank = NULL;
@@ -437,7 +437,7 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
 #else
 /* branch not using MPI_POST_RECV */
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 	dstrank = petorank[node];
 #else
 	dstrank=node;
@@ -1107,7 +1107,7 @@ void LrtsDrainResources() {
         }
     }
 #endif
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
     if (CmiMyPe() == 0) mpi_end_spare();
 #endif
     MACHSTATE(2, "Machine exit barrier begin {");
@@ -1339,7 +1339,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     }
 
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
     if (CmiGetArgInt(largv,"+wp",&num_workpes)) {
        CmiAssert(num_workpes <= *numNodes);
        total_pes = *numNodes;
@@ -1705,7 +1705,7 @@ void CmiTimerInit(char **argv) {
     if (_absoluteTime && CmiMyPe() == 0)
         printf("Charm++> absolute MPI timer is used\n");
 
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && ! CMK_MESSAGE_LOGGING
     _is_global = CmiTimerIsSynchronized();
 #else
     _is_global = 0;
@@ -1725,7 +1725,7 @@ void CmiTimerInit(char **argv) {
             starttimer = minTimer;
         }
     } else { /* we don't have a synchronous timer, set our own start time */
-#if ! CMK_MEM_CHECKPOINT
+#if ! CMK_MEM_CHECKPOINT && ! CMK_MESSAGE_LOGGING
         CmiBarrier();
         CmiBarrier();
         CmiBarrier();
@@ -1867,7 +1867,7 @@ int CmiBarrierZero() {
 }
 
 
-#if CMK_MEM_CHECKPOINT
+#if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 
 void mpi_restart_crashed(int pe, int rank)
 {
