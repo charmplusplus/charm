@@ -1393,8 +1393,12 @@ void killLocal(void *_dummy,double curWallTime){
         printf("[%d] KillLocal called at %.6lf \n",CkMyPe(),CmiWallTimer());          
         if(CmiWallTimer()<killTime-1){
                 CcdCallFnAfter(killLocal,NULL,(killTime-CmiWallTimer())*1000);        
-        }else{  
+        }else{ 
+#if CMK_CONVERSE_MPI
+				CkDieNow();
+#else 
                 kill(getpid(),SIGKILL);                                               
+#endif
         }              
 } 
 #else
