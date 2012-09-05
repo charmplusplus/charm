@@ -116,12 +116,15 @@ int setJcontext (const uJcontext_t *u)
 			__asm { mov esp, new_sp };
 #elif defined(__CYGWIN__)
 			asm ( "mov %0, %%esp\n"::"m"(new_sp));
+#elif defined(__APPLE__) && CMK_64BIT
+			asm ( "mov %0, %%rsp\n"::"m"(new_sp));
 #elif 0 /* Blue Gene/Light gcc PPC assembly version: */
 			asm __volatile__ ("mr 1,%0" :: "r"(new_sp));
 #else /* Portable alloca version */
 			char *old_sp=(char *)&old_sp; /* address of any local variable */
 			register CmiInt8 allocLen=old_sp-new_sp;
                   
+		        VERBOSE( printf("calling alloca with %lld", allocLen); printStack(); )
 			_dummyAllocaSetJcontext = alloca(allocLen);  /* defeat the compiler optimization! */
 #endif
 		}

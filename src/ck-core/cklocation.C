@@ -2075,11 +2075,11 @@ void CkLocMgr::informHome(const CkArrayIndex &idx,int nowOnPe)
 		//Let this element's home Pe know it lives here now
 		DEBC((AA"  Telling %s's home %d that it lives on %d.\n"AB,idx2str(idx),home,nowOnPe));
 //#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#if defined(_FAULT_MLOG_)
-        informLocationHome(thisgroup,idx,home,CkMyPe());
-#else
+//#if defined(_FAULT_MLOG_)
+//        informLocationHome(thisgroup,idx,home,CkMyPe());
+//#else
 		thisProxy[home].updateLocation(idx,nowOnPe);
-#endif
+//#endif
 	}
 }
 
@@ -2251,7 +2251,7 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		DEBS((AA"deliver %s rec is null\n"AB,idx2str(idx)));
 	}
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
-#if !defined(_FAULT_MLOG_)
+//#if !defined(_FAULT_MLOG_)
 #if CMK_LBDB_ON
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
@@ -2260,7 +2260,7 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 		}
 	}
 #endif
-#endif
+//#endif
 #if CMK_GRID_QUEUE_AVAILABLE
 	int gridSrcPE;
 	int gridSrcCluster;
@@ -2671,12 +2671,12 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	DEBM((AA"Migrated index size %s to %d \n"AB,idx2str(idx),toPe));	
 
 //#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-#if defined(_FAULT_MLOG_)
-    sendMlogLocation(toPe,UsrToEnv(msg));
-#else
+//#if defined(_FAULT_MLOG_)
+//    sendMlogLocation(toPe,UsrToEnv(msg));
+//#else
 	//Send off message and delete old copy
 	thisProxy[toPe].immigrate(msg);
-#endif
+//#endif
 
 	duringMigration=CmiTrue;
 	delete rec; //Removes elements, hashtable entries, local index
@@ -2686,9 +2686,9 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	//The element now lives on another processor-- tell ourselves and its home
 	inform(idx,toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
-#if !defined(_FAULT_MLOG_)    
+//#if !defined(_FAULT_MLOG_)    
 	informHome(idx,toPe);
-#endif
+//#endif
 
 #if CMK_GLOBAL_LOCATION_UPDATE
         DEBM((AA"Global location update. idx %s " 
@@ -2721,11 +2721,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage *msg)
 
 	//Create a record for this element
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
-#if !defined(_FAULT_MLOG_)     
+//#if !defined(_FAULT_MLOG_)     
 	CkLocRec_local *rec=createLocal(idx,CmiTrue,msg->ignoreArrival,CmiFalse /* home told on departure */ );
-#else
-    CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );
-#endif
+//#else
+//    CkLocRec_local *rec=createLocal(idx,CmiTrue,CmiTrue,CmiFalse /* home told on departure */ );
+//#endif
 	
 	//Create the new elements as we unpack the message
 	pupElementsFor(p,rec,CkElementCreation_migrate);

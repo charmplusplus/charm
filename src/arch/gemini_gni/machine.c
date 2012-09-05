@@ -1651,8 +1651,9 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
     CMI_SET_CHECKSUM(msg, size);
 }
 
-CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode)
 {
+    int destNode = CmiNodeOf(destPE);
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
     CONTROL_MSG         *control_msg_tmp;
@@ -1710,6 +1711,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     return 0;
 }
 
+#if 0
+// this is no different from the common code
 void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   int i;
@@ -1776,6 +1779,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiFree(msg);
 #endif
 }
+#endif
 
 static void    PumpDatagramConnection();
 static      int         event_SetupConnect = 111;
@@ -2280,7 +2284,7 @@ static void PumpNetworkSmsg()
     }   //end while GetEvent
     if(status == GNI_RC_ERROR_RESOURCE)
     {
-        printf("charm> Please use +useRecvQueue 204800 in your command line, if the error comes again, increase this number\n");  
+        printf("charm> Please use +useRecvQueue %d in your command line, if the error comes again, increase this number\n", REMOTE_QUEUE_ENTRIES*2);
         GNI_RC_CHECK("Smsg_rx_cq full", status);
     }
 }

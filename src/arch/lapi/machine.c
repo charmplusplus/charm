@@ -412,7 +412,8 @@ static INLINE_KEYWORD void lapiSendFn(int destNode, int size, char *msg, scompl_
     MACHSTATE(2,"} lapiSendFn end");
 }
 
-static CmiCommHandle MachineSendFuncForLAPI(int destNode, int size, char *msg, int mode) {
+static CmiCommHandle MachineSendFuncForLAPI(int destPE, int size, char *msg, int mode) {
+    int destNode = CmiNodeOf(destPE);
     scompl_hndlr_t *shdlr = NULL;
     void *sinfo = NULL;
 

@@ -17,10 +17,6 @@
    /* can not handle reduction in inmem FT */
 #define USE_REDUCTION         0
 #define USE_LDB_SPANNING_TREE 0
-#elif defined(_FAULT_MLOG_)
-/* can not handle reduction in inmem FT */
-#define USE_REDUCTION         0
-#define USE_LDB_SPANNING_TREE 0
 #else
 #define USE_REDUCTION         1
 #define USE_LDB_SPANNING_TREE 1
@@ -789,7 +785,6 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
 	if(step() > m->step){
 		char str[100];
 		envelope *env = UsrToEnv(m);
-		CmiPrintf("[%d] Object %s tProcessed %d m->TN %d\n",CmiMyPe(),mlogData->objID.toString(str),mlogData->tProcessed,env->TN);
 		return;
 	}
 	lbDecisionCount = m->lbDecisionCount;

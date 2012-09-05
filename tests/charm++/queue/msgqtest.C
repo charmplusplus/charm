@@ -183,6 +183,19 @@ double timePerOp_stlQ(int qBaseSize = 256)
 
 bool perftest_general_ififo()
 {
+  std::vector<double> timings;
+  timings.reserve(256);
+  // Charm applications typically have a small/moderate number of different message priorities
+  for (int hl = 16; hl <= 128; hl *=2)
+  {
+    std::srand(42);
+    for (int i = 0; i < qSizeMax + numMsgs; i++)
+      prios[i] = std::rand() % hl;
+
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
+      timings.push_back( timePerOp_stlQ(i) );
+  }
+
   #if CMK_HAS_STD_UNORDERED_MAP
   CkPrintf("The STL variant of the msg q is using a std::unordered_map\n");
   #else
@@ -198,16 +211,11 @@ bool perftest_general_ififo()
   for (int i = qSizeMin; i <= qSizeMax; i*=2)
     CkPrintf("%10d", i);
 
-  // Charm applications typically have a small/moderate number of different message priorities
-  for (int hl = 16; hl <= 128; hl *=2)
+  for (int hl = 16, j=0; hl <= 128; hl *=2)
   {
-    std::srand(42);
-    for (int i = 0; i < qSizeMax + numMsgs; i++)
-      prios[i] = std::rand() % hl;
-
     CkPrintf("\n    stl %7d", hl);
-    for (int i = qSizeMin; i <= qSizeMax; i *= 2)
-      CkPrintf("%10.4f", timePerOp_stlQ(i));
+    for (int i = qSizeMin; i <= qSizeMax; i *= 2, j++)
+      CkPrintf("%10.4f", timings[j]);
   }
 
   CkPrintf("\n");

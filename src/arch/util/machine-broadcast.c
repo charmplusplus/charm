@@ -2,7 +2,7 @@
  *        functions for broadcast
 **/
 
-CmiCommHandle CmiSendNetworkFunc(int destNode, int size, char *msg, int mode);
+CmiCommHandle CmiSendNetworkFunc(int destPE, int size, char *msg, int mode);
 
 static void handleOneBcastMsg(int size, char *msg) {
     CmiAssert(CMI_BROADCAST_ROOT(msg)!=0);
@@ -112,10 +112,10 @@ static void SendSpanningChildren(int size, char *msg, int rankToAssign, int star
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
 #else
         newmsg = CopyMsg(msg, size);
-        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
@@ -160,10 +160,10 @@ static void SendHyperCube(int size,  char *msg, int rankToAssign, int startNode)
         CmiAssert(nd>=0 && nd!=CmiMyNode());
 #if CMK_BROADCAST_USE_CMIREFERENCE
         CmiReference(msg);
-        CmiSendNetworkFunc(nd, size, msg, BCAST_SYNC);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, msg, BCAST_SYNC);
 #else
         char *newmsg = CopyMsg(msg, size);
-        CmiSendNetworkFunc(nd, size, newmsg, BCAST_SYNC);
+        CmiSendNetworkFunc(CmiNodeFirst(nd), size, newmsg, BCAST_SYNC);
 #endif
     }
     CMI_DEST_RANK(msg) = oldRank;
