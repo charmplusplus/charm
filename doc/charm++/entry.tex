@@ -20,7 +20,8 @@ an entry method:
 \index{threaded}\item[threaded] \index{entry method}entry methods 
 run in their own non-preemptible threads. These
 entry methods may perform blocking operations, such as calls to a
-\kw{sync} entry method, or explicitly suspending themselves.
+\kw{sync} entry method, or explicitly suspending themselves. For more
+details, refer to section~\ref{threaded}.
 
 \index{sync}\item[sync] \index{entry method}entry methods are special in that
 calls to them are blocking--they do not return control to the caller until the
@@ -33,6 +34,7 @@ invocation:
  ReturnMsg* m;
  m = A[i].foo(a, b, c);
 \end{alltt}
+For more details, refer to section~\ref{sync}.
 
 \index{exclusive}\item[exclusive] \index{entry method} entry methods should
 only exist on NodeGroup objects. One such entry method will not execute while
@@ -40,7 +42,7 @@ some other exclusive entry methods belonging to the same NodeGroup object are
 executing on the same node. In other words, if one exclusive method of a
 NodeGroup object is executing on node N, and another one is scheduled to run on
 the same node, the second exclusive method will wait to execute until the first
-one finishes.
+one finishes. An example can be found in \testrefdir{pingpong}.
 
 \index{nokeep}\item[nokeep] entry methods only take a message as the argument,
 and the memory buffer for this message will be managed by the \charmpp{}
@@ -48,7 +50,8 @@ runtime rather than the user calls. This means that user has to guarantee that
 the message should not be buffered for a later usage or be freed in the user 
 codes. Otherwise, a runtime error will be caused. 
 Such entry methods entail runtime 
-optimizations such as reusing the message memory.
+optimizations such as reusing the message memory. An example can be found in
+\examplerefdir{histogram\_group}.
 %these user entry methods will not be kept by the calls. Charm++ runtime
 %may be able to adopt optimization for reusing the message memory.
 
@@ -75,7 +78,8 @@ execution of immediate entry methods from being delayed by entry functions that
 could take a long time to finish. Immediate entry methods are implicitly
 ``exclusive'' on each node, meaning that one execution of immediate message
 will not be interrupted by another. Function \kw{CmiProbeImmediateMsg()} can be
-called in user codes to probe and process immediate messages periodically.
+called in user codes to probe and process immediate messages periodically. An
+example ``immediatering'' can be found in \testrefdir{megatest}.
 
 \index{expedited}\item[expedited] entry methods skip the priority-based message
 queue in \charmpp{} runtime. It is useful for messages that require prompt
@@ -85,13 +89,14 @@ general solution that works for all types of \charmpp{} objects, i.e. Chare,
 Group, NodeGroup and Chare Array. However, expedited entry methods will still
 be scheduled in the lower-level Converse message queue, and be processed in the
 order of message arrival. Therefore, they may still suffer from delays caused
-by long running entry methods.
+by long running entry methods. An example can be found in 
+\examplerefdir{satisfiability}.
 
 \index{inline}\item[inline] entry methods will be immediately invoked if the
 message recipient happens to be on the same PE. These entry methods need to be
 re-entrant as they could be called multiple times recursively. If the recipient
 resides on a non-local PE, a regular message is sent, and \kw{inline} has no
-effect.
+effect. An example ``inlineem'' can be found in \testrefdir{megatest}.
 
 \index{local}\item[local] entry methods are equivalent to normal function
 calls: the entry method is always executed immediately. This feature is
@@ -104,11 +109,11 @@ modify the caller data if method parameters are passed by pointer or reference.
 Furthermore, input parameters do not require to be PUPable. Considering that
 these entry methods always execute immediately, they are allowed to have a
 non-void return value. Nevertheless, the return type of the method must be a
-pointer.
+pointer. An example can be found in \examplerefdir{hello/local}.
 
 \index{python}\item[python] entry methods are enabled to be
 called from python scripts as explained in chapter~\ref{python}. Note that the object owning the method must also be declared with the
-keyword \kw{python}.
+keyword \kw{python}. Refer to chapter~\ref{python} for more details.
 
 \index{reductiontarget}\item[reductiontarget] entry methods may be used as the
 target of reductions, despite not taking CkReductionMsg as an argument.
