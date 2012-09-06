@@ -111,7 +111,8 @@ processor is executing an entry point, no messages are awaiting processing, and
 there are no messages in-flight.  \charmpp\ provides two facilities for
 detecting quiescence: \kw{CkStartQD} and \kw{CkWaitQD}.  \kw{CkStartQD}
 registers with the system a callback that is to be invoked the next time
-\index{quiescence}quiescence is detected.  \kw{CkStartQD} has two variants
+\index{quiescence}quiescence is detected. Note that if immediate messages are
+used, QD cannot be used.  \kw{CkStartQD} has two variants
 which expect the following arguments: 
 
 \begin{enumerate}
