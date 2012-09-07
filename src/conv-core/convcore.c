@@ -131,6 +131,11 @@ extern void CldModuleInit(char **);
 #endif
 
 #include "quiescence.h"
+
+#if USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+#include <mpi.h>
+#endif
+
 //int cur_restart_phase = 1;      /* checkpointing/restarting phase counter */
 CpvDeclare(int,_curRestartPhase);
 static int CsdLocalMax = CSD_LOCAL_MAX_DEFAULT;
@@ -2846,6 +2851,8 @@ void *CmiAlloc(int size)
   res =(char *) LrtsAlloc(size, sizeof(CmiChunkHeader));
 #elif CONVERSE_POOL
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+  MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -2947,6 +2954,8 @@ void CmiFree(void *blk)
     LrtsFree(BLKSTART(parentBlk));
 #elif CONVERSE_POOL
     CmiPoolFree(BLKSTART(parentBlk));
+#elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
+    MPI_Free_mem(parentBlk);
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif
