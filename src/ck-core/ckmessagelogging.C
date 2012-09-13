@@ -79,8 +79,6 @@ CpvDeclare(Chare *,_currentObj);
 CpvDeclare(StoredCheckpoint *,_storedCheckpointData);
 // stores the incarnation number from every other processor
 CpvDeclare(char *, _incarnation);
-// stores messages received before object gets created
-CpvDeclare(Queue, _outOfOrderMessageQueue);
 /***** *****/
 
 /***** VARIABLES FOR PARALLEL RECOVERY *****/
@@ -223,11 +221,7 @@ void _messageLoggingInit(){
 	partnerFailureHandlerIdx = CkRegisterHandler((CmiHandler)partnerFailureHandler);
 #endif
 	
-	//Cpv variables for message logging
-	CpvInitialize(Queue, _outOfOrderMessageQueue);
-	CpvAccess(_outOfOrderMessageQueue) = CqsCreate();
-	
-	// Cpv variables for causal protocol
+	// Cpv variables for message-logging protocol
 	CpvInitialize(char *, _incarnation);
 	CpvAccess(_incarnation) = (char *) CmiAlloc(CmiNumPes() * sizeof(int));
 	for(int i=0; i<CmiNumPes(); i++){
@@ -729,23 +723,13 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 		return 1;
 	}
 
+	// checking if object is NULL 
 	Chare *obj = (Chare *)recver.getObject();
 	*objPointer = obj;
 	if(obj == NULL){
-		int possiblePE = recver.guessPE();
-		if(possiblePE != CkMyPe()){
-			int totalSize = env->getTotalsize();
-			CmiSyncSendAndFree(possiblePE,totalSize,(char *)env);
-			
-			DEBUG_NOW(printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
-		}else{
-			// this is the case where a message is received and the object has not been initialized
-			// we delayed the delivery of the message
-			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
-			
-			DEBUG_NOW(printf("[%d] Message SN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString)));
-		}
-		return 0;
+		// the objects does not exist on this PE, we let Charm forward the message and update the location manager.
+		DEBUG(printf("[%d] Message SN %d sender %s for NULL recver %s\n",CkMyPe(),env->SN,env->sender.toString(senderString),recver.toString(recverString)));
+		return 1;
 	}
 
 	// checking if message comes from an old incarnation, message must be discarded
