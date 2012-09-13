@@ -735,15 +735,15 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 		int possiblePE = recver.guessPE();
 		if(possiblePE != CkMyPe()){
 			int totalSize = env->getTotalsize();
-			CmiSyncSend(possiblePE,totalSize,(char *)env);
+			CmiSyncSendAndFree(possiblePE,totalSize,(char *)env);
 			
-			DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
+			DEBUG_NOW(printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
 		}else{
 			// this is the case where a message is received and the object has not been initialized
 			// we delayed the delivery of the message
 			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
 			
-			DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
+			DEBUG_NOW(printf("[%d] Message SN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString)));
 		}
 		return 0;
 	}
@@ -2112,141 +2112,6 @@ void _messageLoggingExit(){
 	printf("\n");
 #endif
 #endif
-
-
-}
-
-/**
-	The method for returning the actual object pointed to by an id
-	If the object doesnot exist on the processor it returns NULL
-**/
-
-void* CkObjID::getObject(){
-	
-		switch(type){
-			case TypeChare:	
-				return CkLocalChare(&data.chare.id);
-			case TypeMainChare:
-				return CkLocalChare(&data.chare.id);
-			case TypeGroup:
-	
-				CkAssert(data.group.onPE == CkMyPe());
-				return CkLocalBranch(data.group.id);
-			case TypeNodeGroup:
-				CkAssert(data.group.onPE == CkMyNode());
-				//CkLocalNodeBranch(data.group.id);
-				{
-					CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-				  void *retval = CksvAccess(_nodeGroupTable)->find(data.group.id).getObj();
-				  CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));					
-	
-					return retval;
-				}	
-			case TypeArray:
-				{
-	
-	
-					CkArrayID aid(data.array.id);
-	
-					if(aid.ckLocalBranch() == NULL){ return NULL;}
-	
-					CProxyElement_ArrayBase aProxy(aid,data.array.idx.asChild());
-	
-					return aProxy.ckLocal();
-				}
-			default:
-				CkAssert(0);
-		}
-}
-
-
-int CkObjID::guessPE(){
-		switch(type){
-			case TypeChare:
-			case TypeMainChare:
-				return data.chare.id.onPE;
-			case TypeGroup:
-			case TypeNodeGroup:
-				return data.group.onPE;
-			case TypeArray:
-				{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						return -1;
-					}
-					return aid.ckLocalBranch()->lastKnown(data.array.idx.asChild());
-				}
-			default:
-				CkAssert(0);
-		}
-};
-
-char *CkObjID::toString(char *buf) const {
-	
-	switch(type){
-		case TypeChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);
-			break;
-		case TypeMainChare:
-			sprintf(buf,"Chare %p PE %d \0",data.chare.id.objPtr,data.chare.id.onPE);	
-			break;
-		case TypeGroup:
-			sprintf(buf,"Group %d	PE %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeNodeGroup:
-			sprintf(buf,"NodeGroup %d	Node %d \0",data.group.id.idx,data.group.onPE);
-			break;
-		case TypeArray:
-			{
-				const CkArrayIndexMax &idx = data.array.idx.asChild();
-				const int *indexData = idx.data();
-				sprintf(buf,"Array |%d %d %d| id %d \0",indexData[0],indexData[1],indexData[2],data.array.id.idx);
-				break;
-			}
-		default:
-			CkAssert(0);
-	}
-	
-	return buf;
-};
-
-void CkObjID::updatePosition(int PE){
-	if(guessPE() == PE){
-		return;
-	}
-	switch(type){
-		case TypeArray:
-			{
-					CkArrayID aid(data.array.id);
-					if(aid.ckLocalBranch() == NULL){
-						
-					}else{
-						char str[100];
-						CkLocMgr *mgr = aid.ckLocalBranch()->getLocMgr();
-//						CmiPrintf("[%d] location for object %s is %d\n",CmiMyPe(),toString(str),PE);
-						CkLocRec *rec = mgr->elementNrec(data.array.idx.asChild());
-						if(rec != NULL){
-							if(rec->type() == CkLocRec::local){
-								CmiPrintf("[%d] local object %s can not exist on another processor %d\n",CmiMyPe(),str,PE);
-								return;
-							}
-						}
-						mgr->inform(data.array.idx.asChild(),PE);
-					}	
-				}
-
-			break;
-		case TypeChare:
-		case TypeMainChare:
-			CkAssert(data.chare.id.onPE == PE);
-			break;
-		case TypeGroup:
-		case TypeNodeGroup:
-			CkAssert(data.group.onPE == PE);
-			break;
-		default:
-			CkAssert(0);
-	}
 }
 
 void MlogEntry::pup(PUP::er &p){
