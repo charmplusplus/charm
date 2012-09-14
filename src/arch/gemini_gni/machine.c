@@ -645,7 +645,11 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     if (s == -1) {
         int newsize = pool->size * 2;
         //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
-        if (newsize > (1<<(32-SHIFT-1))) CmiAbort("IndexPool too large");
+        if (newsize > (1<<(32-SHIFT-1))) {
+            printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            return -1;
+            CmiAbort("IndexPool for remote events overflows, try compile Charm++ with remote event disabled.");
+        }
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
         memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
@@ -1443,7 +1447,15 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         if (tag == LMSG_INIT_TAG || tag == LMSG_OOB_INIT_TAG) {
             CONTROL_MSG *control_msg_tmp = (CONTROL_MSG*)msg;
             if (control_msg_tmp->seq_id == 0 && control_msg_tmp->ack_index == -1)
+            {
                 control_msg_tmp->ack_index = IndexPool_getslot(&ackPool, (void*)control_msg_tmp->source_addr, 1);
+                if (control_msg_tmp->ack_index == -1) {    /* table overflow */
+                    status = GNI_RC_NOT_DONE;
+                    if (inbuff ==0)
+                        buffer_small_msgs(queue, msg, size, destNode, tag);
+                    return status;
+                }
+            }
         }
         // GNI_EpSetEventData(ep_hndl_array[destNode], destNode, myrank);
 #endif
@@ -1651,8 +1663,9 @@ inline void LrtsPrepareEnvelope(char *msg, int size)
     CMI_SET_CHECKSUM(msg, size);
 }
 
-CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
+CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode)
 {
+    int destNode = CmiNodeOf(destPE);
     gni_return_t        status  =   GNI_RC_SUCCESS;
     uint8_t tag;
     CONTROL_MSG         *control_msg_tmp;
@@ -1710,6 +1723,8 @@ CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode)
     return 0;
 }
 
+#if 0
+// this is no different from the common code
 void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg)
 {
   int i;
@@ -1776,6 +1791,7 @@ void LrtsFreeListSendFn(int npes, int *pes, int len, char *msg)
     CmiFree(msg);
 #endif
 }
+#endif
 
 static void    PumpDatagramConnection();
 static      int         event_SetupConnect = 111;
@@ -2280,7 +2296,7 @@ static void PumpNetworkSmsg()
     }   //end while GetEvent
     if(status == GNI_RC_ERROR_RESOURCE)
     {
-        printf("charm> Please use +useRecvQueue 204800 in your command line, if the error comes again, increase this number\n");  
+        printf("charm> Please use +useRecvQueue %d in your command line, if the error comes again, increase this number\n", REMOTE_QUEUE_ENTRIES*2);
         GNI_RC_CHECK("Smsg_rx_cq full", status);
     }
 }

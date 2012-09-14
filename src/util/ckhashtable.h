@@ -122,10 +122,6 @@ inline int CkHashCompare_int(const void *k1,const void *k2,size_t /*len*/)
 inline int CkHashCompare_pointer(const void *k1,const void *k2,size_t /*len*/)
 	{return *(char **)k1 == *(char **)k2;}
 
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-extern int countHashRefs;
-extern int countHashCollisions;
-#endif
 
 ///////////////////////// Hashtable //////////////////////
 
@@ -384,7 +380,6 @@ public:
 
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	OBJ *getPointer(const KEY &key) {
-        countHashRefs++;
         int i=key.hash()%this->len;
         while(1) {//Assumes key or empty slot will be found
             char *cur=this->entry(i);
@@ -396,7 +391,6 @@ public:
             if (key.compare(*(KEY *)this->layout.getKey(cur)))
                 return (OBJ *)this->layout.getObject(cur);
             this->inc(i);
-            countHashCollisions++;
         };
         return NULL;
     }

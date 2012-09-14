@@ -886,7 +886,7 @@ int main()
         << myidx.data[[0]] << ","
         << myidx.data[[1]] << ","
         << myidx.z << ")\n";
-    return (myidx.data[[0]] = 1 && myidx.y == 2 && myidx.data[[2]] == 3);
+    return (myidx.data[[0]] == 1 && myidx.y == 2 && myidx.data[[2]] == 3);
 }
 EOT
 test_cxx "whether anon structs are permitted" "yes" "no" ""
@@ -926,7 +926,7 @@ AC_DEFINE_UNQUOTED(CMK_HAS_OFFSETOF, $pass, [whether offsetof exists])
 cat > $t <<EOT
 double foo(void)
 {
-  unsigned long long int v;
+  unsigned long long int v=0;
   int *lo=0+(int *)&v;
   int *hi=1+(int *)&v;
   __asm__ __volatile__(

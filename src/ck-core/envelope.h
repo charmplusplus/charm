@@ -26,7 +26,7 @@
 // silly ancient name: for backward compatability only.
 #define PW(x) CkPriobitsToInts(x) 
 
-#if defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 #define CK_FREE_MSG_MLOG 	0x1
 #define CK_BYPASS_DET_MLOG 	0x2
 #endif
@@ -186,7 +186,9 @@ public:
     CkObjID sender;
     CkObjID recver;
     MCount SN;
+#if defined(_FAULT_CAUSAL_)
     MCount TN;
+#endif
     int incarnation;
 	int flags;
 #endif
@@ -226,7 +228,7 @@ private:
     void   setMsgIdx(const UChar idx) { attribs.msgIdx = idx; }
     UInt   getTotalsize(void) const { return totalsize; }
     void   setTotalsize(const UInt s) { totalsize = s; }
-    UInt   getUsersize(void) const { return totalsize - priobits - sizeof(envelope); }
+    UInt   getUsersize(void) const { return totalsize - getPrioBytes() - sizeof(envelope); }
     UChar  isPacked(void) const { return attribs.isPacked; }
     void   setPacked(const UChar p) { attribs.isPacked = p; }
     UShort getPriobits(void) const { return priobits; }
@@ -265,7 +267,9 @@ private:
       env->sender.type = TypeInvalid;
       env->recver.type = TypeInvalid;
       env->SN = 0;
+#if defined(_FAULT_CAUSAL_)
       env->TN = 0;
+#endif
 	  env->incarnation = -1;
 #endif
 

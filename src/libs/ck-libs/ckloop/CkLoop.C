@@ -5,6 +5,9 @@
 #include "qd.h"
 #endif
 
+#define CKLOOP_USECHARM 1
+#define CKLOOP_PTHREAD 2
+
 /*====Beginning of pthread-related variables and impelementation====*/
 //__thread is not portable, but it works almost everywhere if pthread works
 //After C++11, this should be thread_local
@@ -454,30 +457,25 @@ void CurLoopInfo::stealWork() {
 //   End of functions related with FuncSingleHelper                     //
 //======================================================================//
 
-CProxy_FuncCkLoop CkLoop_Init(int mode, int numThreads) {
-    if (mode == CKLOOP_USECHARM) {
+CProxy_FuncCkLoop CkLoop_Init(int numThreads) {
+    int mode;
+#if CMK_SMP
+    mode = CKLOOP_USECHARM;
 #if USE_CONVERSE_NOTIFICATION
-        CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (converse-level notification) but not using node-level queue\n");
+    CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (converse-level notification) but not using node-level queue\n");
 #else
-        CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (charm-level notifiation) but not using node-level queue\n");
+    CkPrintf("CkLoopLib is used in SMP with a simple dynamic scheduling (charm-level notifiation) but not using node-level queue\n");
 #endif
-    } else if (mode==CKLOOP_PTHREAD) {
-        CkPrintf("CkLoopLib is used with extra %d pthreads via a simple dynamic scheduling\n", numThreads);
-        CmiAssert(numThreads>0);
-    }
+#else
+    mode = CKLOOP_PTHREAD;
+    CkPrintf("CkLoopLib is used with extra %d pthreads via a simple dynamic scheduling\n", numThreads);
+    CmiAssert(numThreads>0);
+#endif
     return CProxy_FuncCkLoop::ckNew(mode, numThreads);
 }
 
 void CkLoop_Exit(CProxy_FuncCkLoop ckLoop) {
     ckLoop.exit();
-}
-
-void CkLoop_Parallelize(CProxy_FuncCkLoop ckLoop, HelperFn func,
-                            int paramNum, void * param,
-                            int numChunks, int lowerRange, int upperRange,
-                            int sync,
-                            void *redResult, REDUCTION_TYPE type) {
-    ckLoop[CkMyNode()].ckLocalBranch()->parallelizeFunc(func, paramNum, param, numChunks, lowerRange, upperRange, sync, redResult, type);
 }
 
 void CkLoop_Parallelize(HelperFn func,

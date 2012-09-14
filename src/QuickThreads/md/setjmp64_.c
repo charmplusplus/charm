@@ -66,6 +66,8 @@ static void qt_args_1(qt_t *rjb, void *u, void *t,
   write(2,"Never get here 2.\n",18);
 }
 
+qt_t *qt_args(qt_t *sp, void *u, void *t, qt_userf_t *userf, qt_only_t *only)  __attribute__((optimize(0)));
+
 qt_t *qt_args(qt_t *sp, void *u, void *t,
 	      qt_userf_t *userf, qt_only_t *only)
 {

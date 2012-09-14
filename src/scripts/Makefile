@@ -1132,5 +1132,11 @@ dependsCaseSensitive: cidepends
         done;  \
         rm -f metis.h  scotch.h
 
-
+# The build script should have spit out the build options into this makefile
+-include buildopts.mk
+# If OPTS was not defined, use the build time options
+OPTS ?= $(OPTSATBUILDTIME)
+ifeq ($(strip $(OPTS)),)
+$(warning Variable OPTS is defined to an empty string. Are you sure this is what you want?)
+endif
 

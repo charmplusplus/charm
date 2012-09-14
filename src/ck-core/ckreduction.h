@@ -544,7 +544,7 @@ public:
 	*/
 	int getGCount(){return gcount;};
         static void sanitycheck();
-#if defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	void decGCount(){gcount--;}
 	void incNumImmigrantRecObjs(){
 		numImmigrantRecObjs++;
@@ -563,7 +563,7 @@ public:
 
 private:
 
-#if defined(_FAULT_CAUSAL_)
+#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
 	int numImmigrantRecObjs;
 	int numEmigrantRecObjs;
 #endif

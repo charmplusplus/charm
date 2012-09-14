@@ -1,0 +1,14 @@
+mainmodule sync_square {
+
+    message int_message;
+
+    mainchare Driver {
+        entry Driver(CkArgMsg*);
+        entry void get_square(int value);
+    }
+
+    chare Squarer {
+        entry Squarer(void);
+        entry [sync] int_message* square(int x);
+    }
+}

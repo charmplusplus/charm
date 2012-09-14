@@ -4,7 +4,7 @@
 void LrtsPrepareEnvelope(char *msg, int size);
 
 /* The machine-specific send function */
-CmiCommHandle LrtsSendFunc(int destNode, int size, char *msg, int mode);
+CmiCommHandle LrtsSendFunc(int destPE, int size, char *msg, int mode);
 
 void LrtsSyncListSendFn(int npes, int *pes, int len, char *msg);
 CmiCommHandle LrtsAsyncListSendFn(int npes, int *pes, int len, char *msg);
