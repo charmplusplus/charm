@@ -613,8 +613,8 @@ inline bool isTeamLocal(int destPE){
  * Method that does the actual send by creating a ticket request filling it up and sending it.
  */
 void sendRemoteMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount SN,int resend){
-	DEBUG_NOW(char recverString[100]);
-	DEBUG_NOW(char senderString[100]);
+	DEBUG(char recverString[100]);
+	DEBUG(char senderString[100]);
 
 	int totalSize;
 
@@ -702,8 +702,8 @@ bool fault_aware(CkObjID &recver){
 
 /* Preprocesses a received message */
 int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **logEntryPointer){
-	DEBUG_NOW(char recverString[100]);
-	DEBUG_NOW(char senderString[100]);
+	DEBUG(char recverString[100]);
+	DEBUG(char senderString[100]);
 	DEBUG_MEM(CmiMemoryCheck());
 	int flag;
 	bool ticketSuccess;
@@ -734,6 +734,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// checking if message comes from an old incarnation, message must be discarded
 	if(env->incarnation < CpvAccess(_incarnation)[env->getSrcPe()]){
+		DEBUG(printf("[%d] Stale message SN %d sender %s for recver %s being ignored\n",CkMyPe(),env->SN,env->sender.toString(senderString),recver.toString(recverString)));
 		CmiFree(env);
 		return 0;
 	}
@@ -743,7 +744,7 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// checking if message has already been processed, message must be discarded	
 	if(obj->mlogData->checkAndStoreSsn(env->sender,env->SN)){
-		DEBUG(printf("[%d] Message SN %d sender %s for recver %s being ignored\n",CkMyPe(),env->SN,env->sender.toString(senderString),recver.toString(recverString)));
+		DEBUG(printf("[%d] Duplicate message SN %d sender %s for recver %s being ignored\n",CkMyPe(),env->SN,env->sender.toString(senderString),recver.toString(recverString)));
 		CmiFree(env);
 		return 0;
 	}
