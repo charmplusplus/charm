@@ -180,10 +180,12 @@ public:
   // entry
   void init(int numLocalContributors, CkCallback startCb, CkCallback endCb, 
             int prio, bool usePeriodicFlushing);
-  void associateCallback(int numContributors, 
-                         CkCallback startCb, CkCallback endCb, 
-                         CProxy_CompletionDetector detector,
-                         int prio, bool usePeriodicFlushing);
+  void init(int numContributors, CkCallback startCb, CkCallback endCb, 
+            CProxy_CompletionDetector detector,
+            int prio, bool usePeriodicFlushing);
+  void init(CkArrayID senderArrayID, CkCallback startCb, CkCallback endCb, 
+            int prio, bool usePeriodicFlushing);
+
   void receiveAlongRoute(MeshStreamerMessage<dtype> *msg);
   virtual void receiveAtDestination(MeshStreamerMessage<dtype> *msg) = 0;
   void flushIfIdle();
@@ -654,11 +656,10 @@ void MeshStreamer<dtype>::init(int numLocalContributors, CkCallback startCb,
 }
 
 template <class dtype>
-void MeshStreamer<dtype>::associateCallback(
-			  int numContributors,
-			  CkCallback startCb, CkCallback endCb, 
-			  CProxy_CompletionDetector detector, 
-			  int prio, bool usePeriodicFlushing) {
+void MeshStreamer<dtype>::init(int numContributors,	  
+                               CkCallback startCb, CkCallback endCb,
+                               CProxy_CompletionDetector detector, 
+                               int prio, bool usePeriodicFlushing) {
 
   useStagedCompletion_ = false; 
   yieldCount_ = 0; 
@@ -688,6 +689,15 @@ void MeshStreamer<dtype>::associateCallback(
   }
 
 }
+
+template <class dtype>
+void MeshStreamer<dtype>::init(CkArrayID senderArrayID, CkCallback startCb, 
+            CkCallback endCb, int prio, bool usePeriodicFlushing) {
+    CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
+    int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
+    init(numLocalElements, startCb, endCb, prio, usePeriodicFlushing); 
+  }
+
 
 template <class dtype>
 void MeshStreamer<dtype>::finish() {
@@ -1181,15 +1191,6 @@ public:
     delete [] destinationPes_;
     delete [] isCachedArrayMetadata_; 
 #endif
-  }
-
-  void init(CkArrayID senderArrayID, CkCallback startCb, 
-            CkCallback endCb, int prio, bool usePeriodicFlushing) {
-    CkArray *senderArrayMgr = senderArrayID.ckLocalBranch();
-    int numLocalElements = senderArrayMgr->getLocMgr()->numLocalElements();
-    MeshStreamer<ArrayDataItem<dtype, itype> >::init(
-                 numLocalElements, startCb, endCb, prio,
-                 usePeriodicFlushing); 
   }
 
   void receiveAtDestination(
