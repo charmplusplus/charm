@@ -6,6 +6,8 @@ class ArrayDataItem{
  public:
   itype arrayIndex;
   dtype dataItem;
+
+  ArrayDataItem(itype i, const dtype d) : arrayIndex(i), dataItem(d) {}
 };
 
 #endif
