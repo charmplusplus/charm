@@ -973,8 +973,12 @@ void CkMigratable::commonInit(void) {
 	usesAtSync=CmiFalse;
 	usesAutoMeasure=CmiTrue;
 	barrierRegistered=CmiFalse;
-	atsync_iteration = -1;
-  clearAdaptiveData();
+
+  local_state = OFF;
+  prev_load = 0.0;
+  can_reset = false;
+  atsync_iteration = myRec->getLBDB()->get_iteration();
+
 	/*
 	FAULT_EVAC
 	*/
@@ -1100,19 +1104,16 @@ void CkMigratable::recvLBPeriod(void *data) {
 
   if (local_state == PAUSE) {
     if (atsync_iteration < lb_period) {
-    //  CkPrintf("---[pe %s] pause and decided\n", idx2str(thisIndexMax));
       local_state = DECIDED;
       ResumeFromSync();
       return;
     }
-   // CkPrintf("---[pe %s] load balance\n", idx2str(thisIndexMax));
     local_state = LOAD_BALANCE;
 
     can_reset = true;
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
- // CkPrintf("---[pe %s] decided\n", idx2str(thisIndexMax));
   local_state = DECIDED;
 }
 
@@ -1159,19 +1160,16 @@ void CkMigratable::AtSync(int waitForMigration)
   double tmp = prev_load;
   prev_load = myRec->getObjTime();
   double current_load = prev_load - tmp;
+  if (atsync_iteration < myRec->getLBDB()->get_iteration()) {
+    CkPrintf("[%d:%s] Error!! Contributing to iter %d < current iter %d\n",
+      CkMyPe(), idx2str(thisIndexMax), atsync_iteration,
+      myRec->getLBDB()->get_iteration());
+    CkAbort("Not contributing to the right iteration\n");
+  }
 
   if (atsync_iteration != 0) {
     myRec->getLBDB()->AddLoad(atsync_iteration, current_load);
   }
-
-//
-//  if (atsync_iteration == 3) {
-//    myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
-//    return;
-//  } else {
-//    ResumeFromSync();
-//    return;
-//  }
 
   bool is_tentative;
   if (atsync_iteration < myRec->getLBDB()->getPredictedLBPeriod(is_tentative)) {
@@ -1179,12 +1177,12 @@ void CkMigratable::AtSync(int waitForMigration)
   } else if (is_tentative) {
     local_state = PAUSE;
   } else if (local_state == DECIDED) {
-    DEBAD(("[pe %s] Went to load balance iter %d\n", idx2str(thisIndexMax), atsync_iteration));
+    DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = LOAD_BALANCE;
     can_reset = true;
     myRec->getLBDB()->AtLocalBarrier(ldBarrierHandle);
   } else {
-    DEBAD(("[pe %s] Went to pause state iter %d\n", idx2str(thisIndexMax), atsync_iteration));
+    DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax), atsync_iteration));
     local_state = PAUSE;
   }
 }

@@ -359,6 +359,7 @@ public:
   inline double GetLBPeriod() { return LDGetLBPeriod(myLDHandle);}
 
   void ResetAdaptive();
+  int get_iteration();
   bool AddLoad(int iteration, double load);
   void ReceiveMinStats(CkReductionMsg *);
   void TriggerSoon(int iteration_no, double imbalance_ratio, double tolerate_imb);
