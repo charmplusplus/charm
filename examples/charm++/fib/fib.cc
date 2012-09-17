@@ -1,50 +1,34 @@
-#include "fib.h"
-#define THRESHOLD 10
+#include "fib.decl.h"
 
-main::main(CkArgMsg * m)
-{ 
-    if(m->argc < 2) CmiAbort("./pgm N.");
-    int n = atoi(m->argv[1]); 
-    CProxy_fib::ckNew(1, n, thishandle); 
-}
+#define THRESHOLD 3
 
-int seqFib(int n) {
-    if (n<2) return n;
-    else return (seqFib(n-1) + seqFib(n-2));
-}
+struct Main : public CBase_Main {
+  Main(CkArgMsg* m) { CProxy_Fib::ckNew(atoi(m->argv[1]), true, CProxy_Fib()); }
+};
 
-fib::fib(int AmIRoot, int n, CProxy_fib parent){ 
-    CkPrintf("in fib::fib. n=%d\n", n);
-    IamRoot = AmIRoot;
-    this->parent = parent;
-    if (n< THRESHOLD) {
-        result =seqFib(n);
-        processResult();
+struct Fib : public CBase_Fib {
+  Fib_SDAG_CODE
+
+  CProxy_Fib parent; bool isRoot;
+
+  Fib(int n, bool isRoot_, CProxy_Fib parent_)
+    : parent(parent_), isRoot(isRoot_) {
+    __sdag_init();
+    calc(n);
+  }
+
+  int seqFib(int n) { return (n < 2) ? n : seqFib(n - 1) + seqFib(n - 2); }
+
+  void respond(int val) {
+    if (!isRoot) {
+      parent.response(val);
+      delete this;
     } else {
-        CProxy_fib::ckNew(0,n-1, thishandle); 
-        CProxy_fib::ckNew(0,n-2, thishandle); 
-        result = 0;
-        count = 2;
+      CkPrintf("Fibonacci number is: %d\n", val);
+      CkExit();
     }
-}
-
-void fib::response(int fibValue) {
-    result += fibValue;
-    if (--count == 0)
-        processResult();
-}
-
-void fib::processResult()
-{
-    CkPrintf("result:%d\n", result);
-    if (IamRoot) {
-        CkPrintf("The requested Fibonacci number is : %d\n", result);
-        CkExit();
-    } else {
-        parent.response(result);
-    }
-    delete this; /*this chare has no more work to do.*/ 
-}
+  }
+};
 
 #include "fib.def.h"
 

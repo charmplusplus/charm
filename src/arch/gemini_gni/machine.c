@@ -645,7 +645,11 @@ inline int IndexPool_getslot(IndexPool *pool, void *addr, int type)
     if (s == -1) {
         int newsize = pool->size * 2;
         //printf("[%d] IndexPool_getslot %p expand to: %d\n", myrank, pool, newsize);
-        if (newsize > (1<<(32-SHIFT-1))) CmiAbort("IndexPool too large");
+        if (newsize > (1<<(32-SHIFT-1))) {
+            printf("[%d] Warning: IndexPool_getslot %p overflow when expanding to: %d\n", myrank, pool, newsize);
+            return -1;
+            CmiAbort("IndexPool for remote events overflows, try compile Charm++ with remote event disabled.");
+        }
         struct IndexStruct *old_ackpool = pool->indexes;
         pool->indexes = (struct IndexStruct *)malloc(newsize*sizeof(struct IndexStruct));
         memcpy(pool->indexes, old_ackpool, pool->size*sizeof(struct IndexStruct));
@@ -1443,7 +1447,15 @@ static gni_return_t send_smsg_message(SMSG_QUEUE *queue, int destNode, void *msg
         if (tag == LMSG_INIT_TAG || tag == LMSG_OOB_INIT_TAG) {
             CONTROL_MSG *control_msg_tmp = (CONTROL_MSG*)msg;
             if (control_msg_tmp->seq_id == 0 && control_msg_tmp->ack_index == -1)
+            {
                 control_msg_tmp->ack_index = IndexPool_getslot(&ackPool, (void*)control_msg_tmp->source_addr, 1);
+                if (control_msg_tmp->ack_index == -1) {    /* table overflow */
+                    status = GNI_RC_NOT_DONE;
+                    if (inbuff ==0)
+                        buffer_small_msgs(queue, msg, size, destNode, tag);
+                    return status;
+                }
+            }
         }
         // GNI_EpSetEventData(ep_hndl_array[destNode], destNode, myrank);
 #endif

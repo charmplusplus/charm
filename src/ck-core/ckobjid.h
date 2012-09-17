@@ -84,7 +84,7 @@ public:
 	
 	void* getObject();
 
-	inline int guessPE();
+	int guessPE();
 	
 	char *toString(char *buf) const;
 

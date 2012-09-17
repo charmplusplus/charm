@@ -198,13 +198,24 @@ static void reportMsgHistogramInfo();
 
 #endif /* end of MPI_POST_RECV defined */
 
+/* to avoid MPI's in order delivery, changing MPI Tag all the time */
+#define TAG     1375
+#if MPI_POST_RECV
+#define POST_RECV_TAG       (TAG+1)
+#define BARRIER_ZERO_TAG  TAG
+#else
+#define BARRIER_ZERO_TAG   (TAG-1)
+#endif
+
+#define USE_MPI_CTRLMSG_SCHEME 0
+
 /* Defining this macro will use MPI_Irecv instead of MPI_Recv for
  * large messages. This could save synchronization overhead caused by
  * the rzv protocol used by MPI
  */
 #define USE_ASYNC_RECV_FUNC 0
 
-#ifdef USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 static int IRECV_MSG_THRESHOLD = 8000;
 typedef struct IRecvListEntry{
     MPI_Request req;
@@ -233,7 +244,7 @@ static void irecvListEntryFree(IRecvList used){
     freedIrecvList = used;
 }
 
-#endif /* end of USE_ASYNC_RECV_FUNC */
+#endif /* end of USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME */
 
 /* Providing functions for external usage to set up the dynamic recv buffer
  * when the user is aware that it's safe to call such function
@@ -249,14 +260,6 @@ static void recordMsgHistogramInfo(int size);
 static void reportMsgHistogramInfo();
 #endif
 
-/* to avoid MPI's in order delivery, changing MPI Tag all the time */
-#define TAG     1375
-#if MPI_POST_RECV
-#define POST_RECV_TAG       (TAG+1)
-#define BARRIER_ZERO_TAG  TAG
-#else
-#define BARRIER_ZERO_TAG   (TAG-1)
-#endif
 /* ###End of POST_RECV related related macros ### */
 
 #if CMK_BLUEGENEL
@@ -375,6 +378,10 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-lrts.h"
 #include "machine-common-core.c"
 
+#if USE_MPI_CTRLMSG_SCHEME
+#include "machine-ctrlmsg.c"
+#endif
+
 /* The machine specific msg-sending function */
 
 #if CMK_SMP
@@ -434,8 +441,10 @@ static CmiCommHandle MPISendOneMsg(SMSG_LIST *smsg) {
             CmiAbort("MPISendOneMsg: MPI_Isend failed!\n");
         END_TRACE_SENDCOMM(msg);
     }
+#elif USE_MPI_CTRLMSG_SCHEME
+	sendViaCtrlMsg(node, size, msg, smsg);
 #else
-/* branch not using MPI_POST_RECV */
+/* branch not using MPI_POST_RECV or USE_MPI_CTRLMSG_SCHEME */
 
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 	dstrank = petorank[node];
@@ -612,9 +621,12 @@ static int PumpMsgs(void) {
 #endif
 
         START_TRACE_RECVCOMM(NULL);
-
-        /* First check posted recvs then do  probe unmatched outstanding messages */
-#if MPI_POST_RECV
+#if USE_MPI_CTRLMSG_SCHEME
+	doSyncRecv = 0;
+	nbytes = recvViaCtrlMsg();
+	if(nbytes == -1) break;
+#elif MPI_POST_RECV
+		/* First check posted recvs then do  probe unmatched outstanding messages */
         MPIPostRecvList *postedOne = NULL;
         int completed_index = -1;
         flg = 0;
@@ -691,7 +703,7 @@ static int PumpMsgs(void) {
             CpvAccess(Cmi_unposted_recv_total)++;
         }
 #else
-        /* Original version */
+        /* Original version of not using MPI_POST_RECV and USE_MPI_CTRLMSG_SCHEME */
         START_EVENT();
         res = MPI_Iprobe(MPI_ANY_SOURCE, TAG, charmComm, &flg, &sts);
         if (res != MPI_SUCCESS)
@@ -728,20 +740,20 @@ static int PumpMsgs(void) {
         }
 #endif
 
-#endif /*end of not MPI_POST_RECV */
+#endif /*end of !MPI_POST_RECV and !USE_MPI_CTRLMSG_SCHEME*/
 
-        MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
-        CMI_CHECK_CHECKSUM(msg, nbytes);
-#if CMK_ERROR_CHECKING
-        if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
-            CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
-            CmiFree(msg);
-            CmiAbort("Abort!\n");
-            continue;
-        }
-#endif
-
-        if(doSyncRecv){
+		if(doSyncRecv){
+			MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
+			CMI_CHECK_CHECKSUM(msg, nbytes);
+	#if CMK_ERROR_CHECKING
+			if (CMI_MAGIC(msg) != CHARM_MAGIC_NUMBER) { /* received a non-charm msg */
+				CmiPrintf("Charm++ Abort: Non Charm++ Message Received of size %d. \n", nbytes);
+				CmiFree(msg);
+				CmiAbort("Abort!\n");
+				continue;
+			}
+	#endif
+        
             END_TRACE_RECVCOMM(msg);
             handleOneRecvedMsg(nbytes, msg);
         }
@@ -820,9 +832,10 @@ static int PumpMsgs(void) {
 
     }
 
-#if USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 /* Another loop to check the irecved msgs list */
 {
+	/*TODO: msg cap (throttling) is not exerted here */
     IRecvList irecvEnt;
     int irecvDone = 0;
     MPI_Status sts;
@@ -1446,6 +1459,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
                MPI_POST_RECV_MSG_CNT_THRESHOLD, MPI_POST_RECV_INC, MPI_POST_RECV_MSG_INC, MPI_POST_RECV_FREQ);
     }
 #endif
+	
+#if USE_MPI_CTRLMSG_SCHEME
+	CmiGetArgInt(largv, "+ctrlMsgCnt", &MPI_CTRL_MSG_CNT);
+	if(myNID == 0){
+		printf("Charm++: using the alternative ctrl msg scheme with %d pre-posted ctrl msgs\n", MPI_CTRL_MSG_CNT);
+	}
+#endif
 
 #if CMI_EXERT_SEND_CAP
     CmiGetArgInt(largv, "+dynCapSend", &SEND_CAP);
@@ -1503,7 +1523,13 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
 
 void LrtsPreCommonInit(int everReturn) {
 
-#if MPI_POST_RECV
+#if USE_MPI_CTRLMSG_SCHEME
+	#if CMK_SMP
+		if(CmiMyRank() == CmiMyNodeSize()) createCtrlMsgIrecvBufs();
+	#else
+		createCtrlMsgIrecvBufs();
+	#endif
+#elif MPI_POST_RECV
     int doInit = 1;
     int i;
 
@@ -1575,15 +1601,15 @@ void LrtsPreCommonInit(int everReturn) {
         }
 #endif
     }
-#endif /* end of MPI_POST_RECV */
-
+#endif /* end of MPI_POST_RECV  and USE_MPI_CTRLMSG_SCHEME */
+	
 #if CAPTURE_MSG_HISTOGRAM && !MPI_DYNAMIC_POST_RECV
     CpvInitialize(int *, MSG_HISTOGRAM_ARRAY);
     CpvAccess(MSG_HISTOGRAM_ARRAY) = (int *)malloc(sizeof(int)*MAX_HISTOGRAM_BUCKETS);
     memset(CpvAccess(MSG_HISTOGRAM_ARRAY), 0, sizeof(int)*MAX_HISTOGRAM_BUCKETS);
 #endif
 
-#if USE_ASYNC_RECV_FUNC
+#if USE_ASYNC_RECV_FUNC || USE_MPI_CTRLMSG_SCHEME
 #if CMK_SMP
     /* allocate the guardian entry only on comm thread considering NUMA */
     if(CmiMyRank() == CmiMyNodeSize()) {

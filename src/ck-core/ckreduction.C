@@ -666,7 +666,9 @@ void CkReductionMgr::finishReduction(void)
       return; // Wait for migrants to contribute
     } else if (totalElements<result->nSources()) {
       DEBR((AA"Got %d of %d contributions\n"AB,result->nSources(),totalElements));
+#if !defined(_FAULT_CAUSAL_)
       CkAbort("ERROR! Too many contributions at root!\n");
+#endif
     }
     DEBR((AA"Passing result to client function\n"AB));
     CkSetRefNum(result, result->getUserFlag());

@@ -1,5 +1,4 @@
 mainmodule jacobi3d {
-
   readonly CProxy_Main mainProxy;
   readonly int arrayDimX;
   readonly int arrayDimY;
@@ -7,39 +6,47 @@ mainmodule jacobi3d {
   readonly int blockDimX;
   readonly int blockDimY;
   readonly int blockDimZ;
-
   readonly int num_chare_x;
   readonly int num_chare_y;
   readonly int num_chare_z;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry void report();
+    entry void done(int iterations);
   };
 
   array [3D] Jacobi {
     entry Jacobi(void);
-    entry void begin_iteration(void);
-    entry void receiveGhosts(int iter, int dir, int height, int width,
-                             double ghosts[height*width]);
-
-    entry void doStep() {
-      atomic "begin_iteration" {
-	begin_iteration();
-      }
-      for(imsg = 0; imsg < 6; imsg++) {
-	// "iterations" keeps track of messages across steps
-	when
-          receiveGhosts[iterations] (int iter, int dir, int height, 
-                                     int width, double ghosts[height*width])
-	  atomic "process ghosts" {
-            processGhosts(dir, height, width, ghosts);
+    entry void updateGhosts(int ref, int dir, int w, int h, double gh[w*h]);
+    entry [reductiontarget] void checkConverged(bool result);
+    entry void checkpointFinished();
+    entry void run() {
+      while (!converged) {
+        atomic { begin_iteration(); }
+        for (remoteCount = 0; remoteCount < 6; remoteCount++) {
+          when updateGhosts[iterations](int ref, int dir, int w, int h, double buf[w*h]) atomic {
+            updateBoundary(dir, w, h, buf);
           }
-      }
-      atomic "doWork" {
-	check_and_compute();
+        }
+        atomic {
+          double error = computeKernel();
+          int conv = error < DELTA;
+          if (iterations % 5 == 1) {
+            contribute(sizeof(int), &conv, CkReduction::logical_and, CkCallback(CkReductionTarget(Jacobi, checkConverged), thisProxy));
+          }
+        }
+        if (++iterations % 5 == 0)
+          when checkConverged(bool result)
+            if (result) atomic { mainProxy.done(iterations); converged = true; }
+        if (iterations % LBPERIOD == 0) atomic { AtSync(); }
+        if (iterations % CHECKPOINTPERIOD == 0) {
+          atomic {
+            CkCallback cb(CkIndex_Jacobi::checkpointFinished(), thisProxy);
+            CkStartMemCheckpoint(cb);
+          }
+          when checkpointFinished() { }
+        }
       }
     };
   };
-
 };
