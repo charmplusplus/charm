@@ -63,16 +63,20 @@ public:
 		MCount *old;
 
 		// checking if ssn can be inserted, most common case
-		if(start == end && ssn == (data[start] + 1)){
+		if((start == end && ssn == (data[start] + 1)) || data[start] == 0){
 			data[start] = ssn;
 			return 0;
 		}
 
 		// checking if ssn was already received
-		if(ssn <= data[start]) return 1;
+		if(ssn <= data[start]){
+			CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]);
+			return 1;
+		}
 
 		// checking if data needs to be extended
 		if(ssn-data[start] >= currentSize){
+			CkPrintf("[%d] Extending Data %d %d %d\n",CkMyPe(),ssn,data[start],currentSize);
 			old = data;
 			oldCS = currentSize;
 			currentSize *= 2;
@@ -86,6 +90,7 @@ public:
 			delete[] old;
 		}
 
+		CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]);
 		// adding ssn into data
 		num = end - start;
 		if(num < 0) num += currentSize;
