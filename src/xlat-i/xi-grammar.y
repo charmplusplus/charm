@@ -1076,7 +1076,9 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		| ParamBraceStart CCode ParamBraceEnd
 		{ $$ = buildAtomic($2, NULL, NULL); }
         | error
-        { printf("Unknown SDAG construct\n"); YYABORT; }
+        { printf("Unknown SDAG construct or malformed entry method definition.\n"
+                 "You may have forgotten to terminate an entry method definition with a"
+                 " semicolon or forgotten to mark a block of sequential SDAG code as 'atomic'\n"); YYABORT; }
         ;
 
 HasElse		: /* Empty */
