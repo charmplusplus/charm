@@ -221,10 +221,10 @@ void getDimension(int *maxnid, int *xdim, int *ydim, int *zdim)
 #if CMK_HAS_RCA_MAX_DIMENSION
   // rca_get_meshtopology(&mnid);
   rca_get_max_dimension(&dimsize);
-  *xdim = dimsize.mesh_x+1;
-  *ydim = dimsize.mesh_y+1;
-  *zdim = dimsize.mesh_z+1;
-  *maxnid = *xdim * *ydim * *zdim * 2;
+  maxX = *xdim = dimsize.mesh_x+1;
+  maxY = *ydim = dimsize.mesh_y+1;
+  maxZ = *zdim = dimsize.mesh_z+1;
+  maxNID = *maxnid = *xdim * *ydim * *zdim * 2;
 
 #else
 
