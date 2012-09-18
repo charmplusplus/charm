@@ -2386,7 +2386,7 @@ else
 fi
 
 
-if test "$with_prio_type" = "char" -o "$with_prio_type" = "short" -o "$with_prio_type" = "int" -o "$with_prio_type" = "long"
+if test "$with_prio_type" = "char" -o "$with_prio_type" = "short" -o "$with_prio_type" = "int" -o "$with_prio_type" = "long" -o "$with_prio_type" = "float" -o "$with_prio_type" = "double"
 then
   Echo "Configuring support for message priorities of sizeof type $with_prio_type"
 
@@ -2413,7 +2413,7 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 else
-  Echo "Invalid size ($with_prio_type) specified for message priorities. Can only accept char, short, int, long and bitvec"
+  Echo "Invalid size ($with_prio_type) specified for message priorities. Can only accept char, short, int, long, float, double and bitvec"
   test_finish 1
 fi
 
