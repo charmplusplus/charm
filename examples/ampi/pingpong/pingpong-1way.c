@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     bandwidth = msg_size / elapsed_time_sec; /* bandwidth */
     
     fprintf (stdout, "%5d %7d\t ", max_msgs, msg_size);
-    fprintf (stdout,"%8.3f us,\t %8.3f MB/sec\n",
+    fprintf (stdout,"%8.3f us\t %8.3f MB/sec\n",
 	     elapsed_time_sec * 1e6, bandwidth / 1e6);
     
   }

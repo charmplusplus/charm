@@ -1,16 +1,27 @@
-\subsection{Parameter Marshalling}
+\section{Entry Methods}
+\label{entry}
 
-\label{marshalling}
+Member functions in the user program which function as entry methods have to be
+defined in public scope within the class definition.
+Entry methods typically do not return data and have a ``void'' return type.
+An entry method with the same name as its enclosing class is a constructor entry method
+and is used to create or spawn chare objects during execution.
+Class member functions are annotated as entry methods by declaring them in the
+the interface file as:
+\begin{alltt}
+entry void \uw{Entry1}(\uw{parameters});
+\end{alltt}
 
-\experimental{}	
-In \charmpp, \index{chare}chares, \index{group}groups and \index{nodegroup}
-nodegroups communicate by invoking each others methods. 
-The methods may either take several parameters, described here; 
-or take a special message object as described in the next section.
-Since parameters get marshalled into a message before being
-sent across the network, in this manual we use ``message''
-to mean either a literal message object or a set of marshalled
-parameters.
+\uw{Parameters} is either a list of serializable parameters, (e.g., ``int i,
+double x''), or a message type (e.g., ``MyMessage *msg'').
+Since parameters get marshalled into a message before being sent across the
+network, in this manual we use ``message'' to mean either a message type or a
+set of marshalled parameters.
+
+%Constructors in \CC have no return type.
+%Finally, sync methods, described below, may return a message.
+
+Messages are lower level, more efficient, more flexible to use than parameter marshalling.
 
 For example, a chare could have this entry method declaration in 
 the interface ({\tt .ci}) file:
@@ -18,7 +29,7 @@ the interface ({\tt .ci}) file:
   entry void foo(int i,int k);
 \end{alltt}
 Then invoking foo(2,3) on the chare proxy will eventually
-invoke foo(2,3) on the remote chare.
+invoke foo(2,3) on the chare object.
 
 Since \charmpp\ runs on distributed memory machines, we cannot
 pass an array via a pointer in the usual \CC\ way.  Instead,
@@ -67,67 +78,8 @@ pup routine, a ``PUPbytes'' declaration, or a working operator|.
 See the PUP description in Section~\ref{sec:pup} for more details 
 on these routines.
 
-\begin{alltt}
-//Declarations:
-class point3d \{
-public:
-    double x,y,z;    
-    void pup(PUP::er &p) \{
-      p|x; p|y; p|z;
-    \}
-\};
-
-typedef struct \{
-    int refCount;
-    char data[17];
-\} refChars;
-PUPbytes(date);
-
-class date \{
-public:
-    char month,day;
-    int year;
-    //...non-virtual manipulation routines...
-\};
-inline void operator|(PUP::er &p,date &d) \{
-    p|d.month; p|d.day;
-    p|d.year;
-\}
-
-//In the .ci file:
-    entry void pointRefOnDate(point3d &p,refChars r[d.year],date &d);
-\end{alltt}
-
 Any user-defined types in the argument list must be declared 
 before including the ``.decl.h'' file.
 As usual in \CC, it is often dramatically more efficient to pass
-a large structure by reference (as shown) than by value.
+a large structure by reference than by value.
 
-For efficiency, arrays (like \uw{refChars} above) are always copied
-as blocks of bytes and passed via pointers.  This means classes
-that need their pup routines to be called, such as those with dynamically
-allocated data or virtual methods cannot be passed as arrays--use CkVec
-or STL vectors to pass lists of complicated user-defined classes. 
-For historical reasons, pointer-accessible structures 
-cannot appear alone in the parameter list (because they are confused 
-with messages).
-
-The order of marshalling operations on the send side is:
-\begin{itemize}
-\item Call ``p\verb.|.a'' on each marshalled parameter with a sizing PUP::er.
-\item Compute the lengths of each array.
-\item Call ``p\verb.|.a'' on each marshalled parameter with a packing PUP::er.
-\item \kw{memcpy} each arrays' data.
-\end{itemize}
-
-The order of marshalling operations on the receive side is:
-\begin{itemize}
-\item Create an instance of each marshalled parameter using its default constructor.
-\item Call ``p\verb.|.a'' on each marshalled parameter using an unpacking PUP::er.
-\item Compute pointers into the message for each array.
-\end{itemize}
-
-Finally, very large structures are most efficiently passed via messages,
-because messages are an efficient, low-level construct that minimizes copying
-and overhead; but very complicated structures are easiest to pass via 
-marshalling, because marshalling uses the high-level pup framework.

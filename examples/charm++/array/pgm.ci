@@ -1,0 +1,15 @@
+mainmodule arr {
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void finished();
+  }
+
+  array [1D]  ArrayA { entry ArrayA(); entry void e(); }
+  array [2D]  ArrayB { entry ArrayB(); entry void e(); }
+  array [3D]  ArrayC { entry ArrayC(); entry void e(); }
+  array [4D]  ArrayD { entry ArrayD(); entry void e(); }
+  array [5D]  ArrayE { entry ArrayE(); entry void e(); }
+  array [6D]  ArrayF { entry ArrayF(); entry void e(); }
+}

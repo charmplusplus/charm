@@ -1,0 +1,11 @@
+
+mainmodule seek_block {
+  mainchare main {
+    entry main(CkArgMsg *m);
+  };
+
+  array [1D] SimpleArray{
+    entry SimpleArray();
+    entry void acceptData(C& inData);
+  };
+};

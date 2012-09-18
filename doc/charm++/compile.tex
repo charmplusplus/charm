@@ -1,0 +1,209 @@
+The {\tt charmc} program, located in ``charm/bin'', standardizes 
+compiling and linking procedures
+among various machines and operating systems.  ``charmc'' is
+a general-purpose tool for compiling and
+linking, not only restricted to \charmpp{} programs.
+
+Charmc can perform the following tasks.  The (simplified) syntax for
+each of these modes is shown.  Caution: in reality, one almost always
+has to add some command-line options in addition to the simplified
+syntax shown below.  The options are described next.
+
+\begin{alltt}
+ * Compile C                            charmc -o pgm.o pgm.c
+ * Compile C++                          charmc -o pgm.o pgm.C
+ * Link                                 charmc -o pgm   obj1.o obj2.o obj3.o...
+ * Compile + Link                       charmc -o pgm   src1.c src2.ci src3.C
+ * Create Library                       charmc -o lib.a obj1.o obj2.o obj3.o...
+ * Translate Charm++ Interface File     charmc file.ci
+\end{alltt}
+% * CPM preprocessing                charmc -gen-cpm file.c
+
+Charmc automatically figures out where the charm lib and include
+directories are --- at no point do you have to configure this
+information.  However, the code that finds the lib and include
+directories can be confused if you remove charmc from its normal
+directory, or rearrange the directory tree.  Thus, the files in the
+\kw{charm/bin}, \kw{charm/include}, and \kw{charm/lib} directories 
+must be left where they are relative to each other.  
+
+The following command-line options are available to users of charmc:
+
+\begin{description}
+
+\item[{\tt -o} {\em output-file}:]
+
+Output file name.  Note: charmc only ever produces one output file at
+a time.  Because of this, you cannot compile multiple source files at
+once, unless you then link or archive them into a single output-file.
+If exactly one source-file is specified, then an output file will be
+selected by default using the obvious rule (eg, if the input file if
+pgm.c, the output file is pgm.o).  If multiple input files are
+specified, you must manually specify the name of the output file,
+which must be a library or executable.
+
+\item[{\tt -c}:]
+
+Ignored.  There for compatibility with {\tt cc}.
+
+\item[{\tt -D{\em symbol}[={\em value}]}:]
+
+Defines preprocessor variables from the command line at compile time.
+
+\item[{\tt -I}:]
+
+Add a directory to the search path for preprocessor include files.
+
+\item[{\tt -g}:]
+
+Causes compiled files to include debugging information.
+
+\item[{\tt -L*}:]
+
+Add a directory to the search path for libraries selected by
+the {\tt -l} command.
+
+\item[{\tt -l*}:]
+
+Specifies libraries to link in.
+
+\item[{\tt -module {\em m1}[,{\em m2}[,...]]}]
+Specifies additional \charmpp{} modules to link in. 
+Similar to {\tt -l}, but also registers \charmpp{} parallel objects.
+See the library's documentation for whether to use {\tt -l} or {\tt -module}.
+
+\item[{\tt -optimize}:]
+
+Causes files to be compiled with maximum optimization.
+
+\item[{\tt -no-optimize}:]
+
+If this follows -O on the command line, it turns optimization back off.
+This is just a convenience for simple-minded makefiles.
+
+\item[{\tt -production}:]
+
+Enable architecture-specific production-mode features. For instance,
+use available hardware features more aggressively. It's probably a bad
+idea to build some objects with this, and others without.
+
+\item[{\tt -s}:]
+
+Strip the executable of debugging symbols.  Only meaningful when
+producing an executable.
+
+\item[{\tt -verbose}:]
+
+All commands executed by charmc are echoed to stdout.
+
+\item[{\tt -seq}:]
+
+Indicates that we're compiling sequential code.  On parallel machines
+with front ends, this option also means that the code is for the front
+end.  This option is only valid with C and C++ files.
+
+\item[{\tt -use-fastest-cc}:]
+
+Some environments provide more than one C compiler (cc and gcc, for
+example).  Usually, charmc prefers the less buggy of the two.  This
+option causes charmc to switch to the most aggressive compiler,
+regardless of whether it's buggy or not.
+
+\item[{\tt -use-reliable-cc}:]
+
+Some environments provide more than one C compiler (cc and gcc, for
+example).  Usually, charmc prefers the less buggy of the two, but
+not always.  This option causes charmc to switch to the most reliable
+compiler, regardless of whether it produces slow code or not.
+
+\item[{\tt -language \{converse|charm++|ampi|fem|f90charm\}}:]
+
+When linking with charmc, one must specify the ``language''.  This
+is just a way to help charmc include the right libraries.  Pick the
+``language'' according to this table:
+
+\begin{itemize}
+\item{{\bf Charm++} if your program includes \charmpp{}, C++, and C.}
+\item{{\bf Converse} if your program includes C or C++.}
+\item{{\bf f90charm} if your program includes f90 Charm interface.}
+\end{itemize}
+
+\item[{\tt -balance} {\em seed load-balance-strategy}:]
+
+When linking any \converse{} program (including any \charmpp{} or sdag program),
+one must include a seed load-balancing
+library.  There are currently three to choose from: {\tt rand}, {\tt
+test}, and {\tt neighbor} are supported.  Default is {\tt -balance rand}.
+
+When linking with {\tt neighbor} seed load balancer, one can also specify
+a virtual tolpogy for constructing neighbors during run-time using 
+{\tt +LBTopo topo}, where {\em topo} can be one of (a) ring, (b) mesh2d,
+(c) mesh3d and (d) graph. The default is mesh2d.
+
+\item[{\tt -tracemode} {\em tracing-mode}:]
+
+Selects the desired degree of tracing for \charmpp{} programs.
+See the \charmpp{} manual and the \projections{} manuals for
+more information.  Currently supported modes are {\tt none}, {\tt
+summary}, and {\tt projections}. Default is {\tt -tracemode none}.
+
+
+\item[{\tt -memory} {\em memory-mode}:]
+Selects the implementation of \kw{malloc} and \kw{free}
+to use.  Select a memory mode from the table below.
+
+\begin{itemize}
+\item{{\bf os} Use the operating system's standard memory routines.}
+\item{{\bf gnu} Use a set of GNU memory routines.}
+\item{{\bf paranoid} Use an error-checking set of routines.
+These routines will detect common mistakes such as buffer
+overruns, underruns, double-deletes, and use-after-delete.
+The extra checks slow down programs, so this version should
+not be used in production code.}
+\item{{\bf verbose} Use a tracing set of memory routines.
+Every memory-related call results in a line printed to 
+standard out. This version is useful for detecting memory leaks.}
+\item{{\bf default} Use the default, which depends on the version of \charmpp.}
+\end{itemize}
+
+
+\item[{\tt -c++} {\em C++ compiler}:]
+
+Forces the specified C++ compiler to be used.
+
+\item[{\tt -cc} {\em C-compiler}:]
+
+Forces the specified C compiler to be used.
+
+\item[{\tt -cp} {\em copy-file}:]
+
+Creates a copy of the output file in {\em copy-file}.
+
+\item[{\tt -cpp-option} {\em options}:]
+
+Options passed to the C pre-processor.
+
+\item[{\tt -ld} {\em linker}:]
+
+Use this option only when compiling programs that do not include C++
+modules.  Forces charmc to use the specified linker.
+
+\item[{\tt -ld++} {\em linker}:]
+
+Use this option only when compiling programs that include C++
+modules.  Forces charmc to use the specified linker.
+
+\item[{\tt -ld++-option} {\em options}:]
+
+Options passed to the linker for {\tt -language charm++}.
+
+\item[{\tt -ld-option} {\em options}:]
+
+Options passed to the linker for {\tt -language converse}.
+
+\item[{\tt -ldro-option} {\em options}:]
+
+Options passes to the linker when linking {\tt .o} files.
+
+
+\end{description}

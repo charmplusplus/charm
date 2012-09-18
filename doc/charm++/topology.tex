@@ -1,0 +1,53 @@
+The following calls provide information about the machine upon which the
+parallel program is executed. A processing element (PE) refers to a single CPU,
+whereas a node refers to a single machine -- a set of processing elements that share
+memory (i.e. an address space).  PEs and nodes are ranked separately starting
+from zero, i.e., PEs are ranked in range 0 to {\em CmiNumPes()}, and nodes are
+ranked in range 0 to {\em CmiNumNodes()}.
+
+%\section{Network Topology}
+Charm++ provides a unified abstraction for querying topology of IBM's BG/L, BG/P
+and BG/Q, and Cray's XT3, XT4, XT5 and XE6. Class TopoManager, which can be used 
+by including TopoManager.h, contains following member functions:
+
+\begin{description}
+\item [TopoManager():] Default constructor.
+\item [getDimNX(), getDimNY(), getDimNZ():] Returns the length of X, Y and Z
+dimensions (except BG/Q).
+\item [getDimNA(), getDimNB(), getDimNC(), getDimND(), getDimNE():] Returns the
+length of A, B, C, D and E dimensions on BG/Q.
+\item [getDimNT():] Returns the length of T dimension. TopoManager uses T
+dimension to represent different cores that reside within a physical node.
+\item [rankToCoordinates(int pe, int \&x, int \&y, int \&z, int \&t):] Get the
+coordinates of PE with rank {\em pe} (except BG/Q).
+\item [rankToCoordinates(int pe, int \&a, int \&b, int \&c, int \&d, int \&e, int
+\&t):] Get the coordinates of PE with rank {\em pe} on BG/Q.
+\item [coordinatesToRank(int x, int y, int z, int t):] Returns the rank of PE
+with given coordinates (except BG/Q).
+\item [coordinatesToRank(int a, int b, int c, int d, int e, int t):] Returns the
+rank of PE with given coordinates on BG/Q.
+\item [getHopsBetweenRanks(int pe1, int pe2):] Returns the distance between the
+given PEs in terms of the hops count on the network between the two PEs.
+\item [printAllocation(FILE *fp):] Outputs the allocation for a particular
+execution to the given file.
+\end{description}
+
+\noindent For example, one can obtain rank of a processor, whose coordinates are known, on 
+BG/P as well as on Cray XE6 using the following code:
+
+\begin{alltt}
+TopoManager tmgr;
+int rank,x,y,z,t;
+x = y = z = t = 2;
+rank = tmgr.coordinatesToRank(x,y,z,t);
+\end{alltt}
+
+\noindent For more examples, please refer to examples/charm++/topology.
+%\section{Node Topology}
+
+%Thus if a parallel program is executing on one 4-processor workstation and one
+%2-processor workstation, there would be 6 processing elements (0, 1 ,2, 3, 4,
+%and 5) but only 2 nodes (0 and 1).  A given node's processing elements are
+%numbered sequentially.
+
+

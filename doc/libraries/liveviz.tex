@@ -205,3 +205,4 @@ If you use the old version of ``liveVizInit" method that only receives 3 paramet
 Using that version of the ``liveVizInit" method, its contribute call is handled as if it were the chare calling ``liveVizDeposit'' that actually contributed to the liveViz reduction.
 If there is any other reduction going on elsewhere in this chare, some liveViz contribute calls might be issued before the corresponding non-liveViz contribute is reached.
 This would imply that image data would be treated as if were part of the non-liveViz reduction, leading to unexpected behavior potentially anywhere in the non-liveViz code.
+

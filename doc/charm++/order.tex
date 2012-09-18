@@ -1,13 +1,10 @@
-\subsection{Delivery Order}
+\section{Controlling Delivery Order}
 
-By default, \charmpp\ will process the messages you send in roughly
-FIFO\index{message delivery order} order when they arrive at a PE.
-For most programs, this behavior is fine.  However, for optimal
-performance, some programs need more explicit control over the order
-in which messages are processed. \charmpp\ allows you to adjust
-delivery order on a per-message basis.
-
-% Example general use cases here
+By default, \charmpp\ processes the messages sent in roughly FIFO\index{message
+  delivery order} order when they arrive at a PE.  For most programs, this
+behavior is fine. However, for optimal performance, some programs need more
+explicit control over the order in which messages are processed. \charmpp\
+allows you to adjust delivery order on a per-message basis.
 
 An example program demonstrating how to modify delivery order for messages and
 parameter marshaling can be found in \examplerefdir{prio}.
@@ -15,34 +12,29 @@ parameter marshaling can be found in \examplerefdir{prio}.
 \subsubsection{Queueing Strategies}
 \label{queueing strategies}
 
-The simplest call available to change the order in which messages
-are processed is \kw{CkSetQueueing}.
+The order in which messages are processed in the recipient's queue can be set
+by explicitly setting the queuing strategy using one the following
+constants. These constants can be applied when sending a message or invoking an
+entry method using parameter marshaling:
 
-\function{void CkSetQueueing(MsgType message, int queueingtype)}
+\begin{itemize}
+\item \texttt{CK\_QUEUEING\_FIFO}: FIFO ordering
+\item \texttt{CK\_QUEUEING\_LIFO}: LIFO ordering
+\item \texttt{CK\_QUEUEING\_IFIFO}: FIFO ordering with \emph{integer} priority
+\item \texttt{CK\_QUEUEING\_ILIFO}: LIFO ordering with \emph{integer} priority
+\item \texttt{CK\_QUEUEING\_BFIFO}: FIFO ordering with \emph{bitvector} priority
+\item \texttt{CK\_QUEUEING\_BLIFO}: LIFO ordering with \emph{bitvector} priority
+\item \texttt{CK\_QUEUEING\_LFIFO}: FIFO ordering with \emph{long integer} priority
+\item \texttt{CK\_QUEUEING\_LLIFO}: FIFO ordering with \emph{long integer} priority
+\end{itemize}
 
-where \uw{queueingtype} is one of the following constants:
+\subsubsection{Parameter Marshaling}
+
+For parameter marshaling, the \kw{queueingtype} can be set for
+\kw{CkEntryOptions}, which is passed to an entry method invocation as the
+optional last parameter.
 
 \begin{alltt}
-  CK_QUEUEING_FIFO
-  CK_QUEUEING_LIFO
-  CK_QUEUEING_IFIFO
-  CK_QUEUEING_ILIFO
-  CK_QUEUEING_BFIFO
-  CK_QUEUEING_BLIFO
-  CK_QUEUEING_LFIFO
-  CK_QUEUEING_LLIFO
-\end{alltt}
-
-The first two options,  \kw{CK\_QUEUEING\_FIFO} and
-\kw{CK\_QUEUEING\_LIFO}, are used as follows:
-
-\begin{alltt}
-  MsgType *msg1 = new MsgType ;
-  CkSetQueueing(msg1, CK_QUEUEING_FIFO);
-
-  MsgType *msg2 = new MsgType ;
-  CkSetQueueing(msg2, CK_QUEUEING_LIFO);
-
   CkEntryOptions opts1, opts2;
   opts1.setQueueing(CK_QUEUEING_FIFO);
   opts2.setQueueing(CK_QUEUEING_LIFO);
@@ -51,12 +43,30 @@ The first two options,  \kw{CK\_QUEUEING\_FIFO} and
   chare.entry_name(arg1, arg2, opts2);
 \end{alltt}
 
-When message \kw{msg1} arrives at its destination, it will be pushed
-onto the end of the message queue as usual.  However, when \kw{msg2}
-arrives, it will be pushed onto the {\em front} of the message
-queue. Similarly, the two parameter-marshalled calls to \kw{chare}
-will be inserted at the end and beginning of the message queue,
-respectively.
+When message \kw{msg1} arrives at its destination, it will be pushed onto the
+end of the message queue as usual.  However, when \kw{msg2} arrives, it will be
+pushed onto the \emph{front} of the message queue. Similarly, the two
+parameter-marshalled calls to \kw{chare} will be inserted at the end and
+beginning of the message queue, respectively.
+
+\subsubsection{Messages}
+
+For messages, the \kw{CkSetQueueing} function can be used to change the order
+in which messages are processed, where \kw{queueingtype} is one of the above
+constants.\\
+
+\function{void CkSetQueueing(MsgType message, int queueingtype)}
+
+\noindent The first two options,  \kw{CK\_QUEUEING\_FIFO} and
+\kw{CK\_QUEUEING\_LIFO}, are used as follows:
+%
+\begin{alltt}
+  MsgType *msg1 = new MsgType ;
+  CkSetQueueing(msg1, CK_QUEUEING_FIFO);
+
+  MsgType *msg2 = new MsgType ;
+  CkSetQueueing(msg2, CK_QUEUEING_LIFO);
+\end{alltt}
 
 \subsubsection{Prioritized Execution}
 \label{prioritized message passing}
@@ -64,11 +74,10 @@ respectively.
 \index{prioritized message passing}
 \index{priorities}
 
-The basic FIFO and LIFO strategies are sufficient to approximate
-parallel breadth-first and depth-first explorations of a problem
-space, but they don't admit more fine-grained control. To provide that
-degree of control, \charmpp\ also allows explicit prioritization of
-messages.
+The basic FIFO and LIFO strategies are sufficient to approximate parallel
+breadth-first and depth-first explorations of a problem space, but they do not
+allow more fine-grained control. To provide that degree of control, \charmpp\
+also allows explicit prioritization of messages.
 
 The other six queueing strategies involve the use of
 priorities\index{priorities}.  There are two kinds of priorities which can be
@@ -79,21 +88,8 @@ numerically lower priorities will be dequeued and delivered before numerically
 greater priorities. The FIFO and LIFO queueing strategies then control the
 relative order in which messages of the same priority will be delivered.
 
-\subsubsection{Parameter Marshaling}
-
-Integer proiorities for parameter-marshalled messages can be achieved
-through {\tt CkEntryOptions::setPriority()}:
-
-\begin{alltt}
-  CkEntryOptions opts;
-  opts.setPriority(7);
-  chare.entry_name(arg1, arg2, &opts);
-\end{alltt}
-
-\subsubsection{Messages}
-
-To attach a priority field to a message, space must be explicitly allocated in
-the message's buffer while allocating the message\index{message priority}.  To
+To attach a priority field to a message, one needs to set aside space in the
+message's buffer while allocating the message\index{message priority}.  To
 achieve this, the size of the priority field\index{priority field} in bits
 should be specified as a placement argument to the \kw{new} operator, as
 described in section~\ref{memory allocation}.  Although the size of the
@@ -196,7 +192,8 @@ be ``close'', so priorities can strongly affect the efficiency of your program.
 
 Some operations that one might want to perform are sufficiently
 latency-sensitive that they should never wait in line behind other
-messages. The \charmpp\ runtime offers two attributes for entry methods, {\kw
-  expedited} and {\kw immediate}, to serve these needs. For more information on
-these attributes, see Section~\ref{attributes} and the example in {\tt
-  charm/pgms/charm++/megatest/immediatering.C}.
+messages. The \charmpp\ runtime offers two attributes for entry
+methods, {\kw expedited} and {\kw immediate}, to serve these
+needs. For more information on these attributes, see
+Section~\ref{attributes} and the example in
+  \testreffile{megatest/immediatering.ci}.
