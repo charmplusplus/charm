@@ -532,27 +532,41 @@ ArrayIndexType	: '[' NUMBER Name ']'
 		;
 
 Array		: ARRAY ArrayAttribs ArrayIndexType NamedType OptBaseList MemberEList
-		{  $$ = new Array(lineno, $2, $3, $4, $5, $6); }
+		{  $$ = new Array(lineno, $2, $3, $4, $5, $6);
+          hasSeenConstructor = false;
+        }
 		| ARRAY ArrayIndexType ArrayAttribs NamedType OptBaseList MemberEList
-		{  $$ = new Array(lineno, $3, $2, $4, $5, $6); }
+		{  $$ = new Array(lineno, $3, $2, $4, $5, $6);
+          hasSeenConstructor = false;
+        }
 		;
 
 TChare		: CHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new Chare(lineno, $2|Chare::CCHARE, new NamedType($3), $4, $5);}
+		{ $$ = new Chare(lineno, $2|Chare::CCHARE, new NamedType($3), $4, $5);
+          hasSeenConstructor = false;
+        }
 		| MAINCHARE CAttribs Name OptBaseList MemberEList
-		{ $$ = new MainChare(lineno, $2, new NamedType($3), $4, $5); }
+		{ $$ = new MainChare(lineno, $2, new NamedType($3), $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 TGroup		: GROUP CAttribs Name OptBaseList MemberEList
-		{ $$ = new Group(lineno, $2, new NamedType($3), $4, $5); }
+		{ $$ = new Group(lineno, $2, new NamedType($3), $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 TNodeGroup	: NODEGROUP CAttribs Name OptBaseList MemberEList
-		{ $$ = new NodeGroup( lineno, $2, new NamedType($3), $4, $5); }
+		{ $$ = new NodeGroup( lineno, $2, new NamedType($3), $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 TArray		: ARRAY ArrayIndexType Name OptBaseList MemberEList
-		{ $$ = new Array( lineno, 0, $2, new NamedType($3), $4, $5); }
+		{ $$ = new Array( lineno, 0, $2, new NamedType($3), $4, $5);
+          hasSeenConstructor = false;
+        }
 		;
 
 TMessage	: MESSAGE MAttribs Name ';'
@@ -730,7 +744,7 @@ Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
             }
             Entry *e = new Entry(lineno, $2, 0, $3, $4, 0, $5, 0, 0);
             if (e->param && e->param->isCkMigMsgPtr()) {
-              yyerror("Charm++ takes a CkMigrateMsg chare constructor for granted, but continuing anyway");
+              yyerror("Charm++ generates a CkMigrateMsg chare constructor implicitly, but continuing anyway");
               $$ = NULL;
             } else {
               $$ = e;
