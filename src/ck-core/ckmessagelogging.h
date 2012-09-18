@@ -31,6 +31,7 @@ extern char objString[100];
 // constant to define the type of checkpoint used (synchronized or not)
 #define SYNCHRONIZED_CHECKPOINT 1
 
+#define DEBUG(x) // x
 
 class MlogEntry;
 
@@ -70,7 +71,7 @@ public:
 
 		// checking if ssn was already received
 		if(ssn <= data[start]){
-			CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]);
+			DEBUG(CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
 			return 1;
 		}
 
@@ -90,7 +91,8 @@ public:
 			delete[] old;
 		}
 
-		CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]);
+		DEBUG(CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
+
 		// adding ssn into data
 		num = end - start;
 		if(num < 0) num += currentSize;
