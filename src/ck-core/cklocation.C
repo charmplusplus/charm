@@ -18,6 +18,9 @@
 
 #if CMK_LBDB_ON
 #include "LBDatabase.h"
+#if CMK_GLOBAL_LOCATION_UPDATE
+#include "BaseLB.h"
+#endif
 #endif // CMK_LBDB_ON
 
 #if CMK_GRID_QUEUE_AVAILABLE
@@ -82,8 +85,32 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
         r.id[j]+=circleShift(data[i],22+11*i*(j+1))+
           circleShift(data[i],21-9*i*(j+1));
   }
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+  r.dimension = idx.dimension;
+  r.nInts = idx.nInts; 
+#endif
+
   return r;
 }
+
+#if CMK_GLOBAL_LOCATION_UPDATE
+void UpdateLocation(MigrateInfo& migData) {
+
+  CkArrayIndex idx; 
+  idx.dimension = migData.obj.id.dimension; 
+  idx.nInts = migData.obj.id.nInts; 
+
+  for (int i = 0; i < idx.nInts; i++) {
+    idx.data()[i] = migData.obj.id.id[i];    
+  }
+
+  CkLocMgr *localLocMgr = 
+    (CkLocMgr *) CkLocalBranch(migData.obj.omhandle.id.id); 
+  localLocMgr->updateLocation(idx, migData.to_pe); 
+}
+#endif
+
 #endif
 
 /*********************** Array Messages ************************/
@@ -1881,7 +1908,9 @@ CkLocMgr::CkLocMgr(CkGroupID mapID_,CkGroupID lbdbID_,CkArrayIndex& numInitial)
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
+#if !CMK_GLOBAL_LOCATION_UPDATE
 	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
 
 //Register with the map object
 	mapID=mapID_;
@@ -1904,7 +1933,9 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
 	firstFree=localLen=0;
 	duringMigration=CmiFalse;
 	nSprings=0;
+#if !CMK_GLOBAL_LOCATION_UPDATE
 	CcdCallOnConditionKeepOnPE(CcdPERIODIC_1minute,staticSpringCleaning,(void *)this, CkMyPe());
+#endif
 	hashImmLock = CmiCreateImmediateLock();
 }
 
@@ -2432,6 +2463,7 @@ CmiBool CkLocMgr::demandCreateElement(CkArrayMessage *msg,int onPe,CkDeliver_t t
 //This message took several hops to reach us-- fix it
 void CkLocMgr::multiHop(CkArrayMessage *msg)
 {
+
 	CK_MAGICNUMBER_CHECK
 	int srcPe=msg->array_getSrcPe();
 	if (srcPe==CkMyPe())
@@ -2687,10 +2719,12 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	inform(idx,toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 //#if !defined(_FAULT_MLOG_)    
+#if !CMK_GLOBAL_LOCATION_UPDATE
 	informHome(idx,toPe);
+#endif
 //#endif
 
-#if CMK_GLOBAL_LOCATION_UPDATE
+#if !CMK_LDB_ON && CMK_GLOBAL_LOCATION_UPDATE
         DEBM((AA"Global location update. idx %s " 
               "assigned to %d \n"AB,idx2str(idx),toPe));
         thisProxy.updateLocation(idx, toPe);                        
