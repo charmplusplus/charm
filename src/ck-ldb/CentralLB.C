@@ -34,6 +34,10 @@ extern void sendDummyMigrationCounts(int *);
 CpvExtern(void *, CkGridObject);
 #endif
 
+#if CMK_GLOBAL_LOCATION_UPDATE      
+extern void UpdateLocation(MigrateInfo& migData); 
+#endif
+
 CkGroupID loadbalancer;
 int * lb_ptr;
 int load_balancer_created;
@@ -842,6 +846,12 @@ void CentralLB::ProcessReceiveMigration(CkReductionMsg  *msg)
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
     }
+    else {
+#if CMK_GLOBAL_LOCATION_UPDATE      
+      UpdateLocation(move); 
+#endif
+    }
+
   }
   DEBUGF(("[%d] in ReceiveMigration %d moves expected: %d future expected: %d\n",CkMyPe(),m->n_moves, migrates_expected, future_migrates_expected));
   // if (_lb_debug) CkPrintf("[%d] expecting %d objects migrating.\n", CkMyPe(), migrates_expected);
