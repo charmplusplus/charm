@@ -2724,7 +2724,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 #endif
 //#endif
 
-#if !CMK_LDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
         DEBM((AA"Global location update. idx %s " 
               "assigned to %d \n"AB,idx2str(idx),toPe));
         thisProxy.updateLocation(idx, toPe);                        
