@@ -1,156 +1,197 @@
-\subsection{Modules}
+A \charm program is essentially a \CC program where some components describe
+its parallel structure. Sequential code can be written using any programming
+technologies that cooperate with the \CC toolchain. This includes C and
+Fortran. Parallel entities in the user's code are written in \CC{}. These
+entities interact with the \charm framework via inherited classes and function
+calls.
 
-\subsubsection{Structure of a \charmpp\ Program}
 
-A \charmpp\ program is structurally similar to a \CC{} program.  Most of a
-\charmpp\ program {\em is} \CC{} code.\footnote{\bf Constraint: The \CC{} code
-cannot, however, contain global or static variables.} The main syntactic units
-in a \charmpp\ program are class definitions. A \charmpp\ program can be
-distributed across several source code files.
+\section{.ci Files}
+\index{ci}
+All user program components that comprise its parallel interface (such as
+messages, chares, entry methods, etc.) are granted this elevated status by
+declaring or describing them in separate \emph{charm interface} description
+files. These files have a \emph{.ci} suffix and adopt a \CC-like declaration
+syntax with several additional keywords. In some declaration contexts, they
+may also contain some sequential \CC source code.
+%that is embedded unmodified into the generated code.
+\charm parses these interface descriptions and generates \CC code (base
+classes, utility classes, wrapper functions etc.) that facilitates the
+interaction of the user program's entities with the framework.  A program may
+have several interface description files.
 
-There are five disjoint categories of objects (classes) in \charmpp:
 
-\begin{itemize}
-\item Sequential objects: as in \CC{}
-\item Chares (concurrent objects) \index{chare}
-\item Chare Groups \index{chare groups} (a form of replicated objects)
-\index{group}
-\item Chare Arrays \index{chare arrays} (an indexed collection of chares)
-\index{array}
-\item Messages (communication objects)\index{message}
-\end{itemize}
-
-The user's code is written in \CC{} and interfaces with the \charmpp\ system as
-if it were a library containing base classes, functions, etc.  A translator is
-used to generate the special code needed to handle \charmpp\ constructs.  This
-translator generates \CC{} code that needs to be compiled with the user's code.
-
-Interfaces to the \charmpp\ objects (such as messages, chares, readonly
-variables etc.) \index{message}\index{chare}\index{readonly} have to be
-declared in \charmpp\ interface files. Typically, such entities are grouped
-\index{module} into {\em modules}. A \charmpp\ program may consist of multiple
-modules.  One of these modules is declared to be a \kw{mainmodule}. All the
-modules that are ``reachable'' from the \kw{mainmodule} via the \kw{extern}
-construct are included in a \charmpp\ program.
-
-The \charmpp\ interface file has the suffix ``.ci''.  The \charmpp\ interface
-translator parses this file and produces two files (with suffixes ``.decl.h''
-and ``.def.h'', {\em for each module declared in the ``.ci'' file}), that
-contain declarations (interface) and definitions (implementation)of various
-translator-generated entities. If the name of a module is \uw{MOD}, then the
-files produced by the \charmpp\ interface translator are named \uw{MOD.decl.h}
-and \uw{MOD.def.h}.\footnote{Note that the interface file for module \uw{MOD}
-need not be named \uw{MOD.ci}. Indeed one ``.ci'' file may contain interface
-declarations for multiple modules, and the translator will produce one pair of
-declaration and definition files for each module.}  We recommend that the
-declarations header file be included at the top of the header file (\uw{MOD.h})
-for module \uw{MOD}, and the definitions file be included at the bottom of the
-code for module (\uw{MOD.C}).\footnote{In the earlier version of interface
-translator, these files used to be suffixed with ``.top.h'' and ``.bot.h'' for
-this reason.}
-
-A simple \charmpp\ program is given below:
+\section{Modules}
+\index{module}
+The top-level construct in a \ci file is a named container for interface
+declarations called a \kw{module}. Modules allow related declarations to be
+grouped together, and cause generated code for these declarations to be grouped
+into files named after the module. Modules cannot be nested, but each \ci file
+can have several modules. Modules are specified using the keyword \kw{module}.
 
 \begin{alltt}
-///////////////////////////////////////
-// File: pgm.ci
-
-mainmodule Hello \{
-  readonly CProxy_HelloMain mainProxy;
-  mainchare HelloMain \{
-    entry HelloMain(); // implicit CkArgMsg * as argument
-    entry void PrintDone(void);
-  \};
-  group HelloGroup \{
-    entry HelloGroup(void);
-  \};
+module myFirstModule \{
+    // Parallel interface declarations go here
+    ...
 \};
-
-////////////////////////////////////////
-// File: pgm.h
-#include "Hello.decl.h" // Note: not pgm.decl.h
-
-class HelloMain : public CBase_HelloMain \{
-  public:
-    HelloMain(CkArgMsg *);
-    void PrintDone(void);
-  private:
-    int count;
-\};
-
-class HelloGroup: public Group \{
-  public:
-    HelloGroup(void);
-\};
-
-/////////////////////////////////////////
-// File: pgm.C
-#include "pgm.h"
-
-CProxy_HelloMain mainProxy;
-
-HelloMain::HelloMain(CkArgMsg *msg) \{
-  delete msg;
-  count = 0;
-  mainProxy = thisProxy;
-  CProxy_HelloGroup::ckNew(); // Create a new "HelloGroup"
-\}
-
-void HelloMain::PrintDone(void) \{
-  count++;
-  if (count == CkNumPes()) \{ // Wait for all group members to finish the printf
-    CkExit();
-  \}
-\}
-
-HelloGroup::HelloGroup(void) \{
-  ckout << "Hello World from processor " << CkMyPe() << endl;
-  mainProxy.PrintDone();
-\}
-
-#include "Hello.def.h" // Include the Charm++ object implementations
-
-/////////////////////////////////////////
-// File: Makefile
-
-pgm: pgm.ci pgm.h pgm.C
-      charmc -c pgm.ci
-      charmc -c pgm.C
-      charmc -o pgm pgm.o -language charm++
-
 \end{alltt}
 
-\uw{HelloMain} is designated a \kw{mainchare}. Thus the Charm Kernel starts
-execution of this program by creating an instance of \uw{HelloMain} on
-processor 0. The HelloMain constructor creates a chare group
-\uw{HelloGroup}, and stores a handle to itself and returns. The call to
-create the group returns immediately after directing Charm Kernel to perform
-the actual creation and invocation.  Shortly after, the Charm Kernel will
-create an object of type \uw{HelloGroup} on each processor, and call its
-constructor. The constructor will then print ``Hello World...'' and then
-call the \uw{PrintDone} method of \uw{HelloMain}. The \uw{PrintDone} method
-calls \kw{CkExit} after all group members have called it (i.e., they have
-finished printing ``Hello World...''), and the \charmpp program exits.
 
-\subsubsection{Functions in the ``decl.h'' and ``def.h'' files}
+\section{Generated Files}
+\index{decl}\index{def}
 
-The \texttt{decl.h} file provides declarations for the proxy classes of the
-concurrent objects declared in the ``.ci'' file (from which the \texttt{decl.h}
-file is generated). So the \uw{Hello.decl.h} file will have the declaration of
-the class CProxy\_HelloMain. Similarly it will also have the declaration for
-the HelloGroup class. 
+Each module present in a \ci file is parsed to generate two files. The basename
+of these files is the same as the name of the module and their suffixes are
+\emph{.decl.h} and \emph{.def.h}. For e.g., the module defined earlier will
+produce the files ``myFirstModule.decl.h'' and ``myFirstModule.def.h''. As the
+suffixes indicate, they contain the declarations and definitions respectively,
+of all the classes and functions that are generated based on the parallel
+interface description.
 
-This class will have functions to create new instances of the chares and
-groups, like the function \kw{ckNew}. For \uw{HelloGroup} this function creates
-an instance of the class \uw{HelloGroup} on all the processors. 
+We recommend that the header file containing the declarations (decl.h) be
+included at the top of the files that contain the declarations or definitions
+of the user program entities mentioned in the corresponding module. The def.h
+is not actually a header file because it contains definitions for the generated
+entities. To avoid multiple definition errors, it should be compiled into just
+one object file. A convention we find useful is to place the def.h file at the
+bottom of the source file (.C, .cpp, .cc etc.) which includes the definitions
+of the corresponding user program entities.
 
-The proxy class also has functions corresponding to the entry methods defined
-in the ``.ci'' file. In the above program the method wait is declared in
-\uw{CProxy\_HelloMain} (proxy class for \uw{HelloMain}).
+\experimental
+It should be noted that the generated files have no dependence on the name of the \ci
+file, but only on the names of the modules. This can make automated dependency-based
+build systems slightly more complicated. We adopt some conventions to ease this process.
+This is described in~\ref{AppendixSectionDescribingPhilRamsWorkOnCi.stampAndCharmc-M}.
 
-The proxy class also provides static registration functions used by the
-\charmpp{} runtime.  The \texttt{def.h} file has a registration function
-(\uw{\_\_registerHello} in the above program) which calls all the registration
-functions corresponding to the readonly variables and entry methods declared in
-the module.
+
+\section{Module Dependencies}
+\index{extern}
+
+A module may depend on the parallel entities declared in another module. It can
+express this dependency using the \kw{extern} keyword. \kw{extern}ed modules
+do not have to be present in the same \ci file.
+
+\begin{alltt}
+module mySecondModule \{
+
+    // Entities in this module depend on those declared in another module
+    extern module myFirstModule;
+
+    // More parallel interface declarations
+    ...
+\};
+\end{alltt}
+
+The \kw{extern} keyword places an include statement for the decl.h file of the
+\kw{extern}ed module in the generated code of the current module. Hence,
+decl.h files generated from \kw{extern}ed modules are required during the
+compilation of the source code for the current module. This is usually required
+anyway because of the dependencies between user program entities across the two
+modules.
+
+\section{The Main Module and Reachable Modules}
+\index{mainmodule}
+
+\charm software can contain several module definitions from several
+independently developed libraries / components. However, the user program must
+specify exactly one module as containing the starting point of the program's
+execution. This module is called the \kw{mainmodule}. Every \charm program
+has to contain precisely one \kw{mainmodule}.
+
+All modules that are ``reachable'' from the \kw{mainmodule} via a chain of
+\kw{extern}ed module dependencies are included in a \charm program. More
+precisely, during program execution, the \charm runtime system will recognize
+only the user program entities that are declared in reachable modules. The
+decl.h and def.h files may be generated for other modules, but the runtime
+system is not aware of entities declared in such unreachable modules.
+
+\begin{alltt}
+module A \{
+    ...
+\};
+
+module B \{
+    extern module A;
+    ...
+\};
+
+module C \{
+    extern module A;
+    ...
+\};
+
+module D \{
+    extern module B;
+    ...
+\};
+
+module E \{
+    ...
+\};
+
+mainmodule M \{
+    extern module C;
+    extern module D;
+    // Only modules A, B, C and D are reachable and known to the runtime system
+    // Module E is unreachable via any chain of externed modules
+    ...
+\};
+\end{alltt}
+
+
+\section{Including other headers}
+\index{include}
+
+There can be occasions where code generated from the module definitions
+requires other declarations / definitions in the user program's sequential
+code. Usually, this can be achieved by placing such user code before the point
+of inclusion of the decl.h file. However, this can become laborious if the
+decl.h file has to included in several places. \charm supports the keyword
+\kw{include} in \ci files to permit the inclusion of any header directly into
+the generated decl.h files.
+
+\begin{alltt}
+module A \{
+    include "myUtilityClass.h"; //< Note the semicolon
+    // Interface declarations that depend on myUtilityClass
+    ...
+\};
+
+module B \{
+    include "someUserTypedefs.h";
+    // Interface declarations that require user typedefs
+    ...
+\};
+
+module C \{
+    extern module A;
+    extern module B;
+    // The user includes will be indirectly visible here too
+    ...
+\};
+\end{alltt}
+
+
+\section{The main() function}
+
+The \charmpp framework implements its own main\(\) function and retains control
+until the parallel execution environment is initialized and ready for executing
+user code. Hence, the user program must not define a \emph{main()} function.
+Control enters the user code via the \kw{mainchare} of the \kw{mainmodule}.
+This will be discussed in further detail in~\ref{mainchare}.
+
+Using the facilities described thus far, the parallel interface declarations
+for a \charm program can be spread across multiple ci files and multiple
+modules, permitting good control over the grouping and export of parallel API.
+This aids the encapsulation of parallel software.
+
+\section{Compiling \charm Programs}
+\index{charmc}
+
+\charm provides a compiler-wrapper called \kw{charmc} that handles all \ci, C,
+\CC and fortran source files that are part of a user program. Users can invoke
+charmc to parse their interface descriptions, compile source code and link
+objects into binaries. It also links against the appropriate set of charm
+framework objects and libraries while producing a binary. \kw{charmc} and its functionality
+is described in~\ref{sec:compile}.
 

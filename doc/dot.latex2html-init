@@ -2,7 +2,8 @@
 #
 ### Command Line Argument Defaults #######################################
 
-# $MAX_SPLIT_DEPTH = 5;	# Stop making separate files at this depth
+# Supplied on the command line in the makefile
+$MAX_SPLIT_DEPTH = 3;	# Stop making separate files at this depth
 
 $MAX_LINK_DEPTH = 4;    # Stop showing child nodes at this depth   
 
@@ -47,7 +48,7 @@ $NEXT_PAGE_IN_NAVIGATION = 1;
 # Put a link to the previous logical page  in  the  navigation  panel
 $PREVIOUS_PAGE_IN_NAVIGATION = 1;
 
-$INFO = 1;              # 0 = do not make a "About this document..." section 
+$INFO = 0;              # 0 = do not make a "About this document..." section 
 
 # Reuse images generated during previous runs
 $REUSE = 2;
@@ -104,8 +105,8 @@ $DEBUG = 0;
 #  of the navigation panel in the first node/page of a converted document
 #  will point to $EXTERNAL_UP_LINK. $EXTERNAL_UP_TITLE should be set
 #  to some text which describes this external link.
-$EXTERNAL_UP_LINK = "/manuals/";
-$EXTERNAL_UP_TITLE = "Other Manuals";
+$EXTERNAL_UP_LINK = "/help";
+$EXTERNAL_UP_TITLE = "Other Documentation";
 
 # If this is set then the resulting HTML will look marginally better if viewed 
 # with Netscape.
@@ -152,56 +153,29 @@ $TITLES_LANGUAGE = "english";
 # Feel free to mix and match buttons, titles, your own text, your logos,
 # and arbitrary HTML (the "." is the Perl concatenation operator).
 sub top_navigation_panel {
-    "<!--#include virtual=\"/includes/top.shtml\"-->" .
-    "<style type=\"text/css\"><!--@import url(\"manual.css\");--></style>" .
-
-    "<DIV class=\"ManualTitle\"><!--#include virtual=\"title.html\"--></DIV>\n" .
-
     # Now add a few buttons with a space between them
     #"$NEXT $UP $PREVIOUS $CONTENTS $INDEX $CUSTOM_BUTTONS" .
-    
-    #"<BR>\n" .		# Line break
-
-    "<center><table border=0 cellpadding=10><tr>" .
-	
-    # ... and the ``previous'' title
-    ($PREVIOUS_TITLE ? "<td><B> Previous:</B> $PREVIOUS_TITLE</td>\n" : undef) .
-   
-    # Similarly with the ``up'' title ...
-    ($UP_TITLE ? "<td><B>Up:</B> $UP_TITLE</td>\n" : undef) . 
- 
+    '<ul id="nav-quicklinks">' . "\n" .
+	# ... and the ``previous'' title
+    ($PREVIOUS_TITLE ? '<li id="nav-prev">' . $PREVIOUS_TITLE . "</li>\n" : undef) .
     # If ``next'' section exists, add its title to the navigation panel
-    ($NEXT_TITLE ? "<td><B> Next:</B> $NEXT_TITLE</td>\n" : undef) . 
-    
-    "</tr></table></center>" .
+    ($NEXT_TITLE ? '<li id="nav-next">' . $NEXT_TITLE . "</li>\n" : undef) .
+    "</ul>" .
 
-    #  Line Break, horizontal rule (3-d dividing line) and new paragraph  
-    "<BR> <P>\n"		
+    '<div class="manualtitle">' .
+    ($ENV{'MANUALTITLE'} ? $ENV{'MANUALTITLE'} : undef) .
+    "</div>\n"
 }
 
 sub bot_navigation_panel {
+}
 
-    #  Start with a horizontal rule (3-d dividing line)
-    "<HR>".			
-    
-    # Now add a few buttons with a space between them
-    #"$NEXT $UP $PREVIOUS $CONTENTS $INDEX $CUSTOM_BUTTONS" .
-    
-    #"<BR>\n" .		# Line break
-	
-    "<center><table border=0 cellpadding=10><tr>" .
-	
-    # ... and the ``previous'' title
-    ($PREVIOUS_TITLE ? "<td><B> Previous:</B> $PREVIOUS_TITLE</td>\n" : undef) .
-   
-    # Similarly with the ``up'' title ...
-    ($UP_TITLE ? "<td><B>Up:</B> $UP_TITLE</td>\n" : undef) . 
- 
-    # If ``next'' section exists, add its title to the navigation panel
-    ($NEXT_TITLE ? "<td><B> Next:</B> $NEXT_TITLE</td>\n" : undef) . 
-    
-    "</tr></table></center>"
-  
+# Add more tags etc to the head section of each page
+sub replace_morelinks {
+    $_ =~ s/$more_links_mark/$more_links."\n".&head_tags()/e;
+}
+
+sub head_tags {
 }
 
 1;	# This must be the last line

@@ -1,0 +1,68 @@
+\section{Machine Model}
+\label{machineModel}
+\label{sec:machine}
+At its basic level, \charmpp{} machine model is very simple: Think of
+each chare as a separate processor by itself. The methods of each
+chare can access its own instance variables (which are all private, at
+this level), and any global variables declared as {\em readonly}. It
+also has access to the names of all other chares (the ``global object
+space''), but all that it can do with that is to send asynchronous
+remote method invocations towards other chare objects. (Of course, the
+instance variables can include as many other regular C++ objects that
+it ``has''; but no chare objects. It can only have references to other
+chare objects).
+
+In accordance with this vision, the first part of the manual (up to
+and including the chapter on load balancing) has almost no mention of
+entities with physical meanings (cores, nodes, etc.). The runtime
+system is responsible for the magic of keeping closely communicating
+objects on nearby physical locations, and optimizing communications
+within chares on the same node or core by exploiting the physically
+available shared memory. The programmer does not have to deal with
+this at all. The only exception to this pure model in the basic part
+are the functions used for finding out which ``processor'' an object
+is running on, and for finding how many total processors are there.
+
+However, for implementing lower level libraries, and certain optimizations,
+programmers need to be aware of processors. In any case, it is useful
+to understand how the \charmpp{} implementation works under the hood. So,
+we describe the machine model, and some associoated terminology here.
+
+In terms of physical resources, we assume the parallel machine
+consists of one or more {\em nodes}, where a node is a largest unit
+over which cache coherent shared memory is feasible (and therefore,
+the maximal set of cores per which a single process {\em can} run.
+Each node may include one or more processor chips, with shared or
+private caches between them. Each chip may contain multiple cores, and
+each core may support multiple hardware threads (SMT for example).
+
+\charmpp{} recognizes two logical entities: a PE (processing element) and 
+a ``node''.   In a \charmpp{} program, a PE is a
+unit of mapping and scheduling: each PE has a scheduler with an
+associated pool of messages. Each chare is assumed to reside on one PE
+at a time. Depending on the runtime command-line parmeters, a PE may
+be associated with a subset of cores or hardware threads. One or more PEs
+make up of a logical ``node'', the unit that one may partition a physical node
+into. In the implementation, a separate
+process exists for each logical node and all PEs within the logical node share
+the same memory address space. The \charmpp{} runtime system optimizes
+communication within a logical node by using shared memory. 
+%one may partition a
+%physical node into one or more logical nodes. What \charmpp{} calls a
+%``node'' is this logical node. 
+
+For example, on a machine with 16-core nodes, where each core has two
+hardware threads, one may launch a \charmpp{} program with one or multiple
+(logical) nodes per physical node. One may choose 32 PEs per (logical) node,
+and one logical node per physical node. Alternatively, one can launch
+it with 12 PEs per logical node, and 1 logical node per physical
+node. One can also choose to partition the physical node, and launch
+it with 4 logical nodes per physical node (for example), and 4 PEs per
+node. It is not a general practice in \charmpp{} to oversubscribe the underlying
+physical cores or hardware threads on each node. In other words, a
+\charmpp{} program is usually not launched with more PEs than there
+are physical cores or hardware threads allocated to it. More information about
+these launch time options are provided in Appendix~\ref{sec:run}.
+And utility functions to retrieve the information about those
+\charmpp{} logical machine entities in user programs can be refered
+in section~\ref{basic utility fns}.

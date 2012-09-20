@@ -31,6 +31,7 @@ extern char objString[100];
 // constant to define the type of checkpoint used (synchronized or not)
 #define SYNCHRONIZED_CHECKPOINT 1
 
+#define DEBUG(x) // x
 
 class MlogEntry;
 
@@ -63,16 +64,20 @@ public:
 		MCount *old;
 
 		// checking if ssn can be inserted, most common case
-		if(start == end && ssn == (data[start] + 1)){
+		if((start == end && ssn == (data[start] + 1)) || data[start] == 0){
 			data[start] = ssn;
 			return 0;
 		}
 
 		// checking if ssn was already received
-		if(ssn <= data[start]) return 1;
+		if(ssn <= data[start]){
+			DEBUG(CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
+			return 1;
+		}
 
 		// checking if data needs to be extended
 		if(ssn-data[start] >= currentSize){
+			CkPrintf("[%d] Extending Data %d %d %d\n",CkMyPe(),ssn,data[start],currentSize);
 			old = data;
 			oldCS = currentSize;
 			currentSize *= 2;
@@ -85,6 +90,8 @@ public:
 			end = num-1;
 			delete[] old;
 		}
+
+		DEBUG(CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
 
 		// adding ssn into data
 		num = end - start;

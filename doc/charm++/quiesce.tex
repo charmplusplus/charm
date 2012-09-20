@@ -1,79 +1,19 @@
-\subsection{Quiescence Detection}
+\section{Completion Detection}
 
-\label{sec:qd}
-
-In \charmpp, \index{quiescence}quiescence is defined as the state in which no
-processor is executing an entry point, and no messages are awaiting processing.
-
-\charmpp\ provides two facilities for detecting quiescence: \kw{CkStartQD} and
-\kw{CkWaitQD}.
-
-\kw{CkStartQD} registers with the system a callback that should be made the
-next time \index{quiescence}quiescence is detected.  \kw{CkStartQD} has two
-variants which expect the following arguments: 
-\begin{enumerate}
-\item An index corresponding to the entry function that is to be called,
-and a handle to the chare on which that entry function should be called.  The
-syntax of this call looks like this:
-
-\begin{alltt}
- CkStartQD(int Index,const CkChareID* chareID);
-\end{alltt}
-
-To retrieve the corresponding index of a particular \index{entry method}entry
-method, you must use a static method contained within the \uw{CkIndex} object
-corresponding to the \index{chare}chare containing that entry method.  The
-syntax of this call is as follows:
-
-\begin{alltt}
-\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{EntryMethod}(\uw{parameters});
-\end{alltt}
-
-where \uw{ChareClass} is the C++ class of the chare containing
-the desired entry method, \uw{EntryMethod} is the name of that entry method,
-and \uw{parameters} are the parameters taken by the method.
-These parameters are only used to resolve the proper \uw{EntryMethod};
-they are otherwise ignored.
-
-\item 
-A \uw{CkCallback} object. The syntax of this call looks like:
-\begin{alltt}
-  CkStartQD(const CkCallback& cb);
-\end{alltt}
-
-Upon quiescence detection, specified callback is called with no parameters.
-
-\end{enumerate}
+Completion detection is a method for automatically detecting completion of a
+distributed process within an application. This functionality is helpful when
+the exact number of messages expected by individual objects is not known. In
+such cases, the process must achieve global consensus as to the number of
+messages produced and the number of messages consumed.  Completion is reached
+within a distributed process when the participating objects have produced and
+consumed an equal number of events globally. The number of global events that
+will be produced and consumed does not need to be known, just the number of
+producers is required.
 
 
-\kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
-\kw{CkWaitQD} blocks and does not return until \index{quiescence}quiescence is
-detected.  It takes no parameters and returns no value.  A call to
-\kw{CkWaitQD} simply looks like this: 
-
-\begin{alltt}
-  CkWaitQD();
-\end{alltt}
-
-Keep in mind that \kw{CkWaitQD} should only be called from threaded
-\index{entry method}entry methods because a call to \kw{CkWaitQD} suspends the
-current thread of execution, and if it were called outside of a threaded entry
-method it would suspend the main thread of execution of the processor from
-which \kw{CkWaitQD} was called and the entire program would come to a grinding
-halt on that processor.
-
-\subsubsection{Completion Detection}
-
-Completion detection is a method for automatically detecting
-completion of a distributed process within an application. It is a
-module, and therefore is only included when ``-module completion'' is
+The completion detection feature is implemented in \charmpp{} as a
+module, and therefore is only included when ``{\tt -module completion}'' is
 specified when linking your application.
-
-Completion is reached within a distributed process when the
-participating objects have produced and consumed an equal number of
-events globally. The number of global events that will be produced and
-consumed does not need to be known, just the number of producers is
-required.
 
 First, the detector should be constructed. This call would typically
 belong in application startup code (it initializes the group that
@@ -83,36 +23,40 @@ keeps track of completion):
 CProxy_CompletionDetector detector = CProxy_CompletionDetector::ckNew();
 \end{alltt}
 
-When it is time to start completion detection, make the following call to the
-library:
+When it is time to start completion detection, invoke the following method of the
+library on {\em all} branches of the completion detection group:
 
 \begin{alltt}
-void start_detection(int num_producers, CkCallback start, CkCallback finish,
-int prio_)
-\end{alltt}
-
-\begin{alltt}
-detector.start_detection(10, CkCallback(CkIndex_chare1::start_test(0),
-                                       thisProxy),
-                             CkCallback(CkIndex_chare2::finish_test(0),
-                                       thisProxy), 0);
+void start_detection(int num_producers, CkCallback start, CkCallback finish, int prio_);
 \end{alltt}
 
 The \verb|num_producers| parameter is the number of objects (chares)
-that will produce elements. So if every array element will produce one
+that will produce elements. So if every chare array element will produce one
 event, then it would be the size of the array.
 
 The \verb|start| callback notifies your program that it is safe to
 begin producing and consuming (this state is reached when the module
 has finished its internal initialization).
 
-The \verb|finish| callback is instigated when completion has been
+The \verb|finish| callback is invoked when completion has been
 detected (all objects participating have produced and consumed an
 equal number of elements globally).
 
-The \verb|prio| parameter is the priority that the detector will run
-at. This is still under development, but it should be set below the
+The \verb|prio| parameter is the priority with which the completion detector will run. 
+This feature is still under development, but it should be set below the
 application's priority if possible.
+
+For example, the call
+
+\begin{alltt}
+detector.start_detection(10, CkCallback(CkIndex_chare1::start_test(0), thisProxy),
+                             CkCallback(CkIndex_chare2::finish_test(0), thisProxy), 0);
+\end{alltt}
+
+sets up completion detection for 10 producers. Once initialization is done, the callback 
+associated with the {\tt start\_test} method will be invoked. Furthermore, when the system
+detects completion, the callback associated with {\tt finish\_test} will be invoked. Finally,
+the priority given to the completion detection library is set to 0 in this case.
 
 Once initialization is complete (the ``start'' callback is triggered),
 make the following call to the library:
@@ -122,6 +66,7 @@ void CompletionDetector::produce(int events_produced)
 void CompletionDetector::produce() // 1 by default
 \end{alltt}
 
+For example, within the code for a chare array object, you might make the following call:
 \begin{alltt}
 detector.ckLocalBranch()->produce(4);
 \end{alltt}
@@ -138,7 +83,7 @@ void CompletionDetector::done() // 1 by default
 detector.ckLocalBranch()->done();
 \end{alltt}
 
-The application can now start consuming elements, using the following calls:
+At the same time, objects can also consume produced elements, using the following calls:
 
 \begin{alltt}
 void CompletionDetector::consume(int events_consumed)
@@ -149,7 +94,85 @@ void CompletionDetector::consume() // 1 by default
 detector.ckLocalBranch()->consume();
 \end{alltt}
 
-At some point, when everyone is consuming elements, completion will be
-reached. The system will detect that state and will trigger the \verb|finish|
-callback. At that point, \verb|start_detection| can be called again to restart
-the process.
+Note that an object may interleave calls to {\tt produce()} and {\tt consume()}, i.e.
+it could produce a few elements, consume a few, etc. When it is done producing its elements,
+it should call {\tt done()}, after which cannot {\tt produce()} any more elements. However,
+it can continue to {\tt consume()} elements even after calling {\tt done()}. 
+When the library detects that, globally, the number of produced elements equals
+the number of consumed elements, and all producers have finished producing
+(i.e. called {\tt done()}), it will invoke the \verb|finish| callback.
+Thereafter, \verb|start_detection| can be called again to restart the process.
+
+\section{Quiescence Detection}
+\label{sec:qd}
+
+In \charmpp, \index{quiescence}quiescence is defined as the state in which no
+processor is executing an entry point, no messages are awaiting processing, and
+there are no messages in-flight.  \charmpp\ provides two facilities for
+detecting quiescence: \kw{CkStartQD} and \kw{CkWaitQD}.  \kw{CkStartQD}
+registers with the system a callback that is to be invoked the next time
+\index{quiescence}quiescence is detected. Note that if immediate messages are
+used, QD cannot be used.  \kw{CkStartQD} has two variants
+which expect the following arguments: 
+
+\begin{enumerate}
+\item 
+A \uw{CkCallback} object. The syntax of this call looks like:
+\begin{alltt}
+  CkStartQD(const CkCallback& cb);
+\end{alltt}
+
+Upon quiescence detection, the specified callback is called with no parameters. Note that
+using this variant, you could have your program terminate after quiescence is detected, by
+supplying the above method with a CkExit callback (\S~\ref{sec:callbacks/creating}).
+
+\item An index corresponding to the entry function that is to be called,
+and a handle to the chare on which that entry function should be called.  The
+syntax of this call looks like this:
+
+\begin{alltt}
+ CkStartQD(int Index,const CkChareID* chareID);
+\end{alltt}
+
+To retrieve the corresponding index of a particular \index{entry method}entry
+method, you must use a static method contained within the
+(\kw{charmc}-generated) \uw{CkIndex} object corresponding to the
+\index{chare}chare containing that entry method.  The syntax of this call is as
+follows:
+
+\begin{alltt}
+\kw{myIdx}=CkIndex_\uw{ChareClass}::\uw{entryMethod}(\uw{parameters});
+\end{alltt}
+
+where \uw{ChareClass} is the \CC{} class of the chare containing
+the desired entry method, \uw{entryMethod} is the name of that entry method,
+and \uw{parameters} are the parameters taken by the method.
+These parameters are only used to resolve the proper \uw{entryMethod};
+they are otherwise ignored.
+
+\end{enumerate}
+
+\kw{CkWaitQD}, by contrast, does not register a callback.  Rather,
+\kw{CkWaitQD} {\em blocks} and does not return until \index{quiescence}quiescence is
+detected.  It takes no parameters and returns no value.  A call to
+\kw{CkWaitQD} simply looks like this: 
+
+\begin{alltt}
+  CkWaitQD();
+\end{alltt}
+
+Note that \kw{CkWaitQD} should only be called from a threaded
+\index{entry method}entry method because a call to \kw{CkWaitQD} suspends the
+current thread of execution ({\em cf.} \S~\ref{threaded}). 
+%If it were called from outside a threaded entry
+%method it would suspend the main thread of execution of the processor from
+%which \kw{CkWaitQD} was called, and the entire program would come to a grinding
+%halt on that processor.
+
+%\function{void CkExitAfterQuiescence()} \index{CkExitAfterQuiescence}
+%\desc{This call informs the Charm RTS that computation on all processors
+%should terminate as soon as the machine becomes completely idle--that is,
+%after all messages and entry methods are finished.  This is the state of 
+%quiescence, as described further in Section~\ref{sec:qd}.
+%This routine returns immediately.}
+

@@ -1,23 +1,22 @@
-\subsection{Read-only Variables, Messages and Arrays}
-
+\section{Read-only Variables, Messages and Arrays}
 \label{readonly}
 
-Since \charmpp\ does not allow global variables for keeping programs portable
-across a wide range of machines, it provides a special mechanism for sharing
-data amongst all objects. {\it Read-only} variables, messages and arrays are
-used to share information that is obtained only after the program begins
-execution and does not change after they are initialized in the dynamic scope
-of {\tt main::main()} function. They can be accessed from any
-\index{chare}chare on any processor as ``global'' variables.When a variable is declared as read only,it is PUPped so that it can be accessed from any chare on any processor. Large data
-structures containing pointers can be made available as read-only variables
-using read-only messages or read-only arrays. Read-only variables, messages and
-arrays can be used just like local variables for each processor, but the user
-has to allocate space for read-only messages using \kw{new} to create the
+Since \charmpp\ does not allow global variables,
+it provides a special mechanism for sharing
+data amongst all objects. {\it Read-only} variables of simple data types or
+compound data types including messages and arrays are used to share information
+that is obtained only after the program begins execution and does not change
+after they are initialized in the dynamic scope of the {\tt main} function of
+the \kw{mainchare}. They are broadcast to every PE by the \charmpp\ runtime,
+and can be accessed in the same way as \CC ``global'' variables on any PE.
+Compound data structures containing pointers can be made available as read-only
+variables using read-only messages or read-only arrays.  Note that memory
+has to be allocated for read-only messages by using \kw{new} to create the
 message in the {\tt main} function of the \kw{mainchare}. 
 
-Read-only variables, messages, and arrays are declared by using the type
-modifier \kw{readonly}, which is similar to \kw{const} in \CC. Read-only data
-is specified in the {\tt .ci} file (the interface file) as: 
+Read-only variables are declared by using the type modifier \kw{readonly},
+which is similar to \kw{const} in \CC. Read-only data is specified in the {\tt
+.ci} file (the interface file) as: 
 
 \begin{alltt}
  readonly Type ReadonlyVarName;
@@ -33,18 +32,20 @@ type \uw{Type}. \uw{Type} must be a single token and not a type expression.
 The variable \uw{ReadonlyMsgName} is declared to be a read-only message of type
 \uw{MessageType}. Pointers are not allowed to be readonly variables unless they
 are pointers to message types. In this case, the message will be initialized on
-every processor.
+every PE.
 
 \begin{alltt}
  readonly Type ReadonlyArrayName [arraysize];
 \end{alltt}
 
 The variable \uw{ReadonlyArrayName} is declared to be a read-only array of type
-\uw{Type}. \uw{Type} must be a single token and not a type expression.
+\uw{Type} with \uw{arraysize} elements. \uw{Type} must be a single token and
+not a type expression. The value of \uw{arraysize} must be known at compile
+time.
 
-Read-only variables, messages and arrays must be declared either as
-global or as public class static data, and these declarations have the
-usual form:
+Read-only variables must be declared either as global or as public class static
+data in the C/\CC\ implementation files, and these declarations have the usual
+form:
 
 \begin{alltt}
  Type ReadonlyVarName;
@@ -57,5 +58,9 @@ Similar declarations preceded by \kw{extern} would appear in the {\tt
 
 {\it Note:}  The current \charmpp\ translator cannot prevent
 assignments to read-only variables.  The user must make sure that no
-assignments occur in the program.
+assignments occur in the program outside of the mainchare constructor.
 
+For concrete examples for using read-only variables, please refer to Travelling
+Salesman Problem (TSP) in
+\examplerefdir{state\_space\_searchengine/TSP\_SE}, and GaussSeidel
+elimination in \examplerefdir{gaussSeidel3D}.

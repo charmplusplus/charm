@@ -1,124 +1,149 @@
-\subsection{Group Objects}
+So far, we have discussed chares separately from the underlying
+hardware resources to which they are mapped. However, for writing
+lower-level libraries or optimizing application performance it is
+sometimes useful to create chare collections where a single chare is
+mapped per specified resource used in the run. The
+\kw{group} \footnote{Originally called {\em Branch Office Chare} or
+  {\em Branched Chare}} and \kw{node group} constructs provide this
+facility by creating a collection of chares with \index{chare}a single
+chare (or {\sl branch}) on each PE (in the case of groups) or process
+(for node groups). 
 
+\section{Group Objects}
 \label{sec:group}
 
-A \kw{group}\footnote{Originally called {\em Branch Office Chare} or 
-{\em Branched Chare}} \index{group}is a collection of chares where 
-there exists \index{chare}one chare (or {\sl branch}) on each
-processor.   Each branch has its own data members.  Groups have
-a definition syntax similar to normal chares,
-and they have to inherit from the system defined class \kw{CBase}\_\uw{ClassName}.
-\footnote{A deprecated older syntax allow them to inherit directly from the
-system-defined class \kw{Group}}.
+Groups have a definition syntax similar to normal chares, and they
+have to inherit from the system-defined class
+\kw{CBase}\_\uw{ClassName}, where \uw{ClassName} is the name of the
+group's \CC{} class \footnote{Older, deprecated syntax allows groups
+to inherit directly from the system-defined class \kw{Group}}.
 
-In the interface file, we declare
+\subsection{Group Definition}
+
+In the interface ({\tt .ci}) file, we declare
 
 \begin{alltt}
- group GroupType \{
-   // Interface specifications as for normal chares
- \};
+group Foo \{
+  // Interface specifications as for normal chares
+
+  // For instance, the constructor ...
+  entry Foo(\uw{parameters1});
+
+  // ... and an entry method
+  entry void someEntryMethod(\uw{parameters2});
+\};
 \end{alltt}
 
-In the \texttt{.h} file, we define \uw{GroupType} as follows:
+The definition of the {\tt Foo} class is given in the \texttt{.h} file, as follows:
 
 \begin{alltt}
- class GroupType : public CBase\_GroupType \{
+class Foo : public CBase\_Foo \{
   // Data and member functions as in C++
   // Entry functions as for normal chares
- \};
-\end{alltt}
 
-A group is identified by a globally unique group identifier, whose type is
-\kw{CkGroupID}. This identifier is common to all of the group's branches and
-can be obtained from the variable \kw{thisgroup}, which is a public local
-variable of the \kw{Group} superclass.  For groups, \kw{thishandle} is the
-handle of the particular branch in which the function is executing: it is a
-normal chare handle.
-
-Groups can be used to implement data-parallel operations easily.  In addition
-to sending messages to a particular branch of a group, one can broadcast
-messages to all branches of a group.  There can be many instances corresponding
-to a group type.  Each instance has a different group handle, and its own set
-of branches.
-
-\subsubsection{Group Creation}
-
-Given a \texttt{.ci} file as follows:
-
-\begin{alltt}
-group G \{
-  entry G(\uw{parameters1});
-  entry void someEntry(\uw{parameters2});
-\};
-\end{alltt}
-
-and the following \texttt{.h} file:
-
-\begin{alltt}
-class G : public CBase\_G \{
   public:
-    G(\uw{parameters1});
-    void someEntry(\uw{parameters2});
+    Foo(\uw{parameters1});
+    void someEntryMethod(\uw{parameters2});
 \};
 \end{alltt}
 
-we can create a \index{group}group in a manner similar to a regular
-\index{chare}chare. 
+\subsection{Group Creation}
+\label{sec:groups/creation}
+
+Groups are created in a manner similar to chares and chare arrays, i.e. 
+through \kw{ckNew}. Given the declarations and definitions of group {\tt Foo}
+from above, we can create a group in the following manner:
 
 \begin{alltt}
-CProxy_G groupProxy = CProxy_G::ckNew(\uw{parameters1});
-or
-CkGroupID groupId = CProxy_G::ckNew(\uw{parameters1});
-CProxy_G groupProxy(groupId);
+CkGroupID fooGroupID = CProxy_Foo::ckNew(\uw{parameters1});
+\end{alltt}
+
+In the above, \kw{ckNew} returns an object of type \kw{CkGroupID},
+which is the globally unique identifier of the corresponding instance
+of the group.  This identifier is common to all of the group's
+branches and can be obtained in the group's methods by accessing the variable
+\kw{thisgroup}, which is a public data member of the \kw{Group}
+superclass.
+
+A group can also be identified through its proxy, which can be obtained in one of three ways:
+(a) as the inherited {\tt thisProxy} data member of the class; (b) when creating a group,
+you can obtain a proxy to it from a call to \kw{ckNew} 
+as shown below:
+
+\begin{alltt}
+CProxy fooProxy = CProxy_Foo::ckNew(\uw{parameters1});
+\end{alltt}
+
+or (c) by using a group identifier to create a proxy, as shown below:
+
+\begin{alltt}
+// Assume that we have obtained `fooGroupID' as the CkGroupID for the group
+
+// Obtain a proxy to the group from its group ID
+CProxy_Foo anotherFooProxy = CProxy_Foo(fooGroupID);
 \end{alltt}
 
 It is possible to specify the dependence of group creations using
-\uw{CkEntryOptions}, for example, creation of group B on each processor depends
-on group A being created on that processor.
+\uw{CkEntryOptions}. For example, in the following code, the creation of group
+{\tt GroupB} on each PE depends on the creation of {\tt GroupA} on that PE.
 
 \begin{alltt}
-// create group A
-CkGroupID groupAId = CProxy_GroupA::ckNew(\uw{parameters1});
+// Create GroupA
+CkGroupID groupAID = CProxy_GroupA::ckNew(\uw{parameters1});
 
-// create group B which depends on group A being created
+// Create GroupB. However, for each PE, do this only 
+// after GroupA has been created on it
+
+// Specify the dependency through a `CkEntryOptions' object
 CkEntryOptions opts;
 opts.setGroupDepID(groupAId);
-CkGroupID groupBId = CProxy_GroupB::ckNew(\uw{parameters2});
+
+// The last argument to `ckNew' is the `CkEntryOptions' object from above
+CkGroupID groupBID = CProxy_GroupB::ckNew(\uw{parameters2}, opts);
 \end{alltt}
 
-\subsubsection{Method Invocation on Groups}
+%For groups, \kw{thishandle} is the
+%handle of the particular branch in which the function is executing: it is a
+%normal chare handle.
 
-Before sending a message to a \index{group}group via an entry
-method, we need to get a proxy of that group.
+%Groups can be used to implement data-parallel operations easily.  In addition
+%to sending messages to a particular branch of a group, one can broadcast
+%messages to all branches of a group.  
+Note that there can be several instances of each group type.
+In such a case, each instance has a unique group identifier, and its own set
+of branches.
 
-A message may be sent to a particular \index{branch}branch of group using the
-notation:
+\subsection{Method Invocation on Groups}
+
+An asynchronous entry method can be invoked on a particular branch of a
+group through a proxy of that group. If we have a group with a proxy
+{\tt fooProxy} and we wish to invoke entry method {\tt someEntryMethod} on
+that branch of the group which resides on PE {\tt somePE}, we would accomplish
+this with the following syntax:
 
 \begin{alltt}
- groupProxy[Processor].EntryMethod(\uw{parameters});
+fooProxy[somePE].someEntryMethod(\uw{parameters});
 \end{alltt}
 
-This sends the given parameters to the \index{branch}branch of
-the group referred to by \uw{groupProxy} which is on processor number
-\uw{Processor} at the entry method \uw{EntryMethod}, which must be a valid
-entry method of that group type. This call is asynchronous and non-blocking; it
-returns immediately after sending the message.
-
+%This sends the given parameters to the \index{branch}branch of
+%the group referred to by \uw{groupProxy} which is on processor number
+%\uw{Processor} at the entry method \uw{EntryMethod}, which must be a valid
+%entry method of that group type. 
+This call is asynchronous and non-blocking; it returns immediately after sending the message.
 A message may be broadcast \index{broadcast} to all branches of a group
-(i.e., to all processors) using the notation :
+(i.e., to all PEs) using the notation :
 
 \begin{alltt}
- groupProxy.EntryMethod(\uw{parameters});
+fooProxy.anotherEntryMethod(\uw{parameters});
 \end{alltt}
 
-This sends the given parameters to all branches of the group at
-the entry method \uw{EntryMethod}, which must be a valid entry method of that
-group type. This call is asynchronous and non-blocking; it returns immediately
+This invokes entry method \uw{anotherEntryMethod} with the given \uw{parameters} on 
+all branches of the group. This call is also asynchronous and non-blocking, and it, too, returns immediately
 after sending the message.
 
-
-Sequential objects, chares and other groups can gain access to the local
-(i.e., on their processor) group object using:
+Recall that each PE hosts a branch of every instantiated group. 
+Sequential objects, chares and other groups can gain access to this {\em PE-local}
+branch using \kw{ckLocalBranch()}:
 
 \begin{alltt}
 GroupType *g=groupProxy.ckLocalBranch();
@@ -129,23 +154,26 @@ referred to by the proxy \uw{groupProxy}.  Once a proxy to the
 local branch of a group is obtained, that branch can be accessed as a regular
 \CC\ object.  Its public methods can return values, and its public data is 
 readily accessible.
+%Thus a dynamically created \index{chare}chare can invoke a public method of a
+%group without knowing the PE on which it actually resides. 
+%the method
+%executes in the local \index{branch}branch of the group.
 
-Thus a dynamically created \index{chare}chare can call a public method of a
-group without needing to know which processor it actually resides: the method
-executes in the local \index{branch}branch of the group.
-
-One very nice use of Groups is to reduce the number of messages sent between
-processors by collecting the data from all the chares on a single processor
-before sending that data to the mainchare.  To do this, create basic chares to
-break up the work of a problem.  Also, create a group.  When a particular chare
+Let us end with an example use-case for groups.
+%One very nice use of Groups is to reduce the number of messages sent between
+%processors by collecting the data from all the chares on a single processor
+Suppose that we have a task-parallel program in which we dynamically spawn
+new chares. Furthermore, assume that each one of these chares has some data
+to send to the mainchare.  Instead of creating a separate message for each 
+chare's data, we create a group. When a particular chare
 finishes its work, it reports its findings to the local branch of the group.
-When all the chares on one processor are complete, the local branch of the
-group can then report to the main chare.  This reduces the number of messages
-sent to main from the number of chares created to the number of processors. 
+When all the chares on a PE have finished their work, the local branch
+can send a single message to the main chare.  This reduces the number of messages
+sent to the mainchare from the number of chares created to the number of processors. 
 
-
-
-
-
-
+For a more concrete example on how to use groups, please refer to
+\examplerefdir{histogram\_group}. It presents a parallel
+histogramming operation in which chare array elements funnel their bin counts
+through a group, instead of contributing directly to a reduction across all
+chares.
 

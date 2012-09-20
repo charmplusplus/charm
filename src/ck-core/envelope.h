@@ -182,16 +182,6 @@ public:
       UChar isPacked:1; ///< If true, message must be unpacked before use
       UChar isUsed:1;   ///< Marker bit to prevent message re-send.
     };
-#if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
-    CkObjID sender;
-    CkObjID recver;
-    MCount SN;
-#if defined(_FAULT_CAUSAL_)
-    MCount TN;
-#endif
-    int incarnation;
-	int flags;
-#endif
 private:
     u_type type;           ///< Depends on message type (attribs.mtype)
     CMK_REFNUM_TYPE ref;            ///< Used by futures
@@ -207,6 +197,14 @@ private:
     
   public:
 #if (defined(_FAULT_MLOG_) || defined(_FAULT_CAUSAL_))
+    CkObjID sender;
+    CkObjID recver;
+    MCount SN;
+#if defined(_FAULT_CAUSAL_)
+    MCount TN;
+#endif
+    int incarnation;
+	int flags;
     UInt piggyBcastIdx;
 #endif
     void pup(PUP::er &p);

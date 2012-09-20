@@ -135,11 +135,12 @@ Choose an interconnect from below: [1-11]
 	 5) LAPI
 	 6) Cray XT3, XT4
          7) Cray XT5
-	 8) Bluegene/L Native (only at T. J. Watson)
-	 9) Bluegene/L MPI
-        10) Bluegene/P Native
-	11) Bluegene/P MPI
-	12) VMI
+         8) Cray XE, XK
+	 9) Bluegene/L Native (only at T. J. Watson)
+	10) Bluegene/L MPI
+        11) Bluegene/P Native
+	12) Bluegene/P MPI
+	13) VMI
 
 EOF
 	
@@ -170,24 +171,27 @@ EOF
 	        $arch = "mpi-crayxt";
 	        last;
 	  } elsif($line eq "8"){
+	        $arch = "gemini_gni-crayxe";
+	        last;
+	  } elsif($line eq "9"){
 		$arch = "bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "9"){
+	  } elsif($line eq "10"){
 		$arch = "mpi-bluegenel";
 		$compilers = "xlc ";
 		$nobs = "--no-build-shared";
 		last;
-	  } elsif($line eq "10"){
+	  } elsif($line eq "11"){
 		$arch = "bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "11"){
+	  } elsif($line eq "12"){
 		$arch = "mpi-bluegenep";
 		$compilers = "xlc ";
 		last;
-	  } elsif($line eq "12"){
+	  } elsif($line eq "13"){
 		$converse_network_type = "vmi";
 		last;
 	  } else {
