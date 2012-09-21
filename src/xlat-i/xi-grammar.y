@@ -111,7 +111,7 @@ char *lastConstructor;
 %type <modlist>		ModuleEList File
 %type <module>		Module
 %type <conslist>	ConstructEList ConstructList
-%type <construct>	Construct
+%type <construct>	Construct ConstructSemi
 %type <strval>		Name QualName CCode CPROGRAM_List OptNameInit 
 %type <strval>		OptTraceName
 %type <val>		OptStackSize
@@ -140,7 +140,7 @@ char *lastConstructor;
 %type <accelBlock>      AccelBlock
 %type <typelist>	BaseList OptBaseList
 %type <mbrlist>		MemberEList MemberList
-%type <member>		Member NonEntryMember InitNode InitProc
+%type <member>		Member MemberBody NonEntryMember InitNode InitProc UnexpectedToken
 %type <pupable>		PUPableClass
 %type <includeFile>	IncludeFile
 %type <tvar>		TVar
@@ -216,19 +216,35 @@ ConstructList	: /* Empty */
 		{ $$ = new ConstructList(lineno, $1, $2); }
 		;
 
+ConstructSemi   : USING NAMESPACE QualName
+                { $$ = new UsingScope($3, false); }
+                | USING QualName
+                { $$ = new UsingScope($2, true); }
+                | OptExtern NonEntryMember
+                { $2->setExtern($1); $$ = $2; }
+                | OptExtern Message
+                { $2->setExtern($1); $$ = $2; }
+                | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters
+                {
+                  Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
+                  int isExtern = 1;
+                  e->setExtern(isExtern);
+                  e->targs = $6;
+                  e->label = new XStr;
+                  $4->print(*e->label);
+                  $$ = e;
+                }
+                ;
+
 Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { if($3) $3->setExtern($1); $$ = $3; }
         | NAMESPACE Name '{' ConstructList '}'
         { $$ = new Scope($2, $4); }
-        | USING NAMESPACE QualName ';'
-        { $$ = new UsingScope($3, false); }
-        | USING QualName ';'
-        { $$ = new UsingScope($2, true); }
+        | ConstructSemi ';'
+        { $$ = $1; }
+        | ConstructSemi UnexpectedToken
+        { yyerror("The preceding construct must be semicolon terminated"); YYABORT; }
         | OptExtern Module
-        { $2->setExtern($1); $$ = $2; }
-        | OptExtern NonEntryMember
-        { $2->setExtern($1); $$ = $2; }
-        | OptExtern Message ';'
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Chare
         { $2->setExtern($1); $$ = $2; }
@@ -240,16 +256,6 @@ Construct	: OptExtern '{' ConstructList '}' OptSemiColon
         { $2->setExtern($1); $$ = $2; }
         | OptExtern Template
         { $2->setExtern($1); $$ = $2; }
-        | EXTERN ENTRY EReturn QualNamedType Name OptTParams EParameters ';'
-        {
-          Entry *e = new Entry(lineno, 0, $3, $5, $7, 0, 0, 0, 0, 0);
-          int isExtern = 1;
-          e->setExtern(isExtern);
-          e->targs = $6;
-          e->label = new XStr;
-          $4->print(*e->label);
-          $$ = e;
-        }
         | HashIFComment
         { $$ = NULL; }
         | HashIFDefComment
@@ -648,18 +654,18 @@ MemberList	: /* Empty */
 		{ $$ = new MemberList($1, $2); }
 		;
 
-NonEntryMember  : Readonly ';'
+NonEntryMember  : Readonly
 		{ $$ = $1; }
-		| ReadonlyMsg ';'
+		| ReadonlyMsg
 		{ $$ = $1; }
-		| InitProc ';'
-		| InitNode ';'
+		| InitProc
+		| InitNode
 		{ $$ = $1; }
-		| PUPABLE PUPableClass ';'
+		| PUPABLE PUPableClass
 		{ $$ = $2; }
-		| INCLUDE IncludeFile ';'
+		| INCLUDE IncludeFile
 		{ $$ = $2; }
-		| CLASS Name ';'
+		| CLASS Name
 		{ $$ = new ClassDeclaration(lineno,$2); } 
 		;
 
@@ -708,9 +714,16 @@ IncludeFile    : LITERAL
 		{ $$ = new IncludeFile(lineno,$1); } 
 		;
 
-Member		: Entry ';'
+Member          : MemberBody ';'
+                { $$ = $1; }
+                // Error constructions
+                | MemberBody UnexpectedToken
+                { yyerror("The preceding entry method declaration must be semicolon-terminated."); YYABORT; }
+                ;
+
+MemberBody	: Entry
 		{ $$ = $1; }
-                | TemplateSpec Entry ';'
+                | TemplateSpec Entry
                 {
                   $2->tspec = $1;
                   $$ = $2;
@@ -718,6 +731,29 @@ Member		: Entry ';'
 		| NonEntryMember
 		{ $$ = $1; }
 		;
+
+UnexpectedToken : ENTRY
+                { $$ = 0; }
+                | '}'
+                { $$ = 0; }
+                | INITCALL
+                { $$ = 0; }
+                | INITNODE
+                { $$ = 0; }
+                | INITPROC
+                { $$ = 0; }
+                | CHARE
+                { $$ = 0; }
+                | MAINCHARE
+                { $$ = 0; }
+                | ARRAY
+                { $$ = 0; }
+                | GROUP
+                { $$ = 0; }
+                | NODEGROUP
+                { $$ = 0; }
+                | READONLY
+                { $$ = 0; }
 
 Entry		: ENTRY EAttribs EReturn Name EParameters OptStackSize OptSdagCode
 		{ 
