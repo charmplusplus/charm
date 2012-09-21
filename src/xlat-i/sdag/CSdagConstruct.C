@@ -1114,6 +1114,12 @@ void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry)
 
 void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
 {
+  if (entry->isConstructor()) {
+    std::cerr << cur_file << ":" << entry->getLine()
+              << ": Chare constructor cannot be defined with SDAG code" << std::endl;
+    exit(1);
+  }
+
   decls << "public:\n";
   generateSignature(decls, defs, entry, false, "void", con1->text, false, stateVars);
   SdagConstruct *sc;

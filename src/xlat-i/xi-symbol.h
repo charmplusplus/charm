@@ -1043,6 +1043,7 @@ class Entry : public Member {
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
+    int getLine() { return line; }
 };
 
 class EntryList {
