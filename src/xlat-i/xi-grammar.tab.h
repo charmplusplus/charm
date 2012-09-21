@@ -193,7 +193,7 @@ typedef union YYSTYPE
 {
 
 /* Line 1676 of yacc.c  */
-#line 27 "xi-grammar.y"
+#line 23 "xi-grammar.y"
 
   ModuleList *modlist;
   Module *module;
