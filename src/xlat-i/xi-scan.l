@@ -127,6 +127,7 @@ struct rwtable rwtable[] = {
 {  "void",	VOID },
 {  "const",	CONST },
 {  "atomic", 	ATOMIC },
+{  "serial",    ATOMIC },
 {  "forward", 	FORWARD },
 {  "when", 	WHEN },
 {  "while", 	WHILE },
