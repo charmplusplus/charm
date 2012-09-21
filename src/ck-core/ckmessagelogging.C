@@ -653,9 +653,7 @@ void sendRemoteMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,M
 
 
 /**
- * @brief Function to send a local message. It first gets a ticket and
- * then enqueues the message. If we are recovering, then the message 
- * is enqueued in a delay queue.
+ * @brief Function to send a local message. 
  */
 void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG_PERF(double _startTime=CkWallTimer());
@@ -665,6 +663,9 @@ void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG(char recverString[100]);
 
 	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),env->SN,env->sender.toString(senderString),env->recver.toString(recverString)));
+
+	// setting flag to free allocated memory space for this message
+	env->flags = env->flags | CK_FREE_MSG_MLOG;
 
 	// getting the receiver local object
 	Chare *recverObj = (Chare *)env->recver.getObject();
