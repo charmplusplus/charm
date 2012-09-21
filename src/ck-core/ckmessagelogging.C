@@ -665,7 +665,7 @@ void sendLocalMsg(envelope *env, int _infoIdx){
 	DEBUG(printf("[%d] Local Message being sent for SN %d sender %s recver %s \n",CmiMyPe(),env->SN,env->sender.toString(senderString),env->recver.toString(recverString)));
 
 	// setting flag to free allocated memory space for this message
-	env->flags = env->flags | CK_FREE_MSG_MLOG;
+	//env->flags = env->flags | CK_FREE_MSG_MLOG;
 
 	// getting the receiver local object
 	Chare *recverObj = (Chare *)env->recver.getObject();
@@ -1175,6 +1175,12 @@ void _verifyAckHandler(VerifyAckMsg *verifyReply){
 	}
 }
 
+/**
+ * Resets sequences numbers.
+ */
+void resetRSSN(void *data, ChareMlogData *mlogData){
+	mlogData->resetRSSN();
+}
 
 /**
  * Sends the checkpoint to its buddy. 
@@ -1219,6 +1225,7 @@ void sendCheckpointData(){
 		buf = &buf[migratedNoticeList.size()*sizeof(MigrationRecord)];
 	}
 	
+
 
 	memcpy(buf,storedChkpt->buf,storedChkpt->bufSize);
 	buf = &buf[storedChkpt->bufSize];
@@ -1288,6 +1295,7 @@ void _recvCheckpointHandler(char *_restartData){
 
 	
 }
+
 
 /**
  * @brief Initializes variables and flags for restarting procedure.
@@ -1922,6 +1930,9 @@ void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 	DEBUG(CmiPrintf("[%d] _checkpointBarrierAckHandler \n",CmiMyPe()));
 	DEBUGLB(CkPrintf("[%d] Reaching this point\n",CkMyPe()));
 
+	// resetting sequences
+	forAllCharesDo(resetRSSN,NULL);
+
 	// resuming LB function pointer
 	(*resumeLbFnPtr)(centralLb);
 
@@ -2169,6 +2180,18 @@ int ChareMlogData::checkAndStoreSsn(const CkObjID &sender, MCount ssn){
 		receivedSsnTable.put(sender) = rssn;
 	}
 	return rssn->checkAndStore(ssn);
+}
+
+/**
+ * Resets all sequences.
+ */
+void ChareMlogData::resetRSSN(){
+	CkHashtableIterator *iter = receivedSsnTable.iterator();
+	while(iter->hasNext()){
+		RSSN **row = (RSSN **)iter->next();
+		(*row)->reset();
+	}
+	delete iter;
 }
 
 /**
