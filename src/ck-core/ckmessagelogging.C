@@ -1176,13 +1176,6 @@ void _verifyAckHandler(VerifyAckMsg *verifyReply){
 }
 
 /**
- * Resets sequences numbers.
- */
-void resetRSSN(void *data, ChareMlogData *mlogData){
-	mlogData->resetRSSN();
-}
-
-/**
  * Sends the checkpoint to its buddy. 
  */
 void sendCheckpointData(){	
@@ -1930,9 +1923,6 @@ void _checkpointBarrierAckHandler(CheckpointBarrierMsg *msg){
 	DEBUG(CmiPrintf("[%d] _checkpointBarrierAckHandler \n",CmiMyPe()));
 	DEBUGLB(CkPrintf("[%d] Reaching this point\n",CkMyPe()));
 
-	// resetting sequences
-	forAllCharesDo(resetRSSN,NULL);
-
 	// resuming LB function pointer
 	(*resumeLbFnPtr)(centralLb);
 
@@ -2180,18 +2170,6 @@ int ChareMlogData::checkAndStoreSsn(const CkObjID &sender, MCount ssn){
 		receivedSsnTable.put(sender) = rssn;
 	}
 	return rssn->checkAndStore(ssn);
-}
-
-/**
- * Resets all sequences.
- */
-void ChareMlogData::resetRSSN(){
-	CkHashtableIterator *iter = receivedSsnTable.iterator();
-	while(iter->hasNext()){
-		RSSN **row = (RSSN **)iter->next();
-		(*row)->reset();
-	}
-	delete iter;
 }
 
 /**

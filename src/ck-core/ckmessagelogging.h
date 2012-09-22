@@ -58,13 +58,6 @@ public:
 		bzero(data,sizeof(MCount)*currentSize);
 	}
 
-	// Resets the sequences
-	void reset(){
-		start = 0;
-		end = 0;
-		bzero(data,sizeof(MCount)*currentSize);
-	}
-
 	// Checks if a particular SSN is already in the data; if not, stores it		
 	// return value: 0 (sucess, value stored), 1 (value already there)
 	int checkAndStore(MCount ssn){
@@ -79,13 +72,19 @@ public:
 
 		// checking if ssn was already received
 		if(ssn <= data[start]){
-			DEBUG_NOW(CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
+			DEBUG(CkPrintf("[%d] Repeated ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
 			return 1;
 		}
 
 		// checking if data needs to be extended
 		if(ssn-data[start] >= currentSize){
-			CkPrintf("[%d] Extending Data %d %d %d\n",CkMyPe(),ssn,data[start],currentSize);
+			DEBUG(CkPrintf("[%d] Extending Data %d %d %d\n",CkMyPe(),ssn,data[start],currentSize));
+
+			// HACK for migration
+			data[0] = ssn;
+			start = end = 0;
+			return 0;		//HACK
+
 			old = data;
 			oldCS = currentSize;
 			currentSize *= 2;
@@ -99,7 +98,7 @@ public:
 			delete[] old;
 		}
 
-		DEBUG_NOW(CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
+		DEBUG(CkPrintf("[%d] Ahead ssn=%d start=%d\n",CkMyPe(),ssn,data[start]));
 
 		// adding ssn into data
 		num = end - start;
@@ -133,12 +132,6 @@ public:
 		}
 		for(int i=0;i<currentSize;i++){
 			p | data[i];
-		}
-		// HACK for migration
-		if(p.isUnpacking()){
-			start = 0;
-			end = 0;
-			bzero(data,sizeof(MCount)*currentSize);
 		}
 	}
 
@@ -194,7 +187,6 @@ public:
 	void addLogEntry(MlogEntry *entry);
 	virtual void pup(PUP::er &p);
 	CkQ<MlogEntry *> *getMlog(){ return &mlog;};
-	void resetRSSN();
 };
 
 /**
