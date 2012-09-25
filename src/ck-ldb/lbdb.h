@@ -66,8 +66,10 @@ typedef struct {
 typedef struct _LDObjid {
   int id[OBJ_ID_SZ];
 #if CMK_GLOBAL_LOCATION_UPDATE
-  short dimension; 
-  short nInts;
+  char dimension;
+  char nInts;
+  char isArrayElement;
+  char locMgrGid; 
 #endif
   CmiBool operator==(const struct _LDObjid& objid) const {
     for (int i=0; i<OBJ_ID_SZ; i++) if (id[i] != objid.id[i]) return CmiFalse;
@@ -370,6 +372,8 @@ inline void LDObjid::pup(PUP::er &p) {
 #if CMK_GLOBAL_LOCATION_UPDATE
   p|dimension;
   p|nInts;
+  p|isArrayElement;
+  p|locMgrGid;
 #endif
 }
 PUPmarshall(LDObjid)

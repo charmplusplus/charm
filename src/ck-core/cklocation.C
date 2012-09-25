@@ -20,6 +20,7 @@
 #include "LBDatabase.h"
 #if CMK_GLOBAL_LOCATION_UPDATE
 #include "BaseLB.h"
+#include "init.h"
 #endif
 #endif // CMK_LBDB_ON
 
@@ -89,6 +90,7 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
 #if CMK_GLOBAL_LOCATION_UPDATE
   r.dimension = idx.dimension;
   r.nInts = idx.nInts; 
+  r.isArrayElement = 1; 
 #endif
 
   return r;
@@ -96,6 +98,10 @@ LDObjid idx2LDObjid(const CkArrayIndex &idx)
 
 #if CMK_GLOBAL_LOCATION_UPDATE
 void UpdateLocation(MigrateInfo& migData) {
+
+  if (migData.obj.id.isArrayElement == 0) {
+    return;
+  }
 
   CkArrayIndex idx; 
   idx.dimension = migData.obj.id.dimension; 
@@ -105,8 +111,9 @@ void UpdateLocation(MigrateInfo& migData) {
     idx.data()[i] = migData.obj.id.id[i];    
   }
 
-  CkLocMgr *localLocMgr = 
-    (CkLocMgr *) CkLocalBranch(migData.obj.omhandle.id.id); 
+  CkGroupID locMgrGid;
+  locMgrGid.idx = migData.obj.id.locMgrGid;
+  CkLocMgr *localLocMgr = (CkLocMgr *) CkLocalBranch(locMgrGid);
   localLocMgr->updateLocation(idx, migData.to_pe); 
 }
 #endif
@@ -1301,8 +1308,12 @@ CkLocRec_local::CkLocRec_local(CkLocMgr *mgr,CmiBool fromMigration,
         enable_measure = CmiTrue;
 	bounced  = CmiFalse;
 	the_lbdb=mgr->getLBDB();
+        LDObjid ldid = idx2LDObjid(idx);
+#if CMK_GLOBAL_LOCATION_UPDATE
+        ldid.locMgrGid = mgr->getGroupID().idx;
+#endif        
 	ldHandle=the_lbdb->RegisterObj(mgr->getOMHandle(),
-		idx2LDObjid(idx),(void *)this,1);
+		ldid,(void *)this,1);
 	if (fromMigration) {
 		DEBL((AA"Element %s migrated in\n"AB,idx2str(idx)));
 		if (!ignoreArrival)  {
@@ -2155,9 +2166,11 @@ CmiBool CkLocMgr::addElement(CkArrayID id,const CkArrayIndex &idx,
 	{ //This is the first we've heard of that element-- add new local record
 		rec=createLocal(idx,CmiFalse,CmiFalse,CmiTrue);
 #if CMK_GLOBAL_LOCATION_UPDATE
-                DEBC((AA"Global location broadcast for new element idx %s "
-                      "assigned to %d \n"AB, idx2str(idx), CkMyPe()));
-                thisProxy.updateLocation(idx, CkMyPe());                        
+                if (homePe(idx) != CkMyPe()) {
+                  DEBC((AA"Global location broadcast for new element idx %s "
+                        "assigned to %d \n"AB, idx2str(idx), CkMyPe()));
+                  thisProxy.updateLocation(idx, CkMyPe());  
+                }
 #endif
                 
 	} else 
@@ -2284,10 +2297,15 @@ int CkLocMgr::deliver(CkMessage *m,CkDeliver_t type,int opts) {
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))
 //#if !defined(_FAULT_MLOG_)
 #if CMK_LBDB_ON
+
+        LDObjid ldid = idx2LDObjid(idx);
+#if CMK_GLOBAL_LOCATION_UPDATE
+        ldid.locMgrGid = thisgroup.idx;
+#endif        
 	if (type==CkDeliver_queue) {
 		if (!(opts & CK_MSG_LB_NOTRACE) && the_lbdb->CollectingCommStats()) {
-		if(rec!=NULL) the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
-		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,idx2LDObjid(idx),UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
+		if(rec!=NULL) the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(), rec->lookupProcessor(), 1);
+		else /*rec==NULL*/ the_lbdb->Send(myLBHandle,ldid,UsrToEnv(msg)->getTotalsize(),homePe(msg->array_index()), 1);
 		}
 	}
 #endif
@@ -2719,9 +2737,7 @@ void CkLocMgr::emigrate(CkLocRec_local *rec,int toPe)
 	inform(idx,toPe);
 //#if (!defined(_FAULT_MLOG_) && !defined(_FAULT_CAUSAL_))    
 //#if !defined(_FAULT_MLOG_)    
-#if !CMK_GLOBAL_LOCATION_UPDATE
 	informHome(idx,toPe);
-#endif
 //#endif
 
 #if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
