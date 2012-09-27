@@ -1,3 +1,6 @@
+#ifndef CK_CPARSEDFILE_H
+#define CK_CPARSEDFILE_H
+
 #include "xi-symbol.h"
 #include "CEntry.h"
 #include "sdag-globals.h"
@@ -67,3 +70,5 @@ class CParsedFile {
 };
 
 }
+
+#endif
