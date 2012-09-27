@@ -302,7 +302,7 @@ public:
 #if DYNAMIC_IMBALANCE
 	else if(nTimes > n_loadbalance && (nTimes-(n_loadbalance/2)) % n_loadbalance == 0) {
 		//printf("Here at %d\n",nTimes);
-		contribute(CkCallback(CkIndex_Topo::shuffleLoad(),topoid));
+		contribute(CkCallback(CkIndex_Topo::shuffleLoad(),topoid,1));
 	} 
 #endif
 	else ForwardMessages();

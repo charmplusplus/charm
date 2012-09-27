@@ -131,7 +131,7 @@ void Topo::FindComputeTimes()
     // CkPrintf("%d work %f\n", i, work);
     total_work += work;
   }
-  if (CkMyPe() == 0)
+  if (CkMyNode() == 0)
     CkPrintf("[%d] Total work/step = %f sec\n",CkMyPe(),total_work*1e-6);
       
 }
