@@ -29,8 +29,9 @@ class CParsedFile {
     void generateTrace();
     std::list<Entry*> nodeList;
     TList<CEntry*> entryList;
-  public:
     Chare *container;
+
+  public:
     static XStr *className;
     TList<SdagConstruct *> connectEntryList;
     CParsedFile(Chare *c): container(c) {}
