@@ -2,7 +2,7 @@
 #include "CEntry.h"
 #include "sdag-globals.h"
 #include "EToken.h"
-
+#include <list>
 namespace xi {
 
 class Chare;
@@ -27,15 +27,16 @@ class CParsedFile {
     void generateRegisterEp(XStr& decls, XStr& defs);
     void generateDependencyMergePoints(XStr& output);
     void generateTrace();
+    std::list<Entry*> nodeList;
   public:
     Chare *container;
     static XStr *className;
     TList<CEntry*> entryList;
     TList<SdagConstruct *> connectEntryList;
-    TList<Entry*> nodeList;
     CParsedFile(Chare *c): container(c) {}
     ~CParsedFile(void){}
     void print(int indent);
+    void addNode(Entry *e) { nodeList.push_back(e); }
     void doProcess(XStr& classname, XStr& decls, XStr& defs) {
       className = &classname;
       decls << "#define " << classname << "_SDAG_CODE \n";

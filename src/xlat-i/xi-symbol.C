@@ -2735,26 +2735,26 @@ XStr *CParsedFile::className = NULL;
 
 void CParsedFile::numberNodes(void)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->numberNodes();
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    if ((*cn)->sdagCon != 0) {
+      (*cn)->sdagCon->numberNodes();
     }
   }
 }
 
 void CParsedFile::labelNodes(void)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->labelNodes();
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    if ((*cn)->sdagCon != 0) {
+      (*cn)->sdagCon->labelNodes();
     }
   }
 }
 
 void CParsedFile::propagateState(void)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->propagateState(0);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    (*cn)->sdagCon->propagateState(0);
   }
 }
 
@@ -2768,23 +2768,23 @@ void CParsedFile::mapCEntry(void)
 
 void CParsedFile::generateEntryList(void)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateEntryList(entryList, 0);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    (*cn)->sdagCon->generateEntryList(entryList, (SdagConstruct*)0);
   }
 }
 
 void CParsedFile::generateConnectEntryList(void)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->generateConnectEntryList(connectEntryList);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    (*cn)->sdagCon->generateConnectEntryList(connectEntryList);
   }
 }
 
 void CParsedFile::generateCode(XStr& decls, XStr& defs)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    cn->sdagCon->setNext(0,0);
-    cn->sdagCon->generateCode(decls, defs, cn);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    (*cn)->sdagCon->setNext(0, 0);
+    (*cn)->sdagCon->generateCode(decls, defs, *cn);
   }
 }
 
@@ -2849,9 +2849,9 @@ void CParsedFile::generatePupFunction(XStr& decls)
 
 void CParsedFile::generateTrace()
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTrace();
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    if ((*cn)->sdagCon != 0) {
+      (*cn)->sdagCon->generateTrace();
     }
   }
 }
@@ -2861,9 +2861,9 @@ void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
   XStr name = "__sdag_register";
   generateSignature(decls, defs, container, true, "void", &name, false, NULL);
 
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateRegisterEp(defs);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    if ((*cn)->sdagCon != 0) {
+      (*cn)->sdagCon->generateRegisterEp(defs);
     }
   }
   endMethod(defs);
@@ -2871,9 +2871,9 @@ void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)
 
 void CParsedFile::generateTraceEp(XStr& decls, XStr& defs)
 {
-  for(Entry *cn=nodeList.begin(); !nodeList.end(); cn=nodeList.next()) {
-    if (cn->sdagCon != 0) {
-      cn->sdagCon->generateTraceEp(decls, defs, container);
+  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
+    if ((*cn)->sdagCon != 0) {
+      (*cn)->sdagCon->generateTraceEp(decls, defs, container);
     }
   }
 }
@@ -3015,7 +3015,7 @@ void Entry::collectSdagCode(CParsedFile *pf, int& sdagPresent)
 {
   if (isSdag()) {
     sdagPresent = 1;
-    pf->nodeList.append(this);
+    pf->addNode(this);
   }
 }
 
