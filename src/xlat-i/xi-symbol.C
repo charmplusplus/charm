@@ -2717,58 +2717,6 @@ void Chare::lookforCEntry(CEntry *centry)
   }
 }
 
-////////////////////////// SDAGCONSTRUCT ///////////////////////
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
-{
-  con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-}
-
-SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
-{
-  con1=0; con2=0; con3=0; con4=0;
-  type = t;
-  traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-  SdagConstruct *sc;
-  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
-    constructs->append(sc);
-}
-
-SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
-			     SdagConstruct *c4, SdagConstruct *constructAppend, EntryList *el)
-{
-  text = txt;
-  type = t;
-  traceName=NULL;
-  con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  if (constructAppend != 0) {
-    constructs->append(constructAppend);
-  }
-  elist = el;
-}
-
-SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl)
-{
-  type = t;
-  traceName=NULL;
-  text = new XStr(codeStr);
-  connectEntry = new XStr(entryStr);
-  con1 = 0; con2 = 0; con3 = 0; con4 =0;
-  publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  param = pl;
-
-}
-
 ///////////////////////////// ENTRY ////////////////////////////
 
 void ParamList::checkParamList(){
