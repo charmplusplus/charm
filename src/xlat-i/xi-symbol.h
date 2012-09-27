@@ -6,7 +6,6 @@
 #include "CEntry.h"
 #include "sdag-globals.h"
 #include "CList.h"
-#include "CParsedFile.h"
 
 #include <iostream>
 #include <stdio.h>
@@ -16,6 +15,9 @@
 
 
 namespace xi {
+
+class Chare;
+class CParsedFile;
 
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,

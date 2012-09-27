@@ -6,6 +6,7 @@
 #include "sdag-globals.h"
 #include "EToken.h"
 #include <list>
+
 namespace xi {
 
 class Chare;
