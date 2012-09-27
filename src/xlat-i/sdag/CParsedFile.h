@@ -28,10 +28,10 @@ class CParsedFile {
     void generateDependencyMergePoints(XStr& output);
     void generateTrace();
     std::list<Entry*> nodeList;
+    TList<CEntry*> entryList;
   public:
     Chare *container;
     static XStr *className;
-    TList<CEntry*> entryList;
     TList<SdagConstruct *> connectEntryList;
     CParsedFile(Chare *c): container(c) {}
     ~CParsedFile(void){}
