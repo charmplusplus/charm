@@ -488,6 +488,39 @@ Module::print(XStr& str)
   }
 }
 
+void Module::check() {
+  if (clist)
+    clist->check();
+}
+
+void ConstructList::check() {
+  perElem(constructs, &Construct::check);
+}
+
+void Scope::check() {
+  if (contents_)
+    contents_->check();
+}
+
+void Entry::check() {
+  if (!external) {
+    if(isConstructor() && retType && !retType->isVoid())
+      die("Constructors cannot return a value",line);
+
+    if (!isConstructor() && !retType)
+      die("Non-constructor entry methods must specify a return type (probably void)", line);
+  }
+}
+
+void Chare::check() {
+  if (list)
+    list->check();
+}
+
+void MemberList::check() {
+  perElem(members, &Member::check);
+}
+
 void
 Module::generate()
 {
@@ -660,6 +693,12 @@ void
 ModuleList::generate()
 {
   perElem(modules, &Module::generate);
+}
+
+void
+ModuleList::check()
+{
+  perElem(modules, &Module::check);
 }
 
 void
@@ -4139,9 +4178,6 @@ void Entry::genDecls(XStr& str)
 {
   if (external)
     return;
-
-  if(isConstructor() && retType && !retType->isVoid())
-    die("Constructors cannot return a value",line);
 
   str << "/* DECLS: "; print(str); str << " */\n";
   if(retType==0 && !isConstructor())

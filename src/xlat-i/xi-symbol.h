@@ -108,6 +108,7 @@ class Construct : public Printable {
     virtual void genDefs(XStr& str) { (void)str; }
     virtual void genReg(XStr& str) { (void)str; }
     virtual void preprocess() { }
+    virtual void check() { }
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) { (void)str; return 0; }
@@ -125,6 +126,7 @@ class ConstructList : public Construct {
     void setExtern(int e);
     void setModule(Module *m);
     void print(XStr& str);
+    void check();
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
     void genDefs(XStr& str);
@@ -489,6 +491,7 @@ class Scope : public Construct {
         contents_->print(str);
         str << "} // namespace " << name_ << "\n";
     }
+    void check();
 
     // DMK - Accel Support
     virtual int genAccels_spe_c_funcBodies(XStr& str) {
@@ -663,6 +666,7 @@ class MemberList : public Printable {
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void preprocess();
+    void check();
 
     // DMK - Accel Support
     int genAccels_spe_c_funcBodies(XStr& str);
@@ -741,6 +745,7 @@ class Chare : public TEntity {
     void  setSdag(int f) { hasSdagEntry = f; }
     forWhom getForWhom(void) const {return forElement;}
     void print(XStr& str);
+    void check();
     void genDefs(XStr& str);
     void genReg(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
@@ -1033,6 +1038,7 @@ class Entry : public Member {
     int isReductionTarget(void) { return (attribs & SREDUCE); }
 
     void print(XStr& str);
+    void check();
     void genIndexDecls(XStr& str);
     void genPub(XStr& declstr, XStr& defstr, XStr& defconstr, int& connectPresent);
     void genDecls(XStr& str);
@@ -1107,6 +1113,7 @@ class Module : public Construct {
 	    if (clist!=NULL) clist->setModule(this);
     }
     void print(XStr& str);
+    void check();
     void generate();
     void setModule();
     void prependConstruct(Construct *c) { clist = new ConstructList(-1, c, clist); }
@@ -1140,6 +1147,7 @@ class ModuleList : public Printable {
 			       n->modules.begin(), n->modules.end());
 	}
     void print(XStr& str);
+    void check();
     void generate();
     void preprocess();
     void genDepends(std::string ciFileBaseName);

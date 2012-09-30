@@ -169,6 +169,7 @@ int main(int argc, char *argv[])
   ModuleList *m = Parse(openFile(fname)) ;
   if (!m) return 0;
   m->preprocess();
+  m->check();
   if (dependsMode)
   {
       std::string ciFileBaseName = fname;
