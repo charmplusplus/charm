@@ -2802,8 +2802,8 @@ Entry::Entry(int l, int a, Type *r, const char *n, ParamList *p, Value *sz, Sdag
   if(!isLocal() && p){
     p->checkParamList();
   }
-
 }
+
 void Entry::setChare(Chare *c) {
 	Member::setChare(c);
         // mainchare constructor parameter is not allowed
