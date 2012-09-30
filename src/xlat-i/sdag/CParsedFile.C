@@ -1,8 +1,10 @@
+#include <algorithm>
 #include "CParsedFile.h"
+
+using std::for_each;
 
 namespace xi {
 
-///////////////////////////// CPARSEDFILE //////////////////////
 /*void CParsedFile::print(int indent)
 {
   for(CEntry *ce=entryList.begin(); !entryList.end(); ce=entryList.next())
@@ -19,29 +21,55 @@ namespace xi {
 */
 XStr *CParsedFile::className = NULL;
 
-void CParsedFile::numberNodes(void)
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    if ((*cn)->sdagCon != 0) {
-      (*cn)->sdagCon->numberNodes();
-    }
-  }
-}
+  template <typename T>
+  struct SdagConCall {
+    void (SdagConstruct::*fn)(T);
+    T arg;
 
-void CParsedFile::labelNodes(void)
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    if ((*cn)->sdagCon != 0) {
-      (*cn)->sdagCon->labelNodes();
+    SdagConCall(void (SdagConstruct::*fn_)(T), const T& arg_) : fn(fn_), arg(arg_) { }
+    void operator()(Entry *e) {
+      if (e->sdagCon) {
+        (e->sdagCon->*fn)(arg);
+      }
     }
-  }
-}
+  };
 
-void CParsedFile::propagateState(void)
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    (*cn)->sdagCon->propagateState(0);
-  }
+  template <>
+  struct SdagConCall<void> {
+    void (SdagConstruct::*fn)();
+    SdagConCall(void (SdagConstruct::*fn_)()) : fn(fn_) { }
+    void operator()(Entry *e) {
+      if (e->sdagCon) {
+        (e->sdagCon->*fn)();
+      }
+    }
+  };
+
+void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
+  className = &classname;
+  decls << "#define " << classname << "_SDAG_CODE \n";
+
+  for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::numberNodes));
+  for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::labelNodes));
+  for_each(nodeList.begin(), nodeList.end(), SdagConCall<int>(&SdagConstruct::propagateState, 0));
+  generateConnectEntryList();
+  generateTrace();
+  generateEntryList();
+  mapCEntry();
+
+  generateCode(decls, defs);
+  generateEntries(decls, defs);
+  generateInitFunction(decls, defs);
+  generatePupFunction(decls);
+  generateRegisterEp(decls, defs);
+  generateTraceEp(decls, defs);
+
+#ifdef USE_CRITICAL_PATH_HEADER_ARRAY
+  generateDependencyMergePoints(decls); // for Isaac's Critical Path Detection
+#endif
+
+  decls.line_append_padding('\\');
+  decls << "\n";
 }
 
 void CParsedFile::mapCEntry(void)
