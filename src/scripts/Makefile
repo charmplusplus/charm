@@ -962,6 +962,9 @@ CEntry.o: CEntry.C $(XIHEADERS) $(SDAGHEADERS)
 CParsedFile.o: CParsedFile.C $(XIHEADERS) $(SDAGHEADERS)
 	$(NATIVECHARMC) -c $<
 
+xi-clean:
+	rm $(CHARMXIOBJ) $(SDAGOBJ)
+
 ###############################################################################
 #
 # Simple Messaging
