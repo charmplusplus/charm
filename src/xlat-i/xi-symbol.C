@@ -167,6 +167,35 @@ void perElemGen(list<T*> &l, A* arg_, void (U::*fn_)(A*))
     perElemGenC<T, U, A*>(l, arg_, fn_, NULL);
 }
 
+/**
+   Apply fn_ on each non-NULL element in the list l.
+   If between_ is passed, do that between each element.
+ */
+template<typename T, typename U>
+class perElemC
+{
+    void (U::*fn)();
+public:
+    perElemC(list<T*> &l,
+	       void (U::*fn_)())
+	: fn(fn_)
+	{
+	    for_each(l.begin(), l.end(), *this);
+	}
+    void operator()(T* m)
+	{
+	    if (m) {
+		(m->*fn)();
+	    }
+	}
+};
+
+template<typename T, typename U>
+void perElem(list<T*> &l, void (U::*fn_)())
+{
+    perElemC<T, U>(l, fn_);
+}
+
 void newLine(XStr &str)
 {
     str << endx;
@@ -630,15 +659,13 @@ ModuleList::print(XStr& str)
 void
 ModuleList::generate()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->generate();
+  perElem(modules, &Module::generate);
 }
 
 void
 ModuleList::preprocess()
 {
-    for (list<Module*>::iterator i = modules.begin(); i != modules.end(); ++i)
-	(*i)->preprocess();
+  perElem(modules, &Module::preprocess);
 }
 
 void
@@ -704,10 +731,7 @@ ConstructList::genReg(XStr& str)
 void
 ConstructList::preprocess()
 {
-    for (list<Construct*>::iterator i = constructs.begin(); 
-	 i != constructs.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(constructs, &Construct::preprocess);
 }
 
 XStr Chare::proxyName(int withTemplates)
@@ -2666,9 +2690,7 @@ void MemberList::genReg(XStr& str)
 
 void MemberList::preprocess()
 {
-    for (list<Member*>::iterator i = members.begin(); i != members.end(); ++i)
-	if (*i)
-	    (*i)->preprocess();
+  perElem(members, &Member::preprocess);
 }
 
 void MemberList::lookforCEntry(CEntry *centry)
