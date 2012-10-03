@@ -304,9 +304,9 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
    decls << "  }\n";
 }
 
-void SdagConstruct::generateConnectEntryList(TList<SdagConstruct*>& ConnectEList) {
+void SdagConstruct::generateConnectEntryList(std::list<SdagConstruct*>& ConnectEList) {
   if (type == SCONNECT)
-     ConnectEList.append(this);
+     ConnectEList.push_back(this);
   if (constructs != 0) {
     SdagConstruct *cn;
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {

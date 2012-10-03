@@ -1,7 +1,8 @@
-#include <algorithm>
 #include "CParsedFile.h"
+#include <algorithm>
 
 using std::for_each;
+using std::list;
 
 namespace xi {
 
@@ -105,10 +106,9 @@ void CParsedFile::generateCode(XStr& decls, XStr& defs)
 void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
   CEntry *en;
-  SdagConstruct *sc;
   decls << "public:\n";
-  for(sc=connectEntryList.begin(); !connectEntryList.end(); sc=connectEntryList.next())
-     sc->generateConnectEntries(decls);
+  for(list<SdagConstruct *>::iterator sc=connectEntryList.begin(); sc != connectEntryList.end(); ++sc)
+    (*sc)->generateConnectEntries(decls);
   for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
     en->generateCode(decls, defs);
   }

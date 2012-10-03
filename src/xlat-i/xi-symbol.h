@@ -1309,7 +1309,7 @@ public:
   SdagConstruct(EToken t, const char *entryStr, const char *codeStr, ParamList *pl);
   void numberNodes(void);
   void labelNodes(void);
-  void generateConnectEntryList(TList<SdagConstruct*>&);
+  void generateConnectEntryList(std::list<SdagConstruct*>&);
   void generateConnectEntries(XStr&);
   void generateEntryList(TList<CEntry*>&, SdagConstruct *);
   void propagateState(int);

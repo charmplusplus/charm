@@ -27,7 +27,7 @@ class CParsedFile {
     void generateDependencyMergePoints(XStr& output);
     std::list<Entry*> nodeList;
     TList<CEntry*> entryList;
-    TList<SdagConstruct *> connectEntryList;
+    std::list<SdagConstruct *> connectEntryList;
     Chare *container;
 
   public:
