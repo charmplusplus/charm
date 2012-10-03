@@ -5,6 +5,8 @@
 #include "sdag-globals.h"
 #include "CList.h"
 
+#include <list>
+
 namespace xi {
 
 class Entry;
@@ -23,7 +25,7 @@ class CEntry{
     int refNumNeeded;
     TList<CStateVar*> *myParameters;
     //TList<CParseNode*> whenList;
-    TList<SdagConstruct*> whenList;
+    std::list<SdagConstruct*> whenList;
     CEntry(XStr *e, ParamList *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
        myParameters = new TList<CStateVar*>();
        CStateVar *sv;

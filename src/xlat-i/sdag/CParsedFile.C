@@ -75,9 +75,8 @@ void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
 
 void CParsedFile::mapCEntry(void)
 {
-  CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    container->lookforCEntry(en);
+  for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en) {
+    container->lookforCEntry(*en);
   }
 }
 
@@ -105,12 +104,11 @@ void CParsedFile::generateCode(XStr& decls, XStr& defs)
 
 void CParsedFile::generateEntries(XStr& decls, XStr& defs)
 {
-  CEntry *en;
   decls << "public:\n";
   for(list<SdagConstruct *>::iterator sc=connectEntryList.begin(); sc != connectEntryList.end(); ++sc)
     (*sc)->generateConnectEntries(decls);
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateCode(decls, defs);
+  for(list<CEntry*>::iterator en = entryList.begin(); en != entryList.end(); ++en) {
+    (*en)->generateCode(decls, defs);
   }
 }
 
@@ -123,8 +121,8 @@ void CParsedFile::generateInitFunction(XStr& decls, XStr& defs)
   generateSignature(decls, defs, container, false, "void", &name, false, NULL);
   defs << "    __cDep = new CDep(" << numEntries << "," << numWhens << ");\n";
   CEntry *en;
-  for(en=entryList.begin(); !entryList.end(); en=entryList.next()) {
-    en->generateDeps(defs);
+  for(list<CEntry*>::iterator en=entryList.begin(); en != entryList.end(); ++en) {
+    (*en)->generateDeps(defs);
   }
   endMethod(defs);
 

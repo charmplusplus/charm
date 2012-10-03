@@ -5,6 +5,8 @@
 #include "CParsedFile.h"
 #include "EToken.h"
 #include "CStateVar.h"
+#include <list>
+using std::list;
 
 namespace xi {
 
@@ -184,7 +186,7 @@ void SdagConstruct::labelNodes(void)
   }
 }
 
-void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void EntryList::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
 {
    EntryList *el;
    el = this;
@@ -195,21 +197,21 @@ void EntryList::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thi
    }
 }
 
-void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void Entry::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
 {
    // case SENTRY:
-   CEntry *entry;
    bool found = false;
    
-   for(entry=CEntrylist.begin(); !CEntrylist.end(); entry=CEntrylist.next()) {
-     if(*(entry->entry) == (const char *)name) 
+   for(list<CEntry *>::iterator entry=CEntrylist.begin(); 
+       entry != CEntrylist.end(); ++entry) {
+     if(*((*entry)->entry) == (const char *)name) 
      {
         ParamList *epl;
-	epl = entry->paramlist;
+	epl = (*entry)->paramlist;
         ParamList *pl;
         pl = param;
         found = false;
-	if ((entry->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
+	if (((*entry)->paramlist->isVoid() == 1) && (pl->isVoid() == 1)) {
 	   found = true;
 	}
 	while ((pl != NULL) && (epl != NULL))
@@ -232,34 +234,33 @@ void Entry::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhe
           found = false;
 	if (found) {
           // check to see if thisWhen is already in entry's whenList
-          int whenFound = 0;
-          TList<SdagConstruct*> *tmpList = &(entry->whenList);
-          SdagConstruct *tmpNode;
-          for(tmpNode = tmpList->begin(); !tmpList->end(); tmpNode = tmpList->next()) {
-            if(tmpNode->nodeNum == thisWhen->nodeNum)
-               whenFound = 1;
+          bool whenFound = false;
+          for(list<SdagConstruct*>::iterator it = (*entry)->whenList.begin();
+              it != (*entry)->whenList.end(); ++it) {
+            if ((*it)->nodeNum == thisWhen->nodeNum)
+              whenFound = true;
           }
           if(!whenFound)
-            entry->whenList.append(thisWhen);
-          entryPtr = entry;
+            (*entry)->whenList.push_back(thisWhen);
+          entryPtr = *entry;
           if(intExpr != 0)
-            entry->refNumNeeded = 1; 
+            (*entry)->refNumNeeded = 1; 
 	 } 
      }
    }
    if(!found) {
      CEntry *newEntry;
      newEntry = new CEntry(new XStr(name), param, estateVars, paramIsMarshalled() );
-     CEntrylist.append(newEntry);
+     CEntrylist.push_back(newEntry);
      entryPtr = newEntry;
-     newEntry->whenList.append(thisWhen);
+     newEntry->whenList.push_back(thisWhen);
      if(intExpr != 0)
        newEntry->refNumNeeded = 1; 
    }
       //break;
 }
 
-void SdagConstruct::generateEntryList(TList<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void SdagConstruct::generateEntryList(std::list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
 {
   SdagConstruct *cn;
   switch(type) {

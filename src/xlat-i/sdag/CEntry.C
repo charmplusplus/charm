@@ -2,13 +2,14 @@
 #include "xi-symbol.h"
 #include "CStateVar.h"
 
+using std::list;
+
 namespace xi {
 
 void CEntry::generateDeps(XStr& op)
 {
-  SdagConstruct *cn;
-  for(cn=whenList.begin(); !whenList.end(); cn=whenList.next()) {
-    op << "    __cDep->addDepends("<<cn->nodeNum<<","<<entryNum<<");\n";
+  for(list<SdagConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
+    op << "    __cDep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
   }
 }
 
@@ -261,19 +262,19 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   SdagConstruct::generateEndExec(defs);
 #endif
 
-  if(whenList.length() == 1) {
+  if(whenList.size() == 1) {
     defs << "    {\n";
-    generateWhenCode(defs, whenList.begin());
+    generateWhenCode(defs, *whenList.begin());
     defs << "    }\n";
   }
   else {   
     defs << "    switch(tr->whenID) {\n";
-    for(SdagConstruct *cn=whenList.begin(); !whenList.end(); cn=whenList.next())
+    for(list<SdagConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn)
     {
-      defs << "      case " << cn->nodeNum << ":\n";
+      defs << "      case " << (*cn)->nodeNum << ":\n";
       defs << "      {\n";
       // This emits a `return;', so no `break' is needed
-      generateWhenCode(defs, cn);
+      generateWhenCode(defs, *cn);
       defs << "      }\n";
     }
     defs << "    }\n";

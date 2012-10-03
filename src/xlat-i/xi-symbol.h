@@ -1047,7 +1047,7 @@ class Entry : public Member {
     XStr genRegEp(bool isForRedn = false);
     void preprocess();
     char *getEntryName() { return name; }
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
@@ -1060,7 +1060,7 @@ class EntryList {
     EntryList *next;
     EntryList(Entry *e,EntryList *elist=NULL):
     	entry(e), next(elist) {}
-    void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
 };
 
 
@@ -1311,7 +1311,7 @@ public:
   void labelNodes(void);
   void generateConnectEntryList(std::list<SdagConstruct*>&);
   void generateConnectEntries(XStr&);
-  void generateEntryList(TList<CEntry*>&, SdagConstruct *);
+  void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
   void propagateState(int);
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
   void generateCode(XStr& decls, XStr& defs, Entry *entry);
