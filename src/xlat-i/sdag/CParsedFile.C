@@ -53,7 +53,7 @@ void CParsedFile::doProcess(XStr& classname, XStr& decls, XStr& defs) {
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::labelNodes));
   for_each(nodeList.begin(), nodeList.end(), SdagConCall<int>(&SdagConstruct::propagateState, 0));
   generateConnectEntryList();
-  generateTrace();
+  for_each(nodeList.begin(), nodeList.end(), SdagConCall<void>(&SdagConstruct::generateTrace));
   generateEntryList();
   mapCEntry();
 
@@ -164,15 +164,6 @@ void CParsedFile::generatePupFunction(XStr& decls)
   decls << "  void __sdag_pup(PUP::er& p) {\n";
   decls << "    if (__cDep) { __cDep->pup(p); }\n";
   decls << "  }\n";
-}
-
-void CParsedFile::generateTrace()
-{
-  for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    if ((*cn)->sdagCon != 0) {
-      (*cn)->sdagCon->generateTrace();
-    }
-  }
 }
 
 void CParsedFile::generateRegisterEp(XStr& decls, XStr& defs)

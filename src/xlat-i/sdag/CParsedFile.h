@@ -25,7 +25,6 @@ class CParsedFile {
     void generateTraceEp(XStr& decls, XStr& defs);
     void generateRegisterEp(XStr& decls, XStr& defs);
     void generateDependencyMergePoints(XStr& output);
-    void generateTrace();
     std::list<Entry*> nodeList;
     TList<CEntry*> entryList;
     TList<SdagConstruct *> connectEntryList;
