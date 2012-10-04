@@ -1272,7 +1272,7 @@ private:
   void generateForward(XStr& decls, XStr& defs, Entry* entry);
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
   void generateCall(XStr& defs, TList<CStateVar*>& args,
-                    const char* name, const char* nameSuffix = 0);
+                    const XStr* name, const char* nameSuffix = 0);
 
   void generateTraceBeginCall(XStr& defs);          // for trace
   void generateBeginTime(XStr& defs);               //for Event Bracket

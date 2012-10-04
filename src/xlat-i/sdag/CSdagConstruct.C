@@ -577,10 +577,10 @@ void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
     defs << "    { ";
-    generateCall(defs, *stateVarsChildren, cn->text->charstar());
+    generateCall(defs, *stateVarsChildren, cn->text);
     defs<<" }\n";
   }
-  generateCall(defs, *stateVarsChildren, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVarsChildren, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -743,9 +743,9 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   defs << "       ";
 
   if (constructs && !constructs->empty()) {
-    generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+    generateCall(defs, *stateVarsChildren, constructs->front()->label);
   } else {
-    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label, "_end");
   }
 
   el = elist;
@@ -822,7 +822,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
            defs<< "       int impl_arrstart=0;\n";
          defs <<"       int impl_off_"<<sv->name<<", impl_cnt_"<<sv->name<<";\n";
          defs <<"       impl_off_"<<sv->name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type<<"));\n";
-         defs <<"       impl_off+=(impl_cnt_"<<sv->name<<"=sizeof("<<sv->type<<")*("<<sv->arrayLength->charstar()<<"));\n";
+         defs <<"       impl_off+=(impl_cnt_"<<sv->name<<"=sizeof("<<sv->type<<")*("<<sv->arrayLength<<"));\n";
       }
     }
   }
@@ -903,7 +903,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SWHEN_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   
   el = elist;
   while (el) {
@@ -924,20 +924,20 @@ void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -957,10 +957,10 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #endif
   defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 
@@ -975,13 +975,13 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
   defs << "   " << con3->text << ";\n";
   defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
 #if CMK_BIGSIM_CHARM
   generateEventBracket(defs, SFOR_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -996,13 +996,13 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
 #endif
   defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    } else {\n";
   defs << "      ";
   if (con2 != 0) {
-    generateCall(defs, *stateVarsChildren, con2->label->charstar());
+    generateCall(defs, *stateVarsChildren, con2->label);
   } else {
-    generateCall(defs, *stateVarsChildren, label->charstar(), "_end");
+    generateCall(defs, *stateVarsChildren, label, "_end");
   }
   defs << "    }\n";
   endMethod(defs);
@@ -1015,7 +1015,7 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs,SIF_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1027,7 +1027,7 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
   generateBeginTime(defs);
   generateEventBracket(defs, SELSE);
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   // trace
@@ -1039,7 +1039,7 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs,SELSE_END);
 #endif
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1059,7 +1059,7 @@ void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
         "=__first;" << con1->text <<
         "<=__last;" << con1->text << "+=__stride) {\n";
   defs << "      ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   defs << "    }\n";
   endMethod(defs);
 
@@ -1068,7 +1068,7 @@ void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
   defs << "    if (" << counter << "->isDone()) {\n";
   defs << "      delete " << counter << ";\n";
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -1082,7 +1082,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   for(cn=constructs->begin(); 
                      !constructs->end(); cn=constructs->next()) {
     defs << "    ";
-    generateCall(defs, *stateVarsChildren, cn->label->charstar());
+    generateCall(defs, *stateVarsChildren, cn->label);
   }
   endMethod(defs);
 
@@ -1119,7 +1119,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   defs << "      ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
   endMethod(defs);
 }
@@ -1133,7 +1133,7 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SOVERLAP);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   // trace
@@ -1145,7 +1145,7 @@ void SdagConstruct::generateOverlap(XStr& decls, XStr& defs, Entry* entry)
   generateEventBracket(defs, SOVERLAP_END);
 #endif
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1153,12 +1153,12 @@ void SdagConstruct::generateSlist(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1186,7 +1186,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
     generateTraceEndCall(defs);
 
   defs << "    ";
-  generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
+  generateCall(defs, *stateVarsChildren, constructs->front()->label);
 
 #if CMK_BIGSIM_CHARM
   generateTlineEndCall(defs);
@@ -1226,7 +1226,7 @@ void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
 #endif
 
   defs << "    ";
-  generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
+  generateCall(defs, *stateVars, next->label, nextBeginOrEnd ? 0 : "_end");
   endMethod(defs);
 }
 
@@ -1298,7 +1298,7 @@ void endMethod(XStr& op)
 }
 
 void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
-                                 const char* name, const char* nameSuffix) {
+                                 const XStr* name, const char* nameSuffix) {
   op << name << (nameSuffix ? nameSuffix : "") << "(";
 
   CStateVar *sv;
