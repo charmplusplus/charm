@@ -13,87 +13,6 @@ void CEntry::generateDeps(XStr& op)
   }
 }
 
-static void generateWhenCode(XStr& op, SdagConstruct *cn)
-{
-  XStr whenParams = "";
-  CStateVar *sv = cn->stateVars->begin();
-  int i = 0;
-  int iArgs = 0;
-  bool lastWasVoid = false;
-  bool paramMarshalling = false;
-
-#if CMK_BIGSIM_CHARM
-  // bgLog2 stores the parent dependence of when, e.g. for, olist
-  op <<"  cmsgbuf->bgLog2 = (void*)tr->args[1];\n";
-#endif
-
-  for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-    if ((sv->isMsg == 0) && (paramMarshalling == 0) && (sv->isVoid ==0)){
-      paramMarshalling =1;
-      op << "        CkMarshallMsg *impl_msg" <<cn->nodeNum <<" = (CkMarshallMsg *) tr->args["<<iArgs++<<"];\n";
-      op << "        char *impl_buf" <<cn->nodeNum <<"=((CkMarshallMsg *)impl_msg" <<cn->nodeNum <<")->msgBuf;\n";
-      op << "        PUP::fromMem implP" <<cn->nodeNum <<"(impl_buf" <<cn->nodeNum <<");\n";
-    }
-    if (sv->isMsg == 1) {
-      if((i!=0) && (lastWasVoid == 0))
-        whenParams.append(", ");
-#if CMK_BIGSIM_CHARM
-      if(i==1) {
-        whenParams.append(" NULL ");
-        lastWasVoid=0;
-        // skip this arg which is supposed to be _bgParentLog
-        iArgs++;
-        continue;
-      }
-#endif
-      whenParams.append("(");
-      whenParams.append(sv->type->charstar());
-      whenParams.append(") tr->args[");
-      whenParams<<iArgs;
-      whenParams.append("]");
-      iArgs++;
-    }
-    else if (sv->isVoid == 1)
-      // op <<"    CkFreeSysMsg((void  *)tr->args[" <<iArgs++ <<"]);\n";
-      op <<"        tr->args[" <<iArgs++ <<"] = 0;\n";
-    else if ((sv->isMsg == 0) && (sv->isVoid == 0)) {
-      if((i > 0) && (lastWasVoid == 0))
-        whenParams.append(", ");
-      whenParams.append(*(sv->name));
-      if (sv->arrayLength != 0)
-        op << "        int impl_off" << cn->nodeNum << "_" << sv->name << "; implP"
-          <<cn->nodeNum << "|impl_off" <<cn->nodeNum  << "_" << sv->name << ";\n";
-      else
-        op << "        " << sv->type << " " << sv->name << "; implP"
-          <<cn->nodeNum << "|" << sv->name << ";\n";
-    }
-    lastWasVoid = sv->isVoid;
-  }
-  if (paramMarshalling == 1)
-    op << "        impl_buf"<<cn->nodeNum << "+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
-  i = 0;
-  sv = (CStateVar *)cn->stateVars->begin();
-  for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
-    if (sv->arrayLength != 0)
-      op << "        " << sv->type << " *" << sv->name << "=(" << sv->type << " *)(impl_buf" <<cn->nodeNum
-        << "+impl_off" <<cn->nodeNum << "_" << sv->name << ");\n";
-  }
-  if (paramMarshalling == 1)
-    op << "        delete (CkMarshallMsg *)impl_msg" <<cn->nodeNum <<";\n";
-  op << "        " << cn->label << "(" << whenParams;
-  op << ");\n";
-  op << "        delete tr;\n";
-
-#if CMK_BIGSIM_CHARM
-  cn->generateTlineEndCall(op);
-  cn->generateBeginExec(op, "sdagholder");
-#endif
-  op << "    ";
-  cn->generateDummyBeginExecute(op);
-
-  op << "        return;\n";
-}
-
 void CEntry::generateCode(XStr& decls, XStr& defs)
 {
   CStateVar *sv;
@@ -269,7 +188,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 
   if(whenList.size() == 1) {
     defs << "    {\n";
-    generateWhenCode(defs, *whenList.begin());
+    (*whenList.begin())->generateWhenCode(defs);
     defs << "    }\n";
   }
   else {   
@@ -279,7 +198,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
       defs << "      case " << (*cn)->nodeNum << ":\n";
       defs << "      {\n";
       // This emits a `return;', so no `break' is needed
-      generateWhenCode(defs, *cn);
+      (*cn)->generateWhenCode(defs);
       defs << "      }\n";
     }
     defs << "    }\n";

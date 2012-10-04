@@ -1278,6 +1278,10 @@ private:
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
+  TList<SdagConstruct *> *constructs;
+  TList<SdagConstruct *> *publishesList;
+  TList<CStateVar *> *stateVars;
+  TList<CStateVar *> *stateVarsChildren;
 public:
   int nodeNum;
   XStr *label;
@@ -1285,10 +1289,6 @@ public:
   EToken type;
   char nameStr[128];
   XStr *traceName;	
-  TList<SdagConstruct *> *constructs;
-  TList<SdagConstruct *> *publishesList;
-  TList<CStateVar *> *stateVars;
-  TList<CStateVar *> *stateVarsChildren;
   SdagConstruct *next;
   ParamList *param;
   XStr *text;
@@ -1324,6 +1324,7 @@ public:
   void propagateState(int);
   void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
   void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  void generateWhenCode(XStr& op);
   void setNext(SdagConstruct *, int);
 
   // for trace
