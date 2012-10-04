@@ -1056,7 +1056,7 @@ class Entry : public Member {
     XStr genRegEp(bool isForRedn = false);
     void preprocess();
     char *getEntryName() { return name; }
-    void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
     void collectSdagCode(CParsedFile *pf, int& sdagPresent);
     void propagateState(int);
     void lookforCEntry(CEntry *centry);
@@ -1069,7 +1069,7 @@ class EntryList {
     EntryList *next;
     EntryList(Entry *e,EntryList *elist=NULL):
     	entry(e), next(elist) {}
-    void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
+    void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
 };
 
 
@@ -1258,7 +1258,6 @@ public:
 /******************* Structured Dagger Constructs ***************/
 class SdagConstruct { 
 private:
-  void generateWhen(XStr& decls, XStr& defs, Entry* entry);
   void generateOverlap(XStr& decls, XStr& defs, Entry* entry);
   void generateWhile(XStr& decls, XStr& defs, Entry* entry);
   void generateFor(XStr& decls, XStr& defs, Entry* entry);
@@ -1271,6 +1270,8 @@ private:
   void generateAtomic(XStr& decls, XStr& defs, Entry* entry);
   void generateForward(XStr& decls, XStr& defs, Entry* entry);
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
+
+protected:
   void generateCall(XStr& defs, TList<CStateVar*>& args,
                     const XStr* name, const char* nameSuffix = 0);
 
@@ -1278,10 +1279,14 @@ private:
   void generateBeginTime(XStr& defs);               //for Event Bracket
   void generateEventBracket(XStr& defs, int eventType);     //for Event Bracket
   void generateListEventBracket(XStr& defs, int eventType);
+  void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
+  void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
+  void propagateStateToChildren(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
   TList<SdagConstruct *> *constructs;
   TList<SdagConstruct *> *publishesList;
   TList<CStateVar *> *stateVars;
   TList<CStateVar *> *stateVarsChildren;
+
 public:
   int nodeNum;
   XStr *label;
@@ -1320,10 +1325,10 @@ public:
   void labelNodes(void);
   void generateConnectEntryList(std::list<SdagConstruct*>&);
   void generateConnectEntries(XStr&);
-  void generateEntryList(std::list<CEntry*>&, SdagConstruct *);
+  virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
-  void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  virtual void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
+  virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
   void generateWhenCode(XStr& op);
   void setNext(SdagConstruct *, int);
 
@@ -1337,7 +1342,16 @@ public:
   static void generateEndExec(XStr& defs);
   static void generateEndSeq(XStr& defs);
   static void generateDummyBeginExecute(XStr& defs);
+};
 
+class WhenConstruct : public SdagConstruct {
+public:
+  void generateCode(XStr& decls, XStr& defs, Entry *entry);
+  WhenConstruct(EntryList *el, SdagConstruct *body)
+    : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
+  { }
+  void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
+  void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
 };
 
 SdagConstruct *buildAtomic(const char* code,

@@ -186,7 +186,7 @@ void SdagConstruct::labelNodes(void)
   }
 }
 
-void EntryList::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void EntryList::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
    EntryList *el;
    el = this;
@@ -197,7 +197,7 @@ void EntryList::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *this
    }
 }
 
-void Entry::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void Entry::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
    // case SENTRY:
    bool found = false;
@@ -235,7 +235,7 @@ void Entry::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen
 	if (found) {
           // check to see if thisWhen is already in entry's whenList
           bool whenFound = false;
-          for(list<SdagConstruct*>::iterator it = (*entry)->whenList.begin();
+          for(list<WhenConstruct*>::iterator it = (*entry)->whenList.begin();
               it != (*entry)->whenList.end(); ++it) {
             if ((*it)->nodeNum == thisWhen->nodeNum)
               whenFound = true;
@@ -260,25 +260,30 @@ void Entry::generateEntryList(list<CEntry*>& CEntrylist, SdagConstruct *thisWhen
       //break;
 }
 
-void SdagConstruct::generateEntryList(std::list<CEntry*>& CEntrylist, SdagConstruct *thisWhen)
+void SdagConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
 {
-  SdagConstruct *cn;
-  switch(type) {
-    case SWHEN:
-      elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
-      break;
-    case SIF:
-	/* con2 is the ELSE corresponding to this IF */
-      if(con2!=0) con2->generateEntryList(CEntrylist, thisWhen); 
-      break;
-  }
+  if (SIF == type && con2 != 0)
+    con2->generateEntryList(CEntrylist, thisWhen);
+  generateChildrenEntryList(CEntrylist, thisWhen);
+}
+
+void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *thisWhen)
+{
+  elist->generateEntryList(CEntrylist, this);  /* con1 is the WHEN's ELIST */
+  generateChildrenEntryList(CEntrylist, thisWhen);
+}
+
+void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist,
+                                              WhenConstruct *thisWhen) {
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+    for(SdagConstruct *cn = constructs->begin();
+        !constructs->end();
+        cn = constructs->next()) {
       cn->generateEntryList(CEntrylist,thisWhen);
     }
   }
 }
- 
+
 void SdagConstruct::generateConnectEntries(XStr& decls) {
    decls << "  void " <<connectEntry << "(";
    ParamList *pl = param;
@@ -358,7 +363,6 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   delete whensEntryMethodStateVars;
 }
 
-
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
@@ -379,43 +383,6 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
         counter = new XStr(txt);
         sv = new CStateVar(0, "CCounter *", 0, txt, 0, NULL, 1);
         stateVarsChildren->append(sv);
-      }
-      break;
-    case SWHEN:
-      whensEntryMethodStateVars = new TList<CStateVar*>();
-      stateVarsChildren = new TList<CStateVar*>();
-      for(sv=list.begin(); !list.end(); sv=list.next()) {
-        stateVars->append(sv);
-        stateVarsChildren->append(sv);
-      }
-     
-      {  
-        EntryList *el;
-	el = elist;
-        ParamList *pl;
-	while (el != NULL) {
-          pl = el->entry->param;
-	  el->entry->stateVars = new TList<CStateVar*>();
-          if (pl->isVoid()) {
-            sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
-            //stateVars->append(sv);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
-              el->entry->addEStateVar(sv);
-          }
-          else {
-            while(pl != NULL) {
-              sv = new CStateVar(pl);
-              stateVarsChildren->append(sv);
-              whensEntryMethodStateVars->append(sv); 
-              el->entry->addEStateVar(sv);
-
-              pl = pl->next;
-	    }
-	  }
-	  el = el->next;
-
-	}
       }
       break;
     case SIF:
@@ -485,16 +452,59 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       exit(1);
       break;
   }
+
+  propagateStateToChildren(*stateVarsChildren, wlist, publist,  uniqueVarNum);
+  delete whensEntryMethodStateVars;
+}
+
+void WhenConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum) {
+  CStateVar *sv;
+  TList<CStateVar*> whensEntryMethodStateVars;
+  stateVars = new TList<CStateVar*>();
+  stateVarsChildren = new TList<CStateVar*>();
+
+  for(sv=list.begin(); !list.end(); sv=list.next()) {
+    stateVars->append(sv);
+    stateVarsChildren->append(sv);
+  }
+
+  EntryList *el;
+  el = elist;
+  ParamList *pl;
+  while (el != NULL) {
+    pl = el->entry->param;
+    el->entry->stateVars = new TList<CStateVar*>();
+    if (pl->isVoid()) {
+      sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
+      //stateVars->append(sv);
+      stateVarsChildren->append(sv);
+      whensEntryMethodStateVars.append(sv);
+      el->entry->addEStateVar(sv);
+    }
+    else {
+      while(pl != NULL) {
+        sv = new CStateVar(pl);
+        stateVarsChildren->append(sv);
+        whensEntryMethodStateVars.append(sv);
+        el->entry->addEStateVar(sv);
+
+        pl = pl->next;
+      }
+    }
+    el = el->next;
+
+  }
+
+  propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist,  uniqueVarNum);
+}
+
+void SdagConstruct::propagateStateToChildren(TList<CStateVar*>& stateVarsChildren, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum) {
   SdagConstruct *cn;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      if (type == SWHEN)
-         cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars, publist,  uniqueVarNum);
-      else
-         cn->propagateState(*stateVarsChildren, wlist, publist,  uniqueVarNum);
+      cn->propagateState(stateVarsChildren, wlist, publist, uniqueVarNum);
     }
   }
-  delete whensEntryMethodStateVars;
 }
 
 void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
@@ -532,9 +542,6 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     case SOVERLAP:
       generateOverlap(decls, defs, entry);
       break;
-    case SWHEN:
-      generateWhen(decls, defs, entry);
-      break;
     case SFORWARD:
       generateForward(decls, defs, entry);
       break;
@@ -544,6 +551,10 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
     default:
       break;
   }
+  generateChildrenCode(decls, defs, entry);
+}
+
+void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
   SdagConstruct *cn;
   if (constructs != 0) {
     for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
@@ -669,7 +680,7 @@ void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
 }
 
 
-void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
+void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 {
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   generateSignature(decls, defs, entry, false, "int", label, false, stateVars);
@@ -1001,6 +1012,8 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   }
 
   endMethod(defs);
+
+  generateChildrenCode(decls, defs, entry);
 }
 
 void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)

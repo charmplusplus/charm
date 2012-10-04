@@ -1057,11 +1057,11 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}
 		| WHEN SEntryList '{' '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  $2); }
+		{ $$ = new WhenConstruct($2, 0); }
 		| WHEN SEntryList SingleConstruct
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $3, $2); }
+		{ $$ = new WhenConstruct($2, $3); }
 		| WHEN SEntryList '{' Slist '}'
-		{ $$ = new SdagConstruct(SWHEN, 0, 0, 0,0,0, $4, $2); }
+		{ $$ = new WhenConstruct($2, $4); }
 		| OVERLAP '{' Olist '}'
 		{ $$ = new SdagConstruct(SOVERLAP,0, 0,0,0,0,$3, 0); }	
 		| FOR StartIntExpr CCode ';' CCode ';' CCode  EndIntExpr '{' Slist '}'

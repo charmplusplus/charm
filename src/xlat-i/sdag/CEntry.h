@@ -10,6 +10,7 @@ namespace xi {
 
 class Entry;
 class SdagConstruct;
+class WhenConstruct;
 class ParamList;
 class CStateVar;
 
@@ -24,7 +25,7 @@ public:
     int entryNum;
     int needsParamMarshalling;
     int refNumNeeded;
-    std::list<SdagConstruct*> whenList;
+    std::list<WhenConstruct*> whenList;
     CEntry(XStr *e, ParamList *p, const std::list<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
        CStateVar *sv;
        myParameters = list;

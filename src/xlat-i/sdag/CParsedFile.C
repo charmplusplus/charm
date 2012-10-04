@@ -83,7 +83,7 @@ void CParsedFile::mapCEntry(void)
 void CParsedFile::generateEntryList(void)
 {
   for(std::list<Entry*>::iterator cn = nodeList.begin(); cn != nodeList.end(); ++cn) {
-    (*cn)->sdagCon->generateEntryList(entryList, (SdagConstruct*)0);
+    (*cn)->sdagCon->generateEntryList(entryList, NULL);
   }
 }
 

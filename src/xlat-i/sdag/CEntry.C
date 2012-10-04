@@ -8,7 +8,7 @@ namespace xi {
 
 void CEntry::generateDeps(XStr& op)
 {
-  for(list<SdagConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
+  for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn) {
     op << "    __cDep->addDepends(" << (*cn)->nodeNum << "," << entryNum << ");\n";
   }
 }
@@ -193,7 +193,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   }
   else {   
     defs << "    switch(tr->whenID) {\n";
-    for(list<SdagConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn)
+    for(list<WhenConstruct*>::iterator cn = whenList.begin(); cn != whenList.end(); ++cn)
     {
       defs << "      case " << (*cn)->nodeNum << ":\n";
       defs << "      {\n";

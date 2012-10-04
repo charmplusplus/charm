@@ -4224,21 +4224,21 @@ yyreduce:
 
 /* Line 1455 of yacc.c  */
 #line 1060 "xi-grammar.y"
-    { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, 0,  (yyvsp[(2) - (4)].entrylist)); }
+    { (yyval.sc) = new WhenConstruct((yyvsp[(2) - (4)].entrylist), 0); }
     break;
 
   case 274:
 
 /* Line 1455 of yacc.c  */
 #line 1062 "xi-grammar.y"
-    { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(3) - (3)].sc), (yyvsp[(2) - (3)].entrylist)); }
+    { (yyval.sc) = new WhenConstruct((yyvsp[(2) - (3)].entrylist), (yyvsp[(3) - (3)].sc)); }
     break;
 
   case 275:
 
 /* Line 1455 of yacc.c  */
 #line 1064 "xi-grammar.y"
-    { (yyval.sc) = new SdagConstruct(SWHEN, 0, 0, 0,0,0, (yyvsp[(4) - (5)].sc), (yyvsp[(2) - (5)].entrylist)); }
+    { (yyval.sc) = new WhenConstruct((yyvsp[(2) - (5)].entrylist), (yyvsp[(4) - (5)].sc)); }
     break;
 
   case 276:
