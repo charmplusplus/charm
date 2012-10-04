@@ -400,16 +400,14 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
             //stateVars->append(sv);
               stateVarsChildren->append(sv);
               whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
+              el->entry->addEStateVar(sv);
           }
           else {
             while(pl != NULL) {
               sv = new CStateVar(pl);
               stateVarsChildren->append(sv);
               whensEntryMethodStateVars->append(sv); 
- 	      el->entry->estateVars.append(sv);
- 	      el->entry->stateVars->append(sv);
+              el->entry->addEStateVar(sv);
 
               pl = pl->next;
 	    }

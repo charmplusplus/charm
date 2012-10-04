@@ -3,7 +3,6 @@
 
 #include "xi-util.h"
 #include "sdag-globals.h"
-#include "CList.h"
 
 #include <list>
 
@@ -26,11 +25,9 @@ public:
     int needsParamMarshalling;
     int refNumNeeded;
     std::list<SdagConstruct*> whenList;
-    CEntry(XStr *e, ParamList *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
+    CEntry(XStr *e, ParamList *p, const std::list<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
        CStateVar *sv;
-       for(sv=list.begin(); !list.end(); sv=list.next()) {
-	  myParameters.push_back(sv);
-       }
+       myParameters = list;
        entryNum = numEntries++;
        refNumNeeded =0;
        decl_entry = NULL;

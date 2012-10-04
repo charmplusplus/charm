@@ -976,6 +976,7 @@ class Entry : public Member {
     XStr syncReturn(void);
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
+    std::list<CStateVar *> estateVars;
   public:
     XStr *label;
     char *name;
@@ -985,13 +986,17 @@ class Entry : public Member {
     SdagConstruct *sdagCon;
     TList<CStateVar *> *stateVars;
     TList<CStateVar *> *stateVarsChildren;
-    TList<CStateVar *> estateVars;
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
     ParamList *connectParam;
     int isConnect;
     int isWhenEntry;
+
+    void addEStateVar(CStateVar *sv) {
+      estateVars.push_back(sv);
+      stateVars->append(sv);
+    }
 
     // DMK - Accel Support
     ParamList* accelParam;
