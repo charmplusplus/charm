@@ -22,11 +22,11 @@ class CParsedFile;
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Entry* entry, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
-                              TList<CStateVar*>* params);
+                              std::list<CStateVar*>* params);
 extern void generateSignature(XStr& decls, XStr& defs,
                               const Chare* chare, bool declareStatic,
                               const char* returnType, const XStr* name, bool isEnd,
-                              TList<CStateVar*>* params);
+                              std::list<CStateVar*>* params);
 extern void endMethod(XStr& op);
 
 class CStateVar;
@@ -1272,7 +1272,7 @@ private:
   void generateConnect(XStr& decls, XStr& defs, Entry* entry);
 
 protected:
-  void generateCall(XStr& defs, TList<CStateVar*>& args,
+  void generateCall(XStr& defs, std::list<CStateVar*>& args,
                     const XStr* name, const char* nameSuffix = 0);
 
   void generateTraceBeginCall(XStr& defs);          // for trace
@@ -1281,11 +1281,11 @@ protected:
   void generateListEventBracket(XStr& defs, int eventType);
   void generateChildrenCode(XStr& decls, XStr& defs, Entry* entry);
   void generateChildrenEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateStateToChildren(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
+  void propagateStateToChildren(std::list<CStateVar*>&, std::list<CStateVar*>&, TList<SdagConstruct*>&, int);
   TList<SdagConstruct *> *constructs;
   TList<SdagConstruct *> *publishesList;
-  TList<CStateVar *> *stateVars;
-  TList<CStateVar *> *stateVarsChildren;
+  std::list<CStateVar *> *stateVars;
+  std::list<CStateVar *> *stateVarsChildren;
 
 public:
   int nodeNum;
@@ -1327,7 +1327,7 @@ public:
   void generateConnectEntries(XStr&);
   virtual void generateEntryList(std::list<CEntry*>&, WhenConstruct *);
   void propagateState(int);
-  virtual void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
+  virtual void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, TList<SdagConstruct*>&, int);
   virtual void generateCode(XStr& decls, XStr& defs, Entry *entry);
   void generateWhenCode(XStr& op);
   void setNext(SdagConstruct *, int);
@@ -1351,7 +1351,7 @@ public:
     : SdagConstruct(SWHEN, 0, 0, 0,0,0, body, el)
   { }
   void generateEntryList(std::list<CEntry*>& CEntrylist, WhenConstruct *thisWhen);
-  void propagateState(TList<CStateVar*>&, TList<CStateVar*>&, TList<SdagConstruct*>&, int);
+  void propagateState(std::list<CStateVar*>&, std::list<CStateVar*>&, TList<SdagConstruct*>&, int);
 };
 
 SdagConstruct *buildAtomic(const char* code,
