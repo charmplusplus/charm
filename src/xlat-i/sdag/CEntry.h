@@ -15,7 +15,9 @@ class ParamList;
 class CStateVar;
 
 class CEntry{
-  public:
+  std::list<CStateVar*> myParameters;
+
+public:
     XStr *entry;
     Entry *decl_entry;			// point to the real Entry of the Chare
     //CParseNode *paramlist;
@@ -23,14 +25,11 @@ class CEntry{
     int entryNum;
     int needsParamMarshalling;
     int refNumNeeded;
-    TList<CStateVar*> *myParameters;
-    //TList<CParseNode*> whenList;
     std::list<SdagConstruct*> whenList;
     CEntry(XStr *e, ParamList *p, TList<CStateVar*>& list, int pm) : entry(e), paramlist(p), needsParamMarshalling(pm) {
-       myParameters = new TList<CStateVar*>();
        CStateVar *sv;
        for(sv=list.begin(); !list.end(); sv=list.next()) {
-	  myParameters->append(sv);
+	  myParameters.push_back(sv);
        }
        entryNum = numEntries++;
        refNumNeeded =0;

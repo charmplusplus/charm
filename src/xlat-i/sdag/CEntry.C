@@ -100,7 +100,6 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   int i;
   int isVoid = 1;
   int lastWasVoid;
-  sv = (CStateVar *)myParameters->begin();
   i = 0;
   decls << "  void ";
 
@@ -109,7 +108,9 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 
   XStr signature;
   signature <<  *entry << "(";
-  for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
+  for(list<CStateVar*>::iterator it = myParameters.begin();
+      it != myParameters.end(); ++it, ++i) {
+    sv = *it;
     isVoid = sv->isVoid;
     if ((sv->isMsg != 1) && (sv->isVoid != 1)) {
        if (i >0)
@@ -153,14 +154,15 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
   int hasArrays = 0;
   int paramMarshalling = 0;
   int count = 0;
-  sv = (CStateVar *)myParameters->begin();
   i = 0;
   if (isVoid == 1) {
      defs << "    __cDep->bufferMessage("<<entryNum<<", (void *) CkAllocSysMsg(), (void*) _bgParentLog, 0);\n";
      defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
   }
   else {
-     for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
+     for(list<CStateVar*>::iterator it = myParameters.begin();
+         it != myParameters.end(); ++it, ++i) {
+       sv = *it;
         if ((i==0) && (sv->isMsg !=1)) {
            defs <<"    int impl_off=0; int impl_arrstart=0;\n";
   	   paramMarshalling = 1;
@@ -190,10 +192,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
    if (paramMarshalling == 1) {
      defs <<"    {\n";
      defs <<"      PUP::sizer implP1;\n";
-     sv = (CStateVar *)myParameters->begin();
      i = 0;
  
-     for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
+     for(list<CStateVar*>::iterator it = myParameters.begin();
+         it != myParameters.end(); ++it, ++i) {
+       sv = *it;
         if(sv->arrayLength != 0)
            defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
@@ -217,10 +220,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
      //Second pass: write the data
      defs <<"    {\n";
      defs <<"      PUP::toMem implP1((void *)impl_msg1->msgBuf);\n";
-     sv = (CStateVar *)myParameters->begin();
      i = 0;
  
-     for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
+     for(list<CStateVar*>::iterator it = myParameters.begin();
+         it != myParameters.end(); ++it, ++i) {
+       sv = *it;
         if(sv->arrayLength != 0)
            defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
         else if(sv->byRef != 0)
@@ -232,9 +236,10 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
      if (hasArrays > 0)
      { //Marshall each array
        defs <<"    char *impl_buf1=impl_msg1->msgBuf+impl_arrstart;\n";
-       sv = (CStateVar *)myParameters->begin();
        i = 0;
-       for(; i<(myParameters->length());i++, sv=(CStateVar *)myParameters->next()) {
+     for(list<CStateVar*>::iterator it = myParameters.begin();
+         it != myParameters.end(); ++it, ++i) {
+       sv = *it;
          if(sv->arrayLength != 0) {
            defs <<"    memcpy(impl_buf1+impl_off_"<<sv->name->charstar()<<","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
 	 }
@@ -245,7 +250,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
      // that need marshalling (in other words the parameters of the
      // entry method are not messages) then the first parameter of the
      // entry method is an integer that specifies the reference number
-     const char* refNumArg = refNumNeeded ? myParameters->begin()->name->charstar() : "0";
+     const char* refNumArg = refNumNeeded ? (*myParameters.begin())->name->charstar() : "0";
 
      defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum
         << ", (void *) impl_msg1, (void*) _bgParentLog, "
