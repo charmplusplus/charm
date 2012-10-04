@@ -976,7 +976,12 @@ class Entry : public Member {
     XStr syncReturn(void);
     XStr marshallMsg(void);
     XStr callThread(const XStr &procName,int prependEntryName=0);
+
+    // SDAG support
     std::list<CStateVar *> estateVars;
+    TList<CStateVar *> *stateVarsChildren;
+
+
   public:
     XStr *label;
     char *name;
@@ -985,7 +990,6 @@ class Entry : public Member {
     // SDAG support
     SdagConstruct *sdagCon;
     TList<CStateVar *> *stateVars;
-    TList<CStateVar *> *stateVarsChildren;
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
