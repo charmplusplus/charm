@@ -355,13 +355,14 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
      cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars , *publishesList, uniqueVarNum);
   }
+  delete whensEntryMethodStateVars;
 }
 
 
 void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
-  TList<CStateVar*> *whensEntryMethodStateVars; 
+  TList<CStateVar*> *whensEntryMethodStateVars = NULL;
   stateVars = new TList<CStateVar*>();
   switch(type) {
     case SFORALL:
@@ -492,7 +493,8 @@ void SdagConstruct::propagateState(TList<CStateVar*>& list, TList<CStateVar*>& w
       else
          cn->propagateState(*stateVarsChildren, wlist, publist,  uniqueVarNum);
     }
- } 
+  }
+  delete whensEntryMethodStateVars;
 }
 
 void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
