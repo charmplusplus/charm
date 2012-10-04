@@ -280,7 +280,7 @@ void SdagConstruct::generateEntryList(std::list<CEntry*>& CEntrylist, SdagConstr
 }
  
 void SdagConstruct::generateConnectEntries(XStr& decls) {
-   decls << "  void " <<connectEntry->charstar() << "(";
+   decls << "  void " <<connectEntry << "(";
    ParamList *pl = param;
    XStr msgParams;
    if (pl->isVoid() == 1) {
@@ -290,7 +290,7 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
      decls << pl->getBaseName() <<" *" <<pl->getGivenName();
    }
    else {
-    decls << "CkMarshallMsg *" /*<< connectEntry->charstar()*/ <<"_msg";
+    decls << "CkMarshallMsg *" /*<< connectEntry*/ <<"_msg";
    }
    decls << ") {\n";
 
@@ -299,8 +299,8 @@ void SdagConstruct::generateConnectEntries(XStr& decls) {
     param->beginUnmarshall(msgParams);
    }
 
-   decls << msgParams.charstar() <<"\n"; 
-   decls << "  " <<text->charstar() <<"\n";
+   decls << msgParams <<"\n";
+   decls << "  " <<text <<"\n";
 
    decls << "  }\n";
 }
@@ -555,19 +555,19 @@ void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
   defs << "    int index;\n";
   if ((param->isVoid() == 0) && (param->isMessage() == 0)) {
      defs << "    CkMarshallMsg *x;\n";
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else if (param->isVoid() == 1) {
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(void);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(void);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
   else {
      defs << "    " << param->getBaseName() <<" *x;\n";  // replace
-     defs << "    index = CkIndex_Ar1::" <<connectEntry->charstar() <<"(x);\n";  //replace
+     defs << "    index = CkIndex_Ar1::" <<connectEntry <<"(x);\n";  //replace
      defs << "    CkCallback cb(index, CkArrayIndex1D(thisIndex), a1);\n";  // replace
   }
-  defs << "    myPublish->get_" <<connectEntry->charstar() <<"(cb);\n";  //replace - myPublish
+  defs << "    myPublish->get_" <<connectEntry <<"(cb);\n";  //replace - myPublish
 
   endMethod(defs);
 }
@@ -610,9 +610,9 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
     }
     else {
         for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
-          defs << "    CMsgBuffer *"<<sv->name->charstar()<<"_buf;\n";
-          defs << "    " << sv->type->charstar() << " " <<
-                          sv->name->charstar() << ";\n";
+          defs << "    CMsgBuffer *"<<sv->name<<"_buf;\n";
+          defs << "    " << sv->type << " " <<
+                          sv->name << ";\n";
         } 
     }
     el = el->next;
@@ -627,7 +627,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() == 1))
        defs << e->getEntryName();
      else
-       defs << sv->name->charstar();
+       defs << sv->name;
      defs << "_buf = __cDep->getMessage(" << e->entryPtr->entryNum;
      if (e->intExpr)
        defs << ", " << e->intExpr;
@@ -646,7 +646,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      }
      else {
         sv = e->stateVars->begin();
-        defs << "(" << sv->name->charstar() << "_buf != 0)";
+        defs << "(" << sv->name << "_buf != 0)";
      }
      el = el->next;
      if (el != NULL)
@@ -666,13 +666,13 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
   for(el=elist; el!=NULL; el=elist->next) {
     e = el->entry;
        if ((e->paramIsMarshalled() == 1) || (e->param->isVoid() ==1)) {
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar() sv->type->charstar()*/e->getEntryName() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text sv->type*/e->getEntryName() << "_buf->bgLog2; \n";
 	localnum++;
       }
       else{
-	defs << "       logs1[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar()<< "_buf->bgLog1; \n";
-	defs << "       logs2[" << localnum << "] = " << /*el->con4->text->charstar()*/ sv->name->charstar() << "_buf->bgLog2; \n";
+	defs << "       logs1[" << localnum << "] = " << /*el->con4->text*/ sv->name<< "_buf->bgLog1; \n";
+	defs << "       logs2[" << localnum << "] = " << /*el->con4->text*/ sv->name << "_buf->bgLog2; \n";
 	localnum++;
       }
   }
@@ -701,21 +701,21 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              defs <<"       int impl_off_"<<sv->name->charstar()
+              defs <<"       int impl_off_"<<sv->name
 	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
-		 <<sv->name->charstar()<<";\n";
+		 <<sv->name<<";\n";
            else
-               defs <<"       "<<sv->type->charstar()<<" "<<sv->name->charstar()
+               defs <<"       "<<sv->type<<" "<<sv->name
 	       <<"; " <<e->getEntryName() <<"_implP|"
-	       <<sv->name->charstar()<<";\n";
+	       <<sv->name<<";\n";
 	}
         defs << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
 	   <<e->getEntryName() <<"_implP.size(),16);\n";
         for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
            if (sv->arrayLength != NULL)
-              defs << "       "<<sv->type->charstar()<< " *" <<sv->name->charstar() <<"=(" <<sv->type->charstar()
+              defs << "       "<<sv->type<< " *" <<sv->name <<"=(" <<sv->type
 		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
-		 <<sv->name->charstar()<<");\n";
+		 <<sv->name<<");\n";
         }
         defs << "       __cDep->removeMessage(" << e->getEntryName() <<
               "_buf);\n";
@@ -723,21 +723,21 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      }
      else {  // There was a message as the only parameter
         sv = e->stateVars->begin();
-        defs << "       " << sv->name->charstar() << " = (" <<
-              sv->type->charstar() << ") " <<
-              sv->name->charstar() << "_buf->msg;\n";
-        defs << "       __cDep->removeMessage(" << sv->name->charstar() <<
+        defs << "       " << sv->name << " = (" <<
+              sv->type << ") " <<
+              sv->name << "_buf->msg;\n";
+        defs << "       __cDep->removeMessage(" << sv->name <<
               "_buf);\n";
-        defs << "       delete " << sv->name->charstar() << "_buf;\n";
+        defs << "       delete " << sv->name << "_buf;\n";
      }
      el = el->next;
   }
 
   // max(current,merge) --> current, then reset the mergepath
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
-  defs << "       " << label->charstar()  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
   defs << "       ";
@@ -806,7 +806,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
     }
     else {
       if (sv->isMsg == 1) {
-         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name->charstar()<<";\n";
+         defs << "       tr->args["<<iArgs++ <<"] = (size_t) " <<sv->name<<";\n";
       }
       else {
          numParamsNeedingMarshalling++;
@@ -820,9 +820,9 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
          hasArray++;
          if (hasArray == 1)
            defs<< "       int impl_arrstart=0;\n";
-         defs <<"       int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-         defs <<"       impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-         defs <<"       impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+         defs <<"       int impl_off_"<<sv->name<<", impl_cnt_"<<sv->name<<";\n";
+         defs <<"       impl_off_"<<sv->name<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type<<"));\n";
+         defs <<"       impl_off+=(impl_cnt_"<<sv->name<<"=sizeof("<<sv->type<<")*("<<sv->arrayLength->charstar()<<"));\n";
       }
     }
   }
@@ -831,9 +831,9 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      defs << "         PUP::sizer implP;\n";
      for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
        if (sv->arrayLength !=NULL)
-         defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+         defs << "         implP|impl_off_" <<sv->name <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid !=1)) 
-         defs << "         implP|" <<sv->name->charstar() <<";\n";
+         defs << "         implP|" <<sv->name <<";\n";
      }
      if (hasArray > 0) {
         defs <<"         impl_arrstart=CK_ALIGN(implP.size(),16);\n";
@@ -849,17 +849,17 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
      defs << "         PUP::toMem implP((void *)impl_msg->msgBuf);\n";
      for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
        if (sv->arrayLength !=NULL)
-          defs << "         implP|impl_off_" <<sv->name->charstar() <<";\n";
+          defs << "         implP|impl_off_" <<sv->name <<";\n";
        else if ((sv->isMsg != 1) && (sv->isVoid != 1))  
-          defs << "         implP|" <<sv->name->charstar() <<";\n";
+          defs << "         implP|" <<sv->name <<";\n";
      }
      defs << "       }\n";
      if (hasArray > 0) {
         defs <<"       char *impl_buf=impl_msg->msgBuf+impl_arrstart;\n";
         for(sv=stateVars->begin();!stateVars->end();sv=stateVars->next()) {
            if (sv->arrayLength !=NULL)
-              defs << "       memcpy(impl_buf+impl_off_"<<sv->name->charstar()<<
-	                 ","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+              defs << "       memcpy(impl_buf+impl_off_"<<sv->name<<
+	                 ","<<sv->name<<",impl_cnt_"<<sv->name<<");\n";
         }  
      }
   defs << "       tr->args[" <<paramIndex <<"] = (size_t) impl_msg;\n";
@@ -883,8 +883,8 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
   // max(current,merge) --> current
-  defs << "       " << label->charstar()  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
-  defs << "       currentlyExecutingPath = " << label->charstar()  << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "       " << label  << "_PathMergePoint.updateMax(currentlyExecutingPath); /* Critical Path Detection */ \n";
+  defs << "       currentlyExecutingPath = " << label  << "_PathMergePoint; /* Critical Path Detection */ \n";
 #endif
 
   defs << "       __cDep->Register(tr);\n";
@@ -910,7 +910,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
     e = el->entry;
     if (e->param->isMessage() == 1) {
       sv = e->stateVars->begin();
-      defs << "    CmiFree(UsrToEnv(" << sv->name->charstar() << "));\n";
+      defs << "    CmiFree(UsrToEnv(" << sv->name << "));\n";
     }
 
     el = el->next;
@@ -922,7 +922,7 @@ void SdagConstruct::generateWhen(XStr& decls, XStr& defs, Entry* entry)
 void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    } else {\n";
@@ -932,7 +932,7 @@ void SdagConstruct::generateWhile(XStr& decls, XStr& defs, Entry* entry)
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    } else {\n";
@@ -950,12 +950,12 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
-  defs << "    " << con1->text->charstar() << ";\n";
+  defs << "    " << con1->text << ";\n";
   //Record only the beginning for FOR
 #if CMK_BIGSIM_CHARM
   generateEventBracket(defs, SFOR);
 #endif
-  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    } else {\n";
@@ -972,8 +972,8 @@ void SdagConstruct::generateFor(XStr& decls, XStr& defs, Entry* entry)
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
 #endif
-  defs << "   " << con3->text->charstar() << ";\n";
-  defs << "    if (" << con2->text->charstar() << ") {\n";
+  defs << "   " << con3->text << ";\n";
+  defs << "    if (" << con2->text << ") {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    } else {\n";
@@ -994,7 +994,7 @@ void SdagConstruct::generateIf(XStr& decls, XStr& defs, Entry* entry)
   generateBeginTime(defs);
   generateEventBracket(defs, SIF);
 #endif
-  defs << "    if (" << con1->text->charstar() << ") {\n";
+  defs << "    if (" << con1->text << ") {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    } else {\n";
@@ -1046,27 +1046,27 @@ void SdagConstruct::generateElse(XStr& decls, XStr& defs, Entry* entry)
 void SdagConstruct::generateForall(XStr& decls, XStr& defs, Entry* entry)
 {
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    int __first = (" << con2->text->charstar() <<
-        "), __last = (" << con3->text->charstar() << 
-        "), __stride = (" << con4->text->charstar() << ");\n";
+  defs << "    int __first = (" << con2->text <<
+        "), __last = (" << con3->text << 
+        "), __stride = (" << con4->text << ");\n";
   defs << "    if (__first > __last) {\n";
   defs << "      int __tmp=__first; __first=__last; __last=__tmp;\n";
   defs << "      __stride = -__stride;\n";
   defs << "    }\n";
-  defs << "    CCounter *" << counter->charstar() <<
+  defs << "    CCounter *" << counter <<
         " = new CCounter(__first,__last,__stride);\n"; 
-  defs << "    for(int " << con1->text->charstar() <<
-        "=__first;" << con1->text->charstar() <<
-        "<=__last;" << con1->text->charstar() << "+=__stride) {\n";
+  defs << "    for(int " << con1->text <<
+        "=__first;" << con1->text <<
+        "<=__last;" << con1->text << "+=__stride) {\n";
   defs << "      ";
   generateCall(defs, *stateVarsChildren, constructs->front()->label->charstar());
   defs << "    }\n";
   endMethod(defs);
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
-  defs << "    " << counter->charstar() << "->decrement(); /* DECREMENT 1 */ \n";
-  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
-  defs << "      delete " << counter->charstar() << ";\n";
+  defs << "    " << counter << "->decrement(); /* DECREMENT 1 */ \n";
+  defs << "    if (" << counter << "->isDone()) {\n";
+  defs << "      delete " << counter << ";\n";
   defs << "      ";
   generateCall(defs, *stateVars, next->label->charstar(), nextBeginOrEnd ? 0 : "_end");
   defs << "    }\n";
@@ -1077,7 +1077,7 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
 {
   SdagConstruct *cn;
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  defs << "    CCounter *" << counter->charstar() << "= new CCounter(" <<
+  defs << "    CCounter *" << counter << "= new CCounter(" <<
         constructs->length() << ");\n";
   for(cn=constructs->begin(); 
                      !constructs->end(); cn=constructs->next()) {
@@ -1089,33 +1089,33 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   sprintf(nameStr,"%s%s", CParsedFile::className->charstar(),label->charstar());
   strcat(nameStr,"_end");
 #if CMK_BIGSIM_CHARM
-  defs << "  CkVec<void*> " <<label->charstar() << "_bgLogList;\n";
+  defs << "  CkVec<void*> " <<label << "_bgLogList;\n";
 #endif
 
   generateSignature(decls, defs, entry, false, "void", label, true, stateVarsChildren);
 #if CMK_BIGSIM_CHARM
   generateBeginTime(defs);
-  defs << "    " <<label->charstar() << "_bgLogList.insertAtEnd(_bgParentLog);\n";
+  defs << "    " <<label << "_bgLogList.insertAtEnd(_bgParentLog);\n";
 #endif
   //Accumulate all the bgParent pointers that the calling when_end functions give
-  defs << "    " << counter->charstar() << "->decrement();\n";
+  defs << "    " << counter << "->decrement();\n";
  
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
- defs << "    olist_" << counter->charstar() << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
+ defs << "    olist_" << counter << "_PathMergePoint.updateMax(currentlyExecutingPath);  /* Critical Path Detection FIXME: is the currently executing path the right thing for this? The duration ought to have been added somewhere. */ \n";
 #endif
 
-  defs << "    if (" << counter->charstar() << "->isDone()) {\n";
+  defs << "    if (" << counter << "->isDone()) {\n";
 
 #ifdef USE_CRITICAL_PATH_HEADER_ARRAY
-  defs << "      currentlyExecutingPath = olist_" << counter->charstar() << "_PathMergePoint; /* Critical Path Detection */ \n";
-  defs << "      olist_" << counter->charstar() << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
+  defs << "      currentlyExecutingPath = olist_" << counter << "_PathMergePoint; /* Critical Path Detection */ \n";
+  defs << "      olist_" << counter << "_PathMergePoint.reset(); /* Critical Path Detection */ \n";
 #endif
 
-  defs << "      delete " << counter->charstar() << ";\n";
+  defs << "      delete " << counter << ";\n";
 
 #if CMK_BIGSIM_CHARM
   generateListEventBracket(defs, SOLIST_END);
-  defs << "       "<< label->charstar() <<"_bgLogList.length()=0;\n";
+  defs << "       "<< label <<"_bgLogList.length()=0;\n";
 #endif
 
   defs << "      ";
@@ -1176,7 +1176,7 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   SdagConstruct *sc1;
   for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
      for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-        defs << "    _connect_" << sc1->text->charstar() <<"();\n";
+        defs << "    _connect_" << sc1->text <<"();\n";
   }
 
 #if CMK_BIGSIM_CHARM
@@ -1218,7 +1218,7 @@ void SdagConstruct::generateAtomic(XStr& decls, XStr& defs, Entry* entry)
 #endif
   generateTraceBeginCall(defs);
 
-  defs << "    " << text->charstar() << "\n";
+  defs << "    " << text << "\n";
 
   generateTraceEndCall(defs);
 #if CMK_BIGSIM_CHARM
@@ -1270,13 +1270,13 @@ void generateSignature(XStr& decls, XStr& defs,
           op << ", ";
 
         if (sv->type != 0) 
-          op <<sv->type->charstar() <<" ";
+          op <<sv->type <<" ";
         if (sv->byRef != 0)
           op <<" &";
         if (sv->arrayLength != NULL) 
           op <<"* ";
         if (sv->name != 0)
-          op <<sv->name->charstar();
+          op <<sv->name;
 
         count++;
       }
@@ -1310,7 +1310,7 @@ void SdagConstruct::generateCall(XStr& op, TList<CStateVar*>& list,
      if ((count != 0) && (isVoid != 1))
         op << ", ";
      if (sv->name != 0) 
-       op << sv->name->charstar();
+       op << sv->name;
     if (sv->isVoid != 1)
        count++;
     sv = list.next();
@@ -1409,7 +1409,7 @@ void SdagConstruct::generateTrace()
 void SdagConstruct::generateTraceBeginCall(XStr& op)          // for trace
 {
   if(traceName)
-    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName->charstar() << "()), CkMyPe(), 0, NULL); \n";
+    op << "    " << "_TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, (" << "_sdag_idx_" << traceName << "()), CkMyPe(), 0, NULL); \n";
 }
 
 void SdagConstruct::generateDummyBeginExecute(XStr& op)
@@ -1464,7 +1464,7 @@ void SdagConstruct::generateListEventBracket(XStr& op, int eventType)
 {
   (void) eventType;
   op << "    _TRACE_BGLIST_USER_EVENT_BRACKET(\"" << nameStr
-     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label->charstar()
+     << "\",__begintime,CkVTimer(),&_bgParentLog, " << label
      << "_bgLogList);\n";
 }
 

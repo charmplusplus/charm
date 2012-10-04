@@ -611,9 +611,9 @@ Module::generate()
   decl<<declstr.get_string();
   def<<defstr.get_string();
   if (connectPresent == 1) {
-    decl << pubDeclStr.charstar();
-    def << pubDefConstr.charstar();
-    def << pubDefStr.charstar();
+    decl << pubDeclStr;
+    def << pubDefConstr;
+    def << pubDefStr;
   }
 
   // DMK - Accel Support
@@ -4281,7 +4281,7 @@ void Entry::genPub(XStr &declstr, XStr& defstr, XStr& defconstr, int& connectPre
      declstr << "      int publishflag_" << getEntryName() << ";\n";
      declstr << "      int getflag_" << getEntryName() << ";\n";
      declstr << "      CkCallback " << getEntryName() << "_cb;\n";
-     declstr << parameters->charstar();
+     declstr << parameters;
 
      // Following generates the def publish::connectFunction code
 

@@ -61,26 +61,26 @@ static void generateWhenCode(XStr& op, SdagConstruct *cn)
         whenParams.append(", ");
       whenParams.append(*(sv->name));
       if (sv->arrayLength != 0)
-        op<<"        int impl_off"<<cn->nodeNum <<"_"<<sv->name->charstar()<<"; implP"
-          <<cn->nodeNum <<"|impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<";\n";
+        op << "        int impl_off" << cn->nodeNum << "_" << sv->name << "; implP"
+          <<cn->nodeNum << "|impl_off" <<cn->nodeNum  << "_" << sv->name << ";\n";
       else
-        op<<"        "<<sv->type->charstar()<<" "<<sv->name->charstar()<<"; implP"
-          <<cn->nodeNum <<"|"<<sv->name->charstar()<<";\n";
+        op << "        " << sv->type << " " << sv->name << "; implP"
+          <<cn->nodeNum << "|" << sv->name << ";\n";
     }
     lastWasVoid = sv->isVoid;
   }
   if (paramMarshalling == 1)
-    op<<"        impl_buf"<<cn->nodeNum <<"+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
+    op << "        impl_buf"<<cn->nodeNum << "+=CK_ALIGN(implP" <<cn->nodeNum <<".size(),16);\n";
   i = 0;
   sv = (CStateVar *)cn->stateVars->begin();
   for(; i<(cn->stateVars->length());i++, sv=(CStateVar *)cn->stateVars->next()) {
     if (sv->arrayLength != 0)
-      op<<"        "<<sv->type->charstar()<<" *"<<sv->name->charstar()<<"=("<<sv->type->charstar()<<" *)(impl_buf" <<cn->nodeNum
-        <<"+impl_off" <<cn->nodeNum <<"_"<<sv->name->charstar()<<");\n";
+      op << "        " << sv->type << " *" << sv->name << "=(" << sv->type << " *)(impl_buf" <<cn->nodeNum
+        << "+impl_off" <<cn->nodeNum << "_" << sv->name << ");\n";
   }
   if (paramMarshalling == 1)
     op << "        delete (CkMarshallMsg *)impl_msg" <<cn->nodeNum <<";\n";
-  op << "        " << cn->label->charstar() << "(" << whenParams.charstar();
+  op << "        " << cn->label << "(" << whenParams;
   op << ");\n";
   op << "        delete tr;\n";
 
@@ -115,7 +115,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
     if ((sv->isMsg != 1) && (sv->isVoid != 1)) {
        if (i >0)
          signature <<", ";
-       signature << sv->type->charstar() << " ";
+       signature << sv->type << " ";
        if (sv->arrayLength != 0)
          signature << "*";
        else if (sv->byRef != 0) {
@@ -126,11 +126,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
 	    signature << "*";
        }
        if (sv->name != 0)
-         signature << sv->name->charstar();
+         signature << sv->name;
     }
     else if (sv->isVoid != 1){
       if (i < 1) 
-         signature << sv->type->charstar() <<" "<<sv->name->charstar() <<"_msg";
+         signature << sv->type << " " << sv->name << "_msg";
       else
          printf("ERROR: A message must be the only parameter in an entry function\n");
     }
@@ -171,19 +171,19 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
            hasArrays++ ;
 	   if (sv->numPtrs > 0)
               printf("ERROR: can't pass pointers across processors \n -- Indicate the array length with []'s, or pass a reference\n");
-           defs <<"    int impl_off_"<<sv->name->charstar()<<", impl_cnt_"<<sv->name->charstar()<<";\n";
-           defs <<"    impl_off_"<<sv->name->charstar()<<"=impl_off=CK_ALIGN(impl_off,sizeof("<<sv->type->charstar()<<"));\n";
-           defs <<"    impl_off+=(impl_cnt_"<<sv->name->charstar()<<"=sizeof("<<sv->type->charstar()<<")*("<<sv->arrayLength->charstar()<<"));\n";
+           defs << "    int impl_off_" << sv->name << ", impl_cnt_" << sv->name << ";\n";
+           defs << "    impl_off_" << sv->name << "=impl_off=CK_ALIGN(impl_off,sizeof(" << sv->type << "));\n";
+           defs << "    impl_off+=(impl_cnt_" << sv->name << "=sizeof(" << sv->type << ")*(" << sv->arrayLength << "));\n";
         }
         if (paramMarshalling ==0) {
-	   defs << "    CmiReference(UsrToEnv(" << sv->name->charstar() << "_msg));\n";
+	   defs << "    CmiReference(UsrToEnv(" << sv->name << "_msg));\n";
            if(refNumNeeded) {
-              defs << "    int refnum = CkGetRefNum(" <<sv->name->charstar() <<"_msg);\n";
-              defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<",(void *) "<<sv->name->charstar() <<"_msg , (void *) _bgParentLog, refnum);\n";
-              defs << "    tr = __cDep->getTrigger("<<entryNum<<", refnum);\n";
+              defs << "    int refnum = CkGetRefNum(" <<sv->name << "_msg);\n";
+              defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum << ",(void *) " << sv->name << "_msg , (void *) _bgParentLog, refnum);\n";
+              defs << "    tr = __cDep->getTrigger(" << entryNum<<", refnum);\n";
            } else {
-              defs << "    cmsgbuf = __cDep->bufferMessage("<<entryNum<<", (void *) "<<sv->name->charstar() <<"_msg,  (void *) _bgParentLog, 0);\n";
-              defs << "    tr = __cDep->getTrigger("<<entryNum<<", 0);\n";
+              defs << "    cmsgbuf = __cDep->bufferMessage(" << entryNum << ", (void *) " << sv->name << "_msg,  (void *) _bgParentLog, 0);\n";
+              defs << "    tr = __cDep->getTrigger(" << entryNum<<", 0);\n";
            } 
         }
         count++;
@@ -198,11 +198,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
          it != myParameters.end(); ++it, ++i) {
        sv = *it;
         if(sv->arrayLength != 0)
-           defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
+           defs << "      implP1|impl_off_" << sv->name << ";\n";
         else if(sv->byRef != 0)
-	   defs <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+	   defs << "      implP1|(" <<sv->type << " &)" <<sv->name << ";\n";
 	else   
-	   defs <<"      implP1|"<<sv->name->charstar()<<";\n";
+	   defs << "      implP1|" << sv->name << ";\n";
      }
  
      if (hasArrays > 0)
@@ -226,11 +226,11 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
          it != myParameters.end(); ++it, ++i) {
        sv = *it;
         if(sv->arrayLength != 0)
-           defs <<"      implP1|impl_off_"<<sv->name->charstar()<<";\n";
+           defs << "      implP1|impl_off_" << sv->name << ";\n";
         else if(sv->byRef != 0)
-           defs <<"      implP1|(" <<sv->type->charstar() <<" &)" <<sv->name->charstar() <<";\n";
+           defs << "      implP1|(" << sv->type << " &)" << sv->name << ";\n";
         else   
-	   defs <<"      implP1|"<<sv->name->charstar()<<";\n";
+	   defs << "      implP1|" << sv->name << ";\n";
      }
      defs <<"    }\n";
      if (hasArrays > 0)
@@ -241,7 +241,7 @@ void CEntry::generateCode(XStr& decls, XStr& defs)
          it != myParameters.end(); ++it, ++i) {
        sv = *it;
          if(sv->arrayLength != 0) {
-           defs <<"    memcpy(impl_buf1+impl_off_"<<sv->name->charstar()<<","<<sv->name->charstar()<<",impl_cnt_"<<sv->name->charstar()<<");\n";
+           defs << "    memcpy(impl_buf1+impl_off_" << sv->name << "," << sv->name << ",impl_cnt_" << sv->name << ");\n";
 	 }
        }
      }
