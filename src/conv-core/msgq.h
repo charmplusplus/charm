@@ -15,9 +15,6 @@ namespace conv {
 
 typedef void msg_t;
 
-template <typename P>
-inline P defaultprio(P *dummy_tag) { return 0; }
-
 
 template <typename P = int>
 class msgQ
@@ -30,7 +27,7 @@ class msgQ
         msgQ(): qSize(0) {}
         ///
         void enq(const msg_t *msg
-                ,const prio_t &prio = defaultprio<prio_t>(0)
+                ,const prio_t &prio = prio_t()
                 ,const bool isFifo = true
                 );
         ///
