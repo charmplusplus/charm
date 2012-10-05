@@ -927,8 +927,7 @@ conv-cpm.o: conv-cpm.c $(CVHEADERS)
 XIHEADERS=conv-autoconfig.h xi-symbol.h xi-util.h xi-grammar.tab.h
 CHARMXIOBJ=xi-main.o xi-symbol.o xi-grammar.tab.o xi-scan.o xi-util.o
 SDAGOBJ=sdag-globals.o CSdagConstruct.o CEntry.o CParsedFile.o
-SDAGHEADERS= CToken.h EToken.h CParsedFile.h \
-	sdag-globals.h CEntry.h
+SDAGHEADERS= CToken.h EToken.h CParsedFile.h sdag-globals.h CEntry.h
 
 charmxi: ../bin/charmxi
 

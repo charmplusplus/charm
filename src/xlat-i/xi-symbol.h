@@ -5,7 +5,6 @@
 #include "EToken.h"
 #include "CEntry.h"
 #include "sdag-globals.h"
-#include "CList.h"
 
 #include <iostream>
 #include <stdio.h>
