@@ -20,7 +20,7 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
   con1 = 0;  con2 = 0; con3 = 0; con4 = 0;
   type = t;
   traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
+  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   constructs->push_back(construct1);
 }
@@ -30,7 +30,7 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct 
   con1=0; con2=0; con3=0; con4=0;
   type = t;
   traceName=NULL;
-  publishesList = new TList<SdagConstruct*>();
+  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   constructs->push_back(construct1);
   constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
@@ -43,7 +43,7 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   type = t;
   traceName=NULL;
   con1 = c1; con2 = c2; con3 = c3; con4 = c4;
-  publishesList = new TList<SdagConstruct*>();
+  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   if (constructAppend != 0) {
     constructs->push_back(constructAppend);
@@ -58,7 +58,7 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
   text = new XStr(codeStr);
   connectEntry = new XStr(entryStr);
   con1 = 0; con2 = 0; con3 = 0; con4 =0;
-  publishesList = new TList<SdagConstruct*>();
+  publishesList = new list<SdagConstruct*>();
   constructs = new list<SdagConstruct*>();
   param = pl;
 }
@@ -350,7 +350,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
     (*it)->propagateState(*stateVarsChildren, whensEntryMethodStateVars, *publishesList, uniqueVarNum);
 }
 
-void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
+void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum)
 {
   CStateVar *sv;
   list<CStateVar*> *whensEntryMethodStateVars = NULL;
@@ -397,7 +397,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
       stateVars->insert(stateVars->end(), plist.begin(), plist.end());
       stateVarsChildren = stateVars;
       if (con1 != 0) {
-        publist.append(con1);
+        publist.push_back(con1);
         /*SdagConstruct *sc;
         SdagConstruct *sc1;
         for(sc =publist.begin(); !publist.end(); sc=publist.next()) {
@@ -426,7 +426,7 @@ void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
   delete whensEntryMethodStateVars;
 }
 
-void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum) {
+void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
   CStateVar *sv;
   list<CStateVar*> whensEntryMethodStateVars;
   stateVars = new list<CStateVar*>();
@@ -468,7 +468,7 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
   propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
 }
 
-void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum) {
+void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, list<SdagConstruct*>& publist, int uniqueVarNum) {
   if (constructs != 0) {
     for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
          ++it)
@@ -1252,9 +1252,10 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
 
   decls << "public:\n";
   generateSignature(decls, defs, entry, false, "void", con1->text, false, stateVars);
-  SdagConstruct *sc;
-  SdagConstruct *sc1;
-  for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
+  for (list<SdagConstruct*>::iterator pubIter = publishesList->begin();
+       pubIter != publishesList->end();
+       ++pubIter) {
+    SdagConstruct *sc = *pubIter;
     for (list<SdagConstruct*>::iterator it = sc->constructs->begin();
          it != sc->constructs->end();
          ++it)
