@@ -11,7 +11,7 @@ extern unsigned char in_comment;
 void yyerror(const char *);
 extern unsigned int lineno;
 extern int in_bracket,in_braces,in_int_expr;
-extern TList<Entry *> *connectEntries;
+extern std::list<Entry *> connectEntries;
 ModuleList *modlist;
 namespace xi {
 extern int macroDefined(const char *str, int istrue);
@@ -607,20 +607,9 @@ MemberEList	: ';'
 
 MemberList	: /* Empty */
 		{ 
-		  Entry *tempEntry;
-		  if (!connectEntries->empty()) {
-		    tempEntry = connectEntries->begin();
-		    MemberList *ml;
-		    ml = new MemberList(tempEntry, 0);
-		    tempEntry = connectEntries->next();
-		    for(; !connectEntries->end(); tempEntry = connectEntries->next()) {
-                      ml->appendMember(tempEntry); 
-		    }
-		    while (!connectEntries->empty())
-		      connectEntries->pop();
-                    $$ = ml; 
-		  }
-		  else {
+                  if (!connectEntries.empty()) {
+                    $$ = new MemberList(connectEntries);
+		  } else {
 		    $$ = 0; 
                   }
 		}
@@ -1047,12 +1036,12 @@ SingleConstruct : ATOMIC OptTraceName ParamBraceStart CCode ParamBraceEnd OptPub
 		   in_braces = 0;
 		   if (($4->isVoid() == 0) && ($4->isMessage() == 0))
                    {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, 
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3,
 	 	 			new ParamList(new Parameter(lineno, new PtrType( 
                                         new NamedType("CkMarshallMsg")), "_msg")), 0, 0, 0, 1, $4));
 		   }
 		   else  {
-		      connectEntries->append(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
+		      connectEntries.push_back(new Entry(0, 0, new BuiltinType("void"), $3, $4, 0, 0, 0, 1, $4));
                    }
                    $$ = new SdagConstruct(SCONNECT, $3, $7, $4);
 		}

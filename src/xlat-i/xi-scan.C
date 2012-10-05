@@ -821,16 +821,16 @@ char *yytext;
 #include <string.h>
 #include "xi-symbol.h"
 #include <ctype.h>
-#include "CList.h"
 using namespace xi;
 #include "xi-grammar.tab.h"
+#include <list>
 
 /* Global Variables and Functions - used in grammar.y */
 unsigned int lineno = 1;
 int in_bracket=0; /*Horrific hack to get "array length" code snippets (between []'s)*/
 int in_braces=0; /*Horrific hack to get SDAG entry code snippets (between {}'s)*/
 int in_int_expr=0;
-TList<Entry *> *connectEntries = new TList<Entry *>();
+std::list<Entry *> connectEntries;
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);

@@ -656,6 +656,8 @@ class MemberList : public Printable {
     std::list<Member*> members;
   public:
     MemberList(Member *m, MemberList *n=0);
+    MemberList(std::list<Entry*>&);
+
     void appendMember(Member *m);
     void print(XStr& str);
     void setChare(Chare *c);

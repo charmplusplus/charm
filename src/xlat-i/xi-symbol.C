@@ -344,6 +344,11 @@ MemberList::MemberList(Member *m, MemberList *n)
 	members.insert(members.end(), n->members.begin(), n->members.end());
 }
 
+MemberList::MemberList(list<Entry*>&l)
+{
+  members.insert(members.begin(), l.begin(), l.end());
+  l.clear();
+}
 
 void
 MemberList::print(XStr& str)
