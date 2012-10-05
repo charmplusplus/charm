@@ -7,6 +7,11 @@
 #include "CStateVar.h"
 #include <list>
 using std::list;
+#include <algorithm>
+using std::for_each;
+#include <functional>
+using std::mem_fun;
+using std::bind2nd;
 
 namespace xi {
 
@@ -16,8 +21,8 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1)
   type = t;
   traceName=NULL;
   publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
+  constructs = new list<SdagConstruct*>();
+  constructs->push_back(construct1);
 }
 
 SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct *aList)
@@ -26,11 +31,9 @@ SdagConstruct::SdagConstruct(EToken t, SdagConstruct *construct1, SdagConstruct 
   type = t;
   traceName=NULL;
   publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
-  constructs->append(construct1);
-  SdagConstruct *sc;
-  for(sc = aList->constructs->begin(); !aList->constructs->end(); sc=aList->constructs->next())
-    constructs->append(sc);
+  constructs = new list<SdagConstruct*>();
+  constructs->push_back(construct1);
+  constructs->insert(constructs->end(), aList->constructs->begin(), aList->constructs->end());
 }
 
 SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstruct *c2, SdagConstruct *c3,
@@ -41,9 +44,9 @@ SdagConstruct::SdagConstruct(EToken t, XStr *txt, SdagConstruct *c1, SdagConstru
   traceName=NULL;
   con1 = c1; con2 = c2; con3 = c3; con4 = c4;
   publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
   if (constructAppend != 0) {
-    constructs->append(constructAppend);
+    constructs->push_back(constructAppend);
   }
   elist = el;
 }
@@ -56,9 +59,8 @@ SdagConstruct::SdagConstruct(EToken t, const char *entryStr, const char *codeStr
   connectEntry = new XStr(entryStr);
   con1 = 0; con2 = 0; con3 = 0; con4 =0;
   publishesList = new TList<SdagConstruct*>();
-  constructs = new TList<SdagConstruct*>();
+  constructs = new list<SdagConstruct*>();
   param = pl;
-
 }
 
 SdagConstruct *buildAtomic(const char* code,
@@ -104,9 +106,7 @@ void SdagConstruct::numberNodes(void)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->numberNodes();
-    }
+    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::numberNodes));
   }
 }
 
@@ -180,9 +180,7 @@ void SdagConstruct::labelNodes(void)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=(SdagConstruct *)(constructs->begin()); !constructs->end(); cn=(SdagConstruct *)(constructs->next())) {
-      cn->labelNodes();
-    }
+    for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::labelNodes));
   }
 }
 
@@ -276,11 +274,9 @@ void WhenConstruct::generateEntryList(list<CEntry*>& CEntrylist, WhenConstruct *
 void SdagConstruct::generateChildrenEntryList(list<CEntry*>& CEntrylist,
                                               WhenConstruct *thisWhen) {
   if (constructs != 0) {
-    for(SdagConstruct *cn = constructs->begin();
-        !constructs->end();
-        cn = constructs->next()) {
-      cn->generateEntryList(CEntrylist,thisWhen);
-    }
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->generateEntryList(CEntrylist, thisWhen);
   }
 }
 
@@ -314,12 +310,9 @@ void SdagConstruct::generateConnectEntryList(std::list<SdagConstruct*>& ConnectE
   if (type == SCONNECT)
      ConnectEList.push_back(this);
   if (constructs != 0) {
-    SdagConstruct *cn;
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateConnectEntryList(ConnectEList);
-    }
+    for_each(constructs->begin(), constructs->end(),
+             bind2nd(mem_fun(&SdagConstruct::generateConnectEntryList), ConnectEList));
   }
-
 }
 
 void SdagConstruct::propagateState(int uniqueVarNum)
@@ -351,13 +344,10 @@ void SdagConstruct::propagateState(int uniqueVarNum)
   stateVarsChildren = stateVars; 
 #endif
 
-  SdagConstruct *cn;
-  list<CStateVar*> *whensEntryMethodStateVars;
-  whensEntryMethodStateVars = new list<CStateVar*>();
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-     cn->propagateState(*stateVarsChildren, *whensEntryMethodStateVars, *publishesList, uniqueVarNum);
-  }
-  delete whensEntryMethodStateVars;
+  list<CStateVar*> whensEntryMethodStateVars;
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it)
+    (*it)->propagateState(*stateVarsChildren, whensEntryMethodStateVars, *publishesList, uniqueVarNum);
 }
 
 void SdagConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum)
@@ -479,11 +469,10 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
 }
 
 void SdagConstruct::propagateStateToChildren(list<CStateVar*>& stateVarsChildren, list<CStateVar*>& wlist, TList<SdagConstruct*>& publist, int uniqueVarNum) {
-  SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->propagateState(stateVarsChildren, wlist, publist, uniqueVarNum);
-    }
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->propagateState(stateVarsChildren, wlist, publist, uniqueVarNum);
   }
 }
 
@@ -535,11 +524,10 @@ void SdagConstruct::generateCode(XStr& decls, XStr& defs, Entry *entry)
 }
 
 void SdagConstruct::generateChildrenCode(XStr& decls, XStr& defs, Entry* entry) {
-  SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->generateCode(decls, defs, entry);
-    }
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it)
+      (*it)->generateCode(decls, defs, entry);
   }
 }
 
@@ -651,11 +639,11 @@ void SdagConstruct::generateConnect(XStr& decls, XStr& defs, Entry* entry) {
 }
 
 void SdagConstruct::generateForward(XStr& decls, XStr& defs, Entry* entry) {
-  SdagConstruct *cn;
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
-  for (cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
     defs << "    { ";
-    generateCall(defs, *stateVarsChildren, cn->text);
+    generateCall(defs, *stateVarsChildren, (*it)->text);
     defs<<" }\n";
   }
   generateCall(defs, *stateVarsChildren, next->label, nextBeginOrEnd ? 0 : "_end");
@@ -1170,11 +1158,11 @@ void SdagConstruct::generateOlist(XStr& decls, XStr& defs, Entry* entry)
   SdagConstruct *cn;
   generateSignature(decls, defs, entry, false, "void", label, false, stateVars);
   defs << "    CCounter *" << counter << "= new CCounter(" <<
-        constructs->length() << ");\n";
-  for(cn=constructs->begin(); 
-                     !constructs->end(); cn=constructs->next()) {
+    (int)constructs->size() << ");\n";
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
     defs << "    ";
-    generateCall(defs, *stateVarsChildren, cn->label);
+    generateCall(defs, *stateVarsChildren, (*it)->label);
   }
   endMethod(defs);
 
@@ -1267,8 +1255,10 @@ void SdagConstruct::generateSdagEntry(XStr& decls, XStr& defs, Entry *entry)
   SdagConstruct *sc;
   SdagConstruct *sc1;
   for(sc =publishesList->begin(); !publishesList->end(); sc=publishesList->next()) {
-     for(sc1=sc->constructs->begin(); !sc->constructs->end(); sc1 = sc->constructs->next())
-        defs << "    _connect_" << sc1->text <<"();\n";
+    for (list<SdagConstruct*>::iterator it = sc->constructs->begin();
+         it != sc->constructs->end();
+         ++it)
+       defs << "    _connect_" << (*it)->text <<"();\n";
   }
 
 #if CMK_BIGSIM_CHARM
@@ -1421,16 +1411,19 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
       next = n;
       nextBeginOrEnd = boe;
       {
-        SdagConstruct *cn=constructs->begin();
-        if (cn==0) // empty slist
+        if (constructs->empty())
           return;
 
-        for(SdagConstruct *nextNode=constructs->next(); nextNode != 0; nextNode = constructs->next()) {
-	  if (nextNode->type == SCONNECT)
+        list<SdagConstruct*>::iterator it = constructs->begin();
+        SdagConstruct *cn = *it;
+        ++it;
+
+        for(; it != constructs->end(); ++it) {
+	  if ((*it)->type == SCONNECT)
 	    continue;
 
-          cn->setNext(nextNode, 1);
-          cn = nextNode;
+          cn->setNext(*it, 1);
+          cn = *it;
         }
         cn->setNext(this, 0);
       }
@@ -1461,8 +1454,9 @@ void SdagConstruct::setNext(SdagConstruct *n, int boe)
   }
   SdagConstruct *cn;
   if (constructs != 0) {
-    for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-      cn->setNext(n, boe);
+    for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+         ++it) {
+      (*it)->setNext(n, boe);
     }
   }
 }
@@ -1490,10 +1484,7 @@ void SdagConstruct::generateTrace()
     break;
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTrace();
-  }
+  for_each(constructs->begin(), constructs->end(), mem_fun(&SdagConstruct::generateTrace));
   if (con1) con1->generateTrace();
   if (con2) con2->generateTrace();
   if (con3) con3->generateTrace();
@@ -1567,10 +1558,8 @@ void SdagConstruct::generateRegisterEp(XStr& defs)
     defs << "    (void)_sdag_idx_" << traceName << "();\n";
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateRegisterEp(defs);
-  }
+  for_each(constructs->begin(), constructs->end(),
+           bind2nd(mem_fun(&SdagConstruct::generateRegisterEp), defs));
   if (con1) con1->generateRegisterEp(defs);
   if (con2) con2->generateRegisterEp(defs);
   if (con3) con3->generateRegisterEp(defs);
@@ -1595,9 +1584,9 @@ void SdagConstruct::generateTraceEp(XStr& decls, XStr& defs, Chare* chare)
     endMethod(defs);
   }
 
-  SdagConstruct *cn;
-  for(cn=constructs->begin(); !constructs->end(); cn=constructs->next()) {
-    cn->generateTraceEp(decls, defs, chare);
+  for (list<SdagConstruct*>::iterator it = constructs->begin(); it != constructs->end();
+       ++it) {
+    (*it)->generateTraceEp(decls, defs, chare);
   }
   if (con1) con1->generateTraceEp(decls, defs, chare);
   if (con2) con2->generateTraceEp(decls, defs, chare);
