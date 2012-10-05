@@ -1,4 +1,10 @@
+
+XLC_TYPICAL_PRE=/opt/ibmcmp/
+if test -d /soft/compilers/ibmcmp-may2012
+then
 XLC_TYPICAL_PRE=/soft/compilers/ibmcmp-may2012
+fi
+
 XLC_PRE=$XLC_TYPICAL_PRE/vacpp/bg/12.1
 
 XLC_TYPICAL_POST=bin/bg

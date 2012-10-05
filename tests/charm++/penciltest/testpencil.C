@@ -3,8 +3,9 @@
 #include "pencilfft/pencil_api.h"
 #include "testpencil.decl.h"
 
-#define START_TIMING   10
-#define MAX_ITERATIONS 100
+#define NUM_FFT_ITER   200
+#define START_TIMING   1
+#define MAX_ITERATIONS 5
 
 LineFFTInfo   info;
 int           iteration;
@@ -13,7 +14,8 @@ double        startTime;
 void red_handler (void *param, int size, void *data) {
 
   iteration ++;
-
+  //printf ("Iteration Complete\n", iteration);
+  
   if (iteration == START_TIMING)
     startTime = CmiWallTimer ();
   
@@ -24,10 +26,11 @@ void red_handler (void *param, int size, void *data) {
     CkAssert (MAX_ITERATIONS > START_TIMING);
     CkPrintf ("Time to perform a pair of (%d, %d, %d) 3D FFT operations %g ms\n", 
 	      info.sizeX, info.sizeY, info.sizeZ,
-	      (endTime - startTime) * 1000.0/ (MAX_ITERATIONS - START_TIMING));
+	      (endTime - startTime) * 1000.0/ 
+	      (NUM_FFT_ITER * (MAX_ITERATIONS - START_TIMING)));
     CkExit ();
   }
-
+  
   startLineFFTArray (&info);
 }
 
@@ -67,7 +70,10 @@ main::main (CkArgMsg *m) {
   CkPrintf ("Calling Configure\n");
   configureLineFFTInfo (&info, sizeX, sizeY, sizeZ, 
 			grainX, grainY, grainZ,
-			NULL, ARRAY_REDUCTION, true);
+			NULL, 
+			ARRAY_REDUCTION, 
+			true,
+			NUM_FFT_ITER);
 
   CkPrintf ("Calling Create\n");
   createLineFFTArray (&info);

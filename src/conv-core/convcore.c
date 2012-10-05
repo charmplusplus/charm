@@ -217,6 +217,10 @@ void infi_freeMultipleSend(void *ptr);
 void infi_unregAndFreeMeta(void *ch);
 #endif
 
+#if CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+void * CmiAlloc_bgq (int     size);
+void   CmiFree_bgq  (void  * buf);
+#endif
 
 #if CMK_GRID_QUEUE_AVAILABLE
 CpvDeclare(void *, CkGridObject);
@@ -2853,6 +2857,8 @@ void *CmiAlloc(int size)
   res =(char *) CmiPoolAlloc(size+sizeof(CmiChunkHeader));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
   MPI_Alloc_mem(size+sizeof(CmiChunkHeader), MPI_INFO_NULL, &res);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+  res = (char *) CmiAlloc_bgq(size+sizeof(CmiChunkHeader));
 #else
   res =(char *) malloc_nomigrate(size+sizeof(CmiChunkHeader));
 #endif
@@ -2956,6 +2962,8 @@ void CmiFree(void *blk)
     CmiPoolFree(BLKSTART(parentBlk));
 #elif USE_MPI_CTRLMSG_SCHEME && CMK_CONVERSE_MPI
     MPI_Free_mem(parentBlk);
+#elif CMK_SMP && CMK_BLUEGENEQ && CMK_USE_L2ATOMICS
+    CmiFree_bgq(BLKSTART(parentBlk));
 #else
     free_nomigrate(BLKSTART(parentBlk));
 #endif

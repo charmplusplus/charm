@@ -69,6 +69,7 @@
 #define CMK_CCS_AVAILABLE				   0
 
 #define CMK_BLUEGENEQ                                      1
+#define CMK_BLUEGENEQ_OPTCOPY                              1
 
 #define CMK_NO_ISO_MALLOC                                  1
 
