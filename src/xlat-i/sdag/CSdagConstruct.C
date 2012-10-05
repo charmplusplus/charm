@@ -443,7 +443,6 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
   ParamList *pl;
   while (el != NULL) {
     pl = el->entry->param;
-    el->entry->stateVars = new TList<CStateVar*>();
     if (pl->isVoid()) {
       sv = new CStateVar(1, NULL, 0, NULL, 0, NULL, 0);
       //stateVars->push_back(sv);
@@ -462,7 +461,6 @@ void WhenConstruct::propagateState(list<CStateVar*>& plist, list<CStateVar*>& wl
       }
     }
     el = el->next;
-
   }
 
   propagateStateToChildren(*stateVarsChildren, whensEntryMethodStateVars, publist, uniqueVarNum);
@@ -675,11 +673,12 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
                         e->getEntryName() << "_msg;\n";
     }
     else {
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); e->stateVars->next()) {
-          defs << "    CMsgBuffer *"<<sv->name<<"_buf;\n";
-          defs << "    " << sv->type << " " <<
-                          sv->name << ";\n";
-        } 
+      for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+           ++it) {
+        sv = *it;
+        defs << "    CMsgBuffer *" << sv->name << "_buf;\n"
+             << "    " << sv->type << " " << sv->name << ";\n";
+      }
     }
     el = el->next;
   }
@@ -711,8 +710,8 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
         defs << "(" << e->getEntryName() << "_buf != 0)";
      }
      else {
-        sv = e->stateVars->begin();
-        defs << "(" << sv->name << "_buf != 0)";
+       sv = *(e->stateVars.begin());
+       defs << "(" << sv->name << "_buf != 0)";
      }
      el = el->next;
      if (el != NULL)
@@ -765,7 +764,9 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
         defs <<"       PUP::fromMem " <<e->getEntryName() <<"_implP("
 	   <<e->getEntryName() <<"_impl_buf);\n";
 
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+        for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+             ++it) {
+        CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
               defs <<"       int impl_off_"<<sv->name
 	         <<"; "<<e->getEntryName() <<"_implP|impl_off_"
@@ -777,7 +778,9 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
 	}
         defs << "       " <<e->getEntryName() <<"_impl_buf+=CK_ALIGN("
 	   <<e->getEntryName() <<"_implP.size(),16);\n";
-        for(sv=e->stateVars->begin(); !e->stateVars->end(); sv=e->stateVars->next()) {
+        for (list<CStateVar*>::iterator it = e->stateVars.begin(); it != e->stateVars.end();
+             ++it) {
+          CStateVar *sv = *it;
            if (sv->arrayLength != NULL)
               defs << "       "<<sv->type<< " *" <<sv->name <<"=(" <<sv->type
 		 <<" *)(" <<e->getEntryName() <<"_impl_buf+" <<"impl_off_"
@@ -788,7 +791,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
         defs << "       delete " << e->getEntryName() << "_buf;\n";
      }
      else {  // There was a message as the only parameter
-        sv = e->stateVars->begin();
+        sv = *e->stateVars.begin();
         defs << "       " << sv->name << " = (" <<
               sv->type << ") " <<
               sv->name << "_buf->msg;\n";
@@ -987,7 +990,7 @@ void WhenConstruct::generateCode(XStr& decls, XStr& defs, Entry* entry)
   while (el) {
     e = el->entry;
     if (e->param->isMessage() == 1) {
-      sv = e->stateVars->begin();
+      sv = *e->stateVars.begin();
       defs << "    CmiFree(UsrToEnv(" << sv->name << "));\n";
     }
 

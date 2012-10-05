@@ -979,8 +979,6 @@ class Entry : public Member {
 
     // SDAG support
     std::list<CStateVar *> estateVars;
-    TList<CStateVar *> *stateVarsChildren;
-
 
   public:
     XStr *label;
@@ -989,7 +987,7 @@ class Entry : public Member {
 
     // SDAG support
     SdagConstruct *sdagCon;
-    TList<CStateVar *> *stateVars;
+    std::list<CStateVar *> stateVars;
     CEntry *entryPtr;
     const char *intExpr;
     ParamList *param;
@@ -999,7 +997,7 @@ class Entry : public Member {
 
     void addEStateVar(CStateVar *sv) {
       estateVars.push_back(sv);
-      stateVars->append(sv);
+      stateVars.push_back(sv);
     }
 
     // DMK - Accel Support
