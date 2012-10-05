@@ -24,7 +24,7 @@
 #define COLLECT_STATS_DETS 0
 #define COLLECT_STATS_DETS_DUP 0
 #define COLLECT_STATS_MEMORY 0
-#define COLLECT_STATS_TEAM 0
+#define COLLECT_STATS_LOGGING 0
 
 #define RECOVERY_SEND "SEND"
 #define RECOVERY_PROCESS "PROCESS"
@@ -156,9 +156,10 @@ int bufferedDetsSize;
 int storedDetsSize;
 #endif
 //TML: variables for measuring savings with teams in message logging
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 float MLOGFT_totalLogSize = 0.0;
 float MLOGFT_totalMessages = 0.0;
+float MLOGFT_totalMcastLogSize = 0.0;
 #endif
 
 static double adjustChkptPeriod=0.0; //in ms
@@ -722,7 +723,7 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 	int totalSize;
 
 	envelope *env = entry->env;
-	DEBUG_PE(3,printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
+	DEBUG(printf("[%d] Sending message to %s from %s PE %d SN %d time %.6lf \n",CkMyPe(),env->recver.toString(recverString),env->sender.toString(senderString),destPE,env->SN,CkWallTimer()));
 
 	// setting all the information
 	Chare *obj = (Chare *)entry->env->sender.getObject();
@@ -733,9 +734,13 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 		//TML: only stores message if either it goes to this processor or to a processor in a different group
 		if(!isTeamLocal(entry->destPE)){
 			obj->mlogData->addLogEntry(entry);
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 			MLOGFT_totalMessages += 1.0;
 			MLOGFT_totalLogSize += entry->env->getTotalsize();
+			if(entry->env->flags & CK_MULTICAST_MSG_MLOG){
+				MLOGFT_totalMcastLogSize += entry->env->getTotalsize();	
+				CkPrintf("[%d] Adding %f to the log\n",CkMyPe(),entry->env->getTotalsize());
+			}
 #endif
 		}else{
 			// the message has to be deleted after it has been sent
@@ -3614,10 +3619,10 @@ void _messageLoggingExit(){
 	if(CkMyPe() == 0)
 		printf("[%d] _causalMessageLoggingExit \n",CmiMyPe());
 
-	//TML: printing some statistics for group approach
-#if COLLECT_STATS_TEAM
+#if COLLECT_STATS_LOGGING
 	printf("[%d] LOGGED MESSAGES: %.0f\n",CkMyPe(),MLOGFT_totalMessages);
 	printf("[%d] MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalLogSize/(float)MEGABYTE);
+	printf("[%d] MULTICAST MESSAGE LOG SIZE: %.2f MB\n",CkMyPe(),MLOGFT_totalMcastLogSize/(float)MEGABYTE);
 #endif
 
 #if COLLECT_STATS_MSGS
