@@ -80,7 +80,7 @@ extern "C" int pidtonid(int numpes);
 extern "C" int getMeshCoord(int nid, int *x, int *y, int *z);
 extern "C" void getDimension(int *,int *, int *, int *);
 #if CMK_HAS_RCALIB
-extern "C" rca_mesh_coord_t  *coords;
+extern "C" rca_mesh_coord_t  *rca_coords;
 #endif
 
 struct loc {
