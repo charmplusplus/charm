@@ -336,7 +336,7 @@ void SdagConstruct::propagateState(int uniqueVarNum)
 
 #if CMK_BIGSIM_CHARM
   // adding _bgParentLog as the last extra parameter for tracing
-  stateVarsChildren = new list<CStateVar*>(stateVars);
+  stateVarsChildren = new list<CStateVar*>(*stateVars);
   sv = new CStateVar(0, "void *", 0,"_bgParentLog", 0, NULL, 1);  
   stateVarsChildren->push_back(sv);
 #else
