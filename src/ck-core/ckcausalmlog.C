@@ -739,7 +739,6 @@ void sendMsg(CkObjID &sender,CkObjID &recver,int destPE,MlogEntry *entry,MCount 
 			MLOGFT_totalLogSize += entry->env->getTotalsize();
 			if(entry->env->flags & CK_MULTICAST_MSG_MLOG){
 				MLOGFT_totalMcastLogSize += entry->env->getTotalsize();	
-				CkPrintf("[%d] Adding %f to the log\n",CkMyPe(),entry->env->getTotalsize());
 			}
 #endif
 		}else{
@@ -1051,6 +1050,8 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 
 	// getting the receiver object
 	CkObjID recver = env->recver;
+	Chare *obj = (Chare *)recver.getObject();
+	*objPointer = obj;
 
 	// checking for determinants bypass in message logging
 	if(env->flags & CK_BYPASS_DET_MLOG){
@@ -1064,27 +1065,26 @@ int preProcessReceivedMessage(envelope *env, Chare **objPointer, MlogEntry **log
 		return 1;
 	}
 
-	Chare *obj = (Chare *)recver.getObject();
-	*objPointer = obj;
+	// checking if receiver is NULL
 	if(obj == NULL){
-		int possiblePE = recver.guessPE();
+		return 1;
+
+/*		int possiblePE = recver.guessPE();
 		if(possiblePE != CkMyPe()){
 			int totalSize = env->getTotalsize();
 			CmiSyncSendAndFree(possiblePE,totalSize,(char *)env);
-			
 			DEBUG_PE(0,printf("[%d] Forwarding message SN %d sender %s recver %s to %d\n",CkMyPe(),env->SN,env->sender.toString(senderString), recver.toString(recverString), possiblePE));
 		}else{
 			// this is the case where a message is received and the object has not been initialized
 			// we delayed the delivery of the message
 			CqsEnqueue(CpvAccess(_outOfOrderMessageQueue),env);
-			
 			DEBUG_PE(0,printf("[%d] Message SN %d TN %d sender %s recver %s, receiver NOT found\n",CkMyPe(),env->SN,env->TN,env->sender.toString(senderString), recver.toString(recverString)));
 		}
-		return 0;
+		return 0;*/
+
 	}
 
-	// checking if message comes from an old incarnation
-	// message must be discarded
+	// checking if message comes from an old incarnation (if so, message must be discarded)
 	if(env->incarnation < CpvAccess(_incarnation)[env->getSrcPe()]){
 		CmiFree(env);
 		return 0;
