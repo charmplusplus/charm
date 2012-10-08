@@ -204,7 +204,7 @@ class er {
   void operator()(CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
   void operator()(unsigned CMK_PUP_LONG_LONG &v) {(*this)(&v,1);}
 #endif
-#ifdef CMK___int128_DEFINED
+#if CMK___int128_DEFINED
   void operator()(__int128 &v) {(*this)(&v,1);}
   void operator()(unsigned __int128 &v) {(*this)(&v,1);}
 #endif
@@ -256,7 +256,7 @@ class er {
   void operator()(unsigned CMK_PUP_LONG_LONG *a,int nItems)
     {bytes((void *)a,nItems,sizeof(unsigned CMK_PUP_LONG_LONG),Tulonglong);}
 #endif
-#ifdef CMK___int128_DEFINED
+#if CMK___int128_DEFINED
   void operator()(__int128 *a,int nItems)
     {bytes((void *)a,nItems,sizeof(__int128),Tint128);}
   void operator()(unsigned __int128 *a,int nItems)
@@ -957,7 +957,7 @@ PUP_BUILTIN_SUPPORT(long double)
 PUP_BUILTIN_SUPPORT(CMK_PUP_LONG_LONG)
 PUP_BUILTIN_SUPPORT(unsigned CMK_PUP_LONG_LONG)
 #endif
-#ifdef CMK___int128_DEFINED
+#if CMK___int128_DEFINED
 PUP_BUILTIN_SUPPORT(__int128)
 PUP_BUILTIN_SUPPORT(unsigned __int128)
 #endif
