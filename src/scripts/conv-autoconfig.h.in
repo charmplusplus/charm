@@ -330,6 +330,9 @@
 /* enable statistics collection */
 #undef CMK_WITH_STATS
 
+/* whether __int128 works */
+#undef CMK___int128_DEFINED
+
 /* whether __int64 works */
 #undef CMK___int64_DEFINED
 
