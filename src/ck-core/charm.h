@@ -107,6 +107,17 @@ extern int CkRegisterMsg(const char *name, CkPackFnPtr pack,
 #define CK_EP_MEMCRITICAL (1<<5)
 
 /** type of a chare */
+#if CMK_MESSAGE_LOGGING
+typedef enum{
+	TypeInvalid=0,
+	TypeChare,
+	TypeMainChare,
+	TypeGroup,
+	TypeNodeGroup,
+	TypeArray,
+	TypeSection
+} ChareType;
+#else
 typedef enum{
 	TypeInvalid=0,
 	TypeChare,
@@ -115,6 +126,7 @@ typedef enum{
 	TypeNodeGroup,
 	TypeArray
 } ChareType;
+#endif
 
 /** A "call function" to invoke a method on an object. See EntryInfo */
 typedef void  (*CkCallFnPtr) (void *msg, void *obj);
