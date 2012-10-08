@@ -646,6 +646,7 @@ void LogPool::flushLogBuffer()
     numEntries = 0;
     new (&pool[numEntries++]) LogEntry(writeTime, BEGIN_INTERRUPT);
     new (&pool[numEntries++]) LogEntry(TraceTimer(), END_INTERRUPT);
+    CkPrintf("Warning: Projections log flushed to disk on PE %d.\n", CkMyPe());
   }
 }
 
