@@ -10,12 +10,9 @@
  */
 
 #include "MetaBalancer.h"
-#include "LBSimulation.h"
 #include "topology.h"
 
 #include "limits.h"
-
-#include "NullLB.h"
 
 #define VEC_SIZE 50
 #define IMB_TOLERANCE 1.1

@@ -67,7 +67,7 @@ void AdaptiveLB::work(LDStats* stats)
   ObjGraph *ogr = new ObjGraph(stats);
   CkPrintf("Adaptive work\n");
 
-  bool isComm = theLbdb->isStrategyComm();
+  //bool isComm = theLbdb->isStrategyComm();
 
   // Calculate the load and total messages
   double totalLoad = 0.0;
@@ -110,7 +110,8 @@ void AdaptiveLB::work(LDStats* stats)
   // Choose the right LB
   //
   // If communication overhead is 10% computation, then choose Scotch LB
-  if (isComm || (commOverhead > (totalLoad * percent_overhead / 100))) {
+  //if (isComm || (commOverhead > (totalLoad * percent_overhead / 100))) {
+  if ((commOverhead > (totalLoad * percent_overhead / 100))) {
     if(lb_type == -1) {
       lb_type = 2;
       metisLB->work(stats);
