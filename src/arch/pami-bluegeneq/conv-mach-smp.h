@@ -24,3 +24,6 @@
 #define CMK_SMP_NO_COMMTHD                                 1
 
 #define CMK_FAKE_SCHED_YIELD                               1
+
+#define CMK_USE_L2ATOMICS                                  1
+

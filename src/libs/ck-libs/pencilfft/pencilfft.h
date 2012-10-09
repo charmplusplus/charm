@@ -4,8 +4,13 @@
 
 #include "charm++.h"
 #include "ckcomplex.h"
-
 #include "sfftw.h"
+
+//#define USE_MANY_TO_MANY  1
+
+#if USE_MANY_TO_MANY
+#include "cmidirectmanytomany.h"
+#endif
 
 #define LineFFTAssert(x)  //CkAssert(x)
 #define __LINEFFT_DEBUG__  0
@@ -16,7 +21,8 @@
 enum LineFFTPhase {
   PHASE_X = 0,
   PHASE_Y,
-  PHASE_Z
+  PHASE_Z,
+  NUM_PHASES
 };
 
 
@@ -66,14 +72,18 @@ struct LineFFTInfo {
   CProxy_LineFFTArray     yProxy; 
   CProxy_LineFFTArray     zProxy;
 
+  CProxy_PencilMapX       mapx;
+  CProxy_PencilMapY       mapy;
+  CProxy_PencilMapZ       mapz;
+
   CkCallback              kSpaceCallback;
   LineFFTCompletion       completionId;
 
   bool                    normalize;
+  int                     numIter;
 };
 
 PUPbytes (LineFFTInfo)
-
 
 ///////////////////////////////////////////////////////////////
 //             The Pencil FFT Array Class
@@ -105,6 +115,20 @@ class LineFFTGridMsg : public CMessage_LineFFTGridMsg {
   fftw_real         * data;  
 };
 
+class LineFFTCompleteMsg :  public CMessage_LineFFTCompleteMsg {
+ public:
+  int     dir;
+};
+
+class LineFFTArray;
+
+struct LineFFTCbWrapper {
+  CkCallback                    cb;
+  LineFFTCompleteMsg          * msg;
+  LineFFTArray                * me;
+};
+
+PUPbytes (LineFFTCbWrapper)
 
 ///
 /// Main Pencil FFT Chare Array
@@ -126,6 +150,8 @@ class LineFFTArray : public CBase_LineFFTArray {
   
   LineFFTPhase  _phase;  //X, Y or Z chare
 
+  ///\brief Iteration count
+  int         _iter;
 
   ///
   /// \brief the current number of grid messages received so far
@@ -198,6 +224,11 @@ class LineFFTArray : public CBase_LineFFTArray {
   void receiveGridMessage (LineFFTGridMsg   *msg);
 
   ///
+  /// \brief transpose an intermediate FFT message
+  ///
+  void receive_transpose (int id, complex *data, int, int, int);
+
+  ///
   /// \brief Receive an intermediate FFT message
   ///
   void receiveFFTMessage (LineFFTMsg *msg);
@@ -206,9 +237,14 @@ class LineFFTArray : public CBase_LineFFTArray {
   /// \brief Start the 3D fft operation. This can be called externally
   /// or intiated when all the grid/fft messages have been received.
   ///
+  void start_fft (int direction = FFTW_FORWARD);
+
+  ///
+  /// \brief Start the 3D fft operation. This can be called externally
+  /// or intiated when all the grid/fft messages have been received.
+  ///
   void startFFT (int direction = FFTW_FORWARD);
 
-  
   ///
   /// \brief Set the number of grid messages to expect
   ///
@@ -224,11 +260,35 @@ class LineFFTArray : public CBase_LineFFTArray {
     contribute (sizeof (int), &x, CkReduction::sum_int, cb);
   }
 
+#if USE_MANY_TO_MANY 
+  void             * handle;   //many to many handle
+  int                tag_s[2]; //fwd and bwd send tags
+  complex          * many_to_many_data;
+  LineFFTCbWrapper   cbf_recv; //fwd recv completion
+  LineFFTCbWrapper   cbb_recv; //bwd recv completion
+
+  void initialize_many_to_many ();
+
+  ///
+  /// \brief many to many recv completion
+  ///
+  void many_to_many_recvFFT(LineFFTCompleteMsg *msg);
+#else
+  void many_to_many_recvFFT(LineFFTCompleteMsg *msg) {
+    //CmiAbort();
+  }
+#endif
+
   /////////////////////////////////////////////////////////////
   ///           End Entry Methods
   /////////////////////////////////////////////////////////////
   
  private:
+
+  ///
+  /// \brief Send the fft messages for the next few phases
+  /// 
+  void send_transpose (int id, complex *data, int, int, int);
 
   ///
   /// \brief Send the fft messages for the next few phases
@@ -257,5 +317,188 @@ class LineFFTArray : public CBase_LineFFTArray {
       sendGridMessages ();
   }
 };   // -- End class LineFFTArray
+
+extern CmiNodeLock fftw_plan_lock;
+
+class PencilMapX : public CBase_PencilMapX
+{
+  LineFFTInfo   _info;
+  int         * _mapcache;
+  int           _sizeY;
+
+ public:
+  PencilMapX(LineFFTInfo  &info) { 
+    _info = info;         
+    if (CmiMyRank() == 0)
+      if (fftw_plan_lock == NULL)
+	fftw_plan_lock = CmiCreateLock();
+    
+    initialize();
+  }
+  PencilMapX(CkMigrateMessage *m){}
+
+  void initialize () {    
+    double pe = 0.0;
+    int y = 0, z = 0;    
+    int nelem = (_info.sizeY * _info.sizeZ)/
+      (_info.grainY * _info.grainZ);    
+    if ((CkNumPes() % nelem) != 0)
+      nelem ++;
+    double stride = (int) ((1.0 *CkNumPes())/ nelem);
+#if USE_MANY_TO_MANY
+    CmiAssert (stride >= 1.0);
+#endif
+    _mapcache = new int[nelem];
+    memset (_mapcache, 0, sizeof(int)*nelem);
+    _sizeY = _info.sizeY/_info.grainY;	
+
+    int idx = 0;
+    for (pe = 0.0, z = 0; z < (_info.sizeZ)/(_info.grainZ); z ++) {
+      for (y = 0; y < (_info.sizeY)/(_info.grainY); y++) {
+	if(pe >= CkNumPes()) {
+	  pe = pe - CkNumPes();	
+	  if ((int)pe == 0)
+	    pe++;
+	}
+	idx = z * _sizeY + y;	
+	_mapcache[idx] = (int)pe;
+	pe +=  stride;
+      }
+    }
+    //if (CkMyPe() == 0)
+    //printf("X Last allocation to %d\n", (int)pe);    
+  }
+
+  int procNum(int, const CkArrayIndex &idx) {
+    CkArrayIndex2D idx2d = *(CkArrayIndex2D *) &idx;    
+    int y = idx2d.index[0];
+    int z = idx2d.index[1];
+    int id = z * _sizeY + y;
+
+    return _mapcache[id];
+  }
+};
+
+
+class PencilMapY : public CBase_PencilMapY
+{
+  LineFFTInfo   _info;
+  int         * _mapcache;
+  int           _sizeZ;
+
+ public:
+  PencilMapY(LineFFTInfo  &info) { 
+    _info = info;         
+    if (CmiMyRank() == 0)
+      if (fftw_plan_lock == NULL)
+	fftw_plan_lock = CmiCreateLock();
+    
+    initialize();
+  }
+  PencilMapY(CkMigrateMessage *m){}
+
+  void initialize () {    
+    double pe = 0.0;
+    int z = 0, x = 0;    
+    int nelem = (_info.sizeZ * _info.sizeX)/
+      (_info.grainZ * _info.grainX);    
+    if ((CkNumPes() % nelem) != 0)
+      nelem ++;
+    double stride = (int)((1.0 *CkNumPes())/ nelem);
+#if USE_MANY_TO_MANY
+    CmiAssert (stride >= 1.0);
+#endif
+    _mapcache = new int[nelem];
+    memset (_mapcache, 0, sizeof(int)*nelem);
+    _sizeZ = _info.sizeZ/_info.grainZ;	
+
+    int idx = 0;
+    for (pe = 1.0, x = 0; x < (_info.sizeX)/(_info.grainX); x ++) {
+      for (z = 0; z < (_info.sizeZ)/(_info.grainZ); z++) {
+	if(pe >= CkNumPes()) {
+	  pe = pe - CkNumPes();	
+	  if ((int)pe == 1)
+	    pe++;
+	}
+	idx = x * _sizeZ + z;	
+	_mapcache[idx] = (int)pe;
+	pe +=  stride;
+      }
+    }
+
+    //if (CkMyPe() == 0)
+    //printf("Y Last allocation to %d\n", (int)pe);
+  }
+
+  int procNum(int, const CkArrayIndex &idx) {
+    CkArrayIndex2D idx2d = *(CkArrayIndex2D *) &idx;    
+    int z = idx2d.index[0];
+    int x = idx2d.index[1];
+    int id = x * _sizeZ + z;
+
+    return _mapcache[id];
+  }
+};
+
+////////////////////////////////////////////
+
+class PencilMapZ : public CBase_PencilMapZ
+{
+  LineFFTInfo   _info;
+  int         * _mapcache;
+  int           _sizeX;
+
+ public:
+  PencilMapZ(LineFFTInfo  &info) { 
+    _info = info;         
+    if (CmiMyRank() == 0)
+      if (fftw_plan_lock == NULL)
+	fftw_plan_lock = CmiCreateLock();
+    
+    initialize();
+  }
+  PencilMapZ(CkMigrateMessage *m){}
+
+  void initialize () {    
+    double pe = 0.0;
+    int x = 0, y = 0;    
+    int nelem = (_info.sizeX * _info.sizeY)/
+      (_info.grainX * _info.grainY);    
+    if ((CkNumPes() % nelem) != 0)
+      nelem ++;
+    double stride = (int)((1.0 *CkNumPes())/ nelem);
+#if USE_MANY_TO_MANY
+    CmiAssert (stride >= 1.0);
+#endif
+    _mapcache = new int[nelem];    
+    memset (_mapcache, 0, sizeof(int)*nelem);
+    _sizeX = _info.sizeX/_info.grainX;	
+
+    int idx = 0;
+    for (pe = 0.0, x = 0; x < (_info.sizeX)/(_info.grainX); x ++) {
+      for (y = 0; y < (_info.sizeY)/(_info.grainY); y++) {
+	if(pe >= CkNumPes()) {
+	  pe = pe - CkNumPes();	
+	  if((int) pe == 0)
+	    pe++;
+	}
+	idx = y * _sizeX + x;	
+	_mapcache[idx] = (int)pe;
+	pe +=  stride;
+      }
+    }
+    //if (CkMyPe() == 0)
+    //printf("Z Last allocation to %d\n", (int)pe);
+  }
+
+  int procNum(int, const CkArrayIndex &idx) {
+    CkArrayIndex2D idx2d = *(CkArrayIndex2D *) &idx;    
+    int x = idx2d.index[0];
+    int y = idx2d.index[1];
+    int id = y * _sizeX + x;
+
+    return _mapcache[id];
+  }
+};
 
 #endif

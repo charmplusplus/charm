@@ -170,6 +170,8 @@ typedef int CmiNodeLock;
 #define CmiTryLock(lock)  ((lock)?1:((lock)=1,0))
 #define CmiDestroyLock(lock) /*empty*/
 
+#define CmiInCommThread() (0)
+
 #endif
 
 #if CMK_SHARED_VARS_POSIX_THREADS_SMP /*Used by the net-*-smp versions*/
@@ -224,12 +226,25 @@ extern CmiNodeLock CmiMemLock_lock;
 #define CmiMemUnlock() do{if (CmiMemLock_lock) CmiUnlock(CmiMemLock_lock);} while (0)
 
 
+#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS
+extern __thread int32_t _cmi_bgq_incommthread;
+#define CmiInCommThread()  (_cmi_bgq_incommthread)
+#else
+#define CmiInCommThread()  (CmiMyRank() == CmiMyNodeSize())
 #endif
+
+#endif //POSIX_THREADS_SMP
 
 #include "string.h"
 
 #if CMK_BLUEGENEL || CMK_BLUEGENEP
 #include "cmimemcpy.h"
+#elif CMK_BLUEGENEQ && CMK_BLUEGENEQ_OPTCOPY  
+void CmiMemcpy_qpx (void *dst, const void *src, size_t n);
+#define CmiMemcpy(dst,src,n)         				\
+  if ( (n > 512+32) &&  ((((size_t)dst|(size_t)src) & 0x1F)==0) ) \
+    CmiMemcpy_qpx(dst, src, n);			\
+  else memcpy(dst,src,n);
 #else
 #define CmiMemcpy(dest, src, size) memcpy((dest), (src), (size))
 #endif
@@ -435,9 +450,14 @@ for each processor in the node.
        } \
     } while(0)
 #define CpvInitialized(v) (0!=CMK_TAG(Cpv_,v))
-#define CpvAccess(v) (*CMK_TAG(Cpv_,v))
-#define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 
+#if CMK_BLUEGENEQ && CMK_ENABLE_ASYNC_PROGRESS && CMK_IMMEDIATE_MSG
+  #define CpvAccess(v) (*(CMK_TAG(Cpv_addr_,v)[CmiMyRank()]))
+#else
+#define CpvAccess(v) (*CMK_TAG(Cpv_,v))
+#endif
+
+#define CpvAccessOther(v, r) (*(CMK_TAG(Cpv_addr_,v)[r]))
 #else
 
 #define CpvDeclare(t,v) t* CMK_TAG(Cpv_,v)
